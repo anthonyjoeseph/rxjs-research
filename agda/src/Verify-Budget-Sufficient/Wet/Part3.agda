@@ -1,16 +1,15 @@
 -- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY, part 3 of 4.
 --
 -- `cascadeGo-walk`, and nothing else: the W11-A/B width and Ω
--- preservation lemmas that made up the rest of this module were
--- DELETED 2026-08-21 with the width walk (.Measures carries the
--- record).  What remains consumes the wet block above as finished
--- facts.
+-- preservation lemmas that made up the rest of this module went with the
+-- width walk (.Measures carries the record).  What remains consumes the
+-- wet block above as finished facts.
 --
--- Split from Verify-Budget-Sufficient.Wet on 2026-08-12 so that a
+-- Split from Verify-Budget-Sufficient.Wet so that a
 -- multi-member block gets its own module and an edit re-checks one
 -- part instead of 4.7k lines.  The family is FOUR modules numbered
 -- 1, 2, 3, 6: Parts 4 and 5 were the width walk and went with it
--- (2026-08-21).  The gap is deliberate — renaming Part6 would churn
+-- .  The gap is deliberate — renaming Part6 would churn
 -- every consumer's import for nothing, and .Measures carries the
 -- deletion record.
 
@@ -112,7 +111,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- THE PROOF DESIGN for the three cores (2026-07-19, after the tower
+-- THE PROOF DESIGN for the three cores (after the tower
 -- attack).  The wet contract for the mutual subscription block is one
 -- strengthened induction, consumed through `hasAtLeast`:
 --
@@ -120,17 +119,19 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --
 -- and the induction that defines/bounds `need` is LEXICOGRAPHIC over
 -- the three decrement edges:
---
+
 --   1. share connect — decreases the UNCONNECTED-SLOT COUNT
 --      (connectedShares latches; a def's walk can only shrink it).
+
 --   2. μ-unfold — decreases SYNC-REACHABLE SIZE (syncSizeᵉ, deferᵉ
 --      a leaf): unfoldμ substitutes `μᵉ body` only at var positions,
 --      and vars are TYPE-GUARANTEED defer-gated (Δᵍ→Δ moves only at
 --      deferᵉ), so the substituted copies are invisible to the
 --      synchronous walk.  DISCHARGED above: syncSize-unfoldμ /
 --      unfoldμ-shrinks, machine-checked.
+
 --   3. subscribeInner — decreases the DERSHOWITZ–MANNA MULTISET of
---      SHELL sizes (2026-07-20: the SHELL DESIGN, adopted with
+--      SHELL sizes (the SHELL DESIGN, adopted with
 --      Anthony's approval, replacing the layer-derivation reading).
 --      A runtime obs value IS a closed expression; its measure is
 --      measureE = counts B ∘ shellsᵉ — the multiset of operator-
@@ -139,6 +140,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --      syntax.  Shells count Exp constructors ONLY (Tm material
 --      weightless, strmᵗ/deferᵉ leaves), which buys the design's
 --      two load-bearing facts, both PROVEN above:
+
 --        · substitution invariance (shellSize-subΘ): subΘ rewrites
 --          only Tm material, so instantiation preserves every
 --          shell size EXACTLY.  No inflation — an instantiated
@@ -146,6 +148,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --          template's plus the plugged obs values' own shells
 --          (reify-inner: a plug's footprint is void, its shells
 --          join the inner multiset verbatim).
+
 --        · free side conditions: every shell of e is ≤ sizeᵉ e
 --          (shells-≤/shellsᵛ-≤) and shells number ≤ sizeᵉ e
 --          (shells-len) — so stBounded?'s sizeᵛ cap bounds both
@@ -153,12 +156,14 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --          bridge's side condition).  NO new invariant; the whole
 --          Layered derivation apparatus is deleted (git: 1fbc59c).
 --      The hops:
+
 --        · embedded-value hop (subscribing a value that sits as a
 --          strmᵗ subtree of the carrier — of-list literals under
 --          closed evaluation, evalWith (strmᵗ e) []ᵃ = e): its
 --          shellsᵉ is a CONTIGUOUS sublist of the carrier's inner
 --          (innerᵗ (strmᵗ e) = shellsᵉ e), and the carrier's own
 --          shell rides on top — strict sub-multiset, ≺-embed.
+
 --        · eval/scan-produced hop (applyFn/evalWith instantiates a
 --          template): by shellSize-subΘ the produced multiset =
 --          the fn-body strmᵗ subtree's sub-multiset, classes on
@@ -174,12 +179,13 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --          multiset-level input is the subΘ multiset equation
 --          (subΘ-countsᵉ, proven); subΘ-capᵉ is its All-cap
 --          shadow and subΘ-shells-len its entry-sum package.
+
 --        · share-crossing hop (a template's `input` hits a slot):
 --          exits the per-value measure — it anchors against the
 --          slot's own element of the GLOBAL multiset {program} ⊎
 --          {slots}; that re-anchoring is the ownership half of the
 --          ledger (the cascade fold-threading memo), not the per-value order.
---      (The 2026-07-19 layer-derivation design worked but carried
+--      (The layer-derivation design worked but carried an
 --      an unfixable wart: unused env entries gave layers with no
 --      syntactic footprint, so the entry-sum side condition needed
 --      its own invariant.  The design before THAT — lex (skeleton,
@@ -188,7 +194,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --      x]), and the embedded-value hop lands on a first-scan ac
 --      whose template is subterm-incomparable with the carrier's
 --      and can dwarf it.)
---
+
 -- THE DEMAND, closed-form and PROVEN (dBound above).  Fuel is
 -- depth-consumed, so the contract carries
 --
@@ -207,14 +213,14 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 -- budget-hasAtLeast's tower summand dominates with room to spare,
 -- and every literal-headed demand (no chained scans) is already
 -- covered by the 2^(sz·(id+1)²) summand alone.
---
+
 -- The cores below are the contract instantiated at
 -- the root burst (burst-dry/-bounded) and at the chain fold
 -- (the cascade fold-threading memo); the disjointness argument (each registration's
 -- path owns its minted nodes, so per-cascade store traffic is
 -- structure-bounded) supplies the store-boundedness half.
---
--- THE WALK INVARIANT (2026-07-20, the clause-grind session).  The
+
+-- THE WALK INVARIANT (the clause-grind session).  The
 -- stated subscribeE-wet is the contract's OUTER FACE only — its
 -- `sizeᵉ b ≤ V` hypothesis holds at both instantiation sites (root
 -- program; stored values) but does NOT self-apply down the walk,
@@ -234,7 +240,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --     peel gas).
 --   · the missing accounting is a per-instant BREADTH LEDGER: the
 --     value-list lengths threading stepFrame/pushBurst.  SETTLED
---     2026-07-24 — see THE WALK LEDGER section above: the sharp
+--     — see THE WALK LEDGER section above: the sharp
 --     eval bound (caseW, substitution-invariant exponent) replaces
 --     applyFn-size's self-inflating one, the ledger is the
 --     multiplicative exponent capᴱ W₀ E with one uniform ×3^(suc Ψ)
@@ -242,7 +248,7 @@ cascadeGo-walk Ψ W a id ((rid , c) ∷ chains) sched st E 3≤E inv chB vB
 --     3^(suc Ψ · m) by scanVals-sharp, and INV? (store bounds +
 --     fn caps + registry cardinality + chain frames) is the
 --     invariant the walk contracts thread.  The count cap's DESIGN
---     closed 2026-07-24 (memo (5), THE WIDTH LEDGER, corrected to
+--     is closed (memo (5), THE WIDTH LEDGER, corrected to
 --     the recurrence-closed walkCap form): widths are
 --     substitution-invariant, so run lengths and the per-lineage
 --     fold count 𝔉 anchor at walkCap — all entry-frozen.  The

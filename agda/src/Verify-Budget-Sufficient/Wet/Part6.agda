@@ -3,11 +3,11 @@
 --
 -- blocks 74-103: the dBound arithmetic and the closing invariants.
 --
--- Split from Verify-Budget-Sufficient.Wet on 2026-08-12 so that a
+-- Split from Verify-Budget-Sufficient.Wet so that a
 -- multi-member block gets its own module and an edit re-checks one
 -- part instead of 4.7k lines.  The family is FOUR modules numbered
 -- 1, 2, 3, 6: Parts 4 and 5 were the width walk and went with it
--- (2026-08-21).  The gap is deliberate — renaming Part6 would churn
+-- .  The gap is deliberate — renaming Part6 would churn
 -- every consumer's import for nothing, and .Measures carries the
 -- deletion record.
 
@@ -91,13 +91,13 @@ open import Verify-Budget-Sufficient.Wet.Part2 using
 open import Decide using (T-to; T⇒≡true; ∧-intro)
 
 ------------------------------------------------------------------
--- THE WET CORES — THE ASSEMBLY, TRANSCRIBED (2026-08-01), AND THE
+-- THE WET CORES — THE ASSEMBLY, TRANSCRIBED, AND THE
 -- THREE STATEMENT-LEVEL GAPS IT FOUND.  Outside-in, at this joint:
 -- the companion tree the wet induction would walk was written down
 -- BEFORE any clause was ground — and writing it down is what found
 -- the gaps.  They are cured below, in one pass, against the caps
 -- recurrence.
---
+
 -- THE COMPANION TREE.  The wet induction needs no new tree.  It is
 -- subscribeE-walkS's, clause for clause, with the wet payload (hasDry
 -- ≡ false, and one hasAtLeast peel per gas edge) carried alongside the
@@ -143,21 +143,21 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --   shareGo-wet → foldPath-wet.  It spends NO gas at all: a burst
 --   leaves subscribeE through a FRAME and is never re-entered through
 --   a path (the Keeps memo's clique boundary, same reason).
---
+
 -- So the structural half transcribes exactly.  What did NOT transcribe
 -- was the two cores' own faces — and that is what is repaired here.
 --
 -- ================================================================
--- THE RESTATEMENT (2026-08-01): THE WET STACK ANCHORS AT capsAt
+-- THE RESTATEMENT: THE WET STACK ANCHORS AT capsAt
 -- ================================================================
---
+
 -- This is the convergence the caps campaign existed for.  Round 3b's
 -- Ŝ / R̂ / F were always waiting for an ENTRY-COMPUTABLE reach bound —
 -- round3b-ledger-reset-absurd is the proof that nothing ledger-shaped
 -- can serve — and capsAt is it: a recurrence on the program syntax and
 -- the slot telescope alone, with no reference to E, to capᴱ, or to any
 -- quantity the walk's own work moves.
---
+
 -- GAP 1 — THE INVARIANT WAS THE WRONG ONE, IN AND OUT.  Both cores
 -- carried `stBounded? B`: two conjuncts, live pendings and node
 -- stores.  Every member of the companion tree above, and the only face
@@ -171,14 +171,14 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 -- not compose.  And subscribeE-wet's κ was completely unconstrained, where
 -- every member needs `pathB? B Ψ κ` (register-INV consumes it to keep
 -- regsB?).
---
+
 --   CURED.  Both cores now carry INV? Ψ B in AND out, at
 --   (Ψ, B) = (ΨAt e sl, sizeCapAt e sl ·) — a fn-cap seed that never
 --   grows and a size cap that rides the caps recurrence per instant —
 --   plus `pathB? B Ψ κ` on subscribeE-wet's continuation.
 --   the one-cascade step's conclusion is now LITERALLY drain-dry's next-instant
 --   hypothesis, with no residue.
---
+
 -- GAP 2 — THE DEMAND'S RESET CAPS WERE THE LEDGER.  subscribeE-wet
 -- measured its demand at V = sizeBudgetAt e slots id — the instant's
 -- STORE bound — in every cap role at once: dBound's V, R as hopR V,
@@ -189,7 +189,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 -- capᴱ W E′ — whose permitted range grows with the walk's work, which
 -- grows with the demand, which is ≥ suc V by sucV≤d.  That is exactly
 -- the shape round3b-ledger-reset-absurd refutes.
---
+
 --   CURED.  Ŝ is read off capsAt — `Caps.cSize (capsAt e sl ·)`,
 --   abbreviated sizeCapAt below — and R̂ = hopR Ŝ, F = Ŝ.  The wiring
 --   is reach-resets (.Caps-Face, PROVEN): from `sizeᵉ o ≤ C` at
@@ -200,7 +200,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --   the same way it did on the caps side: the walk carries its own
 --   progress index (the walk face's G, the caps face's j) while the
 --   ANCHORS stay entry-fixed.
---
+
 --   WHICH LEVEL, AND WHY — the hop edge picks it.  The entry
 --   hypotheses (INV?, pathB?, sizeᵉ b) read level `id`; the reset caps
 --   Ŝ / R̂ / F and the landing invariant read level `suc id`.
@@ -220,7 +220,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --   level `id` would NOT close it: the mid-instant inner is not
 --   bounded there.  No pre-blowup base and no partial frameStep level
 --   is needed — the two endpoints of one instant suffice.
---
+
 -- GAP 3 — THE ARRIVAL WAS UNBOUNDED, AND THE POP RING COULD NOT BOUND
 -- IT.  The cascade face quantified over `chains` and over `a` with no
 -- bound on either.  cascadeGo-walk needs `all (λ rc → pathB? …)
@@ -229,14 +229,14 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 -- (arrVal a)`.  Nothing bounded a POPPED arrival's value:
 -- schedHeadOf-bounded and pop-bounded both keep the TAIL and drop the
 -- popped element on the floor.
---
+
 --   CURED at the statement.  The cascade face gains the arrival
 --   hypothesis, and the companion that supplies it is NAMED:
 --   pop-head-bounded, the head-KEEPING schedGo inversion (the popped
 --   arrival was a pending of a live source, so stBounded?'s pendings
 --   half bounds it).  Stated here, consumed by drain-dry; NOT proven
 --   this leg.
---
+
 -- WHAT THE WALK FACE'S PARAMETERS BECOME.  subscribeE-walk
 -- (.Measures) is NOT restated: its eight caps are universally
 -- quantified ℕs, so the capsAt instantiation is a choice of arguments
@@ -244,14 +244,15 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 -- is not re-derived:
 --
 --   Ŝ  ←  Caps.cSize (capsAt e sl (suc id))            (= sizeCapAt)
+
 --   R̂  ←  hopR Ŝ         — DERIVED from cSize by reach-resets, not a
 --                          Caps field; hop rank is derivable, which is
 --                          why there is no cHop
+
 --   F  ←  Ŝ              — same object; reach-resets' second component
 --                          is stated at index C = Ŝ
---   ℓ  ←  REFUTED AT Ŝ (2026-08-13).  The reading below is right about
---                          where the LENGTH ledger lives, and wrong
---                          about the level.  The walk also demands
+--
+--   ℓ  ←  REFUTED AT Ŝ.  The walk demands
 --                          `pathLen κ + G ≤ ℓ`, and G is the demand
 --                          MEASURED AT Ŝ, so `sucV≤d` (.Measures:6476)
 --                          gives `suc Ŝ ≤ G` under the same
@@ -267,24 +268,23 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --                          in, so raising ℓ to satisfy this hypothesis
 --                          RAISES the ceiling GAP 4 already refutes.
 --                          Machine-checked: wet-ell-absurd, below.
---                          RULED 2026-08-13: under GAP 4's E-into-j
---                          collapse (ruling in its header) ℓ decouples
---                          from Ŝ and floats above the demand — this
---                          refutation kills the PIN, not the ledger.
---                          (was: the caps face already reads path
---                          LENGTH at cSize — pathSz?'s
---                          `suc (pathLen p) ≤ᵇ B` conjunct is the ℓ
---                          ledger at ℓ := cSize, its own memo says so)
+--                          Under GAP 4's E-into-j collapse (ruling in
+--                          its header) ℓ decouples from Ŝ and floats
+--                          above the demand, so the refutation kills
+--                          the PIN and not the ledger.
+--
 --   Ω  ←  NOT a Caps field.  ΩAt e sl.  cWid is the FRAME width
 --                          (widLive / widNode); Ω is the per-NODE ofW
---                          width (widthOK?, DELETED 2026-08-21 with
---                          the width walk — .Measures carries the
---                          record), and om-is-not-a-frame-budget is
+--                          width (widthOK?, which went with the width
+--                          walk — .Measures carries the record), and
+--                          om-is-not-a-frame-budget is
 --                          the counterexample to conflating them.
+--
 --   Ψ  ←  NOT a Caps field.  ΨAt e sl.  Ψ never grows (caseW is
 --                          substitution-invariant), so no recurrence.
+
 --   L̂  ←  the ENTRY BUDGET, opIterD at the entry caps/depth/nest/ops
---                          and j = 0 (2026-08-13).  The ceiling pin
+--                          and j = 0.  The ceiling pin
 --                          `cSize (frameStep L̂ c) ≤ Ŝ` is
 --                          entry-ceiling (.Walk-Level) — the size-cap
 --                          half of wet-landing-lift's chain — and each
@@ -294,21 +294,19 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --                          what lets a face prove hop-edge's
 --                          `sizeᵛ o ≤ Ŝ` premise from a mid-walk
 --                          value's LEVEL receipt.
---   W, E ← the walk's OWN ledger.  The joint this map left open —
+
+--   W, E ← the walk's OWN ledger.  Their joint —
 --                            capᴱ W (E · 3^(suc Ψ · walkCap Ω ℓ G))
 --                              ≤ sizeCapAt e sl (suc id)
---                          — was recorded here as "arithmetic, not
---                          statement-level".  IT IS NEITHER: it is
---                          REFUTED, by walk-hyps-absurd at V := Ŝ.  See
---                          GAP 4 below (wet-ceiling-absurd).  So the
---                          "two parallel accounting mechanisms for one
---                          growth is a smell" note at the end of
---                          .Caps-Face is not a smell but an
---                          obstruction, and collapsing E into j is not
---                          a follow-up but the only surviving route.
+--                          — is REFUTED, by walk-hyps-absurd at V := Ŝ,
+--                          and GAP 4 below (wet-ceiling-absurd) is the
+--                          same obstruction.  So two parallel
+--                          accounting mechanisms for one growth is not
+--                          a smell but an obstruction, and collapsing E
+--                          into j is the only surviving route.
 --
 -- cascadeGo-level and cascadeGo-deliveries (.Caps-Face) are both
--- THEOREMS as of 2026-08-03, and design-owned.  Nothing restated here
+-- THEOREMS, and design-owned.  Nothing restated here
 -- consumes either of them.
 ------------------------------------------------------------------
 
@@ -374,7 +372,7 @@ mu-edge Ŝ R̂ U η body
 -- call collapses to `syncSize≤sizeᵉ` composed with the size premise —
 -- one less hypothesis than the reach-reset route would have forced,
 -- and no `hη` obligation on the environment.
--- ══ RECOVERY POINTER (2026-08-18) — THE DRY APPARATUS THAT WAS DELETED ══
+-- ══ RECOVERY POINTER — THE DRY APPARATUS THAT WAS DELETED ══
 -- `dry-tick-core`'s nine-lemma route list is wrong about itself: the dry
 -- half is `cascadeGo`'s stream verbatim, so no bound and no ledger fact
 -- can enter it.  Eight proven lemmas had no real consumer — they were in
@@ -391,10 +389,11 @@ mu-edge Ŝ R̂ U η body
 -- for hop-edge's call sites in thruConsume.  Neither was ever wrong; they
 -- were early.
 --
+-- Restore in that order; Anchor-Dry needs both of the others.
+--
 -- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Anchor-Dry.agda
 --           git show fa9692d:agda/src/Verify-Budget-Sufficient/Tick-Headroom.agda
 --           git show fa9692d:agda/src/Verify-Budget-Sufficient/Occurrences.agda
--- Restore in that order; Anchor-Dry needs both of the others.
 
 hop-edge : ∀ {n} {Γ : Ctx n} {u} (Ŝ U r s : ℕ) (η : Fin n → ℕ) → 2 ≤ Ŝ →
   (o : Val Γ (obs u)) → sizeᵛ (obs u) o ≤ Ŝ → hopDᵛ Ŝ η (obs u) o < r →
@@ -484,10 +483,10 @@ size≤sizeCapAt e sl id =
   ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
 
--- REFUTED (moved out of src 2026-08-18): `wet-ceiling-absurd` and
--- `wet-ell-absurd` now live in `refuted/Refuted/Wet.agda`, checked by
--- `make refuted`.  They kill the shared-anchor ceiling and the d-indexed
--- length ledger for the wet face; see that module before re-deriving one.
+-- REFUTED: `wet-ceiling-absurd` and
+--   `wet-ell-absurd` now live in `refuted/Refuted/Wet.agda`, checked by
+--   `make refuted`.  They kill the shared-anchor ceiling and the d-indexed
+--   length ledger for the wet face; see that module before re-deriving one.
 
 
 ------------------------------------------------------------------
@@ -672,7 +671,7 @@ pop-head-bounded Ψ B sched st eq inv with INV-parts Ψ B sched st inv
 ------------------------------------------------------------------
 -- THE SEED ON THE SIX-CONJUNCT FACE AT THE CAPS LEVEL — PROVEN.
 -- the stBounded? projection used to live here as `init-bounded`, read
--- against sizeBudgetAt; it was DELETED 2026-08-09 with the rest of #7's
+-- against sizeBudgetAt; it was DELETED with the rest of #7's
 -- superseded scaffold (git is the archive) because
 -- capsAt-base-size relocates the same mkHot argument to
 -- `Caps.cSize (capsAt …)`, the registry conjuncts are refl at st-init
@@ -773,16 +772,17 @@ abstract
                (m≤n+m (towerℕ (3 + capsHgo (capsBase e ins) 1)) (2 ^ (sz * 1 * 1)))))
 
 -- `subscribeE-wet-core` / `subscribeE-wet` and the root burst cores
--- (`burst-dry`/`burst-bounded`) LEFT this module on
--- 2026-08-13.  The wet contract is now stated over the COLLAPSED walk
+-- (`burst-dry`/`burst-bounded`) are NOT in this module.  The wet
+-- contract is stated over the COLLAPSED walk
 -- (`.Walk-Level`, the E-into-j restatement ruled in GAP 4's header
 -- above), whose statement reads the caps vocabulary this module
 -- deliberately does not import; the root instantiation follows it to
 -- `.Caps-Bridge`, where it is one projection of the same
 -- `subscribeE-wet-via-caps` call `burst-caps` already made.
--- RECOVERY: git show c87c91a restores the ledger-walk forms.
 --
 -- What stays here is what the collapsed walk still consumes as
 -- finished facts: the three gas edges (mu-/hop-/connect-), the
 -- hop-step pair, the pop ring, and the two refutations that ruled the
 -- collapse (`wet-ceiling-absurd`, `wet-ell-absurd`).
+--
+-- RECOVERY: git show c87c91a restores the ledger-walk forms.

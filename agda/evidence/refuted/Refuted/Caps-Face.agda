@@ -5,7 +5,7 @@
 -- CANNOT work, and says it in a form the typechecker rechecks — unlike a
 -- prose note, which decays silently.
 --
--- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony, 2026-08-18).
+-- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony).
 -- Keeping a dead route in `src` forces `src` to keep whatever machinery
 -- makes the route STATE-able, and that machinery is otherwise deletable:
 -- these two files held seven definitions alive in Measures for no other
@@ -37,9 +37,6 @@ open import Verify-Budget-Sufficient.Caps using
 
 
 ------------------------------------------------------------------
--- REFUTED: caps-frame AS STATED IS FALSE, TWICE OVER.  Both halves are
--- statement-level — the face is uninstantiable, not merely unproven —
--- and the same disease class as the original vacuity.
 --
 -- (1) THE BOUNDARY FOLD.  caps-frame's hypothesis admits a state
 -- satisfying capsOK? with ZERO slack and a `b` whose size is exactly the
@@ -63,10 +60,10 @@ open import Verify-Budget-Sufficient.Caps using
 -- caps-tick must apply caps-frame at every inner subscribe inside that
 -- cascade, and there are exactly two such call sites:
 --
---   · subscribeInner   (Rx/Evaluator.agda:531) — a *All consuming an
---     obs payload mid-cascade, reached from stepFrame
---   · sharedConnect    (Rx/Evaluator.agda:871) — a shared slot's lazy
---     connect, which subscribes the def mid-cascade
+--  · subscribeInner   (Rx/Evaluator.agda:531) — a *All consuming an
+--    obs payload mid-cascade, reached from stepFrame
+--  · sharedConnect    (Rx/Evaluator.agda:871) — a shared slot's lazy
+--    connect, which subscribes the def mid-cascade
 --
 -- At both, earlier chains in the SAME cascade have already grown the
 -- store, so the level-id hypothesis is simply unavailable.  Even had (1)
@@ -87,6 +84,10 @@ open import Verify-Budget-Sufficient.Caps using
 -- carry the iteration count, caps preservation falls out of the walk
 -- face instead of standing beside it as a second ledger.
 ------------------------------------------------------------------
+--
+-- caps-frame AS STATED IS FALSE, TWICE OVER.  Both halves are
+-- statement-level — the face is uninstantiable, not merely unproven —
+--  and the same disease class as the original vacuity.
 
 -- the arithmetic obstruction behind (1), UNIFORM IN C: one fold from a
 -- cap-sized value on a cap-sized step function always overflows the cap,
@@ -107,13 +108,13 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
                         (+-monoʳ-< C 0<prod))
 
 ------------------------------------------------------------------
--- WHAT WAS HERE, AND WHY IT IS GONE (2026-08-01).  regsSz?-subscribeE,
+-- WHAT WAS HERE, AND WHY IT IS GONE.  regsSz?-subscribeE,
 -- "the chain half of ANY repaired face" — a fixed cap C, a registry
 -- bounded by it, an expression of size ≤ C subscribed under a κ with
 -- `pathSz? C κ` and `suc (pathLen κ) ≤ C`, concluding the registry is
 -- still bounded by C.
 --
--- IT IS FALSE, and Chain-Half-Probe (DELETED; git history) computes the
+-- IT IS FALSE, and `git show 94a5a3c^:agda/probe/Chain-Half-Probe.agda` computes the
 -- counterexample: at C = 5, a κ of four map-f frames (both hypotheses
 -- TIGHT) and `mapᵉ f (mapᵉ f (input 0))` (sizeᵉ exactly 5) register a
 -- chain of length SIX.  subscribeE pushes one frame per shell of what
@@ -145,7 +146,7 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- the accumulator towers ONCE PER FOLD, and folds grow one per instant,
 -- so the height grows with `id`.  The machine-checked account, with the
 -- recurrence and the payload counts, is the deepScan section of
--- Frame-Work-Probe (DELETED; git history).  The Caps recurrence above is the
+-- `git show 94a5a3c^:agda/probe/Frame-Work-Probe.agda`.  The Caps recurrence above is the
 -- replacement; git history is the archive for the rest.
 ------------------------------------------------------------------
 
@@ -206,7 +207,7 @@ reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
 -- constrains opIterD's iteration count, not the relation between the two
 -- axes at a level.
 --
--- ⚠ SCOPE, ADDED 2026-08-19 AFTER THIS WAS READ TOO WIDELY.  What is
+-- ⚠ SCOPE, ADDED AFTER THIS WAS READ TOO WIDELY.  What is
 -- refuted is bounding the fold's exponent FROM THE CEILING PINS.  It is
 -- NOT a blocker on walk-scan, and it does NOT show a width ceiling is the
 -- missing hypothesis — an earlier draft of this note said exactly that
@@ -214,7 +215,7 @@ reach-via-size-absurd C h = <-irrefl refl (<-≤-trans (n<2^n C) h)
 -- three candidate ceilings.  The exponent is bounded from the STORE
 -- INVARIANT instead: `boundedNode B (scan-st v) = sizeᵛ v ≤ᵇ B`, supplied
 -- by WalkTail's own `INV?` hypothesis and carried to `Ŝ` by `ceil`.  That
--- was worked out on 2026-07-28 and is recorded in Keeps-Ring's header.
+-- was worked out and is recorded in Keeps-Ring's header.
 -- This witness stays because the ceiling route is genuinely dead and
 -- someone will propose it again; it decides nothing else.
 -- ══════════════════════════════════════════════════════════════════

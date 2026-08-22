@@ -1,5 +1,5 @@
 -- THE DEPTH MIRROR: how deep a RUN nests its subscribes.
---
+
 -- The subscribe clique in .Subscribe-Face carries a sufficiency
 -- hypothesis for the budget (`nest o sl cs ≤ bud`) and for the operator
 -- count (`suc (sizeᵉ b) ≤ ops`).  It needs a third, for the DEPTH FUEL
@@ -11,7 +11,7 @@
 -- carries the family's termination) and a depth-zero walk STRICTLY
 -- overshoots it, so no rearrangement closes those clauses.  They have
 -- to be unreachable, and only a hypothesis can make them so.
---
+
 -- WHAT THE CURRENCY IS, AND WHY NOTHING SMALLER WORKS.  Three cheaper
 -- candidates are machine-refuted and must not be re-proposed:
 --
@@ -31,7 +31,7 @@
 --     sits one `blowH` story ABOVE that (Rx.Evaluator:710-717, "a
 --     stratification, not a domination").  A hypothesis known false at
 --     its own supply site is not a hypothesis.
---
+
 -- SO THE CURRENCY IS THE RUN ITSELF.  Each head below shadows one
 -- evaluator head, clause for clause, taking the SAME arguments and
 -- returning the `⊔` of its callees' mirrors on the SAME expressions —
@@ -44,13 +44,13 @@
 --     comment names it), and
 --   · `depthFinC`'s `yes refl` — `innerFinish`'s concat drain, one
 --     subscribe per parked inner.
---
+
 -- NOT at `subscribeInner`'s gas peel, NOT at μ, NOT at the share
 -- connect: the mirror mirrors where the CAPS PROOF spends, not where
 -- the evaluator peels gas.  Being the depth this very run reaches, it is
 -- the WEAKEST hypothesis that can close the clique, so any later
 -- discharge argument factors through it.
---
+
 -- SOME CLAUSES ARE DELIBERATELY TOO BIG, and that is free.  Where the
 -- evaluator dispatches on a Bool whose branches subscribe the same
 -- things or nothing (`concatDrain`'s `if done`, `innerReact`'s
@@ -64,11 +64,11 @@
 -- ignored, and the scrutinee becomes a real argument of a helper head
 -- rather than a `with` — so the mirror stays free of with-abstraction
 -- and every consumer can read its equations off the clause list.
---
+
 -- NOT `abstract`, on purpose: the whole point is that a caps clause's
 -- hypothesis REDUCES in that clause's own pattern context, to a `⊔` of
 -- its callees' mirrors.  Opaque, every supply would need a rewrite.
---
+
 -- WHAT IS STILL OWED, AND IT IS OWED AT THE TOP.  `dep` is instantiated
 -- nowhere yet.  When it is (`capsAt`, .Caps:449-458, reads
 -- `d := capsH e sl id`), the obligation is ONE statement —
@@ -473,7 +473,7 @@ depthCascade a id ((rid , c) ∷ chains) sched st =
 -- not a first-order match: Agda reports `blocked on _a` and gives up.  An
 -- implicit-bound version typechecks fine as a DEFINITION — its bounds are
 -- variables — and then fails at every CALL.  That is the whole of the
--- 2026-08-05 Stage-A build failure, and `Lub3-Probe` records it.
+-- Stage-A build failure it caused, and `Lub3-Probe` records it.
 --
 -- Naming the bounds turns the INVERSION into a CHECK, which just unfolds
 -- both sides.  The one-level projections elsewhere in the clique get away

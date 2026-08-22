@@ -277,7 +277,7 @@ finList-dry false = refl
 -- proven caps sibling or plain algebra on a definition; none of it is
 -- research.  The dry trio (any-dry-++ / splitEvents-nodry /
 -- splitBurst-nodry) and the fnCap node lookup moved DOWN from
--- .Burst-Walk (2026-08-14): the leaf's body consumes them and
+-- .Burst-Walk: the leaf's body consumes them and
 -- .Burst-Walk sits above this module, so this is their home now —
 -- .Burst-Walk imports them back from here.
 ------------------------------------------------------------------

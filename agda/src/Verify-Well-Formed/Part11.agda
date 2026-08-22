@@ -202,7 +202,7 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 --                                   bump is repaid one-per-fan-out, so the
 --                                   share subtree nets owed back to zero
 --                                   (the diamond, batched by construction)
---
+
 -- The missing piece is FoldInv — the mid-fold relation foldPath-wf is
 -- stated over (BurstInv's delivery-side analog): unlike BurstInv's
 -- literally-empty owed table, FoldInv carries the PARTIALLY-PAID open
@@ -212,7 +212,7 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- remainder) plus reading Mid back off the FoldInv result.  Kept as ONE
 -- postulate until FoldInv lands, so no half-stated (possibly-false) leaf
 -- enters the development early — the whole point of the outside-in rule.
---
+
 -- WHERE TO SPLIT (verified empirically, 2026-07): the Path-constructor
 -- case split MUST live at foldPath-wf, which — like foldPath itself —
 -- quantifies the chain's SOURCE type `u` FREELY (path : Path Γ u t).
@@ -224,14 +224,14 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- free `u`, matching share-sink cleanly sets `u := lookup Γ i`.  So:
 -- mid-step invokes foldPath-wf at `u := arrTy a` with the seed; the
 -- three-way induction (root / frame / share) is foldPath-wf's own.
---
+
 -- STATE OF THE DECOMPOSITION (2026-07):
 --   PRE   mid-seed : Mid (head∷ps) ⇒ FoldInv              — PROVEN
 --   MID   foldPath-wf : FoldInv ⇒ Σ S′, runProtocol ≡ S′  — PROVEN
 --           (modulo the two structural leaves stepFrame-wf / dispatchShare-wf,
 --            postulated exactly as subscribeE-wf is on the burst side)
 --   POST  readoff : … ⇒ Mid ps                            — the remaining gap
---
+
 -- THE READOFF, precisely.  mid-step must return `Mid a nextId ps st″ sched″ S′`
 -- where (·,sched″,st″) = chainStep …, and S′ is foldPath-wf's accepted state.
 -- Its eight fields all reference st″/sched″/S′, so the readoff needs a
@@ -241,7 +241,7 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- true else done S}, and foldPath root leaves the EvalSt untouched, so
 -- st″ = record st{delivered=…} (registry st″ ≡ registry st, sched″ ≡ sched).
 -- That is the proven anchor to read the root chain's Mid ps off.
---
+
 -- The obstruction is that the SAME `arrTy a` pinning that forces the case
 -- split into foldPath-wf also forbids a standalone post-hoc readoff on `p`:
 -- Mid ps must be reconstructed by the SAME path induction, so foldPath-wf's
@@ -273,12 +273,12 @@ mid-seed {a = a} {nextId} {rid} {p} {ps} {sched} {st} {S} mid ceq = record
 -- "foldPath-wf's CONCLUSION has to carry the readoff data".  This is
 -- that statement: foldPath-wf's run equation AND the FoldOut, over the
 -- FREE `u` where the Path constructors are matchable.
---
+
 -- Its ROOT arm is PROVEN, and proving it is what gives
 -- `foldPath-root-out` a consumer that reduces.  The other two arms are
 -- leaves, so this is a 1-of-3 discharge and not a proof of the fold.
 postulate
-  -- FRAME arm, NOW THE FoldOut ONLY (2026-08-18).  The run equation is
+  -- FRAME arm, NOW THE FoldOut ONLY.  The run equation is
   -- not this leaf's to prove: `foldPath-wf` (.Part9) already proves it
   -- for EVERY path constructor, by the same `stepFrame-wf` + IH
   -- induction this arm was restating — so as posed it was a second
@@ -303,7 +303,7 @@ postulate
       ≡ just S′ →
     FoldOut sf gas id now envSrc (f ↠ path′) vals evs fin sched st (FoldInv.ob′ fi) S S′
 
-  -- SHARE arm, NOW THE FoldOut ONLY (2026-08-18).  The handoff emit plus
+  -- SHARE arm, NOW THE FoldOut ONLY.  The handoff emit plus
   -- one delivery per registration of share i, each its own foldPath.  As
   -- posed this arm re-proved the run equation that `dispatchShare-wf`
   -- (.Part9) already owes — two postulates for one obligation — so it

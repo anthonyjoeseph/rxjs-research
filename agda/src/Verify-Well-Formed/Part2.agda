@@ -349,8 +349,8 @@ record Inv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- carried it afterwards, so subscribeE's hot/live input arm could not
     -- pay initReg-wf's `ltok` — the finding is in subscribeE-input-wf's
     -- header (.Part3), where `BurstInv.hot-live binv i` spends it.  It is a
-    -- FIELD and not a hypothesis by ruling (Anthony,
-    -- 2026-08-15): `live` and `slots` are independent fields of the plain
+    -- FIELD and not a hypothesis by ruling (Anthony): `live` and `slots`
+    -- are independent fields of the plain
     -- record `Sched`, so no lemma over an arbitrary sched could be true,
     -- and a hypothesis would bind only whoever calls today while making
     -- the debt invisible to `make wiring`.  See CLAUDE.md, "A POSTULATE
@@ -371,7 +371,7 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                 (id : Id) (sched : Sched Γ) (st : EvalSt e)
                 (S : ProtocolSt) : Set where
   field
-    -- OFF THE DYING SOURCES ONLY (2026-08-18, ruling by Anthony).  The
+    -- OFF THE DYING SOURCES ONLY (ruling by Anthony).  The
     -- all-sources form was REFUTED at a dying source: a victim that has
     -- already delivered on a dying source carried its exhausted close on
     -- its own emit, so `cutThrough` drops it from the registry and emits
@@ -413,7 +413,7 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- registrations without touching activeInners (the count LEADS it).  No
     -- relation between the two survives both, so no weakening of the field
     -- would work — it has to leave.  Both directions were checked by
-    -- computation before the field was dropped (2026-08-09).  Like done-plumbed
+    -- computation before the field was dropped.  Like done-plumbed
     -- it is re-established once, at the root exit, from `root-caches`.
     -- NB: no done-plumbed here.  A base burst always latches done ≡ true, but
     -- an INNER base completing amid a live async sibling makes the full-registry

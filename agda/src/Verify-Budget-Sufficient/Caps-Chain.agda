@@ -29,15 +29,6 @@
 -- descends by one per operator.  So the recursive call inside an
 -- operator clause is not a fresh entry but the same sweep, one shorter,
 -- and the conversion the grind would need in the other direction is
--- REFUTED (Chain-Index-Probe (DELETED; git history) § 1: it asks that a sweep
--- sized for a whole chain fit inside the operators the caller has
--- remaining, and at zero operators left the walk transformer is the
--- identity, so the entry sweep — which is strictly above the level —
--- cannot fit).  For the OPERATOR COUNT the grind uses `chain-desc`
--- (§ 3) for the descent and a bare `s≤s` for the fresh-entry case (both
--- are inline at every site and need no conversion lemma).  § 2 below is
--- the WIDTH-INDEX pair: `walk-index` (sIterD monotone in the payload
--- count) and `burst-index` (fIterD monotone in the emit count).
 --
 -- This module is not mutual with any of them — it consumes the `-mono`
 -- and `-infl` families as finished facts — so it is its own compilation
@@ -46,6 +37,14 @@
 -- opened by hand through the clause equation (`sIterD-suc`,
 -- `opIterD-suc`) rather than by reduction.
 ------------------------------------------------------------------
+--
+-- A CHAIN-SIZED SWEEP CANNOT FIT THE CALLER'S REMAINING OPERATORS, and at
+-- zero operators left the walk transformer is the identity, so the entry
+-- sweep — strictly above the level — cannot fit.  For the OPERATOR COUNT the grind uses `chain-desc`
+--  (§ 3) for the descent and a bare `s≤s` for the fresh-entry case (both
+--  are inline at every site and need no conversion lemma).  § 2 below is
+--  the WIDTH-INDEX pair: `walk-index` (sIterD monotone in the payload
+--  count) and `burst-index` (fIterD monotone in the emit count).
 module Verify-Budget-Sufficient.Caps-Chain where
 
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
@@ -439,7 +438,7 @@ chain-desc hd src m′ (s≤s h) = ≤-trans (s≤s (m≤n+m src hd)) h
 --
 -- AND THE STATEMENT IS FALSE AT A ZERO BUDGET — `sLvlD S W d 0 J` is `J`
 -- on the nose, so the goal would ask `suc (suc j) ≤ suc j`
--- (machine-refuted, Queue-Push-Probe (DELETED; git history) § 1).  So the level
+-- (machine-refuted, `git show 94a5a3c^:agda/probe/Queue-Push-Probe.agda` § 1).  So the level
 -- is bought with the budget's POSITIVITY — and since the walk heads now
 -- report at `suc bud`, that positivity is a literal `s≤s z≤n` at the
 -- clause.  It used to be earned from a head's `nest … ≤ bud` hypothesis

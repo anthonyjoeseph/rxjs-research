@@ -4,7 +4,7 @@
 A source header is where the roadmap's character budget SENDS research: the
 hygiene rule "research lives in source comments" makes this file the
 destination for everything evicted from PROOF-STATE.  That is the whole reason
-the four checks below are shaped the way they are, and it rules out the obvious
+the six checks below are shaped the way they are, and it rules out the obvious
 design.  A flat per-block ceiling would budget the destination, and then a
 finding with nowhere to go does not move — it gets deleted.  Deleting a real
 finding to satisfy a length check is strictly worse than the verbosity it cures.
@@ -139,6 +139,22 @@ SHA_TOKEN = re.compile(r"\b[0-9a-f]{7,40}\b")
 # report every banner-closed block in the tree.
 RULE_LINE = re.compile(r"^[-=─━═_*+#.·]{3,}\s*$")
 GITLOG = re.compile(r"git log[^`\n]*agda/")
+
+
+# FIFTH CHECK's vocabulary.  A structured section is a machine-checked
+# reference a few lines below, so prose that ALSO names its subject is paying
+# charged characters to say what the free part says -- and says it worse, since
+# the prose copy is the one nothing resolves and the one that drifts.  Each
+# entry fires only when the block ALREADY HAS that section, which is what keeps
+# the check free of false positives: the duplication is then structural, not a
+# judgement about the writing.
+ECHO = {
+    "PROBED":     re.compile(r"\bprobe(?:s|d|es)?\b", re.I),
+    "REFUTED":    re.compile(r"\brefut(?:ed|es|ation|ations)\b", re.I),
+    "DEAD ROUTE": re.compile(r"\bdead (?:route|end)s?\b", re.I),
+    "TWIN":       re.compile(r"\btwins?\b", re.I),
+    "RECOVERY":   re.compile(r"\bgit show\b", re.I),
+}
 
 
 def ref_tokens(text):
@@ -318,9 +334,17 @@ def check_refs(refs, root):
                             "names `" + sorted(still)[0] + "`, which is STILL A "
                             "POSTULATE — a twin that is not proven earns no class"))
         elif kind == "REFUTED":
-            if not (toks & ref):
+            # A sha counts here for the same reason it counts for PROBED: a
+            # refutation dies when `src` can no longer STATE it, and deleting
+            # it then is CORRECT -- `src` must not keep machinery alive whose
+            # only purpose is making a dead route expressible.  The receipt is
+            # all that survives, so demanding a live declaration would demand
+            # that the tree keep the very thing the deletion rule removes.
+            if not (toks & ref) and not (set(SHA_TOKEN.findall(text)) & shas):
                 bad.append((f, lineno, kind,
-                            "names no declaration in `agda/evidence/refuted`"))
+                            "names neither a declaration in "
+                            "`agda/evidence/refuted` nor the sha holding a "
+                            "refutation `src` can no longer state"))
         elif kind == "PROBED":
             if not (toks & prb) and not (set(SHA_TOKEN.findall(text)) & shas):
                 bad.append((f, lineno, kind,
@@ -333,7 +357,7 @@ def check_refs(refs, root):
 
 
 def audit(files, budget):
-    dated, hist, shape, fat, refs = [], [], [], [], []
+    dated, hist, shape, fat, refs, echo = [], [], [], [], [], []
     for f in files:
         for start, body in blocks(f):
             for off, line in enumerate(body):
@@ -344,7 +368,8 @@ def audit(files, budget):
                 if m:
                     hist.append((f, start + off, m.group(1)))
 
-            for off, kind, text in sections(body):
+            secs = sections(body)
+            for off, kind, text in secs:
                 if kind in VALIDATED:
                     refs.append((f, start + off, kind, text))
 
@@ -377,7 +402,16 @@ def audit(files, budget):
                        and not RULE_LINE.match(line.strip()))
             if cost > budget:
                 fat.append((f, start, cost, len(body)))
-    return dated, hist, shape, fat, refs
+
+            # FIFTH CHECK.  Say it once.
+            expl = " ".join(body[:cut])
+            for kind in {k for _, k, _ in secs}:
+                pat = ECHO.get(kind)
+                if pat is not None:
+                    m = pat.search(expl)
+                    if m:
+                        echo.append((f, start, kind, m.group(0)))
+    return dated, hist, shape, fat, refs, echo
 
 
 def main():
@@ -399,7 +433,7 @@ def main():
         print(f"comments-check: no .agda files under {', '.join(str(d) for d in dirs)}")
         return 1
 
-    dated, hist, shape, fat, refs = audit(files, args.budget)
+    dated, hist, shape, fat, refs, echo = audit(files, args.budget)
     dangling = [] if args.no_refs else check_refs(refs, root)
 
     if dated:
@@ -462,13 +496,25 @@ def main():
         print("`PROBED` receipt for a DELETED probe names the sha holding it — that")
         print("is what makes the `git log -S` recovery rule actually work.")
 
-    if dated or hist or shape or fat or dangling:
+    if echo:
+        print(f"\nEXPLANATION ECHOES ITS OWN LEDGER — {len(echo)} block(s):")
+        for f, lineno, kind, word in echo:
+            print(f"  {f}:{lineno}  says \"{word}\" above its own {kind} section")
+        print("\nThe section is a machine-checked reference a few lines down, so prose")
+        print("that also names its subject spends CHARGED characters saying what the")
+        print("FREE part already says — and says it worse, since the prose copy is the")
+        print("one nothing resolves. It is also how the two halves drift: the paragraph")
+        print("ages while the section stays live, and then nothing says which sentence")
+        print("is current. Delete the mention and let the ledger carry it.")
+
+    if dated or hist or shape or fat or dangling or echo:
         return 1
 
     n = len(files)
     print(f"comments-check: {n} file(s), no dated comment, no historical marker, "
-          f"evidence last and in order, every reference resolving, every "
-          f"explanation within its {args.budget}-char budget")
+          f"evidence last and in order, every reference resolving, no "
+          f"explanation echoing its own ledger, every explanation within its "
+          f"{args.budget}-char budget")
     return 0
 
 

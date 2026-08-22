@@ -67,7 +67,7 @@ climb S W d k m =
   opIterD S W d k m
     (sLvlD S W d k (suc (suc (sizeAt S 0) * suc (sizeAt S 0))))
 
--- WHAT MOVED OUT (2026-08-07): `opIterD-budget` and
+-- WHAT MOVED OUT: `opIterD-budget` and
 -- `opIterD-dominated` — route steps (a)+(b) — are now PROVEN, in
 -- `Verify-Budget-Sufficient.Op-Budget`, which imports this module's
 -- results as finished facts.  The monolithic postulate

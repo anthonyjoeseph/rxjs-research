@@ -113,7 +113,7 @@ burstHopSpn-cap {u = u} V Ψ (suc base) B Bsz η str 1≤b hBsz hB hS =
 -- through pairs and sums and bottoms out at `obs` with the headline
 -- inequality.
 --
--- IT STOPS AT `obs`, AND THAT IS THE WHOLE DESIGN DECISION (2026-08-19).
+-- IT STOPS AT `obs`, AND THAT IS THE WHOLE DESIGN DECISION.
 -- Hereditary-everywhere would mean recursing into the EXPRESSION a
 -- stream value is, which is a second structural induction and a second
 -- predicate to preserve.  It is not needed, and the reason is a property
@@ -271,16 +271,16 @@ valHopSpn?-intro V η P B (obs t) e h =
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
--- WHAT THIS LEAF NOW OWES, AND WHAT IT NO LONGER DOES (2026-08-19).
---
--- DISCHARGED around it, all REAL BODIES: the fold (`scanVals-hopSpn`,
+-- WHAT THIS LEAF NOW OWES, AND WHAT IT NO LONGER DOES.
+
+-- WHAT IS ALREADY REAL AROUND IT, all bodies: the fold (`scanVals-hopSpn`,
 -- below), the burst walk that spends it (`pushBurst-scan-hopSpn`,
 -- .Hop-Spine-Push), the scan clause's own assembly (`walk-scan-hop-spn`,
 -- .Walk-Level), and both headline-to-hereditary lifts (`scanSeed-hopSpn`
 -- and `burstHopSpnH-intro`, below).  So the ENTIRE scan hop receipt now
 -- reduces to this one substitution step plus a frame condition on the
 -- node table.
---
+
 -- THE ARITHMETIC IS SETTLED, and that is a receipt rather than a plan.
 -- The `strmᵗ` clause needs: the template's own hop `h ≤ B`, the plugged
 -- value's receipt at its own spine `k`, the multiplier `P`, and at least
@@ -292,7 +292,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- the wiring law does not carry code nothing calls.  It is four lines of
 -- `≤-trans` over `^-distribˡ-+-*`; the finding is that it CLOSES, not
 -- how it is spelled.
---
+
 -- THE ONE REMAINING UNKNOWN, STATED NARROWLY.  It is NOT "does the
 -- spine drag" in general — that question is about whole values and is
 -- the wrong one, because a projection inside the induction can reach a
@@ -309,9 +309,9 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- this and the size measure `Refuted.Hop-Drag` kills: a `caseᵗ` branch
 -- discards a SIBLING, and a sibling is never on the hop-deepest path, so
 -- `spnᵉ` never counted it.
---
+
 -- AND THAT CLAIM IS NOW EVIDENCED, WHICH IS WHY THIS ROW IS GRINDABLE
--- RATHER THAN DIFFICULTY (2026-08-19).  Three things, and the class rests
+-- RATHER THAN DIFFICULTY.  Three things, and the class rests
 -- on all three together:
 --
 --   · EXHAUSTIVE INSPECTION OF THE MEASURE.  Every non-leaf clause of
@@ -335,7 +335,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 --     where it carries a number.  Its `EnvHopDs`/`sumW` shape is also the
 --     answer to the `caseᵗ` question above, so the generalisation the
 --     body needs is already written down and discharged next door.
---
+
 -- WHAT THE EVIDENCE DID NOT REACH, stated so the demotion is auditable:
 -- no probe covers `ifᵗ` or nested `caseᵗ` plugs, and nobody has typed the
 -- induction, so the bookkeeping could still surprise.  What would REOPEN
@@ -343,7 +343,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- not advance the spine — the same refutation Hop-Drag ran against
 -- `sizeᵛ`, which is exactly what these two series looked for and did not
 -- find.
---
+
 -- THE `caseᵗ` BOOKKEEPING QUESTION IS ANSWERED, and the answer changes
 -- the induction's SHAPE rather than adding a lemma.  A uniform
 -- hypothesis `∀ j → pmᵗ V j tm ≤ P` does not survive `caseᵗ`: the
@@ -364,7 +364,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- the scan clause was assembled and this became the only thing it owes.
 -- Read it as being about the fold `scanVals` runs, whose per-step
 -- substitution is exactly the statement above.
---
+
 -- It is the scan clause that GROWS values within an instant (applyFn-size is the Ŝ-ceiling supplier; the
 -- P-series probe receipts in the block header above ran exactly this
 -- shape).  Why it is not GRINDABLE beside walk-map: map's emitted value
@@ -377,8 +377,8 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- be decided is what the accumulator's invariant IS across the fold.
 -- Decide that before authoring scan-f's push face, not after: the face
 -- reports at whatever index the invariant turns out to need.
---
--- THE INVARIANT, DERIVED (2026-08-19) — the fold half is settled and
+
+-- THE INVARIANT, DERIVED — the fold half is settled and
 -- one arithmetic question is all that is left.  Write P = pmᵗ V 0 f ⊔ 1
 -- and B = hopDᵗ f + hopDᵗ z + hopDᵉ b, so hopDᵉ's scan clause is
 -- `(2 + pmᵗ V 0 f) ^ V * B`.  Let Aₖ be the accumulator's hop after k
@@ -395,12 +395,12 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- the ⊔.  So the induction closes at exactly the base hopDᵉ already
 -- carries — the scan clause was evidently sized for this fold, which is
 -- the strongest evidence the shape is the intended one.
---
+
 -- SO THE INVARIANT IS `hopDᵛ acc ≤ (2 + pmᵗ V 0 f) ^ k * B after k
 -- applications`, established at the seed and preserved by
 -- hopD-applyFn.  The one remaining question is the exponent, and the
 -- answer is that it is NOT `k` — it is the ACCUMULATOR'S OWN SIZE:
---
+
 -- ⚠ DO NOT BOUND k FROM THE CEILING PINS.  That route is REFUTED
 -- (`scan-count-under-ceiling-absurd`, agda/evidence/refuted, Refuted.Caps-Face):
 -- via the ceiling, `k` is bounded only by burstCount?, which caps
@@ -414,11 +414,11 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- asks `opIterD … ≤ L̂` while the walk's exit level is bounded by that
 -- same `opIterD …`, so `L̂ := opIterD …` is admissible and both are read
 -- at the SAME level.
---
+
 -- BUT THE CEILING WAS NEVER THE ROUTE, and reading the refutation as a
 -- blocker cost this row a SHAPE classification it did not deserve.  The
 -- bound comes from the STORE INVARIANT, which this face already carries
--- as a hypothesis — worked out 2026-07-28 and recorded in Keeps-Ring's
+-- as a hypothesis — worked out and recorded in Keeps-Ring's
 -- header, where a search would have found it:
 --   · `boundedNode B (scan-st v) = sizeᵛ t v ≤ᵇ B` (.Measures) — the
 --     accumulator is a STORED value and stBounded? reads it as a size;
@@ -431,7 +431,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- space below is therefore MOOT; it is kept only so the two dead
 -- candidates are not re-proposed.
 --
--- ✗ DEAD ROUTE 2026-08-19 — BOUNDING k AT ALL.  Recorded because it is
+-- ✗ DEAD ROUTE — BOUNDING k AT ALL.  Recorded because it is
 -- the obvious first move and it cannot work; it is NOT the row's
 -- residue, and an earlier draft of this header wrongly promoted it to
 -- one.  Take the inventory of what bounds the fold's step count k:
@@ -447,13 +447,13 @@ valHopSpn?-intro V η P B (obs t) e h =
 --     (Rx/Exp:500): `syncSizeᵉ` does NOT bound emissions per instant —
 --     valueCount 30 against syncSizeᵉ 20 at K = 4, with K = 1..3 all
 --     holding, which is why it looks true from small cases.
---
+
 -- And hopDᵉ's scan clause targets `(2 + pmᵗ V 0 f) ^ V`, with V the
 -- SIZE cap.  So a bound on k and the budget for it are in different
 -- currencies, and converting between them is dead route #1 below —
 -- width sits ABOVE size at the true instantiation because foldStep
 -- towers where sizeStep scales.
---
+
 -- WHY THAT COSTS NOTHING: THE LIVE ROUTE NEVER MENTIONS k.  Rx.Hop-Depth's
 -- own header is explicit — "a fold that deepens the accumulator adds at
 -- least one constructor, and a fold that does not deepen it does not raise
@@ -462,7 +462,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- in steps rather than in the accumulator's own measure.  Do not re-open
 -- it, and do not commission the `valCountᵉ ≤ sizeᵉ b` probe an earlier
 -- draft of this header asked for: its answer changes nothing here.
---
+
 -- THE OLD FRAMING, kept because its refutation is still load-bearing.
 -- `k ≤ sizeᵛ accₖ` is FALSE as literally stated — an identity or
 -- constant fold leaves the size alone — so the exponent cannot be the
@@ -478,8 +478,8 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- hop cap — astronomically above the `(2 + pmᵗ V 0 f) ^ V * B` this
 -- conjunct is measured against.  The base has to be the plug
 -- multiplier, not the size; that gap is the lemma this row owes.
---
--- THE RISKY REGION IS AMPLIFYING FOLDS ONLY (corrected 2026-08-19; an
+
+-- THE RISKY REGION IS AMPLIFYING FOLDS ONLY (corrected; an
 -- earlier draft of this header said the slack is nil everywhere, which
 -- is wrong and made the region look bigger than it is).  Write
 -- P = pmᵗ V 0 f ⊔ 1 and split on it:
@@ -490,7 +490,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 --   · P ≥ 2 — `Aₖ ≤ (1+P)^k * B` against `(2+P)^V * B` needs
 --     `k ≤ V * log(2+P)/log(1+P)`, which at P = 2 is 1.26·V.  That is
 --     `k ≤ V` up to a constant, and it is where the row actually lives.
---
+
 -- THE REPAIR SPACE BELOW IS MOOT — kept so the dead candidates are not
 -- re-proposed, since each cost a day to kill.  It was written while the
 -- ceiling looked like the only source of a bound on the exponent; the
@@ -520,15 +520,15 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- G, which `g hasAtLeast suc G` must fund — a budget question, and one
 -- whose rough shape was discouraging.  It is not asked; the store
 -- invariant makes the whole detour unnecessary.)
---
+
 -- `ops ≥ 1` (WalkTail's `suc (sizeᵉ b) ≤ ops`) rescues nothing here — it
 -- constrains opIterD's iteration count, not the relation between the two
 -- axes at a level.
---
--- IS THE FOLD'S GROWTH REALLY GEOMETRIC?  ANSWERED 2026-08-19: YES.
+
+-- IS THE FOLD'S GROWTH REALLY GEOMETRIC?  ANSWERED: YES.
 -- The cheap escape is CLOSED, so the raise-Ŝ repair above is the only
 -- one left and the gas question is the live one.  Do not re-open this.
---
+
 -- The hope was that hopD-applyFn's MULTIPLICATIVE factor, `hopDᵛ
 -- (applyFn f v) ≤ hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵛ v`, is loose for a
 -- DEPTH — hopDᵛ reads pairs by ⊔ (Rx.Hop-Depth), so duplicating the
@@ -539,12 +539,12 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- of hopDᵉ that multiplies — `hopDᵗ f + (pmᵗ V 0 f ⊔ 1) * hopDᵉ e` —
 -- where the source's WHOLE depth is scaled.  The ⊔ at the pair node
 -- never sees that factor and cannot damp it.
---
+
 -- MACHINE-CHECKED: Demand-Probe series X.  A scan step with P = 2
 -- iterated four times gives Aₖ = 2^(k+1) − 2, and hopD-applyFn's bound
 -- instantiates to `Aₖ₊₁ ≤ 2 + 2 * Aₖ` — MET WITH EQUALITY at every
 -- step, so there is no slack to strengthen away.
---
+
 -- AND AMPLIFICATION NEEDS NOTHING EXOTIC, which is what kills the
 -- fallback hope that a nested scan could be excluded by the fold's own
 -- size budget.  `pmᵗ V 0 g = 2` is reachable in a NAT-TYPED template
@@ -553,11 +553,11 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- step function need only route its accumulator through `ofᵉ` + a *All
 -- frame (the only way an obs-typed Θ-var reaches expression position)
 -- into such a map.
---
+
 -- The one thing series X does NOT settle: what bounds k.  It says the
 -- growth is geometric, not that k exceeds V.
 --
--- ═══ THE ROW IS SPLIT (2026-08-19), AND ONLY THE HOP HALF IS HARD ═══
+-- ═══ THE ROW IS SPLIT, AND ONLY THE HOP HALF IS HARD ═══
 -- `walk-scan` is now a real body (below) pairing the two leaves that
 -- follow.  Everything above this line is about the hop
 -- half ALONE; the other eight conjuncts never see the fold's arithmetic.
@@ -581,9 +581,9 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- what makes the exponent the accumulator's own size rather than the step
 -- count k — and it is why `k` need never be bounded at all, which retires
 -- the currency question the paragraph above raises against the k-form.
---
--- WHERE EXACTLY THE INVARIANT BREAKS, AND IT IS ONE CASE (derived
--- 2026-08-19; arithmetic, NOT typechecked).  Write P = pmᵗ V 0 f ⊔ 1,
+
+-- WHERE EXACTLY THE INVARIANT BREAKS, AND IT IS ONE CASE (hand
+-- arithmetic, NOT typechecked).  Write P = pmᵗ V 0 f ⊔ 1,
 -- B = hopDᵗ f + hopDᵗ z + hopDᵉ b — the clause's own summand — and
 -- Aᵢ = hopDᵛ accᵢ, sᵢ = sizeᵛ accᵢ along scanVals' fold.
 --   · BASE: `hopD-evalWith` (.Measures, PROVEN) at the empty env, since
@@ -599,16 +599,16 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- So the ENTIRE residue is the SIZE-PRESERVING step — and that step is
 -- REACHABLE, which is the next section.
 --
--- ═══ THE SIZE-PRESERVING ARM IS NOT EMPTY.  REFUTED 2026-08-19 ═══
+-- ═══ THE SIZE-PRESERVING ARM IS NOT EMPTY ═══
 -- REFUTED: `Refuted.Hop-Drag.hop-drag-absurd`, which states and kills
--- the arm's whole content — "a step that does not GROW the accumulator
--- cannot DEEPEN it" — in the strongest form (the size hypothesis
--- compares new accumulator against old, not against the step's whole
--- argument).  So the invariant `hopDᵛ accᵢ ≤ (1 + P) ^ sizeᵛ accᵢ * B`
--- is not provable step-by-step, and the paragraph an earlier draft of
--- this header ended on — "what is owed is therefore that lemma, and
--- only that lemma" — was owed a FALSE lemma.
---
+--   the arm's whole content — "a step that does not GROW the accumulator
+--   cannot DEEPEN it" — in the strongest form (the size hypothesis
+--   compares new accumulator against old, not against the step's whole
+--   argument).  So the invariant `hopDᵛ accᵢ ≤ (1 + P) ^ sizeᵛ accᵢ * B`
+--   is not provable step-by-step, and the paragraph an earlier draft of
+--   this header ended on — "what is owed is therefore that lemma, and
+--   only that lemma" — was owed a FALSE lemma.
+
 -- THE DRAG ARGUMENT HAS A HOLE, AND IT IS `caseᵗ`.  Demand-Probe series
 -- Y (below, still standing) established the drag: a step can mention the
 -- accumulator inside a `strmᵗ` only by substitution, `subΘ` substitutes
@@ -617,7 +617,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- of it and pays in size.  Series Y ran the sharpest attack available on
 -- that (wrap one component of a pair, discard a large shallow sibling)
 -- and collected no refund at all: 34 ↦ 51 ↦ 68, monotone.
---
+
 -- What series Y could not reach is a BINDER.  A `caseᵗ` branch binds the
 -- SCRUTINEE'S PAYLOAD, and evalWith EVALUATES the scrutinee before the
 -- branch is substituted — so the branch's `strmᵗ` drags a copy of that
@@ -645,7 +645,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- `ofᵉ` lists, caseᵗ/ifᵗ branches).  On the refutation's own run the
 -- spine is 4 ↦ 7 ↦ 10 ↦ 13, strictly monotone across the very step
 -- that drops 27 units of total size; pinned there beside it.
---
+
 -- WHAT IS ALREADY PROVEN, and it is why this leaf is stated at the
 -- spine rather than at F:
 --   · `spn≤sizeᵛ` (Rx.Hop-Spine) — every ⊔ sits where size has a `+`,
@@ -659,7 +659,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 --     the exponent to F once.  `hopDᵉ F η (scanᵉ f z b)` is
 --     definitionally `(2 + pmᵗ F 0 f) ^ F * (…)`, so the conclusion
 --     lands with no arithmetic at the boundary.
---
+
 -- SO THE RESIDUE IS THE FOLD AT THE SPINE EXPONENT, and nothing else.
 -- Two twins govern it, both PROVEN and both at this exact shape:
 --   · `scanVals-size` (.Caps-Face/Part5) — the SAME fold over the SAME
@@ -670,8 +670,8 @@ valHopSpn?-intro V η P B (obs t) e h =
 --     `pmᵗ V 0 f ⊔ 1`) already settles the degenerate half for free:
 --     at `pmᵗ V 0 f ≡ 0` it gives `hopDᵛ (applyFn f v) ≤ hopDᵗ f ≤ B`
 --     outright, so the arithmetic is only ever asked at `≥ 1`.
---
--- THE INVARIANT IS HEREDITARY, AND THAT DECISION IS LANDED (2026-08-19).
+
+-- THE INVARIANT IS HEREDITARY, AND THAT DECISION IS LANDED.
 -- This leaf now concludes at `burstHopSpnH?` (.Hop-Spine-Face), whose
 -- value predicate `valHopSpn?` recurses through pairs and sums and
 -- bottoms out at `obs` with the headline inequality.  Headline-only
@@ -681,7 +681,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- `valHopSpn?-hopD` (PROVEN) recovers the headline, and `walk-scan`
 -- spends it through `burstHopSpnH-headline`, so the extra structure is
 -- free at the consumer.
---
+
 -- IT STOPS AT `obs`, which is the substantive half of the decision:
 -- `Tm` HAS NO ELIMINATOR FOR `obs`.  The only eliminating term formers
 -- are `fstᵗ`, `sndᵗ` and `caseᵗ` — pairs and sums and nothing else —
@@ -690,7 +690,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- only ever BUILT, and a builder needs its argument's headline bound,
 -- not its interior.  Recursing into the expression would be a second
 -- structural induction and a second predicate to preserve, for nothing.
---
+
 -- WHAT IS LEFT, all three with named PROVEN twins:
 --   · the fold — `scanVals` preserves `valHopSpn?`; twin
 --     `scanVals-size` (.Caps-Face/Part5), the same fold over the same
@@ -702,9 +702,9 @@ valHopSpn?-intro V η P B (obs t) e h =
 --     the env-wise hypothesis needs);
 --   · the evaluator connection — subscribeE's scan clause emits the
 --     fold's accumulators; the same job `walk-map` does for mapᵉ.
---
+
 -- THE RESIDUE IS PROOF LABOUR, NOT A TRUTH QUESTION (Demand-Probe
--- series Ω, 2026-08-19).  Those rows are DEGENERATE and that is the
+-- series Ω).  Those rows are DEGENERATE and that is the
 -- finding: run at the AMPLIFYING step (`pmᵗ V 0 fʸ ≡ 2`, the
 -- accumulator plugged into a `mapᵉ` source, the one clause of hopDᵉ
 -- that multiplies) the invariant clears by orders of magnitude, and it
@@ -717,7 +717,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- charges for.  A step that multiplies the depth at ZERO spine cost
 -- would refute this, and none is constructible — the plug must sit
 -- under a `mapᵉ` source and that node is counted.
---
+
 -- STILL DIFFICULTY, and the one open bookkeeping question is `caseᵗ`.
 -- Its branch is evaluated under an EXTENDED env, so the step lemma has
 -- to bound the branch's own plug slope, and the parent's `pmᵗ V j
@@ -728,7 +728,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- probe that: a caseᵗ probe is degenerate for the same reason series Ω
 -- is, so the only way to settle it is to write the clause.
 --
--- ✗ DEAD ROUTE 2026-08-19 — A VALUE-LOCAL BOUND BASED ON `fnCapᵛ`.
+-- ✗ DEAD ROUTE — A VALUE-LOCAL BOUND BASED ON `fnCapᵛ`.
 -- Recorded because it is the obvious repair and it is one
 -- instantiation from being checkable: a sharper twin of
 -- `hopD-sizeᵗ`/`pm-sizeᵗ` (.Measures, both PROVEN, both landing at the
@@ -744,7 +744,7 @@ valHopSpn?-intro V η P B (obs t) e h =
 -- bound.  No choice of leaf depth repairs a base already too big, and
 -- the same objection kills every measure of the VALUE ALONE — which is
 -- why the spine is spent inside the fold rather than instead of it.
---
+
 -- THE ADDITIVE CORNER IS NOT A SEPARATE CASE, correcting the P-split
 -- above: at P = 1 the recurrence is Aᵢ₊₁ ≤ B + Aᵢ and the invariant
 -- asks `1 + 2^s ≤ 2^(suc s)` — the same split, the same failing arm.

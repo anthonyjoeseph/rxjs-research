@@ -1,4 +1,4 @@
--- THE COLLAPSED WALK — the E-into-j restatement (2026-08-13), executing
+-- THE COLLAPSED WALK — the E-into-j restatement, executing
 -- the ruling in Wet/Part6's GAP 4 header ("THE NESTING BUDGET IS THE
 -- GAS").  The wet walk's running position is a caps LEVEL j — frameStep
 -- iterated on the entry caps — and the capᴱ W E ledger is RETIRED from
@@ -6,14 +6,14 @@
 -- composition is machine-refuted at both ends (`wet-ceiling-absurd`
 -- way-out, `wet-ell-absurd` way-in, Wet/Part6), and the two refutations
 -- dissolve together under this collapse.
---
+
 -- WHY ITS OWN MODULE.  The wet stratum (.Wet) and the caps face
 -- (.Subscribe-Face) are deliberate siblings — neither imports the other
 -- — and this statement is the one artifact that reads BOTH vocabularies
 -- (INV?/dBound/hasAtLeast from the wet side, capsOK?/frameStep/opIterD
 -- from the caps side).  It sits where .Caps-Bridge sits, one arrow
 -- above each; .Caps-Bridge consumes it.
---
+
 -- THE STATEMENT IS subscribeE-caps ⊗ THE WET CONTENT, ONE Σ.  The caps
 -- half (hypotheses and the first four conclusion conjuncts) is
 -- `subscribeE-caps`'s own face VERBATIM (.Subscribe-Face:937, GROUND) —
@@ -24,8 +24,8 @@
 -- second walk.  The two halves must share ONE witness j′ — two separate
 -- Σs could not be joined — which is why the caps conjuncts are
 -- restated here rather than consumed as a black box.
---
--- THE RULING'S "VERIFY FIRST" ITEM, EXECUTED (census 2026-08-13, all
+
+-- THE RULING'S "VERIFY FIRST" ITEM, EXECUTED (census, all
 -- consumers of the old walk's conclusion traced): the old mintCount /
 -- burstLen conjuncts do NOT reappear in wet flavour.  Their jobs are
 -- the level machinery's own conjuncts, already carried here — registry
@@ -36,10 +36,10 @@
 -- outer lenOK is sourced from caps-tick via capsOK?-count +
 -- B2-cReg≤cSize, not from the walk).  The Ω width trio (widthOK? /
 -- ofWᵉ ≤ Ω / pathΩ?) went WITH the ledger: Ω fed only walkCap's base,
--- and the caps side carries width as dWᵉ ≤ cWid.  Its proofs were
--- DELETED 2026-08-21 (.Measures carries the record); `ofWᵉ` itself
--- stays, and this module is what spends it.
---
+-- and the caps side carries width as dWᵉ ≤ cWid.  Its proofs are gone
+-- (.Measures carries the record); `ofWᵉ` itself stays, and this module
+-- is what spends it.
+
 -- WHAT SURVIVES UNCHANGED: the dry half.  The demand `dBound Ŝ R̂ U
 -- (hopDᵉ F b) (syncSizeᵉ b) ≤ G` at the ENTRY-COMPUTABLE reset caps,
 -- the gas `g hasAtLeast suc G`, and the length ledger `pathLen κ + G ≤
@@ -47,7 +47,7 @@
 -- ruling says (`wet-ell-absurd` killed the ℓ := Ŝ pin, not the
 -- ledger; the outer instantiation floats ℓ to pathLen κ + G ⊔ the
 -- registry bound).
---
+
 -- THE LANDING.  The outer face needs INV? at Ŝ = sizeCapAt e sl
 -- (suc id).  The walk lands INV? at cSize (frameStep (j + j′) c); the
 -- charge conjunct bounds j + j′ by opIterD, and the lift to Ŝ is the
@@ -56,13 +56,13 @@
 -- over depOK → capsAt-suc-full → frameStep-mono-j, plus INV?'s upward
 -- monotonicity in B (a lemma the core's grind owes; INV? weakens
 -- upward conjunct by conjunct).
---
+
 -- RECOVERY: git show eb11caf:agda/src/Verify-Budget-Sufficient/Measures.agda
--- restores the old ledger walk (subscribeE-walk, subscribeE-walk-core,
--- its 20 sub-postulates and the round-3 DAG) — deleted the day this
--- landed, because its composition with the core was refuted for every
--- parameter choice, not because its clauses were wrong.
---
+--   restores the old ledger walk (subscribeE-walk, subscribeE-walk-core,
+--   its 20 sub-postulates and the round-3 DAG) — deleted the day this
+--   landed, because its composition with the core was refuted for every
+--   parameter choice, not because its clauses were wrong.
+
 -- THE VOCABULARY AND THE SHELF ARE TWO MODULES BELOW THIS ONE, and the
 -- reason is the mutual block that remains: a block is an indivisible
 -- checking unit, so anything left beside it is re-checked on every
@@ -203,9 +203,9 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 ------------------------------------------------------------------
 -- THE INPUT CLAUSE'S WET RESIDUE.  walk-input is assembled below; this
 -- is the half the caps face cannot give.
---
--- RESTATED 2026-08-14 AFTER A MACHINE REFUTATION, and the restatement
--- is what the whole η parameterisation exists for.  The old form
+
+-- THE η PARAMETERISATION EXISTS FOR THIS STATEMENT'S SHAPE, and a machine
+-- refutation is why.  The unparameterised form
 -- bounded the connect burst's hop by `hopDᵉ V (input i)`, which was
 -- 0 at every V — while `sharedConnect` passes the slot def's burst up
 -- with its values UNTOUCHED, so an obs-typed slot whose def emits
@@ -213,7 +213,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- Demand-Probe series W discharges every hypothesis and derives ⊥; no
 -- entry hypothesis excluded it, because slotsCaps? is size/width and
 -- INV? is size/fnCap — the hop channel for slot defs was UNGUARDED.
---
+
 -- ROUTE (b) WAS TAKEN: hopD is now parameterised by an input
 -- environment η (Rx.Hop-Depth), and the walk face instantiates it at
 -- the HONEST one, `slotHop F sl` (Rx.Slot-Hop), for which
@@ -227,9 +227,9 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- types — were rejected: (a) leaves the *All hop descent unfunded for
 -- shared carriers (the strict-drop argument reads the carrier's own
 -- hopDᵉ, which a smuggled def value exceeds), and (c) is a spec change.
---
--- PROBED-HISTORICAL 2026-08-14 (Demand-Probe series W, the refutation's own
--- program, flipped): at the obs-typed shared slot whose def emits
+
+-- THE REPAIR IS A REPAIR, NOT A WEAKENED TEST — measured on the
+-- refutation's own program, flipped: at the obs-typed shared slot whose def emits
 -- strmᵗ (mergeAllᵉ emptyᵉ), the hop conjunct is now `true` at every
 -- measurement index and every non-dry gas, and the OLD bound is pinned
 -- still rejecting the SAME burst — so the repair is a repair, not a
@@ -243,22 +243,21 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- vacuous, so the staging recursion was untested until T pinned
 -- `slotHop V sl i ≡ hopDᵉ V (slotHop V sl) d` by refl at i = 1 and
 -- i = 2, with the off-by-one alternative pinned as a live contrast).
---
--- PROBED-HISTORICAL 2026-08-14 (Demand-Probe series V): the other four conjuncts
--- RUN, at the series W program, co-instantiated — INV?, burstB?,
+
+-- THE OTHER FOUR CONJUNCTS RUN, at the series W program, co-instantiated — INV?, burstB?,
 -- hasDry and regsLen? all `true` against one exit state, with B tight
 -- (B = 5 holds, B = 4 fails on slotsSize; B = 1 fails burstB? on the
 -- emitted value's sizeᵉ = 2) and hasDry pinned at series V's OWN gas
 -- term rather than cited from series W's, since that program dries one
 -- gas step down and the terms are not interchangeable by inspection.
---
+
 -- NOT COVERED BY THE PROBES, and while the face was open this was its
 -- FALSITY region: series V holds TWO
 -- axes flat — Ψ = 0 at every row (the def is mergeAllᵉ emptyᵉ, so
 -- slotsFnCap insᵂ = 0) and the exit registry is EMPTY (sharedConnect's
 -- burstCompleted branch drops the one entry), so regsLen? is vacuous
 -- there and the Ψ conjuncts of INV?/burstB? are satisfied by 0 ≤ 0.
---
+
 -- THE Ψ AXIS WAS NOT AN ARBITRARY GAP — IT IS WHERE THE REFUTATION WOULD
 -- HAVE RECURRED, HAD THE FACE STAYED OPEN.  It did not; what follows is
 -- why, and it is the reason the face is ground rather than parked.  `fnCapᵉ (input i) = 0` (.Measures) is
@@ -268,14 +267,14 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- constant did not account for.  fnCapᵉ is positive on scanᵉ/mapᵉ with
 -- a function-valued term, so a shared slot whose def carries one is
 -- exactly the analogue of the refuting program.
---
+
 -- THE RISK HISTORY, and it is HISTORY: the face is a real definition on
 -- every clause and holds no live postulate, so no risk class applies to it
 -- any more.  What follows is kept because it says what the probes reached
 -- and what they could not, which is a fact about the evidence rather than a
 -- claim about an open statement.
---
--- CLASS LOWERED FALSITY → DIFFICULTY (2026-08-15).  What earned it, and
+
+-- CLASS LOWERED FALSITY → DIFFICULTY.  What earned it, and
 -- what did NOT:
 --   · the conjunct that was actually REFUTED is repaired and the repair is
 --     PROVEN — slotHop-fix rests on no postulate — and it is pinned at the
@@ -292,15 +291,15 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 --     non-degenerate via series REG.
 -- NOT part of the case: the Ψ/Ψ2/Ψ3 probe series, which were deleted for
 -- being structurally unable to refute.  The class rests on the proofs.
---
+
 -- PROBE RESIDUE, and while the face was open it was what would have
 -- re-raised the class: every probe is a small program.  Deeper telescopes,
 -- scripted/shared mixes, and μ-nesting inside a slot def are uncovered, so
 -- a surprise would have come from a fact about those shapes that no probe
 -- touched.  The proof closes all of them; the boundary is recorded because
 -- a reader restating any of this inherits the probes, not the proof.
---
--- THE Ψ AXIS IS ANSWERED, AND BY PROOF RATHER THAN BY PROBE (2026-08-15).
+
+-- THE Ψ AXIS IS ANSWERED, AND BY PROOF RATHER THAN BY PROBE.
 -- Two lemmas in .Measures, both already proven, close the smuggle:
 --   · `caseW-subΘ` / `caseW-ren` (W1) — caseWᵗ is substitution- and
 --     renaming-INVARIANT, because reify images contain no caseᵗ at all and
@@ -312,7 +311,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 --     fnCapᵉ (subΘExp Θloc σ e) ≤ Ψ.  Evaluation cannot lift fnCap past Ψ.
 -- Together: a value emitted anywhere in the telescope carries fnCap ≤ Ψ, so
 -- `fnCapᵉ (input i) = 0` is SAFE despite looking like the refuted hop clause.
---
+
 -- AND THAT IS THE REAL DISANALOGY WITH HOP.  No lemma of this kind could
 -- exist for hop: hop genuinely depends on the slot environment, which is
 -- exactly why the repair had to parameterise the input clause by η.  fnCap
@@ -320,14 +319,14 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- slotsFnCap sl` summing rather than ⊔-ing the telescope is a second, weaker
 -- reason — it covers a def that reads ANOTHER input without a staged
 -- fixpoint — but the substitution lemmas are what actually settle it.)
---
+
 -- METHOD NOTE, worth more than the result: three probe series (Ψ, Ψ2, Ψ3)
 -- were commissioned to test this before anyone grepped .Measures for a
 -- substitution lemma.  The receipts are real but they were never the cheapest
 -- route, and none of them COULD have refuted — in every series the emitted
 -- value is a subterm of its own def, where the ⊔-fold bounds it structurally.
 -- Grep for the fact before designing the experiment.
---
+
 -- WHY THE SPLIT IS EXACT.  WalkStmt's first thirteen hypotheses ARE
 -- subscribeE-caps' hypothesis list verbatim, and its first four
 -- conjuncts ARE subscribeE-caps' Σ verbatim (.Subscribe-Face) — the
@@ -339,19 +338,19 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- three gas peels, and the demand drop that funds it is connect-edge's
 -- (U strictly drops on the connectedShares insert, both child measures
 -- reset at the anchor).
---
+
 -- IT TAKES THE CAPS RECEIPTS AS HYPOTHESES, AND THAT IS THE POINT: j′
 -- is BOUND by the caps call at the assembly site, so this postulate
 -- cannot be satisfied by inflating the witness.  Stated with a free j′
 -- and no caps receipts it would be upward-closed and vacuous — the
 -- failure mode CLAUDE.md's Σ-receipt rule names, and the one that
 -- machine-refuted the exit-level count face.
---
--- THE MUTUAL LANDING IS DONE (2026-08-15).  input-wet is a real definition
+
+-- THE MUTUAL LANDING IS DONE.  input-wet is a real definition
 -- over input-wet-core, which RECEIVES the walk face at the peeled fuel, so
 -- the induction this clause needs can now be written.  `make agda` accepts
 -- the recursion: zero TerminationIssue.
---
+
 -- IT TOOK THREE SHAPES, AND THE TWO THAT FAILED ARE WHY THE THIRD IS WRITTEN
 -- THE WAY IT IS.  Do not simplify it back:
 --   · PASS walkFace ITSELF (`input-wet = input-wet-core walkFace`).  Typechecks;
@@ -368,7 +367,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 --     `subscribeE g b κ …`, so a body computed at `fuel` cannot inhabit a type
 --     demanding the binder's `g`.  "A walk face at the peeled fuel" is simply
 --     not a term of type WalkLevel.
---
+
 -- WHAT MADE IT WORK: give that phrase a type.  WalkTail factors the statement
 -- from κ onwards with the gas as a PARAMETER; WalkStmt keeps its old argument
 -- order over it (so none of its 23 call sites, nor Demand-Probe's
@@ -377,14 +376,14 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- no lambda at all, and `peelGas` in input-wet-core's type carries the peel —
 -- so at `gs fuel` the type reduces to `WalkLevelAt fuel` and the call site
 -- shows the structural decrease the checker was looking for.
---
+
 -- ONE MEASUREMENT WORTH KEEPING: declaring walkFace's signature far from its
 -- clauses sweeps every definition in between into the mutual block — 47
 -- members, 33 of them in no cycle at all.  Relocating input-wet/walk-input
 -- adjacent to the dispatch gives exactly the 14 that genuinely cycle, and the
 -- tight block type-checks FASTER than the status quo (28.7 s against 37.9 s).
 -- `make agda-dev ARGS='--list <file>'` shows this for free.
---
+
 -- THE PROVEN TEMPLATE IS `subscribeE-input-caps` (.Subscribe-Face), and it
 -- is worth naming because it settles the SHAPE of the missing induction
 -- rather than leaving it to be rediscovered.  It is the caps twin of this
@@ -392,11 +391,11 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- so the wet induction is three clauses too, not one.  Its second and third
 -- clauses are where `len≤inputSize` and the LENB chain do the work, which is
 -- the same bookkeeping the wet side's hasDry conjunct needs.
---
--- THE BLOCKER THIS HEADER USED TO NAME IS GONE (corrected 2026-08-19).  It
+
+-- THE BLOCKER THIS HEADER USED TO NAME IS GONE (corrected).  It
 -- said walkFace was a plain definition sitting after the postulate block, so
 -- nothing could call it, and that making walkFace and the walk-* clauses
--- MUTUAL was "the real prerequisite".  That refactor LANDED on 2026-08-15 —
+-- MUTUAL was "the real prerequisite".  That refactor LANDED —
 -- it is the mutual-landing paragraph above, in this same header — and the
 -- paragraph describing it as still owed was never removed.  The walk face is
 -- available: `input-wet-core` takes `WalkLevelAt (peelGas g)` and passes it
@@ -404,12 +403,12 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- prerequisite is met and the eight PROVEN lemmas named below are in scope;
 -- what remains is the induction that spends them, and nothing structural is
 -- in its way.
---
+
 -- Two paragraphs of one header disagreeing is the "lying comment" forbidden
 -- state, and this is what it costs: the stale half reads as a work order for
 -- a refactor already done, which is a session's worth of misdirection aimed
 -- squarely at whoever picks this up next.
---
+
 -- EXPECTED TO PAY IT when it is ground: connect-edge (the demand drop),
 -- sharedConnect-unconn and unconn-cons-≤ (the U bookkeeping either side
 -- of the insert), obs-slot-shared and connect-anchor (the child's reset
@@ -424,22 +423,22 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- consumer stepThru-walk, and the REAL push face over them.  Each is
 -- its caps twin ⊗ the wet content on one witness, the discipline the
 -- whole module runs on.
---
--- ⚠ DEAD ROUTE 2026-08-13, and it shaped this whole section: A
--- FRAME-GENERIC WET PUSH FACE IS FALSE.  The first statement of this
--- face (one postulate `pushBurst-walk`, generic in `f : Frame Γ s u`,
--- committed 9fb13d3) carried a uniform hop conjunct — input receipts
--- at r̂, output at suc r̂ — and that is REFUTABLE BY CONSTRUCTION at
--- f := map-f: a step function that wraps its input two mergeAll levels
--- deep sends a value of hop exactly r̂ to hop r̂ + 2 > suc r̂, with every
--- hypothesis satisfiable (frameB? bounds the fn's SIZE and WEIGHT,
--- never its hop growth).  The caps face is frame-generic because caps
--- measures are; THE HOP LEDGER IS FRAME-SPECIFIC.  pushBurst has four
--- call sites (thru-outer, map-f, take-f, scan-f — Rx.Evaluator), so
--- the repair is one wet push face PER FRAME KIND, this one thru-outer's.
--- Two of the chain frames' faces are now authored — `pushTake-wet` at
--- the identity index and `pushMap-wet` at hopD-map-emit's — leaving
--- scan-f's, whose index is the exponential one.
+
+-- ⚠ DEAD ROUTE, and it shaped this whole section: A
+--   FRAME-GENERIC WET PUSH FACE IS FALSE.  The first statement of this
+--   face (one postulate `pushBurst-walk`, generic in `f : Frame Γ s u`,
+--   committed 9fb13d3) carried a uniform hop conjunct — input receipts
+--   at r̂, output at suc r̂ — and that is REFUTABLE BY CONSTRUCTION at
+--   f := map-f: a step function that wraps its input two mergeAll levels
+--   deep sends a value of hop exactly r̂ to hop r̂ + 2 > suc r̂, with every
+--   hypothesis satisfiable (frameB? bounds the fn's SIZE and WEIGHT,
+--   never its hop growth).  The caps face is frame-generic because caps
+--   measures are; THE HOP LEDGER IS FRAME-SPECIFIC.  pushBurst has four
+--   call sites (thru-outer, map-f, take-f, scan-f — Rx.Evaluator), so
+--   the repair is one wet push face PER FRAME KIND, this one thru-outer's.
+--   Two of the chain frames' faces are now authored — `pushTake-wet` at
+--   the identity index and `pushMap-wet` at hopD-map-emit's — leaving
+--   scan-f's, whose index is the exponential one.
 ------------------------------------------------------------------
 
 -- THE LEAF — the wet face of subscribeInner, WHERE THE GAS PEEL IS.
@@ -447,7 +446,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- PROVEN both clauses, including the strict sLvlD report), ⊗ the wet
 -- content.  Σ-content: the strict level bound is the one downward
 -- conjunct; the hop/dry/regsLen? conjuncts are j′-free.
---
+
 -- WHAT IS NAILED DOWN BY THE STATEMENT ALONE: subscribeInner's g0 arm
 -- is the evaluator's ONE remaining dry mint under this face
 -- (`close drySource dried`, Rx.Evaluator) — and the gas hypothesis
@@ -455,8 +454,8 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- unreachable by type, exactly as the μ mint is at walkFace's absurd
 -- clause.  Both of the machine's dry mints are now excluded by the
 -- same one-line shape; what remains everywhere else is PRESERVATION.
---
--- THE gs ROUTE, EXECUTED (2026-08-14, the body at the end of the
+
+-- THE gs ROUTE, EXECUTED (the body at the end of the
 -- mutual block): peel the gas at the matched constructor
 -- (hasAtLeast-peel-gs); walkFace o — the mutual walk at the inner,
 -- legitimate because the peel descends the gas, the same induction
@@ -469,8 +468,8 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- and the dBound monos — funds the inner walk's demand STRICTLY below
 -- suc r̂'s, and that ONE unit also pays the from-inner frame's ℓ
 -- extension: the +1/+1 lockstep, in the telescope.
---
--- THE LIVE EDGE IS CLOSED AT THE STATEMENT (2026-08-13, the
+
+-- THE LIVE EDGE IS CLOSED AT THE STATEMENT (the
 -- reset-anchor pins): the face used to quantify Ŝ freely with NO
 -- hypothesis linking the level cap to it, which made the demand
 -- funding unprovable and possibly false — hop-step-gives' premise
@@ -494,8 +493,8 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- finished walk face; this statement is the SUBSCRIBE-side leaf the
 -- walk face itself consumes.  Same evaluator function, opposite
 -- direction of dependency.)
---
--- PAYABILITY (census 2026-08-13): the ceiling conversion the gs body
+
+-- PAYABILITY (census): the ceiling conversion the gs body
 -- owes the inner walkFace call — its own `sLvlD S W dep (suc bud)
 -- (suc j) ≤ L̂` into the inner's `opIterD … (suc j) ≤ L̂` — is
 -- DEFINITIONAL.  sLvlD-suc (Rx.Evaluator, refl):
@@ -621,7 +620,7 @@ StepThruWalk = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (any dryEvent (proj₁ (proj₂ r)) ≡ false)
      × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
 
--- EX-POSTULATES (2026-08-14): subscribeInner-walk and the loop it
+-- EX-POSTULATES: subscribeInner-walk and the loop it
 -- feeds are REAL — forward-declared here, ground after subscribeAll-walk
 -- at the end of the mutual block, mirroring the caps clique's own
 -- recursion (subscribeInner-caps → subscribeE-caps at the peeled fuel,
@@ -1025,7 +1024,7 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
 -- returned burst (REAL, above — its hop receipts return AT hopDᵉ F b,
 -- and the composite conjunct's suc is one widening here) → op-step for
 -- the level charge.  The hop-edge chain below it is REAL too
--- (2026-08-14): subscribeInner-walk, thruConsume-walk, thruWalk-walk
+-- : subscribeInner-walk, thruConsume-walk, thruWalk-walk
 -- and stepThru-walk are all ground at the end of this mutual block, so
 -- this face's walk residue is the CLAUSE postulates alone.
 --
@@ -2289,7 +2288,7 @@ stepThru-walk {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ (suc dep′) bud j g bid 
          (valsOf (frameStep (j + j′) c) sl (proj₁ WK) T2)
          T3
 
--- EX-POSTULATE (2026-08-13): the core is the dispatch.  Its 21 route
+-- EX-POSTULATE: the core is the dispatch.  Its 21 route
 -- hypotheses are bound and awaiting their clauses — each clause
 -- postulate's header names the ones expected to pay it, and a clause
 -- grind spends them from module scope, shedding nothing here until the
@@ -2343,7 +2342,7 @@ WetOuter =
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
 
 ------------------------------------------------------------------
--- THE OUTER FACE, ASSEMBLED — ex-postulate (2026-08-13).
+-- THE OUTER FACE, ASSEMBLED — ex-postulate.
 --
 -- `subscribeE-wet-core` used to be a postulate over the walk face and
 -- 19 route lemmas.  Writing the assembly showed it is pure PLUMBING:
@@ -2372,9 +2371,9 @@ WetOuter =
 ------------------------------------------------------------------
 
 -- ENTRY, (i) is `slotsCaps?-capsAt` (Caps-Face/Part4) as it stands — the
--- slot store fits the caps its own recurrence is built from.  It had a
--- local eta-alias here until 2026-08-19; `Id` and `ℕ` are the same type,
--- so that was one fact under two names.
+-- slot store fits the caps its own recurrence is built from.  There is no
+-- local eta-alias for it here: `Id` and `ℕ` are the same type, so an
+-- alias would be one fact under two names.
 
 -- ENTRY, (ii): and its total size does too.  Companion of
 -- `size≤sizeCapAt` (.Wet/Part6, PROVEN) for the slot summand.
@@ -2410,14 +2409,13 @@ regsLen?-mono m ℓ rs m≤ℓ h =
 -- by side is what showed wet-landing-lift was assemblable rather than
 -- hard: the walk hands back a level bounded by the same opIterD term,
 -- so one `≤-trans` covers the gap.
--- NOT SEALED, deliberately (2026-08-15).  It was sealed for one build on the
+-- NOT SEALED, deliberately.  It was sealed for one build on the
 -- theory that wet-landing-lift's body unfolding into the opIterD tower was
 -- what cost Walk-Level its memory.  That was wrong: the FIRST build, with
 -- both this and wet-landing-lift unsealed, cleared Walk-Level and died
 -- later in VWF.  Sealing is a CONSUMER-side fix and this module is the
 -- producer, so the seal bought nothing here and its duplicated signature
--- cost real memory.  entry-ceiling below has consumed it unsealed since
--- 2026-08-13 without trouble.
+-- cost real memory.  entry-ceiling below consumes it unsealed.
 entry-ceiling-at : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : Id) {u} (b : Closed Γ u) (cs : List Source) (j′ : ℕ) →
   3 + nest b sl cs ≤ Caps.cSize (capsAt e sl id) →     -- nestOK
@@ -2444,7 +2442,7 @@ entry-ceiling-at e sl id b cs j′ nestOK opsOK j′≤L₀ = proj₁ lift-⊑
                  (frameStep-mono-j c hS (≤-trans j′≤L₀ j≤full))
 
 -- ENTRY, (iii): the reset cap ceils the walk — no level the entry budget can
--- reach outgrows the NEXT instant's size cap.  Discharged 2026-08-13: the
+-- reach outgrows the NEXT instant's size cap.  Discharged: the
 -- chain is opIterD-dominated → sizeCount-body → capsAt-suc-full →
 -- frameStep-mono-j (identical to sub-charge-capsOK-lift's route, .Caps-Bridge,
 -- without the final capsOK?-mono step — we only need the size projection).
@@ -2462,7 +2460,7 @@ entry-ceiling : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 entry-ceiling e sl id b cs nestOK opsOK =
   entry-ceiling-at e sl id b cs _ nestOK opsOK ≤-refl
 
--- THE LANDING LIFT, DISCHARGED (2026-08-14) — ex-postulate, and it was
+-- THE LANDING LIFT, DISCHARGED — ex-postulate, and it was
 -- the last FALSITY-classed row in this file that was not the walk face
 -- itself.  Its header used to say the content "is sub-charge-capsOK-lift's
 -- chain plus INV?'s upward monotonicity in B", and that sentence was a
@@ -2477,7 +2475,7 @@ entry-ceiling e sl id b cs nestOK opsOK =
 --   · INV?-widen (.Wet/Part1) raises the B index;
 --   · subscribeE-slots (.Keeps-Ring) transports the Ψ and size indices,
 --     since slots never change across a run.
---
+
 -- IT GAINED nestOK/opsOK, AND THAT IS A RESTATEMENT, NOT A CONVENIENCE.
 -- The justification is not "the call site has them" (CLAUDE.md rejects
 -- that reason outright): it is that without them the statement looks
@@ -2487,10 +2485,10 @@ entry-ceiling e sl id b cs nestOK opsOK =
 -- and ops bounds hold.  Drop them and nothing bounds j′ against the
 -- ceiling at all.
 -- SEALED, AND THE SEAL IS LOAD-BEARING — established by measurement, not by
--- the rule (2026-08-15).  This was a POSTULATE the wet spine consumed as an
+-- the rule.  This was a POSTULATE the wet spine consumed as an
 -- axiom; discharging it lets Verify-Well-Formed unfold the body, and VWF then
 -- dies exactly where CLAUDE.md records its three prior instances.
---
+
 -- IT WAS CONFIRMED THE EXPENSIVE WAY, and the sequence is kept because the
 -- wrong turn is the instructive part:
 --   · first VWF death had a 3.8 GB competing agda beside a 7.3 GB build —
@@ -2500,7 +2498,7 @@ entry-ceiling e sl id b cs nestOK opsOK =
 --     Verify-Well-Formed.Part13 still died `Killed: 9` at 3.7 GB entering the
 --     module, with nothing else running.  That is the seal's justification —
 --     contention was ruled OUT by experiment, not argued away.
---
+
 -- THE TYPE IS A SYNONYM, AND THAT IS NOT COSMETIC.  Sealing needs private-impl
 -- + abstract-alias, because the body's untyped `where r = …` is something a
 -- plain `abstract` block rejects — and that idiom needs the signature at BOTH
@@ -2508,11 +2506,11 @@ entry-ceiling e sl id b cs nestOK opsOK =
 -- projections, so writing it twice makes Agda elaborate all of that twice.
 -- Naming it once is what keeps the seal affordable; it is the same idiom the
 -- file already uses for WalkLevel / WetOuter, and Burst-Walk for InnerNodryFuel.
---
+
 -- TWO THINGS THAT ARE **NOT** THE FIX, both tried:
 --   · sealing entry-ceiling-at as well, on the theory that the body unfolding
 --     into the opIterD tower was the cost — no effect, reverted; entry-ceiling
---     has consumed it unsealed since 2026-08-13.  Sealing is a CONSUMER-side
+--     has consumed it unsealed.  Sealing is a CONSUMER-side
 --     fix and this module is the producer.
 --   · reading a dev-green as evidence.  Every state above was `agda-dev` GREEN.
 --     What carried the signal was the RATIO to the module's recorded best in

@@ -158,7 +158,7 @@ thruConsume-nodry-nestBud-absurd nb
                  fits)
 
 ----------------------------------------------------------------------
--- CHECKED THE DECISIVE WAY (2026-08-20), then reverted: with both
+-- CHECKED THE DECISIVE WAY, then reverted: with both
 -- postulates imported from `src` and APPLIED to the two witnesses above,
 -- `_ : ⊥` typechecked.  So this is not a mismatch between a transcribed
 -- type and the real one — `src` proved falsity, and the restatement that

@@ -14,7 +14,7 @@
 -- concrete programs either refutes them or gives a real receipt.  Their
 -- former shared merge-cert HYPOTHESIS is decidable too (`mergeCertAt`), so
 -- it is pinned at the same states rather than assumed.  That postulate was
--- retired 2026-08-18 when the two assemblies became real bodies (it does not
+-- retired when the two assemblies became real bodies (it does not
 -- close their k ≡ 0 case — see Part4.root-mergeCache); the pins stay, since
 -- they are the evidence base a restated merge coherence will be built on.
 --
@@ -63,7 +63,7 @@ ins₀ = λ ()
 -- wiring law reporting the truth rather than a new problem.  A restated
 -- merge-cert in .Part4 states its own predicate; these rows are evidence
 -- about THIS one.
--- WHY IT SURVIVES ITS OWN COUNTEREXAMPLE SHAPE (probed 2026-08-06;
+-- WHY IT SURVIVES ITS OWN COUNTEREXAMPLE SHAPE (probed;
 -- the probe is deleted — this header is the receipt).  A hand-built
 -- state with k = 0 and a live from-inner registration (dying /
 -- delivered / cancelled all empty) makes mergeCertAt FALSE, so the
@@ -346,7 +346,7 @@ _ = refl
 ----------------------------------------------------------------------
 
 -- THE FORMER SHARED HYPOTHESIS.  Both -cores took merge-cert; neither
--- assembly does any more (retired 2026-08-18).  mergeCertAt is decidable, so
+-- assembly takes it now.  mergeCertAt is decidable, so
 -- it is pinned rather than assumed — at every node id the merge programs
 -- actually mint, plus one that does not exist (where mergeCertAt is true by
 -- its catch-all, hence DEGENERATE).  These rows are now evidence for a

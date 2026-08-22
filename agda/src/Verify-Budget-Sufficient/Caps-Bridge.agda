@@ -14,7 +14,7 @@
 -- `cascadeGo-caps` concludes boundedness only, no dry — dryness stays
 -- on the gas axis (S3, P2's unchanged dry half).
 --
--- CONSUMERS.  CORRECTED 2026-08-05 (the 2026-08-05 upside-down ruling) — the original text here said
+-- CONSUMERS.  CORRECTED (the upside-down ruling) — the original text here said
 -- "`cascade-dry` and `burst-wet` (.Wet) migrate to consume
 -- `cascade-wet-via-caps`", which is IMPOSSIBLE: `.Caps-Bridge` imports
 -- `.Wet` (below), so `.Wet` can never import `.Caps-Bridge` back. The
@@ -122,7 +122,7 @@ open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
   (pathBΨ?; pathBΨ?-of; regsB?-of-parts; regsBΨ?; regsBΨ?-of)
--- the wet contract itself, stated over the COLLAPSED walk (2026-08-13).
+-- the wet contract itself, stated over the COLLAPSED walk.
 -- It lives one arrow above .Wet and .Subscribe-Face because its
 -- statement is the only one reading BOTH vocabularies; this module is
 -- its sole consumer.
@@ -142,7 +142,7 @@ open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-wid
 -- in .Burst-Walk, imported above.
 ------------------------------------------------------------------
 
--- frameBΨ?/pathBΨ?/regsBΨ? RELOCATED to .Burst-Walk (2026-08-10): the
+-- frameBΨ?/pathBΨ?/regsBΨ? RELOCATED to .Burst-Walk: the
 -- burst walk's Ψ ledger consumes them there, upstream of this module.
 
 ------------------------------------------------------------------
@@ -223,9 +223,8 @@ slots-tick a id sched st =
 
 -- embedding a fixed bound B into capᴱ form: B ≤ 2 + 2·B ≤ capᴱ B 3,
 -- the second step by `pow1` (Measures.agda, already proven).  The `≤`
--- step is `V≤C` (.Measures) — this module had its own `b≤2+2b` and the
--- rearrangement lemma under it until 2026-08-19; both are gone, and the
--- one proof lives in the lower module.
+-- step is `V≤C` (.Measures), where the one proof lives; this module
+-- must not restate it, which is what `make dup-check` is for.
 b≤capᴱ-b-3 : ∀ b → b ≤ capᴱ b 3
 b≤capᴱ-b-3 b = ≤-trans (V≤C b) (pow1 b {3} (s≤s z≤n))
 
@@ -317,10 +316,10 @@ fn-tick {e = e} a id sched st inv val =
 ------------------------------------------------------------------
 -- S3 `dry-tick` : the cascade's dry half, on the gas-peel axis
 -- (dBound-μ/hop/connect).
---
+
 -- TIER 0, LAST.  Nearly all this postulate's risk is INHERITED from
 -- the anchor chain — its first hypothesis is `cascadeGo-nodry`, which
--- since 2026-08-13 is a REAL projection of the three-flavour walk
+-- is a REAL projection of the three-flavour walk
 -- (.Burst-Walk), so the inherited risk now bottoms out in
 -- `stepFrame-nodry` (§ 5a) and through it in `subscribeE-walk-level`
 -- (.Walk-Level).  Given those, what is left here is latch/finish
@@ -328,8 +327,8 @@ fn-tick {e = e} a id sched st inv val =
 -- chain resolves, never first.  (An earlier version of this header
 -- claimed independence from the caps/INV? bridging problem — wrong,
 -- and the kind of wrong that re-orders a schedule.)
---
--- THE MIRROR CENSUS (2026-08-12) SWAPPED THE FIRST HYPOTHESIS.  It
+
+-- THE MIRROR CENSUS SWAPPED THE FIRST HYPOTHESIS.  It
 -- used to be the full `cascadeGo-wet` (hasDry × INV?-landing, the old
 -- two-conjunct anchor).  The INV? conjunct was never needed here — this
 -- core's own conclusion is dry-only, and the mid-cascade invariant a
@@ -338,15 +337,15 @@ fn-tick {e = e} a id sched st inv val =
 -- (§ C below), also proven.  So the hypothesis is now the dry-only
 -- `cascadeGo-nodry`, at the caps telescope this core's driver facts
 -- already supply — the same telescope as `cascadeGo-burst-dry` below.
---
--- ASSEMBLY (2026-08-06): narrowed over the cascade-level facts it was
+
+-- ASSEMBLY: narrowed over the cascade-level facts it was
 -- written to be built from.  `cascade` IS cascadeLatch → cascadeGo →
 -- cascadeFinish, so the pieces are the anchor's dry half,
 -- .Subscribe-Face's per-chain caps step, and .Deliveries' four cascade
 -- counts, which say the latch clears the ledger and the two walk lines
 -- account for it.
 --
--- ══ THAT ROUTE LIST IS WRONG ABOUT ITSELF (2026-08-17).  Two facts, one
+-- ══ THAT ROUTE LIST IS WRONG ABOUT ITSELF.  Two facts, one
 -- ══ pinned and one cited:
 --
 -- (1) THE CONCLUSION IS `cascadeGo-nodry`'s VERBATIM.  `cascadeFinish`
@@ -375,20 +374,20 @@ fn-tick {e = e} a id sched st inv val =
 --     conjuncts (widLive, widNode) for which INV? has no counterpart at
 --     all, so no proof can manufacture them.  The caps face is not
 --     missing a lemma; the statement is missing a hypothesis.
---
+
 --     AND ITS SOLE CALLER ALREADY HOLDS IT.  `cascade-wet-via-caps` (§ C)
 --     takes `capsOK? (capsAt e sl id) sched st` and `valCaps? …` as its
 --     own hypotheses (`pre`, `valC`) and calls `dry-tick a id sched st
 --     inv val` without them — so the two premises the body needs are
 --     already proven one line up.
---
+
 -- WRITING THE REAL BODY IS BLOCKED ON A RESTATEMENT, NOT A PROOF:
 -- dry-tick and this core gain `pre` and `valC`, threaded from the caller.
 -- That is "ADDING A HYPOTHESIS IS A RESTATEMENT" (CLAUDE.md), and the
 -- one sufficient justification is a REFUTATION of the unconditional
 -- form — a state satisfying INV? and failing capsOK?.
 --
--- ══ THAT REFUTATION IS NOW BUILT (2026-08-17) — see the anonymous pin
+-- ══ THAT REFUTATION IS NOW BUILT — see the anonymous pin
 -- ══ below, just above `dry-tick`.  The restatement is UNBLOCKED.
 -- The witness is not a width at all but the concat queue's LENGTH: INV?
 -- reaches a node only through boundedNode and fnCapNode, both `all`s
@@ -398,7 +397,7 @@ fn-tick {e = e} a id sched st inv val =
 -- `capsAt e sl id` itself.  So dry-tick may not consume capsOK? from the
 -- INV? it is given, and "the call site happens to supply it" — which
 -- here it demonstrably does — remains not a reason.
--- ── WHAT THE DRY HALF ACTUALLY REDUCES TO (2026-08-17) ──────────────
+-- ── WHAT THE DRY HALF ACTUALLY REDUCES TO ──────────────
 -- `cascadeFinish` returns a (Sched × EvalSt) and NO emits (Evaluator:1683),
 -- so a cascade's stream IS its cascadeGo's, and dry-tick's conclusion is
 -- `cascadeGo-nodry`'s conclusion verbatim at the latched state.  Pinned
@@ -411,7 +410,7 @@ _ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       ≡ proj₁ (cascadeGo a id (chainsOf a st) sched (cascadeLatch a st))
 _ = λ a id sched st → refl
 
--- ══ INV? DOES NOT IMPLY capsOK? — MACHINE-REFUTED 2026-08-17 ═══════
+-- ══ INV? DOES NOT IMPLY capsOK? — MACHINE-REFUTED ═══════
 -- dry-tick-core's header (above) names the restatement that blocks it:
 -- dry-tick and the core gain `pre`/`valC`, threaded from
 -- `cascade-wet-via-caps`.  CLAUDE.md's "ADDING A HYPOTHESIS IS A
@@ -564,7 +563,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
                 ln = widNode-len W sl q false false w
             in f≡t-absurd (trans (sym hLen) ln)
 
--- ══ MIGRATED 2026-08-18 — `dry-tick-core` IS GONE ═══════════════════
+-- ══ MIGRATED — `dry-tick-core` IS GONE ═══════════════════
 -- It was a postulate over NINE proven lemmas.  Eight were never
 -- ingredients (the route list was wrong about itself, refuted by the pin
 -- above: `cascadeFinish` emits nothing, so the dry half is `cascadeGo`'s
@@ -702,7 +701,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- a `capsOK?`/`valCaps?` hypothesis, concluding dryness, INV? at the
 -- output, AND capsOK? at the output — the joint invariant a future
 -- `cascade-dry`/`burst-wet` migrate to consume in place of the
--- old postulated cascade face — which the 2026-08-12 census then
+-- old postulated cascade face — which the census then
 -- retired outright (`cascadeGo-nodry` keeps only the dry half).
 --
 -- THE INV? ASSEMBLY CLOSED CONJUNCT-BY-CONJUNCT — no `inv-assemble`
@@ -823,7 +822,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
 
 ------------------------------------------------------------------
 -- (D) THE THREADED TOP OF THE TOWER.  MOVED here from .Wet
--- (the 2026-08-05 upside-down ruling) — this
+-- (the upside-down ruling) — this
 -- is not a copy beside `drain-dry`/`budget-sufficient`,
 -- it IS them, generalised to also carry `capsOK?` beside `INV?` through
 -- the fuel loop.  `.Wet` cannot state this (it imports `.Wet`... no —
@@ -834,7 +833,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre valC =
 -- `burst-bounded`/`pop-INV`/`pop-head-bounded` — this module consumes
 -- all five, unchanged, as the INV?-only half of its own burst and pop.
 --
--- REHEARSED in `Caps-Thread-Probe (DELETED; git history)` (2026-08-05) as
+-- REHEARSED in ``git show 94a5a3c^:agda/probe/Caps-Thread-Probe.agda`` as
 -- `drain-dry-threaded`/`budget-sufficient-threaded`; landed here under
 -- their FINAL names (`drain-dry`, `budget-sufficient`) since they
 -- replace, not sit beside, `.Wet`'s versions of the same name.
@@ -1022,10 +1021,10 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
 -- the caps `capsAt e sl zero` blows up from, named so the depth bound
 -- can be taken at it.  That it IS that blowup's inner argument holds by
 -- `refl` — checked as `baseCaps-is-inner` in
--- Depth-Wire-Probe (DELETED; git history), which is where it lives because
+-- `git show 1f1730e^:agda/probe/Depth-Wire-Probe.agda`, which is where it lives because
 -- nothing in the claim graph consumes it and the wiring law admits no
 -- orphans here.
--- `baseCaps` and `init-capsOK?-base` MOVED OUT 2026-08-07 to
+-- `baseCaps` and `init-capsOK?-base` MOVED OUT to
 -- `Verify-Budget-Sufficient.Init-Caps`, where the postulate
 -- `init-capsOK?-base-core` is DISCHARGED.  The five
 -- capsOK? conjuncts are proven directly, including the one that was
@@ -1058,7 +1057,7 @@ init-capsOK?-0 {n = n} e ins =
 -- (frameStep-0), level suc id at the FULL frameStep endpoint
 -- (frameStep-full composed with capsAt's own suc clause, which is
 -- definitional), and frameStep-mono-j spans the two at 0 ≤ sizeCount.
--- This is what retired the `init-capsOK?-suc` postulate (2026-08-06):
+-- This is what retired the `init-capsOK?-suc` postulate:
 -- its recorded blocker — `capsAt e ins id` never reduces to a numeral
 -- because `sizeCount` is abstract — killed only the COMPUTATIONAL
 -- route.  The monotonicity route never needs a numeral: `capsOK?` is
@@ -1067,7 +1066,7 @@ init-capsOK?-0 {n = n} e ins =
 -- standing normalization contract (see sizeCount's header): these are
 -- PROOFS, no consumer ever unfolds them, and an unfoldable body here
 -- hands VWF's conversion the whole capsOK?-mono/frameStep-mono-j proof
--- tower — measured 2026-08-07 as an OOM (two Killed:9 builds; VWF was
+-- tower — measured as an OOM (two Killed:9 builds; VWF was
 -- green the same morning with the postulate in this spot, i.e. with
 -- exactly this opacity).  The alias pattern rather than a plain
 -- abstract block because the bodies lean on untyped where-bindings,
@@ -1091,7 +1090,7 @@ private
   -- capsOK?-mono), and the suc case is capsOK?-mono along capsAt-⊑-suc
   -- over the induction hypothesis: the initial state never changes,
   -- only the caps widen, so `capsOK?` at level id survives to level
-  -- suc id verbatim.  Discharged 2026-08-06.
+  -- suc id verbatim.
   init-capsOK?-go : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (id : ℕ) →
     capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
@@ -1108,8 +1107,8 @@ abstract
     capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
   init-capsOK? = init-capsOK?-go
 
--- THE ROOT DEPTH BOUND, RESTATED 2026-08-21 over the nesting measure.
---
+-- THE ROOT DEPTH BOUND, RESTATED over the nesting measure.
+
 -- WHAT WENT: `depth-capped` (Depth-Bound.agda, DELETED) and its
 -- `3 · cSize` conclusion, with `three-size≤capsH` and the whole
 -- caps-conditioned route.  All of it was refuted together
@@ -1122,16 +1121,7 @@ abstract
 -- `opIterD`'s height budget that shows this consumer never needed any of
 -- it.  Read it at that commit before re-deriving any of them.
 --
--- RECOVERY: `git show <the commit that deleted Depth-Bound.agda>`
--- restores the node-half kit — `foldr-⊔-bounded`, `node-nest-bounded`,
--- `nodesNestMax-bounded`, an inversion of `stBounded?`'s `boundedNode`
--- test — which is still TRUE and is the apparatus a stored-state
--- version of the leaf below would want.  Only the SLOT half broke, and
--- it broke because that generation's slot measure paid its def's
--- nesting.  Both measures it was stated over are since DELETED with the
--- nesting currency, so recovering the kit means restating it over
--- `slotHop`.
---
+
 -- WHAT REPLACES IT: `depth-hop` reaches the root directly.  Its
 -- conclusion at `sched-init`/`st-init`/`root` is purely SYNTACTIC —
 -- `pathNestD root` is 0 and `Sched.slots (sched-init e ins)` is `ins` —
@@ -1139,7 +1129,7 @@ abstract
 -- is what made the old `depth-capped` statement false.  And the target
 -- is astronomically slack: `capsH e ins 0` is `blowH (capsBase e ins)`,
 -- carrying `2 * poolCount (towerℕ m) m`.
---
+
 -- AND THE TARGET DOMINATES AT A HEIGHT WITH ROOM IN IT, which is the
 -- second version of this paragraph and the reason the first was not
 -- enough.  The caps side is stated at a FREE height:
@@ -1148,7 +1138,7 @@ abstract
 -- level step exponentiates, and `poolBody` iterates it `towerℕ m`
 -- times).  The body below spends it at `k = 3 * capsBase e ins`, which
 -- leaves a factor of three for the measure half to land inside.
---
+
 -- THE MEASURE HALF IS THE LEAF, and it is the one thing the currency
 -- swap leaves owed here.  Its predecessor `nest-store≤capsH` went
 -- through `.Nest-Tower`'s `nestD-le-tower` — three measures at one
@@ -1185,6 +1175,16 @@ abstract
 -- different instance of that side condition — `3m+1≤towerℕ` is the
 -- `k = 3m` one and is spent below.  Nothing above this leaf reads the
 -- height.
+
+-- RECOVERY: `git show 555ee43^:agda/src/Verify-Budget-Sufficient/Depth-Bound.agda`
+--   restores the node-half kit — `foldr-⊔-bounded`, `node-nest-bounded`,
+--   `nodesNestMax-bounded`, an inversion of `stBounded?`'s `boundedNode`
+--   test — which is still TRUE and is the apparatus a stored-state
+--   version of the leaf below would want.  Only the SLOT half broke, and
+--   it broke because that generation's slot measure paid its def's
+--   nesting.  Both measures it was stated over are since DELETED with the
+--   nesting currency, so recovering the kit means restating it over
+--   `slotHop`.
 postulate
   -- ⚠ AND DO NOT BOUND THE STORE'S CONTRIBUTION BY A MAX OVER SLOTS.
   -- The predecessor's store measure did, and was refuted at a nine-slot
@@ -1230,10 +1230,10 @@ depthE≤capsH-root e ins =
 -- depthE≤capsH-root (above), whose consumer is burst-caps: it
 -- discharges the root instance of the depOK premise threaded below.
 
--- sizeCount-mono-d is now a real proof in Verify-Budget-Sufficient.Level-Mono
--- (imported above; discharged 2026-08-07).
+-- sizeCount-mono-d is a real proof in Verify-Budget-Sufficient.Level-Mono,
+-- imported above.
 
--- THE SUBSCRIBE-SIDE CAPS LIFT, and it is PROVEN (2026-08-06) — the
+-- THE SUBSCRIBE-SIDE CAPS LIFT, and it is PROVEN — the
 -- `sub-charge-capsOK-lift-core` postulate is replaced outright.
 -- What made it provable is the LAST premise, depOK: the general-id
 -- depth bound `depthE … ≤ capsH e sl id` is a RUN INVARIANT, not a
@@ -1462,7 +1462,7 @@ subscribeE-wet-via-caps {n = n} {e = e} g b κ id now sched st
 -- sizeStep S S = S * suc (2 * S) ≥ S + S ≥ suc S.
 -- SEALED (private impl + abstract alias): burst-caps is on the
 -- budget-sufficient spine, and an unfoldable body here is what OOM'd
--- VWF on 2026-08-07.
+-- VWF.
 private
  sucSize≤frameBlowup-go : ∀ (c : Caps) (d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
@@ -1536,16 +1536,17 @@ sizeE≤cap e ins =
 -- THE ROOT INSTANTIATION — ONE call to subscribeE-wet-via-caps, with
 -- burst-dry / burst-bounded / burst-caps as its three projections.
 -- The first two used to be a SECOND root call in .Wet, against the wet
--- face's five-hypothesis form; on 2026-08-13 the wet face was restated
+-- face's five-hypothesis form; the wet face was restated
 -- over the collapsed walk (.Walk-Level) and gained the caps
 -- hypotheses, which are exactly the ones this call site already had to
 -- supply.  So the two calls merged rather than the second one growing.
--- RECOVERY: git show c87c91a restores the split form.
 --
 -- pathLen root = 0, so suc (pathLen root) = 1 ≤ B (moot at the root).
 -- `EvalSt.connectedShares (st-init e) = []` (Evaluator:943) and
 -- `Sched.slots (sched-init e ins) = ins` (Evaluator:118), so the
 -- premises reduce to the root bounds at (capsAt e ins 0).
+--
+-- RECOVERY: git show c87c91a restores the split form.
 burst-all : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   let r   = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)

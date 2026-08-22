@@ -1,6 +1,6 @@
 # `make comments-check` — the source-comment law
 
-Holds every line comment in `agda/src` and `agda/evidence` to four checks. Run
+Holds every line comment in `agda/src` and `agda/evidence` to six checks. Run
 by both gate paths, in the cheap block, so a violation never costs a build.
 
 ```
@@ -23,7 +23,7 @@ So the law charges **explaining** and leaves **evidence** free, which is the
 same split the roadmap's row budget already uses for names. Everything below
 follows from that.
 
-## The five checks
+## The six checks
 
 **1 — Dates.** No calendar date in any comment. A receipt's content is its
 *coverage statement* — which shapes were reached, which were not — and coverage
@@ -88,7 +88,7 @@ against ninety-eight deleted probe files.
 | section | referent | resolved against |
 | --- | --- | --- |
 | `TWIN:` | a **proven** definition | declared in `agda/src` **and not in the postulate ledger** |
-| `REFUTED:` | a refutation | declared in `agda/evidence/refuted` |
+| `REFUTED:` | a refutation, live or spent | declared in `agda/evidence/refuted`, **or a git sha** |
 | `PROBED:` | a probe, live or spent | a module under `agda/evidence/probed`, **or a git sha** |
 | `RECOVERY:` | a commit | `git cat-file`, or a `git log … agda/…` form |
 | `DEAD ROUTE:` | *nothing* | not validated |
@@ -104,6 +104,13 @@ checked it. **A twin that is itself still a postulate means the class is
 wrong** — the route has not been walked, so the row is DIFFICULTY. That is a
 mis-classification caught mechanically.
 
+`REFUTED:` takes a sha for the same reason, and the reason is a rule rather
+than a convenience: a refutation dies when `src` can no longer STATE it, and
+deleting it then is *correct* — `src` must not keep machinery alive whose only
+purpose is making a dead route expressible, measured once at seven live
+definitions held up by six refutations. Demanding a live declaration would
+therefore demand the tree keep exactly what the deletion rule removes.
+
 `PROBED:` cannot demand a *live* probe, because a probe expiring with its
 target is correct and expected; "the probe is deleted" is a normal state and
 the receipt is all that survives. So the sha is the whole recovery route, and
@@ -113,7 +120,26 @@ aspire to.
 `--no-refs` skips this pass. Fixtures outside the real trees cannot be judged
 by it.
 
-**5 — Explanation budget.** The prose before the first evidence marker, with
+**5 — Say it once.** An explanation may not name the subject of a section the
+same block already carries: no "probe" above a `PROBED`, no "refutation" above
+a `REFUTED`, no "dead end" above a `DEAD ROUTE`, no `git show` above a
+`RECOVERY`. The prose copy is spending charged characters on what the free part
+says, and saying it worse — the section resolves and the sentence does not.
+
+The reason it is a *check* and not a style note is **drift**: the paragraph ages
+while the section stays live, so a block ends up carrying a refutation it no
+longer has beside a receipt that contradicts it, and nothing marks which
+sentence is current.
+
+**It fires only when the block ACTUALLY HAS that section**, which is what keeps
+it free of false positives — the duplication is then structural rather than a
+judgement about the writing, and prose naming a probe in a block with no
+`PROBED` section is the only place that fact could live. Marker lines and their
+indented continuations are not explanation, so a section whose own text names
+its own subject cannot fire against itself. At the sweep that introduced it,
+2 blocks of 2357.
+
+**6 — Explanation budget.** The prose before the first evidence marker, with
 sha-bearing lines free. Nothing evidential is ever what has to give.
 
 ## Where the budget comes from, and why it is not tighter
@@ -138,6 +164,7 @@ For calibration, the count it fires on at each ceiling: 2000 → 73 blocks,
 | --- | --- |
 | dates | delete the date. If the line said nothing but *when*, delete the line. |
 | markers | delete the line — `git log -S<name> --all` holds it, unrotting. |
+| echoes | delete the mention; the ledger below already carries it, resolvably. |
 | shape | move the evidence to the foot of the block, in order. If the stranded prose is superseded framing, it goes rather than moves. |
 | references | resolve it, or demote the section to `DEAD ROUTE:`, which names nothing and is not validated. A `REFUTED:` used as *emphasis* rather than as a ledger entry is the common case — reword it to name the module in backticks mid-prose. |
 | budget | **usually SPLIT, not cut.** A blank line separates blocks, so the ceiling caps one unstructured explanation rather than what a declaration may carry: an essay holding ten findings becomes ten blocks, each with its own heading and ledger, and nothing is deleted. Cut only when one block holds ONE finding and still runs long — then it is superseded framing, and what survives is usually a fifth of the words. |

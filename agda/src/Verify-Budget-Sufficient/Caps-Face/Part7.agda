@@ -44,7 +44,7 @@ open import Rx.Slots using (Slots; slotsSize)
 --
 --   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
 --     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
---     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     .Measures.  Extracted so that a grind here no longer
 --     re-checks .Wet — see that module's head.
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition
@@ -752,7 +752,7 @@ cascadeGo-deliveries siC ifc {n = n} {e = e} c d a id chains sl sched st 2≤S 1
 -- delivery's frames at the level the CASCADE entered at; the iteration
 -- charges each at the level the one before it LEFT.  That is the same
 -- distinction entry-charging was refuted on one stratum down
--- (machine-refuted 2026-08-01: a frame's own output breaches
+-- (machine-refuted: a frame's own output breaches
 -- the cap it was charged at), which is why the walk was rebuilt around
 -- levels in the first place — and why the count the recurrence spends
 -- was rebuilt around them too.
@@ -1279,10 +1279,10 @@ caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre val =
   j     = proj₁ GO
   jFits = proj₁ (proj₂ GO)
 
--- REFUTED (moved out of src 2026-08-18): `caps-frame-boundary-absurd`
--- (sizeStep C C ≤ C is impossible for 1 ≤ C) and `reach-via-size-absurd`
--- (2 ^ C ≤ C is impossible) now live in `refuted/Refuted/Caps-Face.agda`,
--- checked by `make refuted`.  Do not re-attempt either bound here.
+-- REFUTED: `caps-frame-boundary-absurd`
+--   (sizeStep C C ≤ C is impossible for 1 ≤ C) and `reach-via-size-absurd`
+--   (2 ^ C ≤ C is impossible) now live in `refuted/Refuted/Caps-Face.agda`,
+--   checked by `make refuted`.  Do not re-attempt either bound here.
 
 
 -- (`reach-resets`, the reset cluster this section's prose names, is

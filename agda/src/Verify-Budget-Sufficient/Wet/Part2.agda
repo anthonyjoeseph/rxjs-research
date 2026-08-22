@@ -1,14 +1,14 @@
 -- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY, part 2 of 4.
 --
 -- THE WET WALK's 36-member block (genuine cycles of 14 and 3).  Isolated
--- 2026-08-12 so that an edit anywhere else in the wet family does not
--- re-check it; this is the heaviest single unit in the module.
+-- so that an edit anywhere else in the wet family does not re-check it;
+-- this is the heaviest single unit in the module.
 --
--- Split from Verify-Budget-Sufficient.Wet on 2026-08-12 so that a
+-- Split from Verify-Budget-Sufficient.Wet so that a
 -- multi-member block gets its own module and an edit re-checks one
 -- part instead of 4.7k lines.  The family is FOUR modules numbered
 -- 1, 2, 3, 6: Parts 4 and 5 were the width walk and went with it
--- (2026-08-21).  The gap is deliberate — renaming Part6 would churn
+-- .  The gap is deliberate — renaming Part6 would churn
 -- every consumer's import for nothing, and .Measures carries the
 -- deletion record.
 

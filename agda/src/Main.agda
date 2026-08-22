@@ -1,4 +1,4 @@
--- MAIN IS THE TOP-LINE PROOF (Anthony, 2026-08-05).  Three rules:
+-- MAIN IS THE TOP-LINE PROOF (Anthony).  Three rules:
 --
 --   1. WHATEVER MAIN IMPORTS STICKS AROUND.  This list is the deletion
 --      exemption — it is not a build convenience.  Everything else in

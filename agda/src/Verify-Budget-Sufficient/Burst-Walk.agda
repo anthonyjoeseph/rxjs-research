@@ -1,25 +1,19 @@
 ------------------------------------------------------------------
 -- BURST-WALK: the THREE-flavour burst ledger over the Delivery-Walk —
 -- the walk/cascade burst content landed at Ŝ with no tower constant,
--- and (2026-08-13) the cascade's DRY half off the same run: the third
+-- and the cascade's DRY half off the same run: the third
 -- flavour is `nodry`, gas-conditioned through the walk's GOK hook, and
 -- `cascadeGo-nodry` — the ex-anchor — is now a projection of `cascadeGo-burst-nodry`.
 -- THE ANCHOR CHAIN IS DISCHARGED: `stepFrame-nodry`, which carried the last of
 -- its risk, is a real definition, and this module's only live postulate is
 -- `subscribeE-Ψ`.
--- RECOVERY: `git log --diff-filter=D -- agda/src/Verify-Budget-Sufficient/Demand-Probe.agda`
--- restores 1857 lines / 194 refl rows of GAS-DEMAND measurement — the minimal
--- gasPad h* at which each canonical program stops drying.  Deleted because its
--- target `cascadeGo-nodry` is discharged; wanted back only if a restatement
--- reopens gas SUFFICIENCY, which `subscribeE-Ψ` is not (that is fnCap/Ψ
--- preservation, and the probe says nothing about it).
---
--- Landed from Caps-Burst-Walk-Probe (DELETED; git history) (2026-08-10), which
+
+-- Landed from `git show 050c69a^:agda/probe/Caps-Burst-Walk-Probe.agda`, which
 -- was v2 of the route: v1's two bridging postulates were BOTH
 -- mis-stated (one concluded fnCap facts from hypotheses carrying no
 -- fnCap information; one lacked the plen/gas guards that keep its
 -- arithmetic true), and v0 — demand ledgers CONSTANT in the walk
--- level — was MACHINE-REFUTED (2026-08-10; the probe is deleted at
+-- level — was MACHINE-REFUTED (the probe is deleted at
 -- 83b29c1, this paragraph is the receipt).  The refutation: at
 -- fn = pairᵗ (varᵗ x) (varᵗ x), Dm = 1, Ψ = 0, one payload 0 : natᵗ,
 -- `sizeᵛ natᵗ 0 = 1` fits the bound and `sizeᵛ (applyFn fn 0) = 3`
@@ -33,7 +27,7 @@
 -- ledger through every frame, so Walk's *-widen fields are not
 -- decoration — they are the walk telling you the ledger must GROW
 -- WITH THE LEVEL.
---
+
 -- THE DESIGN, in one paragraph.  `valB? B Ψ`'s two conjuncts have
 -- OPPOSITE characters: the SIZE half grows per frame and must ride
 -- the walk's caps level (`valsCaps? (frameStep J c) sl`), while the
@@ -50,7 +44,7 @@
 -- appears NOWHERE — the anchor's content is no longer a second,
 -- measured-not-proven numeric model, but the same "landing level fits
 -- sizeCount" obligation the caps machinery exists to prove.
---
+
 -- WHAT REPLACED WHAT.  `cascadeGo-burst-dry` replaces BOTH
 -- `chainStep-demand` and `foldPath-demand` (ex-.Anchor-Dry, deleted) and
 -- their dry wrappers: the per-chain/per-fold granularity those carried
@@ -63,7 +57,7 @@
 -- reappears then is the nonzero-base level bound, and the design note
 -- for it is v1's `fold-level-fits` REPAIRED with `suc plen ≤ S` and a
 -- gas guard.
---
+
 -- THE FRAME FACE IS NOT A POSTULATE.  `stepFrame-burst-face` is
 -- an ASSEMBLY over the PROVEN `stepFrame-face` (.Caps-Face:4678) plus
 -- five per-frame WET leaves (`wet-face`) plus the DRY face
@@ -74,10 +68,17 @@
 -- the three state-local wet leaves (map, take, scan), `wet-inner` and
 -- `wet-thru` (the two *All edges, same family as `subscribeInner-demand`,
 -- ex-.Anchor-Dry), and `stepFrame-nodry`, which carries the dry.
---
+
 -- Also home to frameBΨ?/pathBΨ?/regsBΨ?, RELOCATED from .Caps-Bridge
 -- (they were defined there, downstream of this module's consumers).
 ------------------------------------------------------------------
+
+-- RECOVERY: `git log --diff-filter=D -- agda/src/Verify-Budget-Sufficient/Demand-Probe.agda`
+--  restores 1857 lines / 194 refl rows of GAS-DEMAND measurement — the minimal
+--  gasPad h* at which each canonical program stops drying.  Deleted because its
+--  target `cascadeGo-nodry` is discharged; wanted back only if a restatement
+--  reopens gas SUFFICIENCY, which `subscribeE-Ψ` is not (that is fnCap/Ψ
+--  preservation, and the probe says nothing about it).
 module Verify-Budget-Sufficient.Burst-Walk where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
@@ -233,7 +234,7 @@ module _ {n} {Γ : Ctx n} {t : Ty} where
     burstCaps? (frameStep J c) sl str ∧ burstΨ? Ψ str
       ∧ not (hasDry str)
 
--- any-dry-++ MOVED DOWN to .Walk-Level (2026-08-14), with the whole
+-- any-dry-++ MOVED DOWN to .Walk-Level, with the whole
 -- dry trio: the ground subscribeInner-walk consumes it there, and this
 -- module sits above .Walk-Level.  Imported back below.
 
@@ -445,10 +446,9 @@ OKB c sl Ψ J sched st =
 ------------------------------------------------------------------
 -- ONE FRAME PRESERVES BOTH FLAVOURS — no longer one postulate.
 --
--- 2026-08-10: `stepFrame-burst-face` was a MONOLITH; it is now a REAL
--- ASSEMBLY (`stepFrame-burst-face`) over the already-proven caps face plus five per-frame
--- WET leaves, of which the three STATE-LOCAL ones are proven here and
--- the two *All edges remain.
+-- `stepFrame-burst-face` is a REAL ASSEMBLY over the already-proven
+-- caps face plus five per-frame WET leaves, of which the three
+-- STATE-LOCAL ones are proven here and the two *All edges remain.
 --
 -- WHAT THE CAPS SIDE ALREADY GIVES.  `stepFrame-face` (Caps-Face:4678)
 -- picks a j′ and reports the level bound, `capsOK?`, `valsCaps?` and
@@ -460,7 +460,7 @@ OKB c sl Ψ J sched st =
 -- WHAT IS LEFT is the WET face of one frame (`WetFace`): five
 -- Ψ-only conjuncts, all frame-invariant — no level index anywhere.
 --
--- THE EVENTS CAPS HALF MOVED TO `FrameFace` (2026-08-10).  It sat here
+-- THE EVENTS CAPS HALF MOVED TO `FrameFace`.  It sat here
 -- first, at the assembly's j′ with the two caps receipts as hypotheses
 -- — and in that form the two *All leaves were UNPROVABLE: an emitted
 -- root delivery is pinned by no state or vals receipt, so a program
@@ -566,7 +566,7 @@ WetFace sl Ψ r =
 -- *All-edge postulates bottom out in (`wet-thru` and
 -- `subscribeInner-demand` (.Anchor-Dry) are the other two).
 --
--- Ψ-PURE SINCE 2026-08-10 (the FrameFace move, `FrameFace`'s header): no level
+-- Ψ-PURE (the FrameFace move, `FrameFace`'s header): no level
 -- index, no caps receipts.  What remains says only that a subscribe
 -- PRESERVES the Ψ ledger — the same invariant `INV?`'s Ψ half claims
 -- for whole subscribes (subscribeE-wet, tier 2) — so its proof is the
@@ -1582,21 +1582,21 @@ fnCapB-finish Ψ i true  out h =
 ------------------------------------------------------------------
 -- THE DRY FACE OF ONE FRAME (stepFrame-nodry) — WHERE THE ANCHOR'S RISK USED TO
 -- LIVE, and it is now a real definition (the ruling is `cascadeGo-nodry`'s header).
---
+
 -- One frame of one delivery, run on the WALK'S OWN MINTED GAS, emits
 -- no dried close.  This is the ex-anchor (`cascadeGo-nodry`)
 -- with everything transport-shaped stripped off: the walk carries
 -- dryness through appends and widens mechanically (`EbB`/`BbB`'s third
 -- flavour), so the entire dry content of the cascade concentrates in
 -- this one per-frame face.
---
+
 -- THE GAS HYPOTHESIS IS THE POINT.  `sf ≡ budgetAt e sl id` — the one
 -- gas `chainStep` mints (Rx/Evaluator:1598), carried to the frame by
 -- the walk's GOK/g-mint hook (.Delivery-Walk, built for exactly this).
 -- Without it the statement is FALSE: `subscribeInner g0` emits a
 -- dried close and the depth premise does not exclude g0 (depth
 -- measures nesting demand, not supply).
---
+
 -- THE GRIND ROUTE, per frame constructor:
 --   · map-f / take-f / scan-f — event inspection: these frames emit
 --     no events of their own (the map/take/scan leaves' proofs enumerate the outputs);
@@ -1618,7 +1618,7 @@ fnCapB-finish Ψ i true  out h =
 --           (.Caps-Bridge) makes one stratum up.  Needs
 --           cReg (frameStep J c) ≤ cSize (frameStep J c) — B2's
 --           frameStep analogue — for the registry-length conjunct.
---           ARITHMETIC CHECKED TRUE 2026-08-13 (hand derivation, not
+--           ARITHMETIC CHECKED TRUE (hand derivation, not
 --           yet machine): with F j := cSize (frameStep j c), R ≤ S,
 --           2 ≤ S, induct on j: F 0 = S ≥ R; F (suc j) = S + 2S·F j
 --           (frameStep-size-suc) ≥ S·F j + S·F j ≥ F j + R·S, and
@@ -1627,7 +1627,7 @@ fnCapB-finish Ψ i true  out h =
 --      (ii) the fuel: `budgetAt e sl id hasAtLeast suc G` for a demand
 --           G measured at Ŝ := sizeCapAt e sl (suc id) — the
 --           general-id crib of `caps-fuel-root` (.Wet/Part6, PROVEN,
---           id = 0).  SHAPE CHECKED 2026-08-13: `budgetAt e sl id`
+--           id = 0).  SHAPE CHECKED: `budgetAt e sl id`
 --           unfolds to gasPad (2^(sz·suc id·suc id)) (gasTower
 --           (3 + capsHgo m (suc id))) — the EXACT gas
 --           `budget-hasAtLeast sz m id` (.Measures, PROVEN, general
@@ -1637,7 +1637,7 @@ fnCapB-finish Ψ i true  out h =
 --           facts change instantiation.  The inner value's size fits
 --           under Ŝ by the walk's own landing arithmetic (lvl-fits +
 --           capsAt-suc-full, `cascadeGo-burst-nodry`'s payoff arithmetic).
---
+
 -- THIS FACE WAS THE ANCHOR'S RISKY REGION (a from-inner subscribe
 -- mid-delivery), carried as FALSITY until it was ground.  The receipt
 -- that still matters: it CANNOT BE PROBED, same as the anchor — the gas
@@ -1645,7 +1645,7 @@ fnCapB-finish Ψ i true  out h =
 -- normalise — so the discharge is a proof, and never could have been a probe.
 --
 -- ═══ THE FIVE-FRAME CENSUS — ALL FIVE ARE NOW REAL ═══
---
+
 -- `stepFrame-nodry` is an assembly over the frame constructors, and the risk
 -- did NOT spread evenly across them.  The census is kept because it is what
 -- located the consolidation below; the column says where each frame's dryness
@@ -1664,7 +1664,7 @@ fnCapB-finish Ψ i true  out h =
 --              again, free) plus `subscribeInner`'s.         via SiNodry
 --
 -- ═══ THE CONSOLIDATION THAT FALLS OUT, and it is the finding ═══
---
+
 -- Chase those two frames to their leaves and they MEET:
 -- `concatDrain` (Evaluator:1195) emits nothing of its own — its `bs`
 -- is `subscribeInner`'s, appended down the queue.  `switchKill` is
@@ -1679,11 +1679,11 @@ fnCapB-finish Ψ i true  out h =
 --                 hasDry conjunct, at `fuel` — and the walk face asks for
 --                 `g hasAtLeast suc G`, an INEQUALITY, not a pin to
 --                 `budgetAt`, so the `gs`-peel goes straight through.
---                 Checked 2026-08-13; had the walk pinned its gas the
+--                 Checked; had the walk pinned its gas the
 --                 descent would not have typed.
 --
--- ═══ THE LOOP QUESTION, RULED 2026-08-13 ═══
---
+-- ═══ THE LOOP QUESTION, RULED ═══
+
 -- The two remaining frames are NOT one-step: `concatDrain` and
 -- `thruWalk` LOOP, calling `subscribeInner` at a state that has
 -- already moved.  So the leaf's hypotheses (capsOK? and friends, all
@@ -1692,14 +1692,14 @@ fnCapB-finish Ψ i true  out h =
 -- conclusion cannot.  The gas hypothesis is the one part that threads
 -- for FREE: `fuel` is passed unchanged by every one of innerReact,
 -- innerFinish, concatDrain, thruWalk, thruConsume and thruWrap
--- (checked 2026-08-13), so the `g0` exclusion never has to be re-won.
---
+-- (checked), so the `g0` exclusion never has to be re-won.
+
 -- TWO ROUTES WERE ON THE TABLE.  (A) take the already-proven caps
 -- faces (siC/ifc) as extra parameters and re-establish `capsOK?` at
 -- the moved state from their Σ-witness, mirroring what `stepFrame-burst-face` already
 -- does one level up.  (B) widen SiCFace/IfcFace's own conclusions
 -- with a nodry conjunct, so the re-establishment comes for free.
---
+
 -- RULED: (A).  (B) is tidier to read and strictly worse to build —
 -- its suppliers (`subscribeInner-caps`, `innerFinish-caps`) are
 -- PROVEN inside Subscribe-Face, so widening their conclusions
@@ -1707,7 +1707,7 @@ fnCapB-finish Ψ i true  out h =
 -- (timings: typecheck-performance-numbers.md), and buys no strength that threading the same witness does not.
 -- (A) also has a working precedent in this file rather than a
 -- hypothetical one.
---
+
 -- WHAT THAT MAKES THE TWO FRAMES: transport over ONE leaf, named
 -- below as `SiNodry` and — at the time of the ruling — postulated once,
 -- since PROVEN as `subscribeInner-nodry`.  The `-core` pair keeps
@@ -1735,7 +1735,7 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   PbB c Ψ J κ ≡ true →
-  -- THE PATH-LENGTH HYPOTHESIS, IN THE CAPS FACE'S OWN SHAPE (2026-08-15).
+  -- THE PATH-LENGTH HYPOTHESIS, IN THE CAPS FACE'S OWN SHAPE.
   -- This is `lC` verbatim from subscribeE-caps / subscribeInner-caps, and
   -- that is the point: WalkStmt's hypotheses ARE the caps face's, so the wet
   -- inner call has no business asking for a different one.
@@ -1753,7 +1753,7 @@ SiNodry = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   depthInner g op allNid κ id now o sched st ≤ dep →
-  -- the reset-anchor ceiling (2026-08-13): the walk face's pins force
+  -- the reset-anchor ceiling: the walk face's pins force
   -- the honest instantiation Ŝ := sizeCapAt e sl (suc id), and this is
   -- the c-to-entry anchoring the caller owns (c is free here; the
   -- caller knows it is capsAt-rooted).  The face's budget at this
@@ -1788,7 +1788,7 @@ budgetAt-gs e sl id
 ... | k , eq rewrite eq =
       gasPad k (gasTower (3 + capsHgo (capsBase e sl) (suc id))) , refl
 
--- THE SAME FACT WITH THE PAD COUNT KEPT (2026-08-15).  budgetAt-gs
+-- THE SAME FACT WITH THE PAD COUNT KEPT.  budgetAt-gs
 -- existentially quantifies the GAS, which is all its own consumers need —
 -- but a caller that wants a hasAtLeast bound needs the ℕ pad, since
 -- hasAtLeast-pad-plus is indexed by it.  The body above already computes
@@ -1808,10 +1808,10 @@ budgetAt-gs-pad e sl id
 ... | k , eq rewrite eq = k , refl
 
 -- splitEvents-nodry / splitBurst-nodry MOVED DOWN to .Walk-Level
--- (2026-08-14), with any-dry-++: the ground subscribeInner-walk
+-- , with any-dry-++: the ground subscribeInner-walk
 -- consumes the split there.  Imported back through the module import.
 
--- EX-RESIDUE, PROVEN 2026-08-13.  It was postulated on the grounds
+-- EX-RESIDUE, PROVEN.  It was postulated on the grounds
 -- that `outWᵛ` sits outside this module's import scope — a missing
 -- import, not a mathematical obstacle, and the wrong reason for a
 -- postulate.  `dWᵛ` at an `obs` type IS `dWᵉ` (Rx/Frame-Width:411,
@@ -1853,7 +1853,7 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- Residue postulates for subscribeE-inner-nodry-core.
 -- Each names one manufacturing obligation; all seven are consumed by
 -- the assembly below.
--- subscribeE-inner-nodry-pSz and -pLen are BOTH GONE (2026-08-15), and they
+-- subscribeE-inner-nodry-pSz and -pLen are BOTH GONE, and they
 -- fell to the same one-line change: the inner call now subscribes at `suc J`,
 -- matching the PROVEN twin subscribeInner-caps.
 --   · -pLen was an identity returning a bound nothing could supply.  With the
@@ -1880,7 +1880,7 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- families, so the lemmas were simply left behind when the Ψ predicates
 -- themselves were relocated); and the two slot conjuncts are hypotheses,
 -- transported across walkOK's `Sched.slots sched ≡ sl`.
---
+
 -- ⚠ SHAPE DEFECT FOUND AND REPAIRED — the SAME anti-pattern as `-pLen`
 -- above ("a conclusion needing information that appears in NONE of its
 -- hypotheses"), caught by reading the definitions rather than by a failed
@@ -1891,7 +1891,7 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- never bounds the SLOT STORE's size or fn-weight, and fnCapBounded? reads
 -- only live/nodes.  `PbB`/`VbB` are about the path and the value.  So the
 -- statement was UNDERDETERMINED, not hard.
---
+
 -- The repair MIRRORS a hypothesis already threaded at every level of this
 -- stack: `slotsSize sl ≤ cSize c` was present all the way down (so that
 -- conjunct was always reachable and only the transport was unstated); its
@@ -1900,8 +1900,8 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- instantiation Ψ := ΨAt e sl is `fnCapᵉ e + slotsFnCap sl`, so the new
 -- hypothesis is `m≤n+m` — the same way `caps-fuel-root` (.Wet/Part6)
 -- already discharges it.
---
--- ⚠ AND THE SAME DEFECT AGAIN, ONE CONJUNCT OVER — REFUTED 2026-08-21,
+
+-- ⚠ AND THE SAME DEFECT AGAIN, ONE CONJUNCT OVER — REFUTED,
 -- machine-checked: `inner-nodry-inv-regLen-absurd` (agda/evidence/refuted,
 -- Refuted.Inner-Nodry).  INV?'s THIRD conjunct is the registry CARDINALITY
 -- against the SIZE cap, and the only hypothesis mentioning that length is
@@ -1910,7 +1910,7 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- every hypothesis and breaks the conclusion — the witness holds four root
 -- chains under cReg 4 and cSize 3, with every other conjunct clear by a
 -- margin.
---
+
 -- THE LESSON, and it is why the row was misclassified: this row was called
 -- GRINDABLE on the grounds that "every conjunct has a named source IN
 -- SCOPE", and `frameStep-reg≤size` was one of the names.  A lemma being
@@ -1919,7 +1919,7 @@ inner-dWO {n = n} {u = u} c sl Ψ J o vb =
 -- `cReg c ≤ cSize c`, neither of which the statement carried.  So the
 -- premise is now stated at the level the conclusion is stated at, where
 -- the consumer discharges it from its own `2≤S` and `hCR`.
---
+
 -- AND THE SLOT PREMISE IS RE-INDEXED RATHER THAN CONDITIONED.  It reads
 -- `slotsSize sl ≤ Caps.cSize (frameStep J c)`, which is the WEAKER
 -- hypothesis and therefore the STRONGER statement: the inflation transport
@@ -1948,7 +1948,7 @@ subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc rgSz ((slEq , cOK) , fcb
     (subst (λ x → (slotsFnCap x ≤ᵇ Ψ) ≡ true) (sym slEq)
       (T⇒≡true (slotsFnCap sl ≤ᵇ Ψ) (≤⇒≤ᵇ slFc)))
 
--- pathB? FOR THE EXTENDED PATH — a real body since 2026-08-20, and it is
+-- pathB? FOR THE EXTENDED PATH — a real body, and it is
 -- three lines.  `frameB? B Ψ (from-inner _ _ _) = true` (.Measures) gives the
 -- head by `refl`, and `pathB?-of-parts` — PROVEN above in this module since
 -- the relocation that moved it out of downstream .Caps-Bridge — recombines
@@ -1969,22 +1969,21 @@ subscribeE-inner-nodry-pBO c Ψ J op allNid inst κ pb =
       (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c)) κ) (pathBΨ? Ψ κ) pb)))
 
 -- Gas bound at the inner call: fuel hasAtLeast suc G.
--- ASSEMBLED 2026-08-14: follows from gk via budgetAt-gs (gs-peel) and the
--- demand chain dBound-bound → prod≤3pow → tower-3 → m≤n+m.  sizeᵉ o ≤ Ŝr
--- hypothesis added (was missing; derives at call site from szO via
--- frameStep-mono-j + opIterD-infl + the caller's cl ceiling).
--- RESTATED 2026-08-13 at the RESET caps Ŝ := sizeCapAt e sl (suc id):
--- the walk face's reset-anchor pins reject the old level-cap
--- instantiation (frameStep J c cannot ceiling a walk that climbs
--- past J), and the reset caps are where budget-hasAtLeast actually
--- lives — budgetAt e sl id is minted from e's entry measures, so
--- this form is the MORE provable one.
--- SEALED 2026-08-15.  This was a POSTULATE the wet spine consumed as an
--- axiom; discharging it makes the body transparent to Verify-Well-Formed,
--- which is the exact transition that OOMed the first full build after
--- wet-landing-lift's discharge tonight (`Killed: 9` in VWF/Part13; a fourth
--- instance of the trap, figures in typecheck-performance-numbers.md).  No
--- consumer needs more than the type.  private-impl + abstract-alias rather
+-- THE ROUTE: gk via budgetAt-gs (gs-peel) and the demand chain
+-- dBound-bound → prod≤3pow → tower-3 → m≤n+m.  The `sizeᵉ o ≤ Ŝr`
+-- hypothesis derives at the call site from szO via frameStep-mono-j +
+-- opIterD-infl + the caller's cl ceiling.
+--
+-- IT IS STATED AT THE RESET CAPS Ŝ := sizeCapAt e sl (suc id), not at a
+-- level cap: the walk face's reset-anchor pins reject the level-cap
+-- instantiation (frameStep J c cannot ceiling a walk that climbs past J),
+-- and the reset caps are where budget-hasAtLeast lives — budgetAt e sl id
+-- is minted from e's entry measures, so this form is the MORE provable one.
+--
+-- SEALED, AND THE SEAL MAY NOT COME OFF.  A transparent body here reaches
+-- Verify-Well-Formed, which is the exact transition that OOMs a full build
+-- (`Killed: 9` in VWF/Part13; the trap's instances are in
+-- typecheck-performance-numbers.md).  No consumer needs more than the type.  private-impl + abstract-alias rather
 -- than a plain `abstract` block, because the body has a with-abstraction
 -- and untyped where-bindings, both of which `abstract` rejects.
 -- The type is NAMED rather than written twice: private-impl + abstract-alias
@@ -2144,7 +2143,7 @@ subscribeE-inner-nodry-core wl {n} {Γ} {t} {e} {u}
                                                       dep bud (suc (sizeᵉ o)) (suc J)))))
                      cl)
 
-  -- THE PATH-LENGTH BOUND, DERIVED (2026-08-15) — cribbed from
+  -- THE PATH-LENGTH BOUND, DERIVED — cribbed from
   -- subscribeInner-caps, which pays the same unit the same way: extend the
   -- path by a frame, subscribe at one more j, and the chain bound carries.
   step⊑  = frameStep-mono-j c 2≤S (n≤1+n J)
@@ -2348,7 +2347,7 @@ abstract
 -- bodies could not pay used to be postulated here.  Nothing is: the one
 -- surviving member is `switchKill-context`, a real body, and the four NOTEs
 -- below are what it and its neighbours THREAD rather than assert.
---
+
 -- NOTE ON slFc: slotsFnCap sl ≤ Ψ is THREADED, not postulated.  It is a
 -- static capsule invariant that OKB cannot reach — `walkOK` is
 -- slots-eq × capsOK?, and capsOK? bounds live/nodes/registry/widths but
@@ -2360,8 +2359,8 @@ abstract
 -- Ψ := ΨAt e sl is `fnCapᵉ e + slotsFnCap sl`, so the whole chain is
 -- discharged by `m≤n+m` at cascadeGo-burst-nodry — the same way
 -- `caps-fuel-root` (.Wet/Part6) already discharges it.
---
--- NOTE ON ceiling, RESOLVED (2026-08-20): the per-element ceiling is no
+
+-- NOTE ON ceiling, RESOLVED: the per-element ceiling is no
 -- longer paid from the frame's fused `fLvlD` by an unstated inequality.
 -- The thru walk threads an ABSTRACT ceiling level L̂ — `CL`'s own idiom,
 -- one flavour down — and converts it to each element's budget with the
@@ -2371,8 +2370,8 @@ abstract
 -- the other wants it small) leaves the level algebra entirely; what
 -- survives is a nest bound with no ceiling coupled to it, and one
 -- k-and-index fit at the frame boundary.
---
--- NOTE ON loop invariants, RESOLVED (2026-08-20): OKB/regP? after a
+
+-- NOTE ON loop invariants, RESOLVED: OKB/regP? after a
 -- subscribeInner / thruConsume step are no longer leaves.  Each is the caps
 -- face's own step (.Subscribe-Face) tensored with this module's Ψ face, with
 -- `capsOK?-regs` and `regP?-of-parts` recombining the registry halves at the
@@ -2383,7 +2382,7 @@ abstract
 -- subscribeInner-nodry call.  A REAL BODY, and the whole of it is a
 -- three-way split of the conjunction along the faces that already own the
 -- pieces — nothing about `switchKill` is re-derived here.
---
+
 -- WHY THIS ONE IS AT THE SAME LEVEL, where the thru side's same-level form
 -- is REFUTED (Refuted.Thru-Loop): `switchKill` only ever DROPS.  It filters
 -- the registry through `cutThrough`, sweeps `live` against the survivors and
@@ -2391,10 +2390,10 @@ abstract
 -- concat park GROWS a node's queue, which is what `capsOK?`'s width conjunct
 -- bounds, so there a post-state need not satisfy the invariant at the level
 -- its pre-state did.  Dropping cannot break an upper bound; appending can.
---
+
 -- THE SPLIT.  `walkOK` is slots-eq × `capsOK?`, and the Ψ half is
 -- `fnCapBounded?`, so the three pieces land on three faces:
---
+
 --   Sched.slots ≡ sl    ← switchKill-Ψ's first conjunct (the record update
 --                          touches `live`, never `slots`, so this is the
 --                          hypothesis itself — but read it off the face that
@@ -2648,9 +2647,6 @@ concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
 -- Loop invariant after one thruConsume step: OKB + regP? at the level
 -- the step LANDS at, with that level reported.
 --
--- ⚠ REFUTED IN THE SAME-LEVEL FORM (2026-08-20) — `Refuted.Thru-Loop`,
--- and the witness computes: `capsOK?` on the post-state evaluates to
--- `false` while the conclusion demanded `true`.
 --
 -- WHY.  Concat's park clause is a pure GROWTH step: with the node's
 -- inner already active, `thruConsume` appends the element to the node's
@@ -2658,10 +2654,10 @@ concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
 -- is `refl` there, and why nothing else in this block notices.  And
 -- `capsOK?`'s width conjunct bounds that queue's LENGTH
 -- (`widNode`'s `length q ≤ᵇ W`).  A queue sitting AT the cap is one
--- park from breaching it, and the refuted telescope said nothing about
+-- park from breaching it, and the same-level telescope said nothing about
 -- the queue at all: CLAUDE.md's first almost-always-wrong shape.
 --
--- IT WAS NOT A ZERO-CAP ARTIFACT: the refutation's caps are read off the
+-- IT IS NOT A ZERO-CAP ARTIFACT: the witness's caps are read off the
 -- value (cSize 3, cWid 2, both pinned by `refl`), every other conjunct
 -- held with margin, and the only tight one was the length.  Threading
 -- `vb : VbB c sl Ψ J vals` would NOT have repaired it either: VbB bounds
@@ -2689,6 +2685,10 @@ concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
 -- thing preserved, and this step exists to grow it.  Shape-checking a
 -- statement against `hypothesis ⇒ conclusion` says nothing about the
 -- STEP in between.
+--
+-- ⚠ REFUTED IN THE SAME-LEVEL FORM — `Refuted.Thru-Loop`,
+--   and the witness computes: `capsOK?` on the post-state evaluates to
+--   `false` while the conclusion demanded `true`.
 
 -- IT IS NO LONGER A POSTULATE.  `thruConsume-caps` (.Subscribe-Face) is this
 -- step's caps face, PROVEN, and it already reports the landing level in the
@@ -3537,7 +3537,7 @@ module BurstWalk
     ; Vb        = VbB c sl Ψ
     ; Eb        = EbB c sl Ψ
     ; Bb        = BbB c sl Ψ
-    -- THE GAS HOOK, SPENT (2026-08-13, the anchor ruling, `cascadeGo-nodry`'s header): the
+    -- THE GAS HOOK, SPENT (the anchor ruling, `cascadeGo-nodry`'s header): the
     -- nodry flavour is gas-conditioned, so GOK pins the frame gas to
     -- the one gas the walk mints.  g-mint is the walk's own slotsEq
     ; GOK       = λ sf id → sf ≡ budgetAt e sl id
@@ -3640,7 +3640,7 @@ module BurstWalk
 
 ------------------------------------------------------------------
 -- THE PAYOFF (cascadeGo-burst-nodry) — the walk/cascade burst content, at Ŝ, with no Dm,
--- AND the cascade's dry half, off the SAME run (2026-08-13).
+-- AND the cascade's dry half, off the SAME run.
 --
 -- The level arithmetic is `cascadeGo-caps`'s own (Caps-Face:4901),
 -- cribbed term for term: Res.cnt through dWalkᶜ-mono and cDel-body,
@@ -3749,7 +3749,7 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 
 ------------------------------------------------------------------
 -- THE EX-ANCHOR (cascadeGo-nodry) — the cascade's dry half, now TWO PROJECTIONS of
--- the `cascadeGo-burst-nodry` run (2026-08-13; postulate → definition).
+-- the `cascadeGo-burst-nodry` run (postulate → definition).
 --
 -- THE RULING THAT DISCHARGED IT: the dry half rides the walk as a
 -- THIRD, GAS-CONDITIONED ledger flavour (`EbB`/`BbB`), spending the GOK/g-mint
@@ -3772,14 +3772,14 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
 -- named manufacture obligations, (i) mid-delivery INV? and (ii) the
 -- general-id fuel, each a crib of a proven sibling, and each since paid.
 --
--- History (mirror census 2026-08-12, demand-side probe 2026-08-13,
+-- History (mirror census, demand-side probe,
 -- the can't-probe receipt): superseded by this discharge; recover the
 -- full text from the parent of the landing commit if the route ever
 -- needs re-litigating.  The can't-probe receipt SURVIVES on `stepFrame-nodry`'s header,
 -- restated there.
 ------------------------------------------------------------------
 
--- (DELETED 2026-08-18) `cascadeGo-burst-dry` sat here — `proj₁` of
+-- (DELETED) `cascadeGo-burst-dry` sat here — `proj₁` of
 -- `cascadeGo-burst-nodry`, exactly as `cascadeGo-nodry` below is `proj₂`.
 -- Its only consumer was `dry-tick-core`'s argument list, and that list is
 -- wrong about itself: the dry half concludes `hasDry`, and a `burstB?`

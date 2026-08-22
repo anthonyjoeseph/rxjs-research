@@ -146,7 +146,7 @@ frameStep j c =
 --     exponential in the number of shared slots (2 ^ (k+2) - 2) while
 --     every component of the triple stays linear (registrations 2k + 2,
 --     cSize and cWid constant).  2 ^ k passes 12k + 6 for good at k = 7.
---
+
 -- THE SHAPE THAT SURVIVES, derived from the share DAG rather than
 -- guessed, and REPAIRED once since: the first derivation had a false
 -- middle step and Mint-Loop-Probe caught it.
@@ -159,7 +159,7 @@ frameStep j c =
 -- per subset.  The step that FAILS is reading R as cReg:
 --
 --     deliveries ≤ 2 ^ cReg          -- FALSE, and measured false
---
+
 -- The R of that count is the registry AT THE END of the cascade, not at
 -- entry, because `shareAdmit` reads the live registry; a fold that mints
 -- on a shared slot adds a node mid-traversal.  Mint-Loop-Probe's
@@ -167,13 +167,13 @@ frameStep j c =
 -- registry of 7, and 2 ^ 7 = 128.  So the excess is real, `D * cSize`
 -- is itself over `2 ^ cReg * cSize`, and the whole paths-times-frames
 -- route through that middle step is gone.
---
+
 -- WHAT SURVIVES IS THE SAME INJECTION WITH A SECOND COORDINATE.  A
 -- delivery is sent not to the set of registrations it visits but to the
 -- PAIR (the pre-state registrations it visits, an index for which minted
 -- registrations it went through).  The first coordinate ranges over
 -- subsets of the entry registry — `2 ^ cReg` of them.
---
+
 -- THE SECOND COORDINATE IS NOT BOUNDED BY cSize, and that was the second
 -- thing measured false here.  It was first stated so, on the reasoning
 -- that a mint is born of a subscribe inside ONE frame and a frame's step
@@ -183,7 +183,7 @@ frameStep j c =
 -- lean two-level ladder and 8 against 3 on the lean three-level one.
 -- The lean families exist for exactly this: they keep the delivery
 -- structure and shrink the syntax the cap is read off.
---
+
 -- AND THAT SQUARE IS FALSE TOO — the third correction, and the first
 -- one predicted before it was measured.  The pair story gave
 --
@@ -199,7 +199,7 @@ frameStep j c =
 -- growth is `2 ^ (2 ^ L)`-shaped — DOUBLY exponential in the ladder
 -- depth, hence a 2-TOWER over cReg, not any single exponential and not
 -- a square of one.
---
+
 -- AND THE 2-TOWER `2 ^ (2 ^ cReg)` IS GONE TOO — not because a row
 -- breached it (none does) but because NOTHING CAN PROVE IT.  Every
 -- route to a bound that reads cReg alone needs two facts, and the two
@@ -219,7 +219,7 @@ frameStep j c =
 -- repaired by making the bound bigger: any closed form F would have to
 -- satisfy `F ≥ (1 + cReg + Q · F) ^ (1 + n)`, and no natural number
 -- does.
---
+
 -- SO THE BOUND STOPS BEING A FORMULA AND BECOMES A RECURSION, `cDel`,
 -- exactly as the caps themselves did.  `dCap` (Rx.Evaluator) is the
 -- SEQUENTIAL reading of the very same two facts: the walk is done one
@@ -230,7 +230,7 @@ frameStep j c =
 -- (dispatch gas, walk position) is well-founded where the closed form
 -- was circular.  The refuted routes are recorded at
 -- cascadeGo-deliveries in .Caps-Face; this is what replaces them.
---
+
 -- IT IS ACKERMANN-FLAVOURED IN THE GAS, and the height pays for that by
 -- READING it: `blowH` is `6 + m + 2 · poolCount (towerℕ m)`, and
 -- poolCount IS this count with every field pooled.  The per-instant
@@ -246,7 +246,7 @@ frameStep j c =
 -- carrying (pR vs pRs, 3 ↦ 12 against 3 ↦ 30) belongs to the per-fold
 -- `foldStep` / `sizeStep` gates, which is where State-Blowup-Probe
 -- checks it.
---
+
 -- AND cWid MAY NEVER COME BACK INTO THE COUNT.  Width-Count-Probe
 -- proves the reason: `iterFold` EXPONENTIATES per fold, so j folds put
 -- the width above towerℕ j, and a count that reads cWid would iterate
@@ -258,13 +258,13 @@ frameStep j c =
 -- `suc (length vals * suc (sizeᵗ fn))` and `length vals` is a burst
 -- width.  Where that width is paid for is the open question the charge
 -- face carries.
---
+
 -- The cSize factor still reads cSize because that is where the length
 -- conjunct puts it, not because a length is a size: `pathLen p ≤ᵇ cSize`
 -- is a separate conjunct of the same field, and at pM 6 the two
 -- genuinely differ (a 9-frame chain in a state whose largest term
 -- measures 7).
---
+
 -- STILL INSIDE THE ROUND-5 GATE: the count reads the Caps triple and
 -- nothing else, so round3b-ledger-reset-absurd stays unavailable
 
@@ -273,8 +273,8 @@ frameStep j c =
 -- cSize), the walk starts at LEVEL 0 — the entry caps themselves,
 -- `frameStep 0 c ≡ c` — and every registry length, chain cap and
 -- per-frame receipt the walk reads is read off the level it has climbed
--- to.  Nothing is charged at the entry caps, which is the 2026-08-02
--- repair (machine-refuted 2026-08-01).
+-- to.  Nothing is charged at the entry caps, and charging there is
+-- machine-refuted.
 --
 -- ABSTRACT, and it is a NORMALISATION contract rather than an
 -- abstraction one.  `iterSize` and `iterFold` pattern-match on the

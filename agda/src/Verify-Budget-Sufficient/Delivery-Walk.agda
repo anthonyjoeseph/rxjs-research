@@ -10,16 +10,14 @@
 --     shareGo       sf gas … ps …    ↦  dWalkᶜ S W R d gas J (length ps)
 --     cascadeGo     a id chains …    ↦  dWalkᶜ S W R d n   J (length chains)
 --
--- with J the CAPS LEVEL at the call's entry state.  That is the
--- 2026-08-02 repair, and it is forced: the walk used to thread a
+-- with J the CAPS LEVEL at the call's entry state.  That is forced: the walk used to thread a
 -- REGISTRY and charge each delivery a fixed `Q` read once at the
 -- cascade's entry caps, and charging anything per-frame at the entry
--- caps is machine-refuted (2026-08-01 — one
--- `map-f` frame's output breaches the very cap it was charged at,
--- because `applyFn` grows a value).  The honest per-frame face is the
+-- caps is machine-refuted — one `map-f` frame's output breaches the very
+-- cap it was charged at, because `applyFn` grows a value.  The honest per-frame face is the
 -- PROVEN `stepFrame-caps`, which REPORTS its growth as an index j′ and
 -- lands at `frameStep (j + j′) c`, so the walk carries that index.
---
+
 -- WHAT THE LEVEL BUYS, and why it is simpler rather than harder:
 --
 --   · THE REGISTRY NEEDS NO ACCOUNTING.  `capsOK?`'s own fifth conjunct
@@ -34,7 +32,7 @@
 --   · AND THE WALK STILL DECOMPOSES FROM THE FRONT: `dWalkᶜ-front`
 --     (.Caps) is an equality, so the change of direction the head-first
 --     evaluator forces costs nothing, exactly as before.
---
+
 -- WHY THE HYPOTHESES ARE A RECORD AND NOT POSTULATES.  The frame face is
 -- a fact about `stepFrame` under a caps invariant, and `capsOK?` lives
 -- two strata up (.Caps-Face).  Rather than postulate a caps-flavoured
@@ -45,7 +43,7 @@
 -- lists), and the facts about one frame under them.  .Caps-Face is
 -- where they are instantiated, at `capsOK? (frameStep J c)`,
 -- `pathSz? (cSize (frameStep J c))` and `valsCaps? (frameStep J c) sl`.
---
+
 -- AND THE TWO SYNTACTIC LEDGERS ARE NOT OPTIONAL: without them the
 -- frame fact is FALSE, not merely unproven.  Quantified over an
 -- arbitrary `vals` it is refuted by one `thru-outer` frame, which
@@ -206,7 +204,7 @@ shareAdmit-chP {Γ = Γ} Pb i ((rid , s , (u , p)) ∷ r) h
 -- denied.  The face this record asks for is that shape with a bound on
 -- j′, where the previous record asked for same-level preservation —
 -- which is FALSE, machine-refuted by one `map-f` frame
--- (machine-refuted 2026-08-01).
+-- (machine-refuted).
 --
 -- AND THE TWO SYNTACTIC LEDGERS ARE STILL NOT OPTIONAL, for the same
 -- reasons they never were: `sf-step` quantified over an arbitrary

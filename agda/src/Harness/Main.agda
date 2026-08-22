@@ -166,8 +166,8 @@ rowAt 8 = "runDry (sucG (progD 7 8)) (progD 7 8)  [TRUE = REFUTES] = "
             ++ showB (runDry (sucG (progD 7 8)) (progD 7 8))
 
 ------------------------------------------------------------------
--- QUARANTINE — DEAD ROUTE 2026-08-12: the caps counting family is
--- UNREACHABLE BY MEASUREMENT, and compiling it does not change that.
+-- QUARANTINE.  The caps counting family is UNREACHABLE BY MEASUREMENT,
+-- and compiling it does not change that.
 --
 -- WHAT WAS TRIED.  This harness was built partly on the hypothesis that
 -- `poolCount`'s silence in the typechecker was OPACITY (`fLvlD` is
@@ -186,7 +186,7 @@ rowAt 8 = "runDry (sucG (progD 7 8)) (progD 7 8)  [TRUE = REFUTES] = "
 -- iterates a number that itself grows with the level.  The value is
 -- astronomically large by construction; no backend prints it.
 --
--- CONSEQUENCE — this CONFIRMS the 2026-08-11 ruling "THE ANCHOR CANNOT
+-- CONSEQUENCE — this CONFIRMS the ruling "THE ANCHOR CANNOT
 -- BE PROBED" by an INDEPENDENT route (native code, no typechecker in the
 -- loop), and confirms its stated reason: the blowup is COMPUTATIONAL,
 -- not definitional.  Un-sealing the `abstract` blocks would not help,

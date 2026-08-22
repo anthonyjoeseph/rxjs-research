@@ -41,7 +41,7 @@ open import Rx.Slots using (Slots; slotsSize)
 --
 --   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
 --     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
---     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     .Measures.  Extracted so that a grind here no longer
 --     re-checks .Wet — see that module's head.
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition
@@ -128,7 +128,7 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- is the drain's one subscribe per queued inner, and that is the
 -- second number, the one nothing in the tree reports
 --
--- ASSEMBLY (2026-08-06): narrowed over the burst-construction and
+-- ASSEMBLY: narrowed over the burst-construction and
 -- slot-transport toolkit stated at ~3608-3645, which is exactly the
 -- kit the drain's output needs — one `∷` per queued inner's burst,
 -- and the four `*-slots` substitutions that move a bound from the
@@ -146,10 +146,9 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- to `innerFinish-face-keep` at j′ = 0, and concat+yes is the one real
 -- obligation — `innerFinish-caps` (Subscribe-Face:1761), which is
 -- exactly what H1 and H2 were added to feed.
--- LANDED from InnerFinish-Concat-Go-Probe (DELETED; git history) (2026-08-10):
--- `ifc` (IfcFace = innerFinish-caps' type) threads as a new first kit
--- arg so the proof can call innerFinish-caps without creating a circular
--- import (Subscribe-Face already imports Caps-Face).
+-- `ifc` (IfcFace = innerFinish-caps' type) threads as the FIRST kit arg
+-- so the proof can call innerFinish-caps without creating a circular
+-- import — Subscribe-Face already imports Caps-Face.
 innerFinish-concat-face-go :
     -- ifc  (innerFinish-caps, Verify-Budget-Sufficient/Subscribe-Face.agda:1760)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -290,13 +289,13 @@ innerFinish-concat-face-go ifc k₁ k₂ k₃ k₄ k₅
          (sym ndEq)
          rearranged
 
--- thruOuter-face-core: PROVED (2026-08-11) by landing the body from
--- ThruOuter-Face-Core-Probe (DELETED; git history).  Private helpers inline
+-- thruOuter-face-core: PROVED by landing the body from
+-- the probe whose body became `thruOuter-face-core` (`git show 0b9cca9`).  Private helpers inline
 -- Subscribe-Face's walk machinery against a `siC` hypothesis instead
 -- of a direct call to subscribeInner-caps.  Abstract to keep VWF
 -- from reaching the walk helpers on the budget-sufficient spine.
 
--- LIFTED OUT OF THE `private` BLOCK BELOW, 2026-08-19.  These nine were
+-- LIFTED OUT OF THE `private` BLOCK BELOW.  These nine were
 -- private clones of lemmas .Subscribe-Face also proved, and the clones
 -- existed because Part6 sits BELOW Subscribe-Face and could not see the
 -- originals — a duplicate forced by module ORDER, not by carelessness.
@@ -905,7 +904,7 @@ abstract
   thruOuter-face-core = thruOuter-face-core-go
 
 -- the two faces, assembled over their cores
--- P3's ASSEMBLY, landed from `InnerFinish-Concat-Probe (DELETED; git history)`.
+-- P3's ASSEMBLY, landed from ``git show 360d562^:agda/probe/InnerFinish-Concat-Probe.agda``.
 -- `innerFinish-concat-face-core` is a REAL DEFINITION now: one call to
 -- the sub-postulate at `nd = lookupNode allNid (EvalSt.nodes st)`, with
 -- no with-abstraction anywhere between, so `dpt`'s type and the

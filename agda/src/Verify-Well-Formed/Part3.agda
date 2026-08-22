@@ -123,7 +123,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
                       (sym (+-identityʳ (countRegs s (EvalSt.registry st))))
 
 -- ════════════════════════════════════════════════════════════════════════
--- SUBSCRIBE-SIDE DECOMPOSITION BLUEPRINT (opened 2026-07-19)
+-- SUBSCRIBE-SIDE DECOMPOSITION BLUEPRINT
 --
 -- subscribeE-wf preserves BurstInv across one subscription's burst, and yields
 -- a protocol run for that burst.  BurstInv is CLEAN: fin-independent, and (as of
@@ -132,13 +132,13 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- events (unlike FoldInv's SHADOW), because the burst's events are reconciled
 -- into live by runProtocol, not carried.  done-plumbed is a root-exit obligation
 -- (root-done-plumbed), handed to burst-final directly.
---
+
 -- THE CENTRAL MECHANISM.  A subscription grows the registry by `register`ing a
 -- source and, in the SAME burst emit, ships an `init` of that source.  runProtocol
 -- applies the init to `live`, so countIn and countRegs bump in lockstep and
 -- live-matches is preserved.  Symmetrically a one-shot's `close`+`complete` drain
 -- what its `init` added.  Every clause below is an instance of this balance.
---
+
 -- CLAUSE GROUPS (b : Closed Γ u = Exp Γ [] [] [] u), and their obligations:
 --   · ABSURD: varᵉ () — Δ ≡ [] so t ∈ [] is uninhabited.  Proven by ().
 --   · RECURSION: μᵉ — fuel-zero emits dryBurst (hasDry ≡ true, contra nodry, ⊥);
@@ -170,22 +170,22 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --     merge coherence (root-caches) actually gets exercised (walk subscribes
 --     inners) — and where the SECOND fork below says the counter cannot be kept
 --     coherent emit-by-emit, only re-established at the exit.
+
+-- A FORWARD TYPE DECLARATION and not a postulate; the body sits below, after
+-- subscribeE-take-wf.  The gap postulates further down cover the blocked
+-- clauses — the map-/scan-/take- shape gaps, the four *All wrap clauses,
+-- subscribeE-input-wf/defer-wf/takeᵉ-wf — while dispatchShare-wf and the
+-- stepFrame-wf-inner-concat/outer residues are blocked on merge-cert, the
+-- SKETCH in Part8's establishment block rather than a Part4 postulate.
 --
--- BUILD ORDER (outside-in): PHASES 1-4 DONE; this is now a forward TYPE DECLARATION
--- (not a postulate), with the body placed after subscribeE-take-wf (~line 3100).
--- DONE: (3) oneShotBurst-wf (base clauses ofᵉ/emptyᵉ); (4) subscribeE-map-wf,
--- subscribeE-scan-wf, subscribeE-take-wf (frame clauses).  pushBurst-wf and
--- stepFrame-burst were dropped (both had `→ Set` return types — asserting nothing
--- checkable by the typechecker).  The gap postulates below cover blocked clauses
--- (map-*/scan-*/take-* shape gaps, the four *All wrap clauses,
--- subscribeE-input-wf/defer-wf/takeᵉ-wf).  dispatchShare-wf and the
--- stepFrame-wf-inner-concat/outer residues remain blocked on merge-cert — the
--- SKETCH in Part8's establishment block, no longer a Part4 postulate (retired
--- 2026-08-18 with the alive-vs-present finding on Part4.root-mergeCache).
--- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other recursion
--- drops Closed structurally; Agda sees it inline, mirroring subscribeE itself.
+-- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other
+-- recursion drops Closed structurally; Agda sees it inline, mirroring
+-- subscribeE itself.
 --
--- ── FORK SURFACED while landing (3) oneShotBurst-wf (2026-07-20) ─────────
+-- A `→ Set` return type asserts nothing the typechecker can check, which is
+-- why there is no pushBurst-wf or stepFrame-burst here.
+
+-- ── WHY done-plumbed IS A ROOT-EXIT OBLIGATION AND NOT A BurstInv FIELD ──
 -- oneShotBurst-run PROVES a base burst ALWAYS ends done ≡ true (the trailing
 -- `complete` latches it).  So subscribeE-wf's output BurstInv.done-plumbed is
 -- demanded at EVERY base subscribe as `allShareSunk (registry st) ≡ true`
@@ -212,15 +212,13 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --   So per the standing rule (input-side fields earn their existence from
 --   consumers, not symmetry), done-plumbed is a ROOT-EXIT obligation, not
 --   threaded through the recursive/inner BurstInv.
---   RESOLVED (2026-07-20): done-plumbed DROPPED from BurstInv.  It is now
---   re-established once, at burst-final, from the `root-done-plumbed` postulate
---   (root-returned stream's done ≡ true ⟹ registry share-sunk — the merge-
---   coherence content, to be proven when the *All wrap clauses are).  This
---   also DELETED the `allShareSunk` premise the base clause used to owe.  Fully
---   proof-side (BurstInv is not the spec); makes subscribeE-wf TRUE for inners
---   (only done-plumbed was false there).  Note kept as the rationale of record.
---
--- ── SECOND FORK, same shape, surfaced while proving cut-head-joint (2026-07-27) ─
+--   SO IT IS NOT A FIELD.  It is re-established once, at burst-final, from
+--   the `root-done-plumbed` postulate — root-returned stream's done ≡ true ⟹
+--   registry share-sunk, the merge-coherence content, provable when the *All
+--   wrap clauses are.  That is what makes subscribeE-wf TRUE for inners, and
+--   it is entirely proof-side: BurstInv is not the spec.
+
+-- ── WHY caches IS A ROOT-EXIT OBLIGATION TOO, and it fails harder ──
 -- BurstInv.caches asserted cachesValid of every intermediate burst state.  It is
 -- FALSE there, and — unlike done-plumbed, which merely failed on one path — it
 -- fails in BOTH DIRECTIONS, so no weakening rescues it:
@@ -233,37 +231,36 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- nodeCacheOK's merge clause demands equality while the outer is registered, and
 -- the outer IS registered across both (subscribeAll registers it before pushBurst).
 -- Both halves were checked by computation before the field was dropped;
--- the probe that checked them is retired (2026-08-09).
+-- the probe that checked them is retired.
 --   CONSUMER: exactly as with done-plumbed — BurstInv.caches was read ONLY by
 --   burst-final (root frame-0 exit → Inv.caches).
---   RESOLVED (2026-07-27): caches DROPPED from BurstInv, re-established once at
---   burst-final from the `root-caches` postulate — the settled state, by which
---   point every mergeBump has landed.  This also DELETED initReg-wf's `cok`
---   premise and cachesValid-setNode-ok (both existed only to feed the field), and
---   reduced pushBurst-scan-caches to pushBurst-scan-fixed.  root-caches is the
---   same merge-coherence content root-done-plumbed is waiting on, so the two
---   discharge together, once the *All wrap clauses acquire real proofs.
+--   SO IT IS NOT A FIELD EITHER.  It is re-established once at burst-final
+--   from the `root-caches` postulate — the settled state, by which point every
+--   mergeBump has landed.  root-caches is the same merge-coherence content
+--   root-done-plumbed waits on, so the two discharge together, once the *All
+--   wrap clauses acquire real proofs.
 -- ════════════════════════════════════════════════════════════════════════
 -- ════════════════════════════════════════════════════════════════
 -- GAP POSTULATES — real gaps against the actual lemma types
 -- ════════════════════════════════════════════════════════════════
 
--- REFUTED AND DELETED (2026-08-06): `burst-done-false` claimed
--- `BurstInv id sched st S → done S ≡ false`.  It is FALSE — BurstInv's four
--- fields never mention `done`, so the empty state with `done = true` inhabits
--- it and forces `true ≡ false`.  Machine refutation:
--- `Battery-Burst-Done (DELETED; git history)` (`burst-done-false-absurd`, a proven ⊥).
--- oneShotBurst-wf's own header (below, ~line 876) had said so all along:
--- `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it
--- must come from the walk order."  So it now comes from the walk order —
--- `subscribeE-wf` and every per-clause receipt TAKE it as the premise `deq`,
--- threaded unchanged down the spine, and `subscribe-wf` supplies `refl` at
--- `protocol-init`.  The threading was rehearsed in a probe first; that
--- rehearsal is spent and the probe is retired (2026-08-09).
+-- `burst-done-false` — `BurstInv id sched st S → done S ≡ false` — IS FALSE,
+-- and is not stated anywhere: BurstInv's four fields never mention `done`, so
+-- the empty state with `done = true` inhabits it and forces `true ≡ false`.
+--
+-- REFUTED: `git show 94a5a3c^:agda/probe/Battery-Burst-Done.agda` holds
+--   `burst-done-false-absurd`, a proven ⊥.
+--   oneShotBurst-wf's own header (below, ~line 876) had said so all along:
+--   `done ≡ false` is a subscribe-TIME fact and "BurstInv cannot carry it; it
+--   must come from the walk order."  So it now comes from the walk order —
+--   `subscribeE-wf` and every per-clause receipt TAKE it as the premise `deq`,
+--   threaded unchanged down the spine, and `subscribe-wf` supplies `refl` at
+--   `protocol-init`.  The threading was rehearsed in a probe first; that
+--   rehearsal is spent and the probe is retired.
 postulate
   -- mapᵉ GAP 1: hasDry propagates inward through the map push.
   --
-  -- ROUTE (2026-08-19): `pushBurst-map-char` (Part5:432) shows that
+  -- ROUTE: `pushBurst-map-char` (Part5:432) shows that
   -- subscribeE (mapᵉ f b) κ ... ≡ (map (reEmit (map (applyFn f))) burst, sched, st)
   -- where burst = proj₁ (subscribeE b (map-f f ↠ κ) ...).  `stepFrame (map-f f)`
   -- returns evs = [] (Evaluator:1271-1272), so the events of each reEmitted emit are
@@ -295,7 +292,7 @@ postulate
 
   -- scanᵉ GAP 1: hasDry propagates inward through the scan push.
   --
-  -- ROUTE (2026-08-19): `stepFrame (scan-f fn nid)` also returns evs = []
+  -- ROUTE: `stepFrame (scan-f fn nid)` also returns evs = []
   -- (Evaluator:1274-1284 — the scan frame writes only to the node table, never
   -- emitting protocol events).  So the events of each pushBurst emit are
   -- `splitEvents(inner events).bookkeeping ++ map value vals′ ++ finFlag`,
@@ -333,13 +330,13 @@ postulate
   -- Sched.live, so all four BurstInv fields are preserved at the FIELD TYPE level.
   -- But Agda does NOT fire this at the record-type INDEX level — it compares whole
   -- sched / st objects, not their projections.
-  -- DISCHARGED 2026-08-06 — see `scan-binv-adapt` (a real definition) below.
+  -- `scan-binv-adapt` below is the real definition that closes this.
 
   -- takeᵉ GAP 1: hasDry propagates inward through the take push.  Twin of
   -- scan-nodry-push, plus the `ecEq` the evaluator's `with evalTm count`
   -- needs before the outer side reduces at all.
   --
-  -- ROUTE (2026-08-19): Same structural argument as scan-nodry-push.  The `evs`
+  -- ROUTE: Same structural argument as scan-nodry-push.  The `evs`
   -- from `takeDispatch` in the NON-cut case are [] (Evaluator:1096).  In the
   -- CUT case, `evs = closes` where `closes = proj₁ (proj₂ (cutThrough ...))`.
   -- `cutThrough` (Evaluator:251-261) emits only `close src cut` or
@@ -367,7 +364,7 @@ postulate
   -- returns the valsLast? conjunct (off the proven pushBurst-take-valsLast),
   -- so the take clause's conclusion needs no bridge.
 
--- scanᵉ GAP 2, DISCHARGED (2026-08-20): the freshly installed scan node
+-- scanᵉ GAP 2, DISCHARGED: the freshly installed scan node
 -- survives the inner `subscribeE b`.  The Σ is here only because the
 -- consumer (.Part8) asks for one; the witness is `evalTm seed` on the nose,
 -- since a subscribe writes nothing below the watermark it was handed.  The
@@ -388,7 +385,7 @@ scan-node fuel f seed b κ id now sched st =
   , mint-install-survives fuel b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
       (scan-st (evalTm seed)) sched st
 
--- takeᵉ GAP 2, DISCHARGED (2026-08-20): scan-node's twin, and it needs no Σ
+-- takeᵉ GAP 2, DISCHARGED: scan-node's twin, and it needs no Σ
 -- — a take node's count is spent by the take FRAME, which runs above this
 -- subscription rather than inside it, so `suc k` comes back exactly.
 take-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -402,12 +399,12 @@ take-node fuel k b κ id now sched st =
   mint-install-survives fuel b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
     (take-st (suc k)) sched st
 
--- scan-binv-adapt: DISCHARGED (2026-08-06).  Was a postulate; its own comment
+-- scan-binv-adapt: DISCHARGED.  Was a postulate; its own comment
 -- said "provable inline as record { … }" and that was right.  A scanᵉ clause
 -- mints a node and installs it, and BurstInv reads NEITHER: `installNode`
 -- touches only `nodes`, `mintNode` only `nextNode`, so `EvalSt.registry` and
 -- `Sched.live` are unchanged and all four fields transport by record eta with
--- no rewrites.  Verified in `Battery-VWF-Prop (DELETED; git history)`.
+-- no rewrites.  Verified in ``git show 1f1730e^:agda/probe/Battery-VWF-Prop.agda``.
 scan-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (fuel : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u)
   (b : Closed Γ s) (κ : Path Γ u t)
@@ -501,7 +498,7 @@ postulate
   -- the sync prefix in the SAME emit (`init src ∷ map value sync`), so
   -- the run has values to absorb and the schedule grows a live entry.
   --
-  -- STRUCTURAL OBSTACLE (2026-08-19): the emit is `(init src ∷ map value sync)
+  -- STRUCTURAL OBSTACLE: the emit is `(init src ∷ map value sync)
   -- at id from src as subscribe`.  `runProtocol` must handle this combined
   -- init + values emit.  `stepProtocol-faithful` (Part5:415) handles value-free
   -- transforms of bursts, and `initReg-run` (above) covers `init src ∷ []` only.
@@ -542,7 +539,7 @@ postulate
 
   -- deferᵉ: init + register, no inner burst at subscribe time.
   --
-  -- ROUTE (2026-08-19): `subscribeE fuel (deferᵉ body) κ ...` reduces to
+  -- ROUTE: `subscribeE fuel (deferᵉ body) κ ...` reduces to
   -- (Evaluator:1485-1496):
   --   burst  = ((init src ∷ []) at id from src as subscribe) ∷ []
   --   sched' = sched₄ (after mintNode, mintSource, mintOrdinal, live ∷= entry)
@@ -677,7 +674,7 @@ postulate
 -- second and third pins below carry that.
 --
 -- So the question moved up to `BurstInv.live-matches` itself, and Anthony
--- ruled it (2026-08-18): key the field off `EvalSt.dying st`, not off an
+-- ruled it: key the field off `EvalSt.dying st`, not off an
 -- envSrc index — A′, the field note in .Part2.  `dyF` is then not re-keyed
 -- but GONE, since what it was trying to establish became the field's own
 -- hypothesis.  Its TRUE form survives as `subscribeE-dying` (.Part8):
@@ -721,7 +718,7 @@ _ = λ sched dyF →
              (record (st-init (emptyᵉ {t = natᵗ})) { dying = 0 ∷ [] }) 0
              0)
 
--- ── AND THE PROPOSED REPAIR IS REFUTED TOO (2026-08-17) ─────────────
+-- ── AND THE PROPOSED REPAIR IS REFUTED TOO ─────────────
 -- The route above says: re-key `dyF` off the envSrc-conditioned
 -- `FoldInv.dying-envSrc`.  Following it to the BOTTOM of the chain
 -- kills it.  `dyF` is threaded through pushBurst-take-joint and
@@ -782,7 +779,7 @@ _ = λ n Γ bal → 1+n≢0 (bal {Γ′ = Γ} {t = natᵗ} 0 0 (0 ∷ []) 0 (0 �
 --
 -- which nothing in scope supplies, because `Sched` (Evaluator:63) is a
 -- plain record whose `live` and `slots` are independent and nothing
--- tied them across a schedule transition.  Anthony's ruling (2026-08-15)
+-- tied them across a schedule transition.  Anthony's ruling
 -- put the fact on BurstInv/Inv/Mid as the `hot-live` field rather than
 -- into this signature as a hypothesis — tracked debt, not laundered —
 -- and `BurstInv.hot-live binv i (cong hotSlot? slotEq)` spends it

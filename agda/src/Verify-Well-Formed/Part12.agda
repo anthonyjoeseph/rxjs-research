@@ -432,7 +432,7 @@ mergeReachable-drop-false nid s ((rid , x , (u , p)) ∷ r) h with sameSource s 
 ... | false rewrite ∨-fˡ (pathThruOuter nid p) (mergeReachable nid r) h =
       mergeReachable-drop-false nid s r (∨-fʳ (pathThruOuter nid p) (mergeReachable nid r) h)
 
--- the pure nubLen SET-PARTITION (PROVEN, 2026-07-19), isolated from the
+-- the pure nubLen SET-PARTITION (PROVEN), isolated from the
 -- latch/guard/isLast shell.  At full ps and cancelled ≡ [] the arrSource inners
 -- dropSource removes are EXACTLY those mergeAdjust adds back: countLiveInners of
 -- the full registry splits into the adjustment plus countLiveInners of the

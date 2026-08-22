@@ -43,7 +43,7 @@ open import Rx.Slots using (Slots)
 --
 --   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
 --     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
---     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     .Measures.  Extracted so that a grind here no longer
 --     re-checks .Wet — see that module's head.
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition

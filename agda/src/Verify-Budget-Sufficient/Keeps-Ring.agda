@@ -67,7 +67,7 @@ open import Verify-Budget-Sufficient.Measures using
 -- subscribeInner re-enters subscribeE on an observable VALUE o
 -- carried by the carrier's burst, so the clause owes a strictly
 -- smaller dBound demand for o.  Two routes were stated for it.  One
--- survives; the other was REFUTED 2026-07-27 and is gone.
+-- survives; the other was REFUTED and is gone.
 --
 --   hop-anchored (SURVIVES)  o crossed a SHARE boundary — it came out
 --             of slot i's def, whose shells are unrelated to b's.
@@ -79,10 +79,9 @@ open import Verify-Budget-Sufficient.Measures using
 --
 --   hop-descends (FALSE)  measureE B o ≺ᵛ measureE B b — "o's shells
 --             sit inside b's", fed to dBound-hop through rank-mono-≺.
---             This does not hold, at ANY of its three claimed sites.
---             Hop-Descent-Probe (DELETED; git history) refutes all three by
---             absurd pattern (make hop-descent-probe).
---
+--             This does not hold, at ANY of its three claimed sites; all
+--             three die by absurd pattern.
+
 -- WHY IT IS FALSE, in one line: a hop value is a TEMPLATE
 -- INSTANTIATED WITH A VALUE, and a template may use its bound
 -- variable more than once.  subΘ then copies that value's shells
@@ -94,10 +93,10 @@ open import Verify-Budget-Sufficient.Measures using
 -- whose hop grows class-4 from 1 to 2.  Note it needs no `caseᵗ` and
 -- no exotic typing — an ordinary two-use lambda over an obs-typed
 -- source does it.
---
+
 -- Three things this KILLS, and it is worth being exact about each:
 --
---   · the isData restriction (2026-07-27) does NOT rescue site 2a.
+--   · the isData restriction does NOT rescue site 2a.
 --     It empties the plug when the SOURCE is data, but `caseᵗ` mints
 --     an obs-carrying value from a closed term — `inlᵗ (strmᵗ big)` —
 --     and binds it to a Θ var the branch then uses twice.  The
@@ -111,22 +110,22 @@ open import Verify-Budget-Sufficient.Measures using
 --     clause a demand `d` that the clause was to peel with dBound-hop,
 --     and with the hop's measure able to exceed the carrier's that
 --     peel was unavailable — `d` could simply under-count the walk.
---     SETTLED 2026-07-28: `r` is now hopDᵉ V b (phase 2 below).
---
+--     SETTLED: `r` is now hopDᵉ V b (phase 2 below).
+
 -- Site 3, μ-unfold, was unaffected and had been proven as unfoldμ-≺;
 -- under hopD it is not even an inequality (hopD is EQUAL across an
 -- unfold), so the shell version is retired with the rest.
---
+
 -- WHAT `r` MUST BE INSTEAD is open.  Note first that this is the
 -- SAME pattern syncBudget's memo already records as the reason the
 -- budget must be a tower at all — "a scanᵉ with an obs-typed
 -- accumulator whose template embeds the accumulator twice
--- (acc ↦ mergeAll(of[acc,acc]))", measured 2026-07-19.  That memo
+-- (acc ↦ mergeAll(of[acc,acc]))", measured.  That memo
 -- read the pattern as a demand SIZE problem and towered the budget
 -- for it; what went unnoticed is that the same two-use template also
 -- destroys the per-hop ORDER the demand was to descend in.  The size
 -- half is fine and stays.
---
+
 -- Ruled out as `r` so far, each against the probe's witness:
 --   · the shell multiset — the refutation above
 --   · syncSizeᵉ — 16 ↦ 17 across the witness's first hop
@@ -134,7 +133,7 @@ open import Verify-Budget-Sufficient.Measures using
 --   · obs-depth of the subscribed type — CONSTANT along the
 --     witness's hop chain (natᵗ, natᵗ, natᵗ), so never strict
 --   · strmᵗ-nesting depth — 1, 1, 0: non-strict at the first hop
---
+
 -- THE CANDIDATE, now stated as Rx.Hop-Depth.hopD: a REMAINING-HOP
 -- count — how many *All frames a subscription can still enter.  Two
 -- of its clauses were forced by witnesses rather than chosen:
@@ -150,15 +149,15 @@ open import Verify-Budget-Sufficient.Measures using
 --     sync-linearity ledger already uses.
 --
 -- V enters at scanᵉ, where the accumulator is REFOLDED: hopD(accₖ)
--- grows once per folded value — the 07-19 memo's "after k folded
--- values the acc nests k deep" — so the clause pays (2 + occs)^V,
+-- grows once per folded value — the acc nests k deep after k folded
+-- values — so the clause pays (2 + occs)^V,
 -- from solving aₖ ≤ F + c·(aₖ₋₁ ⊔ m) at k ≤ V.  hopD is therefore a
 -- function of the expression AND the store bound, which is what
 -- dBound already anticipates in allowing r ≤ R = suc V ^ suc V.
---
--- MEASURED (2026-07-27) before anything below took a dependency on it.
--- Static, in Hop-Descent-Probe (DELETED; git history) — all four refutation
--- witnesses descend strictly (2↦1, 2↦1, 2↦1, 4↦2); the scan
+
+-- THE DESCENT IS MEASURED, statically and corpus-wide, and it was measured
+-- before anything below took a dependency on it.  Statically, all four
+-- refutation witnesses descend strictly (2↦1, 2↦1, 2↦1, 4↦2); the scan
 -- accumulator's depth is 0,1,2,3 after 0..3 folds, against a clause
 -- paying 256 at V ≡ 4; and hopD is EQUAL across a μ unfold, since an
 -- unfold substitutes for a Δᵍ variable and those sit only under
@@ -166,7 +165,7 @@ open import Verify-Budget-Sufficient.Measures using
 -- keeps paying with dBound-μ's s — unfoldμ-≺ was NOT assumed to
 -- transfer, it is a fact about the shell multiset and says nothing
 -- about hopD.
---
+
 -- Corpus-wide, via the burst probe's numeric hopLog (make
 -- the burst harness), testing the emitted-value invariant hopD v ≤ hopD b
 -- that the hop edge consumes — with hopD (mergeAllᵉ c) ≡ suc (hopD c),
@@ -178,17 +177,16 @@ open import Verify-Budget-Sufficient.Measures using
 --   C₃ directed, 3 slots, 2 shares     36 progs     681 obs   0 viol
 --   D  directed, obs into templates    14 progs     172 obs   0 viol
 --   D  generated, obs into templates  700 progs   17804 obs   0 viol
---
+
 -- Re-measured in full after the coefficient became a multiplier: the
 -- coefficient sits on both sides of every one of these inequalities,
 -- so none of the earlier greens carried over.
 --
--- B was first run at 6 programs (three seeds deep) and REBALANCED
--- 2026-07-28 toward breadth — 40 seeds × 25 programs at depth 3 —
--- because random SHARE shapes are where a surprise would hide and
--- depth had been bought at coverage's expense.
+-- B IS BREADTH-WEIGHTED — 40 seeds × 25 programs at depth 3 — because
+-- random SHARE shapes are where a surprise would hide, and a deeper,
+-- narrower run buys depth at coverage's expense.
 --
--- D WAS ADDED 2026-07-28 to close a structural blind spot, and it is
+-- D CLOSES A STRUCTURAL BLIND SPOT, and it is
 -- the only one of the six with a demonstrated ability to see the bug
 -- this measure was calibrated against.  A, B, C and C₃ keep every
 -- observable inside `ofᵉ (strmᵗ e ∷ …)` with e Θ-CLOSED — the
@@ -209,19 +207,19 @@ open import Verify-Budget-Sufficient.Measures using
 --
 --   occsᵗ (the index-blind count)   130 obs   9 VIOLATIONS
 --   the multiplier                  130 obs   0 violations
---
+
 -- Eight of those eleven programs fire under occsᵗ; the other three are
 -- controls whose shapes are correct by construction.  That 9 ↦ 0 is
 -- the evidence that the corpus can see the mechanism at all — a corpus
 -- that cannot fail on the bug it guards is decoration.
---
+
 -- Three further directed programs (mulG/mulG₂) carry the SECOND
 -- refutation, the one the per-binder count `occs0ᵗ` also failed: an
 -- outer template that mentions its observable once and duplicates
 -- nothing, over an inner map whose coefficient multiplies whatever
 -- lands in its source.  Their machine-checked static counterpart is
--- Hop-Descent-Probe's mul-exceeds (6 against an allowance of 4 under
--- occs0ᵗ) and mul-fits (2 ≤ 2 under the multiplier); the corpus
+-- mul-exceeds (6 against an allowance of 4 under occs0ᵗ) and mul-fits
+-- (2 ≤ 2 under the multiplier); the corpus
 -- carries the runtime guard.
 --
 -- (Two of thirty D seeds time out on pathological programs and are
@@ -236,7 +234,7 @@ open import Verify-Budget-Sufficient.Measures using
 -- the test harder, never hide a violation.  Sweeping it over 4/8/16
 -- gives identical counts and no violations, so the cap is not deciding
 -- the answer.
---
+
 -- AND k ≤ V, the piece whose failure would have reshaped the assembly,
 -- turns out to need no measurement at all — it is a CONSEQUENCE of the
 -- store invariant this proof already carries, not a new premise:
@@ -249,16 +247,15 @@ open import Verify-Budget-Sufficient.Measures using
 --     does not raise hopD either, so it costs nothing;
 --   · hence k ≤ sizeᵛ accₖ ≤ V, which is the scan clause's side
 --     condition, discharged from INV? rather than assumed.
---
+
 -- The margin is not close, and that is why no corpus counter was
 -- written for it: V is towerℕ ((4 + size) · suc id), so V ≥ towerℕ 5 ≡
 -- 2^65536.  A counter comparing a run's fold count against a number
 -- that cannot be computed would be vacuous, not evidence.  (k≤towerℕ,
 -- already proven above, is the arithmetic half.)
---
--- THE GATE PASSED, and PHASE 2 (the assembly) is DONE as of
--- 2026-07-28 — everything below is now stated in terms of hopD and
--- typechecks.  What moved, and what it cost:
+
+-- PHASE 2 (the assembly) IS DONE — everything below is stated in terms
+-- of hopD and typechecks.  What moved, and what it cost:
 --
 --   · `r` is hopDᵉ V b, a plain ℕ.  rank ∘ measureE is gone and
 --     NOTHING replaces the rank wrapper — hopD is already the number.
@@ -278,10 +275,10 @@ open import Verify-Budget-Sufficient.Measures using
 --     hopD-map/-take/-scan/-all above are one line each.
 --   · the μ edge is not even an inequality — see the hopD structural
 --     block's header.
---
+
 -- AND THEN THE HOP EDGE ITSELF WAS REFUTED, same day, before anything
 -- was proven — which is what phase 2 existed to find out.
---
+
 -- The plan was that the hop edge needs no postulate: hopD's *All
 -- clauses are literally suc (hopD carrier), so a walk conjunct
 --
@@ -289,16 +286,21 @@ open import Verify-Budget-Sufficient.Measures using
 --     subscribed                                        (burstHopD?)
 --
 -- would make the strictness definitional.  That conjunct is FALSE for
--- hopD as written.  Hop-Descent-Probe (DELETED; git history) (make
--- hop-descent-probe) carries the witness as refl-checked numbers plus
--- an absurd pattern: a program whose allowance is 2 and whose very
--- first emission is 3.
+-- hopD as written: a program whose allowance is 2 and whose very first
+-- emission is 3.
 --
+-- PROBED: `git show 94a5a3c^:agda/probe/Hop-Descent-Probe.agda` carries
+--   the witness as refl-checked numbers plus an absurd pattern, together
+--   with mul-exceeds / mul-fits and the four static descent rows this
+--   header cites.  COVERED: the three claimed hop-descent sites and the
+--   two coefficient candidates; NOT covered: anything outside the
+--   scripted-slot shapes.
+
 -- WHY, and it is a CALIBRATION bug in one coefficient rather than a
 -- failure of the remaining-hop idea.  hopD's mapᵉ clause scales by a
 -- coefficient, and the question is what that coefficient counts.
 -- Three answers were tried in one day; the first two are refuted by
--- machine-checked witnesses in Hop-Descent-Probe (DELETED; git history).
+-- machine-checked witnesses.
 --
 -- (1) occsᵗ, the index-blind count the sync-linearity ledger uses.
 -- It counts EVERY varᵗ in the template.  The coefficient exists to
@@ -326,12 +328,12 @@ open import Verify-Budget-Sufficient.Measures using
 -- witness: an outer template that mentions its argument exactly once
 -- and duplicates nothing, emitting at hop depth 6 against an
 -- allowance of 4.
---
+
 -- Note (1) and (2) point in OPPOSITE directions: (1) over-prices
 -- phantom duplication, (2) under-prices real multiplication.  That is
 -- what makes the third answer determined rather than guessed — it is
 -- pinned from both sides.
---
+
 -- Neither is the two-use duplication that killed measureE.  That was
 -- real duplication the measure failed to price at all.
 --
@@ -354,20 +356,20 @@ open import Verify-Budget-Sufficient.Measures using
 -- the same reason and at the same index.  It also reads the witnesses
 -- of (1) and (2) correctly in BOTH directions: 1 where occsᵗ said 3,
 -- and 1 where occs0ᵗ's ×3 came from primᵗ positions hopD scores as 0.
---
+
 -- WHAT IT COST, all inside the same three exponential stories: hopR's
 -- exponent went from polynomial to exponential (see the hop-rank-cap
 -- memo), hopD-size was restated at (2+s)^(V′^s) — the old (2+s)^(V′·s)
 -- is FALSE for a multiplier and was retracted rather than left
 -- standing — and prod≤3pow's side condition moved from 3V ≤ 2^V (V ≥ 4)
 -- to (V+2)² ≤ 2^V (V ≥ 6).  The budget tower did not move.
---
+
 -- WHAT STOOD THROUGHOUT: the structural facts, the μ edge, `r`'s slot
 -- being a plain ℕ, and R being a cap on hopD over store-sized syntax
 -- whatever the coefficient.  What is RESTATED: the emitted-value
 -- conjunct, burstHopD? above, carried by subscribeE-walk.
---
--- PHASE 3 IS DISCHARGED (2026-07-29).  The conjunct's engine is built
+
+-- PHASE 3 IS DISCHARGED.  The conjunct's engine is built
 -- and contains no postulate:
 --
 --   pm-subΘ          a coefficient does not move under substitution
@@ -389,7 +391,7 @@ open import Verify-Budget-Sufficient.Measures using
 -- THE SHARE BOUNDARY IS THE ONLY input SITE AT AN OBSERVABLE TYPE.
 -- `scripted` demands T (isData (obs u)), and isData (obs u) is false, so
 -- the constructor is uninhabited here and Agda discharges it with (). This
--- is the whole content of the 2026-07-27 restriction, in one absurd pattern:
+-- is the whole content of the restriction, in one absurd pattern:
 -- before it, this lemma was false and the *All input clause had a case that
 -- could not be paid for.  Every hop that reaches a slot is now a connect.
 obs-slot-shared : ∀ {n} {Γ : Ctx n} {k u} (s : Slot Γ k (obs u)) →

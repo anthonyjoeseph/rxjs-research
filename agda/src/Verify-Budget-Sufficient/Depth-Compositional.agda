@@ -1,13 +1,13 @@
 ------------------------------------------------------------------
 -- THE SUBSCRIBE-SIDE DEPTH BOUND, in the tree's own depth currency.
---
+
 -- WHAT THIS MODULE WAS, AND WHY ALMOST ALL OF IT IS GONE.  It used to
 -- carry `depthCap` — a linear sum of syntactic measures read at the
 -- subject expression — together with a 16-clause induction
 -- (`depth-compositional-go`), seven `emit-*` leaves, the store measure
 -- `storeNestMax` and its helpers, and the exported widening
 -- `cap-≤-store`.  All of it was the decomposition of a FALSE
--- STATEMENT, refuted 2026-08-22 at the exported conclusion and not
+-- STATEMENT, refuted at the exported conclusion and not
 -- merely at a leaf, and it was deleted rather than repaired.  The
 -- findings that outlive it are below; the code is in git.
 --
@@ -20,7 +20,7 @@
 -- that could no longer be STATED once it went (Refuted.Depth-Comp,
 -- .Depth-Nest, .Depth-Conn, .Depth-Chain, .Emit-Map, .Emit-Scan;
 -- Probed.Depth-All, .Depth-Mu, .Emit-Cap, .Nest-Depth).
---
+
 -- ⚠ WHAT WAS REFUTED, AND IT IS THE PART TO READ BEFORE PROPOSING A
 -- MEASURE.  The cap was `nestDᵉ b + pathNestD κ` plus a store term.
 -- The argument for dropping its size term was that an emitted inner
@@ -34,13 +34,13 @@
 -- re-wrap the accumulator in the step, and stack two `*All` layers so
 -- the walk descends into what the scan emits: `depthE` read FOUR
 -- against a cap of THREE.
---
+
 -- AND THE GAP IS THE PAYLOAD COUNT, so no constant repair reaches it —
 -- widening the map's source from three literals to seven took the
 -- depth 4 → 8 with the cap at 3 in both.  The cap is read off the
 -- SYNTAX; the depth is the count the RUN delivers; that count is a
 -- WIDTH, and no syntactic term bounds it.
---
+
 -- AND RESTORING `sizeᵉ` IS REFUTED TOO, BY DEGREE RATHER THAN BY A
 -- CONSTANT, which is what settled it: `sizeᵉ b + nestDᵉ b + pathLen κ
 -- + storeNestMax` read 56 where `depthE` read 70.  A scan whose step
@@ -50,7 +50,7 @@
 -- bound is linear in it.  The paired row two ticks earlier sits UNDER
 -- the bound (35 against 52) deliberately — a crossing is a difference
 -- in degree, which no re-weighting of a syntactic sum survives.
---
+
 -- AND ITERATING ON THE GAS IS NOT THE ANSWER, which is worth saying
 -- because it is the first thing the shape suggests.  Gas is the one
 -- index that moves the right way at a descent — the `gs` clause is the
@@ -60,7 +60,7 @@
 -- gas TOWER at a height above `capsH`'s own, and anything iterated per
 -- unit of gas is larger still.  A cap must be SMALLER than the gas to
 -- be spendable, which rules out the whole family.
---
+
 -- ⚠ AND FIVE REFUTATIONS CAME OUT OF ONE REGION, which is the
 -- convergence test's STOP CONDITION and not an invitation to
 -- subdivide again: `emit-map` as stated, `emit-scan` as stated, the
@@ -159,7 +159,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- slot ENVIRONMENT `η i`, and its own header records the constant-0
 -- version as machine-REFUTED — the same refutation the dead cap's slot
 -- half was rebuilt around, arrived at independently.
---
+
 -- IT IS ALSO ALREADY CLOSED UNDER SUBSTITUTION, WHICH IS THE WHOLE
 -- DIFFICULTY: `hopD-sub-spnᵉ` (Hop-Spine-Sub) bounds
 -- `hopDᵉ V η (subΘExp Θloc σ e)` under an `EnvPlug` hypothesis about
@@ -170,14 +170,14 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `hopD-sub-spnᵉ`, proven.  The `emit-*` leaf set is likewise already
 -- discharged in this currency — `valHopSpn?` is a hereditary value
 -- invariant that `applyFn-hopSpn` preserves.
---
+
 -- AND THE TWO MEASURES AGREE AT `deferᵉ` WHERE THE OLD ONE DID NOT.
 -- `depthE` reads a defer as 0 — a defer's body is a fresh subscription
 -- at a later tick, not part of this one — and `hopDᵉ` cuts there for
 -- its own reason (Δᵍ vars are reachable only under a defer).  `nestDᵉ`
 -- descended instead.  Harmless there, and one more place the two were
 -- not the same measure.
---
+
 -- AND THE CONSUMER ALREADY ASKS IN THIS CURRENCY, which is the part
 -- that says the swap is a reinvention undone and not a coincidence.
 -- `subscribeE-wet-via-caps` (Caps-Bridge) carries, in ONE signature, a
@@ -191,14 +191,14 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `make dup-check` could not see that: the two statements are not the
 -- same fact, only the same job.
 --
--- -- PROBED 2026-08-22: DOMINATION AT THE FOUR REFUTATION WITNESSES.
+-- -- PROBED: DOMINATION AT THE FOUR REFUTATION WITNESSES.
 -- `hopDᵉ` dominates `depthE` at every program that killed the
 -- predecessor — the two small programs at a refold bound of one (depth
 -- 4 and 8), and both rows of the quadratic gadget at four (35 and 70).
 -- That is evidence reaching the RISKY region rather than a degenerate
 -- row, because those four programs ARE the region.
---
--- ⚠ AND IT IS NOT TRUE FOR EVERY `V` — REFUTED 2026-08-22 as first
+
+-- ⚠ AND IT IS NOT TRUE FOR EVERY `V` — REFUTED as first
 -- stated (`Refuted.Depth-Hop`).  `hopDᵉ`'s scan clause is
 -- `(2 + pmᵗ V 0 f) ^ V * (…)`, so at `V = 0` the factor is 1 and a scan
 -- is charged its step, seed and source with nothing for refolding.  The
@@ -215,7 +215,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- `Ŝ = sizeCapAt e sl (suc id)`, where `2≤sizeCapAt` and
 -- `size≤sizeCapAt` are both PROVEN — which is why the root consumer can
 -- discharge both without a new leaf.
---
+
 -- ⚠ AND `sizeᵉ b ≤ V` IS THE CONDITION THE BURST ARM WILL TEST, which is
 -- worth writing down before it is ground: `b` shrinks at every
 -- structural descent, so the condition is inherited for free there, but
@@ -227,7 +227,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- statement carries, the finding is a caps hypothesis — the shape
 -- `cascade-depth-capsH` already has — and not a smaller `V`.
 --
--- -- PROBED 2026-08-22: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT.
+-- -- PROBED: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT.
 -- The three regions this receipt used to name as unreached — off the
 -- root path, the slot telescope, the `input` clause — are reached, and
 -- the rows are tight rather than slack, which is the part worth
@@ -246,7 +246,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- was the widest untested coverage claim in the measure, since
 -- cancelling and dropping change which inners are LIVE and not how
 -- deep a live one sits.
---
+
 -- AND A MID-RUN STATE, REACHED BY RUNNING: the state the root
 -- subscribe RETURNS — registry, node table and delivered set all
 -- populated by the evaluator — gives 4 against 4, the same answer as
@@ -254,7 +254,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- store the measure is read against does not move the depth.  The
 -- state is PROJECTED out of `subscribeE`, never written as a record
 -- update, so it is one the evaluator can actually be in.
---
+
 -- SO THE CLASS COMES DOWN, FALSITY → DIFFICULTY, and the region the
 -- evidence reached is nameable in full: every clause of `hopDᵉ`; all
 -- four `*All` operators; both `Slot` constructors; a two-slot
@@ -265,7 +265,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- separates this from a measure that is merely large.  The series is
 -- also known to be able to kill this statement, having done it: the
 -- ∀ V form died at `V = 0` on a program from the same file.
---
+
 -- AND THE MIRROR IS `subscribeE-caps` (.Subscribe-Face), PROVEN: a
 -- clause-by-clause induction over exactly this `b`, at exactly these
 -- indices, which already carries a depth bound as a parameter — so it
@@ -274,13 +274,13 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- despite reading like one at the type: it is a five-line wrapper that
 -- instantiates that parameter at `depthE g b κ bid now sched st` and
 -- projects.  Diff the ARGUMENTS against it, not the statements.
---
+
 -- ⚠ AND THE MIRROR DOES NOT MAKE THIS GRINDABLE.  What it settles is
 -- the clause skeleton; what it does not settle is the burst arm, where
 -- the caps twin spends caps machinery and this side needs an EMITTED
 -- payload's hop bounded by its emitter's — a different fact, and the
 -- one design decision left in the row.
---
+
 -- ⚠ WHAT WOULD RAISE THE CLASS AGAIN, and what is still unreached: a state
 -- deep inside a CASCADE rather than one subscribe in, since the
 -- gadget's mid-run state does not normalise (7.9 GB in six minutes —
@@ -289,12 +289,12 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- branches and multiplies by a scrutinee; and a `V` between 2 and the
 -- refuted 0, since `2 ≤ V` is the tree's idiom and not a boundary this
 -- evidence found.
---
+
 -- ⚠ AND `pathNestD κ` IS SLACK ON EVERY SUBSCRIBE-SIDE ARM.  The probe
 -- noticed it — `depthE` returned 0 at every non-root path tried, so no
 -- row needs the term at all — and reading `depthE`'s clauses says why,
 -- which is the part that matters for the grind.
---
+
 -- `depthFrame` has the only two `suc`s in the mirror: a `thru-outer`
 -- frame pays one for its walk, and a `concatAll` finish pays one for
 -- its drain.  `depthE` only ever hands `depthBurst` THE FRAME IT JUST
@@ -308,7 +308,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- against `hopD-unfoldμ`.  What the walk arm needs instead is that an
 -- EMITTED inner has hop at most its emitter's, which is the value
 -- invariant and not a path fact.
---
+
 -- ⚠ SO THE TERM STAYS, AND DELIBERATELY.  Dropping it strengthens the
 -- statement, and strengthening a FALSITY row is the wrong direction
 -- under de-risk: the slack costs nothing to carry (no arm has to
@@ -318,7 +318,7 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- path-shaped term IS load-bearing on the DELIVERY side, where
 -- `depthFold` walks κ frame by frame and pays `depthFrame` at each,
 -- which is why this currency has the term in it at all.
---
+
 -- ⚠ AND THE CONDITIONS ARE NOT KNOWN TO BE TIGHT — the refutation kills
 -- `V = 0` and nothing more.  `V = 1` was MEASURED to hold on the same
 -- program, with no margin whatever (the green row is in

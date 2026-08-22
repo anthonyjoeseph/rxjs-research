@@ -155,7 +155,7 @@ anySlot = genFin2 >>=G λ i → pureG (inputNat i)
 -- observables in `ofᵉ (strmᵗ e ∷ …)` with `e` Θ-CLOSED, so no generated
 -- program ever substitutes an observable into a template — which left the
 -- burst probe's hop-depth corpora structurally unable to see the one mechanism
--- both 2026-07-27 refutations live in (the harness's corpus D is what closes
+-- both refutations live in (the harness's corpus D is what closes
 -- that).  `noWrap` draws no randomness, so `genExp` consumes exactly the bits
 -- it always did and every existing seed's corpus is unchanged.
 ObsWrap : Set

@@ -5,7 +5,7 @@
 -- CANNOT work, and says it in a form the typechecker rechecks — unlike a
 -- prose note, which decays silently.
 --
--- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony, 2026-08-18).
+-- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony).
 -- Keeping a dead route in `src` forces `src` to keep whatever machinery
 -- makes the route STATE-able, and that machinery is otherwise deletable:
 -- these two files held seven definitions alive in Measures for no other
@@ -46,8 +46,8 @@ walkCap : (Ω ℓ d : ℕ) → ℕ
 walkCap Ω ℓ d = ((3 + Ω) * suc ℓ) ^ (3 ^ d)
 
 ------------------------------------------------------------------
--- ROUND 3's VOCABULARY (2026-07-29): one shared anchor, one d-free
--- work index.  RETIRED WITH THE LEDGER WALK (2026-08-13, module
+-- ROUND 3's VOCABULARY: one shared anchor, one d-free
+-- work index.  RETIRED WITH THE LEDGER WALK (module
 -- header); what is left is what the four absurds below consume.
 ------------------------------------------------------------------
 
@@ -61,7 +61,7 @@ anchorᴬ : (Ψ W Ω ℓ G E : ℕ) → ℕ
 anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 
 ------------------------------------------------------------------
--- THE JOINT WALK FACE (2026-07-24): wet half, dry half, and the
+-- THE JOINT WALK FACE: wet half, dry half, and the
 -- length ledger in ONE contract — memo (5)(b)'s "state them
 -- together".  Settled design points:
 --   · d is an UPPER bound on the call's dBound demand (≤, not ≡):
@@ -82,8 +82,8 @@ anchorᴬ Ψ W Ω ℓ G E = capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ G))
 --   · the dry half consumes hasAtLeast (suc d) peels against
 --     dBound-μ/-hop/-connect; hop targets get their rank drop
 --     from the shell hop machinery and their width bound from W11
---     applied to the child call (W11 deleted 2026-08-21 with the
---     retired walk; this records the contract, not live machinery).
+--     applied to the child call (W11 went with the retired walk; this
+--     records the contract, not live machinery).
 --   · subsumption: subscribeE-walkS below is this contract's
 --     store-half projection — its ground clauses lift conjunct by
 --     conjunct in the grind.  The two cores at the bottom stay
@@ -98,7 +98,7 @@ g0-hasAtLeast-absurd : ∀ {G} → g0 hasAtLeast suc G → ⊥
 g0-hasAtLeast-absurd ()
 
 ------------------------------------------------------------------
--- REFUTATION 1 (the statement): the 2026-07-24 face was vacuous.
+-- REFUTATION 1 (the statement): the face was vacuous.
 --
 --   (demand)  dBound V (hopR V) U (hopDᵉ V b) (syncSizeᵉ b) ≤ d
 --   (ceiling) capᴱ W (E * 3 ^ (suc Ψ * walkCap Ω ℓ d))       ≤ V
@@ -196,7 +196,7 @@ walk-hyps-absurd Ψ W Ω V ℓ R U r s d E 3≤E 1≤ dem ceil =
 
 ------------------------------------------------------------------
 -- REFUTATION 2 (the hop edge): THE SPLIT ANCHOR DOES NOT CLOSE
--- EITHER.  Probed 2026-07-29 BEFORE grinding any clause, per the
+-- EITHER.  Probed BEFORE grinding any clause, per the
 -- outside-in rule — the vacuity had already shown once that this face
 -- can look grind-ready and be uninstantiable, so the most uncertain
 -- piece goes first.  IT REFUTES.
@@ -285,7 +285,7 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- refutations in two days, both statement-level, both found by writing
 -- the witness down rather than by grinding a clause.  The third shape
 -- gets the same treatment first.
---
+
 -- THE WITNESS DAG.  Every parameter must be definable in ONE acyclic
 -- order, each from entry data and previously-defined parameters only:
 --
@@ -304,7 +304,7 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- universally quantified — fixed before anything store-shaped exists —
 -- and G is existentially produced from them, ℓ from G.  A statement of
 -- that shape cannot hide a cycle.
---
+
 -- WHY IT IS NOT TRIVIALLY TRUE, since "pick d enormous" is exactly
 -- what round 2 could not do: there the hop child re-anchored at
 -- capᴱ W E″ for the GROWN ledger, and E″'s permitted range was itself
@@ -312,7 +312,7 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- and suc (child demand) ≤ d was unreachable at EVERY d.  Here the
 -- child measures at the same A, so the hop edge is dBound-hop
 -- verbatim.  Conjunct (4) is the one that died in round 2.
---
+
 -- AND TWO CONDITIONAL REFUTATIONS, which is the probe's real yield:
 -- the DAG is satisfiable but only after two further contract edits,
 -- and each is forced by a machine-checked absurdity, not by taste.
@@ -336,7 +336,7 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 --       whose EXPONENT is the store anchor, so a single scanᵉ puts the
 --       hop depth above the anchor.  Keep hopD's V-index and round 3
 --       dies exactly where rounds 1 and 2 did.
---
+
 -- So the load-bearing edit is NOT walkCap's index — that is a
 -- consequence.  It is hopD's scan-clause allowance, which must move
 -- off the store bound and onto an entry-determined frame-emission
@@ -349,10 +349,10 @@ hop-anchor-absurd Ψ W Ω ℓ E d U″ r″ s″ 3≤E 1≤ owed =
 -- reachable only under deferᵉ, Rx/Exp.agda:76-79, which crosses a
 -- tick).  A scan therefore folds at most as many times per frame as
 -- emissions arrive, and that count is entry data.
---
+
 -- WHAT WAS STILL UNCHECKED HERE — that an entry-determined G really
 -- does bound the frame work — is semantic, not arithmetic, and it has
--- since been measured: Frame-Work-Probe (DELETED; git history).  It reports
+-- since been measured: `git show 94a5a3c^:agda/probe/Frame-Work-Probe.agda`.  It reports
 -- YES, with one correction to the expected shape.  The fold count is
 -- the source's per-frame PAYLOAD count (for a literal source, the ofᵉ
 -- list's length), so it is entry-determined; but each *All nesting

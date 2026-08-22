@@ -639,13 +639,6 @@ roadmap-selftest:
 # NOT suppressed meanwhile: `make imports-check` runs it in full, and
 # `imports-selftest` below still holds the checker itself to firing.
 #
-# `comments-check` IS THE SAME SITUATION AND IS OWED: the tree carries 351 dated
-# comments, 19 historical markers, 31 blocks whose evidence is buried mid-prose and
-# 39 over-budget explanations, all predating the law.  Wiring it before the sweep
-# would land a knowingly-red gate, which is the one thing that teaches everyone to
-# ignore red.  `make comments-check` runs it in full meanwhile, and
-# `comments-selftest` above IS wired, so the checker itself cannot rot untested.
-#
 # AND A `#` COMMENT AT COLUMN 0 CANNOT GO INSIDE A RECIPE -- it ENDS the recipe,
 # and the tab-indented lines after it become orphans ("recipe commences before
 # first target").  That is why this note sits here rather than beside the line it
@@ -681,11 +674,11 @@ comments-check:
 # the check as dead.  So the name is read from the live ledger at run time.
 comments-selftest:
 	@fail=0; \
-	  for d in clean sha; do \
+	  for d in clean sha echo-ok; do \
 	    scripts/check-comments.py --no-refs --dir scripts/comments-selftest/$$d > /dev/null 2>&1 \
 	      || { echo "SELFTEST FAIL: the $$d fixture was REJECTED — a precision property of the checker has died"; fail=1; }; \
 	  done; \
-	  for d in dated history shape order fat; do \
+	  for d in dated history shape order fat echo; do \
 	    if scripts/check-comments.py --no-refs --dir scripts/comments-selftest/$$d > /dev/null 2>&1; then \
 	      echo "SELFTEST FAIL: the $$d fixture PASSED — that check is dead"; fail=1; \
 	    fi; \
@@ -705,6 +698,9 @@ comments-selftest:
 	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/fat 2>&1 \
 	    | grep -q 'EXPLANATIONS OVER BUDGET' \
 	    || { echo "SELFTEST FAIL: an over-budget explanation was not reported"; fail=1; }; \
+	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/echo 2>&1 \
+	    | grep -q 'ECHOES ITS OWN LEDGER' \
+	    || { echo "SELFTEST FAIL: prose naming its own ledger's subject was not reported"; fail=1; }; \
 	  scripts/check-comments.py --dir scripts/comments-selftest/ref-ok > /dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a TWIN naming a PROVEN definition, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
 	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
@@ -728,7 +724,7 @@ comments-selftest:
 	      || { echo "SELFTEST FAIL: a TWIN naming live postulate $$pn was not reported as one"; fail=1; }; \
 	    rm -rf $$d; \
 	  fi; \
-	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all five checks fire, including a TWIN naming a live postulate read from the ledger; an indented marker, an undated SEALED, a sha pointer and a resolving reference do not)"; \
+	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all six checks fire, including a TWIN naming a live postulate read from the ledger; an indented marker, an undated SEALED, a sha pointer and a resolving reference do not)"; \
 	  else exit 1; fi
 
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a
@@ -738,7 +734,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              imports-selftest imports-check \
              evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
-             comments-selftest dev-changed-selftest
+             comments-selftest comments-check dev-changed-selftest
 
 gate-cheap:
 	@for t in $(GATE_CHEAP); do \

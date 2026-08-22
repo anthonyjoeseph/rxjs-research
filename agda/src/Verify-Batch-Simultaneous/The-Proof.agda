@@ -194,7 +194,7 @@ apply-agree (close x dried ∷ es) live owed done vs eq with removeOne x live | 
 ------------------------------------------------------------------
 
 -- `≡ᵇ→≡`, `≡ᵇ-refl` and `≡ᵇ-sym` come from .Verify-Well-Formed (Part1
--- and Part12); they were re-proved verbatim here until 2026-08-19.
+-- and Part12).
 
 -- an id is always seen in a list it heads
 seenBefore-hit : ∀ (i : Id) (seen : List Id) → seenBefore i (i ∷ seen) ≡ true

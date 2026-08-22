@@ -1,6 +1,6 @@
 ------------------------------------------------------------------
 -- OP-BUDGET: the residual-budget invariant, PROVEN.
---
+
 -- This is the arithmetic that `opIterD-budget` used to postulate
 -- (formerly `opIterD-budget-core` in Op-Dominance).
 -- It is its own module because it is a lemma FAMILY consuming
@@ -11,7 +11,7 @@
 -- ══════════════════════════════════════════════════════════════
 -- § THE TWO NORMAL FORMS the proof rests on
 -- ══════════════════════════════════════════════════════════════
---
+
 -- CLIMB.  Unrolling opIterD's suc clause m times:
 --
 --     opIterD S W d k m J  =  TAIL^m ( (sLvlD k ∘ J₀)^m (J) )
@@ -20,7 +20,7 @@
 -- per-round entry jump and TAIL(Y) = fIterD … (suc (widAt Y)) Y is the
 -- per-round burst tail, dominated in lvls-currency by Op-Dominance's
 -- `fIterD-lvls`: TAIL(Y) ≤ lvls Y (suc (widAt Y)) =: G(Y).
---
+
 -- BUDGET.  `dWalkᶜ-front` (Caps.agda) decomposes the walk from the
 -- front: spending dCapᶜ (suc g) from level J is
 --
@@ -35,7 +35,7 @@
 -- ══════════════════════════════════════════════════════════════
 -- § THE PAYMENT SCHEME, and its constants
 -- ══════════════════════════════════════════════════════════════
---
+
 -- One ROUND costs FIVE walk positions:
 --   · positions 1–2, THE JUMP: two direct dLvl-steps.  One dLvl from
 --     J ≥ X gains ≥ sizeAt S J, so the second runs from a level
@@ -55,13 +55,13 @@
 --     LENGTH.  A gas-1 budget is only regAt ≈ J·S long and provably
 --     CANNOT pay a tail; a gas-2 budget is a tower of height regAt(J)
 --     (`tail-fits`).  This is what forces the `2 +` in the guard.
---
+
 -- GAS.  `walk-paid` needs `2 + k ≤ g`, and the k-descent preserves it
 -- exactly ((g−1, k−1)).  The TOP (`climb-paid`) spends two more units:
 -- one unfolding cDel's dCapᶜ into a walk, one descending into a
 -- position because level 0 has only regAt S R 0 = R positions and
 -- R MAY BE 1.  Hence the guard `3 + k ≤ S` — see § THE TOP FORM.
---
+
 -- CORNERS respected: k at the guard boundary (gas is exact, no
 -- headroom on the k-descent); S = 2 (tails at the deepest level
 -- survive because suc m ≤ S forces m ≤ 1); d = 0 vs d ≥ 1 (fLvlD's
@@ -217,8 +217,7 @@ tail-fits S W d R J g 2≤S 1≤R 2≤g =
 -- residual bookkeeping.
 ------------------------------------------------------------------
 
--- spending never descends: `lvls-infl` is .Caps's, re-proved here (via
--- iterL-infl rather than dLvl-infl) until 2026-08-19.
+-- spending never descends: `lvls-infl` is .Caps's.
 
 -- the tail-closure is monotone
 G-mono : ∀ S W d {X Y} → 2 ≤ S → X ≤ Y → G S W d X ≤ G S W d Y
@@ -497,7 +496,7 @@ mutual
                 (lvls-add S W d P₃ 1 (dCapᶜ S W R d g Pw))
 
 ------------------------------------------------------------------
--- § THE TOP FORM — PROVEN 2026-08-07, and the formalization PINS THE
+-- § THE TOP FORM — PROVEN, and the formalization PINS THE
 -- GAS CORNER EXACTLY: the guard the proof needs is `3 + k ≤ S`, not
 -- `k ≤ S`.  This is the finding the rehearsal exists to produce, and
 -- it is now a number rather than an estimate.
@@ -651,8 +650,8 @@ climb-paid S W d k m R g 2≤S hk hm hR hg =
 -- suc S; record eta pins `caps S W R`'s fields.
 --
 -- `1 ≤ R` IS LOAD-BEARING, and the statement without it is FALSE —
--- machine-refuted 2026-08-06 as `opIterD-budget-R0-false`, a proven
--- → ⊥ (probe retired 2026-08-09).  At R = 0 the registry
+-- machine-refuted as `opIterD-budget-R0-false`, a proven `→ ⊥`.
+-- At R = 0 the registry
 -- walk is empty (`regAt S 0 J = 0 * suc (J * S) = 0`), so
 -- `cDel (caps S W 0) d = 0` and the RHS collapses to
 -- `lvls S W d 0 0 = 0`; but the LHS is a `dLvl` application and
@@ -680,7 +679,7 @@ opIterD-budget S W d k m R 2≤S hk hm hR =
 -- SEALED, and this is not optional: `opIterD-dominated` is the ONLY
 -- name this module exports to the spine, and an UNSEALED body hands
 -- Verify-Well-Formed's conversion checker the whole tower above —
--- measured 2026-08-07 as a `Killed: 9` OOM in VWF.  Private impl plus
+-- measured as a `Killed: 9` OOM in VWF.  Private impl plus
 -- abstract alias, the caps axis's normalisation contract: no consumer
 -- ever needs more than the type.
 private

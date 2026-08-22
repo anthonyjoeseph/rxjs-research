@@ -5,7 +5,7 @@
 -- CANNOT work, and says it in a form the typechecker rechecks — unlike a
 -- prose note, which decays silently.
 --
--- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony, 2026-08-18).
+-- THIS TREE IS OUTSIDE `agda/src` ON PURPOSE (Anthony).
 -- Keeping a dead route in `src` forces `src` to keep whatever machinery
 -- makes the route STATE-able, and that machinery is otherwise deletable:
 -- these two files held seven definitions alive in Measures for no other
@@ -39,22 +39,22 @@ open import Verify-Budget-Sufficient.Wet.Part6 using
 open import Refuted.Anchor using (sucV≤d; walk-hyps-absurd; walkCap)
 
 ------------------------------------------------------------------
--- GAP 4 (2026-08-01, found grinding the gas edges): THE LEDGER CANNOT
+-- GAP 4 (found grinding the gas edges): THE LEDGER CANNOT
 -- DELIVER subscribeE-wet's LANDING LEVEL, AND THAT IS NOT AN OPEN
 -- ARITHMETIC DEBT — IT IS REFUTED.
---
+
 -- The restatement's parameter map (above) leaves exactly one thing to
 -- the follow-up, and calls it "arithmetic, not statement-level":
 --
 --     capᴱ W (E · 3^(suc Ψ · walkCap Ω ℓ G)) ≤ sizeCapAt e sl (suc id)
---
+
 -- That inequality is the ONLY route from subscribeE-walk's conclusion
 -- (INV? at the ledger position capᴱ W E′, with E′ bounded ABOVE by the
 -- receipt and by nothing else) to subscribeE-wet's conclusion (INV? at
 -- the caps level).  INV? weakens upward in B, so the core's landing
 -- needs its ledger ceiling UNDER Ŝ, and the receipt's ceiling is the
 -- only upper bound on E′ the face provides.
---
+
 -- IT IS THE SAME THREE-EDGE LOOP the round-1 vacuity died of, and it
 -- needs no new witness: walk-hyps-absurd (.Measures) IS the refutation,
 -- at V := Ŝ, R := hopR Ŝ, d := G.  The edges, spelled out:
@@ -70,14 +70,14 @@ open import Refuted.Anchor using (sucV≤d; walk-hyps-absurd; walkCap)
 -- restriction worth caring about: it fails only when the call has NO
 -- gas edge left at all (no unconnected share, no hop), i.e. exactly
 -- when the wet contract has no content.
---
+
 -- WHAT THIS DOES NOT SAY.  It does not refute subscribeE-wet, and it
 -- does not refute subscribeE-walk.  It refutes the COMPOSITION: the
 -- ledger receipt cannot be the supplier of the caps-level landing, for
 -- any Ψ, W, Ω, ℓ, E, G.  Collapsing E into j is therefore not an
 -- optimisation — it is the only surviving route, and the two
 -- accounting mechanisms cannot be joined at the receipt.
---
+
 -- WHAT IS LEFT, then, and it is where the next design ruling belongs.
 -- The other candidate supplier is the caps face, which already lands a
 -- whole cascade from capsAt id to capsAt (suc id) (caps-tick, ground).
@@ -94,7 +94,7 @@ open import Refuted.Anchor using (sucV≤d; walk-hyps-absurd; walkCap)
 --       faces wait on (.Caps-Face, conjunct (a) there), seen from the
 --       wet side — one companion would close both.
 --       AND THE COMPANION IS NOT A CLOSED FORM (measured,
---       Sub-Charge-Probe (DELETED; git history)): a subscribe installs frames
+--       `git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda`): a subscribe installs frames
 --       and a frame subscribes one inner per payload, so the subscribe
 --       charge and the frame charge are MUTUALLY RECURSIVE and no
 --       function of (S, W, J) closes the loop — the same failure
@@ -110,12 +110,12 @@ open import Refuted.Anchor using (sucV≤d; walk-hyps-absurd; walkCap)
 --       INV? adds fnCapBounded?, regsB?, slotsFnCap and reads registry
 --       cardinality at cSize where capsOK? reads it at cReg.  Four
 --       conjuncts of the wet predicate have no caps-side counterpart.
---
+
 -- Both are statement-level and both are face-level, so per the
 -- outside-in rule the clause grind stops here rather than guessing at
 -- them: the gas edges themselves are ground above and wait on this.
---
--- RULED 2026-08-13 (design session): THE NESTING BUDGET IS THE GAS.
+
+-- RULED (design session): THE NESTING BUDGET IS THE GAS.
 -- The one instantiation (a) waited on is ruled, and the ℓ finding in
 -- the parameter map above is what forced the ruling's shape:
 --
@@ -126,7 +126,7 @@ open import Refuted.Anchor using (sucV≤d; walk-hyps-absurd; walkCap)
 --     subscribe re-entry costs exactly one peel, because
 --     subscribeInner / sharedConnect / μ are the machine's only peel
 --     sites and deferᵉ crosses a tick (closed by typing, above).
---     MEASURED 2026-08-13 (Verify-Budget-Sufficient/Demand-Probe):
+--     MEASURED (Verify-Budget-Sufficient/Demand-Probe):
 --     demand is additive — one peel per *All layer, per μ, per first
 --     connect; zero for defer; payload-driven layers add linearly
 --     (h* = k+1 single-wrap, 2k+1 double-wrap).  Subscribe-time
@@ -168,7 +168,7 @@ wet-ceiling-absurd e sl id Ψ W Ω ℓ E G U r s 3≤E 1≤ dem ceil =
   walk-hyps-absurd Ψ W Ω (sizeCapAt e sl (suc id)) ℓ
                    (hopR (sizeCapAt e sl (suc id))) U r s G E 3≤E 1≤ dem ceil
 
--- THE WAY-IN INSTANCE (2026-08-13): pinning the walk's length ledger ℓ
+-- THE WAY-IN INSTANCE: pinning the walk's length ledger ℓ
 -- to the caps anchor is refuted by the same loop, with no walkCap and
 -- no ceiling needed — the demand measured AT Ŝ already exceeds Ŝ
 -- whenever the contract has content, so `pathLen κ + G ≤ Ŝ` cannot

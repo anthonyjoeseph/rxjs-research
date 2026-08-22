@@ -406,13 +406,13 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- its exhausted close on its own emit, so `live` has dropped it while the
 -- registry still carries it.  The closes cutThrough emits there are exactly
 -- the NOT-yet-delivered victims, and they must still land.
---
--- THE LEDGER THAT PAYS IT, derived by hand 2026-08-18 and exact (not a bound).
+
+-- THE LEDGER THAT PAYS IT, derived by hand and exact (not a bound).
 -- Write dlv for the entries on s already folded this cascade.  At a dying s
 -- the live list lags the registry by precisely those:
 --
 --     countIn s live + dlv(reg)  ≡  countRegs s reg                    … (LAG)
---
+
 -- Split the registry by the cut: reg = victims ++ kept, victims =
 -- delivVictims ++ nonDelivVictims, and cutThrough emits a close for exactly
 -- the nonDelivVictims (its `delivered ∧ memberSource src dying` guard skips
@@ -423,7 +423,7 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- so the bound `closeCount ≤ countIn s live` holds with slack `kept − dlv(kept)`,
 -- and applying the closes lands on `countIn s L′ = kept − dlv(kept)` — which is
 -- (LAG) again at the post-cut state.  The cut PRESERVES the ledger exactly.
---
+
 -- WHY (LAG) IS NOT A `BurstInv` FIELD TODAY, which is a finding and not a
 -- shrug.  Adding it obliges every producer, and `initReg-wf` cannot discharge
 -- it: `register` mints `rid = nextReg st`, and showing the fresh id is absent
@@ -434,10 +434,7 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- one, so the subdivision stops here and (LAG) stands as a leaf.  Adding the
 -- field is the route; it needs the id-discipline invariant first.
 --
--- ⚠ REFUTED 2026-08-18 — BOTH LEAVES BELOW ARE FALSE AS STATED.
--- `Refuted.Cut-Through.cutThrough-close-bound-dying-absurd` and
--- `-live-dying-absurd` (agda/evidence/refuted/, `make refuted`).
---
+
 -- THE DEFECT IS IN THE QUANTIFIER STRUCTURE, NOT IN THE EVALUATOR — say
 -- this first, because the shape invites the opposite reading.  `L₁` is
 -- universally quantified and its ONLY hypothesis constrains it at
@@ -449,12 +446,12 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- itself unconstrained (it demands 1 ≡ 0).  Nothing about reachability
 -- is at stake: the statements quantify over every `st`, so a free `L₁`
 -- alone sinks them.
---
+
 -- This is CLAUDE.md's first almost-always-wrong shape — a conclusion
 -- needing information appearing in NONE of its hypotheses — and it is
 -- the same diagnosis `subscribeE-inner-nodry-inv`'s header records for
 -- its own repair: UNDERDETERMINED, not hard.
---
+
 -- THE REPAIR IS THE (LAG) LEDGER ABOVE, hypothesised AT the dying source
 -- rather than derived there: `countIn s L₁ + dlv(s, reg) ≡ countRegs s reg`,
 -- which needs a delivered-count helper `dlv` that does not exist yet.
@@ -463,6 +460,10 @@ cutThrough-no-init s nid dlv wm dying ((rid , src , c) ∷ r)
 -- (CLAUDE.md's one sufficient justification for adding a hypothesis).
 -- It is deliberately NOT done here: this family is tier 2 and tier 1 is
 -- open, so the finding is recorded and the repair scheduled, not ground.
+
+-- ⚠ REFUTED — BOTH LEAVES BELOW ARE FALSE AS STATED.
+--   `Refuted.Cut-Through.cutThrough-close-bound-dying-absurd` and
+--   `-live-dying-absurd` (agda/evidence/refuted/, `make refuted`).
 postulate
   cutThrough-close-bound-dying : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
@@ -494,7 +495,7 @@ postulate
 
 -- every close cutThrough emits has a live entry to land on: the closes are
 -- bounded by the registry (cutThrough-balance) and the registry is what the
--- live list shadows (live-matches).  SPLIT ON `dying` (2026-08-18): the
+-- live list shadows (live-matches).  SPLIT ON `dying`: the
 -- unconditional `dyF` premise this used to take was REFUTED at its only call
 -- site — `cascadeLatch` seeds `dying` before any chain is processed, so inside
 -- a cascade it is false, not free (the refutation is the first pin in .Part3).
@@ -529,12 +530,13 @@ cutThrough-close-bound {A} nid st L₁ lm s
 -- The `dying` guard is cutThrough-balance's own: a victim that already
 -- delivered on a dying source carried its exhausted close on its own emit, so
 -- the registry would drop an entry the live list does not.
--- PREMISE WEAKENED 2026-08-18 (A′): takes the `dying`-conditioned shadow that
--- `BurstInv.live-matches` now supplies, and STILL RETURNS THE ALL-SOURCES
--- equality — the dying instance comes off `cutThrough-live-dying`, so no
--- consumer has to learn which side of the split it is on.  The old
--- `∀ s → memberSource s (EvalSt.dying st) ≡ false` premise is gone; it was
--- unpayable at the only call site inside a cascade.
+-- ITS PREMISE IS THE (A′) SHADOW, and that is forced: it takes the
+-- `dying`-conditioned shadow `BurstInv.live-matches` supplies, and STILL
+-- RETURNS THE ALL-SOURCES equality — the dying instance comes off
+-- `cutThrough-live-dying`, so no consumer has to learn which side of the
+-- split it is on.  An unconditional
+-- `∀ s → memberSource s (EvalSt.dying st) ≡ false` premise is unpayable at
+-- the only call site inside a cascade.
 cutThrough-live-apply : ∀ {A : Set} {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (nid : NodeId) (st : EvalSt e) (L₁ : List Source) →
   (∀ s → memberSource s (EvalSt.dying st) ≡ false →
@@ -580,7 +582,7 @@ cut-head-joint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   proj₂ (proj₂ (takeVals kCount (proj₁ (splitEvents {A = Val Γ s} es)))) ≡ true →
   stepProtocol (es at i from src as ek) S ≡ just S₁ →
   BurstInv id sched st S₁ →
-  -- NO `dyF` PREMISE (dropped 2026-08-18).  It used to sit here, asserting the
+  -- NO `dyF` PREMISE (dropped).  It used to sit here, asserting the
   -- cut's live/registry balance off every source, with a comment claiming it
   -- "rides in from the enclosing cascade".  That was backwards — `cascadeLatch`
   -- SEEDS `dying` before any chain is processed, so inside a cascade it is

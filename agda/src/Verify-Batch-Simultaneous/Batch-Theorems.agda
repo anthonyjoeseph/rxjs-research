@@ -1,6 +1,6 @@
 -- ONLINE-NESS: the batcher never reopens a group it has closed.
 --
--- HISTORY, because the shape here is the whole content (2026-08-06).  This
+-- HISTORY, because the shape here is the whole content.  This
 -- claim used to read
 --
 --   Prefix _≡_ (impl-batchSimultaneous xs) (impl-batchSimultaneous (xs ++ ys))
@@ -8,7 +8,7 @@
 -- and it is FALSE.  `impl-batchSimultaneous = foldBatch batch-init`, and
 -- `foldBatch st [] = flushBatch st` — so on `xs` alone the batcher FLUSHES a
 -- batch that is still open, and on `xs ++ ys` that same batch keeps growing.
--- Machine refutation in `Battery-Batch-Online (DELETED; git history)`
+-- Machine refutation in ``git show 94a5a3c^:agda/probe/Battery-Batch-Online.agda``
 -- (`batch-online-refuted`, a proven `¬`): two emits flush to `value [1]`, while
 -- three close the same batch as `value [1,2]`, so the first elements differ and
 -- no prefix relation can hold.  The old statement's own trailing comments —
@@ -23,7 +23,7 @@
 -- mid-stream by `paidOff`, and a closed group is final — that is exactly the
 -- no-lookahead property, and it is now what the type says.
 --
--- AUTHORITY (2026-08-06).  Anthony delegated the SHAPE to this session,
+-- AUTHORITY.  Anthony delegated the SHAPE to this session,
 -- conditional on the main proof not depending on this claim.  That condition was
 -- then verified, not assumed: `Batch-Theorems` is imported ONLY by Main,
 -- `The-Proof.agda` does not import it at all, and `batch-online` has no in-repo

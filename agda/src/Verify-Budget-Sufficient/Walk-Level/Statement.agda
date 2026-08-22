@@ -130,7 +130,7 @@ WalkTail {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
     INV? Ψ (Caps.cSize (frameStep j c)) sched st ≡ true →
     fnCapᵉ b ≤ Ψ →
     pathB? (Caps.cSize (frameStep j c)) Ψ κ ≡ true →
-    -- the reset-anchor pins (2026-08-13): the hop measurement index
+    -- the reset-anchor pins: the hop measurement index
     -- and rank ARE the reset cap's (refl at the true instantiation,
     -- where F, Ŝ := sizeCapAt e sl (suc id) and R̂ := hopR Ŝ), and the
     -- CEILING — no level this walk can reach outgrows Ŝ, stated as one
@@ -553,19 +553,19 @@ WalkTail⁻ᴴ {n} {Γ} {t} {e} {u} g b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j =
        × (regsLen? ℓ (EvalSt.registry (proj₂ (proj₂ r))) ≡ true)
 
 -- RECOVERY: `git show 62fb817` restores `WalkTailᴴ`/`WalkStmtᴴ` (the hop
--- conjunct at WalkTail's telescope, bounded by ONE number) and `walk-join`
--- (the generic re-association of the two halves).  They were scan's assembly
--- until the hop half moved to the SPINE exponent, which is scan-specific;
--- another chain clause needing the SAME split at a single bound would want
--- them back verbatim.
--- GAS-FIXED, because the one clause stated at it needs the walk's own
--- INDUCTION HYPOTHESIS beside it and that hypothesis is stated at a fixed
--- gas (`WalkStmtAt`).  The gas-POLYMORPHIC version this replaces had
--- exactly one user and could not have one that closed — all of its
--- conjuncts are assertions about a subscribe that unfolds THROUGH the
--- source's own, so without the induction hypothesis there is nothing to
--- close them with.  `walk-scan-rest` (.Parts) is that user, and it is a
--- real body now.
+--   conjunct at WalkTail's telescope, bounded by ONE number) and `walk-join`
+--   (the generic re-association of the two halves).  They were scan's assembly
+--   until the hop half moved to the SPINE exponent, which is scan-specific;
+--   another chain clause needing the SAME split at a single bound would want
+--   them back verbatim.
+--   GAS-FIXED, because the one clause stated at it needs the walk's own
+--   INDUCTION HYPOTHESIS beside it and that hypothesis is stated at a fixed
+--   gas (`WalkStmtAt`).  The gas-POLYMORPHIC version this replaces had
+--   exactly one user and could not have one that closed — all of its
+--   conjuncts are assertions about a subscribe that unfolds THROUGH the
+--   source's own, so without the induction hypothesis there is nothing to
+--   close them with.  `walk-scan-rest` (.Parts) is that user, and it is a
+--   real body now.
 WalkStmtAt⁻ᴴ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
   Gas → Closed Γ u → Set
 WalkStmtAt⁻ᴴ {n} {Γ} {t} {e} {u} g b =
@@ -591,7 +591,7 @@ peelGas : Gas → Gas
 peelGas g0       = g0
 peelGas (gs fuel) = fuel
 
--- THE 19 ROUTE LEMMAS, RE-HOMED (2026-08-13).  They used to hang off
+-- THE 19 ROUTE LEMMAS, RE-HOMED.  They used to hang off
 -- `subscribeE-wet-core`'s hypothesis list, from the days when that
 -- core walked the gas edges clause by clause.  Assembling the outer
 -- face showed it needs NONE of them — it is pure instantiation and
@@ -741,7 +741,7 @@ WalkLevelCore =
 -- then the dry half (demand at the reset caps, one spare peel, the free
 -- length ledger ℓ).  Conclusion: subscribeE-caps' Σ with the wet
 -- conjuncts riding the same witness.
---
+
 -- THE FACE IS GROUND.  `walkFace` (.Walk-Level) is a real definition on
 -- every clause and this tree holds no live postulate; what follows is
 -- what a reader editing the statement or the arms still needs, and
@@ -750,7 +750,7 @@ WalkLevelCore =
 -- the proof of the very conjuncts they were about.  The probe that
 -- carried the P-series rows expired with them and is deleted:
 -- `git log --diff-filter=D -- agda/src/Verify-Budget-Sufficient/Demand-Probe.agda`.
---
+
 -- WHY THE SPLIT IS EXACT, and it is the reason every arm's caps half is
 -- a DELEGATION rather than a re-derivation.  Against `subscribeE-caps`
 -- (.Subscribe-Face, GROUND):
@@ -767,7 +767,7 @@ WalkLevelCore =
 -- read the twin's witness through `proj₁`, which is why they split on
 -- `ops` first: the twin's case tree splits on `ops` before the
 -- expression, so with `ops` a variable its witness stays stuck.
---
+
 -- DO NOT WEAKEN THE opIterD LEVEL BOUND.  Five of the nine conjuncts —
 -- capsOK? / burstCaps? / burstCount? / INV? / burstB? — are
 -- UPWARD-closed in j′ (frameStep is monotone in j and each is a
@@ -776,7 +776,7 @@ WalkLevelCore =
 -- ABOVE, and it is what gives those five their content: delete or weaken
 -- it and the whole Σ is satisfiable by taking j′ enormous.  The
 -- burstHopD? / hasDry / regsLen? conjuncts do not mention j′ at all.
---
+
 -- AT THE DEGENERATE CORNER: `opIterD` is the identity at m = 0
 -- (`opIterD-0`, .Rx.Evaluator) and `ops` sits in the m position, so
 -- `ops = 0` would pin j′ = 0.  It is excluded by the `suc (sizeᵉ b) ≤
@@ -784,7 +784,7 @@ WalkLevelCore =
 -- `bud = 0` ARE reachable and are harmless: opIterD's `suc m` clause
 -- bumps J unconditionally (J₀ = suc (J + …)) before any d/k-dependent
 -- step runs.
---
+
 -- THE CHAIN FRAMES DO NOT SHARE A PUSH FACE, and that is the one design
 -- ruling to internalise before touching them.  A frame-generic wet push
 -- face is REFUTED — the DEAD ROUTE at the hop-edge chain section below
@@ -802,7 +802,7 @@ WalkLevelCore =
 --   · scanᵉ  `(2 + pmᵗ V 0 f) ^ V * (hopDᵗ f + hopDᵗ z + hopDᵉ e)` —
 --            EXPONENTIAL in V, which is the room that funds repeated
 --            application.
---
+
 -- THE GAS-PEEL FINDING, and it is what took the chain frames off
 -- FALSITY.  In .Rx.Evaluator the mapᵉ, takeᵉ-`suc k` and scanᵉ clauses
 -- each pass `fuel` UNCHANGED to both the recursive `subscribeE` and the

@@ -74,7 +74,7 @@
 -- the descent itself, and only lemmas that reduce through the `input`
 -- clause ever mention them.
 
--- GATED, NOT GUESSED.  Frame-Work-Probe (DELETED; git history) measures nine
+-- GATED, NOT GUESSED.  `git show 94a5a3c^:agda/probe/Frame-Work-Probe.agda` measures nine
 -- runs of the real evaluator, and the gate there checks these measures
 -- against every one of them — the literal corpus, the duplication case,
 -- the two-level amplification, and all three share routings.  A draft

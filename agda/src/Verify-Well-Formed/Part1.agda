@@ -199,7 +199,7 @@ allShareSunk []                      = true
 allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
 
 ------------------------------------------------------------------
--- NODE-CACHE VALIDITY (the first GLOBAL coherence field, 2026-07-19).
+-- NODE-CACHE VALIDITY (the first GLOBAL coherence field).
 --
 -- UNIFYING PRINCIPLE: the registry is GROUND TRUTH; node counters
 -- (merge-st's activeInners, concat's innerActive, switch's cur, exhaust's

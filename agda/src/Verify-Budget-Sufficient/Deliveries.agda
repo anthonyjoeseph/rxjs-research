@@ -844,7 +844,7 @@ abstract
         trans (delivN-cons rid st _ (⊑ᵈ-trans FP GO))
               (cong suc (delivN-split FP GO))
 
--- (DELETED 2026-08-18) § E held `cascadeLatch-deliv`, `cascadeFinish-deliv`
+-- (DELETED) § E held `cascadeLatch-deliv`, `cascadeFinish-deliv`
 -- and `cascade-delivN` — one cascade's deliveries are its final ledger,
 -- counted flat, because the latch clears `delivered` and cascadeFinish
 -- touches it not at all.  Together with `cascadeGo-skip-N` / `cascadeGo-cons-N`
@@ -854,7 +854,7 @@ abstract
 -- emits nothing), so no ledger fact can enter it.
 --
 -- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Deliveries.agda
--- restores all five.  `delivN` itself is LIVE (.Delivery-Walk reads it all
--- through the walk), so the cascade-level counts are the natural thing to
--- want back the moment a delivery-count obligation is actually stated.
+--   restores all five.  `delivN` itself is LIVE (.Delivery-Walk reads it all
+--   through the walk), so the cascade-level counts are the natural thing to
+--   want back the moment a delivery-count obligation is actually stated.
 ------------------------------------------------------------------

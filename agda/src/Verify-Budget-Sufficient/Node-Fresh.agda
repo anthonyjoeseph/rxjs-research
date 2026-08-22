@@ -39,7 +39,6 @@
 -- A probe series once carried this fact and no longer does: the ring
 -- proves it at every `κ`, including the `share-sink` tail the probe could
 -- not reach, so the probe expired with its target and was deleted.  The
--- RECOVERY pointer is on `subscribeE-nodes-below` below.
 --
 -- THE MEMBER LIST MIRRORS `.Keeps-Ring` ONE FOR ONE, and the two rings
 -- are complementary in a way worth knowing before editing either: where
@@ -48,6 +47,8 @@
 -- are this ring's only real work, and everything else is `fresh-refl` or
 -- a `fresh-trans`.
 ------------------------------------------------------------------
+--
+-- The recovery pointer for this module sits on `subscribeE-nodes-below`.
 module Verify-Budget-Sufficient.Node-Fresh where
 
 open import Data.Bool  using (Bool; true; false; not; if_then_else_)
@@ -639,10 +640,10 @@ subscribeE-fresh w g (deferᵉ body) κ id now sched st hw =
 ------------------------------------------------------------------
 
 -- RECOVERY: `git log --diff-filter=D -- agda/src/Verify-Budget-Sufficient/Scan-Node-Probe.agda`
--- restores 297 lines / 24 refl rows that probed this fact at the scan source
--- before it was proven here.  They pinned the EVALUATOR (that those composites
--- reduce, and reduce to this) rather than the statement, which is why they
--- outlived their target and had to go.
+--   restores 297 lines / 24 refl rows that probed this fact at the scan source
+--   before it was proven here.  They pinned the EVALUATOR (that those composites
+--   reduce, and reduce to this) rather than the statement, which is why they
+--   outlived their target and had to go.
 subscribeE-nodes-below : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (k : NodeId) →

@@ -82,7 +82,7 @@ open import Verify-Budget-Sufficient.Walk-Level.Parts using
 open import Decide using (T⇒≡true; ∧-intro)
 
 
--- THE SHARED SLOT, ASSEMBLED (2026-08-19).  Was one opaque postulate over
+-- THE SHARED SLOT, ASSEMBLED.  Was one opaque postulate over
 -- the whole slot; it is now the real three-way dispatch subscribeSharedSlot
 -- performs, against the PROVEN clause-for-clause twin `sharedSlot-caps`
 -- (.Subscribe-Face), whose three arms are these three at the same
@@ -508,14 +508,14 @@ scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 
 -- no connect, so no recursion: a scripted slot replays its own values
 --
--- ═══ THE CENSUS (2026-08-19).  FOUR SHAPES × THE WET FIVE ═══
+-- ═══ THE CENSUS.  FOUR SHAPES × THE WET FIVE ═══
 -- GRINDABLE.  The precedent is `subscribeE-input-caps` (.Subscribe-Face,
 -- PROVEN), whose scripted side splits into exactly these four branches
 -- and whose clauses correspond one-to-one.  Note this postulate takes NO
 -- walk face (contrast input-wet-shared) — the scripted slot never
 -- connects, so nothing here recurses and no induction has to be designed.
 -- The caps receipts arrive as HYPOTHESES, so only the wet five are owed.
---
+
 -- What subscribeE produces (Evaluator:1401-1426), and the ingredient for
 -- each conjunct.  Every one named below is PROVEN except where marked:
 --
@@ -548,23 +548,23 @@ scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 --        burstHopD? mapValue-hop (above, this module)
 --        hasDry     mapValue-dry + any-dry-++ (above, this module)
 --        regsLen?   ⚠ register-regsLen — THE ONE GAP, stated below
---
+
 -- THE MINT IS TRANSPARENT TO INV?, which is why C and D need no lemma for
 -- it: INV? reads the schedule ONLY through `Sched.live` and `Sched.slots`
 -- (Measures:4438, via stBounded? and fnCapBounded?), while mintSource and
 -- mintOrdinal touch `nextSource` / `nextOrdinal` alone (Evaluator:305).
 -- The record update reduces, so the mint is invisible to the predicate.
 -- Only D's addLive genuinely moves `live`, and that is addLive-INV's job.
---
--- THE regsLen? CONJUNCT IS DISCHARGED (2026-08-19).  `input-wet-scripted`
+
+-- THE regsLen? CONJUNCT IS DISCHARGED.  `input-wet-scripted`
 -- below is a REAL BODY over this leaf: it pairs the four conjuncts owed
 -- here with the PROVEN `input-wet-scripted-regs` (above, this module),
 -- which closes the fifth for all four shapes off `register-regsLen`.  So
 -- the ⚠ rows in A-D are shape B's and shape D's, and they are shut.
---
+
 -- `pathLen κ ≤ ℓ`, which that lemma wants, comes from this statement's own
 -- `pathLen κ + G ≤ ℓ` by m≤m+n — nothing new is spent for it.
---
+
 -- PLACEMENT, a real constraint and cheap to get wrong: neither the leaf nor
 -- the body takes a walk face, so neither may join the heavy mutual block
 -- (block 42, 15 members — `make agda-dev ARGS='--list …'` shows them free).

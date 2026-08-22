@@ -93,7 +93,7 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
         ≡ countRegs s (EvalSt.registry (foldSt sf gas id now envSrc path vals evs fin sched st))
     -- [→ live-source] envSrc's live count drains by exactly its closes in the
     -- accumulated evs (the seed exhausted close, plus any take-head cut).  KEYED
-    -- ON closeCount, NOT `if fin` (2026-07-19): the `if fin` form is frame-UNSTABLE
+    -- ON closeCount, NOT `if fin`: the `if fin` form is frame-UNSTABLE
     -- — an absorbing *All frame leaves fin′ ≡ false (from-inner react true) while
     -- the seed close still sits in evs draining envSrc, so ∸1 ≢ ∸0 across the
     -- frame.  closeCount is additive over ++, so it threads (the take-head frame
@@ -124,7 +124,7 @@ record FoldOut {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     -- [Mid ps.done-plumbed] — split into the done-FLIP and the STEADY case,
     -- both keyed on frame-stable protocol states (done S / done S′ are unchanged
     -- by frames; only the terminal emit steps the automaton), per the higher
-    -- model's 2026-07-19 call.  The old done-S′-keyed-with-`if fin` form was NOT
+    -- model's own call.  The done-S′-keyed-with-`if fin` form is NOT
     -- establishable: that `fin` is the INPUT fin, but a *All frame ABSORBS
     -- completion (fin′ ≢ fin, from-inner `react true`), so an `if fin` field
     -- cannot pass the frame recursion.  Keying on done S / done S′ (protocol
@@ -259,7 +259,7 @@ postulate
   --    never has to face.
   -- So the per-element step is the concat residue and the fold above it is new
   -- work on top.  Ordering it after that one is not a preference: proving this
-  -- first means proving that one inline. (2026-08-19)
+  -- first means proving that one inline.
   stepFrame-wf-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (envSrc : Source)
     (op : AllOp) (nid : NodeId) (path′ : Path Γ u t)

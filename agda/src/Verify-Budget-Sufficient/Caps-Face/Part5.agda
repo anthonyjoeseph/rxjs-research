@@ -42,7 +42,7 @@ open import Rx.Slots using (Slots)
 --
 --   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
 --     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
---     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     .Measures.  Extracted so that a grind here no longer
 --     re-checks .Wet — see that module's head.
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition
@@ -105,7 +105,7 @@ innerFinish-zero c j sl vals sched st inv vC =
 ------------------------------------------------------------------
 -- THE SLOT EDGE, GROUND: subscribeE-input-caps, and both of the two
 -- blockages that stopped it are gone.
---
+
 -- Its four branches:
 --
 --   scripted (hot _)   A spent script answers with a
@@ -116,9 +116,9 @@ innerFinish-zero c j sl vals sched st inv vC =
 --                      values, and the async tail becomes a LiveSource
 --                      whose pendings capsOK? bounds by cSize and
 --                      cWid.  Both are slot data.
---
--- BLOCKAGE 1 — THE JOINT BOUND — IS RESOLVED, by the design ruling of
--- 2026-07-31, and the evidence is Joint-Probe.  What blocked here (and
+
+-- BLOCKAGE 1 — THE JOINT BOUND — IS RESOLVED, by a design ruling whose
+-- evidence is Joint-Probe.  What blocked here (and
 -- at thruWalk / concatDrain / innerFinish) was that subscribeE-caps
 -- demanded `pathLen κ + sizeᵉ b ≤ cSize` while the delivery side
 -- carries the two bounds SEPARATELY.  The natural-looking repair —
@@ -136,7 +136,7 @@ innerFinish-zero c j sl vals sched st inv vC =
 -- from-inner frame it adds, and one j at least doubles cSize
 -- (frameStep-chain-suc), so a +1 chain extension is absorbed with
 -- room.  The extra receipt rides in the same sum the fold receipts do.
---
+
 -- BLOCKAGE 2 — `c` NOT TIED TO `sl` — IS REPAIRED AT THE TELESCOPE.
 -- capsAt's base is `2 + sizeᵉ e + slotsSize sl`, so the connection
 -- exists at the top and used to be thrown away by the time a companion
@@ -149,7 +149,7 @@ innerFinish-zero c j sl vals sched st inv vC =
 -- slotsCaps?-capsAt.  What is left here is the CLAUSE: the shared
 -- branch reads its `d` out of it, and the cold branch its sync values
 -- and async pendings.
---
+
 -- AND THE WIDTH HALF IS FREE, which is why slotsCaps? carries sizes
 -- only.  A scripted slot's element type is DATA — the `ok` proof the
 -- `scripted` constructor carries is exactly `T (isData t)` — and pWᵛ
@@ -847,8 +847,8 @@ stepFrame-face-zero c d j u sl fin sched st inv =
     , refl
 
 ------------------------------------------------------------------
--- THE TWO *All FACES WAIT ON **TWO** NUMBERS, NOT ONE (2026-08-03).
---
+-- THE TWO *All FACES WAIT ON **TWO** NUMBERS, NOT ONE.
+
 -- Both postulates below were flagged as waiting on the burst VALUE
 -- COUNT — the (b) conjunct — and that reading is right about (b) and
 -- incomplete about (a).  Enumerating what the tree reports:
@@ -878,9 +878,9 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 --       two.  The count conjunct does not touch it: knowing how many
 --       VALUES a subscribe emits says nothing about how many LEVELS it
 --       climbed to emit them.
---
+
 -- AND (a) DOES NOT FIT `fCharge`, NOR ANY CLOSED FORM IN (S, W, J) —
--- measured, Sub-Charge-Probe (DELETED; git history), which reads the receipt
+-- measured, `git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda`, which reads the receipt
 -- table off this file's own GROUND clauses.  The crude reading said one
 -- subscribe walks the inner's operator chain paying a frame receipt per
 -- operator, `sizeᵉ o ≤ cSize` of them, so ~2·cSize per subscribe and
@@ -898,7 +898,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- NOT BY A CONSTANT", Rx.Evaluator), and it takes the same repair: a
 -- RECURSION on a nesting budget, every level quantity read at the level
 -- the walk has climbed to.
---
+
 -- THE GAS ESCAPE IS CLOSED BY TYPING, which had to be checked first.  A
 -- synchronous fixpoint `μ x. mergeAll (of x)` would re-enter subscribeE
 -- once per unfolding, bounded by the GAS and nothing else — and
@@ -910,26 +910,26 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- one subscribe unfolds a μ at most as many times as the syntax nests
 -- them — the μ clause's `j₀ = m + suc (m * m)` is a per-operator cost
 -- like any other.
---
--- THE REPLACEMENT IS LANDED (2026-08-03), AND SO IS THE RE-RULING ON
+
+-- THE REPLACEMENT IS LANDED, AND SO IS THE RE-RULING ON
 -- TOP OF IT.  The per-frame level in Rx.Evaluator is now the REFRESHED
 -- hierarchy — `fLvlD` / `sIterD` / `sLvlD` / `opIterD` / `fIterD`, with
 -- `k := suc (sizeAt S J)` re-read AT EVERY FRAME ENTRY rather than
 -- inherited down the subscribe tree — and `iterL` spends `fLvlD S W d`
 -- per frame where it spent `fLvl`.  The inherited family it replaces is
 -- gone.  Reading the budget once, where a subscribe BEGAN, is refuted
--- (Nest-Budget-Probe (DELETED; git history) § 3: a `scanᵉ` under an *All mints
+-- (`git show 1f1730e^:agda/probe/Nest-Budget-Probe.agda` § 3: a `scanᵉ` under an *All mints
 -- a payload per fold, the k-th mint nests k deep, the carrier's own
 -- nesting stands still — 2 against 43690 at S = 2, W = 1, J = 0).  The
 -- refresh's soundness is a theorem (Refresh-Probe § 1: `stepFrame`
 -- reaches `subscribeInner` from two clauses only, and both suppliers are
 -- bounded at the frame's own entry); its cost is the DEPTH FUEL `d`,
 -- which descends where `k` used to.
---
+
 -- Nothing above the frame had to move: `fLvl ≤ fLvlD` pointwise at every
 -- fuel (.Caps), and `iterL`, `dLvl`, `lvls`, `sizeCount` and the count
 -- gate are built from the per-frame monotonicity and nothing else.
---
+
 -- AND THE FUEL IS RULED: it is the budget recurrence's OWN STORY INDEX,
 -- threaded explicitly.  `blowH m` hands the pooled count its own m
 -- (`poolCount (towerℕ m) m`) and `capsAt` runs instant id's blowup at
@@ -943,13 +943,13 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- level.  What the placement still owes — the story index dominating the
 -- depth an instant reaches, where the gas bound sits one blowH story
 -- above it — is recorded there as owed.
---
+
 -- WHAT IS LEFT IS THE PASS THAT SURFACES THE RECEIPTS INTO THE
 -- SIGNATURES: `subscribeE-caps`'s Σ gains `j + j′ ≤ sLvlD S W d k j`
 -- under a nesting hypothesis on `b`, and the six companions it calls
 -- gain the matching conjunct.  The arithmetic each clause SHAPE needs
 -- is proven ahead of the grind, and now against the LANDED family
--- rather than a mirror of it (Sub-Charge-Probe (DELETED; git history) § 5, five
+-- rather than a mirror of it (`git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda` § 5, five
 -- steps: `walk-step` a payload of thruWalk / concatDrain, `frame-step`
 -- the refresh itself — a frame's payload walk stops taking its nesting
 -- hypothesis from the subscribe that installed it and reads its own —
@@ -960,8 +960,8 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- ran the frames before the rest of the operator chain, it charged a
 -- payload's subscribe at J rather than at `suc J`, and its eval receipt
 -- was linear where `unfoldμ-caps` pays `m + suc (m * m)`).
---
--- THE NESTING HYPOTHESIS IS SETTLED (2026-08-03) and is not `nestᵉ`.
+
+-- THE NESTING HYPOTHESIS IS SETTLED and is not `nestᵉ`.
 -- The measure k really counts is `syncSizeᵉ` — the one that stops at
 -- `deferᵉ`, the sole gate moving Δᵍ into Δ, and so drops by exactly one
 -- across the μ edge, matching k's single descent at
@@ -975,7 +975,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- carry is .Caps-Nest's `M` — syncSize plus the residue owed by the
 -- unconnected shares — and the frame supplies it one size level up
 -- (`refresh-supplies-M`; the entry level is refuted outright).
---
+
 -- THE COMPANION SIDE'S OWN FUEL is the gas it is handed: subscribe depth
 -- ≤ gas height, by induction on the evaluator's recursion, which is the
 -- same bridge the level side reads.  And the two faces below are the
@@ -983,8 +983,8 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- reports the level a frame LEAVES (`J + j′ ≤ fLvlD S W d J`) rather
 -- than the receipt alone, so what these two owe is a receipt inside ONE
 -- refreshed frame level rather than inside `fCharge`.
---
--- AND `FrameFace` IS NOW STATED THERE (2026-08-03).  It carries the
+
+-- AND `FrameFace` IS NOW STATED THERE.  It carries the
 -- depth fuel `d` and its receipt conjunct IS the landing form, `j + j′ ≤
 -- fLvlD (cSize c) (cWid c) d j`.  The five ground construction sites
 -- still pay `fCharge` and are lifted one at a time by `face-lift` (which
@@ -996,8 +996,8 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- sum of subscribe receipts inside `sIterD` — which is what `fLvlD S W
 -- (suc d) J` spends, one payload at a time, at the level the last one
 -- left — and (b) is the width sum the block above prices.
---
--- BUT (a) IS DOWNSTREAM OF (b), NOT PARALLEL TO IT (2026-08-03, read off
+
+-- BUT (a) IS DOWNSTREAM OF (b), NOT PARALLEL TO IT (read off
 -- the two ground clauses below rather than argued).  The block above
 -- calls (b) "a standalone induction" and (a) the receipt with no
 -- supplier, as if either could be done first.  It cannot: (a)'s own
@@ -1024,7 +1024,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 --     width, and the companion's two callers have none to give"), now
 --     read from the other end: the split is why the face can be charged
 --     at one `fLvlD` and the companion cannot.
---
+
 -- So the pass is (b) THEN (a), and (b) is two counts rather than one —
 -- emits per burst and values per emit.  Both have the same entry
 -- measure, `outWᵉ` (Rx.Frame-Width), and the same supplier for a payload

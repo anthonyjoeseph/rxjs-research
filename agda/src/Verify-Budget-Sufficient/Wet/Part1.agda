@@ -8,10 +8,10 @@
 ------------------------------------------------------------------
 -- STRATUM 2b of Verify-Budget-Sufficient: THE WET FAMILY.
 --
--- TIMING RECEIPT 2026-08-11 (--profile=internal, dirty solo check): see
--- typecheck-performance-numbers.md.  Measured because Subscribe-Face's cost turned
--- out to be 86% Agda's Positivity pass over ONE mutual block, and this module
--- is written in the same style; the roadmap records whether that generalises.
+-- THIS MODULE'S COST IS MEASURED, and the figures are in
+-- typecheck-performance-numbers.md.  It is worth measuring because
+-- Subscribe-Face's cost turned out to be 86% Agda's Positivity pass over ONE
+-- mutual block, and this module is written in the same style.
 --
 -- The half that steps the evaluator.  The Keeps ring (slot/share
 -- monotonicity), the size-elim laws, the ledger arithmetic, the wet
@@ -22,13 +22,13 @@
 --
 -- `drain-dry` and `budget-sufficient` — the theorem
 -- Verify-Well-Formed consumes — MOVED to `.Caps-Bridge`
--- (the 2026-08-05 upside-down ruling): a
+-- (the upside-down ruling): a
 -- module above `.Wet` can consume `.Caps-Bridge`'s `cascade-wet-via-caps`
 -- in place of the cascade wet face (whose dry half is now
 -- `cascadeGo-nodry`, .Burst-Walk); `.Wet` itself
 -- cannot, since `.Caps-Bridge` imports `.Wet`.
 --
--- This module is a LAYER OVER .Caps as of 2026-08-01: the wet cores'
+-- This module is a LAYER OVER .Caps: the wet cores'
 -- reset caps and per-instant store bound are read off `capsAt`, the caps
 -- recurrence, which is the only entry-computable reach bound in the
 -- machine (round3b-ledger-reset-absurd rules out the ledger).  The
@@ -37,9 +37,9 @@
 -- landed — so this module and the caps FACE are still siblings and a
 -- caps-face grind does not re-check twenty minutes of wet clauses.
 
--- Split 2026-08-12 into Wet/Part1..Part6 to bound per-edit recheck time;
+-- SPLIT INTO Wet/Part1..Part6 to bound per-edit recheck time;
 -- no mutual block was broken and no content changed.  Parts 4 and 5 were
--- the width walk and went with it (2026-08-21), so the family is now
+-- the width walk and went with it, so the family is now
 -- Parts 1, 2, 3 and 6, imported directly — there is no umbrella.
 module Verify-Budget-Sufficient.Wet.Part1 where
 

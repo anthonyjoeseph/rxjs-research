@@ -226,7 +226,7 @@ private
     (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     b ≡ inputᶜ i →
-    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
     -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
@@ -419,7 +419,7 @@ abstract
     (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     b ≡ inputᶜ i →
-    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
     -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
@@ -531,7 +531,7 @@ private
     (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     b ≡ inputᶜ i →
-    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
     -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
@@ -696,7 +696,7 @@ abstract
     (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
     Sched.slots sched i ≡ shared d {ok = ok} →
     b ≡ inputᶜ i →
-    -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+    -- FRESHNESS, added, and it is a PRECONDITION OF THE
     -- OPERATION rather than a convenience of today's caller — which is
     -- what makes this a restatement of a true theorem and not a
     -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches
@@ -788,7 +788,7 @@ sharedConnect-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
   Sched.slots sched i ≡ shared d {ok = ok} →
   b ≡ inputᶜ i →
-  -- FRESHNESS, added 2026-08-20, and it is a PRECONDITION OF THE
+  -- FRESHNESS, added, and it is a PRECONDITION OF THE
   -- OPERATION rather than a convenience of today's caller — which is
   -- what makes this a restatement of a true theorem and not a
   -- weakening.  `subscribeSharedSlot` (Rx/Evaluator:1388-1396) reaches

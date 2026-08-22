@@ -14,7 +14,7 @@
 -- caps-tick DERIVED from those, and the reachability cluster
 -- (reach-resets) that pays round 3's debt.
 --
--- THE SUBSCRIBE CLIQUE LEFT ON 2026-08-03, for .Subscribe-Face.  The
+-- THE SUBSCRIBE CLIQUE LIVES IN .Subscribe-Face.  The
 -- caps face itself (subscribeE-caps), the twelve companions mutual with
 -- it, and the four delivery leaves that call it are a SUFFIX of this
 -- module — reverse-reachability from the clique reaches nothing else
@@ -23,7 +23,7 @@
 -- subscribe grind therefore re-checks 1.9k lines, not this file's 6.5k
 -- (18 minutes cold).
 --
--- THE RECURRENCE ITSELF LIVES IN .Caps as of 2026-08-01 — the Caps
+-- THE RECURRENCE ITSELF LIVES IN .Caps — the Caps
 -- triple, sizeStep / foldStep / iterSize / iterFold / frameStep /
 -- frameBlowup with their monotonicity toolkit, capsAt, and the supply
 -- lemmas that read a level off it.  .Wet reads those and nothing else
@@ -44,9 +44,9 @@
 -- sub-call (valCaps? and its relatives read Sched.slots, and the caller
 -- reports at the callee's post sched).
 
--- Split 2026-08-12 into Caps-Face/Part1..Part7 to bound per-edit recheck
--- time (cold agda-dev was 72.6 s for the whole file).  All consumers
--- import this umbrella and are unaffected.
+-- SPLIT INTO Part1..Part7 to bound per-edit recheck time.  There is no
+-- umbrella module over them — one could only re-export, and a name is
+-- imported from where it is DEFINED — so consumers import the Parts.
 
 -- STRATUM 2a of Verify-Budget-Sufficient: THE CAPS FACE (round 4).
 --
@@ -56,7 +56,7 @@
 -- caps-tick DERIVED from those, and the reachability cluster
 -- (reach-resets) that pays round 3's debt.
 --
--- THE SUBSCRIBE CLIQUE LEFT ON 2026-08-03, for .Subscribe-Face.  The
+-- THE SUBSCRIBE CLIQUE LIVES IN .Subscribe-Face.  The
 -- caps face itself (subscribeE-caps), the twelve companions mutual with
 -- it, and the four delivery leaves that call it are a SUFFIX of this
 -- module — reverse-reachability from the clique reaches nothing else
@@ -65,7 +65,7 @@
 -- subscribe grind therefore re-checks 1.9k lines, not this file's 6.5k
 -- (18 minutes cold).
 --
--- THE RECURRENCE ITSELF LIVES IN .Caps as of 2026-08-01 — the Caps
+-- THE RECURRENCE ITSELF LIVES IN .Caps — the Caps
 -- triple, sizeStep / foldStep / iterSize / iterFold / frameStep /
 -- frameBlowup with their monotonicity toolkit, capsAt, and the supply
 -- lemmas that read a level off it.  .Wet reads those and nothing else
@@ -133,7 +133,7 @@ open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 --
 --   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
 --     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
---     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     .Measures.  Extracted so that a grind here no longer
 --     re-checks .Wet — see that module's head.
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition
@@ -195,7 +195,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 ------------------------------------------------------------------
 
 -- the frame-width half of the state predicate.  NOT widthOK? — that
--- was ofW, a per-NODE width (deleted 2026-08-21 with the width walk),
+-- was ofW, a per-NODE width (deleted with the width walk),
 -- and om-is-not-a-frame-budget is the counterexample to conflating
 -- the two
 widLive : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → LiveSource Γ → Bool
@@ -816,9 +816,8 @@ slotsCaps?-lookup B W sl i h = slotsGo?-tab B W sl (λ k → k) i h
 -- nothing in capsOK? relates the two: the relation is a fact about the
 -- SLOT TELESCOPE, and it is true at every level because capsAt's base
 -- contains slotsSize as a summand and iterSize only grows it
--- (1≤slotSize / n≤sum-tab / n≤slotsSize MOVED DOWN to .Measures
--- 2026-08-19, where slotHop-sup also needs them.  They are still in
--- scope here, imported by name from .Measures.)
+-- (1≤slotSize / n≤sum-tab / n≤slotsSize live in .Measures, which
+-- slotHop-sup also reads them from; they are in scope here by name.)
 n≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   n ≤ Caps.cSize (capsAt e sl id)
 n≤capsAt-size e sl id =

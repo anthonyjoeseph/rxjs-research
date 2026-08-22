@@ -229,7 +229,7 @@ subscribeE-take-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
         (runProtocol S (proj₁ r₀) ≡ just S′)
         × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
         × (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀))) ≡ just (take-st (suc k)))
-        -- `dyF` CONJUNCT REMOVED 2026-08-18 (A′).  It used to sit here claiming
+        -- `dyF` CONJUNCT REMOVED (A′).  It used to sit here claiming
         -- the cut's balance held off every source, "riding in from the enclosing
         -- cascade" — and it was the one premise this clause could never pay, since
         -- `cascadeLatch` seeds `dying` before any chain is processed.  The cut no
@@ -563,7 +563,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- invariant; its live-source readoff lives in FoldOut as output deltas
     -- (live-envSrc-out : live S′ ≡ live S ∸ (if fin then 1 else 0), universal;
     -- reg-envSrc-out via cutCloseCount over the emit, no-take-head first).
-    -- (DROPPED 2026-07-19) a `done-plumbed : done S ≡ true → allShareSunk (if fin
+    -- (DROPPED) a `done-plumbed: done S ≡ true → allShareSunk (if fin
     -- then dropSource envSrc reg else reg)` field used to live here.  Its `if fin`
     -- keying is frame-unstable under from-inner absorption (fin true→false with reg
     -- unchanged flips the dropSource off, demanding the full registry be share-sunk
@@ -601,7 +601,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- if fin then 1 else 0).  The take-head cut is the one edge stepFrame-wf must
     -- carry (a head take flips fin AND closes envSrc), pinned by Unit-Test.
     env-init  : initCount envSrc evs ≡ 0
-    -- (DROPPED 2026-07-19) an `env-close : closeCount envSrc evs ≡ if fin then 1
+    -- (DROPPED) an `env-close: closeCount envSrc evs ≡ if fin then 1
     -- else 0` field used to live here.  It was FRAME-UNSTABLE under from-inner
     -- absorption (envSrc = the completing inner chain's own source, so its close
     -- sits in evs with fin ≡ true; a live sibling under the same instance absorbs
@@ -631,7 +631,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- the record lands).  foldPath-wf will return, alongside `Σ S′ (runProtocol
 -- ≡ just S′)`, a FoldOut relating the fold's OUTPUT triple (S′, st″, sched″)
 -- to its inputs, from which mid-step reads Mid ps off directly.
---
+
 -- WHY A THREE-WAY INVARIANT (the frame case is NOT a live↔registry
 -- pass-through).  stepFrame mutates the registry — subscribeInner adds an
 -- entry AND emits `init`; a take/switch cut removes an entry AND emits
@@ -653,7 +653,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --   • ROOT base: applyEvents drains evs into live, so countIn s Lv = countIn s
 --     (live S) + initCount − closeCount = countRegs s (registry st) (registry
 --     unchanged by root) ⇒ live-others-out.  SHADOW is thus added to FoldInv.
---
+
 -- FoldOut FIELDS (postcondition at the output S′, st″, sched″), each tagged
 -- with the Mid ps field it discharges and its establishing obligation:
 --   1 live-others-out : ∀ s≠envSrc, countIn s (live S′) ≡ countRegs s
@@ -693,7 +693,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --                                                         [Mid ps.done-plumbed]
 --   (fold-live is NOT a FoldOut field — it names a/nextId/ps, absent from the
 --    fold; mid-step peels it from Mid(head∷ps).fold-live directly.)
---
+
 -- PER-CASE establishment of FoldOut:
 --   root        : all fields concrete from foldPath-root-wf + SHADOW.
 --   f ↠ path′   : foldPath frame ≡ foldPath path′ (transformed state), so the
@@ -705,7 +705,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --                 bumps owed[i] by countIn i (live); the fan-out repays one
 --                 per registration and (isLast) dropSource i at finish resyncs
 --                 registry i against the fan-out's closes — the diamond.
---
+
 -- WHICH FIELDS ARE FoldOut vs. FoldInv (traced 2026-07):
 --  • OUTPUT-ONLY (clean FoldOut fields — reference only st″/sched″/S′, so they
 --    pass through the frame recursion): live-others-out (s≠envSrc, from SHADOW),
@@ -743,8 +743,9 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --    connection made at mid-step off Mid.live-source + the ledger.  The
 --    take-head corner (head's own cut close + cancellation) is the one edge to
 --    pin with a Unit-Test before relying on it.
---
--- VERIFIED 2026-07-19 (foldPath-root-out groundwork):
+
+-- THE foldPath-root-out GROUNDWORK, and what it establishes:
+
 --  • live-others-out is now MECHANISED end-to-end for the root: readoff-cancel
 --    = applyEvents-count (drains evs into live) ∘ SHADOW ∘ +-cancelʳ-≡
 --    (cancel the shared closeCount) ⇒ countIn s Lv ≡ countRegs s (registry st).
@@ -752,14 +753,17 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --    registry/sched fields reduce to reg-envSrc-out = refl and reg-typed-out =
 --    FoldInv.reg-typed verbatim.  current-out reads off FoldInv.ov-zero/
 --    ov-unique/ov-envSrc (added today) with Ov = the applies output.
+
 --  • done-plumbed-out is the ONE genuinely hard field, and it is NOT a
---    seed-threadable FoldInv invariant — established here (2026-07-19):
+--    seed-threadable FoldInv invariant — established here:
+
 --     - done S′ = if fin then true else done S, so a completing chain
 --       (fin ≡ true, done S ≡ false) sets done S′ ≡ true while
 --       FoldInv.done-plumbed (keyed on done S ≡ true) does NOT fire.  cascadeGo
 --       only builds emits; runProtocol flips done at the first `complete`, so
 --       the first chain of the last arrival flips it and every later ps chain
 --       runs with done ≡ true — the flip case is reachable, not a corner.
+
 --     - The tempting fix (a FoldInv field `fin ≡ true → allShareSunk(dropSource
 --       envSrc registry)`, threaded like SHADOW) is FALSE at the seed: the seed
 --       fin = isLast a, but a downstream *All frame ABSORBS a completing inner
@@ -769,7 +773,8 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       completes, and with a live merge sibling every other root-direct source
 --       is still non-share-sunk — allShareSunk(dropSource envSrc registry) is
 --       plainly false there.  A seed field would be a FALSE leaf.
---     - RESOLUTION (higher model, 2026-07-19): the fin ≡ true plumbing is a
+
+--     - RESOLUTION (higher model): the fin ≡ true plumbing is a
 --       post-frame property, so it belongs in FoldOut keyed on fin-OUT, NOT
 --       threaded from the seed.  fin-out is not returned by foldPath, so encode
 --       it frame-stably as done S ≡ false ∧ done S′ ≡ true (⟺ fin-out ≡ true
@@ -779,34 +784,42 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       clause.  Two FoldOut fields now (see the record above):
 --         flip-plumbed-out : done S ≡ false → done S′ ≡ true → allShareSunk(drop)
 --         done-plumbed-out : done S ≡ true  → allShareSunk(full)
+
 --       ESTABLISHMENT: from-inner comes nearly free — fin passes it only when
 --       the evaluator's own `any aliveThrough ≡ false` scrutinee holds, an
 --       operational certificate the proof converts into the invariant.  thru-
 --       outer wrap gates on NODE counts (merge-st k / concat queue / switch
 --       Maybe), so they force a node↔registry coherence fact — added MINIMALLY
 --       as threaded FoldInv fields per wrap clause as forced (same discipline as
+
 --       SHADOW), never globally up front.  Couples with the take-head cut (take-f
 --       flips fin AND emits cutThrough closes, Evaluator 540-548).
---       MERGE COHERENCE — candidate FALSIFIED by the guardrail-3 hand-check
---       (2026-07-19).  The identified candidate field
+
+--       MERGE COHERENCE — candidate FALSIFIED by the guardrail-3
+--       hand-check.  The identified candidate field
 --         merge k@nid : (merge-st k _ at nid) ⇒ k ≡ countRegsUnder nid registry
 --       (k ≡ #live registrations whose path threads nid, via pathHasNode) is
+
 --       FALSE — THREE independent reasons, each a concrete counterexample:
+
 --        (1) The OUTER stream itself flows through `thru-outer mergeᵒ nid`, so
 --            the outer registration threads nid too (frameNodes (thru-outer _ k)
 --            = k ∷ []), yet `k` counts only ACTIVE INNERS.  Whenever the outer is
 --            live, countRegsUnder nid ≥ 1 while k may be 0.  Airtight, needs no
 --            nesting: `mergeAll(of(a))` after a completes but before outer does.
+
 --        (2) An inner obs is an ARBITRARY closed Exp (Rx.Exp: Val Γ (obs u) =
 --            Exp Γ [] [] [] u), so a multi-source inner — e.g. `mergeAll(of(
 --            merge(a,b)))` — makes subscribeE register TWO chains threading nid
 --            (subscribeInner path = from-inner mergeᵒ nid inst ↠ κ, and
 --            pathHasNode nid fires on the from-inner allNid), but `bump`
 --            (Evaluator 609-611) does a single `suc k` for the whole inner.
+
 --        (3) `finish mergeᵒ` (Evaluator 568-570) does `merge-st (pred k)` and
 --            does NOT touch the registry, so a completed inner's registrations
 --            LINGER (dropped only at cut/cascadeFinish).  k decrements; the raw
 --            structural count does not.
+
 --       COROLLARY (the real lesson): the gate-relevant count is NOT a raw
 --       structural pathHasNode count.  k tracks distinct LIVE inner INSTANCES
 --       (one inst per subscribeInner, pred on finish), so the true measure must
@@ -817,15 +830,19 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       is a from-inner-instance liveness count, not countRegsUnder.  Probe code
 --       (countRegsUnder + mergeWrap-nil-coherent) reverted; git has it.  DO NOT
 --       generalise to a global node↔registry theory, and NOT onto dispatchShare.
---     - flip-plumbed-out IS SOUND — the count field is not even needed (2026-07-19).
+
+--     - flip-plumbed-out IS SOUND — the count field is not even needed.
 --       A false alarm ("a co-completing inner's lingering reg breaks allShareSunk
 --       (dropSource envSrc)") was chased down and REFUTED by the cascade lifecycle:
+
 --        • A cascade is SINGLE-SOURCE: cascadeGo folds only chainsOf a (arrSource a
 --          = envSrc); every chain folded in one cascade shares that one source.
+
 --        • cascadeFinish drops arrSource a's regs at the END of each cascade (Evtr
 --          1088-1093), and sync-completing sources never linger at all (of/empty/
 --          finite-cold never `register`; a share def dying in its connect burst
 --          self-drops, Evtr 830).  Only genuinely-live async/hot sources hold regs.
+
 --        • So "simultaneous" completions are still SEPARATE cascades (drain pulls
 --          one arrival at a time, distinct ids).  A co-completing inner is a prior
 --          cascade whose cascadeFinish already dropped its reg before envSrc's
@@ -836,10 +853,13 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       react true / merge-st k>0 / concat queue), so it could not have let fin
 --       reach root in the first place.  (c)-root-sinking is thus incompatible with
 --       the flip; only (a)+(b) coexist with it ⇒ allShareSunk(dropSource envSrc).
+
 --     - ESTABLISHMENT, REDIRECTED: flip-plumbed-out is NOT a per-frame node-COUNT
 --       fact — it is the contrapositive of ABSORPTION, assembled from the per-frame
+
 --       GATE CERTIFICATES along the fold path.  Two ingredients:
---        (i) TOPOLOGY (verified 2026-07-19): there is no binary static merge —
+
+--        (i) TOPOLOGY (verified): there is no binary static merge —
 --            mergeAllᵉ is the ONLY merge (Evtr 896), so `merge(a,b)` desugars to
 --            mergeAll(of(a,b)) with a,b inners of ONE node nid (from-inner mergeᵒ
 --            nid _).  concat/switch/exhaust likewise.  Hence ANY two root-sinking
@@ -847,6 +867,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --            COMMON *All gate; there are no independent root-sinkers whose fins
 --            race to root ungated.  (foldPath root emits `if fin complete` with no
 --            join, Evtr 960-962 — soundness relies entirely on this gating.)
+
 --        (ii) CERTIFICATE: when the fold's fin passes a gate on envSrc's path, the
 --            evaluator's own scrutinee fired.  A merge gate absorbs on TWO axes,
 --            and fin passes only when BOTH clear:
@@ -875,18 +896,22 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       frameNodes).  The merge-cert still needs the CORRECTED k↔live-inst
 --       coherence as a threaded FoldInv field — its exact statement (and whether
 --       k≡0⇒none is seed-provable) is the remaining design point, NOT countRegsUnder.
---       NAME NOTE 2026-08-18: `merge-cert` above is this SKETCH, not a postulate —
+
+--       NAME NOTE: `merge-cert` above is this SKETCH, not a postulate —
 --       the Part4 postulate of that name is gone.  It existed only as the
 --       hypothesis of the two root-exit -cores, and writing those as real bodies
 --       showed it does not close even their k ≡ 0 case: mergeCertAt rules out
+
 --       ALIVE from-inner instances while countLiveInners counts PRESENT ones, so
 --       a dead-but-present instance defeats it.  Full finding on
 --       Part4.root-mergeCache; RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda.
 --       Whatever is threaded here must close that alive-vs-present gap too.
+
 --     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise
 --       is done ≡ true, vacuous right up until the flip; the flip is mid-cascade,
 --       where Inv does not exist.  Nothing to derive from at the one moment the
 --       conclusion is needed.
+
 --     - GUARD (standing): if fin reaches root while a non-envSrc root-sinking
 --       registration survives, that is an evaluator completion BUG, not an
 --       invariant gap — stop and surface it.  (Not a spec counterexample: the

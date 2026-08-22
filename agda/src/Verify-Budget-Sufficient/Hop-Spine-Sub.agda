@@ -223,7 +223,7 @@ mutual
 -- `2 + P`, still lands under `(2 + P) ^ spnᵗ` OF THE PLUGGED TERM.
 --
 -- WHY THE HEREDITARY PREDICATE AND NOT `valHopSpn?-hopD`'s FLATTENED
--- FORM (2026-08-20).  The flattened route wants `spnᵛ t v < spnᵗ (wkTm
+-- FORM.  The flattened route wants `spnᵛ t v < spnᵗ (wkTm
 -- (reify v))` — one spare unit to pay for the slope — and that is
 -- FALSE.  Take a pair of an `obs` of spine 1 with a ground nest of
 -- spine 10: `spnᵛ` is `suc (1 ⊔ 10) ≡ 11`, and reifying gives `suc
@@ -445,7 +445,7 @@ plug-hopSpnC {Δᵍ = Δᵍ} {Δ = Δ} {Θ = Θ} V η P B d (obs t) e h =
 
 ------------------------------------------------------------------
 -- THE ENVIRONMENT CONDITION, PER POSITION, AND THE DISJUNCTION IS THE
--- FINDING (2026-08-19).  Three single-number hypotheses were tried and
+-- FINDING.  Three single-number hypotheses were tried and
 -- each died at the opposite end from the one it fixed — a derived bound
 -- decays per fold step, a global `∀ j → pmᵗ V j tm ≤ P` dies at a
 -- CLOSED `caseᵗ` scrutinee, and a global product `pmᵗ V j tm * Ds j ≤ B`
@@ -540,7 +540,7 @@ c*w≤ c w x y le =
 -- the plugs; that route cannot be used here and the reason is worth
 -- recording, because it looks like the obvious one.
 --
--- x DEAD ROUTE 2026-08-19: one shot through `hopD-subΘᵉ`.  Its bound
+-- x DEAD ROUTE: one shot through `hopD-subΘᵉ`.  Its bound
 -- SUMS over environment positions, so it pays for every plug even when
 -- the plugs sit on different branches of a `⊔` — where `hopDᵉ` itself
 -- takes the max and the spine grows by the max too.  Feeding that sum
@@ -548,7 +548,7 @@ c*w≤ c w x y le =
 -- environment of length M, false at M ≥ 2.  The information lost is the
 -- `⊔` structure, and no arithmetic downstream of the sum can recover it.
 --
--- x DEAD ROUTE 2026-08-20: `sumW` replaced by a `⊔`-weighted `maxW`.
+-- x DEAD ROUTE: `sumW` replaced by a `⊔`-weighted `maxW`.
 -- This was the recorded plan and it is REFUTED at `mapᵉ`, one clause in:
 -- the clause needs `maxW Gf + C * maxW Ge ≤ maxW (λ j → Gf j + C * Ge j)`
 -- — a sum of maxes under a max of sums — and that is backwards.  At

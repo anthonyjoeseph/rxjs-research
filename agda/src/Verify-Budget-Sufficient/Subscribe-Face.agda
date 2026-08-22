@@ -1,13 +1,13 @@
 -- STRATUM 2a-ii of Verify-Budget-Sufficient: THE SUBSCRIBE FACE.
---
--- The subscribe clique, carved out of .Caps-Face (2026-08-03).  Thirteen
+
+-- The subscribe clique, carved out of .Caps-Face.  Thirteen
 -- definitions in ONE mutual block — subscribeE-caps and the companion
 -- tree it is decomposed into (subscribeInner, sharedConnect, sharedSlot,
 -- thruConsume, thruWalk, concatDrain, innerFinish, subscribeE-input,
 -- innerReact, stepFrame-caps, pushBurst, subscribeAll) — plus the three
 -- delivery leaves that CALL it (foldPath-caps, dispatchShare-caps,
 -- shareGo-caps) and pushBurst's private retagEvents-caps.
---
+
 -- WHY IT MOVED.  Nothing here is imported by anything else in .Caps-Face:
 -- reverse-reachability from the clique lands on exactly those three
 -- delivery leaves, and stepFrame-FACE does not call stepFrame-CAPS, so
@@ -17,12 +17,12 @@
 -- need from .Caps-Face directly, and a clause edit in the subscribe
 -- grind re-checks THIS
 -- module only instead of .Caps-Face's eighteen minutes.
---
+
 -- This is the .Caps / .Keeps-Ring precedent applied a third time, in the
 -- other direction: .Caps was peeled off the FRONT (shared upstream),
 -- this is peeled off the BACK (unshared downstream).
---
--- TIMING, measured 2026-08-11 (--profile=definitions then --profile=internal,
+
+-- TIMING, measured (--profile=definitions then --profile=internal,
 -- genuinely dirty solo check): 927s total, and the cost is NOT the proofs —
 -- every definition here typechecks in ~18s combined (largest: subscribeE-caps
 -- 2.9s).  The bill is POSITIVITY 779s (86%) and Termination.Graph 92s (10%),
@@ -33,7 +33,7 @@
 --     is a no-op); `--no-positivity-check` on the command line is REJECTED
 --     (written without pragma delimiters on purpose: `make unsafe-check` greps
 --     for the delimited form and does not strip comments, so quoting a pragma
---     verbatim in prose FAILS THE GATE — hit 2026-08-11)
+--     verbatim in prose FAILS THE GATE, which has happened)
 --     outright because agda-stdlib is --safe (EXIT=42 in 267ms); and as a
 --     per-module OPTIONS pragma it is accepted but measured 805s vs 779s —
 --     NO SAVING.  Do not re-attempt any of these three.
@@ -106,7 +106,7 @@ open import Rx.Slots using (inputSize; scripted; shared; Slots; slotSize; slotsS
 --
 --   · .Caps holds the recurrence (Caps / frameStep / frameBlowup /
 --     capsAt and their supply lemmas) and re-exports .Keeps-Ring, hence
---     .Measures.  Extracted 2026-08-01 so that a grind here no longer
+--     .Measures.  Extracted so that a grind here no longer
 --     re-checks .Wet — see that module's head.
 --   · .Deliveries is the ledger stratum: where EvalSt.delivered moves
 --     and where it provably does not, plus delivN and its composition
@@ -179,7 +179,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
--- THE COUNT, FOLDED IN (2026-08-03) — and now DISCHARGED, so the
+-- THE COUNT, FOLDED IN — and now DISCHARGED, so the
 -- placeholders that held its place are gone.
 --
 -- .Subscribe-Count is gone.  It said nothing: its one export was a Σ
@@ -191,7 +191,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- premise is `valsCaps?` — caps AND cardinality in one predicate — and
 -- pushBurst-caps can only supply it from an input count, so the count
 -- is an argument of the clique, not a sibling of it.
---
+
 -- NOTHING IS OPEN.  Every caps conjunct in this file is ground and so
 -- are the NEW ones — burst emit/value counts, and the length half of
 -- `valsCaps?`.  A grep for `postulate` in this module now returns
@@ -201,7 +201,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- pushBurst's empty stream) has both conjuncts reduce — `1 ≤ᵇ suc W` is
 -- `0 ≤ᵇ W` is `true` and `valCountᵉ` of an init/close/complete run is
 -- `0` — at EVERY `c`, so the count costs those clauses nothing at all.
---
+
 -- HOW THE OTHER TWELVE CAME OFF, in the order Phase 2 took them:
 --
 --   · THE EMIT COUNT is structural.  pushBurst is 1:1 (one envelope per
@@ -232,16 +232,16 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 --     needs a case split on the small rows, whereas two folds clear it
 --     outright from `suc W ≤ 2 ^ W` twice.  Two rungs are cheap here and
 --     the tightening is available if a later leg ever wants it.
---
+
 -- THE MARGIN IS NOT TIGHT, which is why one fold is enough and not two.
 -- Concat-Sum-Probe's two worst rows, both machine-checked: `cWid
 -- (frameStep 1 (caps 9 1 1)) ≡ 81` against a sum of `8 + 8 ≤ 82`, and
 -- `cWid (frameStep 2 (caps 2 1 1)) ≡ 32` against `5 + 5 ≤ 33`.  The
 -- summands are each at most `suc W` and one fold takes `W` to `S ^ suc
 -- W ≥ 2 ^ suc W ≥ 2 * suc W`, so the doubling is covered outright.
---
--- FINDING, FOR THE (a) PASS AND NOT FOR THIS LEG (per the ruling of
--- 2026-08-03; recorded, not designed for).  Charging a fold PER CONS
+
+-- FINDING, FOR THE (a) PASS AND NOT FOR THIS LEG (recorded, not
+-- designed for).  Charging a fold PER CONS
 -- means the level a concat clause reports at grows with the length of
 -- the list it walked, and (a) — bounding `j′` by `fLvlD` — has to know
 -- that growth does not outrun the iterator.  The first question (a)
@@ -327,7 +327,7 @@ burstCount?-tail c em str h =
 
 ------------------------------------------------------------------
 -- THE COUNT'S ARITHMETIC (ported from probe/Count-Grind-Probe and
--- probe/Concat-Sum-Probe, 2026-08-03).  Four facts, and the count is
+-- probe/Concat-Sum-Probe).  Four facts, and the count is
 -- exactly their consequence:
 --
 --   § 1  A SIZE FITS UNDER A WIDTH THREE FOLDS UP, and not one fold
@@ -552,7 +552,7 @@ slotSize≤slotsSize sl i = fᵢ≤sum-tab (λ k → slotSize (sl k)) i
 -- two receipts at one level add to one receipt a fold up
 
 -- `2*suc≤2^suc` and `dbl-suc` are .Caps-Face/Part6's, imported by name
--- since 2026-08-19; they were verbatim here too until dup-check saw them.
+-- ; they were verbatim here too until dup-check saw them.
 
 
 
@@ -676,7 +676,7 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- a frame, only j does) and supplied once at the top by
 -- 2≤capsAt-size, which the recurrence proves rather than assumes.
 -- THE CHAIN HYPOTHESIS IS SEPARATE FROM THE SIZE ONE, and that is the
--- joint-bound repair (Joint-Probe, 2026-07-31).  What stood here was
+-- joint-bound repair (Joint-Probe).  What stood here was
 -- `pathLen κ + sizeᵉ b ≤ cSize` — a JOINT bound the delivery side
 -- cannot supply, since it carries the two separately and their sum can
 -- be twice the cap.  Joint-Probe measured the joint form false at the
@@ -689,8 +689,8 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- (a) THE REPAIRED FRAME FACE: a subscribe consumes some number of
 -- folds and reports how many.  j′ folds spent means the caps advance
 -- from frameStep j to frameStep (j + j′), never staying put.
---
--- SURVEYED, NOT ATTEMPTED (2026-07-31), now that every COMPANION is
+
+-- SURVEYED, NOT ATTEMPTED, now that every COMPANION is
 -- ground and this is the only caps face left.  Three things it needs
 -- that are not clause work, recorded so the next leg starts from a
 -- statement rather than from a grind:
@@ -716,21 +716,21 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 --      call has no size hypothesis until one is stated.
 --
 -- (iii) THE ONE THAT WAS A STATEMENT-LEVEL GAP, NOW REPAIRED (the
---      parked-width ruling, 2026-07-31).  `deferᵉ body` PARKS AN
+--      parked-width ruling).  `deferᵉ body` PARKS AN
 --      OBSERVABLE ON THE SCHEDULE: its clause adds a LiveSource at
 --      `elemTy = obs u` with `pending = (suc now , body)`, so
 --      capsOK?'s widLive conjunct demands a WIDTH for the body — and
 --      `outWᵉ (deferᵉ e) = 0` by definition (a defer crosses a tick,
 --      and that semantics is load-bearing on the wet side), so no
 --      outW-derived entry measure supplied it.
---
+
 --      THE REPAIR IS SUPPLY-SIDE AND CAPS-SIDE ONLY.  Rx.Frame-Width
 --      gains dW — the PARKED width, ⊔-collecting every deferᵉ
 --      subterm's `outWᵉ body ⊔ dWᵉ body` — and pW = outW ⊔ dW.  The
 --      caps side reads pW (widLive, widNode, valCaps?, obsCaps?), the
 --      wet side keeps outW untouched, and capsAt's base pays for both
 --      through the ENTRY CEILING it now carries.
---
+
 --      AND THE TELESCOPE CONJUNCT IS dW, NOT pW, which is the one
 --      place the ruling's shape had to be sharpened in the making.
 --      `dWᵉ n sl (deferᵉ body) = pWᵉ n sl body` EXACTLY, so a dW
@@ -745,7 +745,7 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 --      paths from valCaps?'s width half, the root from the base, and
 --      sharedConnect from slotsCaps?, which gains a width half at pW
 --      on its shared branch
---
+
 -- AND IT IS NO LONGER A POSTULATE: it is FORWARD-DECLARED here (so the
 -- companion tree below can call it, exactly as foldPath-caps and its
 -- clique are declared before they are defined) and GROUND at the end
@@ -769,7 +769,7 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 --
 -- Every head below reports the LEVEL it leaves, in the one transformer
 -- its arc of the family's clause cycle forces
--- (Chain-Supply-Probe (DELETED; git history) § 4).  The heads are
+-- (`git show 109757a^:agda/probe/Chain-Supply-Probe.agda` § 4).  The heads are
 -- forward-declared, so the conjunct could not land head by head: the
 -- SHAPES all landed at once and the PROOFS landed per clause.  They are
 -- all in now — a leaf (`emptyᵉ`, `takeᵉ 0`, the dry closes), a chain edge
@@ -3361,7 +3361,7 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
   j₂  = proj₁ IH
   REST = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
 
--- (DELETED 2026-08-18) `chainStep-caps` sat here — one arrival into one
+-- (DELETED) `chainStep-caps` sat here — one arrival into one
 -- chain, a thin wrapper over `foldPath-caps`.  Its only consumer was
 -- `dry-tick-core`'s argument list, and that list is wrong about itself: the
 -- dry half concludes `hasDry`, so a capsOK?/burstCaps? Σ cannot be an

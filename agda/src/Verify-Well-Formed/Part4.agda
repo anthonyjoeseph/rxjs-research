@@ -82,14 +82,8 @@ paid-empty S ceq with ProtocolSt.current S | ceq
 -- leaving the frame: the open instant settles (owed never seeded ⇒
 -- paid), landing Inv-related for the first arrival
 --
--- `dyF` ADDED 2026-08-18, and it is a RESTATEMENT WITH THE SANCTIONED
+-- `dyF` ADDED, and it is a RESTATEMENT WITH THE SANCTIONED
 -- JUSTIFICATION: the unconditional form is not weakened away, it was
--- REFUTED.  `BurstInv.live-matches` is now conditioned on non-dying
--- (.Part2's field note) because at a dying source the equation is FALSE
--- — a delivered victim's exhausted close rode its own emit, so the cut
--- drops a registry entry the live list never sees.  `Inv.live-matches`
--- stays ALL-SOURCES, since between cascades `cascadeFinish` has swept
--- the dying source out; this premise is what bridges the two.
 --
 -- IT IS FREE AT THE ONLY CALL SITE, which is the point.  burst-final is
 -- the root frame-0 exit (.Part8's subscribe-wf, its sole consumer), where
@@ -102,6 +96,13 @@ paid-empty S ceq with ProtocolSt.current S | ceq
 -- pay — its original comment claimed it "free at a root subscribe", which
 -- was right about the root and wrong about inners.  A′ moves it to the one
 -- place it is true.
+--
+-- `BurstInv.live-matches` IS CONDITIONED ON NON-DYING (.Part2's field note)
+-- because at a dying source the equation is FALSE — a delivered victim's
+-- exhausted close rode its own emit, so the cut drops a registry entry the
+-- live list never sees.  `Inv.live-matches`
+--   stays ALL-SOURCES, since between cascades `cascadeFinish` has swept
+--   the dying source out; this premise is what bridges the two.
 burst-final : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
   BurstInv 0 sched st S →
@@ -161,7 +162,7 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- consumers read meanwhile.
 ------------------------------------------------------------------
 
--- NO `merge-cert` POSTULATE LIVES HERE ANY MORE (2026-08-18).  It existed
+-- NO `merge-cert` POSTULATE LIVES HERE ANY MORE.  It existed
 -- ONLY as the hypothesis of `root-caches-core` / `root-done-plumbed-core`,
 -- and writing those two assemblies as real bodies showed that hypothesis
 -- does not close: see the ALIVE-vs-PRESENT gap recorded on root-mergeCache
@@ -173,8 +174,9 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- states its predicate HERE, freshly; the probe's rows are evidence about
 -- the predicate they were written against, and inheriting them across a
 -- restatement is the extrapolation the probe rules forbid.
+--
 -- RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda restores
--- the postulate as it stood.
+--   the postulate as it stood.
 
 -- the SETTLED root-exit state: the evaluator state the root subscription's
 -- burst leaves behind.  Both root-exit facts below are stated at it, and it
@@ -190,11 +192,11 @@ rootExitSt e ins =
 -- inner-recursion path this is false, but done-plumbed is never read there; it
 -- is consumed ONLY here, at the root frame-0 exit.)
 --
--- LEAF-ONLY 2026-08-18.  Was `root-done-plumbed-core`, a postulate taking
--- merge-cert, whose composition was checked by nobody.  `allShareSunk` is a
--- conjunction fold over the registry, so the assembly IS writable today: the
--- fold's induction is below and the whole residue is the PER-ENTRY leaf.
--- What the conversion bought beyond the fit test: the residue no longer
+-- IT IS A LEAF AND MUST STAY ONE.  `allShareSunk` is a conjunction fold
+-- over the registry, so the assembly is writable: the fold's induction is
+-- below and the whole residue is the PER-ENTRY leaf.  A parent taking
+-- merge-cert instead would have its composition checked by nobody.
+-- Leaf-only also shrinks what is at risk — the residue no longer
 -- quantifies over the registry, so the FALSITY region the `Probed.Root` sweep
 -- could not reach is now a statement about ONE surviving entry — a size a
 -- counterexample can actually be built at.
@@ -217,43 +219,45 @@ postulate
   -- leads it after a take-cut, so only the SETTLED state at the root exit — by
   -- which point every mergeBump has landed — satisfies cachesValid.
   --
-  -- LEAF-ONLY 2026-08-18, the same conversion as root-entry-sunk above: was
-  -- `root-caches-core` over merge-cert.  `cachesValid` is a conjunction fold
+  -- IT IS A LEAF, on the same grounds as root-entry-sunk above.
+  -- `cachesValid` is a conjunction fold
   -- over the node list, so the residue is this PER-NODE leaf — and five of
   -- nodeCacheOK's six constructor clauses are `true` outright, so what is
   -- actually open here is the merge clause alone.
   --
-  -- PROBED 2026-08-18 (Probed.Root, `make probed`), NON-VACUOUSLY, in the
-  -- assembled form: `cachesValid` holds at the settled root exit for seven
-  -- programs whose node lists are pinned non-empty in the same file — merge
-  -- (one inner, two inners, nested), concat, switch, exhaust, and
-  -- take-over-merge.  That last is the region this header names as the hard
-  -- one: the merge count leads the registry after a take-cut, so it is the
-  -- edge a wrong cache would show at.
-  -- COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
-  -- levels, and a single slot context at most.
-  -- DEAD ROUTE 2026-08-18: `merge-cert` (mergeCertAt at the root exit) does
-  -- NOT discharge even the k ≡ 0 case of this clause, which is what the old
-  -- `root-caches-core` hypothesis list silently claimed.  The two predicates
-  -- count DIFFERENT things: `countLiveInners` is `nubLen ∘ innerInstsR`, and
-  -- innerInstsP collects EVERY `from-inner _ nid j` frame on a registered
-  -- path with no aliveness test at all, while mergeCertAt only rules out the
-  -- ones with `aliveThroughᶠ`.  A registration whose path still mentions a
-  -- DEAD instance of nid is therefore counted by countLiveInners and ignored
-  -- by mergeCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
-  -- Closing this needs the separate invariant that no dead-but-present
-  -- from-inner instance survives in the root-exit registry; that fact does
-  -- not exist in the repo today.  The gap was invisible while this was a
-  -- -core, and became a type error the moment the assembly was real.
   --
   -- AND MERGE COHERENCE — the branch's own design question — IS UNSTATED, so
   -- the invariant above has no statement to be a corollary of.  The decidable
-  -- predicate such a statement would be about lives with the probe that is
-  -- its ONLY consumer (`Probed.Root`), which is the trap: a coherence stated
-  -- HERE states its own predicate and inherits NONE of the evidence earned
-  -- against that one, however alike the two read.  What is owed is the
+  -- predicate such a statement would be about lives elsewhere, with its ONLY
+  -- consumer, and that is the trap: a coherence stated HERE states its own
+  -- predicate and inherits NONE of the evidence earned against that one,
+  -- however alike the two read.  What is owed is the
   -- statement, a mid-fold `FoldInv` form of it, and the consumer rewrites
   -- that spend it.
+  --
+  -- DEAD ROUTE: `merge-cert` (mergeCertAt at the root exit) does
+  --   NOT discharge even the k ≡ 0 case of this clause, which is what the old
+  --   `root-caches-core` hypothesis list silently claimed.  The two predicates
+  --   count DIFFERENT things: `countLiveInners` is `nubLen ∘ innerInstsR`, and
+  --   innerInstsP collects EVERY `from-inner _ nid j` frame on a registered
+  --   path with no aliveness test at all, while mergeCertAt only rules out the
+  --   ones with `aliveThroughᶠ`.  A registration whose path still mentions a
+  --   DEAD instance of nid is therefore counted by countLiveInners and ignored
+  --   by mergeCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
+  --   Closing this needs the separate invariant that no dead-but-present
+  --   from-inner instance survives in the root-exit registry; that fact does
+  --   not exist in the repo today.  The gap was invisible while this was a
+  --   -core, and became a type error the moment the assembly was real.
+  --
+  -- PROBED (Probed.Root, `make probed`), NON-VACUOUSLY, in the
+  --   assembled form: `cachesValid` holds at the settled root exit for seven
+  --   programs whose node lists are pinned non-empty in the same file — merge
+  --   (one inner, two inners, nested), concat, switch, exhaust, and
+  --   take-over-merge.  That last is the region this header names as the hard
+  --   one: the merge count leads the registry after a take-cut, so it is the
+  --   edge a wrong cache would show at.
+  --   COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
+  --   levels, and a single slot context at most.
   root-mergeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (nid : NodeId) (k : ℕ) (od : Bool) →
     (nid , merge-st k od) ∈ EvalSt.nodes (rootExitSt e ins) →

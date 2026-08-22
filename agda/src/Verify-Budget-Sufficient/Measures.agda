@@ -8,7 +8,7 @@
 -- retired ledger walk's ARITHMETIC (walkCap, anchorᴬ) kept solely to
 -- support the four machine-checked absurdity records that killed it.
 --
--- THE LEDGER WALK ITSELF IS GONE (2026-08-13).  `subscribeE-walk`, its
+-- THE LEDGER WALK ITSELF IS GONE.  `subscribeE-walk`, its
 -- core, its 20 sub-postulates and the two satisfiability contrasts were
 -- deleted the day the wet contract was restated over the COLLAPSED walk
 -- (.Walk-Level) — the E-into-j route ruled in Wet/Part6's GAP 4 header,
@@ -17,7 +17,6 @@
 -- COMPOSITION with the outer face was refuted for every parameter
 -- choice (`wet-ceiling-absurd` way-out, `wet-ell-absurd` way-in, both in
 -- Wet/Part6), not because any clause of the walk was wrong.
--- RECOVERY: git show c87c91a:agda/src/Verify-Budget-Sufficient/Measures.agda
 --
 -- What survives below is exactly the evidence: `walkCap`/`anchorᴬ` and
 -- the tower arithmetic over them (sucV≤d, d≤walkCap, walkCap≤walkArg,
@@ -31,6 +30,8 @@
 -- which is what keeps a caps edit off the wet family's clock.
 --
 -- The roadmap for the whole proof lives in Verify-Budget-Sufficient.agda.
+--
+-- RECOVERY: git show c87c91a:agda/src/Verify-Budget-Sufficient/Measures.agda
 module Verify-Budget-Sufficient.Measures where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; if_then_else_)
@@ -310,10 +311,10 @@ pop-bounded B sched st eq bnd
 
 
 -- generic: two pointwise `all`s zip into an `all` of their combined
--- predicate — the two-hypothesis sibling of all-impl below.  It LIVED in
--- Caps-Bridge until 2026-08-19, when .Hop-Spine-Face needed it from below
--- and `make dup-check` caught the second copy; moved down here, which is
--- the lowest module reaching both.
+-- predicate — the two-hypothesis sibling of all-impl below.  It lives
+-- HERE because .Caps-Bridge and .Hop-Spine-Face both need it and this is
+-- the lowest module reaching both, which is the repair `make dup-check`
+-- demands: move the fact down, never pick a winner among the copies.
 all-zip : ∀ {A : Set} (P Q R : A → Bool) →
   (∀ x → P x ≡ true → Q x ≡ true → R x ≡ true) →
   ∀ (xs : List A) → all P xs ≡ true → all Q xs ≡ true → all R xs ≡ true
@@ -730,7 +731,7 @@ sum-tab-mono {suc m} f g h =
 -- "the slots FIT in the size budget V" into "there are at most V of
 -- them", and hence into a bound on how many stages slotHop can cross.
 --
--- MOVED DOWN from .Caps-Face.Part1 (2026-08-19), where this and the two
+-- MOVED DOWN from .Caps-Face.Part1, where this and the two
 -- slot lemmas below were proven for `n≤capsAt-size` and could not be
 -- reached from here.  slotHop-sup needed the identical three and they
 -- were rewritten from scratch, clashing on the name — the tenth-plus
@@ -808,8 +809,7 @@ unconn-insert sl cs i eqi fresh =
 -- `sizeᵉ-pos`/`1≤sizeᵉ` and `1≤sizeᵗ`/`sizeᵗ-pos`, each pair the same
 -- statement twice in THIS file, and `1≤sizeᵗ` was written by someone
 -- who grepped for the `1≤` spelling and did not find `sizeᵗ-pos` 3000
--- lines below.  Merged 2026-08-19; `make dup-check` now fails on a
--- recurrence.
+-- lines below.  `make dup-check` fails on a recurrence.
 sizeᵉ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t) →
   1 ≤ sizeᵉ e
 sizeᵉ-pos (input i)       = s≤s z≤n
@@ -935,7 +935,7 @@ hopW^suc V =
 --
 -- (An earlier `hopW-cube : hopW V ^ 3 ≤ hopR V` sat here, from a
 -- reading that priced the telescope at two budgets before the headcount
--- was written down.  Deleted 2026-08-19 with slotHop-sup's proof: the
+-- was written down.  Deleted with slotHop-sup's proof: the
 -- telescope's cost is V, not 2, and the assembly is exact rather than
 -- comfortable.)
 
@@ -948,7 +948,7 @@ hopW^suc V =
 -- coefficient WAS ≤ s and the bound was (2+s)^(V′·s); that statement
 -- is false for pm and has been retracted rather than left standing.
 --
--- WHAT THE INDUCTION NEEDS, worked out 2026-07-29 and written down
+-- WHAT THE INDUCTION NEEDS, worked out and written down
 -- because the shape is not the obvious one.  The statement must be
 -- JOINT — the same bound for pm, since hopD's clauses read pm for
 -- their coefficients — and then, with P(s) = (2+s)^(V′^s):
@@ -1446,18 +1446,18 @@ slotDef-size sl i {d} eq =
             (≤-trans (s≤s (s≤s z≤n))
                      (m≤m*n (4 + (sizeᵉ e + slotsSize sl)) (suc id))))
 
--- DIFFICULTY (was FALSITY until probed, 2026-08-14).  slotHop
+-- DIFFICULTY (was FALSITY until probed).  slotHop
 -- telescopes hopD through the stratified slots, and hopD's scan clause
 -- multiplies by (2 + pm)^V, so a chain of shared slots — slot k's def
 -- scanning over input (k-1), which stratification expressly permits —
 -- is an amplifier tower.  That tower is the risky region.
---
+
 -- THE STRUCTURAL FACT THAT MAKES IT SURVIVABLE: `slotsSize sl ≤ V`
 -- bounds the TOTAL slot size by V, so a telescope cannot hold V slots
 -- of size V — it holds at most V/9 amplifier links (scanᵉ is the ONLY
 -- clause contributing a ^V factor, and its minimal legal instance
 -- costs 9 units of size).
---
+
 -- ⚠ THE MARGIN HAD BEEN MISREAD THREE TIMES, ALWAYS BY TREATING
 -- hopR AS A SINGLE BUDGET, so the correction is pinned in CODE rather
 -- than argued here: `hopW^suc` (above) proves hopR V ≡ hopW V ^ suc V.
@@ -1466,30 +1466,29 @@ slotDef-size sl i {d} eq =
 -- against hopR's (1+V)^(1+V)") were comparing a product of budgets
 -- against one budget, which is why one of them made the statement look
 -- tight and the other made it look impossible.
---
+
 -- AND THE FOURTH READING IS THE RIGHT ONE, because it stopped asking
 -- how big the margin is and asked what it COUNTS.  `1≤slotSize` puts
 -- the slot COUNT under `slotsSize sl ≤ V`; each link costs at most one
 -- hopW (szB≤hopW); the walked expression costs one more.  `suc V` is
 -- one per link plus one for b — a headcount, not a margin.  The
 -- assembly below spends all of it and closes by `≤-reflexive`.
---
--- PROBED-HISTORICAL 2026-08-14 (Demand-Probe series S), at the tightest legal
--- budget V := slotsSize, which is the worst case since any larger V
--- only inflates hopR:
+
+-- THE MARGIN AT THE TIGHTEST LEGAL BUDGET V := slotsSize, which is the
+-- worst case since any larger V only inflates hopR:
 --   depth 1:  V = 16,  compound = 3^17 ≈ 2^27,   hopR exp 17^17 ≈ 8.3e20
 --   depth 2:  V = 30,  compound ≈ 1.27e29 ≈ 2^97, hopR exp 31^31 ≈ 1.7e46
 -- One extra link WIDENS the exponent ratio from ~3e19 to ~1.8e44,
 -- because a link costs slot size, which raises V, which raises hopR
 -- super-exponentially.  The trend runs away from falsity, and the
 -- structural reason above says it must.
---
+
 -- COVERED: the scanᵉ amplifier chain at depths 1 and 2, hypotheses
 -- discharged, at the tightest V.  NOT COVERED: folds with large pmᵗ
 -- (unmeasured; the route no longer prices them in the exponent, since
 -- szB-scan absorbs the `^ V` into one unit of size whatever pm is),
 -- caseᵗ amplification inside a fold, and depth ≥ 3.
---
+
 -- ⚠ NO ≤ᵇ ROW EXISTS, and cannot: a telescope big enough to amplify
 -- forces V ≥ 16, where hopR has ~10^21 digits; where hopR computes
 -- (V ≤ 6) no scan fits and every row is degenerate.  CONCLUSION-SIDE
@@ -1497,31 +1496,11 @@ slotDef-size sl i {d} eq =
 -- therefore pins the compound exactly and reaches hopR through its
 -- EXPONENT, which does compute.
 --
--- ⚠ DEAD ROUTE 2026-08-19 (route A, superseded the same day it was
--- written).  It kept the two inductions below but priced a link by
--- widening pm to szB FIRST and only then raising to the `^ V`:
--- `2 + pmᵗ V 0 f ≤ 2 + szB V sf`, hence a link under
--- `(2+V) ^ (V * (1+V)^sf)`, exponents adding along the telescope, and
--- `Σ sfᵢ ≤ V` with `(1+V)^x` convex giving `V * (1+V)^V` against hopR's
--- `(1+V)^(1+V) = (1+V) * (1+V)^V` — "one whole factor of (1+V)^V to
--- spare".  STRUCTURALLY DEAD for two independent reasons:
---
---   · it counted only the TELESCOPE.  The walked expression b carries
---     its own budget `V * (1+V)^(sizeᵉ b)`, and `sizeᵉ b ≤ V` and
---     `slotsSize sl ≤ V` are INDEPENDENT hypotheses, so both saturate.
---     Two budgets need `2V ≤ 1+V`, i.e. V ≤ 1 — false for every V this
---     statement is used at.  Its own numeric check at V = 16 shows the
---     problem once b is counted: 2*16*17^16 exceeds 17^17.
---   · the `^ V` is overpriced by a factor of V per link.  The PROVEN
---     `szB-scan` already absorbs the identical `(2 + pmᵗ V 0 f) ^ V`
---     into ONE unit of szB's size argument — szB's exponent multiplies
---     by (1+V) per size unit, which is what the `^ V` costs.  Paying
---     for it a second time, at the top level, is where the factor went.
---
+
 -- Both errors are the same mistake in different clothes, and it is the
 -- one `hopW` now exists to prevent: comparing a PRODUCT of budgets
 -- against hopR read as ONE budget.
---
+
 -- THE ROUTE, assembled in code below rather than described here.  ONE
 -- postulate remains, and it is not about the telescope at all:
 --   A′. `hopD-relᵉ` — the RELATIVE bound, multiplicative in the
@@ -1530,11 +1509,11 @@ slotDef-size sl i {d} eq =
 --       arithmetic unchanged.  Multiplicative is what lets the
 --       telescope splice in as a factor; an additive bound does not
 --       compose.
---   B′. `slotHop-sup` — PROVEN 2026-08-19, by `ηAt-bound` below.  Stage
+--   B′. `slotHop-sup` — PROVEN, by `ηAt-bound` below.  Stage
 --       k is under k budgets, one per link crossed; a slot reads its
 --       own stage, and its index is under the slot count, which
 --       `n≤slotsSize` puts under V.
---
+
 -- ⚠ AN EARLIER PLAN FOR B′ WANTED szB SUBMULTIPLICATIVITY
 -- (`szB V a * szB V b ≤ szB V (a+b)`) TO ACCUMULATE THE SLOT SIZES, and
 -- carried a separate `4 ^ Sₖ` factor because the per-link constant may
@@ -1555,15 +1534,7 @@ slotDef-size sl i {d} eq =
 -- through `szB V 1` spends the margin before the comparison, routing
 -- through hopW does not.
 --
--- ⚠ DEAD ROUTE 2026-08-19: DO NOT DELEGATE THIS TO `hopD-cap`.  The
--- attempt is near-irresistible and it is refuted by rows already in the
--- repo, so it is worth the space.  `hopD-cap` (two definitions above,
--- PROVEN) concludes `hopDᵉ V η e ≤ hopR V` for a GENERAL η — literally
--- this statement's conclusion — so slotHop-cap looks like `hopD-cap`
--- applied at `η := slotHop V sl`, leaving one residue:
---
---     ∀ i → slotHop V sl i ≤ szB V 1            -- hopD-cap's η premise
---
+
 -- THAT RESIDUE IS FALSE.  `szB V 1 = 3 ^ (suc V)`, and Demand-Probe's
 -- series S measures the left side directly: its targets are `input i`,
 -- and `hopDᵉ V η (input i) = η i` definitionally, so those rows ARE
@@ -1574,7 +1545,7 @@ slotDef-size sl i {d} eq =
 --     1.27e29, against szB 30 1 = 3^31 ≈ 6.18e14.  Over by fourteen
 --     orders of magnitude.
 -- One amplifier link saturates the premise and the second blows it.
---
+
 -- WHY IT FAILS, structurally, so the shape is not re-attempted with a
 -- cleverer η: szB V 1 is a bound at ONE unit of size, while a staged
 -- telescope compounds a factor per link, so no per-index bound at that
@@ -1583,7 +1554,7 @@ slotDef-size sl i {d} eq =
 -- amplifying slots.  The cap itself survives because hopR holds (1 + V)
 -- whole budgets — the margin is real, but routing through szB V 1
 -- throws it away before the comparison happens.
---
+
 -- What is dead is therefore the ORDER, not the per-index shape: leaf 2
 -- above states a per-index bound at `hopW V ^ 2` and is not touched by
 -- this.  And it is a clean instance of the near-degenerate trap — the
@@ -1598,7 +1569,7 @@ slotDef-size sl i {d} eq =
 -- szB-mono, szB-suc, szB-sq, szB-scan — is reused UNCHANGED, because
 -- N factors through each of them linearly.  That correspondence is
 -- clause-for-clause, which is what makes this leaf GRINDABLE.
---
+
 -- Multiplicative is the whole point: it is what lets the telescope's
 -- accumulated environment splice in as a FACTOR (below), where an
 -- additive bound would not compose.
@@ -1609,6 +1580,36 @@ slotDef-size sl i {d} eq =
 -- because at `n = 0` the η premise quantifies over no index and
 -- constrains nothing.  The same `1 ≤ N` is what pays for `suc` in all
 -- four *Allᵉ clauses (`suc (X * N) ≤ suc X * N`).
+
+-- ⚠ DEAD ROUTE (route A, superseded the same day it was
+--   written).  It kept the two inductions below but priced a link by
+--   widening pm to szB FIRST and only then raising to the `^ V`:
+--   `2 + pmᵗ V 0 f ≤ 2 + szB V sf`, hence a link under
+--   `(2+V) ^ (V * (1+V)^sf)`, exponents adding along the telescope, and
+--   `Σ sfᵢ ≤ V` with `(1+V)^x` convex giving `V * (1+V)^V` against hopR's
+--   `(1+V)^(1+V) = (1+V) * (1+V)^V` — "one whole factor of (1+V)^V to
+--   spare".  STRUCTURALLY DEAD for two independent reasons:
+--
+--   · it counted only the TELESCOPE.  The walked expression b carries
+--     its own budget `V * (1+V)^(sizeᵉ b)`, and `sizeᵉ b ≤ V` and
+--     `slotsSize sl ≤ V` are INDEPENDENT hypotheses, so both saturate.
+--     Two budgets need `2V ≤ 1+V`, i.e. V ≤ 1 — false for every V this
+--     statement is used at.  Its own numeric check at V = 16 shows the
+--     problem once b is counted: 2*16*17^16 exceeds 17^17.
+--   · the `^ V` is overpriced by a factor of V per link.  The PROVEN
+--     `szB-scan` already absorbs the identical `(2 + pmᵗ V 0 f) ^ V`
+--     into ONE unit of szB's size argument — szB's exponent multiplies
+--     by (1+V) per size unit, which is what the `^ V` costs.  Paying
+--     for it a second time, at the top level, is where the factor went.
+
+-- ⚠ DEAD ROUTE: DO NOT DELEGATE THIS TO `hopD-cap`.  The
+--   attempt is near-irresistible and it is refuted by rows already in the
+--   repo, so it is worth the space.  `hopD-cap` (two definitions above,
+--   PROVEN) concludes `hopDᵉ V η e ≤ hopR V` for a GENERAL η — literally
+--   this statement's conclusion — so slotHop-cap looks like `hopD-cap`
+--   applied at `η := slotHop V sl`, leaving one residue:
+--
+--     ∀ i → slotHop V sl i ≤ szB V 1            -- hopD-cap's η premise
 hopD-relᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (V : ℕ) (η : Fin n → ℕ)
   (e : Exp Γ Δᵍ Δ Θ t) (N : ℕ) → 2 ≤ V → 1 ≤ N → (∀ i → η i ≤ N) →
   hopDᵉ V η e ≤ szB V (sizeᵉ e) * N
@@ -1877,7 +1878,7 @@ dBound V R U r s = s + suc V * (r + suc R * U)
 -- BOTH dBound arguments move at once: rank weakly, syncSize strictly.
 -- V R U are EXPLICIT: dBound unfolds through _*_, which matches on its
 -- first argument, so implicits here are stuck in the same way
--- ⊔-elim-help's were.  MOVED UP 2026-08-05 from below the hopD section
+-- ⊔-elim-help's were.  MOVED UP from below the hopD section
 -- so that dBound-μ can delegate to it — it had been sitting orphaned
 -- purely because it was stated AFTER its own specialisation.
 dBound-struct : ∀ (V R U : ℕ) {r′ r s′ s} → r′ ≤ r → s′ < s →
@@ -3438,17 +3439,9 @@ applyFn-size : ∀ {n} {Γ : Ctx n} {s t} (V : ℕ)
 applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
 
 ------------------------------------------------------------------
--- THE WALK LEDGER (2026-07-24 — the settled per-instant invariant).
+-- THE WALK LEDGER — the settled per-instant invariant.
 --
--- ⚠ DEAD ROUTE 2026-08-13 — READ THIS BEFORE THE MEMO BELOW.  What
--- follows is a design record of a route that is RETIRED, not a plan.
--- Its (1) sharp eval bound survives and is proven below (evalWith-size,
--- caseWᵗ, fnCap); everything from (2) THE LEDGER onward — the running
--- cap capᴱ W₀ E as a walk position, the receipt algebra spendᴱ/
--- spendᴱ-compose, the Ω width ledger, the mintCount/burstLen counter
--- deltas, and the staged plan (a)–(d) at the end — describes apparatus
--- that no longer exists and a landing that was machine-refuted.
---
+
 -- WHAT STRUCTURALLY BLOCKED IT: the ledger position E cannot be both
 -- the thing the walk's receipt GROWS and the thing the outer face's
 -- reset caps must DOMINATE.  Refuted at both ends — `wet-ceiling-absurd`
@@ -3456,201 +3449,210 @@ applyFn-size V fn v hv = evalWith-size V fn (v ∷ᵃ []ᵃ) (hv , tt)
 -- and `wet-ell-absurd` (way in: pinning ℓ := Ŝ is unsatisfiable), both
 -- in Wet/Part6, plus the four absurds at the bottom of THIS file, which
 -- are the reason walkCap and anchorᴬ are still defined at all.
---
+
 -- WHAT REPLACED IT: the E-into-j collapse (.Walk-Level) — the running
 -- position is a caps LEVEL j, the charge companion's nesting budget IS
 -- the gas, and the walk rides subscribeE-caps' proven level skeleton
 -- rather than a ledger of its own.  Do not resurrect the ledger walk;
 -- if a fact from this memo is needed, restate it at a level.
---
+
 -- The blocking question was the closed form of the internal
 -- invariant that survives subscribeE's walk: scan frames fold
 -- value-list breadth with no fuel peel, so no fixed (V, R) and no
 -- gas-indexed cap works.  Settled:
---
+
 -- (1) THE SHARP EVAL BOUND.  evalWith-size's exponent 3^|tm| was
---     the lossy culprit: |tm| grows under substitution, so iterated
---     folds looked like iterated exponentials.  But the ONLY
---     constructor that compounds sizes multiplicatively under
---     evalWith is caseᵗ — its branch runs over an environment
---     extended with an already-grown scrutinee component; ifᵗ
---     branches see the unextended environment, pair components
---     multiply bounds side by side, and reify images (pairᵗ / inlᵗ
---     / inrᵗ / strmᵗ / literals) are eval-passive.  caseWᵗ counts
---     exactly that compounding structure, with strmᵗ a LEAF (an
---     embedded expression is inert during eval: evalWith (strmᵗ e)
---     σ = subΘ e, LINEAR in the plugs — size-subΘᵉ).  Then (W3):
---       sizeᵛ (evalWith tm env) ≤ sizeᵗ tm · (2+2V)^(3^caseWᵗ tm)
---     — the BASE carries the store, the EXPONENT carries only
---     template structure.  And caseW is EXACTLY substitution-
---     invariant (caseW-subΘ: plugs land behind reify images, which
---     weigh 0), so every runtime fn's caseW is its program
---     template's: ≤ Ψ FOREVER, Ψ seeded once from program+slots
---     (ΨAt).  fnCap is the max-shaped closure carrying "every
---     embedded fn's caseW ≤ Ψ" through stores, evals
---     (fnCap-evalWith), substitution and μ-unfolds.
---
+--    the lossy culprit: |tm| grows under substitution, so iterated
+--    folds looked like iterated exponentials.  But the ONLY
+--    constructor that compounds sizes multiplicatively under
+--    evalWith is caseᵗ — its branch runs over an environment
+--    extended with an already-grown scrutinee component; ifᵗ
+--    branches see the unextended environment, pair components
+--    multiply bounds side by side, and reify images (pairᵗ / inlᵗ
+--    / inrᵗ / strmᵗ / literals) are eval-passive.  caseWᵗ counts
+--    exactly that compounding structure, with strmᵗ a LEAF (an
+--    embedded expression is inert during eval: evalWith (strmᵗ e)
+--    σ = subΘ e, LINEAR in the plugs — size-subΘᵉ).  Then (W3):
+--      sizeᵛ (evalWith tm env) ≤ sizeᵗ tm · (2+2V)^(3^caseWᵗ tm)
+--    — the BASE carries the store, the EXPONENT carries only
+--    template structure.  And caseW is EXACTLY substitution-
+--    invariant (caseW-subΘ: plugs land behind reify images, which
+--    weigh 0), so every runtime fn's caseW is its program
+--    template's: ≤ Ψ FOREVER, Ψ seeded once from program+slots
+--    (ΨAt).  fnCap is the max-shaped closure carrying "every
+--    embedded fn's caseW ≤ Ψ" through stores, evals
+--    (fnCap-evalWith), substitution and μ-unfolds.
+
 -- (2) THE LEDGER.  Freeze W₀ := sizeBudgetAt id at instant entry;
---     the running cap is capᴱ W₀ E = (2+2W₀)^E with E ≥ 2 the
---     ledger position.  ONE RULE covers every growth edge: at
---     E ≥ 2, an eval/fold application multiplies E by at most
---     3^(suc Ψ) (from (W3) and grow-pow: the recurrence
---     q′ = E + (q+2)·3^Ψ ≤ q·3^(suc Ψ) for q ≥ E ≥ 2), and a
---     register / μ-copy / one-shot install multiplies E by at most
---     2.  A fold-RUN over a value list of length m costs the single
---     factor 3^(suc Ψ · m) (scanVals-sharp) — the value-list
---     lengths thread the receipts, and receipts compose
---     multiplicatively: spendᴱ Ψ r s = 2^r · 3^(suc Ψ · s),
---     spendᴱ-compose.  Receipts are LOCAL — a clause's spend is its
---     own sites plus its children's, no global count needed for
---     preservation.
---
+--    the running cap is capᴱ W₀ E = (2+2W₀)^E with E ≥ 2 the
+--    ledger position.  ONE RULE covers every growth edge: at
+--    E ≥ 2, an eval/fold application multiplies E by at most
+--    3^(suc Ψ) (from (W3) and grow-pow: the recurrence
+--    q′ = E + (q+2)·3^Ψ ≤ q·3^(suc Ψ) for q ≥ E ≥ 2), and a
+--    register / μ-copy / one-shot install multiplies E by at most
+--    2.  A fold-RUN over a value list of length m costs the single
+--    factor 3^(suc Ψ · m) (scanVals-sharp) — the value-list
+--    lengths thread the receipts, and receipts compose
+--    multiplicatively: spendᴱ Ψ r s = 2^r · 3^(suc Ψ · s),
+--    spendᴱ-compose.  Receipts are LOCAL — a clause's spend is its
+--    own sites plus its children's, no global count needed for
+--    preservation.
+
 -- (3) THE LANDING.  sizeBudgetAt now has height (4+sz)(1+id): the
---     per-instant gain of (4+sz) ≥ 5 stories dominates the walk's
---     spend measured against the ENTRY cap: the spend exponent is
---     (counts)·(suc Ψ), one story for the counts, one for the 3^·,
---     one for capᴱ, margin for the rest.  The instant's total
---     application COUNT still needs its a-priori entry-anchored
---     bound — the one remaining quantitative core: per-subscription
---     sites are template-invariant (shells, of-widths and caseW all
---     substitution-invariant), subscriptions ≤ 1 + fuel peels, and
---     peels are bounded by the lex descent (U, rank, syncSize),
---     whose ℕ collapse anchors at the LANDING budget (mid-walk
---     values outgrow the entry cap, but every hop target measures
---     strictly below its parent).  The dry-half demand therefore
---     anchors at sizeBudgetAt (suc id) — the gas tower's height
---     (7+sz)(2+id) covers it (budget-covers) — while the count cap
---     needs the descent length anchored one story sharper.  Closing
---     that gap is the remaining quantitative debt, localized in the
---     two cores below; do NOT restate their landing halves until it
---     closes.  REFINEMENT (2026-07-24, the grind session): the
---     boundary will need the RUN receipts in their sharp MIXED
---     form, not the uniform ×3^(suc Ψ) rule — for a caseW-0 fn the
---     run recurrence q′ = E + q + 2 is ADDITIVE (the exponent grows
---     linearly in the fold count, matching the attack's
---     one-story-per-instant reality), and only executed CASE-work
---     compounds multiplicatively: E_fin ≤ (E₀ + 2 + F) · 3^(Σ wᵢ)
---     with F the total fold count and Σ wᵢ the caseW actually
---     executed.  The uniform rule stays true and is what the
---     preservation grind below uses; the boundary consumes the
---     mixed form, whose F needs the a-priori anchor — CLOSED
---     2026-07-24: see (5) THE WIDTH LEDGER below.  SUPERSEDED
---     (same day, the dry-half session): the joint face's receipt
---     (E′ ≤ E·3^(suc Ψ·walkCap), subscribeE-walk) anchors the
---     whole walk's spend a priori, so the boundary consumes THAT
---     directly — no per-fold count, uniform or mixed, global or
---     per-lineage, is needed at all.
---
+--    per-instant gain of (4+sz) ≥ 5 stories dominates the walk's
+--    spend measured against the ENTRY cap: the spend exponent is
+--    (counts)·(suc Ψ), one story for the counts, one for the 3^·,
+--    one for capᴱ, margin for the rest.  The instant's total
+--    application COUNT still needs its a-priori entry-anchored
+--    bound — the one remaining quantitative core: per-subscription
+--    sites are template-invariant (shells, of-widths and caseW all
+--    substitution-invariant), subscriptions ≤ 1 + fuel peels, and
+--    peels are bounded by the lex descent (U, rank, syncSize),
+--    whose ℕ collapse anchors at the LANDING budget (mid-walk
+--    values outgrow the entry cap, but every hop target measures
+--    strictly below its parent).  The dry-half demand therefore
+--    anchors at sizeBudgetAt (suc id) — the gas tower's height
+--    (7+sz)(2+id) covers it (budget-covers) — while the count cap
+--    needs the descent length anchored one story sharper.  Closing
+--    that gap is the remaining quantitative debt, localized in the
+--    two cores below; do NOT restate their landing halves until it
+--    closes.  REFINEMENT (the grind session): the
+--    boundary will need the RUN receipts in their sharp MIXED
+--    form, not the uniform ×3^(suc Ψ) rule — for a caseW-0 fn the
+--    run recurrence q′ = E + q + 2 is ADDITIVE (the exponent grows
+--    linearly in the fold count, matching the attack's
+--    one-story-per-instant reality), and only executed CASE-work
+--    compounds multiplicatively: E_fin ≤ (E₀ + 2 + F) · 3^(Σ wᵢ)
+--    with F the total fold count and Σ wᵢ the caseW actually
+--    executed.  The uniform rule stays true and is what the
+--    preservation grind below uses; the boundary consumes the
+--    mixed form, whose F needs the a-priori anchor — CLOSED, see
+--    (5) THE WIDTH LEDGER below, and then superseded outright:
+--    the joint face's receipt
+--    (E′ ≤ E·3^(suc Ψ·walkCap), subscribeE-walk) anchors the
+--    whole walk's spend a priori, so the boundary consumes THAT
+--    directly — no per-fold count, uniform or mixed, global or
+--    per-lineage, is needed at all.
+
 -- (4) THE REGISTRY (the fold-threading design block).  INV?
---     extends stBounded? with: fnCap-boundedness of every store
---     (Ψ never grows), length (registry) ≤ B (the CARDINALITY
---     invariant cascadeGo's fold needs: |chains| ≤ registry length
---     at the latch), and per-chain frame bounds (registered
---     scan/map fns are runtime material — sizes ride B, caseW
---     rides Ψ; the "registry entries are fixed syntax" assumption
---     held only for the root program's chains).  chainStep-wet is
---     stated against INV?, and cascadeGo-walk (PROVEN below) is
---     the fold decomposition: it threads INV? and the ledger
---     position chain by chain — the structure the cascade fold-threading
---     memo demanded — leaving the per-chain core and the landing
---     arithmetic as the only leaves.
---
--- (5) THE WIDTH LEDGER (2026-07-24, the anchor session — closes
---     the count cap).  Two settled findings.
---
---     IMPOSSIBILITY: no GLOBAL-SEQUENTIAL count can land.  If the
---     boundary threads ONE exponent through every fold of the
---     instant in sequence, the total fold count N is bounded only
---     through list lengths ≤ value sizes ≤ the FINAL cap — but the
---     final cap sits a story above N (capᴱ of an N-linear
---     exponent), so the tower heights demand story(N) ≥
---     story(cap) + 1 ≥ story(N) + 2: a divergent fixpoint.  No
---     sharper counting RULE fixes this; the landing must break the
---     "lengths ≤ sizes" self-reference itself.
---
---     THE BREAK: stream WIDTH is substitution-invariant.  Widths
---     (of-list lengths) are SYNTAX: subΘ/elimG/ren map over the
---     of-list (length preserved), evalWith on strmᵗ IS subΘ, reify
---     at obs is strmᵗ, and NO operator converts a value's SIZE
---     into a stream's WIDTH — ofᵉ is the only width mint and its
---     list is template-fixed.  (PORTABILITY TRIPWIRE: a
---     fromArray-style operator — value ↦ stream of its elements —
---     would break exactly this; the modeled fragment has none, and
---     adding one re-opens this core.)  So the width cap Ω (ofW,
---     the max-shaped closure mirroring fnCap clause for clause,
---     seeded ΩAt = program + slots) NEVER GROWS: it rides the walk
---     as Ψ does, with NO ledger position at all (widthOK?, flat and
---     with no existential — DELETED 2026-08-21, record below).
---
---     THE ANCHOR: fold counts are now entry-anchored.  A list
---     delivered to a frame is a concatenation of per-subscription
---     of-runs, each of length ≤ Ω, so run lengths ride the
---     SUBSCRIPTION COUNT S — the machine's own counter delta
---     (mintCount below): the length ledger threads counter
---     deltas.  S is NOT ≤ the descent length: fuel is
---     depth-consumed and SIBLINGS SHARE IT (syncBudget's memo —
---     mints are breadth-many; the measured attack makes 2^k
---     sibling subscriptions on k peels).
---
---     CORRECTION (2026-07-24, the dry-half session): this memo's
---     first cut claimed per-subscription fan-out ≤ Ω and hence
---     S ≤ Ω^(suc D₀).  That accounting is WRONG twice over: a
---     *All frame hops once per VALUE of its child's burst — an
---     aggregate of the whole child SUBTREE's emissions, not of
---     one subscription's of-run — and one value can hop again at
---     every later *All frame it crosses.  The honest call-tree
---     recurrence (every edge descends the dBound demand d:
---     structural edges drop s, μ drops s, hops drop r, connects
---     drop U) is QUADRATIC,
---       S(d) ≤ c + S(d-1) + burstLen(d-1)·S(d-1),
---     whose naive closure is doubly exponential in d:
---       S, burstLen ≤ walkCap Ω ℓ d = ((3+Ω)·suc ℓ)^(3^d)
---     with ℓ ≥ pathLen κ + d the frame-crossing bound (path
---     lengths join the base: each value folds/hops at most once
---     per frame crossed; `pathLen κ + d ≤ ℓ` is preserved on
---     every edge for free).  Whether dBound's rank-weighting
---     recovers a singly-exponential form (the rank component
---     self-limits nested-hop capacity) is OPEN and IRRELEVANT for
---     the landing: walkCap is frozen at instant entry, one tower
---     story above the old claim — story counts shift by one and
---     nothing else changes.  Fold counts per value lineage:
---       F ≤ 𝔉 := suc ℓ₀ · walkCap Ω ℓ₀ D₀
---     (crossings per value ≤ suc ℓ₀, values ≤ walkCap) — every
---     factor frozen at instant entry.  The wet and dry halves
---     consume the SAME descent: d bounds the hop geometry for the
---     count cap exactly where dBound bounds it for the fuel.
---     Story count, W₀ = tower h: Ω syntax-seeded, ℓ₀ ≤ tower(h+3)
---     (dBound at R₀ = (suc V)^(suc V)), 3^D₀ ≤ tower(h+4),
---     walkCap and 𝔉 ≤ tower(h+5), E_fin ≤ E₀·3^(suc Ψ·𝔉) ≤
---     tower(h+6), sizes ≤ capᴱ W₀ E_fin ≤ tower(h+7): a CONSTANT
---     story count per instant, absorbed by the height multiplier
---     (bump 4+sz if the grind's constants land above it —
---     verification-side, plus the matching gas-tower bump; both
---     behavior-preserving, Unit-Test guards).
---
---     WHAT REMAINS is grind, not design: (a) the ofW invariance /
---     preservation mirrors (W10/W11 — literal fnCap-grind repeats;
---     W11 DELETED 2026-08-21, record below); (b) STATED 2026-07-24:
---     subscribeE-walk is the JOINT FACE — the wet conjuncts with their
---     receipt E′ ≤ E·3^(suc Ψ·walkCap), the dry half, and the
---     length ledger (mintCount delta, burstLen, registered path
---     lengths) in one hypothesis block under one ceiling; its
---     clause grind extends the ground walkS clauses conjunct by
---     conjunct, consuming W11 for hop targets and hasAtLeast-peel
---     (BOTH RETIRED with the walk)
---     against dBound-μ/-hop/-connect for the fuel; (c) RETIRED —
---     the face's receipt anchors the spend a priori, so no
---     lineage-indexed (or any per-fold) receipt is needed; (d) the
---     landing: instantiate the face at the root with V =
---     sizeBudgetAt (suc id) and discharge the ceiling by the
---     story-count arithmetic above (this WILL need the height-
---     multiplier bump and its matching gas-tower bump), the fuel
---     seed by budget-hasAtLeast, and the Ω/ℓ₀/regsLen? seeds at
---     init — replacing the two cores' landing halves.  The
---     instant-level (cascadeGo) joint face repeats this design at
---     the chain fold, but is deliberately NOT stated until (b)'s
---     grind confirms the subscribeE face survives contact.
+--    extends stBounded? with: fnCap-boundedness of every store
+--    (Ψ never grows), length (registry) ≤ B (the CARDINALITY
+--    invariant cascadeGo's fold needs: |chains| ≤ registry length
+--    at the latch), and per-chain frame bounds (registered
+--    scan/map fns are runtime material — sizes ride B, caseW
+--    rides Ψ; the "registry entries are fixed syntax" assumption
+--    held only for the root program's chains).  chainStep-wet is
+--    stated against INV?, and cascadeGo-walk (PROVEN below) is
+--    the fold decomposition: it threads INV? and the ledger
+--    position chain by chain — the structure the cascade fold-threading
+--    memo demanded — leaving the per-chain core and the landing
+--    arithmetic as the only leaves.
+
+-- (5) THE WIDTH LEDGER (the anchor session — closes
+--    the count cap).  Two settled findings.
+
+--    IMPOSSIBILITY: no GLOBAL-SEQUENTIAL count can land.  If the
+--    boundary threads ONE exponent through every fold of the
+--    instant in sequence, the total fold count N is bounded only
+--    through list lengths ≤ value sizes ≤ the FINAL cap — but the
+--    final cap sits a story above N (capᴱ of an N-linear
+--    exponent), so the tower heights demand story(N) ≥
+--    story(cap) + 1 ≥ story(N) + 2: a divergent fixpoint.  No
+--    sharper counting RULE fixes this; the landing must break the
+--    "lengths ≤ sizes" self-reference itself.
+
+--    THE BREAK: stream WIDTH is substitution-invariant.  Widths
+--    (of-list lengths) are SYNTAX: subΘ/elimG/ren map over the
+--    of-list (length preserved), evalWith on strmᵗ IS subΘ, reify
+--    at obs is strmᵗ, and NO operator converts a value's SIZE
+--    into a stream's WIDTH — ofᵉ is the only width mint and its
+--    list is template-fixed.  (PORTABILITY TRIPWIRE: a
+--    fromArray-style operator — value ↦ stream of its elements —
+--    would break exactly this; the modeled fragment has none, and
+--    adding one re-opens this core.)  So the width cap Ω (ofW,
+--    the max-shaped closure mirroring fnCap clause for clause,
+--    seeded ΩAt = program + slots) NEVER GROWS: it rides the walk
+--    as Ψ does, with NO ledger position at all (widthOK?, flat and
+--    with no existential — DELETED, record below).
+
+--    THE ANCHOR: fold counts are now entry-anchored.  A list
+--    delivered to a frame is a concatenation of per-subscription
+--    of-runs, each of length ≤ Ω, so run lengths ride the
+--    SUBSCRIPTION COUNT S — the machine's own counter delta
+--    (mintCount below): the length ledger threads counter
+--    deltas.  S is NOT ≤ the descent length: fuel is
+--    depth-consumed and SIBLINGS SHARE IT (syncBudget's memo —
+--    mints are breadth-many; the measured attack makes 2^k
+--    sibling subscriptions on k peels).
+
+--    CORRECTION (the dry-half session): this memo's
+--    first cut claimed per-subscription fan-out ≤ Ω and hence
+--    S ≤ Ω^(suc D₀).  That accounting is WRONG twice over: a
+--    *All frame hops once per VALUE of its child's burst — an
+--    aggregate of the whole child SUBTREE's emissions, not of
+--    one subscription's of-run — and one value can hop again at
+--    every later *All frame it crosses.  The honest call-tree
+--    recurrence (every edge descends the dBound demand d:
+--    structural edges drop s, μ drops s, hops drop r, connects
+--    drop U) is QUADRATIC,
+--      S(d) ≤ c + S(d-1) + burstLen(d-1)·S(d-1),
+--    whose naive closure is doubly exponential in d:
+--      S, burstLen ≤ walkCap Ω ℓ d = ((3+Ω)·suc ℓ)^(3^d)
+--    with ℓ ≥ pathLen κ + d the frame-crossing bound (path
+--    lengths join the base: each value folds/hops at most once
+--    per frame crossed; `pathLen κ + d ≤ ℓ` is preserved on
+--    every edge for free).  Whether dBound's rank-weighting
+--    recovers a singly-exponential form (the rank component
+--    self-limits nested-hop capacity) is OPEN and IRRELEVANT for
+--    the landing: walkCap is frozen at instant entry, one tower
+--    story above the old claim — story counts shift by one and
+--    nothing else changes.  Fold counts per value lineage:
+--      F ≤ 𝔉 := suc ℓ₀ · walkCap Ω ℓ₀ D₀
+--    (crossings per value ≤ suc ℓ₀, values ≤ walkCap) — every
+--    factor frozen at instant entry.  The wet and dry halves
+--    consume the SAME descent: d bounds the hop geometry for the
+--    count cap exactly where dBound bounds it for the fuel.
+--    Story count, W₀ = tower h: Ω syntax-seeded, ℓ₀ ≤ tower(h+3)
+--    (dBound at R₀ = (suc V)^(suc V)), 3^D₀ ≤ tower(h+4),
+--    walkCap and 𝔉 ≤ tower(h+5), E_fin ≤ E₀·3^(suc Ψ·𝔉) ≤
+--    tower(h+6), sizes ≤ capᴱ W₀ E_fin ≤ tower(h+7): a CONSTANT
+--    story count per instant, absorbed by the height multiplier
+--    (bump 4+sz if the grind's constants land above it —
+--    verification-side, plus the matching gas-tower bump; both
+--    behavior-preserving, Unit-Test guards).
+
+--    WHAT REMAINS is grind, not design: (a) the ofW invariance /
+--    preservation mirrors (W10/W11 — literal fnCap-grind repeats;
+--    W11 is deleted, record below); (b)
+--    subscribeE-walk is the JOINT FACE — the wet conjuncts with their
+--    receipt E′ ≤ E·3^(suc Ψ·walkCap), the dry half, and the
+--    length ledger (mintCount delta, burstLen, registered path
+--    lengths) in one hypothesis block under one ceiling; its
+--    clause grind extends the ground walkS clauses conjunct by
+--    conjunct, consuming W11 for hop targets and hasAtLeast-peel
+--    (BOTH RETIRED with the walk)
+--    against dBound-μ/-hop/-connect for the fuel; (c) RETIRED —
+--    the face's receipt anchors the spend a priori, so no
+--    lineage-indexed (or any per-fold) receipt is needed; (d) the
+--    landing: instantiate the face at the root with V =
+--    sizeBudgetAt (suc id) and discharge the ceiling by the
+--    story-count arithmetic above (this WILL need the height-
+--    multiplier bump and its matching gas-tower bump), the fuel
+--    seed by budget-hasAtLeast, and the Ω/ℓ₀/regsLen? seeds at
+--    init — replacing the two cores' landing halves.  The
+--    instant-level (cascadeGo) joint face repeats this design at
+--    the chain fold, but is deliberately NOT stated until (b)'s
+--    grind confirms the subscribeE face survives contact.
 ------------------------------------------------------------------
+--
+-- ⚠ DEAD ROUTE — READ THIS BEFORE THE MEMO BELOW.  What
+--  follows is a design record of a route that is RETIRED, not a plan.
+--  Its (1) sharp eval bound survives and is proven below (evalWith-size,
+--  caseWᵗ, fnCap); everything from (2) THE LEDGER onward — the running
+--  cap capᴱ W₀ E as a walk position, the receipt algebra spendᴱ/
+--  spendᴱ-compose, the Ω width ledger, the mintCount/burstLen counter
+--  deltas, and the staged plan (a)–(d) at the end — describes apparatus
+--  that no longer exists and a landing that was machine-refuted.
 
 -- the eval-compounding weight: caseᵗ nodes only; strmᵗ is a leaf
 -- (embedded expressions are inert during eval); reify images weigh 0
@@ -4820,7 +4822,7 @@ burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 -- hopDᵉ c < hopDᵉ (mergeAllᵉ c), and dBound-hop's r′ < r is discharged
 -- by the definition rather than by a lemma.
 --
--- This conjunct was postulated on 2026-07-28, REFUTED the same day
+-- This conjunct was postulated, REFUTED the same day
 -- against the index-blind coefficient, retracted, and restated here
 -- once occs0 had been re-gated — see the hop-descent memo below for the
 -- mechanism and the corpus numbers both ways.
@@ -5279,13 +5281,13 @@ ofW-evalWith Ω (strmᵗ e) (v ∷ᵃ vs) hσ h = ofW-subΘᵉ Ω [] (v ∷ᵃ v
 
 
 ------------------------------------------------------------------
--- DELETED (2026-08-21): (W11) THE WIDTH WALK, and its whole cone —
+-- (W11) THE WIDTH WALK IS GONE, and its whole cone with it —
 -- the Ω state predicates (widthOK? / pathΩ? / frameΩ? / eventΩ? /
 -- burstΩ? / regsΩ? / ofWLive / ofWNode / slotOfW / slotsOfW), the
 -- ofW elimG/elimD laws, and the 61 preservation lemmas that stood
 -- over them in .Wet/Part3 (W11-A/B), .Wet/Part4 and .Wet/Part5.
 -- 1820 lines, all PROVEN, with ZERO consumers: the joint face that
--- read the width conjuncts was the ledger walk, retired 2026-08-13,
+-- read the width conjuncts was the ledger walk, since retired,
 -- and the collapsed walk (.Walk-Level) carries width as `dWᵉ ≤ cWid`
 -- on the caps side instead.  It reached Main only through a `public`
 -- re-export in .Wet/Part6, which is what made a self-consuming
@@ -5319,11 +5321,11 @@ regsLen? : ∀ {n} {Γ : Ctx n} {t} → ℕ
          → List (RegId × Source × Chain Γ t) → Bool
 regsLen? ℓ = all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ ℓ)
 
--- REFUTED (moved out of src 2026-08-18): ROUND 3's anchor vocabulary
--- — `walkCap`, `anchorᴬ` and their arithmetic — was retired with the
--- ledger walk (2026-08-13) and survived only to STATE six refutations.
--- All of it, and they, now live in `refuted/Refuted/Anchor.agda`,
--- checked by `make refuted`.  What they establish: a single shared
--- anchor cannot serve the demand, the s′ reset and the receipt ceiling
--- at once, and a d-indexed anchor is impossible outright.
+-- REFUTED: ROUND 3's anchor vocabulary
+--   — `walkCap`, `anchorᴬ` and their arithmetic — was retired with the
+--   ledger walk and survived only to STATE six refutations.
+--   All of it, and they, now live in `refuted/Refuted/Anchor.agda`,
+--   checked by `make refuted`.  What they establish: a single shared
+--   anchor cannot serve the demand, the s′ reset and the receipt ceiling
+--   at once, and a d-indexed anchor is impossible outright.
 
