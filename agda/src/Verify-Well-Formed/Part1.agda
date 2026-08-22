@@ -1,10 +1,8 @@
 ------------------------------------------------------------------
--- STRATUM DOCUMENTATION, INHERITED FROM THE DELETED `Verify-Well-Formed` UMBRELLA.
--- That module held nothing but an `open import ... public` re-export,
--- which is now illegal — a name is imported from where it is DEFINED — so
--- the umbrella went and its prose came here, this file being the
--- stratum's bottom rung.  Consumers import the Parts directly now;
--- nothing was proven or unproven by the move.
+-- STRATUM DOCUMENTATION FOR THE WHOLE `Verify-Well-Formed` LADDER, which
+-- lives here because this file is the stratum's bottom rung.  There is no
+-- umbrella module to hold it: an umbrella could only re-export, and a
+-- name is imported from where it is DEFINED.  Consumers import the Parts.
 ------------------------------------------------------------------
 -- THE PROOF that the evaluator's output satisfies the protocol
 -- automaton: evaluate-well-formed, the primitives' half of the
@@ -27,39 +25,14 @@
 --      fuel loop, and the theorem — are all DEFINED, glued by
 --      runProtocol's distribution over ++.
 
--- SPLIT 2026-08-11 into 13 parts.  This file was 5,816 lines forming ONE mutual
--- block of 276 members with ZERO cycles -- an artefact of declaration order,
--- not recursion.  Nothing could make a check of it incremental and
--- `make agda-dev` had no cycle to break, so it was the one module in the repo
--- that could not be iterated on.
---
--- The cut is mechanical: parts are consecutive runs of the ORIGINAL text, at
--- boundaries where no definition depends on a later one.  Two definitions moved
--- to make every boundary safe -- `subscribe-wf` and `subscribeE-wf`'s signature,
--- both DOWN to sit after what they use.  No statement, proof or signature
--- changed.  Consumers are unaffected: the parts are re-exported here under the
--- original module name.
+-- THE PARTS ARE CONSECUTIVE RUNS OF ONE FORMER MUTUAL BLOCK, and that is a
+-- live constraint on editing them rather than a note about how they got here.
+-- The block had 276 members and ZERO cycles — an artefact of declaration
+-- order, not recursion — so `make agda-dev` had no cycle to break and no
+-- check of it could be made incremental.  A part boundary is therefore valid
+-- exactly where no definition depends on a LATER one, and moving a
+-- definition across one is only safe downward, after everything it uses.
 
--- THE PROOF that the evaluator's output satisfies the protocol
--- automaton: evaluate-well-formed, the primitives' half of the
--- batching sandwich (see Verify-Batch-Simultaneous.The-Proof).
---
--- Architecture: a simulation, in three layers.
---   1. Inv (CONCRETE below) relates evaluator state to automaton
---      state between cascades.
---   2. Two frame relations — BurstInv (mid-subscribe-frame) and Mid
---      (mid-cascade, indexed by the chains still to fold) — both
---      CONCRETE records now, with entry/step/exit lemmas.  Proven:
---      burst-init, burst-final.  Postulated (all believed true and
---      properly hypothesised — no known-false placeholders): the
---      step lemmas
---      (subscribeE-wf, mid-step — the per-clause preservation
---      grind), mid-init, mid-skip, mid-final.  Budget sufficiency
---      is no longer assumed here: it is imported, proven, from
---      Verify-Budget-Sufficient.
---   3. The compositions — the subscribe frame, the chain fold, the
---      fuel loop, and the theorem — are all DEFINED, glued by
---      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part1 where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_; _∧_; _∨_; not)
@@ -75,9 +48,7 @@ open import Relation.Nullary using (yes; no)
 
 -- from .Caps-Bridge, not from the top module: the top module is the
 -- active caps grind, and importing it here would put this file on that
--- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
--- not change, only which module proves it, so nothing else here needed
--- to move with it.
+-- clock.
 open import Rx.Prim      using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
 open import Rx.Evaluator using (EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; from-inner; thru-outer;

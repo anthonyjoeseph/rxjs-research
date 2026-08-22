@@ -33,9 +33,7 @@ open import Relation.Binary.PropositionalEquality
 
 -- from .Caps-Bridge, not from the top module: the top module is the
 -- active caps grind, and importing it here would put this file on that
--- clock.  MOVED 2026-08-05 from .Wet (the 2026-08-05 upside-down ruling) — `budget-sufficient`'s TYPE did
--- not change, only which module proves it, so nothing else here needed
--- to move with it.
+-- clock.
 open import Rx.Prim      using (Gas; Tick; Id; Source; InstEmit; InstEvent; init; value; close; handoff; complete; EmitKind;
   _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val; Fn; _×ᵗ_; Tm; scanᵉ; evalTm)

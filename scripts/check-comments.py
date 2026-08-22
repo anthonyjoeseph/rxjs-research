@@ -108,10 +108,47 @@ DATE_RE = re.compile(
 # The four markers whose subject is the STATEMENT.  Order here IS the mandated
 # order in a block's tail; `DEAD ROUTE` shares a rank with `REFUTED` because
 # both answer "what has been ruled out".
-DURABLE = [("REFUTED", 0), ("DEAD ROUTE", 0), ("PROBED", 1), ("RECOVERY", 2)]
+# Rank 0 answers "what is ruled out, and what is the route" — a refutation, a
+# route that cannot work, a proven counterpart whose clauses correspond.  Rank 1
+# is coverage.  Rank 2 is where deleted apparatus went.
+DURABLE = [("REFUTED", 0), ("DEAD ROUTE", 0), ("TWIN", 0),
+           ("PROBED", 1), ("RECOVERY", 2)]
 DURABLE_RE = re.compile(
-    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|PROBED|RECOVERY)\b(?!-)"
+    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b(?!-)"
 )
+
+# The markers whose text names something that can STOP EXISTING.  `DEAD ROUTE`
+# is deliberately absent and unvalidated: it has no referent by construction --
+# it records that a way of proving something cannot work, and there is no object
+# to resolve.  That is exactly why it got a prose convention instead of a check.
+VALIDATED = ("TWIN", "REFUTED", "PROBED", "RECOVERY")
+
+# A reference is BACKTICKED or DOTTED, never a bare word, and that is a rule
+# about how the line is written rather than a parsing convenience: English prose
+# is full of words that happen to be declared names in this tree (`all`, `map`,
+# `init`), so a scan over bare words would resolve by accident and report a
+# healthy reference where there is none.  Both forms are already how the repo
+# writes them.
+BACKTICKED = re.compile(r"`([^`]+)`")
+DOTTED = re.compile(r"\b((?:[A-Z][A-Za-z0-9-]*\.)+[A-Za-z][A-Za-z0-9'_-]*)")
+SHA_TOKEN = re.compile(r"\b[0-9a-f]{7,40}\b")
+GITLOG = re.compile(r"git log[^`\n]*agda/")
+
+
+def ref_tokens(text):
+    """-> the names a section REFERS to: backticked spans and dotted paths."""
+    out = set()
+    for m in BACKTICKED.finditer(text):
+        inner = m.group(1).strip()
+        out.add(inner)
+        out.add(inner.split(".")[-1])
+        for w in re.findall(r"[A-Za-z][^\s,;:()]*", inner):
+            out.add(w)
+            out.add(w.split(".")[-1])
+    for m in DOTTED.finditer(text):
+        out.add(m.group(1))
+        out.add(m.group(1).split(".")[-1])
+    return {t for t in out if len(t) > 2}
 
 # Markers whose subject is what HAPPENED TO THIS DECLARATION.  Refused in
 # marker position only.  `ROUTE` is here bare and absent above as `DEAD ROUTE`,
@@ -142,6 +179,64 @@ SHA_RE = re.compile(r"\b[0-9a-f]{7,40}\b")
 # it and the first thing to break is that front matter, which is the one kind of
 # long comment nobody has ever complained about.
 EXPL_BUDGET = 3000
+
+
+# Deliberately generous, and copied in spirit from the roadmap checker's: its
+# only job is to tell a name that EXISTS from one that does not, so erring
+# toward finding a declaration errs toward silence rather than a false report.
+DECL_RE = re.compile(r"^\s*([^\s:(){}@]+)\s*:(?:\s|$)")
+DECL_KW_RE = re.compile(r"\b(?:data|record|module)\s+([^\s({]+)")
+
+
+def declared_names(tree):
+    """-> every name `tree` declares, plus every module path it defines."""
+    out = set()
+    for f in pathlib.Path(tree).rglob("*.agda"):
+        rel = f.relative_to(tree).with_suffix("")
+        out.add(str(rel).replace("/", "."))
+        for line in f.read_text().splitlines():
+            if line.strip().startswith("--"):
+                continue
+            m = DECL_RE.match(line)
+            if m:
+                out.add(m.group(1))
+            m = DECL_KW_RE.search(line)
+            if m:
+                out.add(m.group(1).split(".")[-1])
+                out.add(m.group(1))
+    return out
+
+
+def live_postulates(root):
+    """-> the live-postulate names, or None if the ledger cannot be read."""
+    import subprocess
+    try:
+        r = subprocess.run(["scripts/check-wiring.py", "--postulates"],
+                           cwd=root, capture_output=True, text=True, timeout=180)
+    except Exception:
+        return None
+    if r.returncode != 0:
+        return None
+    names = [ln.split()[0] for ln in r.stdout.splitlines() if ".agda:" in ln]
+    return set(names) or None
+
+
+def real_shas(root, candidates):
+    """-> the subset of `candidates` git can actually resolve to an object."""
+    import subprocess
+    if not candidates:
+        return set()
+    try:
+        r = subprocess.run(["git", "cat-file", "--batch-check"], cwd=root,
+                           input="\n".join(sorted(candidates)) + "\n",
+                           capture_output=True, text=True, timeout=120)
+    except Exception:
+        return set(candidates)          # git unavailable: do not invent failures
+    good = set()
+    for want, line in zip(sorted(candidates), r.stdout.splitlines()):
+        if " missing" not in line and " ambiguous" not in line:
+            good.add(want)
+    return good
 
 
 def blocks(path):
@@ -180,8 +275,59 @@ def rank(line):
     return None
 
 
+def sections(body):
+    """-> [(offset, kind, text)] — each evidence marker with its continuations."""
+    marks = [i for i, l in enumerate(body) if DURABLE_RE.match(l)]
+    out = []
+    for j, i in enumerate(marks):
+        end = marks[j + 1] if j + 1 < len(marks) else len(body)
+        kind = DURABLE_RE.match(body[i]).group(1)
+        out.append((i, kind, " ".join(body[i:end])))
+    return out
+
+
+def check_refs(refs, root):
+    """-> [(file, lineno, kind, why)] for every reference that resolves to
+    nothing.  A marker naming something that can STOP EXISTING is only worth
+    the line it costs if its disappearance is a build failure -- the same law
+    `make evidence-check` already applies to a probe's `-- TARGET:`, arriving
+    here from the header's side."""
+    src = declared_names(root / "agda/src")
+    ref = declared_names(root / "agda/evidence/refuted")
+    prb = declared_names(root / "agda/evidence/probed")
+    post = live_postulates(root) or set()
+    shas = real_shas(root, {t for _, _, _, text in refs
+                            for t in SHA_TOKEN.findall(text)})
+
+    bad = []
+    for f, lineno, kind, text in refs:
+        toks = ref_tokens(text)
+        if kind == "TWIN":
+            hits = toks & src
+            still = hits & post
+            if not hits:
+                bad.append((f, lineno, kind, "names nothing declared in `agda/src`"))
+            elif hits <= still:
+                bad.append((f, lineno, kind,
+                            "names `" + sorted(still)[0] + "`, which is STILL A "
+                            "POSTULATE — a twin that is not proven earns no class"))
+        elif kind == "REFUTED":
+            if not (toks & ref):
+                bad.append((f, lineno, kind,
+                            "names no declaration in `agda/evidence/refuted`"))
+        elif kind == "PROBED":
+            if not (toks & prb) and not (set(SHA_TOKEN.findall(text)) & shas):
+                bad.append((f, lineno, kind,
+                            "names neither a live probe nor the sha holding a "
+                            "deleted one"))
+        elif kind == "RECOVERY":
+            if not (set(SHA_TOKEN.findall(text)) & shas) and not GITLOG.search(text):
+                bad.append((f, lineno, kind, "carries no sha git can resolve"))
+    return bad
+
+
 def audit(files, budget):
-    dated, hist, shape, fat = [], [], [], []
+    dated, hist, shape, fat, refs = [], [], [], [], []
     for f in files:
         for start, body in blocks(f):
             for off, line in enumerate(body):
@@ -191,6 +337,10 @@ def audit(files, budget):
                 m = HISTORY_RE.match(line)
                 if m:
                     hist.append((f, start + off, m.group(1)))
+
+            for off, kind, text in sections(body):
+                if kind in VALIDATED:
+                    refs.append((f, start + off, kind, text))
 
             cut = first_marker(body)
 
@@ -218,7 +368,7 @@ def audit(files, budget):
             cost = sum(len(line) for line in body[:cut] if not SHA_RE.search(line))
             if cost > budget:
                 fat.append((f, start, cost, len(body)))
-    return dated, hist, shape, fat
+    return dated, hist, shape, fat, refs
 
 
 def main():
@@ -228,6 +378,9 @@ def main():
                          + " and ".join(DEFAULT_DIRS))
     ap.add_argument("--budget", type=int, default=EXPL_BUDGET,
                     help="explanation budget in characters")
+    ap.add_argument("--no-refs", action="store_true",
+                    help="skip reference resolution (it reads the real trees, so "
+                         "a fixture outside them cannot be judged by it)")
     args = ap.parse_args()
 
     root = pathlib.Path(__file__).resolve().parent.parent
@@ -237,7 +390,8 @@ def main():
         print(f"comments-check: no .agda files under {', '.join(str(d) for d in dirs)}")
         return 1
 
-    dated, hist, shape, fat = audit(files, args.budget)
+    dated, hist, shape, fat, refs = audit(files, args.budget)
+    dangling = [] if args.no_refs else check_refs(refs, root)
 
     if dated:
         print(f"\nDATED COMMENTS — {len(dated)} line(s) naming a calendar date:")
@@ -281,13 +435,31 @@ def main():
         print("time.  Cut the superseded framing and the corrections-to-corrections;")
         print("what survives is the finding, which is usually a fifth of the words.")
 
-    if dated or hist or shape or fat:
+    if dangling:
+        print(f"\nDANGLING REFERENCES — {len(dangling)} marker(s) naming "
+              f"something that is not there:")
+        for f, lineno, kind, why in dangling:
+            print(f"  {f}:{lineno}  {kind} {why}")
+        print("\nA marker naming something that can STOP EXISTING is only worth its")
+        print("line if the disappearance is a build failure — the same law")
+        print("`make evidence-check` puts on a probe's `-- TARGET:`, arriving here")
+        print("from the header's side, and closing the loop between them: that check")
+        print("expires a probe when its target is discharged, and this one catches")
+        print("the receipt left pointing at the probe it just deleted.")
+        print("\nWrite the reference BACKTICKED or DOTTED — a bare word is not read as")
+        print("one, because English is full of words this tree happens to declare. A")
+        print("`TWIN` names a PROVEN definition, which is what earns a GRINDABLE row")
+        print("its class; if the twin is still a postulate the class is wrong. A")
+        print("`PROBED` receipt for a DELETED probe names the sha holding it — that")
+        print("is what makes the `git log -S` recovery rule actually work.")
+
+    if dated or hist or shape or fat or dangling:
         return 1
 
     n = len(files)
     print(f"comments-check: {n} file(s), no dated comment, no historical marker, "
-          f"evidence last and in order, every explanation within its "
-          f"{args.budget}-char budget")
+          f"evidence last and in order, every reference resolving, every "
+          f"explanation within its {args.budget}-char budget")
     return 0
 
 

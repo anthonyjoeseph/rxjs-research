@@ -659,42 +659,76 @@ comments-check:
 	@scripts/check-comments.py
 
 # PROVES comments-check IS LOAD-BEARING, one fixture per check, each firing
-# exactly one.  `clean` is the fixture that matters most: it is the MUST-NOT
-# direction, and it passes only if all four precision properties hold at once --
-# an INDENTED `ASSEMBLED`/`MEASURED` is a continuation and not a marker, an
-# UNDATED `SEALED:` is durable rationale and not history (the census found the
-# marker word does not separate the two -- the date does), an indented line
-# after `PROBED` is not stranded prose, and a `git show` pointer is not an
-# explanation.  `sha` pins that last one as load-bearing rather than decorative:
-# its raw comment total is well OVER budget and its charged total well under, so
-# dropping the exemption turns it red.
+# exactly one.  The six structural fixtures run with --no-refs so that each
+# tests ONE thing; ref-ok and ref-bad are the two that resolve references.
+#
+# `clean` is the fixture that matters most: it is the MUST-NOT direction, and it
+# passes only if four precision properties hold at once -- an INDENTED
+# `ASSEMBLED`/`MEASURED` is a continuation and not a marker, an UNDATED
+# `SEALED:` is durable rationale and not history (the census found the marker
+# word does not separate the two -- the date does), an indented line after
+# `PROBED` is not stranded prose, and a `git show` pointer is not an
+# explanation.  `sha` pins that last one as load-bearing rather than
+# decorative: its raw comment total is well OVER budget and its charged total
+# well under, so dropping the exemption turns it red.
+#
+# THE POSTULATE-TWIN ASSERTION IS GENERATED, and deliberately: the highest-value
+# thing this checker does is refuse a `TWIN` naming a statement that is ITSELF
+# STILL A POSTULATE, because that is a row whose GRINDABLE class was never
+# earned.  A fixture naming a postulate by hand would go stale the day that
+# postulate is discharged -- and it WOULD be discharged, since the whole point
+# of the campaign is to discharge them -- and it would then pass while reporting
+# the check as dead.  So the name is read from the live ledger at run time.
 comments-selftest:
 	@fail=0; \
 	  for d in clean sha; do \
-	    scripts/check-comments.py --dir scripts/comments-selftest/$$d > /dev/null 2>&1 \
+	    scripts/check-comments.py --no-refs --dir scripts/comments-selftest/$$d > /dev/null 2>&1 \
 	      || { echo "SELFTEST FAIL: the $$d fixture was REJECTED — a precision property of the checker has died"; fail=1; }; \
 	  done; \
 	  for d in dated history shape order fat; do \
-	    if scripts/check-comments.py --dir scripts/comments-selftest/$$d > /dev/null 2>&1; then \
+	    if scripts/check-comments.py --no-refs --dir scripts/comments-selftest/$$d > /dev/null 2>&1; then \
 	      echo "SELFTEST FAIL: the $$d fixture PASSED — that check is dead"; fail=1; \
 	    fi; \
 	  done; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/dated 2>&1 \
+	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/dated 2>&1 \
 	    | grep -q 'DATED COMMENTS' \
 	    || { echo "SELFTEST FAIL: a dated comment was not reported as one"; fail=1; }; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/history 2>&1 \
+	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/history 2>&1 \
 	    | grep -q 'HISTORICAL MARKERS' \
 	    || { echo "SELFTEST FAIL: an UNDATED historical marker was not reported — only the name check can see one"; fail=1; }; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/shape 2>&1 \
+	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/shape 2>&1 \
 	    | grep -q 'prose line(s) after the evidence' \
 	    || { echo "SELFTEST FAIL: prose stranded behind the evidence was not reported"; fail=1; }; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/order 2>&1 \
+	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/order 2>&1 \
 	    | grep -q 'evidence out of order' \
 	    || { echo "SELFTEST FAIL: PROBED before REFUTED was not reported — the order half is dead"; fail=1; }; \
-	  scripts/check-comments.py --dir scripts/comments-selftest/fat 2>&1 \
+	  scripts/check-comments.py --no-refs --dir scripts/comments-selftest/fat 2>&1 \
 	    | grep -q 'EXPLANATIONS OVER BUDGET' \
 	    || { echo "SELFTEST FAIL: an over-budget explanation was not reported"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all four checks fire; an indented marker, an undated SEALED and a sha pointer do not)"; \
+	  scripts/check-comments.py --dir scripts/comments-selftest/ref-ok > /dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: a TWIN naming a PROVEN definition, a REFUTED naming a real refutation and a RECOVERY carrying a real sha were REJECTED"; fail=1; }; \
+	  out=$$(scripts/check-comments.py --dir scripts/comments-selftest/ref-bad 2>&1); \
+	  if scripts/check-comments.py --dir scripts/comments-selftest/ref-bad > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: references naming nothing PASSED — the resolution check is dead"; fail=1; \
+	  fi; \
+	  echo "$$out" | grep -q 'TWIN names nothing' \
+	    || { echo "SELFTEST FAIL: an unresolvable TWIN was not reported"; fail=1; }; \
+	  echo "$$out" | grep -q 'RECOVERY carries no sha' \
+	    || { echo "SELFTEST FAIL: a bogus sha was not reported"; fail=1; }; \
+	  pn=$$(scripts/check-wiring.py --postulates 2>/dev/null | grep '\.agda:' | head -1 | awk '{print $$1}'); \
+	  if [ -z "$$pn" ]; then \
+	    echo "SELFTEST FAIL: the postulate ledger is unreadable — the postulate-TWIN assertion cannot run"; fail=1; \
+	  else \
+	    d=$$(mktemp -d); printf 'module Gen where\n\n-- WHAT THIS LEAF OWES.\n-- TWIN: `%s` is claimed as the proven counterpart.\npostulate leaf : Set\n' "$$pn" > $$d/Gen.agda; \
+	    g=$$(scripts/check-comments.py --dir $$d 2>&1); \
+	    if scripts/check-comments.py --dir $$d > /dev/null 2>&1; then \
+	      echo "SELFTEST FAIL: a TWIN naming the live postulate $$pn PASSED — an unearned GRINDABLE class would go unnoticed"; fail=1; \
+	    fi; \
+	    echo "$$g" | grep -q 'STILL A POSTULATE' \
+	      || { echo "SELFTEST FAIL: a TWIN naming live postulate $$pn was not reported as one"; fail=1; }; \
+	    rm -rf $$d; \
+	  fi; \
+	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all five checks fire, including a TWIN naming a live postulate read from the ledger; an indented marker, an undated SEALED, a sha pointer and a resolving reference do not)"; \
 	  else exit 1; fi
 
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a

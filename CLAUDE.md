@@ -112,7 +112,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-selftest` | all four comment checks still fire, and three precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
-| `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date or a historical marker; a block's evidence sits LAST and in order; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
+| `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date or a historical marker; a block's evidence sits LAST and in order; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
 | `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` | the refutations typecheck | EVIDENCE.md |
 | `probed` | the probes typecheck | EVIDENCE.md |
@@ -654,7 +654,9 @@ rows are all GRINDABLE.
 
 **EARNING THE CLASS: NAME THE PRECEDENT.** GRINDABLE is not "feels easy", it is "here is
 the worked instance." The postulate's own header must name the proven twin or the
-mechanical route; absent one, the row is DIFFICULTY. Without this the class becomes the
+mechanical route; absent one, the row is DIFFICULTY. **Name it in a `TWIN:` section, where
+`make comments-check` resolves it** — and refuses a twin that is itself still a postulate,
+which is this rule finally having teeth instead of a convention. Without this the class becomes the
 place everything nobody wants to think about gets parked, which is the one failure mode
 that would make it worse than not having it.
 
@@ -1021,12 +1023,43 @@ derivation that would typecheck, move it into the derivation.
 
 ### A HEADER HAS A SHAPE, AND HISTORY IS NOT PART OF IT (Anthony)
 
-**EXPLANATION FIRST, THEN EVIDENCE — `REFUTED`/`DEAD ROUTE`, then `PROBED`, then
-`RECOVERY` — AND THE EVIDENCE COMES LAST.** Not a style preference: it is what gives a
-long header landmarks to skip by, and it is what makes the budget below definable at
-all. A marker is a **LEDGER ENTRY**, so prose that wants to mention a refutation in
-passing names its module in backticks rather than opening a `REFUTED:` section
-mid-paragraph — a ledger interleaved with the argument is neither.
+**EXPLANATION FIRST, THEN EVIDENCE — `REFUTED`/`DEAD ROUTE`/`TWIN`, then `PROBED`,
+then `RECOVERY` — AND THE EVIDENCE COMES LAST.** Not a style preference: it is what
+gives a long header landmarks to skip by, and it is what makes the budget below
+definable at all. Rank one answers *what is ruled out and what the route is*, rank two
+*what was covered*, rank three *where deleted apparatus went*. A marker is a **LEDGER
+ENTRY**, so prose that wants to mention a refutation in passing names its module in
+backticks rather than opening a `REFUTED:` section mid-paragraph — a ledger interleaved
+with the argument is neither.
+
+**AND A MARKER THAT NAMES SOMETHING MUST NAME SOMETHING THAT EXISTS (Anthony).** Every
+one of those sections except `DEAD ROUTE` refers to an object that can be deleted, so
+its disappearance is a build failure — the same law `make evidence-check` already puts
+on a probe's `-- TARGET:`, arriving from the header's side and closing the loop with it:
+that check expires a probe when its target is discharged, and this one catches the
+receipt left pointing at the probe it just deleted. **Write the reference BACKTICKED or
+DOTTED**, because English is full of words this tree happens to declare and a bare word
+resolves by accident.
+
+- **`TWIN:` NAMES A PROVEN DEFINITION, AND THAT IS WHAT MAKES "NAME THE PRECEDENT"
+  CHECKABLE.** The de-risk rule below demands a GRINDABLE row name its worked instance;
+  nothing checked it, and a mirror recorded in prose is a claim no machine reads. **If
+  the named twin is ITSELF STILL A POSTULATE the class is wrong** — the route has not
+  been walked, so the row is DIFFICULTY. That is a mis-classification caught
+  mechanically, which is the one thing the class system exists to prevent.
+- **A `PROBED:` RECEIPT FOR A DELETED PROBE CARRIES THE SHA.** A probe is *supposed* to
+  outlive nothing — it expires with its target — so "the probe is deleted" is a normal
+  state and the receipt is all that is left. Then the sha is the whole recovery route,
+  and it is what makes the `git log -S` rule below actually work rather than aspire to.
+- **`DEAD ROUTE:` IS UNVALIDATED, BY CONSTRUCTION.** It has no referent: it records that
+  a *way of proving* something cannot work, and there is no object to resolve. That is
+  precisely why it got a prose convention instead of a check, and it is the section to
+  reach for when a finding is real but names nothing.
+
+**THE SECTIONS ARE OPTIONAL WHEN ABSENT AND VALIDATED WHEN PRESENT — NEVER MANDATORY.**
+A required field on a row that has no twin produces a filler `TWIN:`, and filler there
+is **worse than empty**, because it earns a class the row has not earned. Structure is
+enforced on *order and resolution*, never on presence.
 
 **AND ONLY THE EXPLANATION IS CHARGED (Anthony).** The prose before the first evidence
 marker has a character budget; the evidence sections and any `git show` pointer are

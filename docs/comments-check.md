@@ -23,7 +23,7 @@ So the law charges **explaining** and leaves **evidence** free, which is the
 same split the roadmap's row budget already uses for names. Everything below
 follows from that.
 
-## The four checks
+## The five checks
 
 **1 — Dates.** No calendar date in any comment. A receipt's content is its
 *coverage statement* — which shapes were reached, which were not — and coverage
@@ -57,7 +57,9 @@ Deliberately **not** on it: `SEALED`, `SPLIT`, `RESOLVED`, `SETTLED`,
 `FRESHNESS`, `ASSEMBLY`.
 
 **3 — Shape.** A block's evidence sits at its end, in the order `REFUTED` /
-`DEAD ROUTE`, then `PROBED`, then `RECOVERY`. Past the first marker a line may
+`DEAD ROUTE` / `TWIN`, then `PROBED`, then `RECOVERY`. Rank one is *what is
+ruled out and what the route is*, rank two *what was covered*, rank three
+*where deleted apparatus went*. Past the first marker a line may
 be another marker, a blank, or an indented continuation; flush-left prose down
 there is an explanation stranded behind the ledger with no landmark in front of
 it.
@@ -75,7 +77,43 @@ Consequence worth knowing before you write the sentence: a marker is a **ledger
 entry**, not emphasis. To mention a refutation mid-paragraph, name its module in
 backticks; reserve `REFUTED:` for the ledger at the foot of the block.
 
-**4 — Explanation budget.** The prose before the first evidence marker, with
+**4 — References resolve.** Every section except `DEAD ROUTE` names an object
+that can be deleted, so its disappearance is a build failure. This is the same
+law `make evidence-check` puts on a probe's `-- TARGET:`, arriving from the
+header's side — and the two close a loop: E2 expires a probe when its target is
+discharged, and this catches the receipt left pointing at the probe it just
+deleted. That gap is one CLAUDE.md already names, at ten surviving receipts
+against ninety-eight deleted probe files.
+
+| section | referent | resolved against |
+| --- | --- | --- |
+| `TWIN:` | a **proven** definition | declared in `agda/src` **and not in the postulate ledger** |
+| `REFUTED:` | a refutation | declared in `agda/evidence/refuted` |
+| `PROBED:` | a probe, live or spent | a module under `agda/evidence/probed`, **or a git sha** |
+| `RECOVERY:` | a commit | `git cat-file`, or a `git log … agda/…` form |
+| `DEAD ROUTE:` | *nothing* | not validated |
+
+**A reference is BACKTICKED or DOTTED, and that is a rule about writing the
+line rather than a parsing convenience.** English prose is full of words this
+tree happens to declare — `all`, `map`, `init` — so a scan over bare words
+resolves by accident and reports a healthy reference where there is none.
+
+`TWIN:` is the sharp one. CLAUDE.md's *"EARNING THE CLASS: NAME THE
+PRECEDENT"* demanded a GRINDABLE row name its worked instance, and nothing
+checked it. **A twin that is itself still a postulate means the class is
+wrong** — the route has not been walked, so the row is DIFFICULTY. That is a
+mis-classification caught mechanically.
+
+`PROBED:` cannot demand a *live* probe, because a probe expiring with its
+target is correct and expected; "the probe is deleted" is a normal state and
+the receipt is all that survives. So the sha is the whole recovery route, and
+requiring it is what makes CLAUDE.md's `git log -S` rule work rather than
+aspire to.
+
+`--no-refs` skips this pass. Fixtures outside the real trees cannot be judged
+by it.
+
+**5 — Explanation budget.** The prose before the first evidence marker, with
 sha-bearing lines free. Nothing evidential is ever what has to give.
 
 ## Where the budget comes from, and why it is not tighter
@@ -101,6 +139,7 @@ For calibration, the count it fires on at each ceiling: 2000 → 73 blocks,
 | dates | delete the date. If the line said nothing but *when*, delete the line. |
 | markers | delete the line — `git log -S<name> --all` holds it, unrotting. |
 | shape | move the evidence to the foot of the block, in order. If the stranded prose is superseded framing, it goes rather than moves. |
+| references | resolve it, or demote the section to `DEAD ROUTE:`, which names nothing and is not validated. A `REFUTED:` used as *emphasis* rather than as a ledger entry is the common case — reword it to name the module in backticks mid-prose. |
 | budget | cut the superseded framing and the corrections-to-corrections. What survives is the finding, usually a fifth of the words. |
 
 ## The fixtures
@@ -115,6 +154,17 @@ history, an indented line after `PROBED` is not stranded prose, and a `git show`
 pointer is not an explanation. `sha` pins that last one as load-bearing rather
 than decorative: its raw comment total is well over budget and its charged total
 well under, so dropping the exemption turns it red.
+
+**The postulate-twin assertion is generated at run time**, from the live
+ledger, and deliberately: a fixture naming a postulate by hand would go stale
+the day that postulate is discharged — and it *would* be, since discharging
+them is the point of the campaign — and would then pass while reporting the
+check as dead.
+
+The six structural fixtures run with `--no-refs`, so each tests one thing;
+`ref-ok` and `ref-bad` are the two that resolve references. `ref-bad` names
+something no edit can accidentally make valid: an undeclared name, and a sha of
+all `f`s.
 
 Fixtures live under `scripts/`, not `agda/`, so they are never compiled and need
 not be valid Agda — and no claim root reaches them, so `make wiring` is not
