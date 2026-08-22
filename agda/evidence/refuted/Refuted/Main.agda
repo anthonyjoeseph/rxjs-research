@@ -34,7 +34,8 @@ open import Refuted.Depth-Nest
          depth-capped-absurd; width-route-absurd)
 open import Refuted.Emit-Map
   using (fnNest; srcNest; bound; emitted; row; emit-map-absurd;
-         progTopDepth; progTopCap)
+         progTopDepth; progTopCap;
+         wideNest; wideOutW; fnNestW; boundW; emittedW3; emittedW7; rowW)
 open import Refuted.Emit-Scan
   using (seedNest; stepNest; srcNest; countFactor; bound; emitted; row;
          emit-scan-absurd)

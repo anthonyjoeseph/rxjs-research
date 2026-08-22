@@ -1196,12 +1196,37 @@ postulate
   -- DEPTH stays far below, and caps-by-caps is the wrong currency here
   -- however tight the predicate is made.
   --
-  -- NEITHER REPAIR IS LOCAL, so neither is taken without a ruling:
-  -- charge the measure for template occurrences (`occᵗ f * nestDᵉ sl e`,
-  -- and no CONSTANT will do — a template nesting k maps deep delivers k
-  -- copies), which cascades through `depthCap`; or state the burst
-  -- predicate over `depthE` rather than over the cap, which is what the
-  -- walk actually needs and restates the whole family.
+  -- AND THE OCCURRENCE REPAIR IS REFUTED TOO (Refuted.Emit-Map § 2), which
+  -- is what turns this from an arithmetic finding into a ruling.  Charging
+  -- the measure `occᵗ f * nestDᵉ sl e` for template occurrences reads as
+  -- sufficient against the witness above, and it cannot be: put the
+  -- payload variable under an inner `*All` that feeds a `scanᵉ` and the
+  -- payload's `outWᵉ` becomes the scan clause's per-payload FACTOR, so at
+  -- a payload of nesting ZERO the emitted nesting is the payload's WIDTH.
+  -- The rows read 4 at a three-payload source and 8 at a seven-payload
+  -- one, bound 1 in both.  Every multiple of `nestDᵉ sl e` is 0 there.
+  --
+  -- THE CURRENCY, THEN, IS SETTLED BY WHAT THE SIBLING FACES ALREADY DO.
+  -- `innWⱽ` meets this exact problem on the width face and pays for it
+  -- twice over: a `mapᵉ` charges its source a multiplier read off the
+  -- template's own payload multiplicity, and a `scanᵉ` EXPONENTIATES that
+  -- multiplicity over the source's payload count.  Transporting both onto
+  -- `nestDᵉ` still does not close it, and that is the decisive part — the
+  -- exponent is `outWᵉ` of the source, and `outWᵉ` is not stable under
+  -- substitution, since a `varᵗ` carries no width and a `strmᵗ v` carries
+  -- `v`'s.  A syntactic measure cannot be closed under a substitution that
+  -- moves its own count factor.
+  --
+  -- SO `EmitCap` IS THE DEPTH FACE'S MISSING THIRD MEMBER OF THE
+  -- SUBSTITUTION FAMILY, and the two that exist say what it has to look
+  -- like: `applyFn-iterSize` and `applyFn-iterFold` each read a CAP for
+  -- the environment and an ITERATED count for the term, because neither
+  -- face could state its own bound off the program text either.  The
+  -- unconditional form is what these rows refute, so a hypothesis is
+  -- licensed here for the one reason that licenses one at all — and the
+  -- restatement is caps-conditioned at an iterated count, not a tighter
+  -- constant.  It moves `nestDᵉ`, `depthCap` and everything stated over
+  -- them, so it is the whole of the next leg rather than a patch here.
   emit-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {s}
     (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (κ : Path Γ u t) (bid : Id) (now : Tick)
@@ -1229,8 +1254,11 @@ postulate
   -- witness.  Both leaves that take a `Fn` are refuted by a template
   -- whose substituted variable lands under a `+` in the measure, and
   -- `nestDᵗ` charges an occurrence 0 whatever it is about to become.  So
-  -- the question is the currency and not the constants; see the `mapᵉ`
-  -- leaf's header for the two repairs.
+  -- the question is the currency and not the constants — and the `mapᵉ`
+  -- leaf's header carries the ruling, since the width witness that
+  -- settles it is stated over that clause and covers this one by the same
+  -- argument: a scan's step function is substituted exactly as a map's
+  -- is, and its clause carries the count factor the witness moves.
   emit-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {s}
     (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) (κ : Path Γ u t) (bid : Id) (now : Tick)

@@ -251,14 +251,14 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated
-  (Refuted.Emit-Map). The parent survives the same witness, so caps-by-caps is
-  the wrong currency here, not the wrong constant. Its header states the two
-  repairs, both cascading. Do not grind it.
+- **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated AND the
+  occurrence repair refuted with it (Refuted.Emit-Map): at a payload of nesting
+  0 the emitted nesting is the payload's WIDTH. So `EmitCap` is the depth face's
+  missing `applyFn-iterFold` — caps-conditioned at an iterated count. Restate.
 - **`emit-scan`** (Depth-Compositional) — SHAPE, refuted by the SAME mechanism
   (Refuted.Emit-Scan), and the `outWᵉ` factor its clause already carries reads 1
-  at the witness — so the two products multiply independent things and neither
-  absorbs the other. Two clauses, one defect: reconsider the currency.
+  at the witness, so the two products multiply independent things. Restated with
+  `emit-map`; the width witness is stated over that clause and covers this one.
 - **`emit-input`** (Depth-Compositional) — DIFFICULTY, the connect and the only
   leaf with content: the emitter's own nesting is 0 at a slot, so the whole
   bound is the below-sum's step. Probed green at the shape that refuted the
