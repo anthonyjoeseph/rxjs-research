@@ -1175,6 +1175,33 @@ postulate
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     EmitCap g (ofᵉ ts) κ bid now sched st
 
+  -- ⚠ REFUTED 2026-08-22 AS STATED (Refuted.Emit-Map), and the route is
+  -- what is dead rather than the arithmetic.  A step function whose
+  -- `strmᵗ` template is itself a `mapᵉ` with the payload variable under
+  -- BOTH operands delivers the payload's nesting twice while charging its
+  -- own syntax nothing — both occurrences are `varᵗ`, worth 0 — so the
+  -- clause's `nestDᵗ sl f + nestDᵉ sl e` is exceeded by exactly one copy.
+  -- The ⊔ repair does not reach it: `nestDᵗ` joins duplicated subterms at
+  -- `pairᵗ`, at a term list and at `ifᵗ`, and a map's own layers over its
+  -- source's genuinely stack.  A `caseᵗ` cannot do it despite also
+  -- summing, because `evalWith` CONSUMES a scrutinee instead of embedding
+  -- it.
+  --
+  -- THE PARENT SURVIVES THE SAME WITNESS — `depthE` 1 against a
+  -- `depthCap` of 2 — and that is what says where the defect is.
+  -- `burstND?` bounds an emitted payload's CAP by the emitter's cap, and
+  -- a cap is syntactic, while `depthBurst`'s walk enters a payload only
+  -- through a `thru-outer` frame and a `map-f` is not one.  So a map
+  -- hands on a payload whose cap exceeds its own while that payload's
+  -- DEPTH stays far below, and caps-by-caps is the wrong currency here
+  -- however tight the predicate is made.
+  --
+  -- NEITHER REPAIR IS LOCAL, so neither is taken without a ruling:
+  -- charge the measure for template occurrences (`occᵗ f * nestDᵉ sl e`,
+  -- and no CONSTANT will do — a template nesting k maps deep delivers k
+  -- copies), which cascades through `depthCap`; or state the burst
+  -- predicate over `depthE` rather than over the cap, which is what the
+  -- walk actually needs and restates the whole family.
   emit-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {s}
     (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (κ : Path Γ u t) (bid : Id) (now : Tick)
