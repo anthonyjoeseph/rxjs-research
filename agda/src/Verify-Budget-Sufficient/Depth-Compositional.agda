@@ -594,6 +594,29 @@ postulate
   -- compounding row is degree THREE, so nothing here says the pattern
   -- continues past it — only that it does not stop at two.
   --
+  -- AND THE ROUTE INTO `src` HAS ONE DESIGN CHOICE IN IT, WITH ONE
+  -- ANSWER.  Enlarging `depthCap`'s first summand to
+  -- `sizeᵉ b + nestD b` leaves the `input` clause owing the SLOT
+  -- definition's nesting, and there are exactly two places to pay it.
+  --
+  -- Paying it in `slotNest` is the tempting one — it already pays
+  -- `sizeᵉ d` on the nose, and `slotsNestBelow-step` is built around
+  -- that being an equality — and it is WRONG, because `slotNest` is
+  -- held pointwise under `slotsSize` by `slots-nest-≤-size`, which is
+  -- what keeps `storeNest-capped` under the caps.  The nesting quantity
+  -- is exponential in the program (the compounding row above), so no
+  -- bound by a size survives there, and that lemma is not one this
+  -- development can afford to lose.
+  --
+  -- So the measure pays it ITSELF, by descending into slot definitions
+  -- on slot fuel with a visited set — exactly `outWⱽ`'s shape, whose
+  -- `input` clause is already written that way and whose `j` is the
+  -- lexicographic measure a connect spends.  Then `slotNest`,
+  -- `slotsNestSum` and `slots-nest-≤-size` keep their text, and the
+  -- restatement is confined to this module plus `depth-capped`'s own
+  -- chain, where `three-size-le-blowH` gives way to the matching
+  -- arithmetic into `blowH`.
+  --
   -- The measure is NOT in `src` yet on purpose — landing it
   -- means enlarging `depthCap`'s first summand, which re-opens every
   -- clause of this block, and that is a grind to schedule rather than
