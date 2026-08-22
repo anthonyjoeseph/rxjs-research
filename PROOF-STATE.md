@@ -222,6 +222,13 @@ enlarging it costs no signature — but it buys levels, and levels exponentiate,
 so the bound may not be tower-valued. A fold count is not; a new measure of that
 shape is what the restatement needs, and no existing one has it.
 
+That measure is now derived and pinned (`Probed.Nest-Depth`): one `suc` per
+`*All` layer, and a `scanᵉ` worth its source's payload count times its step
+function's layers. It equals `depthE` exactly at both crossings — 49 and 204 —
+so the rows ask for equality, not domination, and no constant passes both. It
+stays out of `src` until scheduled, because landing it enlarges `depthCap`'s
+first summand and re-opens every clause of `depth-compositional-go`.
+
 - **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
   (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.
   Do not grind it; the statement and its parent's are both restatements, into the

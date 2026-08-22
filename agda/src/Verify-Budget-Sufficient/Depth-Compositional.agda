@@ -552,6 +552,28 @@ postulate
   -- same height budget `Caps`'s own header defends when it forbids
   -- `cWid` from re-entering the delivery count.  A fold count is not
   -- tower-valued; that is why it is the candidate and a tower is not.
+  --
+  -- PROBED 2026-08-21 (Probed.Nest-Depth), AND THE MEASURE IS DERIVED
+  -- RATHER THAN FITTED — which is why the rows ask for EQUALITY and not
+  -- domination.  Charge one `suc` per `*All` layer, because that is what
+  -- `depthFrame` at `thru-outer` charges, and charge a `scanᵉ` its
+  -- SOURCE'S PAYLOAD COUNT times its step function's layers, because the
+  -- accumulator is re-wrapped once per delivered payload and the scan's
+  -- own frame charges its emissions nothing.  The resulting measure
+  -- equals `depthE` on the nose at both crossings the refutation walks:
+  -- 49 at four wraps over twelve ticks, 204 at seven over twenty-nine.
+  -- Two products, so no constant passes both, and a zero-wrap row pins
+  -- the collapse to 1.
+  --
+  -- Shapes NOT covered, and they are why this is still a postulate:
+  -- `mergeAllᵉ` only; ONE scan, so a scan inside another scan's step
+  -- function is untested and is exactly where a third factor would
+  -- appear; no slot descent, so the connect arc is unmeasured and
+  -- `slotsNestBelow` is the term that would carry it; no post-cascade
+  -- state.  The measure is NOT in `src` yet on purpose — landing it
+  -- means enlarging `depthCap`'s first summand, which re-opens every
+  -- clause of this block, and that is a grind to schedule rather than
+  -- one to start on a guess.
   depth-all-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)
