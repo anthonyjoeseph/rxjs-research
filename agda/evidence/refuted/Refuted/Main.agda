@@ -32,6 +32,9 @@ open import Refuted.Depth-Chain
 open import Refuted.Depth-Nest
   using (depth-all-bound-absurd; depth-compositional-sum-absurd;
          depth-capped-absurd; width-route-absurd)
+open import Refuted.Depth-Comp
+  using (fnA; capA; theCap; theDepth; theCapB; theDepthB;
+         depth-compositional-absurd)
 open import Refuted.Emit-Map
   using (fnNest; srcNest; bound; emitted; row; emit-map-absurd;
          progTopDepth; progTopCap;

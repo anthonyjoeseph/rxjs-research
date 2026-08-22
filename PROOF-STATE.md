@@ -196,8 +196,9 @@ blocked the burst arm — and it was measured slack, the μ probe reading caps o
 and 12 against depths of 1 and 2 where the tightened cap reads 1 and 2 on the
 nose. Every clause got shorter: the three structural descents need no arithmetic
 step, the μ clause's two caps became one term, and the connect now over-pays.
-Both remaining leaves are strengthened by it, and `Probed.Nest-Depth`'s rows now
-pin the cap itself as an EQUALITY with the depth.
+Both remaining leaves are strengthened by it, and `Probed.Nest-Depth`'s rows
+pinned the cap itself as an EQUALITY with the depth — AT THE SHAPES THEY WALK,
+which is the qualifier the next paragraph collects on.
 
 AND THE CURRENCY IS NOW ONE THROUGHOUT, which the first half of that tightening
 left owed. `slotNest` charged a def's size beside its nesting and `nodeNestMax`
@@ -251,6 +252,22 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
+AND THE CAP ITSELF IS NOW REFUTED — the exported conclusion, not a leaf of it
+(`Refuted.Depth-Comp`). Substitute a payload into a `scanᵉ`'s SOURCE and the
+count the product term charges parts company with the count the run delivers:
+the term reads `outWᵉ` at the unsubstituted source, where a bare variable is 0.
+At a closed program with no slots and an empty path `depthE` reads 4 against a
+cap of 3, and 8 against the same 3 when the map's source widens from three
+literals to seven — so the gap is the payload COUNT and no constant repair
+reaches it. Restoring the dropped size term does not either: the burst arm reads
+the cap at the PAYLOAD, whose size and nesting both exceed its emitter's. Every
+row below is a leaf of a decomposition of a false statement, which is why they
+are all SHAPE: the restatement moves the CAP, to the iterated form both sibling
+faces already carry (`applyFn-iterSize` on the size half, `applyFn-iterFold` on
+the width half). The depth face is that family's third member and has no
+iterator yet. The exported widening `cap-≤-store` re-admits `sizeᵉ` and still
+covers both witnesses — the next probe, not a repair.
+
 - **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated AND the
   occurrence repair refuted with it (Refuted.Emit-Map): at a payload of nesting
   0 the emitted nesting is the payload's WIDTH. So `EmitCap` is the depth face's
@@ -259,16 +276,19 @@ measures at once), and take a fixed-degree product of caps fields.
   (Refuted.Emit-Scan), and the `outWᵉ` factor its clause already carries reads 1
   at the witness, so the two products multiply independent things. Restated with
   `emit-map`; the width witness is stated over that clause and covers this one.
-- **`emit-input`** (Depth-Compositional) — DIFFICULTY, the connect and the only
-  leaf with content: the emitter's own nesting is 0 at a slot, so the whole
-  bound is the below-sum's step. Probed green at the shape that refuted the
-  predecessor. Its three `scripted` arms are provable — `isData` is hereditary.
-- **`emit-of`**, **`emit-take`** (Depth-Compositional) — DIFFICULTY: a term list's
-  own nesting, and a filter that emits a sub-list of what it was handed.
-- **`emit-all`** (Depth-Compositional) — DIFFICULTY, shared by all four `*All`
-  clauses because each puts one `suc` on the bound and leaves `maxInputᵉ` alone.
-- **`emit-mu`** (Depth-Compositional) — DIFFICULTY: the unfolding's nesting
-  against the body's, which is a substitution fact about `unfoldμ`.
+- **`emit-input`** (Depth-Compositional) — SHAPE with the cap, and the only leaf
+  with content of its own: the emitter's nesting is 0 at a slot, so its whole
+  bound is the below-sum's step. Probed green, and its three `scripted` arms are
+  provable, so it is the leaf likeliest to survive restatement intact.
+- **`emit-of`**, **`emit-take`** (Depth-Compositional) — SHAPE with the cap: a
+  term list's own nesting, and a filter emitting a sub-list of what it was
+  handed. Both are true of the current cap and say nothing about the iterated one.
+- **`emit-all`** (Depth-Compositional) — SHAPE with the cap, shared by all four
+  `*All` clauses because each puts one `suc` on the bound and leaves `maxInputᵉ`
+  alone. The `suc` is what the two refuted witnesses stack to reach the payload.
+- **`emit-mu`** (Depth-Compositional) — SHAPE with the cap: the unfolding's
+  nesting against the body's, a substitution fact about `unfoldμ` — and
+  substitution is the operation the cap is not stable under.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
