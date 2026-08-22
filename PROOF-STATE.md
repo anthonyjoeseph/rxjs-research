@@ -214,9 +214,9 @@ multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
 - **`depth-all-burst`** (Depth-Compositional) — DIFFICULTY, all that is left of the
-  `*All` face. Its dead route is repaired, the cap's size term gone, so what
-  remains is that an emitted inner's nesting is bounded by its emitter's, plus
-  finding (4)'s state conjunct.
+  `*All` face. Dead route repaired, and the measure is the GAS the burst already
+  peels — so this arm joins the induction as its sibling did, leaving one leaf:
+  an emitted inner's nesting is bounded by its emitter's.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

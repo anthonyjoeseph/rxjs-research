@@ -812,22 +812,30 @@ postulate
   -- frame's charge and `pathNestD` no longer bills the extra path frame
   -- at all, so the arithmetic is finished before the induction starts.
   --
-  -- AND THE ROUTE COSTS ONE THING THE TIGHTENING DID NOT BUY: the
-  -- assembly's RECURSION SHAPE.  `depthWalk`'s consume clause reaches
-  -- `depthE` at the emitted inner AT THE SAME GAS — checked, not
-  -- assumed — and an emitted inner is not a subexpression of its
-  -- emitter, so structural recursion on the subject cannot reach it and
-  -- no gas decrease covers it either.  What DOES decrease is the
-  -- nesting: an emitted inner's is bounded by its emitter's, which is
-  -- strictly below the `*All` layer's own.  The structural descents do
-  -- not decrease it — a scalar `mapᵉ` leaves it equal — so they need
-  -- the size beside it, and the connect and the guarded μ decrease the
-  -- gas above both.  That is a lexicographic measure in three
-  -- components where there is now a structural recursion in one, and
-  -- restructuring the assembly onto it is the next leg rather than a
-  -- line of this one: the measure is settled, the well-founded
-  -- plumbing is not, and this face's bodies are sealed for a measured
-  -- reason that the plumbing has to respect.
+  -- AND THE MEASURE THE ROUTE NEEDS IS ALREADY IN THE SIGNATURE: THE
+  -- GAS.  An emitted inner is not a subexpression of its emitter, so
+  -- structural recursion on the subject cannot reach it — but the
+  -- descent that reaches it PEELS ONE GAS (`depthInner`'s `gs` clause
+  -- is what enters the payload, and its zero clause returns 0), and the
+  -- gas travels unchanged from `depthAll` down through the burst, the
+  -- frame, the walk and the consume to get there.  So the pair is
+  -- lexicographic on gas and then on the subject, which is the order
+  -- the arguments already sit in, and no fuel parameter and no
+  -- well-founded plumbing is owed.  What the `*All` clauses gain is a
+  -- SPLIT ON THE GAS they currently do not perform: at `g0` the burst
+  -- arm is `0` outright, and at `gs fuel′` it recurses one level down.
+  --
+  -- WHICH MEANS THIS ARM CANNOT STAY A LEAF EITHER, for the reason its
+  -- sibling could not: the recursion it needs exists only inside the
+  -- induction.  Its route is to mirror the burst-side clique — burst,
+  -- frame, walk, consume, inner, and concat's drain — as members of
+  -- that induction, each recursing on its own list at a fixed gas and
+  -- reaching the subject only one gas lower.  Every cycle in that call
+  -- graph then decreases something: the lists on their own edges, the
+  -- gas on the edge back to the subject.  What is left over as a true
+  -- leaf is the one fact none of it supplies — an emitted inner's
+  -- nesting is bounded by its emitter's — together with finding (4)'s
+  -- state conjunct.
   -- THE BURST ARM, over the stream the outer subscribe returned.  Its
   -- own scheduler and state come out of that subscribe rather than out
   -- of `sched`/`st`, which is why the arm cannot be stated over
