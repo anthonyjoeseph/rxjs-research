@@ -81,34 +81,41 @@
 
 module Verify-Budget-Sufficient.Depth-Compositional where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (⊔-lub; ≤-trans; m≤n+m; m≤n⊔m;
-  *-identityˡ; *-monoˡ-≤; +-monoˡ-≤; +-monoʳ-≤; +-suc; ≤-reflexive; n≤1+n)
+  *-identityˡ; *-monoˡ-≤; +-monoˡ-≤; +-monoʳ-≤; +-suc; ≤-reflexive; n≤1+n; ≤ᵇ⇒≤)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
-open import Data.List using ([]; _∷_)
-open import Data.Bool using (false)
-open import Data.Maybe using (nothing)
-open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym)
-open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
+open import Data.List using (List; []; _∷_)
+open import Data.Bool using (Bool; true; false)
+open import Data.Bool.ListAction using (all)
+open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Product using (_×_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans)
+open import Decide using (∧-trueˡ; ∧-trueʳ; ∧-intro; T-to)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit; InstEvent;
+  value; init; close; handoff; complete)
 open import Rx.Exp using (Ctx; Closed; Val; Exp; Fn; Tm; _×ᵗ_; natᵗ; obs;
   syncSizeᵉ; unfoldμ; evalTm;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
-open import Rx.Slots using (Slot; slotsSize; scripted; shared)
+open import Rx.Slots using (Slot; Slots; slotsSize; scripted; shared)
 open import Rx.Evaluator
-  using (Sched; EvalSt; NodeId; Path; Stream; AllOp; NodeState; _↠_; map-f;
-  scan-f; take-f; from-inner; thru-outer; root; share-sink; splitEvents;
-  stepFrame; subscribeE; mintNode; installNode; take-st; mergeᵒ; concatᵒ;
-  switchᵒ; exhaustᵒ;
-  merge-st; concat-st; switch-st; exhaust-st; scan-st)
+  using (Sched; EvalSt; NodeId; Path; Stream; AllOp; NodeState; _↠_; map-f; scan-f; take-f;
+  from-inner; thru-outer; root; share-sink; splitEvents; stepFrame; subscribeE; mintNode;
+  installNode; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; thruConsume; switchKill;
+  lookupNode; merge-st; concat-st; switch-st; exhaust-st; scan-st)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; pmᵗ; hopD-unfoldμ)
 open import Rx.Slot-Hop using (slotHop; slotHop-fix)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthBurst; depthAll; depthTake; depthSlot)
+  using (depthE; depthBurst; depthAll; depthTake; depthSlot; depthWalk;
+  depthConsume; depthConsumeS; depthInner)
 open import Verify-Budget-Sufficient.Measures
-  using (syncSize-unfoldμ; syncSize≤sizeᵉ; slotDef-size; 1≤pow)
+  using (syncSize-unfoldμ; syncSize≤sizeᵉ; slotDef-size; 1≤pow;
+  burstHopD?; hopDev?)
+open import Verify-Budget-Sufficient.Keeps-Ring
+  using (KeepsC; subscribeE-slots; stepFrame-keeps; thruConsume-keeps;
+  switchKill-keeps)
 
 ------------------------------------------------------------------
 -- THE PATH MEASURE — the one arc on a path that a subscribe actually
@@ -207,6 +214,74 @@ allBurst g op ns b κ bid now sched st =
   sched₁ = proj₂ (mintNode sched)
   st₀    = installNode nid ns st
   r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+
+------------------------------------------------------------------
+-- THE WALK IS THE ONLY GAP, AND IT IS A FOLD.  Of `depthE`'s four heads
+-- only the `thru-outer` burst is one: the other three reduce to this
+-- face's own induction plus arithmetic, and the three chain frames'
+-- bursts are bounded by zero.  A `thru-outer` burst reaches `depthWalk`,
+-- which SUBSCRIBES every emitted inner — so the hop edge's `suc` has to
+-- be earned against payloads of `b` rather than read off a clause of the
+-- measure.
+--
+-- SO THE FOLD IS WRITTEN OUT rather than asserted, which is what makes
+-- its arithmetic checked: `depthBurst` peels an emission, `depthWalk`
+-- peels a payload, `depthConsume` picks the operator's branch and
+-- `depthInner` peels the gas and re-enters `depth-hop`.  Each of those
+-- is a head of the block below, and what the fold cannot supply itself
+-- is ONE leaf: the payload condition.  Everything else it needs about
+-- the schedule the `Keeps` ring already proves.
+------------------------------------------------------------------
+
+-- THE FOLD CARRIES ITS CURRENCY AT A FIXED SLOT VECTOR, so each stepper
+-- owes one equation — and it costs NO LEAF, because the whole subscribe
+-- clique already carries the fact through the `Keeps` ring: one `slotsEq`
+-- projection per stepper, at the exact tuple position each fold reads.
+-- `mintNode` and the node bump inside `depthInner` need not even that,
+-- since a record update on another field reduces.
+-- THE SOURCE CONDITION, AS A PREDICATE ON THE STREAM.  The hop half is
+-- `burstHopD?`, which .Measures already has and the walk face already
+-- lands; the re-entry also wants `depth-hop`'s own source condition at
+-- each payload, and stating it the same way is what lets both halves
+-- travel through the fold as `all`s over one list — so a tail is a
+-- projection instead of a re-establishment.
+syncEv? : ∀ {n} {Γ : Ctx n} {u} → ℕ → InstEvent (Val Γ (obs u)) → Bool
+syncEv? V (value v)   = syncSizeᵉ v ≤ᵇ V
+syncEv? V (init _)    = true
+syncEv? V (close _ _) = true
+syncEv? V (handoff _) = true
+syncEv? V complete    = true
+
+burstSync? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ (obs u) → Bool
+burstSync? V = all (λ em → all (syncEv? V) (InstEmit.events em))
+
+-- the frame is handed the VALUES and both predicates speak of EVENTS, so
+-- one induction over the event list moves each of them across the split
+split-hop : ∀ {n} {Γ : Ctx n} {u} {A : Set} (V : ℕ) (η : Fin n → ℕ) (d : ℕ)
+  (evs : List (InstEvent (Val Γ (obs u)))) →
+  all (hopDev? V η d) evs ≡ true →
+  all (λ o → hopDᵉ V η o ≤ᵇ d)
+      (proj₁ (splitEvents {Γ = Γ} {u = obs u} {A = A} evs)) ≡ true
+split-hop V η d []               h = refl
+split-hop V η d (value v   ∷ es) h =
+  ∧-intro (∧-trueˡ h) (split-hop V η d es (∧-trueʳ h))
+split-hop V η d (init _    ∷ es) h = split-hop V η d es (∧-trueʳ h)
+split-hop V η d (close _ _ ∷ es) h = split-hop V η d es (∧-trueʳ h)
+split-hop V η d (handoff _ ∷ es) h = split-hop V η d es (∧-trueʳ h)
+split-hop V η d (complete  ∷ es) h = split-hop V η d es (∧-trueʳ h)
+
+split-sync : ∀ {n} {Γ : Ctx n} {u} {A : Set} (V : ℕ)
+  (evs : List (InstEvent (Val Γ (obs u)))) →
+  all (syncEv? V) evs ≡ true →
+  all (λ o → syncSizeᵉ o ≤ᵇ V)
+      (proj₁ (splitEvents {Γ = Γ} {u = obs u} {A = A} evs)) ≡ true
+split-sync V []               h = refl
+split-sync V (value v   ∷ es) h =
+  ∧-intro (∧-trueˡ h) (split-sync V es (∧-trueʳ h))
+split-sync V (init _    ∷ es) h = split-sync V es (∧-trueʳ h)
+split-sync V (close _ _ ∷ es) h = split-sync V es (∧-trueʳ h)
+split-sync V (handoff _ ∷ es) h = split-sync V es (∧-trueʳ h)
+split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 
 -- THE RESTATEMENT, AND IT IS A SWAP RATHER THAN A REPAIR.
 --
@@ -402,6 +477,8 @@ allBurst g op ns b κ bid now sched st =
 -- shared slot was ever covered.
 ------------------------------------------------------------------
 
+
+
 -- ⚠ THE SIZE CONDITION IS NOT INHERITED AT THE `input` CLAUSE, WHICH IS
 -- WHY THERE IS A THIRD CONDITION.  A slot read is not a structural
 -- descent: `depthE` recurses into the shared DEF, and the subject's own
@@ -454,29 +531,18 @@ allBurst g op ns b κ bid now sched st =
 --   slot telescope must also fit.
 
 ------------------------------------------------------------------
--- THE ONE LEAF, AND IT IS THE WALK.  Of `depthE`'s four heads only the
--- `thru-outer` burst is a gap: the other three reduce to this face's own
--- induction plus arithmetic, and the three chain frames' bursts are
--- bounded by zero.  A `thru-outer` burst is not, because it reaches
--- `depthWalk`, which SUBSCRIBES every emitted inner — so the hop edge's
--- `suc` has to be earned against payloads of `b` rather than read off a
--- clause of the measure.  The conditions are the ones the whole block
--- above is about, and this is the only statement still asserting them.
-------------------------------------------------------------------
-
--- ⚠ AND THE CONCLUSION WANTS A FACT ABOUT PAYLOADS.  `depthBurst` over a
--- `thru-outer` frame folds `suc (depthWalk …)`, and `depthWalk` reaches
--- `depthE` at each emitted inner — so the arm closes exactly when every
--- inner `o` in the burst satisfies `hopDᵉ V η o ≤ hopDᵉ V η b`, and then
--- the frame's own `suc` and the measure's hop edge are the SAME unit, so
--- the bound comes out tight rather than slack.  Nothing in `2 ≤ V`,
--- `syncSizeᵉ b ≤ V` and the slots width mentions a payload, which is why
--- this arm is the one the whole face reduces to.
+-- THE CONTENT LEAF, and after the fold below it is the whole of what
+-- `depth-hop` still owes.  Nothing in `2 ≤ V`, `syncSizeᵉ b ≤ V` and the
+-- slots width mentions a payload, and the fold consumes one payload
+-- condition per emitted inner — so this is where the face's remaining
+-- risk went, and the two conjuncts are the two hypotheses the re-entry
+-- needs.  The hop conjunct is the sharp one: at no slack it makes the
+-- frame's own `suc` and the measure's hop edge the SAME unit, which is
+-- why the arm's bound comes out tight rather than generous.
 --
 -- THE PRODUCER IS THE WALK FACE'S OWN LANDING, and it is NOT circular:
 -- `WalkStmt` (.Walk-Level/Statement) takes `depthE g b κ … ≤ dep` as a
--- PARAMETER and lands `burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F
--- sl) b) (proj₁ r)` — the per-inner bound, at no slack — so
+-- PARAMETER and lands `burstHopD?` at exactly this instantiation — so
 -- `depth-hop-all`'s own first disjunct is what pays for it.  The cost is
 -- the context: `F ≡ sizeCapAt e sl (suc id)` PINS `V` to a size cap, and
 -- `capsOK?`, `INV?`, the path predicates, the registry ledger and the
@@ -493,18 +559,24 @@ allBurst g op ns b κ bid now sched st =
 --   `INV?` and no burst-hop conjunct at all, and the hop-spine face
 --   reaches only the `scan-f` frame at push level — so there is nothing
 --   to spend, and a depth-free supplier means a SECOND `subscribeE`-level
---   induction in the hop currency rather than a lemma.
--- PROBED: `Probed.Depth-Hop` § 13 instantiates this arm ALONE — `allBurst`
---   directly, so no outer descent can be carrying the bound the way it
---   can in a row over a whole program.  All four `AllOp`s, each on its
---   own program's initial state, over a syntactic outer emitting one
---   `*All` inner, at the smallest `V` the condition admits: 2 against 2
---   every time, so the rows are LOAD-BEARING at zero margin.  Conjuncts
---   covered: the frame's `suc` against the measure's hop edge, and the
---   four walks' subscribe / park / cancel / drop behaviour.  Not reached:
---   a non-root `κ`, since every row sits at `root` and `pathNestD` is 0
---   throughout, and the slot telescope, since every program runs over an
---   empty slot vector.
+--   induction in the hop currency rather than a lemma.  What such a ring
+--   would mirror is `subscribeE-caps`, which is PROVEN and lands stream
+--   predicates over the same clique; what it would have to decide is its
+--   own conjunct list and hypotheses, which is why naming it settles no
+--   class.
+-- PROBED: `Probed.Depth-Hop` § 13, at the ASSEMBLY's conclusion rather
+--   than at this statement — `allBurst` is a real body over this leaf, so
+--   its rows compute through the fold and are evidence for the region the
+--   leaf is quantified over.  `allBurst` instantiated directly, so no
+--   outer descent can be carrying the bound the way it can in a row over
+--   a whole program: all four `AllOp`s, each on its own program's initial
+--   state, over a syntactic outer emitting one `*All` inner, at the
+--   smallest `V` the condition admits — 2 against 2 every time, so the
+--   rows are LOAD-BEARING at zero margin.  Conjuncts covered: the frame's
+--   `suc` against the measure's hop edge, and the four walks' subscribe /
+--   park / cancel / drop behaviour.  Not reached: a non-root `κ`, since
+--   every row sits at `root` and `pathNestD` is 0 throughout, and the
+--   slot telescope, since every program runs over an empty slot vector.
 --   AND THE ONE DIRECTION THAT COULD FAIL IS NOT REACHABLE AT ALL, which
 --   is that section's § 14 and carries no row deliberately: only the
 --   exponential `scanᵉ` clause lets an emitted inner's hop outrun its
@@ -515,14 +587,21 @@ allBurst g op ns b κ bid now sched st =
 --   what would reach it is an emission that is not syntax: a scripted
 --   slot, which the slots width bounds the same way, or a `μᵉ` re-entry,
 --   which `hopD-unfoldμ` holds fixed.
+------------------------------------------------------------------
 postulate
-  depth-hop-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  allBurst-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
     (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
-    allBurst g op ns b κ bid now sched st
-      ≤ suc (hopDᵉ V (slotHop V (Sched.slots sched)) b) + pathNestD κ
+    let nid    = proj₁ (mintNode sched)
+        sched₁ = proj₂ (mintNode sched)
+        st₀    = installNode nid ns st
+        r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+        η      = slotHop V (Sched.slots sched)
+    in (burstHopD? V η (hopDᵉ V η b) (proj₁ r) ≡ true)
+     × (burstSync? V (proj₁ r) ≡ true)
+
 
 ------------------------------------------------------------------
 -- THE TWO MONOTONICITY STEPS THE CHAIN EDGES NEED.  A `mapᵉ` and a
@@ -563,7 +642,7 @@ sync-src : ∀ {a b V} → suc (a + b) ≤ V → b ≤ V
 sync-src {a} {b} h = ≤-trans (≤-trans (m≤n+m b a) (n≤1+n (a + b))) h
 
 ------------------------------------------------------------------
--- THE FOUR HEADS, MUTUALLY.  The split is `depthE`'s own and not an
+-- THE HEADS, MUTUALLY.  The split is `depthE`'s own and not an
 -- invented decomposition: `input` reaches `depthSlot`, `takeᵉ` reaches
 -- `depthTake`, and all four `*All` constructors reach `depthAll`.  Each
 -- head recurses back into `depth-hop` at a subject the CALLER made
@@ -628,6 +707,78 @@ depth-hop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
   depthE g b κ bid now sched st
     ≤ hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ
+
+------------------------------------------------------------------
+-- AND THE WALK'S OWN HEADS, one per layer of the fold.  Each carries
+-- the slot vector as a PARAMETER with `Sched.slots sched ≡ sl` beside
+-- it, which is what keeps the hop currency still while the schedule
+-- moves underneath: the payload predicates are then facts about a fixed
+-- `η` and a fixed list, so a tail case projects them instead of
+-- re-establishing them.
+------------------------------------------------------------------
+
+depth-hop-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  allBurst g op ns b κ bid now sched st
+    ≤ suc (hopDᵉ V (slotHop V (Sched.slots sched)) b) + pathNestD κ
+
+-- one emission at a time.  The frame charges the burst a level, so this
+-- head is the ONLY one stated at `suc d` — the walk under it runs at `d`
+depth-hop-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (d : ℕ) (sl : Slots Γ) (strm : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+  burstHopD? V (slotHop V sl) d strm ≡ true → burstSync? V strm ≡ true →
+  depthBurst g bid now (thru-outer op nid) κ strm sched st
+    ≤ suc d + pathNestD κ
+
+-- one payload at a time, at the state the previous payload's consume
+-- left behind
+depth-hop-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (d : ℕ) (sl : Slots Γ)
+  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+  all (λ o → hopDᵉ V (slotHop V sl) o ≤ᵇ d) vals ≡ true →
+  all (λ o → syncSizeᵉ o ≤ᵇ V) vals ≡ true →
+  depthWalk g op nid κ bid now vals sched st ≤ d + pathNestD κ
+
+-- the operator's branch: three of the four subscribe at the incoming
+-- state, and switchAll reads its node first
+depth-hop-consume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (d : ℕ) (sl : Slots Γ) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+  (hopDᵉ V (slotHop V sl) o ≤ᵇ d) ≡ true → (syncSizeᵉ o ≤ᵇ V) ≡ true →
+  depthConsume g op nid κ bid now o sched st ≤ d + pathNestD κ
+
+-- THE NODE READ IS A PARAMETER for the reason the slot read is one: the
+-- clause splits on a state the subject cannot see, and enumerating the
+-- constructors is what lets the mirror's catch-all reduce to zero
+depth-hop-consumeS : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (nid : NodeId) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (d : ℕ) (sl : Slots Γ) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+  (hopDᵉ V (slotHop V sl) o ≤ᵇ d) ≡ true → (syncSizeᵉ o ≤ᵇ V) ≡ true →
+  (nd : Maybe (NodeState Γ)) →
+  depthConsumeS g nid κ bid now o sched st nd ≤ d + pathNestD κ
+
+-- the re-entry: one gas peeled, the payload subscribed under a
+-- `from-inner` frame whose nesting is the path's own, and `depth-hop`
+-- back at the payload
+depth-hop-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (d : ℕ) (sl : Slots Γ) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+  (hopDᵉ V (slotHop V sl) o ≤ᵇ d) ≡ true → (syncSizeᵉ o ≤ᵇ V) ≡ true →
+  depthInner g op nid κ bid now o sched st ≤ d + pathNestD κ
 
 depth-hop-input V g i κ bid now sched st 2≤V slB =
   depth-hop-slot V g i κ bid now sched st 2≤V slB (Sched.slots sched i) refl
@@ -736,3 +887,87 @@ depth-hop V (gs fuel) (μᵉ body) κ bid now sched st 2≤V szB slB =
            (subst (_≤ V) (sym (syncSize-unfoldμ body))
               (≤-trans (n≤1+n _) szB))
            slB)
+
+depth-hop-all-burst V g op ns b κ bid now sched st 2≤V szB slB =
+  depth-hop-burst V g op nid κ bid now
+    (hopDᵉ V (slotHop V (Sched.slots sched)) b) (Sched.slots sched)
+    (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) 2≤V slB
+    (subscribeE-slots g b (thru-outer op nid ↠ κ) bid now sched₁ st₀)
+    (proj₁ hops) (proj₂ hops)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns st
+  r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+  hops   = allBurst-hops V g op ns b κ bid now sched st 2≤V szB slB
+
+depth-hop-burst V g op nid κ bid now d sl [] sched st 2≤V slB slE hopH syncH = z≤n
+depth-hop-burst {Γ = Γ} {u = u} V g op nid κ bid now d sl (em ∷ ems) sched st
+                2≤V slB slE hopH syncH =
+  ⊔-lub
+    (s≤s (depth-hop-walk V g op nid κ bid now d sl (proj₁ sp) sched st
+            2≤V slB slE
+            (split-hop V (slotHop V sl) d (InstEmit.events em) (∧-trueˡ hopH))
+            (split-sync V (InstEmit.events em) (∧-trueˡ syncH))))
+    (depth-hop-burst V g op nid κ bid now d sl ems
+       (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+       2≤V slB
+       (trans (KeepsC.slotsEq (stepFrame-keeps g bid now (thru-outer op nid) κ
+                 (proj₁ sp) (proj₂ (proj₂ sp)) sched st)) slE)
+       (∧-trueʳ hopH) (∧-trueʳ syncH))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r  = stepFrame g bid now (thru-outer op nid) κ
+         (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+
+depth-hop-walk V g op nid κ bid now d sl [] sched st 2≤V slB slE hopH syncH = z≤n
+depth-hop-walk V g op nid κ bid now d sl (o ∷ os) sched st
+               2≤V slB slE hopH syncH =
+  ⊔-lub
+    (depth-hop-consume V g op nid κ bid now d sl o sched st 2≤V slB slE
+       (∧-trueˡ hopH) (∧-trueˡ syncH))
+    (depth-hop-walk V g op nid κ bid now d sl os
+       (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r))) 2≤V slB
+       (trans (KeepsC.slotsEq (thruConsume-keeps g op nid κ bid now o sched st)) slE)
+       (∧-trueʳ hopH) (∧-trueʳ syncH))
+  where r = thruConsume g op nid κ bid now o sched st
+
+depth-hop-consume V g mergeᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO =
+  depth-hop-inner V g mergeᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO
+depth-hop-consume V g concatᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO =
+  depth-hop-inner V g concatᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO
+depth-hop-consume V g exhaustᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO =
+  depth-hop-inner V g exhaustᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO
+depth-hop-consume V g switchᵒ nid κ bid now d sl o sched st 2≤V slB slE hO sO =
+  depth-hop-consumeS V g nid κ bid now d sl o sched st 2≤V slB slE hO sO
+    (lookupNode nid (EvalSt.nodes st))
+
+depth-hop-consumeS V g nid κ bid now d sl o sched st 2≤V slB slE hO sO
+                   (just (switch-st cur od)) =
+  depth-hop-inner V g switchᵒ nid κ bid now d sl o
+    (proj₁ (proj₂ (switchKill cur sched st)))
+    (proj₂ (proj₂ (switchKill cur sched st))) 2≤V slB
+    (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) slE) hO sO
+depth-hop-consumeS V g nid κ bid now d sl o sched st _ _ _ _ _ nothing = z≤n
+depth-hop-consumeS V g nid κ bid now d sl o sched st _ _ _ _ _
+                   (just (scan-st _)) = z≤n
+depth-hop-consumeS V g nid κ bid now d sl o sched st _ _ _ _ _
+                   (just (take-st _)) = z≤n
+depth-hop-consumeS V g nid κ bid now d sl o sched st _ _ _ _ _
+                   (just (merge-st _ _)) = z≤n
+depth-hop-consumeS V g nid κ bid now d sl o sched st _ _ _ _ _
+                   (just (concat-st _ _ _)) = z≤n
+depth-hop-consumeS V g nid κ bid now d sl o sched st _ _ _ _ _
+                   (just (exhaust-st _ _)) = z≤n
+
+depth-hop-inner V g0 op nid κ bid now d sl o sched st _ _ _ _ _ = z≤n
+depth-hop-inner V (gs fuel) op nid κ bid now d sl o sched st
+                2≤V slB slE hO sO =
+  ≤-trans
+    (depth-hop V fuel o (from-inner op nid (Sched.nextNode sched) ↠ κ) bid now
+       (record sched { nextNode = suc (Sched.nextNode sched) }) st 2≤V
+       (≤ᵇ⇒≤ (syncSizeᵉ o) V (T-to sO))
+       (subst (λ X → slotsSize X ≤ V) (sym slE) slB))
+    (+-monoˡ-≤ (pathNestD κ)
+       (subst (λ X → hopDᵉ V (slotHop V X) o ≤ d) (sym slE)
+          (≤ᵇ⇒≤ (hopDᵉ V (slotHop V sl) o) d (T-to hO))))

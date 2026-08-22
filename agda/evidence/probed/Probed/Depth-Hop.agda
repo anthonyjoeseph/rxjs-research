@@ -1,6 +1,6 @@
 -- THE DEPTH FACE'S NEW CURRENCY, INSTANTIATED AT THE FOUR PROGRAMS
 -- THAT KILLED THE OLD ONE.
--- TARGET: depth-hop-all-burst
+-- TARGET: allBurst-hops
 --
 -- EVIDENCE, not a claim: `src` cannot import this file (the library
 -- layout makes `Probed.Depth-Hop` unresolvable from there) and nothing
