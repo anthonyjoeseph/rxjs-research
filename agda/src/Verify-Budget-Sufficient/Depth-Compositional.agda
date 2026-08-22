@@ -607,17 +607,47 @@ depthCapN sz mx κ sched =
 -- face is the third member of that family and does not yet have its
 -- iterator.
 --
--- AND THE INDEX TO ITERATE ON IS THE GAS, WHICH IS WHAT MAKES THE
--- BURST ARM CLOSE.  A cap read off the subject alone cannot: the arm
--- applies its hypothesis at the emitted PAYLOAD, whose size and
--- nesting both exceed the emitter's, so a monotone function of the
--- subject is going the wrong way.  Gas goes the right way — the `gs`
--- clause is the only entry into a payload and it peels one — and
--- `applyFn-iterSize` already bounds the payload's size by
--- `iterSize S (sizeᵗ fn) V` from a bound `V` on the argument's, so the
--- descent's growth is a known number of iterator steps rather than an
--- unknown.  The obligation that replaces this cap is arithmetic:
--- `iterSize` iterated once per unit of gas, dominated from `capsH`.
+-- AND ITERATING ON THE GAS IS NOT THE ANSWER, WHICH IS WORTH SAYING
+-- BECAUSE IT IS THE FIRST THING THE SHAPE SUGGESTS.  Gas is the one
+-- index that moves the right way at a descent — the `gs` clause is the
+-- only entry into a payload and it peels one — so a cap iterated once
+-- per unit of gas closes the burst arm structurally.  It is dead all
+-- the same, and for a reason already recorded one tier over: bounding
+-- the depth BY the gas is true and useless, because `budgetAt-gs-pad`
+-- exhibits the budget as a gas TOWER at a height above `capsH`'s own.
+-- Anything iterated per unit of gas is larger still.  A cap must be
+-- smaller than the gas to be spendable, which rules out the whole
+-- family.
+--
+-- ⚠ AND FIVE REFUTATIONS HAVE NOW COME OUT OF ONE REGION, which is the
+-- convergence test's stop condition and not another subdivision:
+-- `emit-map` as stated, `emit-scan` as stated, the occurrence repair,
+-- this cap, and the size-restored export.  Every one of them was an
+-- attempt to keep a bound on `depthE` TIGHT — a linear sum of
+-- syntactic measures, read at the subject.  THE TIGHTNESS IS THE
+-- MECHANISM ERROR, and the precedent against it is in this proof
+-- already, one module away.
+--
+-- `capsBase` carries `entryCeil`, and `ceilᵉ` is a deliberately
+-- GENEROUS ceiling: a recursive ⊔ of every node's five width measures
+-- with its children's ceilings, joined with the slot telescope's.  Its
+-- own comment says why it is shaped that way — "the five static width
+-- measures TOWER in the syntax and no closed bracket on them exists
+-- that is worth proving" — and that reading it "costs nothing: the
+-- height is never normalised".  The width face did not bracket its
+-- measures; it read them, and paid for the generosity with tower
+-- growth it already had.
+--
+-- SO THE ROUTE IS A GENEROUS DEPTH CEILING, NOT A SIXTH TIGHT ONE.
+-- The currency `nestDᵉ` chose is not what is wrong — its product term
+-- `outWᵉ src * nestDᵗ f` is the right accounting, charging one re-wrap
+-- per delivered payload — it is wrong only in reading `outWᵉ` at the
+-- UNSUBSTITUTED source.  Charging the SUBSTITUTED width is the one
+-- missing ingredient, and it is nameable: `nest-subΘ`, the nesting
+-- mirror of `wid-subΘ`.  Its mirror is caps-conditioned and lands at
+-- `iterFold`, so the repaired measure will tower — and towering is
+-- what `capsH` is built to swallow, which is exactly what the five
+-- refuted attempts were each trying to avoid needing.
 --
 -- AND THE TOP-LINE CLAIM IS NOT WHAT IS FALSE — the route to it is.
 -- `depthE≤capsH-root` (Caps-Bridge) chains this cap through

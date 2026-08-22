@@ -280,6 +280,20 @@ survives a difference in degree. WHAT IS NOT FALSE IS THE TOP-LINE CLAIM:
 dominates 70 with room these rows do not come near. The intermediate currency
 and the `Nest-Tower` arithmetic above it are what move.
 
+AND THAT IS FIVE REFUTATIONS OUT OF ONE REGION, so the response is the stop
+condition's and not a sixth subdivision: reconsider the mechanism. What every
+one of the five had in common is that it kept the bound TIGHT — a linear sum of
+syntactic measures read at the subject — and the precedent against tightness is
+in this proof already. `capsBase` carries `entryCeil`, a deliberately generous
+recursive ⊔ of every node's five width measures, read rather than bracketed
+because "the five static width measures TOWER in the syntax and no closed
+bracket on them exists that is worth proving". The depth face wants the same: a
+generous ceiling that towers, not a sixth tight one. `nestDᵉ`'s product term is
+the right accounting and reads its count at the wrong term, so the ingredient
+is `nest-subΘ`, the nesting mirror of `wid-subΘ`. Iterating on the GAS instead
+is dead before it starts — `budgetAt-gs-pad` exhibits the budget as a tower
+above `capsH`, so a cap must be smaller than the gas to be spendable.
+
 - **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated AND the
   occurrence repair refuted with it (Refuted.Emit-Map): at a payload of nesting
   0 the emitted nesting is the payload's WIDTH. So `EmitCap` is the depth face's
