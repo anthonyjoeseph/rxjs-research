@@ -101,11 +101,12 @@ burstSync? V = all (λ em → all (syncEv? V) (InstEmit.events em))
 -- `hopDᵉ` carries an occurrence COEFFICIENT (`pmᵗ`) for exactly this
 -- reason, and the consuming depth bound comes out EQUAL to the measured
 -- depth at the same programs, duplication and an extra level of nesting
--- included.  So the repair is a size currency of `hopDᵉ`'s shape, or the
--- caps ledger that already has one — `valCaps?` bounds a payload by
--- `Caps.cSize (frameStep J c)` and the wet push faces establish it at
--- every frame — and it is NOT a larger `V`: each witness scales with its
--- own source, so no numeral survives.
+-- included.  The repair is NOT a larger `V`: each witness scales with
+-- its own source, so no numeral survives.  Nor is it a caps quantity at
+-- a level — `depth-hop`'s own header prices that, and the reason is that
+-- `V` is `hopDᵉ`'s refold exponent and cannot also outgrow a payload.
+-- So what has to move is the CONSUMER's induction, and this conjunct
+-- goes wherever that lands.
 -- REFUTED: `Refuted.Hop-Burst-Sync`, four witnesses — the map arm, the
 --   scan arm, the `*All` arm, and the dispatch they sit under.  The same
 --   module pins the CONSUMING bound as tight rather than false at the

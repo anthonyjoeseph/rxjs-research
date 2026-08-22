@@ -159,8 +159,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`hops-map`** (Hop-Burst-Face) — SHAPE, refuted: the size conjunct asks a
   payload to fit a budget that paid ADDITIVELY for the function, while
-  substitution multiplies by its occurrences. Restate over the caps ledger,
-  which bounds a payload at a stepped cap already; the hop half is untouched.
+  substitution multiplies by its occurrences. The hop half is untouched; the
+  caps restatement is priced DEAD in `depth-hop`'s header, so the induction
+  moves.
 - **`hops-scan`** (Hop-Burst-Face) — SHAPE, refuted one fold deeper: a step
   naming its accumulator twice doubles the stored observable per emission. The
   exponential hop arithmetic it was ranked for is still owed after restating.

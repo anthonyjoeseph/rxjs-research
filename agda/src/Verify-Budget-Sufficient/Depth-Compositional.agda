@@ -362,6 +362,33 @@ split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 -- payload's hop bounded by its emitter's — a different fact, and the
 -- one design decision left in the row.
 
+-- ⚠ AND THE OBSTACLE THERE IS THE SIZE CONDITION, NOT THE HOP HALF.  `V`
+-- is `hopDᵉ`'s refold EXPONENT, so a ceiling on the conclusion forces it
+-- small on any program carrying a scan; the recursion at an emitted
+-- payload needs that same `V` to dominate a synchronous size that
+-- substitution multiplies at every level of re-entry, with the number of
+-- levels bounded by nothing but the conclusion.  The two roles pull in
+-- opposite directions, and no `V` serves both — so this arm cannot be
+-- ground until one of them moves.
+-- REFUTED: `Refuted.Hop-Burst-Sync` kills the supplier — the burst
+--   face's second conjunct, which is where the condition at a payload
+--   was to come from.
+-- DEAD ROUTE: moving that condition to the caps ledger under a level
+--   index, the payload reported one level up.  It IS closed under
+--   re-entry, and it dies at the top instead: `V` becomes a cap at a
+--   level as deep as the run, and `(2 + pmᵗ) ^ V` then outruns every
+--   ceiling of the ledger's own height.  A gas-indexed refold bound
+--   dies the other way — emissions inside one instant peel no gas, the
+--   burst walk being structural on the emission list — so the gas
+--   bounds no refolds at all.
+--   WHAT IS NOT DEAD, and is the shape to price before this family is
+--   restated: `cascade-depth-capsH` (.Caps-Face/Part7) reaches a depth
+--   bound from `capsOK?` alone, carrying no syntactic side condition
+--   and no hop measure — and a state invariant IS re-establishable at
+--   a payload where a size is not.  Its price is that the depth face
+--   would join the caps clique rather than feed it, `subscribeE-caps`
+--   taking a depth bound as a hypothesis today.
+
 -- ⚠ WHAT WOULD RAISE THE CLASS AGAIN, and what is still unreached: a state
 -- deep inside a CASCADE rather than one subscribe in, since the
 -- gadget's mid-run state does not normalise (7.9 GB in six minutes —
