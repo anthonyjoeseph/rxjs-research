@@ -81,7 +81,35 @@ syncEv? V complete    = true
 burstSync? : ∀ {n} {Γ : Ctx n} {u} → ℕ → Stream Γ u → Bool
 burstSync? V = all (λ em → all (syncEv? V) (InstEmit.events em))
 
--- the pair every arm lands, at the currency's own slot vector
+-- the pair every arm lands, at the currency's own slot vector.
+--
+-- ⚠ THE SECOND CONJUNCT IS FALSE AS STATED, AND THE FACE IS UNDER
+-- RESTATEMENT BECAUSE OF IT.  `syncOK?` at an observable payload asks
+-- `syncSizeᵉ ≤ V` for a `V` the arms receive ADDITIVELY — a map's
+-- condition is `suc (syncSizeᵗ f + syncSizeᵉ e)` and `syncSizeᵗˢ` is a
+-- sum — while substitution MULTIPLIES by the number of times the
+-- function names its argument.  A function naming it twice therefore
+-- emits a payload about twice its source's size out of a budget that
+-- paid for the source once, and a scan step naming its accumulator
+-- twice doubles per emission.  Three of the five arms emit substituted
+-- payloads and all three fall to that one witness family; the two that
+-- do not are the one-shot, whose payloads are `evalTm` of terms the
+-- source was written with, and the take, whose frame does not touch a
+-- value.
+--
+-- WHAT SURVIVES IS THE HOP CONJUNCT, and that is the useful half.
+-- `hopDᵉ` carries an occurrence COEFFICIENT (`pmᵗ`) for exactly this
+-- reason, and the consuming depth bound comes out EQUAL to the measured
+-- depth at the same programs, duplication and an extra level of nesting
+-- included.  So the repair is a size currency of `hopDᵉ`'s shape, or the
+-- caps ledger that already has one — `valCaps?` bounds a payload by
+-- `Caps.cSize (frameStep J c)` and the wet push faces establish it at
+-- every frame — and it is NOT a larger `V`: each witness scales with its
+-- own source, so no numeral survives.
+-- REFUTED: `Refuted.Hop-Burst-Sync`, four witnesses — the map arm, the
+--   scan arm, the `*All` arm, and the dispatch they sit under.  The same
+--   module pins the CONSUMING bound as tight rather than false at the
+--   same programs, which is what confines the repair to this conjunct.
 HopsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
   ℕ → Slots Γ → ℕ → Stream Γ u × Sched Γ × EvalSt e → Set
 HopsOK V sl d r = (burstHopD? V (slotHop V sl) d (proj₁ r) ≡ true)
@@ -244,10 +272,12 @@ sharedPlumb-sync V (em ∷ ems) h =
 -- termination is the GAS: the depth measure peels one before entering
 -- the payload.
 --
--- ⚠ THAT IS A ROUTE AND NOT EVIDENCE, so it ranks these rows at nothing
--- and licenses no restatement: trading a leaf for those hypotheses would
--- launder tracked debt into untracked, and only a refutation of the
--- unconditional form buys that.
+-- ⚠ THAT IS A ROUTE AND NOT EVIDENCE, so it ranks the hop half at
+-- nothing.  It does now license the size half's restatement: trading a
+-- leaf for those hypotheses would launder tracked debt into untracked,
+-- and only a refutation of the unconditional form buys it — which is
+-- what `Refuted.Hop-Burst-Sync` supplies, and it supplies it against
+-- the size conjunct alone.
 -- DEAD ROUTE: spending an existing depth-free producer, so that no caps
 --   context is needed at all.  `subscribeE-wet`'s landing carries
 --   `hasDry` and `INV?` and no burst-hop conjunct, and the hop-spine
@@ -261,6 +291,26 @@ sharedPlumb-sync V (em ∷ ems) h =
 --   `hopD-map-emit` and `hopD-unfoldμ` for the per-frame arithmetic
 --   under them, and `hopD-evalWith` for a one-shot's own payloads, which
 --   are `evalTm` of the terms the source was written with.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- THE SIZE CONJUNCT'S TRUE FORM IS ALREADY PROVEN, AND THE CITATION IS
+-- STRATIFIED RATHER THAN CIRCULAR.  `subscribeE-caps` (.Subscribe-Face)
+-- lands `burstCaps? (frameStep j c) sl` over this very burst, and that
+-- bounds every payload in it by `Caps.cSize` — `valCaps?-size` reads the
+-- bound off — so no payload arithmetic has to be re-derived here at all.
+-- What it costs is the caps context, and the one hypothesis worth naming
+-- before reaching for it is `depthE g b κ … ≤ dep`: the depth bound this
+-- module exists to supply.
+--
+-- SO THE CITATION IS AVAILABLE ONLY WHERE THE DEPTH INDUCTION HAS
+-- ALREADY FIRED — at a STRUCTURAL descent, where the subject shrinks and
+-- the face's own hypothesis at the subterm is in hand.  The `*All` clause
+-- is exactly that shape: the outer IS a subterm, so its depth bound comes
+-- from the induction, that bound buys the caps receipt over the outer's
+-- burst, and the receipt bounds the payloads the inner descent then
+-- re-enters at one gas less.  Read as a cycle it is caps ← depth ← caps;
+-- read at the indices it is two subjects and two measures.
 ------------------------------------------------------------------
 
 -- AND THE CONSUMER ALREADY ASKS IN THIS CURRENCY, which is the part
@@ -294,9 +344,11 @@ postulate
   --   with a budget one unit lower FALSE — which is what makes the
   --   series LOAD-BEARING at zero margin rather than merely green.
   --   Conjuncts covered: the hop conjunct against the measure's hop
-  --   edge, and the sync conjunct at the same `V`.  Not reached: a path
-  --   that is not `thru-outer … ↠ root`, and the slot telescope, since
-  --   every program runs over an empty slot vector.
+  --   edge, and the sync conjunct at the same `V` — the latter only over
+  --   payloads no substitution enlarged, which is the region where it is
+  --   true.  Not reached: a path that is not `thru-outer … ↠ root`, and
+  --   the slot telescope, since every program runs over an empty slot
+  --   vector.
   --   AND THE ONE DIRECTION THAT COULD FAIL IS NOT REACHABLE AT ALL,
   --   which is that section's § 14 and carries no row deliberately: only
   --   the exponential `scanᵉ` clause lets an emitted inner's hop outrun
@@ -361,9 +413,11 @@ postulate
   -- emitted payload's size by the cap), which is why `V` is a size CAP and
   -- not `sizeᵉ e`; and it re-establishes MORE than the arm needs, since
   -- `syncSize≤sizeᵉ` turns a `sizeᵉ` bound on the payload into this
-  -- condition in one step.  If that arm cannot re-establish it from what
-  -- the statement carries, the finding is a caps hypothesis — the shape
-  -- `cascade-depth-capsH` already has — and not a smaller `V`.
+  -- condition in one step.  IT CANNOT BE RE-ESTABLISHED FROM WHAT THIS
+  -- STATEMENT CARRIES, and `Refuted.Hop-Burst-Sync` says so at an inner
+  -- that is itself a duplicating map — so none of the four operators'
+  -- arithmetic enters, and the finding is the caps hypothesis, the shape
+  -- `cascade-depth-capsH` already has, rather than a smaller `V`.
   --
   -- PROBED: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT (`Probed.Depth-Hop`).
   --   The three regions this receipt used to name as unreached — off the

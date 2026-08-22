@@ -28,3 +28,7 @@ open import Refuted.Inner-Nodry
 open import Refuted.Depth-Hop
   using (theDepth; theRow; depth-hop-∀V-absurd;
          slotSubjSize; slotBound; slotDepth; slotRow; depth-hop-slot-absurd)
+open import Refuted.Hop-Burst-Sync
+  using (syncBudget; syncRow; hops-map-sync-absurd; subscribeE-hops-sync-absurd; wrapDepth; wrapBound; nestBudget; nestDepth; nestBound;
+         scanBudget; scanRow; hops-scan-sync-absurd;
+         allBudget; allRow; hops-all-sync-absurd)
