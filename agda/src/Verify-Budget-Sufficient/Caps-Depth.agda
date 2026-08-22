@@ -428,7 +428,7 @@ depthChain {n = n} {e = e} id a path sched st =
 ------------------------------------------------------------------
 -- ONE ARRIVAL INTO EVERY LIVE CHAIN, mirroring `cascadeGo` clause for
 -- clause.  This is the DELIVERY side's top measure, and the reason it
--- exists: `depth-compositional` bounds `depthE`, the SUBSCRIBE side, and
+-- exists: `depth-hop` bounds `depthE`, the SUBSCRIBE side, and
 -- nothing bounds the delivery side at all.  The walk's `cascadeGo-go`
 -- reads its per-chain premise off this head, so the two clauses must
 -- match the evaluator's exactly or the projections stop being definitional.

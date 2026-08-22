@@ -1166,9 +1166,9 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- `depthE≤capsH-root`, and the one genuinely NEW obligation the P3/#9
 -- signature pass creates.
 --
--- WHY IT IS A POSTULATE AND NOT A DERIVATION.  `depth-compositional`
+-- WHY IT IS A POSTULATE AND NOT A DERIVATION.  `depth-hop`
 -- (Depth-Compositional.agda) bounds `depthE`, the SUBSCRIBE side, by
--- `sizeᵉ b + pathLen κ + storeNestMax sched st`.  Nothing anywhere
+-- `hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ`.  Nothing anywhere
 -- bounds the DELIVERY side: `depthCascade` reaches frames through
 -- `chainStep`/`foldPath`/`stepFrame`, and every one of those is outside
 -- `depthE`'s induction.  So this is a real gap with a real statement,
@@ -1179,7 +1179,7 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- bounded by its path length, which `pathSz?` caps at `sizeAt S J` — so
 -- the whole cascade climbs at most the registry's own depth, which is
 -- what `capsH` counts.  Its eventual proof is the delivery-side twin of
--- `depth-compositional`'s induction and belongs beside it.
+-- `depth-hop`'s induction and belongs beside it.
 --
 -- CONDITIONED ON `capsOK?`, deliberately: the unconditional form is
 -- false for the same reason `depthE ≤ capsH` is (Depth-Bound.agda:11) —

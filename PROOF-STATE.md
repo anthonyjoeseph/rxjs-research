@@ -178,166 +178,49 @@ wraps over twenty-nine ticks, 204 against 201, every hypothesis satisfied and
 postulate's, and a row whose OBSTACLE is written down is not thereby a row whose
 STATEMENT is right.
 
-THE FACE IS NOW RESTATED, over a measure derived from the evaluator and pinned
-by `Probed.Nest-Depth`: one `suc` per `*All` layer, and a `scanᵉ` worth its
-source's payload count times its step function's layers. It EQUALS `depthE` —
-not merely dominates it — at three programs, the third a scan nested inside
-another scan's step function, which says the product COMPOUNDS: one factor per
-nested scan, so the measure is exponential in the program and no fixed-degree
-product of caps fields could have replaced it. `depthCap`,
-`depth-compositional`, `depth-all-burst` and `slotNest` all carry it now, and a
-shared slot pays its def's nesting.
+THE DEPTH FACE'S CURRENCY HAS BEEN SWAPPED, AND THE OLD ONE IS DELETED.
+`depthCap`, its sixteen-head induction, its seven `emit-*` leaves, its store
+measure and the exported widening are gone, together with `Rx.Nest-Depth`,
+`.Nest-Tower` and the ten evidence files that could no longer be STATED once
+their subject went. Five refutations came out of that one region — two leaves
+as stated, the occurrence repair, the cap itself, and the size-restored export
+— which is the convergence test's stop condition rather than an invitation to
+subdivide a sixth time. What all five had in common is that they kept the bound
+TIGHT: a linear sum of syntactic measures read at the subject. The last settled
+it by DEGREE and not by a constant, a bound of 56 against a depth of 70, with
+the paired row two ticks earlier deliberately UNDER at 35 against 52 so that
+the finding is a crossing no re-weighting survives. The precedent against
+tightness was already one module away: `capsBase` carries `entryCeil`, a
+deliberately generous recursive ⊔ of every node's five width measures, read
+rather than bracketed because those measures tower in the syntax and no closed
+bracket on them is worth proving.
 
-AND THE CAP IS NOW READ OFF NESTING ALONE, its size term gone and `pathLen`
-replaced by a measure charging only the SPENDING ARC. That is what the `*All`
-face's recorded dead route asked for: an emitted inner can be arbitrarily larger
-than its emitter but never more deeply nested, so the size currency was what
-blocked the burst arm — and it was measured slack, the μ probe reading caps of 7
-and 12 against depths of 1 and 2 where the tightened cap reads 1 and 2 on the
-nose. Every clause got shorter: the three structural descents need no arithmetic
-step, the μ clause's two caps became one term, and the connect now over-pays.
-Both remaining leaves are strengthened by it, and `Probed.Nest-Depth`'s rows
-pinned the cap itself as an EQUALITY with the depth — AT THE SHAPES THEY WALK,
-which is the qualifier the next paragraph collects on.
+WHAT REPLACES IT WAS ALREADY IN THE TREE, WHICH IS THE PART THAT MAKES THIS A
+REINVENTION UNDONE. `hopDᵉ` (Rx.Hop-Depth) is the same accounting written
+correctly — `suc` per `*All` layer as before, but `mapᵉ` MULTIPLIES the source's
+depth by the template's occurrence count and `scanᵉ` charges an exponential in
+a refold bound rather than a product with the source's width, so neither
+witness outruns it. It is already closed under substitution
+(`hopD-sub-spnᵉ`, `applyFn-hopSpn`, `hopD-unfoldμ`, `hopD-η-congᵉ`,
+`slotHop-fix`), its hereditary `valHopSpn?` invariant already discharges what
+the `emit-*` leaves were for, and `subscribeE-wet-via-caps` states its gas
+hypothesis over `hopDᵉ Ŝ (slotHop Ŝ sl) b` in the SAME signature as the `depOK`
+this face exists to discharge, at the same `sl` and `Ŝ` — so the face had been
+proving `depOK` in a private currency nothing else in the tree uses, and `V`
+and `η` are not inventions. The swap DELETED rather than repaired. The
+top-line claim never moved: `depthE≤capsH-root` still lands in `capsH e ins 0`,
+`blowH` of a tower, and it is now a real body over two leaves.
 
-AND THE CURRENCY IS NOW ONE THROUGHOUT, which the first half of that tightening
-left owed. `slotNest` charged a def's size beside its nesting and `nodeNestMax`
-charged a queued inner's size alone; both now charge `nestDᵉ`, `nodeNestMax`
-taking the `Slots` it needs to. Two of the three consumers got smaller: the slot
-half of the tower bound is `nestD-tower` with a level to spare rather than a
-two-summand `sum2H`, and the connect's payment is an equality again. The probe
-rows moved with the measure — a nine-link chain's store reads 9 where it read
-60, against a depth of 5, so what margin is left is of the same order as the
-thing it bounds.
-
-AND THEN THE CAP STOPPED READING THE STATE AT ALL, which is the finding the
-burst arm actually produced — not the one it was expected to. It was expected to
-collect on the currency change above: a `concatAllᵉ` queues an emitted inner
-into `nodeNestMax`, so a size there looked to demand the cap bound an emitted
-inner's size. Working the arm's arithmetic instead showed the cap's node arm is
-UNREACHABLE from `depthE` — `depthDrain` is the only clause that reads a queue's
-content and it hangs off the delivery family — and that the arm was the thing
-blocking on it, since a `thru-outer` frame's `suc` cannot be pushed through a
-bare join. Dropping it strengthens every statement below, and pays: `cap-≤-store`
-lost a half, three arithmetic lemmas and the connect lost a join layer, the
-install lemma and its `setNode` induction went entirely, and the burst arm's
-remaining obligation is slot preservation with no state conjunct at all. The
-store measure keeps the arm for the delivery face, which is the face that reads a
-queue.
-
-AND THE ARM'S PRESERVATION CONJUNCT IS NOT OWED — IT WAS ALREADY PROVEN, which a
-search found and no amount of grinding would have. With the cap a function of
-`Sched.slots` alone, the one fact carrying the arm's own cap back to the entry
-cap is that a subscribe keeps the slots, and `subscribeE-slots` (Keeps-Ring) says
-exactly that, unconditionally, off a `KeepsC` family that also covers
-`stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`, `switchKill` and
-`concatDrain` — everything a burst-side clique threads state through. So the leaf
-is restated at the scheduler the burst REACHED and the `gs` arm substitutes with
-the proven lemma. What is left on it is one sum: an emitted inner's root-path cap
-under its emitter's. The sum and not its two conjuncts, because at a connect the
-emitter's own nesting is 0 while the inner comes out of the slot's def, and the
-below-sum's step is what pays for it.
-
-WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
-`depth-capped`, its `3 · cSize` conclusion, the `storeNestMax`-under-`capsOK?`
-inversion, and `three-size≤capsH` with the pool-lower chain that proved it.
-`depth-compositional` reaches the root directly, where `pathLen root` is 0,
-`st-init`'s nodes are empty and `Sched.slots (sched-init e ins)` is `ins` — so
-the remaining obligation carries NO state hypothesis, which is exactly what made
-the old statement false: `capsOK?` was checked at the entry state and the
-conclusion was about a depth reached much later. Three dead routes are recorded
-where they were tried: bound the depth by the GAS (true, and `budgetAt-gs-pad`
-puts the budget a full capsH-step the wrong side of the goal), bound it by the
-WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
-multiplies by one and adds nothing — refuted against the max of all four
-measures at once), and take a fixed-degree product of caps fields.
-
-AND THE CAP ITSELF IS NOW REFUTED — the exported conclusion, not a leaf of it
-(`Refuted.Depth-Comp`). Substitute a payload into a `scanᵉ`'s SOURCE and the
-count the product term charges parts company with the count the run delivers:
-the term reads `outWᵉ` at the unsubstituted source, where a bare variable is 0.
-At a closed program with no slots and an empty path `depthE` reads 4 against a
-cap of 3, and 8 against the same 3 when the map's source widens from three
-literals to seven — so the gap is the payload COUNT and no constant repair
-reaches it. Restoring the dropped size term does not either: the burst arm reads
-the cap at the PAYLOAD, whose size and nesting both exceed its emitter's. Every
-row below is a leaf of a decomposition of a false statement, which is why they
-are all SHAPE: the restatement moves the CAP, to the iterated form both sibling
-faces already carry (`applyFn-iterSize` on the size half, `applyFn-iterFold` on
-the width half). The depth face is that family's third member and has no
-iterator yet. The exported widening `cap-≤-store` re-admits `sizeᵉ` and still
-covers both witnesses — the next probe, not a repair.
-
-AND THAT PROBE WENT RED. The exported bound reads 56 where `depthE` reads 70,
-and 52 against a depth of 35 two ticks earlier — so the two sides differ in
-DEGREE, not by a constant. A scan whose step merges its accumulator with a
-constant emitter grows its emission count per tick, and the `*All` over the
-scan runs over every accumulator it emitted, so the delivered count is
-quadratic in the tick count while every term of the bound is linear in it.
-Restoring `sizeᵉ` is refuted by machine, and no re-weighting of a syntactic sum
-survives a difference in degree. WHAT IS NOT FALSE IS THE TOP-LINE CLAIM:
-`depthE≤capsH-root` lands in `capsH e ins 0`, `blowH` of a tower, which
-dominates 70 with room these rows do not come near. The intermediate currency
-and the `Nest-Tower` arithmetic above it are what move.
-
-AND THAT IS FIVE REFUTATIONS OUT OF ONE REGION, so the response is the stop
-condition's and not a sixth subdivision: reconsider the mechanism. What every
-one of the five had in common is that it kept the bound TIGHT — a linear sum of
-syntactic measures read at the subject — and the precedent against tightness is
-in this proof already. `capsBase` carries `entryCeil`, a deliberately generous
-recursive ⊔ of every node's five width measures, read rather than bracketed
-because "the five static width measures TOWER in the syntax and no closed
-bracket on them exists that is worth proving". The depth face wants the same: a
-generous ceiling that towers, not a sixth tight one. `nestDᵉ`'s product term is
-the right accounting and reads its count at the wrong term, so the ingredient
-is `nest-subΘ`, the nesting mirror of `wid-subΘ`. Iterating on the GAS instead
-is dead before it starts — `budgetAt-gs-pad` exhibits the budget as a tower
-above `capsH`, so a cap must be smaller than the gas to be spendable.
-
-AND THE GENEROUS CEILING ALREADY EXISTS UNDER ANOTHER NAME — the search for
-`nest-subΘ` found `hopDᵉ` instead. It is this accounting written correctly:
-`suc` per `*All` layer as here, but `mapᵉ` MULTIPLIES the source's depth by the
-template's occurrence count, and `scanᵉ` charges an exponential in a refold
-bound rather than a product with the source's width, so neither witness outruns
-it. It is already closed under substitution — `hopD-sub-spnᵉ`,
-`applyFn-hopSpn`, `hopD-unfoldμ`, `hopD-η-congᵉ`, `slotHop-fix`, fifteen
-modules — and it dominates `depthE` at all four refutation witnesses, which is
-the risky region itself. And `subscribeE-wet-via-caps` carries a gas hypothesis
-over `hopDᵉ Ŝ (slotHop Ŝ sl) b` in the SAME signature as the `depOK`
-hypothesis this face exists to discharge, at the same `sl` and `Ŝ`, so `V` and
-`η` are not inventions either. This face has been proving `depOK` in a private
-currency nothing else in the tree uses. The restatement is the swap, and it
-deletes rather than repairs.
-
-- **`emit-map`** (Depth-Compositional) — SHAPE, refuted as stated AND the
-  occurrence repair refuted with it (Refuted.Emit-Map): at a payload of nesting
-  0 the emitted nesting is the payload's WIDTH. So `EmitCap` is the depth face's
-  missing `applyFn-iterFold` — caps-conditioned at an iterated count. Restate.
-- **`emit-scan`** (Depth-Compositional) — SHAPE, refuted by the SAME mechanism
-  (Refuted.Emit-Scan), and the `outWᵉ` factor its clause already carries reads 1
-  at the witness, so the two products multiply independent things. Restated with
-  `emit-map`; the width witness is stated over that clause and covers this one.
-- **`emit-input`** (Depth-Compositional) — SHAPE with the cap, and the only leaf
-  with content of its own: the emitter's nesting is 0 at a slot, so its whole
-  bound is the below-sum's step. Probed green, and its three `scripted` arms are
-  provable, so it is the leaf likeliest to survive restatement intact.
-- **`emit-of`**, **`emit-take`** (Depth-Compositional) — SHAPE with the cap: a
-  term list's own nesting, and a filter emitting a sub-list of what it was
-  handed. Both are true of the current cap and say nothing about the iterated one.
-- **`emit-all`** (Depth-Compositional) — SHAPE with the cap, shared by all four
-  `*All` clauses because each puts one `suc` on the bound and leaves `maxInputᵉ`
-  alone. The `suc` is what the two refuted witnesses stack to reach the payload.
-- **`emit-mu`** (Depth-Compositional) — SHAPE with the cap: the unfolding's
-  nesting against the body's, a substitution fact about `unfoldμ` — and
-  substitution is the operation the cap is not stable under.
+- **`depth-hop`** (Depth-Compositional) — FALSITY: the swapped face's whole
+  induction. The ∀ V form is machine-refuted, so `V` is conditioned; probed only
+  at the root path, empty store, and not at all at the `input` clause.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
   unconditional form is false.
-- **`depth-subst-guarded`** (Depth-Compositional) — GRINDABLE: the `deferᵉ` clause
-  is `z≤n` and the rest is the structural recursion the assembly above it already
-  performs, on `body` rather than on its unfolding; the guardedness is a property
-  of the syntax. Strengthened with the cap; the μ probe crosses it with no slack.
+- **`hopD-le-tower`** (Caps-Bridge) — DIFFICULTY: the measure-to-tower half, at
+  the height the deleted arithmetic already used. Its tower step survives and is
+  spent by a real body; the induction does not, a refold being an exponential.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.

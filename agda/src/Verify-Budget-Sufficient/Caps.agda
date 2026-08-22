@@ -1426,7 +1426,10 @@ tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
 -- the depth face spent exactly that intermediate, `towerℕ m ≤ blowH m`.
 --
 -- IT IS NOT ENOUGH, and the arithmetic says so before any grinding does.
--- `nestDᵉ` multiplies by `outWᵉ` at every `scanᵉ`, and `wid-iterFold`
+-- The depth measure of the day multiplied by `outWᵉ` at every `scanᵉ`
+-- (that measure is deleted — Depth-Compositional's header says why — and
+-- its successor `hopDᵉ` charges an exponential there instead, so the
+-- reading below only gets worse), and `wid-iterFold`
 -- (Caps-Face/Part2) bounds `outWᵉ` by `iterFold S (sizeᵉ e) M`, which
 -- `iterFold-tower` puts at `towerℕ (k + 2 * sizeᵉ e)`.  One tower level per
 -- product on top of that gives a height around `3 * sizeᵉ e`, against a

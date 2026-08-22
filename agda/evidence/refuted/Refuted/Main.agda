@@ -25,21 +25,5 @@ open import Refuted.Thru-Loop
   using (thruConsume-nodry-loop-absurd)
 open import Refuted.Inner-Nodry
   using (inner-nodry-inv-regLen-absurd)
-open import Refuted.Depth-Conn
-  using (depth-conn-free-def-absurd)
-open import Refuted.Depth-Chain
-  using (depth-conn-input-absurd; depth-compositional-absurd)
-open import Refuted.Depth-Nest
-  using (depth-all-bound-absurd; depth-compositional-sum-absurd;
-         depth-capped-absurd; width-route-absurd)
-open import Refuted.Depth-Comp
-  using (fnA; capA; theCap; theDepth; theCapB; theDepthB;
-         depth-compositional-absurd; sizeC; nestC; depthC; exportRHS;
-         exportRHS-D; depthD)
-open import Refuted.Emit-Map
-  using (fnNest; srcNest; bound; emitted; row; emit-map-absurd;
-         progTopDepth; progTopCap;
-         wideNest; wideOutW; fnNestW; boundW; emittedW3; emittedW7; rowW)
-open import Refuted.Emit-Scan
-  using (seedNest; stepNest; srcNest; countFactor; bound; emitted; row;
-         emit-scan-absurd)
+open import Refuted.Depth-Hop
+  using (theDepth; theRow; depth-hop-∀V-absurd)
