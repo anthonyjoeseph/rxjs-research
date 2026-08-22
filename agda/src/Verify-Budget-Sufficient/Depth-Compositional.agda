@@ -524,9 +524,13 @@ postulate
   -- about `depthAll` moved — only the right-hand side, and it got
   -- SMALLER, which is the direction that could have refuted this.
   --
-  -- REFUTED 2026-08-21 (Refuted.Depth-Nest), AND THE RECEIPT ABOVE IS
-  -- WHAT AIMED IT: the one shape it names as untested is a NESTED
-  -- burst, and that is the shape this statement dies at.  A `scanᵉ`
+  -- ITS PREDECESSOR IS REFUTED 2026-08-21 (Refuted.Depth-Nest), AND THE
+  -- RECEIPT ABOVE IS WHAT AIMED IT: the one shape it names as untested is
+  -- a NESTED burst, and that is the shape the predecessor — the same
+  -- statement with `depthCapN (suc (sizeᵉ b))` and no nesting term —
+  -- dies at.  The statement below adds `suc (nestDᵉ …)` to that first
+  -- argument, so it is strictly weaker than the refuted form and the
+  -- witness does not reach it; what follows is why.  A `scanᵉ`
   -- whose step function wraps its own accumulator gains `w` nesting
   -- levels PER TICK while the syntax gains `4` per wrap and `1` per
   -- listed source value — so the left side grows in `w · k` and the
@@ -1031,14 +1035,21 @@ private
     depth-all-bound fuel exhaustᵒ (exhaust-st false false) b κ bid now sched st
 
 
--- REFUTED 2026-08-21 (Refuted.Depth-Nest, `depth-compositional-sum-absurd`):
--- this statement is FALSE, and so is the body below — a `scanᵉ` that wraps
--- its own accumulator makes `depthE` grow in `wraps × ticks` while
--- `sizeᵉ b` grows in `wraps + ticks`.  Measured 49 against 38.  The leaf
--- `depth-all-bound`'s header carries the mechanism and the repair; the
--- currency, not the induction, is what has to change, and `depth-capped`
--- above the line keeps its statement.  Everything reachable from here is
--- resting on a false lemma until that restatement lands.
+-- ITS PREDECESSOR IS REFUTED 2026-08-21 (Refuted.Depth-Nest,
+-- `depth-compositional-sum-absurd`), AND THE RESTATEMENT HAS LANDED —
+-- read the two right-hand sides side by side before believing either.
+-- What died was `sizeᵉ b + pathLen κ + storeNestMax`, with no nesting
+-- term: a `scanᵉ` that wraps its own accumulator makes `depthE` grow in
+-- `wraps × ticks` while `sizeᵉ b` grows in `wraps + ticks`, measured 49
+-- against 38.  The statement below carries `nestDᵉ`, which IS the
+-- quantity that witness was measuring, so the witness cannot reach it —
+-- the currency changed, exactly as the leaf's header said it had to, and
+-- the induction did not.
+--
+-- THE REFUTATION IS KEPT FOR THE ROUTE, NOT FOR THIS STATEMENT.  It is
+-- what forbids ever dropping the nesting term again to make an arm close,
+-- and a sum whose margin grows down a connect chain is not something a
+-- reader recovers from the statement alone.
 abstract
   depth-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
