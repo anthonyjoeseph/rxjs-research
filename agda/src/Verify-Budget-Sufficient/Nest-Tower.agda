@@ -30,28 +30,35 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Nest-Tower where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤;
-  +-monoˡ-≤; m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; n≤1+n; ⊔-identityʳ)
+  +-monoˡ-≤; +-monoʳ-≤; *-monoʳ-≤; +-comm; m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; ⊔-lub;
+  n≤1+n; ⊔-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List using ([]; _∷_)
+open import Data.List using (List; []; _∷_)
 open import Data.Product using (_,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (towerℕ)
-open import Rx.Exp using (Ctx; Closed; Exp; sizeᵉ)
+open import Rx.Exp using (Ctx; Closed; Exp; Tm; sizeᵉ; sizeᵗ; sizeᵗˢ;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
+  inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import Rx.Slots using (Slots; slotsSize; shared; scripted)
-open import Rx.Nest-Depth using (nestDᵉ)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵗˢ)
 open import Rx.Frame-Width using (entryCeil; pWᵉ; innWᵉ; outWᵉ; dWᵉ;
   slotsPW≤entryCeil; slotsIW≤entryCeil)
 open import Rx.Evaluator using (capsBase; sched-init; st-init)
 
-open import Verify-Budget-Sufficient.Measures using (k≤towerℕ; towerℕ-mono)
-open import Verify-Budget-Sufficient.Caps using (3T≤)
+open import Verify-Budget-Sufficient.Measures using (k≤towerℕ; towerℕ-mono;
+  sizeᵗ-pos)
+open import Verify-Budget-Sufficient.Caps using (3T≤; tower-mul;
+  iterFold-tower; 1≤towerℕ; 2≤towerℕ)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (SlotWid; Sub-[];
   slotsPW-lb; slotsIW-lb)
-open import Verify-Budget-Sufficient.Caps-Face.Part2 using (monoᵉ; monoᴰᵉ)
+open import Verify-Budget-Sufficient.Caps-Face.Part2 using (monoᵉ; monoᴰᵉ;
+  wid-iterFold)
 open import Verify-Budget-Sufficient.Depth-Compositional using
   (storeNestMax; slotsNestSum)
 
@@ -93,44 +100,268 @@ entryCeil-slotWid {n = suc m} sl e i
   iw′ = ≤-trans iw (n≤1+n (entryCeil (suc m) sl e))
 
 ------------------------------------------------------------------
--- THE TWO HALVES OF THE MEASURE, each at the height the width
--- machinery forces.  `S` is fixed at 2 inside — it is the base
--- `wid-iterFold` asks for and it never reaches the conclusion, so
--- carrying it as a parameter would say nothing.
+-- THE TWO HALVES OF THE MEASURE.  The term half is a real body below;
+-- the store half is still a leaf.  `S` is fixed at 2 inside — it is
+-- the base `wid-iterFold` asks for and it never reaches the
+-- conclusion, so carrying it as a parameter would say nothing.
 ------------------------------------------------------------------
 
-postulate
-  -- THE TERM HALF.  Induction on `e`, and the height was chosen so that
-  -- EVERY CLAUSE HAS A LEVEL LEFT OVER: `3 * suc x` is `3 + 3 * x`, so
-  -- each syntax node grants three levels and no clause needs more than
-  -- two.  The budget, clause by clause:
-  --
-  --   input i          0, nothing to pay
-  --   mergeAllᵉ &c.    suc of the child — one level, via `3T≤`
-  --   mapᵉ / takeᵉ     a sum of two children — one level
-  --   ofᵉ ts           a sum over the list; the LENGTH is under `sizeᵉ`,
-  --                    so `tower-mul` turns it into one level
-  --   scanᵉ f z e      TWO: `outWᵉ n sl e * nestDᵗ f` is a `tower-mul`
-  --                    over `wid-iterFold` (at base 2) composed with
-  --                    `iterFold-tower`, which lands `outWᵉ` at height
-  --                    `k + 2 * sizeᵉ e` — inside the `3 * sizeᵉ e` this
-  --                    is stated at — and then the three-way sum costs
-  --                    the second
-  --
-  -- The two precedents are for the two HALVES and not for the pair, so
-  -- this is not a mechanical transcription of either: `wid-iterFold` is
-  -- the same Exp/Tm induction with the same slot leaf and is where the
-  -- `outWᵉ` bound comes from, and `iterFold-tower` is the worked
-  -- instance of the tower arithmetic.
+------------------------------------------------------------------
+-- THE ADDITION KIT.  Every clause of the measure is a sum, and each
+-- summand arrives at ITS OWN height, so these take one height PER
+-- SUMMAND and ask only for a `suc` of headroom above each.  A single
+-- shared height would have been cheaper to state and does not work:
+-- the `ofᵉ` list's cons clause gains no `suc` of its own, and pays
+-- for its level out of the positivity of the head's `sizeᵗ` — which
+-- is a fact about one summand and not about a maximum.
+------------------------------------------------------------------
+
+sum2H : ∀ (hx hy h : ℕ) → 3 ≤ hx → ∀ {x y} →
+  x ≤ towerℕ hx → y ≤ towerℕ hy → suc hx ≤ h → suc hy ≤ h →
+  x + y ≤ towerℕ h
+sum2H hx hy h 3x xle yle sx sy =
+  ≤-trans (+-mono-≤ (≤-trans xle (towerℕ-mono (m≤m⊔n hx hy)))
+                    (≤-trans yle (towerℕ-mono (m≤n⊔m hx hy))))
+  (≤-trans (m≤m+n (T + T) T)
+  (≤-trans (≤-reflexive (solve 1 (λ t → (t :+ t) :+ t := con 3 :* t) refl T))
+  (≤-trans (3T≤ (hx ⊔ hy) (≤-trans 3x (m≤m⊔n hx hy)))
+           (towerℕ-mono (⊔-lub sx sy)))))
+  where T = towerℕ (hx ⊔ hy)
+
+sum3H : ∀ (hx hy hz h : ℕ) → 3 ≤ hx → ∀ {x y z} →
+  x ≤ towerℕ hx → y ≤ towerℕ hy → z ≤ towerℕ hz →
+  suc hx ≤ h → suc hy ≤ h → suc hz ≤ h →
+  x + y + z ≤ towerℕ h
+sum3H hx hy hz h 3x xle yle zle sx sy sz =
+  ≤-trans (+-mono-≤ (+-mono-≤ (≤-trans xle (towerℕ-mono ax))
+                              (≤-trans yle (towerℕ-mono ay)))
+                    (≤-trans zle (towerℕ-mono az)))
+  (≤-trans (≤-reflexive (solve 1 (λ t → (t :+ t) :+ t := con 3 :* t) refl T))
+  (≤-trans (3T≤ H (≤-trans 3x ax))
+           (towerℕ-mono (⊔-lub (⊔-lub sx sy) sz))))
+  where
+  H = hx ⊔ hy ⊔ hz
+  T = towerℕ H
+  ax : hx ≤ H
+  ax = ≤-trans (m≤m⊔n hx hy) (m≤m⊔n (hx ⊔ hy) hz)
+  ay : hy ≤ H
+  ay = ≤-trans (m≤n⊔m hx hy) (m≤m⊔n (hx ⊔ hy) hz)
+  az : hz ≤ H
+  az = m≤n⊔m (hx ⊔ hy) hz
+
+sucH : ∀ (hx h : ℕ) → 3 ≤ hx → ∀ {x} →
+  x ≤ towerℕ hx → suc hx ≤ h → suc x ≤ towerℕ h
+sucH hx h 3x xle sx = sum2H hx hx h 3x (1≤towerℕ hx) xle sx sx
+
+-- A node's three levels, spending one.  `hIn` spends none, for the
+-- clauses where the measure does not grow at all.
+hUp : ∀ (k a s : ℕ) → a ≤ s → suc (k + 3 * a) ≤ k + 3 * suc s
+hUp k a s a≤s =
+  ≤-trans (s≤s (+-monoʳ-≤ k (*-monoʳ-≤ 3 a≤s)))
+  (≤-trans (m≤m+n (suc (k + 3 * s)) 2)
+           (≤-reflexive (solve 2 (λ n x → (con 1 :+ (n :+ con 3 :* x)) :+ con 2
+                                       := n :+ con 3 :* (con 1 :+ x))
+                               refl k s)))
+
+hIn : ∀ (k a s : ℕ) → a ≤ s → k + 3 * a ≤ k + 3 * s
+hIn k a s a≤s = +-monoʳ-≤ k (*-monoʳ-≤ 3 a≤s)
+
+------------------------------------------------------------------
+-- THE TERM HALF.  Induction on the syntax, at a height chosen so
+-- that EVERY CLAUSE HAS A LEVEL LEFT OVER: `3 * suc x` is
+-- `3 + 3 * x`, so each node grants three levels and no clause needs
+-- more than two.  `scanᵉ` is the clause that needs both — its
+-- product goes through `wid-iterFold` at base 2 composed with
+-- `iterFold-tower`, which lands `outWᵉ` at height `k + 2 * sizeᵉ e`,
+-- strictly inside the `3 * sizeᵉ e` this is stated at, and then the
+-- three-way sum costs the second.
+--
+-- THE LIST COMPANION CARRIES A SPARE `suc`, and that is forced
+-- rather than slack: `sizeᵗˢ (y ∷ ys)` is `sizeᵗ y + sizeᵗˢ ys` with
+-- no `suc` of its own, so the cons clause has no level of its own to
+-- spend on its `+`.  It pays out of `sizeᵗ-pos` at the HEAD, which
+-- is worth three levels — one for the cons, and the parent `ofᵉ`
+-- redeems the carried `suc` against its own node.  The alternative,
+-- a `1 ≤ sizeᵗˢ` lemma, does not exist in the tree and would have
+-- to be stated for this one clause.
+------------------------------------------------------------------
+
+mutual
   nestD-tower : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
     M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M → (e : Exp Γ Δᵍ Δ Θ t) →
     nestDᵉ sl e ≤ towerℕ (k + 3 * sizeᵉ e)
+  nestD-tower k M 3k 1M MT sl w (input i)  = z≤n
+  nestD-tower k M 3k 1M MT sl w emptyᵉ     = z≤n
+  nestD-tower k M 3k 1M MT sl w (varᵉ x)   = z≤n
+  nestD-tower k M 3k 1M MT sl w (ofᵉ ts)   =
+    ≤-trans (nestD-towerᵗˢ k M 3k 1M MT sl w ts)
+            (towerℕ-mono (hUp k (sizeᵗˢ ts) (sizeᵗˢ ts) ≤-refl))
+  nestD-tower k M 3k 1M MT sl w (mapᵉ f e) =
+    sum2H (k + 3 * sizeᵗ f) (k + 3 * sizeᵉ e) _
+      (≤-trans 3k (m≤m+n k (3 * sizeᵗ f)))
+      (nestD-towerᵗ k M 3k 1M MT sl w f)
+      (nestD-tower  k M 3k 1M MT sl w e)
+      (hUp k (sizeᵗ f) (sizeᵗ f + sizeᵉ e) (m≤m+n (sizeᵗ f) (sizeᵉ e)))
+      (hUp k (sizeᵉ e) (sizeᵗ f + sizeᵉ e) (m≤n+m (sizeᵉ e) (sizeᵗ f)))
+  nestD-tower k M 3k 1M MT sl w (takeᵉ c e) =
+    ≤-trans (nestD-tower k M 3k 1M MT sl w e)
+            (towerℕ-mono (hIn k (sizeᵉ e) (suc (sizeᵗ c + sizeᵉ e))
+               (≤-trans (m≤n+m (sizeᵉ e) (sizeᵗ c)) (n≤1+n _))))
+  nestD-tower k M 3k 1M MT sl w (μᵉ e) =
+    ≤-trans (nestD-tower k M 3k 1M MT sl w e)
+            (towerℕ-mono (hIn k (sizeᵉ e) (suc (sizeᵉ e)) (n≤1+n _)))
+  nestD-tower k M 3k 1M MT sl w (deferᵉ e) =
+    ≤-trans (nestD-tower k M 3k 1M MT sl w e)
+            (towerℕ-mono (hIn k (sizeᵉ e) (suc (sizeᵉ e)) (n≤1+n _)))
+  nestD-tower k M 3k 1M MT sl w (mergeAllᵉ e) =
+    sucH (k + 3 * sizeᵉ e) _ (≤-trans 3k (m≤m+n k (3 * sizeᵉ e)))
+      (nestD-tower k M 3k 1M MT sl w e) (hUp k (sizeᵉ e) (sizeᵉ e) ≤-refl)
+  nestD-tower k M 3k 1M MT sl w (concatAllᵉ e) =
+    sucH (k + 3 * sizeᵉ e) _ (≤-trans 3k (m≤m+n k (3 * sizeᵉ e)))
+      (nestD-tower k M 3k 1M MT sl w e) (hUp k (sizeᵉ e) (sizeᵉ e) ≤-refl)
+  nestD-tower k M 3k 1M MT sl w (switchAllᵉ e) =
+    sucH (k + 3 * sizeᵉ e) _ (≤-trans 3k (m≤m+n k (3 * sizeᵉ e)))
+      (nestD-tower k M 3k 1M MT sl w e) (hUp k (sizeᵉ e) (sizeᵉ e) ≤-refl)
+  nestD-tower k M 3k 1M MT sl w (exhaustAllᵉ e) =
+    sucH (k + 3 * sizeᵉ e) _ (≤-trans 3k (m≤m+n k (3 * sizeᵉ e)))
+      (nestD-tower k M 3k 1M MT sl w e) (hUp k (sizeᵉ e) (sizeᵉ e) ≤-refl)
+  nestD-tower {n = n} k M 3k 1M MT sl w (scanᵉ f z e) =
+    sum3H (k + 3 * Sz) (suc m₀) (k + 3 * Se) _
+      (≤-trans 3k (m≤m+n k (3 * Sz)))
+      (nestD-towerᵗ k M 3k 1M MT sl w z)
+      mid
+      (nestD-tower k M 3k 1M MT sl w e)
+      (hUp k Sz (Sf + Sz + Se)
+         (≤-trans (m≤n+m Sz Sf) (m≤m+n (Sf + Sz) Se)))
+      midUp
+      (hUp k Se (Sf + Sz + Se) (m≤n+m Se (Sf + Sz)))
+    where
+    Sf = sizeᵗ f
+    Sz = sizeᵗ z
+    Se = sizeᵉ e
+    m₀ = k + 2 * Se + 3 * Sf
+    3m₀ : 3 ≤ m₀
+    3m₀ = ≤-trans 3k (≤-trans (m≤m+n k (2 * Se)) (m≤m+n (k + 2 * Se) (3 * Sf)))
+    outW≤ : outWᵉ n sl e ≤ towerℕ (k + 2 * Se)
+    outW≤ = ≤-trans (proj₁ (wid-iterFold 2 M (s≤s (s≤s z≤n)) 1M sl w e))
+                    (iterFold-tower k 2 M Se 3k
+                       (2≤towerℕ k (≤-trans (s≤s z≤n) 3k)) MT)
+    mid : outWᵉ n sl e * nestDᵗ sl f ≤ towerℕ (suc m₀)
+    mid = tower-mul m₀ _ _ 3m₀
+            (≤-trans outW≤ (towerℕ-mono (m≤m+n (k + 2 * Se) (3 * Sf))))
+            (≤-trans (nestD-towerᵗ k M 3k 1M MT sl w f)
+                     (towerℕ-mono (+-monoˡ-≤ (3 * Sf) (m≤m+n k (2 * Se)))))
+    midUp : suc (suc m₀) ≤ k + 3 * suc (Sf + Sz + Se)
+    midUp = ≤-trans (m≤m+n (suc (suc m₀)) (suc (3 * Sz + Se)))
+                    (≤-reflexive (solve 4 (λ a x y u →
+                       (con 2 :+ ((a :+ con 2 :* u) :+ con 3 :* x))
+                         :+ (con 1 :+ (con 3 :* y :+ u))
+                       := a :+ con 3 :* (con 1 :+ ((x :+ y) :+ u)))
+                      refl k Sf Sz Se))
 
+  nestD-towerᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
+    M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M → (f : Tm Γ Δᵍ Δ Θ t) →
+    nestDᵗ sl f ≤ towerℕ (k + 3 * sizeᵗ f)
+  nestD-towerᵗ k M 3k 1M MT sl w (varᵗ x)  = z≤n
+  nestD-towerᵗ k M 3k 1M MT sl w unit̂      = z≤n
+  nestD-towerᵗ k M 3k 1M MT sl w (bool̂ _)  = z≤n
+  nestD-towerᵗ k M 3k 1M MT sl w (nat̂ _)   = z≤n
+  nestD-towerᵗ k M 3k 1M MT sl w (pairᵗ a b) =
+    sum2H (k + 3 * sizeᵗ a) (k + 3 * sizeᵗ b) _
+      (≤-trans 3k (m≤m+n k (3 * sizeᵗ a)))
+      (nestD-towerᵗ k M 3k 1M MT sl w a)
+      (nestD-towerᵗ k M 3k 1M MT sl w b)
+      (hUp k (sizeᵗ a) (sizeᵗ a + sizeᵗ b) (m≤m+n (sizeᵗ a) (sizeᵗ b)))
+      (hUp k (sizeᵗ b) (sizeᵗ a + sizeᵗ b) (m≤n+m (sizeᵗ b) (sizeᵗ a)))
+  nestD-towerᵗ k M 3k 1M MT sl w (fstᵗ p) =
+    ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w p)
+            (towerℕ-mono (hIn k (sizeᵗ p) (suc (sizeᵗ p)) (n≤1+n _)))
+  nestD-towerᵗ k M 3k 1M MT sl w (sndᵗ p) =
+    ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w p)
+            (towerℕ-mono (hIn k (sizeᵗ p) (suc (sizeᵗ p)) (n≤1+n _)))
+  nestD-towerᵗ k M 3k 1M MT sl w (inlᵗ a) =
+    ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w a)
+            (towerℕ-mono (hIn k (sizeᵗ a) (suc (sizeᵗ a)) (n≤1+n _)))
+  nestD-towerᵗ k M 3k 1M MT sl w (inrᵗ a) =
+    ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w a)
+            (towerℕ-mono (hIn k (sizeᵗ a) (suc (sizeᵗ a)) (n≤1+n _)))
+  nestD-towerᵗ k M 3k 1M MT sl w (primᵗ _ a) =
+    ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w a)
+            (towerℕ-mono (hIn k (sizeᵗ a) (suc (sizeᵗ a)) (n≤1+n _)))
+  nestD-towerᵗ k M 3k 1M MT sl w (strmᵗ e) =
+    ≤-trans (nestD-tower k M 3k 1M MT sl w e)
+            (towerℕ-mono (hIn k (sizeᵉ e) (suc (sizeᵉ e)) (n≤1+n _)))
+  nestD-towerᵗ k M 3k 1M MT sl w (caseᵗ s l r) =
+    sum3H (k + 3 * sizeᵗ s) (k + 3 * sizeᵗ l) (k + 3 * sizeᵗ r) _
+      (≤-trans 3k (m≤m+n k (3 * sizeᵗ s)))
+      (nestD-towerᵗ k M 3k 1M MT sl w s)
+      (nestD-towerᵗ k M 3k 1M MT sl w l)
+      (nestD-towerᵗ k M 3k 1M MT sl w r)
+      (hUp k (sizeᵗ s) _ (≤-trans (m≤m+n (sizeᵗ s) (sizeᵗ l))
+                                  (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r))))
+      (hUp k (sizeᵗ l) _ (≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ s))
+                                  (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r))))
+      (hUp k (sizeᵗ r) _ (m≤n+m (sizeᵗ r) (sizeᵗ s + sizeᵗ l)))
+  nestD-towerᵗ k M 3k 1M MT sl w (ifᵗ c a b) =
+    sum3H (k + 3 * sizeᵗ c) (k + 3 * sizeᵗ a) (k + 3 * sizeᵗ b) _
+      (≤-trans 3k (m≤m+n k (3 * sizeᵗ c)))
+      (nestD-towerᵗ k M 3k 1M MT sl w c)
+      (nestD-towerᵗ k M 3k 1M MT sl w a)
+      (nestD-towerᵗ k M 3k 1M MT sl w b)
+      (hUp k (sizeᵗ c) _ (≤-trans (m≤m+n (sizeᵗ c) (sizeᵗ a))
+                                  (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))))
+      (hUp k (sizeᵗ a) _ (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                  (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))))
+      (hUp k (sizeᵗ b) _ (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a)))
+
+  nestD-towerᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
+    M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M →
+    (ts : List (Tm Γ Δᵍ Δ Θ t)) →
+    nestDᵗˢ sl ts ≤ towerℕ (suc (k + 3 * sizeᵗˢ ts))
+  nestD-towerᵗˢ k M 3k 1M MT sl w []       = z≤n
+  nestD-towerᵗˢ k M 3k 1M MT sl w (y ∷ ys) =
+    sum2H (k + 3 * A) (suc (k + 3 * B)) _
+      (≤-trans 3k (m≤m+n k (3 * A)))
+      (nestD-towerᵗ  k M 3k 1M MT sl w y)
+      (nestD-towerᵗˢ k M 3k 1M MT sl w ys)
+      (s≤s (hIn k A (A + B) (m≤m+n A B)))
+      (s≤s headPays)
+    where
+    A = sizeᵗ y
+    B = sizeᵗˢ ys
+    1≤3A : 1 ≤ 3 * A
+    1≤3A = ≤-trans (s≤s z≤n) (*-monoʳ-≤ 3 (sizeᵗ-pos y))
+    headPays : suc (k + 3 * B) ≤ k + 3 * (A + B)
+    headPays =
+      ≤-trans (≤-reflexive (+-comm 1 (k + 3 * B)))
+      (≤-trans (+-monoʳ-≤ (k + 3 * B) 1≤3A)
+               (≤-reflexive (solve 3 (λ a x y′ →
+                  (a :+ con 3 :* y′) :+ con 3 :* x := a :+ con 3 :* (x :+ y′))
+                 refl k A B)))
+
+------------------------------------------------------------------
+-- THE STORE HALF, still a leaf.
+------------------------------------------------------------------
+
+postulate
   -- THE STORE HALF, at the entry state, where the node table is empty
   -- and the whole store is the slot telescope.  A scripted slot pays
   -- nothing and a shared slot's summand is its def's size plus the term
   -- half at that def, so the count of nonzero summands is under
   -- `slotsSize sl` — which is the height this is stated at.
+  --
+  -- ITS SIBLING HALF IS NOW PROVEN, AND COVERS THE ARITHMETIC BUT NOT
+  -- THE INDUCTION.  `nestD-tower` bounds the second summand of a shared
+  -- slot at height `k + 3 * sizeᵉ d`, `k≤towerℕ` bounds the first at the
+  -- same height, and the kit above adds them for one level — so the
+  -- PER-SLOT bound is settled, at `suc (k + 3 * slotSize (sl i))`.
+  -- What is not settled is the sum: this is an induction over
+  -- `sum (tabulate …)` against `sum (tabulate slotSize)`, which is
+  -- vector machinery and not the Exp/Tm recursion the sibling runs on.
+  -- Each slot grants three levels and needs about two — one for its own
+  -- `+` and one for the cons — so the budget is there; how to route it
+  -- through a tabulate is the open decision, and it is why this stays
+  -- DIFFICULTY rather than inheriting the sibling's shape.
   storeNest-tower : ∀ {n} {Γ : Ctx n} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
     M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M →
     slotsNestSum sl ≤ towerℕ (k + 3 * slotsSize sl)
