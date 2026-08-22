@@ -1444,12 +1444,15 @@ tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
 -- `towerℕ m`, which is why `towerℕ k ≤ poolCount (towerℕ m) m` holds for
 -- every `k` the width machinery can reach, not merely for `k = m`.
 --
--- SUPERSEDED AND DELETED with the linear reading: `sucJ≤fLvlD`,
--- `sucJ≤dLvl` (+1 per level step) and `J+n≤lvls` (linear in the count),
--- each replaced below by the exponential form of the same fact, plus
--- `capsBase-le-pool` and `three-size-le-blowH` whose consumers are gone.
--- `git log -S'"'"'J+n≤lvls'"'"'` restores the linear versions; they are what an
--- `exp≤dLvl` proof mirrors, one growth rate up.
+-- WHAT THE LINEAR READING LEFT BEHIND, since deleting it was half right.
+-- `sucJ≤dLvl` and `J+n≤lvls` are genuinely superseded -- the exponential
+-- forms below prove strictly more at the same indices -- and so are
+-- `capsBase-le-pool` and `three-size-le-blowH`, whose consumers are gone.
+-- But `sucJ≤fLvlD` came BACK (git log -S by that name), because it was
+-- never where the growth was: it is what carries the iteration COUNT down
+-- into the level, and `exp≤dLvl` spends it once per step.  A shadow of a
+-- stronger fact and a leaf the stronger fact is BUILT FROM read alike from
+-- the statement; only the successor's body tells them apart.
 
 -- i ≤ dWalkᶜ S W R d g J i
 i≤dWalkᶜ : ∀ (S W R d g J i : ℕ) → i ≤ dWalkᶜ S W R d g J i
@@ -1481,8 +1484,59 @@ M≤dCapᶜ M d =
 -- and `sizeStep S s = S * suc (2 * s)` at least doubles.  Both halves are
 -- ordinary inductions; the `iterL` half mirrors the deleted `J+n≤lvls`
 -- with `fLvlD` in place of `dLvl`.
-postulate
-  exp≤dLvl : ∀ (S W d J : ℕ) → 2 ≤ S → 2 ^ J ≤ dLvl S W d J
+-- (1) suc J ≤ fLvlD S W d J.  RECOVERED (git log -S'sucJ≤fLvlD') a
+-- commit after being deleted as a linear shadow, and wanted back for a
+-- different reason than it was written for: it is not where the growth
+-- comes from, it is what carries the iteration COUNT down into the level
+-- the iteration lands at.
+sucJ≤fLvlD : ∀ (S W d J : ℕ) → suc J ≤ fLvlD S W d J
+sucJ≤fLvlD S W d J =
+  ≤-trans
+    (≤-trans (s≤s (m≤m+n J (suc (widAt S W J) * suc (sizeAt S J))))
+             (≤-reflexive (sym (+-suc J (suc (widAt S W J) * suc (sizeAt S J))))))
+    (fLvl≤fLvlD S W d J)
+
+-- (2) n steps of the level ladder are worth at least n levels
+J+n≤iterL : ∀ (S W d n J : ℕ) → J + n ≤ iterL S W d n J
+J+n≤iterL S W d zero    J = ≤-reflexive (+-identityʳ J)
+J+n≤iterL S W d (suc n) J =
+  ≤-trans (≤-reflexive (+-suc J n))
+  (≤-trans (+-monoˡ-≤ n (sucJ≤fLvlD S W d J))
+           (J+n≤iterL S W d n (fLvlD S W d J)))
+
+-- (3) THE GROWTH IS IN THE COUNT, NOT IN THE STEP, which is the whole
+-- reason a level step outruns the linear reading: `sizeStep S s` is
+-- `S * suc (2 * s)`, so it at least DOUBLES for `2 ≤ S`, and `sizeAt S J`
+-- iterates it J times.
+2s≤sizeStep : ∀ (S s : ℕ) → 2 ≤ S → 2 * s ≤ sizeStep S s
+2s≤sizeStep S s 2≤S =
+  ≤-trans (*-monoʳ-≤ 2 (≤-trans (s≤2s s) (n≤1+n (2 * s))))
+          (*-monoˡ-≤ (suc (2 * s)) 2≤S)
+
+exp-iterSize : ∀ (S k s : ℕ) → 2 ≤ S → 2 ^ k * s ≤ iterSize S k s
+exp-iterSize S zero    s 2≤S = ≤-reflexive (*-identityˡ s)
+exp-iterSize S (suc k) s 2≤S =
+  ≤-trans (≤-reflexive shuffle)
+  (≤-trans (*-monoʳ-≤ (2 ^ k) (2s≤sizeStep S s 2≤S))
+           (exp-iterSize S k (sizeStep S s) 2≤S))
+  where
+  shuffle : 2 ^ suc k * s ≡ 2 ^ k * (2 * s)
+  shuffle = trans (cong (_* s) (*-comm 2 (2 ^ k))) (*-assoc (2 ^ k) 2 s)
+
+exp≤sizeAt : ∀ (S J : ℕ) → 2 ≤ S → 2 ^ J ≤ sizeAt S J
+exp≤sizeAt S J 2≤S =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ J))))
+                   (*-monoʳ-≤ (2 ^ J) (≤-trans (s≤s z≤n) 2≤S)))
+          (exp-iterSize S J S 2≤S)
+
+-- (4) ONE LEVEL STEP AT LEAST EXPONENTIATES: `dLvl` runs `fLvlD`
+-- `suc (sizeAt S J)` times from J, each worth a level, and the count
+-- alone already clears `2 ^ J`.
+exp≤dLvl : ∀ (S W d J : ℕ) → 2 ≤ S → 2 ^ J ≤ dLvl S W d J
+exp≤dLvl S W d J 2≤S =
+  ≤-trans (exp≤sizeAt S J 2≤S)
+  (≤-trans (≤-trans (n≤1+n (sizeAt S J)) (m≤n+m (suc (sizeAt S J)) J))
+           (J+n≤iterL S W d (suc (sizeAt S J)) J))
 
 -- THE COUNT BUYS A TOWER, one story per level step.  This is the fact the
 -- deleted `J+n≤lvls` was the linear shadow of.
@@ -1520,9 +1574,7 @@ tower-le-blowH k m 1≤m hk =
   P = poolCount (towerℕ m) m
 
 -- THE SIDE CONDITIONS `tower-le-blowH` ASKS FOR, at the one index the
--- depth face spends it at.  Both are arithmetic and neither is deep; the
--- tower one is a leaf because `towerℕ`'s step is `2 ^_`, so the induction
--- needs `x + 3 ≤ 2 ^ x` rather than anything about this development.
+-- depth face spends it at.  Both are arithmetic and neither is deep.
 4≤capsBase : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
   4 ≤ capsBase e sl
 4≤capsBase {n = n} e sl =
@@ -1530,5 +1582,37 @@ tower-le-blowH k m 1≤m hk =
     (s≤s (≤-trans (m≤m+n 3 (sizeᵉ e + slotsSize sl))
                   (m≤m+n (3 + (sizeᵉ e + slotsSize sl)) (entryCeil n sl e))))
 
-postulate
-  3m+1≤towerℕ : ∀ (m : ℕ) → 4 ≤ m → suc (3 * m) ≤ towerℕ m
+-- LINEAR AGAINST A TOWER, in two doublings: `4 * m ≤ 2 ^ m` from
+-- 16 = 16 up, and then one tower story absorbs the exponent, since
+-- `towerℕ (suc h)` IS `2 ^ towerℕ h` and `towerℕ` already dominates its
+-- own index (`k≤towerℕ`, .Measures).
+4m≤2^m : ∀ (i : ℕ) → 4 * (4 + i) ≤ 2 ^ (4 + i)
+4m≤2^m zero    = ≤-refl
+4m≤2^m (suc i) =
+  ≤-trans (≤-reflexive (*-suc 4 (4 + i)))
+  (≤-trans (+-mono-≤ 4≤pow (4m≤2^m i))
+           (≤-reflexive (sym (2X≡X+X (2 ^ (4 + i))))))
+  where
+  4≤pow : 4 ≤ 2 ^ (4 + i)
+  4≤pow = ≤-trans (≤ᵇ⇒≤ 4 16 _) (^-monoʳ-≤ 2 (m≤m+n 4 i))
+
+-- `4 * m` is `m + 3 * m` by definition, so one unit of it pays the suc
+suc3m≤4m : ∀ (m : ℕ) → 1 ≤ m → suc (3 * m) ≤ 4 * m
+suc3m≤4m m 1≤m = +-monoˡ-≤ (3 * m) 1≤m
+
+4+i≤pow : ∀ (i : ℕ) → 4 + i ≤ 2 ^ (2 + i)
+4+i≤pow i =
+  ≤-trans (+-monoʳ-≤ 4 (m≤m+n i (3 * i)))
+  (≤-trans (≤-reflexive (sym (*-suc 4 i)))
+  (≤-trans (*-monoʳ-≤ 4 (n<2^n i))
+           (≤-reflexive (solve 1 (λ x → con 4 :* x := con 2 :* (con 2 :* x))
+                               refl (2 ^ i)))))
+
+pow≤towerℕ : ∀ (i : ℕ) → 2 ^ (4 + i) ≤ towerℕ (4 + i)
+pow≤towerℕ i =
+  ^-monoʳ-≤ 2 (≤-trans (4+i≤pow i) (^-monoʳ-≤ 2 (k≤towerℕ (2 + i))))
+
+3m+1≤towerℕ : ∀ (m : ℕ) → 4 ≤ m → suc (3 * m) ≤ towerℕ m
+3m+1≤towerℕ (suc (suc (suc (suc i)))) (s≤s (s≤s (s≤s (s≤s z≤n)))) =
+  ≤-trans (suc3m≤4m (4 + i) (s≤s z≤n))
+  (≤-trans (4m≤2^m i) (pow≤towerℕ i))

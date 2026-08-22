@@ -204,12 +204,8 @@ measures at once), and take a fixed-degree product of caps fields.
 
 - **`nestD-le-tower`** (Caps-Bridge) — DIFFICULTY, the tier's new anchor: the
   whole depth face reduces to one SYNTACTIC inequality, with no `capsOK?`, no
-  `blowH` and nothing `abstract` in it. The caps side is discharged at a FREE
-  height, so the leaf may spend a factor; its header says why a constant is short.
-- **`exp≤dLvl`** (Caps) — DIFFICULTY, what buys that free height: one level step
-  at least exponentiates, since `iterL` iterates `fLvlD` `suc (sizeAt S J)` times
-  and `sizeStep S s = S * suc (2 * s)` at least doubles. The `iterL` half mirrors
-  the deleted `J+n≤lvls` with `fLvlD` where it had `dLvl`.
+  `blowH` and nothing `abstract` in it. The caps side is fully proven, at a FREE
+  height, so the leaf may spend a factor; its header says why.
 - **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY, downgraded from
   FALSITY by rows that reached the product itself: the burst's sibling-max
   finding survives, and the nesting term the restatement added is what the
@@ -218,9 +214,6 @@ measures at once), and take a fixed-degree product of caps fields.
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
   unconditional form is false.
-- **`3m+1≤towerℕ`** (Caps) — GRINDABLE: `suc (3 * m) ≤ towerℕ m` for `4 ≤ m`,
-  which needs only `x + 3 ≤ 2 ^ x` against `towerℕ`'s own step `2 ^ towerℕ h`;
-  `k≤towerℕ` in Measures is the worked instance of that shape.
 - **`depth-subst-guarded`** (Depth-Compositional) — GRINDABLE: the `deferᵉ` clause
   is `z≤n` and the rest is the structural recursion the assembly above it already
   performs, on `body` rather than on its unfolding; the guardedness is a property
