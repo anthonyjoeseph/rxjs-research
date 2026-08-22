@@ -37,17 +37,20 @@
 module Probed.Depth-Hop where
 
 open import Data.Bool using (true)
+open import Data.Fin using (zero; suc)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Vec using () renaming ([] to []ⱽ)
+open import Data.Vec using (_∷_) renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_)
 
-open import Rx.Prim using (Gas; g0; gs)
+open import Rx.Prim using (Gas; g0; gs; cold)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; varᵗ;
-  ofᵉ; emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; fstᵗ)
-open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Sched; EvalSt; root; sched-init; st-init)
+  ofᵉ; emptyᵉ; mapᵉ; scanᵉ; mergeAllᵉ; fstᵗ; input; deferᵉ; μᵉ; varᵉ; takeᵉ;
+  concatAllᵉ; switchAllᵉ; exhaustAllᵉ)
+open import Rx.Slots using (Slots; scripted; shared)
+open import Rx.Evaluator using (Sched; EvalSt; root; share-sink; _↠_;
+  from-inner; thru-outer; mergeᵒ; sched-init; st-init)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
@@ -190,5 +193,353 @@ _ = refl
 
 _ : (depthE (gN 200) progC root 0 0 schedC stC
        ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progC + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 5  THE SLOT TELESCOPE — the `input` clause, which every row
+--      above leaves untouched (they all run at `Γ₀`, where `Slots`
+--      is the empty function and `η` is never read).
+--
+-- This is the region the PREDECESSOR was refuted in: its measure
+-- charged an `input` nothing, and `input-wet` exhibited an obs-typed
+-- shared slot whose def emits values of positive hop.  `hopDᵉ` takes
+-- an `η` for exactly that reason, and `slotHop` is the honest one.
+-- So these rows test the repair, not the measure's arithmetic.
+--
+-- ⚠ AND THEY REACH THE STRATIFICATION, WHICH IS THE POINT.  Slot 1's
+-- def READS slot 0, so `slotHop` must resolve slot 1 at stage 1 —
+-- `ηAt`'s `suc k` branch, whose `k = 0` case is vacuous and which
+-- Demand-Probe series W therefore never exercised (recorded in
+-- `Rx.Slot-Hop`'s own header).  A one-slot telescope would have been
+-- a degenerate row here; a chain of two is not.
+------------------------------------------------------------------
+
+Γ₂ : Ctx 2
+Γ₂ = obs natᵗ ∷ obs natᵗ ∷ []ⱽ
+
+-- slot 0: no inputs at all (stratification forbids them at index 0),
+-- and a `*All` layer so its hop is positive rather than 0
+d₀ : Closed Γ₂ (obs natᵗ)
+d₀ = ofᵉ (strmᵗ (mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 7 ∷ [])) ∷ []))) ∷ [])
+
+-- slot 1: READS SLOT 0, which is what makes stage 1 load-bearing
+d₁ : Closed Γ₂ (obs natᵗ)
+d₁ = ofᵉ (strmᵗ (mergeAllᵉ (input zero)) ∷ [])
+
+slots₂ : Slots Γ₂
+slots₂ zero          = shared d₀
+slots₂ (suc zero)     = shared d₁
+slots₂ (suc (suc ()))
+
+-- the program is the input itself, wrapped once so it is `natᵗ`-typed
+progE : Closed Γ₂ natᵗ
+progE = mergeAllᵉ (input (suc zero))
+
+schedE : Sched Γ₂
+schedE = sched-init progE slots₂
+
+stE : EvalSt progE
+stE = st-init progE
+
+-- LOAD-BEARING, and tight: 3 against 3, with 2 of the 3 units coming
+-- out of the η chain rather than the program's own syntax
+_ : depthE (gN 20) progE root 0 0 schedE stE ≡ 3
+_ = refl
+
+_ : (depthE (gN 20) progE root 0 0 schedE stE
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₂) progE + pathNestD (root {Γ = Γ₂} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : (depthE (gN 20) progE root 0 0 schedE stE
+       ≤ᵇ hopDᵉ 1 (slotHop 1 slots₂) progE + pathNestD (root {Γ = Γ₂} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 6  A SCRIPTED SLOT IS CHARGED 0 — the other `Slot` constructor,
+-- and the one where the charge could be too small by construction.
+-- `slotHopD (scripted _) = 0` rests on the data-only side condition
+-- (`T (isData t)`): no emission of a scripted slot can hold an
+-- observable, so nothing it delivers is ever subscribed.
+--
+-- ⚠ SO THE PROGRAM HAS TO PUT THE SUBSCRIPTION SOMEWHERE ELSE, or the
+-- row is not a row.  Reading a scripted slot and stopping gives depth
+-- 0 against a bound of 0 — measured, and unfalsifiable, since a
+-- data-only pipeline cannot have positive depth by construction.  So
+-- the map's FUNCTION mints the observable and `mergeAllᵉ` subscribes
+-- it: the depth is then positive and paid for entirely by `hopDᵗ f`,
+-- and the row fails if `depthE` charges anything at all for the trip
+-- through the slot.
+------------------------------------------------------------------
+
+Γ₃ : Ctx 1
+Γ₃ = natᵗ ∷ []ⱽ
+
+slots₃ : Slots Γ₃
+slots₃ zero     = scripted (cold (3 ∷ 4 ∷ []) [])
+slots₃ (suc ())
+
+-- the payload becomes a one-element observable, so the subscription is
+-- the FUNCTION's and not the slot's
+fS : Fn Γ₃ [] [] [] natᵗ (obs natᵗ)
+fS = strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))
+
+progF : Closed Γ₃ natᵗ
+progF = mergeAllᵉ (mapᵉ fS (input zero))
+
+schedF : Sched Γ₃
+schedF = sched-init progF slots₃
+
+stF : EvalSt progF
+stF = st-init progF
+
+-- LOAD-BEARING, and tight: 1 against 1
+_ : depthE (gN 20) progF root 0 0 schedF stF ≡ 1
+_ = refl
+
+_ : (depthE (gN 20) progF root 0 0 schedF stF
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₃) progF + pathNestD (root {Γ = Γ₃} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : (depthE (gN 20) progF root 0 0 schedF stF
+       ≤ᵇ hopDᵉ 1 (slotHop 1 slots₃) progF + pathNestD (root {Γ = Γ₃} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 7  OFF THE ROOT PATH — `pathNestD κ` is the whole of the
+-- statement's path term, and it charges NOTHING for four of the five
+-- frames.  Only `thru-outer` is a `suc`.  So the sharp question is
+-- whether `depthE` grows along a path built entirely out of the free
+-- ones; if it does, the statement is false with no repair available
+-- in `hopDᵉ`, since `hopDᵉ` never sees `κ` at all.
+--
+-- ⚠ THE PAIRINGS BELOW ARE NOT CLAIMED REACHABLE, and they do not
+-- need to be: `depth-hop` quantifies over `b` and `κ` INDEPENDENTLY,
+-- so any well-typed pair is a legitimate instantiation of the
+-- statement as written.  The states are still reached honestly —
+-- `sched-init`/`st-init`, never a record update.  A FAILING row here
+-- would make reachability the next question rather than the finding.
+--
+-- ⚠⚠ AND THE ANSWER MEASURED IS 0 AT EVERY PATH TRIED — 0 against
+-- bounds of 0, 2 and 1.  `depthE` does not read `κ` at the call it is
+-- given; the path only starts costing anything when a clause EXTENDS
+-- it, descending into a subscribed inner.  So the first row below is
+-- the load-bearing one (0 against 0: it fails if a single frame is
+-- charged anything), and the two after it are SLACK — genuine, since a
+-- charge of 3 for a share sink would have shown up, but they pin
+-- nothing tight.
+--
+-- ⚠⚠ WHICH MEANS `pathNestD κ` IS STILL UNEXERCISED, and that is the
+-- coverage boundary to carry into the grind: no row here needs the
+-- term to be there at all.  A statement with a slack term is weaker
+-- rather than wrong, so this is not a refutation — but whoever grinds
+-- the `thru-outer` clause should find out whether the term is
+-- load-bearing in the INDUCTION before assuming it must be carried.
+------------------------------------------------------------------
+
+-- hop 0, so the bound is `pathNestD κ` alone and nothing hides in it
+bFlat : Closed Γ₀ natᵗ
+bFlat = ofᵉ (nat̂ 1 ∷ nat̂ 2 ∷ [])
+
+-- hop 1, an inner observable waiting to be subscribed
+bObs : Closed Γ₀ (obs natᵗ)
+bObs = ofᵉ (strmᵗ (mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ []))) ∷ [])
+
+-- TWO `from-inner` FRAMES AND A `take`-shaped map: `pathNestD` is 0 on
+-- all of them, so this row demands `depthE` be 0 outright
+-- LOAD-BEARING: both sides are 0, so any charge at all breaks it
+_ : depthE (gN 20) bFlat
+      (from-inner mergeᵒ 1 2 ↠ (from-inner mergeᵒ 3 4 ↠ root)) 0 0 schedA stA
+      ≡ 0
+_ = refl
+
+_ : (depthE (gN 20) bFlat
+       (from-inner mergeᵒ 1 2 ↠ (from-inner mergeᵒ 3 4 ↠ root)) 0 0 schedA stA
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) bFlat
+           + pathNestD (from-inner mergeᵒ 1 2
+                         ↠ (from-inner mergeᵒ 3 4 ↠ root {Γ = Γ₀} {t = natᵗ})))
+      ≡ true
+_ = refl
+
+-- and one `thru-outer`, the only frame that pays: 0 against 1 + 1, so
+-- SLACK — it would have caught a charge of 3, and nothing smaller
+_ : (depthE (gN 20) bObs (thru-outer mergeᵒ 5 ↠ root) 0 0 schedA stA
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) bObs
+           + pathNestD (thru-outer mergeᵒ 5 ↠ root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+-- A SHARE SINK, the third `Path` constructor, which `pathNestD` also
+-- charges 0 for.  Its slot is the shared chain of § 5, so the values
+-- landing in the subject are the ones with positive hop — 0 against 1,
+-- SLACK in the same way.
+bIn : Closed Γ₂ (obs natᵗ)
+bIn = input zero
+
+_ : (depthE (gN 20) bIn (share-sink zero) 0 0 schedE stE
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₂) bIn
+           + pathNestD (share-sink {Γ = Γ₂} {t = natᵗ} zero))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 8  THE OTHER CONSTANT-ZERO CLAUSE — `hopDᵉ V η (deferᵉ e) = 0`,
+-- which charges NOTHING for an arbitrarily deep body.  That is the
+-- same shape as the `input` clause the predecessor died on, so it is
+-- the sharpest thing left to instantiate: wrap the deepest program in
+-- this file and the bound goes to 0 while the body's own depth is 4.
+--
+-- It survives, and the reason is the one the clause is named for: a
+-- `deferᵉ` subscribes its body at the NEXT tick, so nothing of the
+-- body's depth is spent in the frame `depthE` is asked about.  Note
+-- that `inputsBelowᵉ` deliberately does NOT cut at `deferᵉ` (recorded
+-- in `Rx.Exp`) while `hopDᵉ` does — the two answer different
+-- questions, and this row is why the second cut is sound.
+------------------------------------------------------------------
+
+progG : Closed Γ₀ natᵗ
+progG = deferᵉ progA
+
+schedG : Sched Γ₀
+schedG = sched-init progG slots₀
+
+stG : EvalSt progG
+stG = st-init progG
+
+-- LOAD-BEARING at its sharpest: the bound is 0 and the body's own
+-- depth is 4, so the row fails unless the defer really does cost
+-- nothing in this frame
+_ : hopDᵉ 4 (slotHop 4 slots₀) progG ≡ 0
+_ = refl
+
+_ : (depthE (gN 20) progG root 0 0 schedG stG
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progG + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+-- and once more with the defer INSIDE a subscribing layer, so the
+-- frame that would pay for it is a `*All` rather than the root
+progH : Closed Γ₀ natᵗ
+progH = mergeAllᵉ (ofᵉ (strmᵗ (deferᵉ progA) ∷ []))
+
+schedH : Sched Γ₀
+schedH = sched-init progH slots₀
+
+stH : EvalSt progH
+stH = st-init progH
+
+-- LOAD-BEARING, and tight: 1 against 1
+_ : hopDᵉ 4 (slotHop 4 slots₀) progH ≡ 1
+_ = refl
+
+_ : depthE (gN 20) progH root 0 0 schedH stH ≡ 1
+_ = refl
+
+_ : (depthE (gN 20) progH root 0 0 schedH stH
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progH + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 9  THE FIXPOINT AND THE TAKE — the two remaining clauses that
+-- pass their subject's hop straight through: `hopDᵉ (μᵉ e) = hopDᵉ e`
+-- and `hopDᵉ (takeᵉ c e) = hopDᵉ e`.  The μ one is the sharp case,
+-- because a μ RE-SUBSCRIBES: the program below unfolds once per tick
+-- for as long as the gas lasts, and the bound does not grow with it.
+-- What makes that sound is that the recursive reference is reachable
+-- only through a `deferᵉ` (synchronous self-reference is a type
+-- error), so each unfolding lands in a LATER frame than the one
+-- `depthE` is asked about — the § 8 fact, spent recursively.
+------------------------------------------------------------------
+
+progI : Closed Γ₀ natᵗ
+progI = μᵉ (mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ []))
+                        ∷ strmᵗ (deferᵉ (varᵉ (here refl))) ∷ [])))
+
+schedI : Sched Γ₀
+schedI = sched-init progI slots₀
+
+stI : EvalSt progI
+stI = st-init progI
+
+-- LOAD-BEARING, and tight: 1 against 1, with the μ unfolding for as
+-- long as twenty units of gas last
+_ : hopDᵉ 4 (slotHop 4 slots₀) progI ≡ 1
+_ = refl
+
+_ : depthE (gN 20) progI root 0 0 schedI stI ≡ 1
+_ = refl
+
+_ : (depthE (gN 20) progI root 0 0 schedI stI
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progI + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+-- a `takeᵉ` over the deepest program: the count is a term, evaluated
+-- once at subscription, so it adds no layer and the bound is progA's —
+-- LOAD-BEARING, and tight: 4 against 4
+progJ : Closed Γ₀ natᵗ
+progJ = takeᵉ (nat̂ 2) progA
+
+schedJ : Sched Γ₀
+schedJ = sched-init progJ slots₀
+
+stJ : EvalSt progJ
+stJ = st-init progJ
+
+_ : depthE (gN 20) progJ root 0 0 schedJ stJ ≡ 4
+_ = refl
+
+_ : (depthE (gN 20) progJ root 0 0 schedJ stJ
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progJ + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 10  THE OTHER THREE `*All` OPERATORS.  `hopDᵉ` charges all four
+-- the same `suc`, which is the obvious thing to distrust: `switchAllᵉ`
+-- CANCELS a live inner when the next arrives and `exhaustAllᵉ` DROPS
+-- one, so their evaluators do work `mergeAllᵉ`'s does not, and every
+-- row above this section is a merge.  A uniform clause over four
+-- operators with three of them uninstantiated is exactly the coverage
+-- claim that reads as wider than it is.
+--
+-- The nesting is § 1's, so the comparison is against a KNOWN answer:
+-- the merge version has depth 4 and bound 4.  ALL THREE COME OUT AT 4
+-- AS WELL — every row here is LOAD-BEARING and tight, and the uniform
+-- clause is uniform for a reason: cancelling and dropping change WHICH
+-- inners are live, never how many layers deep a live one sits.
+------------------------------------------------------------------
+
+progK progL progM : Closed Γ₀ natᵗ
+progK = concatAllᵉ  (concatAllᵉ  (mapᵉ fA (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])) ∷ []))))
+progL = switchAllᵉ  (switchAllᵉ  (mapᵉ fA (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])) ∷ []))))
+progM = exhaustAllᵉ (exhaustAllᵉ (mapᵉ fA (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ nat̂ 2 ∷ [])) ∷ []))))
+
+_ : depthE (gN 20) progK root 0 0 (sched-init progK slots₀) (st-init progK) ≡ 4
+_ = refl
+
+_ : depthE (gN 20) progL root 0 0 (sched-init progL slots₀) (st-init progL) ≡ 4
+_ = refl
+
+_ : depthE (gN 20) progM root 0 0 (sched-init progM slots₀) (st-init progM) ≡ 4
+_ = refl
+
+_ : (depthE (gN 20) progK root 0 0 (sched-init progK slots₀) (st-init progK)
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progK + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : (depthE (gN 20) progL root 0 0 (sched-init progL slots₀) (st-init progL)
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progL + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : (depthE (gN 20) progM root 0 0 (sched-init progM slots₀) (st-init progM)
+       ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progM + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
       ≡ true
 _ = refl

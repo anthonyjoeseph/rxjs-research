@@ -212,8 +212,9 @@ top-line claim never moved: `depthE≤capsH-root` still lands in `capsH e ins 0`
 `blowH` of a tower, and it is now a real body over two leaves.
 
 - **`depth-hop`** (Depth-Compositional) — FALSITY: the swapped face's whole
-  induction. The ∀ V form is machine-refuted, so `V` is conditioned; probed only
-  at the root path, empty store, and not at all at the `input` clause.
+  induction. The ∀ V form is machine-refuted, so `V` is conditioned. Every
+  `hopDᵉ` clause is now probed TIGHT; what is left is state, not syntax — no row
+  reaches a mid-run store with a burst in flight.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the

@@ -227,10 +227,39 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- statement carries, the finding is a caps hypothesis — the shape
 -- `cascade-depth-capsH` already has — and not a smaller `V`.
 --
--- ⚠ AND NOTHING WIDER: the four rows are all at the ROOT path, with an
--- empty store and no slot telescope, and they say nothing about the
--- `input` clause — which is where the predecessor's first two
--- refutations lived.  FALSITY class until it is probed off the root.
+-- -- PROBED 2026-08-22: EVERY CLAUSE OF `hopDᵉ`, AND ALL OF IT TIGHT.
+-- The three regions this receipt used to name as unreached — off the
+-- root path, the slot telescope, the `input` clause — are reached, and
+-- the rows are tight rather than slack, which is the part worth
+-- trusting.  A two-slot STRATIFIED telescope whose slot 1 reads slot 0
+-- gives 3 against 3, with two of the three units coming out of the η
+-- chain instead of the program's syntax, and it exercises `ηAt`'s
+-- `suc k` branch — the one `Rx.Slot-Hop` records series W as having
+-- missed entirely.  A scripted slot charged 0 gives 1 against 1, with
+-- the subscription moved into the map's function so the row can fail.
+-- `deferᵉ`, the other constant-0 clause and the same shape that killed
+-- the predecessor's `input`, gives 0 against 0 wrapping the deepest
+-- program in the file, and 1 against 1 nested under a `*All`.  `μᵉ`
+-- unfolding for twenty units of gas gives 1 against 1.  `takeᵉ` over
+-- that deepest program gives 4 against 4.  And all four `*All`
+-- operators give 4 against 4 at one nesting — the uniform `suc` clause
+-- was the widest untested coverage claim in the measure, since
+-- cancelling and dropping change which inners are LIVE and not how
+-- deep a live one sits.
+--
+-- ⚠ AND WHAT IS LEFT IS STATE, NOT SYNTAX — which is why the class does
+-- not move.  Every row above starts from `st-init` and `sched-init`:
+-- the slot telescope is populated but the NODE STORE is not, so no row
+-- reaches a mid-run state with a burst in flight, and that is exactly
+-- the arm the paragraph below is about.  The region is strictly
+-- smaller than the one this receipt replaced, and it is now nameable
+-- in one clause instead of three, but it is not empty.  FALSITY.
+--
+-- ⚠ AND `pathNestD κ` IS UNEXERCISED: `depthE` returned 0 at every
+-- non-root path tried, so no row needs the term to be present at all.
+-- A slack term makes the statement weaker rather than wrong, so this
+-- is not a refutation — but find out whether the term is load-bearing
+-- in the INDUCTION before carrying it through the `thru-outer` clause.
 --
 -- ⚠ AND THE CONDITIONS ARE NOT KNOWN TO BE TIGHT — the refutation kills
 -- `V = 0` and nothing more.  `V = 1` was MEASURED to hold on the same
