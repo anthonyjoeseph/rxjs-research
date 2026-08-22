@@ -43,7 +43,7 @@ open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import Rx.Prim      using (Gas; Tick; Id; Fuel; close; exhausted; towerℕ)
+open import Rx.Prim      using (Gas; Tick; Id; Fuel; close; exhausted)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
 open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
@@ -59,21 +59,15 @@ open import Rx.Slots using (Slots; slotsSize)
 -- toolkit ∧-true/∧-intro/all-impl/≤ᵇ-widen/T-to/T⇒≡true), each imported
 -- below from the module that defines it
 open import Verify-Budget-Sufficient.Measures using
-  (_hasAtLeast_; all-impl; boundedLive;
-                                                      capᴱ; chainsB?-widen; dBound;
-                                                      finish-slots; fnCapBounded?; fnCapLive;
-                                                      fnCapᵉ; fnCapᵛ; hasDry-append; hopR;
-                                                      INV-parts; INV?; pathB?; pathLen;
-                                                      pop-bounded; pop-slots; pow1; regsB?;
-                                                      slotsFnCap; stBounded?; syncSize≤sizeᵉ;
-                                                      unconn; valB?;
-                                                      valB?-widen; V≤C; ΨAt; ∧-true; szB)
+  (_hasAtLeast_; all-impl; boundedLive; capᴱ; chainsB?-widen; dBound; finish-slots;
+  fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; pathB?;
+  pathLen; pop-bounded; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
+  valB?-widen; V≤C; ΨAt; ∧-true; szB)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
 open import Verify-Budget-Sufficient.Wet.Part6 using
-  (caps-fuel-root; cascadeFinish-INV; cascadeLatch-INV; chainsOf-B; init-INV;
-   pop-head-bounded; pop-INV; sizeCapAt; sizeCapAt-mono; 2≤sizeCapAt;
-   size≤sizeCapAt; slotsSize≤sizeCapAt)
+  (caps-fuel-root; cascadeFinish-INV; cascadeLatch-INV; chainsOf-B; init-INV; pop-head-bounded;
+  pop-INV; sizeCapAt; sizeCapAt-mono; 2≤sizeCapAt; size≤sizeCapAt)
 open import Verify-Budget-Sufficient.Wet.Part1 using
   (INV?-widen)
 open import Verify-Budget-Sufficient.Wet.Part3 using
@@ -101,24 +95,14 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
 -- `chainStep-caps`, whose statement is stated at the chain depth measure.
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
--- `depth-hop` (Depth-Compositional): the depth mirror bounded by the
--- tree's own depth currency, `hopDᵉ` — the predecessor bounded it by
--- its own nesting measure and was refuted at the exported conclusion
--- (Refuted.Depth-Comp).  Consumed by depthE≤capsH-root (at the SMALL
--- baseCaps — the general-id depth bound does NOT route through it; see
--- the depOK premise on sub-charge-capsOK-lift).
--- Acyclic: Depth-Bound imports Wet and Subscribe-Face, NOT Caps-Bridge.
-open import Verify-Budget-Sufficient.Depth-Compositional
-  using (depth-hop; pathNestD)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
-  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body;
-  frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize;
-  1≤capsAt-reg; _⊑ᶜ_; Caps; caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0;
-  frameStep-full; frameStep-mono-j; sizeCount; tower-le-blowH; 4≤capsBase;
-  3m+1≤towerℕ)
+  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; frameBlowup;
+  iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize; 1≤capsAt-reg; _⊑ᶜ_; Caps;
+  caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0; frameStep-full;
+  frameStep-mono-j; sizeCount)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -1107,130 +1091,108 @@ abstract
     capsOK? (capsAt e ins id) (sched-init e ins) (st-init e) ≡ true
   init-capsOK? = init-capsOK?-go
 
--- THE ROOT DEPTH BOUND, RESTATED over the nesting measure.
-
--- WHAT WENT: `depth-capped` (Depth-Bound.agda, DELETED) and its
--- `3 · cSize` conclusion, with `three-size≤capsH` and the whole
--- caps-conditioned route.  All of it was refuted together
--- (Refuted.Depth-Nest — `depth-capped-absurd`, 204 against 201): a
--- constant multiple of `cSize` cannot dominate a quantity that
--- COMPOUNDS, one factor per nested scan, and `capsOK?` is checked at the
--- entry state while the deep accumulator is reached much later.  The
--- module's header carried the mechanism, the two dead routes (bound the
--- depth by the gas; bound it by the width family) and the reading of
--- `opIterD`'s height budget that shows this consumer never needed any of
--- it.  Read it at that commit before re-deriving any of them.
+-- THE ROOT DEPTH BOUND, OVER THE STATE RATHER THAN THE SYNTAX.  A depth
+-- bound has to be re-establishable at an emitted payload, and that is
+-- what picks the currency: a payload is a STORED value, so a state
+-- predicate reaches it and a syntactic size does not.  `capsOK?` is the
+-- state predicate the caps ledger already carries at every level and
+-- `capsH` is that ledger's own level count, so the statement below is
+-- the ledger bounding the nesting it has already paid for.  Its
+-- delivery-side sibling `cascade-depth-capsH` (.Caps-Face/Part7) is the
+-- same statement over `depthCascade`, and one induction should cover
+-- both — neither is proven, so neither is the other's precedent.
 --
+-- WHY IT IS CONDITIONED.  The unconditional form is false: `capsH e sl
+-- id` is fixed by `e`, `sl` and `id`, while an `EvalSt e` may carry a
+-- registry of any depth at all, so a state no cap has seen breaks it.
+-- The premises are `subscribeE-caps`'s own, at the same level, which is
+-- what lets the two meet at a call site rather than at a coincidence.
 
--- WHAT REPLACES IT: `depth-hop` reaches the root directly.  Its
--- conclusion at `sched-init`/`st-init`/`root` is purely SYNTACTIC —
--- `pathNestD root` is 0 and `Sched.slots (sched-init e ins)` is `ins` —
--- so the remaining obligation carries no state hypothesis at all, which
--- is what made the old `depth-capped` statement false.  And the target
--- is astronomically slack: `capsH e ins 0` is `blowH (capsBase e ins)`,
--- carrying `2 * poolCount (towerℕ m) m`.
-
--- AND THE TARGET DOMINATES AT A HEIGHT WITH ROOM IN IT, which is the
--- second version of this paragraph and the reason the first was not
--- enough.  The caps side is stated at a FREE height:
--- `tower-le-blowH k m` for any `k` with `suc k ≤ towerℕ m`, paid for by
--- the pool's own growth rate (Caps' header there has the argument — one
--- level step exponentiates, and `poolBody` iterates it `towerℕ m`
--- times).  The body below spends it at `k = 3 * capsBase e ins`, which
--- leaves a factor of three for the measure half to land inside.
-
--- THE MEASURE HALF IS THE LEAF, and it is the one thing the currency
--- swap leaves owed here.  Its predecessor `nest-store≤capsH` went
--- through `.Nest-Tower`'s `nestD-le-tower` — three measures at one
--- tower height, then this same tower step — and both died with the
--- nesting measure (Depth-Compositional's header carries the
--- refutation).  The HEIGHT is already the right one: every
--- measure-to-tower lemma there was stated at
--- `M = suc (entryCeil n ins e)` — and that is NOT the bound used below.
--- `depth-hop` is instantiated at `sizeCapAt e ins 1`, the SIZE cap the
--- consumer itself reads (`subscribeE-wet-via-caps`, at
--- `Ŝ = sizeCapAt e sl (suc id)`), because its conditions are over
--- `syncSizeᵉ e` and the slot width and NOTHING RELATES `entryCeil` TO
--- EITHER — Caps' own header records its only two facts bound SLOT
--- widths by it.  `2≤sizeCapAt`, `size≤sizeCapAt` (via `syncSize≤sizeᵉ`)
--- and `slotsSize≤sizeCapAt` discharge all three with no new leaf.
--- What does NOT transfer is the induction: a scan's refold is an
--- EXPONENTIAL in `hopDᵉ` where it was a product with the source's
--- width in `nestDᵉ`, so the height has to absorb an exponential rather
--- than a product.  That is the depth face's one open arithmetic
--- question, and `capsH` is `blowH` of a tower — the side with room.
---
--- ⚠ AND THE HEIGHT `3 * capsBase e ins` IS A PARAMETER, NOT A FINDING.
--- It is inherited from the deleted arithmetic, where the measure was a
--- product; at a size cap `V` the refold factor is `(2 + p) ^ V`, so the
--- eventual proof may need a taller one.  `tower-le-blowH k m` admits ANY
--- `k` with `suc k ≤ towerℕ m`, so raising the height costs only a
--- different instance of that side condition — `3m+1≤towerℕ` is the
--- `k = 3m` one and is spent below.  Nothing above this leaf reads the
--- height.
+-- WHY THE PREDECESSOR IS GONE, AND WHY A SIZE PREMISE DOES NOT REPAIR
+-- IT.  `depth-hop` bounded this by `hopDᵉ V η b + pathNestD κ`, and
+-- every arm needed a payload's synchronous size under `V`.  `V` cannot
+-- carry that: it is `hopDᵉ`'s refold EXPONENT, so a ceiling on the
+-- conclusion forces it small on any program carrying a scan, while
+-- substitution multiplies a payload's synchronous size by the
+-- function's occurrence count at every level of re-entry.  Nor may `V`
+-- grow with the level — the measure joins a payload's depth into its
+-- SOURCE's bound, so the recursive call is at the OUTER `V` and a
+-- level-indexed cap cannot compose.  `hopDᵉ` itself survives, as the
+-- DEMAND measure the budget must cover (`caps-fuel-root`, .Wet/Part6);
+-- what died is the claim that it also bounds `depthE`.
+-- DEAD ROUTE: the supplier itself.  The burst face's synchronous-size
+--   conjunct was where the condition at a payload was to have come
+--   from, and it was machine-refuted at a map whose function names its
+--   argument twice — 22 units of payload against a 21-unit budget, on
+--   a step that pays ADDITIVELY for a function substitution multiplies
+--   by.  Both the conjunct and its refutation are gone from the tree,
+--   the refutation because `src` can no longer state it; the sha below
+--   holds them.
+-- DEAD ROUTE: a gas-indexed bound, dying by arithmetic rather than by
+--   shape.  `budgetAt` is a `gasTower` at height `3 + capsHgo m (suc
+--   id)`, a tower ABOVE the target, so a bound in the gas lands nowhere
+--   near `capsH` however tight the induction behind it is.
+-- RECOVERY: `git show 58f813a:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda`
+--   restores the hop-currency depth face.  All ten of its mutual
+--   clauses have real bodies and every one is an induction over the
+--   same measure family this statement is about, so the clause skeleton
+--   transfers even though the bound does not.  `Hop-Burst-Face.agda`
+--   (the five arms), `hopD-le-tower`/`hop≤capsH`, and the
+--   `Refuted.Depth-Hop` / `Refuted.Hop-Burst-Sync` / `Probed.Depth-Hop`
+--   evidence are in the same tree at that sha.
+-- RECOVERY: `git show 58f813a:agda/src/Verify-Budget-Sufficient/Caps.agda`
+--   restores the TAIL of that module — the pool's growth-rate argument
+--   and the nineteen lemmas under it, ending in `tower-le-blowH k m`,
+--   which is the only handle anything has ever had on `blowH` and hence
+--   on `capsH`.  It went out with the depth face because that face was
+--   its one consumer; whatever proves the statement above will want it
+--   back, or will want to know why a tower height is the wrong
+--   decomposition.  The argument in the header there is the part that
+--   took two passes: one level step at least exponentiates and
+--   `poolBody` iterates it `towerℕ m` times, so `towerℕ k ≤ poolCount
+--   (towerℕ m) m` for every `k` the width machinery can reach, not
+--   merely for `k = m`.
 -- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
---   restores the height arithmetic that assembly used, most of which is
---   currency-INDEPENDENT and will be wanted again: `sum2H`/`sum3H`/
---   `sucH`/`hUp`/`hIn`/`1≤3x`/`payL`/`payR` for moving a bound up a
---   tower, `tower-sum-tab` for a slot telescope, and
---   `entryCeil-slotWid`.  Only the three `nestD-*` inductions and
---   `slotNest-tower`/`storeNest-tower` died with their measure.
-
+--   restores height arithmetic that is currency-INDEPENDENT and will be
+--   wanted again whatever the decomposition: `sum2H`/`sum3H`/`sucH`/
+--   `hUp`/`hIn`/`1≤3x`/`payL`/`payR` for moving a bound up a tower,
+--   `tower-sum-tab` for a slot telescope, and `entryCeil-slotWid`.
 -- RECOVERY: `git show 555ee43^:agda/src/Verify-Budget-Sufficient/Depth-Bound.agda`
 --   restores the node-half kit — `foldr-⊔-bounded`, `node-nest-bounded`,
---   `nodesNestMax-bounded`, an inversion of `stBounded?`'s `boundedNode`
---   test — which is still TRUE and is the apparatus a stored-state
---   version of the leaf below would want.  Only the SLOT half broke, and
---   it broke because that generation's slot measure paid its def's
---   nesting.  Both measures it was stated over are since DELETED with the
---   nesting currency, so recovering the kit means restating it over
---   `slotHop`.
+--   `nodesNestMax-bounded`, and an inversion of `stBounded?`'s
+--   `boundedNode` test.  It is still TRUE and it is the apparatus a
+--   STORED-STATE depth bound wants, which is what the statement above
+--   is; only its slot half broke, and it broke on a measure that paid a
+--   def's nesting.
 postulate
-  -- ⚠ AND DO NOT BOUND THE STORE'S CONTRIBUTION BY A MAX OVER SLOTS.
-  -- The predecessor's store measure did, and was refuted at a nine-slot
-  -- program: connects CHAIN, so slot k's def can subscribe slot k-1's,
-  -- and the depths ADD down the telescope where a max reads only the
-  -- deepest single slot.  `slotHop` is built the other way round — a
-  -- staged environment resolving each slot at its own index, which is
-  -- what stratification is for — so the arithmetic this leaf owes is
-  -- over that environment and not over a fold of `slotSize`.
-  hopD-le-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    hopDᵉ (sizeCapAt e ins 1) (slotHop (sizeCapAt e ins 1) ins) e
-      + pathNestD (root {Γ = Γ} {t = t})
-      ≤ towerℕ (3 * capsBase e ins)
-
-hop≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  hopDᵉ (sizeCapAt e ins 1) (slotHop (sizeCapAt e ins 1) ins) e
-    + pathNestD (root {Γ = Γ} {t = t})
-    ≤ capsH e ins 0
-hop≤capsH e ins =
-  ≤-trans (hopD-le-tower e ins)
-          (tower-le-blowH (3 * capsBase e ins) (capsBase e ins)
-             (≤-trans (s≤s z≤n) 4≤m)
-             (3m+1≤towerℕ (capsBase e ins) 4≤m))
-  where
-  4≤m = 4≤capsBase e ins
+  subscribe-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    sizeᵉ b ≤ sizeCapAt e sl id →
+    pathSz? (sizeCapAt e sl id) κ ≡ true →
+    suc (pathLen κ) ≤ sizeCapAt e sl id →
+    depthE g b κ bid now sched st ≤ capsH e sl id
 
 depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
     ≤ capsH e ins 0
 depthE≤capsH-root e ins =
-  ≤-trans
-    (depth-hop (sizeCapAt e ins 1) (budgetAt e ins 0) e root 0 0
-       (sched-init e ins) (st-init e)
-       (2≤sizeCapAt e ins 1)
-       (≤-trans (syncSize≤sizeᵉ e) (size≤sizeCapAt e ins 1))
-       (slotsSize≤sizeCapAt e ins 1))
-    (hop≤capsH e ins)
+  subscribe-depth-capsH ins 0 (budgetAt e ins 0) e root 0 0
+    (sched-init e ins) (st-init e)
+    refl
+    (init-capsOK? e ins 0)
+    (size≤sizeCapAt e ins 0)
+    refl
+    (≤-trans (s≤s z≤n) (2≤sizeCapAt e ins 0))
 
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
--- Mirrors cascade-wet-via-caps structurally.
--- Wet hypotheses: those of subscribeE-wet (Wet.agda:~4303).
--- Caps additions: capsOK? at the entry level + dWᵉ ≤ cWid.
--- burst-caps (below) is a closed corollary at the root call.
--- WIRING NOTE: depth-capped and three-size-le-blowH are wired through
--- depthE≤capsH-root (above), whose consumer is burst-caps: it
--- discharges the root instance of the depOK premise threaded below.
+-- Mirrors cascade-wet-via-caps structurally.  Its wet hypotheses are
+-- `subscribeE-wet`'s (.Walk-Level); the caps additions are `capsOK?` at
+-- the entry level and `dWᵉ ≤ cWid`; `burst-caps` below is a closed
+-- corollary at the root call, and it is where `depthE≤capsH-root`
+-- (above) is spent — on the root instance of the depOK premise.
 
 -- sizeCount-mono-d is a real proof in Verify-Budget-Sufficient.Level-Mono,
 -- imported above.
@@ -1238,26 +1200,25 @@ depthE≤capsH-root e ins =
 -- THE SUBSCRIBE-SIDE CAPS LIFT, and it is PROVEN — the
 -- `sub-charge-capsOK-lift-core` postulate is replaced outright.
 -- What made it provable is the LAST premise, depOK: the general-id
--- depth bound `depthE … ≤ capsH e sl id` is a RUN INVARIANT, not a
--- lemma — the unconditional form is FALSE (an adversarial state with a
--- long map-f chain breaks any state-free `depthE ≤ capsH`; that finding
--- is prose, never machine-checked, and the module holding it is the one
--- the recovery pointer above restores), and "reachable" is not a
--- first-class predicate
--- here, so the bound enters as a premise exactly the way nestOK/opsOK
--- did and is owed by whoever owns the run structure: burst-caps
--- discharges it at the root via depthE≤capsH-root, and the eventual
--- subscribe/cascade induction must carry it as an invariant.  THE
--- PRESERVATION STEP IS A ONE-INSTANT DEPTH-GROWTH BOUND: depthE data
--- at ≤ h grows to ≤ blowH h in one instant, riding the recurrence
--- `capsH e sl (suc id) = blowH (capsH e sl id)` (`blowH` is BY DESIGN
--- "the worst one instant's cascades can do") — NOT `depth-capped` at
--- the state's own caps, which is off by "towerℕ of" at every index
--- (see (2) below; no index shift closes it).  That preservation lemma
--- is genuinely new mathematics of the demand-walk flavour; per the
--- wiring law it is not stated as a postulate until the induction that
--- consumes it exists — this note is where it is recorded meanwhile.
+-- depth bound `depthE … ≤ capsH e sl id`, supplied by the caller.  A
+-- premise is not a weakening here — `subscribe-depth-capsH` (above) IS
+-- that bound, at the same level and off the same `capsOK?` — and it is
+-- what keeps this lemma independent of the depth induction: the two
+-- meet at a call site, and `burst-caps` is where the root instance is
+-- met.  The state-free form is false, a state being free to carry a
+-- registry no cap has seen, which is why the bound reads a LEVEL and
+-- not only the syntax.
 --
+-- ITS PRESERVATION STEP IS A ONE-INSTANT DEPTH-GROWTH BOUND: depth
+-- data at ≤ h grows to ≤ blowH h in one instant, riding the recurrence
+-- `capsH e sl (suc id) = blowH (capsH e sl id)` (`blowH` is BY DESIGN
+-- "the worst one instant's cascades can do").  It is not stated as a
+-- postulate until an induction consumes it.
+-- DEAD ROUTE: charging the growth at the state's OWN caps instead.
+--   That is off by "towerℕ of" at every index, and no index shift
+--   closes the gap — see (2) below, where the same arithmetic is spent
+--   the other way round.
+
 -- THE CHAIN, every link named: jB puts j′ under the walk receipt
 -- `opIterD S W dep k m 0`; opIterD-dominated (with nestOK/opsOK
 -- supplying k ≤ S / m ≤ S, and 2≤capsAt-size / 1≤capsAt-reg free)

@@ -157,33 +157,14 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`hops-map`** (Hop-Burst-Face) — SHAPE, refuted: the size conjunct asks a
-  payload to fit a budget that paid ADDITIVELY for the function, while
-  substitution multiplies by its occurrences. The hop half is untouched; the
-  caps restatement is priced DEAD in `depth-hop`'s header, so the induction
-  moves.
-- **`hops-scan`** (Hop-Burst-Face) — SHAPE, refuted one fold deeper: a step
-  naming its accumulator twice doubles the stored observable per emission. The
-  exponential hop arithmetic it was ranked for is still owed after restating.
-- **`hops-all`** (Hop-Burst-Face) — SHAPE, refuted with no arithmetic of its
-  own: the operator republishes an inner's values, so a duplicating inner hands
-  it a payload its condition never sized. The frame walk and the inner descent
-  are the work that survives.
-- **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
-  twins are proven, but its header rules out repackaging — the delivery machinery
-  sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
-  unconditional form is false.
-- **`hopD-le-tower`** (Caps-Bridge) — DIFFICULTY: the measure-to-tower half, at
-  the height the deleted arithmetic already used. Its tower step survives and is
-  spent by a real body; the induction does not, a refold being an exponential.
-- **`hops-of`** (Hop-Burst-Face) — GRINDABLE, the one-shot arm: payloads are
-  `evalTm` of the terms written in the source, which `hopD-evalWith` already
-  bounds by their own `hopDᵗ`, and no substitution enlarges them — so the size
-  conjunct survives the face's restatement. Probed tight at four paths.
-- **`hops-take`** (Hop-Burst-Face) — GRINDABLE, the take arm: the frame does
-  not touch a value — so the size conjunct survives the face's restatement —
-  and `hopDᵉ` is EQUAL on a take and its source, so `pushTake-wet` is the whole
-  shape.
+- **`subscribe-depth-capsH`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
+  depth bound, restated over `capsOK?` once the hop currency was refuted. A
+  payload is a stored value, so a state predicate reaches it where a syntactic
+  size cannot; its header prices both dead currencies.
+- **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY: the delivery half of
+  the same bound, over `depthCascade`. The delivery machinery sits wholly
+  outside `depthE`'s induction, so the sibling reaches none of it; one induction
+  should cover both, and neither is the other's precedent.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.

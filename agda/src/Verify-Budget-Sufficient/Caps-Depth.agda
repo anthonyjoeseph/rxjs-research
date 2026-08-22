@@ -82,8 +82,8 @@
 module Verify-Budget-Sufficient.Caps-Depth where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≤_)
-open import Data.Nat.Properties using (≤-trans; m≤m⊔n; m≤n⊔m)
+open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≤_; z≤n)
+open import Data.Nat.Properties using (≤-trans; m≤m⊔n; m≤n⊔m; ⊔-lub)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Fin     using (Fin; toℕ)
@@ -427,9 +427,10 @@ depthChain {n = n} {e = e} id a path sched st =
 
 ------------------------------------------------------------------
 -- ONE ARRIVAL INTO EVERY LIVE CHAIN, mirroring `cascadeGo` clause for
--- clause.  This is the DELIVERY side's top measure, and the reason it
--- exists: `depth-hop` bounds `depthE`, the SUBSCRIBE side, and
--- nothing bounds the delivery side at all.  The walk's `cascadeGo-go`
+-- clause.  This is the DELIVERY side's top measure, and it is separate
+-- because the delivery machinery — `chainStep`, `foldPath`, `stepFrame`
+-- — sits wholly outside `depthE`'s induction, so a subscribe-side bound
+-- reaches none of it.  The walk's `cascadeGo-go`
 -- reads its per-chain premise off this head, so the two clauses must
 -- match the evaluator's exactly or the projections stop being definitional.
 --
@@ -491,3 +492,24 @@ lub3-m a b c h = ≤-trans (m≤m⊔n b c) (≤-trans (m≤n⊔m a (b ⊔ c)) h)
 
 lub3-r : ∀ a b c {d} → a ⊔ (b ⊔ c) ≤ d → c ≤ d
 lub3-r a b c h = ≤-trans (m≤n⊔m b c) (≤-trans (m≤n⊔m a (b ⊔ c)) h)
+
+------------------------------------------------------------------
+-- A TAKE'S PUSH COSTS NO DEPTH AT ALL, and it lives beside the measure
+-- rather than beside a bound: `takeDispatch` subscribes nothing, so the
+-- frame clause is `0` and the burst is a fold of `0`s.  Nothing about
+-- the currency a consumer bounds this by enters the statement
+------------------------------------------------------------------
+
+burst-takef-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (fuel : Gas) (bid : Id) (now : Tick)
+  (nid : NodeId) (κ : Path Γ s t)
+  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst fuel bid now (take-f nid) κ stream sched st ≤ 0
+burst-takef-zero fuel bid now nid κ [] sched st = z≤n
+burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
+  ⊔-lub z≤n (burst-takef-zero fuel bid now nid κ ems sched' st')
+  where
+  sp     = splitEvents {A = Val Γ s} (InstEmit.events em)
+  r      = stepFrame fuel bid now (take-f nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))

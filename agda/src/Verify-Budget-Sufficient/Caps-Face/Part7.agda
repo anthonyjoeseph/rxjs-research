@@ -1165,28 +1165,27 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- `depthE≤capsH-root`, and the one genuinely NEW obligation the P3/#9
 -- signature pass creates.
 --
--- WHY IT IS A POSTULATE AND NOT A DERIVATION.  `depth-hop`
--- (Depth-Compositional.agda) bounds `depthE`, the SUBSCRIBE side, by
--- `hopDᵉ V (slotHop V (Sched.slots sched)) b + pathNestD κ`.  Nothing anywhere
--- bounds the DELIVERY side: `depthCascade` reaches frames through
--- `chainStep`/`foldPath`/`stepFrame`, and every one of those is outside
--- `depthE`'s induction.  So this is a real gap with a real statement,
--- not a repackaging of one already proven.
+-- WHY IT IS A POSTULATE AND NOT A DERIVATION.  Its subscribe-side
+-- sibling `subscribe-depth-capsH` (.Caps-Bridge) bounds `depthE`, and
+-- reaches none of the DELIVERY side: `depthCascade` gets to frames
+-- through `chainStep`/`foldPath`/`stepFrame`, and every one of those is
+-- outside `depthE`'s induction.  So this is a real gap with a real
+-- statement, not a repackaging of one already proven — and the sibling
+-- is itself open, so neither is the other's precedent.
 --
 -- WHY IT SHOULD BE TRUE.  A cascade climbs one nesting level per
 -- thru-outer frame (`depthFrame`'s only `suc`), and a chain's frames are
 -- bounded by its path length, which `pathSz?` caps at `sizeAt S J` — so
 -- the whole cascade climbs at most the registry's own depth, which is
--- what `capsH` counts.  Its eventual proof is the delivery-side twin of
--- `depth-hop`'s induction and belongs beside it.
+-- what `capsH` counts.  One induction should cover this and the
+-- subscribe side together, and neither home is where it will live.
 --
 -- CONDITIONED ON `capsOK?`, deliberately: the unconditional form is
 -- false for the same reason a state-free `depthE ≤ capsH` is — a state
 -- may carry an arbitrarily deep store that no cap has seen, and the
 -- witness is an adversarial `map-f` chain.  That finding is prose and
--- not a machine refutation, and the module it was written in is gone;
--- `Caps-Bridge`'s own account of the `depOK` premise is where it now
--- lives, with the recovery sha beside it.
+-- not a machine refutation; `Caps-Bridge`'s account of the `depOK`
+-- premise is where it lives.
 postulate
   cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

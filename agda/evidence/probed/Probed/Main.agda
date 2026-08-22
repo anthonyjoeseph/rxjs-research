@@ -17,4 +17,3 @@
 module Probed.Main where
 
 open import Probed.Root using ()
-open import Probed.Depth-Hop using ()

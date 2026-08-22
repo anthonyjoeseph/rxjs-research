@@ -103,7 +103,7 @@ open import Verify-Budget-Sufficient.Caps-Nest
 open import Verify-Budget-Sufficient.Node-Fresh
   using (mint-install-survives)
 -- take's push costs no depth at all: takeDispatch subscribes nothing
-open import Verify-Budget-Sufficient.Depth-Compositional
+open import Verify-Budget-Sufficient.Caps-Depth
   using (burst-takef-zero)
 open import Verify-Budget-Sufficient.Walk-Level.Statement using
   (inputᶜ; WalkStmt; WalkStmtAt; WalkStmtAt⁻ᴴ; WalkStmtᴴˢ; WalkStmtᴴˢˢ;

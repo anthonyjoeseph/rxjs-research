@@ -483,16 +483,6 @@ size≤sizeCapAt e sl id =
   ≤-trans (≤-trans (m≤n+m (sizeᵉ e) 2) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
 
--- and so does the slot telescope's, out of the SAME summand.  The depth
--- mirror is what wants this one: `depth-hop`'s size condition is not
--- inherited at the `input` clause, where the subject's own `sizeᵉ` is 1
--- and the recursion enters a shared def of any size at all
--- REFUTED: `Refuted.Depth-Hop`, `depth-hop-slot-absurd`
-slotsSize≤sizeCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : Id) → slotsSize sl ≤ sizeCapAt e sl id
-slotsSize≤sizeCapAt e sl id =
-  ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
-
 -- REFUTED: `wet-ceiling-absurd` and
 --   `wet-ell-absurd` now live in `refuted/Refuted/Wet.agda`, checked by
 --   `make refuted`.  They kill the shared-anchor ceiling and the d-indexed
