@@ -202,11 +202,10 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`nest-store≤capsH`** (Caps-Bridge) — DIFFICULTY, the tier's new anchor: the
-  whole depth face now reduces to one syntactic inequality into
-  `blowH (capsBase e ins)`. Not FALSITY, and its header says why the target
-  dominates; what is real work is that the proven `poolCount` lower bound is
-  linear and `blowH` is `abstract`.
+- **`nestD-le-tower`** (Caps-Bridge) — DIFFICULTY, the tier's new anchor: the
+  whole depth face reduces to one SYNTACTIC inequality, with no `capsOK?`, no
+  `blowH` and nothing `abstract` in it. The caps side is discharged by
+  `tower-le-blowH`; the header names the tower kit the induction spends.
 - **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY, downgraded from
   FALSITY by rows that reached the product itself: the burst's sibling-max
   finding survives, and the nesting term the restatement added is what the

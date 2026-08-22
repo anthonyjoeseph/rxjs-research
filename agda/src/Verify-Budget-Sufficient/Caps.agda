@@ -1416,3 +1416,83 @@ capsAt-tower e sl (suc id) =
 -- three stories on top of a tower height is three more levels
 tower-3 : ∀ (h x : ℕ) → x ≤ towerℕ h → 2 ^ (2 ^ (2 ^ x)) ≤ towerℕ (3 + h)
 tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
+
+-- A TOWER'S WORTH OF POOL — restored, and generalised past the statement
+-- it was originally cut down to.
+--
+-- This chain was written to discharge `three-size≤capsH`, whose deliverable
+-- needed only `m ≤ poolCount (towerℕ m) m`, so that is all the old
+-- `capsBase-le-pool` STATED.  Its route always proved more: it goes
+-- `m ≤ towerℕ m ≤ dCapᶜ … ≤ lvls … ≤ poolCount`, and the second link is
+-- where the strength is.  The depth face's restatement over a measure that
+-- is exponential in the program needs exactly the intermediate, so the
+-- lemma is now stated at the strength its own proof had, and the linear
+-- corollary is gone with its only consumer.
+--
+-- The five steps below are unchanged; only (7) and (8) are new.  They were
+-- deleted for one commit when `three-size-le-blowH` lost its consumer, and
+-- restoring them is the reachability check being right about "no consumer
+-- TODAY" and wrong about "no consumer EVER".
+
+-- (1) suc J ≤ fLvlD S W d J
+sucJ≤fLvlD : ∀ (S W d J : ℕ) → suc J ≤ fLvlD S W d J
+sucJ≤fLvlD S W d J =
+  ≤-trans
+    (≤-trans (s≤s (m≤m+n J (suc (widAt S W J) * suc (sizeAt S J))))
+             (≤-reflexive (sym (+-suc J (suc (widAt S W J) * suc (sizeAt S J))))))
+    (fLvl≤fLvlD S W d J)
+
+-- (2) suc J ≤ dLvl S W d J
+sucJ≤dLvl : ∀ (S W d J : ℕ) → suc J ≤ dLvl S W d J
+sucJ≤dLvl S W d J =
+  ≤-trans (sucJ≤fLvlD S W d J)
+          (iterL-infl S W d (sizeAt S J) (fLvlD S W d J))
+
+-- (3) J + n ≤ lvls S W d J n
+J+n≤lvls : ∀ (S W d J n : ℕ) → J + n ≤ lvls S W d J n
+J+n≤lvls S W d J zero    = ≤-reflexive (+-identityʳ J)
+J+n≤lvls S W d J (suc n) =
+  ≤-trans (≤-reflexive (+-suc J n))
+  (≤-trans (s≤s (J+n≤lvls S W d J n))
+           (sucJ≤dLvl S W d (lvls S W d J n)))
+
+-- (4) i ≤ dWalkᶜ S W R d g J i
+i≤dWalkᶜ : ∀ (S W R d g J i : ℕ) → i ≤ dWalkᶜ S W R d g J i
+i≤dWalkᶜ S W R d g J zero    = z≤n
+i≤dWalkᶜ S W R d g J (suc i) =
+  let w = dWalkᶜ S W R d g J i
+      D = dCapᶜ S W R d g (lvls S W d J (suc w))
+  in ≤-trans (s≤s (i≤dWalkᶜ S W R d g J i))
+     (≤-trans (s≤s (m≤m+n w D))
+              (≤-reflexive (sym (+-suc w D))))
+
+-- (5) M ≤ dCapᶜ M M M d (suc M) 0
+M≤dCapᶜ : ∀ (M d : ℕ) → M ≤ dCapᶜ M M M d (suc M) 0
+M≤dCapᶜ M d =
+  ≤-trans (≤-reflexive (sym (*-identityʳ M)))
+          (i≤dWalkᶜ M M M d M 0 (regAt M M 0))
+
+-- (6) 1 ≤ towerℕ m for all m
+1≤towerℕ : ∀ m → 1 ≤ towerℕ m
+1≤towerℕ zero    = ≤-refl
+1≤towerℕ (suc m) = ≤-trans (s≤s z≤n) (k≤towerℕ (suc m))
+
+-- (7) THE INTERMEDIATE, which is the whole point: the pool is at least a
+-- TOWER in its own index, not merely linear in it.
+towerℕ≤pool : ∀ (m : ℕ) → towerℕ m ≤ poolCount (towerℕ m) m
+towerℕ≤pool m =
+  ≤-trans (M≤dCapᶜ (towerℕ m) m)
+  (≤-trans (J+n≤lvls (towerℕ m) (towerℕ m) m 0
+                     (dCapᶜ (towerℕ m) (towerℕ m) (towerℕ m) m (suc (towerℕ m)) 0))
+           (poolBody≤poolCount (towerℕ m) m (1≤towerℕ m)))
+
+-- (8) THE DELIVERABLE: a story index buys a tower of its own height.
+-- `blowH` is `abstract`, so `blowH-body` is the only door.
+tower-le-blowH : ∀ (m : ℕ) → towerℕ m ≤ blowH m
+tower-le-blowH m =
+  ≤-trans (towerℕ≤pool m)
+  (≤-trans (m≤m+n P (P + 0))
+  (≤-trans (m≤n+m (2 * P) (6 + m))
+           (≤-reflexive (sym (blowH-body m)))))
+  where
+  P = poolCount (towerℕ m) m
