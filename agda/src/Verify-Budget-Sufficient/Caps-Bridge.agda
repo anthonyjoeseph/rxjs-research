@@ -1121,11 +1121,6 @@ abstract
 -- bound the source by the hypothesis, spend `sub-charge` to reach the
 -- burst's state, bound the frames there.
 --
--- WHAT IS STILL TO DECIDE, and it is why this is not a grind: the
--- measure spends a `suc` in exactly two places — a `thru-outer` frame
--- and a concatAll drain — and both are reached under a `⊔`, so the
--- question is whether ONE level allowance serves both or whether the
--- statement has to be indexed by which arc it is under.
 -- DEAD ROUTE: bounding the nesting count by the PATH LENGTH.  The
 --   invariant is true and it lands in the wrong place.  `depthE g b κ …
 --   + pathLen κ ≤ sizeCapAt e sl id` propagates cleanly — each re-entry
@@ -1145,6 +1140,72 @@ abstract
 --   `blowH` is `abstract` for a measured reason — with the body visible
 --   the delivery count inlines twice and squares — so the level count
 --   has to be reached through the recurrence's own name.
+
+-- FOUR CURRENCIES HAVE DIED IN THIS ONE REGION, SO THE FIFTH THING TO
+-- TRY IS NOT A CURRENCY.  A bound on `depthE` read at the ENTRY
+-- subject — some syntactic measure of `b`, plus some measure of the
+-- entry state — has now been refuted or priced dead four times over,
+-- and the four do not share an arithmetic mistake.  They share a
+-- SHAPE: the bound is read where `capsOK?` is checked and spent where
+-- the sweep has already deepened, so the hypothesis holds at a level
+-- the conclusion is not about.  This is the one statement of the face
+-- that reads a level it does not REPORT; every other one reports
+-- growth, `frameStep j ↦ frameStep (j + j′)`, with `sub-charge`
+-- minting the `j′` over exactly this burst.
+--
+-- AND THE FUEL IS NOT THE PROBLEM, WHICH IS WHY THE REPAIR IS THE
+-- MECHANISM.  `capsH e sl id` is `blowH` iterated `id` times, so it
+-- towers away from anything a sweep can reach and the goal is
+-- astronomically true — every crossing has been in the ROUTE.  What no
+-- route can cross is that the invariant's only handle on a stored
+-- observable is `sizeᵛ (obs t) e ≡ sizeᵉ e` under `cSize`, a SIZE, and
+-- the size cap sits exponentially above the height cap at every level:
+-- `capsAt e sl (suc id)` steps the previous caps `sizeCount` times at
+-- `sizeStep S s = S * suc (2 * s)` each, while `capsH` gains that same
+-- count only LINEARLY through `blowH`'s pooled summand.  So the fact
+-- the conclusion needs is not in the invariant at any strength, and a
+-- nesting cap belongs in the caps RECORD beside `cSize`/`cWid`/`cReg`,
+-- carried and reported like them, rather than in a fifth measure read
+-- off the subject.
+-- DEAD ROUTE: a nesting measure read at the subject, and it died by
+--   DEGREE rather than by arithmetic, which is what makes it evidence
+--   about every such measure.  A gadget's depth grows QUADRATICALLY in
+--   ticks while a sum of syntactic measures grows linearly, so no
+--   tightening of the sum could have closed it; the same measure also
+--   read its widening at the UNSUBSTITUTED source, where a bare
+--   payload variable weighs nothing, so two programs differing only in
+--   how many literals a map consumes shared one cap against depths of
+--   4 and 8.
+-- DEAD ROUTE: the three-size cap, `sizeᵉ b + pathLen κ` joined with a
+--   store maximum, conditioned on `capsOK?`.  Refuted: the multiple of
+--   `cSize` is a CONSTANT while the gap under it is a PRODUCT, and the
+--   deeply nested value is a scan's stored accumulator — which
+--   `boundedNode` bounds by `cSize` at the entry state, where the
+--   nodes are empty.  Crossed at seven wraps over twenty-nine ticks,
+--   204 against 201.
+-- DEAD ROUTE: the WIDTH measures, and this is the one that reads alive
+--   from the clause.  `innWⱽ`/`pmIⱽ` each carry an exponential at a
+--   `scanᵉ`, which looks like the missing per-wrap charge — but the
+--   base is `pmIᵗⱽ … 0 f ⊔ 1`, and a step function that re-wraps its
+--   accumulator has that at exactly 1, so the family is blind to the
+--   wrap count.  Refuted against the MAX of all four measures at once,
+--   24 against a depth of 49.  Width is how many payloads travel
+--   abreast; a wrap deepens ONE payload.
+-- RECOVERY: `git show 555ee43^:agda/src/Verify-Budget-Sufficient/Depth-Bound.agda`
+--   holds the three-size assembly and, PROVEN under it, the inversion a
+--   record-carried nesting cap will want back: `storeNest-capped` reads
+--   `capsOK?`'s own conjuncts, and `foldr-⊔-bounded` /
+--   `node-nest-bounded` / `nodesNestMax-bounded` take a `boundedNode`
+--   test to a `⊔`-measure bound.  Only its slot half broke, on a
+--   measure that paid a def's nesting.
+-- RECOVERY: `git show c3a51ea^:agda/src/Verify-Budget-Sufficient/Depth-Compositional.agda`
+--   holds the nesting-currency face at its high-water mark — sixteen
+--   real clauses over `nestDᵉ` (`Rx/Nest-Depth.agda` at the same sha),
+--   the seven `emit-*` leaves and `emit-cap`, `depth-μ-bound` and
+--   `depth-subst-guarded`.  The clause census transfers to any
+--   successor: it traces every head of the depth family to the channel
+--   that funds it, and the `*All` burst arm is where a per-wrap charge
+--   has to go.
 
 -- WHY THE PREDECESSOR IS GONE, AND WHY A SIZE PREMISE DOES NOT REPAIR
 -- IT.  `depth-hop` bounded this by `hopDᵉ V η b + pathNestD κ`, and
@@ -1195,13 +1256,6 @@ abstract
 --   wanted again whatever the decomposition: `sum2H`/`sum3H`/`sucH`/
 --   `hUp`/`hIn`/`1≤3x`/`payL`/`payR` for moving a bound up a tower,
 --   `tower-sum-tab` for a slot telescope, and `entryCeil-slotWid`.
--- RECOVERY: `git show 555ee43^:agda/src/Verify-Budget-Sufficient/Depth-Bound.agda`
---   restores the node-half kit — `foldr-⊔-bounded`, `node-nest-bounded`,
---   `nodesNestMax-bounded`, and an inversion of `stBounded?`'s
---   `boundedNode` test.  It is still TRUE and it is the apparatus a
---   STORED-STATE depth bound wants, which is what the statement above
---   is; only its slot half broke, and it broke on a measure that paid a
---   def's nesting.
 postulate
   subscribe-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)

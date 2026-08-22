@@ -1173,19 +1173,25 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- statement, not a repackaging of one already proven — and the sibling
 -- is itself open, so neither is the other's precedent.
 --
--- WHY IT SHOULD BE TRUE.  A cascade climbs one nesting level per
--- thru-outer frame (`depthFrame`'s only `suc`), and a chain's frames are
--- bounded by its path length, which `pathSz?` caps at `sizeAt S J` — so
--- the whole cascade climbs at most the registry's own depth, which is
--- what `capsH` counts.  One induction should cover this and the
--- subscribe side together, and neither home is where it will live.
+-- WHERE THE LEVELS COME FROM.  A cascade climbs one nesting level per
+-- thru-outer frame — `depthFrame`'s only `suc` on this side — so the
+-- quantity to bound is how many such frames one arrival can drive.  One
+-- induction should cover this and the subscribe side together, and
+-- neither home is where it will live.
+--
+-- AND COUNTING THEM BY THE PATH LENGTH IS THE TRAP.  `pathSz?` caps a
+-- chain's frames at `sizeAt S J`, so the count is available — as a
+-- SIZE, which sits exponentially above `capsH` at every level, and the
+-- gap is not an arithmetic one.  The sibling carries that finding and
+-- the four dead currencies behind it; this row inherits all of it,
+-- including that a nesting cap belongs in the caps record rather than
+-- in a measure read off the subject.
 --
 -- CONDITIONED ON `capsOK?`, deliberately: the unconditional form is
--- false for the same reason a state-free `depthE ≤ capsH` is — a state
--- may carry an arbitrarily deep store that no cap has seen, and the
--- witness is an adversarial `map-f` chain.  That finding is prose and
--- not a machine refutation; `Caps-Bridge`'s account of the `depOK`
--- premise is where it lives.
+-- false because a state may carry an arbitrarily deep store that no cap
+-- has seen.  The conditioned form is not yet enough either, for the
+-- reason above — `capsOK?`'s only handle on a stored observable is its
+-- size.
 postulate
   cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

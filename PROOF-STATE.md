@@ -157,14 +157,14 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`subscribe-depth-capsH`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
-  depth bound, restated over `capsOK?` once the hop currency was refuted. Its
-  header prices both dead currencies and names the route: the caps preservation
-  the induction needs is depth-free, so the cycle it looks like is not one.
-- **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY: the delivery half of
-  the same bound, over `depthCascade`. The delivery machinery sits wholly
-  outside `depthE`'s induction, so the sibling reaches none of it; one induction
-  should cover both, and neither is the other's precedent.
+- **`subscribe-depth-capsH`** (Caps-Bridge) — SHAPE: the subscribe-side depth
+  bound. Its header prices four dead currencies which share a shape rather
+  than an arithmetic mistake, so what gets restated is the mechanism: a
+  nesting cap carried in the caps RECORD, not a fifth measure read off entry.
+- **`cascade-depth-capsH`** (Caps-Face/Part7) — SHAPE: the delivery half, over
+  `depthCascade`. Same defect, and its own trap is counting frames by the path
+  length, which `pathSz?` supplies as a SIZE. The delivery machinery sits
+  wholly outside `depthE`'s induction, so neither row is the other's precedent.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.
