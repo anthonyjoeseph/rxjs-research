@@ -140,7 +140,7 @@ For calibration, the count it fires on at each ceiling: 2000 → 73 blocks,
 | markers | delete the line — `git log -S<name> --all` holds it, unrotting. |
 | shape | move the evidence to the foot of the block, in order. If the stranded prose is superseded framing, it goes rather than moves. |
 | references | resolve it, or demote the section to `DEAD ROUTE:`, which names nothing and is not validated. A `REFUTED:` used as *emphasis* rather than as a ledger entry is the common case — reword it to name the module in backticks mid-prose. |
-| budget | cut the superseded framing and the corrections-to-corrections. What survives is the finding, usually a fifth of the words. |
+| budget | **usually SPLIT, not cut.** A blank line separates blocks, so the ceiling caps one unstructured explanation rather than what a declaration may carry: an essay holding ten findings becomes ten blocks, each with its own heading and ledger, and nothing is deleted. Cut only when one block holds ONE finding and still runs long — then it is superseded framing, and what survives is usually a fifth of the words. |
 
 ## The fixtures
 

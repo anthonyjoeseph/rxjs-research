@@ -132,6 +132,12 @@ VALIDATED = ("TWIN", "REFUTED", "PROBED", "RECOVERY")
 BACKTICKED = re.compile(r"`([^`]+)`")
 DOTTED = re.compile(r"\b((?:[A-Z][A-Za-z0-9-]*\.)+[A-Za-z][A-Za-z0-9'_-]*)")
 SHA_TOKEN = re.compile(r"\b[0-9a-f]{7,40}\b")
+
+# A rule line is STRUCTURE, not prose: it separates, it says nothing, and it
+# closes a block from the left margin.  Charging it to the explanation would
+# tax punctuation, and reading it as prose stranded behind the evidence would
+# report every banner-closed block in the tree.
+RULE_LINE = re.compile(r"^[-=─━═_*+#.·]{3,}\s*$")
 GITLOG = re.compile(r"git log[^`\n]*agda/")
 
 
@@ -357,7 +363,8 @@ def audit(files, budget):
                         shape.append((f, start, "evidence out of order"))
                         break
                     seen = r
-                elif line.strip() and not line.startswith(" "):
+                elif (line.strip() and not line.startswith(" ")
+                      and not RULE_LINE.match(line.strip())):
                     stray += 1
             else:
                 if stray:
@@ -365,7 +372,9 @@ def audit(files, budget):
 
             # FOURTH CHECK.  Charge the explanation; sha-bearing lines are a
             # pointer rather than an explanation, so they are free.
-            cost = sum(len(line) for line in body[:cut] if not SHA_RE.search(line))
+            cost = sum(len(line) for line in body[:cut]
+                       if not SHA_RE.search(line)
+                       and not RULE_LINE.match(line.strip()))
             if cost > budget:
                 fat.append((f, start, cost, len(body)))
     return dated, hist, shape, fat, refs

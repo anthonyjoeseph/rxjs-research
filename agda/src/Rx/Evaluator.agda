@@ -373,7 +373,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- folded values the acc nests k deep, and fuel is depth-consumed —
 -- siblings share it), while SUBSCRIBING that acc emits its 2^k leaves
 -- as values — count exponentiates at each chained scan.  Measured
--- exactly (2026-07-19): thresholds 2,3,5,9 = 2^d+1 for one scan over
+-- exactly: thresholds 2,3,5,9 = 2^d+1 for one scan over
 -- 2^d values; counts 2,6,30,510 = 2^(2^d+1)−2; the next scan's
 -- threshold tracks that count.  So fuel demand towers in the number
 -- of chained scans (≤ size per instant, and scan state compounds one
@@ -396,7 +396,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- absorbs any polynomial fudge within two stories — the rest is
 -- margin.  The extra stories are free: the tower tail is lazy and
 -- never forced on a feasible run.
---
+
 -- AND THE HEIGHT IS NO LONGER LINEAR IN THE INSTANT.  It was, while the
 -- caps recurrence's per-instant fold count was `D̂ · cSize`: four tower
 -- stories an instant, height (7+sz)(id+2), and `capsAt-tower` bracketed
@@ -423,9 +423,9 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- height of `capsAt e sl id`, one `blowH` per instant, and `blowH` is
 -- exactly what one frameBlowup's inequalities demand plus visible
 -- margin — so domination is by construction rather than by arithmetic.
---
+
 -- THE PER-INSTANT COST, at a pooled level M (every Caps field ≤ M):
---
+
 --   THE COUNT     sizeCount c m ≤ poolCount M m     (by monotonicity —
 --                 poolCount IS sizeCount with every field pooled and
 --                 the SAME fuel, so this costs no arithmetic at all)
@@ -443,7 +443,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 
 ------------------------------------------------------------------
 -- THE DELIVERY BUDGET, AND WHY IT IS A RECURSION AND NOT A FORMULA.
---
+
 -- One cascade's deliveries are a TREE: `cascadeGo` walks the chains
 -- (at most cReg of them), a delivery's `foldPath` bottoms out at one
 -- `share-sink`, and `dispatchShare` fans out over `shareAdmit`'s
@@ -452,7 +452,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- THAT DISPATCH — and the registry GROWS mid-cascade, by at most `Q`
 -- mints per delivery (a mint is a subscribe, hence a charged step, so Q
 -- is the per-delivery charge).
---
+
 -- EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT.  Each closed attempt
 -- bounded the registry through the deliveries and the deliveries
 -- through the registry:
@@ -463,7 +463,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- right-hand side outgrows the left at every D, so the pair of facts
 -- bounds nothing whatever the constants.  A bigger closed form does not
 -- help; the fix is to stop asking for one.
---
+
 -- `dCapᶜ` IS THE SEQUENTIAL READING OF THE SAME TWO FACTS.  The walk
 -- happens one chain at a time, and what a later chain sees is what the
 -- deliveries ALREADY MADE left behind — which is exactly the ordering
@@ -472,14 +472,14 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- Written that way the recursion is on the dispatch gas outside and the
 -- walk position inside, and it is well-founded precisely where the
 -- closed form was circular.
---
+
 -- AND WHAT IT THREADS IS THE CAPS LEVEL, NOT A REGISTRY.  The first
 -- version threaded `R + Q · suc d` with `Q` a per-delivery mint budget
 -- read once at the cascade's ENTRY caps, and charging anything
--- per-frame at the entry caps is machine-refuted
--- (machine-refuted 2026-08-01: one `map-f` frame's output
+-- per-frame at the entry caps is machine-refuted by
+-- `Refuted.Caps-Face.caps-frame-boundary-absurd`: one `map-f` frame's output
 -- breaches the very cap it was charged at, because `applyFn` grows a
--- value).  The honest per-frame face REPORTS its growth as an index j′
+-- value.  The honest per-frame face REPORTS its growth as an index j′
 -- and lands at `frameStep (j + j′) c`, so the walk carries that index:
 --
 --   · a FRAME costs `fCharge S W J`, the receipt `scanFrame-caps` pays
@@ -494,17 +494,17 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 --   · and the REGISTRY needs no accounting at all: `capsOK?`'s fifth
 --     conjunct is `length registry ≤ cReg (frameStep J c)`, so the walk
 --     a dispatch fans out over is `regAt S R J` long.
---
+
 -- It is POINTWISE ABOVE the registry walk it replaces
 -- (measured as `old-cDel≤new-cDel` in a probe module since DELETED), so every
 -- measured delivery row the old bound cleared this one clears too.
---
+
 -- IT IS ACKERMANN-FLAVOURED IN THE GAS, and that costs nothing here:
 -- `blowH` READS it, so the per-instant story increment stays true by
 -- construction rather than by arithmetic.  The price of a lazy Gas
 -- tower's height being large is nothing at all
 -- ONE FOLD's worst case on a width — AND WHY IT READS THE SIZE.
---
+
 -- The earlier `2 ^ suc w` was gated against deepScan's PAYLOAD count and
 -- is refuted against the quantity capsOK? actually bounds: one fold
 -- takes deepScan's stored width 1 ↦ 6 where it allowed 4
@@ -512,7 +512,7 @@ hasDry (em ∷ ems) = any dryEvent (InstEmit.events em) ∨ hasDry ems
 -- puts the source's width in an EXPONENT whose base is read off the step
 -- function's syntax — so the per-fold multiplier is a property of `f`,
 -- and cSize is the only thing in Caps that bounds a step function.
---
+
 -- Note this is a strict GENERALISATION: at S = 2 it is exactly the old
 -- step, so Frame-Work-Probe's 2 / 6 / 126 gates still read as before
 foldStep : ℕ → ℕ → ℕ
@@ -538,10 +538,10 @@ iterSize S (suc k) s = iterSize S k (sizeStep S s)
 -- THE LEVEL READING, AND THE WALK THAT CARRIES IT.
 --
 -- `dCap` above threads a REGISTRY and charges each delivery a fixed `Q`
--- read once at the cascade's ENTRY caps.  That charging is REFUTED
--- (machine-refuted 2026-08-01: one `map-f` frame's output
+-- read once at the cascade's ENTRY caps.  That charging is refuted by
+-- `Refuted.Caps-Face.caps-frame-boundary-absurd`: one `map-f` frame's output
 -- breaches the entry cap it was charged at, because `applyFn` grows a
--- value), and the honest per-frame face — the PROVEN `stepFrame-caps`
+-- value.  The honest per-frame face — the PROVEN `stepFrame-caps`
 -- — reports a growth index j′ and lands its post-state at
 -- `frameStep (j + j′) c`.  So the walk carries the LEVEL instead:
 --
@@ -596,16 +596,15 @@ fLvl S W J = J + fCharge S W J
 --                     ≤ suc (widAt S W J) frames      (pushBurst, one
 --                                                      frame per emit)
 --
--- and the two charges are MUTUALLY RECURSIVE (measured, clause by
--- clause, off the ground companion tree —
--- Sub-Charge-Probe (DELETED; git history) § 0).  NO CLOSED FORM IN (S, W, J)
+-- and the two charges are MUTUALLY RECURSIVE, measured clause by clause off
+-- the ground companion tree.  NO CLOSED FORM IN (S, W, J)
 -- CLOSES THAT LOOP; it is the same failure `dCapᶜ` takes one stratum up
 -- ("EVERY CLOSED FORM FAILS, AND NOT BY A CONSTANT", below), and it
 -- takes the same repair: a RECURSION on a budget, with every level
 -- quantity read at the level the walk has CLIMBED TO rather than at the
--- entry (charging at the entry is machine-refuted,
--- machine-refuted 2026-08-01).
---
+-- entry (charging at the entry is machine-refuted by
+-- `Refuted.Caps-Face.caps-frame-boundary-absurd`).
+
 -- THE BUDGET IS THE SUBSCRIBE-NESTING DEPTH `k`, and the loop is not
 -- gas-escaping.  The obvious breach is a synchronous fixpoint
 -- `μ x. mergeAll (of x)`, which would re-enter `subscribeE` once per
@@ -615,7 +614,7 @@ fLvl S W J = J + fCharge S W J
 -- and `deferᵉ` is the sole gate moving Δᵍ into scope (Rx.Exp), so a μ's
 -- self-reference is reachable only across a TICK.  One subscribe
 -- unfolds a μ at most as many times as the syntax nests them.
---
+
 -- AND THE FAMILY IS WRITTEN IN THE ORDER THE CLAUSES RUN, which is not
 -- a cosmetic choice: the receipts compose as a CHAIN of inflationary
 -- maps, and two of them applied in the wrong order bound nothing.  A
@@ -629,22 +628,29 @@ fLvl S W J = J + fCharge S W J
 -- the per-operator EVAL receipt is QUADRATIC in the size cap, not
 -- linear — `unfoldμ-caps` pays `m + suc (m * m)`, which `suc B` does
 -- not cover and `suc B * suc B` does.  Each of the four clause shapes
--- then lands in one monotonicity step (gated:
--- Sub-Charge-Probe (DELETED; git history) § 5).
+-- then lands in one monotonicity step.
 --
+-- PROBED: the mutual recursion of the two charges (§ 0) and the four clause
+--   shapes' monotonicity step (§ 5).  The probe is spent;
+--   `git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda` recovers its rows.
+
 -- THE BUDGET IS RE-READ AT EVERY FRAME ENTRY, AND THE DEPTH FUEL `d` IS
 -- WHAT PAYS FOR THE RE-READING.  `fLvlD S W (suc d) J` spends one unit
 -- and instantiates k at `suc (sizeAt S J)`, the size cap at the level
 -- THAT frame runs at — not at the level the subscribe that reached it
--- began at.  Inheriting the budget instead is REFUTED (2026-08-03,
--- Nest-Budget-Probe (DELETED; git history) § 3): a `scanᵉ` under an *All mints
--- a payload per fold, the k-th mint nests k deep and is subscribed in
+-- began at.  Inheriting the budget instead is refuted: a `scanᵉ` under an
+-- *All mints a payload per fold, the k-th mint nests k deep and is subscribed in
 -- the SAME delivery, and the carrier's own nesting stands still — so a
 -- k read where the subscribe BEGAN (2, at S = 2, W = 1, J = 0) is spent
 -- where the walk has CLIMBED TO (43690).  It is the Entry-Caps-Refuted
 -- distinction moved from the caps to the budget.
 --
--- THE REFRESH IS SOUND AS A THEOREM (Refresh-Probe (DELETED; git history) § 1):
+-- DEAD ROUTE: inheriting the budget from the level the subscribe began at,
+--   rather than re-reading it at the level the frame runs at.  Refuted in § 3
+--   of the probe `git show 1f1730e^:agda/probe/Nest-Budget-Probe.agda`
+--   recovers.
+
+-- THE REFRESH IS SOUND AS A THEOREM.
 -- `stepFrame` reaches `subscribeInner` from two clauses only —
 -- `thru-outer`, whose payloads are its own arriving values, and a concat
 -- drain, whose queue was filled at a LOWER level — so `valsCaps?` at the
@@ -655,8 +661,11 @@ fLvl S W J = J + fCharge S W J
 -- the fuel `d` is threaded as the argument that descends and the d = 0
 -- clause is the old family's own k = 0 answer, `J + m`.
 --
+-- PROBED: the refresh's soundness (§ 1).  The probe is spent;
+--   `git show 94a5a3c^:agda/probe/Refresh-Probe.agda` recovers its rows.
+
 -- AND `d` IS THE BUDGET RECURRENCE'S OWN HEIGHT, THREADED EXPLICITLY
--- (the ruling, 2026-08-03).  It is NOT read off (S, W, J): a fuel read
+-- (the ruling).  It is NOT read off (S, W, J): a fuel read
 -- at a level is spent after a climb, which is the same refutation one
 -- stratum up.  The one supplier that owes no new invariant is the
 -- evaluator's OWN `Gas`, and the gas discipline that licenses it is
@@ -684,7 +693,7 @@ fLvl S W J = J + fCharge S W J
 --   `suc now`, a later instant with a budget of its own.  Hence
 --   subscribe-nesting depth ≤ the gas the instant runs under, by
 --   induction on the evaluator's own recursion.
---
+
 -- THE INSTANTIATION IS THEREFORE AT THE TOP, TWICE, AND THE CYCLE IS
 -- BROKEN BY THE STORY INDEX.  `budgetAt`'s height runs through
 -- `capsHgo`, hence `blowH`, hence `poolCount`, hence `lvls` — so a `d`
@@ -696,7 +705,7 @@ fLvl S W J = J + fCharge S W J
 -- level up — instant id's blowup runs at `d := capsH e sl id` — so the
 -- two agree by construction and `blowup-tower`'s count axis compares
 -- `sizeCount c m` against `poolCount (towerℕ m) m` at the SAME fuel.
---
+
 -- WHAT IS STILL OWED, AND IT IS OWED BY THE SIGNATURE PASS RATHER THAN
 -- BY THIS DEFINITION: that the story index dominates the depth the
 -- instant actually reaches.  The bridge above bounds that depth by the
@@ -706,7 +715,7 @@ fLvl S W J = J + fCharge S W J
 -- cycle, and the inequality it needs (nesting depth ≤ m, rather than ≤
 -- the gas height) is a smaller claim than the gas bound supplies.
 -- Reported, not assumed
---
+
 -- ABSTRACT, and for the same PERFORMANCE reason `blowH` and `sizeCount`
 -- are.  Every one of these clauses matches on an argument that is a
 -- literal `suc` even at a variable J (`suc (widAt S W J)`,
@@ -715,26 +724,28 @@ fLvl S W J = J + fCharge S W J
 -- times over.  Opaque, a frame's level is one symbol everywhere above
 -- it, and the `-body` equations hand the clauses back where the
 -- arithmetic needs them (.Caps)
---
--- DEAD ROUTE 2026-08-12: THIS FAMILY CANNOT BE PROBED, and the seal is
--- not the reason — so unsealing it would not help.  `blowH-body`
--- unfolds `blowH`, but `poolCount` then sticks on THIS block, and
--- `poolCount 1 0` does not reduce to a numeral at the smallest possible
--- arguments.  A non-abstract COPY of the whole family fails the same
--- way: the blowup is COMPUTATIONAL, not definitional.  Confirmed
--- independently with no typechecker in the loop — the compiled harness
--- (`make harness`) ran `poolCount 1 0` and `blowH 0` for 45 s at `-O`
--- without printing, in the same binary whose calibration row passed.
+
+-- THIS FAMILY CANNOT BE PROBED, and the seal is not the reason — so
+-- unsealing it would not help.  `blowH-body` unfolds `blowH`, but
+-- `poolCount` then sticks on THIS block, and `poolCount 1 0` does not
+-- reduce to a numeral at the smallest possible arguments.  A non-abstract
+-- COPY of the whole family fails the same way: the blowup is
+-- COMPUTATIONAL, not definitional.  Confirmed independently with no
+-- typechecker in the loop — the compiled harness (`make harness`) ran
+-- `poolCount 1 0` and `blowH 0` for 45 s at `-O` without printing, in the
+-- same binary whose calibration row passed.
 -- `blowH m = 6 + m + 2 · poolCount (towerℕ m) m` feeds `poolCount` a
 -- TOWER, so the value is astronomically large by construction and no
 -- backend or hardware prints it.  `towerℕ` is NOT the blocker (it
 -- computes to height 4).
 --
--- CONSEQUENCE, and check it before planning a probe: a statement whose
--- CONCLUSION depends on this family is symbolic-or-nothing.  A
--- statement that touches it only in its HYPOTHESES is a different case
--- and may well be probeable on the conclusion side — do not read this
--- note as covering the whole caps development.
+-- AND CHECK THIS BEFORE PLANNING A PROBE: a statement whose CONCLUSION
+-- depends on this family is symbolic-or-nothing.  A statement that touches
+-- it only in its HYPOTHESES is a different case and may well be probeable on
+-- the conclusion side — do not read this note as covering the whole caps
+-- development.
+--
+-- DEAD ROUTE: probing this family at all, sealed or unsealed.
 ------------------------------------------------------------------
 
 abstract

@@ -16,4 +16,5 @@ module Clean where
 --   `*All`s -- nine rows with no margin.  Not reached: a state deep in a
 --   cascade, and the `caseᵗ` clause.
 -- RECOVERY: git show 853c49e7ca7d24 restores the width walk and its cone.
+------------------------------------------------------------------
 postulate leaf : Set

@@ -1061,6 +1061,17 @@ A required field on a row that has no twin produces a filler `TWIN:`, and filler
 is **worse than empty**, because it earns a class the row has not earned. Structure is
 enforced on *order and resolution*, never on presence.
 
+**AND THE REPAIR FOR AN OVER-BUDGET BLOCK IS USUALLY TO SPLIT IT, NOT TO CUT IT.**
+This is what the budget is FOR, and it is worth knowing before you start deleting: a
+block is separated from the next by a genuinely blank line, so the ceiling caps **one
+unstructured explanation**, not how much a declaration may carry. An essay holding ten
+findings under one banner becomes ten blocks, each with its own heading and its own
+ledger, and nothing is lost — the reader gains landmarks and the budget stops firing
+because each finding now fits. Reach for the knife only when a block holds ONE finding
+and still runs long; then what is over budget is genuinely superseded framing. Worked
+instance: a 154-line wall in the evaluator became ten skimmable blocks with no prose
+deleted at all.
+
 **AND ONLY THE EXPLANATION IS CHARGED (Anthony).** The prose before the first evidence
 marker has a character budget; the evidence sections and any `git show` pointer are
 free. This asymmetry is the entire design, and the tempting symmetric rule is wrong: a

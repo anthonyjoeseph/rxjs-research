@@ -19,10 +19,10 @@
 -- exactly what `hopD-η-congᵉ` (Rx.Hop-Eta-Cong) and `ηAt-agrees`
 -- (below) say, and nothing more is needed.
 --
--- BOTH ARE NOW PROVEN (2026-08-14), so slotHop-fix rests on no
--- postulate.  That matters beyond the count: the input-wet restatement
--- is built on this equation, so while these two were postulates the
--- repair for a machine-refuted statement was itself unverified.
+-- BOTH ARE PROVEN, so slotHop-fix rests on no postulate.  That matters
+-- beyond the count: the input-wet restatement is built on this equation,
+-- so a postulate here would leave the repair for a machine-refuted
+-- statement itself unverified.
 ------------------------------------------------------------------
 module Rx.Slot-Hop where
 
@@ -40,7 +40,7 @@ open import Rx.Exp       using (Ctx; Closed; inputsBelowᵉ; isData; Val)
 open import Rx.Slots     using (Slot; Slots; scripted; shared)
 open import Rx.Prim      using (ObservableInput)
 open import Rx.Hop-Depth using (hopDᵉ)
--- PROVEN (ex-postulate 2026-08-14): the η congruence slotHop-fix spends
+-- PROVEN: the η congruence slotHop-fix spends
 open import Rx.Hop-Eta-Cong using (hopD-η-congᵉ)
 
 -- one slot's hop, given an environment for the inputs its def may
@@ -63,8 +63,8 @@ slotHopD V η (shared d)   = hopDᵉ V η d
 slotHop : ∀ {n} {Γ : Ctx n} (V : ℕ) (sl : Slots Γ) → Fin n → ℕ
 slotHop V sl i = slotHopD V (ηAt V sl (toℕ i)) (sl i)
 
--- THE STAGE IS ALREADY RIGHT WHERE IT CLAIMS TO BE — ex-postulate
--- (2026-08-14): below k, ηAt's answer IS the fixpoint's.
+-- THE STAGE IS ALREADY RIGHT WHERE IT CLAIMS TO BE: below k, ηAt's
+-- answer IS the fixpoint's.
 --
 -- Induction on k.  At k = 0 the guard `T (toℕ j <ᵇ 0)` is ⊥ and the
 -- statement is vacuous, which is exactly why Demand-Probe series W —

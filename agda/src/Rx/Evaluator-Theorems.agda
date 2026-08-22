@@ -22,9 +22,7 @@ open import Rx.Slots using (Slot; Slots)
 -- lives in Verify-Well-Formed as a real proof over postulated
 -- stage lemmas.
 
--- PROBED 2026-08-11 (receipt; the probe is deleted).  No refutation
--- found for `fuel-coherent` or `μ-unfold` on the evaluator's own laws.  Two
--- facts worth keeping from that sweep:
+-- Two facts worth keeping from the sweep over the evaluator's own laws:
 --   * μ SELF-SUBSCRIPTION IS A TYPE ERROR, not merely unreachable — the Δᵍ/Δ
 --     gate via `deferᵉ` rules it out at the type level, so no dynamic argument
 --     is owed for it.
@@ -32,6 +30,10 @@ open import Rx.Slots using (Slot; Slots)
 --     (9 → 9).  That asymmetry is the reason the budget measure reads
 --     syncSize; see Rx/Exp.agda's header, which also records the refutation
 --     of the emissions-per-instant bound.
+--
+-- PROBED: no refutation found for `fuel-coherent` or `μ-unfold`.  The probe
+--   is spent and deleted;
+--   `git show 1f1730e^:agda/probe/Battery-Eval-Laws.agda` recovers its rows.
 postulate
   -- fuel is arrivals: processing more arrivals only extends the stream
   fuel-coherent :

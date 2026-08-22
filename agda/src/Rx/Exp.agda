@@ -497,14 +497,17 @@ mutual
 -- only at defer-gated var positions, so μ-unfolding PRESERVES
 -- syncSize while sizeᵉ grows.
 --
--- REFUTED 2026-08-11, and this is the receipt for a route that must not be
--- retried: **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT.**  Machine-
--- checked counterexample: at K = 4 a scripted source emits valueCount 30
--- against syncSizeᵉ 20.  K = 1..3 all hold (2≤17, 6≤18, 14≤19), which is
--- exactly why the bound looks true from small cases — it fails only once the
--- family is pushed.  This killed the `sync-count-bounded` postulate, which no
--- longer exists anywhere in src; the note survives so nobody re-derives it
--- from the first three rows.
+-- **`syncSizeᵉ` DOES NOT BOUND EMISSIONS PER INSTANT**, and the shape of the
+-- failure is the part worth carrying: K = 1..3 all hold (2≤17, 6≤18, 14≤19),
+-- so the bound looks true from small cases and fails only once the family is
+-- pushed.  Nothing in src states it any more.
+--
+-- DEAD ROUTE: bounding emissions per instant by `syncSizeᵉ`.  The witness was
+--   machine-checked but never lived in `agda/evidence/refuted`, so there is no
+--   refutation to cite — at K = 4 a scripted source emits valueCount 30
+--   against syncSizeᵉ 20, and
+--   `git show 1f1730e^:agda/probe/Battery-Value-Count.agda` recovers the rows
+--   and the `sync-count-bounded` postulate they killed.
 ------------------------------------------------------------------
 
 mutual
@@ -627,7 +630,7 @@ mutual
 -- `occsᵗ` above is index-BLIND on purpose — it bounds the copying a
 -- WHOLE-environment substitution does, which is exactly what
 -- plugs-lenᵉ needs, and exactly what a per-binder coefficient must not
--- use.  Two refutations on 2026-07-28 pinned that down, and then a
+-- use.  Two refutations pinned that down, and then a
 -- third showed that no occurrence count of any kind is the right
 -- quantity for such a coefficient; see the Rx.Hop-Depth header.
 varIx : ∀ {t} {Θ : List Ty} → t ∈ Θ → ℕ

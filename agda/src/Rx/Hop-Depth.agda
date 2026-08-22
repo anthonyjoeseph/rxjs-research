@@ -1,13 +1,14 @@
 ------------------------------------------------------------------
 -- THE REMAINING-HOP DEPTH, candidate replacement for dBound's `r`.
---
--- `rank ∘ measureE` was refuted as the hop-descending quantity on
--- 2026-07-27 (Hop-Descent-Probe (DELETED; git history)): a two-use template
--- copies the plugged value's shells once per occurrence, so the hop's
--- multiset can EXCEED the carrier's.  hopD is the replacement under
+
+-- `rank ∘ measureE` was refuted as the hop-descending quantity: a two-use
+-- template copies the plugged value's shells once per occurrence, so the
+-- hop's multiset can EXCEED the carrier's.  The witnesses are in the probe
+-- `git show 94a5a3c^:agda/probe/Hop-Descent-Probe.agda` recovers.  hopD is
+-- the replacement under
 -- measurement.  It is stated here, alone, so the probes can gate it
 -- before the walk statement takes a dependency on it.
---
+
 -- WHAT IT COUNTS: an upper bound on the number of *All frames a
 -- subscription can still enter — hop edges remaining.  Two design
 -- points, each forced by a witness rather than chosen:
@@ -23,9 +24,9 @@
 --     read that value's depth more than once.  So the source's depth
 --     enters SCALED, and `⊔ 1` keeps the scale ≥ 1 so a fn that drops
 --     its argument still dominates the source's own walk.
---
---     Three drafts of "scaled by what", each refuted by a witness in
---     Hop-Descent-Probe (DELETED; git history), all on 2026-07-28:
+
+--     Three drafts of "scaled by what", each refuted by a witness in the
+--     probe `git show 94a5a3c^:agda/probe/Hop-Descent-Probe.agda` recovers:
 --
 --       occsᵗ — the index-blind count the sync-linearity ledger
 --       (plugs-lenᵉ, inner-len-subΘ) uses.  It reads every varᵗ as 1,
@@ -47,7 +48,7 @@
 --
 --       pmᵗ V 0 — the plug MULTIPLIER, below.  This is what a
 --       coefficient in these clauses has always meant.
---
+
 -- WHY IT IS V-PARAMETERISED: at scanᵉ the accumulator is REFOLDED, so
 -- its depth compounds once per folded value — syncBudget's memo,
 -- "after k folded values the acc nests k deep".  k is bounded by the
@@ -65,7 +66,7 @@
 -- (4 + size)(1 + id), hence ≥ towerℕ 5 ≡ 2^65536.  This is why there is
 -- no corpus counter for k ≤ V — V is not even computable, so the
 -- comparison would be vacuous rather than informative.
---
+
 -- Everything here is an UPPER bound; no clause needs to be tight.
 ------------------------------------------------------------------
 module Rx.Hop-Depth where

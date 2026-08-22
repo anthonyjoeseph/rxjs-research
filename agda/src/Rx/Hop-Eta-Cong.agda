@@ -1,7 +1,6 @@
 ------------------------------------------------------------------
 -- hopD READS η ONLY AT THE INPUTS ITS TERM ACTUALLY CONTAINS.
 --
--- Ex-postulate (2026-08-14), formerly `hopD-η-congᵉ` in Rx.Slot-Hop.
 -- It lives in its own module because it is a NEW mutual family over
 -- Exp/Tm/List Tm and nothing else here is mutual with it — Slot-Hop
 -- consumes it as a finished fact, which is an import, not mutuality.

@@ -1,7 +1,7 @@
 ------------------------------------------------------------------
 -- THE FRAME WIDTH: how much work one subscribe frame can be made to
 -- do, measured from the PROGRAM rather than from the size ledger.
---
+
 -- This is round 3's escape.  hopD's scan clause charges (2 + pm)^V with
 -- V the STORE anchor, and round3-anchor-indexed-absurd shows that any
 -- work index reading such a charge re-anchors at capᴱ and closes the
@@ -9,7 +9,7 @@
 -- the fold count instead — and a scan's fold count is its SOURCE's
 -- per-frame payload count, which bottoms out in `ofᵉ` list lengths.
 -- That is what these measures compute.
---
+
 -- TWO MEASURES, because a *All multiplies them:
 --
 --   outWᵉ e   how many payloads e's subscribe frame can deliver
@@ -20,7 +20,7 @@
 -- entering every inner that every payload carries.  Neither bounds the
 -- other, so both are needed, and each needs its own plug slope — hence
 -- four functions rather than two.
---
+
 -- AND TWO SLOPES, for the reason hopD needed pm and for the reason
 -- three drafts of hopD's coefficient were refuted: a template may use
 -- its bound variable more than once, so a coefficient here is the
@@ -31,23 +31,23 @@
 --   pmOᵉ k (mergeAllᵉ e) = outWᵉ e * pmIᵉ k e + pmOᵉ k e * innWᵉ e
 --
 -- A draft with one slope cannot state that clause at all.
---
+
 -- WHERE THE TOWER IS: the scanᵉ clause, and only there.
 --
 --   innWᵉ (scanᵉ f z e) = (pmIᵗ 0 f ⊔ 1) ^ (outWᵉ e) * (…)
---
+
 -- The accumulator is refolded once per arriving payload, and each fold
 -- scales its width by the template's slope — so the exponent is the
 -- SOURCE's payload count.  Syntax in, syntax out: no store quantity
 -- appears anywhere in these definitions.  That is the whole point.
---
+
 -- THE SLOT DESCENT DROPS VISITED SLOTS.  A share is reached by a
 -- connect, not by descending into syntax, and a slot def may reference
 -- other slots — so `input` is not structural.  The descent carries the
 -- set `vs` of shared slots already entered on this path: entering
 -- `input i` at an unvisited `shared d` descends into `d` with `i`
 -- marked, and A REVISIT CONTRIBUTES ZERO.
---
+
 -- WHY ZERO IS THE FAITHFUL NUMBER.  A share is reached by a CONNECT,
 -- and share-connect-no-replay says the second arrival at slot i inside
 -- one cascade gets no replay of the burst — it hands back the existing
@@ -55,12 +55,12 @@
 -- which the cascade side counts; the static measure must not count it
 -- twice.  Scripted slots are not marked (they cannot cycle, and the `1`
 -- for a data payload is load-bearing — State-Blowup-Probe refutes 0).
---
+
 -- THE FUEL `j` STAYS, FOR TERMINATION ONLY: the visited check fires
 -- first, so `j` no longer carries any semantics.  The lexicographic
 -- order is still (j, the expression), and j is instantiated at the slot
 -- count because the connect descent strictly drops `unconn`.
---
+
 -- AND THE COLLECTORS STAY AT `[]`.  `capsOK?` bounds a STORED value,
 -- and a stored value carries no record of which connect put it there —
 -- its width is read at the ENTRY form — so `subscribeE`'s shared branch
@@ -69,11 +69,11 @@
 -- in), so the base height is `Σkᵢ + max kᵢ` rather than `Σkᵢ`: still
 -- linear, which is what `visited-height-fits-unmarked` gates.  Against
 -- the fuel form's `(Σkᵢ)·n` that is the whole point.
---
+
 -- The exported names are the measures AT `[]`; `outWⱽ` and friends are
 -- the descent itself, and only lemmas that reduce through the `input`
 -- clause ever mention them.
---
+
 -- GATED, NOT GUESSED.  Frame-Work-Probe (DELETED; git history) measures nine
 -- runs of the real evaluator, and the gate there checks these measures
 -- against every one of them — the literal corpus, the duplication case,
