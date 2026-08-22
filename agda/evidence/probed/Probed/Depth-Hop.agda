@@ -50,6 +50,7 @@
 module Probed.Depth-Hop where
 
 open import Data.Bool using (true; false)
+open import Data.Maybe using (nothing)
 open import Data.Fin using (zero; suc)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here)
@@ -64,11 +65,13 @@ open import Rx.Exp using (Ctx; Closed; Exp; Fn; natᵗ; obs; _×ᵗ_; nat̂; str
   concatAllᵉ; switchAllᵉ; exhaustAllᵉ; sizeᵉ; syncSizeᵉ; unfoldμ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Sched; EvalSt; root; share-sink; _↠_;
-  from-inner; thru-outer; mergeᵒ; sched-init; st-init; subscribeE; Stream)
+  from-inner; thru-outer; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; merge-st;
+  concat-st; switch-st; exhaust-st; sched-init; st-init; subscribeE; Stream)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
-open import Verify-Budget-Sufficient.Depth-Compositional using (pathNestD)
+open import Verify-Budget-Sufficient.Depth-Compositional
+  using (pathNestD; allBurst)
 
 gN : ℕ → Gas
 gN zero    = g0
@@ -707,3 +710,121 @@ _ : (depthE (gN 20) progR root 0 0 schedR stR
        ≤ᵇ hopDᵉ 8 (slotHop 8 slots₀) progR + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
       ≡ true
 _ = refl
+
+------------------------------------------------------------------
+-- § 13  THE WALK ARM ON ITS OWN, which is the only clause of the face
+-- still a postulate.  Every row above bounds `depthE` at a whole
+-- program, so a `*All` row bounds a `_⊔_` and says nothing about WHICH
+-- disjunct is tight — the outer's own descent could be carrying them
+-- all.  These rows instantiate `allBurst` directly, so the burst is the
+-- only thing measured.
+--
+-- ⚠ AND THE OPERATOR IS A PARAMETER OF THE ARM, so all four are rows
+-- here and not one: `mergeᵒ` subscribes every inner, `concatᵒ` parks all
+-- but the first, `switchᵒ` cancels the previous and `exhaustᵒ` drops
+-- while busy — four different WALKS over the same burst, and the arm is
+-- stated once for all of them.  Each runs at its OWN program's initial
+-- state, so no row pairs one operator's walk with another's store.
+--
+-- ⚠ AND `V` IS THE SMALLEST THE CONDITION ADMITS, which is the sharp
+-- direction: `V` drives the bound, so a larger one only makes a row
+-- easier.  Here that is `syncSizeᵉ bT`, pinned below beside the rows so
+-- the choice is checkable rather than asserted.
+------------------------------------------------------------------
+
+-- A syntactic outer emitting one inner that is itself a `*All`: the walk
+-- subscribes it, so the arm's `suc` and the measure's hop edge are the
+-- SAME unit and there is no margin at all.  Tightness does not depend on
+-- `V`, since no clause of this outer is the exponential one.
+bT : Exp Γ₀ [] [] [] (obs natᵗ)
+bT = ofᵉ (strmᵗ (mergeAllᵉ (ofᵉ (strmᵗ lits20 ∷ []))) ∷ [])
+
+progTm : Closed Γ₀ natᵗ
+progTm = mergeAllᵉ bT
+
+progTc : Closed Γ₀ natᵗ
+progTc = concatAllᵉ bT
+
+progTs : Closed Γ₀ natᵗ
+progTs = switchAllᵉ bT
+
+progTe : Closed Γ₀ natᵗ
+progTe = exhaustAllᵉ bT
+
+_ : syncSizeᵉ bT ≡ 29
+_ = refl
+
+_ : hopDᵉ 29 (slotHop 29 slots₀) bT ≡ 1
+_ = refl
+
+-- 2 against 2, four times: LOAD-BEARING with no margin, so any charge
+-- the walk made that the hop edge does not cover would show here
+_ : allBurst (gN 200) mergeᵒ (merge-st 0 false) bT root 0 0
+      (sched-init progTm slots₀) (st-init progTm) ≡ 2
+_ = refl
+
+_ : (allBurst (gN 200) mergeᵒ (merge-st 0 false) bT root 0 0
+       (sched-init progTm slots₀) (st-init progTm)
+       ≤ᵇ suc (hopDᵉ 29 (slotHop 29 slots₀) bT)
+            + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : allBurst (gN 200) concatᵒ (concat-st {t = natᵗ} [] false false) bT root 0 0
+      (sched-init progTc slots₀) (st-init progTc) ≡ 2
+_ = refl
+
+_ : (allBurst (gN 200) concatᵒ (concat-st {t = natᵗ} [] false false) bT root 0 0
+       (sched-init progTc slots₀) (st-init progTc)
+       ≤ᵇ suc (hopDᵉ 29 (slotHop 29 slots₀) bT)
+            + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : allBurst (gN 200) switchᵒ (switch-st nothing false) bT root 0 0
+      (sched-init progTs slots₀) (st-init progTs) ≡ 2
+_ = refl
+
+_ : (allBurst (gN 200) switchᵒ (switch-st nothing false) bT root 0 0
+       (sched-init progTs slots₀) (st-init progTs)
+       ≤ᵇ suc (hopDᵉ 29 (slotHop 29 slots₀) bT)
+            + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+_ : allBurst (gN 200) exhaustᵒ (exhaust-st false false) bT root 0 0
+      (sched-init progTe slots₀) (st-init progTe) ≡ 2
+_ = refl
+
+_ : (allBurst (gN 200) exhaustᵒ (exhaust-st false false) bT root 0 0
+       (sched-init progTe slots₀) (st-init progTe)
+       ≤ᵇ suc (hopDᵉ 29 (slotHop 29 slots₀) bT)
+            + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+------------------------------------------------------------------
+-- § 14  THE ONE DIRECTION THAT COULD FAIL, AND WHY NO ROW REACHES IT.
+-- This section is a NON-COVERAGE finding and deliberately carries no
+-- `refl`: writing one would be writing a row that could not have failed.
+--
+-- `hopDᵉ` charges a `scanᵉ` an EXPONENTIAL in `V` and every other clause
+-- a syntactic sum, so the refold is the only place an emitted inner's
+-- hop could outrun its emitter's — § 3's `dupF` wraps the accumulator in
+-- one more `mergeAllᵉ` per tick, so the inners a walk subscribes get
+-- strictly deeper while the emitter's syntax does not change at all.
+-- Instantiated, that outer gives a burst of 5 against a bound of 82 at
+-- `V = 4`; and `V = 4` is not an instance of the arm, because
+-- `syncSizeᵉ` of that outer is 23 and the condition demands `V ≥ 23`,
+-- where the bound is `3 ^ 23`.
+--
+-- THE EXCLUSION IS STRUCTURAL AND NOT AN ARTIFACT OF THIS GADGET.  Deep
+-- nesting needs many refolds, many refolds need a long source, a long
+-- source is a large `syncSizeᵉ b`, and the condition then forces a `V`
+-- whose `3 ^ V` outruns every nesting those refolds could have built.
+-- So the risky region is excluded by the condition itself, and what
+-- would reach it is a source whose emissions are NOT syntax — a scripted
+-- slot, which `slotsSize ≤ V` bounds the same way, or a `μᵉ` re-entry,
+-- whose unfolding `hopD-unfoldμ` holds fixed.  Each of those is a
+-- separate instantiation and none is done here.
+------------------------------------------------------------------

@@ -464,6 +464,57 @@ allBurst g op ns b κ bid now sched st =
 -- above is about, and this is the only statement still asserting them.
 ------------------------------------------------------------------
 
+-- ⚠ AND THE CONCLUSION WANTS A FACT ABOUT PAYLOADS.  `depthBurst` over a
+-- `thru-outer` frame folds `suc (depthWalk …)`, and `depthWalk` reaches
+-- `depthE` at each emitted inner — so the arm closes exactly when every
+-- inner `o` in the burst satisfies `hopDᵉ V η o ≤ hopDᵉ V η b`, and then
+-- the frame's own `suc` and the measure's hop edge are the SAME unit, so
+-- the bound comes out tight rather than slack.  Nothing in `2 ≤ V`,
+-- `syncSizeᵉ b ≤ V` and the slots width mentions a payload, which is why
+-- this arm is the one the whole face reduces to.
+--
+-- THE PRODUCER IS THE WALK FACE'S OWN LANDING, and it is NOT circular:
+-- `WalkStmt` (.Walk-Level/Statement) takes `depthE g b κ … ≤ dep` as a
+-- PARAMETER and lands `burstHopD? F (slotHop F sl) (hopDᵉ F (slotHop F
+-- sl) b) (proj₁ r)` — the per-inner bound, at no slack — so
+-- `depth-hop-all`'s own first disjunct is what pays for it.  The cost is
+-- the context: `F ≡ sizeCapAt e sl (suc id)` PINS `V` to a size cap, and
+-- `capsOK?`, `INV?`, the path predicates, the registry ledger and the
+-- ceiling all arrive as hypotheses — the shape `cascade-depth-capsH`
+-- already has.  Per-inner termination is the GAS: `depthInner` peels one
+-- before entering the payload.
+--
+-- ⚠ THAT IS A ROUTE AND NOT EVIDENCE, so it ranks this row at nothing and
+-- licenses no restatement: trading the postulate for those hypotheses
+-- would launder tracked debt into untracked, and only a refutation of the
+-- unconditional form buys that.
+-- DEAD ROUTE: spending an existing depth-free producer, so that no caps
+--   context is needed.  `subscribeE-wet`'s landing carries `hasDry` and
+--   `INV?` and no burst-hop conjunct at all, and the hop-spine face
+--   reaches only the `scan-f` frame at push level — so there is nothing
+--   to spend, and a depth-free supplier means a SECOND `subscribeE`-level
+--   induction in the hop currency rather than a lemma.
+-- PROBED: `Probed.Depth-Hop` § 13 instantiates this arm ALONE — `allBurst`
+--   directly, so no outer descent can be carrying the bound the way it
+--   can in a row over a whole program.  All four `AllOp`s, each on its
+--   own program's initial state, over a syntactic outer emitting one
+--   `*All` inner, at the smallest `V` the condition admits: 2 against 2
+--   every time, so the rows are LOAD-BEARING at zero margin.  Conjuncts
+--   covered: the frame's `suc` against the measure's hop edge, and the
+--   four walks' subscribe / park / cancel / drop behaviour.  Not reached:
+--   a non-root `κ`, since every row sits at `root` and `pathNestD` is 0
+--   throughout, and the slot telescope, since every program runs over an
+--   empty slot vector.
+--   AND THE ONE DIRECTION THAT COULD FAIL IS NOT REACHABLE AT ALL, which
+--   is that section's § 14 and carries no row deliberately: only the
+--   exponential `scanᵉ` clause lets an emitted inner's hop outrun its
+--   emitter's, and reaching it needs many refolds, which need a long
+--   source, which raises `syncSizeᵉ b` — so the condition forces a `V`
+--   whose `3 ^ V` outruns whatever nesting those refolds built.  The
+--   risky region is excluded by the hypothesis rather than by luck, and
+--   what would reach it is an emission that is not syntax: a scripted
+--   slot, which the slots width bounds the same way, or a `μᵉ` re-entry,
+--   which `hopD-unfoldμ` holds fixed.
 postulate
   depth-hop-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
