@@ -40,7 +40,7 @@ open import Rx.Slots using (scripted; shared; Slots; slotsSize)
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
 open import Verify-Budget-Sufficient.Measures using
-  (_hasAtLeast_; all-++-intro;
+  (_hasAtLeast_; all-++-intro; hopDᵛ-data;
                                                       boundedLive; burstB?; burstHopD?;
                                                       dBound; fnCapLive; fnCapᵉ; hopR; INV?;
                                                       mapValue-B; oneShot-tail-dry; pathB?;
@@ -77,7 +77,7 @@ open import Verify-Budget-Sufficient.Walk-Level.Connect using
 open import Verify-Budget-Sufficient.Walk-Level.Statement using
   (inputᶜ; peelGas; WalkLevelAt; WalkStmt; WalkStmt⁻)
 open import Verify-Budget-Sufficient.Walk-Level.Parts using
-  (hopDᵛ-data; input-wet-scripted-regs; INV?-install; mapValue-dry;
+  (input-wet-scripted-regs; INV?-install; mapValue-dry;
    mapValue-hop; register-regsLen)
 open import Decide using (T⇒≡true; ∧-intro)
 

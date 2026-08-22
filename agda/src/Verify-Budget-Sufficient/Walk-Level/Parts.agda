@@ -23,9 +23,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _<_
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Unit    using (tt)
 -- the data-emptiness induction discharges its obs arm from the absurd `ok`
-open import Data.Empty   using (⊥-elim)
 -- the value cases of a Ty induction: a sum's payload is inj₁/inj₂
-open import Data.Sum     using (inj₁; inj₂)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; +-suc; +-assoc; +-mono-≤; +-monoʳ-≤;
   +-monoˡ-≤; *-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Maybe   using (Maybe; just; nothing)
@@ -39,8 +37,8 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Source; init; value; close; complete; handoff; exhausted; dried; cut; cutPending;
   InstEmit; InstEvent; Gas; gs; ObservableInput; hot; cold)
-open import Rx.Exp       using (Ty; obs; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; Ctx; Closed; Val; Tm; Fn; isData; _≟ᵗ_; sizeᵉ;
-  sizeᵗ; sizeᵗˢ; syncSizeᵉ; syncSizeᵗ; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; applyFn; evalTm)
+open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; Ctx; Closed; Val; Tm; Fn; isData; _≟ᵗ_; sizeᵉ; sizeᵗ; sizeᵗˢ; syncSizeᵉ;
+  syncSizeᵗ; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; applyFn; evalTm)
 open import Rx.Frame-Width using (dWᵉ; dWᵗ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ)
 open import Rx.Slot-Hop  using (slotHop)
@@ -55,22 +53,13 @@ open import Rx.Slots using (scripted; Slots; slotsSize)
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
 open import Verify-Budget-Sufficient.Measures using
-  (_hasAtLeast_; all-++-intro; all-impl;
-                                                      boundedLive; boundedLive-widen;
-                                                      boundedNode; boundedNode-widen;
-                                                      burstB?; burstB?-widen; burstHopD?;
-                                                      caseWᵗ; cutThrough-len; dBound;
-                                                      dBound-struct; eventB?; fcB-live;
-                                                      fcB-nodes; fnCap-evalWith; fnCapLive;
-                                                      fnCapNode; fnCapᵉ; fnCapᵗ; fnCapᵗˢ;
-                                                      fnCapᵛ; hasAtLeast-mono; hopD-map-emit;
-                                                      hopDev?; hs; INV-parts; INV?;
-                                                      mapValue-B; oneShot-tail-dry; pathB?;
-                                                      pathB?-widen; pathLen; regsB?-widen;
-                                                      regsLen?; slotsFnCap; splitEvents-bk-B;
-                                                      splitEvents-vals-B; sweepLive-all;
-                                                      takeVals-all; unconn; valB?; ∧-true;
-                                                      ∨-false; ⊔ʳ; ⊔ˡ)
+  (_hasAtLeast_; all-++-intro; all-impl; boundedLive; boundedLive-widen; boundedNode;
+  boundedNode-widen; burstB?; burstB?-widen; burstHopD?; caseWᵗ; cutThrough-len; dBound;
+  dBound-struct; eventB?; fcB-live; fcB-nodes; fnCap-evalWith; fnCapLive; fnCapNode; fnCapᵉ;
+  fnCapᵗ; fnCapᵗˢ; fnCapᵛ; hasAtLeast-mono; hopD-map-emit; hopDev?; hs; INV-parts; INV?;
+  mapValue-B; oneShot-tail-dry; pathB?; pathB?-widen; pathLen; regsB?-widen; regsLen?;
+  slotsFnCap; splitEvents-bk-B; splitEvents-vals-B; sweepLive-all; takeVals-all; unconn; valB?;
+  ∧-true; ∨-false; ⊔ʳ; ⊔ˡ)
 open import Verify-Budget-Sufficient.Wet.Part1 using
   (applyFn-fnCap; INV?-widen; lookupNode-B; scanVals-fnCap; takeVals-B)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -225,27 +214,6 @@ retagEvents-dry (close _ dried      ∷ es) ()
 retagEvents-dry (handoff _        ∷ es) h = retagEvents-dry es h
 retagEvents-dry (complete         ∷ es) h = retagEvents-dry es h
 
--- a data type has no observable inside it, so it has no hop depth either --
--- the third member of a family whose other two sit in .Caps-Face/Part5
--- (`fnCapᵛ-data`, and `outWᵛ-data`/`dWᵛ-data` before it).  Like fnCapᵛ and
--- unlike outWᵛ, hopDᵛ carries no isData scrutinee of its own, so the pair case
--- reads the conjunction straight off instead of needing a `with`.
-hopDᵛ-data : ∀ {n} {Γ : Ctx n} (F : ℕ) (η : Fin n → ℕ) (u : Ty) → T (isData u) →
-  (v : Val Γ u) → hopDᵛ F η u v ≡ 0
-hopDᵛ-data F η unitᵗ ok v = refl
-hopDᵛ-data F η boolᵗ ok v = refl
-hopDᵛ-data F η natᵗ  ok v = refl
-hopDᵛ-data F η (s ×ᵗ u) ok (a , b) with isData s in eqs
-... | true  = cong₂ _⊔_ (hopDᵛ-data F η s (subst T (sym eqs) tt) a)
-                        (hopDᵛ-data F η u ok b)
-... | false = ⊥-elim ok
-hopDᵛ-data F η (s +ᵗ u) ok (inj₁ a) with isData s in eqs
-... | true  = hopDᵛ-data F η s (subst T (sym eqs) tt) a
-... | false = ⊥-elim ok
-hopDᵛ-data F η (s +ᵗ u) ok (inj₂ b) with isData s
-... | true  = hopDᵛ-data F η u ok b
-... | false = ⊥-elim ok
-hopDᵛ-data F η (obs u) ok v = ⊥-elim ok
 
 mapValue-hop : ∀ {n} {Γ : Ctx n} {u} (F : ℕ) (η : Fin n → ℕ) (r : ℕ) (vs : List (Val Γ u)) →
   all (λ v → hopDᵛ F η u v ≤ᵇ r) vs ≡ true →

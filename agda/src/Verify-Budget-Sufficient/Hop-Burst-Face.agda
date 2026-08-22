@@ -28,28 +28,37 @@ module Verify-Budget-Sufficient.Hop-Burst-Face where
 
 open import Data.Nat using (ℕ; suc; _≤_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-trans; n≤1+n; ≤-reflexive)
-open import Data.Bool using (Bool; true; false; _∧_)
+open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (all)
-open import Data.Fin using (Fin)
+open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
-open import Data.List using (List; [])
-open import Data.Product using (_×_; _,_; proj₁)
+open import Data.List using (List; []; _∷_; map)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Maybe using (nothing)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; sym; trans; cong)
+open import Data.Empty using (⊥-elim)
+open import Data.Unit using (tt)
+open import Data.Bool using (T)
+open import Decide using (∧-intro)
 
-open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit; InstEvent;
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit; InstEvent; hot; cold;
+  _at_from_as_; subscribe; exhausted;
   value; init; close; handoff; complete)
-open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; Tm; syncSizeᵉ; unfoldμ; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; input;
+open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; Tm; isData; inputsBelowᵉ; syncSizeᵉ; unfoldμ; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; input;
   ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ;
   deferᵉ)
-open import Rx.Slots using (Slots; slotsSize)
-open import Rx.Evaluator using (Sched; EvalSt; NodeState; AllOp; Path; Stream;
+open import Rx.Slots using (Slots; scripted; shared; slotsSize)
+open import Rx.Evaluator using (Sched; EvalSt; NodeState; AllOp; Path; Stream; sharedPlumb;
+  subscribeSharedSlot; memberSource; burstCompleted; share-sink; register; dropSource;
   subscribeE; subscribeAll; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
   merge-st; concat-st; switch-st; exhaust-st)
 open import Rx.Hop-Depth using (hopDᵉ; hopD-unfoldμ)
-open import Rx.Slot-Hop using (slotHop)
-open import Verify-Budget-Sufficient.Measures using (burstHopD?; syncSize-unfoldμ)
+open import Rx.Slot-Hop using (slotHop; slotHop-fix)
+open import Verify-Budget-Sufficient.Measures using (burstHopD?; hopDev?; syncSize-unfoldμ;
+  hopDᵛ-data;
+  syncSize≤sizeᵉ; slotDef-size; ∧-true; all-++-intro)
+open import Verify-Budget-Sufficient.Wet.Part2 using (sharedPlumb-hopD)
 
 -- the sync-size side of `hopDᵛ`: read off the VALUE's type, since only
 -- an observable payload carries an expression to size
@@ -82,6 +91,61 @@ HopsOK V sl d r = (burstHopD? V (slotHop V sl) d (proj₁ r) ≡ true)
 -- `hopDᵉ` are not read at three unsolved binder lists
 inp : ∀ {n} (Γ : Ctx n) (i : Fin n) → Closed Γ (lookup Γ i)
 inp Γ i = input i
+
+
+------------------------------------------------------------------
+-- A SCRIPTED SLOT'S SCRIPT IS DATA, WHICH IS WHAT MAKES THREE OF THE
+-- FOUR `input` BRANCHES CLOSE WITHOUT ARITHMETIC.  `Slot`'s scripted
+-- constructor carries `T (isData t)` as a side condition, and both
+-- conjuncts read a value by its TYPE — so at a data type there is no
+-- expression to size and no hop to charge, at any budget whatever.
+-- Only the sync half is new: `hopDᵛ-data` (.Measures) already says the
+-- same of the hop side and is shared with the walk face's push arms.
+-- Each measure needs its own `with` on the pair's left half, which is
+-- where `isData`'s hereditary reading has to be taken apart.
+------------------------------------------------------------------
+
+syncOK?-data : ∀ {n} {Γ : Ctx n} (V : ℕ) (u : Ty) → T (isData u) →
+  (v : Val Γ u) → syncOK? {Γ = Γ} V u v ≡ true
+syncOK?-data V unitᵗ ok v = refl
+syncOK?-data V boolᵗ ok v = refl
+syncOK?-data V natᵗ  ok v = refl
+syncOK?-data V (s ×ᵗ u) ok (a , b) with isData s in eqs
+... | true  = ∧-intro (syncOK?-data V s (subst T (sym eqs) tt) a)
+                      (syncOK?-data V u ok b)
+... | false = ⊥-elim ok
+syncOK?-data V (s +ᵗ u) ok (inj₁ a) with isData s in eqs
+... | true  = syncOK?-data V s (subst T (sym eqs) tt) a
+... | false = ⊥-elim ok
+syncOK?-data V (s +ᵗ u) ok (inj₂ b) with isData s
+... | true  = syncOK?-data V u ok b
+... | false = ⊥-elim ok
+syncOK?-data V (obs u) ok v = ⊥-elim ok
+
+-- a scripted slot's script is data, so its values pass both conjuncts at
+-- every budget -- which is what makes the scripted arms close with no
+-- arithmetic at all
+mapValue-hopD : ∀ {n} {Γ : Ctx n} (V : ℕ) (η : Fin n → ℕ) (r : ℕ) (u : Ty) →
+  T (isData u) → (vs : List (Val Γ u)) →
+  all (hopDev? V η r) (map value vs) ≡ true
+mapValue-hopD V η r u ok []       = refl
+mapValue-hopD V η r u ok (v ∷ vs) =
+  ∧-intro (subst (λ x → (x ≤ᵇ r) ≡ true) (sym (hopDᵛ-data V η u ok v)) refl)
+          (mapValue-hopD V η r u ok vs)
+
+mapValue-sync : ∀ {n} {Γ : Ctx n} (V : ℕ) (u : Ty) → T (isData u) →
+  (vs : List (Val Γ u)) → all (syncEv? {Γ = Γ} {u = u} V) (map value vs) ≡ true
+mapValue-sync V u ok []       = refl
+mapValue-sync V u ok (v ∷ vs) =
+  ∧-intro (syncOK?-data V u ok v) (mapValue-sync V u ok vs)
+
+-- retagging an emit's kind leaves its EVENTS alone, so the share's
+-- plumbing relabel is invisible to the sync side too
+sharedPlumb-sync : ∀ {n} {Γ : Ctx n} {u} (V : ℕ) (str : Stream Γ u) →
+  burstSync? V str ≡ true → burstSync? V (sharedPlumb str) ≡ true
+sharedPlumb-sync V []         h = refl
+sharedPlumb-sync V (em ∷ ems) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (sharedPlumb-sync V ems (proj₂ (∧-true _ _ h)))
 
 ------------------------------------------------------------------
 -- THE ARMS.  One leaf per constructor whose burst is not already free
@@ -220,13 +284,6 @@ inp Γ i = input i
 --   row, because those four programs ARE the region.
 
 postulate
-  hops-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (V : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
-    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ V → syncSizeᵉ (inp Γ i) ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
-    HopsOK V sl (hopDᵉ V (slotHop V sl) (inp Γ i))
-      (subscribeE g (inp Γ i) κ bid now sched st)
-
   -- PROBED: `Probed.Depth-Hop` §§ 13 and 15, over a syntactic outer —
   --   `ofᵉ` of one `*All` inner — at the smallest `V` the conditions
   --   admit.  § 13 measures the CONSUMING assembly's arithmetic and § 15
@@ -336,44 +393,153 @@ postulate
       (subscribeAll g op ns b κ bid now sched st)
 
 ------------------------------------------------------------------
+-- THE CONNECT WRAPPER, over the latch as a BOOLEAN rather than a
+-- scrutinee.  `sharedConnect` decides in one `if` whether the def died
+-- inside its own connect burst, and both arms wrap the SAME plumbing
+-- relabel behind an emit carrying no value event — so taking the latch
+-- as an argument turns a `with` inside a recursive clause into two lines
+-- that say the same thing, and keeps the recursion's `where` block free.
+------------------------------------------------------------------
+connect-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (V : ℕ) (η : Fin n → ℕ)
+  (r : ℕ) (i : Fin n) (bid : Id) (c : Bool)
+  (burst : Stream Γ (lookup Γ i)) (sched : Sched Γ) (st : EvalSt e) →
+  burstHopD? V η r burst ≡ true → burstSync? V burst ≡ true →
+  let res : Stream Γ (lookup Γ i) × Sched Γ × EvalSt e
+      res = if c
+        then (((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+                 at bid from toℕ i as subscribe) ∷ sharedPlumb burst)
+             , sched
+             , record st { registry = dropSource (toℕ i) (EvalSt.registry st)
+                         ; completedSources = toℕ i ∷ EvalSt.completedSources st }
+        else ((init (toℕ i) ∷ []) at bid from toℕ i as subscribe) ∷ sharedPlumb burst
+             , sched , st
+  in (burstHopD? V η r (proj₁ res) ≡ true) × (burstSync? V (proj₁ res) ≡ true)
+connect-hops V η r i bid true burst sched st h sy =
+  ∧-intro refl (sharedPlumb-hopD V η r burst h)
+  , ∧-intro refl (sharedPlumb-sync V burst sy)
+connect-hops V η r i bid false burst sched st h sy =
+  ∧-intro refl (sharedPlumb-hopD V η r burst h)
+  , ∧-intro refl (sharedPlumb-sync V burst sy)
+
+------------------------------------------------------------------
 -- THE DISPATCH.  Three constructors need no arm at all — their burst
 -- carries no `value` event, so both predicates hold by computation —
 -- and `μᵉ` needs none either: unfolding leaves the hop EQUAL and
 -- strictly shrinks the synchronous size, so the recursive call is the
 -- whole proof and the gas peel is what terminates it.
 ------------------------------------------------------------------
-subscribeE-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (V : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-  (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
-  2 ≤ V → syncSizeᵉ b ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
-  HopsOK V sl (hopDᵉ V (slotHop V sl) b) (subscribeE g b κ bid now sched st)
-subscribeE-hops V g (input i) κ bid now sl sched st 2≤V szb slSz slEq =
+mutual
+  subscribeE-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (V : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ V → syncSizeᵉ b ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+    HopsOK V sl (hopDᵉ V (slotHop V sl) b) (subscribeE g b κ bid now sched st)
+
+  -- THE SLOT ARM.  Three of the four branches carry no value event of
+  -- their own: a spent script and a live re-registration emit only
+  -- protocol, and a script's own values are DATA by the constructor's
+  -- side condition.  The fourth is the connect, and it is the only
+  -- recursive edge in the face that is not a structural descent.
+  hops-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (V : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ V → syncSizeᵉ (inp Γ i) ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+    HopsOK V sl (hopDᵉ V (slotHop V sl) (inp Γ i))
+      (subscribeE g (inp Γ i) κ bid now sched st)
+
+  -- THE SLOT IS A PARAMETER, WITH ITS EQUATION BESIDE IT: `slotHop V sl
+  -- i` unfolds through `sl i`, so an arm that matched the slot would
+  -- rewrite its own budget and the fixpoint would no longer apply to
+  -- what was left.  The def's connect spends a gas unit, and
+  -- `slotHop-fix` says the staged number IS that def's hop — so the arm
+  -- is the dispatch again at the def, transported along an equality,
+  -- with `slotDef-size` paying the def's size condition out of the
+  -- slots telescope.
+  hops-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (V : ℕ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+    {ok : T (inputsBelowᵉ (toℕ i) d)} → sl i ≡ shared d {ok = ok} →
+    HopsOK V sl (slotHop V sl i)
+      (subscribeSharedSlot g i d κ bid now sched st)
+
+  subscribeE-hops V g (input i) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-input V g i κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g (ofᵉ ts) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-of V g ts κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g emptyᵉ κ bid now sl sched st 2≤V szb slSz slEq = refl , refl
+  subscribeE-hops V g (mapᵉ f b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-map V g f b κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g (takeᵉ cnt b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-take V g cnt b κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g (scanᵉ f z b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-scan V g f z b κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g (mergeAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-all V g mergeᵒ (merge-st 0 false) b κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops {u = u} V g (concatAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-all V g concatᵒ (concat-st {t = u} [] false false) b κ bid now sl sched st
+      2≤V szb slSz slEq
+  subscribeE-hops V g (switchAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-all V g switchᵒ (switch-st nothing false) b κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g (exhaustAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
+    hops-all V g exhaustᵒ (exhaust-st false false) b κ bid now sl sched st 2≤V szb slSz slEq
+  subscribeE-hops V g0 (μᵉ body) κ bid now sl sched st 2≤V szb slSz slEq = refl , refl
+  subscribeE-hops V (gs fuel) (μᵉ body) κ bid now sl sched st 2≤V szb slSz slEq =
+    subst (λ d → HopsOK V sl d (subscribeE fuel (unfoldμ body) κ bid now sched st))
+      (hopD-unfoldμ V (slotHop V sl) body)
+      (subscribeE-hops V fuel (unfoldμ body) κ bid now sl sched st 2≤V
+        (≤-trans (≤-reflexive (syncSize-unfoldμ body))
+                 (≤-trans (n≤1+n (syncSizeᵉ body)) szb))
+        slSz slEq)
+  subscribeE-hops V g (varᵉ ()) κ bid now sl sched st
+  subscribeE-hops V g (deferᵉ body) κ bid now sl sched st 2≤V szb slSz slEq = refl , refl
+
+
   hops-input V g i κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g (ofᵉ ts) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-of V g ts κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g emptyᵉ κ bid now sl sched st 2≤V szb slSz slEq = refl , refl
-subscribeE-hops V g (mapᵉ f b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-map V g f b κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g (takeᵉ cnt b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-take V g cnt b κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g (scanᵉ f z b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-scan V g f z b κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g (mergeAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-all V g mergeᵒ (merge-st 0 false) b κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops {u = u} V g (concatAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-all V g concatᵒ (concat-st {t = u} [] false false) b κ bid now sl sched st
-    2≤V szb slSz slEq
-subscribeE-hops V g (switchAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-all V g switchᵒ (switch-st nothing false) b κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g (exhaustAllᵉ b) κ bid now sl sched st 2≤V szb slSz slEq =
-  hops-all V g exhaustᵒ (exhaust-st false false) b κ bid now sl sched st 2≤V szb slSz slEq
-subscribeE-hops V g0 (μᵉ body) κ bid now sl sched st 2≤V szb slSz slEq = refl , refl
-subscribeE-hops V (gs fuel) (μᵉ body) κ bid now sl sched st 2≤V szb slSz slEq =
-  subst (λ d → HopsOK V sl d (subscribeE fuel (unfoldμ body) κ bid now sched st))
-    (hopD-unfoldμ V (slotHop V sl) body)
-    (subscribeE-hops V fuel (unfoldμ body) κ bid now sl sched st 2≤V
-      (≤-trans (≤-reflexive (syncSize-unfoldμ body))
-               (≤-trans (n≤1+n (syncSizeᵉ body)) szb))
-      slSz slEq)
-subscribeE-hops V g (varᵉ ()) κ bid now sl sched st
-subscribeE-hops V g (deferᵉ body) κ bid now sl sched st 2≤V szb slSz slEq = refl , refl
+    with Sched.slots sched i in slotEq
+  ... | shared d =
+    hops-slot V g i d κ bid now sl sched st 2≤V slSz slEq
+      (trans (sym (cong (λ y → y i) slEq)) slotEq)
+  ... | scripted (hot _)
+    with memberSource (toℕ i) (EvalSt.completedSources st)
+  ...   | true  = refl , refl
+  ...   | false = refl , refl
+  hops-input {Γ = Γ} V g i κ bid now sl sched st 2≤V szb slSz slEq
+    | scripted {ok} (cold sync []) =
+    ∧-intro (∧-intro refl
+               (all-++-intro (hopDev? V (slotHop V sl) (slotHop V sl i))
+                  (map value sync) _
+                  (mapValue-hopD V (slotHop V sl) (slotHop V sl i)
+                     (lookup Γ i) ok sync) refl)) refl
+    , ∧-intro (∧-intro refl
+                 (all-++-intro (syncEv? V) (map value sync) _
+                    (mapValue-sync V (lookup Γ i) ok sync) refl)) refl
+  hops-input {Γ = Γ} V g i κ bid now sl sched st 2≤V szb slSz slEq
+    | scripted {ok} (cold sync (dl ∷ ds)) =
+    ∧-intro (∧-intro refl
+               (mapValue-hopD V (slotHop V sl) (slotHop V sl i)
+                  (lookup Γ i) ok sync)) refl
+    , ∧-intro (∧-intro refl (mapValue-sync V (lookup Γ i) ok sync)) refl
+
+  hops-slot V g i d κ bid now sl sched st 2≤V slSz slEq eq
+    with memberSource (toℕ i) (EvalSt.completedSources st)
+       | memberSource (toℕ i) (EvalSt.connectedShares st)
+  ... | true  | _    = refl , refl
+  ... | false | true = refl , refl
+  hops-slot V g0 i d κ bid now sl sched st 2≤V slSz slEq eq
+    | false | false = refl , refl
+  hops-slot V (gs fuel) i d κ bid now sl sched st 2≤V slSz slEq eq
+    | false | false =
+    connect-hops V (slotHop V sl) (slotHop V sl i) i bid
+      (burstCompleted (proj₁ r)) (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+      (subst (λ x → burstHopD? V (slotHop V sl) x (proj₁ r) ≡ true)
+             (sym (slotHop-fix V sl i eq)) (proj₁ ih))
+      (proj₂ ih)
+    where
+    st₁ = register (toℕ i) κ
+            (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+    r   = subscribeE fuel d (share-sink i) bid now sched st₁
+    ih  = subscribeE-hops V fuel d (share-sink i) bid now sl sched st₁ 2≤V
+            (≤-trans (syncSize≤sizeᵉ d) (≤-trans (slotDef-size sl i eq) slSz))
+            slSz slEq

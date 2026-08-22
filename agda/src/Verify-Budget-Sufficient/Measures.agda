@@ -41,7 +41,7 @@ open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; �
   +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ; *-distribʳ-+;
   *-distribˡ-+; *-identityʳ; ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; *-comm;
   m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ; suc-injective; <-irrefl; ≤-antisym; m^n≢0; m^n>0)
-open import Data.Empty   using (⊥)
+open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; concat; map)
@@ -76,7 +76,7 @@ open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEv
 open import Rx.Prim using (_at_from_as_; after_,_; close; cold; complete; exhausted; g0; Gas; gasDouble; gasPad;
   gasPow2; gasTower; gs; handoff; hot; Id; init; InstEmit; InstEvent; ObservableInput; Source;
   Tick; Timed; towerℕ; value)
-open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ; Ctx; Closed; Val; sizeᵉ; sizeᵗ;
+open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ; isData; Ctx; Closed; Val; sizeᵉ; sizeᵗ;
   sizeᵗˢ; sizeᵛ; syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
   subΘExp; subΘTm; subΘTms; varIx; renExp; renTm; renTms; Ren∈; ext∈; ++Ren; wkTm; reify; Exp;
   Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
@@ -5329,3 +5329,26 @@ regsLen? ℓ = all (λ en → pathLen (proj₂ (proj₂ (proj₂ en))) ≤ᵇ �
 --   anchor cannot serve the demand, the s′ reset and the receipt ceiling
 --   at once, and a d-indexed anchor is impossible outright.
 
+-- a data type has no observable inside it, so it has no hop depth
+-- either -- the third member of a family whose other two sit in
+-- .Caps-Face/Part5.  Like fnCapᵛ and unlike outWᵛ, hopDᵛ carries no
+-- isData scrutinee of its own, so the pair case reads the conjunction
+-- straight off instead of needing a `with`.  It sits here rather than at
+-- either consumer because BOTH the walk face's push arms and the burst
+-- face's slot arm need it, and neither can import the other.
+hopDᵛ-data : ∀ {n} {Γ : Ctx n} (F : ℕ) (η : Fin n → ℕ) (u : Ty) → T (isData u) →
+  (v : Val Γ u) → hopDᵛ F η u v ≡ 0
+hopDᵛ-data F η unitᵗ ok v = refl
+hopDᵛ-data F η boolᵗ ok v = refl
+hopDᵛ-data F η natᵗ  ok v = refl
+hopDᵛ-data F η (s ×ᵗ u) ok (a , b) with isData s in eqs
+... | true  = cong₂ _⊔_ (hopDᵛ-data F η s (subst T (sym eqs) tt) a)
+                        (hopDᵛ-data F η u ok b)
+... | false = ⊥-elim ok
+hopDᵛ-data F η (s +ᵗ u) ok (inj₁ a) with isData s in eqs
+... | true  = hopDᵛ-data F η s (subst T (sym eqs) tt) a
+... | false = ⊥-elim ok
+hopDᵛ-data F η (s +ᵗ u) ok (inj₂ b) with isData s
+... | true  = hopDᵛ-data F η u ok b
+... | false = ⊥-elim ok
+hopDᵛ-data F η (obs u) ok v = ⊥-elim ok

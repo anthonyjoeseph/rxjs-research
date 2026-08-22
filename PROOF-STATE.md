@@ -157,10 +157,6 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`hops-input`** (Hop-Burst-Face) — DIFFICULTY, the slot arm of the burst
-  payload conditions: a scripted slot's payloads are its own script, but a
-  SHARED slot subscribes a def, so this arm is the connect sub-clique and not
-  one clause.
 - **`hops-scan`** (Hop-Burst-Face) — DIFFICULTY, the scan arm: the emitted
   accumulator's hop is exponential in `V`, and the exponent arrives through the
   per-value spine rather than any per-step size comparison, so the arm has to
