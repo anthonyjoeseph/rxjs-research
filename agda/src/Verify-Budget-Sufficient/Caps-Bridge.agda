@@ -43,7 +43,7 @@ open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import Rx.Prim      using (Gas; Tick; Id; Fuel; close; exhausted; towerℕ)
+open import Rx.Prim      using (Gas; Tick; Id; Fuel; close; exhausted)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
 open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
@@ -108,6 +108,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Depth-Compositional
   using (depth-compositional; storeNestMax)
 open import Rx.Nest-Depth using (nestDᵉ)
+open import Verify-Budget-Sufficient.Nest-Tower using (nestD-le-tower)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
@@ -1155,18 +1156,10 @@ abstract
 -- factor of three the width machinery needs.
 --
 -- WHAT REMAINS IS PURELY SYNTACTIC — no `capsOK?`, no `blowH`, nothing
--- `abstract` — and it is real work rather than a chain of monotonicities,
--- because `nestDᵉ` is tower-valued and not merely exponential.  The
--- apparatus is already here: `tower-mul`, `tower-mul-suc`, `3T≤`,
--- `k≤tower` and `towerℕ-mono` are what the induction on `e` spends, and
--- `iterFold-tower` is the worked instance of exactly this shape one face
--- over.
-postulate
-  nestD-le-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    sizeᵉ e + nestDᵉ ins e + 0
-      + storeNestMax (sched-init e ins) (st-init e)
-      ≤ towerℕ (3 * capsBase e ins)
-
+-- `abstract` — and it lives in `.Nest-Tower`, whose `nestD-le-tower` is
+-- now a real body: three bounds at one height, `3T≤` to add them and
+-- `towerℕ-mono` to land here.  The two leaves left out there are the
+-- measure's own two halves.
 nest-store≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   sizeᵉ e + nestDᵉ ins e + 0
     + storeNestMax (sched-init e ins) (st-init e)

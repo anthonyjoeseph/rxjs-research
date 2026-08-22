@@ -202,10 +202,14 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`nestD-le-tower`** (Caps-Bridge) — DIFFICULTY, the tier's new anchor: the
-  whole depth face reduces to one SYNTACTIC inequality, with no `capsOK?`, no
-  `blowH` and nothing `abstract` in it. The caps side is fully proven, at a FREE
-  height, so the leaf may spend a factor; its header says why.
+- **`nestD-tower`** (Nest-Tower) — DIFFICULTY, the tier's anchor: the depth
+  measure under a tower whose height is linear in `sizeᵉ e`. The clause-by-clause
+  budget is in its header and every clause closes with a level spare, so the
+  statement is settled; the two precedents cover its halves and not the pair.
+- **`storeNest-tower`** (Nest-Tower) — DIFFICULTY: the same currency summed over
+  the slot telescope at the entry state, where the node table is empty. A
+  scripted slot pays nothing, so the count of live summands is under
+  `slotsSize`; that count is the height, and turning a sum into it is the work.
 - **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY, downgraded from
   FALSITY by rows that reached the product itself: the burst's sibling-max
   finding survives, and the nesting term the restatement added is what the
