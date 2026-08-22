@@ -30,29 +30,32 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Nest-Tower where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤;
-  +-monoˡ-≤; +-monoʳ-≤; *-monoʳ-≤; +-comm; m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; ⊔-lub;
-  n≤1+n; ⊔-identityʳ)
+  +-monoˡ-≤; +-monoʳ-≤; *-monoʳ-≤; +-comm; +-identityʳ; m≤m+n; m≤n+m; m≤m⊔n;
+  m≤n⊔m; ⊔-lub; n≤1+n; ⊔-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; tabulate)
+open import Data.Nat.ListAction using (sum)
+open import Data.Fin using (Fin)
+import Data.Fin as Fin
 open import Data.Product using (_,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Rx.Prim using (towerℕ)
 open import Rx.Exp using (Ctx; Closed; Exp; Tm; sizeᵉ; sizeᵗ; sizeᵗˢ;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
   inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
-open import Rx.Slots using (Slots; slotsSize; shared; scripted)
+open import Rx.Slots using (Slots; Slot; slotSize; slotsSize; shared; scripted)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵗˢ)
 open import Rx.Frame-Width using (entryCeil; pWᵉ; innWᵉ; outWᵉ; dWᵉ;
   slotsPW≤entryCeil; slotsIW≤entryCeil)
 open import Rx.Evaluator using (capsBase; sched-init; st-init)
 
 open import Verify-Budget-Sufficient.Measures using (k≤towerℕ; towerℕ-mono;
-  sizeᵗ-pos)
+  sizeᵉ-pos; sizeᵗ-pos; 1≤slotSize; n≤sum-tab)
 open import Verify-Budget-Sufficient.Caps using (3T≤; tower-mul;
   iterFold-tower; 1≤towerℕ; 2≤towerℕ)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (SlotWid; Sub-[];
@@ -60,7 +63,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using (SlotWid; Sub-[];
 open import Verify-Budget-Sufficient.Caps-Face.Part2 using (monoᵉ; monoᴰᵉ;
   wid-iterFold)
 open import Verify-Budget-Sufficient.Depth-Compositional using
-  (storeNestMax; slotsNestSum)
+  (storeNestMax; slotNest; slotsNestSum)
 
 ------------------------------------------------------------------
 -- THE UNCONDITIONAL LEAF BOUND.
@@ -100,10 +103,10 @@ entryCeil-slotWid {n = suc m} sl e i
   iw′ = ≤-trans iw (n≤1+n (entryCeil (suc m) sl e))
 
 ------------------------------------------------------------------
--- THE TWO HALVES OF THE MEASURE.  The term half is a real body below;
--- the store half is still a leaf.  `S` is fixed at 2 inside — it is
--- the base `wid-iterFold` asks for and it never reaches the
--- conclusion, so carrying it as a parameter would say nothing.
+-- THE TWO HALVES OF THE MEASURE, both real bodies below.  `S` is
+-- fixed at 2 inside — it is the base `wid-iterFold` asks for and it
+-- never reaches the conclusion, so carrying it as a parameter would
+-- say nothing.
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
@@ -165,6 +168,33 @@ hUp k a s a≤s =
 
 hIn : ∀ (k a s : ℕ) → a ≤ s → k + 3 * a ≤ k + 3 * s
 hIn k a s a≤s = +-monoʳ-≤ k (*-monoʳ-≤ 3 a≤s)
+
+x≤3x : ∀ (x : ℕ) → x ≤ 3 * x
+x≤3x x =
+  ≤-trans (m≤m+n x (x + x))
+          (≤-reflexive (solve 1 (λ u → u :+ (u :+ u) := con 3 :* u) refl x))
+
+1≤3x : ∀ (x : ℕ) → 1 ≤ x → 1 ≤ 3 * x
+1≤3x x 1x = ≤-trans (s≤s z≤n) (*-monoʳ-≤ 3 1x)
+
+-- A POSITIVE SUMMAND PAYS FOR THE `+` IT IS ADDED BY, which is the
+-- only reason any of these clauses close: a sum's two heights are
+-- both the FULL height, so the level has to come from a size that
+-- cannot be zero rather than from headroom in the statement.
+payL : ∀ (k a b : ℕ) → 1 ≤ 3 * a → suc (k + 3 * b) ≤ k + 3 * (a + b)
+payL k a b 1≤3a =
+  ≤-trans (≤-reflexive (+-comm 1 (k + 3 * b)))
+  (≤-trans (+-monoʳ-≤ (k + 3 * b) 1≤3a)
+           (≤-reflexive (solve 3 (λ n x y → (n :+ con 3 :* y) :+ con 3 :* x
+                                         := n :+ con 3 :* (x :+ y))
+                               refl k a b)))
+
+payR : ∀ (k a b : ℕ) → 1 ≤ 3 * b → suc (k + 3 * a) ≤ k + 3 * (a + b)
+payR k a b 1≤3b =
+  ≤-trans (payL k b a 1≤3b)
+          (≤-reflexive (solve 3 (λ n x y → n :+ con 3 :* (y :+ x)
+                                        := n :+ con 3 :* (x :+ y))
+                              refl k a b))
 
 ------------------------------------------------------------------
 -- THE TERM HALF.  Induction on the syntax, at a height chosen so
@@ -325,46 +355,75 @@ mutual
       (nestD-towerᵗ  k M 3k 1M MT sl w y)
       (nestD-towerᵗˢ k M 3k 1M MT sl w ys)
       (s≤s (hIn k A (A + B) (m≤m+n A B)))
-      (s≤s headPays)
+      (s≤s (payL k A B (1≤3x A (sizeᵗ-pos y))))
     where
     A = sizeᵗ y
     B = sizeᵗˢ ys
-    1≤3A : 1 ≤ 3 * A
-    1≤3A = ≤-trans (s≤s z≤n) (*-monoʳ-≤ 3 (sizeᵗ-pos y))
-    headPays : suc (k + 3 * B) ≤ k + 3 * (A + B)
-    headPays =
-      ≤-trans (≤-reflexive (+-comm 1 (k + 3 * B)))
-      (≤-trans (+-monoʳ-≤ (k + 3 * B) 1≤3A)
-               (≤-reflexive (solve 3 (λ a x y′ →
-                  (a :+ con 3 :* y′) :+ con 3 :* x := a :+ con 3 :* (x :+ y′))
-                 refl k A B)))
 
 ------------------------------------------------------------------
--- THE STORE HALF, still a leaf.
+-- THE STORE HALF.  The level accounting is per-SLOT rather than
+-- per-node: `slotSize` is at least 1, so each slot grants three
+-- levels, and a shared slot spends two — one for the `+` inside its
+-- own summand and one for the cons that adds it to the rest.
+--
+-- THE SPARE `suc` IN THE CONCLUSION IS FORCED, not slack, and the
+-- one-slot telescope is the whole argument: a shared slot's summand
+-- is `sizeᵉ d + nestDᵉ sl d`, and BOTH sides already sit at the full
+-- `k + 3 * sizeᵉ d` — the term half is stated exactly there and
+-- `k≤towerℕ` puts the size no lower — so no routing brings the
+-- per-slot bound below `suc (k + 3 * slotSize s)`, and at one slot
+-- that bound IS the statement.  The assembly pays for it out of
+-- `3 * sizeᵉ e`, which is at least 3.
 ------------------------------------------------------------------
 
-postulate
-  -- THE STORE HALF, at the entry state, where the node table is empty
-  -- and the whole store is the slot telescope.  A scripted slot pays
-  -- nothing and a shared slot's summand is its def's size plus the term
-  -- half at that def, so the count of nonzero summands is under
-  -- `slotsSize sl` — which is the height this is stated at.
-  --
-  -- ITS SIBLING HALF IS NOW PROVEN, AND COVERS THE ARITHMETIC BUT NOT
-  -- THE INDUCTION.  `nestD-tower` bounds the second summand of a shared
-  -- slot at height `k + 3 * sizeᵉ d`, `k≤towerℕ` bounds the first at the
-  -- same height, and the kit above adds them for one level — so the
-  -- PER-SLOT bound is settled, at `suc (k + 3 * slotSize (sl i))`.
-  -- What is not settled is the sum: this is an induction over
-  -- `sum (tabulate …)` against `sum (tabulate slotSize)`, which is
-  -- vector machinery and not the Exp/Tm recursion the sibling runs on.
-  -- Each slot grants three levels and needs about two — one for its own
-  -- `+` and one for the cons — so the budget is there; how to route it
-  -- through a tabulate is the open decision, and it is why this stays
-  -- DIFFICULTY rather than inheriting the sibling's shape.
-  storeNest-tower : ∀ {n} {Γ : Ctx n} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
-    M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M →
-    slotsNestSum sl ≤ towerℕ (k + 3 * slotsSize sl)
+-- ONE SUMMAND PER SLOT, each arriving at its own height.  The
+-- one-slot case is its own clause and not a degenerate instance of
+-- the cons: the cons is paid for by the TAIL being nonempty, and at
+-- one slot the tail is `sum []`, which is 0 and pays nothing.  There
+-- is nothing to pay for there either, since `x + 0` adds no level.
+tower-sum-tab : ∀ {m} (k : ℕ) → 3 ≤ k → (f g : Fin m → ℕ) →
+  (∀ i → 1 ≤ g i) → (∀ i → f i ≤ towerℕ (suc (k + 3 * g i))) →
+  sum (tabulate f) ≤ towerℕ (suc (k + 3 * sum (tabulate g)))
+tower-sum-tab {zero}          k 3k f g 1g hf = z≤n
+tower-sum-tab {suc zero}      k 3k f g 1g hf =
+  ≤-trans (≤-reflexive (+-identityʳ (f Fin.zero)))
+  (≤-trans (hf Fin.zero)
+           (towerℕ-mono (s≤s (hIn k (g Fin.zero) (g Fin.zero + 0)
+              (≤-reflexive (sym (+-identityʳ (g Fin.zero))))))))
+tower-sum-tab {suc (suc m)} k 3k f g 1g hf =
+  sum2H (suc (k + 3 * A)) (suc (k + 3 * B)) _
+    (≤-trans 3k (≤-trans (m≤m+n k (3 * A)) (n≤1+n (k + 3 * A))))
+    (hf Fin.zero)
+    (tower-sum-tab k 3k (λ i → f (Fin.suc i)) (λ i → g (Fin.suc i))
+       (λ i → 1g (Fin.suc i)) (λ i → hf (Fin.suc i)))
+    (s≤s (payR k A B (1≤3x B (≤-trans (s≤s z≤n)
+             (n≤sum-tab (λ i → g (Fin.suc i)) (λ i → 1g (Fin.suc i)))))))
+    (s≤s (payL k A B (1≤3x A (1g Fin.zero))))
+  where
+  A = g Fin.zero
+  B = sum (tabulate (λ i → g (Fin.suc i)))
+
+-- The per-slot bound.  A scripted slot pays nothing; a shared slot's
+-- two summands are the def's size and the term half at that def.
+slotNest-tower : ∀ {n} {Γ : Ctx n} {j t} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
+  M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M → (s : Slot Γ j t) →
+  slotNest sl s ≤ towerℕ (suc (k + 3 * slotSize s))
+slotNest-tower k M 3k 1M MT sl w (scripted i) = z≤n
+slotNest-tower k M 3k 1M MT sl w (shared d) =
+  sum2H (k + 3 * sizeᵉ d) (k + 3 * sizeᵉ d) _
+    (≤-trans 3k (m≤m+n k (3 * sizeᵉ d)))
+    (≤-trans (k≤towerℕ (sizeᵉ d))
+             (towerℕ-mono (≤-trans (x≤3x (sizeᵉ d)) (m≤n+m (3 * sizeᵉ d) k))))
+    (nestD-tower k M 3k 1M MT sl w d)
+    ≤-refl ≤-refl
+
+storeNest-tower : ∀ {n} {Γ : Ctx n} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
+  M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M →
+  slotsNestSum sl ≤ towerℕ (suc (k + 3 * slotsSize sl))
+storeNest-tower {n = n} k M 3k 1M MT sl w =
+  tower-sum-tab {m = n} k 3k (λ i → slotNest sl (sl i)) (λ i → slotSize (sl i))
+    (λ i → 1≤slotSize (sl i))
+    (λ i → slotNest-tower k M 3k 1M MT sl w (sl i))
 
 ------------------------------------------------------------------
 -- THE ASSEMBLY.  Three bounds at one height, `3T≤` to add them, and
@@ -408,9 +467,16 @@ nestD-le-tower {n = n} e ins =
   storeLe : storeNestMax (sched-init e ins) (st-init e) ≤ T
   storeLe = ≤-trans (≤-reflexive (⊔-identityʳ (slotsNestSum ins)))
             (≤-trans (storeNest-tower K M 3≤K (s≤s z≤n) M≤TK ins wid)
-                     (towerℕ-mono {K + 3 * L} {H}
-                        (+-monoˡ-≤ (3 * L) (m≤m+n K (3 * S)))))
-    where wid = entryCeil-slotWid ins e
+                     (towerℕ-mono {suc (K + 3 * L)} {H} fitsL))
+    where
+    wid = entryCeil-slotWid ins e
+    -- `sizeᵉ e` is at least 1, so the term half's three levels cover
+    -- the store half's spare one with two to spare.
+    fitsL : suc (K + 3 * L) ≤ H
+    fitsL = ≤-trans (payL K S L (1≤3x S (sizeᵉ-pos e)))
+                    (≤-reflexive (solve 3 (λ n x y →
+                       n :+ con 3 :* (x :+ y) := (n :+ con 3 :* x) :+ con 3 :* y)
+                      refl K S L))
 
   sizeLe : S ≤ T
   sizeLe = ≤-trans (k≤towerℕ S) (towerℕ-mono {S} {H} S≤H)

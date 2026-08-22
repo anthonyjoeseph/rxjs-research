@@ -1158,8 +1158,8 @@ abstract
 -- WHAT REMAINS IS PURELY SYNTACTIC — no `capsOK?`, no `blowH`, nothing
 -- `abstract` — and it lives in `.Nest-Tower`, whose `nestD-le-tower` is
 -- now a real body: three bounds at one height, `3T≤` to add them and
--- `towerℕ-mono` to land here.  The two leaves left out there are the
--- measure's own two halves.
+-- `towerℕ-mono` to land here.  That module holds no leaves; both halves
+-- of the measure are proven there.
 nest-store≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   sizeᵉ e + nestDᵉ ins e + 0
     + storeNestMax (sched-init e ins) (st-init e)

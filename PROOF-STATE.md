@@ -202,10 +202,6 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`storeNest-tower`** (Nest-Tower) — DIFFICULTY, the tier's anchor: the same
-  currency summed over the slot telescope. Its sibling half is now proven and
-  supplies the per-slot bound and the addition kit, so what is left to decide is
-  the sum-over-tabulate induction, not the arithmetic.
 - **`depth-all-bound`** (Depth-Compositional) — DIFFICULTY, downgraded from
   FALSITY by rows that reached the product itself: the burst's sibling-max
   finding survives, and the nesting term the restatement added is what the
