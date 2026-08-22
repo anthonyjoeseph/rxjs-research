@@ -47,10 +47,9 @@
 -- (c) THE CONNECT, a real clause: `input` recurses into the slot's own
 -- def and pays for it out of the summand admitting slot `i` to the
 -- partial sum.  (d) BLOCKED, two named postulates —
--- `depth-all-burst-reached` (the burst half of the `*All` clauses at
--- POSITIVE gas, read at the scheduler the burst reached; the outer half
--- is proven in the assembly itself, the zero-gas half in bucket (b′),
--- and finding (4) is spent rather than absorbed) and
+-- `emit-cap` (what a subscribe's burst EMITS is no more deeply nested
+-- than the expression that emitted it; every other part of the `*All`
+-- face is a real body over it, including the burst walk itself) and
 -- `depth-μ-bound` (sizeᵉ (unfoldμ body) > sizeᵉ (μᵉ body) kills the
 -- size IH; the honest route is the guarded-context discipline —
 -- μ-variable occurrences sit under deferᵉ, and deferᵉ contributes 0
@@ -65,19 +64,24 @@
 module Verify-Budget-Sufficient.Depth-Compositional where
 
 open import Data.Nat
-  using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s; _<ᵇ_)
+  using (ℕ; zero; suc; _+_; _≤_; _⊔_; z≤n; s≤s; _<ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; m≤n+m; +-mono-≤; ⊔-lub; n≤1+n; m≤m⊔n; m≤n⊔m; +-suc; ≤-reflexive; ≤ᵇ⇒≤; n≮n;
-  +-identityʳ)
+  +-identityʳ; +-monoˡ-≤)
+open import Data.Nat.Solver using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; con)
 open import Data.Fin   using (Fin; toℕ)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
 open import Data.List.Relation.Unary.Any using (here)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; trans)
 open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (Bool; false; true; if_then_else_; T; _∧_)
+open import Data.Bool.ListAction using (all)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; proj₁; proj₂)
-open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
+open import Rx.Prim
+  using (Gas; g0; gs; Id; Tick; InstEmit; InstEvent; init; value; close; handoff;
+  complete)
 open import Rx.Exp
   using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; input; ofᵉ;
   emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
@@ -87,7 +91,7 @@ open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
   take-f; from-inner; thru-outer; mintNode; installNode; subscribeE; splitEvents; stepFrame;
-  root; share-sink; register; lookupNode; thruConsume)
+  root; share-sink; register; lookupNode; thruConsume; switchKill)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 
@@ -97,11 +101,14 @@ open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; sum-tab-mono)
 open import Verify-Budget-Sufficient.Caps-Nest using (sum-tab-slack)
-open import Verify-Budget-Sufficient.Keeps-Ring using (subscribeE-slots)
+open import Verify-Budget-Sufficient.Keeps-Ring
+  using (subscribeE-slots; KeepsC; thruConsume-keeps; stepFrame-keeps;
+  switchKill-keeps)
 open import Data.Empty using (⊥-elim)
-open import Decide using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ)
+open import Decide
+  using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthBurst; depthWalk; depthConsume; depthConsumeS)
+  using (depthE; depthBurst; depthWalk; depthConsume; depthConsumeS; depthInner)
 
 ------------------------------------------------------------------
 -- THE MEASURE — the state's contribution to subscribe-time depth,
@@ -617,353 +624,6 @@ slotsNestBelow-step sl i =
 ------------------------------------------------------------------
 
 postulate
-  -- depthAll's burst uses thru-outer (the spending arc).  Bounding the
-  -- inner subscribes requires storeNestMax preservation through
-  -- subscribeE proved simultaneously (census finding (4)).
-  --
-  -- PROBED 2026-08-21 (Probed.Depth-All): the burst takes a MAX across
-  -- SIBLINGS, not a sum.  A merge over one slot-chain top measures 5;
-  -- a merge over two independent 4-link chains measures 5 as well,
-  -- with the store held at 9 in both rows by using the same slots.
-  -- So the arc that accumulates is the CONNECT — which is what forced
-  -- `slotsNestSum` (Refuted.Depth-Chain) — and NOT the sibling entry,
-  -- so this arm's own `suc` is not being asked to pay for k chains.
-  -- RE-READ 2026-08-22 in the nesting currency: the figures were 5
-  -- against a store of 60 and a cap of 53 when the slot measure paid
-  -- sizes, and are 5 against 9 and 9 now, so the margin the rows cross
-  -- is of the same order as the depth rather than mostly size slack.  This
-  -- was the live falsity candidate once the chain finding landed, and
-  -- it is the region the rows reached.
-  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
-  -- burst (different `initSt`, and their queueing is charged by the
-  -- store's node half, which this cap does not read); no nested burst;
-  -- no post-cascade state;
-  -- and both arms are the same length, so a burst over siblings of
-  -- DIFFERENT depths is untested.
-  --
-  -- RESTATED over `depthCapN` when the connect landed and again when the
-  -- cap lost its size term, and the rows were re-read rather than
-  -- inherited both times: the two-chain program measures 5 against a cap
-  -- of 53, where the `storeNestMax` bound it replaced gave 60.  The
-  -- mirror-side findings above are untouched, since nothing about
-  -- `depthAll` moved — only the right-hand side, and it got SMALLER each
-  -- time, which is the direction that could have refuted this.  Almost
-  -- all of what is left is the slot chain: this program's own
-  -- contribution to its cap is ONE, its `mergeAllᵉ` layer.
-  --
-  -- ITS PREDECESSOR IS REFUTED 2026-08-21 (Refuted.Depth-Nest), AND THE
-  -- RECEIPT ABOVE IS WHAT AIMED IT: the one shape it names as untested is
-  -- a NESTED burst, and that is the shape the predecessor — the same
-  -- statement with `depthCapN (suc (sizeᵉ b))` and no nesting term —
-  -- dies at.  The statement below adds `suc (nestDᵉ …)` to that first
-  -- argument, so it is strictly weaker than the refuted form and the
-  -- witness does not reach it; what follows is why.  A `scanᵉ`
-  -- whose step function wraps its own accumulator gains `w` nesting
-  -- levels PER TICK while the syntax gains `4` per wrap and `1` per
-  -- listed source value — so the left side grows in `w · k` and the
-  -- right in `w + k`, and at `w = 4, k = 12` the depth is 49 against a
-  -- cap of 38.  `depthE` of a `scanᵉ` charges its emissions nothing
-  -- (`burst-scf-zero`), which is exactly what makes a scan a free
-  -- generator of nesting; the charge lands only here, in the `*All`
-  -- that consumes it.
-  --
-  -- The sibling-max finding above SURVIVES and is not what failed: the
-  -- burst does take a max across siblings.  It accumulates down
-  -- NESTING, which is a different axis and the one no syntactic term
-  -- can pay for.  Restating means conditioning on the caps, whose
-  -- `valCaps?` already bounds `sizeᵛ` — and `sizeᵛ (obs t) v` IS
-  -- `sizeᵉ v`, so the nesting of a reachable value is bounded there and
-  -- nowhere in the program text.
-  --
-  -- AND THE RESTATEMENT DOES NOT STOP AT `depth-capped`, WHICH THIS
-  -- HEADER PREVIOUSLY CLAIMED IT WOULD.  `3 · cSize` has room at THIS
-  -- witness (114 against 49) and none in general, because a constant
-  -- multiple is still linear: `depth-capped-absurd` walks the same
-  -- family out to `w = 7, k = 29` and measures 204 against 201.  The
-  -- interface has to move too.
-  --
-  -- THE CURRENCY TO MOVE IT INTO IS ALREADY IN THE TREE, and it is not
-  -- a bigger multiple.  `scanFrame-caps` charges a scan frame
-  -- `length vals * suc (sizeᵗ fn)` folds — burst cardinality times step
-  -- size, which is `k · w` with the two factors named — and the size
-  -- and width faces both read their bound at that count
-  -- (`iterSize S (length vals * suc (sizeᵗ fn)) B`,
-  -- `iterFold S … M`).  So the product this statement dies on is the
-  -- product those faces already pay, and the depth face is the one
-  -- reading a linear cap where its siblings read a fold count.
-  --
-  -- AND THE OBLIGATION ON A NEW CONCLUSION IS WEAK, once the right
-  -- consumer is read.  A depth bound spent through `opIterD` does climb
-  -- levels tower-ly per unit — `opIterD`'s `d` slot passes to `fLvlD`,
-  -- whose `suc d` clause unfolds a whole `sIterD` sweep — but that `dep`
-  -- bounds `depthInner`, and it arrives on `sub-charge-capsOK-lift`'s
-  -- `depOK` premise rather than from this family.  What this statement
-  -- feeds is `depth-capped`, and `depth-capped` has exactly ONE consumer:
-  -- `depthE≤capsH-root`, chaining into `capsH e ins 0` through
-  -- `three-size-le-blowH`.  So all a restatement owes is to sit under
-  -- `blowH (capsBase e ins)`, which carries `2 * poolCount (towerℕ m) m`
-  -- and is astronomically above any exponential in `sizeᵉ e`.
-  --
-  -- PROBED 2026-08-21 (Probed.Nest-Depth), AND THE MEASURE IS DERIVED
-  -- RATHER THAN FITTED — which is why the rows ask for EQUALITY and not
-  -- domination.  Charge one `suc` per `*All` layer, because that is what
-  -- `depthFrame` at `thru-outer` charges, and charge a `scanᵉ` its
-  -- SOURCE'S PAYLOAD COUNT times its step function's layers, because the
-  -- accumulator is re-wrapped once per delivered payload and the scan's
-  -- own frame charges its emissions nothing.  The resulting measure
-  -- equals `depthE` on the nose at both crossings the refutation walks:
-  -- 49 at four wraps over twelve ticks, 204 at seven over twenty-nine.
-  -- Two products, so no constant passes both, and a zero-wrap row pins
-  -- the collapse to 1.
-  --
-  -- AND THE PRODUCT COMPOUNDS, which is the row that settles the
-  -- currency rather than merely confirming the measure.  Put a scan
-  -- inside the outer scan's STEP FUNCTION, seeded by the incoming
-  -- accumulator, and the inner scan's layers are re-applied once per
-  -- outer payload: the measure predicts `j · (k · w + 1) + 1`, and
-  -- `depthE` returns exactly that (22 at two wraps, three inner, three
-  -- outer).  One factor per nested scan, with no bound on how many.
-  --
-  -- So `depthE` is EXPONENTIAL in the program size — each factor costs a
-  -- constant of syntax and multiplies — and every fixed-degree product
-  -- of caps fields is dead, `cSize · cSize` included.  That closes the
-  -- guess two commits back by measurement rather than by argument, and
-  -- it sharpens the one open question to a single arithmetic one: the
-  -- depth bound is spent as a LEVEL COUNT through `opIterD`, and levels
-  -- exponentiate, so what has to be checked is whether the height
-  -- budget absorbs an EXPONENTIAL level count.  A tower it certainly
-  -- does not (`Caps`'s own header defends that when it forbids `cWid`
-  -- from re-entering the delivery count); an exponential is undecided
-  -- and is the next thing to settle.
-  --
-  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
-  -- layer, whose queueing `nodesNestMax` charges separately; no slot
-  -- descent, so the connect arc is unmeasured here and `slotsNestBelow`
-  -- is the term that would carry it; no post-cascade state; and the
-  -- compounding row is degree THREE, so nothing here says the pattern
-  -- continues past it — only that it does not stop at two.
-  --
-  -- AND THE ROUTE INTO `src` HAD ONE DESIGN CHOICE IN IT, WHOSE FIRST
-  -- ANSWER WAS WRONG.  Putting `nestDᵉ b` into `depthCap`'s first
-  -- summand — beside `sizeᵉ b` then, alone there now — leaves the
-  -- `input` clause owing the SLOT definition's nesting, and there were
-  -- exactly two places to pay it.
-  --
-  -- DEAD ROUTE 2026-08-21: PAY IT IN THE MEASURE, by descending into
-  -- slot definitions on slot fuel with a visited set — `outWⱽ`'s shape,
-  -- whose `input` clause is already written that way and whose `j` is
-  -- the lexicographic measure a connect spends.  It was chosen first,
-  -- and for a good reason: it kept `slots-nest-≤-size`, which held
-  -- `slotNest` pointwise under `slotsSize` and kept `storeNest-capped`
-  -- under the caps.  It is STRUCTURALLY DEAD.  The consumer fixes the
-  -- fuel at the slot count `n`, a VARIABLE, so `nestDⱽ n [] sl (input i)`
-  -- never reduces, and the parent has no more fuel than the child it
-  -- would recurse into — there is no inequality to prove even in
-  -- principle, and no lemma repairs it.  `outWⱽ` gets away with the
-  -- shape by threading `j` through its own consumers; a measure read off
-  -- a `Sched` cannot.
-  --
-  -- So it is paid in `slotNest`, whose `slotsNestBelow-step` is an
-  -- equality at exactly the index the `input` clause needs.  It paid the
-  -- def's SIZE beside its nesting while the cap read both currencies,
-  -- and pays the nesting ALONE now, so the charge and the payment are
-  -- again the same number.  What either version cost was
-  -- `slots-nest-≤-size`, `storeNest-capped` and `depth-capped`, since an
-  -- exponential quantity has no bound by a size: the whole
-  -- caps-conditioned interface went, and `depth-compositional` reaches
-  -- the root directly now (`nest-store≤capsH`, Caps-Bridge, whose header
-  -- carries what the deleted module knew).  That was the right trade
-  -- rather than a loss — the interface was refuted anyway, and it was
-  -- refuted for reading a level it does not report.
-  -- THE FACE SPLIT INTO ITS TWO ARMS, AND ONLY THE BURST ONE IS A LEAF.
-  -- `depthAll` reduces to `depthE … ⊔ depthBurst …` — Caps-Depth is
-  -- deliberately not `abstract`, so both arms are visible from here —
-  -- so the four `*All` clauses of the assembly below close with `⊔-lub`
-  -- over an OUTER half they prove and this BURST half they assume.
-  --
-  -- DEAD ROUTE 2026-08-22: STATE THE OUTER ARM AS A LEAF OF ITS OWN.
-  -- It was written that way first, alongside this one, and it is
-  -- STRUCTURALLY DEAD — not hard, impossible.  The arm's only route is
-  -- the take/scan buckets' route step for step: the assembly's own
-  -- recursion at the SUB-expression, then the install lemma, then the
-  -- `*All` layer's cap arithmetic.  That first step is the induction
-  -- hypothesis, and it is available only INSIDE the induction: a
-  -- standalone lemma would have to call the assembly at an expression
-  -- of the same size as its own argument, so nothing decreases and no
-  -- measure repairs it.  The decrease happens at the CALLER, which is
-  -- exactly where the proof now lives.
-  --
-  -- AND THE `initSt` GENERALITY WAS A SYMPTOM OF THE SAME THING, worth
-  -- recording because it read as the blocker and because the way it
-  -- dissolved is the lesson.  Stated standalone, the arm quantifies over
-  -- a free initial node state, the install lemma needed that state to
-  -- weigh 0, and the unconditional form was NOT refuted — installing can
-  -- only raise a node measure — so a hypothesis was not licensed and the
-  -- arm looked stuck.  What settled it was neither a proof nor a
-  -- hypothesis: the cap stopped reading the node store at all
-  -- (`depthCapN`'s header), the install lemma went with it, and there is
-  -- nothing left for a free `initSt` to threaten.  An over-general
-  -- argument in a statement is worth suspecting of being a statement
-  -- that belongs somewhere else.
-  --
-  -- WHAT IS LEFT HERE IS THE ARM THAT CANNOT BE INLINED, and finding
-  -- (4) above says why: its scheduler and state come out of the REAL
-  -- `subscribeE`, while the cap reads the entry scheduler, so it owes a
-  -- preservation argument no arithmetic supplies.  That obligation is
-  -- one conjunct lighter than it was — the cap reads the SLOTS and
-  -- nothing else, so the state half of it went with the node arm.  The
-  -- three projections below are that subscribe's stream, scheduler and
-  -- state, in that order.
-  --
-  -- DEAD ROUTE 2026-08-22: RUN THE ASSEMBLY'S OWN INDUCTION AT THE
-  -- EMITTED INNER AND DOMINATE ITS CAP.  It is the obvious route and
-  -- the arms line up: the burst reaches `depthE` at each delivered
-  -- inner observable one gas lower, and the `*All` layer's two `suc`s
-  -- pay exactly the frame's charge and the extra path frame, leaving
-  -- the inner's own size-plus-nesting to be covered by the source's.
-  -- It is STRUCTURALLY DEAD IN THE SIZE TERM.  Take a scan whose step
-  -- re-wraps its own accumulator inside one more `*All` layer per tick:
-  -- the accumulator's NESTING grows by one per delivered payload and
-  -- the measure pays for precisely that, since the scan clause's
-  -- `outWᵉ · nestDᵗ` IS the per-payload re-wrap — but its SIZE grows by
-  -- a constant per payload too, and the target's size term is fixed
-  -- syntax.  So the child's cap outruns the parent's by the size term
-  -- alone, at a program where the depths are fine.
-  --
-  -- WHICH IS TO SAY THE BLOCKAGE IS SLACK, NOT FALSITY.  At that same
-  -- program the depth IS the nesting, so nothing here is refuted and no
-  -- hypothesis is licensed; what is wrong is that `depthCap` reads the
-  -- size currency at all.  `Probed.Nest-Depth` says so in the strongest
-  -- available form: its rows report `depthE` EQUAL to `nestDᵉ`, not
-  -- dominated by it, so the `sizeᵉ` summand buys nothing at any row
-  -- reached.  Those rows are all at the root with no slot and no node
-  -- store, so they do NOT reach the two places the size currency is
-  -- load-bearing — the connect, which pays a def's `sizeᵉ` through
-  -- `slotNest`, and `nodeNestMax`, which charges a concat queue by its
-  -- observables' `sizeᵉ`.  Both of those keep paying under any repair;
-  -- the summand in question is the one read off the SUBJECT.
-  --
-  -- AND THE `pathLen` SUMMAND IS NOT SLACK, WHICH IS THE PART THE ROWS
-  -- CANNOT SEE, since `pathLen root` is 0 in every one of them.
-  -- Spending arc 2 charges a `suc` for a `from-inner` frame that came
-  -- out of the PATH rather than out of the subject, so a cap with no
-  -- path term cannot pay for it — dropping the summand is not the
-  -- repair, restating it in the nesting currency is.
-  --
-  -- THAT REPAIR IS DONE, AND IT IS WHY THIS STATEMENT READS AS IT NOW
-  -- DOES.  The cap is read off nesting throughout: the subject's
-  -- `sizeᵉ` is gone, the below-sum is kept, and `pathLen` became
-  -- `pathNestD`, which charges the SPENDING ARC and nothing else.  The
-  -- dead route above is what forced it and it stays recorded, because
-  -- what was dead was the route THROUGH THE OLD STATEMENT and the
-  -- repair was to move the statement — the route it kills is still
-  -- dead for anyone who puts a size term back.
-  --
-  -- WHAT IT COST, and the answer is nothing: every clause of the
-  -- assembly got SHORTER.  The three structural descents need no
-  -- arithmetic step at all now, since the measure they used to have to
-  -- fund is not charged; the `*All` arm's step is `arith-step` at
-  -- `c = 0`, an equality in all but association; the μ clause's two
-  -- caps became the SAME TERM, so its bridge went entirely; and the
-  -- connect's charge and its payment are the same number again.  A
-  -- tightening that simplifies every consumer is evidence about the
-  -- measure, not about the arithmetic.
-  --
-  -- AND THE STORE MEASURE FOLLOWED IT, THOUGH NOT FOR THE REASON GIVEN
-  -- WHEN IT DID — worth recording, because the wrong reason is the one
-  -- this arm supplied.  The expectation was that the burst has to bound
-  -- the IH's cap at the state the walk REACHED, and a `concatAllᵉ`
-  -- queues an emitted inner into `nodeNestMax`, so while that charged a
-  -- SIZE the arm looked to need the cap to bound an emitted inner's size
-  -- — exactly what an accumulator-wrapping scan refutes.  Working the
-  -- arithmetic said otherwise: the cap does not read the node store at
-  -- all, so this arm never collects.  Both halves of the store read
-  -- `nestDᵉ` anyway, which shrank the EXPORT rather than this leaf, and
-  -- the leaf below is one conjunct lighter for the same finding.
-  --
-  -- SO WHAT IS LEFT ON THIS LEAF IS EXACTLY "an emitted inner's nesting
-  -- is bounded by its emitter's nesting", which is the one thing the
-  -- measure was derived to pay and which the scan clause pays on the
-  -- nose — plus finding (4)'s state-preservation conjunct, which no
-  -- restatement removes.  The `*All` layer's `suc` on `nestDᵉ` pays the
-  -- frame's charge and `pathNestD` no longer bills the extra path frame
-  -- at all, so the arithmetic is finished before the induction starts.
-  --
-  -- AND THE MEASURE THE ROUTE NEEDS IS ALREADY IN THE SIGNATURE: THE
-  -- GAS.  An emitted inner is not a subexpression of its emitter, so
-  -- structural recursion on the subject cannot reach it — but the
-  -- descent that reaches it PEELS ONE GAS (`depthInner`'s `gs` clause
-  -- is what enters the payload, and its zero clause returns 0), and the
-  -- gas travels unchanged from `depthAll` down through the burst, the
-  -- frame, the walk and the consume to get there.  So the pair is
-  -- lexicographic on gas and then on the subject, which is the order
-  -- the arguments already sit in, and no fuel parameter and no
-  -- well-founded plumbing is owed.  THE SPLIT IS TAKEN: `depth-all-burst`
-  -- is a real body over `g0` and `gs fuel`, and the zero half is
-  -- discharged in bucket (b′) — which also checks the claim of this
-  -- paragraph, since the base case of a gas descent closing is what
-  -- says the gas is the thing being descended on.
-  --
-  -- WHICH MEANS THIS ARM CANNOT STAY A LEAF EITHER, for the reason its
-  -- sibling could not: the recursion it needs exists only inside the
-  -- induction.  Its route is to mirror the burst-side clique — burst,
-  -- frame, walk, consume, inner, and concat's drain — as members of
-  -- that induction, each recursing on its own list at a fixed gas and
-  -- reaching the subject only one gas lower.  Every cycle in that call
-  -- graph then decreases something: the lists on their own edges, the
-  -- gas on the edge back to the subject.  What is left over as a true
-  -- leaf is the one fact none of it supplies — an emitted inner's
-  -- nesting is bounded by its emitter's — together with finding (4)'s
-  -- state conjunct.
-  -- THE BURST ARM AT POSITIVE GAS, over the stream the outer subscribe
-  -- returned.  Its own scheduler and state come out of that subscribe
-  -- rather than out of `sched`/`st`, which is why the arm cannot be
-  -- stated over arbitrary ones: the three projections are the
-  -- subscribe's stream, scheduler and state, in that order.
-  --
-  -- AND THE GAS SPLIT IS DONE, which is the half of the route above
-  -- that needed no new mathematics.  `depth-all-burst` below is a real
-  -- body: at `g0` every entry into a payload returns 0 without looking
-  -- at it, so the whole burst-side clique collapses to the ONE `suc` a
-  -- `thru-outer` frame charges and the cap's `suc` pays it.  What is
-  -- left is this leaf, and its gas is the thing the route descends on.
-  --
-  -- AND THE PRESERVATION CONJUNCT IS SPENT RATHER THAN OWED, which is
-  -- what the statement below reads at the REACHED scheduler for.  The
-  -- cap reads a scheduler through `Sched.slots` and nothing else, so the
-  -- one fact that moves the arm's own cap back to the entry cap is that
-  -- a subscribe keeps the slots — and that is PROVEN, unconditionally,
-  -- as `subscribeE-slots` (Keeps-Ring), off a `KeepsC` family covering
-  -- `stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`, `switchKill` and
-  -- `concatDrain` besides.  The `gs` clause below substitutes with it and
-  -- this leaf never sees the question, so nothing here is conditioned on
-  -- a scheduler agreement: the two schedulers agree by construction
-  -- because the statement is made where the burst is.
-  --
-  -- WHAT IS LEFT ON IT, in one line and in the SUM currency: an emitted
-  -- inner's cap at a root path is bounded by its emitter's, that is
-  -- `nestDᵉ sl o + slotsNestBelow sl (maxInputᵉ o)` under
-  -- `nestDᵉ sl b + slotsNestBelow sl (maxInputᵉ b)`.  The SUM and not
-  -- the two conjuncts: at `b = input i` the emitter's own nesting is 0
-  -- while the inner comes out of the slot's def, and the below-sum's step
-  -- at `suc (toℕ i)` is what pays for it — the same equality the connect
-  -- clause already spends.  The four other shapes check by hand: `ofᵉ`
-  -- with equality, `mapᵉ` off its function's own term measure, `scanᵉ`
-  -- off the product term, which IS the per-payload re-wrap.
-  depth-all-burst-reached : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
-    (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    let g   = gs fuel
-        nid = proj₁ (mintNode sched)
-        r   = subscribeE g b (thru-outer op nid ↠ κ) bid now
-                (proj₂ (mintNode sched)) (installNode nid initSt st)
-        sl′ = Sched.slots (proj₁ (proj₂ r))
-    in depthBurst g bid now (thru-outer op nid) κ
-         (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ suc (nestDᵉ sl′ b) + pathNestD κ
-             + slotsNestBelow sl′ (maxInputᵉ b)
-
   -- SUBSTITUTION UNDER THE GUARD, which is what `unfoldμ` is: it is
   -- `elimGExp (here refl) (μᵉ body) body`, and `elimGExp` reaches a
   -- `varᵉ` only by descending into a `deferᵉ` — because `μᵉ` puts its
@@ -1180,27 +840,546 @@ one-≤-capN : ∀ {n} {Γ : Ctx n} {t} {u}
   1 ≤ depthCapN (suc N) mx κ sched
 one-≤-capN N mx κ sched = s≤s z≤n
 
--- THE ARM, split on its gas.  The `g0` clause is the clique above; the
--- `gs` clause is an assembly over ONE leaf, and nothing else remains of
--- this face.  Its whole content is the `subst`: the cap is a function of
--- `Sched.slots` alone, so the PROVEN `subscribeE-slots` carries the leaf's
--- statement at the scheduler the burst reached back to the entry one, and
--- the two `nestDᵉ`/`slotsNestBelow` readings move together under a single
--- motive.  That is the dividend of the cap losing its node arm — before
--- it, this rewrite would have had to move a store as well, and no
--- unconditional lemma says a subscribe keeps THAT.
-depth-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
+------------------------------------------------------------------
+-- BUCKET (d′) — THE BURST ARM AT POSITIVE GAS, and it is bucket (b′)'s
+-- clique one currency up.  Where the zero-gas clique reported 0 at every
+-- entry, this one ENTERS, so each member carries two things the zero
+-- version needed neither of: the induction hypothesis, to bound what it
+-- finds inside a payload, and the fact that the slots have not moved, so
+-- that the bound it carries still names the same number.
+--
+-- THE IH IS AN EXPLICIT PARAMETER, NOT A MUTUAL SIBLING, and that is a
+-- cost decision rather than a style one.  Made mutual with the assembly,
+-- this clique would give the module its FIRST multi-member mutual block,
+-- and `make agda-dev` STUBS those — the file's dev check would stop being
+-- a real check, termination included, for the sake of a recursion that is
+-- not actually mutual.  It is not: every edge here descends either its own
+-- list argument or the gas, and the gas edge is the one that reaches the
+-- subject, because `depthInner`'s `gs` clause is the only entry into a
+-- payload and it peels one.  So the hypothesis is taken at `fuel` and the
+-- conclusion drawn at `gs fuel`, which is the same lexicographic order on
+-- (gas, subject) the connect clause has always run on.
+------------------------------------------------------------------
+
+DepthIH : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Gas → Set
+DepthIH {Γ = Γ} {t = t} e g = ∀ {u} (b : Closed Γ u) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  depthE g b κ bid now sched st ≤ depthCap b κ sched
+
+-- THE SUBJECT HALF OF THE CAP, which is the half that travels.  A burst
+-- walk holds its path fixed and changes the subject at every payload, so
+-- what has to be carried across the clique is `depthCapN`'s two subject
+-- terms rather than the cap itself.
+innerNest : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ w} → Slots Γ → Exp Γ Δᵍ Δ Θ w → ℕ
+innerNest sl x = nestDᵉ sl x + slotsNestBelow sl (maxInputᵉ x)
+
+-- THE SUM AND NOT THE TWO CONJUNCTS, and the `input` shape is why: at
+-- `b = input i` the emitter's own nesting is 0 while what it emits comes
+-- out of the slot's def, so the nesting conjunct alone is false there and
+-- the below-sum's step at `suc (toℕ i)` is what pays — the same equality
+-- the connect clause spends.  A predicate that split them would be
+-- refuted by the connect and could not be repaired by tightening either.
+valND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ → Val Γ (obs u) → Bool
+valND? sl C o = innerNest sl o ≤ᵇ C
+
+valsND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ → List (Val Γ (obs u)) → Bool
+valsND? sl C = all (valND? sl C)
+
+eventND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ →
+  InstEvent (Val Γ (obs u)) → Bool
+eventND? sl C (value o)   = valND? sl C o
+eventND? sl C (init _)    = true
+eventND? sl C (close _ _) = true
+eventND? sl C (handoff _) = true
+eventND? sl C complete    = true
+
+burstND? : ∀ {n} {Γ : Ctx n} {u} → Slots Γ → ℕ → Stream Γ (obs u) → Bool
+burstND? sl C = all (λ em → all (eventND? sl C) (InstEmit.events em))
+
+-- the walk reads the VALUES out of a burst's events, so the predicate has
+-- to come apart the same way `splitEvents` does.  Its `Ψ` and `caps`
+-- twins are in .Psi-Split and .Caps-Face.Part4; this is the same
+-- induction over the five event shapes, four of which carry no value.
+splitEvents-vals-ND : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+  (sl : Slots Γ) (C : ℕ) (es : List (InstEvent (Val Γ (obs u)))) →
+  all (eventND? sl C) es ≡ true →
+  valsND? sl C (proj₁ (splitEvents {A = A} es)) ≡ true
+splitEvents-vals-ND sl C [] h = refl
+splitEvents-vals-ND {A = A} sl C (value o ∷ es) h =
+  ∧-intro (∧-trueˡ h) (splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h))
+splitEvents-vals-ND {A = A} sl C (init _ ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
+splitEvents-vals-ND {A = A} sl C (close _ _ ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
+splitEvents-vals-ND {A = A} sl C (handoff _ ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
+splitEvents-vals-ND {A = A} sl C (complete ∷ es) h =
+  splitEvents-vals-ND {A = A} sl C es (∧-trueʳ h)
+
+-- the one arithmetic move the clique makes, and it makes it once: the
+-- path term sits BETWEEN the cap's two subject terms, so spending a
+-- bound on their SUM means commuting it past the path
+private
+  nest-shuffle : ∀ (a p b c : ℕ) → a + b ≤ c → a + p + b ≤ c + p
+  nest-shuffle a p b c h =
+    ≤-trans (≤-reflexive (solve 3 (λ x y z →
+               (x :+ y) :+ z := (x :+ z) :+ y) refl a p b))
+            (+-monoˡ-≤ p h)
+
+  cap-shuffle : ∀ (a p b : ℕ) → suc (a + b + p) ≡ suc a + p + b
+  cap-shuffle a p b =
+    solve 3 (λ x y z → con 1 :+ ((x :+ z) :+ y) := ((con 1 :+ x) :+ y) :+ z)
+      refl a p b
+
+-- ONE PAYLOAD, and the only place the gas peels.  What comes back is the
+-- IH's cap at the payload, whose path term is `κ`'s again because
+-- `pathNestD` charges a `from-inner` nothing — the frame that installed
+-- the inner was already charged for it, by the `suc` the walk sits under.
+inner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → valND? sl C o ≡ true →
+  depthInner (gs fuel) op nid κ bid now o sched st ≤ C + pathNestD κ
+inner-nest fuel ih sl C op nid κ bid now o sched st refl hv =
+  ≤-trans (ih o (from-inner op nid (Sched.nextNode sched) ↠ κ) bid now
+              (record sched { nextNode = suc (Sched.nextNode sched) }) st)
+          (nest-shuffle (nestDᵉ (Sched.slots sched) o) (pathNestD κ)
+             (slotsNestBelow (Sched.slots sched) (maxInputᵉ o)) C
+             (≤ᵇ⇒≤ _ C (T-to hv)))
+
+-- switchAll's node read, split for the same reason `consumeS-zero` is:
+-- a catch-all over a variable `Maybe` is stuck, so every constructor
+-- appears.  Only the live-inner arm subscribes, and it subscribes at the
+-- state the CUT left — which is why its slot equation is a `trans`
+-- through `switchKill-keeps` rather than the caller's own.
+consumeS-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
+  (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e)
+  (nd : Maybe (NodeState Γ)) →
+  Sched.slots sched ≡ sl → valND? sl C o ≡ true →
+  depthConsumeS (gs fuel) nid κ bid now o sched st nd ≤ C + pathNestD κ
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  (just (switch-st cur od)) hs hv =
+  inner-nest fuel ih sl C switchᵒ nid κ bid now o
+    (proj₁ (proj₂ (switchKill cur sched st)))
+    (proj₂ (proj₂ (switchKill cur sched st)))
+    (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) hs) hv
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  nothing                  hs hv = z≤n
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  (just (scan-st _))       hs hv = z≤n
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  (just (concat-st _ _ _)) hs hv = z≤n
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  (just (take-st _))       hs hv = z≤n
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  (just (merge-st _ _))    hs hv = z≤n
+consumeS-nest fuel ih sl C nid κ bid now o sched st
+  (just (exhaust-st _ _))  hs hv = z≤n
+
+consume-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → valND? sl C o ≡ true →
+  depthConsume (gs fuel) op nid κ bid now o sched st ≤ C + pathNestD κ
+consume-nest fuel ih sl C mergeᵒ nid κ bid now o sched st hs hv =
+  inner-nest fuel ih sl C mergeᵒ nid κ bid now o sched st hs hv
+consume-nest fuel ih sl C concatᵒ nid κ bid now o sched st hs hv =
+  inner-nest fuel ih sl C concatᵒ nid κ bid now o sched st hs hv
+consume-nest fuel ih sl C exhaustᵒ nid κ bid now o sched st hs hv =
+  inner-nest fuel ih sl C exhaustᵒ nid κ bid now o sched st hs hv
+consume-nest fuel ih sl C switchᵒ nid κ bid now o sched st hs hv =
+  consumeS-nest fuel ih sl C nid κ bid now o sched st
+    (lookupNode nid (EvalSt.nodes st)) hs hv
+
+-- the walk threads a state per payload, so the tail runs at the consume's
+-- outputs and its slot equation chains through `thruConsume-keeps`.  The
+-- predicate comes apart the same way the list does.
+walk-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → valsND? sl C vals ≡ true →
+  depthWalk (gs fuel) op nid κ bid now vals sched st ≤ C + pathNestD κ
+walk-nest fuel ih sl C op nid κ bid now [] sched st hs hvs = z≤n
+walk-nest fuel ih sl C op nid κ bid now (o ∷ os) sched st hs hvs =
+  ⊔-lub (consume-nest fuel ih sl C op nid κ bid now o sched st hs
+           (∧-trueˡ hvs))
+        (walk-nest fuel ih sl C op nid κ bid now os sched' st'
+           (trans (KeepsC.slotsEq (thruConsume-keeps (gs fuel) op nid κ bid now o
+                              sched st)) hs)
+           (∧-trueʳ hvs))
+  where
+  r      = thruConsume (gs fuel) op nid κ bid now o sched st
+  sched' = proj₁ (proj₂ (proj₂ r))
+  st'    = proj₂ (proj₂ (proj₂ r))
+
+-- ONE, and it is the frame's own: `depthFrame` at a `thru-outer` is
+-- `suc (depthWalk …)`, exactly as at zero gas.  The `⊔` keeps the bound
+-- across the stream and `stepFrame-keeps` keeps the slots.
+burst-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (ih : DepthIH e fuel) (sl : Slots Γ) (C : ℕ)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (stream : Stream Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → burstND? sl C stream ≡ true →
+  depthBurst (gs fuel) bid now (thru-outer op nid) κ stream sched st
+    ≤ suc (C + pathNestD κ)
+burst-nest fuel ih sl C op nid κ bid now [] sched st hs hb = z≤n
+burst-nest {Γ = Γ} {u = u} fuel ih sl C op nid κ bid now (em ∷ ems) sched st
+  hs hb =
+  ⊔-lub (s≤s (walk-nest fuel ih sl C op nid κ bid now (proj₁ sp) sched st hs
+                (splitEvents-vals-ND {A = Val Γ u} sl C
+                   (InstEmit.events em) (∧-trueˡ hb))))
+        (burst-nest fuel ih sl C op nid κ bid now ems sched' st'
+           (trans (KeepsC.slotsEq (stepFrame-keeps (gs fuel) bid now
+                              (thru-outer op nid) κ (proj₁ sp)
+                              (proj₂ (proj₂ sp)) sched st)) hs)
+           (∧-trueʳ hb))
+  where
+  -- `A` is the LEFTOVER event type, pinned as `depthBurst` pins it, so
+  -- the two `sp`s are the same term
+  sp     = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r      = stepFrame (gs fuel) bid now (thru-outer op nid) κ
+             (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
+
+-- depthAll's burst uses thru-outer (the spending arc).  Census finding
+-- (4) read this as owing `storeNestMax` preservation through
+-- `subscribeE`, proved simultaneously; it owes neither.  The cap does not
+-- read the store at all, and the slots half is PROVEN separately
+-- (`subscribeE-slots`) — so the whole of that finding is discharged by a
+-- single `subst` in the arm below, and it is recorded here as read
+-- because a route that turned out unnecessary is the kind a later reader
+-- would otherwise re-schedule.
+--
+-- PROBED 2026-08-21 (Probed.Depth-All): the burst takes a MAX across
+-- SIBLINGS, not a sum.  A merge over one slot-chain top measures 5;
+-- a merge over two independent 4-link chains measures 5 as well,
+-- with the store held at 9 in both rows by using the same slots.
+-- So the arc that accumulates is the CONNECT — which is what forced
+-- `slotsNestSum` (Refuted.Depth-Chain) — and NOT the sibling entry,
+-- so this arm's own `suc` is not being asked to pay for k chains.
+-- RE-READ 2026-08-22 in the nesting currency: the figures were 5
+-- against a store of 60 and a cap of 53 when the slot measure paid
+-- sizes, and are 5 against 9 and 9 now, so the margin the rows cross
+-- is of the same order as the depth rather than mostly size slack.  This
+-- was the live falsity candidate once the chain finding landed, and
+-- it is the region the rows reached.
+-- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
+-- burst (different `initSt`, and their queueing is charged by the
+-- store's node half, which this cap does not read); no nested burst;
+-- no post-cascade state;
+-- and both arms are the same length, so a burst over siblings of
+-- DIFFERENT depths is untested.
+--
+-- RESTATED over `depthCapN` when the connect landed and again when the
+-- cap lost its size term, and the rows were re-read rather than
+-- inherited both times: the two-chain program measures 5 against a cap
+-- of 53, where the `storeNestMax` bound it replaced gave 60.  The
+-- mirror-side findings above are untouched, since nothing about
+-- `depthAll` moved — only the right-hand side, and it got SMALLER each
+-- time, which is the direction that could have refuted this.  Almost
+-- all of what is left is the slot chain: this program's own
+-- contribution to its cap is ONE, its `mergeAllᵉ` layer.
+--
+-- ITS PREDECESSOR IS REFUTED 2026-08-21 (Refuted.Depth-Nest), AND THE
+-- RECEIPT ABOVE IS WHAT AIMED IT: the one shape it names as untested is
+-- a NESTED burst, and that is the shape the predecessor — the same
+-- statement with `depthCapN (suc (sizeᵉ b))` and no nesting term —
+-- dies at.  The statement below adds `suc (nestDᵉ …)` to that first
+-- argument, so it is strictly weaker than the refuted form and the
+-- witness does not reach it; what follows is why.  A `scanᵉ`
+-- whose step function wraps its own accumulator gains `w` nesting
+-- levels PER TICK while the syntax gains `4` per wrap and `1` per
+-- listed source value — so the left side grows in `w · k` and the
+-- right in `w + k`, and at `w = 4, k = 12` the depth is 49 against a
+-- cap of 38.  `depthE` of a `scanᵉ` charges its emissions nothing
+-- (`burst-scf-zero`), which is exactly what makes a scan a free
+-- generator of nesting; the charge lands only here, in the `*All`
+-- that consumes it.
+--
+-- The sibling-max finding above SURVIVES and is not what failed: the
+-- burst does take a max across siblings.  It accumulates down
+-- NESTING, which is a different axis and the one no syntactic term
+-- can pay for.  Restating means conditioning on the caps, whose
+-- `valCaps?` already bounds `sizeᵛ` — and `sizeᵛ (obs t) v` IS
+-- `sizeᵉ v`, so the nesting of a reachable value is bounded there and
+-- nowhere in the program text.
+--
+-- AND THE RESTATEMENT DOES NOT STOP AT `depth-capped`, WHICH THIS
+-- HEADER PREVIOUSLY CLAIMED IT WOULD.  `3 · cSize` has room at THIS
+-- witness (114 against 49) and none in general, because a constant
+-- multiple is still linear: `depth-capped-absurd` walks the same
+-- family out to `w = 7, k = 29` and measures 204 against 201.  The
+-- interface has to move too.
+--
+-- THE CURRENCY TO MOVE IT INTO IS ALREADY IN THE TREE, and it is not
+-- a bigger multiple.  `scanFrame-caps` charges a scan frame
+-- `length vals * suc (sizeᵗ fn)` folds — burst cardinality times step
+-- size, which is `k · w` with the two factors named — and the size
+-- and width faces both read their bound at that count
+-- (`iterSize S (length vals * suc (sizeᵗ fn)) B`,
+-- `iterFold S … M`).  So the product this statement dies on is the
+-- product those faces already pay, and the depth face is the one
+-- reading a linear cap where its siblings read a fold count.
+--
+-- AND THE OBLIGATION ON A NEW CONCLUSION IS WEAK, once the right
+-- consumer is read.  A depth bound spent through `opIterD` does climb
+-- levels tower-ly per unit — `opIterD`'s `d` slot passes to `fLvlD`,
+-- whose `suc d` clause unfolds a whole `sIterD` sweep — but that `dep`
+-- bounds `depthInner`, and it arrives on `sub-charge-capsOK-lift`'s
+-- `depOK` premise rather than from this family.  What this statement
+-- feeds is `depth-capped`, and `depth-capped` has exactly ONE consumer:
+-- `depthE≤capsH-root`, chaining into `capsH e ins 0` through
+-- `three-size-le-blowH`.  So all a restatement owes is to sit under
+-- `blowH (capsBase e ins)`, which carries `2 * poolCount (towerℕ m) m`
+-- and is astronomically above any exponential in `sizeᵉ e`.
+--
+-- PROBED 2026-08-21 (Probed.Nest-Depth), AND THE MEASURE IS DERIVED
+-- RATHER THAN FITTED — which is why the rows ask for EQUALITY and not
+-- domination.  Charge one `suc` per `*All` layer, because that is what
+-- `depthFrame` at `thru-outer` charges, and charge a `scanᵉ` its
+-- SOURCE'S PAYLOAD COUNT times its step function's layers, because the
+-- accumulator is re-wrapped once per delivered payload and the scan's
+-- own frame charges its emissions nothing.  The resulting measure
+-- equals `depthE` on the nose at both crossings the refutation walks:
+-- 49 at four wraps over twelve ticks, 204 at seven over twenty-nine.
+-- Two products, so no constant passes both, and a zero-wrap row pins
+-- the collapse to 1.
+--
+-- AND THE PRODUCT COMPOUNDS, which is the row that settles the
+-- currency rather than merely confirming the measure.  Put a scan
+-- inside the outer scan's STEP FUNCTION, seeded by the incoming
+-- accumulator, and the inner scan's layers are re-applied once per
+-- outer payload: the measure predicts `j · (k · w + 1) + 1`, and
+-- `depthE` returns exactly that (22 at two wraps, three inner, three
+-- outer).  One factor per nested scan, with no bound on how many.
+--
+-- So `depthE` is EXPONENTIAL in the program size — each factor costs a
+-- constant of syntax and multiplies — and every fixed-degree product
+-- of caps fields is dead, `cSize · cSize` included.  That closes the
+-- guess two commits back by measurement rather than by argument, and
+-- it sharpens the one open question to a single arithmetic one: the
+-- depth bound is spent as a LEVEL COUNT through `opIterD`, and levels
+-- exponentiate, so what has to be checked is whether the height
+-- budget absorbs an EXPONENTIAL level count.  A tower it certainly
+-- does not (`Caps`'s own header defends that when it forbids `cWid`
+-- from re-entering the delivery count); an exponential is undecided
+-- and is the next thing to settle.
+--
+-- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
+-- layer, whose queueing `nodesNestMax` charges separately; no slot
+-- descent, so the connect arc is unmeasured here and `slotsNestBelow`
+-- is the term that would carry it; no post-cascade state; and the
+-- compounding row is degree THREE, so nothing here says the pattern
+-- continues past it — only that it does not stop at two.
+--
+-- AND THE ROUTE INTO `src` HAD ONE DESIGN CHOICE IN IT, WHOSE FIRST
+-- ANSWER WAS WRONG.  Putting `nestDᵉ b` into `depthCap`'s first
+-- summand — beside `sizeᵉ b` then, alone there now — leaves the
+-- `input` clause owing the SLOT definition's nesting, and there were
+-- exactly two places to pay it.
+--
+-- DEAD ROUTE 2026-08-21: PAY IT IN THE MEASURE, by descending into
+-- slot definitions on slot fuel with a visited set — `outWⱽ`'s shape,
+-- whose `input` clause is already written that way and whose `j` is
+-- the lexicographic measure a connect spends.  It was chosen first,
+-- and for a good reason: it kept `slots-nest-≤-size`, which held
+-- `slotNest` pointwise under `slotsSize` and kept `storeNest-capped`
+-- under the caps.  It is STRUCTURALLY DEAD.  The consumer fixes the
+-- fuel at the slot count `n`, a VARIABLE, so `nestDⱽ n [] sl (input i)`
+-- never reduces, and the parent has no more fuel than the child it
+-- would recurse into — there is no inequality to prove even in
+-- principle, and no lemma repairs it.  `outWⱽ` gets away with the
+-- shape by threading `j` through its own consumers; a measure read off
+-- a `Sched` cannot.
+--
+-- So it is paid in `slotNest`, whose `slotsNestBelow-step` is an
+-- equality at exactly the index the `input` clause needs.  It paid the
+-- def's SIZE beside its nesting while the cap read both currencies,
+-- and pays the nesting ALONE now, so the charge and the payment are
+-- again the same number.  What either version cost was
+-- `slots-nest-≤-size`, `storeNest-capped` and `depth-capped`, since an
+-- exponential quantity has no bound by a size: the whole
+-- caps-conditioned interface went, and `depth-compositional` reaches
+-- the root directly now (`nest-store≤capsH`, Caps-Bridge, whose header
+-- carries what the deleted module knew).  That was the right trade
+-- rather than a loss — the interface was refuted anyway, and it was
+-- refuted for reading a level it does not report.
+-- THE FACE SPLIT INTO ITS TWO ARMS, AND ONLY THE BURST ONE IS A LEAF.
+-- `depthAll` reduces to `depthE … ⊔ depthBurst …` — Caps-Depth is
+-- deliberately not `abstract`, so both arms are visible from here —
+-- so the four `*All` clauses of the assembly below close with `⊔-lub`
+-- over an OUTER half they prove and this BURST half they assume.
+--
+-- DEAD ROUTE 2026-08-22: STATE THE OUTER ARM AS A LEAF OF ITS OWN.
+-- It was written that way first, alongside this one, and it is
+-- STRUCTURALLY DEAD — not hard, impossible.  The arm's only route is
+-- the take/scan buckets' route step for step: the assembly's own
+-- recursion at the SUB-expression, then the install lemma, then the
+-- `*All` layer's cap arithmetic.  That first step is the induction
+-- hypothesis, and it is available only INSIDE the induction: a
+-- standalone lemma would have to call the assembly at an expression
+-- of the same size as its own argument, so nothing decreases and no
+-- measure repairs it.  The decrease happens at the CALLER, which is
+-- exactly where the proof now lives.
+--
+-- AND THE `initSt` GENERALITY WAS A SYMPTOM OF THE SAME THING, worth
+-- recording because it read as the blocker and because the way it
+-- dissolved is the lesson.  Stated standalone, the arm quantifies over
+-- a free initial node state, the install lemma needed that state to
+-- weigh 0, and the unconditional form was NOT refuted — installing can
+-- only raise a node measure — so a hypothesis was not licensed and the
+-- arm looked stuck.  What settled it was neither a proof nor a
+-- hypothesis: the cap stopped reading the node store at all
+-- (`depthCapN`'s header), the install lemma went with it, and there is
+-- nothing left for a free `initSt` to threaten.  An over-general
+-- argument in a statement is worth suspecting of being a statement
+-- that belongs somewhere else.
+--
+-- WHAT IS LEFT HERE IS THE ARM THAT CANNOT BE INLINED, and finding
+-- (4) above says why: its scheduler and state come out of the REAL
+-- `subscribeE`, while the cap reads the entry scheduler, so it owes a
+-- preservation argument no arithmetic supplies.  That obligation is
+-- one conjunct lighter than it was — the cap reads the SLOTS and
+-- nothing else, so the state half of it went with the node arm.  The
+-- three projections below are that subscribe's stream, scheduler and
+-- state, in that order.
+--
+-- DEAD ROUTE 2026-08-22: RUN THE ASSEMBLY'S OWN INDUCTION AT THE
+-- EMITTED INNER AND DOMINATE ITS CAP.  It is the obvious route and
+-- the arms line up: the burst reaches `depthE` at each delivered
+-- inner observable one gas lower, and the `*All` layer's two `suc`s
+-- pay exactly the frame's charge and the extra path frame, leaving
+-- the inner's own size-plus-nesting to be covered by the source's.
+-- It is STRUCTURALLY DEAD IN THE SIZE TERM.  Take a scan whose step
+-- re-wraps its own accumulator inside one more `*All` layer per tick:
+-- the accumulator's NESTING grows by one per delivered payload and
+-- the measure pays for precisely that, since the scan clause's
+-- `outWᵉ · nestDᵗ` IS the per-payload re-wrap — but its SIZE grows by
+-- a constant per payload too, and the target's size term is fixed
+-- syntax.  So the child's cap outruns the parent's by the size term
+-- alone, at a program where the depths are fine.
+--
+-- WHICH IS TO SAY THE BLOCKAGE IS SLACK, NOT FALSITY.  At that same
+-- program the depth IS the nesting, so nothing here is refuted and no
+-- hypothesis is licensed; what is wrong is that `depthCap` reads the
+-- size currency at all.  `Probed.Nest-Depth` says so in the strongest
+-- available form: its rows report `depthE` EQUAL to `nestDᵉ`, not
+-- dominated by it, so the `sizeᵉ` summand buys nothing at any row
+-- reached.  Those rows are all at the root with no slot and no node
+-- store, so they do NOT reach the two places the size currency is
+-- load-bearing — the connect, which pays a def's `sizeᵉ` through
+-- `slotNest`, and `nodeNestMax`, which charges a concat queue by its
+-- observables' `sizeᵉ`.  Both of those keep paying under any repair;
+-- the summand in question is the one read off the SUBJECT.
+--
+-- AND THE `pathLen` SUMMAND IS NOT SLACK, WHICH IS THE PART THE ROWS
+-- CANNOT SEE, since `pathLen root` is 0 in every one of them.
+-- Spending arc 2 charges a `suc` for a `from-inner` frame that came
+-- out of the PATH rather than out of the subject, so a cap with no
+-- path term cannot pay for it — dropping the summand is not the
+-- repair, restating it in the nesting currency is.
+--
+-- THAT REPAIR IS DONE, AND IT IS WHY THIS STATEMENT READS AS IT NOW
+-- DOES.  The cap is read off nesting throughout: the subject's
+-- `sizeᵉ` is gone, the below-sum is kept, and `pathLen` became
+-- `pathNestD`, which charges the SPENDING ARC and nothing else.  The
+-- dead route above is what forced it and it stays recorded, because
+-- what was dead was the route THROUGH THE OLD STATEMENT and the
+-- repair was to move the statement — the route it kills is still
+-- dead for anyone who puts a size term back.
+--
+-- WHAT IT COST, and the answer is nothing: every clause of the
+-- assembly got SHORTER.  The three structural descents need no
+-- arithmetic step at all now, since the measure they used to have to
+-- fund is not charged; the `*All` arm's step is `arith-step` at
+-- `c = 0`, an equality in all but association; the μ clause's two
+-- caps became the SAME TERM, so its bridge went entirely; and the
+-- connect's charge and its payment are the same number again.  A
+-- tightening that simplifies every consumer is evidence about the
+-- measure, not about the arithmetic.
+--
+-- AND THE STORE MEASURE FOLLOWED IT, THOUGH NOT FOR THE REASON GIVEN
+-- WHEN IT DID — worth recording, because the wrong reason is the one
+-- this arm supplied.  The expectation was that the burst has to bound
+-- the IH's cap at the state the walk REACHED, and a `concatAllᵉ`
+-- queues an emitted inner into `nodeNestMax`, so while that charged a
+-- SIZE the arm looked to need the cap to bound an emitted inner's size
+-- — exactly what an accumulator-wrapping scan refutes.  Working the
+-- arithmetic said otherwise: the cap does not read the node store at
+-- all, so this arm never collects.  Both halves of the store read
+-- `nestDᵉ` anyway, which shrank the EXPORT rather than this leaf, and
+-- the leaf below is one conjunct lighter for the same finding.
+--
+-- AND THE ROUTE IS RUN.  Everything the paragraphs above scheduled is
+-- below as real bodies: the gas split, the burst-side clique, and the
+-- entry into the payload.  One thing came out differently from how it was
+-- scheduled, and it is worth recording because the route took it for
+-- granted: THE CLIQUE DID NOT HAVE TO JOIN THE ASSEMBLY'S MUTUAL BLOCK.
+-- The recursion is not mutual — the induction hypothesis travels as an
+-- ARGUMENT at strictly lower gas (`DepthIH e fuel`, concluding at
+-- `gs fuel`) — so this module still has NO multi-member mutual block and
+-- its `make agda-dev` run is still a real check, termination included,
+-- which is exactly what a stubbed block would have stopped checking.
+--
+-- WHAT WAS RIGHT is the half that mattered: the gas is the measure, and
+-- what is left over is one fact about what a burst emits.
+postulate
+  -- WHAT A SUBSCRIBE'S BURST EMITS IS NO MORE DEEPLY NESTED THAN THE
+  -- EXPRESSION THAT EMITTED IT, and this is all that is left of the
+  -- `*All` face: the burst arm, the walk, the consume and the payload
+  -- entry are real bodies over it, and so is the arm's gas split.
+  --
+  -- IT IS THE SUM AND NOT THE TWO CONJUNCTS, and the `input` shape is
+  -- why.  At `b = input i` the emitter's own nesting is 0 while what it
+  -- emits comes out of the slot's def, so a nesting-only conjunct is
+  -- FALSE there; the below-sum's step at `suc (toℕ i)` is what pays,
+  -- which is the same equality the connect clause spends.  A predicate
+  -- splitting them would be refuted by the connect and no tightening
+  -- would repair it.
+  --
+  -- ITS PREDECESSOR — the same statement over a SUMMING `nestDᵗˢ` — IS
+  -- REFUTED, and the refutation is why `Rx.Nest-Depth` reads an `ofᵉ`
+  -- list with a `⊔`.  A step function may hand its input observable to
+  -- an `ofᵉ` list twice; under the sum, the emitted inner then measured
+  -- 3 where its emitter measured 2, while its own DEPTH was 2 — the
+  -- measure was over the depth by exactly the duplication.  Measured at
+  -- that program (Probed.Nest-Depth §3), which is now the row that keeps
+  -- the sum from coming back.
+  --
+  -- WHAT IT IS NOT ASKED FOR: slot preservation.  The consumer moves its
+  -- own cap between the entry scheduler and the reached one with the
+  -- PROVEN `subscribeE-slots` (Keeps-Ring), off a `KeepsC` family
+  -- covering `stepFrame`, `thruConsume`, `thruWalk`, `thruWrap`,
+  -- `switchKill` and `concatDrain` besides — so the statement below is
+  -- read at the reached scheduler and never sees the question.
+  emit-cap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
+    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    let r  = subscribeE g b κ bid now sched st
+        sl = Sched.slots (proj₁ (proj₂ r))
+    in burstND? sl (innerNest sl b) (proj₁ r) ≡ true
+
+-- THE ARM AT ZERO GAS.  Unchanged in content from the clause it was
+-- split out of; it is a separate name now only because its sibling
+-- takes an induction hypothesis and it does not.
+depth-all-burst-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (bid : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r   = subscribeE g b (thru-outer op nid ↠ κ) bid now
+      r   = subscribeE g0 b (thru-outer op nid ↠ κ) bid now
               (proj₂ (mintNode sched)) (installNode nid initSt st)
-  in depthBurst g bid now (thru-outer op nid) κ
+  in depthBurst g0 bid now (thru-outer op nid) κ
        (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ depthCapN (suc (nestDᵉ (Sched.slots sched) b))
                    (maxInputᵉ b) κ sched
-depth-all-burst g0 op initSt b κ bid now sched st =
+depth-all-burst-zero op initSt b κ bid now sched st =
   ≤-trans (burst-thru-zero bid now op nid κ
              (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
           (one-≤-capN (nestDᵉ (Sched.slots sched) b) (maxInputᵉ b) κ sched)
@@ -1208,18 +1387,52 @@ depth-all-burst g0 op initSt b κ bid now sched st =
   nid = proj₁ (mintNode sched)
   r   = subscribeE g0 b (thru-outer op nid ↠ κ) bid now
           (proj₂ (mintNode sched)) (installNode nid initSt st)
-depth-all-burst (gs fuel) op initSt b κ bid now sched st =
+
+-- THE ARM AT POSITIVE GAS, and it is now a real body over ONE leaf.
+-- Two things are spent here and neither is owed: `subscribeE-slots`,
+-- which is PROVEN in .Keeps-Ring and moves the burst's own cap back to
+-- the entry cap under a single `subst` — the cap reads a scheduler
+-- through `Sched.slots` and nothing else, which is the dividend of its
+-- having lost its node arm — and the clique above, which walks the burst
+-- the subscribe returned.  What the leaf supplies is the one fact the
+-- walk cannot derive: that what came out is no more deeply nested than
+-- what emitted it.
+depth-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (ih : DepthIH e fuel)
+  (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let nid = proj₁ (mintNode sched)
+      r   = subscribeE (gs fuel) b (thru-outer op nid ↠ κ) bid now
+              (proj₂ (mintNode sched)) (installNode nid initSt st)
+  in depthBurst (gs fuel) bid now (thru-outer op nid) κ
+       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ depthCapN (suc (nestDᵉ (Sched.slots sched) b))
+                   (maxInputᵉ b) κ sched
+depth-all-burst fuel ih op initSt b κ bid now sched st =
   subst (λ sl → depthBurst (gs fuel) bid now (thru-outer op nid) κ
                   (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                   ≤ suc (nestDᵉ sl b) + pathNestD κ
                       + slotsNestBelow sl (maxInputᵉ b))
         (subscribeE-slots (gs fuel) b (thru-outer op nid ↠ κ) bid now
            (proj₂ (mintNode sched)) (installNode nid initSt st))
-        (depth-all-burst-reached fuel op initSt b κ bid now sched st)
+        reached
   where
   nid = proj₁ (mintNode sched)
   r   = subscribeE (gs fuel) b (thru-outer op nid ↠ κ) bid now
           (proj₂ (mintNode sched)) (installNode nid initSt st)
+  sl′ = Sched.slots (proj₁ (proj₂ r))
+  reached : depthBurst (gs fuel) bid now (thru-outer op nid) κ
+              (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+            ≤ suc (nestDᵉ sl′ b) + pathNestD κ
+                + slotsNestBelow sl′ (maxInputᵉ b)
+  reached =
+    ≤-trans (burst-nest fuel ih sl′ (innerNest sl′ b) op nid κ bid now
+               (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) refl
+               (emit-cap (gs fuel) b (thru-outer op nid ↠ κ) bid now
+                  (proj₂ (mintNode sched)) (installNode nid initSt st)))
+            (≤-reflexive (cap-shuffle (nestDᵉ sl′ b) (pathNestD κ)
+                            (slotsNestBelow sl′ (maxInputᵉ b))))
 
 -- NOTHING IS OWED FOR AN INSTALL ANY MORE, and the two lemmas that
 -- used to pay for one are gone with the node arm.  `mintNode` leaves the
@@ -1437,48 +1650,101 @@ private
   -- not an argument to that arithmetic at all: the cap reads the
   -- scheduler's slots, so the IH comes back at the ENTRY cap by
   -- reduction, exactly as take and scan do.
-  depth-compositional-go fuel (mergeAllᵉ b) κ bid now sched st =
+  depth-compositional-go g0 (mergeAllᵉ b) κ bid now sched st =
     ⊔-lub
-      (≤-trans (depth-compositional-go fuel b
+      (≤-trans (depth-compositional-go g0 b
                   (thru-outer mergeᵒ nid ↠ κ) bid now sched₁ st₀)
                (all-outer-arith mergeᵒ b κ sched))
-      (depth-all-burst fuel mergeᵒ (merge-st 0 false) b κ bid now sched st)
+      (depth-all-burst-zero mergeᵒ (merge-st 0 false) b κ bid now sched st)
     where
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₀    = installNode nid (merge-st 0 false) st
 
-  depth-compositional-go {u = u} fuel (concatAllᵉ b) κ bid now sched st =
+  depth-compositional-go (gs fuel) (mergeAllᵉ b) κ bid now sched st =
     ⊔-lub
-      (≤-trans (depth-compositional-go fuel b
+      (≤-trans (depth-compositional-go (gs fuel) b
+                  (thru-outer mergeᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith mergeᵒ b κ sched))
+      (depth-all-burst fuel
+         (λ {w} c ν cid tick sch stt →
+            depth-compositional-go {u = w} fuel c ν cid tick sch stt)
+         mergeᵒ (merge-st 0 false) b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (merge-st 0 false) st
+
+  depth-compositional-go {u = u} g0 (concatAllᵉ b) κ bid now sched st =
+    ⊔-lub
+      (≤-trans (depth-compositional-go g0 b
                   (thru-outer concatᵒ nid ↠ κ) bid now sched₁ st₀)
                (all-outer-arith concatᵒ b κ sched))
-      (depth-all-burst fuel concatᵒ (concat-st {t = u} [] false false)
-         b κ bid now sched st)
+      (depth-all-burst-zero concatᵒ (concat-st {t = u} [] false false) b κ bid now sched st)
     where
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₀    = installNode nid (concat-st {t = u} [] false false) st
 
-  depth-compositional-go fuel (switchAllᵉ b) κ bid now sched st =
+  depth-compositional-go {u = u} (gs fuel) (concatAllᵉ b) κ bid now sched st =
     ⊔-lub
-      (≤-trans (depth-compositional-go fuel b
+      (≤-trans (depth-compositional-go (gs fuel) b
+                  (thru-outer concatᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith concatᵒ b κ sched))
+      (depth-all-burst fuel
+         (λ {w} c ν cid tick sch stt →
+            depth-compositional-go {u = w} fuel c ν cid tick sch stt)
+         concatᵒ (concat-st {t = u} [] false false) b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (concat-st {t = u} [] false false) st
+
+  depth-compositional-go g0 (switchAllᵉ b) κ bid now sched st =
+    ⊔-lub
+      (≤-trans (depth-compositional-go g0 b
                   (thru-outer switchᵒ nid ↠ κ) bid now sched₁ st₀)
                (all-outer-arith switchᵒ b κ sched))
-      (depth-all-burst fuel switchᵒ (switch-st nothing false)
-         b κ bid now sched st)
+      (depth-all-burst-zero switchᵒ (switch-st nothing false) b κ bid now sched st)
     where
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)
     st₀    = installNode nid (switch-st nothing false) st
 
-  depth-compositional-go fuel (exhaustAllᵉ b) κ bid now sched st =
+  depth-compositional-go (gs fuel) (switchAllᵉ b) κ bid now sched st =
     ⊔-lub
-      (≤-trans (depth-compositional-go fuel b
+      (≤-trans (depth-compositional-go (gs fuel) b
+                  (thru-outer switchᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith switchᵒ b κ sched))
+      (depth-all-burst fuel
+         (λ {w} c ν cid tick sch stt →
+            depth-compositional-go {u = w} fuel c ν cid tick sch stt)
+         switchᵒ (switch-st nothing false) b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (switch-st nothing false) st
+
+  depth-compositional-go g0 (exhaustAllᵉ b) κ bid now sched st =
+    ⊔-lub
+      (≤-trans (depth-compositional-go g0 b
                   (thru-outer exhaustᵒ nid ↠ κ) bid now sched₁ st₀)
                (all-outer-arith exhaustᵒ b κ sched))
-      (depth-all-burst fuel exhaustᵒ (exhaust-st false false)
-         b κ bid now sched st)
+      (depth-all-burst-zero exhaustᵒ (exhaust-st false false) b κ bid now sched st)
+    where
+    nid    = proj₁ (mintNode sched)
+    sched₁ = proj₂ (mintNode sched)
+    st₀    = installNode nid (exhaust-st false false) st
+
+  depth-compositional-go (gs fuel) (exhaustAllᵉ b) κ bid now sched st =
+    ⊔-lub
+      (≤-trans (depth-compositional-go (gs fuel) b
+                  (thru-outer exhaustᵒ nid ↠ κ) bid now sched₁ st₀)
+               (all-outer-arith exhaustᵒ b κ sched))
+      (depth-all-burst fuel
+         (λ {w} c ν cid tick sch stt →
+            depth-compositional-go {u = w} fuel c ν cid tick sch stt)
+         exhaustᵒ (exhaust-st false false) b κ bid now sched st)
     where
     nid    = proj₁ (mintNode sched)
     sched₁ = proj₂ (mintNode sched)

@@ -54,8 +54,7 @@ open import Rx.Frame-Width using (entryCeil; pWᵉ; innWᵉ; outWᵉ; dWᵉ;
   slotsPW≤entryCeil; slotsIW≤entryCeil)
 open import Rx.Evaluator using (capsBase; sched-init; st-init)
 
-open import Verify-Budget-Sufficient.Measures using (k≤towerℕ; towerℕ-mono;
-  sizeᵉ-pos; sizeᵗ-pos; 1≤slotSize; n≤sum-tab)
+open import Verify-Budget-Sufficient.Measures using (k≤towerℕ; towerℕ-mono; sizeᵉ-pos; 1≤slotSize; n≤sum-tab)
 open import Verify-Budget-Sufficient.Caps using (3T≤; tower-mul;
   iterFold-tower; 1≤towerℕ; 2≤towerℕ)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (SlotWid; Sub-[];
@@ -201,14 +200,14 @@ payR k a b 1≤3b =
 -- strictly inside the `3 * sizeᵉ e` this is stated at, and then the
 -- three-way sum costs the second.
 --
--- THE LIST COMPANION CARRIES A SPARE `suc`, and that is forced
--- rather than slack: `sizeᵗˢ (y ∷ ys)` is `sizeᵗ y + sizeᵗˢ ys` with
--- no `suc` of its own, so the cons clause has no level of its own to
--- spend on its `+`.  It pays out of `sizeᵗ-pos` at the HEAD, which
--- is worth three levels — one for the cons, and the parent `ofᵉ`
--- redeems the carried `suc` against its own node.  The alternative,
--- a `1 ≤ sizeᵗˢ` lemma, does not exist in the tree and would have
--- to be stated for this one clause.
+-- AND THE CLAUSES THAT ARE A `⊔` SPEND NOTHING AT ALL, which is what
+-- retired the level accounting the list companion used to need.  A max
+-- of two things each under `towerℕ h` is under `towerℕ h`, so `⊔-lub`
+-- over two `hIn` widenings closes those clauses with no node to pay
+-- from — the list companion no longer carries a spare `suc`, and `ofᵉ`
+-- no longer redeems one.  `caseᵗ` is the one mixed clause left, its
+-- scrutinee a genuine summand because its value is substituted into the
+-- branch that runs, and its two branches a `⊔` because only one does.
 ------------------------------------------------------------------
 
 mutual
@@ -220,7 +219,7 @@ mutual
   nestD-tower k M 3k 1M MT sl w (varᵉ x)   = z≤n
   nestD-tower k M 3k 1M MT sl w (ofᵉ ts)   =
     ≤-trans (nestD-towerᵗˢ k M 3k 1M MT sl w ts)
-            (towerℕ-mono (hUp k (sizeᵗˢ ts) (sizeᵗˢ ts) ≤-refl))
+            (towerℕ-mono (hIn k (sizeᵗˢ ts) (suc (sizeᵗˢ ts)) (n≤1+n _)))
   nestD-tower k M 3k 1M MT sl w (mapᵉ f e) =
     sum2H (k + 3 * sizeᵗ f) (k + 3 * sizeᵉ e) _
       (≤-trans 3k (m≤m+n k (3 * sizeᵗ f)))
@@ -292,12 +291,12 @@ mutual
   nestD-towerᵗ k M 3k 1M MT sl w (bool̂ _)  = z≤n
   nestD-towerᵗ k M 3k 1M MT sl w (nat̂ _)   = z≤n
   nestD-towerᵗ k M 3k 1M MT sl w (pairᵗ a b) =
-    sum2H (k + 3 * sizeᵗ a) (k + 3 * sizeᵗ b) _
-      (≤-trans 3k (m≤m+n k (3 * sizeᵗ a)))
-      (nestD-towerᵗ k M 3k 1M MT sl w a)
-      (nestD-towerᵗ k M 3k 1M MT sl w b)
-      (hUp k (sizeᵗ a) (sizeᵗ a + sizeᵗ b) (m≤m+n (sizeᵗ a) (sizeᵗ b)))
-      (hUp k (sizeᵗ b) (sizeᵗ a + sizeᵗ b) (m≤n+m (sizeᵗ b) (sizeᵗ a)))
+    ⊔-lub (≤-trans (nestD-towerᵗ k M 3k 1M MT sl w a)
+                   (towerℕ-mono (hIn k (sizeᵗ a) (suc (sizeᵗ a + sizeᵗ b))
+                      (≤-trans (m≤m+n (sizeᵗ a) (sizeᵗ b)) (n≤1+n _)))))
+          (≤-trans (nestD-towerᵗ k M 3k 1M MT sl w b)
+                   (towerℕ-mono (hIn k (sizeᵗ b) (suc (sizeᵗ a + sizeᵗ b))
+                      (≤-trans (m≤n+m (sizeᵗ b) (sizeᵗ a)) (n≤1+n _)))))
   nestD-towerᵗ k M 3k 1M MT sl w (fstᵗ p) =
     ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w p)
             (towerℕ-mono (hIn k (sizeᵗ p) (suc (sizeᵗ p)) (n≤1+n _)))
@@ -317,40 +316,43 @@ mutual
     ≤-trans (nestD-tower k M 3k 1M MT sl w e)
             (towerℕ-mono (hIn k (sizeᵉ e) (suc (sizeᵉ e)) (n≤1+n _)))
   nestD-towerᵗ k M 3k 1M MT sl w (caseᵗ s l r) =
-    sum3H (k + 3 * sizeᵗ s) (k + 3 * sizeᵗ l) (k + 3 * sizeᵗ r) _
+    sum2H (k + 3 * sizeᵗ s) (k + 3 * (sizeᵗ l + sizeᵗ r)) _
       (≤-trans 3k (m≤m+n k (3 * sizeᵗ s)))
       (nestD-towerᵗ k M 3k 1M MT sl w s)
-      (nestD-towerᵗ k M 3k 1M MT sl w l)
-      (nestD-towerᵗ k M 3k 1M MT sl w r)
+      (⊔-lub (≤-trans (nestD-towerᵗ k M 3k 1M MT sl w l)
+                      (towerℕ-mono (hIn k (sizeᵗ l) (sizeᵗ l + sizeᵗ r)
+                         (m≤m+n (sizeᵗ l) (sizeᵗ r)))))
+             (≤-trans (nestD-towerᵗ k M 3k 1M MT sl w r)
+                      (towerℕ-mono (hIn k (sizeᵗ r) (sizeᵗ l + sizeᵗ r)
+                         (m≤n+m (sizeᵗ r) (sizeᵗ l))))))
       (hUp k (sizeᵗ s) _ (≤-trans (m≤m+n (sizeᵗ s) (sizeᵗ l))
                                   (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r))))
-      (hUp k (sizeᵗ l) _ (≤-trans (m≤n+m (sizeᵗ l) (sizeᵗ s))
-                                  (m≤m+n (sizeᵗ s + sizeᵗ l) (sizeᵗ r))))
-      (hUp k (sizeᵗ r) _ (m≤n+m (sizeᵗ r) (sizeᵗ s + sizeᵗ l)))
+      (hUp k (sizeᵗ l + sizeᵗ r) _
+         (+-mono-≤ (m≤n+m (sizeᵗ l) (sizeᵗ s)) ≤-refl))
   nestD-towerᵗ k M 3k 1M MT sl w (ifᵗ c a b) =
-    sum3H (k + 3 * sizeᵗ c) (k + 3 * sizeᵗ a) (k + 3 * sizeᵗ b) _
-      (≤-trans 3k (m≤m+n k (3 * sizeᵗ c)))
-      (nestD-towerᵗ k M 3k 1M MT sl w c)
-      (nestD-towerᵗ k M 3k 1M MT sl w a)
-      (nestD-towerᵗ k M 3k 1M MT sl w b)
-      (hUp k (sizeᵗ c) _ (≤-trans (m≤m+n (sizeᵗ c) (sizeᵗ a))
-                                  (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))))
-      (hUp k (sizeᵗ a) _ (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
-                                  (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))))
-      (hUp k (sizeᵗ b) _ (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a)))
+    ⊔-lub (⊔-lub (arm c (≤-trans (m≤m+n (sizeᵗ c) (sizeᵗ a))
+                                 (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b))))
+                 (arm a (≤-trans (m≤n+m (sizeᵗ a) (sizeᵗ c))
+                                 (m≤m+n (sizeᵗ c + sizeᵗ a) (sizeᵗ b)))))
+          (arm b (m≤n+m (sizeᵗ b) (sizeᵗ c + sizeᵗ a)))
+    where
+    S = sizeᵗ c + sizeᵗ a + sizeᵗ b
+    arm : ∀ {t′} (x : Tm _ _ _ _ t′) → sizeᵗ x ≤ S →
+      nestDᵗ sl x ≤ towerℕ (k + 3 * suc S)
+    arm x le = ≤-trans (nestD-towerᵗ k M 3k 1M MT sl w x)
+                       (towerℕ-mono (hIn k (sizeᵗ x) (suc S)
+                          (≤-trans le (n≤1+n S))))
 
   nestD-towerᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
     M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M →
     (ts : List (Tm Γ Δᵍ Δ Θ t)) →
-    nestDᵗˢ sl ts ≤ towerℕ (suc (k + 3 * sizeᵗˢ ts))
+    nestDᵗˢ sl ts ≤ towerℕ (k + 3 * sizeᵗˢ ts)
   nestD-towerᵗˢ k M 3k 1M MT sl w []       = z≤n
   nestD-towerᵗˢ k M 3k 1M MT sl w (y ∷ ys) =
-    sum2H (k + 3 * A) (suc (k + 3 * B)) _
-      (≤-trans 3k (m≤m+n k (3 * A)))
-      (nestD-towerᵗ  k M 3k 1M MT sl w y)
-      (nestD-towerᵗˢ k M 3k 1M MT sl w ys)
-      (s≤s (hIn k A (A + B) (m≤m+n A B)))
-      (s≤s (payL k A B (1≤3x A (sizeᵗ-pos y))))
+    ⊔-lub (≤-trans (nestD-towerᵗ  k M 3k 1M MT sl w y)
+                   (towerℕ-mono (hIn k A (A + B) (m≤m+n A B))))
+          (≤-trans (nestD-towerᵗˢ k M 3k 1M MT sl w ys)
+                   (towerℕ-mono (hIn k B (A + B) (m≤n+m B A))))
     where
     A = sizeᵗ y
     B = sizeᵗˢ ys

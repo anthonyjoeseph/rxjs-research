@@ -10,7 +10,7 @@
 -- its own accumulator.  `Refuted.Depth-Nest.width-route-absurd` pins
 -- that against the max of all four at once, 24 against a depth of 49.
 --
--- THE TWO CLAUSES THAT CARRY IT, both read off the evaluator rather
+-- THE THREE CLAUSES THAT CARRY IT, all read off the evaluator rather
 -- than fitted to a number:
 --
 --   · a `*All` layer is worth ONE `suc`, because that is what
@@ -18,14 +18,35 @@
 --   · a `scanᵉ` is worth its SOURCE'S PAYLOAD COUNT times its step
 --     function's layers, because the accumulator is re-wrapped once per
 --     delivered payload while the scan's own frame charges its
---     emissions nothing (`burst-scf-zero`).
+--     emissions nothing (`burst-scf-zero`);
+--   · a LIST of payloads is worth their MAX and not their sum, because
+--     `depthWalk` is a `⊔` over the burst's values — they are entered
+--     one at a time, each from the same frame, so two payloads abreast
+--     cost what the deeper of them costs.
 --
 -- which is the `length vals * suc (sizeᵗ fn)` shape `scanFrame-caps`
 -- already pays on the size and width faces, arriving at the depth face.
 --
+-- THE MAX IS NOT A TIGHTENING FOR ITS OWN SAKE — THE SUM FORM WAS
+-- REFUTED, and by the one statement this measure exists to support.  The
+-- depth face's `*All` arm bounds a burst by descending into each emitted
+-- inner, so it needs an emitted inner's nesting to be under its
+-- EMITTER'S; under a summing `nestDᵗˢ` it is not, because a step
+-- function may hand its input observable to an `ofᵉ` list TWICE.
+-- Measured at such a program (Probed.Nest-Depth §3): the emitter reads
+-- 2, the inner it emits reads 3, and the inner's own DEPTH is 2 — so the
+-- summing measure was over the depth by exactly the duplication, which
+-- is the slack that broke the descent.  The `⊔` restores it to 2 = 2 and
+-- the descent closes.
+--
+-- Every existing row is unmoved by the change, which is the other half
+-- of why it is safe: the crossing families' `ofᵉ` lists are singletons
+-- or carry payloads of nesting 0, where a max and a sum agree.  The
+-- change can therefore only make the cap SMALLER, never a probe greener.
+--
 -- The rows behind this shape live in `Probed.Nest-Depth`, and the
 -- receipt they earned sits in the header of the statement they are
--- evidence about (`depth-all-burst-reached`, the one arm of that face still
+-- evidence about (`emit-cap`, the one arm of that face still
 -- open): this measure equals `depthE` ON
 -- THE NOSE — not merely dominates it — at three programs, the third of
 -- which is a scan nested inside another scan's step function, and says
@@ -64,7 +85,7 @@
 module Rx.Nest-Depth where
 
 open import Data.List using (List; []; _∷_)
-open import Data.Nat  using (ℕ; suc; _+_; _*_)
+open import Data.Nat  using (ℕ; suc; _+_; _*_; _⊔_)
 
 open import Rx.Exp using (Ctx; Exp; Tm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
   scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
@@ -97,17 +118,17 @@ mutual
   nestDᵗ sl unit̂          = 0
   nestDᵗ sl (bool̂ _)      = 0
   nestDᵗ sl (nat̂ _)       = 0
-  nestDᵗ sl (pairᵗ a b)   = nestDᵗ sl a + nestDᵗ sl b
+  nestDᵗ sl (pairᵗ a b)   = nestDᵗ sl a ⊔ nestDᵗ sl b
   nestDᵗ sl (fstᵗ p)      = nestDᵗ sl p
   nestDᵗ sl (sndᵗ p)      = nestDᵗ sl p
   nestDᵗ sl (inlᵗ a)      = nestDᵗ sl a
   nestDᵗ sl (inrᵗ a)      = nestDᵗ sl a
-  nestDᵗ sl (caseᵗ s l r) = nestDᵗ sl s + nestDᵗ sl l + nestDᵗ sl r
-  nestDᵗ sl (ifᵗ c a b)   = nestDᵗ sl c + nestDᵗ sl a + nestDᵗ sl b
+  nestDᵗ sl (caseᵗ s l r) = nestDᵗ sl s + (nestDᵗ sl l ⊔ nestDᵗ sl r)
+  nestDᵗ sl (ifᵗ c a b)   = nestDᵗ sl c ⊔ nestDᵗ sl a ⊔ nestDᵗ sl b
   nestDᵗ sl (primᵗ _ a)   = nestDᵗ sl a
   nestDᵗ sl (strmᵗ e)     = nestDᵉ sl e
 
   nestDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (sl : Slots Γ) →
     List (Tm Γ Δᵍ Δ Θ t) → ℕ
   nestDᵗˢ sl []       = 0
-  nestDᵗˢ sl (y ∷ ys) = nestDᵗ sl y + nestDᵗˢ sl ys
+  nestDᵗˢ sl (y ∷ ys) = nestDᵗ sl y ⊔ nestDᵗˢ sl ys

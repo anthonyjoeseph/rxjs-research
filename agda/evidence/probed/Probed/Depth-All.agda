@@ -1,9 +1,14 @@
--- TARGET: depth-all-burst-reached
+-- TARGET: emit-cap
 --
--- THE BURST ARM IS WHAT THESE ROWS ISOLATE, which is now also the only
--- half of the face still open: its outer arm is proven inside the
--- assembly's own induction, so what the rows read through `depthCap`
--- rests on a leaf on one side and on a body on the other.
+-- THE BURST ARM IS WHAT THESE ROWS ISOLATE, and the arm is now a real
+-- BODY: the gas split, the walk, the consume and the payload entry are
+-- all proven, and the one thing left inside them is the target named
+-- above.  So these rows instantiate an ASSEMBLY'S CONCLUSION rather than
+-- a leaf — which is the more valuable of the two, since a false
+-- conclusion over honest leaves is the retroactive kind, and it is the
+-- one nobody instantiates because the arm typechecks.  They expire with
+-- the target all the same: it is the arm's only gap, so a discharge
+-- retires the arm and these rows with it.
 --
 -- THE BURST OVER SEVERAL CHAIN TOPS.  `Refuted.Depth-Chain` measured
 -- what a single connect costs — one arc per link, accumulating down a

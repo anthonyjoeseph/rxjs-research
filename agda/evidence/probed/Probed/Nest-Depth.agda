@@ -1,5 +1,5 @@
 ------------------------------------------------------------------
--- TARGET: depth-all-burst-reached
+-- TARGET: emit-cap
 --
 -- RETARGETED WHEN THE FACE SPLIT.  `depth-all-bound` is gone: its outer
 -- arm is proven inside the assembly's own induction and its burst arm is
@@ -42,6 +42,11 @@
 -- product of THREE factors would show up; no `input`/slot descent, so
 -- the connect arc is unmeasured here and `slotsNestBelow` is the term
 -- that would carry it; and no post-cascade state.
+--
+-- §3 IS A DIFFERENT KIND OF ROW and is described where it sits: not a
+-- crossing of the measure against the depth, but the witness that killed
+-- the SUM form of the list clause, kept as the row that fails the day
+-- anyone puts the sum back.
 ------------------------------------------------------------------
 module Probed.Nest-Depth where
 
@@ -52,7 +57,9 @@ open import Data.Vec  using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
-open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; fstᵗ; varᵗ; ofᵉ; scanᵉ; mergeAllᵉ)
+open import Rx.Exp
+  using (Ctx; Closed; Tm; Fn; Val; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; fstᵗ; varᵗ;
+  ofᵉ; scanᵉ; mapᵉ; mergeAllᵉ; applyFn)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using (Path; root; sched-init; st-init)
 -- THE MEASURE ITSELF, from `src` — these rows are evidence about the
@@ -203,3 +210,85 @@ deepRow : depthE (gasN 90) (rootProg₂ 2 3 3) rootPath 0 0
             (sched-init (rootProg₂ 2 3 3) slots₀) (st-init (rootProg₂ 2 3 3))
           ≡ nestDᵉ slots₀ (rootProg₂ 2 3 3)
 deepRow = refl
+
+------------------------------------------------------------------
+-- §3  THE DUPLICATION WITNESS — why the list clause is a `⊔`
+--
+-- THIS SECTION IS NOT A CROSSING.  §1 and §2 ask whether the measure
+-- equals the depth; this one asks the ONE question the target's
+-- statement turns on, which is a comparison between two expressions
+-- rather than between a measure and a run: is what a step function
+-- EMITS bounded by the expression that emitted it?
+--
+-- It was a refutation first.  Under a SUMMING `nestDᵗˢ` the answer is
+-- NO, and the witness is nothing exotic: a step function that hands its
+-- own input observable to an `ofᵉ` list TWICE.  The emitter measured 2
+-- and what it emitted measured 3, while the emitted inner's own DEPTH
+-- was 2 — so the measure was over the depth by exactly the duplication,
+-- and the leaf the `*All` burst arm needs was false as stated.
+--
+-- The repair was to the MEASURE, not to the statement: `nestDᵗˢ` takes a
+-- `⊔` where `depthWalk` takes a `⊔`, which is the honest reading of the
+-- mechanism (a list of payloads is walked, not concatenated) and makes
+-- the cap strictly smaller everywhere.  Every row in §1 and §2 is
+-- unmoved by it, because their `ofᵉ` lists are singletons or carry
+-- payloads of nesting 0, where a max and a sum agree.
+--
+-- LOAD-BEARING, and permanently so: `emittedCap` is an equality between
+-- the two sides the leaf compares, at the program that refuted the sum.
+-- It is 2 ≡ 2 under the `⊔` and 3 ≡ 2 under a sum, so it is the row that
+-- fails the day the summing clause comes back — which is the only thing
+-- standing between that clause and a leaf that reads as provable.
+------------------------------------------------------------------
+
+-- a step function that hands its input to an `ofᵉ` list TWICE
+dupF : Fn Γ₀ [] [] [] (obs natᵗ) (obs natᵗ)
+dupF = strmᵗ (mergeAllᵉ (ofᵉ (varᵗ (here refl) ∷ varᵗ (here refl) ∷ [])))
+
+-- the payload it is applied to, itself one `*All` layer deep
+inner₁ : Val Γ₀ (obs natᵗ)
+inner₁ = mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))
+
+-- the emitter: `dupF` mapped over a source carrying that payload
+emitter : Closed Γ₀ (obs natᵗ)
+emitter = mapᵉ dupF (ofᵉ (strmᵗ inner₁ ∷ []))
+
+-- and what it emits, which is what the leaf must bound
+emitted : Val Γ₀ (obs natᵗ)
+emitted = applyFn dupF inner₁
+
+topD : Closed Γ₀ natᵗ
+topD = mergeAllᵉ emitter
+
+-- the two sides in closed form, so the row below is legible as
+-- arithmetic: the duplication is invisible to a max and worth one full
+-- layer to a sum
+emitterND : nestDᵉ slots₀ emitter ≡ 2
+emitterND = refl
+
+emittedND : nestDᵉ slots₀ emitted ≡ 2
+emittedND = refl
+
+-- LOAD-BEARING, and this is the row: 2 ≡ 2 under the `⊔`, 3 ≡ 2 under a
+-- sum.  Nothing else in this tree fails when the list clause regresses.
+emittedCap : nestDᵉ slots₀ emitted ≡ nestDᵉ slots₀ emitter
+emittedCap = refl
+
+-- AND THE EMITTED INNER'S OWN DEPTH, which is what says the finding was
+-- the measure's and not the mechanism's: the run agrees with the `⊔`.
+emittedDepth : depthE (gasN 30) emitted rootPath 0 0
+                 (sched-init emitted slots₀) (st-init emitted)
+               ≡ 2
+emittedDepth = refl
+
+-- LOAD-BEARING as the containment row: the top of the same program is
+-- one layer up from the emitter, and the cap meets its depth exactly
+-- there — so the refutation above was a defect in the route through the
+-- payload, never slack in the cap.
+topND : nestDᵉ slots₀ topD ≡ 3
+topND = refl
+
+topRow : depthE (gasN 30) topD rootPath 0 0
+           (sched-init topD slots₀) (st-init topD)
+         ≡ nestDᵉ slots₀ topD
+topRow = refl

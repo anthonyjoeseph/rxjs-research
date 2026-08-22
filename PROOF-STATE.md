@@ -251,10 +251,9 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`depth-all-burst-reached`** (Depth-Compositional) — DIFFICULTY, all that is
-  left of the `*All` face. Both halves of the arm around it are real: the `g0`
-  gas half, and the `subst` that spends the proven `subscribeE-slots`. Owes one
-  thing — an emitted inner's root-path cap bounded by its emitter's.
+- **`emit-cap`** (Depth-Compositional) — DIFFICULTY, all that is left of the
+  `*All` face: a burst emits nothing more deeply nested than what emitted it.
+  Everything around it is a real body now. Its predecessor is refuted.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
