@@ -1126,6 +1126,25 @@ abstract
 -- and a concatAll drain — and both are reached under a `⊔`, so the
 -- question is whether ONE level allowance serves both or whether the
 -- statement has to be indexed by which arc it is under.
+-- DEAD ROUTE: bounding the nesting count by the PATH LENGTH.  The
+--   invariant is true and it lands in the wrong place.  `depthE g b κ …
+--   + pathLen κ ≤ sizeCapAt e sl id` propagates cleanly — each re-entry
+--   pushes one `from-inner` frame, so the depth falls exactly as the
+--   path grows, and `pathSz?` re-establishes at the longer path out of
+--   the premises with no new leaf.  But a size cap is not a height:
+--   `capsAt e sl (suc id)` is `capsAt e sl id` STEPPED `sizeCount`
+--   times, one `sizeStep S s = S * suc (2 * s)` each, and that count is
+--   itself under `blowH`'s own pooled summand — so the size cap sits
+--   exponentially ABOVE the height it would have to fit under.
+--   `blowup-tower` and `capsAt-tower` bracket it from the other side,
+--   at `towerℕ` of the height, which is the wrong side.  What has to
+--   bound the nesting is the LEVEL count, one nesting level per caps
+--   level, and that is the one-instant growth bound the `depOK` note
+--   below calls new mathematics.
+--   AND DO NOT PUT THE POOLED FORMULA IN A STATEMENT to get at it.
+--   `blowH` is `abstract` for a measured reason — with the body visible
+--   the delivery count inlines twice and squares — so the level count
+--   has to be reached through the recurrence's own name.
 
 -- WHY THE PREDECESSOR IS GONE, AND WHY A SIZE PREMISE DOES NOT REPAIR
 -- IT.  `depth-hop` bounded this by `hopDᵉ V η b + pathNestD κ`, and
