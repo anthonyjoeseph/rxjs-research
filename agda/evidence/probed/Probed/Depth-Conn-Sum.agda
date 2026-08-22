@@ -65,6 +65,7 @@
 module Probed.Depth-Conn-Sum where
 
 open import Data.List using ([]; _∷_)
+open import Data.Nat  using (_+_)
 open import Data.Unit using (tt)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin  using (Fin) renaming (zero to fz; suc to fs)
@@ -76,7 +77,9 @@ open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax;
-  slotNest)
+  slotNest; nodesNestMax)
+open import Verify-Budget-Sufficient.Caps-Nest using (nest; resid)
+open import Verify-Budget-Sufficient.Measures using (pathLen)
 
 g40 : Gas
 g40 = gs (gs (gs (gs (gs (gs (gs (gs (gs (gs (gs (gs (gs (gs (gs
@@ -319,4 +322,83 @@ _ : depthE g40 progD root 0 0 schedD stD ≡ 9
 _ = refl
 
 _ : storeNestMax schedD stD ≡ 47
+_ = refl
+
+----------------------------------------------------------------------
+-- § E — THE RESTATED BOUND, measured before anything is restated over
+-- it.  The statement's clause cannot close in the present currency: the
+-- `input` clause recurses on the slot's DEF, and the def's own size is
+-- charged on top of a store term that already paid for it.  The
+-- currency that fixes it exists and is proven — `nest b sl cs =
+-- syncSizeᵉ b + resid sl cs`, whose `resid-connect` says the residue
+-- falls by exactly the connected slot's weight, and which the caps face
+-- already threads at these very call sites.
+--
+-- BUT THE RESTATED RIGHT-HAND SIDE IS NOT UNIFORMLY LARGER, which is
+-- why it gets measured rather than assumed: `syncSizeᵉ ≤ sizeᵉ` and
+-- `resid ≤ slotsNestSum` both shrink it, while the node half has to
+-- become a `+` where it is now a `⊔` (a `+` distributes over the
+-- residue payment and a `⊔` does not), which grows it.  The net is a
+-- question about programs.
+----------------------------------------------------------------------
+
+_ : nest progC (Sched.slots schedC) (EvalSt.connectedShares stC)
+      + pathLen (root {Γ = ΓC} {t = natᵗ})
+      + nodesNestMax (EvalSt.nodes stC) ≡ 33
+_ = refl
+
+-- LOAD-BEARING, and this is the row that decides whether the
+-- restatement is worth doing: the refutation's own nine-link witness,
+-- where the depth is 9.  WHAT WOULD MAKE IT FAIL: the restated bound
+-- shrinking below the depth it has to pay for, which would mean the
+-- currency that fixes the clause cannot state the theorem.
+_ : nest progD (Sched.slots schedD) (EvalSt.connectedShares stD)
+      + pathLen (root {Γ = ΓD} {t = natᵗ})
+      + nodesNestMax (EvalSt.nodes stD) ≡ 48
+_ = refl
+
+-- and the same at the CHEAP-link chain, whose defs are the ones
+-- `syncSizeᵉ` could in principle measure differently from `sizeᵉ`
+_ : nest progB (Sched.slots schedB) (EvalSt.connectedShares stB)
+      + pathLen (root {Γ = ΓB} {t = natᵗ})
+      + nodesNestMax (EvalSt.nodes stB) ≡ 44
+_ = refl
+
+----------------------------------------------------------------------
+-- § F — THE RESIDUE'S OWN EDGE, and the reason the restatement is not
+-- simply a currency swap.  `resid` masks a slot that is already in
+-- `connectedShares`, so its weight is 0 there and `resid-connect` has
+-- nothing to pay with.  The evaluator is fine with that:
+-- `subscribeSharedSlot` short-circuits on a spent share.  The MIRROR
+-- does not — `depthShSlot` reports the connect unconditionally, which
+-- is a sound over-approximation of "does nothing" and is exactly the
+-- loss the residue accounting cannot absorb.
+--
+-- SO THE ROW BELOW IS A CONSTRUCTED STATE, and that is a caveat rather
+-- than a result: a state written as a record update is not one the
+-- evaluator is thereby known to reach.  It is worth measuring anyway,
+-- because a FAILING predicate at a constructed state is a refutation
+-- CANDIDATE whose reachability becomes the question — and
+-- `connectedShares` is append-only and starts `[]`, so a state with
+-- slots already connected is the ordinary mid-run case rather than an
+-- exotic one.
+----------------------------------------------------------------------
+
+stSat : EvalSt progD
+stSat = record stD { connectedShares = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 6 ∷ 7 ∷ 8 ∷ [] }
+
+-- DEGENERATE: only fixes that the mask really is saturated.
+_ : resid (Sched.slots schedD) (EvalSt.connectedShares stSat) ≡ 0
+_ = refl
+
+-- LOAD-BEARING, and this is the row that decides the shape of the
+-- restatement.  If the depth is positive while the residue it would be
+-- bounded by is 0, then the currency that fixes the clause cannot state
+-- the theorem UNLESS the mirror is made to short-circuit the way the
+-- evaluator already does.
+_ : depthE g40 progD root 0 0 schedD stSat ≡ 9
+_ = refl
+
+-- and the node half, so the reading is not confounded by it
+_ : nodesNestMax (EvalSt.nodes stSat) ≡ 0
 _ = refl

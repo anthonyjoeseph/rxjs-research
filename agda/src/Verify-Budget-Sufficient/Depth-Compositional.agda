@@ -216,6 +216,23 @@ postulate
   -- never selects the node half), and a `scripted` slot mixed into a
   -- chain.
   --
+  -- DEAD ROUTE 2026-08-21: the RESIDUE currency, which is the obvious
+  -- candidate because the exact accounting already exists and is
+  -- PROVEN — `resid sl cs` masks a slot that is in `connectedShares`,
+  -- `resid-connect` says the residue falls by precisely the connected
+  -- slot's weight, `depthConn` conses `toℕ i` on before recursing, and
+  -- the caps face already threads `nest b sl (EvalSt.connectedShares
+  -- st)` at these very call sites.  The payment is exact and it is
+  -- still dead: the residue is 0 at a slot already connected, while the
+  -- MIRROR charges the connect there anyway.  `subscribeSharedSlot`
+  -- short-circuits on a spent share and `depthShSlot` does not — a
+  -- sound over-approximation of "does nothing", and exactly the loss
+  -- the accounting cannot absorb.  MEASURED, in Probed.Depth-Conn-Sum
+  -- § F: at the nine-link chain with `connectedShares` saturated, the
+  -- residue is 0 and the node half is 0 while the depth is 9.  So the
+  -- route reopens only by making the mirror short-circuit too, which is
+  -- a change to `depthE` and invalidates every statement about it.
+  --
   -- WHAT THE SUM DOES *NOT* FIX IS THIS CLAUSE.  The double-count is
   -- untouched: the goal after `depth-compositional` is still
   -- `sizeᵉ d + storeNestMax ≤ storeNestMax`.  What the sum ADDS is that
@@ -224,8 +241,27 @@ postulate
   -- down the chain by stratification, with `sizeᵉ d` absorbed by the
   -- summand for `i` itself.  That is a JOINT restatement with
   -- `depth-compositional`, whose own right-hand side would have to
-  -- carry the partial sum, so it is a design leg and a measurement
-  -- before it is a route: nothing here is evidence that it closes.
+  -- carry the partial sum.
+  --
+  -- AND IT IS NOW THE ONLY SURVIVING SHAPE, which is what the dead
+  -- route above buys.  Three things it has that the residue needed and
+  -- lacked: it reads STRATIFICATION, already in the syntax, since
+  -- `shared`'s `ok` field IS `T (inputsBelowᵉ (toℕ i) d)`, so nothing
+  -- about the mirror moves; the payment is an EQUALITY rather than a
+  -- bound, because `slotNest (shared d)` is `sizeᵉ d` on the nose, so no
+  -- migration to a smaller size measure is forced; and the strict
+  -- decrease in `i` that pays for the arithmetic is simultaneously a
+  -- termination measure for a recursion that is not structural in `b` —
+  -- which is the reason this clause is a separate statement at all.
+  --
+  -- ONE THING THE SHAPE FORCES, and it is a real cost: the `⊔` with the
+  -- node half has to move OUTWARD, so the slot-side arithmetic happens
+  -- inside the left arm.  With the join left where it is, a node half
+  -- that dominates leaves the goal needing `sizeᵉ d ≤ suc (pathLen κ)`,
+  -- which no hypothesis offers.  Outward it goes through, and
+  -- `storeNest-capped`'s `⊔-lub` split survives unchanged — which a `+`
+  -- would NOT, since that needs the SUM of two quantities the caps
+  -- bound only separately.
   depth-conn-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (g : Gas) (i : Fin n)
     (κ : Path Γ (lookup Γ i) t) (bid : Id) (now : Tick)
