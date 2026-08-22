@@ -1,4 +1,4 @@
-.PHONY: gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -639,17 +639,72 @@ roadmap-selftest:
 # NOT suppressed meanwhile: `make imports-check` runs it in full, and
 # `imports-selftest` below still holds the checker itself to firing.
 #
+# `comments-check` IS THE SAME SITUATION AND IS OWED: the tree carries 351 dated
+# comments, 19 historical markers, 31 blocks whose evidence is buried mid-prose and
+# 39 over-budget explanations, all predating the law.  Wiring it before the sweep
+# would land a knowingly-red gate, which is the one thing that teaches everyone to
+# ignore red.  `make comments-check` runs it in full meanwhile, and
+# `comments-selftest` above IS wired, so the checker itself cannot rot untested.
+#
 # AND A `#` COMMENT AT COLUMN 0 CANNOT GO INSIDE A RECIPE -- it ENDS the recipe,
 # and the tab-indented lines after it become orphans ("recipe commences before
 # first target").  That is why this note sits here rather than beside the line it
 # is about; a recipe-internal comment must itself be tab-indented to be one.
+# THE SOURCE-COMMENT LAW.  A source header is where the roadmap's own character
+# budget SENDS research, which is what rules out the obvious design: a flat
+# per-block ceiling budgets the DESTINATION, and then a finding with nowhere to
+# go does not move, it gets deleted.  So this charges EXPLAINING and leaves
+# EVIDENCE free -- the same split the roadmap's row budget uses for names.
+comments-check:
+	@scripts/check-comments.py
+
+# PROVES comments-check IS LOAD-BEARING, one fixture per check, each firing
+# exactly one.  `clean` is the fixture that matters most: it is the MUST-NOT
+# direction, and it passes only if all four precision properties hold at once --
+# an INDENTED `ASSEMBLED`/`MEASURED` is a continuation and not a marker, an
+# UNDATED `SEALED:` is durable rationale and not history (the census found the
+# marker word does not separate the two -- the date does), an indented line
+# after `PROBED` is not stranded prose, and a `git show` pointer is not an
+# explanation.  `sha` pins that last one as load-bearing rather than decorative:
+# its raw comment total is well OVER budget and its charged total well under, so
+# dropping the exemption turns it red.
+comments-selftest:
+	@fail=0; \
+	  for d in clean sha; do \
+	    scripts/check-comments.py --dir scripts/comments-selftest/$$d > /dev/null 2>&1 \
+	      || { echo "SELFTEST FAIL: the $$d fixture was REJECTED — a precision property of the checker has died"; fail=1; }; \
+	  done; \
+	  for d in dated history shape order fat; do \
+	    if scripts/check-comments.py --dir scripts/comments-selftest/$$d > /dev/null 2>&1; then \
+	      echo "SELFTEST FAIL: the $$d fixture PASSED — that check is dead"; fail=1; \
+	    fi; \
+	  done; \
+	  scripts/check-comments.py --dir scripts/comments-selftest/dated 2>&1 \
+	    | grep -q 'DATED COMMENTS' \
+	    || { echo "SELFTEST FAIL: a dated comment was not reported as one"; fail=1; }; \
+	  scripts/check-comments.py --dir scripts/comments-selftest/history 2>&1 \
+	    | grep -q 'HISTORICAL MARKERS' \
+	    || { echo "SELFTEST FAIL: an UNDATED historical marker was not reported — only the name check can see one"; fail=1; }; \
+	  scripts/check-comments.py --dir scripts/comments-selftest/shape 2>&1 \
+	    | grep -q 'prose line(s) after the evidence' \
+	    || { echo "SELFTEST FAIL: prose stranded behind the evidence was not reported"; fail=1; }; \
+	  scripts/check-comments.py --dir scripts/comments-selftest/order 2>&1 \
+	    | grep -q 'evidence out of order' \
+	    || { echo "SELFTEST FAIL: PROBED before REFUTED was not reported — the order half is dead"; fail=1; }; \
+	  scripts/check-comments.py --dir scripts/comments-selftest/fat 2>&1 \
+	    | grep -q 'EXPLANATIONS OVER BUDGET' \
+	    || { echo "SELFTEST FAIL: an over-budget explanation was not reported"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "comments-selftest: PASS (all four checks fire; an indented marker, an undated SEALED and a sha pointer do not)"; \
+	  else exit 1; fi
+
 # Everything decidable without Agda: seconds, and deliberately FIRST, so a
 # textual violation never costs a full build to discover.  Both gates run it.
 GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              unsafe-check dup-selftest dup-check \
              imports-selftest imports-check \
              evidence-selftest evidence-check \
-             roadmap-selftest roadmap-check dev-changed-selftest
+             roadmap-selftest roadmap-check \
+             comments-selftest dev-changed-selftest
 
 gate-cheap:
 	@for t in $(GATE_CHEAP); do \

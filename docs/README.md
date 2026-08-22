@@ -44,6 +44,8 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `roadmap-selftest` | [roadmap-check.md](roadmap-check.md) | ship a roadmap checker that has stopped firing |
 | `dev-changed-selftest` | [gate.md](gate.md) | ship a light gate that passes while checking nothing |
 | `roadmap-check` | [roadmap-check.md](roadmap-check.md) | leave PROOF-STATE stale, unsorted, verbose, or dated — or date CLAUDE.md |
+| `comments-selftest` | [comments-check.md](comments-check.md) | ship a comment checker that has stopped firing |
+| `comments-check` | [comments-check.md](comments-check.md) | date a source comment, record what happened to a declaration, bury the evidence mid-paragraph, or let an explanation grow into an essay |
 | `agda` | [agda-build.md](agda-build.md) | land anything that does not typecheck, warnings included |
 | `refuted` | [evidence.md](evidence.md) | land a refutation that does not typecheck |
 | `probed` | [evidence.md](evidence.md) | land a probe that does not typecheck |

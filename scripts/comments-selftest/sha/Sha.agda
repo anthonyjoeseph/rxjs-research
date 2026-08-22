@@ -1,0 +1,37 @@
+module Sha where
+
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The bound is over the staged environment, so the arithmetic owed is a telescope down the slots rather than a fold over them.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+-- The predecessor lived at git show 853c49e5201364 and its burst receipt at git show 266d382ecaf391, both restorable.
+postulate leaf : Set

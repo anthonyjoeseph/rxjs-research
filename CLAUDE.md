@@ -54,12 +54,32 @@ ruling in the file of record is in force whatever its age, which is what "file o
 record" means, and two rulings that genuinely conflict get MERGED rather than ordered
 by date. Same for the evidence under a rule — the fact that three of four workers died
 polling a build is the argument; when it happened is decoration, and a timing figure
-has one home and this is not it. Dates ARE wanted in a source header, where a
-`-- PROBED` or `-- DEAD ROUTE` receipt is only as good as the code being unmoved since,
-so its age is a signal about the evidence rather than about the rule.
-**`make roadmap-check` ENFORCES THIS on this file and on `docs/`, and a date is a build
-failure** — the same scan that holds the roadmap to it, since a rule stated in a file
-nobody checks is the thing this whole section is about.
+has one home and this is not it.
+
+**AND THE SAME GOES FOR A SOURCE COMMENT, WHICH USED TO BE THE ONE CARVE-OUT
+(Anthony).** This file argued that a `-- PROBED` or `-- DEAD ROUTE` receipt
+is only as good as the code being unmoved since, so its age was a signal about the
+evidence. That reasoning was wrong twice over. A receipt's content is its **coverage
+statement** — which shapes were reached and which were not — and coverage is
+*re-runnable*, so the date adds nothing a reader can act on; and nobody has ever
+checked one, which makes it a stale line number in prose form, the exact failure the
+rule directly below this one exists for.
+
+What the date actually buys is **enforcement of the history ban**, and it buys it
+cheaply. Purely historical prose arrives WITH a timestamp attached, because the writer
+knows they are recording a change rather than a fact — "corrected `<date>`", "ANSWERED
+`<date>`", "moved here from the walk face when …". Measured on the sweep that set this
+rule, the marker WORD does not separate history from fact and the date does: `SEALED
+<date>. This was a POSTULATE …` is history, `SEALED, and this is not optional: …` is
+the load-bearing reason the seal may not come off, and every dated instance of the
+ambiguous markers was historical while every undated one was durable. So a date ban is
+the cheapest machine-visible proxy for "delete purely historical information", which is
+the standing directive it serves.
+
+**`make roadmap-check` ENFORCES THIS on this file and on `docs/`, and `make
+comments-check` on every comment in `agda/src` and `agda/evidence`; a date is a build
+failure** — since a rule stated in a file nobody checks is the thing this whole section
+is about.
 
 **LINE NUMBERS ARE THE WORST CASE AND THERE IS NO EXCEPTION FOR THEM.** A stale name at
 least fails a `grep` loudly; a stale line number resolves, points at unrelated code, and
@@ -91,6 +111,8 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `imports-check` | **NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE (Anthony: "no unused imports, either")** — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. AND no `using` clause may ask a module of this tree for a name that module does not have — a definition MOVES, one consumer's clause is repaired and its sibling's is not, and Agda reports that only as a scope warning `-W error` promotes MANY MINUTES down the tower, one instance per build, naming the importer and not the name's new home. What makes the cheap check sound is the `public` ban directly above: with no re-exports, a module can only export what its own text mentions. AND every file DECLARES its own module name, matching its path: a missing header is not a syntax error, so Agda checks such a file as a target and then crashes every IMPORTER with an internal error naming neither end — and a dev check cannot see it, because it checks a generated copy carrying its own header. Every part of this buys LEGIBILITY, not time: `using` filters scope rather than the build, a re-export removes no edge since a ladder's name-level dependencies are genuine, and a clause with one live name holds its edge open however many dead names sit beside it — which is why the name-level half was once argued to be optional, and is the wrong measure. A list naming thirty things the file never touches is not a record of what the file depends on | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `comments-selftest` | all four comment checks still fire, and three precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
+| `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date or a historical marker; a block's evidence sits LAST and in order; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
 | `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` | the refutations typecheck | EVIDENCE.md |
 | `probed` | the probes typecheck | EVIDENCE.md |
@@ -996,6 +1018,35 @@ postulate.)
 Corollary for headers: a header's job is what CANNOT be code — a refuted route, a coverage
 boundary, a ruling and its rationale, a recovery pointer. The moment a header explains a
 derivation that would typecheck, move it into the derivation.
+
+### A HEADER HAS A SHAPE, AND HISTORY IS NOT PART OF IT (Anthony)
+
+**EXPLANATION FIRST, THEN EVIDENCE — `REFUTED`/`DEAD ROUTE`, then `PROBED`, then
+`RECOVERY` — AND THE EVIDENCE COMES LAST.** Not a style preference: it is what gives a
+long header landmarks to skip by, and it is what makes the budget below definable at
+all. A marker is a **LEDGER ENTRY**, so prose that wants to mention a refutation in
+passing names its module in backticks rather than opening a `REFUTED:` section
+mid-paragraph — a ledger interleaved with the argument is neither.
+
+**AND ONLY THE EXPLANATION IS CHARGED (Anthony).** The prose before the first evidence
+marker has a character budget; the evidence sections and any `git show` pointer are
+free. This asymmetry is the entire design, and the tempting symmetric rule is wrong: a
+source header is precisely where the roadmap's own budget SENDS research, so budgeting
+the destination too means a finding with nowhere to go does not MOVE, it gets DELETED —
+the one outcome the directive behind all of this rules out. Same principle as the
+roadmap's rows, where names are free and explaining is charged. The budget is set at
+the measured p99 for a reason: its job is to declare a block **over-explained**, not to
+trim writing, and a module's front matter legitimately runs long.
+
+**AND A HEADER RECORDS WHAT IS TRUE OF THE STATEMENT, NEVER WHAT HAPPENED TO THE
+DECLARATION (Anthony: "I definitely do want to delete purely historical information —
+nobody needs that").** The four durable markers pass that test — coverage, a dead
+route, a refutation, where deleted apparatus went. "Was restated", "was split", "was
+sealed on", "converted from a `-core`", "measured at 400 s" do not: that is git's
+subject, `git log -S<name> --all` finds it, and it cannot rot there because nobody
+maintains it. **The superseded framing goes too** — a paragraph kept "so the dead
+candidates are not retried" is a dead route, and a dead route is one `DEAD ROUTE` line,
+not the argument that produced it.
 
 **NEVER WRITE CODE IN A COMMENT (Anthony).** Not a body, not a signature, not a
 "here is the lemma we need" block. This is the sharpest form of the rule above and it is
