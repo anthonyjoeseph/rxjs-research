@@ -1,5 +1,5 @@
 ------------------------------------------------------------------
--- TARGET: depth-all-burst
+-- TARGET: depth-all-burst-gs
 --
 -- RETARGETED WHEN THE FACE SPLIT.  `depth-all-bound` is gone: its outer
 -- arm is proven inside the assembly's own induction and its burst arm is

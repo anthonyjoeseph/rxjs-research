@@ -34,7 +34,7 @@
 -- (4) THE REAL WORK: every clause that calls `depthBurst` feeds it the
 --     state produced by running the REAL `subscribeE`, while the RHS
 --     reads the ENTRY state.  The `storeNestMax`-preservation conjunct
---     is what `depth-all-burst` (below) absorbs; when it is ground it
+--     is what `depth-all-burst-gs` (below) absorbs; when it is ground it
 --     must be proved as a second conjunct of the same induction, not a
 --     separate family, and must NOT ride `subscribeE-caps` (circular —
 --     that face takes `depthE ≤ dep` as a hypothesis).  Its sibling arm
@@ -47,9 +47,10 @@
 -- (c) THE CONNECT, a real clause: `input` recurses into the slot's own
 -- def and pays for it out of the summand admitting slot `i` to the
 -- partial sum.  (d) BLOCKED, two named postulates —
--- `depth-all-burst` (needs the preservation conjunct, finding (4); it is
--- the burst half of the `*All` clauses, whose outer half is proven in
--- the assembly itself) and
+-- `depth-all-burst-gs` (needs the preservation conjunct, finding (4);
+-- it is the burst half of the `*All` clauses at POSITIVE gas — the
+-- outer half is proven in the assembly itself and the zero-gas half in
+-- bucket (b′)) and
 -- `depth-μ-bound` (sizeᵉ (unfoldμ body) > sizeᵉ (μᵉ body) kills the
 -- size IH; the honest route is the guarded-context discipline —
 -- μ-variable occurrences sit under deferᵉ, and deferᵉ contributes 0
@@ -74,7 +75,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (Bool; false; true; if_then_else_; T; _∧_)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
@@ -86,7 +87,7 @@ open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
   take-f; from-inner; thru-outer; mintNode; installNode; subscribeE; splitEvents; stepFrame;
-  setNode; root; share-sink; register)
+  setNode; root; share-sink; register; lookupNode; thruConsume)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 
@@ -99,7 +100,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using (sum-tab-slack)
 open import Data.Empty using (⊥-elim)
 open import Decide using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthBurst)
+  using (depthE; depthBurst; depthWalk; depthConsume; depthConsumeS)
 
 ------------------------------------------------------------------
 -- THE MEASURE — the state's contribution to subscribe-time depth,
@@ -857,9 +858,11 @@ postulate
   -- frame, the walk and the consume to get there.  So the pair is
   -- lexicographic on gas and then on the subject, which is the order
   -- the arguments already sit in, and no fuel parameter and no
-  -- well-founded plumbing is owed.  What the `*All` clauses gain is a
-  -- SPLIT ON THE GAS they currently do not perform: at `g0` the burst
-  -- arm is `0` outright, and at `gs fuel′` it recurses one level down.
+  -- well-founded plumbing is owed.  THE SPLIT IS TAKEN: `depth-all-burst`
+  -- is a real body over `g0` and `gs fuel`, and the zero half is
+  -- discharged in bucket (b′) — which also checks the claim of this
+  -- paragraph, since the base case of a gas descent closing is what
+  -- says the gas is the thing being descended on.
   --
   -- WHICH MEANS THIS ARM CANNOT STAY A LEAF EITHER, for the reason its
   -- sibling could not: the recursion it needs exists only inside the
@@ -872,16 +875,24 @@ postulate
   -- leaf is the one fact none of it supplies — an emitted inner's
   -- nesting is bounded by its emitter's — together with finding (4)'s
   -- state conjunct.
-  -- THE BURST ARM, over the stream the outer subscribe returned.  Its
-  -- own scheduler and state come out of that subscribe rather than out
-  -- of `sched`/`st`, which is why the arm cannot be stated over
-  -- arbitrary ones: the three projections are the subscribe's stream,
-  -- scheduler and state, in that order.
-  depth-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
+  -- THE BURST ARM AT POSITIVE GAS, over the stream the outer subscribe
+  -- returned.  Its own scheduler and state come out of that subscribe
+  -- rather than out of `sched`/`st`, which is why the arm cannot be
+  -- stated over arbitrary ones: the three projections are the
+  -- subscribe's stream, scheduler and state, in that order.
+  --
+  -- AND THE GAS SPLIT IS DONE, which is the half of the route above
+  -- that needed no new mathematics.  `depth-all-burst` below is a real
+  -- body: at `g0` every entry into a payload returns 0 without looking
+  -- at it, so the whole burst-side clique collapses to the ONE `suc` a
+  -- `thru-outer` frame charges and the cap's `suc` pays it.  What is
+  -- left is this leaf, and its gas is the thing the route descends on.
+  depth-all-burst-gs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (fuel : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    let nid = proj₁ (mintNode sched)
+    let g   = gs fuel
+        nid = proj₁ (mintNode sched)
         r   = subscribeE g b (thru-outer op nid ↠ κ) bid now
                 (proj₂ (mintNode sched)) (installNode nid initSt st)
     in depthBurst g bid now (thru-outer op nid) κ
@@ -1017,6 +1028,121 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
   r      = stepFrame fuel bid now (take-f nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
   sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
   st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
+
+------------------------------------------------------------------
+-- BUCKET (b′) — the burst arm AT ZERO GAS, and it is the same list
+-- induction one clique wider.  `depthInner`'s zero clause returns 0
+-- without entering the payload, and the gas travels UNCHANGED from the
+-- burst through the frame, the walk and the consume to reach it — so at
+-- `g0` every one of those returns 0 and the only charge left standing
+-- is the single `suc` a `thru-outer` frame makes.  A cap whose subject
+-- term is `suc _` pays that with nothing else spent.
+--
+-- WHICH IS ALSO A CHECK ON THE ROUTE rather than only a discharge: the
+-- arm's header argues the induction descends on the GAS, and this is
+-- that claim's base case, typechecked.  Had the gas not been the thing
+-- the descent peels, this clique would not close.
+------------------------------------------------------------------
+
+-- switchAll's node read, which is the one place the walk looks at the
+-- store before entering.  Every arm returns 0 at zero gas, but the
+-- `Maybe` has to be SPLIT for that to reduce — a catch-all over a
+-- variable is stuck.
+consumeS-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (nid : NodeId) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e)
+  (nd : Maybe (NodeState Γ)) →
+  depthConsumeS g0 nid κ id now o sched st nd ≤ 0
+consumeS-zero nid κ id now o sched st nothing                  = z≤n
+consumeS-zero nid κ id now o sched st (just (scan-st _))       = z≤n
+consumeS-zero nid κ id now o sched st (just (concat-st _ _ _)) = z≤n
+consumeS-zero nid κ id now o sched st (just (take-st _))       = z≤n
+consumeS-zero nid κ id now o sched st (just (merge-st _ _))    = z≤n
+consumeS-zero nid κ id now o sched st (just (switch-st _ _))   = z≤n
+consumeS-zero nid κ id now o sched st (just (exhaust-st _ _))  = z≤n
+
+consume-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  depthConsume g0 op nid κ id now o sched st ≤ 0
+consume-zero mergeᵒ   nid κ id now o sched st = z≤n
+consume-zero concatᵒ  nid κ id now o sched st = z≤n
+consume-zero exhaustᵒ nid κ id now o sched st = z≤n
+consume-zero switchᵒ  nid κ id now o sched st =
+  consumeS-zero nid κ id now o sched st
+    (lookupNode nid (EvalSt.nodes st))
+
+-- the walk threads a state per payload, so the tail's scheduler and
+-- state are the consume's outputs — the same `where` shape the three
+-- frame-zero lemmas above use, read off `thruConsume` instead of
+-- `stepFrame`.
+walk-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (κ : Path Γ u t) (id : Id) (now : Tick)
+  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+  depthWalk g0 op nid κ id now vals sched st ≤ 0
+walk-zero op nid κ id now []       sched st = z≤n
+walk-zero op nid κ id now (o ∷ os) sched st =
+  ⊔-lub (consume-zero op nid κ id now o sched st)
+        (walk-zero op nid κ id now os sched' st')
+  where
+  r      = thruConsume g0 op nid κ id now o sched st
+  sched' = proj₁ (proj₂ (proj₂ r))
+  st'    = proj₂ (proj₂ (proj₂ r))
+
+-- ONE, and the `suc` is the frame's own: `depthFrame` at a
+-- `thru-outer` is `suc (depthWalk …)`, so the bound is `s≤s` over the
+-- walk and the burst's `⊔` keeps it there across the whole stream.
+burst-thru-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (bid : Id) (now : Tick) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (stream : Stream Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst g0 bid now (thru-outer op nid) κ stream sched st ≤ 1
+burst-thru-zero bid now op nid κ [] sched st = z≤n
+burst-thru-zero {Γ = Γ} {u = u} bid now op nid κ (em ∷ ems) sched st =
+  ⊔-lub (s≤s (walk-zero op nid κ bid now (proj₁ sp) sched st))
+        (burst-thru-zero bid now op nid κ ems sched' st')
+  where
+  -- `A` is the LEFTOVER event type, pinned to the path's root as
+  -- `depthBurst` pins it, so the two `sp`s are the same term
+  sp     = splitEvents {A = Val Γ u} (InstEmit.events em)
+  r      = stepFrame g0 bid now (thru-outer op nid) κ
+             (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))
+
+-- the cap's subject term is `suc _` at every `*All` layer, and that is
+-- the whole of what the zero-gas arm has to be paid out of
+one-≤-capN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (N mx : ℕ) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+  1 ≤ depthCapN {e = e} (suc N) mx κ sched st
+one-≤-capN N mx κ sched st =
+  ≤-trans (s≤s z≤n)
+          (m≤m⊔n (suc N + pathNestD κ + slotsNestBelow (Sched.slots sched) mx)
+                 (nodesNestMax (Sched.slots sched) (EvalSt.nodes st)))
+
+-- THE ARM, split on its gas.  The `g0` clause is the clique above; the
+-- `gs` clause is the leaf, and nothing else remains of this face.
+depth-all-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (initSt : NodeState Γ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let nid = proj₁ (mintNode sched)
+      r   = subscribeE g b (thru-outer op nid ↠ κ) bid now
+              (proj₂ (mintNode sched)) (installNode nid initSt st)
+  in depthBurst g bid now (thru-outer op nid) κ
+       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ depthCapN (suc (nestDᵉ (Sched.slots sched) b))
+                   (maxInputᵉ b) κ sched st
+depth-all-burst g0 op initSt b κ bid now sched st =
+  ≤-trans (burst-thru-zero bid now op nid κ
+             (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+          (one-≤-capN (nestDᵉ (Sched.slots sched) b) (maxInputᵉ b)
+             κ sched st)
+  where
+  nid = proj₁ (mintNode sched)
+  r   = subscribeE g0 b (thru-outer op nid ↠ κ) bid now
+          (proj₂ (mintNode sched)) (installNode nid initSt st)
+depth-all-burst (gs fuel) op initSt b κ bid now sched st =
+  depth-all-burst-gs fuel op initSt b κ bid now sched st
 
 -- INSTALLING A 0-WEIGHT NODE NEVER RAISES `nodesNestMax`, over the
 -- HYPOTHESIS rather than over a constructor.  It was two copies of this

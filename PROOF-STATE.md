@@ -226,10 +226,10 @@ WIDTH family (its exponential's base is 1, since a wrap layer's `outWⱽ`
 multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
-- **`depth-all-burst`** (Depth-Compositional) — DIFFICULTY, all that is left of the
-  `*All` face. Dead route repaired, and the measure is the GAS the burst already
-  peels, so this arm joins the induction as its sibling did. One leaf left: an
-  emitted inner's nesting is bounded by its emitter's.
+- **`depth-all-burst-gs`** (Depth-Compositional) — DIFFICULTY, all that is left of
+  the `*All` face. The arm is a real body split on its gas and the `g0` half is
+  discharged, which checks the claim that the GAS is what the route descends on.
+  One leaf left: an emitted inner's nesting is bounded by its emitter's.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
