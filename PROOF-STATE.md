@@ -255,13 +255,14 @@ measures at once), and take a fixed-degree product of caps fields.
   (Refuted.Emit-Map). The parent survives the same witness, so caps-by-caps is
   the wrong currency here, not the wrong constant. Its header states the two
   repairs, both cascading. Do not grind it.
+- **`emit-scan`** (Depth-Compositional) — SHAPE, refuted by the SAME mechanism
+  (Refuted.Emit-Scan), and the `outWᵉ` factor its clause already carries reads 1
+  at the witness — so the two products multiply independent things and neither
+  absorbs the other. Two clauses, one defect: reconsider the currency.
 - **`emit-input`** (Depth-Compositional) — DIFFICULTY, the connect and the only
   leaf with content: the emitter's own nesting is 0 at a slot, so the whole
   bound is the below-sum's step. Probed green at the shape that refuted the
   predecessor. Its three `scripted` arms are provable — `isData` is hereditary.
-- **`emit-scan`** (Depth-Compositional) — DIFFICULTY: the same mechanism is
-  available to a scan's step template, and untested — its clause already carries
-  an `outWᵉ` product for a different axis, which may or may not absorb this one.
 - **`emit-of`**, **`emit-take`** (Depth-Compositional) — DIFFICULTY: a term list's
   own nesting, and a filter that emits a sub-list of what it was handed.
 - **`emit-all`** (Depth-Compositional) — DIFFICULTY, shared by all four `*All`

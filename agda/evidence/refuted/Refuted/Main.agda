@@ -35,3 +35,6 @@ open import Refuted.Depth-Nest
 open import Refuted.Emit-Map
   using (fnNest; srcNest; bound; emitted; row; emit-map-absurd;
          progTopDepth; progTopCap)
+open import Refuted.Emit-Scan
+  using (seedNest; stepNest; srcNest; countFactor; bound; emitted; row;
+         emit-scan-absurd)

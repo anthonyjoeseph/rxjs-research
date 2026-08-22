@@ -1214,6 +1214,23 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     EmitCap g (takeᵉ c b) κ bid now sched st
 
+  -- ⚠ REFUTED 2026-08-22 AS STATED (Refuted.Emit-Scan), by the SAME
+  -- mechanism as the `mapᵉ` leaf above and independently of the axis this
+  -- clause was already paying for.  `nestDᵉ` of a `scanᵉ` carries an
+  -- `outWᵉ n sl e *` factor, put there because a step function re-wraps
+  -- its own ACCUMULATOR once per delivered payload — the product
+  -- `Refuted.Depth-Nest` forced.  The witness moves the other axis: the
+  -- step's template mentions the incoming payload, not the accumulator,
+  -- under both operands of an inner `mapᵉ`.  `outWᵉ` reads 1 there, one
+  -- payload and one wrap, so the existing product absorbs nothing —
+  -- bound 2, emitted 3.
+  --
+  -- TWO CLAUSES, ONE DEFECT, and that is the finding rather than either
+  -- witness.  Both leaves that take a `Fn` are refuted by a template
+  -- whose substituted variable lands under a `+` in the measure, and
+  -- `nestDᵗ` charges an occurrence 0 whatever it is about to become.  So
+  -- the question is the currency and not the constants; see the `mapᵉ`
+  -- leaf's header for the two repairs.
   emit-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} {s}
     (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
     (b : Closed Γ s) (κ : Path Γ u t) (bid : Id) (now : Tick)
