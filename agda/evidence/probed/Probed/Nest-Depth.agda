@@ -59,6 +59,7 @@ open import Rx.Evaluator using (Path; root; sched-init; st-init)
 -- definition the proof uses, not about a local copy of it
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
+open import Verify-Budget-Sufficient.Depth-Compositional using (depthCap)
 
 ------------------------------------------------------------------
 -- the harness: Refuted.Depth-Nest's family, which is where the
@@ -133,6 +134,26 @@ lowVal = refl
 
 highVal : nestDᵉ slots₀ (rootProg 7 29) ≡ 204
 highVal = refl
+
+-- AND THE SAME TWO ROWS READ OFF THE STATEMENT THAT IS OPEN.  The cap
+-- the target's face is stated over is read off NESTING throughout, so at
+-- a root path over a context with no slots and a store with no nodes it
+-- is `nestDᵉ` and nothing else — which makes the two rows above the
+-- cap's own crossings rather than a measure's, and makes them
+-- EQUALITIES of the cap with the depth.  These rows are what say the
+-- cap has no slack at all on this family: it is not that the bound
+-- holds, it is that one more unit of depth anywhere would break it.
+lowCap : depthE (gasN 70) (rootProg 4 12) rootPath 0 0
+           (sched-init (rootProg 4 12) slots₀) (st-init (rootProg 4 12))
+         ≡ depthCap (rootProg 4 12) rootPath
+             (sched-init (rootProg 4 12) slots₀) (st-init (rootProg 4 12))
+lowCap = refl
+
+highCap : depthE (gasN 215) (rootProg 7 29) rootPath 0 0
+            (sched-init (rootProg 7 29) slots₀) (st-init (rootProg 7 29))
+          ≡ depthCap (rootProg 7 29) rootPath
+              (sched-init (rootProg 7 29) slots₀) (st-init (rootProg 7 29))
+highCap = refl
 
 ------------------------------------------------------------------
 -- §2  A SCAN INSIDE A SCAN'S STEP FUNCTION — the third factor

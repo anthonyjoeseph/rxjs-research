@@ -11,16 +11,18 @@
 -- max into a sum.  The question this leaves is what happens across
 -- SIBLINGS: `depthAll`'s burst enters every inner observable of a
 -- merge, and if those arcs add the way the chain's do, a merge over k
--- chain tops charges the sum of k chains while `suc (sizeᵉ b)` grows
--- only with the syntax that lists them.
+-- chain tops charges the sum of k chains while the cap's own subject
+-- term grows only with the syntax that lists them — by ONE for the
+-- whole merge, since a `*All` layer is worth one `suc` however many
+-- inners it lists.
 --
 -- THEY DO NOT ADD.  Measured: one chain top gives 5, two independent
 -- chain tops under one burst give 5 as well, with the store at 60 in
 -- both rows by construction (same slots) so the rows isolate the
 -- burst.  The burst takes a MAX across siblings, which is the opposite
 -- of what the chain does down a stratified descent — so the arc that
--- accumulates is the CONNECT, not the sibling entry, and
--- `suc (sizeᵉ b)` is not being asked to pay for k chains.
+-- accumulates is the CONNECT, not the sibling entry, and the layer's
+-- one `suc` is not being asked to pay for k chains.
 --
 -- The rows are read against the CURRENT currency, so a green here is
 -- evidence about the sum and not about the max that was refuted.
@@ -122,8 +124,9 @@ stT = st-init progTwo
 
 -- ALL SEVEN ROWS LOAD-BEARING, and the pair is the point: had the
 -- burst's arcs ADDED across siblings, the two-top row would exceed the
--- one-top row by the second chain's depth while `suc (sizeᵉ b)` grew
--- by only the one `strmᵗ` that lists it.  WHAT WOULD MAKE THEM FAIL:
+-- one-top row by the second chain's depth while the cap grew by
+-- NOTHING AT ALL — the second `strmᵗ` moves the size, which the cap no
+-- longer reads, and leaves the nesting where it was.  WHAT WOULD MAKE THEM FAIL:
 -- sibling accumulation outrunning the syntax that names the siblings.
 -- The store rows are not decoration — they are what makes the depth
 -- rows comparable, since two programs with different stores could not
@@ -151,7 +154,12 @@ _ = refl
 -- the PARENT's conclusion at the harder of the two, spelled out so a
 -- crossing is visible as a number rather than inferred.  Read over the
 -- CAP the bound was restated to, not over `storeNestMax`: the slot half
--- is now the partial sum below the program's own stratification level,
--- so the two figures are only equal when every slot is under the cut.
-_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 60
+-- is the partial sum below the program's own stratification level, so
+-- the two figures part company as soon as one slot sits above the cut —
+-- slot 8 here, worth 8, which is the whole of the 60/53 gap.  The
+-- SEVEN of the remaining difference from the size figures above is what
+-- the tightening removed: this program's own contribution to its cap is
+-- one, its `mergeAllᵉ` layer, and the chain in the store is everything
+-- else.
+_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 53
 _ = refl

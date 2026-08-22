@@ -188,6 +188,17 @@ product of caps fields could have replaced it. `depthCap`,
 `depth-compositional`, `depth-all-burst` and `slotNest` all carry it now, a
 shared slot paying its def's nesting beside its size.
 
+AND THE CAP IS NOW READ OFF NESTING ALONE, its size term gone and `pathLen`
+replaced by a measure charging only the SPENDING ARC. That is what the `*All`
+face's recorded dead route asked for: an emitted inner can be arbitrarily larger
+than its emitter but never more deeply nested, so the size currency was what
+blocked the burst arm — and it was measured slack, the μ probe reading caps of 7
+and 12 against depths of 1 and 2 where the tightened cap reads 1 and 2 on the
+nose. Every clause got shorter: the three structural descents need no arithmetic
+step, the μ clause's two caps became one term, and the connect now over-pays.
+Both remaining leaves are strengthened by it, and `Probed.Nest-Depth`'s rows now
+pin the cap itself as an EQUALITY with the depth.
+
 WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
 `depth-capped`, its `3 · cSize` conclusion, the `storeNestMax`-under-`capsOK?`
 inversion, and `three-size≤capsH` with the pool-lower chain that proved it.
@@ -203,9 +214,9 @@ multiplies by one and adds nothing — refuted against the max of all four
 measures at once), and take a fixed-degree product of caps fields.
 
 - **`depth-all-burst`** (Depth-Compositional) — DIFFICULTY, all that is left of the
-  `*All` face: the outer arm is proven inside the assembly, the only place the IH
-  exists. This one reads the state the real `subscribeE` produced while the cap
-  reads the entry state, so finding (4)'s conjunct lands here.
+  `*All` face. Its dead route is repaired, the cap's size term gone, so what
+  remains is that an emitted inner's nesting is bounded by its emitter's, plus
+  finding (4)'s state conjunct.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
@@ -213,7 +224,7 @@ measures at once), and take a fixed-degree product of caps fields.
 - **`depth-subst-guarded`** (Depth-Compositional) — GRINDABLE: the `deferᵉ` clause
   is `z≤n` and the rest is the structural recursion the assembly above it already
   performs, on `body` rather than on its unfolding; the guardedness is a property
-  of the syntax, so nothing has to be maintained.
+  of the syntax. Strengthened with the cap; the μ probe crosses it with no slack.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.

@@ -28,7 +28,9 @@
 --     obligation and must not be given this statement's shape.
 -- (3) `depthBurst` calls `depthFrame` at the SAME `κ`, so
 --     `thru-outer`'s `suc` is paid by the `*All` constructor's own
---     `sizeᵉ (mergeAllᵉ b) ≡ suc (sizeᵉ b)`, not by `pathLen`.
+--     `nestDᵉ (mergeAllᵉ b) ≡ suc (nestDᵉ b)` — the cap's path measure
+--     charges that frame and no other, and the constructor grants
+--     exactly the one unit it charges.
 -- (4) THE REAL WORK: every clause that calls `depthBurst` feeds it the
 --     state produced by running the REAL `subscribeE`, while the RHS
 --     reads the ENTRY state.  The `storeNestMax`-preservation conjunct
@@ -69,22 +71,22 @@ open import Data.Nat.Properties
 open import Data.Fin   using (Fin; toℕ)
 open import Data.List  using (List; []; _∷_; foldr; tabulate)
 open import Data.List.Relation.Unary.Any using (here)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 open import Data.Nat.ListAction using (sum)
 open import Data.Bool  using (Bool; false; true; if_then_else_; T; _∧_)
 open import Data.Maybe using (nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Exp
-  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; sizeᵗ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
-  varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
-  strmᵗ; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
+  using (natᵗ; _×ᵗ_; Ctx; Closed; Exp; Tm; Fn; Val; obs; evalTm; unfoldμ; elimGExp; sizeᵉ; input; ofᵉ;
+  emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+  inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator
   using (Sched; EvalSt; NodeState; AllOp; NodeId; Path; Stream; scan-st; merge-st; concat-st;
   switch-st; exhaust-st; take-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; _↠_; map-f; scan-f;
-  take-f; thru-outer; mintNode; installNode; subscribeE; splitEvents; stepFrame; setNode;
-  share-sink; register)
+  take-f; from-inner; thru-outer; mintNode; installNode; subscribeE; splitEvents; stepFrame;
+  setNode; root; share-sink; register)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 
@@ -92,7 +94,7 @@ open import Rx.Slots using (scripted; shared; Slot; Slots)
 -- SAME pathLen `depth-capped`'s statement reads, so the landing plugs
 -- into its consumer unchanged.
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; sum-tab-mono; +-mix4)
+  (pathLen; sum-tab-mono)
 open import Verify-Budget-Sufficient.Caps-Nest using (sum-tab-slack)
 open import Data.Empty using (⊥-elim)
 open import Decide using (force-false; T-to; ≤ᵇ-true; ≤ᵇ-widen; ∧ˡ; ∧ʳ)
@@ -428,16 +430,65 @@ slotsNestBelow-mono {n} sl k k′ le =
 -- goes through, and `storeNest-capped`'s `⊔-lub` split survives — which
 -- a `+` would NOT, since that needs the SUM of two quantities the caps
 -- bound only separately.
+
+-- THE PATH MEASURE THE CAP READS, AND IT IS NOT `pathLen`.  A frame in
+-- the path is charged on DELIVERY by `depthFold`, but only a
+-- `thru-outer` frame charges a `suc` on the SUBSCRIBE side, which is
+-- the side this face is about — `depthFrame` returns 0 on map-f,
+-- scan-f and take-f definitionally.  Counting all frames therefore
+-- makes the cap pay for descent steps that cost nothing, and something
+-- has to fund that: it was `sizeᵉ`, which is why the cap carried a size
+-- term at all.  Charging the spending arc alone is what lets the size
+-- term go, and the `*All` clause pays its one unit out of
+-- `nestDᵉ (mergeAllᵉ b) ≡ suc (nestDᵉ b)` — the same `suc`, in the
+-- currency the depth is actually generated in.
+--
+-- `from-inner` charges NOTHING here, and it is the one clause worth
+-- justifying: the arc it funds (`depthFinC`'s completion `suc`) is
+-- reached only through `depthFold`, and its contents are the queued
+-- observables the node half already charges.  A unit here would double
+-- charge the layer the `thru-outer` above it already bought.
+pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+pathNestD root                    = 0
+pathNestD (share-sink i)          = 0
+pathNestD (map-f _ ↠ p)           = pathNestD p
+pathNestD (scan-f _ _ ↠ p)        = pathNestD p
+pathNestD (take-f _ ↠ p)          = pathNestD p
+pathNestD (from-inner _ _ _ ↠ p)  = pathNestD p
+pathNestD (thru-outer _ _ ↠ p)    = suc (pathNestD p)
+
+-- what the exported statement is still stated over, so the tightening
+-- is invisible outside this module
+pathNestD≤pathLen : ∀ {n} {Γ : Ctx n} {s t} (κ : Path Γ s t) →
+  pathNestD κ ≤ pathLen κ
+pathNestD≤pathLen root                   = z≤n
+pathNestD≤pathLen (share-sink i)         = z≤n
+pathNestD≤pathLen (map-f _ ↠ p)          = ≤-trans (pathNestD≤pathLen p) (n≤1+n _)
+pathNestD≤pathLen (scan-f _ _ ↠ p)       = ≤-trans (pathNestD≤pathLen p) (n≤1+n _)
+pathNestD≤pathLen (take-f _ ↠ p)         = ≤-trans (pathNestD≤pathLen p) (n≤1+n _)
+pathNestD≤pathLen (from-inner _ _ _ ↠ p) = ≤-trans (pathNestD≤pathLen p) (n≤1+n _)
+pathNestD≤pathLen (thru-outer _ _ ↠ p)   = s≤s (pathNestD≤pathLen p)
+
 depthCapN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sz mx : ℕ) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) → ℕ
 depthCapN sz mx κ sched st =
-  (sz + pathLen κ + slotsNestBelow (Sched.slots sched) mx)
+  (sz + pathNestD κ + slotsNestBelow (Sched.slots sched) mx)
     ⊔ nodesNestMax (EvalSt.nodes st)
 
+-- NO SIZE TERM.  The depth this face bounds is generated by the
+-- spending arc and by nothing else, so `nestDᵉ` is the currency
+-- throughout and `sizeᵉ` was slack — measured slack: at the two μ
+-- probe programs the old cap read 7 and 12 where the depth is 1 and 2,
+-- and `nestDᵉ` reads 1 and 2 on the nose.  Dropping it is what makes
+-- the `*All` burst arm statable: an emitted inner can be arbitrarily
+-- LARGER than the source that emitted it (a scan whose step re-wraps
+-- its accumulator), but it cannot be more deeply NESTED than the
+-- source's own nesting measure, because that measure's product term
+-- charges one re-wrap per delivered payload precisely to cover this.
 depthCap : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u}
   (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) → ℕ
 depthCap {n = n} b κ sched st =
-  depthCapN (sizeᵉ b + nestDᵉ (Sched.slots sched) b) (maxInputᵉ b) κ sched st
+  depthCapN (nestDᵉ (Sched.slots sched) b) (maxInputᵉ b) κ sched st
 
 slotsNestBelow-≤-sum : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (k : ℕ) →
   slotsNestBelow sl k ≤ slotsNestSum sl
@@ -458,9 +509,15 @@ cap-≤-store {n = n} b κ sched st = ⊔-lub slotHalf nodeHalf
   where
   SZ : ℕ
   SZ = sizeᵉ b + nestDᵉ (Sched.slots sched) b
-  slotHalf : SZ + pathLen κ + slotsNestBelow (Sched.slots sched) (maxInputᵉ b)
+  -- three widenings, one per summand: the cap's own currency into the
+  -- exported sum, the spending-arc count into the frame count, and the
+  -- below-sum into the whole sum
+  slotHalf : nestDᵉ (Sched.slots sched) b + pathNestD κ
+               + slotsNestBelow (Sched.slots sched) (maxInputᵉ b)
                ≤ SZ + pathLen κ + storeNestMax sched st
-  slotHalf = +-mono-≤ ≤-refl
+  slotHalf = +-mono-≤
+               (+-mono-≤ (m≤n+m (nestDᵉ (Sched.slots sched) b) (sizeᵉ b))
+                         (pathNestD≤pathLen κ))
                (≤-trans (slotsNestBelow-≤-sum (Sched.slots sched) (maxInputᵉ b))
                         (m≤m⊔n _ _))
   nodes≤store : nodesNestMax (EvalSt.nodes st) ≤ storeNestMax sched st
@@ -523,12 +580,15 @@ postulate
   -- and both arms are the same length, so a burst over siblings of
   -- DIFFERENT depths is untested.
   --
-  -- RESTATED over `depthCapN` when the connect landed, and the rows were
-  -- re-read rather than inherited: the two-chain program measures 5
-  -- against a cap of 51, where the `storeNestMax` bound it replaced gave
-  -- 58.  The mirror-side findings above are untouched, since nothing
-  -- about `depthAll` moved — only the right-hand side, and it got
-  -- SMALLER, which is the direction that could have refuted this.
+  -- RESTATED over `depthCapN` when the connect landed and again when the
+  -- cap lost its size term, and the rows were re-read rather than
+  -- inherited both times: the two-chain program measures 5 against a cap
+  -- of 53, where the `storeNestMax` bound it replaced gave 60.  The
+  -- mirror-side findings above are untouched, since nothing about
+  -- `depthAll` moved — only the right-hand side, and it got SMALLER each
+  -- time, which is the direction that could have refuted this.  Almost
+  -- all of what is left is the slot chain: this program's own
+  -- contribution to its cap is ONE, its `mergeAllᵉ` layer.
   --
   -- ITS PREDECESSOR IS REFUTED 2026-08-21 (Refuted.Depth-Nest), AND THE
   -- RECEIPT ABOVE IS WHAT AIMED IT: the one shape it names as untested is
@@ -623,9 +683,10 @@ postulate
   -- continues past it — only that it does not stop at two.
   --
   -- AND THE ROUTE INTO `src` HAD ONE DESIGN CHOICE IN IT, WHOSE FIRST
-  -- ANSWER WAS WRONG.  Enlarging `depthCap`'s first summand to
-  -- `sizeᵉ b + nestDᵉ b` leaves the `input` clause owing the SLOT
-  -- definition's nesting, and there were exactly two places to pay it.
+  -- ANSWER WAS WRONG.  Putting `nestDᵉ b` into `depthCap`'s first
+  -- summand — beside `sizeᵉ b` then, alone there now — leaves the
+  -- `input` clause owing the SLOT definition's nesting, and there were
+  -- exactly two places to pay it.
   --
   -- DEAD ROUTE 2026-08-21: PAY IT IN THE MEASURE, by descending into
   -- slot definitions on slot fuel with a visited set — `outWⱽ`'s shape,
@@ -724,14 +785,49 @@ postulate
   -- path term cannot pay for it — dropping the summand is not the
   -- repair, restating it in the nesting currency is.
   --
-  -- SO THE CANDIDATE REPAIR IS THE CAP READ OFF NESTING THROUGHOUT: the
-  -- subject's `sizeᵉ` gone, the below-sum kept, and the path and node
-  -- halves restated in the same currency.  Under it this arm's leaf is
-  -- exactly "an emitted inner's nesting is bounded by its emitter's
-  -- nesting", which is the one thing the measure was derived to pay and
-  -- which the scan clause pays on the nose.  That is a restatement of
-  -- the whole face rather than of this statement, which is why it is
-  -- recorded and not done here.
+  -- THAT REPAIR IS DONE, AND IT IS WHY THIS STATEMENT READS AS IT NOW
+  -- DOES.  The cap is read off nesting throughout: the subject's
+  -- `sizeᵉ` is gone, the below-sum is kept, and `pathLen` became
+  -- `pathNestD`, which charges the SPENDING ARC and nothing else.  The
+  -- dead route above is what forced it and it stays recorded, because
+  -- what was dead was the route THROUGH THE OLD STATEMENT and the
+  -- repair was to move the statement — the route it kills is still
+  -- dead for anyone who puts a size term back.
+  --
+  -- WHAT IT COST, and the answer is nothing: every clause of the
+  -- assembly got SHORTER.  The three structural descents need no
+  -- arithmetic step at all now, since the measure they used to have to
+  -- fund is not charged; the `*All` arm's step is `arith-step` at
+  -- `c = 0`, an equality in all but association; the μ clause's two
+  -- caps became the SAME TERM, so its bridge went entirely; and the
+  -- connect now over-pays, since the summand slot `i` buys still covers
+  -- the def's size.  A tightening that simplifies every consumer is
+  -- evidence about the measure, not about the arithmetic.
+  --
+  -- SO WHAT IS LEFT ON THIS LEAF IS EXACTLY "an emitted inner's nesting
+  -- is bounded by its emitter's nesting", which is the one thing the
+  -- measure was derived to pay and which the scan clause pays on the
+  -- nose — plus finding (4)'s state-preservation conjunct, which no
+  -- restatement removes.  The `*All` layer's `suc` on `nestDᵉ` pays the
+  -- frame's charge and `pathNestD` no longer bills the extra path frame
+  -- at all, so the arithmetic is finished before the induction starts.
+  --
+  -- AND THE ROUTE COSTS ONE THING THE TIGHTENING DID NOT BUY: the
+  -- assembly's RECURSION SHAPE.  `depthWalk`'s consume clause reaches
+  -- `depthE` at the emitted inner AT THE SAME GAS — checked, not
+  -- assumed — and an emitted inner is not a subexpression of its
+  -- emitter, so structural recursion on the subject cannot reach it and
+  -- no gas decrease covers it either.  What DOES decrease is the
+  -- nesting: an emitted inner's is bounded by its emitter's, which is
+  -- strictly below the `*All` layer's own.  The structural descents do
+  -- not decrease it — a scalar `mapᵉ` leaves it equal — so they need
+  -- the size beside it, and the connect and the guarded μ decrease the
+  -- gas above both.  That is a lexicographic measure in three
+  -- components where there is now a structural recursion in one, and
+  -- restructuring the assembly onto it is the next leg rather than a
+  -- line of this one: the measure is settled, the well-founded
+  -- plumbing is not, and this face's bodies are sealed for a measured
+  -- reason that the plumbing has to respect.
   -- THE BURST ARM, over the stream the outer subscribe returned.  Its
   -- own scheduler and state come out of that subscribe rather than out
   -- of `sched`/`st`, which is why the arm cannot be stated over
@@ -746,7 +842,7 @@ postulate
                 (proj₂ (mintNode sched)) (installNode nid initSt st)
     in depthBurst g bid now (thru-outer op nid) κ
          (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ depthCapN (suc (sizeᵉ b) + suc (nestDᵉ (Sched.slots sched) b))
+         ≤ depthCapN (suc (nestDᵉ (Sched.slots sched) b))
                      (maxInputᵉ b) κ sched st
 
   -- SUBSTITUTION UNDER THE GUARD, which is what `unfoldμ` is: it is
@@ -764,12 +860,15 @@ postulate
   -- `z≤n`; the rest is the structural recursion `depth-compositional`
   -- already does, on `body` rather than on its unfolding.
   --
-  -- STATED OVER `sizeᵉ body`, NOT `sizeᵉ (μᵉ body)`, so the parent's
-  -- `suc` is spent in the assembly below rather than smuggled into the
-  -- leaf.  The obstacle its predecessor's header named — `unfoldμ body`
-  -- is LARGER than `μᵉ body`, so the size IH fails — was a fact about
-  -- the route through `sizeᵉ (unfoldμ body)`, never about the
-  -- statement, and this leaf is the route that does not take it.
+  -- STATED OVER `body`, NOT OVER `μᵉ body`, so the parent's own step is
+  -- spent in the assembly below rather than smuggled into the leaf —
+  -- and since the cap lost its size term that step is now the identity,
+  -- `μᵉ` moving neither the nesting nor the input cut.  The obstacle its
+  -- predecessor's header named — `unfoldμ body` is LARGER than
+  -- `μᵉ body`, so the size IH fails — was a fact about the route
+  -- through `sizeᵉ (unfoldμ body)`, never about the statement, and this
+  -- leaf is the route that does not take it.  There is no size on
+  -- either side of it any more.
   -- PROBED 2026-08-21 (Probed.Depth-Mu): depth is INDEPENDENT OF GAS,
   -- which is the region the falsity candidate lived in — `unfoldμ`
   -- grows the term once per unfolding and no right-hand side here
@@ -788,11 +887,17 @@ postulate
   -- so the interaction with the connect chain is untested; and the
   -- guarded body uses its variable exactly once.
   --
-  -- RESTATED over `depthCap` when the connect landed.  Re-read: the two
-  -- bodies' caps are 6 and 10, and DEGENERATE on the slot half — this
-  -- program has no shared slot, so the partial sum is 0 at every cut and
-  -- these figures cannot tell the cap from the bound it replaced.  What
-  -- they do is keep the crossing against the depth rows honest.
+  -- RESTATED over `depthCap` when the connect landed, and RE-READ when
+  -- the cap lost its size term — which is what turned these rows from
+  -- decoration into evidence.  Still DEGENERATE on the slot half, since
+  -- this program has no shared slot and the partial sum is 0 at every
+  -- cut; but the two bodies' caps read 6 and 10 before against depths of
+  -- 1 and 2, and read 1 and 2 now.  The statement was almost entirely
+  -- size slack, so nothing this probe could have measured would have
+  -- crossed it; it holds with NO room at all, and any accumulation
+  -- whatsoever refutes it.  That is the strongest form a green row
+  -- comes in, and it is also the reason the row is worth re-running
+  -- after anything touches the guard.
   depth-subst-guarded : ∀ {n} {Γ : Ctx n} {r u} {e : Closed Γ r}
     (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u) (cl : Closed Γ u)
     (κ : Path Γ u r) (bid : Id) (now : Tick)
@@ -813,15 +918,11 @@ depth-μ-bound : ∀ {n} {Γ : Ctx n} {r u} {e : Closed Γ r}
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   depthE fuel (unfoldμ body) κ bid now sched st
     ≤ depthCap (μᵉ body) κ sched st
+-- `μᵉ` adds one to the SIZE and NOTHING to the nesting or the input
+-- cut, so with the size term gone the two caps are the SAME TERM and
+-- the arithmetic that used to bridge them is not needed at all.
 depth-μ-bound {n = n} fuel body κ bid now sched st =
-  ≤-trans (depth-subst-guarded fuel body (μᵉ body) κ bid now sched st)
-          (⊔-mono-≤ (+-mono-≤ (+-mono-≤ step ≤-refl) ≤-refl) ≤-refl)
-  where
-  -- `μᵉ` adds one to the SIZE and nothing to the nesting, so the whole
-  -- first summand climbs by exactly the one `suc`
-  step : sizeᵉ body + nestDᵉ (Sched.slots sched) body
-           ≤ suc (sizeᵉ body) + nestDᵉ (Sched.slots sched) body
-  step = n≤1+n (sizeᵉ body + nestDᵉ (Sched.slots sched) body)
+  depth-subst-guarded fuel body (μᵉ body) κ bid now sched st
 
 ------------------------------------------------------------------
 -- BUCKET (b) — burst = 0 for non-thru-outer frames (provable by
@@ -913,63 +1014,61 @@ depthCap-install0 b κ sched st s eq =
 -- ARITHMETIC HELPERS — proved here.
 ------------------------------------------------------------------
 
--- Core step: a + suc p ≤ suc (c + a) + p.
--- Used by map-size-arith and take-size-arith.
+-- Core step: a + suc p ≤ suc (c + a) + p.  The `*All` arm is the ONLY
+-- caller now: it is the only descent that moves the path measure, and
+-- the unit it moves it by is the one the `*All` constructor's own
+-- `nestDᵉ` grants.  The three structural descents below need no
+-- arithmetic step at all, which is the tightening's whole dividend —
+-- `pathNestD` does not charge them, so nothing has to fund them.
 private
   arith-step : ∀ (a p c : ℕ) → a + suc p ≤ suc (c + a) + p
   arith-step a p c =
     ≤-trans (≤-reflexive (+-suc a p))
             (s≤s (+-mono-≤ (m≤n+m a c) ≤-refl))
 
-  -- the two summands of the enlarged cap travel together, so every
-  -- `*-size-arith` needs the middle pair swapped: the SIZE the operator
-  -- adds sits beside the size below it, and the NESTING it adds beside
-  -- the nesting below it, while `arith-step` delivers them grouped the
-  -- other way
-  arith-step₂ : ∀ (S N p C D : ℕ) → (S + N) + suc p ≤ (suc (C + S) + (D + N)) + p
-  arith-step₂ S N p C D =
-    ≤-trans (arith-step (S + N) p (C + D))
-            (≤-reflexive (cong (_+ p) (cong suc (+-mix4 C D S N))))
-
--- sizeᵉ b + 1 ≤ 1 + sizeᵗ f + sizeᵉ b = sizeᵉ (mapᵉ f b)
+-- nestDᵉ b ≤ nestDᵗ f + nestDᵉ b = nestDᵉ (mapᵉ f b), and the path
+-- measure is UNCHANGED by the descent
 map-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
   (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
   depthCap b (map-f f ↠ κ) sched st ≤ depthCap (mapᵉ f b) κ sched st
 map-size-arith {n = n} f b κ sched st =
-  ⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b) (nestDᵉ (Sched.slots sched) b)
-                        (pathLen κ) (sizeᵗ f) (nestDᵗ (Sched.slots sched) f))
-                     (slotsNestBelow-mono (Sched.slots sched)
-                        (maxInputᵉ b) (maxInputᵉ (mapᵉ f b)) (m≤n⊔m _ _)))
+  ⊔-mono-≤ (+-mono-≤
+              (+-mono-≤ (m≤n+m (nestDᵉ (Sched.slots sched) b)
+                               (nestDᵗ (Sched.slots sched) f))
+                        ≤-refl)
+              (slotsNestBelow-mono (Sched.slots sched)
+                 (maxInputᵉ b) (maxInputᵉ (mapᵉ f b)) (m≤n⊔m _ _)))
            ≤-refl
 
--- same shape as map-size-arith
+-- take adds NOTHING to the nesting, so this is the below-sum widening
+-- alone
 take-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (nid : NodeId)
   (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
   depthCap b (take-f nid ↠ κ) sched st ≤ depthCap (takeᵉ c b) κ sched st
 take-size-arith {n = n} c b nid κ sched st =
-  ⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b) (nestDᵉ (Sched.slots sched) b)
-                        (pathLen κ) (sizeᵗ c) 0)
+  ⊔-mono-≤ (+-mono-≤ (≤-refl {x = nestDᵉ (Sched.slots sched) b + pathNestD κ})
                      (slotsNestBelow-mono (Sched.slots sched)
                         (maxInputᵉ b) (maxInputᵉ (takeᵉ c b)) (m≤n⊔m _ _)))
            ≤-refl
 
--- scan: same shape as map-size-arith, because the install is absorbed
--- BEFORE this arithmetic runs — `depthCap-install0` returns the IH's
--- post-install cap to the entry cap, so what is left here is the syntax
--- payment alone.
+-- scan: the seed's nesting and the PRODUCT term both sit to the left of
+-- the source's own nesting, so this is `m≤n+m` at a two-summand
+-- constant.  The install is absorbed BEFORE this arithmetic runs —
+-- `depthCap-install0` returns the IH's post-install cap to the entry
+-- cap, so what is left here is the syntax payment alone.
 scan-size-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (f : Fn Γ [] [] [] (u ×ᵗ s) u) (seed : Tm Γ [] [] [] u) (b : Closed Γ s)
   (nid : NodeId) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
   depthCap b (scan-f f nid ↠ κ) sched st
     ≤ depthCap (scanᵉ f seed b) κ sched st
 scan-size-arith {n = n} f seed b nid κ sched st =
-  ⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b) (nestDᵉ (Sched.slots sched) b)
-                        (pathLen κ) (sizeᵗ f + sizeᵗ seed) _)
-                     (slotsNestBelow-mono (Sched.slots sched)
-                        (maxInputᵉ b) (maxInputᵉ (scanᵉ f seed b))
-                        (m≤n⊔m _ _)))
+  ⊔-mono-≤ (+-mono-≤
+              (+-mono-≤ (m≤n+m (nestDᵉ (Sched.slots sched) b) _) ≤-refl)
+              (slotsNestBelow-mono (Sched.slots sched)
+                 (maxInputᵉ b) (maxInputᵉ (scanᵉ f seed b))
+                 (m≤n⊔m _ _)))
            ≤-refl
 
 -- THE `*All` ARM, and it serves all four operators from one statement:
@@ -990,14 +1089,13 @@ private
     depthCap b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
                (proj₂ (mintNode sched))
                (installNode (proj₁ (mintNode sched)) s st)
-      ≤ depthCapN (suc (sizeᵉ b) + suc (nestDᵉ (Sched.slots sched) b))
+      ≤ depthCapN (suc (nestDᵉ (Sched.slots sched) b))
                   (maxInputᵉ b) κ sched st
   all-outer-arith {n = n} op s b κ sched st eq =
     ≤-trans (depthCap-install0 b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
                sched st s eq)
-            (⊔-mono-≤ (+-mono-≤ (arith-step₂ (sizeᵉ b)
-                                   (nestDᵉ (Sched.slots sched) b)
-                                   (pathLen κ) 0 1)
+            (⊔-mono-≤ (+-mono-≤ (arith-step (nestDᵉ (Sched.slots sched) b)
+                                   (pathNestD κ) 0)
                                 ≤-refl)
                       ≤-refl)
 
@@ -1066,12 +1164,17 @@ private
     step = subst (λ s → slotNest sl s + slotsNestBelow sl (toℕ i)
                           ≤ slotsNestBelow sl (suc (toℕ i)))
                  slotEq (slotsNestBelow-step sl i)
-    -- `pathLen (share-sink i)` is 0 definitionally: the connect resets
-    -- the path, which is why the goal's own `κ` is free room here.
-    slotPay : sizeᵉ d + nestDᵉ sl d + 0 + slotsNestBelow sl (maxInputᵉ d)
+    -- `pathNestD (share-sink i)` is 0 definitionally: the connect resets
+    -- the path, which is why the goal's own `κ` is free room here.  The
+    -- summand slot `i` buys still covers the def's SIZE as well as its
+    -- nesting, so with the cap read off nesting alone the payment now
+    -- strictly over-covers the charge — the one place the tightening
+    -- leaves slack rather than removing it.
+    slotPay : nestDᵉ sl d + 0 + slotsNestBelow sl (maxInputᵉ d)
                 ≤ slotsNestBelow sl (suc (toℕ i))
     slotPay = ≤-trans
-                (+-mono-≤ (≤-reflexive (+-identityʳ (sizeᵉ d + nestDᵉ sl d)))
+                (+-mono-≤ (≤-trans (≤-reflexive (+-identityʳ (nestDᵉ sl d)))
+                                   (m≤n+m (nestDᵉ sl d) (sizeᵉ d)))
                           below)
                 step
 

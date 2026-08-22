@@ -1,13 +1,16 @@
 -- TARGET: depth-subst-guarded
 --
 -- DOES UNFOLDING ACCUMULATE?  The rows pin
--- `depthE fuel (unfoldμ body) …` against `sizeᵉ (μᵉ body) + …`, which
--- is `depth-μ-bound` — a real body now, over the leaf this file
--- targets, so a row here instantiates that leaf at `cl = μᵉ body`.  The
--- statement `depth-μ-bound` REPLACED named the obstacle: `unfoldμ body` is LARGER than `μᵉ body`,
--- so the size IH fails.  That is the same shape the slot chain was
--- refuted for — a left side growing in a variable the right side does
--- not mention, here the number of unfoldings, which is the GAS.
+-- `depthE fuel (unfoldμ body) …` against the body's own cap, which is
+-- `depth-μ-bound` — a real body now, over the leaf this file targets,
+-- so a row here instantiates that leaf at `cl = μᵉ body`.  The
+-- statement `depth-μ-bound` REPLACED named the obstacle: `unfoldμ body`
+-- is LARGER than `μᵉ body`, so the size IH fails.  That is the same
+-- shape the slot chain was refuted for — a left side growing in a
+-- variable the right side does not mention, here the number of
+-- unfoldings, which is the GAS.  The obstacle is now moot rather than
+-- solved: the cap reads NESTING, which `μᵉ` does not move at all, so
+-- the two caps the old body had to bridge are one term.
 --
 -- SO THE ROWS VARY THE GAS AND NOTHING ELSE.  If depth grew with
 -- unfolding, two gas values would give two answers and a large enough
@@ -42,8 +45,9 @@ open import Verify-Budget-Sufficient.Depth-Compositional using (storeNestMax;
 Γ₁ = natᵗ ∷ⱽ []ⱽ
 
 -- the store is deliberately EMPTY of shared defs: a `scripted` slot
--- contributes 0, so `storeNestMax` is 0 and the right-hand side is
--- `sizeᵉ (μᵉ body) + pathLen root` alone.  Nothing can hide in it.
+-- contributes 0, so `storeNestMax` is 0, the below-sum is 0 at every
+-- cut, and the right-hand side is the body's own nesting alone.
+-- Nothing can hide in it.
 ins : Slots Γ₁
 ins fz = scripted (cold [] [])
 
@@ -83,18 +87,20 @@ _ = refl
 _ : sizeᵉ (μᵉ body₂) ≡ 11
 _ = refl
 
--- the leaf's own right-hand side, restated over the CAP.  DEGENERATE on
--- the slot half — this program has no shared slot, so the partial sum
--- is 0 at every cut and the figure cannot distinguish the cap from the
--- old `storeNestMax` bound; it is here so the crossing against the
--- depth rows below is read off the statement that is actually open.
--- The cap now also carries the NESTING term the depth face was restated
--- over, which is what the +1 per `mergeAllᵉ` layer is: one above the
--- size at `body₁`, two at `body₂`.
-_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 7
+-- the leaf's own right-hand side, read off the CAP.  DEGENERATE on the
+-- slot half — this program has no shared slot, so the partial sum is 0
+-- at every cut — but NOT degenerate on the figure, and that changed
+-- when the cap was tightened to read off nesting alone: it used to read
+-- 7 and 12 against depths of 1 and 2, which is to say the statement was
+-- almost entirely size slack and these rows could not have caught
+-- anything.  They now read 1 and 2, EQUAL to the depth rows below, so
+-- the leaf holds here with no room at all and any accumulation
+-- whatsoever refutes it.  The size figures above are kept because they
+-- are what makes that slack legible as a number.
+_ : depthCap body₁ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 1
 _ = refl
 
-_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 12
+_ : depthCap body₂ (root {Γ = Γ₁} {t = natᵗ}) sched₁ st₁ ≡ 2
 _ = refl
 
 -- LOAD-BEARING, and the gas pair is the whole row: these two differ in

@@ -34,6 +34,13 @@
 -- could have replaced it.  A slot's own nesting is the part those rows
 -- do not reach; it is charged in `slotNest`, not here.
 --
+-- AND THE DEPTH FACE'S CAP IS NOW READ OFF THIS MEASURE AND NOTHING
+-- ELSE, its size term dropped, so at a root path over a slotless
+-- context those rows pin the CAP as an equality rather than the measure
+-- as an approximation.  That is what makes the equality load-bearing
+-- rather than pleasing: a measure that merely dominated would leave the
+-- face free to carry slack, and the face now has none to carry.
+--
 -- THE `input` CLAUSE CONTRIBUTES NOTHING, and a descending one was
 -- TRIED AND IS STRUCTURALLY DEAD.  `outWⱽ`'s shape — descend into the
 -- slot definition on slot fuel with a visited set — does not work here,
