@@ -1417,46 +1417,41 @@ capsAt-tower e sl (suc id) =
 tower-3 : ∀ (h x : ℕ) → x ≤ towerℕ h → 2 ^ (2 ^ (2 ^ x)) ≤ towerℕ (3 + h)
 tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
 
--- A TOWER'S WORTH OF POOL — restored, and generalised past the statement
--- it was originally cut down to.
+-- A TOWER'S WORTH OF POOL — and the height is what took two passes.
 --
--- This chain was written to discharge `three-size≤capsH`, whose deliverable
--- needed only `m ≤ poolCount (towerℕ m) m`, so that is all the old
--- `capsBase-le-pool` STATED.  Its route always proved more: it goes
--- `m ≤ towerℕ m ≤ dCapᶜ … ≤ lvls … ≤ poolCount`, and the second link is
--- where the strength is.  The depth face's restatement over a measure that
--- is exponential in the program needs exactly the intermediate, so the
--- lemma is now stated at the strength its own proof had, and the linear
--- corollary is gone with its only consumer.
+-- The chain here was written to discharge `three-size≤capsH`, whose
+-- deliverable needed only `m ≤ poolCount (towerℕ m) m`, so that is all the
+-- old `capsBase-le-pool` STATED.  Its route proved more — it went
+-- `m ≤ towerℕ m ≤ dCapᶜ … ≤ lvls … ≤ poolCount` — and the first repair of
+-- the depth face spent exactly that intermediate, `towerℕ m ≤ blowH m`.
 --
--- The five steps below are unchanged; only (7) and (8) are new.  They were
--- deleted for one commit when `three-size-le-blowH` lost its consumer, and
--- restoring them is the reachability check being right about "no consumer
--- TODAY" and wrong about "no consumer EVER".
+-- IT IS NOT ENOUGH, and the arithmetic says so before any grinding does.
+-- `nestDᵉ` multiplies by `outWᵉ` at every `scanᵉ`, and `wid-iterFold`
+-- (Caps-Face/Part2) bounds `outWᵉ` by `iterFold S (sizeᵉ e) M`, which
+-- `iterFold-tower` puts at `towerℕ (k + 2 * sizeᵉ e)`.  One tower level per
+-- product on top of that gives a height around `3 * sizeᵉ e`, against a
+-- target height of `capsBase e ins` = `3 + (sizeᵉ e + slotsSize ins) +
+-- suc (entryCeil n ins e)` — and nothing relates `entryCeil` to `sizeᵉ e`
+-- (its only two facts bound SLOT widths by it).  So the intermediate is
+-- short by a factor, not by a constant, and no clause grind closes that.
+--
+-- WHAT PAYS FOR IT IS THE POOL'S OWN GROWTH RATE, which the linear chain
+-- never looked at.  `dLvl S W d J` is `iterL S W d (suc (sizeAt S J)) J` —
+-- it runs `fLvlD` `sizeAt S J` times, and `sizeAt S J = iterSize S J S` is
+-- exponential in `J` for `S ≥ 2` since `sizeStep S s` is `S * suc (2 * s)`.
+-- So ONE level step at least exponentiates, and `poolBody` iterates it
+-- `dCapᶜ M M M m (suc M) 0 ≥ towerℕ m` times.  That is a tower of height
+-- `towerℕ m`, which is why `towerℕ k ≤ poolCount (towerℕ m) m` holds for
+-- every `k` the width machinery can reach, not merely for `k = m`.
+--
+-- SUPERSEDED AND DELETED with the linear reading: `sucJ≤fLvlD`,
+-- `sucJ≤dLvl` (+1 per level step) and `J+n≤lvls` (linear in the count),
+-- each replaced below by the exponential form of the same fact, plus
+-- `capsBase-le-pool` and `three-size-le-blowH` whose consumers are gone.
+-- `git log -S'"'"'J+n≤lvls'"'"'` restores the linear versions; they are what an
+-- `exp≤dLvl` proof mirrors, one growth rate up.
 
--- (1) suc J ≤ fLvlD S W d J
-sucJ≤fLvlD : ∀ (S W d J : ℕ) → suc J ≤ fLvlD S W d J
-sucJ≤fLvlD S W d J =
-  ≤-trans
-    (≤-trans (s≤s (m≤m+n J (suc (widAt S W J) * suc (sizeAt S J))))
-             (≤-reflexive (sym (+-suc J (suc (widAt S W J) * suc (sizeAt S J))))))
-    (fLvl≤fLvlD S W d J)
-
--- (2) suc J ≤ dLvl S W d J
-sucJ≤dLvl : ∀ (S W d J : ℕ) → suc J ≤ dLvl S W d J
-sucJ≤dLvl S W d J =
-  ≤-trans (sucJ≤fLvlD S W d J)
-          (iterL-infl S W d (sizeAt S J) (fLvlD S W d J))
-
--- (3) J + n ≤ lvls S W d J n
-J+n≤lvls : ∀ (S W d J n : ℕ) → J + n ≤ lvls S W d J n
-J+n≤lvls S W d J zero    = ≤-reflexive (+-identityʳ J)
-J+n≤lvls S W d J (suc n) =
-  ≤-trans (≤-reflexive (+-suc J n))
-  (≤-trans (s≤s (J+n≤lvls S W d J n))
-           (sucJ≤dLvl S W d (lvls S W d J n)))
-
--- (4) i ≤ dWalkᶜ S W R d g J i
+-- i ≤ dWalkᶜ S W R d g J i
 i≤dWalkᶜ : ∀ (S W R d g J i : ℕ) → i ≤ dWalkᶜ S W R d g J i
 i≤dWalkᶜ S W R d g J zero    = z≤n
 i≤dWalkᶜ S W R d g J (suc i) =
@@ -1466,33 +1461,74 @@ i≤dWalkᶜ S W R d g J (suc i) =
      (≤-trans (s≤s (m≤m+n w D))
               (≤-reflexive (sym (+-suc w D))))
 
--- (5) M ≤ dCapᶜ M M M d (suc M) 0
+-- M ≤ dCapᶜ M M M d (suc M) 0 — the count the pool iterates is at least
+-- the pooled field itself
 M≤dCapᶜ : ∀ (M d : ℕ) → M ≤ dCapᶜ M M M d (suc M) 0
 M≤dCapᶜ M d =
   ≤-trans (≤-reflexive (sym (*-identityʳ M)))
           (i≤dWalkᶜ M M M d M 0 (regAt M M 0))
 
--- (6) 1 ≤ towerℕ m for all m
 1≤towerℕ : ∀ m → 1 ≤ towerℕ m
 1≤towerℕ zero    = ≤-refl
 1≤towerℕ (suc m) = ≤-trans (s≤s z≤n) (k≤towerℕ (suc m))
 
--- (7) THE INTERMEDIATE, which is the whole point: the pool is at least a
--- TOWER in its own index, not merely linear in it.
-towerℕ≤pool : ∀ (m : ℕ) → towerℕ m ≤ poolCount (towerℕ m) m
-towerℕ≤pool m =
-  ≤-trans (M≤dCapᶜ (towerℕ m) m)
-  (≤-trans (J+n≤lvls (towerℕ m) (towerℕ m) m 0
-                     (dCapᶜ (towerℕ m) (towerℕ m) (towerℕ m) m (suc (towerℕ m)) 0))
-           (poolBody≤poolCount (towerℕ m) m (1≤towerℕ m)))
+2≤towerℕ : ∀ m → 1 ≤ m → 2 ≤ towerℕ m
+2≤towerℕ m 1≤m = ≤-trans (≤-reflexive refl) (towerℕ-mono {1} {m} 1≤m)
 
--- (8) THE DELIVERABLE: a story index buys a tower of its own height.
--- `blowH` is `abstract`, so `blowH-body` is the only door.
-tower-le-blowH : ∀ (m : ℕ) → towerℕ m ≤ blowH m
-tower-le-blowH m =
-  ≤-trans (towerℕ≤pool m)
+-- THE LEAF: one level step at least exponentiates.  `dLvl` runs `fLvlD`
+-- `suc (sizeAt S J)` times from `J`, and `fLvlD` is inflationary by at
+-- least one, so the step clears `sizeAt S J` — which is `iterSize S J S`,
+-- and `sizeStep S s = S * suc (2 * s)` at least doubles.  Both halves are
+-- ordinary inductions; the `iterL` half mirrors the deleted `J+n≤lvls`
+-- with `fLvlD` in place of `dLvl`.
+postulate
+  exp≤dLvl : ∀ (S W d J : ℕ) → 2 ≤ S → 2 ^ J ≤ dLvl S W d J
+
+-- THE COUNT BUYS A TOWER, one story per level step.  This is the fact the
+-- deleted `J+n≤lvls` was the linear shadow of.
+lvls-tower : ∀ (S W d n : ℕ) → 2 ≤ S → towerℕ n ≤ lvls S W d 0 (suc n)
+lvls-tower S W d zero    2≤S = exp≤dLvl S W d 0 2≤S
+lvls-tower S W d (suc n) 2≤S =
+  ≤-trans (^-monoʳ-≤ 2 (lvls-tower S W d n 2≤S))
+          (exp≤dLvl S W d (lvls S W d 0 (suc n)) 2≤S)
+
+-- THE POOL AT ANY HEIGHT THE WIDTH MACHINERY CAN REACH, not merely at its
+-- own index: `k` is free, paid for by the count `dCapᶜ` already exceeding
+-- `towerℕ m`.
+pool-tower : ∀ (k m : ℕ) → 1 ≤ m → suc k ≤ towerℕ m →
+  towerℕ k ≤ poolCount (towerℕ m) m
+pool-tower k m 1≤m hk =
+  ≤-trans (lvls-tower M M m k 2≤M)
+  (≤-trans (lvls-mono {M} {M} {M} {M} {0} {0} {m} (suc k) N
+              2≤M ≤-refl ≤-refl ≤-refl (≤-trans hk (M≤dCapᶜ M m)))
+           (poolBody≤poolCount M m (1≤towerℕ m)))
+  where
+  M = towerℕ m
+  N = dCapᶜ M M M m (suc M) 0
+  2≤M : 2 ≤ M
+  2≤M = 2≤towerℕ m 1≤m
+
+-- THE DELIVERABLE.  `blowH` is `abstract`, so `blowH-body` is the only
+-- door.
+tower-le-blowH : ∀ (k m : ℕ) → 1 ≤ m → suc k ≤ towerℕ m → towerℕ k ≤ blowH m
+tower-le-blowH k m 1≤m hk =
+  ≤-trans (pool-tower k m 1≤m hk)
   (≤-trans (m≤m+n P (P + 0))
   (≤-trans (m≤n+m (2 * P) (6 + m))
            (≤-reflexive (sym (blowH-body m)))))
   where
   P = poolCount (towerℕ m) m
+
+-- THE SIDE CONDITIONS `tower-le-blowH` ASKS FOR, at the one index the
+-- depth face spends it at.  Both are arithmetic and neither is deep; the
+-- tower one is a leaf because `towerℕ`'s step is `2 ^_`, so the induction
+-- needs `x + 3 ≤ 2 ^ x` rather than anything about this development.
+4≤capsBase : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  4 ≤ capsBase e sl
+4≤capsBase {n = n} e sl =
+  subst (4 ≤_) (sym (+-suc (3 + (sizeᵉ e + slotsSize sl)) (entryCeil n sl e)))
+    (s≤s (≤-trans (m≤m+n 3 (sizeᵉ e + slotsSize sl))
+                  (m≤m+n (3 + (sizeᵉ e + slotsSize sl)) (entryCeil n sl e))))
+
+postulate
+  3m+1≤towerℕ : ∀ (m : ℕ) → 4 ≤ m → suc (3 * m) ≤ towerℕ m

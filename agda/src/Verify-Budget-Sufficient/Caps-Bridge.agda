@@ -115,7 +115,8 @@ open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body;
   frameBlowup; iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize;
   1≤capsAt-reg; _⊑ᶜ_; Caps; caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0;
-  frameStep-full; frameStep-mono-j; sizeCount; tower-le-blowH)
+  frameStep-full; frameStep-mono-j; sizeCount; tower-le-blowH; 4≤capsBase;
+  3m+1≤towerℕ)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -1136,36 +1137,47 @@ abstract
 -- `capsH e ins 0` is `blowH (capsBase e ins)`, carrying
 -- `2 * poolCount (towerℕ m) m`.
 --
--- AND THE TARGET DOMINATES, which is why the residue is DIFFICULTY and
--- not FALSITY.  `tower-le-blowH` (Caps) now delivers
--- `towerℕ m ≤ blowH m`, and that lemma is not new mathematics — it is the
--- INTERMEDIATE of the pool-lower chain that `three-size≤capsH` already
--- rested on, which went `m ≤ towerℕ m ≤ dCapᶜ … ≤ lvls … ≤ poolCount` and
--- then stated only its weakest link.  So the whole caps side of the depth
--- face is discharged, and what remains is a purely SYNTACTIC inequality
--- with no `capsOK?`, no `blowH` and nothing `abstract` in it.
+-- AND THE TARGET DOMINATES AT A HEIGHT WITH ROOM IN IT, which is the
+-- second version of this paragraph and the reason the first one was not
+-- enough.  `towerℕ m ≤ blowH m` — the intermediate the old pool chain
+-- already proved and stated only weakly — is short by a FACTOR here, not
+-- by a constant: `nestDᵉ` multiplies by `outWᵉ` at every `scanᵉ`,
+-- `wid-iterFold` bounds `outWᵉ` by `iterFold S (sizeᵉ e) M` and
+-- `iterFold-tower` puts that at height `k + 2 * sizeᵉ e`, so the natural
+-- induction lands near `3 * sizeᵉ e` while `capsBase` is `sizeᵉ e` plus
+-- slot and entry terms that nothing relates to `sizeᵉ e`.
 --
--- WHAT MAKES THE LEAF REAL WORK, since the target is a tower: `nestDᵉ`
--- is not merely exponential.  Its `scanᵉ` clause multiplies by `outWᵉ`,
--- whose own `scanᵉ` clause carries `(pmIᵗⱽ f ⊔ 1) ^ outWⱽ e` — so the
--- measure is tower-valued in the program's nesting depth, and the proof
--- has to spend `capsBase`'s three-plus-size height against it rather than
--- wave at the gap.  The apparatus is already here: `tower-mul`,
--- `tower-mul-suc`, `3T≤`, `k≤tower` and `towerℕ-mono` are what the
--- induction on `e` will spend, and `iterFold-tower` is the worked
--- instance of exactly this shape one face over.
+-- So the caps side is stated at a FREE height instead:
+-- `tower-le-blowH k m` for any `k` with `suc k ≤ towerℕ m`, paid for by
+-- the pool's own growth rate (Caps' header there has the argument — one
+-- level step exponentiates, and `poolBody` iterates it `towerℕ m` times).
+-- The leaf below spends it at `k = 3 * capsBase e ins`, which leaves the
+-- factor of three the width machinery needs.
+--
+-- WHAT REMAINS IS PURELY SYNTACTIC — no `capsOK?`, no `blowH`, nothing
+-- `abstract` — and it is real work rather than a chain of monotonicities,
+-- because `nestDᵉ` is tower-valued and not merely exponential.  The
+-- apparatus is already here: `tower-mul`, `tower-mul-suc`, `3T≤`,
+-- `k≤tower` and `towerℕ-mono` are what the induction on `e` spends, and
+-- `iterFold-tower` is the worked instance of exactly this shape one face
+-- over.
 postulate
   nestD-le-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     sizeᵉ e + nestDᵉ ins e + 0
       + storeNestMax (sched-init e ins) (st-init e)
-      ≤ towerℕ (capsBase e ins)
+      ≤ towerℕ (3 * capsBase e ins)
 
 nest-store≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   sizeᵉ e + nestDᵉ ins e + 0
     + storeNestMax (sched-init e ins) (st-init e)
     ≤ capsH e ins 0
 nest-store≤capsH e ins =
-  ≤-trans (nestD-le-tower e ins) (tower-le-blowH (capsBase e ins))
+  ≤-trans (nestD-le-tower e ins)
+          (tower-le-blowH (3 * capsBase e ins) (capsBase e ins)
+             (≤-trans (s≤s z≤n) 4≤m)
+             (3m+1≤towerℕ (capsBase e ins) 4≤m))
+  where
+  4≤m = 4≤capsBase e ins
 
 depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
