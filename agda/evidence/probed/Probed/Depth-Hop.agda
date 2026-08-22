@@ -1,6 +1,6 @@
 -- THE DEPTH FACE'S NEW CURRENCY, INSTANTIATED AT THE FOUR PROGRAMS
 -- THAT KILLED THE OLD ONE.
--- TARGET: allBurst-hops
+-- TARGET: subscribeE-hops
 --
 -- EVIDENCE, not a claim: `src` cannot import this file (the library
 -- layout makes `Probed.Depth-Hop` unresolvable from there) and nothing
@@ -38,9 +38,9 @@
 -- `Slot` constructors and a mid-run store are reached, in § 5 to § 7 and
 -- § 11.
 -- WHAT THIS FILE IS EVIDENCE FOR, AND WHICH ROWS CARRY IT.  `depth-hop`
--- is a real body over ONE leaf — `depth-hop-all-burst`, the `thru-outer`
--- walk arm — and that leaf carries the same three conditions every row
--- below instantiates.  So a row whose program contains a `*All`
+-- is a real body over ONE leaf — `allBurst-hops`, the payload condition
+-- the `thru-outer` walk arm consumes — and that leaf carries the same
+-- three conditions every row below instantiates.  So a row whose program contains a `*All`
 -- constructor runs through the leaf and is LOAD-BEARING for it: § 5,
 -- § 10, § 11 and § 12's refold.  The scan, slot and parking rows —
 -- § 1 to § 4 and § 6 to § 9 — are DEGENERATE for the leaf, since the
@@ -49,7 +49,7 @@
 
 module Probed.Depth-Hop where
 
-open import Data.Bool using (true; false)
+open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Maybe using (nothing)
 open import Data.Fin using (zero; suc)
 open import Data.List using ([]; _∷_)
@@ -66,12 +66,14 @@ open import Rx.Exp using (Ctx; Closed; Exp; Fn; natᵗ; obs; _×ᵗ_; nat̂; str
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Sched; EvalSt; root; share-sink; _↠_;
   from-inner; thru-outer; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; merge-st;
-  concat-st; switch-st; exhaust-st; sched-init; st-init; subscribeE; Stream)
+  concat-st; switch-st; exhaust-st; sched-init; st-init; subscribeE; Stream;
+  AllOp; NodeState; mintNode; installNode)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
+open import Verify-Budget-Sufficient.Measures using (burstHopD?)
 open import Verify-Budget-Sufficient.Depth-Compositional
-  using (pathNestD; allBurst)
+  using (pathNestD; allBurst; burstSync?)
 
 gN : ℕ → Gas
 gN zero    = g0
@@ -828,3 +830,85 @@ _ = refl
 -- whose unfolding `hopD-unfoldμ` holds fixed.  Each of those is a
 -- separate instantiation and none is done here.
 ------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- § 15  THE LEAF'S OWN CONCLUSION, not the assembly's.  § 13 measures
+-- `allBurst` against the arm's bound, which is the assembly reading;
+-- these rows compute the two Bools the leaf actually asserts, so a row
+-- here fails if a single emitted payload is deeper than its emitter even
+-- when the fold's `⊔` would have hidden it.
+--
+-- ⚠ AND THE NEW REGION IS THE `mapᵉ` PLUG, which § 13 does not reach at
+-- all: there the emitter is syntactic and its payloads are subterms, so
+-- the condition holds for a reason no coefficient has to pay for.  A map
+-- whose function WRAPS its argument in a `*All` is the other way a
+-- payload can be deeper than anything written in the source — the depth
+-- appears at substitution, and what has to pay for it is `pmᵗ`'s
+-- occurrence coefficient.  That is the clause whose predecessor was
+-- refuted for reading its coefficient at the UNSUBSTITUTED source, so it
+-- is the one worth instantiating rather than trusting.
+------------------------------------------------------------------
+
+burstOf : ∀ {u} (g : Gas) (op : AllOp) (ns : NodeState Γ₀)
+  (b : Closed Γ₀ (obs u)) (prog : Closed Γ₀ u) → Stream Γ₀ (obs u)
+burstOf g op ns b prog =
+  proj₁ (subscribeE g b (thru-outer op nid ↠ root) 0 0 sched₁ st₀)
+  where
+  sched  = sched-init prog slots₀
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns (st-init prog)
+
+leafOK : ∀ {u} (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ₀)
+  (b : Closed Γ₀ (obs u)) (prog : Closed Γ₀ u) → Bool
+leafOK V g op ns b prog =
+  burstHopD? V η (hopDᵉ V η b) strm ∧ burstSync? V strm
+  where
+  η    = slotHop V slots₀
+  strm = burstOf g op ns b prog
+
+-- § 13's syntactic outer, read at the leaf instead of at the arm
+_ : leafOK 29 (gN 200) mergeᵒ (merge-st 0 false) bT progTm ≡ true
+_ = refl
+
+_ : leafOK 29 (gN 200) concatᵒ (concat-st {t = natᵗ} [] false false) bT progTc ≡ true
+_ = refl
+
+_ : leafOK 29 (gN 200) switchᵒ (switch-st nothing false) bT progTs ≡ true
+_ = refl
+
+_ : leafOK 29 (gN 200) exhaustᵒ (exhaust-st false false) bT progTe ≡ true
+_ = refl
+
+-- the plug: the argument variable goes UNDER a `*All`, so every payload
+-- the map emits is one hop deeper than the inner the source carried
+wrapF : Fn Γ₀ [] [] [] (obs natᵗ) (obs natᵗ)
+wrapF = strmᵗ (mergeAllᵉ (ofᵉ (varᵗ (here refl) ∷ [])))
+
+bMap : Exp Γ₀ [] [] [] (obs natᵗ)
+bMap = mapᵉ wrapF (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ [])) ∷ []))
+
+progMm : Closed Γ₀ natᵗ
+progMm = mergeAllᵉ bMap
+
+_ : syncSizeᵉ bMap ≡ 13
+_ = refl
+
+-- the emitter's whole budget is the function's body: `hopDᵗ` of a `strmᵗ`
+-- reads the body's own hop, and the source contributes nothing
+_ : hopDᵉ 13 (slotHop 13 slots₀) bMap ≡ 1
+_ = refl
+
+_ : leafOK 13 (gN 200) mergeᵒ (merge-st 0 false) bMap progMm ≡ true
+_ = refl
+
+-- LOAD-BEARING, and this is the row that says so: the budget is exactly
+-- the payloads' own hop, so one less refuses the burst.  Every row in
+-- this section is at zero margin for the same reason.
+_ : burstHopD? 13 (slotHop 13 slots₀) 0
+      (burstOf (gN 200) mergeᵒ (merge-st 0 false) bMap progMm) ≡ false
+_ = refl
+
+_ : burstHopD? 29 (slotHop 29 slots₀) 0
+      (burstOf (gN 200) mergeᵒ (merge-st 0 false) bT progTm) ≡ false
+_ = refl

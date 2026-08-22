@@ -540,43 +540,91 @@ split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 -- frame's own `suc` and the measure's hop edge the SAME unit, which is
 -- why the arm's bound comes out tight rather than generous.
 --
--- THE PRODUCER IS THE WALK FACE'S OWN LANDING, and it is NOT circular:
--- `WalkStmt` (.Walk-Level/Statement) takes `depthE g b κ … ≤ dep` as a
--- PARAMETER and lands `burstHopD?` at exactly this instantiation — so
--- `depth-hop-all`'s own first disjunct is what pays for it.  The cost is
--- the context: `F ≡ sizeCapAt e sl (suc id)` PINS `V` to a size cap, and
--- `capsOK?`, `INV?`, the path predicates, the registry ledger and the
--- ceiling all arrive as hypotheses — the shape `cascade-depth-capsH`
--- already has.  Per-inner termination is the GAS: `depthInner` peels one
--- before entering the payload.
+-- IT IS STATED AT THE SUBSCRIBE, NOT AT THE ARM, and that is the whole
+-- reason for its shape: an arbitrary `κ : Path Γ (obs u) t` rather than
+-- the arm's `thru-outer op nid ↠ κ`, and `sl` a parameter with its
+-- equation beside it rather than `Sched.slots sched` read in place.
+-- Neither generality is free decoration.  The burst is `subscribeE`'s
+-- FIRST projection — the values `b` itself emits, before any frame runs
+-- — so nothing in the claim is about the `*All` at all, and pinning the
+-- path to the arm's would make the induction quantify over a shape its
+-- own `*All` clause has to leave.  `subscribeE-caps` is the same clique
+-- at the same generality, which is what says this is a shape a body can
+-- be written at rather than a statement lifted for tidiness.
+--
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- THE ARMS ARE A MIRROR, NOT NEW MATHEMATICS, and that is the one thing
+-- that sizes this row.  Every frame's own arithmetic is discharged — a
+-- payload built at SUBSTITUTION rather than written in the source is
+-- exactly what the substitution kit covers — and so is every frame's
+-- FOLD over a burst: the wet push faces land this exact conjunct at
+-- their own frame, one face per frame, with the same clause structure a
+-- mirror would have.
+--
+-- WHAT THOSE FACES BUNDLE IT WITH is why they cannot simply be spent
+-- here: the invariant, the fnCap burst predicate, dryness and the
+-- registry ledger all arrive as hypotheses beside the hop receipt, and
+-- carrying four more currencies is how a hop statement acquires a caps
+-- context by the back door.  So the work is those faces with their other
+-- conjuncts dropped, under a dispatch at this generality — a mirror
+-- whose every piece has a discharged original, which is what makes the
+-- arms separable and what makes the remaining risk labour rather than
+-- design.
+------------------------------------------------------------------
+
+------------------------------------------------------------------
+-- THE OTHER PRODUCER IS THE WALK FACE'S OWN LANDING, and it is NOT
+-- circular: `WalkStmt` (.Walk-Level/Statement) takes `depthE g b κ … ≤
+-- dep` as a PARAMETER and lands this exact hop conjunct at this exact
+-- instantiation — `subscribeAll-walk`'s body spends it as its own
+-- seventh receipt — so `depth-hop-all`'s first disjunct is what would
+-- pay for it.  The cost is the context: `F ≡ sizeCapAt e sl (suc id)`
+-- PINS `V` to a size cap, and `capsOK?`, `INV?`, the path predicates,
+-- the registry ledger and the ceiling all arrive as hypotheses — the
+-- shape `cascade-depth-capsH` already has.  Per-inner termination is the
+-- GAS: `depthInner` peels one before entering the payload.
 --
 -- ⚠ THAT IS A ROUTE AND NOT EVIDENCE, so it ranks this row at nothing and
 -- licenses no restatement: trading the postulate for those hypotheses
 -- would launder tracked debt into untracked, and only a refutation of the
 -- unconditional form buys that.
 -- DEAD ROUTE: spending an existing depth-free producer, so that no caps
---   context is needed.  `subscribeE-wet`'s landing carries `hasDry` and
---   `INV?` and no burst-hop conjunct at all, and the hop-spine face
---   reaches only the `scan-f` frame at push level — so there is nothing
---   to spend, and a depth-free supplier means a SECOND `subscribeE`-level
---   induction in the hop currency rather than a lemma.  What such a ring
---   would mirror is `subscribeE-caps`, which is PROVEN and lands stream
---   predicates over the same clique; what it would have to decide is its
---   own conjunct list and hypotheses, which is why naming it settles no
---   class.
--- PROBED: `Probed.Depth-Hop` § 13, at the ASSEMBLY's conclusion rather
---   than at this statement — `allBurst` is a real body over this leaf, so
---   its rows compute through the fold and are evidence for the region the
---   leaf is quantified over.  `allBurst` instantiated directly, so no
+--   context is needed at all.  `subscribeE-wet`'s landing carries
+--   `hasDry` and `INV?` and no burst-hop conjunct, and the hop-spine
+--   face reaches only the `scan-f` frame at push level — so there is
+--   nothing already landed to spend, and a depth-free supplier is this
+--   statement rather than a lemma reaching it.
+-- TWIN: `hopD-map-emit` and `hopD-unfoldμ` for the per-frame
+--   arithmetic; `pushMap-wet`, `pushTake-wet`, `pushScan-wet` and
+--   `pushThru-walk` for the fold at each frame; `subscribeE-caps` for
+--   the constructor dispatch above them, at this same generality.
+-- PROBED: `Probed.Depth-Hop` §§ 13 and 15 — the CONSUMING ASSEMBLY's
+--   conclusion and then BOTH CONJUNCTS OF THIS STATEMENT ITSELF, at the
+--   arm's instantiation.  § 13 instantiates `allBurst` directly, so no
 --   outer descent can be carrying the bound the way it can in a row over
 --   a whole program: all four `AllOp`s, each on its own program's initial
 --   state, over a syntactic outer emitting one `*All` inner, at the
---   smallest `V` the condition admits — 2 against 2 every time, so the
---   rows are LOAD-BEARING at zero margin.  Conjuncts covered: the frame's
---   `suc` against the measure's hop edge, and the four walks' subscribe /
---   park / cancel / drop behaviour.  Not reached: a non-root `κ`, since
---   every row sits at `root` and `pathNestD` is 0 throughout, and the
---   slot telescope, since every program runs over an empty slot vector.
+--   smallest `V` the condition admits — 2 against 2 every time.  § 15
+--   computes the two Bools instead of the arm's arithmetic, so a payload
+--   deeper than its emitter fails a row the fold's `⊔` could have
+--   hidden; the same four operators are green there, and a budget one
+--   unit lower is FALSE, which is what makes the series LOAD-BEARING at
+--   zero margin rather than merely green.
+--   § 15 also reaches the region no syntactic outer can: a `mapᵉ` whose
+--   function puts its ARGUMENT under a `*All`, where every payload is a
+--   hop deeper than the inner the source carried and the depth appears
+--   at substitution rather than in the source.  What pays for it is
+--   `pmᵗ`'s occurrence coefficient, and it pays exactly — 1 against 1 —
+--   which is the clause whose predecessor was refuted for reading that
+--   coefficient at the unsubstituted source.  Conjuncts covered: the
+--   hop conjunct against the measure's hop edge, the sync conjunct at
+--   the same `V`, and the four walks' subscribe / park / cancel / drop
+--   behaviour.  Not reached: a path that is not `thru-outer … ↠ root`,
+--   so `pathNestD` is 0 throughout and no frame below the outer runs,
+--   and the slot telescope, since every program runs over an empty slot
+--   vector.
 --   AND THE ONE DIRECTION THAT COULD FAIL IS NOT REACHABLE AT ALL, which
 --   is that section's § 14 and carries no row deliberately: only the
 --   exponential `scanᵉ` clause lets an emitted inner's hop outrun its
@@ -589,18 +637,40 @@ split-sync V (complete  ∷ es) h = split-sync V es (∧-trueʳ h)
 --   which `hopD-unfoldμ` holds fixed.
 ------------------------------------------------------------------
 postulate
-  allBurst-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
-    (b : Closed Γ (obs u)) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
-    let nid    = proj₁ (mintNode sched)
-        sched₁ = proj₂ (mintNode sched)
-        st₀    = installNode nid ns st
-        r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-        η      = slotHop V (Sched.slots sched)
+  subscribeE-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (V : ℕ) (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
+    (bid : Id) (now : Tick) (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ V → syncSizeᵉ b ≤ V → slotsSize sl ≤ V → Sched.slots sched ≡ sl →
+    let r = subscribeE g b κ bid now sched st
+        η = slotHop V sl
     in (burstHopD? V η (hopDᵉ V η b) (proj₁ r) ≡ true)
      × (burstSync? V (proj₁ r) ≡ true)
+
+
+-- THE ARM'S OWN INSTANTIATION, and it needs no arithmetic: `mintNode`
+-- writes `nextNode` and `installNode` writes the state's node map, so
+-- the slot vector the currency is read at is the caller's own by
+-- reduction and the equation is `refl`.  What the specialisation fixes
+-- is the path — the outer frame the walk is about — and nothing else.
+allBurst-hops : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (V : ℕ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  2 ≤ V → syncSizeᵉ b ≤ V → slotsSize (Sched.slots sched) ≤ V →
+  let nid    = proj₁ (mintNode sched)
+      sched₁ = proj₂ (mintNode sched)
+      st₀    = installNode nid ns st
+      r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+      η      = slotHop V (Sched.slots sched)
+  in (burstHopD? V η (hopDᵉ V η b) (proj₁ r) ≡ true)
+   × (burstSync? V (proj₁ r) ≡ true)
+allBurst-hops V g op ns b κ bid now sched st 2≤V szB slB =
+  subscribeE-hops V g b (thru-outer op nid ↠ κ) bid now
+    (Sched.slots sched) sched₁ st₀ 2≤V szB slB refl
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid ns st
 
 
 ------------------------------------------------------------------

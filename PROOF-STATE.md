@@ -157,10 +157,10 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`allBurst-hops`** (Depth-Compositional) — DIFFICULTY, all that is left of
+- **`subscribeE-hops`** (Depth-Compositional) — DIFFICULTY, all that is left of
   `depth-hop`: a burst's payloads have hop at most their emitter's. Probed
-  tight at all four `*All`s; a depth-free producer is a whole second
-  subscribe-level ring, and the caps-landed one pins `V` to a size cap.
+  tight at all four `*All`s and at a substituted payload; the arms are a second
+  subscribe-level ring whose substitution half is already proven.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
