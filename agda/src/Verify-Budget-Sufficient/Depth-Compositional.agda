@@ -1352,6 +1352,50 @@ postulate
   -- that program (Probed.Nest-Depth §3), which is now the row that keeps
   -- the sum from coming back.
   --
+  -- PROBED 2026-08-22 (Probed.Emit-Cap): TRUE at the program that
+  -- refuted its predecessor, and true at the connect.  Two rows, each
+  -- pinned by a `false` row at one less, which is what says neither
+  -- passed by being empty — `burstND?` is an `all` over an `all` and is
+  -- green on an empty burst, so a bare `true` row would be worth
+  -- nothing.  The bound came out at 2 and TIGHT in both: the duplication
+  -- program, where the summing predecessor put the emitted inner at 3
+  -- against the same 2; and `b = input i` over a two-link chain, where
+  -- the emitter's own nesting is 0 and the below-sum is carrying the
+  -- whole bound — which is the row that says the SUM above is not a
+  -- convenience.
+  -- Shapes NOT covered: `mergeAllᵉ` only, so no concat queue or switch
+  -- cut; one link, so a long chain is untested and the below-sum's
+  -- accumulation down a stratified descent is exactly where a bound
+  -- read off ONE slot would fail; no `scanᵉ` emitter, so the product
+  -- term is unreached; and no post-cascade state.
+  --
+  -- AND ONE SHAPE IS UNCOVERED BECAUSE IT IS UNINHABITED, which is
+  -- worth more than a row.  A SCRIPTED slot contributes 0 to the
+  -- below-sum (`slotNest`), while subscribing one emits the script's own
+  -- payloads — so at `b = input i` over a scripted slot carrying a
+  -- nested observable, the bound would be 0 against a positive
+  -- emission, and no tightening could repair it.  It cannot arise:
+  -- `Slot`'s `scripted` constructor carries `ok : T (isData t)` and
+  -- `isData (obs _)` is `false`, so a slot of OBSERVABLE type is always
+  -- `shared` and always charged.  The mirror's scripted clauses at this
+  -- type discharge on that field rather than on an argument.  The same
+  -- shape one level over is REFUTED and recorded at the constructor
+  -- (.Rx.Slots): an obs-typed SHARED def emits values of positive hop,
+  -- so a hop bound zeroing the share boundary is false — which is why
+  -- the shared half is charged here and the scripted half need not be.
+  --
+  -- AND IT HAS A PROVEN MIRROR, which is where the grind starts rather
+  -- than a reason to call this mechanical: `subscribeE-caps`
+  -- (.Subscribe-Face) concludes with `burstCaps? … sl (proj₁ r) ≡ true`
+  -- over this same `subscribeE` recursion, and it is discharged.  The
+  -- clauses correspond; what does NOT correspond is that the caps face
+  -- lets its level FLOAT — its conclusion is a Σ over `j′` with a fourth
+  -- conjunct bounding it — while the bound here is fixed at
+  -- `innerNest sl b` and has nothing to spend.  Whether that float is
+  -- load-bearing in the mirror's clauses is the question that decides
+  -- whether this row is a transcription or a proof, and it is not
+  -- answered yet, so the class stays where it is.
+  --
   -- WHAT IT IS NOT ASKED FOR: slot preservation.  The consumer moves its
   -- own cap between the entry scheduler and the reached one with the
   -- PROVEN `subscribeE-slots` (Keeps-Ring), off a `KeepsC` family
