@@ -129,16 +129,27 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- accumulator varied 1 → 41 with the depth flat at 4 — the measured
 -- form of what the clause now proves.  `git log -S'Probed.Install-Scan'
 -- --all` restores the fixture if a later measure needs one.
-nodeNestMax : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
-nodeNestMax (scan-st _)           = 0
-nodeNestMax (concat-st {t} q _ _) = foldr (λ o acc → sizeᵉ o ⊔ acc) 0 q
-nodeNestMax (take-st _)           = 0
-nodeNestMax (merge-st _ _)        = 0
-nodeNestMax (switch-st _ _)       = 0
-nodeNestMax (exhaust-st _ _)      = 0
+-- AND IT CHARGES THE QUEUE IN THE NESTING CURRENCY, WHICH IS WHY IT
+-- TAKES THE SLOTS.  It read `sizeᵉ o` once, and that was the same
+-- mismatch the cap's own size term was: the burst arm has to bound the
+-- IH's cap at the state the walk REACHED, and a `concatAllᵉ` that
+-- queues an emitted inner puts that inner into this measure — so a
+-- size here demands the cap bound an emitted inner's SIZE, which is
+-- exactly what an accumulator-wrapping scan refutes.  In this currency
+-- the same leaf covers it: an emitted inner's nesting is bounded by its
+-- emitter's, and the emitter's is what the `*All` layer's cap already
+-- names.
+nodeNestMax : ∀ {n} {Γ : Ctx n} → Slots Γ → NodeState Γ → ℕ
+nodeNestMax sl (scan-st _)           = 0
+nodeNestMax sl (concat-st {t} q _ _) = foldr (λ o acc → nestDᵉ sl o ⊔ acc) 0 q
+nodeNestMax sl (take-st _)           = 0
+nodeNestMax sl (merge-st _ _)        = 0
+nodeNestMax sl (switch-st _ _)       = 0
+nodeNestMax sl (exhaust-st _ _)      = 0
 
-nodesNestMax : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
-nodesNestMax = foldr (λ kv acc → nodeNestMax (proj₂ kv) ⊔ acc) 0
+nodesNestMax : ∀ {n} {Γ : Ctx n} → Slots Γ →
+  List (NodeId × NodeState Γ) → ℕ
+nodesNestMax sl = foldr (λ kv acc → nodeNestMax sl (proj₂ kv) ⊔ acc) 0
 
 -- A SHARED SLOT PAYS ITS DEF'S NESTING TOO, and that is where the
 -- refutation's product had to land.  A def reached through `input` is
@@ -153,8 +164,14 @@ nodesNestMax = foldr (λ kv acc → nodeNestMax (proj₂ kv) ⊔ acc) 0
 -- variable fuel.  What it costs is `slotNest-≤-slotSize` and the chain
 -- above it, which fed the caps-conditioned interface this refutation
 -- retires anyway.
+-- ONE SUMMAND, NOT TWO.  It paid `sizeᵉ d + nestDᵉ sl d` while the cap
+-- read both currencies; with the cap read off nesting alone the size
+-- half was pure over-payment, and dropping it makes the connect's
+-- charge and its payment the SAME NUMBER again — `slotsNestBelow-step`
+-- is an equality at exactly the index the `input` clause needs, which
+-- is the property the whole partial-sum design rests on.
 slotNest : ∀ {n} {Γ : Ctx n} {k t} → Slots Γ → Slot Γ k t → ℕ
-slotNest sl (shared d)   = sizeᵉ d + nestDᵉ sl d
+slotNest sl (shared d)   = nestDᵉ sl d
 slotNest sl (scripted _) = 0
 
 -- A SUM OVER THE SLOTS, AND THE `foldr _⊔_ 0` IT REPLACES WAS
@@ -172,11 +189,12 @@ slotNest sl (scripted _) = 0
 -- A SUM IS THE RIGHT CURRENCY BECAUSE THE CHAIN CANNOT REVISIT.
 -- Stratification makes the connect indices strictly decreasing, so
 -- each slot is entered at most once along any path and `Σ slotNest`
--- pays for the whole chain; pointwise `slotNest ≤ slotSize` then keeps
--- it under the caps, which is what `slots-nest-≤-size` and
--- `storeNest-capped` do — and the sum form makes that proof SMALLER,
--- since it is sum monotonicity rather than max-of-tabulate ≤
--- sum-of-tabulate.
+-- pays for the whole chain.  Nothing bounds it by a SIZE any more, and
+-- nothing needs to: the caps-conditioned interface that wanted a
+-- pointwise `slotNest ≤ slotSize` was refuted for reading a level it
+-- does not report, and `nest-store≤capsH` (Caps-Bridge) reaches the
+-- root through the tower instead, where a sum is what `tower-sum-tab`
+-- is stated over.
 --
 -- NOT A WEAKENING: the max was false, so this replaces a refuted
 -- measure rather than retreating from a true one.  Every statement
@@ -194,7 +212,8 @@ slotsNestSum {n} sl = sum (tabulate {n = n} (λ i → slotNest sl (sl i)))
 
 storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → ℕ
 storeNestMax sched st =
-  slotsNestSum (Sched.slots sched) ⊔ nodesNestMax (EvalSt.nodes st)
+  slotsNestSum (Sched.slots sched)
+    ⊔ nodesNestMax (Sched.slots sched) (EvalSt.nodes st)
 
 ------------------------------------------------------------------
 -- THE PARTIAL SUM — the same currency restricted to the slots a term
@@ -427,9 +446,9 @@ slotsNestBelow-mono {n} sl k k′ le =
 -- the left arm.  With the join where `storeNestMax` puts it, a node
 -- half that dominates leaves the connect needing
 -- `sizeᵉ d ≤ suc (pathLen κ)`, which no hypothesis offers.  Outward it
--- goes through, and `storeNest-capped`'s `⊔-lub` split survives — which
--- a `+` would NOT, since that needs the SUM of two quantities the caps
--- bound only separately.
+-- goes through, and the `⊔-lub` split every consumer of this measure
+-- takes survives — which a `+` would NOT, since that needs the SUM of
+-- two quantities the tower bounds only separately.
 
 -- THE PATH MEASURE THE CAP READS, AND IT IS NOT `pathLen`.  A frame in
 -- the path is charged on DELIVERY by `depthFold`, but only a
@@ -473,7 +492,7 @@ depthCapN : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sz mx : ℕ) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) → ℕ
 depthCapN sz mx κ sched st =
   (sz + pathNestD κ + slotsNestBelow (Sched.slots sched) mx)
-    ⊔ nodesNestMax (EvalSt.nodes st)
+    ⊔ nodesNestMax (Sched.slots sched) (EvalSt.nodes st)
 
 -- NO SIZE TERM.  The depth this face bounds is generated by the
 -- spending arc and by nothing else, so `nestDᵉ` is the currency
@@ -520,12 +539,13 @@ cap-≤-store {n = n} b κ sched st = ⊔-lub slotHalf nodeHalf
                          (pathNestD≤pathLen κ))
                (≤-trans (slotsNestBelow-≤-sum (Sched.slots sched) (maxInputᵉ b))
                         (m≤m⊔n _ _))
-  nodes≤store : nodesNestMax (EvalSt.nodes st) ≤ storeNestMax sched st
+  nodes≤store : nodesNestMax (Sched.slots sched) (EvalSt.nodes st)
+                  ≤ storeNestMax sched st
   nodes≤store = m≤n⊔m _ _
   store≤goal : storeNestMax sched st
                  ≤ SZ + pathLen κ + storeNestMax sched st
   store≤goal = m≤n+m (storeNestMax sched st) (SZ + pathLen κ)
-  nodeHalf : nodesNestMax (EvalSt.nodes st)
+  nodeHalf : nodesNestMax (Sched.slots sched) (EvalSt.nodes st)
                ≤ SZ + pathLen κ + storeNestMax sched st
   nodeHalf = ≤-trans nodes≤store store≤goal
 
@@ -568,10 +588,14 @@ postulate
   -- PROBED 2026-08-21 (Probed.Depth-All): the burst takes a MAX across
   -- SIBLINGS, not a sum.  A merge over one slot-chain top measures 5;
   -- a merge over two independent 4-link chains measures 5 as well,
-  -- with the store held at 51 in both rows by using the same slots.
+  -- with the store held at 9 in both rows by using the same slots.
   -- So the arc that accumulates is the CONNECT — which is what forced
   -- `slotsNestSum` (Refuted.Depth-Chain) — and NOT the sibling entry,
-  -- so `suc (sizeᵉ b)` is not being asked to pay for k chains.  This
+  -- so this arm's own `suc` is not being asked to pay for k chains.
+  -- RE-READ 2026-08-22 in the nesting currency: the figures were 5
+  -- against a store of 60 and a cap of 53 when the slot measure paid
+  -- sizes, and are 5 against 9 and 9 now, so the margin the rows cross
+  -- is of the same order as the depth rather than mostly size slack.  This
   -- was the live falsity candidate once the chain finding landed, and
   -- it is the region the rows reached.
   -- Shapes NOT covered: `mergeAllᵉ` only, so no concat/switch/exhaust
@@ -702,10 +726,11 @@ postulate
   -- shape by threading `j` through its own consumers; a measure read off
   -- a `Sched` cannot.
   --
-  -- So it is paid in `slotNest`, which already pays `sizeᵉ d` on the
-  -- nose and whose `slotsNestBelow-step` is an equality at exactly the
-  -- index the `input` clause needs — the charge and the payment stayed
-  -- the same number when the nesting went onto both.  What that cost was
+  -- So it is paid in `slotNest`, whose `slotsNestBelow-step` is an
+  -- equality at exactly the index the `input` clause needs.  It paid the
+  -- def's SIZE beside its nesting while the cap read both currencies,
+  -- and pays the nesting ALONE now, so the charge and the payment are
+  -- again the same number.  What either version cost was
   -- `slots-nest-≤-size`, `storeNest-capped` and `depth-capped`, since an
   -- exponential quantity has no bound by a size: the whole
   -- caps-conditioned interface went, and `depth-compositional` reaches
@@ -800,9 +825,20 @@ postulate
   -- fund is not charged; the `*All` arm's step is `arith-step` at
   -- `c = 0`, an equality in all but association; the μ clause's two
   -- caps became the SAME TERM, so its bridge went entirely; and the
-  -- connect now over-pays, since the summand slot `i` buys still covers
-  -- the def's size.  A tightening that simplifies every consumer is
-  -- evidence about the measure, not about the arithmetic.
+  -- connect's charge and its payment are the same number again.  A
+  -- tightening that simplifies every consumer is evidence about the
+  -- measure, not about the arithmetic.
+  --
+  -- AND THE STORE MEASURE HAD TO FOLLOW IT, which the tightening left
+  -- owed and THIS ARM is what collects.  The burst has to bound the
+  -- IH's cap at the state the walk REACHED, and a `concatAllᵉ` queues
+  -- an emitted inner into `nodeNestMax`; while that charged a SIZE the
+  -- arm needed the cap to bound an emitted inner's size, which is
+  -- exactly what an accumulator-wrapping scan refutes — the same
+  -- mismatch one level down, and no cleverer proof reaches it.  Both
+  -- halves of the store read `nestDᵉ` now (`nodeNestMax` taking the
+  -- `Slots` that costs it), so the ONE leaf below covers the queued
+  -- inner and the emitted one together.
   --
   -- SO WHAT IS LEFT ON THIS LEAF IS EXACTLY "an emitted inner's nesting
   -- is bounded by its emitter's nesting", which is the one thing the
@@ -991,15 +1027,15 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- price, which is what the `*All` clauses need: `merge-st`, `switch-st`,
 -- `exhaust-st` and `concat-st []` all read 0, each by `refl`.
 private
-  setNode-nodesNestMax-0 : ∀ {n} {Γ : Ctx n}
-    (nid : NodeId) (s : NodeState Γ) → nodeNestMax s ≡ 0 →
+  setNode-nodesNestMax-0 : ∀ {n} {Γ : Ctx n} (sl : Slots Γ)
+    (nid : NodeId) (s : NodeState Γ) → nodeNestMax sl s ≡ 0 →
     (nodes : List (NodeId × NodeState Γ)) →
-    nodesNestMax (setNode nid s nodes) ≤ nodesNestMax nodes
-  setNode-nodesNestMax-0 nid s eq [] = ⊔-lub (≤-reflexive eq) z≤n
-  setNode-nodesNestMax-0 nid s eq ((j , ns) ∷ rest) with j ≡ᵇ nid
+    nodesNestMax sl (setNode nid s nodes) ≤ nodesNestMax sl nodes
+  setNode-nodesNestMax-0 sl nid s eq [] = ⊔-lub (≤-reflexive eq) z≤n
+  setNode-nodesNestMax-0 sl nid s eq ((j , ns) ∷ rest) with j ≡ᵇ nid
   ... | true  = ⊔-lub (≤-trans (≤-reflexive eq) z≤n) (m≤n⊔m _ _)
   ... | false = ⊔-lub (m≤m⊔n _ _)
-                      (≤-trans (setNode-nodesNestMax-0 nid s eq rest)
+                      (≤-trans (setNode-nodesNestMax-0 sl nid s eq rest)
                                (m≤n⊔m _ _))
 
 -- After mintNode + installNode(take-st(suc k)), storeNestMax is
@@ -1010,13 +1046,14 @@ private
 -- below-sum included — is definitionally unchanged.
 depthCap-install0 : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} {e : Closed Γ t} {u}
   (b : Exp Γ Δᵍ Δ Θ u) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e)
-  (s : NodeState Γ) → nodeNestMax s ≡ 0 →
+  (s : NodeState Γ) → nodeNestMax (Sched.slots sched) s ≡ 0 →
   depthCap b κ (proj₂ (mintNode sched))
                (installNode (proj₁ (mintNode sched)) s st)
     ≤ depthCap b κ sched st
 depthCap-install0 b κ sched st s eq =
   ⊔-mono-≤ ≤-refl
-    (setNode-nodesNestMax-0 (Sched.nextNode sched) s eq (EvalSt.nodes st))
+    (setNode-nodesNestMax-0 (Sched.slots sched) (Sched.nextNode sched)
+       s eq (EvalSt.nodes st))
 
 ------------------------------------------------------------------
 -- ARITHMETIC HELPERS — proved here.
@@ -1093,7 +1130,7 @@ private
   all-outer-arith : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (op : AllOp) (s : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
-    nodeNestMax s ≡ 0 →
+    nodeNestMax (Sched.slots sched) s ≡ 0 →
     depthCap b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
                (proj₂ (mintNode sched))
                (installNode (proj₁ (mintNode sched)) s st)
@@ -1165,25 +1202,21 @@ private
     below : slotsNestBelow sl (maxInputᵉ d) ≤ slotsNestBelow sl (toℕ i)
     below = slotsNestBelow-mono sl (maxInputᵉ d) (toℕ i)
               (inputsBelow⇒maxᵉ (toℕ i) d ok)
-    -- slot `i`'s summand, which IS `sizeᵉ d + nestDᵉ sl d` — the child's
-    -- whole charge, size and nesting together, on the nose
-    step : sizeᵉ d + nestDᵉ sl d + slotsNestBelow sl (toℕ i)
+    -- slot `i`'s summand, which IS `nestDᵉ sl d` — the child's whole
+    -- charge, on the nose and in the one currency
+    step : nestDᵉ sl d + slotsNestBelow sl (toℕ i)
              ≤ slotsNestBelow sl (suc (toℕ i))
     step = subst (λ s → slotNest sl s + slotsNestBelow sl (toℕ i)
                           ≤ slotsNestBelow sl (suc (toℕ i)))
                  slotEq (slotsNestBelow-step sl i)
     -- `pathNestD (share-sink i)` is 0 definitionally: the connect resets
-    -- the path, which is why the goal's own `κ` is free room here.  The
-    -- summand slot `i` buys still covers the def's SIZE as well as its
-    -- nesting, so with the cap read off nesting alone the payment now
-    -- strictly over-covers the charge — the one place the tightening
-    -- leaves slack rather than removing it.
+    -- the path, which is why the goal's own `κ` is free room here.  With
+    -- both sides in the nesting currency the charge and the payment are
+    -- the same number again, so nothing here is slack.
     slotPay : nestDᵉ sl d + 0 + slotsNestBelow sl (maxInputᵉ d)
                 ≤ slotsNestBelow sl (suc (toℕ i))
     slotPay = ≤-trans
-                (+-mono-≤ (≤-trans (≤-reflexive (+-identityʳ (nestDᵉ sl d)))
-                                   (m≤n+m (nestDᵉ sl d) (sizeᵉ d)))
-                          below)
+                (+-mono-≤ (≤-reflexive (+-identityʳ (nestDᵉ sl d))) below)
                 step
 
   -- BUCKET (b): mapᵉ — burst(map-f) = 0 by frame clause; IH on b

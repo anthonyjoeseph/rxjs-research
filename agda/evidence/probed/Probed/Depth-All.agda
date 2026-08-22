@@ -17,7 +17,7 @@
 -- inners it lists.
 --
 -- THEY DO NOT ADD.  Measured: one chain top gives 5, two independent
--- chain tops under one burst give 5 as well, with the store at 60 in
+-- chain tops under one burst give 5 as well, with the store at 9 in
 -- both rows by construction (same slots) so the rows isolate the
 -- burst.  The burst takes a MAX across siblings, which is the opposite
 -- of what the chain does down a stratified descent — so the arc that
@@ -133,10 +133,10 @@ stT = st-init progTwo
 -- isolate the burst.  None is vacuous: every quantity is a numeral
 -- Agda computed, and the last row is the parent's own conclusion at
 -- the harder program, which is the row a crossing would show up in.
-_ : storeNestMax schedO stO ≡ 60
+_ : storeNestMax schedO stO ≡ 9
 _ = refl
 
-_ : storeNestMax schedT stT ≡ 60
+_ : storeNestMax schedT stT ≡ 9
 _ = refl
 
 _ : sizeᵉ progOne ≡ 5
@@ -156,10 +156,15 @@ _ = refl
 -- CAP the bound was restated to, not over `storeNestMax`: the slot half
 -- is the partial sum below the program's own stratification level, so
 -- the two figures part company as soon as one slot sits above the cut —
--- slot 8 here, worth 8, which is the whole of the 60/53 gap.  The
--- SEVEN of the remaining difference from the size figures above is what
--- the tightening removed: this program's own contribution to its cap is
--- one, its `mergeAllᵉ` layer, and the chain in the store is everything
--- else.
-_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 53
+-- slot 8 here, worth 1, which the program's own `mergeAllᵉ` layer then
+-- puts back, so store and cap coincide at 9 by arithmetic rather than
+-- by construction.
+--
+-- AND THE WHOLE OF THE OLD SLACK WAS SIZE.  These two figures read 60
+-- and 53 while the depth read 5, which is to say the cap was buying its
+-- margin from a currency the depth does not spend; nine `mergeAllᵉ`
+-- layers in the store is what the depth face actually faces here, and 9
+-- against 5 is the margin that is left.  A crossing now has to outrun a
+-- quantity of the same order as the thing it measures.
+_ : depthCap progTwo (root {Γ = Γ₉} {t = natᵗ}) schedT stT ≡ 9
 _ = refl

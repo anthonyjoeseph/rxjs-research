@@ -169,11 +169,6 @@ hUp k a s a≤s =
 hIn : ∀ (k a s : ℕ) → a ≤ s → k + 3 * a ≤ k + 3 * s
 hIn k a s a≤s = +-monoʳ-≤ k (*-monoʳ-≤ 3 a≤s)
 
-x≤3x : ∀ (x : ℕ) → x ≤ 3 * x
-x≤3x x =
-  ≤-trans (m≤m+n x (x + x))
-          (≤-reflexive (solve 1 (λ u → u :+ (u :+ u) := con 3 :* u) refl x))
-
 1≤3x : ∀ (x : ℕ) → 1 ≤ x → 1 ≤ 3 * x
 1≤3x x 1x = ≤-trans (s≤s z≤n) (*-monoʳ-≤ 3 1x)
 
@@ -404,18 +399,18 @@ tower-sum-tab {suc (suc m)} k 3k f g 1g hf =
   B = sum (tabulate (λ i → g (Fin.suc i)))
 
 -- The per-slot bound.  A scripted slot pays nothing; a shared slot's
--- two summands are the def's size and the term half at that def.
+-- ONE summand is the term half at that def, so this is `nestD-tower`
+-- with a level to spare.  It used to add the def's SIZE as a second
+-- summand and needed `sum2H` to combine two heights; the slot measure
+-- pays only nesting now, and the spare `suc` — which the store half of
+-- the assembly wants for its own reasons — is pure slack here.
 slotNest-tower : ∀ {n} {Γ : Ctx n} {j t} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
   M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M → (s : Slot Γ j t) →
   slotNest sl s ≤ towerℕ (suc (k + 3 * slotSize s))
 slotNest-tower k M 3k 1M MT sl w (scripted i) = z≤n
 slotNest-tower k M 3k 1M MT sl w (shared d) =
-  sum2H (k + 3 * sizeᵉ d) (k + 3 * sizeᵉ d) _
-    (≤-trans 3k (m≤m+n k (3 * sizeᵉ d)))
-    (≤-trans (k≤towerℕ (sizeᵉ d))
-             (towerℕ-mono (≤-trans (x≤3x (sizeᵉ d)) (m≤n+m (3 * sizeᵉ d) k))))
-    (nestD-tower k M 3k 1M MT sl w d)
-    ≤-refl ≤-refl
+  ≤-trans (nestD-tower k M 3k 1M MT sl w d)
+          (towerℕ-mono (n≤1+n (k + 3 * sizeᵉ d)))
 
 storeNest-tower : ∀ {n} {Γ : Ctx n} (k M : ℕ) → 3 ≤ k → 1 ≤ M →
   M ≤ towerℕ k → (sl : Slots Γ) → SlotWid sl M →

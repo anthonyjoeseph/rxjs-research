@@ -51,13 +51,15 @@
 -- with it by threading `j` through its consumers; a measure read off a
 -- `Sched` cannot.
 --
--- So the slot's nesting is charged where a slot's SIZE is already
--- charged, in `slotNest` — which pays a def's `sizeᵉ` on the nose and
--- whose `slotsNestBelow-step` is an equality at exactly the index the
--- `input` clause needs.  What that costs is `slotNest-≤-slotSize` and
--- everything resting on it, since an exponential quantity has no bound
--- by a size; those were feeding a caps-conditioned interface that this
--- refutation retires anyway.
+-- So the slot's nesting is charged in `slotNest`, whose
+-- `slotsNestBelow-step` is an equality at exactly the index the `input`
+-- clause needs.  It charged the def's SIZE beside its nesting for as
+-- long as the depth cap read both currencies; with the cap read off
+-- nesting alone that summand was pure over-payment, and dropping it puts
+-- the connect's charge and its payment back on the same number.  What
+-- either version costs is any bound of a slot's nesting BY its size,
+-- since an exponential quantity has none; those were feeding a
+-- caps-conditioned interface that the depth refutations retire anyway.
 ------------------------------------------------------------------
 module Rx.Nest-Depth where
 

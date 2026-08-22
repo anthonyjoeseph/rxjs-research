@@ -110,7 +110,8 @@ slotsNestMaxOld {n} sl = foldr _⊔_ 0 (tabulate {n = n} (λ i → slotNestOld (
 storeNestMaxOld : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   Sched Γ → EvalSt e → ℕ
 storeNestMaxOld sched st =
-  slotsNestMaxOld (Sched.slots sched) ⊔ nodesNestMax (EvalSt.nodes st)
+  slotsNestMaxOld (Sched.slots sched)
+    ⊔ nodesNestMax (Sched.slots sched) (EvalSt.nodes st)
 
 Γ₉ : Ctx 9
 Γ₉ = natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ

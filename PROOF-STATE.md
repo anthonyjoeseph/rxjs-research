@@ -185,8 +185,8 @@ not merely dominates it — at three programs, the third a scan nested inside
 another scan's step function, which says the product COMPOUNDS: one factor per
 nested scan, so the measure is exponential in the program and no fixed-degree
 product of caps fields could have replaced it. `depthCap`,
-`depth-compositional`, `depth-all-burst` and `slotNest` all carry it now, a
-shared slot paying its def's nesting beside its size.
+`depth-compositional`, `depth-all-burst` and `slotNest` all carry it now, and a
+shared slot pays its def's nesting.
 
 AND THE CAP IS NOW READ OFF NESTING ALONE, its size term gone and `pathLen`
 replaced by a measure charging only the SPENDING ARC. That is what the `*All`
@@ -198,6 +198,19 @@ nose. Every clause got shorter: the three structural descents need no arithmetic
 step, the μ clause's two caps became one term, and the connect now over-pays.
 Both remaining leaves are strengthened by it, and `Probed.Nest-Depth`'s rows now
 pin the cap itself as an EQUALITY with the depth.
+
+AND THE CURRENCY IS NOW ONE THROUGHOUT, which the first half of that tightening
+left owed and the burst arm forced. `slotNest` charged a def's size beside its
+nesting and `nodeNestMax` charged a queued inner's size alone, so a
+`concatAllᵉ` that queues an emitted inner put a SIZE into a cap that no longer
+reads one — the same mismatch one level down, and unfixable by any cleverer
+proof. Both now charge `nestDᵉ`, `nodeNestMax` taking the `Slots` it needs to,
+and the one leaf that covers the emitted inner covers the queued one with it.
+Two of the three consumers got smaller: the slot half of the tower bound is
+`nestD-tower` with a level to spare rather than a two-summand `sum2H`, and the
+connect's payment is an equality again. The probe rows moved with the measure —
+a nine-link chain's store reads 9 where it read 60, against a depth of 5, so
+what margin is left is of the same order as the thing it bounds.
 
 WHAT THAT COST IS THE WHOLE CAPS-CONDITIONED ROUTE. `Depth-Bound` is deleted:
 `depth-capped`, its `3 · cSize` conclusion, the `storeNestMax`-under-`capsOK?`
@@ -215,8 +228,8 @@ measures at once), and take a fixed-degree product of caps fields.
 
 - **`depth-all-burst`** (Depth-Compositional) — DIFFICULTY, all that is left of the
   `*All` face. Dead route repaired, and the measure is the GAS the burst already
-  peels — so this arm joins the induction as its sibling did, leaving one leaf:
-  an emitted inner's nesting is bounded by its emitter's.
+  peels, so this arm joins the induction as its sibling did. One leaf left: an
+  emitted inner's nesting is bounded by its emitter's.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
