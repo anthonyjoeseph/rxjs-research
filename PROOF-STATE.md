@@ -182,13 +182,22 @@ right-hand side grows in `wraps + ticks`; a sum cannot dominate a product. So
 `depth-compositional` is FALSE as a real body, not merely unproven, and the
 statement above it is where this tier now starts.
 
-What survives is the interface: `depth-capped` is already caps-conditioned and
-its `3 · cSize` has room (114 against the measured 49), so the restatement stops
-below that line and nothing above it moves. What has to change is the CURRENCY —
-the caps' `valCaps?` bounds `sizeᵛ`, and `sizeᵛ (obs t) v` IS `sizeᵉ v`, so the
-nesting of a reachable value is bounded there and nowhere in the program text.
-Adding the hypothesis is licensed exactly because the unconditional form is
-refuted.
+THE INTERFACE DOES NOT SURVIVE EITHER, and that was checked rather than
+assumed. `depth-capped` looked safe — its `3 · cSize` gives 114 against the
+first witness's 49 — but the multiplier is a CONSTANT and the gap is a product,
+so seven wraps over twenty-nine ticks give 204 against 201. Refuted at
+`caps 67 67 67`, every hypothesis satisfied, `capsOK?` by `refl`.
+
+AND THE THIRD WITNESS NAMES THE REPAIR. `depth-capped` checks `capsOK?` at the
+ENTRY state and concludes about a depth reached much later; the deeply nested
+value is a scan's stored accumulator, which `stBounded?` → `boundedNode` bounds
+by `cSize`. So the hypothesis holds where it is checked — empty nodes — and
+fails where it is spent. Everywhere else this face reports GROWTH,
+`frameStep j ↦ frameStep (j + j′)`, and `sub-charge` already produces such a
+`j′` over exactly this burst. The depth face is the one place that reads a level
+it does not report, and that is the defect rather than the arithmetic. Its call
+site is not where it fails: `Caps-Bridge` passes `baseCaps`, whose `cSize` reads
+`entryCeil`.
 
 - **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
   (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.

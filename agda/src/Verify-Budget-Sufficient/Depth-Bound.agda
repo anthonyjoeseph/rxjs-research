@@ -165,6 +165,27 @@ storeNest-capped c sched st cap slB =
 -- a number the instant's fuel can dominate, tower-free.
 ------------------------------------------------------------------
 
+-- REFUTED 2026-08-21 (Refuted.Depth-Nest, `depth-capped-absurd`): FALSE,
+-- and this one names the repair.  The `3 · cSize` is a CONSTANT multiple
+-- while `depth-compositional`'s gap under it is a PRODUCT, so taking
+-- `cSize` at exactly `sizeᵉ b` — all the hypotheses demand — crosses at
+-- seven wraps over twenty-nine ticks: 204 against 201.
+--
+-- THE DEFECT IS THE LEVEL, NOT THE ARITHMETIC.  `capsOK?` is checked at
+-- the ENTRY state and the conclusion is about a depth reached much
+-- later; the deeply nested value is a scan's stored accumulator, which
+-- `stBounded?` → `boundedNode` bounds by `cSize` — so the hypothesis
+-- holds where it is checked (empty nodes) and fails where it is spent.
+-- Everywhere else this face reports GROWTH, `frameStep j ↦ frameStep
+-- (j + j′)`, and `sub-charge` already produces such a `j′` over exactly
+-- this burst.  This is the one statement that reads a level it does not
+-- report.
+--
+-- The CALL SITE is not where it fails: `Caps-Bridge` applies it at
+-- `baseCaps e ins`, whose `cSize` reads `entryCeil` rather than
+-- bracketing it, on the stated grounds that the static width measures
+-- tower in the syntax.  The statement is false because it admits caps
+-- its caller never passes.
 depth-capped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

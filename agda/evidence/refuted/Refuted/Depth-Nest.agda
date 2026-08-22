@@ -3,7 +3,24 @@
 -- PER TICK, so the depth grows in `wraps × ticks` while every syntactic
 -- right-hand side grows in `wraps + ticks`.  A sum cannot dominate a
 -- product, so neither `depth-all-bound` nor `depth-compositional`
--- itself is true as stated.
+-- itself is true as stated — nor, one level up, `depth-capped`, whose
+-- `3 · cSize` is a CONSTANT multiple of a bound the same product
+-- outruns.
+--
+-- AND THE THIRD WITNESS IS THE ONE THAT NAMES THE REPAIR.
+-- `depth-capped` checks `capsOK?` at the ENTRY state and concludes about
+-- a depth reached much later.  The deeply nested value here is the
+-- scan's stored ACCUMULATOR, and `capsOK?`'s `stBounded?` reaches
+-- `boundedNode`, which tests `sizeᵛ t v ≤ᵇ cSize` for exactly a
+-- `scan-st`.  So the hypothesis is satisfied where it is CHECKED and
+-- violated where it is SPENT: at the entry state the nodes are empty and
+-- any caps pass, while by the twenty-ninth tick the accumulator is an
+-- order of magnitude past `cSize`.  Everywhere else the caps face
+-- already handles this by reporting GROWTH — a subscribe returns
+-- `frameStep j ↦ frameStep (j + j′)`, and `sub-charge` produces exactly
+-- such a `j′` over exactly this burst.  The depth face is the one place
+-- that reads a level it does not report, and that is the defect rather
+-- than the arithmetic.
 --
 -- THE MECHANISM, and it is the finding rather than the witness.
 --
@@ -66,11 +83,11 @@
 -- no syntactic currency can work at all.
 module Refuted.Depth-Nest where
 
-open import Data.Bool  using (false)
+open import Data.Bool  using (false; true)
 open import Data.Empty using (⊥)
 open import Data.List  using (List; []; _∷_)
-open import Data.Nat   using (ℕ; zero; suc; _+_; _≤_)
-open import Data.Nat.Properties using (≤⇒≤ᵇ)
+open import Data.Nat   using (ℕ; zero; suc; _+_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤-reflexive)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec   using () renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst₂)
@@ -78,9 +95,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst₂)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Exp  using (Ctx; Closed; Tm; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ;
   fstᵗ; varᵗ; ofᵉ; mergeAllᵉ; scanᵉ; sizeᵉ)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator using (EvalSt; Sched; Path; NodeState; AllOp; mergeᵒ;
   merge-st; root; sched-init; st-init)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthAll)
 open import Verify-Budget-Sufficient.Depth-Compositional using (depthCapN;
@@ -187,3 +206,62 @@ depth-compositional-sum-absurd :
 depth-compositional-sum-absurd h =
   ≤⇒≤ᵇ (subst₂ _≤_ depthP parentP
           (h (gasN 70) (rootProg 4 12) root 0 0 schedN stN))
+
+----------------------------------------------------------------------
+-- THE SECOND CROSSING, and it is the same arithmetic one level up.
+-- `depth-capped` is the CAPS-CONDITIONED interface the rest of the
+-- proof spends, and it looked safe: at the first witness its
+-- `3 · cSize` gives 114 against a depth of 49.  But the multiplier is a
+-- CONSTANT and the gap is a product, so the margin is spent by moving
+-- the same two axes further.  The only lower bound its hypotheses put on
+-- `cSize` is `sizeᵉ b`, so `cSize` may be taken at exactly `sizeᵉ b`,
+-- and then seven wraps over twenty-nine ticks gives 204 against 201.
+--
+-- ITS CALL SITE IS NOT WHERE IT FAILS.  `Caps-Bridge` applies it at
+-- `c := baseCaps e ins`, whose `cSize` reads `entryCeil` — a ceiling the
+-- caps recurrence reads directly rather than bracketing, on the stated
+-- grounds that the static width measures TOWER in the syntax and no
+-- closed bracket worth proving exists.  This is that same fact arriving
+-- for DEPTH: the statement is false because it is quantified over any
+-- `c` its four hypotheses admit, and those hypotheses bound `cSize`
+-- below by a syntactic sum.
+----------------------------------------------------------------------
+
+schedQ : Sched Γ₀
+schedQ = sched-init (rootProg 7 29) slots₀
+
+stQ : EvalSt (rootProg 7 29)
+stQ = st-init (rootProg 7 29)
+
+-- `cSize` at exactly `sizeᵉ b`, which is all the hypotheses demand
+capsQ : Caps
+capsQ = caps 67 67 67
+
+okQ : capsOK? capsQ schedQ stQ ≡ true
+okQ = refl
+
+sizeQ : sizeᵉ (rootProg 7 29) ≡ 67
+sizeQ = refl
+
+depthQ : depthE (gasN 215) (rootProg 7 29) (root {Γ = Γ₀} {t = natᵗ})
+           0 0 schedQ stQ ≡ 204
+depthQ = refl
+
+three : Caps.cSize capsQ + Caps.cSize capsQ + Caps.cSize capsQ ≡ 201
+three = refl
+
+depth-capped-absurd :
+  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+     (c : Caps) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+     capsOK? c sched st ≡ true →
+     slotsSize (Sched.slots sched) ≤ Caps.cSize c →
+     sizeᵉ b ≤ Caps.cSize c →
+     suc (pathLen κ) ≤ Caps.cSize c →
+     depthE g b κ bid now sched st
+       ≤ Caps.cSize c + Caps.cSize c + Caps.cSize c) → ⊥
+depth-capped-absurd h =
+  ≤⇒≤ᵇ (subst₂ _≤_ depthQ three
+          (h capsQ (gasN 215) (rootProg 7 29) root 0 0 schedQ stQ
+             okQ z≤n (≤-reflexive sizeQ) (s≤s z≤n)))
+
