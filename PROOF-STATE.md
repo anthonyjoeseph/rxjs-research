@@ -234,9 +234,15 @@ the measure predict `j · (k · w + 1) + 1`, and `depthE` returns exactly that.
 One factor per nested scan, unbounded — so `depthE` is exponential in the
 program size and every fixed-degree product of caps fields is dead, including
 the `cSize · cSize` guessed earlier. The open question is now a single
-arithmetic one: the bound is spent as a level count through `opIterD` and levels
-exponentiate, so does the height budget absorb an exponential level count? A
-tower it does not; an exponential is undecided, and that is the next thing.
+arithmetic one — and it turns out to be a weak one, because that caveat sat on
+the wrong consumer. A `dep` spent through `opIterD` does climb levels tower-ly
+per unit, but that `dep` bounds `depthInner` and arrives on
+`sub-charge-capsOK-lift`'s `depOK` premise. `depth-capped` has exactly one
+consumer, `depthE≤capsH-root`, which chains into `capsH e ins 0` via
+`three-size-le-blowH` — so all a restated conclusion owes is to sit under
+`blowH (capsBase e ins)`, which carries `2 * poolCount (towerℕ m) m`. The
+repair is: state the conclusion in the pinned nesting measure, and replace
+`three-size-le-blowH` with the matching arithmetic into `blowH`.
 
 - **`depth-all-bound`** (Depth-Compositional) — FALSITY, REFUTED
   (Refuted.Depth-Nest): 49 against a cap of 38 at four wraps over twelve ticks.

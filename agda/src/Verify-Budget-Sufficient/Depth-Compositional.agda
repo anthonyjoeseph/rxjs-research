@@ -543,15 +543,17 @@ postulate
   -- product those faces already pay, and the depth face is the one
   -- reading a linear cap where its siblings read a fold count.
   --
-  -- WHAT MAKES THAT LANDABLE is that the consumers do not fix the
-  -- number: `subscribeE-inner-nodry` takes the depth bound as a free
-  -- parameter `dep` and spends it through `opIterD` into a LEVEL, so
-  -- enlarging the bound changes an argument and no signature.  What it
-  -- does change is how many levels get climbed, and levels
-  -- exponentiate — so the bound may not be tower-valued, which is the
-  -- same height budget `Caps`'s own header defends when it forbids
-  -- `cWid` from re-entering the delivery count.  A fold count is not
-  -- tower-valued; that is why it is the candidate and a tower is not.
+  -- AND THE OBLIGATION ON A NEW CONCLUSION IS WEAK, once the right
+  -- consumer is read.  A depth bound spent through `opIterD` does climb
+  -- levels tower-ly per unit — `opIterD`'s `d` slot passes to `fLvlD`,
+  -- whose `suc d` clause unfolds a whole `sIterD` sweep — but that `dep`
+  -- bounds `depthInner`, and it arrives on `sub-charge-capsOK-lift`'s
+  -- `depOK` premise rather than from this family.  What this statement
+  -- feeds is `depth-capped`, and `depth-capped` has exactly ONE consumer:
+  -- `depthE≤capsH-root`, chaining into `capsH e ins 0` through
+  -- `three-size-le-blowH`.  So all a restatement owes is to sit under
+  -- `blowH (capsBase e ins)`, which carries `2 * poolCount (towerℕ m) m`
+  -- and is astronomically above any exponential in `sizeᵉ e`.
   --
   -- PROBED 2026-08-21 (Probed.Nest-Depth), AND THE MEASURE IS DERIVED
   -- RATHER THAN FITTED — which is why the rows ask for EQUALITY and not

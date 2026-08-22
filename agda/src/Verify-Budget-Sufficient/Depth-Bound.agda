@@ -236,14 +236,23 @@ storeNest-capped c sched st cap slB =
 -- that count.  The depth face is the outlier reading a linear cap where
 -- its siblings read a fold count.
 --
--- THE BOUND MAY NOT BE TOWER-VALUED, and that is the constraint that
--- makes this a choice rather than a shrug.  The consumers spend the
--- depth bound as a free parameter — `subscribeE-inner-nodry` takes
--- `dep` and feeds it through `opIterD` into a LEVEL — so enlarging it
--- costs no signature but buys levels, and levels exponentiate.  Handing
--- them a tower would demand tower-many stories, which is the height
--- budget `Caps`'s own header defends when it forbids `cWid` from
--- re-entering the delivery count.  A fold count is not tower-valued.
+-- AND THE CONSTRAINT ON THE NEW CONCLUSION IS MUCH WEAKER THAN THIS
+-- HEADER FIRST CLAIMED, because the caveat was attached to the wrong
+-- consumer.  `dep` reaching `opIterD` as a recursion depth is real —
+-- `opIterD`'s `d` slot passes straight to `fLvlD`, whose `suc d` clause
+-- unfolds an entire `sIterD` sweep, so levels climb tower-ly per unit —
+-- but that `dep` bounds `depthInner`, and it arrives on the `depOK`
+-- premise of `sub-charge-capsOK-lift`, NOT from here.  `depth-capped`
+-- has exactly ONE consumer, `depthE≤capsH-root`, which chains it with
+-- `three-size-le-blowH` into `capsH e ins 0`.
+--
+-- So the whole obligation on a restated conclusion is that it sit under
+-- `blowH (capsBase e ins)`, and `blowH m` carries
+-- `2 * poolCount (towerℕ m) m` — astronomically above any exponential in
+-- `sizeᵉ e`.  The repair is therefore: state the conclusion in the
+-- nesting measure `Probed.Nest-Depth` pins, and replace
+-- `three-size-le-blowH` with the corresponding arithmetic into `blowH`.
+-- Fiddly, but ordinary, and nothing about the height budget forbids it.
 depth-capped : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
   (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
