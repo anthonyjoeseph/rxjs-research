@@ -32,7 +32,13 @@ file worse to read: `{a,b}` brace expansion, `*` globs, and a leading-dash
 suffix (`-nestRec` after `concatDrain-nodry-loop` in the same row) all count
 as naming.  Anything else must appear verbatim in backticks.
 
-THIRD CHECK — LENGTH: a row is name + risk class + hook, and nothing more.
+THIRD CHECK — LENGTH, in two places: a row is name + risk class + hook, and a
+tier's PREAMBLE says what the tier IS and what orders it.  The preamble half
+exists because the row half has an escape hatch and it was used — see
+TIER_BUDGET.  Both are charged the same way, and everything below about the
+charge applies to both.
+
+A row is name + risk class + hook, and nothing more.
 PROOF-STATE.md has always said "one line per item"; the failure mode is not
 sloppiness but a HEADER LEAKING UPWARD, one clause at a time.  A finding gets
 written here because here is where it is being discussed, and it then sits far
@@ -137,6 +143,21 @@ LABEL_RE = re.compile(r"\*\*(.+?)\*\*")
 # is what makes a budget safe, not the margin (same rule as AGDA_DEV_BUDGET).
 ROW_BUDGET = 280
 
+# Prose characters per TIER PREAMBLE, names free — the same charge as a row,
+# applied to the section text a row is not.  A per-row budget alone leaves the
+# obvious escape open, and it was taken: with rows held to a line, one tier's
+# preamble reached 4387 characters while its four rows were all inside 280,
+# holding a deleted face's refutation history, a superseded predecessor's
+# deletion story, and the research for a currency swap that was already
+# written into the source header it belongs in.  Both hygiene rules it broke
+# are the file's own — "stay current" and "research lives in source comments"
+# — and neither is visible to a check that only ever looks at bullets.
+#
+# Set from a scan after that cleanup: the three preambles sit at 86, 477 and
+# 620, and this sits in the open space above them.  Re-scan before moving it;
+# the GAP is what makes a budget safe, not the margin.
+TIER_BUDGET = 900
+
 BACKTICK_SPAN_RE = re.compile(r"`[^`]*`")
 
 # Any ISO-ish or spelled date.  The roadmap has no legitimate use for one.
@@ -176,11 +197,25 @@ def prose_cost(chunks):
 
 
 def parse(path):
-    """-> [(tier_name, [(row_label, class_or_None, line_no, prose_cost)])]"""
+    """-> [(tier_name, [(row_label, class_or_None, line_no, prose_cost)], pre)]
+
+    `pre` is (first_lineno, prose_cost) for the tier's PREAMBLE — every line in
+    the section that is not row text.  It is collected HERE, rather than by a
+    separate scan, because only this loop knows which lines are row
+    continuations: a wrapped row's second line is indented and carries no
+    bullet, so any independent scan reads it as preamble and reports a number
+    several times the truth.
+    """
     tiers = []
     cur = None
     rows = None
+    pre = None  # [lineno_or_None, [text chunks]]
     row = None  # (lineno, [text chunks])
+
+    def flush_pre():
+        if pre is not None and pre[1]:
+            return (pre[0], prose_cost(pre[1]))
+        return (None, 0)
 
     def flush_row():
         if row is not None:
@@ -196,10 +231,13 @@ def parse(path):
         mt = TIER_RE.match(line)
         if mt:
             flush_row()
+            if cur is not None:
+                tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre())
             row = None
             cur = mt.group(1)
             rows = []
-            tiers.append((cur, rows))
+            pre = [None, []]
+            tiers.append((cur, rows, (None, 0)))
             continue
         if cur is None:
             continue
@@ -214,7 +252,17 @@ def parse(path):
             else:
                 flush_row()
                 row = None
+                if line.strip():
+                    if pre[0] is None:
+                        pre[0] = i
+                    pre[1].append(line)
+        elif line.strip():
+            if pre[0] is None:
+                pre[0] = i
+            pre[1].append(line)
     flush_row()
+    if cur is not None:
+        tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre())
     return tiers
 
 
@@ -359,7 +407,7 @@ def check_stale(tiers, live, srcnames):
     not owed).  `gone_parents` is the descriptive-head case.
     """
     discharged, vanished, gone_parents = [], [], []
-    for tier, rows in tiers:
+    for tier, rows, _pre in tiers:
         for label, _cls, lineno, _cost in rows:
             if not BACKTICK_RE.search(label):
                 continue
@@ -405,7 +453,10 @@ def main():
     failures = []
     unclassified = []
     overlong = []
-    for tier, rows in tiers:
+    fat_tiers = []
+    for tier, rows, (pre_line, pre_cost) in tiers:
+        if pre_cost > TIER_BUDGET:
+            fat_tiers.append((tier, pre_line, pre_cost))
         worst = -1  # highest class index seen so far
         worst_label = None
         for label, cls, lineno, cost in rows:
@@ -420,7 +471,7 @@ def main():
             else:
                 worst, worst_label = idx, label
 
-    for tier, rows in tiers:
+    for tier, rows, _pre in tiers:
         shown = [f"{c or '-'}" for _, c, _, _ in rows]
         print(f"  Tier {tier}: {' → '.join(shown) if shown else '(no rows)'}")
 
@@ -509,6 +560,22 @@ def main():
         print("the line here. Git history is the archive.")
         failures.append(None)
 
+    if fat_tiers:
+        print(f"\nTIER PREAMBLES OVER BUDGET — {len(fat_tiers)} preamble(s) spend "
+              f"more than {TIER_BUDGET} prose characters:")
+        for tier, pre_line, cost in fat_tiers:
+            print(f"  Tier {tier}  {path.name}:{pre_line}  {cost} chars "
+                  f"(+{cost - TIER_BUDGET})")
+        print("\nA tier preamble says what the tier IS — the one statement it")
+        print("exports, the doors in and out, and what orders the rows. It is not")
+        print("where findings go. Over budget means the same leak the row budget")
+        print("catches, arriving in the section text instead of a bullet: refutation")
+        print("history, a deletion story, the research behind a design change. Move")
+        print("each finding into the header of the postulate or definition it is")
+        print("about, and delete what is purely historical — this file describes the")
+        print("repo's present state, and git history is the archive.")
+        failures.append(None)
+
     if overlong:
         print(f"\nROWS OVER BUDGET — {len(overlong)} row(s) spend more than "
               f"{ROW_BUDGET} prose characters:")
@@ -540,7 +607,8 @@ def main():
         return 1
 
     print(f"\ncheck-roadmap: every tier sorted riskiest-class-first; every row "
-          f"within its {ROW_BUDGET}-char hook budget; no dated narrative in "
+          f"within its {ROW_BUDGET}-char hook budget; every tier preamble "
+          f"within its {TIER_BUDGET}-char budget; no dated narrative in "
           # named individually up to a handful, then counted -- a report line
           # that grows with docs/ stops being read
           + (" or ".join(f.name for f in date_targets) if len(date_targets) <= 4

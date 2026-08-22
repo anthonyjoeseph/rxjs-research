@@ -30,6 +30,14 @@ else lives in the code.
   definition it is about — probe receipts (`-- PROBED`), failed routes
   (`-- DEAD ROUTE`), proof sketches, coverage residue, recovery pointers.
   If a note here outgrows its one line, it belongs in a header instead.
+  **`make roadmap-check` ENFORCES A CHARACTER BUDGET, on a row's hook AND on
+  a tier's PREAMBLE.** The second is not redundant: holding every bullet to a
+  line while writing the finding into the section text above them satisfies
+  the row budget exactly, and one tier's preamble reached 4387 characters
+  that way — a deleted face's refutation history, a superseded predecessor's
+  deletion story, and the research for a currency swap that was already in
+  the source header it belongs in. A preamble says what the tier IS: the one
+  statement it exports, the doors in and out, and what orders the rows.
 - **No numbering.** Items are referred to BY NAME (postulates are unique,
   greppable names — the wiring law guarantees it). Order within a tier is
   the schedule: top item first. Reorder freely, in the same commit as the
@@ -136,85 +144,23 @@ research lives; where they disagree, the header wins.
 
 **The tier is ONE statement, not a directory.** `budget-sufficient`
 (Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false`, and it is the only
-CLAIM the `Verify-Budget-Sufficient` tree exports: 41 of the tree's 42 modules
-sit in Caps-Bridge's import cone, and the one that does not is `Demand-Programs`,
-a program corpus reaching Main through `Harness.Main`.  The tree's two probes
-used to sit outside that cone as well; both expired with their targets and are
-deleted, and a live probe now lives in `agda/evidence/probed` instead.
+CLAIM the `Verify-Budget-Sufficient` tree exports: every module in the tree
+sits in Caps-Bridge's import cone, bar a program corpus that reaches Main
+through `Harness.Main`.
 
-**AND THE COUNT WENT DOWN BY DELETION, WHICH IS WHAT THE CONE IS FOR.** `Wet`
-Parts 4 and 5 and most of Part 3 were the W11 width walk — 1820 proven lines
-whose consuming face, the ledger walk, was retired. It reached Main through a
-`public` re-export in Wet/Part6 and nothing else, so a mutual cluster consuming
-itself read as wired; reachability was the only check that could see it. The
-`ofW` measures stay, spent by the successor face (`Walk-Level`), which is what
-distinguishes a superseded predecessor from a missing wire.
-
-**IT IS ALSO THE TREE'S ONLY DOOR NOW, and what closed the others was a
-module, not a cleanup.** `Verify-Well-Formed` still draws `mint-install-survives`
-(Node-Fresh) by name — one real cross-tier claim. What used to sit beside it was
-`Node-Table`'s utility lemmas crossing two tier boundaries into `The-Proof`,
-which cited `≡ᵇ→≡` and `≡ᵇ-refl` at a module defining neither. Those were never
-claims on this tier; they were arithmetic with no home, so they had accreted a
-copy per tree. They now live in `Decide` below both trees, and `The-Proof`
-reaches into the trees for exactly `evaluate-well-formed` and this door.
+**IT IS ALSO THE TREE'S ONLY DOOR.** `Verify-Well-Formed` draws
+`mint-install-survives` (Node-Fresh) by name, and that is the one real
+cross-tier claim into this tree.
 
 **"A REAL BODY" IS NOT "POSTULATE-FREE".** `budget-sufficient` is a definition
 rather than a postulate; the rows below are the leaves still under it. Reading
-a real body as a discharged cone is how a row gets mis-ranked — the census that
-mis-classed `subscribeE-inner-nodry-inv` read conclusions and never asked what
-its named suppliers needed.
+a real body as a discharged cone is how a row gets mis-ranked, and a row whose
+OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-Labour MOSTLY, and the qualifier has been earned four times here, twice at an
-ASSEMBLY rather than a leaf. The connect leaf admitted instances its caller
-cannot make; `depth-compositional` was refuted at a nine-slot program because
-the measure under it took a max where connects CHAIN; then the one shape
-`depth-all-bound`'s own receipt named as untested refuted the whole face — a
-`scanᵉ` whose step wraps its accumulator gains nesting PER TICK, so `depthE`
-grows in `wraps × ticks` while every syntactic right-hand side grew in
-`wraps + ticks`; and the interface above it fell to the same product at seven
-wraps over twenty-nine ticks, 204 against 201, every hypothesis satisfied and
-`capsOK?` by `refl`. A real body's own conclusion is no safer than a
-postulate's, and a row whose OBSTACLE is written down is not thereby a row whose
-STATEMENT is right.
-
-THE DEPTH FACE'S CURRENCY HAS BEEN SWAPPED, AND THE OLD ONE IS DELETED.
-`depthCap`, its sixteen-head induction, its seven `emit-*` leaves, its store
-measure and the exported widening are gone, together with `Rx.Nest-Depth`,
-`.Nest-Tower` and the ten evidence files that could no longer be STATED once
-their subject went. Five refutations came out of that one region — two leaves
-as stated, the occurrence repair, the cap itself, and the size-restored export
-— which is the convergence test's stop condition rather than an invitation to
-subdivide a sixth time. What all five had in common is that they kept the bound
-TIGHT: a linear sum of syntactic measures read at the subject. The last settled
-it by DEGREE and not by a constant, a bound of 56 against a depth of 70, with
-the paired row two ticks earlier deliberately UNDER at 35 against 52 so that
-the finding is a crossing no re-weighting survives. The precedent against
-tightness was already one module away: `capsBase` carries `entryCeil`, a
-deliberately generous recursive ⊔ of every node's five width measures, read
-rather than bracketed because those measures tower in the syntax and no closed
-bracket on them is worth proving.
-
-WHAT REPLACES IT WAS ALREADY IN THE TREE, WHICH IS THE PART THAT MAKES THIS A
-REINVENTION UNDONE. `hopDᵉ` (Rx.Hop-Depth) is the same accounting written
-correctly — `suc` per `*All` layer as before, but `mapᵉ` MULTIPLIES the source's
-depth by the template's occurrence count and `scanᵉ` charges an exponential in
-a refold bound rather than a product with the source's width, so neither
-witness outruns it. It is already closed under substitution
-(`hopD-sub-spnᵉ`, `applyFn-hopSpn`, `hopD-unfoldμ`, `hopD-η-congᵉ`,
-`slotHop-fix`), its hereditary `valHopSpn?` invariant already discharges what
-the `emit-*` leaves were for, and `subscribeE-wet-via-caps` states its gas
-hypothesis over `hopDᵉ Ŝ (slotHop Ŝ sl) b` in the SAME signature as the `depOK`
-this face exists to discharge, at the same `sl` and `Ŝ` — so the face had been
-proving `depOK` in a private currency nothing else in the tree uses, and `V`
-and `η` are not inventions. The swap DELETED rather than repaired. The
-top-line claim never moved: `depthE≤capsH-root` still lands in `capsH e ins 0`,
-`blowH` of a tower, and it is now a real body over two leaves.
-
-- **`depth-hop`** (Depth-Compositional) — FALSITY: the swapped face's whole
-  induction. The ∀ V form is machine-refuted, so `V` is conditioned. Every
-  `hopDᵉ` clause is now probed TIGHT; what is left is state, not syntax — no row
-  reaches a mid-run store with a burst in flight.
+- **`depth-hop`** (Depth-Compositional) — DIFFICULTY (was FALSITY): every clause,
+  both `Slot` constructors, all four `*All`s, a stratified telescope and a
+  populated store, probed TIGHT — and the series killed the ∀ V form, so it can
+  kill. Left: a state deep in a cascade, and `caseᵗ`; mirror in its header.
 - **`cascade-depth-capsH`** (Caps-Face/Part7) — DIFFICULTY, NOT demotable: both
   twins are proven, but its header rules out repackaging — the delivery machinery
   sits wholly outside `depthE`'s induction. Conditioned on `capsOK?` because the
@@ -231,19 +177,13 @@ top-line claim never moved: `depthE≤capsH-root` still lands in `capsH e ins 0`
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
 bets on ground a `Verify-Budget-Sufficient` failure would move.
 
-**THE TIER IS ONE STATEMENT.** `The-Proof` draws `evaluate-well-formed` (Part13)
-and nothing else from this tree, and all fourteen `Verify-Well-Formed` modules
-sit in its cone. The four utility names it also used to draw are in `Decide`
-now, so the count is a fact about the import graph rather than about which
-lemmas happened to be re-exported.
+**THE TIER IS ONE STATEMENT.** `The-Proof` draws `evaluate-well-formed`
+(Part13) and nothing else from this tree, and every `Verify-Well-Formed` module
+sits in its cone.
 
-The branch's own design question is **merge coherence, and it is UNSTATED**: the
-decidable predicate a statement would be about lives with the probe that is its
-only consumer (`Probed.Root`, moved there when the probes left `MODULE_ROOTS`),
-so a restatement here states its own and does not inherit evidence earned
-against that one. The coherence owes a statement, a mid-fold FoldInv form, and
-the consumer rewrites that spend it. The ALIVE-vs-PRESENT gap any statement has
-to close is recorded on `Part4.root-mergeCache`.
+**MERGE COHERENCE IS UNSTATED** — the branch's own design question. What a
+statement owes, and why it would inherit no evidence from the probe that is the
+predicate's only consumer, is recorded on `Part4.root-mergeCache`.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 

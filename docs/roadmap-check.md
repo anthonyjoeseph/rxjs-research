@@ -18,8 +18,28 @@ can see into build failures.
 4. **Row budget** — each row's PROSE is within `ROW_BUDGET` characters (names are
    free). Research belongs in the postulate's own source header, where it sits in front
    of the next person to pick the row up; a roadmap row is a hook.
-5. **No calendar dates** — anywhere in PROOF-STATE.md, and anywhere in the files listed
+5. **Tier-preamble budget** — the same charge applied to a tier's section text, within
+   `TIER_BUDGET`. It exists because check 4 has an escape hatch and the hatch was used:
+   with every bullet inside 280, one tier's preamble reached 4387 characters of
+   refutation history, a deletion story, and research already written into the source
+   header it belonged in. A check that only reads bullets cannot see that.
+6. **No calendar dates** — anywhere in PROOF-STATE.md, and anywhere in the files listed
    in `DATE_ONLY_FILES` (CLAUDE.md and `docs/*.md`), which get this check only.
+
+## What the preamble check charges, and the one bug it was written after
+
+A tier's preamble is every line in the section that is not row text — so it is collected
+by the SAME loop that parses rows, not by an independent scan. That is not tidiness: a
+wrapped row's continuation lines are indented and carry no bullet, so any scan that does
+not already know where rows end reads them as section text and reports a preamble at
+several times its real size. The fixture pins this from both sides — one tier whose
+preamble is genuinely fat while every row is inside the row budget (so a passing row
+check proves nothing), and one tier whose short preamble sits under three near-budget
+wrapped rows that would push it over if they were ever mischarged.
+
+What a preamble is FOR is the tier's shape: the one statement it exports, the doors in
+and out of its tree, and what orders its rows. Everything else is a finding, and a
+finding has a home — the header of the postulate or definition it is about.
 
 ## Why staleness is checked over ROW HEADS and not every name
 

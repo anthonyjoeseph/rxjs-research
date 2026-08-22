@@ -247,19 +247,77 @@ burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
 -- cancelling and dropping change which inners are LIVE and not how
 -- deep a live one sits.
 --
--- ⚠ AND WHAT IS LEFT IS STATE, NOT SYNTAX — which is why the class does
--- not move.  Every row above starts from `st-init` and `sched-init`:
--- the slot telescope is populated but the NODE STORE is not, so no row
--- reaches a mid-run state with a burst in flight, and that is exactly
--- the arm the paragraph below is about.  The region is strictly
--- smaller than the one this receipt replaced, and it is now nameable
--- in one clause instead of three, but it is not empty.  FALSITY.
+-- AND A MID-RUN STATE, REACHED BY RUNNING: the state the root
+-- subscribe RETURNS — registry, node table and delivered set all
+-- populated by the evaluator — gives 4 against 4, the same answer as
+-- `st-init` does.  That is the finding rather than a coincidence: the
+-- store the measure is read against does not move the depth.  The
+-- state is PROJECTED out of `subscribeE`, never written as a record
+-- update, so it is one the evaluator can actually be in.
 --
--- ⚠ AND `pathNestD κ` IS UNEXERCISED: `depthE` returned 0 at every
--- non-root path tried, so no row needs the term to be present at all.
--- A slack term makes the statement weaker rather than wrong, so this
--- is not a refutation — but find out whether the term is load-bearing
--- in the INDUCTION before carrying it through the `thru-outer` clause.
+-- SO THE CLASS COMES DOWN, FALSITY → DIFFICULTY, and the region the
+-- evidence reached is nameable in full: every clause of `hopDᵉ`; all
+-- four `*All` operators; both `Slot` constructors; a two-slot
+-- stratified telescope at stage 1; three of three `Path`
+-- constructors; a payload-regrowing scan, which is the shape that
+-- refuted the predecessor; and a populated store.  Thirty-seven rows,
+-- and TIGHT — nine of them with no margin at all, which is what
+-- separates this from a measure that is merely large.  The series is
+-- also known to be able to kill this statement, having done it: the
+-- ∀ V form died at `V = 0` on a program from the same file.
+--
+-- AND THE MIRROR IS `subscribeE-caps` (.Subscribe-Face), PROVEN: a
+-- clause-by-clause induction over exactly this `b`, at exactly these
+-- indices, which already carries a depth bound as a parameter — so it
+-- answers "which clause splits on what, and at which fuel" without
+-- any of it being re-decided here.  `sub-charge` is NOT the mirror,
+-- despite reading like one at the type: it is a five-line wrapper that
+-- instantiates that parameter at `depthE g b κ bid now sched st` and
+-- projects.  Diff the ARGUMENTS against it, not the statements.
+--
+-- ⚠ AND THE MIRROR DOES NOT MAKE THIS GRINDABLE.  What it settles is
+-- the clause skeleton; what it does not settle is the burst arm, where
+-- the caps twin spends caps machinery and this side needs an EMITTED
+-- payload's hop bounded by its emitter's — a different fact, and the
+-- one design decision left in the row.
+--
+-- ⚠ WHAT WOULD RAISE THE CLASS AGAIN, and what is still unreached: a state
+-- deep inside a CASCADE rather than one subscribe in, since the
+-- gadget's mid-run state does not normalise (7.9 GB in six minutes —
+-- the boundary is recorded in the probe, do not pay for it twice);
+-- `hopDᵗ`'s `caseᵗ` clause, the one place the measure takes a ⊔ of two
+-- branches and multiplies by a scrutinee; and a `V` between 2 and the
+-- refuted 0, since `2 ≤ V` is the tree's idiom and not a boundary this
+-- evidence found.
+--
+-- ⚠ AND `pathNestD κ` IS SLACK ON EVERY SUBSCRIBE-SIDE ARM.  The probe
+-- noticed it — `depthE` returned 0 at every non-root path tried, so no
+-- row needs the term at all — and reading `depthE`'s clauses says why,
+-- which is the part that matters for the grind.
+--
+-- `depthFrame` has the only two `suc`s in the mirror: a `thru-outer`
+-- frame pays one for its walk, and a `concatAll` finish pays one for
+-- its drain.  `depthE` only ever hands `depthBurst` THE FRAME IT JUST
+-- INSTALLED — `map-f`, `scan-f`, `take-f`, `thru-outer`, never
+-- `from-inner` — so the drain arc is not reachable from this side at
+-- all, and the walk arc is entered exactly where `hopDᵉ`'s own `*All`
+-- clause has already contributed its `suc`.  Every arm therefore
+-- closes with `pathNestD κ` untouched on both sides: the `*All` arms
+-- against `suc (hopDᵉ b)`, the frame arms against `hopDᵉ`'s
+-- multiplier, the connect arm against `slotHop-fix`, and the μ arm
+-- against `hopD-unfoldμ`.  What the walk arm needs instead is that an
+-- EMITTED inner has hop at most its emitter's, which is the value
+-- invariant and not a path fact.
+--
+-- ⚠ SO THE TERM STAYS, AND DELIBERATELY.  Dropping it strengthens the
+-- statement, and strengthening a FALSITY row is the wrong direction
+-- under de-risk: the slack costs nothing to carry (no arm has to
+-- discharge it) and it is the one unit of room available if a burst
+-- arm turns out to need one.  Revisit only once the burst arm is
+-- ground and the room is provably unspent — and note that a
+-- path-shaped term IS load-bearing on the DELIVERY side, where
+-- `depthFold` walks κ frame by frame and pays `depthFrame` at each,
+-- which is why this currency has the term in it at all.
 --
 -- ⚠ AND THE CONDITIONS ARE NOT KNOWN TO BE TIGHT — the refutation kills
 -- `V = 0` and nothing more.  `V = 1` was MEASURED to hold on the same

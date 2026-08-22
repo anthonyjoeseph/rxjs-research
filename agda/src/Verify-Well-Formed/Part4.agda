@@ -247,6 +247,15 @@ postulate
   -- from-inner instance survives in the root-exit registry; that fact does
   -- not exist in the repo today.  The gap was invisible while this was a
   -- -core, and became a type error the moment the assembly was real.
+  --
+  -- AND MERGE COHERENCE — the branch's own design question — IS UNSTATED, so
+  -- the invariant above has no statement to be a corollary of.  The decidable
+  -- predicate such a statement would be about lives with the probe that is
+  -- its ONLY consumer (`Probed.Root`), which is the trap: a coherence stated
+  -- HERE states its own predicate and inherits NONE of the evidence earned
+  -- against that one, however alike the two read.  What is owed is the
+  -- statement, a mid-fold `FoldInv` form of it, and the consumer rewrites
+  -- that spend it.
   root-mergeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (nid : NodeId) (k : ℕ) (od : Bool) →
     (nid , merge-st k od) ∈ EvalSt.nodes (rootExitSt e ins) →

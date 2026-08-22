@@ -43,6 +43,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Vec using (_∷_) renaming ([] to []ⱽ)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Data.Nat using (ℕ; zero; suc; _+_; _≤ᵇ_)
+open import Data.Product using (proj₁; proj₂; _×_)
 
 open import Rx.Prim using (Gas; g0; gs; cold)
 open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ; varᵗ;
@@ -50,7 +51,7 @@ open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; nat̂; strmᵗ;
   concatAllᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator using (Sched; EvalSt; root; share-sink; _↠_;
-  from-inner; thru-outer; mergeᵒ; sched-init; st-init)
+  from-inner; thru-outer; mergeᵒ; sched-init; st-init; subscribeE; Stream)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
@@ -543,3 +544,50 @@ _ : (depthE (gN 20) progM root 0 0 (sched-init progM slots₀) (st-init progM)
        ≤ᵇ hopDᵉ 4 (slotHop 4 slots₀) progM + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
       ≡ true
 _ = refl
+
+------------------------------------------------------------------
+-- § 11  A MID-RUN STATE, REACHED BY RUNNING — the one region § 5–§ 10
+-- leave open, and the one the postulate's own header names as what is
+-- left of its risk.  Every row above starts from `st-init`, where the
+-- node store is empty; these start from the state the ROOT SUBSCRIBE
+-- returns, so the registry, the node table and the delivered set are
+-- all populated by the evaluator rather than by hand.
+--
+-- ⚠ THE STATE IS PROJECTED OUT OF `subscribeE`, NOT WRITTEN DOWN.
+-- That is the whole point: a `record (st-init e) { … }` is not a state
+-- the evaluator can reach, and a row over one says nothing.  The gas
+-- is a concrete numeral rather than `budgetAt`, whose value is a tower
+-- and would not normalise as a unary `Gas` — gas only bounds the
+-- recursion, so a run that completes under 20 is the real run.
+------------------------------------------------------------------
+
+runA : Stream Γ₀ natᵗ × Sched Γ₀ × EvalSt progA
+runA = subscribeE (gN 20) progA root 0 0 schedA stA
+
+schedA′ : Sched Γ₀
+schedA′ = proj₁ (proj₂ runA)
+
+stA′ : EvalSt progA
+stA′ = proj₂ (proj₂ runA)
+
+-- LOAD-BEARING, and tight: 4 against 4 — the same answer as from
+-- `st-init`, which is the finding, not a coincidence
+_ : depthE (gN 20) progA root 0 1 schedA′ stA′ ≡ 4
+_ = refl
+
+_ : (depthE (gN 20) progA root 0 1 schedA′ stA′
+       ≤ᵇ hopDᵉ 4 (slotHop 4 (Sched.slots schedA′)) progA
+           + pathNestD (root {Γ = Γ₀} {t = natᵗ}))
+      ≡ true
+_ = refl
+
+-- ⚠ AND THE GADGET'S MID-RUN STATE DOES NOT NORMALISE — a BOUNDARY,
+-- recorded so nobody pays for it twice.  `subscribeE (gN 200) progC`
+-- projected into `depthE` reached 7.9 GB of resident memory in six
+-- minutes and was killed; progC runs six ticks with a chain registered
+-- per tick, and the state term it returns is shared across both sides
+-- of the comparison rather than being reduced away.  So the mid-run
+-- coverage here is progA's store and nothing deeper.  The lever, if it
+-- is ever wanted, is the compiled harness (`make harness`), which runs
+-- real bodies and would report a number — `measured-not-rechecked`,
+-- and so useless for THIS purpose, which is a `refl`.

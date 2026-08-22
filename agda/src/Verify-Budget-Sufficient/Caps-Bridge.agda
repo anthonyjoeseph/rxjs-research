@@ -1186,6 +1186,14 @@ abstract
 -- `k = 3m` one and is spent below.  Nothing above this leaf reads the
 -- height.
 postulate
+  -- ⚠ AND DO NOT BOUND THE STORE'S CONTRIBUTION BY A MAX OVER SLOTS.
+  -- The predecessor's store measure did, and was refuted at a nine-slot
+  -- program: connects CHAIN, so slot k's def can subscribe slot k-1's,
+  -- and the depths ADD down the telescope where a max reads only the
+  -- deepest single slot.  `slotHop` is built the other way round — a
+  -- staged environment resolving each slot at its own index, which is
+  -- what stratification is for — so the arithmetic this leaf owes is
+  -- over that environment and not over a fold of `slotSize`.
   hopD-le-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     hopDᵉ (sizeCapAt e ins 1) (slotHop (sizeCapAt e ins 1) ins) e
       + pathNestD (root {Γ = Γ} {t = t})

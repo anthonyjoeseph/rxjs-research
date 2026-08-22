@@ -566,6 +566,20 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: a within-budget row was reported over budget"; fail=1; }; \
 	  echo "$$out" | grep -q "OVER BUDGET" \
 	    && { echo "SELFTEST FAIL: the length check fired on the sort fixture"; fail=1; }; \
+	  pre=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/fatpre.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/fatpre.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a tier whose PREAMBLE holds a leaked header PASSED — the preamble budget is dead"; fail=1; \
+	  fi; \
+	  echo "$$pre" | grep -q "TIER PREAMBLES OVER BUDGET" \
+	    || { echo "SELFTEST FAIL: the fat preamble was not reported"; fail=1; }; \
+	  echo "$$pre" | grep -q "^  Tier 0  fatpre.md" \
+	    || { echo "SELFTEST FAIL: the over-budget tier was not NAMED with its first preamble line"; fail=1; }; \
+	  echo "$$pre" | grep -q "^  Tier 1  fatpre.md" \
+	    && { echo "SELFTEST FAIL: a within-budget preamble was reported — three near-budget WRAPPED rows are being charged to their section, which is the bug this fixture exists for"; fail=1; }; \
+	  echo "$$pre" | grep -q "ROWS OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: the row budget fired on fatpre.md, so it does not prove the preamble check catches what the row check cannot"; fail=1; }; \
+	  echo "$$out" | grep -q "TIER PREAMBLES" \
+	    && { echo "SELFTEST FAIL: the preamble check fired on the sort fixture"; fail=1; }; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
 	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1 \
 	    | grep -q names-are-free \
