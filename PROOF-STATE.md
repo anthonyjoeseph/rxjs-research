@@ -157,10 +157,10 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`store-growth`** (Caps-Bridge) — FALSITY: one instant deepens the store by
-  at most its real width times the wrap factor. `nest-tick` is a body over it.
-  UNPROBEABLE, and the header says why: every reached index is degenerate and
-  the one that is not is reached by nobody. The route left is proof.
+- **`cascadeGo-nest`** (Caps-Bridge) — FALSITY: the whole of the bet
+  `store-growth` carried before the latch and the finish were priced off it.
+  One chain walk deepens the store by at most its real width times the wrap
+  factor. UNPROBEABLE, and its header says why.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
@@ -180,6 +180,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   receipt at instant 1, and the one place the currency is really bet — every
   cascade instance is slack. `burst-caps` is the shape, but `burst-all`
   produces no nesting conjunct yet, so the producing lemma is owed first.
+- **`storeNest-finish`** (Nest-Store) — GRINDABLE: the far end of a cascade only
+  shortens lists, and every summand of the store measure is a `⊔`-fold over one.
+  Its header names the proven twin at the same two branches.
 - **`pop-nest`, `pop-head-nest`** (Caps-Bridge) — GRINDABLE: the pop mirrors,
   clause for clause against the proven `pop-caps` and `pop-head-valCaps`.
 - **`chainsNest≤store`** (Caps-Face/Part7) — GRINDABLE: a `⊔`-fold dominates the

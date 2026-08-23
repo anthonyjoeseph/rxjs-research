@@ -1396,8 +1396,12 @@ def main() -> int:
         # FLOOR: without it a module that used to be fast and can no longer finish
         # keeps its old row, and this file then states a number that is not stale
         # but inverted.  It never enters `best`; see scripts/perf_record.py.
+        # The did-work guard cannot apply to a timeout: the run was KILLED, so
+        # its output was never parsed and the `Checking` counter is still zero.
+        # Requiring it there would drop every floor silently, which is the
+        # failure this recording exists to end.
         timed_out = WORK["timeout"]
-        if not args.focus and WORK["checking"] > 0 and (ok or timed_out):
+        if not args.focus and (timed_out or (ok and WORK["checking"] > 0)):
             perf_record.record(f"agda-dev {rel}", elapsed, floor=timed_out)
         return 0 if (ok and within_budget(args, elapsed)) else 1
 

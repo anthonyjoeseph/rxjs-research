@@ -59,7 +59,7 @@ open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_; RegId; NodeState;
   scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
-  Arrival; cascadeLatch; Chain; capsBase)
+  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish)
 open import Rx.Prim using (Source)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
@@ -131,6 +131,23 @@ storeNest-latch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 storeNest-latch a sched st with Arrival.isLast a
 ... | true  = refl
 ... | false = refl
+
+-- AND THE FINISH ONLY DROPS.  `cascadeFinish` either returns its inputs
+-- untouched or removes the spent source's registrations and sweeps the
+-- live list down to what survives them; the slot sum and the node table
+-- are not its arguments in either branch.  Every summand of the store
+-- measure is a ⊔-fold over a list, so a step that only shortens lists
+-- cannot raise it, which is why the growth statement one level up needs
+-- nothing from this end of the cascade.
+--
+-- TWIN: `cascadeFinish-caps` — the same preservation across the same
+--   two branches on the size face, proven, and its `true` arm is a
+--   single lemma about exactly the two list operations this one needs.
+postulate
+  storeNest-finish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    let r = cascadeFinish a sched st
+    in storeNestMax (proj₁ r) (proj₂ r) ≤ storeNestMax sched st
 
 -- THE SYNTACTIC FACTOR: the most any single fold can wrap an
 -- accumulator by, read off the program and its shared defs — a step

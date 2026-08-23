@@ -99,7 +99,7 @@ open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0;
    nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc; nest-sum-3;
-   realWidAt; nestSyn)
+   realWidAt; nestSyn; storeNest-latch; storeNest-finish; nestOK?-latch)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
@@ -794,17 +794,68 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- a refutation of the general form, which nothing here supplies —
 -- vacuous and degenerate rows reach no region and license no change of
 -- class or shape.  The route left is proof.
+--
+-- SO IT IS A BODY NOW, AND THE THREE ENDS OF A CASCADE ARE PRICED
+-- SEPARATELY.  `cascade` latches, walks the arrival's chains, then
+-- finishes, and only the middle one can deepen anything: the latch does
+-- not take the `Sched` at all and the finish only shortens lists.  Both
+-- of those are settled where the measure is defined, so the whole of
+-- the bet — every store this instant performs, against a width times a
+-- syntactic depth — lands on the walk and is legible there without the
+-- cascade's bookkeeping around it.  The split is what makes the fit
+-- checked: this body reduces, so the day the walk leaf is proven is the
+-- day we learn it was the right leaf.
+
+-- THE WALK IS WHERE THE WHOLE BET NOW SITS.  It carries the four
+-- premises unchanged, because the walk is where they are spent: the
+-- caps receipt bounds how many chains the arrival can reach, the
+-- nesting receipt bounds the store it starts from, and the arrival's
+-- own value bound is what each delivery pushes into the store.  What is
+-- owed is a walk invariant — after k chains the store has grown by at
+-- most k stores' worth — and the width premise turning k into
+-- `realWidAt`.
 postulate
-  store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     nestOK? e sl id sched st ≡ true →
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    let r = cascade a nextId sched st
+    let r = cascadeGo a nextId chains sched st
     in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+
+store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  let r = cascade a nextId sched st
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
+  ≤-trans (storeNest-finish a schedG stG)
+          (subst (λ m → storeNestMax schedG stG
+                          ≤ m + realWidAt e sl id * nestSyn e sl)
+                 (storeNest-latch a sched st)
+                 goNest)
+  where
+  st₀    = cascadeLatch a st
+  GO     = cascadeGo a nextId (chainsOf a st) sched st₀
+  schedG = proj₁ (proj₂ GO)
+  stG    = proj₂ (proj₂ GO)
+
+  goNest : storeNestMax schedG stG
+             ≤ storeNestMax sched st₀ + realWidAt e sl id * nestSyn e sl
+  goNest =
+    cascadeGo-nest sl id a nextId (chainsOf a st) sched st₀ hsl
+      (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
+      (trans (nestOK?-latch e sl id a sched st) hnest)
+      hval
 
 nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
