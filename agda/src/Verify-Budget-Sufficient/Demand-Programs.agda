@@ -28,7 +28,7 @@
 -- `make harness-build`.
 module Verify-Budget-Sufficient.Demand-Programs where
 
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; replicate; _++_)
 open import Data.Nat using (ℕ; suc; _+_)
 open import Data.Bool using (Bool; T; true)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
@@ -38,7 +38,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Product using (proj₁)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
-open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold)
+open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold; hot)
 open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; concatAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root;
@@ -206,6 +206,37 @@ sucGT ds ks j d k =
 -- its completion performs the connect mid-run, and the descent's value
 -- before and after that instant is a genuine question.
 ----------------------------------------------------------------------
+
+-- THE FAN FAMILY.  Every other family here registers each input once,
+-- so one arrival drives one chain and a cascade's delivery count is
+-- pinned at one — a count that cannot vary is not evidence about a
+-- bound on counts, whatever the bound.  This one subscribes the SAME
+-- ASYNC input `suc w` times, so the arriving slot has `suc w` registered
+-- chains and the cascade delivers once per chain.  That is what makes
+-- the count a free variable, and it is the only reason the family
+-- exists.
+-- and the slots it runs against: slot 1 HOT rather than cold, which is
+-- the whole point.  A cold source is re-created per subscription, so
+-- fanning one out buys separate arrival INSTANTS each carrying a single
+-- chain — the count stays pinned and nothing is learned.  A hot source
+-- is subscribed once and shared, so the `suc w` references land as
+-- `suc w` chains on ONE arrival, which is the configuration a
+-- multi-delivery cascade needs.
+insF : ℕ → ℕ → ℕ → Slots Γ₂
+insF ds ks j fzero =
+  shared (progD ds ks) {ok = subst T (sym (progD-below 0 ds ks)) tt}
+insF ds ks j (fsuc fzero) = scripted (hot (asyncNats j))
+
+progF : ℕ → ℕ → Closed Γ₂ natᵗ
+progF w k =
+  mergeAllᵉ (scanᵉ (foldD 1) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+                     ++ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ [])))))
+
+sucGF : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGF ds ks j w k =
+  suc (syncSizeᵉ (progF w k)
+       + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progF w k))
 
 progU : ℕ → ℕ → Closed Γ₂ natᵗ
 progU d k =

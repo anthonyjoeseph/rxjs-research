@@ -823,7 +823,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- because its bound is CAP-SIDE and this increment is deliberately not.
 -- So the route is: the walk invariant in deliveries, the proven bound to
 -- count them, and a leaf comparing the two denominations.
---
+
 -- AND THE COMPARISON FAILS, ON THE DENOMINATION LAW ITSELF RATHER THAN
 -- ON ANY NEW ARGUMENT.  That law says an increment denominated in a
 -- cap-side quantity must fit under the fuel that quantity itself
@@ -848,7 +848,36 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- delivery cap cannot be reached at any program, at any index, and the
 -- comparison has no instance.  Hypothesis side fine, conclusion side
 -- blocked — which is why the law had to settle it rather than a sweep.
---
+
+-- AND THE REAL-WIDTH COMPARISON MEASURES SAFE, WITH ROOM THAT WIDENS.
+-- Both sides of `delivN ≤ realWidAt` compute — the count off the
+-- evaluator's own delivered ledger, the width off `nwAt` — which is
+-- what makes the real-denominated question instantiable where the
+-- cap-denominated one was not.  Measured in `Harness.Main`
+-- (measured-not-rechecked, so this discharges nothing): at the entry
+-- index the count runs at one per registered chain while the width runs
+-- at ten per chain, and sweeping the fan alone leaves the count linear
+-- against a width of ten times the slope.  Widening the async length,
+-- the source list and the shared def's own size moves the width up by
+-- hundreds and the count not at all.
+
+-- WHAT MAKES THE ROWS ROWS is that the fan is on a HOT slot.  Every
+-- other family here reaches the arriving slot through a cold source,
+-- and a cold source is re-created per subscription — so fanning one out
+-- buys separate arrival INSTANTS each carrying a single chain, and the
+-- count sits at one however wide the fan.  A count that cannot vary is
+-- not evidence about a bound on counts, whatever the margin under it.
+-- Shared once, the same references land as that many chains on ONE
+-- arrival and the count becomes free.
+
+-- AND THE MARGIN HAS A REASON, WHICH IS WHY IT IS NOT LUCK.  A chain is
+-- a registration, a registration is a syntactic reference, and the
+-- entry width is seeded from `capsBase`, which counts the program's
+-- size and its entry ceiling.  So the only way to buy another delivery
+-- is to buy program size first, and the width is what size is spent on.
+-- That is the argument the leaf would have to make; the rows say it is
+-- worth making.
+
 -- SO THE COUNT MUST COME FROM A REAL WIDTH, AND THAT IS THE OPEN DESIGN
 -- QUESTION under this row.  The walk invariant is unaffected and is
 -- still worth having in deliveries; what has no supplier is the step
