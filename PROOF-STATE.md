@@ -158,16 +158,16 @@ a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
-- **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
-  depth induction, raw measures plus the instant's fresh term
-  `realWidAt · nestSyn`. Every axis but the STORE is covered by rows that
-  could have failed; that one rests on a sketch, which is what holds the
-  class.
+
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: the
   delivery half, lowered on load-bearing rows over both axes the six dead
   currencies died on, including the one instant that really spends margin.
   Its header prices them. Outside `depthE`'s induction, so not its
   sibling's precedent.
+- **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
+  depth induction. Only the SUBJECT axis can refute — the store and path move
+  the bound alone — and the sweeps drive it at the tight index on a product,
+  ratio settling. What remains is the induction.
 - **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — DIFFICULTY: the chain walk's
   induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
   tight — the overshoot is a constant per delivery on both axes. Residue: a

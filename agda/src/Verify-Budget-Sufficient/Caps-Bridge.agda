@@ -1647,19 +1647,23 @@ abstract
 -- afterwards arrives through the burst arm, which this statement's left
 -- side does not enter.  `Harness.Main`, measured-not-rechecked.
 
--- AND THAT ARGUMENT IS A SKETCH, WHICH IS WHAT HOLDS THIS ROW AT ITS
--- CLASS.  Every other axis the statement has is covered by rows that
--- could have failed and did not — the product diagonal at the index
--- whose fresh term is small, both skew directions, the subject and the
--- path together.  The store axis is not: a degenerate row reports
--- nothing, so the store summand is excluded by reading the definitions
--- rather than by instantiating them, and a proof sketch lowers no
--- class however sound it reads.  Nor is the sketch cheap to promote —
--- `depthE` reads the state throughout, since every chain edge
--- subscribes through it; the claim is narrower, that the state's
--- non-slot content cannot reach the NESTING the left side accumulates.
--- Stating that separably is what would close the axis, and it is not a
--- line.
+-- AND ONLY ONE AXIS OF THIS STATEMENT CAN REFUTE IT, WHICH IS WORTH
+-- SAYING BECAUSE THE COVERAGE QUESTION LOOKS WIDER THAN IT IS.  An
+-- axis that moves only the BOUND cannot produce a counterexample: more
+-- slack on the right of a `≤` weakens the claim.  The store summand is
+-- such an axis, so the running-state rows leaving the measure constant
+-- while the bound climbs are not a gap in the coverage — they are the
+-- shape a bound-side axis has, and no row over the store could have
+-- failed however it were built.  Same for the climbed path, whose
+-- summand the measure does not track.
+--
+-- SO THE COVERAGE QUESTION IS THE SUBJECT'S ALONE, and that is the one
+-- the sweeps drive hardest: the measure is the product of the scan
+-- family's two parameters, exactly, against a quadratic, at the index
+-- whose fresh term is `capsBase` rather than the wrap tower — the
+-- tight index, where a row can fail.  The ratio SETTLES rather than
+-- crossing, which is a claim about the limit and not about the points
+-- sampled.  What remains is the induction.
 --
 -- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
 --   restores the count-parametric predecessor's probe harness —
