@@ -31,8 +31,9 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤; *-monoˡ-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
+open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
@@ -849,6 +850,27 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- comparison has no instance.  Hypothesis side fine, conclusion side
 -- blocked — which is why the law had to settle it rather than a sweep.
 
+-- THE WALK'S PER-DELIVERY HALF, which is the half that has to be an
+-- induction.  It charges the store measure by what the walk actually
+-- DID rather than by what it was allowed to do: one `nestSyn` per
+-- delivery on the evaluator's own ledger, with no cap anywhere in the
+-- statement.  That is what lets the counting half be a separate leaf —
+-- and lets it be a comparison between two static quantities, which is
+-- the only reason it can be settled without the run.
+postulate
+  cascadeGo-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+    let r = cascadeGo a nextId chains sched st
+    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+         ≤ storeNestMax sched st
+             + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
+
 -- AND THE REAL-WIDTH COMPARISON MEASURES SAFE, WITH ROOM THAT WIDENS.
 -- Both sides of `delivN ≤ realWidAt` compute — the count off the
 -- evaluator's own delivered ledger, the width off `nwAt` — which is
@@ -893,17 +915,34 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 --   The lemma is proven and stays useful elsewhere; it is unspendable
 --   HERE.
 postulate
-  cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-deliv-real : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascadeGo a nextId chains sched st
-    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+    in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
+
+cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  let r = cascadeGo a nextId chains sched st
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval =
+  ≤-trans (cascadeGo-nest-perDeliv sl id a nextId chains sched st
+             hsl hcaps hnest hval)
+          (+-monoʳ-≤ (storeNestMax sched st)
+             (*-monoˡ-≤ (nestSyn e sl)
+                (cascadeGo-deliv-real sl id a nextId chains sched st
+                   hsl hcaps hnest)))
 
 store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

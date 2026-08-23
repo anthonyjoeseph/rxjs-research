@@ -157,10 +157,9 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`cascadeGo-nest`** (Caps-Bridge) — FALSITY: what `store-growth` carried
-  before the latch and the finish were priced off it. Its counting half is
-  PROVEN but cap-denominated, which the denomination law rules out — dead route
-  recorded. Open: a REAL width bound on deliveries, measured safe.
+- **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — FALSITY: the chain walk's own
+  induction, charging the store measure one `nestSyn` per delivery on the
+  evaluator's ledger. No cap in the statement; unprobed.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
@@ -170,6 +169,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   currencies died on, including the one instant that really spends margin.
   Its header prices them. Outside `depthE`'s induction, so not its
   sibling's precedent.
+- **`cascadeGo-deliv-real`** (Caps-Bridge) — DIFFICULTY: the walk's delivery
+  count under the real width. The cap-denominated route is a recorded dead
+  route; the real one measures safe with widening room on the count axis.
 - **`nestCap-3≤capsH`** (Nest-Store) — DIFFICULTY: the arithmetic both depth
   rows spend, and no evaluator in it. Exponential-per-instant recurrences
   against `blowH`'s pooled tower per instant; a cone is recoverable.
