@@ -58,9 +58,9 @@ open import Data.Product using (proj₁; proj₂)
 open import Rx.Prim using (towerℕ; gasPad; g0)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root)
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (runDry; progD; sucG; ins₀)
+  using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nestSyn; nestCapAt; realWidAt; storeNestMax)
+  using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -142,6 +142,21 @@ storeAfterRoot d k =
 
 allowance : ℕ → ℕ → ℕ
 allowance d k = capsBase (progD d k) ins₀ * nestSyn (progD d k) ins₀
+
+-- SERIES S — the same two numbers over the SHARED-SLOT family, whose
+-- one slot holds a def of the family's own shape.  The row prints
+-- `slotsNestSum` beside them because that is the arm Series Q cannot
+-- enter: a zero there says the sweep measured the same thing again.
+storeAfterRootS : ℕ → ℕ → ℕ → ℕ → ℕ
+storeAfterRootS ds ks d k =
+  let p = progS d k
+      r = subscribeE (gasPad (sucGS ds ks d k) g0) p root 0 0
+                     (sched-init p (insS ds ks)) (st-init p)
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+allowanceS : ℕ → ℕ → ℕ → ℕ → ℕ
+allowanceS ds ks d k =
+  capsBase (progS d k) (insS ds ks) * nestSyn (progS d k) (insS ds ks)
 
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
@@ -274,8 +289,26 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 2000 ≤ᵇ n
-... | true  = nestSweep (n ∸ 2000)
+rowAt n with 3000 ≤ᵇ n
+... | true  = sharedSweep (n ∸ 3000)
+  where
+  sharedSweep : ℕ → String
+  sharedSweep m =
+    let ds = m / 1000
+        ks = (m % 1000) / 100
+        d  = (m % 100) / 10
+        k  = m % 10
+        g  = storeAfterRootS ds ks d k
+        A  = allowanceS ds ks d k
+    in "ds=" ++ show ds ++ " ks=" ++ show ks
+       ++ " d=" ++ show d ++ " k=" ++ show k
+       ++ "  slotsNestSum = " ++ show (slotsNestSum (insS ds ks))
+       ++ "  storeNestMax after root = " ++ show g
+       ++ "  allowance = " ++ show A
+       ++ "  over = " ++ showB (A ≤ᵇ g)
+       ++ "  dry = " ++ showB (runDryS ds ks d k)
+... | false with 2000 ≤ᵇ n
+...   | true  = nestSweep (n ∸ 2000)
   where
   nestSweep : ℕ → String
   nestSweep dk =
@@ -288,9 +321,9 @@ rowAt n with 2000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-... | false with 1000 ≤ᵇ n
-...   | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...   | true  =
+...   | false with 1000 ≤ᵇ n
+...     | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...     | true  =
   let dk = n ∸ 1000
       d  = dk / 100
       k  = dk % 100

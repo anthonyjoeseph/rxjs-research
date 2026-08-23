@@ -758,16 +758,23 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- one: the allowance multiplies two program-shaped quantities where
 -- the growth is linear in each.  Nothing was refuted.
 
--- BUT THAT FAMILY CANNOT REACH THE SHAPE THAT KILLED THE PREDECESSOR,
--- and the gap is worth more than the rows are.  Its slots are EMPTY, so
--- `slotsNestSum` is zero and the shared-slot arm of `storeNestMax` is
--- never entered — while the witness that machine-refuted the
--- count-parametric currency was precisely a shared slot whose def is a
--- scan under a `mergeAllᵉ`.  So these rows are a receipt about the
--- subject-and-nodes arms only, and the arm the last refutation came
--- through is untested.  A family with a shared slot is what would
--- reach it.  Read the margin above as evidence about where it was
--- measured and nowhere else.
+-- THE SHARED-SLOT ARM IS THE ONE THAT KILLED THE PREDECESSOR, AND IT
+-- IS NOW REACHED.  The scan family's slots are EMPTY, so `slotsNestSum`
+-- is zero there and the arm is never entered — while the witness that
+-- machine-refuted the count-parametric currency was precisely a shared
+-- slot whose def is a scan under a `mergeAllᵉ`.  `Harness.Main`'s
+-- S-sweep puts a def of that shape in slot 0 and varies its depth and
+-- length independently of the root's.  The arm is not merely entered
+-- but LOAD-BEARING: at the deepest def the sweep reaches, the store's
+-- value IS the slot's nesting, the other three arms contributing
+-- nothing.  Every row still fits, and the margin widens the same way.
+
+-- WHAT REMAINS UNCOVERED IS THE INSTANT, NOT THE ARM.  Both sweeps
+-- measure the ROOT SUBSCRIBE frame, and this statement's instant is a
+-- DELIVERY — so they constrain the currency where it is seeded and
+-- leave the step it is stated about indicative only.  A cascade sweep
+-- is what would close that, and it needs an arrival the harness can
+-- build.
 postulate
   store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

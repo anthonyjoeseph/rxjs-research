@@ -1,4 +1,6 @@
--- THE SERIES Q PROGRAM FAMILY.  One home, and today one consumer.
+-- THE DEMAND PROGRAM FAMILIES — Q and S.  One home, and today one
+-- consumer.  Q is below; S is at the foot of the file, and its own
+-- section says what it reaches that Q cannot.
 --
 -- Q varies a scan fold's wrap DEPTH d and its source list LENGTH k
 -- independently, which is what makes it the only probe family that can
@@ -28,17 +30,19 @@ module Verify-Budget-Sufficient.Demand-Programs where
 
 open import Data.List using (List; []; _∷_)
 open import Data.Nat using (ℕ; suc; _+_)
-open import Data.Bool using (Bool)
-open import Data.Vec using () renaming ([] to []ⱽ)
+open import Data.Bool using (Bool; T; true)
+open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
+open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
+open import Data.Unit using (tt)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Product using (proj₁)
-open import Relation.Binary.PropositionalEquality using (refl)
+open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
 open import Rx.Prim using (g0; gasPad)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
-  Fn)
+  Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 
@@ -70,19 +74,20 @@ runDry h e =
 ----------------------------------------------------------------------
 
 -- wrap a term d mergeAll-levels deeper
-wrapD : ∀ {Θ} → ℕ → Tm Γ₀ [] [] Θ (obs natᵗ) → Tm Γ₀ [] [] Θ (obs natᵗ)
+wrapD : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
+  Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
 wrapD 0       t = t
 wrapD (suc d) t = strmᵗ (mergeAllᵉ (ofᵉ (wrapD d t ∷ [])))
 
 -- the fold that wraps the accumulator d levels per value
-foldD : ℕ → Fn Γ₀ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
+foldD : ∀ {n} {Γ : Ctx n} → ℕ → Fn Γ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
 foldD d = wrapD d (fstᵗ (varᵗ (here refl)))
 
-natsD : ℕ → List (Tm Γ₀ [] [] [] natᵗ)
+natsD : ∀ {n} {Γ : Ctx n} → ℕ → List (Tm Γ [] [] [] natᵗ)
 natsD 0       = []
 natsD (suc k) = nat̂ k ∷ natsD k
 
-progD : ℕ → ℕ → Closed Γ₀ natᵗ
+progD : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Closed Γ natᵗ
 progD d k =
   mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) (ofᵉ (natsD k)))
 
@@ -93,3 +98,62 @@ progD d k =
 -- So `runDry (sucG p) p ≡ true` REFUTES WalkStmt at p.
 sucG : Closed Γ₀ natᵗ → ℕ
 sucG b = suc (syncSizeᵉ b + hopDᵉ 0 (slotHop 0 ins₀) b)
+
+----------------------------------------------------------------------
+-- THE SHARED-SLOT FAMILY.  Series Q's slots are EMPTY, so `slotNest`
+-- is zero on every slot and the shared arm of the store's nesting
+-- measure is never entered — while the witness that machine-refuted
+-- the count-parametric currency came through exactly that arm.  S
+-- reaches it: one slot, whose def is a scan under a `mergeAllᵉ`, and a
+-- root that both references the slot and carries its own d and k.
+----------------------------------------------------------------------
+
+Γ₁ : Ctx 1
+Γ₁ = natᵗ ∷ⱽ []ⱽ
+
+-- STRATIFICATION HOLDS AT EVERY INDEX, INCLUDING ZERO, because the
+-- family mentions no `input` at all — which is what lets slot 0 (whose
+-- side condition admits nothing) hold a def of the family's full shape.
+-- The three inductions are what make the def's d and k PARAMETERS: the
+-- side condition is an implicit solved by unification, so without them
+-- the sweep could only vary the def by literal dispatch.
+wrapD-below : ∀ {n} {Γ : Ctx n} {Θ} (j d : ℕ)
+  (t : Tm Γ [] [] Θ (obs natᵗ)) →
+  inputsBelowᵗ j t ≡ true → inputsBelowᵗ j (wrapD d t) ≡ true
+wrapD-below j 0       t h = h
+wrapD-below j (suc d) t h rewrite wrapD-below j d t h = refl
+
+natsD-below : ∀ {n} {Γ : Ctx n} (j k : ℕ) →
+  inputsBelowᵗˢ j (natsD {Γ = Γ} k) ≡ true
+natsD-below j 0       = refl
+natsD-below j (suc k) = natsD-below j k
+
+progD-below : ∀ {n} {Γ : Ctx n} (j d k : ℕ) →
+  inputsBelowᵉ j (progD {Γ = Γ} d k) ≡ true
+progD-below {Γ = Γ} j d k
+  rewrite wrapD-below {Γ = Γ} {Θ = ((obs natᵗ) ×ᵗ natᵗ) ∷ []} j d
+            (fstᵗ (varᵗ (here refl))) refl =
+  natsD-below {Γ = Γ} j k
+
+insS : ℕ → ℕ → Slots Γ₁
+insS ds ks fzero =
+  shared (progD ds ks) {ok = subst T (sym (progD-below 0 ds ks)) tt}
+
+-- the root: the same scan, over the slot's emissions MERGED with its
+-- own k-element list, so d and k vary the root independently of the
+-- def's ds and ks
+progS : ℕ → ℕ → Closed Γ₁ natᵗ
+progS d k =
+  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ (ofᵉ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+
+sucGS : ℕ → ℕ → ℕ → ℕ → ℕ
+sucGS ds ks d k =
+  suc (syncSizeᵉ (progS d k)
+       + hopDᵉ 0 (slotHop 0 (insS ds ks)) (progS d k))
+
+runDryS : ℕ → ℕ → ℕ → ℕ → Bool
+runDryS ds ks d k =
+  hasDry (proj₁ (subscribeE (gasPad (sucGS ds ks d k) g0) (progS d k) root 0 0
+                            (sched-init (progS d k) (insS ds ks))
+                            (st-init (progS d k))))
