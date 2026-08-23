@@ -159,11 +159,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: the
-  delivery half, lowered on load-bearing rows over both axes the six dead
-  currencies died on, including the one instant that really spends margin.
-  Its header prices them. Outside `depthE`'s induction, so not its
-  sibling's precedent.
+- **`cascade-nest-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: the cascade face's
+  chain walk, charged one `nestSyn` per delivery. Same decomposition the store
+  face takes; the count converts to a width through the shared leaf.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction. Only the SUBJECT axis can refute — the store and path move
   the bound alone — and the sweeps drive it at the tight index on a product,

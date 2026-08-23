@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeLatch-caps; chainsOf-caps;
+  (cascadeGo-deliv-real; caps-tick; cascade-depth-capsH; cascadeLatch-caps; chainsOf-caps;
    chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
@@ -889,60 +889,6 @@ postulate
          ≤ storeNestMax sched st
              + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
 
--- AND THE REAL-WIDTH COMPARISON MEASURES SAFE, WITH ROOM THAT WIDENS.
--- Both sides of `delivN ≤ realWidAt` compute — the count off the
--- evaluator's own delivered ledger, the width off `nwAt` — which is
--- what makes the real-denominated question instantiable where the
--- cap-denominated one was not.  Measured in `Harness.Main`
--- (measured-not-rechecked, so this discharges nothing): at the entry
--- index the count runs at one per registered chain while the width runs
--- at ten per chain, and sweeping the fan alone leaves the count linear
--- against a width of ten times the slope.  Widening the async length,
--- the source list and the shared def's own size moves the width up by
--- hundreds and the count not at all.
-
--- WHAT MAKES THE ROWS ROWS is that the fan is on a HOT slot.  Every
--- other family here reaches the arriving slot through a cold source,
--- and a cold source is re-created per subscription — so fanning one out
--- buys separate arrival INSTANTS each carrying a single chain, and the
--- count sits at one however wide the fan.  A count that cannot vary is
--- not evidence about a bound on counts, whatever the margin under it.
--- Shared once, the same references land as that many chains on ONE
--- arrival and the count becomes free.
-
--- AND THE MARGIN HAS A REASON, WHICH IS WHY IT IS NOT LUCK.  A chain is
--- a registration, a registration is a syntactic reference, and the
--- entry width is seeded from `capsBase`, which counts the program's
--- size and its entry ceiling.  So the only way to buy another delivery
--- is to buy program size first, and the width is what size is spent on.
--- That is the argument the leaf would have to make; the rows say it is
--- worth making.
-
--- SO THE COUNT MUST COME FROM A REAL WIDTH, AND THAT IS THE OPEN DESIGN
--- QUESTION under this row.  The walk invariant is unaffected and is
--- still worth having in deliveries; what has no supplier is the step
--- from a delivery count to this increment.  A cap cannot supply it, and
--- the evaluator's own per-instant burst width is what the increment was
--- named after — so the fact to look for, or to state, is one bounding
--- the walk's deliveries by that width and not by a ceiling above it.
---
--- DEAD ROUTE: counting the walk's deliveries with `cascadeGo-deliveries`
---   and dominating its bound by this increment.  The bound is cap-side,
---   the increment is real, and the denomination law rules out the
---   comparison in that direction at the entry index and worse above it.
---   The lemma is proven and stays useful elsewhere; it is unspendable
---   HERE.
-postulate
-  cascadeGo-deliv-real : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    let r = cascadeGo a nextId chains sched st
-    in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
-
 cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -960,7 +906,7 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval =
           (+-monoʳ-≤ (storeNestMax sched st)
              (*-monoˡ-≤ (nestSyn e sl)
                 (cascadeGo-deliv-real sl id a nextId chains sched st
-                   hsl hcaps hnest)))
+                   hsl hcaps)))
 
 store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

@@ -1240,17 +1240,98 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- quadratically in the same parameter, so the one instant that spends
 -- margin spends a linear amount of a quadratic supply.
 -- `Harness.Main`, measured-not-rechecked.
+-- AND THE REAL-WIDTH COMPARISON MEASURES SAFE, WITH ROOM THAT WIDENS.
+-- Both sides of `delivN ≤ realWidAt` compute — the count off the
+-- evaluator's own delivered ledger, the width off `nwAt` — which is
+-- what makes the real-denominated question instantiable where the
+-- cap-denominated one was not.  Measured in `Harness.Main`
+-- (measured-not-rechecked, so this discharges nothing): at the entry
+-- index the count runs at one per registered chain while the width runs
+-- at ten per chain, and sweeping the fan alone leaves the count linear
+-- against a width of ten times the slope.  Widening the async length,
+-- the source list and the shared def's own size moves the width up by
+-- hundreds and the count not at all.
+
+-- WHAT MAKES THE ROWS ROWS is that the fan is on a HOT slot.  Every
+-- other family here reaches the arriving slot through a cold source,
+-- and a cold source is re-created per subscription — so fanning one out
+-- buys separate arrival INSTANTS each carrying a single chain, and the
+-- count sits at one however wide the fan.  A count that cannot vary is
+-- not evidence about a bound on counts, whatever the margin under it.
+-- Shared once, the same references land as that many chains on ONE
+-- arrival and the count becomes free.
+
+-- AND THE MARGIN HAS A REASON, WHICH IS WHY IT IS NOT LUCK.  A chain is
+-- a registration, a registration is a syntactic reference, and the
+-- entry width is seeded from `capsBase`, which counts the program's
+-- size and its entry ceiling.  So the only way to buy another delivery
+-- is to buy program size first, and the width is what size is spent on.
+-- That is the argument the leaf would have to make; the rows say it is
+-- worth making.
+
+-- SO THE COUNT MUST COME FROM A REAL WIDTH, AND THAT IS THE OPEN DESIGN
+-- QUESTION under this row.  The walk invariant is unaffected and is
+-- still worth having in deliveries; what has no supplier is the step
+-- from a delivery count to this increment.  A cap cannot supply it, and
+-- the evaluator's own per-instant burst width is what the increment was
+-- named after — so the fact to look for, or to state, is one bounding
+-- the walk's deliveries by that width and not by a ceiling above it.
+--
+-- DEAD ROUTE: counting the walk's deliveries with `cascadeGo-deliveries`
+--   and dominating its bound by this increment.  The bound is cap-side,
+--   the increment is real, and the denomination law rules out the
+--   comparison in that direction at the entry index and worse above it.
+--   The lemma is proven and stays useful elsewhere; it is unspendable
+--   HERE.
 postulate
-  cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-deliv-real : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    let r = cascadeGo a nextId chains sched st
+    in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
+
+postulate
+  cascade-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
-    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-      ≤ nestDᵛ (arrTy a) (arrVal a)
+    let stL = cascadeLatch a st
+        g   = cascadeGo a nextId (chainsOf a st) sched stL
+    in depthCascade a nextId (chainsOf a st) sched stL
+       ≤ nestDᵛ (arrTy a) (arrVal a)
+         + chainsNestD (chainsOf a st)
+         + storeNestMax sched stL
+         + delivN stL (proj₂ (proj₂ g)) * nestSyn e sl
+
+cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+    ≤ nestDᵛ (arrTy a) (arrVal a)
+      + chainsNestD (chainsOf a st)
+      + storeNestMax sched (cascadeLatch a st)
+      + realWidAt e sl id * nestSyn e sl
+cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps =
+  ≤-trans (cascade-nest-perDeliv sl id a nextId sched st hsl hcaps)
+          (+-monoʳ-≤ A (*-mono-≤ cnt (≤-refl {nestSyn e sl})))
+  where
+  stL = cascadeLatch a st
+  A   = nestDᵛ (arrTy a) (arrVal a)
         + chainsNestD (chainsOf a st)
-        + storeNestMax sched (cascadeLatch a st)
-        + realWidAt e sl id * nestSyn e sl
+        + storeNestMax sched stL
+
+  cnt : delivN stL
+          (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched stL)))
+          ≤ realWidAt e sl id
+  cnt = cascadeGo-deliv-real sl id a nextId (chainsOf a st) sched stL hsl
+          (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
+
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store
 -- measure charges, so this premise does not have to be threaded from the
