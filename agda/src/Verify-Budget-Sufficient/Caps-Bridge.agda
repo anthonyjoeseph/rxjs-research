@@ -780,15 +780,20 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- tower — so none of them could have failed, and they are recorded as
 -- a boundary rather than as a receipt.
 
--- SO THE RISK HAS MOVED, AND THE NEXT MOVE IS A RESTATEMENT RATHER
--- THAN A PROBE.  Nothing can instantiate the one id where this
--- statement says something a run could violate, which makes the whole
--- of its FALSITY risk sit in an instance no consumer asks for.  Stating
--- it at a successor index would remove that region without costing the
--- consumer anything — and unlike a hypothesis bolted on to suit today's
--- caller, the index floor is an invariant of the instant loop itself.
--- What must be checked before doing it is the other direction: that no
--- second consumer appears which needs the zero case.
+-- SO PROBING IS EXHAUSTED HERE, AND A RESTATEMENT IS NOT YET EARNED.
+-- Every instance a consumer reaches is degenerate, and the one
+-- non-degenerate index is not reached by any consumer — so no row can
+-- both matter and be run.  Stepping the harness at the zero index
+-- anyway does reach a narrow band where the premise is satisfiable, for
+-- programs small enough that the store fits under the bare syntactic
+-- cap, and the rows there hold; that band is the whole of what any
+-- machine can say about this statement.
+--
+-- The tempting move is to state it at a successor index, since nothing
+-- asks for zero.  That is a WEAKENING, and the justification for one is
+-- a refutation of the general form, which nothing here supplies —
+-- vacuous and degenerate rows reach no region and license no change of
+-- class or shape.  The route left is proof.
 postulate
   store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

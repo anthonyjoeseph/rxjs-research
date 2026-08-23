@@ -159,8 +159,8 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`store-growth`** (Caps-Bridge) — FALSITY: one instant deepens the store by
   at most its real width times the wrap factor. `nest-tick` is a body over it.
-  RESTATE BEFORE GRINDING: no consumer reaches the one index where it can
-  fail, so the risk sits in an instance nothing asks for. Header has the rows.
+  UNPROBEABLE, and the header says why: every reached index is degenerate and
+  the one that is not is reached by nobody. The route left is proof.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
