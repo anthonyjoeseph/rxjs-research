@@ -39,7 +39,7 @@ open import Data.Product using (proj₁)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
 open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold)
-open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
+open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; concatAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root;
   Path; _↠_; thru-outer; mergeᵒ)
@@ -193,6 +193,31 @@ sucGT : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
 sucGT ds ks j d k =
   suc (syncSizeᵉ (progT d k)
        + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progT d k))
+
+----------------------------------------------------------------------
+-- THE LATE-CONNECT FAMILY.  Every other family here connects its shared
+-- slot inside the ROOT SUBSCRIBE, so from the first delivery instant
+-- onward the slot is spent and a re-descent of the subject reads the
+-- same slot state forever.  A depth measure is state-sensitive only
+-- through that read, so those families cannot move it along a run and a
+-- row walked over them is degenerate on the state axis whatever it
+-- reports.  U puts the shared input BEHIND a concat, whose inner
+-- subscribes are deferred to arrivals: the scripted slot drains first,
+-- its completion performs the connect mid-run, and the descent's value
+-- before and after that instant is a genuine question.
+----------------------------------------------------------------------
+
+progU : ℕ → ℕ → Closed Γ₂ natᵗ
+progU d k =
+  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (concatAllᵉ (ofᵉ (strmᵗ (input (fsuc fzero))
+                    ∷ strmᵗ (input fzero)
+                    ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+
+sucGU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGU ds ks j d k =
+  suc (syncSizeᵉ (progU d k)
+       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progU d k))
 
 ----------------------------------------------------------------------
 -- THE CLIMBED-PATH FAMILY.  A compositional depth bound is stated over

@@ -19,8 +19,17 @@ its own recorded numbers leaves the file byte-identical, so a green run does not
 dirty the tree and does not produce a diff to review.  A row is rewritten only on
 a new best, or when `last` moves by more than NOISE.
 
-ONLY GREEN RUNS ARE RECORDED.  A timing from a failed check measures how long it
-took to fail, which is not a cost anyone wants to plan against.
+ONLY GREEN RUNS ARE RECORDED, WITH ONE EXCEPTION THAT IS THE SAME ARGUMENT
+RATHER THAN A HOLE IN IT.  A timing from a failed check measures how long it took
+to FAIL, which is not a cost anyone wants to plan against.  A timing from a check
+killed by the BUDGET measures no such thing: nothing went wrong, the clock simply
+ran out, so the number is a LOWER BOUND on the real cost and it is distorted in
+the slow direction like every other observation here.  Dropping it is the one way
+this file can state a number that is not merely stale but inverted -- a module
+that used to be fast and now cannot finish keeps its old row and reports the old
+figure, with nothing anywhere saying otherwise.  So a timeout updates `last` and
+sets a floor flag that renders it as `>Ns`, and it never touches `best`, which is
+still a real measurement of a run that really finished.
 """
 
 from __future__ import annotations
@@ -60,13 +69,19 @@ def _render(data: dict) -> str:
         "|---|---|---|---|",
     ]
     for name, r in rows:
-        out.append(f"| `{name}` | **{r['best']:.1f} s** | {r['last']:.1f} s | {r['runs']} |")
+        last = (f">{r['last']:.0f} s" if r.get("floor")
+                else f"{r['last']:.1f} s")
+        out.append(f"| `{name}` | **{r['best']:.1f} s** | {last} | {r['runs']} |")
     out += ["", f"<!-- AUTO:DATA {json.dumps(data, sort_keys=True)} -->", "", END]
     return "\n".join(out)
 
 
-def record(target: str, seconds: float) -> bool:
-    """Merge one observation.  Returns True if the file was rewritten."""
+def record(target: str, seconds: float, floor: bool = False) -> bool:
+    """Merge one observation.  Returns True if the file was rewritten.
+
+    `floor` marks an observation cut short by the caller's budget rather than
+    completed, so it bounds the cost from below and may not enter `best`.
+    """
     if not os.path.exists(DOC):
         return False
     text = open(DOC).read()
@@ -76,14 +91,26 @@ def record(target: str, seconds: float) -> bool:
     data = _load(text)
     row = data.get(target)
     if row is None:
-        data[target] = {"best": round(seconds, 1), "last": round(seconds, 1), "runs": 1}
+        if floor:
+            # No completed run to draw a `best` from, and a floor may not become
+            # one: it would understate a module nobody has ever seen finish.
+            data[target] = {"best": round(seconds, 1), "last": round(seconds, 1),
+                            "runs": 1, "floor": True}
+        else:
+            data[target] = {"best": round(seconds, 1), "last": round(seconds, 1),
+                            "runs": 1}
         changed = True
     else:
         row["runs"] += 1
         prev_last, prev_best = row["last"], row["best"]
+        prev_floor = row.get("floor", False)
         row["last"] = round(seconds, 1)
-        row["best"] = round(min(prev_best, seconds), 1)
-        changed = (row["best"] < prev_best) or (
+        if floor:
+            row["floor"] = True
+        else:
+            row.pop("floor", None)
+            row["best"] = round(min(prev_best, seconds), 1)
+        changed = (row["best"] < prev_best) or (row.get("floor", False) != prev_floor) or (
             prev_last > 0 and abs(seconds - prev_last) / prev_last > NOISE
         )
         # `runs` alone is not worth a rewrite; restore it if nothing else moved.

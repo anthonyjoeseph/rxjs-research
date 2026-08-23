@@ -1219,6 +1219,27 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- entry index is the only one where a row can fail, and no run reaches
 -- it, because the instant loop starts one above and only climbs.  Rows
 -- at a reachable index are slack by construction and are not run.
+
+-- THE STATE AXIS HOLDS TOO, AND ONE FAMILY IS NEEDED TO SEE THAT IT IS
+-- SAYING ANYTHING.  The parameter sweep reads one state — the one the
+-- root subscribe produced — so a bound that widened with the program
+-- said nothing about a bound walked along a run, where the store is the
+-- term that grows.  Stepping real cascades nine deep over the arrival
+-- family, the measure climbs and the difference between the two sides
+-- does not move by one: the store's growth enters both sides in the
+-- same amount.  Read alone that is a WEAK row, because a difference
+-- that never moves is equally what a statement insensitive to the run
+-- would report.
+--
+-- A family that connects its shared slot MID-RUN rather than in the
+-- subscribe burst is what separates the two.  There the measure jumps
+-- at the connect instant and the difference really does shrink, so the
+-- rows can fail and the invariance above is a finding rather than an
+-- artefact.  It does not fail: sweeping the shared program's value
+-- count, the jump grows by ONE per value while the bound grows
+-- quadratically in the same parameter, so the one instant that spends
+-- margin spends a linear amount of a quadratic supply.
+-- `Harness.Main`, measured-not-rechecked.
 postulate
   cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

@@ -939,7 +939,8 @@ def agda_flags(args) -> list[str]:
 # own header comments, which is where Agda requires an OPTIONS pragma to be.
 HOLES_PRAGMA: list[str] = []
 
-WORK = {"checking": 0}   # `Checking` lines seen this process; see run_one
+WORK = {"checking": 0, "timeout": False}   # `Checking` lines seen this process,
+# and whether the BUDGET killed a run rather than the run failing; see run_one
 
 
 def run_one(rel_dev: str, args) -> tuple[int, str, float]:
@@ -958,6 +959,7 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
                             timeout=(limit or None),
                             env={**os.environ, "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8"})
     except subprocess.TimeoutExpired:
+        WORK["timeout"] = True
         return 124, (
             f"agda-dev: killed at {limit:.0f}s (the budget).\n"
             "        CHECK THIS FIRST: how long does the module take under `make agda`?\n"
@@ -1384,14 +1386,19 @@ def main() -> int:
         t0 = time.time()
         ok = dev_check(rel, args, args.focus)
         elapsed = time.time() - t0
-        # RECORD ONLY A GREEN, WHOLE-MODULE RUN THAT ACTUALLY CHECKED SOMETHING.
+        # RECORD ONLY A GREEN, WHOLE-MODULE RUN THAT ACTUALLY CHECKED SOMETHING
+        # -- OR A RUN THE BUDGET KILLED, WHICH IS A LOWER BOUND AND NOT A FAILURE.
         # Green: a red run measures how long it took to fail.  Whole-module: a
         # per-member timing depends on WHICH member, so filing it under the file's
         # name would quietly redefine the row.  Did work: an all-interfaces-valid
         # run returns in deserialization time, and recording that would poison
-        # `best` forever (see run_one's WORK counter).
-        if ok and not args.focus and WORK["checking"] > 0:
-            perf_record.record(f"agda-dev {rel}", elapsed)
+        # `best` forever (see run_one's WORK counter).  A timeout is recorded as a
+        # FLOOR: without it a module that used to be fast and can no longer finish
+        # keeps its old row, and this file then states a number that is not stale
+        # but inverted.  It never enters `best`; see scripts/perf_record.py.
+        timed_out = WORK["timeout"]
+        if not args.focus and WORK["checking"] > 0 and (ok or timed_out):
+            perf_record.record(f"agda-dev {rel}", elapsed, floor=timed_out)
         return 0 if (ok and within_budget(args, elapsed)) else 1
 
     # A FILE IS REQUIRED.  There is deliberately no whole-project mode: it was

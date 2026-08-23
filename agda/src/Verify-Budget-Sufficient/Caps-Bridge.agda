@@ -1445,9 +1445,21 @@ abstract
 --
 -- TWO WAYS TO BUILD THAT SUBJECT ARE DEGENERATE and both were built
 -- before the third worked; `.Demand-Programs` carries which and why, at
--- the family rather than here.  What is not covered is the running state:
--- every row of both series reads the state the root subscribe produced,
--- so a state deep into a run is reached by nothing.
+-- the family rather than here.
+--
+-- THE RUNNING STATE CANNOT BE REACHED FROM THE ROOT, AND THAT IS A FACT
+-- ABOUT THE MIRROR RATHER THAN A GAP IN THE FAMILIES.  Walking a real
+-- run nine cascades deep and re-descending the subject at each step
+-- leaves the measure at a constant while the bound rises — on the
+-- arrival family, and again on one built specifically to connect its
+-- shared slot mid-run rather than in the subscribe burst.  So the row
+-- is DEGENERATE and reports nothing, twice, and the second time by
+-- construction: the descent's only state read is a slot's, a slot the
+-- descent reaches is connected by the very subscribe that reaches it,
+-- and a slot connected later is one the descent does not reach.  The
+-- two conditions exclude each other.  Whatever a run does to the state
+-- afterwards arrives through the burst arm, which this statement's left
+-- side does not enter.  `Harness.Main`, measured-not-rechecked.
 --
 -- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
 --   restores the count-parametric predecessor's probe harness —

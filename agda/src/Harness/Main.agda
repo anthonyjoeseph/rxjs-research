@@ -67,7 +67,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthCascade)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
-         progT; sucGT; insT; subjN; pathN)
+         progT; sucGT; progU; sucGU; insT; subjN; pathN)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
          pathNestD; chainsNestD)
@@ -292,6 +292,98 @@ cascNest e sl id sched st with sched-next sched
      ++ " bound = " ++ show rhs
      ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
 
+-- SERIES G — the axis both depth series leave open: a state DEEP INTO A
+-- RUN rather than the one the subscribe frame produced.  The walk steps
+-- real cascades and re-reads the comparison after each, holding the
+-- index at the entry value so that a slack row means the state moved the
+-- bound rather than that the tower did.  Decoupling those two is the
+-- whole point: a row deep in a run at a reachable index would be
+-- degenerate for the tower's reasons and would say nothing about state.
+cascWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+         → ℕ → ℕ → Sched Γ → EvalSt e → String
+cascWalk e sl 0       nextId sched st = ""
+cascWalk e sl (suc m) nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      lhs = depthCascade a nextId (chainsOf a st) sd stL
+      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st)
+            + storeNestMax sd stL + realWidAt e sl 0 * nestSyn e sl
+      r   = cascade a nextId sd st
+  in " | " ++ show lhs ++ "/" ++ show rhs
+     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
+     ++ cascWalk e sl m (suc nextId)
+                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+-- SERIES H — the same walk read against the DEPTH face rather than the
+-- delivery face, which is the half Series D and E left at the state the
+-- subscribe frame produced.  Re-descending the root subject from a state
+-- deep in a run is a real question and not a repeat of Series G: the two
+-- faces charge different things, so a margin that is invariant for one
+-- carries nothing about the other.
+depthRunWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+          → ℕ → ℕ → Sched Γ → EvalSt e → String
+depthRunWalk e sl 0       nextId sched st = ""
+depthRunWalk e sl (suc m) nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let lhs = depthE (budgetAt e sl 0) e root 0 0 sched st
+      rhs = nestDᵉ e + storeNestMax sched st
+            + realWidAt e sl 0 * nestSyn e sl
+      r   = cascade a nextId sd st
+  in " | " ++ show lhs ++ "/" ++ show rhs
+     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
+     ++ depthRunWalk e sl m (suc nextId)
+                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+depthRunWalkRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+depthRunWalkRow steps ds ks j d k =
+  let sl = insT ds ks j
+      p  = progT d k
+      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ depthRunWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+-- SERIES J — both walks over the LATE-CONNECT family, which is the only
+-- one here whose slot state moves after the root subscribe.  Series H
+-- read the depth face along a run and reported a constant; that row is
+-- degenerate rather than reassuring, because the T family spends its
+-- share in the subscribe burst and the descent has nothing left to see.
+-- J is where the depth face's state axis is actually load-bearing: if
+-- the mid-run connect raises the descent above the bound, this is the
+-- row that says so.
+depthRunWalkRowU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+depthRunWalkRowU steps ds ks j d k =
+  let sl = insT ds ks j
+      p  = progU d k
+      r  = subscribeE (gasPad (sucGU ds ks j d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ depthRunWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+cascWalkRowU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+cascWalkRowU steps ds ks j d k =
+  let sl = insT ds ks j
+      p  = progU d k
+      r  = subscribeE (gasPad (sucGU ds ks j d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ cascWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+cascWalkRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+cascWalkRow steps ds ks j d k =
+  let sl = insT ds ks j
+      p  = progT d k
+      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ cascWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
 cascRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 cascRow id ds ks j d k =
   let sl = insT ds ks j
@@ -433,29 +525,49 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 400000 ≤ᵇ n
-... | true  = cascRow (m / 100000) ((m % 100000) / 10000)
-                      ((m % 10000) / 1000) ((m % 1000) / 100)
-                      ((m % 100) / 10) (m % 10)
+rowAt n with 800000 ≤ᵇ n
+... | true  = cascWalkRowU 16 ((m % 100000) / 10000)
+                              ((m % 10000) / 1000) ((m % 1000) / 100)
+                              ((m % 100) / 10) (m % 10)
+  where m = n ∸ 800000
+... | false with 700000 ≤ᵇ n
+...   | true  = depthRunWalkRowU 16 ((m % 100000) / 10000)
+                                    ((m % 10000) / 1000) ((m % 1000) / 100)
+                                    ((m % 100) / 10) (m % 10)
+  where m = n ∸ 700000
+...   | false with 600000 ≤ᵇ n
+...     | true  = depthRunWalkRow 12 ((m % 100000) / 10000)
+                                    ((m % 10000) / 1000) ((m % 1000) / 100)
+                                    ((m % 100) / 10) (m % 10)
+  where m = n ∸ 600000
+...     | false with 500000 ≤ᵇ n
+...       | true  = cascWalkRow 12 ((m % 100000) / 10000)
+                               ((m % 10000) / 1000) ((m % 1000) / 100)
+                               ((m % 100) / 10) (m % 10)
+  where m = n ∸ 500000
+...      | false with 400000 ≤ᵇ n
+...        | true  = cascRow (m / 100000) ((m % 100000) / 10000)
+                        ((m % 10000) / 1000) ((m % 1000) / 100)
+                        ((m % 100) / 10) (m % 10)
   where m = n ∸ 400000
-... | false with 300000 ≤ᵇ n
-...   | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
+...        | false with 300000 ≤ᵇ n
+...          | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
   where m = n ∸ 300000
-...   | false with 200000 ≤ᵇ n
-...     | true  = depthRow (m / 100) (m % 100)
+...          | false with 200000 ≤ᵇ n
+...            | true  = depthRow (m / 100) (m % 100)
   where m = n ∸ 200000
-...     | false with 100000 ≤ᵇ n
-...       | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
+...            | false with 100000 ≤ᵇ n
+...              | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
                              ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 100000
-...       | false with 20000 ≤ᵇ n
-...         | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+...              | false with 20000 ≤ᵇ n
+...                | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 20000
-...         | false with 13000 ≤ᵇ n
-...           | true  = cascadeRow 6 (m / 100) (m % 100)
+...                | false with 13000 ≤ᵇ n
+...                  | true  = cascadeRow 6 (m / 100) (m % 100)
   where m = n ∸ 13000
-...           | false with 3000 ≤ᵇ n
-...             | true  = sharedSweep (n ∸ 3000)
+...                  | false with 3000 ≤ᵇ n
+...                    | true  = sharedSweep (n ∸ 3000)
   where
   sharedSweep : ℕ → String
   sharedSweep m =
@@ -472,8 +584,8 @@ rowAt n with 400000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDryS ds ks d k)
-...             | false with 2000 ≤ᵇ n
-...               | true  = nestSweep (n ∸ 2000)
+...                    | false with 2000 ≤ᵇ n
+...                      | true  = nestSweep (n ∸ 2000)
   where
   nestSweep : ℕ → String
   nestSweep dk =
@@ -488,9 +600,9 @@ rowAt n with 400000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...               | false with 1000 ≤ᵇ n
-...                 | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...                 | true  =
+...                      | false with 1000 ≤ᵇ n
+...                        | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...                     | true  =
   let dk = n ∸ 1000
       d  = dk / 100
       k  = dk % 100

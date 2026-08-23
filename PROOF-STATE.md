@@ -165,9 +165,11 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
   prices them and the denomination law is in Nest-Store's.
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY: the delivery
-  half, same restatement. The delivery machinery sits wholly outside
-  `depthE`'s induction, so neither row is the other's precedent.
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: the
+  delivery half, lowered on load-bearing rows over both axes the six dead
+  currencies died on, including the one instant that really spends margin.
+  Its header prices them. Outside `depthE`'s induction, so not its
+  sibling's precedent.
 - **`nestCap-3≤capsH`** (Nest-Store) — DIFFICULTY: the arithmetic both depth
   rows spend, and no evaluator in it. Exponential-per-instant recurrences
   against `blowH`'s pooled tower per instant; a cone is recoverable.
