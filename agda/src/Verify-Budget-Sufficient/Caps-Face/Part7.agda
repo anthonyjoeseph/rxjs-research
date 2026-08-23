@@ -1200,6 +1200,25 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- mirrored.  `capsOK?` is still a premise, because the delivery
 -- induction's fresh-mint bookkeeping is expected to spend the walk's
 -- receipts; the fact the conclusion needs comes from `nestOK?`.
+--
+-- THIS ONE PROBES CLEANLY, WHICH ITS SIBLING DOES NOT.  Its only
+-- uncomputable premise is `capsOK?`, so a row is a straight comparison
+-- with nothing to satisfy first — where the sibling's `nestOK?` premise
+-- goes unsatisfiable on the programs worth testing.  `Harness.Main`
+-- Series F takes the evaluator's own next arrival off the schedule the
+-- root subscribe hands over and computes both sides at the entry index,
+-- the one whose fresh term is `capsBase` rather than the wrap tower.
+--
+-- The margin GROWS, and by an order rather than a factor.  On the
+-- family's diagonal the measure is quadratic in the parameter while the
+-- bound is cubic, so the ratio bottoms out in the middle of the range
+-- and rises after it — the opposite of the subscribe side, which settles
+-- on a constant.  Nothing refuted.
+--
+-- THE INDEX IS THE BOUNDARY, exactly as it is for `store-growth`: the
+-- entry index is the only one where a row can fail, and no run reaches
+-- it, because the instant loop starts one above and only climbs.  Rows
+-- at a reachable index are slack by construction and are not run.
 postulate
   cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
