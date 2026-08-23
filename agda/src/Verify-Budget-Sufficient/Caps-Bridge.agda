@@ -98,7 +98,8 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0;
-   nestOK?; nestOK?-store; nest-sum-3; realWidAt; nestSyn)
+   nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc; nest-sum-3;
+   realWidAt; nestSyn)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
@@ -708,11 +709,14 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 
 -- THE NESTING INVARIANT RIDES THE TICK exactly as `capsOK?` does — in as
 -- a premise at `id`, out as a conjunct at `suc id` — because that is the
--- only shape the instant loop can carry.  `nest-tick` is the preservation
--- obligation, and it is where the increment has to be enough: one
--- instant re-wraps a stored accumulator at most once per delivery, and
--- `nestCapAt`'s step adds exactly the instant's real-width budget times
--- what the syntax wraps by.
+-- only shape the instant loop can carry.  `nest-tick` is the
+-- preservation obligation, and it is a BODY: the cap arithmetic is
+-- discharged here against `nestCapAt`'s own step equation, leaving
+-- `store-growth` as the single leaf.  What that split buys is that the
+-- leaf mentions no cap at all — it relates the store before an instant
+-- to the store after, and the bet is legible without the recurrence in
+-- the way.  It also makes the fit CHECKED: the body reduces, so the day
+-- the leaf is proven is the day we learn it was the right leaf.
 --
 -- THE MEASURE IS RAW AND THE INCREMENT IS REAL-DENOMINATED, and both
 -- halves are forced.  The count-parametric predecessor read the store
@@ -730,13 +734,12 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- its fuel by construction.  So the increment is priced by
 -- `realWidAt` — per-node folds are per-node deliveries, which are REAL
 -- burst widths, exponential per instant where every cap-side currency
--- towers.  What this row now carries is exactly that bet.  Probing it
--- goes through Nest-Store's exported equations or a hypothesised cap
--- value — the recurrence is sealed there for checker cost, and its
--- header says why.
+-- towers.  `store-growth` is exactly that bet with the arithmetic
+-- lifted off it.
 --
 -- AND THE LOAD-BEARING REGION IS THE FIRST STEP ONLY, which is worth
--- knowing before anyone spends a probe on a later one.  `Harness.Main`
+-- knowing before anyone spends a probe on the leaf at a later one.
+-- `Harness.Main`
 -- Series N evaluates this currency at a small program — the compiled
 -- calculator, so the seal is no obstacle there — and the cap goes 3 at
 -- entry to 66 after one instant, an increment of 63.  That is a real
@@ -746,7 +749,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- instants are degenerate, and a receipt claiming them would be
 -- claiming coverage nothing bought.
 postulate
-  nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
@@ -754,7 +757,29 @@ postulate
     nestOK? e sl id sched st ≡ true →
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascade a nextId sched st
-    in nestOK? e sl (suc id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+
+nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  let r = cascade a nextId sched st
+  in nestOK? e sl (suc id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval =
+  nestOK?-intro e sl (suc id)
+    (proj₁ (proj₂ (cascade a nextId sched st)))
+    (proj₂ (proj₂ (cascade a nextId sched st)))
+    (subst (storeNestMax (proj₁ (proj₂ (cascade a nextId sched st)))
+                         (proj₂ (proj₂ (cascade a nextId sched st))) ≤_)
+           (sym (nestCapAt-suc e sl id))
+           (≤-trans
+             (store-growth sl id a nextId sched st hsl hcaps hnest hval)
+             (+-monoˡ-≤ (realWidAt e sl id * nestSyn e sl)
+                        (nestOK?-store e sl id sched st hnest))))
 
 cascade-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →

@@ -62,6 +62,7 @@ open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; P
   Arrival; cascadeLatch; Chain; capsBase)
 open import Rx.Prim using (Source)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
+open import Decide using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps using (capsH)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
@@ -213,6 +214,27 @@ abstract
   nestOK?-store e sl id sched st h =
     ≤ᵇ⇒≤ (storeNestMax sched st) (nestCapAt e sl id)
          (subst T (sym h) tt)
+
+  -- and putting one back in: the seal means a consumer cannot reach the
+  -- predicate's `≤ᵇ` itself, so the introduction has to be exported
+  -- beside the elimination or a body proving the bound has no way to
+  -- state that it did
+  nestOK?-intro : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+    storeNestMax sched st ≤ nestCapAt e sl id →
+    nestOK? e sl id sched st ≡ true
+  nestOK?-intro e sl id sched st h =
+    ≤ᵇ-true (storeNestMax sched st) (nestCapAt e sl id) h
+
+  -- THE STEP, and it is the whole content of the currency: one instant
+  -- buys exactly its real width times the wrap factor.  A consumer
+  -- proving a preservation step needs this to say that what it proved
+  -- IS the next cap, and outside the block nothing else can.
+  nestCapAt-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    nestCapAt e sl (suc id)
+      ≡ nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+  nestCapAt-suc e sl id = refl
 
 ------------------------------------------------------------------
 -- THE ONE ARITHMETIC OBLIGATION THE WHOLE CURRENCY RESTS ON, and it

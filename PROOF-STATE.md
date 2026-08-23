@@ -157,10 +157,9 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`nest-tick`** (Caps-Bridge) — FALSITY: the preservation bet of the
-  re-denominated currency — raw store measure, increment priced by
-  `realWidAt`. PROBE IT FIRST, via Nest-Store's exported equations; its
-  header carries why no cap-side denomination can ever close this row.
+- **`store-growth`** (Caps-Bridge) — FALSITY: one instant deepens the store by
+  at most its real width times the wrap factor. `nest-tick` is a body over it.
+  PROBE THE FIRST STEP, the only non-degenerate one; the header says why.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
