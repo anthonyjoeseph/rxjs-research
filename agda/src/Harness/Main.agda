@@ -46,7 +46,7 @@ module Harness.Main where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_)
+open import Data.Nat using (_≡ᵇ_; ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_)
 open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_; toList)
@@ -64,6 +64,7 @@ open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using (budgetAt; chainsOf; cascadeLatch)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthCascade)
+open import Verify-Budget-Sufficient.Caps using (cDel; capsAt; Caps)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
@@ -364,6 +365,43 @@ depthRunWalkRowU steps ds ks j d k =
      ++ " d=" ++ show d ++ " k=" ++ show k
      ++ depthRunWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- SERIES K — the denomination question the walk leaf turns on.  A
+-- PROVEN lemma already bounds one walk's delivery count, but it bounds
+-- it by `cDel`, which is cap-side, and the increment the leaf must fit
+-- under is `realWidAt`, which is real.  Whether the proven bound can be
+-- spent at all is therefore one inequality between two computable
+-- numbers, and it decides between a route and a dead route.  Printed
+-- left to right so a stall names which side did not terminate.
+-- MODE selects ONE quantity, because the binary emits a row as a single
+-- line and a row that does not terminate loses everything printed before
+-- the stall.  0 the real width, 1 the cascade depth, 2 the cap record's
+-- size field, 3 the delivery cap at depth zero, 4 the delivery cap at
+-- the real depth.
+denomTail : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+          → ℕ → Sched Γ → EvalSt e → String
+denomTail e sl 0 sd st = "realWid0=" ++ show (realWidAt e sl 0)
+denomTail e sl 2 sd st = "cSize=" ++ show (Caps.cSize (capsAt e sl 0))
+denomTail e sl 3 sd st = "cDel@0=" ++ show (cDel (capsAt e sl 0) 0)
+denomTail e sl m sd st with sched-next sd
+... | inj₁ _         = "[no arrival]"
+... | inj₂ (a , sd₁) =
+  let dep = depthCascade a 1 (chainsOf a st) sd₁ (cascadeLatch a st)
+  in if m ≡ᵇ 1 then "dep=" ++ show dep
+     else "cDel@dep=" ++ show (cDel (capsAt e sl 0) dep)
+
+denomRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
+denomRow ds ks j d k =
+  let sl = insT ds ks j
+      p  = progT d k
+      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+      sd = proj₁ (proj₂ r)
+      st = proj₂ (proj₂ r)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  realWid0=" ++ show (realWidAt p sl 0)
+     ++ "  " ++ denomTail p sl ds sd st
+
 cascWalkRowU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 cascWalkRowU steps ds ks j d k =
   let sl = insT ds ks j
@@ -525,49 +563,53 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 800000 ≤ᵇ n
-... | true  = cascWalkRowU 16 ((m % 100000) / 10000)
-                              ((m % 10000) / 1000) ((m % 1000) / 100)
-                              ((m % 100) / 10) (m % 10)
+rowAt n with 900000 ≤ᵇ n
+... | true  = denomRow ((m % 100000) / 10000) ((m % 10000) / 1000)
+                       ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+  where m = n ∸ 900000
+... | false with 800000 ≤ᵇ n
+...   | true  = cascWalkRowU 16 ((m % 100000) / 10000)
+                                ((m % 10000) / 1000) ((m % 1000) / 100)
+                                ((m % 100) / 10) (m % 10)
   where m = n ∸ 800000
-... | false with 700000 ≤ᵇ n
-...   | true  = depthRunWalkRowU 16 ((m % 100000) / 10000)
+...   | false with 700000 ≤ᵇ n
+...     | true  = depthRunWalkRowU 16 ((m % 100000) / 10000)
                                     ((m % 10000) / 1000) ((m % 1000) / 100)
                                     ((m % 100) / 10) (m % 10)
   where m = n ∸ 700000
-...   | false with 600000 ≤ᵇ n
-...     | true  = depthRunWalkRow 12 ((m % 100000) / 10000)
+...     | false with 600000 ≤ᵇ n
+...       | true  = depthRunWalkRow 12 ((m % 100000) / 10000)
                                     ((m % 10000) / 1000) ((m % 1000) / 100)
                                     ((m % 100) / 10) (m % 10)
   where m = n ∸ 600000
-...     | false with 500000 ≤ᵇ n
-...       | true  = cascWalkRow 12 ((m % 100000) / 10000)
+...       | false with 500000 ≤ᵇ n
+...         | true  = cascWalkRow 12 ((m % 100000) / 10000)
                                ((m % 10000) / 1000) ((m % 1000) / 100)
                                ((m % 100) / 10) (m % 10)
   where m = n ∸ 500000
-...      | false with 400000 ≤ᵇ n
-...        | true  = cascRow (m / 100000) ((m % 100000) / 10000)
+...        | false with 400000 ≤ᵇ n
+...          | true  = cascRow (m / 100000) ((m % 100000) / 10000)
                         ((m % 10000) / 1000) ((m % 1000) / 100)
                         ((m % 100) / 10) (m % 10)
   where m = n ∸ 400000
-...        | false with 300000 ≤ᵇ n
-...          | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
+...          | false with 300000 ≤ᵇ n
+...            | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
   where m = n ∸ 300000
-...          | false with 200000 ≤ᵇ n
-...            | true  = depthRow (m / 100) (m % 100)
+...            | false with 200000 ≤ᵇ n
+...              | true  = depthRow (m / 100) (m % 100)
   where m = n ∸ 200000
-...            | false with 100000 ≤ᵇ n
-...              | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
+...              | false with 100000 ≤ᵇ n
+...                | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
                              ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 100000
-...              | false with 20000 ≤ᵇ n
-...                | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+...                | false with 20000 ≤ᵇ n
+...                  | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 20000
-...                | false with 13000 ≤ᵇ n
-...                  | true  = cascadeRow 6 (m / 100) (m % 100)
+...                  | false with 13000 ≤ᵇ n
+...                    | true  = cascadeRow 6 (m / 100) (m % 100)
   where m = n ∸ 13000
-...                  | false with 3000 ≤ᵇ n
-...                    | true  = sharedSweep (n ∸ 3000)
+...                    | false with 3000 ≤ᵇ n
+...                      | true  = sharedSweep (n ∸ 3000)
   where
   sharedSweep : ℕ → String
   sharedSweep m =
@@ -584,8 +626,8 @@ rowAt n with 800000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDryS ds ks d k)
-...                    | false with 2000 ≤ᵇ n
-...                      | true  = nestSweep (n ∸ 2000)
+...                      | false with 2000 ≤ᵇ n
+...                        | true  = nestSweep (n ∸ 2000)
   where
   nestSweep : ℕ → String
   nestSweep dk =
@@ -600,8 +642,8 @@ rowAt n with 800000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...                      | false with 1000 ≤ᵇ n
-...                        | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...                        | false with 1000 ≤ᵇ n
+...                          | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
 ...                     | true  =
   let dk = n ∸ 1000
       d  = dk / 100

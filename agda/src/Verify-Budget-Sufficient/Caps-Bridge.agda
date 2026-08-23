@@ -814,6 +814,34 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- owed is a walk invariant — after k chains the store has grown by at
 -- most k stores' worth — and the width premise turning k into
 -- `realWidAt`.
+
+-- AND HALF OF THAT IS ALREADY PROVEN, IN THE WRONG CURRENCY.  The
+-- counting half does not need building: `cascadeGo-deliveries` bounds
+-- exactly this walk's delivery count, over exactly these chains, and it
+-- is a real body.  Spending it needs one inequality — its bound against
+-- the increment here — and that inequality is the whole question,
+-- because its bound is CAP-SIDE and this increment is deliberately not.
+-- So the route is: the walk invariant in deliveries, the proven bound to
+-- count them, and a leaf comparing the two denominations.
+--
+-- BEFORE BUILDING THAT, SETTLE THE COMPARISON, AND NOT BY MACHINE.  The
+-- reason the leaf is not stated here already is that the design note
+-- this statement's own increment came from says real burst widths are
+-- what every cap-side currency TOWERS above — and if that holds of the
+-- delivery cap too, the comparison is false, the proven lemma cannot be
+-- spent against a real-denominated increment, and the route is dead
+-- rather than short.  Stating the leaf before knowing which way it goes
+-- would be building an assembly on a coin flip.
+--
+-- WHICH SIDE IS BLOCKED, MEASURED.  `Harness.Main`'s denomination row
+-- splits the comparison into one quantity per row, because the binary
+-- emits a row as a single line and a stall loses everything before it.
+-- The real width evaluates and so does the cascade depth the cap is
+-- read at — 64 and 4 at the smallest arrival program.  The cap record
+-- does not: `capsAt` fails to terminate even in compiled code, so the
+-- delivery cap cannot be reached at any program, at any index, and the
+-- comparison has no instance.  Hypothesis side fine, conclusion side
+-- blocked; this one is owed to arithmetic and no sweep will shorten it.
 postulate
   cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

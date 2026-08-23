@@ -157,10 +157,10 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`cascadeGo-nest`** (Caps-Bridge) — FALSITY: the whole of the bet
-  `store-growth` carried before the latch and the finish were priced off it.
-  One chain walk deepens the store by at most its real width times the wrap
-  factor. UNPROBEABLE, and its header says why.
+- **`cascadeGo-nest`** (Caps-Bridge) — FALSITY: what `store-growth` carried
+  before the latch and the finish were priced off it. Its counting half is
+  PROVEN but cap-denominated, so the route turns on one comparison its header
+  prices, which no machine settles — `capsAt` does not terminate.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
