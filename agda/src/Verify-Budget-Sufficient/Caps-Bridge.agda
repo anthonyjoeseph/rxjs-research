@@ -1646,6 +1646,20 @@ abstract
 -- two conditions exclude each other.  Whatever a run does to the state
 -- afterwards arrives through the burst arm, which this statement's left
 -- side does not enter.  `Harness.Main`, measured-not-rechecked.
+
+-- AND THAT ARGUMENT IS A SKETCH, WHICH IS WHAT HOLDS THIS ROW AT ITS
+-- CLASS.  Every other axis the statement has is covered by rows that
+-- could have failed and did not — the product diagonal at the index
+-- whose fresh term is small, both skew directions, the subject and the
+-- path together.  The store axis is not: a degenerate row reports
+-- nothing, so the store summand is excluded by reading the definitions
+-- rather than by instantiating them, and a proof sketch lowers no
+-- class however sound it reads.  Nor is the sketch cheap to promote —
+-- `depthE` reads the state throughout, since every chain edge
+-- subscribes through it; the claim is narrower, that the state's
+-- non-slot content cannot reach the NESTING the left side accumulates.
+-- Stating that separably is what would close the axis, and it is not a
+-- line.
 --
 -- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
 --   restores the count-parametric predecessor's probe harness —

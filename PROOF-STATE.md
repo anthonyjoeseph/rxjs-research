@@ -160,8 +160,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
-  `realWidAt · nestSyn`. Six dead currencies in this region; the header
-  prices them and the denomination law is in Nest-Store's.
+  `realWidAt · nestSyn`. Every axis but the STORE is covered by rows that
+  could have failed; that one rests on a sketch, which is what holds the
+  class.
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: the
   delivery half, lowered on load-bearing rows over both axes the six dead
   currencies died on, including the one instant that really spends margin.
