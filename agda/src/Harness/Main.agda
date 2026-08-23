@@ -61,7 +61,9 @@ open import Rx.Slots using (Slots)
 open import Rx.Prim using (towerℕ; gasPad; g0)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root;
   Sched; EvalSt; sched-next; cascade; arrTy; arrVal)
-open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
+open import Rx.Evaluator using (budgetAt)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
          progT; sucGT; insT)
@@ -224,6 +226,25 @@ cascadeRowT steps ds ks j d k =
      ++ " d=" ++ show d ++ " k=" ++ show k
      ++ walkC p sl steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- SERIES D — `depth-nest-compositional`'s conclusion at the ROOT call,
+-- which is the instance `depthE≤capsH-root` spends and the one index
+-- where the fresh term is `capsBase` rather than the wrap tower.  Both
+-- sides compute; only the `capsOK?` premise does not, for the reason
+-- Series C's block gives.  A row reading OVER is a refutation
+-- candidate modulo that premise.
+depthRow : ℕ → ℕ → String
+depthRow d k =
+  let p   = progD d k
+      sd  = sched-init p ins₀
+      st  = st-init p
+      lhs = depthE (budgetAt p ins₀ 0) p root 0 0 sd st
+      rhs = nestDᵉ p + storeNestMax sd st
+            + realWidAt p ins₀ 0 * nestSyn p ins₀
+  in "d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE = " ++ show lhs
+     ++ "  bound = " ++ show rhs
+     ++ (if lhs ≤ᵇ rhs then "  ok" else "  OVER")
+
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
@@ -355,18 +376,21 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 100000 ≤ᵇ n
-... | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
-                           ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+rowAt n with 200000 ≤ᵇ n
+... | true  = depthRow (m / 100) (m % 100)
+  where m = n ∸ 200000
+... | false with 100000 ≤ᵇ n
+...   | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
+                             ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 100000
-... | false with 20000 ≤ᵇ n
-...   | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+...   | false with 20000 ≤ᵇ n
+...     | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 20000
-...   | false with 13000 ≤ᵇ n
-...     | true  = cascadeRow 6 (m / 100) (m % 100)
+...     | false with 13000 ≤ᵇ n
+...       | true  = cascadeRow 6 (m / 100) (m % 100)
   where m = n ∸ 13000
-...     | false with 3000 ≤ᵇ n
-...       | true  = sharedSweep (n ∸ 3000)
+...       | false with 3000 ≤ᵇ n
+...         | true  = sharedSweep (n ∸ 3000)
   where
   sharedSweep : ℕ → String
   sharedSweep m =
@@ -383,8 +407,8 @@ rowAt n with 100000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDryS ds ks d k)
-...       | false with 2000 ≤ᵇ n
-...         | true  = nestSweep (n ∸ 2000)
+...         | false with 2000 ≤ᵇ n
+...           | true  = nestSweep (n ∸ 2000)
   where
   nestSweep : ℕ → String
   nestSweep dk =
@@ -399,9 +423,9 @@ rowAt n with 100000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...         | false with 1000 ≤ᵇ n
-...           | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...           | true  =
+...           | false with 1000 ≤ᵇ n
+...             | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...             | true  =
   let dk = n ∸ 1000
       d  = dk / 100
       k  = dk % 100

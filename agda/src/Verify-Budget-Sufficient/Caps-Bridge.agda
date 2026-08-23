@@ -1421,6 +1421,22 @@ abstract
 -- (.Nest-Store) pays three quantities each under `nestCapAt`, plus the
 -- fresh term, out of `capsH`, and the delivery side spends the same
 -- lemma.
+
+-- THE ROOT INSTANCE SURVIVES A PRODUCT, WHICH IS WHAT KILLED THE
+-- PREDECESSORS.  `Harness.Main` Series D computes both sides at the
+-- root call on the entry state — the instance `depthE≤capsH-root`
+-- spends, and the one index whose fresh term is `capsBase` rather than
+-- the wrap tower, so a row here can actually fail.  On the scan family's
+-- diagonal the measure is the product of the two parameters, exactly,
+-- while the bound is a quadratic with leading coefficient seven: the
+-- ratio falls from thirty-odd at the smallest program and settles, not
+-- crosses.  Both skew directions are wider still.  Nothing refuted.
+--
+-- WHAT IS NOT COVERED is every other instance.  The statement quantifies
+-- over an arbitrary subject, an arbitrary path and an arbitrary running
+-- state, and these rows fix all three at the root call from the entry
+-- state.  Inner subjects under a climbed path are where a compositional
+-- bound usually breaks, and no row reaches one.
 --
 -- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
 --   restores the count-parametric predecessor's probe harness —
