@@ -871,6 +871,17 @@ design to move, and it is the one worth naming when you find it.
   does NOT imply symbolic-or-nothing — say which SIDE is blocked.
 - **Never extrapolate a probe past its shapes.** Green on three canonical programs is a
   receipt, not a theorem; say which shapes were covered and which were not.
+- **AND DECIDE WHICH AXES CAN REFUTE BEFORE SWEEPING ANY OF THEM: ONLY A
+  MEASURE-SIDE AXIS CAN.** For a statement of the form `lhs ≤ rhs`, a parameter
+  that moves only the RIGHT weakens the claim, so no instantiation of it can
+  produce a counterexample — a sweep over such an axis is unfalsifiable by
+  construction, however many rows it has and however tight they read. This is
+  the rule below applied to the STATEMENT rather than to a row, and it is worth
+  having separately because it is decidable by looking at the type, before any
+  harness exists. It also runs the other way, which is where it costs something:
+  an axis with no coverage is a finding only if it moves the measure, so reading
+  a bound-side gap as a risk over-ranks the row and holds a class that nothing
+  is holding. Both errors were made on one row of this campaign, in that order.
 - **A row that could not have failed is not a row.** Label every probe row LOAD-BEARING or
   DEGENERATE and state what would make it fail. Three ways a probe lies green, all
   observed in one day, all erring toward false comfort: **(1) vacuous rows** — the
