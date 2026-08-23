@@ -265,7 +265,18 @@ directives, and report review. Standing protocol, per Anthony:
 
 - **Parallel workers are AUTHORIZED, and so is parallel Agda — up to a measured ceiling**
   (two heavyweight checks at once; cheap modules freely —
-  [docs/typecheck-cost.md](docs/typecheck-cost.md)). Beyond hardware:
+  [docs/typecheck-cost.md](docs/typecheck-cost.md)). **BUT THAT CEILING IS ABOUT
+  HARDWARE, AND IT BUYS NOTHING WHERE THE TWO CHECKS SHARE AN INTERFACE CACHE — WHICH
+  EVERY CHECK IN THIS REPO DOES.** Concurrent Agda over one cache does not merely
+  contend for cores: each run invalidates what the other is depending on, so the
+  cheaper one measures a REBUILDING CONE and reports it as its own cost. Measured on
+  the module that is this tree's claim door, **a 140× misreading — over fifteen
+  minutes without finishing, against six and a half seconds on a quiet machine** — and
+  it did not resolve on a retry, because every retry raced something too. The
+  rule the delegation section states over a WORKER's stray build is the same rule and
+  binds the design session identically: **while a gate is live, run no other check —
+  not a dev loop, not a "quick" one.** The concurrency worth having is READ-ONLY
+  fan-out, which touches no cache at all. Beyond hardware:
   **never let two workers edit the same module** — a shared file is a write conflict, not
   a parallel task, so have workers return replacement text and let the design session
   apply it and own the single recheck; **read-only fan-out is unconditionally safe**, so
