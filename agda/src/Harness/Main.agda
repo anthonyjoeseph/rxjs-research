@@ -66,9 +66,10 @@ open import Rx.Evaluator using (budgetAt)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
-         progT; sucGT; insT)
+         progT; sucGT; insT; subjN; pathN)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?)
+  using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
+         pathNestD)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -245,6 +246,28 @@ depthRow d k =
      ++ "  bound = " ++ show rhs
      ++ (if lhs ≤ᵇ rhs then "  ok" else "  OVER")
 
+-- SERIES E — the same conclusion at an INNER subject under a CLIMBED
+-- path, which is the axis Series D fixes.  The state is the one the
+-- root subscribe hands over, so it is reached by running; only the
+-- subject and the path are chosen, and the statement quantifies over
+-- both.  `thru-outer` peels one `obs`, so the two move together.
+depthRowInner : ℕ → ℕ → ℕ → String
+depthRowInner j d k =
+  let p   = progD d k
+      r   = subscribeE (gasPad (sucG p) g0) p root 0 0
+                       (sched-init p ins₀) (st-init p)
+      sd  = proj₁ (proj₂ r)
+      st  = proj₂ (proj₂ r)
+      b   = subjN j d k
+      κ   = pathN j
+      lhs = depthE (budgetAt p ins₀ 0) b κ 0 0 sd st
+      rhs = nestDᵉ b + pathNestD κ + storeNestMax sd st
+            + realWidAt p ins₀ 0 * nestSyn p ins₀
+  in "j=" ++ show j ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE = " ++ show lhs
+     ++ "  bound = " ++ show rhs
+     ++ (if lhs ≤ᵇ rhs then "  ok" else "  OVER")
+
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
@@ -376,21 +399,24 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 200000 ≤ᵇ n
-... | true  = depthRow (m / 100) (m % 100)
+rowAt n with 300000 ≤ᵇ n
+... | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
+  where m = n ∸ 300000
+... | false with 200000 ≤ᵇ n
+...   | true  = depthRow (m / 100) (m % 100)
   where m = n ∸ 200000
-... | false with 100000 ≤ᵇ n
-...   | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
+...   | false with 100000 ≤ᵇ n
+...     | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
                              ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 100000
-...   | false with 20000 ≤ᵇ n
-...     | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+...     | false with 20000 ≤ᵇ n
+...       | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
   where m = n ∸ 20000
-...     | false with 13000 ≤ᵇ n
-...       | true  = cascadeRow 6 (m / 100) (m % 100)
+...       | false with 13000 ≤ᵇ n
+...         | true  = cascadeRow 6 (m / 100) (m % 100)
   where m = n ∸ 13000
-...       | false with 3000 ≤ᵇ n
-...         | true  = sharedSweep (n ∸ 3000)
+...         | false with 3000 ≤ᵇ n
+...           | true  = sharedSweep (n ∸ 3000)
   where
   sharedSweep : ℕ → String
   sharedSweep m =
@@ -407,8 +433,8 @@ rowAt n with 200000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDryS ds ks d k)
-...         | false with 2000 ≤ᵇ n
-...           | true  = nestSweep (n ∸ 2000)
+...           | false with 2000 ≤ᵇ n
+...             | true  = nestSweep (n ∸ 2000)
   where
   nestSweep : ℕ → String
   nestSweep dk =
@@ -423,9 +449,9 @@ rowAt n with 200000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...           | false with 1000 ≤ᵇ n
-...             | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...             | true  =
+...             | false with 1000 ≤ᵇ n
+...               | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...               | true  =
   let dk = n ∸ 1000
       d  = dk / 100
       k  = dk % 100

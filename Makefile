@@ -796,30 +796,40 @@ gate-heavy:
 # empty changed set, or a multi-member block it failed to notice.  Both
 # directions are pinned, against real modules whose block structure is a fact
 # rather than a fixture, and via --verdict-only so it costs no typecheck.
+# A SELFTEST MUST NOT DEPEND ON HOW LONG SINCE THE LAST HEAVY GATE.  Drift
+# is a SECOND escalation axis, orthogonal to every property the cases below
+# assert, and it is on by default -- so once it crosses its limit the cases
+# that must NOT escalate do, the cases that must escalate start passing for
+# the wrong reason, and the whole selftest goes red on a clock rather than on
+# a defect.  Every case therefore pins the axis it is not testing: NODRIFT
+# where drift must stay silent, `--drift -1` in the one case that IS about
+# drift.
+NODRIFT := --drift 1000000
+
 dev-changed-selftest:
 	@fail=0; \
 	  m=agda/src/Verify-Budget-Sufficient/Walk-Level.agda; \
 	  n=agda/src/Verify-Budget-Sufficient/Walk-Level/Arms.agda; \
-	  out=$$(scripts/dev-changed.py --verdict-only --files $$m 2>&1); ec=$$?; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
 	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
 	  [ $$ec -eq 2 ] \
 	    || { echo "SELFTEST FAIL: escalation exited $$ec, not 2 — make must go red"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only --files $$n 2>&1); ec=$$?; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files $$n 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'light gate sufficient' \
 	    || { echo "SELFTEST FAIL: a module with NO multi-member block escalated — the light gate would never be usable"; fail=1; }; \
 	  [ $$ec -eq 0 ] \
 	    || { echo "SELFTEST FAIL: the no-block case exited $$ec, not 0"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only --max-files 2 --files $$n $$m $$n $$m 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --max-files 2 --files $$n $$m $$n $$m 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
 	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
 	  w=agda/src/Verify-Budget-Sufficient/Caps-Face/Part5.agda; \
-	  scripts/dev-changed.py --verdict-only --files $$w >/dev/null 2>&1 \
+	  scripts/dev-changed.py --verdict-only $(NODRIFT) --files $$w >/dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a wide consumer cone escalated to the tower — a wide cone is the one thing the light path leaves unchecked, so the answer is to CHECK the cone (a few dev passes), never to buy the whole build"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE.*commits since' \
 	    || { echo "SELFTEST FAIL: drift is invisible to --verdict-only — \`make gate\` routes on that verdict, so it would take the light path with the consumers long unchecked"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
 	    || { echo "SELFTEST FAIL: a file outside agda/src did not escalate — nothing would have checked it"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
@@ -842,10 +852,10 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Verify-Budget-Sufficient/Walk-Level.agda  — has a multi-member mutual block' \
 	    || { echo "SELFTEST FAIL: a cone member with a multi-member block was dropped in SILENCE — agda-dev stubs a block's siblings, so a dev check there is not a check, and the consumer that validates a new arm's FIT is exactly such a module"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only --files 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
 	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src escalates because no dev check can reach it; a cone member whose dev check would be STUBBED is named rather than silently dropped; and an empty changed set says so rather than passing quietly)"; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src escalates because no dev check can reach it; a cone member whose dev check would be STUBBED is named rather than silently dropped; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
 	  else exit 1; fi
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is

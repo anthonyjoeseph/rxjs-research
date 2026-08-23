@@ -1432,11 +1432,22 @@ abstract
 -- ratio falls from thirty-odd at the smallest program and settles, not
 -- crosses.  Both skew directions are wider still.  Nothing refuted.
 --
--- WHAT IS NOT COVERED is every other instance.  The statement quantifies
--- over an arbitrary subject, an arbitrary path and an arbitrary running
--- state, and these rows fix all three at the root call from the entry
--- state.  Inner subjects under a climbed path are where a compositional
--- bound usually breaks, and no row reaches one.
+-- AND THE CLIMBED PATH IS FREE, which is the axis the root rows fix and
+-- the one where a compositional bound usually breaks.  Series E moves
+-- the subject and the path together — `thru-outer` is the only frame the
+-- path measure charges, and it peels one `obs`, so a path of nesting j
+-- demands a subject j layers up — against the state the root subscribe
+-- hands over.  The measure does not move with j AT ALL, while the bound
+-- gains both the path's nesting and the subject's, so the margin widens
+-- along the whole axis.  The reason is structural and is the property a
+-- compositional statement needs: a subject's descent does not read what
+-- is above it, because the frames above are charged by the caller.
+--
+-- TWO WAYS TO BUILD THAT SUBJECT ARE DEGENERATE and both were built
+-- before the third worked; `.Demand-Programs` carries which and why, at
+-- the family rather than here.  What is not covered is the running state:
+-- every row of both series reads the state the root subscribe produced,
+-- so a state deep into a run is reached by nothing.
 --
 -- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
 --   restores the count-parametric predecessor's probe harness —

@@ -39,9 +39,10 @@ open import Data.Product using (proj₁)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
 open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold)
-open import Rx.Exp using (Ctx; Closed; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
+open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
-open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root)
+open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root;
+  Path; _↠_; thru-outer; mergeᵒ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
@@ -192,3 +193,34 @@ sucGT : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
 sucGT ds ks j d k =
   suc (syncSizeᵉ (progT d k)
        + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progT d k))
+
+----------------------------------------------------------------------
+-- THE CLIMBED-PATH FAMILY.  A compositional depth bound is stated over
+-- an arbitrary subject and an arbitrary rootward path, and the root
+-- call fixes both at their smallest — subject the whole program, path
+-- empty.  This varies them together: `thru-outer` is the one frame the
+-- path measure charges, so a stack of j of them is a path of nesting j,
+-- and the subject it demands is the program under j layers of `obs`.
+-- The two must move together because the frame peels exactly one layer.
+----------------------------------------------------------------------
+
+obsN : ℕ → Ty
+obsN 0       = natᵗ
+obsN (suc j) = obs (obsN j)
+
+pathN : ∀ {n} {Γ : Ctx n} (j : ℕ) → Path Γ (obsN j) natᵗ
+pathN 0       = root
+pathN (suc j) = thru-outer mergeᵒ 0 ↠ pathN j
+
+-- THE SUBJECT MUST NEST ON ITS OWN, and two constructors in a row make
+-- that easy to get wrong.  `ofᵉ` the measure sends to zero outright — a
+-- one-shot list reaches no subscribe.  A scan over one is barely better:
+-- the frame its burst passes is `scan-f`, which subscribes nothing, and
+-- the `thru-outer` above the subject is charged by the CALLER rather
+-- than by the subject's own descent.  Either way every row is
+-- degenerate however deep the path is.  So the scan's source is the
+-- program itself, whose `mergeAllᵉ` is what puts a level on.
+subjN : ∀ {n} {Γ : Ctx n} (j d k : ℕ) → Closed Γ (obsN j)
+subjN 0       d k = progD d k
+subjN (suc j) d k =
+  scanᵉ (fstᵗ (varᵗ (here refl))) (strmᵗ (subjN j d k)) (progD d k)
