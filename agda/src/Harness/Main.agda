@@ -54,12 +54,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
-open import Rx.Prim using (towerℕ)
-open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase)
+open import Data.Product using (proj₁; proj₂)
+open import Rx.Prim using (towerℕ; gasPad; g0)
+open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nestSyn; nestCapAt; realWidAt)
+  using (nestSyn; nestCapAt; realWidAt; storeNestMax)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -114,6 +115,34 @@ showB false = "false"
 -- Indices 20+ cannot be literal PATTERNS (Agda expands a numeric
 -- literal pattern to that many constructors), so Series N dispatches on
 -- an offset instead.  Row 20+k is `nestRow k`.
+-- SERIES N-SWEEP — how deep an instant ACTUALLY drives the store, against
+-- what the currency allows it.  `progD d k` scans k values with a fold
+-- wrapping its accumulator d mergeAll-levels deeper each time, so the
+-- stored accumulator is the one object in reach whose nesting grows with
+-- the run rather than with the syntax — which is exactly the growth the
+-- increment has to cover.
+--
+-- WHAT IS MEASURED, precisely, because the coverage claim is the whole
+-- value of a row: this is the ROOT SUBSCRIBE frame, not `cascade`.  So it
+-- constrains the subscribe side of the currency and is INDICATIVE ONLY
+-- for `store-growth`, whose own instant is a delivery.  The allowance
+-- printed beside it is the increment at instant 0 with `realWidAt`
+-- unfolded to its base — the recurrence is sealed, and its zero clause
+-- IS `capsBase`.
+--
+-- A ROW FAILS INTERESTINGLY when `over` reads true: the store went
+-- deeper in one instant than the instant was allowed to buy.  That is a
+-- lead to chase to a type-level witness, never itself the finding.
+storeAfterRoot : ℕ → ℕ → ℕ
+storeAfterRoot d k =
+  let p = progD d k
+      r = subscribeE (gasPad (sucG p) g0) p root 0 0
+                     (sched-init p ins₀) (st-init p)
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+allowance : ℕ → ℕ → ℕ
+allowance d k = capsBase (progD d k) ins₀ * nestSyn (progD d k) ins₀
+
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
@@ -245,9 +274,23 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 1000 ≤ᵇ n
-... | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-... | true  =
+rowAt n with 2000 ≤ᵇ n
+... | true  = nestSweep (n ∸ 2000)
+  where
+  nestSweep : ℕ → String
+  nestSweep dk =
+    let d = dk / 100
+        k = dk % 100
+        g = storeAfterRoot d k
+        A = allowance d k
+    in "d=" ++ show d ++ " k=" ++ show k
+       ++ "  storeNestMax after root = " ++ show g
+       ++ "  allowance = " ++ show A
+       ++ "  over = " ++ showB (A ≤ᵇ g)
+       ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
+... | false with 1000 ≤ᵇ n
+...   | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...   | true  =
   let dk = n ∸ 1000
       d  = dk / 100
       k  = dk % 100

@@ -717,7 +717,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- to the store after, and the bet is legible without the recurrence in
 -- the way.  It also makes the fit CHECKED: the body reduces, so the day
 -- the leaf is proven is the day we learn it was the right leaf.
---
+
 -- THE MEASURE IS RAW AND THE INCREMENT IS REAL-DENOMINATED, and both
 -- halves are forced.  The count-parametric predecessor read the store
 -- at the instant's own fold count at both ends, so the step paid for a
@@ -736,7 +736,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- burst widths, exponential per instant where every cap-side currency
 -- towers.  `store-growth` is exactly that bet with the arithmetic
 -- lifted off it.
---
+
 -- AND THE LOAD-BEARING REGION IS THE FIRST STEP ONLY, which is worth
 -- knowing before anyone spends a probe on the leaf at a later one.
 -- `Harness.Main`
@@ -748,6 +748,26 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- whether a store fits under THAT could not have failed: later
 -- instants are degenerate, and a receipt claiming them would be
 -- claiming coverage nothing bought.
+
+-- WHAT THE SWEEP FOUND, AND THE HOLE IN IT.  `Harness.Main`'s N-sweep
+-- runs the scan family whose fold wraps its accumulator a level deeper
+-- per value, and the store's depth after the instant comes out at
+-- exactly the product of the two parameters while the allowance comes
+-- out a product of `capsBase` and `nestSyn` — so the margin WIDENS in
+-- both, and it widens for a structural reason rather than a numerical
+-- one: the allowance multiplies two program-shaped quantities where
+-- the growth is linear in each.  Nothing was refuted.
+
+-- BUT THAT FAMILY CANNOT REACH THE SHAPE THAT KILLED THE PREDECESSOR,
+-- and the gap is worth more than the rows are.  Its slots are EMPTY, so
+-- `slotsNestSum` is zero and the shared-slot arm of `storeNestMax` is
+-- never entered — while the witness that machine-refuted the
+-- count-parametric currency was precisely a shared slot whose def is a
+-- scan under a `mergeAllᵉ`.  So these rows are a receipt about the
+-- subject-and-nodes arms only, and the arm the last refutation came
+-- through is untested.  A family with a shared slot is what would
+-- reach it.  Read the margin above as evidence about where it was
+-- measured and nowhere else.
 postulate
   store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
