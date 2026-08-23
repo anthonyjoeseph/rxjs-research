@@ -157,14 +157,28 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`subscribe-depth-capsH`** (Caps-Bridge) — SHAPE: the subscribe-side depth
-  bound. Its header prices four dead currencies which share a shape rather
-  than an arithmetic mistake, so what gets restated is the mechanism: a
-  nesting cap carried in the caps RECORD, not a fifth measure read off entry.
-- **`cascade-depth-capsH`** (Caps-Face/Part7) — SHAPE: the delivery half, over
-  `depthCascade`. Same defect, and its own trap is counting frames by the path
-  length, which `pathSz?` supplies as a SIZE. The delivery machinery sits
-  wholly outside `depthE`'s induction, so neither row is the other's precedent.
+- **`nest-tick`** (Caps-Bridge) — FALSITY: the nesting invariant's preservation
+  across one instant, and the statement the whole restated currency rests on.
+  One instant must re-wrap a stored accumulator at most fold-count-many times.
+- **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
+  depth induction, restated in the nesting currency after four size and width
+  currencies died in this region. Its header prices all four.
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY: the delivery
+  half. The delivery machinery sits wholly outside `depthE`'s induction, so
+  neither row is the other's precedent; they share only the arithmetic leaf.
+- **`nestCap-3≤capsH`** (Nest-Store) — DIFFICULTY: the arithmetic both depth
+  rows spend, and no evaluator in it. `blowH`'s pooled summand is the fold
+  count with every field pooled, so the headroom is there; a cone is recoverable.
+- **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY: the entry state's nesting
+  receipt. `init-capsOK?` is its route, but a scripted slot's obs-freeness only
+  reduces at a concrete type, so an `isData` inversion is owed first.
+- **`burst-nest`** (Caps-Bridge) — DIFFICULTY: the subscribe frame's nesting
+  receipt at instant 1. `burst-caps` is the shape, but `burst-all` produces no
+  nesting conjunct yet, so the producing lemma has to exist first.
+- **`pop-nest`, `pop-head-nest`** (Caps-Bridge) — GRINDABLE: the pop mirrors,
+  clause for clause against the proven `pop-caps` and `pop-head-valCaps`.
+- **`chainsNest≤store`** (Caps-Face/Part7) — GRINDABLE: a `⊔`-fold dominates the
+  selection it folds; `chainsOf-caps` is the same recursion at a size.
 - **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, large: the Ψ mirror of the PROVEN
   `subscribeE-caps` clique over the PROVEN `subscribeInner-Ψ` descent; the
   clause-by-clause sketch in its header names no undecided index.

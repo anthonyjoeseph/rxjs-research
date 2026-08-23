@@ -17,3 +17,4 @@
 module Probed.Main where
 
 open import Probed.Root using ()
+open import Probed.Nest-Depth using ()

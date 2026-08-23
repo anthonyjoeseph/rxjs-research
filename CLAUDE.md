@@ -300,7 +300,28 @@ build only to merge. Timings: `typecheck-performance-numbers.md`.
 - **A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF
   DIES** — three multi-hour OOMs came from unsealing one. Seal in the SAME edit that
   turns the postulate into a definition; no consumer ever needs more than the type.
+  **AND A CAP OR MEASURE IS WORSE THAN A BODY, BECAUSE IT LANDS IN TYPES.** A body is
+  normalised when someone unfolds it; a quantity named in a PREMISE is normalised at
+  every application of every statement carrying that premise, so ONE transparent
+  definition whose body reaches the caps recurrence puts the whole recurrence inside
+  every call site of the instant loop. **The tell: the body mentions a family the tower
+  already seals for cost.** Seal in the edit that introduces it, and export the one or
+  two equations consumers genuinely need as lemmas proven INSIDE the block — always
+  cheaper than transparency, and it makes the dependence on the body explicit.
   → [docs/typecheck-cost.md](docs/typecheck-cost.md)
+- **A MID-BUILD RSS OF SEVEN TO TWELVE GB IS NORMAL AND IS NOT EVIDENCE OF ANYTHING.**
+  Agda frees nothing across a single invocation, so the figure is the whole run's
+  allocation and the peak lands on whichever module happens to be LATE in the order —
+  which makes it a reading about position, not about the module the log names. Nor is a
+  long silence under one `Checking` line: the per-module figures in the numbers file come
+  from the dev loop, which STUBS mutual blocks, so a module that reads as seconds there
+  legitimately takes many minutes under the real termination check. **The consequence, and
+  it is the whole reason this is a rule: DO NOT KILL A LONG BUILD ON EITHER SIGNAL.** A
+  full gate run is a matter of tens of minutes at every tower size on record; killing at
+  fifteen because the number looked alarming costs the run, poisons the next one's
+  attribution, and buys a diagnosis of something that was never happening. Twice, in one
+  session. Read the numbers file BEFORE concluding a build is sick.
+  → [typecheck-performance-numbers.md](typecheck-performance-numbers.md)
 - **THE BUILD IS NOT `--safe`, AND NOTHING MECHANICALLY STOPS AN UNSAFE PRAGMA** — so
   `make unsafe-check` policies them by grep, and anything it finds on the proof path is a
   soundness hole no mandate in this file authorises.

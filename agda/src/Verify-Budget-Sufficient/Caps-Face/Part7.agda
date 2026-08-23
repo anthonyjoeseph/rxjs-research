@@ -30,6 +30,10 @@ open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; Fn; μᵉ; unfoldμ; evalTm;
   applyFn)
 open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
+open import Rx.Nest-Depth using (nestDᵛ)
+open import Verify-Budget-Sufficient.Nest-Store using
+  (chainsNestD; storeNestMax; foldsAt; nestCapAt; nestOK?; nestOK?-latch;
+   nestOK?-store; nest-sum-3; storeNest-latch)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; merge-st;
   concat-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
   scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
@@ -1184,22 +1188,62 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- SIZE, which sits exponentially above `capsH` at every level, and the
 -- gap is not an arithmetic one.  The sibling carries that finding and
 -- the four dead currencies behind it; this row inherits all of it,
--- including that a nesting cap belongs in the caps record rather than
--- in a measure read off the subject.
+-- including which measure replaced them.
 --
--- CONDITIONED ON `capsOK?`, deliberately: the unconditional form is
--- false because a state may carry an arbitrarily deep store that no cap
--- has seen.  The conditioned form is not yet enough either, for the
--- reason above — `capsOK?`'s only handle on a stored observable is its
--- size.
+-- SO IT IS STATED IN THE NESTING CURRENCY, and split the same way: the
+-- leaf is the delivery induction, bounding the cascade by the nesting of
+-- the arriving payload, of the chains it fans out to, and of the store.
+-- The arithmetic half is `nest-sum-3` (.Nest-Store), which the subscribe
+-- side spends too — genuinely shared rather than mirrored.  `capsOK?` is
+-- still a premise, but only to pin the fold count the measure multiplies
+-- by; the fact the conclusion needs comes from `nestOK?`.
 postulate
-  cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-      ≤ capsH e sl id
+      ≤ nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a)
+        + chainsNestD (foldsAt e sl id) (chainsOf a st)
+        + storeNestMax (foldsAt e sl id) sched (cascadeLatch a st)
+
+-- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store
+-- measure charges, so this premise does not have to be threaded from the
+-- caller: `chainsOf` filters the registry by source and type, and a
+-- `⊔`-fold dominates any sublist of what it folds.  The arriving
+-- PAYLOAD is the one quantity that genuinely is not in the state — the
+-- schedule has already popped it — so that one stays a premise, exactly
+-- as `valCaps?` does beside it.
+--
+-- TWIN: `chainsOf-caps` above takes `regsSz?` to the same bound over the
+--   same selection, by recursion on the registry through `chainsGo-caps`.
+postulate
+  chainsNest≤store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (W : ℕ)
+    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    chainsNestD W (chainsOf a st) ≤ storeNestMax W sched st
+
+cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+    ≤ capsH e sl id
+cascade-depth-capsH {e = e} sl id a nextId sched st slEq cok nok harr =
+  ≤-trans (cascade-nest-compositional sl id a nextId sched st slEq cok)
+          (nest-sum-3 e sl id _ _ _ harr
+            (≤-trans (chainsNest≤store (foldsAt e sl id) a sched st)
+                     (≤-trans (≤-reflexive
+                                (sym (storeNest-latch (foldsAt e sl id)
+                                                      a sched st)))
+                              store≤cap))
+            store≤cap)
+  where
+  store≤cap = nestOK?-store e sl id sched (cascadeLatch a st)
+                (trans (nestOK?-latch e sl id a sched st) nok)
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
@@ -1259,10 +1303,12 @@ caps-tick :
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   let r = cascade a nextId sched st
   in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre val =
+caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val =
   cascadeFinish-caps (capsAt e sl (suc id)) a (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
     (capsOK?-mono (frameStep j c) (capsAt e sl (suc id))
                   (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
@@ -1282,7 +1328,7 @@ caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre val =
            -- slot store as a summand
            (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e))
                     (capsAt-base-size e sl id))
-           (cascade-depth-capsH sl id a nextId sched st slEq pre)
+           (cascade-depth-capsH sl id a nextId sched st slEq pre nok bnd)
   GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
   j     = proj₁ GO
   jFits = proj₁ (proj₂ GO)
