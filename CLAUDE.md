@@ -802,6 +802,29 @@ design to move, and it is the one worth naming when you find it.
   green forever as evidence for a question already settled. A probe that outlives its
   target because what it really pins is the EVALUATOR is not a probe: it is a unit test,
   and its home is the bug cache.
+- **A PROBE'S TARGETS ARE WHAT ITS ROWS ARE EVIDENCE ABOUT — NOT EVERYTHING ITS
+  FINDINGS TOUCH.** A probe yields two products with different homes, and conflating
+  them is how a receipt comes to claim coverage nobody bought. The ROWS are evidence
+  about the statements they instantiate: they land as `TARGET:` declarations and
+  `PROBED:` receipts, and a receipt naming a statement the rows never reached is a FALSE
+  coverage claim — worse than no receipt, since the next reader budgets nothing for a
+  region nothing covered. A FINDING is ordinary charged prose in whatever statement it
+  CONSTRAINS, which is usually not the target: an obligation on a quantity the target
+  merely takes as given is owed where that quantity is DEFINED, and a definition cannot
+  carry a receipt at all, since `make evidence-check` requires one to sit above a
+  postulate. So the finding goes in the definition's own block, naming the probe module
+  in backticks — the sanctioned in-passing form, one hop, and `make find` takes the name.
+- **AND A PROBE INFORMING N STATEMENTS GETS N ONE-LINE POINTERS, NEVER N COPIES OF ITS
+  COVERAGE CLAIM.** Several `-- TARGET:` lines in one probe are supported, so the probe
+  stays the single home for what it covered. N copies is the drift failure the
+  explanation-echo check exists for, arriving one level up: the copies age
+  independently, and nothing then says which one is current.
+- **AND THE PROVENANCE OF A FINDING TRAVELS WITH THE FINDING, NOT WITH THE RECEIPT.**
+  Whether something was turned up by INSTANTIATION or by reading the definitions is a
+  reason to trust it, so it belongs in the same block as the claim it justifies. Put it
+  in an explanation sitting above a `PROBED:` section instead and it reads as narrating
+  the ledger, which is charged, checked, and the wrong place; put it beside the finding
+  and it is neither.
 - **DETERMINE COMPUTABILITY BY LOOKING, NEVER FROM A REMEMBERED LIST.** Whether a family
   reduces is a property of the code TODAY: an `abstract` block seals it, and blocks get
   added for measured performance reasons without the statements above them changing. Check

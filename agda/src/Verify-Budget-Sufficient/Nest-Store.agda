@@ -136,6 +136,19 @@ storeNest-latch W a sched st with Arrival.isLast a
 -- `sizeCount` with every field pooled at `towerℕ`, which is above the
 -- caps by `capsAt-tower`.  So each instant's increment is under half of
 -- what `capsH` gains that instant, and the sum telescopes.
+-- AND WHAT THIS COUNT OWES ITS CONSUMERS: IT MUST DOMINATE EVERY
+-- SCAN'S FOLD COUNT, NOT THE OUTERMOST ONE.  The nesting measure has a
+-- single count to spend and spends it once per scan layer, so at a scan
+-- inside a scan's step function it reads `W · (W · w + 1)` — which lands
+-- UNDER the true triple product the moment `W` dominates only the inner
+-- count.  So a `foldsAt` returning one instant's outermost fold count
+-- would be too small, and the obligation is on THIS definition rather
+-- than on any statement that takes it as given, none of which shows it.
+-- The rows that found it are the nested-scan pair in
+-- `Probed.Nest-Depth`, which is where the requirement is legible as
+-- arithmetic; it was invisible from every statement's type, and reading
+-- the definitions is not what turned it up.
+
 -- SEALED, and it is the one part of this module that must be: `foldsAt`
 -- unfolds to `sizeCount (capsAt …) (capsH …)`, so a transparent cap puts
 -- the whole caps recurrence inside every type that mentions the nesting
