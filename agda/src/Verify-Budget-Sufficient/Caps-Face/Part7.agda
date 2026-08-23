@@ -1277,6 +1277,20 @@ chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 -- named after — so the fact to look for, or to state, is one bounding
 -- the walk's deliveries by that width and not by a ceiling above it.
 --
+-- DEAD ROUTE: reusing the proven lemma's CORE and swapping its final
+--   widening.  `cascadeGo-deliveries` reads as core-plus-three-widenings
+--   — the walk at level zero, then the dispatch gas to `cSize`, the walk
+--   length to `cReg`, and `dCapᶜ`'s unfolding — which invites keeping the
+--   core and landing it somewhere real instead.  It does not work, and
+--   the reason is one level deeper than the widenings: the walk module is
+--   PARAMETERISED BY THE CAPS, so its result type already reads
+--   `dWalkᶜ cSize cWid cReg …`.  The count is cap-denominated inside the
+--   apparatus and `cDel` is only its final form.  Re-instantiating the
+--   module at real numbers is not available either, since its invariants
+--   are the `capsOK?` ones, true of the caps and of nothing else.  So a
+--   real-width delivery bound needs new machinery rather than a different
+--   exit from the old, and the proven lemma is not a transferable twin
+--   however exactly its left side matches.
 -- DEAD ROUTE: counting the walk's deliveries with `cascadeGo-deliveries`
 --   and dominating its bound by this increment.  The bound is cap-side,
 --   the increment is real, and the denomination law rules out the

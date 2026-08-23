@@ -170,9 +170,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
   tight — the overshoot is a constant per delivery on both axes. Residue: a
   step that stores without delivering.
-- **`cascadeGo-deliv-real`** (Caps-Bridge) — DIFFICULTY: the walk's delivery
-  count under the real width. The cap-denominated route is a recorded dead
-  route; the real one measures safe with widening room on the count axis.
+- **`cascadeGo-deliv-real`** (Caps-Face/Part7) — DIFFICULTY: the walk's delivery
+  count under the real width; both nest faces now spend it. Measures safe, but
+  the proven counter is cap-denominated INSIDE its walk module, so this wants
+  new machinery — two dead routes recorded.
 - **`nestCap-3≤capsH`** (Nest-Store) — DIFFICULTY: the arithmetic both depth
   rows spend, and no evaluator in it. Exponential-per-instant recurrences
   against `blowH`'s pooled tower per instant; a cone is recoverable.
