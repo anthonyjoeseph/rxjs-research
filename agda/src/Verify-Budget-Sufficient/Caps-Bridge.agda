@@ -97,8 +97,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; slotsNestSum; storeNestMax; foldsAt; nestCapAt; nestCapAt-0;
-   nestOK?; nestOK?-store; nest-sum-3)
+  (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0;
+   nestOK?; nestOK?-store; nest-sum-3; realWidAt; nestSyn)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
@@ -586,7 +586,7 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      valB? B Ψ (arrTy a) (arrVal a) ≡ true →
      capsOK? (capsAt e sl id) sched st ≡ true →
      nestOK? e sl id sched st ≡ true →
-     nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
      valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
      hasDry (proj₁ (cascade a id sched st)) ≡ false
 dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC =
@@ -709,10 +709,31 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- THE NESTING INVARIANT RIDES THE TICK exactly as `capsOK?` does — in as
 -- a premise at `id`, out as a conjunct at `suc id` — because that is the
 -- only shape the instant loop can carry.  `nest-tick` is the preservation
--- obligation, and it is where the fold-count increment has to be enough:
--- one instant re-wraps a stored accumulator at most once per fold, and
--- `nestCapAt`'s step adds exactly that count times what the syntax wraps
--- by.
+-- obligation, and it is where the increment has to be enough: one
+-- instant re-wraps a stored accumulator at most once per delivery, and
+-- `nestCapAt`'s step adds exactly the instant's real-width budget times
+-- what the syntax wraps by.
+--
+-- THE MEASURE IS RAW AND THE INCREMENT IS REAL-DENOMINATED, and both
+-- halves are forced.  The count-parametric predecessor read the store
+-- at the instant's own fold count at both ends, so the step paid for a
+-- store measured at a count it never charged: at a program with one
+-- shared slot whose def is a scan, the cap collapsed to a square of the
+-- entry count and the statement FORCED the count itself to at most
+-- square per instant — while the width the count reads steps by
+-- `foldStep S w = S ^ suc w` per fold, a tower.  The witness that
+-- machine-refuted it: one shared slot whose def is a scan under a
+-- `mergeAllᵉ`, at the first tick, with the cap computing to the square.
+-- And no other count can serve, because the squeeze is not about which
+-- index: any increment denominated in a cap-side quantity must fit
+-- under the fuel that quantity itself defines, and the count exceeds
+-- its fuel by construction.  So the increment is priced by
+-- `realWidAt` — per-node folds are per-node deliveries, which are REAL
+-- burst widths, exponential per instant where every cap-side currency
+-- towers.  What this row now carries is exactly that bet.  Probing it
+-- goes through Nest-Store's exported equations or a hypothesised cap
+-- value — the recurrence is sealed there for checker cost, and its
+-- header says why.
 postulate
   nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -720,7 +741,7 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     nestOK? e sl id sched st ≡ true →
-    nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascade a nextId sched st
     in nestOK? e sl (suc id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 
@@ -733,7 +754,7 @@ cascade-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      valB? B Ψ (arrTy a) (arrVal a) ≡ true →
      capsOK? (capsAt e sl id) sched st ≡ true →
      nestOK? e sl id sched st ≡ true →
-     nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
      valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
      let r    = cascade a id sched st
          sl′  = Sched.slots (proj₁ (proj₂ r))
@@ -1304,25 +1325,28 @@ abstract
 -- ONE LEAF, and the split is where the work now divides.  What is
 -- postulated here is the whole of the depth induction and it says nothing
 -- about caps: a sweep's depth is under the nesting of its subject, of the
--- path it climbs, and of the store it may be handed observables from.
--- Its numeric argument is the instant's FOLD COUNT, which is what makes
--- its `scanᵉ` product an upper bound rather than a guess — hence the
--- `capsOK?` premise, whose only job here is to pin that count.
+-- path it climbs, of the store it may be handed observables from — all
+-- three RAW, read at the instant's entry — plus the instant's own fresh
+-- growth, `realWidAt · nestSyn`, because the walk subscribes
+-- accumulators its own folds have deepened since the entry reading, and
+-- no entry-state measure can see those layers.  The fresh term is
+-- real-denominated by the module's law: per-node folds are per-node
+-- deliveries, and deliveries are real burst widths, never a cap-side
+-- count.  The `capsOK?` premise is retained because the induction's
+-- fresh-mint bookkeeping is expected to spend the walk's receipts.
 --
 -- The arithmetic half is not here and not mirrored: `nest-sum-3`
--- (.Nest-Store) pays three quantities each under `nestCapAt` out of
--- `capsH`, and the delivery side spends the same lemma.
+-- (.Nest-Store) pays three quantities each under `nestCapAt`, plus the
+-- fresh term, out of `capsH`, and the delivery side spends the same
+-- lemma.
 --
--- PROBED: `Probed.Nest-Depth`, twenty-one rows on the wrap/fold family,
---   as EQUALITIES of the measure with `depthE` rather than bounds — both
---   crossings the predecessor was refuted at (49 at four wraps over
---   twelve folds, 204 at seven over twenty-nine), the moved-count row
---   the parameter buys, the nested-scan pair with the two counts
---   DIFFERENT, the duplication witness that keeps the payload-list
---   clause a `⊔`, and the gate clause.  Not reached: any layer but
---   `mergeAllᵉ`; no slot descent, so the connect arc is unmeasured; no
---   `takeᵉ`; and every row starts from `st-init`, so the path and store
---   summands are DEGENERATE and pinned at zero rather than tested.
+-- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
+--   restores the count-parametric predecessor's probe harness —
+--   twenty-one rows pinning the measure EQUAL to `depthE` on the
+--   wrap/fold family, with the running-state plumbing and the
+--   duplication witness that keeps the payload-list clause a `⊔`.  The
+--   rows are evidence about the RESTATED-AWAY statement; the harness
+--   and the row inventory transfer.
 postulate
   depth-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
@@ -1330,8 +1354,9 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     depthE g b κ bid now sched st
-      ≤ nestDᵉ (foldsAt e sl id) b + pathNestD (foldsAt e sl id) κ
-        + storeNestMax (foldsAt e sl id) sched st
+      ≤ nestDᵉ b + pathNestD κ
+        + storeNestMax sched st
+        + realWidAt e sl id * nestSyn e sl
 
 -- THE ENTRY STATE SATISFIES THE NESTING INVARIANT, which is the mirror
 -- of `init-capsOK?` and owed a real proof: no node and no registration
@@ -1350,8 +1375,8 @@ subscribe-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
-  nestDᵉ (foldsAt e sl id) b ≤ nestCapAt e sl id →
-  pathNestD (foldsAt e sl id) κ ≤ nestCapAt e sl id →
+  nestDᵉ b ≤ nestCapAt e sl id →
+  pathNestD κ ≤ nestCapAt e sl id →
   depthE g b κ bid now sched st ≤ capsH e sl id
 subscribe-depth-capsH {e = e} sl id g b κ bid now sched st sleq cok nok hb hk =
   ≤-trans (depth-nest-compositional sl id g b κ bid now sched st sleq cok)
@@ -1370,9 +1395,9 @@ depthE≤capsH-root e ins =
     refl
     (init-capsOK? e ins 0)
     (init-nestOK? e ins 0)
-    (subst (nestDᵉ (foldsAt e ins 0) e ≤_) (sym (nestCapAt-0 e ins))
-       (≤-trans (m≤m+n (nestDᵉ (foldsAt e ins 0) e)
-                       (slotsNestSum (foldsAt e ins 0) ins))
+    (subst (nestDᵉ e ≤_) (sym (nestCapAt-0 e ins))
+       (≤-trans (m≤m+n (nestDᵉ e)
+                       (slotsNestSum ins))
                 (n≤1+n _)))
     z≤n
 
@@ -1785,7 +1810,7 @@ postulate
     (id : ℕ) (sched : Sched Γ) (st : EvalSt e) {a : Arrival Γ} {sched′ : Sched Γ} →
     sched-next sched ≡ inj₂ (a , sched′) →
     nestOK? e (Sched.slots sched) id sched st ≡ true →
-    nestDᵛ (foldsAt e (Sched.slots sched) id) (arrTy a) (arrVal a)
+    nestDᵛ (arrTy a) (arrVal a)
       ≤ nestCapAt e (Sched.slots sched) id
 
 -- THE BURST'S OWN NESTING RECEIPT, the mirror of `burst-caps`.  The
@@ -1842,11 +1867,11 @@ drain-dry {e = e} (suc k) id sched st inv cOK nOK | inj₂ (a , sched′) =
                (λ sl → nestOK? e sl id sched′ st ≡ true)
                (sym (pop-slots sched eq))
                (pop-nest id sched st eq nOK)
-      harr′ : nestDᵛ (foldsAt e (Sched.slots sched′) id)
+      harr′ : nestDᵛ 
                      (arrTy a) (arrVal a)
                 ≤ nestCapAt e (Sched.slots sched′) id
       harr′ = subst
-               (λ sl → nestDᵛ (foldsAt e sl id) (arrTy a) (arrVal a)
+               (λ sl → nestDᵛ (arrTy a) (arrVal a)
                           ≤ nestCapAt e sl id)
                (sym (pop-slots sched eq))
                (pop-head-nest id sched st eq nOK)

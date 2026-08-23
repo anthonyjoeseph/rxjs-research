@@ -8,12 +8,13 @@
 -- at a `thru-outer` frame charges, and a `thru-outer` frame is one of
 -- only two places the depth measure spends anything at all.
 --
--- A `scanᵉ` IS WORTH ITS FOLD COUNT TIMES ITS STEP FUNCTION'S LAYERS,
--- because the accumulator is re-wrapped once per delivered payload
--- while the scan's own frame charges its emissions nothing
--- (`burst-scf-zero`).  That product is the whole reason a syntactic
--- measure of the subject cannot serve: emission k of a w-layer step
--- sits w·k deep under syntax that does not grow with k.
+-- A `scanᵉ` IS WORTH ITS STEP FUNCTION'S LAYERS ONCE, because on any
+-- ONE chain the walk enters the step function once per scan frame; the
+-- layers the folds pile onto the ACCUMULATOR live in the store, whose
+-- measure is read off the state and so sees them as they accrue.  The
+-- fold-times-wrap product is real, but it is priced where the folds
+-- happen — the per-instant cap's increment — never inside a measure of
+-- syntax, which cannot know a count that has not happened yet.
 --
 -- A LIST OF PAYLOADS IS WORTH THEIR MAX, NOT THEIR SUM, because
 -- `depthWalk` is a `⊔` over the burst's values — they are entered one
@@ -21,22 +22,18 @@
 -- what the deeper of them costs.
 
 ------------------------------------------------------------------
--- THE FOLD COUNT IS A PARAMETER, AND THAT IS THE ONE THING THIS
--- MEASURE'S PREDECESSOR GOT WRONG.  It read the count off the width
--- family at the UNSUBSTITUTED source, where a payload variable weighs
--- nothing, so two programs differing only in how many literals a map
--- consumed shared one cap against depths of 4 and 8.  `W` is supplied
--- instead, and the measure is monotone in it.  `W` does no second job
--- here: it multiplies, and nothing is required to fit under it, which is
--- what makes it unlike the refold exponent that killed the hop currency.
---
--- WHAT THE CONSUMER SUPPLIES IS THE INSTANT'S FOLD COUNT, and it is not
--- the burst-width cap even though a burst is what delivers the payloads.
--- The width cap steps by exponentiation once per fold, so it towers over
--- the height cap it would have to fit under; the fold count is the
--- number the caps recurrence itself runs a frame step for, and the
--- height's own pooled summand exists to dominate it.  Same product,
--- different — and available — currency.
+-- THE MEASURE IS RAW, AND ITS TWO PREDECESSORS DIED OF NOT BEING SO.
+-- The first read a fold count off the width family at the UNSUBSTITUTED
+-- source, where a payload variable weighs nothing, so two programs
+-- differing only in how many literals a map consumed shared one cap
+-- against depths of 4 and 8.  The second took the count as a PARAMETER
+-- and multiplied by it — and any count worth supplying is defined off
+-- the caps recurrence, so the parameter moves with the instant while a
+-- preservation step prices its increment at the old one; that is the
+-- squeeze the count-parametric predicate was machine-refuted by.  A raw
+-- layer count has no parameter to move: what a fold ADDS is priced at
+-- the fold, by the per-instant cap's increment, in a currency read off
+-- the real dynamics rather than off any cap.
 --
 -- AND IT IS NOT THE WIDTH FAMILY WEARING A NEW NAME.  That family
 -- measures payloads abreast, and a bare wrap layer multiplies its
@@ -84,7 +81,7 @@
 module Rx.Nest-Depth where
 
 open import Data.List using (List; []; _∷_)
-open import Data.Nat  using (ℕ; suc; _+_; _*_; _⊔_)
+open import Data.Nat  using (ℕ; suc; _+_; _⊔_)
 
 open import Data.Product using (_,_)
 open import Data.Sum     using (inj₁; inj₂)
@@ -96,54 +93,54 @@ open import Rx.Exp using (Ctx; Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; ob
   strmᵗ)
 
 mutual
-  nestDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (W : ℕ) → Exp Γ Δᵍ Δ Θ t → ℕ
-  nestDᵉ W (input i)       = 0
-  nestDᵉ W (ofᵉ ts)        = nestDᵗˢ W ts
-  nestDᵉ W emptyᵉ          = 0
-  nestDᵉ W (mapᵉ f e)      = nestDᵗ W f + nestDᵉ W e
-  nestDᵉ W (takeᵉ c e)     = nestDᵉ W e
+  nestDᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  nestDᵉ (input i)       = 0
+  nestDᵉ (ofᵉ ts)        = nestDᵗˢ ts
+  nestDᵉ emptyᵉ          = 0
+  nestDᵉ (mapᵉ f e)      = nestDᵗ f + nestDᵉ e
+  nestDᵉ (takeᵉ c e)     = nestDᵉ e
   -- THE PRODUCT: one re-wrap per delivered payload
-  nestDᵉ W (scanᵉ f z e)   = nestDᵗ W z + W * nestDᵗ W f + nestDᵉ W e
+  nestDᵉ (scanᵉ f z e)   = nestDᵗ z + nestDᵗ f + nestDᵉ e
   -- THE SPENDING ARC: one suc per *All layer
-  nestDᵉ W (mergeAllᵉ e)   = suc (nestDᵉ W e)
-  nestDᵉ W (concatAllᵉ e)  = suc (nestDᵉ W e)
-  nestDᵉ W (switchAllᵉ e)  = suc (nestDᵉ W e)
-  nestDᵉ W (exhaustAllᵉ e) = suc (nestDᵉ W e)
-  nestDᵉ W (μᵉ e)          = nestDᵉ W e
-  nestDᵉ W (varᵉ x)        = 0
+  nestDᵉ (mergeAllᵉ e)   = suc (nestDᵉ e)
+  nestDᵉ (concatAllᵉ e)  = suc (nestDᵉ e)
+  nestDᵉ (switchAllᵉ e)  = suc (nestDᵉ e)
+  nestDᵉ (exhaustAllᵉ e) = suc (nestDᵉ e)
+  nestDᵉ (μᵉ e)          = nestDᵉ e
+  nestDᵉ (varᵉ x)        = 0
   -- THE GATE TRUNCATES, and it is what makes μ safe
-  nestDᵉ W (deferᵉ e)      = 0
+  nestDᵉ (deferᵉ e)      = 0
 
-  nestDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (W : ℕ) → Tm Γ Δᵍ Δ Θ t → ℕ
-  nestDᵗ W (varᵗ x)      = 0
-  nestDᵗ W unit̂          = 0
-  nestDᵗ W (bool̂ _)      = 0
-  nestDᵗ W (nat̂ _)       = 0
-  nestDᵗ W (pairᵗ a b)   = nestDᵗ W a ⊔ nestDᵗ W b
-  nestDᵗ W (fstᵗ p)      = nestDᵗ W p
-  nestDᵗ W (sndᵗ p)      = nestDᵗ W p
-  nestDᵗ W (inlᵗ a)      = nestDᵗ W a
-  nestDᵗ W (inrᵗ a)      = nestDᵗ W a
-  nestDᵗ W (caseᵗ s l r) = nestDᵗ W s + (nestDᵗ W l ⊔ nestDᵗ W r)
-  nestDᵗ W (ifᵗ c a b)   = nestDᵗ W c ⊔ nestDᵗ W a ⊔ nestDᵗ W b
-  nestDᵗ W (primᵗ _ a)   = nestDᵗ W a
-  nestDᵗ W (strmᵗ e)     = nestDᵉ W e
+  nestDᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  nestDᵗ (varᵗ x)      = 0
+  nestDᵗ unit̂          = 0
+  nestDᵗ (bool̂ _)      = 0
+  nestDᵗ (nat̂ _)       = 0
+  nestDᵗ (pairᵗ a b)   = nestDᵗ a ⊔ nestDᵗ b
+  nestDᵗ (fstᵗ p)      = nestDᵗ p
+  nestDᵗ (sndᵗ p)      = nestDᵗ p
+  nestDᵗ (inlᵗ a)      = nestDᵗ a
+  nestDᵗ (inrᵗ a)      = nestDᵗ a
+  nestDᵗ (caseᵗ s l r) = nestDᵗ s + (nestDᵗ l ⊔ nestDᵗ r)
+  nestDᵗ (ifᵗ c a b)   = nestDᵗ c ⊔ nestDᵗ a ⊔ nestDᵗ b
+  nestDᵗ (primᵗ _ a)   = nestDᵗ a
+  nestDᵗ (strmᵗ e)     = nestDᵉ e
 
-  nestDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (W : ℕ) →
+  nestDᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} →
     List (Tm Γ Δᵍ Δ Θ t) → ℕ
-  nestDᵗˢ W []       = 0
-  nestDᵗˢ W (y ∷ ys) = nestDᵗ W y ⊔ nestDᵗˢ W ys
+  nestDᵗˢ []       = 0
+  nestDᵗˢ (y ∷ ys) = nestDᵗ y ⊔ nestDᵗˢ ys
 
 -- A STORED VALUE IS CHARGED THROUGH ITS TYPE, exactly as its size is:
 -- `Val` is a computed family, so the only way in is to recurse on the
 -- `Ty`, and `obs` is where a value becomes syntax again.  A pair takes
 -- the MAX of its components for the same reason a burst does — they are
 -- entered separately, from the same frame.
-nestDᵛ : ∀ {n} {Γ : Ctx n} (W : ℕ) (t : Ty) → Val Γ t → ℕ
-nestDᵛ W unitᵗ    _        = 0
-nestDᵛ W boolᵗ    _        = 0
-nestDᵛ W natᵗ     _        = 0
-nestDᵛ W (s ×ᵗ t) (a , b)  = nestDᵛ W s a ⊔ nestDᵛ W t b
-nestDᵛ W (s +ᵗ t) (inj₁ a) = nestDᵛ W s a
-nestDᵛ W (s +ᵗ t) (inj₂ b) = nestDᵛ W t b
-nestDᵛ W (obs t)  e        = nestDᵉ W e
+nestDᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+nestDᵛ unitᵗ    _        = 0
+nestDᵛ boolᵗ    _        = 0
+nestDᵛ natᵗ     _        = 0
+nestDᵛ (s ×ᵗ t) (a , b)  = nestDᵛ s a ⊔ nestDᵛ t b
+nestDᵛ (s +ᵗ t) (inj₁ a) = nestDᵛ s a
+nestDᵛ (s +ᵗ t) (inj₂ b) = nestDᵛ t b
+nestDᵛ (obs t)  e        = nestDᵉ e

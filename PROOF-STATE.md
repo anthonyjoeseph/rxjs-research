@@ -157,18 +157,20 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`nest-tick`** (Caps-Bridge) — FALSITY: the nesting invariant's preservation
-  across one instant, and the statement the whole restated currency rests on.
-  One instant must re-wrap a stored accumulator at most fold-count-many times.
+- **`nest-tick`** (Caps-Bridge) — FALSITY: the preservation bet of the
+  re-denominated currency — raw store measure, increment priced by
+  `realWidAt`. PROBE IT FIRST, via Nest-Store's exported equations; its
+  header carries why no cap-side denomination can ever close this row.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
-  depth induction, restated in the nesting currency after four size and width
-  currencies died in this region. Its header prices all four.
+  depth induction, raw measures plus the instant's fresh term
+  `realWidAt · nestSyn`. Six dead currencies in this region; the header
+  prices them and the denomination law is in Nest-Store's.
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY: the delivery
-  half. The delivery machinery sits wholly outside `depthE`'s induction, so
-  neither row is the other's precedent; they share only the arithmetic leaf.
+  half, same restatement. The delivery machinery sits wholly outside
+  `depthE`'s induction, so neither row is the other's precedent.
 - **`nestCap-3≤capsH`** (Nest-Store) — DIFFICULTY: the arithmetic both depth
-  rows spend, and no evaluator in it. `blowH`'s pooled summand is the fold
-  count with every field pooled, so the headroom is there; a cone is recoverable.
+  rows spend, and no evaluator in it. Exponential-per-instant recurrences
+  against `blowH`'s pooled tower per instant; a cone is recoverable.
 - **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY: the entry state's nesting
   receipt. `init-capsOK?` is its route, but a scripted slot's obs-freeness only
   reduces at a concrete type, so an `isData` inversion is owed first.
