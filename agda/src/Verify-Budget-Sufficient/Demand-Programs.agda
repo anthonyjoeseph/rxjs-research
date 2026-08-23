@@ -38,11 +38,11 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Product using (proj₁)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
-open import Rx.Prim using (g0; gasPad)
+open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold)
 open import Rx.Exp using (Ctx; Closed; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 
@@ -157,3 +157,38 @@ runDryS ds ks d k =
   hasDry (proj₁ (subscribeE (gasPad (sucGS ds ks d k) g0) (progS d k) root 0 0
                             (sched-init (progS d k) (insS ds ks))
                             (st-init (progS d k))))
+
+----------------------------------------------------------------------
+-- THE ARRIVAL FAMILY.  Q and S are ALL-SYNCHRONOUS: every source is an
+-- `ofᵉ` list, so the whole run happens in the subscribe burst and
+-- `sched-next` reports an empty schedule immediately.  Neither family
+-- can produce a cascade at all, which is what a delivery instant is.
+-- T adds a scripted slot carrying async values, so the schedule is
+-- non-empty when the burst hands over and the evaluator's own next
+-- arrival is available to step.
+----------------------------------------------------------------------
+
+Γ₂ : Ctx 2
+Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
+
+-- j values, each one tick after the last
+asyncNats : ℕ → List (Timed ℕ)
+asyncNats 0       = []
+asyncNats (suc j) = (after 0 , j) ∷ asyncNats j
+
+insT : ℕ → ℕ → ℕ → Slots Γ₂
+insT ds ks j fzero =
+  shared (progD ds ks) {ok = subst T (sym (progD-below 0 ds ks)) tt}
+insT ds ks j (fsuc fzero) = scripted (cold [] (asyncNats j))
+
+progT : ℕ → ℕ → Closed Γ₂ natᵗ
+progT d k =
+  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ (ofᵉ (strmᵗ (input fzero)
+                   ∷ strmᵗ (input (fsuc fzero))
+                   ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+
+sucGT : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGT ds ks j d k =
+  suc (syncSizeᵉ (progT d k)
+       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progT d k))

@@ -46,7 +46,7 @@ module Harness.Main where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Nat using (ℕ; _+_; _*_; _∸_; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_)
 open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_; toList)
@@ -54,13 +54,19 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (proj₁; proj₂; _,_)
+open import Data.Sum using (inj₁; inj₂)
+open import Rx.Exp using (Ctx; Closed)
+open import Rx.Slots using (Slots)
 open import Rx.Prim using (towerℕ; gasPad; g0)
-open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root)
+open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root;
+  Sched; EvalSt; sched-next; cascade; arrTy; arrVal)
+open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS)
+  using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
+         progT; sucGT; insT)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum)
+  using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -157,6 +163,66 @@ storeAfterRootS ds ks d k =
 allowanceS : ℕ → ℕ → ℕ → ℕ → ℕ
 allowanceS ds ks d k =
   capsBase (progS d k) (insS ds ks) * nestSyn (progS d k) (insS ds ks)
+
+-- SERIES C — `store-growth`'s OWN conclusion, at states the evaluator
+-- reaches by running.  The subscribe frame hands over a schedule and a
+-- state; `sched-next` then yields the arrival the evaluator would take
+-- next, and `cascade` is the statement's own instant.  Each step prints
+-- the store before and after, the increment the currency allows, and a
+-- verdict.
+--
+-- THE HYPOTHESIS SIDE IS HALF BLOCKED, and that is the coverage
+-- boundary: `capsOK?` reads `capsAt`, which sits on the caps recurrence
+-- and does not terminate even in native code, so no row can discharge
+-- it.  The two that DO compute are checked and reported as `H`.  A row
+-- reading `OVER H` is a refutation candidate modulo the caps premise;
+-- a row reading `OVER h` is not a candidate at all.
+walkC : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+      → ℕ → ℕ → ℕ → Sched Γ → EvalSt e → String
+walkC e sl 0       id nextId sched st = ""
+walkC e sl (suc m) id nextId sched st with sched-next sched
+... | inj₁ _          = " [done]"
+... | inj₂ (a , sd) =
+  let before = storeNestMax sd st
+      r      = cascade a nextId sd st
+      after  = storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+      bound  = before + realWidAt e sl id * nestSyn e sl
+  in " | id=" ++ show id ++ " " ++ show before ++ "→" ++ show after
+     ++ "/cap" ++ show (nestCapAt e sl id)
+     ++ (if after ≤ᵇ bound then " ok" else " OVER")
+     ++ (if nestOK? e sl id sd st then " N" else " n")
+     ++ (if nestDᵛ (arrTy a) (arrVal a) ≤ᵇ nestCapAt e sl id
+         then " V" else " v")
+     ++ walkC e sl m (suc id) (suc nextId)
+              (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+cascadeRow : ℕ → ℕ → ℕ → String
+cascadeRow steps d k =
+  let p = progD d k
+      r = subscribeE (gasPad (sucG p) g0) p root 0 0
+                     (sched-init p ins₀) (st-init p)
+  in "d=" ++ show d ++ " k=" ++ show k
+     ++ walkC p ins₀ steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+cascadeRowS : ℕ → ℕ → ℕ → ℕ → ℕ → String
+cascadeRowS steps ds ks d k =
+  let sl = insS ds ks
+      p  = progS d k
+      r  = subscribeE (gasPad (sucGS ds ks d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ walkC p sl steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+cascadeRowT : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+cascadeRowT steps ds ks j d k =
+  let sl = insT ds ks j
+      p  = progT d k
+      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
+                      (sched-init p sl) (st-init p)
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ walkC p sl steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
@@ -289,8 +355,18 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 3000 ≤ᵇ n
-... | true  = sharedSweep (n ∸ 3000)
+rowAt n with 100000 ≤ᵇ n
+... | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
+                           ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+  where m = n ∸ 100000
+... | false with 20000 ≤ᵇ n
+...   | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+  where m = n ∸ 20000
+...   | false with 13000 ≤ᵇ n
+...     | true  = cascadeRow 6 (m / 100) (m % 100)
+  where m = n ∸ 13000
+...     | false with 3000 ≤ᵇ n
+...       | true  = sharedSweep (n ∸ 3000)
   where
   sharedSweep : ℕ → String
   sharedSweep m =
@@ -307,8 +383,8 @@ rowAt n with 3000 ≤ᵇ n
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDryS ds ks d k)
-... | false with 2000 ≤ᵇ n
-...   | true  = nestSweep (n ∸ 2000)
+...       | false with 2000 ≤ᵇ n
+...         | true  = nestSweep (n ∸ 2000)
   where
   nestSweep : ℕ → String
   nestSweep dk =
@@ -318,12 +394,14 @@ rowAt n with 3000 ≤ᵇ n
         A = allowance d k
     in "d=" ++ show d ++ " k=" ++ show k
        ++ "  storeNestMax after root = " ++ show g
+       ++ "  burst cap = " ++ show (nestCapAt (progD d k) ins₀ 1)
+       ++ "  burst-over = " ++ showB (nestCapAt (progD d k) ins₀ 1 <ᵇ g)
        ++ "  allowance = " ++ show A
        ++ "  over = " ++ showB (A ≤ᵇ g)
        ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...   | false with 1000 ≤ᵇ n
-...     | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...     | true  =
+...         | false with 1000 ≤ᵇ n
+...           | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...           | true  =
   let dk = n ∸ 1000
       d  = dk / 100
       k  = dk % 100

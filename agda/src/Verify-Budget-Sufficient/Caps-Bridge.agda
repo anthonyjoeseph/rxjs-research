@@ -737,17 +737,17 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- towers.  `store-growth` is exactly that bet with the arithmetic
 -- lifted off it.
 
--- AND THE LOAD-BEARING REGION IS THE FIRST STEP ONLY, which is worth
--- knowing before anyone spends a probe on the leaf at a later one.
--- `Harness.Main`
--- Series N evaluates this currency at a small program — the compiled
--- calculator, so the seal is no obstacle there — and the cap goes 3 at
--- entry to 66 after one instant, an increment of 63.  That is a real
--- constraint a run can violate.  By the next instant the increment is
--- the width raised to the cap, ninety digits of it, so any row asking
--- whether a store fits under THAT could not have failed: later
--- instants are degenerate, and a receipt claiming them would be
--- claiming coverage nothing bought.
+-- AND THE LOAD-BEARING REGION IS THE FIRST STEP ONLY — WHICH THIS
+-- STATEMENT NEVER REACHES.  `Harness.Main` Series N evaluates the
+-- currency at a small program: the cap goes 3 at entry to 66 after one
+-- instant, an increment of 63, a real constraint a run can violate.
+-- By the next instant the increment is the width raised to the cap,
+-- ninety digits of it, so any row asking whether a store fits under
+-- THAT could not have failed.  And `budget-sufficient` enters the
+-- instant loop at ONE and the loop only increments, so every id this
+-- statement is ever instantiated at is a later one.  The single
+-- non-degenerate increment is spent by the SUBSCRIBE frame, through
+-- `burst-nest`, and never by a cascade.
 
 -- WHAT THE SWEEP FOUND, AND THE HOLE IN IT.  `Harness.Main`'s N-sweep
 -- runs the scan family whose fold wraps its accumulator a level deeper
@@ -769,12 +769,26 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- value IS the slot's nesting, the other three arms contributing
 -- nothing.  Every row still fits, and the margin widens the same way.
 
--- WHAT REMAINS UNCOVERED IS THE INSTANT, NOT THE ARM.  Both sweeps
--- measure the ROOT SUBSCRIBE frame, and this statement's instant is a
--- DELIVERY — so they constrain the currency where it is seeded and
--- leave the step it is stated about indicative only.  A cascade sweep
--- is what would close that, and it needs an arrival the harness can
--- build.
+-- THE CASCADE ROWS EXIST NOW, AND THEY ARE DEGENERATE.  Q and S are
+-- all-synchronous — every source is a literal list, so the whole run
+-- happens in the subscribe burst and the schedule is empty when it
+-- hands over.  Series T adds a scripted slot carrying async values, so
+-- the evaluator's own next arrival is available and `cascade` can be
+-- stepped: this statement's instant, at states reached by running.
+-- Every row holds with both computable hypotheses satisfied.  But
+-- every row also sits at a reachable id, where the increment is the
+-- tower — so none of them could have failed, and they are recorded as
+-- a boundary rather than as a receipt.
+
+-- SO THE RISK HAS MOVED, AND THE NEXT MOVE IS A RESTATEMENT RATHER
+-- THAN A PROBE.  Nothing can instantiate the one id where this
+-- statement says something a run could violate, which makes the whole
+-- of its FALSITY risk sit in an instance no consumer asks for.  Stating
+-- it at a successor index would remove that region without costing the
+-- consumer anything — and unlike a hypothesis bolted on to suit today's
+-- caller, the index floor is an invariant of the instant loop itself.
+-- What must be checked before doing it is the other direction: that no
+-- second consumer appears which needs the zero case.
 postulate
   store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -1881,6 +1895,17 @@ postulate
 -- arrival driving it — every inner it subscribes is grafted from the
 -- program's own syntax — so instant 1's cap is the base cap plus one
 -- increment, which is what `nestCapAt`'s step supplies.
+
+-- AND THIS IS WHERE THE CURRENCY IS ACTUALLY BET.  The increment it
+-- spends is the one at instant zero, the only one that is not the wrap
+-- tower — `store-growth`'s header has the arithmetic and why every
+-- cascade instance is slack by comparison.  `Harness.Main` Series N
+-- reads the post-subscribe store off a run and puts it beside this
+-- cap: the store comes out at the product of the scan family's two
+-- parameters while the cap comes out a product of `capsBase` and
+-- `nestSyn`, so the margin widens in both.  Nothing was refuted, and
+-- these rows COULD have failed, which is what distinguishes them from
+-- the cascade ones.
 postulate
   burst-nest : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0

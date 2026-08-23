@@ -159,7 +159,8 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`store-growth`** (Caps-Bridge) — FALSITY: one instant deepens the store by
   at most its real width times the wrap factor. `nest-tick` is a body over it.
-  PROBE THE FIRST STEP, the only non-degenerate one; the header says why.
+  RESTATE BEFORE GRINDING: no consumer reaches the one index where it can
+  fail, so the risk sits in an instance nothing asks for. Header has the rows.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
@@ -174,8 +175,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   receipt. `init-capsOK?` is its route, but a scripted slot's obs-freeness only
   reduces at a concrete type, so an `isData` inversion is owed first.
 - **`burst-nest`** (Caps-Bridge) — DIFFICULTY: the subscribe frame's nesting
-  receipt at instant 1. `burst-caps` is the shape, but `burst-all` produces no
-  nesting conjunct yet, so the producing lemma has to exist first.
+  receipt at instant 1, and the one place the currency is really bet — every
+  cascade instance is slack. `burst-caps` is the shape, but `burst-all`
+  produces no nesting conjunct yet, so the producing lemma is owed first.
 - **`pop-nest`, `pop-head-nest`** (Caps-Bridge) — GRINDABLE: the pop mirrors,
   clause for clause against the proven `pop-caps` and `pop-head-valCaps`.
 - **`chainsNest≤store`** (Caps-Face/Part7) — GRINDABLE: a `⊔`-fold dominates the
