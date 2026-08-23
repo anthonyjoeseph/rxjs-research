@@ -734,6 +734,17 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- goes through Nest-Store's exported equations or a hypothesised cap
 -- value — the recurrence is sealed there for checker cost, and its
 -- header says why.
+--
+-- AND THE LOAD-BEARING REGION IS THE FIRST STEP ONLY, which is worth
+-- knowing before anyone spends a probe on a later one.  `Harness.Main`
+-- Series N evaluates this currency at a small program — the compiled
+-- calculator, so the seal is no obstacle there — and the cap goes 3 at
+-- entry to 66 after one instant, an increment of 63.  That is a real
+-- constraint a run can violate.  By the next instant the increment is
+-- the width raised to the cap, ninety digits of it, so any row asking
+-- whether a store fits under THAT could not have failed: later
+-- instants are degenerate, and a receipt claiming them would be
+-- claiming coverage nothing bought.
 postulate
   nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

@@ -55,9 +55,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 open import Rx.Prim using (towerℕ)
-open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL)
+open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase)
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (runDry; progD; sucG)
+  using (runDry; progD; sucG; ins₀)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (nestSyn; nestCapAt; realWidAt)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -109,6 +111,19 @@ showB : Bool → String
 showB true  = "true"
 showB false = "false"
 
+-- Indices 20+ cannot be literal PATTERNS (Agda expands a numeric
+-- literal pattern to that many constructors), so Series N dispatches on
+-- an offset instead.  Row 20+k is `nestRow k`.
+nestRow : ℕ → String
+nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
+nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
+nestRow 2 = "nestCapAt (progD 1 1) ins₀ 0 = "   ++ show (nestCapAt (progD 1 1) ins₀ 0)
+nestRow 3 = "realWidAt (progD 1 1) ins₀ 0 = "   ++ show (realWidAt (progD 1 1) ins₀ 0)
+nestRow 4 = "nestCapAt (progD 1 1) ins₀ 1 = "   ++ show (nestCapAt (progD 1 1) ins₀ 1)
+nestRow 5 = "realWidAt (progD 1 1) ins₀ 1 = "   ++ show (realWidAt (progD 1 1) ins₀ 1)
+nestRow 6 = "nestCapAt (progD 1 1) ins₀ 2 = "   ++ show (nestCapAt (progD 1 1) ins₀ 2)
+nestRow _ = "(no such row)"
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -119,6 +134,27 @@ rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
 -- full.
 rowAt 1 = "towerℕ 3 = " ++ show (towerℕ 3)
 rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
+
+------------------------------------------------------------------
+-- SERIES N, THE NESTING CURRENCY — rows 20-26.  The re-denominated cap
+-- is the one quantity in this neighbourhood designed to stay OFF the
+-- caps recurrence, so unlike the anchor it has no `blowH` in it and
+-- there is a real question whether it computes.  These rows answer
+-- that question and nothing else: they are a COMPUTABILITY BOUNDARY,
+-- not evidence for any inequality, because the side these caps would
+-- have to fit under is the anchor and the anchor does not compute.
+--
+-- WHAT WOULD MAKE A ROW INTERESTING.  Row 20 is load-bearing in the
+-- weakest sense that matters here — `capsBase` reaches `entryCeil`,
+-- and if THAT diverges then the whole nesting currency is
+-- symbolic-only and the roadmap's instruction to probe it first is not
+-- executable as written.  Rows 22-26 are load-bearing on the GROWTH
+-- RATE: `realWidAt` squares its own width each instant, so the row
+-- that fails to print is the instant at which no probe of this
+-- currency can reach, and that index is the coverage boundary every
+-- later receipt has to state.
+------------------------------------------------------------------
+
 
 ------------------------------------------------------------------
 -- SERIES Q, THE CROSSOVER — rows 3-8.  The one region this campaign
@@ -210,7 +246,7 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
 rowAt n with 1000 ≤ᵇ n
-... | false = "(no such row)"
+... | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
 ... | true  =
   let dk = n ∸ 1000
       d  = dk / 100
