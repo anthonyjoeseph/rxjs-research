@@ -824,14 +824,20 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- So the route is: the walk invariant in deliveries, the proven bound to
 -- count them, and a leaf comparing the two denominations.
 --
--- BEFORE BUILDING THAT, SETTLE THE COMPARISON, AND NOT BY MACHINE.  The
--- reason the leaf is not stated here already is that the design note
--- this statement's own increment came from says real burst widths are
--- what every cap-side currency TOWERS above — and if that holds of the
--- delivery cap too, the comparison is false, the proven lemma cannot be
--- spent against a real-denominated increment, and the route is dead
--- rather than short.  Stating the leaf before knowing which way it goes
--- would be building an assembly on a coin flip.
+-- AND THE COMPARISON FAILS, ON THE DENOMINATION LAW ITSELF RATHER THAN
+-- ON ANY NEW ARGUMENT.  That law says an increment denominated in a
+-- cap-side quantity must fit under the fuel that quantity itself
+-- defines, and that the count exceeds its fuel by construction.  Here
+-- the two ends meet exactly: this increment's width at the entry index
+-- IS `capsBase`, and `capsBase` is precisely the fuel the entry cap's
+-- own blowup is run at — so the delivery cap is a count taken above the
+-- number it would have to fit under.  Nor does the gap close as the
+-- instants go: the real width iterates an exponential per instant while
+-- the cap height iterates a tower, so the side that must be dominated
+-- is the side that grows faster.  This is the same squeeze that killed
+-- the count-parametric predecessor, reached from the other end — that
+-- one denominated the STORE in a cap, this one would denominate the
+-- COUNT in a cap, and the arithmetic does not care which.
 --
 -- WHICH SIDE IS BLOCKED, MEASURED.  `Harness.Main`'s denomination row
 -- splits the comparison into one quantity per row, because the binary
@@ -841,7 +847,22 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- does not: `capsAt` fails to terminate even in compiled code, so the
 -- delivery cap cannot be reached at any program, at any index, and the
 -- comparison has no instance.  Hypothesis side fine, conclusion side
--- blocked; this one is owed to arithmetic and no sweep will shorten it.
+-- blocked — which is why the law had to settle it rather than a sweep.
+--
+-- SO THE COUNT MUST COME FROM A REAL WIDTH, AND THAT IS THE OPEN DESIGN
+-- QUESTION under this row.  The walk invariant is unaffected and is
+-- still worth having in deliveries; what has no supplier is the step
+-- from a delivery count to this increment.  A cap cannot supply it, and
+-- the evaluator's own per-instant burst width is what the increment was
+-- named after — so the fact to look for, or to state, is one bounding
+-- the walk's deliveries by that width and not by a ceiling above it.
+--
+-- DEAD ROUTE: counting the walk's deliveries with `cascadeGo-deliveries`
+--   and dominating its bound by this increment.  The bound is cap-side,
+--   the increment is real, and the denomination law rules out the
+--   comparison in that direction at the entry index and worse above it.
+--   The lemma is proven and stays useful elsewhere; it is unspendable
+--   HERE.
 postulate
   cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

@@ -159,8 +159,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`cascadeGo-nest`** (Caps-Bridge) — FALSITY: what `store-growth` carried
   before the latch and the finish were priced off it. Its counting half is
-  PROVEN but cap-denominated, so the route turns on one comparison its header
-  prices, which no machine settles — `capsAt` does not terminate.
+  PROVEN but cap-denominated, which the denomination law rules out against a
+  real increment — dead route recorded. Open: a REAL width bound on the walk's
+  deliveries.
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
