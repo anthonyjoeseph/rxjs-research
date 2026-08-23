@@ -157,9 +157,7 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-- **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — FALSITY: the chain walk's own
-  induction, charging the store measure one `nestSyn` per delivery on the
-  evaluator's ledger. No cap in the statement; unprobed.
+
 - **`depth-nest-compositional`** (Caps-Bridge) — FALSITY: the subscribe-side
   depth induction, raw measures plus the instant's fresh term
   `realWidAt · nestSyn`. Six dead currencies in this region; the header
@@ -169,6 +167,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   currencies died on, including the one instant that really spends margin.
   Its header prices them. Outside `depthE`'s induction, so not its
   sibling's precedent.
+- **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — DIFFICULTY: the chain walk's
+  induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
+  tight — the overshoot is a constant per delivery on both axes. Residue: a
+  step that stores without delivering.
 - **`cascadeGo-deliv-real`** (Caps-Bridge) — DIFFICULTY: the walk's delivery
   count under the real width. The cap-denominated route is a recorded dead
   route; the real one measures safe with widening room on the count axis.

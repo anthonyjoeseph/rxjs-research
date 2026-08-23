@@ -857,6 +857,24 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- statement.  That is what lets the counting half be a separate leaf —
 -- and lets it be a comparison between two static quantities, which is
 -- the only reason it can be settled without the run.
+
+-- AND THE CHARGE OVERSHOOTS BY A CONSTANT PER DELIVERY, WHICH IS WHAT
+-- SAYS THE SHAPE IS RIGHT RATHER THAN MERELY SAFE.  Every quantity here
+-- computes and none is a cap, so the statement instantiates directly;
+-- measured in `Harness.Main` (measured-not-rechecked, so this
+-- discharges nothing).  Driving the stored values' nesting from one
+-- wrap level to nine, the store measure and the charge rise in lockstep
+-- and the margin sits at four the whole way — it never widens, so the
+-- rows are tight enough to have broken.  Driving the delivery count
+-- instead, the margin is four times the count, and the two axes compose
+-- linearly rather than interacting.
+--
+-- THE REASON IS THE ONE THE CURRENCY WAS BUILT ON: `nestSyn` is a
+-- SYNTACTIC ceiling on nesting, so deepening what a delivery stores
+-- deepens the ceiling by the same step.  A per-delivery charge in this
+-- currency cannot be outrun by depth, only by a step that stores
+-- without delivering — which is the residue the induction owes, and
+-- which no row in the sweep produced.
 postulate
   cascadeGo-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
