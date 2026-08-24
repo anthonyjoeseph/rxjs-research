@@ -16,7 +16,7 @@
 -- If any part of those towers is NOT reachable from a name below, that
 -- is a finding to wire, not a reason to re-add a bulk import.
 --
--- COVERAGE, and read this before trusting a green `make agda`: Agda
+-- COVERAGE, and read this before trusting a green `make gate-heavy`: Agda
 -- compiles exactly what is transitively imported, so this file defines
 -- the build's coverage as well as its claim set.  Ten V-B-S modules
 -- (14,439 lines, Caps-Face and Subscribe-Face among them) are currently
