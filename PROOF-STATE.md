@@ -153,14 +153,15 @@ GATE, and `Rx.MergeAll-Laws` is the door it is stated behind.
 laws are proven walks: the drain scrutinises the GATE and nothing else, so
 saturation, the lane bound and shrinkage are one walk each, and the caps face
 had already proven the third under its own name. What is left is the claim
-about a node the inner's own burst can re-enter, which no hypothesis bounds.
-It is SPENT, in a real body at the wrap clause, so its shape is settled and
-what remains is its truth.
+about the node a BURST leaves behind, which is a walk of the emit list rather
+than of the evaluator: its header records why no inner can come back in. It
+is SPENT, twice — the wrap's queue claim is a real body over it and
+`mint-install-survives` — so its shape is settled and what remains is truth.
 
-- **`unbounded-never-parks`** (MergeAll-Laws) — DIFFICULTY: the queue stays dead
-  at an unbounded limit across a whole subscribe burst. The appending site is
-  unreachable there and no inner can re-enter the node, so its header reduces
-  the obligation to a burst-list walk of the shape the drain laws already have.
+- **`pushBurst-queue-dead`** (MergeAll-Laws) — DIFFICULTY: at an unbounded limit
+  a burst parks nothing, so a node handed an empty queue comes back with one.
+  The appending site is unreachable there and no inner can re-enter the node,
+  so it is a walk of the emit list, the shape the drain laws already have.
 
 ## Tier 1 — `budget-sufficient` (parked behind tier 0)
 

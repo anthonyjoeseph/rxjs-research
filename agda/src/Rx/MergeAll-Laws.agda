@@ -43,10 +43,10 @@ open import Data.Sum   using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; Id; Tick)
-open import Rx.Exp  using (Ctx; Closed; obs; mergeAllᵉ)
-open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; Sched;
-  mergeAll-st; mergeAllDrain; mergeAllᵒ; hasRoom; lookupNode; mintNode;
-  subscribeE; subscribeInner)
+open import Rx.Exp  using (Ctx; Closed)
+open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; Path; Sched;
+  Stream; mergeAll-st; mergeAllDrain; mergeAllᵒ; hasRoom; lookupNode;
+  pushBurst; subscribeInner)
 
 -- `hasRoom` says a lane is FREE; this says the count is LEGAL.  They
 -- are not negations of each other at the boundary — at `just m` with
@@ -58,12 +58,17 @@ withinLimit nothing  act = true
 withinLimit (just m) act = act ≤ᵇ m
 
 -- the parked queue of whatever state sits at a node, as the claim that
--- it is EMPTY.  A predicate and not an equation because `NodeState`
--- holds the queue's element type existentially, so the two sides of an
--- equation would not even be at the same type
+-- it is EMPTY AT AN UNBOUNDED LIMIT.  A predicate and not an equation
+-- because `NodeState` holds the queue's element type existentially, so
+-- the two sides of an equation would not even be at the same type.  The
+-- limit is pinned INSIDE it rather than left to the consumer, because
+-- the fact is only true at `nothing` -- a bounded wrap parks, which is
+-- what bounding it is for -- and a predicate that reads as
+-- limit-agnostic is one a walk can be asked to preserve at a limit
+-- where it does not hold
 emptyQueue? : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Set
-emptyQueue? (just (mergeAll-st lim act q od)) = q ≡ []
-emptyQueue? _                                = ⊥
+emptyQueue? (just (mergeAll-st nothing act q od)) = q ≡ []
+emptyQueue? _                                     = ⊥
 
 -- A FREE LANE MAKES THE NEXT COUNT LEGAL, and that is the whole
 -- content of the two predicates being different: `hasRoom` is `<`
@@ -125,81 +130,51 @@ drain-within-limit g allNid κ id now lim act (o ∷ q) sched st h
 
 postulate
 
-  -- CONSERVATIVITY AT INFINITY.  At `nothing` the queue is dead: every
-  -- arriving inner is subscribed on the spot, so a node that starts
-  -- with an empty queue keeps one forever.  Note the shape: the
-  -- hypothesis is a LOOKUP and not a `mergeAll-st` pattern, because the
-  -- caller holds a node table and not a state.
+  -- CONSERVATIVITY AT INFINITY, as the one walk the assembly cannot do
+  -- for itself.  At `nothing` the gate is open, so every consumed inner
+  -- is subscribed on the spot and nothing is ever parked; a node handed
+  -- to a burst with an empty queue comes back with one.  Stated over
+  -- `pushBurst` because that is where the risk is: it is the only route
+  -- to `thruConsume`, hence the only thing in the evaluator that can
+  -- park anything at all.
   --
-  -- IT IS THE ONE OF THE FOUR THAT IS NOT LOCAL, and that is why it is
-  -- the tier's risk row rather than a walk like its siblings.  The
-  -- `nothing` gate is open, so every consume subscribes, and the queue
-  -- the statement must report on is the one in the state the INNERS
-  -- left.  What IS local, and is why the claim is credible at all:
-  -- `hasRoom nothing act` is `true` by its first clause, so the single
-  -- syntactic site that appends to a queue — `thruConsume`'s
-  -- capacity-shut branch — is unreachable at this limit, and the only
-  -- other writer reinstalls a queue that `drain-queue-shrinks` bounds
-  -- by the one it was given.
+  -- WHAT MAKES IT CREDIBLE, and both halves are read off the evaluator
+  -- rather than instantiated.  `hasRoom nothing act` is `true` by its
+  -- first clause, so the single syntactic site that appends to a queue
+  -- -- `thruConsume`'s capacity-shut branch -- is unreachable at this
+  -- limit, and the only other writer reinstalls a queue that
+  -- `drain-queue-shrinks` bounds by the one it was given.
   --
-  -- AND THE INNERS CANNOT COME BACK, which is what bounds the induction.
-  -- Read off the evaluator rather than instantiated: `subscribeInner`
-  -- hands every inner a `from-inner` frame and never the wrap's own
-  -- `thru-outer`, and only `thru-outer` reaches `thruConsume`, so no
-  -- inner's synchronous burst can park at the node that spawned it.  The
-  -- other way back in would be a registration under this wrap's frame
-  -- firing mid-burst, and neither route delivers one: a registration is
-  -- served on ARRIVAL at a later instant, and a shared definition's
-  -- connect burst flows up the connecting subscriber's own frames rather
-  -- than dispatching to registered chains.  So the obligation is an
-  -- induction over `pushBurst`'s emit list and `thruWalk`'s value list —
-  -- the same walk shape as the two drain laws above, which are proven —
-  -- and not over the evaluator.
-  --
-  -- STATED OVER THE WHOLE WRAP, and the instant is the entire content.
-  -- `subscribeAll` is mint, then `subscribeE` on the OUTER under a
-  -- `thru-outer` frame, then `pushBurst` of that burst back through the
-  -- frame -- and `pushBurst` is the only thing reaching `thruConsume`,
-  -- so it is the only thing that can ever park.  A claim pinned before
-  -- it is DEGENERATE — every limit reports an empty queue at that
-  -- instant, including the ones this statement exists to exclude.  No
-  -- lookup hypothesis survives the move, because the wrap installs the
-  -- node itself.
-  -- The predicate is a predicate for the reason its own definition
-  -- gives, and that costs the consumer nothing: the shape conjunct
-  -- pins the lookup, and `emptyQueue?` at a pinned `mergeAll-st`
-  -- reduces to the equation.
-  --
-  -- DEAD ROUTE: it was minted to transport the merge face, and the
-  --   transport did not need it — every proof written against a queueless
-  --   merge state migrated to `mergeAllᵉ` by taking the CONCAT clause as the
-  --   general one, which reasons about the queue rather than assuming it
-  --   away.  So its consumer is not the budget tree; it is the well-formed
-  --   tree's mergeAll clause, which reads a node's completion off
-  --   `active ≡ 0 ∧ null queue`.
+  -- AND THE INNERS CANNOT COME BACK, which is what keeps the induction
+  -- inside this walk.  `subscribeInner` hands every inner a `from-inner`
+  -- frame and never the wrap's own `thru-outer`, and only `thru-outer`
+  -- reaches `thruConsume`, so no inner's synchronous burst can park at
+  -- the node that spawned it.  The other way back in would be a
+  -- registration under this frame firing mid-burst, and neither route
+  -- delivers one: a registration is served on ARRIVAL at a later
+  -- instant, and a shared definition's connect burst flows up the
+  -- connecting subscriber's own frames rather than dispatching to
+  -- registered chains.  So this is a walk of the emit list and of
+  -- `thruWalk`'s value list -- the shape the two drain laws above
+  -- already have, proven -- and not an induction over the evaluator.
   --
   -- PROBED: `Probed.MergeAll-Queue`, at two and three OPEN inners, each
-  --   row paired with the same program at `just 1` pinned FALSE — so the
+  --   row paired with the same program at `just 1` pinned FALSE -- so the
   --   greens are not the vacuous kind a family of synchronously-completing
   --   inners would give, where no limit parks and every row passes.
   --   NOT REACHED, and it is the region the statement is actually about:
-  --   RE-ENTRY.  Every inner in these programs is a plain scripted source,
+  --   RE-ENTRY.  Every inner in those programs is a plain scripted source,
   --   so no inner's burst routes back through the wrap's own node, and the
   --   consumes stay sequential.  The rows therefore cover the shape where
   --   the claim is easy and say nothing about the shape where it is hard.
   --   The class stands at DIFFICULTY on exactly that ground.
-  --   The same module pins the instant BEFORE `pushBurst` at both
-  --   `nothing` and `just 1`, both reporting an empty queue while the
-  --   finished wrap at `just 1` parks — which is the degeneracy the
-  --   explanation above states, measured rather than argued.
   --
-  unbounded-never-parks :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
-      (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    let nid = proj₁ (mintNode sched)
-        r   = subscribeE fuel (mergeAllᵉ nothing b) κ id now sched st
-    in emptyQueue? (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r))))
+  pushBurst-queue-dead : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (k : NodeId) →
+    emptyQueue? (lookupNode k (EvalSt.nodes st)) →
+    emptyQueue? (lookupNode k (EvalSt.nodes
+      (proj₂ (proj₂ (pushBurst g id now f κ ems sched st)))))
 
 -- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain
 -- never lengthens the queue.  `mergeAllDrain` returns `[]` when it runs

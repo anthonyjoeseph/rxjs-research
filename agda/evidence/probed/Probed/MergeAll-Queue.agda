@@ -5,7 +5,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file (the library layout
 -- makes the name unresolvable there) and nothing in the proof may rest on
 -- it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: unbounded-never-parks
+-- TARGET: pushBurst-queue-dead
 --
 -- WHY IT IS TESTABLE AT ALL, and which SIDE.  The conclusion is a predicate
 -- on a node LOOKUP after a run, so it computes end to end at a closed

@@ -49,7 +49,7 @@ open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; 
   mergeAll-st; mergeAllᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
-open import Rx.MergeAll-Laws using (emptyQueue?; unbounded-never-parks)
+open import Rx.MergeAll-Laws using (emptyQueue?; pushBurst-queue-dead)
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
 
 ------------------------------------------------------------------
@@ -732,6 +732,41 @@ postulate
 -- shape leaf pins the lookup at the wrap's own `u`, and `emptyQueue?`
 -- at a pinned `mergeAll-st` reduces to exactly the equation wanted.  One
 -- `subst` along the shape equation is the whole bridge.
+-- THE QUEUE STAYS DEAD AT AN UNBOUNDED LIMIT, across the whole wrap and
+-- not merely across its outer subscribe.  A real body, and the split is
+-- the content: `subscribeAll` is mint, then `subscribeE` on the outer
+-- under a `thru-outer` frame, then `pushBurst` of that burst back
+-- through the frame.  The first half is `mint-install-survives`
+-- (.Node-Fresh), PROVEN over a ring on the whole of `subscribeE` -- the
+-- freshly installed node comes back untouched, so the queue reaching
+-- `pushBurst` is the one that was installed.  The second half is the
+-- only walk that can park, and it is the leaf.
+--
+-- PINNING IT AT THE FIRST HALF WAS THE BUG.  Nothing has parked before
+-- `pushBurst` at ANY limit, so the claim held at `just 1` too -- the
+-- limit it exists to exclude -- and read as discharged while asserting
+-- nothing about the case it was minted for.
+unbounded-never-parks : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  let nid = proj₁ (mintNode sched)
+      r   = subscribeE fuel (mergeAllᵉ nothing b) κ id now sched st
+  in emptyQueue? (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r))))
+unbounded-never-parks {u = u} fuel b κ id now sched st =
+  pushBurst-queue-dead fuel id now (thru-outer mergeAllᵒ nid) κ
+    (proj₁ inner) (proj₁ (proj₂ inner)) (proj₂ (proj₂ inner)) nid
+    (subst emptyQueue? (sym survives) refl)
+  where
+  nid : NodeId
+  nid = proj₁ (mintNode sched)
+
+  inner = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
+            (proj₂ (mintNode sched))
+            (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
+
+  survives = mint-install-survives fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
+               (mergeAll-st {t = u} nothing 0 [] false) sched st
+
 mergeAll-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (lim : Maybe ℕ)
   (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
