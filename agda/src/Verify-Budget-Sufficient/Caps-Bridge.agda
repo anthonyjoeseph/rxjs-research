@@ -31,8 +31,8 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤; *-monoˡ-≤;
-  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
+  *-monoˡ-≤; +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -100,6 +100,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0;
    nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc; nest-sum-3;
    realWidAt; nestSyn; storeNest-latch; storeNest-finish; nestOK?-latch)
+
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
@@ -1611,6 +1612,37 @@ abstract
 --   duplication witness that keeps the payload-list clause a `⊔`.  The
 --   rows are evidence about the RESTATED-AWAY statement; the harness
 --   and the row inventory transfer.
+
+-- WHY THE WIDTH FACTOR IS THE CONTENT.  A subscribe registers a width
+-- of observables, and the tempting reading is that the width term is
+-- charged for that registration count while this measures nesting DEPTH
+-- -- and depth does not see width, since merging a value with itself
+-- adds branches rather than levels.  That reading is right about width
+-- and wrong about what the factor is paying for.  The levels this
+-- family spends are paid by path terms: `pathNestD` charges a `suc` at
+-- `thru-outer` and at no other frame, and edge by edge the walk trades
+-- subject for path exactly.  But concat's DRAIN spends a level through
+-- `depthFinC` while sitting under a `from-inner` frame, which the path
+-- measure charges nothing for -- so those levels have no path term, and
+-- a program whose folds nest spends one per layer.  A single constant
+-- cannot pay an unbounded count; the width factor can, and does with
+-- three orders of magnitude to spare.
+--
+-- REFUTED: `Refuted.Nest-Depth-One` -- the one-`nestSyn` form of exactly
+--   this statement, pinned at its first crossing on `progU 5 2`: descent
+--   21 against a bound of 19.  Across the fold parameter the descent
+--   reads 4, 5, 9, 13, 17, 21 while the bound reads 9, 11, 13, 15, 17,
+--   19 -- about four per layer against a flat two, tying at depth 4.
+--
+-- PROBED: `Harness.Main`'s SERIES T reads this bound on the same
+--   crossing family and clears it everywhere the narrow form fails --
+--   descent 481 against 74249 at a fold depth of 120.  SERIES S adds the
+--   scan family across subject, path and fold depth, and SERIES S2 the
+--   root subscribe of `progW`, where one emission hands the outer `*All`
+--   a whole width of inners and the descent stays flat at 3 while the
+--   bound climbs past six billion.  Harness output rather than a probe,
+--   so measured-not-rechecked; two S2 rows overflowed the stack
+--   computing the bound itself, which bounds the sweep and not the claim.
 postulate
   depth-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
@@ -1622,13 +1654,6 @@ postulate
         + storeNestMax sched st
         + realWidAt e sl id * nestSyn e sl
 
--- THE ENTRY STATE SATISFIES THE NESTING INVARIANT, which is the mirror
--- of `init-capsOK?` and owed a real proof: no node and no registration
--- exists yet, so the store's nesting is its slots' plus its scripts', and
--- a scripted slot is obs-free by construction.  What blocks it today is
--- that `isData` discharges by unification at a CONCRETE type, so a live
--- pending value at a variable type does not reduce to nesting zero
--- without an inversion the module does not yet carry.
 postulate
   init-nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (id : ℕ) → nestOK? e ins id (sched-init e ins) (st-init e) ≡ true

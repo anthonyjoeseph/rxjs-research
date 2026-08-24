@@ -70,7 +70,7 @@ open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
          progT; sucGT; progU; sucGU; progF; sucGF; insF; insT; subjN; pathN;
-         progC; sucGC)
+         progC; sucGC; progW; sucGW)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
          pathNestD; chainsNestD)
@@ -546,6 +546,90 @@ chainWalk e sl (suc m) nextId sched st with sched-next sched
 -- it, so a later chain is read at the store the earlier ones deepened,
 -- which is where a per-chain charge would break first.  A row with no
 -- bracket had no chains and is evidence about nothing
+-- SERIES S (6000000): is the SUBSCRIBE side also width-blind?  The
+-- delivery leaf turned out to need one `nestSyn` and no width, for a
+-- reason that says nothing about deliveries in particular -- nesting
+-- depth does not see width.  If that reason is the whole story then
+-- `depthE` fits the same bound with a single `nestSyn` too, the
+-- nineteen-member family it belongs to has ONE uniform shape rather
+-- than two, and the subscribe-side statement is a widening of it
+-- rather than a separate induction.  This reads `depthE` against BOTH
+-- bounds at once so the gap between them is visible.
+--
+-- LOAD-BEARING wherever `one` is smaller than `wide`, which is
+-- everywhere the width exceeds one; a row where they coincide is
+-- evidence about nothing
+-- SERIES S2 (7000000): the same question with the WIDTH actually
+-- driven.  SERIES S runs on `progD`, whose subscribe registers one
+-- thing at a time, so a one-`nestSyn` bound and a width-scaled one
+-- cannot be told apart there any more than they could on the delivery
+-- side.  This reads the ROOT subscribe of `progW`, where one emission
+-- hands over `suc ww` inners, so the registration count the width term
+-- is charged for is the swept axis.  If the subscribe side needs its
+-- width anywhere, it needs it here
+depthWideRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
+depthWideRow ds ks j ww w =
+  let slF = insF ds ks j
+      p   = progW ww w 1
+      r   = subscribeE (gasPad (sucGW ds ks j ww w 1) g0) p root 0 0
+                       (sched-init p slF) (st-init p)
+      sd  = proj₁ (proj₂ r)
+      st  = proj₂ (proj₂ r)
+      κ   = root
+      lhs = depthE (budgetAt p slF 0) p κ 0 0 sd st
+      bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
+      one = bas + nestSyn p slF
+      wid = bas + realWidAt p slF 0 * nestSyn p slF
+  in "ww=" ++ show ww ++ " w=" ++ show w
+     ++ "  depthE=" ++ show lhs
+     ++ "  one=" ++ show one ++ "  wide=" ++ show wid
+     ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
+
+-- SERIES T (8000000): the CONCAT DRAIN arc, which is the one arc of the
+-- depth family whose `suc` the bound has no path term to pay.  A
+-- `thru-outer` frame's `suc` is paid by `pathNestD`, which charges that
+-- frame and only that frame — but `depthFinC`'s drain also spends a
+-- `suc`, and it is reached through a `from-inner` frame, which the path
+-- measure charges nothing for.  So on the accounting the drain's level
+-- has to come out of the single `nestSyn`, and whether that is enough is
+-- not something reading the definitions settles.  `progU` is the
+-- concatAll family — three inners queued behind one — so its root
+-- subscribe is where the drain actually fires.
+depthConcatRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
+depthConcatRow ds ks j d k =
+  let sl  = insT ds ks j
+      p   = progU d k
+      sd  = sched-init p sl
+      st  = st-init p
+      κ   = root
+      lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
+      bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
+      one = bas + nestSyn p sl
+      wid = bas + realWidAt p sl 0 * nestSyn p sl
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE=" ++ show lhs
+     ++ "  one=" ++ show one ++ "  wide=" ++ show wid
+     ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
+
+depthOneRow : ℕ → ℕ → ℕ → String
+depthOneRow j d k =
+  let p   = progD d k
+      r   = subscribeE (gasPad (sucG p) g0) p root 0 0
+                       (sched-init p ins₀) (st-init p)
+      sd  = proj₁ (proj₂ r)
+      st  = proj₂ (proj₂ r)
+      b   = subjN j d k
+      κ   = pathN j
+      lhs = depthE (budgetAt p ins₀ 0) b κ 0 0 sd st
+      bas = nestDᵉ b + pathNestD κ + storeNestMax sd st
+      one = bas + nestSyn p ins₀
+      wid = bas + realWidAt p ins₀ 0 * nestSyn p ins₀
+  in "j=" ++ show j ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE=" ++ show lhs
+     ++ "  one=" ++ show one ++ "  wide=" ++ show wid
+     ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
+
 chainsRep : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
           → (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t)
           → Sched Γ → EvalSt e → String
@@ -582,6 +666,21 @@ leafRow fam steps ds ks j w k =
            in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
               ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 2
+     then (let p = progW ds w k
+               r = subscribeE (gasPad (sucGW ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "W ww=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 3
+     then (let slT = insT ds ks j
+               p   = progU w k
+               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                               (sched-init p slT) (st-init p)
+           in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ leafWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else (let p = progF w k
                r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
@@ -592,7 +691,15 @@ leafRow fam steps ds ks j w k =
 chainRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 chainRow fam steps ds ks j w k =
   let slF = insF ds ks j
-  in if fam ≡ᵇ 0
+  in if fam ≡ᵇ 3
+     then (let slT = insT ds ks j
+               p   = progU w k
+               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                               (sched-init p slT) (st-init p)
+           in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ chainWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 0
      then (let p = progC ds w k
                r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
@@ -954,7 +1061,21 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
 rowAt n =
-  if 5000000 ≤ᵇ n
+  if 9000000 ≤ᵇ n
+  then (let m = n ∸ 9000000
+        in chainRow 3 16 1 2 1 m 2 ++ " || " ++ depthConcatRow 1 2 0 m 2)
+  else if 8000000 ≤ᵇ n
+  then (let m = n ∸ 8000000
+        in depthConcatRow (m / 10000) ((m % 10000) / 1000) ((m % 1000) / 100)
+                          ((m % 100) / 10) (m % 10))
+  else if 7000000 ≤ᵇ n
+  then (let m = n ∸ 7000000
+        in depthWideRow (m / 10000) ((m % 10000) / 1000) ((m % 1000) / 100)
+                        ((m % 100) / 10) (m % 10))
+  else if 6000000 ≤ᵇ n
+  then (let m = n ∸ 6000000
+        in depthOneRow (m / 10000) ((m % 10000) / 100) (m % 100))
+  else if 5000000 ≤ᵇ n
   then (let m = n ∸ 5000000
         in leafRow (m / 100000) 16 ((m % 100000) / 10000)
                    ((m % 10000) / 1000) ((m % 1000) / 100)

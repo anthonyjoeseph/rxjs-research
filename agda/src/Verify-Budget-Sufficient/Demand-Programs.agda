@@ -291,6 +291,32 @@ sucGC ds ks j dd w k =
   suc (syncSizeᵉ (progC dd w k)
        + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progC dd w k))
 
+-- ONE DELIVERY THAT SUBSCRIBES A WIDTH, which is the shape every other
+-- family here misses.  `wrapD` merges a SINGLETON, so each accumulator
+-- level costs one subscribe and a delivery never registers more than
+-- one observable at a time -- and a bound charging one operator's worth
+-- per delivery cannot be told apart from a bound charging a width on
+-- programs like that.  `wrapW` merges the accumulator with itself `suc
+-- w` times instead, so a single scan emission hands the outer *All a
+-- width of inners to subscribe at one instant.
+wrapW : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
+  Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
+wrapW w t = strmᵗ (mergeAllᵉ (ofᵉ (replicate (suc w) t)))
+
+foldW : ∀ {n} {Γ : Ctx n} → ℕ → Fn Γ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
+foldW w = wrapW w (fstᵗ (varᵗ (here refl)))
+
+progW : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
+progW ww w k =
+  mergeAllᵉ (scanᵉ (foldW ww) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+                     ++ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ [])))))
+
+sucGW : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGW ds ks j ww w k =
+  suc (syncSizeᵉ (progW ww w k)
+       + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progW ww w k))
+
 progU : ℕ → ℕ → Closed Γ₂ natᵗ
 progU d k =
   mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))

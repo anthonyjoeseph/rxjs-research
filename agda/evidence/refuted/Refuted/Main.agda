@@ -25,3 +25,5 @@ open import Refuted.Thru-Loop
   using (thruConsume-nodry-loop-absurd)
 open import Refuted.Inner-Nodry
   using (inner-nodry-inv-regLen-absurd)
+open import Refuted.Nest-Depth-One
+  using (descent≡21; oneSyn≡19; nest-one-syn-absurd)
