@@ -181,15 +181,15 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-depth-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
+- **`cascadeGo-depth-perDeliv`** (Caps-Face/Part7) — FALSITY: one arrival's
   cascade descent, one `nestSyn` per delivery off the evaluator's own ledger.
-  The widening half is already stated, so this is what the parent body still
-  owes. Twin: the store face's `cascadeGo-nest`, same split at the same joints.
+  The mirror reports its tail at the pre-step state too, and that phantom run
+  outdelivers the real one by whatever the head cancels. Mechanism in header.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of
   magnitude. Nineteen mutual members, every level paid by a path term but one.
-- **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — DIFFICULTY: the chain walk's
+- **`cascadeGo-nest-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: the chain walk's
   induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
   tight — the overshoot is a constant per delivery on both axes. Residue: a
   step that stores without delivering.

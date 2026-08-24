@@ -1344,6 +1344,45 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- more.  What the sweep did NOT reach is a limit that binds while the
 -- store is loaded: its slot table is the one-arrival table throughout,
 -- so a bounded gate interacting with a shared def is uncovered.
+-- THE WALK'S PER-DELIVERY HALF, which is the half that has to be an
+-- induction.  It charges the store measure by what the walk actually
+-- DID rather than by what it was allowed to do: one `nestSyn` per
+-- delivery on the evaluator's own ledger, with no cap anywhere in the
+-- statement.  That is what lets the counting half be a separate leaf —
+-- and lets it be a comparison between two static quantities, which is
+-- the only reason it can be settled without the run.
+
+-- AND THE CHARGE OVERSHOOTS BY A CONSTANT PER DELIVERY, WHICH IS WHAT
+-- SAYS THE SHAPE IS RIGHT RATHER THAN MERELY SAFE.  Every quantity here
+-- computes and none is a cap, so the statement instantiates directly;
+-- measured in `Harness.Main` (measured-not-rechecked, so this
+-- discharges nothing).  Driving the stored values' nesting from one
+-- wrap level to nine, the store measure and the charge rise in lockstep
+-- and the margin sits at four the whole way — it never widens, so the
+-- rows are tight enough to have broken.  Driving the delivery count
+-- instead, the margin is four times the count, and the two axes compose
+-- linearly rather than interacting.
+--
+-- THE REASON IS THE ONE THE CURRENCY WAS BUILT ON: `nestSyn` is a
+-- SYNTACTIC ceiling on nesting, so deepening what a delivery stores
+-- deepens the ceiling by the same step.  A per-delivery charge in this
+-- currency cannot be outrun by depth, only by a step that stores
+-- without delivering — which is the residue the induction owes, and
+-- which no row in the sweep produced.
+postulate
+  cascadeGo-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+    let r = cascadeGo a nextId chains sched st
+    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+         ≤ storeNestMax sched st
+             + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
+
 -- THE PER-DELIVERY HALF OF THE DEPTH FACE, and the split is the store
 -- face's, taken at the same two joints.  `cascadeGo-nest` charges the
 -- store measure by what the walk DID -- one `nestSyn` per delivery on
@@ -1368,10 +1407,32 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- by the entry store plus the deliveries made so far -- which is
 -- `cascadeGo-nest-perDeliv`'s conclusion exactly.  So neither leaf's
 -- induction closes without the other's statement, and proving them
--- apart means carrying one as a hypothesis of the other.  A joint
--- statement would have to live HERE, since the store leaf's module
--- sits above this one and the dependency runs the other way; doing it
--- costs a restatement now and a discarded grind later.
+-- apart means carrying one as a hypothesis of the other -- which
+-- launders a counted postulate into an invisible premise.  The store
+-- leaf is stated directly above for that reason: it was one module up
+-- and out of reach, and moving it down is what makes a joint induction
+-- possible at all rather than a threading exercise.  The two nesting
+-- hypotheses are here because that leaf demands them, and they cost
+-- nothing to carry: the store face's own two statements carry exactly
+-- this pair, so they are the family's hypotheses rather than one
+-- caller's, and the only consumer of the parent already binds both for
+-- other summands and was simply not passing them down.
+
+-- THE RESIDUE IS A PHANTOM BRANCH, AND IT IS NOT THE STORE LEAF'S.
+-- That one owes a step that stores without delivering; this one owes
+-- the opposite.  `depthCascade`'s cons clause reports its tail at BOTH
+-- states, because the evaluator's cancellation test is with-abstracted
+-- by the consumer and the mirror cannot branch on it.  The
+-- stepped-state summand composes -- the induction hypothesis, the store
+-- leaf at a SINGLETON chain list, where `cascadeGo` degenerates to one
+-- `chainStep`, and `delivN-split` close it between them.  The
+-- entry-state summand does not: it charges a run begun BEFORE the head
+-- stepped against the delivery count of the run that actually
+-- happened, and a chain the head cancels still delivers in that
+-- phantom.  So the left side can count deliveries the right side never
+-- made, and this is the tight form -- the parent is insulated by a
+-- width factor with orders of magnitude of slack, which is exactly why
+-- no measurement of the parent says anything about this.
 postulate
   cascadeGo-depth-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -1379,6 +1440,8 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascadeGo a nextId chains sched st
     in depthCascade a nextId chains sched st
          ≤ nestDᵛ (arrTy a) (arrVal a)
@@ -1391,14 +1454,17 @@ cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ nestDᵛ (arrTy a) (arrVal a)
       + chainsNestD (chainsOf a st)
       + storeNestMax sched (cascadeLatch a st)
       + realWidAt e sl id * nestSyn e sl
-cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps =
+cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval =
   ≤-trans (cascadeGo-depth-perDeliv sl id a nextId (chainsOf a st) sched
-             (cascadeLatch a st) hsl hcapsL)
+             (cascadeLatch a st) hsl hcapsL
+             (trans (nestOK?-latch e sl id a sched st) hnest) hval)
           (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)
                       + chainsNestD (chainsOf a st)
                       + storeNestMax sched (cascadeLatch a st))
@@ -1434,7 +1500,7 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ capsH e sl id
 cascade-depth-capsH {e = e} sl id a nextId sched st slEq cok nok harr =
-  ≤-trans (cascade-nest-compositional sl id a nextId sched st slEq cok)
+  ≤-trans (cascade-nest-compositional sl id a nextId sched st slEq cok nok harr)
           (nest-sum-3 e sl id _ _ _ harr
             (≤-trans (chainsNest≤store a sched st)
                      (≤-trans (≤-reflexive

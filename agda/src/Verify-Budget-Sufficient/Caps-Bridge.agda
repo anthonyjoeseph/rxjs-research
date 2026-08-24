@@ -34,7 +34,6 @@ open import Data.Maybe   using (Maybe; nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
   *-monoˡ-≤; +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
-open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
@@ -85,8 +84,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (cascadeGo-deliv-real; caps-tick; cascade-depth-capsH; cascadeLatch-caps; chainsOf-caps;
-   chainsOf-length; chainStep-slots)
+  (cascadeGo-deliv-real; cascadeGo-nest-perDeliv; caps-tick; cascade-depth-capsH;
+   cascadeLatch-caps; chainsOf-caps; chainsOf-length; chainStep-slots)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -844,45 +843,6 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- delivery cap cannot be reached at any program, at any index, and the
 -- comparison has no instance.  Hypothesis side fine, conclusion side
 -- blocked — which is why the law had to settle it rather than a sweep.
-
--- THE WALK'S PER-DELIVERY HALF, which is the half that has to be an
--- induction.  It charges the store measure by what the walk actually
--- DID rather than by what it was allowed to do: one `nestSyn` per
--- delivery on the evaluator's own ledger, with no cap anywhere in the
--- statement.  That is what lets the counting half be a separate leaf —
--- and lets it be a comparison between two static quantities, which is
--- the only reason it can be settled without the run.
-
--- AND THE CHARGE OVERSHOOTS BY A CONSTANT PER DELIVERY, WHICH IS WHAT
--- SAYS THE SHAPE IS RIGHT RATHER THAN MERELY SAFE.  Every quantity here
--- computes and none is a cap, so the statement instantiates directly;
--- measured in `Harness.Main` (measured-not-rechecked, so this
--- discharges nothing).  Driving the stored values' nesting from one
--- wrap level to nine, the store measure and the charge rise in lockstep
--- and the margin sits at four the whole way — it never widens, so the
--- rows are tight enough to have broken.  Driving the delivery count
--- instead, the margin is four times the count, and the two axes compose
--- linearly rather than interacting.
---
--- THE REASON IS THE ONE THE CURRENCY WAS BUILT ON: `nestSyn` is a
--- SYNTACTIC ceiling on nesting, so deepening what a delivery stores
--- deepens the ceiling by the same step.  A per-delivery charge in this
--- currency cannot be outrun by depth, only by a step that stores
--- without delivering — which is the residue the induction owes, and
--- which no row in the sweep produced.
-postulate
-  cascadeGo-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    let r = cascadeGo a nextId chains sched st
-    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ storeNestMax sched st
-             + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
 
 cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
