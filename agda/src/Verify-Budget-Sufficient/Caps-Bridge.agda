@@ -32,7 +32,7 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤; *-monoˡ-≤;
-  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
+  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; *-identityˡ)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -99,7 +99,8 @@ open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0;
    nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc; nest-sum-3;
-   realWidAt; nestSyn; storeNest-latch; storeNest-finish; nestOK?-latch)
+   realWidAt; nestSyn; storeNest-latch; storeNest-finish; nestOK?-latch;
+   1≤realWidAt)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
@@ -1611,8 +1612,28 @@ abstract
 --   duplication witness that keeps the payload-list clause a `⊔`.  The
 --   rows are evidence about the RESTATED-AWAY statement; the harness
 --   and the row inventory transfer.
+
+-- ONE `nestSyn`, NOT A WIDTH, and the width above is a widening of
+-- this rather than a stronger claim.  A subscribe may register a whole
+-- width of observables, which is what the width term was charged for
+-- -- but what this measures is nesting DEPTH, and merging a value with
+-- itself adds branches, not levels.  So the same bound the delivery
+-- side takes should hold here, and the nineteen-member family both
+-- statements belong to has ONE shape rather than two.
+--
+-- BOTH SIDES READ AT REAL RUNS, by harness rather than by probe, so
+-- nothing here is rechecked.  `Harness.Main`'s SERIES S reads `depthE`
+-- against both bounds on the scan family across the subject, the path
+-- and the fold depth, and every row clears the one-`nestSyn` bound
+-- with the width bound roughly ten times larger.  SERIES S2 then
+-- drives the axis that could actually separate them, the ROOT
+-- subscribe of `progW`, where one emission hands the outer `*All` a
+-- width of inners: `depthE` is EXACTLY FLAT at 3 across every width
+-- swept while the width bound climbs past six billion.  Two of those
+-- rows overflowed the stack computing the width term itself and
+-- printed nothing, which bounds the sweep rather than the claim.
 postulate
-  depth-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  depthE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
@@ -1620,7 +1641,22 @@ postulate
     depthE g b κ bid now sched st
       ≤ nestDᵉ b + pathNestD κ
         + storeNestMax sched st
-        + realWidAt e sl id * nestSyn e sl
+        + nestSyn e sl
+
+depth-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
+  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  depthE g b κ bid now sched st
+    ≤ nestDᵉ b + pathNestD κ
+      + storeNestMax sched st
+      + realWidAt e sl id * nestSyn e sl
+depth-nest-compositional {e = e} sl id g b κ bid now sched st hsl hcaps =
+  ≤-trans (depthE-nest sl id g b κ bid now sched st hsl hcaps)
+          (+-monoʳ-≤ (nestDᵉ b + pathNestD κ + storeNestMax sched st)
+             (≤-trans (≤-reflexive (sym (*-identityˡ (nestSyn e sl))))
+                      (*-monoˡ-≤ (nestSyn e sl) (1≤realWidAt e sl id))))
 
 -- THE ENTRY STATE SATISFIES THE NESTING INVARIANT, which is the mirror
 -- of `init-capsOK?` and owed a real proof: no node and no registration

@@ -173,10 +173,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 - **`chainsOf-real`** (Caps-Face/Part7) — DIFFICULTY: how many chains one arrival
   can have, under the real width. `chainsOf-length` carries it to the registry;
   the caps route overshoots, `cReg` being blown up where the width is bare.
-- **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
-  depth induction. Only the SUBJECT axis can refute — the store and path move
-  the bound alone — and the sweeps drive it at the tight index on a product,
-  ratio settling. What remains is the induction.
+- **`depthE-nest`** (Caps-Bridge) — DIFFICULTY: the subscribe-side depth
+  induction, at ONE `nestSyn` and no width at all. The width form is now a
+  widening off `1≤realWidAt`, so the two faces are one statement; measured flat
+  while the width term climbed past six billion.
 - **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — DIFFICULTY: the chain walk's
   induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
   tight — the overshoot is a constant per delivery on both axes. Residue: a
