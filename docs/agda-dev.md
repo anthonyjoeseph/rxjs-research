@@ -8,7 +8,7 @@ make agda-dev-selftest                 proves the loop is load-bearing
 ```
 
 Paths are `src`-relative, and it works on ANY module you name. **Use it throughout
-development and `make agda` once at the end** — seconds per member against minutes
+development and `make gate-heavy` once at the end** — seconds per member against minutes
 for a real check of the same module.
 
 One OPT-IN flag: **`HOLES=1`** tolerates `?` and missing clauses, off by default so
@@ -28,15 +28,15 @@ Where a block IS stubbed, two things are given up:
 
 - **Termination of the real mutual recursion is not checked** — and in this proof
   the mutual recursion IS the induction, so a bad measure passes dev and fails
-  `make agda`. That is a proof-shape failure, not a typo.
+  `make gate-heavy`. That is a proof-shape failure, not a typo.
 - **Postulates do not reduce**, so a clause needing a sibling to unfold can pass dev
   and fail for real.
 
 Self-recursion and recursion within one batch ARE checked. So the residual risk of
 a dev-only workflow is concentrated in the handful of modules with a heavy block,
-which is exactly where `make agda` earns its keep.
+which is exactly where `make gate-heavy` earns its keep.
 
-**`make agda` is still the merge gate:** never report a result as verified on a dev
+**`make gate-heavy` is still the merge gate:** never report a result as verified on a dev
 run, never commit on one alone, never call dev-green "typechecks".
 
 ## There is no whole-project sweep, and do not rebuild one
@@ -75,7 +75,7 @@ Rationale, measurements and the closed performance experiments also live in
 
 **It must be GREEN on every file in `agda/src`, always.** A failure is a P0 defect
 in the tooling, fixed *before* the work you were doing. Never route around it — not
-with a skip list, not with "it's just the tool", not by falling back to `make agda`.
+with a skip list, not with "it's just the tool", not by falling back to `make gate-heavy`.
 A single tolerated red teaches everyone to ignore the next one.
 
 **The default assumption is that the TOOL is wrong, not the proof** — that is the
@@ -105,7 +105,7 @@ the tell — a per-member cost that does not vary with the member is not a membe
 
 **`--list` already names them,** under `could in principle be hoisted out`, and its
 warning is about a different and much smaller thing: the POSITIVITY cost inside
-`make agda`, where hoisting 22 of 36 members bought 35s of 255s. The dev-loop effect
+`make gate-heavy`, where hoisting 22 of 36 members bought 35s of 255s. The dev-loop effect
 is the bigger one and points the same way, so a no-cycle member is worth hoisting on
 the loop's evidence even when the gate would barely notice.
 

@@ -136,7 +136,7 @@ def sync(agda_dir, roots, dest, verbose=False):
                 fh.write(stripped)
             written += 1
 
-    # A source file that is gone must not linger in the mirror, or `make agda`
+    # A source file that is gone must not linger in the mirror, or `make gate-heavy`
     # keeps compiling a module the tree no longer has.
     # Walk only the mirrored ROOTS, never `dest` wholesale: the mirror also
     # hosts `_dev` (agda-dev's generated modules) and `_build`, and neither is

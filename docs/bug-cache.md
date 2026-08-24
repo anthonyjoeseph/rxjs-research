@@ -29,6 +29,6 @@ and 4): DEPTH caps program nesting, a hard size cap.
 
 ## Why the target exists
 
-`Unit-Test.agda` is **not** reachable from `Main.agda`, so `make agda` does not check
+`Unit-Test.agda` is **not** reachable from `Main.agda`, so `make gate-heavy` does not check
 it. `make bug-cache` enforces the invariant above — it exists precisely because
 nothing else in the build would notice the cache rotting.

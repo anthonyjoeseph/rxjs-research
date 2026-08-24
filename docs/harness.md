@@ -9,7 +9,7 @@ make harness ARGS='10'    ONE row by index (the only way to run a quarantined ro
 ```
 
 `agda/src/Harness/Main.agda` is a **MODULE_ROOT** — in `src` under the wiring law,
-but not reached by `src/Main.agda`, so `make agda` never pays for it.
+but not reached by `src/Main.agda`, so `make gate-heavy` never pays for it.
 
 **It exists because the GHC backend ignores `abstract`**: opacity is a *typechecking*
 contract, not a runtime one, so the compiled binary runs the real bodies of families

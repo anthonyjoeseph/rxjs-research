@@ -108,7 +108,7 @@ escalate — the regression being guarded against is a future session
 The first version of the auto-`--deps` path checked the cone as computed, and
 that is wrong in a way the phrase "cheaper than the tower" hides: **every
 module in `agda/src` has a route to Main by the wiring law, so EVERY cone
-contains the claim roots**, and a dev check on `Main.agda` is `make agda` with
+contains the claim roots**, and a dev check on `Main.agda` is `make gate-heavy` with
 a comment-stripping round trip in front of it. Measured on the run that found
 this: the roots and `The-Proof.agda` each hit the 45 s budget and were reported
 `FAIL`, then at 560 s `Main.agda` took minutes and `The-Proof.agda` had still
@@ -134,7 +134,7 @@ with the mutual block. Measured on the leg that found this, a sweep of 50
 consumers silently dropped exactly the two modules that consume the new arms.
 
 So the sweep names each stubbed member, counts it in the unchecked list, and the
-final line says how many stayed unchecked. `make agda` is what covers them.
+final line says how many stayed unchecked. `make gate-heavy` is what covers them.
 
 ### A BUDGET TIMEOUT IS NOT A RED, and conflating them made the sweep lie
 

@@ -1,4 +1,4 @@
-.PHONY: find-prose gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -17,7 +17,7 @@ export LANG := C.UTF-8
 # warning-free.
 #
 # ⚠ AND SO IS THE BINARY.  `AGDA_BIN` names it in ONE place so an A/B is
-# `make agda AGDA_BIN=/path/to/other/agda` instead of a PATH edit nobody can
+# `make gate-heavy AGDA_BIN=/path/to/other/agda` instead of a PATH edit nobody can
 # see afterwards.  It is EXPORTED, so scripts/agda-dev.py picks up the same
 # one; two tools on two binaries is the same cache war as two tools on two
 # warning modes, one layer lower down.  Which binary a bare `agda` resolves
@@ -49,9 +49,6 @@ all: help
 
 help:
 	@echo "Available targets:"
-	@echo "  agda          typecheck the Agda source (src/Main.agda) — this is"
-	@echo "                  the CLAIM GRAPH: Main names individual claims, so"
-	@echo "                  green here means every claim's support compiles"
 	@echo "  agda-dev      THE FAST DEV LOOP: check one mutual-block member at a"
 	@echo "                  time against its siblings POSTULATED at their exact"
 	@echo "                  signatures.  ONE MEMBER AT A TIME — the grind loop"
@@ -59,7 +56,7 @@ help:
 	@echo "                  IS VALID, wherever a block was stubbed: the real"
 	@echo "                  recursion's TERMINATION is not checked and postulates"
 	@echo "                  do not reduce.  Modules with no multi-member block"
-	@echo "                  are checked verbatim.  'make agda' is the merge gate"
+	@echo "                  are checked verbatim.  'make gate-heavy' is the merge gate"
 	@echo "                  NO whole-project sweep: measured out as costlier"
 	@echo "                  than 'make gate' at lower fidelity"
 	@echo "                  make agda-dev ARGS='Verify-Budget-Sufficient/Wet/Part2.agda'"
@@ -70,7 +67,7 @@ help:
 	@echo "                  body in src, demand the fast check goes RED, restore."
 	@echo "                  Run whenever the stubbing logic changes"
 	@echo "  bug-cache     typecheck the type-level bug cache + the demand-probe rows"
-	@echo "                  (NOT reached by src/Main.agda, so 'make agda' does not"
+	@echo "                  (NOT reached by src/Main.agda, so 'make gate-heavy' does not"
 	@echo "                  cover them — green here <=> no known counterexample remains)"
 	@echo "  unsafe-check  SOUNDNESS GUARD: the build is NOT --safe (it cannot be,"
 	@echo "                  while postulates exist), so nothing stops an unsafe"
@@ -128,25 +125,19 @@ help:
 	@echo "  strip-selftest  proves the stripper safe: the lexical traps (-->, x--y,"
 	@echo "                  {-# #-}) and comment-insert invariance"
 	@echo "  refuted       typecheck agda/evidence/refuted/ — the machine-checked '-> bottom'"
-	@echo "                  witnesses.  Separate include root: 'make agda' never"
+	@echo "                  witnesses.  Separate include root: the tower never"
 	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
-	@echo "                  after 'make agda' (it imports src, so the cache is"
-	@echo "                  warm by then).  See EVIDENCE.md"
-	@echo "  gate          the acceptance test: wiring-selftest + wiring-gate +"
-	@echo "                  unsafe-check + dup-selftest + dup-check + agda +"
-	@echo "                  refuted + bug-cache.  Cheap"
-	@echo "                  checks FIRST so a 2-second failure never waits on"
-	@echo "                  the 13-minute one; 'refuted' comes AFTER 'agda'"
-	@echo "                  because it imports src and wants that cache warm"
+	@echo "                  inside gate-heavy, which runs it AFTER the tower (it"
+	@echo "                  imports src, so the cache is warm).  See EVIDENCE.md"
 	@echo "  bg            RUN EVERY LONG BUILD THROUGH THIS.  ALWAYS EXITS 7,"
 	@echo "                  green or red — a launcher status that is right most"
 	@echo "                  of the time gets believed, so this one is never"
 	@echo "                  right.  It cannot report a false green because it"
 	@echo "                  cannot report anything.  Ask bg-check instead"
-	@echo "                  make bg T=agda   /   make bg T=gate LOG=/tmp/g.log"
+	@echo "                  make bg T=gate-heavy   /   make bg T=gate LOG=/tmp/g.log"
 	@echo "  bg-check      THE VERDICT of a detached run: GREEN, RED + failing"
 	@echo "                  tail, or STILL RUNNING (exit 3 — not a pass)"
-	@echo "                  make bg-check T=agda"
+	@echo "                  make bg-check T=gate-heavy"
 	@echo "                  ⚠ DO NOT BRANCH ON make's EXIT CODE HERE: make"
 	@echo "                  collapses BOTH 3 and 1 to its own 2, so running"
 	@echo "                  and RED are indistinguishable.  Match the text,"
@@ -155,7 +146,7 @@ help:
 	@echo "  bg-wait       block until a detached run is TERMINAL, then report"
 	@echo "                  it — exit 0 green, NONZERO red.  This is the one"
 	@echo "                  to poll: it cannot return while still running"
-	@echo "                  make bg-wait T=gate   /   make bg-wait T=agda I=90"
+	@echo "                  make bg-wait T=gate   /   make bg-wait T=gate-heavy I=90"
 	@echo "  ts-check      typecheck the TypeScript source"
 	@echo "  cli-build     compile the Agda differential-test CLI (agda/_cli/Main)"
 	@echo "  oracle        generate programs, evaluate in rxjs and Agda, report diffs"
@@ -184,22 +175,6 @@ help:
 	@echo "                  make quickcheck ARGS='42 42' (ONE seed, 200 runs, depth 4)"
 	@echo "                  make quickcheck ARGS='1 500 300 5' (seeds 1..500, 300 runs, depth 5)"
 
-# Times itself and records the result in typecheck-performance-numbers.md, so that
-# file stays current for free.  Only a GREEN run is recorded (`&&`), because a
-# timing from a failed build measures how long it took to fail.  The recorder
-# leaves the file byte-identical unless a number actually moved, so a normal build
-# does not dirty the tree.
-agda: stripped
-	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
-	 { (cd agda/_stripped-comments && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 \
-	   | scripts/unmap-positions.py | tee $$log; \
-	 st=$$(cat $$rc); el=$$(( $$(date +%s) - t0 )); \
-	 n=$$(grep -c '^[[:space:]]*Checking ' $$log || true); \
-	 if [ "$$st" -eq 0 ] && [ "$$n" -gt 0 ]; then \
-	   scripts/perf_record.py "make agda (full gate, $$n modules)" $$el; \
-	 fi; \
-	 rm -f $$log $$rc; exit $$st
-
 # THE FAST DEV LOOP.  Checks one mutual-block member at a time against its
 # siblings POSTULATED at their exact signatures; agda/src is never written to.
 #
@@ -210,7 +185,7 @@ agda: stripped
 # HOLES=1 tolerates ? holes and missing clauses (opt-in).  BUDGET=<seconds>
 # overrides the enforced per-file budget below, and is for a cold dependency
 # chain only.  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID
-# -- `make agda` stays the merge gate.  There is deliberately no whole-project
+# -- `make gate-heavy` stays the merge gate.  There is deliberately no whole-project
 # sweep.  All of it, with the measurements: docs/agda-dev.md.
 AGDA_DEV_BUDGET ?= 45
 agda-dev:
@@ -231,7 +206,7 @@ agda-dev-selftest:
 bug-cache: stripped
 	@$(call AGDA_RUN,src/Implementation/Unit-Test.agda)
 
-# SOUNDNESS GUARD.  The build is NOT `--safe` — `make agda` runs a plain
+# SOUNDNESS GUARD.  The build is NOT `--safe` — `make gate-heavy` runs a plain
 # `agda src/Main.agda`, there is no OPTIONS pragma in src/ and no flags in the
 # .agda-lib — so nothing mechanically stops an unsafe pragma landing on the
 # proof path.  `--safe` cannot be switched on while postulates exist (it rejects
@@ -336,7 +311,7 @@ dup-check:
 # ─────────────────────────────────────────────────────────────────────────
 # AN IMPORT NOTHING USES IS A MODULE EDGE NOTHING PAYS FOR.  Agda has no
 # unused-import warning, so this is the one dependency in the tree that can be
-# asserted and never spent -- and an edge decides both what `make agda` must
+# asserted and never spent -- and an edge decides both what `make gate-heavy` must
 # build BEFORE a file and what an edit to the imported module INVALIDATES.
 # Mechanics, and the twelve-edge instance that paid for the checker:
 # docs/imports-check.md
@@ -800,9 +775,29 @@ gate:
 
 # THE MERGE GATE, forced.  Everything, including the full tower.  Stamps the
 # commit on the way out, which is what dev-changed's drift trigger counts from.
-gate-heavy:
+#
+# The tower step is INLINE and has no target of its own.  It used to be `make
+# agda`, and a second public name for the expensive half is exactly the habit
+# the routing gate exists to break: whoever typed it got the tower and skipped
+# every cheap check that would have failed in seconds.
+#
+# It times itself and records the result in typecheck-performance-numbers.md, so
+# that file stays current for free.  Only a GREEN run is recorded, because a
+# timing from a failed build measures how long it took to fail.  The recorder
+# leaves the file byte-identical unless a number actually moved, so a normal
+# build does not dirty the tree.  The recorded label is unchanged from when
+# this step was its own target, so the 47 rows already in that file continue.
+gate-heavy: stripped
 	@$(MAKE) --no-print-directory gate-cheap
-	@$(MAKE) --no-print-directory agda
+	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
+	 { (cd agda/_stripped-comments && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 \
+	   | scripts/unmap-positions.py | tee $$log; \
+	 st=$$(cat $$rc); el=$$(( $$(date +%s) - t0 )); \
+	 n=$$(grep -c '^[[:space:]]*Checking ' $$log || true); \
+	 if [ "$$st" -eq 0 ] && [ "$$n" -gt 0 ]; then \
+	   scripts/perf_record.py "make gate-heavy (full gate, $$n modules)" $$el; \
+	 fi; \
+	 rm -f $$log $$rc; [ "$$st" -eq 0 ]
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
 	@$(MAKE) --no-print-directory bug-cache
@@ -884,10 +879,10 @@ dev-changed:
 # ─────────────────────────────────────────────────────────────────────────
 # DETACHED BUILDS -- always launch a long target through `make bg`.
 #
-#     make bg T=agda                  detach this under run_in_background
+#     make bg T=gate-heavy                  detach this under run_in_background
 #     make bg T=gate LOG=/tmp/g.log   explicit log path
-#     make bg-check T=agda            THE VERDICT: green, red + tail, running
-#     make bg-wait  T=agda            blocks until terminal
+#     make bg-check T=gate-heavy            THE VERDICT: green, red + tail, running
+#     make bg-wait  T=gate-heavy            blocks until terminal
 #
 # `make bg` ALWAYS EXITS 7, GREEN OR RED (Anthony) -- a deliberately useless
 # status, because one that is right most of the time gets believed and the

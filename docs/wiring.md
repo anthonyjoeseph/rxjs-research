@@ -30,7 +30,7 @@ that went unreported. Anything those entries reach is covered automatically.
 
 The probes have since left this table altogether, which is the stronger fix: an entry
 here is a seed inside the PROOF's own scan, so a probe listed here counted as wired
-while nothing in the proof consumed it — and `make agda`, which compiles Main's cone
+while nothing in the proof consumed it — and `make gate-heavy`, which compiles Main's cone
 and nothing else, never saw the file at all. They live in `agda/evidence/probed/` now,
 claimed by `Probed.Main` and held to this same law by `make wiring-probed`.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The CHANGED-SET dev sweep, and the decision of whether the full gate is owed.
 
-`make agda` costs many minutes and re-proves the whole tower.  Most edits
+`make gate-heavy` costs many minutes and re-proves the whole tower.  Most edits
 cannot possibly need it: `make agda-dev` emits a module with no multi-member
 mutual block VERBATIM, so for such a module the dev check IS a real check, and
 the only thing the full build adds is the consumers.
@@ -9,7 +9,7 @@ the only thing the full build adds is the consumers.
 So this script does two jobs, and the SECOND is the one that matters:
 
   1. dev-check every .agda this working tree has changed under `agda/src`.
-  2. decide, mechanically, whether `make agda` is still owed — and FAIL if it
+  2. decide, mechanically, whether `make gate-heavy` is still owed — and FAIL if it
      is, so `make gate-light` cannot be used where it is not valid.
 
 THE ESCALATION TRIGGERS, all three mechanical:
@@ -321,7 +321,7 @@ def main() -> int:
                     cone_stubbed.append(p)
         for m in cone_stubbed:
             print(f"dev-changed: skip  {m}  — has a multi-member mutual block, "
-                  f"where agda-dev stubs the siblings; only `make agda` "
+                  f"where agda-dev stubs the siblings; only `make gate-heavy` "
                   f"checks it")
 
     if a.plan:
@@ -397,7 +397,7 @@ def main() -> int:
         print("dev-changed: FULL GATE REQUIRED — run `make gate`")
         return 2
     print(f"dev-changed: {len(checkable)} module(s) dev-green; no multi-member "
-          f"block touched, so `make agda` adds only the consumers"
+          f"block touched, so `make gate-heavy` adds only the consumers"
           + (f" — {len(unchecked)} of which stayed UNCHECKED, named above"
              if unchecked else ""))
     return 0

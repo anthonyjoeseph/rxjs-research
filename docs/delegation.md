@@ -45,7 +45,7 @@ Consequences:
 ## Commit protocol
 
 **Workers commit and push per green task** to the working branch, in the repo's commit
-voice. `make agda && make bug-cache` green before any commit that touches `agda/src`.
+voice. `make gate-heavy && make bug-cache` green before any commit that touches `agda/src`.
 
 **Never reach into another worker's lane to tidy a shared file.** `PROOF-STATE.md` is a
 shared ledger, and "helpfully" removing a line for a file another worker is mid-landing

@@ -348,13 +348,13 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- THE MUTUAL LANDING IS DONE.  input-wet is a real definition
 -- over input-wet-core, which RECEIVES the walk face at the peeled fuel, so
--- the induction this clause needs can now be written.  `make agda` accepts
+-- the induction this clause needs can now be written.  `make gate-heavy` accepts
 -- the recursion: zero TerminationIssue.
 
 -- IT TOOK THREE SHAPES, AND THE TWO THAT FAILED ARE WHY THE THIRD IS WRITTEN
 -- THE WAY IT IS.  Do not simplify it back:
 --   · PASS walkFace ITSELF (`input-wet = input-wet-core walkFace`).  Typechecks;
---     `make agda` then rejects the whole walk group on termination, and the
+--     `make gate-heavy` then rejects the whole walk group on termination, and the
 --     call it names is not this clause's but a PRE-EXISTING one —
 --     `stepThru-walk … (proj₁ (sp …)) …`, projections of the with-abstracted
 --     `sp`.  Handing the core an unrestricted walk face means the checker must

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The FAST DEV LOOP: typecheck mutual-block members against POSTULATED siblings.
 
-WHY THIS EXISTS.  Most of `make agda` is Agda's occurrence/polarity ("Positivity")
+WHY THIS EXISTS.  Most of `make gate-heavy` is Agda's occurrence/polarity ("Positivity")
 pass over a few big mutual blocks, and THAT PASS CANNOT BE SWITCHED OFF.  Three
 routes were measured and all three failed -- do not re-attempt:
   * NO_POSITIVITY_CHECK on the block is a NO-OP: Agda accepts it only before a
@@ -45,7 +45,7 @@ there is no `mutual` keyword anywhere to grep for.
 
 ALL MEASURED TIMINGS LIVE IN typecheck-performance-numbers.md, NOT HERE.  This
 file used to carry the tables, and they went stale the moment a module was split.
-`make agda` and `make agda-dev` now append their own numbers to that file, so it
+`make gate-heavy` and `make agda-dev` now append their own numbers to that file, so it
 maintains itself; this docstring keeps only the reasoning, which does not age.
 
 TWO WAYS A TIMING HERE LIES, and both have cost this project real time:
@@ -81,7 +81,7 @@ WHAT A GREEN RUN DOES NOT MEAN.  Two things are given up, and the first is not
 minor:
   1. TERMINATION OF THE REAL MUTUAL RECURSION IS NOT CHECKED.  In this proof the
      mutual recursion IS the induction, so a body recursing on a non-decreasing
-     measure passes here and fails `make agda` -- a proof-SHAPE failure, not a
+     measure passes here and fails `make gate-heavy` -- a proof-SHAPE failure, not a
      typo.  Partially recovered: SELF-recursion is real, and so is recursion
      WITHIN a batch (the batch's signatures are forward-declared, so Agda puts
      them in one mutual block).  Only recursion crossing out of the batch is lost.
@@ -95,7 +95,7 @@ block is emitted VERBATIM with zero postulates, so a check of one of those is a
 REAL check.  The residual risk of a dev-only workflow is therefore concentrated
 in the few modules that HAVE a heavy block.
 Everything else is checked in full: types, implicits, metas, and coverage.  So:
-DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.  `make agda`
+DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID.  `make gate-heavy`
 stays the merge gate.  `make agda-dev-selftest` (--falsify) proves the loop is
 load-bearing: it flips one proj1/proj2 in a real body in src, demands RED, and
 restores the file byte-for-byte.  RUN IT WHENEVER THE STUBBING LOGIC CHANGES --
@@ -202,7 +202,7 @@ AGDA = os.path.join(REPO, "agda")
 AGDA_BIN = os.environ.get("AGDA_BIN") or "agda"
 SRC = os.path.join(AGDA, "src")
 # WHAT AGDA READS, AND WHERE IT STANDS: the comment-stripped mirror, entered as
-# the working directory exactly as `make agda` enters it.  Both facts are
+# the working directory exactly as `make gate-heavy` enters it.  Both facts are
 # load-bearing and neither is cosmetic.
 #
 #   THE CWD.  Agda finds a project by walking UP from the file it is checking
@@ -882,11 +882,11 @@ def sanitize(name: str) -> str:
 
 
 def agda_flags(args) -> list[str]:
-    # THE FLAGS MUST MATCH `make agda` EXACTLY, OR THE TWO TOOLS DESTROY EACH
+    # THE FLAGS MUST MATCH `make gate-heavy` EXACTLY, OR THE TWO TOOLS DESTROY EACH
     # OTHER'S INTERFACE CACHE (measured 2026-08-11).  Agda counts the warning
     # mode in an interface's validity key, so this loop used to carry
     #   -W noUserWarning
-    # (to hide the ~1,264 stdlib v2.3 deprecation warnings) while `make agda`
+    # (to hide the ~1,264 stdlib v2.3 deprecation warnings) while `make gate-heavy`
     # ran without it -- and EVERY ALTERNATION between them invalidated the
     # whole cone, stdlib included.  Ping-pong, measured on a 2-line module:
     #   no -W, cold  -> 120 modules checked
@@ -896,7 +896,7 @@ def agda_flags(args) -> list[str]:
     #   add -W       -> 120
     # The cost landed wherever it happened to land: Part1 read as a 400s
     # module (real cost 7.1s) because its dev run was rebuilding Subscribe-Face
-    # and 12 more from source, and a `make agda` after any dev run paid a full
+    # and 12 more from source, and a `make gate-heavy` after any dev run paid a full
     # cold rebuild.  Both were invisible -- each tool blamed its own module.
     #
     # The warnings that motivated it are GONE: the 29 sites were migrated to
@@ -915,7 +915,7 @@ def agda_flags(args) -> list[str]:
     # THE MAKEFILE IN THE SAME COMMIT, or the cache thrash documented above
     # comes straight back.
     # THE INCLUDE PATH IS THE MIRROR, NOT `src`, and that is load-bearing:
-    # `make agda` checks agda/_stripped-comments/ (see the Makefile's `stripped`
+    # `make gate-heavy` checks agda/_stripped-comments/ (see the Makefile's `stripped`
     # target), so an `-i src` here would build a SECOND interface cache and
     # every alternation between the two tools would invalidate the other's
     # cone -- the exact thrash the `-W` lockstep above exists to prevent.
@@ -962,7 +962,7 @@ def run_one(rel_dev: str, args) -> tuple[int, str, float]:
         WORK["timeout"] = True
         return 124, (
             f"agda-dev: killed at {limit:.0f}s (the budget).\n"
-            "        CHECK THIS FIRST: how long does the module take under `make agda`?\n"
+            "        CHECK THIS FIRST: how long does the module take under `make gate-heavy`?\n"
             "        If it is FAST there and slow here, THIS IS A TOOL BUG, not a slow\n"
             "        module, and splitting the file will not help.  The run above was\n"
             "        probably rebuilding DEPENDENCIES, not checking your module -- count\n"

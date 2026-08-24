@@ -44,4 +44,4 @@ Standing rules that apply to every task you are given:
   to classify or forget. When your edits are ready, hand the long gate back to
   the design session rather than polling a build until your turn runs out.
   DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID — the real
-  mutual recursion's termination is unchecked, so `make agda` stays the gate.
+  mutual recursion's termination is unchecked, so `make gate-heavy` stays the gate.

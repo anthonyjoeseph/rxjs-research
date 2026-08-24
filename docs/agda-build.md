@@ -1,6 +1,6 @@
 # The build: the `AGDA` variable, `-W error`, and the mirror
 
-## `make agda` is the merge gate
+## `make gate-heavy` is the merge gate
 
 It takes many minutes; the Bash tool's ceiling is 600 s per foreground call, so it
 must be detached — see [bg.md](bg.md). Iterate with
@@ -136,7 +136,7 @@ of interfaces on its first run, and the selftest above is what caught it.
 
 ## `--safe` is the finish-line certificate, not today's flag
 
-`make agda` runs a plain `agda src/Main.agda`, and a live `{-# TERMINATING #-}`
+`make gate-heavy` runs a plain `agda src/Main.agda`, and a live `{-# TERMINATING #-}`
 already sits in the QuickCheck module, off the proof path. `--safe` cannot be
 enabled today — it rejects `postulate`, and we have dozens by design. But it IS
 the certificate: the day `The-Proof.agda` is discharged, `agda --safe src/Main.agda`

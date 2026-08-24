@@ -128,7 +128,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — and carries no date — and neither does this file or `docs/` | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-selftest` | every comment check still fires, and four precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
 | `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date, a historical marker or a LINE NUMBER — in any of `Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`; a block's evidence sits LAST and in order; no marker is DOUBLED into the comment text (`-- -- RECOVERY:`), which is a marker every checker here reads as prose while a human reads it as a marker; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; no explanation names the subject of a section the same block already carries, which is redundancy that DRIFTS rather than merely repeats; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
-| `agda` | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
+| the tower (inline in `gate-heavy`, no target of its own) | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
 | `refuted` | the refutations typecheck | EVIDENCE.md |
 | `probed` | the probes typecheck | EVIDENCE.md |
 | `bug-cache` | no known impl counterexample has regressed. `Unit-Test.agda` is off Main, so nothing else would notice it rotting | [docs/bug-cache.md](docs/bug-cache.md) |
@@ -308,9 +308,14 @@ directives, and report review. Standing protocol, per Anthony:
 
 ## Running long Agda builds — the rules; mechanics in `docs/`
 
-`make agda` is the merge gate and takes many minutes; the Bash tool's ceiling is 600 s
-per foreground call. Iterate with **`make agda-dev`** (seconds) and reach for the long
-build only to merge. Timings: `typecheck-performance-numbers.md`.
+**`make gate` IS THE MERGE GATE, AND IT ROUTES — TYPE IT AND LET IT DECIDE.** It takes
+the light path when the changed set is light-checkable and the full tower when it is not,
+and it prints which and why. Forcing `make gate-heavy` is for when you can NAME a reason
+the router cannot see; choosing the expensive path by habit is how the cheap checks — the
+ones that fail in seconds — get skipped in favour of many minutes. The heavy path takes
+many minutes and the Bash tool's ceiling is 600 s per foreground call, so iterate with
+**`make agda-dev`** (seconds) and reach for the gate to merge. Timings:
+`typecheck-performance-numbers.md`.
 
 - **A WARNING IS A BUILD FAILURE.** Every Agda invocation goes through the Makefile's
   `AGDA` variable, which carries `-W error` (Agda exits 42). Never call bare `agda` in
@@ -381,7 +386,7 @@ build only to merge. Timings: `typecheck-performance-numbers.md`.
   → [docs/agda-dev.md](docs/agda-dev.md)
 - **ALL MEASURED TIMINGS LIVE IN `typecheck-performance-numbers.md`, AND NOWHERE ELSE.**
   Numbers age far faster than rules, so quoting one elsewhere means maintaining it in two
-  places and getting it wrong in both. `make agda` and `make agda-dev` append their own,
+  places and getting it wrong in both. `make gate-heavy` and `make agda-dev` append their own,
   so it stays current on its own.
 
 ## ALL NEW PROOF CODE IS WRITTEN IN `agda/src` — the `make wiring` jurisdiction
@@ -410,7 +415,7 @@ and was deleted when `make agda-dev` gave one. **`evidence/probed/` is not that
 directory**: the old one sat outside every claim graph, this one is rooted at
 `Probed.Main`, gated, and expires its own contents. Do not recreate the former.
 
-**Iterate with `make agda-dev`, land with `make agda`.** A dev-green body belongs in
+**Iterate with `make agda-dev`, land with `make gate`.** A dev-green body belongs in
 `src` immediately; it does not wait for the slow gate to earn a home.
 
 ### `make agda-dev` — the iteration loop
@@ -421,21 +426,21 @@ make agda-dev ARGS='<file>'            one module, every member
 make agda-dev ARGS='--list <file>'     free: which members are in which block
 ```
 
-**Use it throughout development and `make agda` once at the end.** Two rules you must
+**Use it throughout development and `make gate` once at the end.** Two rules you must
 carry before opening the doc:
 
 - **DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID — but only where
   something was STUBBED.** A module with no multi-member block is emitted VERBATIM, so
   the sweep is a REAL check there, which is most of the repo. Where a block IS stubbed,
   **termination of the real mutual recursion is not checked** — and in this proof the
-  mutual recursion IS the induction, so a bad measure passes dev and fails `make agda`,
+  mutual recursion IS the induction, so a bad measure passes dev and fails the tower,
   a proof-shape failure and not a typo — and **postulates do not reduce**, so a clause
   needing a sibling to unfold can pass dev and fail for real. **Never report a result as
   verified on a dev run, never commit on one alone, never call dev-green "typechecks".**
 - **A RED `agda-dev` ON ANY FILE IN `src` IS A CRITICAL FAILURE — FIX IT IMMEDIATELY.**
   It is a P0 defect in the tooling, fixed *before* the work you were doing. Never route
   around it — not with a skip list, not with "it's just the tool", not by falling back to
-  `make agda`. A single tolerated red teaches everyone to ignore the next one. **The
+  `make gate-heavy`. A single tolerated red teaches everyone to ignore the next one. **The
   default assumption is that the TOOL is wrong, not the proof** — that is the measured
   base rate, and every such failure ever investigated was a bug in the script. **Do not
   diagnose from the error NAME**; read the generated file, where the bug is visible.
@@ -445,7 +450,7 @@ whole-project sweep, and the `NOT_DEV_CHECKABLE` policy.
 
 ### `make harness` — the compiled calculator
 
-`agda/src/Harness/Main.agda` is a MODULE_ROOT that `make agda` never pays for. It exists
+`agda/src/Harness/Main.agda` is a MODULE_ROOT that `make gate-heavy` never pays for. It exists
 because **the GHC backend ignores `abstract`**, so the binary runs the real bodies of
 families the checker refuses to unfold, and laughs at rungs that OOM the checker.
 
@@ -1300,7 +1305,7 @@ get its reachability seeds, so a filename never earns an exemption and a claim c
 self-certify.
 
 Because Agda compiles exactly what is transitively imported, Main also defines the build's
-COVERAGE — **`make agda` IS the claim graph**, and anything outside it is not being checked at
+COVERAGE — **`make gate-heavy` IS the claim graph**, and anything outside it is not being checked at
 all. `make wiring` guards that boundary directly: a module nothing reaches fails the gate in
 seconds, rather than needing a second full compile of the tower to notice. **Never close a
 coverage gap by re-adding a bulk import to Main — that is the loophole, not the repair.**

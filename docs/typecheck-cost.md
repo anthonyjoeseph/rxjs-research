@@ -4,7 +4,7 @@
 That includes the gate's cost, per-module costs, the pass attribution, the split
 before/afters and every closed experiment. Numbers age far faster than rules, so
 quoting one here would mean maintaining it in two places and getting it wrong in both.
-`make agda` and `make agda-dev` append their own timings to that file, so it stays
+`make gate-heavy` and `make agda-dev` append their own timings to that file, so it stays
 current on its own — read it before re-opening any performance question, and re-measure
 before acting on it.
 

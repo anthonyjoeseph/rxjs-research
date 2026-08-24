@@ -4,7 +4,7 @@
 Agda has no unused-import warning, so a `using (…)` clause is the one place in
 this tree where a dependency can be asserted and never spent.  That is not a
 tidiness matter: an import is an edge in the module graph, and an edge decides
-(a) what a full `make agda` must build before this file, and (b) what an edit to
+(a) what a full `make gate-heavy` must build before this file, and (b) what an edit to
 the imported module INVALIDATES.  A name nobody reads still moves both.
 
 The instance that motivated this checker: all thirteen `Verify-Well-Formed/Part*`

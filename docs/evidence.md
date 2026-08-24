@@ -26,10 +26,10 @@ entirely on where the build starts:
 
 | invoked from | include path | can it see `Refuted.*` / `Probed.*`? |
 | --- | --- | --- |
-| `agda/` (what `make agda` does) | `src` | **no — the name does not exist** |
+| `agda/` (what `make gate-heavy` does) | `src` | **no — the name does not exist** |
 | `agda/evidence/` (`make refuted`, `make probed`) | `refuted`, `probed`, `../src` | yes, and it sees `src` too |
 
-That is the whole mechanism. `make agda` starts at the `src` root, so an
+That is the whole mechanism. `make gate-heavy` starts at the `src` root, so an
 evidence import in `src` is an unresolved module, not a policy violation.
 `make evidence-check`'s E1 exists on top of it for speed and legibility — a
 grep in a second beats a scope error eight minutes in — and to survive someone
@@ -53,7 +53,7 @@ make evidence-selftest    proves E1 and E2 still fire
 
 `evidence-check` and `evidence-selftest` are in `GATE_CHEAP` — both are pure
 textual passes over a few hundred files and cost under a second. `refuted` and
-`probed` run in `gate-heavy` beside `make agda`, on the same warm interface
+`probed` run in `gate-heavy` beside `make gate-heavy`, on the same warm interface
 cache.
 
 ## Adding a probe
@@ -76,9 +76,9 @@ cache.
 
 ## What bites
 
-- **`make agda` never sees this tree, and never did.** Before the move the
+- **`make gate-heavy` never sees this tree, and never did.** Before the move the
   probes were `MODULE_ROOTS` entries in `check-wiring.py` typechecked by
-  `make bug-cache`; `make agda` compiles `src/Main.agda`'s cone and nothing
+  `make bug-cache`; `make gate-heavy` compiles `src/Main.agda`'s cone and nothing
   else. If you are wondering why a probe's error never showed up in the gate
   log, that is why.
 - **E2 fires the moment a target is discharged, and that is the point.** It

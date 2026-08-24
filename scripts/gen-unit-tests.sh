@@ -15,7 +15,7 @@
 #
 # Invariant the cache exists to enforce: Unit-Test.agda fully typechecks
 # <=> no known counterexample remains.  So after this appends anything,
-# `make agda` is expected to FAIL until the implementation is fixed.
+# `make gate-heavy` is expected to FAIL until the implementation is fixed.
 set -euo pipefail
 
 FIRST=${1:-1}
@@ -71,7 +71,7 @@ done
 
 echo "gen-unit-tests: appended $added new case(s) to ${CACHE#"$ROOT"/}"
 if [ "$added" -gt 0 ]; then
-  echo "gen-unit-tests: now run 'make agda' — the cache is green iff no"
+  echo "gen-unit-tests: now run 'make gate-heavy' — the cache is green iff no"
   echo "                known counterexample remains, so it should fail"
   echo "                until the implementation is fixed."
 fi

@@ -7,7 +7,7 @@ cannot help: there is no warning to promote.
 That is not a tidiness matter. An import is an **edge in the module graph**, and
 an edge decides two things that govern every build:
 
-- what a full `make agda` must check **before** this file, and
+- what a full `make gate-heavy` must check **before** this file, and
 - what an edit to the imported module **invalidates**.
 
 A name nobody reads still moves both. The numbers behind that claim, and the
@@ -293,7 +293,7 @@ src/Main.agda".
 ## The orphan guard: a sole-route edge is a WIRING finding, not dead weight
 
 An unused import can still be the **only surviving route** to a module. Deleting
-that one does not tidy the graph — it hides a subtree from `make agda` and trips
+that one does not tidy the graph — it hides a subtree from `make gate-heavy` and trips
 `wiring-gate` one step later. So the checker computes reachability first and
 **refuses to report such an edge as dead**: it prints a `WIRING` line instead, and
 `--fix` leaves the line alone and still exits non-zero, so the fixer cannot be

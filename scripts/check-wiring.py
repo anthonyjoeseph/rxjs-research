@@ -102,7 +102,7 @@ from collections import defaultdict
 # Three probe modules used to sit in this table.  A MODULE_ROOTS entry is a
 # reachability SEED inside the PROOF's own scan, so those probes and their whole
 # cone counted as wired while NOTHING in the proof consumed any of it — which is
-# how a probe came to read as reachable from Main when `make agda`, which
+# how a probe came to read as reachable from Main when `make gate-heavy`, which
 # compiles Main's cone and nothing else, never saw the file at all.  They are
 # now `agda/evidence/probed/`, claimed by `Probed.Main` and held to this same law
 # by `make wiring-probed`.  A root-based claim cannot self-certify; a
@@ -930,7 +930,7 @@ def final_conclusion(sig):
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
 # (A3) GATE-ONLY EXEMPTIONS.  A definition whose only consumers sit outside
-# `make agda`'s cone is normally dead proof code propped up by a probe.  Two
+# `make gate-heavy`'s cone is normally dead proof code propped up by a probe.  Two
 # kinds are legitimate, and each is listed with its reason so extending this
 # is a reviewable diff:
 #   * it serves a compiled TOOL (the CLI, QuickCheck, the bug cache, the
@@ -1250,7 +1250,7 @@ def main():
     if not unreached:
         print("  (none)")
     else:
-        print("  Nothing that Main claims reaches these, so `make agda` proves")
+        print("  Nothing that Main claims reaches these, so `make gate-heavy` proves")
         print("  nothing about them.  Each is EITHER a missing wire (its")
         print("  consumer exists but is itself unreachable, or the assembly")
         print("  that should call it was never written) OR dead weight.  Both")

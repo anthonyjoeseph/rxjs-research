@@ -7,7 +7,7 @@
 -- reachability SEED inside the PROOF's own scan: it declares "start here too",
 -- so the probe and everything under it counted as wired while nothing in the
 -- proof consumed any of it.  That is how a probe came to look reachable from
--- Main when Main could not reach it and `make agda` never compiled it.  A
+-- Main when Main could not reach it and `make gate-heavy` never compiled it.  A
 -- root-based claim cannot self-certify; a name-based exemption always can.
 --
 -- A probe module is normally held up ENTIRELY BY ITS PINS — a wall of

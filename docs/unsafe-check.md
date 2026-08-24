@@ -1,7 +1,7 @@
 # `make unsafe-check` — policing pragmas by grep
 
 **The build is not `--safe`, and nothing mechanically stops an unsafe pragma.**
-`make agda` runs a plain `agda src/Main.agda`, and a live `{-# TERMINATING #-}`
+`make gate-heavy` runs a plain `agda src/Main.agda`, and a live `{-# TERMINATING #-}`
 already sits in the QuickCheck module, off the proof path.
 
 So the policing is textual. `make unsafe-check` covers:
