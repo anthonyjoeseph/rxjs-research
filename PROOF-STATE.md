@@ -161,10 +161,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-depth-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
-  cascade descent, one `nestSyn` per delivery off the evaluator's own ledger.
-  The mirror's pre-step tail kills the inductive route and not the statement —
-  measured deep into the skip branch, at six phantom chains of ten.
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
+  cascade descent, width-denominated, and primitive again: both narrow readings
+  are now machine-refuted, the per-delivery one at a single chain. Clears the
+  crossing family by two orders of magnitude.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of

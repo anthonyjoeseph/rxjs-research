@@ -1301,36 +1301,6 @@ chainStep-slots {n = n} {e = e} id a path sched st =
                  (Arrival.isLast a) sched st
 
 
--- ONE ARRIVAL'S WHOLE CASCADE, IN THE WIDTH CURRENCY -- and the width
--- factor is the content, not decoration over a narrower truth.  A
--- delivery walks an already-registered chain, so the tempting reading is
--- that it deepens by one operator's worth and the sum over chains is
--- `length chains` single `nestSyn`s.  Both halves of that reading are
--- false, and the mechanism is one arc: mergeAll's DRAIN spends a nesting
--- level through `depthFinC`, and it is reached through a `from-inner`
--- frame, which `pathNestD` charges nothing for.  Every other level this
--- family spends is paid by a path term -- `pathNestD` charges the
--- `thru-outer` frame and only that frame -- so the drain's levels have
--- nothing to come out of but the constant, and a program whose folds
--- nest spends arbitrarily many of them.  The width factor is what pays
--- for them, and it pays with room to spare: on the crossing family the
--- descent runs three orders of magnitude under it.
---
--- REFUTED: `Refuted.Nest-Depth-One`, which pins the subscribe-side
---   sibling of the narrow form at its first crossing -- descent 21
---   against a bound of 19 on `progU 5 2`.  The delivery side and the
---   per-chain sum cross the same way and for the same reason, read by
---   `Harness.Main`'s SERIES Q and SERIES R on the same family
---   (measured-not-rechecked): the per-chain sum reads 601 against 367
---   at a fold depth of 120, having tied and crossed near depth 5.
---
--- RECOVERY: `git show f53fff4:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda`
---   restores the per-chain assembly and its four leaves -- the marked-state
---   helper, the chain-step store and caps-at-the-next-index transports, and
---   the registry count under the real width.  The chain-step transports are
---   about `chainStep` alone and survive the refutation of what consumed
---   them; the assembly does not.
-
 -- THE BOUNDED LIMIT WAS SWEPT AND FOUND NOTHING, AND THE REGION IS
 -- WORTH NAMING because it is the one this campaign had no coverage of
 -- at all: every earlier family predates mergeAll's `concurrent`
@@ -1383,115 +1353,60 @@ postulate
          ≤ storeNestMax sched st
              + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
 
--- THE PER-DELIVERY HALF OF THE DEPTH FACE, and the split is the store
--- face's, taken at the same two joints.  `cascadeGo-nest` charges the
--- store measure by what the walk DID -- one `nestSyn` per delivery on
--- the evaluator's own ledger, no cap in the statement -- and then
--- widens that count to the static width in a second step.  This is the
--- first of those two halves for the descent, and the second is already
--- available: `cascadeGo-deliv-real` is the same widening, stated once
--- and spent by both faces.  Splitting here is what makes the counting
--- question a comparison of two static quantities rather than something
--- the induction has to carry, which is the property that let the store
--- face settle its own counting leaf without a run.
+-- ONE ARRIVAL'S WHOLE CASCADE, IN THE WIDTH CURRENCY -- and the width
+-- factor is the content, not decoration over a narrower truth.  A
+-- delivery walks an already-registered chain, so the tempting reading
+-- is that it deepens by one operator's worth, and that the cascade is
+-- one such step per delivery or per chain.  Every version of that
+-- reading is false, and the mechanism is one arc: mergeAll's DRAIN
+-- spends a nesting level through `depthFinC`, and it is reached
+-- through a `from-inner` frame, which `pathNestD` charges nothing for.
+-- Every other level this family spends is paid by a path term --
+-- `pathNestD` charges the `thru-outer` frame and only that frame -- so
+-- the drain's levels have nothing to come out of but the constant, and
+-- a program whose folds nest spends arbitrarily many of them on ONE
+-- delivery.  The width factor is what pays for them, and it pays with
+-- room to spare.  So this is a primitive statement, and no
+-- decomposition that charges by the run is a route to it.
 --
--- TWIN: `cascadeGo-nest`, whose body is the assembly below with the
---   store measure in place of the descent, over the same `cascadeGo`
---   and the same widening lemma.
-
--- AND THE TWO PER-DELIVERY LEAVES ARE ONE INDUCTION SEEN FROM TWO
--- SIDES, which is a fact about how to prove this and not about what it
--- says.  `depthCascade`'s cons clause reports its tail TWICE, once at
--- the entry state and once at the state the live chain left, and the
--- second of those needs the store measure at the stepped state bounded
--- by the entry store plus the deliveries made so far -- which is
--- `cascadeGo-nest-perDeliv`'s conclusion exactly.  So neither leaf's
--- induction closes without the other's statement, and proving them
--- apart means carrying one as a hypothesis of the other -- which
--- launders a counted postulate into an invisible premise.  The store
--- leaf is stated directly above for that reason: it was one module up
--- and out of reach, and moving it down is what makes a joint induction
--- possible at all rather than a threading exercise.  The two nesting
--- hypotheses are here because that leaf demands them, and they cost
--- nothing to carry: the store face's own two statements carry exactly
--- this pair, so they are the family's hypotheses rather than one
--- caller's, and the only consumer of the parent already binds both for
--- other summands and was simply not passing them down.
-
--- THE RESIDUE IS A PHANTOM BRANCH, AND IT IS NOT THE STORE LEAF'S.
--- That one owes a step that stores without delivering; this one owes
--- the opposite.  `depthCascade`'s cons clause reports its tail at BOTH
--- states, because the evaluator's cancellation test is with-abstracted
--- by the consumer and the mirror cannot branch on it.  The
--- stepped-state summand composes -- the induction hypothesis, the store
--- leaf at a SINGLETON chain list, where `cascadeGo` degenerates to one
--- `chainStep`, and `delivN-split` close it between them.
+-- REFUTED: `Refuted.Cascade-Deliv-Depth`, the per-DELIVERY half, at
+--   ONE chain, ONE delivery and no cancellation -- so neither the skip
+--   branch nor the phantom tail's delivery count is what kills it.
+--   Across the fold parameter the descent climbs six a layer against
+--   the bound's three, ties at two and crosses at three.  The BOUNDED
+--   limit is the ingredient every earlier family lacked: with nothing
+--   parked there is no drain to reach, and the same witness under an
+--   unbounded limit clears the bound comfortably.
+-- REFUTED: `Refuted.Nest-Depth-One` kills the subscribe-side sibling
+--   of the same narrow reading, descent 21 against 19, which is where
+--   the arc above was first read off.
+-- DEAD ROUTE: charging per CHAIN instead.  That clause CLOSES, which
+--   the per-delivery one does not -- both tails take the hypothesis at
+--   `length chains`, and the head is the one chain by which `suc`
+--   exceeds it -- but the leaf under it is a single delivery within
+--   one `nestSyn`, and that charge is SMALLER than the per-delivery
+--   one wherever a chain is skipped, so the same witness kills it a
+--   fortiori.
 --
--- THE STATEMENT SURVIVES THE BRANCH THAT KILLS THE ROUTE, and the
--- measurement is what separates the two.  `Harness.Main`'s SERIES P is
--- this statement over a family built to reach the skip branch, and it
--- reports the chain count, the deliveries and the cancellations so that
--- a row says whether it bore on that branch at all
--- (measured-not-rechecked, so it discharges nothing).  The load-bearing
--- region is reached: rows at ten chains, four deliveries and ten
--- cancellations -- six chains phantom -- with margins running from
--- seven against twenty-eight to twenty-five against sixty-one.  The
--- left side does not move with the chain count at fixed deliveries,
--- which is the part that matters: the phantom tail contributes its own
--- DEPTH and not a count, and depth at the entry state is what the state
--- terms on the right already pay for.  The sibling family never enters
--- the branch -- every row has chains equal to deliveries -- so it is
--- evidence about the live arm only, whatever its margin.
---
--- DEAD ROUTE: closing the ENTRY-state summand by the same induction
---   hypothesis.  It concludes in the delivery count of a run begun
---   before the head stepped, and every chain the head cancels still
---   delivers in that run, so what it leaves owed is a comparison
---   between two different runs' counts, which nothing bounds by one.
---   The summand wants a bound off the STATE terms alone -- it is a
---   depth at the entry state, where `chainsNestD` and the store measure
---   are already on the right -- and that route goes through no count.
-
+-- RECOVERY: `git show f53fff4:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda`
+--   restores the per-chain assembly and its four leaves -- the marked-state
+--   helper, the chain-step store and caps-at-the-next-index transports, and
+--   the registry count under the real width.  The chain-step transports are
+--   about `chainStep` alone and survive the refutation of what consumed
+--   them; the assembly does not.
 postulate
-  cascadeGo-depth-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     nestOK? e sl id sched st ≡ true →
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    let r = cascadeGo a nextId chains sched st
-    in depthCascade a nextId chains sched st
-         ≤ nestDᵛ (arrTy a) (arrVal a)
-           + chainsNestD chains
-           + storeNestMax sched st
-           + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
-
-cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (capsAt e sl id) sched st ≡ true →
-  nestOK? e sl id sched st ≡ true →
-  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-  depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-    ≤ nestDᵛ (arrTy a) (arrVal a)
-      + chainsNestD (chainsOf a st)
-      + storeNestMax sched (cascadeLatch a st)
-      + realWidAt e sl id * nestSyn e sl
-cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval =
-  ≤-trans (cascadeGo-depth-perDeliv sl id a nextId (chainsOf a st) sched
-             (cascadeLatch a st) hsl hcapsL
-             (trans (nestOK?-latch e sl id a sched st) hnest) hval)
-          (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)
-                      + chainsNestD (chainsOf a st)
-                      + storeNestMax sched (cascadeLatch a st))
-             (*-mono-≤ (cascadeGo-deliv-real sl id a nextId (chainsOf a st)
-                          sched (cascadeLatch a st) hsl hcapsL)
-                       (≤-refl {nestSyn e sl})))
-  where
-  hcapsL = cascadeLatch-caps (capsAt e sl id) a sched st hcaps
+    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+      ≤ nestDᵛ (arrTy a) (arrVal a)
+        + chainsNestD (chainsOf a st)
+        + storeNestMax sched (cascadeLatch a st)
+        + realWidAt e sl id * nestSyn e sl
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

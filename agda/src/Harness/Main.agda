@@ -470,10 +470,22 @@ perDelivWalk e sl (suc m) nextId sched st with sched-next sched
 -- and is evidence about the live branch only, whatever its margin; the
 -- rows that bear on this statement are the ones where `c` exceeds `d`
 -- and `x` is positive.  What refutes it is such a row going OVER.
+-- AND THE FAMILY THAT ACTUALLY BROKE IT IS `Uh`, WHICH IS `progU`
+-- READ THROUGH THE HOT VOCABULARY.  Every family these three series
+-- had until then leaves its mergeAll UNBOUNDED, so nothing ever parks
+-- and the drain -- the one nesting level no path term pays for -- is
+-- never entered during a delivery at all.  `progU` bounds it, but its
+-- own vocabulary scripts a COLD slot, so it schedules no arrival and
+-- every row reads `[done]`.  Crossing the two is the whole ingredient:
+-- a bounded limit for the drain, a hot slot for the cascade.  Read at
+-- the SECOND cascade, where something is parked, all three series go
+-- over together at a fold depth of three, and `Refuted.Cascade-Deliv-Depth`
+-- pins that row.  The skip branch is not involved -- one chain, one
+-- delivery, no cancellation.
 cutWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-        → ℕ → ℕ → Sched Γ → EvalSt e → String
-cutWalk e sl 0       nextId sched st = ""
-cutWalk e sl (suc m) nextId sched st with sched-next sched
+        → ℕ → ℕ → ℕ → Sched Γ → EvalSt e → String
+cutWalk e sl 0       id nextId sched st = ""
+cutWalk e sl (suc m) id nextId sched st with sched-next sched
 ... | inj₁ _        = " [done]"
 ... | inj₂ (a , sd) =
   let stL = cascadeLatch a st
@@ -484,12 +496,15 @@ cutWalk e sl (suc m) nextId sched st with sched-next sched
       rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch
             + storeNestMax sd stL + delivN stL stG * nestSyn e sl
       r   = cascade a nextId sd st
-  in " | " ++ show lhs ++ "/" ++ show rhs
+  in " | id=" ++ show id ++ " " ++ show lhs ++ "/" ++ show rhs
      ++ " (c=" ++ show (length ch)
      ++ " d=" ++ show (delivN stL stG)
      ++ " x=" ++ show (length (EvalSt.cancelled stG)) ++ ")"
      ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
-     ++ cutWalk e sl m (suc nextId)
+     ++ (if nestOK? e sl id sd stL then " N" else " n")
+     ++ (if nestDᵛ (arrTy a) (arrVal a) ≤ᵇ nestCapAt e sl id
+         then " V" else " v")
+     ++ cutWalk e sl m (suc id) (suc nextId)
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 -- SERIES Q (4000000): the PER-CHAIN currency, and the conversion it
@@ -744,6 +759,13 @@ leafRow fam steps ds ks j w k =
            in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
               ++ " j=" ++ show j ++ " k=" ++ show k
               ++ leafWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 4
+     then (let p = progU w k
+               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else (let p = progF w k
                r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
@@ -769,6 +791,13 @@ chainRow fam steps ds ks j w k =
            in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
               ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 4
+     then (let p = progU w k
+               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else (let p = progF w k
                r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
@@ -785,13 +814,20 @@ cutRow fam steps ds ks j w k =
                               (sched-init p slF) (st-init p)
            in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ cutWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+              ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 4
+     then (let p = progU w k
+               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else (let p = progF w k
                r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
            in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ cutWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+              ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
 
 perDelivRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 perDelivRow fam steps ds ks j d k =
