@@ -16,11 +16,14 @@
 -- These are the facts the two verification trees draw on.  They are
 -- stated here rather than at their consumers because both consumers
 -- need them and neither can import the other, which is the
--- lowest-module rule `make dup-check` exists to enforce.  Three of the
--- four turn out to be structural rather than semantic: the drain
--- scrutinises the GATE and nothing else, so shrinkage, saturation and
--- the lane bound all fall out of the same walk, and the queue bound the
--- caps face had proven under its own name is one of them.
+-- lowest-module rule `make dup-check` exists to enforce.  All three
+-- turn out to be structural rather than semantic: the drain scrutinises
+-- the GATE and nothing else, so shrinkage, saturation and the lane
+-- bound all fall out of the same walk, and the queue bound the caps
+-- face had proven under its own name is one of them.  What the gate
+-- newly owes BEYOND them -- that an unbounded limit never parks -- is
+-- not a property of the drain at all and is stated where the ring that
+-- proves it lives, `Verify-Budget-Sufficient.Queue-Dead`.
 --
 -- WHAT IS DELIBERATELY NOT HERE.  A bound on the QUEUE's length.  A
 -- parked inner is retained state that no width measure reads, which
@@ -33,7 +36,6 @@
 module Rx.MergeAll-Laws where
 
 open import Data.Bool  using (Bool; true; false; if_then_else_)
-open import Data.Empty using (⊥)
 open import Data.List  using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; z≤n)
@@ -44,9 +46,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; Id; Tick)
 open import Rx.Exp  using (Ctx; Closed)
-open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; Path; Sched;
-  Stream; mergeAll-st; mergeAllDrain; mergeAllᵒ; hasRoom; lookupNode;
-  pushBurst; subscribeInner)
+open import Rx.Evaluator using (EvalSt; NodeId; Path; Sched; mergeAllDrain; mergeAllᵒ; hasRoom; subscribeInner)
 
 -- `hasRoom` says a lane is FREE; this says the count is LEGAL.  They
 -- are not negations of each other at the boundary — at `just m` with
@@ -56,19 +56,6 @@ open import Rx.Evaluator using (EvalSt; Frame; NodeId; NodeState; Path; Sched;
 withinLimit : Maybe ℕ → ℕ → Bool
 withinLimit nothing  act = true
 withinLimit (just m) act = act ≤ᵇ m
-
--- the parked queue of whatever state sits at a node, as the claim that
--- it is EMPTY AT AN UNBOUNDED LIMIT.  A predicate and not an equation
--- because `NodeState` holds the queue's element type existentially, so
--- the two sides of an equation would not even be at the same type.  The
--- limit is pinned INSIDE it rather than left to the consumer, because
--- the fact is only true at `nothing` -- a bounded wrap parks, which is
--- what bounding it is for -- and a predicate that reads as
--- limit-agnostic is one a walk can be asked to preserve at a limit
--- where it does not hold
-emptyQueue? : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Set
-emptyQueue? (just (mergeAll-st nothing act q od)) = q ≡ []
-emptyQueue? _                                     = ⊥
 
 -- A FREE LANE MAKES THE NEXT COUNT LEGAL, and that is the whole
 -- content of the two predicates being different: `hasRoom` is `<`
@@ -127,54 +114,6 @@ drain-within-limit g allNid κ id now lim act (o ∷ q) sched st h
         (room⇒legal lim act eq)
 ...   | _ , vs , bs , true  , sched₁ , st₁ =
       drain-within-limit g allNid κ id now lim act q sched₁ st₁ h
-
-postulate
-
-  -- CONSERVATIVITY AT INFINITY, as the one walk the assembly cannot do
-  -- for itself.  At `nothing` the gate is open, so every consumed inner
-  -- is subscribed on the spot and nothing is ever parked; a node handed
-  -- to a burst with an empty queue comes back with one.  Stated over
-  -- `pushBurst` because that is where the risk is: it is the only route
-  -- to `thruConsume`, hence the only thing in the evaluator that can
-  -- park anything at all.
-  --
-  -- WHAT MAKES IT CREDIBLE, and both halves are read off the evaluator
-  -- rather than instantiated.  `hasRoom nothing act` is `true` by its
-  -- first clause, so the single syntactic site that appends to a queue
-  -- -- `thruConsume`'s capacity-shut branch -- is unreachable at this
-  -- limit, and the only other writer reinstalls a queue that
-  -- `drain-queue-shrinks` bounds by the one it was given.
-  --
-  -- AND THE INNERS CANNOT COME BACK, which is what keeps the induction
-  -- inside this walk.  `subscribeInner` hands every inner a `from-inner`
-  -- frame and never the wrap's own `thru-outer`, and only `thru-outer`
-  -- reaches `thruConsume`, so no inner's synchronous burst can park at
-  -- the node that spawned it.  The other way back in would be a
-  -- registration under this frame firing mid-burst, and neither route
-  -- delivers one: a registration is served on ARRIVAL at a later
-  -- instant, and a shared definition's connect burst flows up the
-  -- connecting subscriber's own frames rather than dispatching to
-  -- registered chains.  So this is a walk of the emit list and of
-  -- `thruWalk`'s value list -- the shape the two drain laws above
-  -- already have, proven -- and not an induction over the evaluator.
-  --
-  -- PROBED: `Probed.MergeAll-Queue`, at two and three OPEN inners, each
-  --   row paired with the same program at `just 1` pinned FALSE -- so the
-  --   greens are not the vacuous kind a family of synchronously-completing
-  --   inners would give, where no limit parks and every row passes.
-  --   NOT REACHED, and it is the region the statement is actually about:
-  --   RE-ENTRY.  Every inner in those programs is a plain scripted source,
-  --   so no inner's burst routes back through the wrap's own node, and the
-  --   consumes stay sequential.  The rows therefore cover the shape where
-  --   the claim is easy and say nothing about the shape where it is hard.
-  --   The class stands at DIFFICULTY on exactly that ground.
-  --
-  pushBurst-queue-dead : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
-    (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (k : NodeId) →
-    emptyQueue? (lookupNode k (EvalSt.nodes st)) →
-    emptyQueue? (lookupNode k (EvalSt.nodes
-      (proj₂ (proj₂ (pushBurst g id now f κ ems sched st)))))
 
 -- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain
 -- never lengthens the queue.  `mergeAllDrain` returns `[]` when it runs

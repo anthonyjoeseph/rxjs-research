@@ -39,6 +39,8 @@ open import Relation.Binary.PropositionalEquality
 -- active caps grind, and importing it here would put this file on that
 -- clock.
 open import Verify-Budget-Sufficient.Node-Fresh using (mint-install-survives)
+open import Verify-Budget-Sufficient.Queue-Dead using (QDeadC; emptyQueue?;
+  pushBurst-qd; subscribeE-qd)
 open import Rx.Prim      using (Gas; g0; Tick; Id; Source; init; value; close; complete; subscribe; exhausted; Timed; hot;
   cold; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; Val; Fn; obs; mapᵉ; natᵗ; _×ᵗ_; Tm; scanᵉ; takeᵉ; evalTm; input; emptyᵉ;
@@ -49,7 +51,7 @@ open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; 
   mergeAll-st; mergeAllᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
-open import Rx.MergeAll-Laws using (emptyQueue?; pushBurst-queue-dead)
+
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
 
 ------------------------------------------------------------------
@@ -746,6 +748,12 @@ postulate
 -- `pushBurst` at ANY limit, so the claim held at `just 1` too -- the
 -- limit it exists to exclude -- and read as discharged while asserting
 -- nothing about the case it was minted for.
+--
+-- RECOVERY: `git log --diff-filter=D -- agda/evidence/probed/Probed/MergeAll-Queue.agda`
+--   restores the probe that found that, with its two- and three-inner
+--   corpus and the `just 1` controls that made the rows load-bearing.
+--   The theorem says more than the rows ever did, so it expired with
+--   its target; what survives being worth a pointer is the corpus.
 unbounded-never-parks : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -753,9 +761,10 @@ unbounded-never-parks : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       r   = subscribeE fuel (mergeAllᵉ nothing b) κ id now sched st
   in emptyQueue? (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r))))
 unbounded-never-parks {u = u} fuel b κ id now sched st =
-  pushBurst-queue-dead fuel id now (thru-outer mergeAllᵒ nid) κ
-    (proj₁ inner) (proj₁ (proj₂ inner)) (proj₂ (proj₂ inner)) nid
-    (subst emptyQueue? (sym survives) refl)
+  QDeadC.keep (pushBurst-qd nid fuel id now (thru-outer mergeAllᵒ nid) κ
+                 (proj₁ inner) (proj₁ (proj₂ inner)) (proj₂ (proj₂ inner)))
+       (QDeadC.nxMono innerQ)
+       (subst emptyQueue? (sym survives) refl)
   where
   nid : NodeId
   nid = proj₁ (mintNode sched)
@@ -763,6 +772,10 @@ unbounded-never-parks {u = u} fuel b κ id now sched st =
   inner = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
             (proj₂ (mintNode sched))
             (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
+
+  innerQ = subscribeE-qd nid fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
+             (proj₂ (mintNode sched))
+             (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
 
   survives = mint-install-survives fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
                (mergeAll-st {t = u} nothing 0 [] false) sched st

@@ -129,7 +129,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   └─ drain-dry   ← cascade-wet-via-caps     proven
      └─ the well-formedness branch       its own postulates — tier 2
 
-  every tier above is stated over Rx.Exp's syntax  MergeAll-Laws.agda — tier 0
+  every tier above is stated over Rx.Exp's syntax  MergeAll-Laws.agda — closed
 ```
 
 The caps route does not replace the wet contract — it rests on it: both
@@ -142,28 +142,7 @@ Walk-Level tree holding no live postulate.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 0 — the anchor: `mergeAllᵉ` and bounded concurrency
-
-**Re-opened because the syntax moved.** `mergeAllᵉ` and `concatAllᵉ` are gone,
-replaced by ONE `mergeAllᵉ` carrying rxjs's `concurrent` argument, and every
-tier below is stated over that syntax. What is genuinely new is the DRAIN
-GATE, and `Rx.MergeAll-Laws` is the door it is stated behind.
-
-**ONE ROW LEFT, AND IT IS THE ONLY NON-LOCAL ONE.** Three of the four gate
-laws are proven walks: the drain scrutinises the GATE and nothing else, so
-saturation, the lane bound and shrinkage are one walk each, and the caps face
-had already proven the third under its own name. What is left is the claim
-about the node a BURST leaves behind, which is a walk of the emit list rather
-than of the evaluator: its header records why no inner can come back in. It
-is SPENT, twice — the wrap's queue claim is a real body over it and
-`mint-install-survives` — so its shape is settled and what remains is truth.
-
-- **`pushBurst-queue-dead`** (MergeAll-Laws) — DIFFICULTY: at an unbounded limit
-  a burst parks nothing, so a node handed an empty queue comes back with one.
-  The appending site is unreachable there and no inner can re-enter the node,
-  so it is a walk of the emit list, the shape the drain laws already have.
-
-## Tier 1 — `budget-sufficient` (parked behind tier 0)
+## Tier 1 — `budget-sufficient`
 
 **The tier is ONE statement, not a directory.** `budget-sufficient`
 (Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false`, and it is the only
