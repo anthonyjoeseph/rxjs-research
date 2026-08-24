@@ -163,8 +163,8 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
   cascade descent, width-denominated and primitive: both narrow readings are
-  machine-refuted, and no constant multiple of either can stand in — one axis
-  moves the descent five per element and every narrow term not at all.
+  machine-refuted, and no constant multiple can stand in — the descent is a
+  PRODUCT of the two axes and every narrow term moves with one of them.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of

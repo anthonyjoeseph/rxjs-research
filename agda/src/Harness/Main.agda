@@ -521,6 +521,14 @@ cutWalk e sl (suc m) id nextId sched st with sched-next sched
 -- -- so that a row says which of them TRACKS the descent rather than
 -- merely clearing it.
 --
+-- `c` AND `reg` ARE HERE TO SEPARATE TWO MECHANISMS, since the source
+-- axis moves the descent while every narrow term is flat and the
+-- measurement alone cannot say from where.  The chain count is a
+-- function of the registry selection and the source list is ONE
+-- inner's values, so `c` flat while the descent climbs puts the growth
+-- inside the state-threaded fold rather than in more chains -- and
+-- `reg` climbing with it says what the fold is accumulating.
+--
 -- LOAD-BEARING wherever `1ns` reads OVER, which is where the refuted
 -- statement is actually false; a candidate that reads ok only on rows
 -- the refuted one also clears is evidence about nothing.  `W` is read at
@@ -551,6 +559,8 @@ splitWalk e sl (suc m) id nextId sched st with sched-next sched
   in " | id=" ++ show id ++ " D=" ++ show dep
      ++ " N=" ++ show nv ++ " C=" ++ show cn ++ " S=" ++ show sn
      ++ " ns=" ++ show ns ++ " W=" ++ show w ++ " d=" ++ show dn
+     ++ " c=" ++ show (length ch)
+     ++ " reg=" ++ show (length (EvalSt.registry (proj₂ (proj₂ g))))
      ++ " 1ns=" ++ show b1 ++ flag b1
      ++ " 2C=" ++ show b2 ++ flag b2
      ++ " 2ns=" ++ show b3 ++ flag b3

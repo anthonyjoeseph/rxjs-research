@@ -1158,21 +1158,34 @@ chainStep-slots {n = n} {e = e} id a path sched st =
                  (Arrival.isLast a) sched st
 
 
--- AND NO CONSTANT MULTIPLE OF THE SYNTACTIC CEILING CAN WORK, which is
+-- AND NO CONSTANT MULTIPLE OF THE SYNTACTIC CEILING CAN WORK, BECAUSE
+-- THE DESCENT IS A PRODUCT AND EVERY NARROW TERM IS A SUM.  That is
 -- the difference between a width factor that is merely safe and one
 -- that is structural.  The two refutations below kill one narrow
 -- reading each, and either could be read as an off-by-a-constant that
 -- a larger constant would fix.  It is not one.  `Harness.Main`'s
 -- SERIES X decomposes the crossing instant and drives its two axes
--- (measured-not-rechecked, so it discharges nothing).  Down the FOLD
--- axis the descent climbs six a layer against one for `nestSyn` and
--- one for `chainsNestD`, and the three candidates cross at depths
--- three, four and six.  Down the SOURCE axis it climbs five per
--- element while `nestSyn`, `chainsNestD` and `storeNestMax` do not
--- move AT ALL -- so a fixed multiple of them is outrun by lengthening
--- the source, whatever the multiple.  `realWidAt` is the one term in
--- this vocabulary that moves with that axis, which is why the width
--- form clears the same rows throughout.
+-- INDEPENDENTLY (measured-not-rechecked, so it discharges nothing):
+-- over a grid of fold depth `w` against source length `k` the descent
+-- is `w * (k + 4) + 1` throughout, so the slope down the source axis
+-- IS the fold depth.  `nestSyn`, `chainsNestD` and `storeNestMax` each
+-- move with `w` alone and with `k` not at all, so no multiple of them
+-- tracks a term in `w * k` however large it is taken.  `realWidAt` is
+-- the one term in this vocabulary that moves with BOTH axes, which is
+-- what makes `realWidAt * nestSyn` a product rather than a generous
+-- constant, and why the width form clears every row the narrow ones
+-- cross on.
+
+-- AND THE CHAIN COUNT AND THE REGISTRY ARE FLAT ACROSS THAT WHOLE
+-- GRID, both reading ONE at every cell, which is what says where the
+-- growth is NOT.  It is not a longer selection for the cascade to fold
+-- over, and it is not registrations accumulating as the fold threads
+-- its state -- the two readings the shape of the recursion invites,
+-- since both folds in this family carry their tail at the state the
+-- head left.  What is left is the bounded limit's drain, which is
+-- where all three refutations in this face already pointed.  The
+-- positive mechanism is not read off this grid and is not claimed
+-- here.
 
 -- ONE ARRIVAL'S WHOLE CASCADE, IN THE WIDTH CURRENCY -- and the width
 -- factor is the content, not decoration over a narrower truth.  A

@@ -266,7 +266,23 @@ def main() -> int:
                   "a claim that this tool is broken, which is a finding.")
         return 2 if escalate else 0
 
-    checkable = [f for f in src_files if multi.get(f) == 0]
+    # A CLAIM ROOT IS EXCLUDED WHEN IT IS *CHANGED*, FOR THE REASON THE CONE
+    # SWEEP ALREADY EXCLUDES IT: a root's dev check IS the tower, so it times
+    # out at the per-module budget and reports RED for a module with nothing
+    # wrong with it.  The cone half of this was written first and read as the
+    # whole rule; it is not, because a root is a FILE and files get edited --
+    # a one-word comment in Main is enough to put it in the changed set, and
+    # then the light path fails on the one module it can never check.
+    _cir = _load("check-imports")
+    _cir.TREES = list(_cir.CLAIM_ROOT)
+    root_paths = {os.path.join(t, r) for t, r in _cir.CLAIM_ROOT.items()}
+    changed_roots = sorted(f for f in src_files if f in root_paths)
+    if changed_roots:
+        print(f"dev-changed: NOT the {len(changed_roots)} CHANGED claim "
+              f"root(s) — a root's dev check is the tower, which is the heavy "
+              f"gate's job: " + ", ".join(changed_roots))
+    checkable = [f for f in src_files
+                 if multi.get(f) == 0 and f not in root_paths]
     # A WIDE CONE IS NOT A REASON TO REACH FOR THE TOWER, and it used to be
     # taken as one.  The cone is the only thing the light path leaves unchecked,
     # so when it is wide the answer is to CHECK IT -- a few dev passes -- not to

@@ -849,6 +849,11 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: the cone sweep did not hold back the claim roots — EVERY cone contains them by the wiring law, so a sweep that checks them IS the tower it claims to be cheaper than"; fail=1; }; \
 	  echo "$$out" | grep -q 'plan  cone  agda/src/Main.agda' \
 	    && { echo "SELFTEST FAIL: Main.agda is in the sweep plan — a claim root's dev check is the whole build"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --plan --files agda/src/Main.agda 2>&1); \
+	  echo "$$out" | grep -q 'NOT the .* CHANGED claim root(s)' \
+	    || { echo "SELFTEST FAIL: a CHANGED claim root was not held back — a root's dev check IS the tower, so it times out at the per-module budget and reports RED for a module with nothing wrong with it, and one edited comment is enough to put it in the changed set"; fail=1; }; \
+	  echo "$$out" | grep -q 'plan .* agda/src/Main.agda' \
+	    && { echo "SELFTEST FAIL: a CHANGED claim root is in the sweep plan — the cone half of this exclusion was written first and is not the whole rule"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --deps --budget 1 --files agda/src/Verify-Well-Formed/Part13.agda 2>&1); \
 	  echo "$$out" | grep -q 'skip  agda/src/Verify-Batch-Simultaneous/The-Proof.agda' \
 	    || { echo "SELFTEST FAIL: a CONE member over budget was not reported as skipped — a timeout there is only the bet the light path already makes, and calling it RED makes every wide-cone run fail"; fail=1; }; \
@@ -867,7 +872,7 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
 	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src escalates because no dev check can reach it; a cone member whose dev check would be STUBBED is named rather than silently dropped; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src escalates because no dev check can reach it; a cone member whose dev check would be STUBBED is named rather than silently dropped; a CHANGED claim root is held back exactly as a cone one is, since a root is a file and files get edited; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
 	  else exit 1; fi
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is
