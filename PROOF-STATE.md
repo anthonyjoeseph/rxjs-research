@@ -181,10 +181,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
-  whole cascade, in the width currency. The narrow and per-chain forms are both
-  REFUTED — concat's drain spends a level no path term pays for — so the width
-  factor is content, not decoration, and the per-chain route is dead.
+- **`cascadeGo-depth-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
+  cascade descent, one `nestSyn` per delivery off the evaluator's own ledger.
+  The widening half is already stated, so this is what the parent body still
+  owes. Twin: the store face's `cascadeGo-nest`, same split at the same joints.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of

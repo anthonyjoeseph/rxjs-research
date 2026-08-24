@@ -1330,17 +1330,83 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 --   the registry count under the real width.  The chain-step transports are
 --   about `chainStep` alone and survive the refutation of what consumed
 --   them; the assembly does not.
+
+-- THE BOUNDED LIMIT WAS SWEPT AND FOUND NOTHING, AND THE REGION IS
+-- WORTH NAMING because it is the one this campaign had no coverage of
+-- at all: every earlier family predates flatten's `concurrent`
+-- argument, so all of them sit at one of the two saturated ends.
+-- `Harness.Main`'s SERIES V moves the limit alone over a source whose
+-- width outruns it (measured-not-rechecked): limits one to four,
+-- source widths three to twelve, fold depths and list lengths to nine.
+-- Not one row crosses this bound, and the margin WIDENS in every
+-- direction -- the descent grows by the fold depth per added lane
+-- while the width factor grows by better than an order of magnitude
+-- more.  What the sweep did NOT reach is a limit that binds while the
+-- store is loaded: its slot table is the one-arrival table throughout,
+-- so a bounded gate interacting with a shared def is uncovered.
+-- THE PER-DELIVERY HALF OF THE DEPTH FACE, and the split is the store
+-- face's, taken at the same two joints.  `cascadeGo-nest` charges the
+-- store measure by what the walk DID -- one `nestSyn` per delivery on
+-- the evaluator's own ledger, no cap in the statement -- and then
+-- widens that count to the static width in a second step.  This is the
+-- first of those two halves for the descent, and the second is already
+-- available: `cascadeGo-deliv-real` is the same widening, stated once
+-- and spent by both faces.  Splitting here is what makes the counting
+-- question a comparison of two static quantities rather than something
+-- the induction has to carry, which is the property that let the store
+-- face settle its own counting leaf without a run.
+--
+-- TWIN: `cascadeGo-nest`, whose body is the assembly below with the
+--   store measure in place of the descent, over the same `cascadeGo`
+--   and the same widening lemma.
+
+-- AND THE TWO PER-DELIVERY LEAVES ARE ONE INDUCTION SEEN FROM TWO
+-- SIDES, which is a fact about how to prove this and not about what it
+-- says.  `depthCascade`'s cons clause reports its tail TWICE, once at
+-- the entry state and once at the state the live chain left, and the
+-- second of those needs the store measure at the stepped state bounded
+-- by the entry store plus the deliveries made so far -- which is
+-- `cascadeGo-nest-perDeliv`'s conclusion exactly.  So neither leaf's
+-- induction closes without the other's statement, and proving them
+-- apart means carrying one as a hypothesis of the other.  A joint
+-- statement would have to live HERE, since the store leaf's module
+-- sits above this one and the dependency runs the other way; doing it
+-- costs a restatement now and a discarded grind later.
 postulate
-  cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-depth-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
-    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-      ≤ nestDᵛ (arrTy a) (arrVal a)
-        + chainsNestD (chainsOf a st)
-        + storeNestMax sched (cascadeLatch a st)
-        + realWidAt e sl id * nestSyn e sl
+    let r = cascadeGo a nextId chains sched st
+    in depthCascade a nextId chains sched st
+         ≤ nestDᵛ (arrTy a) (arrVal a)
+           + chainsNestD chains
+           + storeNestMax sched st
+           + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
+
+cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+    ≤ nestDᵛ (arrTy a) (arrVal a)
+      + chainsNestD (chainsOf a st)
+      + storeNestMax sched (cascadeLatch a st)
+      + realWidAt e sl id * nestSyn e sl
+cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps =
+  ≤-trans (cascadeGo-depth-perDeliv sl id a nextId (chainsOf a st) sched
+             (cascadeLatch a st) hsl hcapsL)
+          (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)
+                      + chainsNestD (chainsOf a st)
+                      + storeNestMax sched (cascadeLatch a st))
+             (*-mono-≤ (cascadeGo-deliv-real sl id a nextId (chainsOf a st)
+                          sched (cascadeLatch a st) hsl hcapsL)
+                       (≤-refl {nestSyn e sl})))
+  where
+  hcapsL = cascadeLatch-caps (capsAt e sl id) a sched st hcaps
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

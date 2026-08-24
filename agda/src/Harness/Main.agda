@@ -69,7 +69,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
-         progT; sucGT; progU; sucGU; progF; sucGF; insF; insT; subjN; pathN;
+         progT; sucGT; progU; sucGU; progB; sucGB; progN; sucGN; progF; sucGF; insF; insT; subjN; pathN;
          progC; sucGC; progW; sucGW)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
@@ -612,6 +612,69 @@ depthConcatRow ds ks j d k =
      ++ "  one=" ++ show one ++ "  wide=" ++ show wid
      ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
 
+-- SERIES U (10000000): THE ONE REGION NEITHER REMOVED PRIMITIVE COULD
+-- REACH.  Every probe and every refutation in this campaign was built
+-- on a family whose flattens are `nothing` or `just 1`, because until
+-- the syntax moved those were the only two that existed — so the
+-- bounded gate, the whole content of the change, has no coverage at
+-- all.  `progB` moves that axis alone: at `lim = 0` it is `progU`
+-- exactly, which makes the row its own control, and above that the
+-- drain has to refill several lanes in one instant.
+--
+-- LOAD-BEARING on both halves, and they fail differently.  The depth
+-- half asks whether the drain arc still fits the single `nestSyn` —
+-- `ONE-OVER` is the answer SERIES T was built to look for.  The cascade
+-- half reads `cascade-nest-compositional`'s own conclusion, whose bound
+-- is the WIDE one, so `OVER` there is a refutation of a live row rather
+-- than of a narrow form already refuted.  A row where the two `lim`
+-- values print the same numbers is the finding that the gate costs
+-- nothing, which is what the depth mirror's over-approximation predicts.
+depthLimRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+depthLimRow lim ds ks j d k =
+  let sl  = insT ds ks j
+      p   = progB lim d k
+      sd  = sched-init p sl
+      st  = st-init p
+      κ   = root
+      lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
+      bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
+      one = bas + nestSyn p sl
+      wid = bas + realWidAt p sl 0 * nestSyn p sl
+      r   = subscribeE (gasPad (sucGB ds ks j lim d k) g0) p root 0 0 sd st
+  in "lim=" ++ show (suc lim) ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+     ++ " j=" ++ show j ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE=" ++ show lhs ++ "  one=" ++ show one
+     ++ "  wide=" ++ show wid
+     ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
+     ++ (if lhs ≤ᵇ wid then "" else "  WIDE-OVER")
+     ++ " ||" ++ cascNest p sl 0 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+-- SERIES V.  The same two verdicts as SERIES U, over `progN`, whose
+-- source width is an axis of its own.  This is the only family in which
+-- the gate is a gate: at `w` inners and limit `l` with `l < w` the drain
+-- parks, refills, and parks again, which is the state no probe in this
+-- campaign has ever reached -- every earlier family predates the limit
+-- argument and so sits at one of the two saturated ends.
+depthFanRow : ℕ → ℕ → ℕ → ℕ → String
+depthFanRow lim w d k =
+  let sl  = insT 1 1 1
+      p   = progN lim w d k
+      sd  = sched-init p sl
+      st  = st-init p
+      κ   = root
+      lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
+      bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
+      one = bas + nestSyn p sl
+      wid = bas + realWidAt p sl 0 * nestSyn p sl
+      r   = subscribeE (gasPad (sucGN 1 1 1 lim w d k) g0) p root 0 0 sd st
+  in "lim=" ++ show (suc lim) ++ " w=" ++ show (2 + suc w)
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE=" ++ show lhs ++ "  one=" ++ show one
+     ++ "  wide=" ++ show wid
+     ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
+     ++ (if lhs ≤ᵇ wid then "" else "  WIDE-OVER")
+     ++ " ||" ++ cascNest p sl 0 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
 depthOneRow : ℕ → ℕ → ℕ → String
 depthOneRow j d k =
   let p   = progD d k
@@ -1061,7 +1124,16 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
 rowAt n =
-  if 9000000 ≤ᵇ n
+  if 20000000 ≤ᵇ n
+  then (let m = n ∸ 20000000
+        in depthFanRow (m / 1000) ((m % 1000) / 100)
+                       ((m % 100) / 10) (m % 10))
+  else if 10000000 ≤ᵇ n
+  then (let m = n ∸ 10000000
+        in depthLimRow (m / 100000) ((m % 100000) / 10000)
+                       ((m % 10000) / 1000) ((m % 1000) / 100)
+                       ((m % 100) / 10) (m % 10))
+  else if 9000000 ≤ᵇ n
   then (let m = n ∸ 9000000
         in chainRow 3 16 1 2 1 m 2 ++ " || " ++ depthConcatRow 1 2 0 m 2)
   else if 8000000 ≤ᵇ n

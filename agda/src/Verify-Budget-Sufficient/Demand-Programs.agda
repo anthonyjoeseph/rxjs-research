@@ -330,6 +330,46 @@ sucGU ds ks j d k =
   suc (syncSizeᵉ (progU d k)
        + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progU d k))
 
+-- THE BOUNDED-LIMIT FAMILY, which is `progU` with ONE axis moved and
+-- everything else held: the inner flatten's limit is `suc lim` rather
+-- than 1, over the same three inners.  At `lim = 0` it IS `progU`, so
+-- the family contains its own control; at 1 one inner parks behind two
+-- lanes and the drain must refill SEVERAL in an instant, which is the
+-- only behaviour the two removed primitives could not express between
+-- them and so the only region no probe of either face reached.  Holding
+-- the fold depth and the source length fixed is the point: a crossing
+-- that appears here and not at `lim = 0` is attributable to the gate.
+progB : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
+progB lim d k =
+  flattenᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ (just (suc lim)) (ofᵉ (strmᵗ (input (fsuc fzero))
+                    ∷ strmᵗ (input fzero)
+                    ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+
+-- THE GATE IS ONLY A GATE WHEN THE SOURCE OUTRUNS IT.  `progB`'s source
+-- carries exactly three inners, so a limit of three is already the
+-- unbounded case and the family cannot reach a state where the drain
+-- parks anything for more than one refill.  `progN` widens the source
+-- alone, leaving every other axis where `progB` has it: at w inners and
+-- limit l the drain must refill ⌈w/l⌉ times, which is the regime the
+-- bounded argument is actually about.
+progN : ℕ → ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
+progN lim w d k =
+  flattenᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ (just (suc lim))
+      (ofᵉ (strmᵗ (input (fsuc fzero)) ∷ strmᵗ (input fzero)
+            ∷ replicate (suc w) (strmᵗ (ofᵉ (natsD k)))))))
+
+sucGN : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGN ds ks j lim w d k =
+  suc (syncSizeᵉ (progN lim w d k)
+       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progN lim w d k))
+
+sucGB : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGB ds ks j lim d k =
+  suc (syncSizeᵉ (progB lim d k)
+       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progB lim d k))
+
 ----------------------------------------------------------------------
 -- THE CLIMBED-PATH FAMILY.  A compositional depth bound is stated over
 -- an arbitrary subject and an arbitrary rootward path, and the root

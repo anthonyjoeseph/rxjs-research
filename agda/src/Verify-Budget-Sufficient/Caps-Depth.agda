@@ -309,9 +309,19 @@ depthConsumeS fuel nid κ id now o sched₀ st₀ (just (switch-st cur od)) =
     (proj₂ (proj₂ (switchKill cur sched₀ st₀)))
 depthConsumeS fuel nid κ id now o sched₀ st₀ _ = 0
 
--- the drain stops at the first inner that stays open; the mirror walks
--- the whole queue, which is above the truth and costs the consuming
--- clause nothing
+-- the drain stops when the GATE shuts, which is at a count and not at
+-- the first inner that stays open; the mirror walks the whole queue
+-- either way, which is above the truth and costs the consuming clause
+-- nothing.  The over-approximation is what made the bounded limit free
+-- here: a drain at limit k refills several lanes in one instant, and a
+-- mirror already walking the whole queue has nothing to widen.  The
+-- consequence is visible from outside and `Harness.Main`'s SERIES V is
+-- where it was seen: `depthE` takes the SAME value at limits two,
+-- three and four over source widths three to twelve, and drops to a
+-- constant at limit one -- where the gate shuts before the drain is
+-- ever entered, so the walk that this over-approximation would have
+-- widened does not happen at all.  The bounded axis is therefore not an axis for this
+-- face; the only distinction it can draw is entered / not entered
 depthDrain fuel allNid κ id now []      sched₀ st₀ = 0
 depthDrain fuel allNid κ id now (o ∷ q) sched₀ st₀ =
   depthInner fuel flattenᵒ allNid κ id now o sched₀ st₀
