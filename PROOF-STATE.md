@@ -161,10 +161,16 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-nest`** (Caps-Face/Part7) — DIFFICULTY: the chain walk's store
-  growth, width-denominated and primitive. Its per-delivery half is
+- **`cascadeGo-nest-nodes`** (Caps-Face/Part7) — DIFFICULTY: the walk's node
+  states, width-denominated and primitive. Its per-delivery half is
   machine-refuted at ONE delivery: the drain stores many times per delivery, so
-  no count pays. It now carries the whole width of the depth face too.
+  no count pays. Every unit of measured store growth is in this arm.
+- **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY: the walk's pending
+  sources under the same width. The one arm of the store no instantiation has
+  ever reached — every family reads it zero — so its cheapness is a guess.
+- **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY: the walk's registry
+  paths under the same width. Registration adds the one frame the path measure
+  charges nothing for, and the component is measured flat on every family.
 - **`cascade-nest-store`** (Caps-Face/Part7) — DIFFICULTY: the descent under its
   base terms plus the store the walk LEAVES, premise-free. It is what makes the
   cascade descent a corollary of the row above rather than a second width

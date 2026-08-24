@@ -45,8 +45,8 @@ module Harness.Main where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Char using (toℕ)
-open import Data.List using (List; []; _∷_; map; length)
-open import Data.Nat using (_≡ᵇ_; ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_)
+open import Data.List using (List; []; _∷_; map; length; foldr)
+open import Data.Nat using (_≡ᵇ_; ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_; _⊔_)
 open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_; toList)
@@ -73,7 +73,7 @@ open import Verify-Budget-Sufficient.Demand-Programs
          progC; sucGC; progW; sucGW)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
-         pathNestD; chainsNestD)
+         pathNestD; chainsNestD; liveNest; nodeNest; regsNestMax)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -597,6 +597,13 @@ satGo a nextId ch sd stL (suc i) =
      ++ show (storeNestMax (proj₁ (proj₂ g)) (proj₂ (proj₂ g)))
      ++ satGo a nextId ch sd stL i
 
+four : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → Sched Γ → EvalSt e → String
+four sched st =
+  "[sl=" ++ show (slotsNestSum (Sched.slots sched))
+  ++ " lv=" ++ show (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
+  ++ " nd=" ++ show (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))
+  ++ " rg=" ++ show (regsNestMax (EvalSt.registry st)) ++ "]"
+
 satWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
         → ℕ → ℕ → Sched Γ → EvalSt e → String
 satWalk e sl 0       nextId sched st = ""
@@ -617,6 +624,7 @@ satWalk e sl (suc m) nextId sched st with sched-next sched
      ++ " ns=" ++ show (nestSyn e sl)
      ++ " N=" ++ show nv ++ " C=" ++ show cn
      ++ " D=" ++ show dep ++ " A=" ++ show aft
+     ++ " " ++ four (proj₁ (proj₂ g)) (proj₂ (proj₂ g))
      ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
      ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
      ++ " |" ++ satGo a nextId ch sd stL (length ch)

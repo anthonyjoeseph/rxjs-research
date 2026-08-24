@@ -31,13 +31,13 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (Maybe; nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
-open import Data.Bool.ListAction using (all; any)
+open import Data.Bool.ListAction using (all)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Empty   using (⊥)
@@ -49,9 +49,9 @@ open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
 open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st; RegId; Path; root; arrTy; arrVal; cascade;
-  cascadeGo; cascadeLatch; cascadeFinish; chainStep; chainsOf; hasDry; subscribeE; budgetAt;
-  opIterD; sizeStep; capsBase; sched-next; schedGo; schedHeadOf; schedEarlier; drain; evaluate;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st; Path; root; arrTy; arrVal; cascade;
+  cascadeGo; cascadeLatch; cascadeFinish; chainsOf; hasDry; subscribeE; budgetAt; opIterD;
+  sizeStep; capsBase; sched-next; schedGo; schedHeadOf; schedEarlier; drain; evaluate;
   sched-init; st-init)
 open import Rx.Slots using (Slots; slotsSize)
 
@@ -84,8 +84,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeGo-nest;
-   cascadeLatch-caps; chainsOf-caps; chainsOf-length; chainStep-slots)
+  (caps-tick; cascade-depth-capsH; cascadeGo-nest; cascadeGo-slots; cascadeLatch-caps;
+  chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -152,30 +152,6 @@ open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-wid
 -- whole file — `sched-init`'s own construction.  No `record sched
 -- { ... }` update anywhere in the mutual delivery clique ever touches
 -- the `slots` field.  Most of the clique's own slots-invariance is
--- ALREADY PROVEN one layer down:
--- `.Keeps-Ring` (`subscribeE-slots`) carries it through the
--- whole subscribe clique via the `Keeps` invariant, `Caps-Face`
--- (`foldPath-slots`/`dispatchShare-slots`/`shareGo-slots`) has
--- the delivery side, and `.Measures` (`finish-slots`) covers
--- `cascadeFinish`.  Only two thin wrappers were missing -- `chainStep`
--- (one call into `foldPath`, and it sits in `Caps-Face.Part7` now, with
--- the per-chain induction that needs it) and `cascadeGo`'s own fold
--- over chains -- and both are direct compositions of what already
--- exists.
-cascadeGo-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (id : Id) (chains : List (RegId × Path Γ (arrTy a) t))
-  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
-  Sched.slots (proj₁ (proj₂ (cascadeGo a id chains sched₀ st₀))) ≡ Sched.slots sched₀
-cascadeGo-slots a id [] sched₀ st₀ = refl
-cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
-  with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
-... | true = cascadeGo-slots a id chains sched₀ st₀
-... | false =
-      let (emits , sched₁ , st₁) =
-            chainStep id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
-      in trans (cascadeGo-slots a id chains sched₁ st₁)
-               (chainStep-slots id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ }))
-
 slots-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots (proj₁ (proj₂ (cascade a id sched st))) ≡ Sched.slots sched

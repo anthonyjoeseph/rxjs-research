@@ -3,12 +3,12 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
-  *-mono-≤; +-monoʳ-≤; +-assoc)
+  *-mono-≤; +-monoʳ-≤; +-assoc; ⊔-lub; m≤m⊔n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; length; map)
+open import Data.List    using (List; []; _∷_; length; map; foldr)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin)
 import Data.Fin as Fin
@@ -24,7 +24,7 @@ open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _�
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; subst)
+  using (_≡_; refl; sym; trans; subst; cong)
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; Fn; μᵉ; unfoldμ; evalTm;
@@ -33,7 +33,7 @@ open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
-  storeNest-latch; realWidAt; nestSyn)
+  storeNest-latch; realWidAt; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
   scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
   chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ;
@@ -1146,9 +1146,7 @@ chainsOf-length : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 
 -- THE SLOT STORE SURVIVES A CHAIN STEP, one call into `foldPath` and so
--- one composition of `foldPath-slots`.  It sits here rather than beside
--- its sibling for the cascade fold, because the per-chain induction
--- below needs it and lives one layer under that one.
+-- one composition of `foldPath-slots`.
 chainStep-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots (proj₁ (proj₂ (chainStep id a path sched st))) ≡ Sched.slots sched
@@ -1156,6 +1154,27 @@ chainStep-slots {n = n} {e = e} id a path sched st =
   foldPath-slots (budgetAt e (Sched.slots sched) id) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
                  (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
                  (Arrival.isLast a) sched st
+
+
+-- AND SURVIVES THE WHOLE CHAIN FOLD, by the obvious induction over the
+-- list: the cancelled arm changes nothing and the live arm composes the
+-- step above with the tail.  It is one of the four components the
+-- store's nesting is a `⊔` of, and the only one that needs no width at
+-- all -- the slot store is threaded through the fold untouched, so its
+-- nesting is not merely bounded but EQUAL.
+cascadeGo-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (cascadeGo a id chains sched₀ st₀))) ≡ Sched.slots sched₀
+cascadeGo-slots a id [] sched₀ st₀ = refl
+cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
+  with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+... | true = cascadeGo-slots a id chains sched₀ st₀
+... | false =
+      let (emits , sched₁ , st₁) =
+            chainStep id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
+      in trans (cascadeGo-slots a id chains sched₁ st₁)
+               (chainStep-slots id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ }))
 
 
 -- AND NO CONSTANT MULTIPLE OF THE SYNTACTIC CEILING CAN WORK, BECAUSE
@@ -1187,17 +1206,55 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- positive mechanism is not read off this grid and is not claimed
 -- here.
 
--- THE WALK'S STORE GROWTH, IN THE WIDTH CURRENCY, AND IT IS PRIMITIVE.
--- One arrival's chain walk leaves the store measure no deeper than it
--- found it plus one `nestSyn` per unit of REAL WIDTH.  The width factor
--- is the content rather than decoration over a narrower truth, and the
--- mechanism is one arc: mergeAll's DRAIN stores each released inner in
--- turn, and it is reached through a `from-inner` frame, which the path
--- measure charges nothing for -- so ONE delivery can store arbitrarily
--- many times, and no charge that counts what the run DID can bound it.
--- `realWidAt` is the one term in this vocabulary that moves with the
--- axis that drives the drain, which is why the width form clears the
--- rows the narrow ones cross on.
+-- THE PENDING-SOURCE COMPONENT, and it is the one corner of the store
+-- that no instantiation in this campaign has ever reached.  A live
+-- source carries the values an emit has queued but not yet dispatched,
+-- so the walk can in principle leave one holding a value nested deeper
+-- than anything the store held before -- and the width term is there
+-- to pay for exactly that.  Every family the harness drives reads this
+-- component as ZERO at every instant -- and the reason is the FAMILIES,
+-- not the component: their sources script plain numerals, whose nesting
+-- is zero whatever a walk does with them, so reaching this corner at all
+-- needs a source scripting OBSERVABLES.  That is why it is stated
+-- separately rather than folded in: a component with no coverage is a
+-- component whose cheapness is a guess, and guessing it cheap inside a
+-- larger proof is how a corner stops being looked at.
+postulate
+  cascadeGo-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+    let r = cascadeGo a nextId chains sched st
+    in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+
+-- THE NODE-STATE COMPONENT, WHICH IS WHERE THE WIDTH IS ACTUALLY SPENT.
+-- A `scan` node stores its accumulator and a bounded `mergeAll` node
+-- stores its parked queue, so the nodes map is the only part of the
+-- store a delivery can DEEPEN rather than merely re-point.  Measured
+-- across every family the harness drives, the slot store, the pending
+-- sources and the registry read the same before the walk and after,
+-- and every unit of the growth is here -- which is what makes the
+-- other three arms of the parent's `⊔` cheap and this one primitive.
+
+-- AND WITHIN THIS ARM THE WIDTH IS SPENT AT TWO SITES, NOT FIVE.  Three
+-- of the node measure's five clauses are the literal zero, so `take`,
+-- `switch` and `exhaust` cannot move it whatever they store.  A bounded
+-- `mergeAll`'s queue cannot either, and that one is worth the sentence
+-- because it looks like the accumulating one: the measure over it is a
+-- MAX, parking adds the single observable that arrived, and the drain
+-- returns a SUFFIX of the queue it was handed -- so the queue is bounded
+-- by what a delivery brings in and never by how many deliveries there
+-- were.  What is left is a `scan`'s accumulator, which the fold over an
+-- instant's values genuinely deepens once per value; and the inners a
+-- drain SUBSCRIBES, which install their own nodes.  The second is the
+-- drain arc arriving in this currency, and it routes into the subscribe
+-- side -- where the matching statement about the store does not exist,
+-- only the one about the depth.
 --
 -- AND THE BOUND IS NOT TIGHT, WHICH IS THE MOST USEFUL THING KNOWN
 -- ABOUT IT.  At the entry index the real width IS `capsBase`, which
@@ -1276,7 +1333,7 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 --   `cascadeGo-deliv-real` whose only consumer it was, with the four
 --   dead routes its own header carried.
 postulate
-  cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
@@ -1285,8 +1342,90 @@ postulate
     nestOK? e sl id sched st ≡ true →
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascadeGo a nextId chains sched st
-    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+
+-- THE REGISTRY COMPONENT, whose paths only ever gain frames the path
+-- measure does not charge.  A walk registers the inners a release
+-- subscribes, and a registration's path extends the chain's own with a
+-- `from-inner` frame, which is the one frame `pathNestD` charges zero
+-- for -- so the deepest registered path after the walk is expected to
+-- be one the walk already had in hand.  The measurement agrees at
+-- every cell of every family the harness drives.  It is stated at the
+-- parent's right-hand side rather than at the tighter bound that
+-- reading suggests, because the tighter form needs the chain list to
+-- come FROM the registry and this statement takes it free.
+postulate
+  cascadeGo-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+    let r = cascadeGo a nextId chains sched st
+    in regsNestMax (EvalSt.registry (proj₂ (proj₂ r)))
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+
+-- THE WALK'S STORE GROWTH, IN THE WIDTH CURRENCY, AND IT IS PRIMITIVE.
+-- One arrival's chain walk leaves the store measure no deeper than it
+-- found it plus one `nestSyn` per unit of REAL WIDTH.  The width factor
+-- is the content rather than decoration over a narrower truth, and the
+-- mechanism is one arc: mergeAll's DRAIN stores each released inner in
+-- turn, and it is reached through a `from-inner` frame, which the path
+-- measure charges nothing for -- so ONE delivery can store arbitrarily
+-- many times, and no charge that counts what the run DID can bound it.
+-- `realWidAt` is the one term in this vocabulary that moves with the
+-- axis that drives the drain, which is why the width form clears the
+-- rows the narrow ones cross on.
+--
+-- AND THE STORE MEASURE IS A `⊔` OF FOUR COMPONENTS, SO THE ROW SPLITS
+-- FOUR WAYS RATHER THAN INDUCTING ONCE.  A least upper bound sits
+-- below a target exactly when each of its arms does, so the walk's
+-- slot store, its pending sources, its node states and its registry
+-- can each be charged this same right-hand side independently.  The
+-- slot arm needs no charge at all, the fold threading that store
+-- untouched, and the split is worth taking because the three arms
+-- that survive it are nowhere near equally hard.
+cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  let r = cascadeGo a nextId chains sched st
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval =
+  ⊔-lub (⊔-lub (⊔-lub SL LV) ND) RG
+  where
+  r   = cascadeGo a nextId chains sched st
+  sd′ = proj₁ (proj₂ r)
+  st′ = proj₂ (proj₂ r)
+
+  base≤ : storeNestMax sched st
+            ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+  base≤ = m≤m+n _ _
+
+  SL : slotsNestSum (Sched.slots sd′)
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+  SL = ≤-trans (≤-reflexive (cong slotsNestSum (cascadeGo-slots a nextId chains sched st)))
+               (≤-trans (≤-trans (m≤m⊔n _ _) (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _))) base≤)
+
+  LV : foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sd′)
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+  LV = cascadeGo-nest-live sl id a nextId chains sched st hsl hcaps hnest hval
+
+  ND : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st′)
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval
+
+  RG : regsNestMax (EvalSt.registry st′)
+         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+  RG = cascadeGo-nest-regs sl id a nextId chains sched st hsl hcaps hnest hval
 
 -- ONE ARRIVAL'S WHOLE CASCADE, IN THE WIDTH CURRENCY -- and the width
 -- factor is the content, not decoration over a narrower truth.  A
