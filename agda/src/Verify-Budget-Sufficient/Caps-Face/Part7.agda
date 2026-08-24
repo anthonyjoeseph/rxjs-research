@@ -1219,6 +1219,21 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 --   does the gap close as the instants go -- the real width iterates an
 --   exponential per instant while the cap height iterates a tower, so
 --   the side that must be dominated is the side that grows faster.
+-- DEAD ROUTE: instantiating the PROVEN walk rather than writing a new
+--   induction.  `Walk` (.Delivery-Walk) folds this very list with its
+--   state predicate as a PARAMETER, so a nesting flavour of `walkOK`
+--   reading the store under a base plus the level's worth of `nestSyn`
+--   looks like it inherits the whole induction for the price of one
+--   per-frame fact -- and it would also answer the drain, since `lvls`
+--   iterates per delivery AND per frame where a raw delivery count
+--   iterates only per delivery.  It dies on CURRENCY, one line further
+--   on.  The predicate comes back at `Res.lvl` and the only bound on
+--   that level is `Res.hi`, which is `lvls`-denominated, so the route
+--   ends needing the walk's level cap under the real width -- the
+--   comparison the dead route directly above rules out, in the same
+--   direction, for the same reason.  Nothing about the nesting flavour
+--   repairs it: the record forces ONE level, so a counter threaded
+--   more slowly than the caps level cannot be read back out.
 -- DEAD ROUTE: settling that comparison by instantiation instead of by
 --   the law.  The real width evaluates and so does the cascade depth
 --   the cap is read at, but `capsAt` fails to terminate even in
