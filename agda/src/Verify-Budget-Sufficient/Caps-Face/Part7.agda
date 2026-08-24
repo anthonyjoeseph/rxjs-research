@@ -1425,14 +1425,33 @@ postulate
 -- by the consumer and the mirror cannot branch on it.  The
 -- stepped-state summand composes -- the induction hypothesis, the store
 -- leaf at a SINGLETON chain list, where `cascadeGo` degenerates to one
--- `chainStep`, and `delivN-split` close it between them.  The
--- entry-state summand does not: it charges a run begun BEFORE the head
--- stepped against the delivery count of the run that actually
--- happened, and a chain the head cancels still delivers in that
--- phantom.  So the left side can count deliveries the right side never
--- made, and this is the tight form -- the parent is insulated by a
--- width factor with orders of magnitude of slack, which is exactly why
--- no measurement of the parent says anything about this.
+-- `chainStep`, and `delivN-split` close it between them.
+--
+-- THE STATEMENT SURVIVES THE BRANCH THAT KILLS THE ROUTE, and the
+-- measurement is what separates the two.  `Harness.Main`'s SERIES P is
+-- this statement over a family built to reach the skip branch, and it
+-- reports the chain count, the deliveries and the cancellations so that
+-- a row says whether it bore on that branch at all
+-- (measured-not-rechecked, so it discharges nothing).  The load-bearing
+-- region is reached: rows at ten chains, four deliveries and ten
+-- cancellations -- six chains phantom -- with margins running from
+-- seven against twenty-eight to twenty-five against sixty-one.  The
+-- left side does not move with the chain count at fixed deliveries,
+-- which is the part that matters: the phantom tail contributes its own
+-- DEPTH and not a count, and depth at the entry state is what the state
+-- terms on the right already pay for.  The sibling family never enters
+-- the branch -- every row has chains equal to deliveries -- so it is
+-- evidence about the live arm only, whatever its margin.
+--
+-- DEAD ROUTE: closing the ENTRY-state summand by the same induction
+--   hypothesis.  It concludes in the delivery count of a run begun
+--   before the head stepped, and every chain the head cancels still
+--   delivers in that run, so what it leaves owed is a comparison
+--   between two different runs' counts, which nothing bounds by one.
+--   The summand wants a bound off the STATE terms alone -- it is a
+--   depth at the entry state, where `chainsNestD` and the store measure
+--   are already on the right -- and that route goes through no count.
+
 postulate
   cascadeGo-depth-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
