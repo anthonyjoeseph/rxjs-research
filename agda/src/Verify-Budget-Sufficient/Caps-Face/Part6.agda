@@ -356,8 +356,7 @@ private
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-vals concatᵒ nid true (vs , bs , sd , st)
@@ -365,8 +364,7 @@ private
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-vals switchᵒ nid true (vs , bs , sd , st)
@@ -374,8 +372,7 @@ private
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-vals exhaustᵒ nid true (vs , bs , sd , st)
@@ -383,8 +380,7 @@ private
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
 

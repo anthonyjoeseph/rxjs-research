@@ -36,13 +36,14 @@ open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.Unit using (tt)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Product using (proj₁)
+open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
 open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold; hot)
-open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; concatAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; takeᵉ; syncSizeᵉ; Tm;
+open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; flattenᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; takeᵉ; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root;
-  Path; _↠_; thru-outer; mergeᵒ)
+  Path; _↠_; thru-outer; flattenᵒ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
@@ -70,15 +71,15 @@ runDry h e =
 
 ----------------------------------------------------------------------
 -- THE FAMILY.  `progD d k` scans a k-element list with a fold that
--- wraps its accumulator d mergeAll-levels deeper per value, so accᵢ
+-- wraps its accumulator d flatten-levels deeper per value, so accᵢ
 -- carries d·i nested levels and the outer *All subscribes all of them.
 ----------------------------------------------------------------------
 
--- wrap a term d mergeAll-levels deeper
+-- wrap a term d flatten-levels deeper
 wrapD : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
   Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
 wrapD 0       t = t
-wrapD (suc d) t = strmᵗ (mergeAllᵉ (ofᵉ (wrapD d t ∷ [])))
+wrapD (suc d) t = strmᵗ (flattenᵉ nothing (ofᵉ (wrapD d t ∷ [])))
 
 -- the fold that wraps the accumulator d levels per value
 foldD : ∀ {n} {Γ : Ctx n} → ℕ → Fn Γ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
@@ -90,7 +91,7 @@ natsD (suc k) = nat̂ k ∷ natsD k
 
 progD : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Closed Γ natᵗ
 progD d k =
-  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) (ofᵉ (natsD k)))
+  flattenᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) (ofᵉ (natsD k)))
 
 -- THE GAS THE FACE'S DEMAND HYPOTHESIS SUPPLIES at the adversarial
 -- (smallest) instantiation Ŝ := R̂ := F := 0 and U := 0, where dBound
@@ -105,7 +106,7 @@ sucG b = suc (syncSizeᵉ b + hopDᵉ 0 (slotHop 0 ins₀) b)
 -- is zero on every slot and the shared arm of the store's nesting
 -- measure is never entered — while the witness that machine-refuted
 -- the count-parametric currency came through exactly that arm.  S
--- reaches it: one slot, whose def is a scan under a `mergeAllᵉ`, and a
+-- reaches it: one slot, whose def is a scan under a `flattenᵉ`, and a
 -- root that both references the slot and carries its own d and k.
 ----------------------------------------------------------------------
 
@@ -145,8 +146,8 @@ insS ds ks fzero =
 -- def's ds and ks
 progS : ℕ → ℕ → Closed Γ₁ natᵗ
 progS d k =
-  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (ofᵉ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+  flattenᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ nothing (ofᵉ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
 
 sucGS : ℕ → ℕ → ℕ → ℕ → ℕ
 sucGS ds ks d k =
@@ -184,8 +185,8 @@ insT ds ks j (fsuc fzero) = scripted (cold [] (asyncNats j))
 
 progT : ℕ → ℕ → Closed Γ₂ natᵗ
 progT d k =
-  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (ofᵉ (strmᵗ (input fzero)
+  flattenᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ nothing (ofᵉ (strmᵗ (input fzero)
                    ∷ strmᵗ (input (fsuc fzero))
                    ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
 
@@ -201,7 +202,7 @@ sucGT ds ks j d k =
 -- same slot state forever.  A depth measure is state-sensitive only
 -- through that read, so those families cannot move it along a run and a
 -- row walked over them is degenerate on the state axis whatever it
--- reports.  U puts the shared input BEHIND a concat, whose inner
+-- reports.  U puts the shared input BEHIND a capacity-one flatten, whose inner
 -- subscribes are deferred to arrivals: the scripted slot drains first,
 -- its completion performs the connect mid-run, and the descent's value
 -- before and after that instant is a genuine question.
@@ -229,8 +230,8 @@ insF ds ks j (fsuc fzero) = scripted (hot (asyncNats j))
 
 progF : ℕ → ℕ → Closed Γ₂ natᵗ
 progF w k =
-  mergeAllᵉ (scanᵉ (foldD 1) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+  flattenᵉ nothing (scanᵉ (foldD 1) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ nothing (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
                      ++ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ [])))))
 
 sucGF : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
@@ -276,14 +277,14 @@ sucGF ds ks j w k =
 -- carries no value through, the accumulator never wraps, and the rows
 -- come back flat in the fan width however deep the fold -- measured,
 -- and it is what a first arrangement of this family did.  Below it, a
--- skipped chain still runs the merge and the scan before meeting the
+-- skipped chain still runs the flatten and the scan before meeting the
 -- exhausted take, so each phantom step deepens the store and the
 -- charges stack behind the cut with no delivery paying for them.
 progC : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
 progC dd w k =
-  mergeAllᵉ (takeᵉ (nat̂ (suc k))
+  flattenᵉ nothing (takeᵉ (nat̂ (suc k))
     (scanᵉ (foldD dd) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-      (mergeAllᵉ (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+      (flattenᵉ nothing (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
                        ++ (strmᵗ (input fzero) ∷ []))))))
 
 sucGC : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
@@ -301,15 +302,15 @@ sucGC ds ks j dd w k =
 -- width of inners to subscribe at one instant.
 wrapW : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
   Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
-wrapW w t = strmᵗ (mergeAllᵉ (ofᵉ (replicate (suc w) t)))
+wrapW w t = strmᵗ (flattenᵉ nothing (ofᵉ (replicate (suc w) t)))
 
 foldW : ∀ {n} {Γ : Ctx n} → ℕ → Fn Γ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
 foldW w = wrapW w (fstᵗ (varᵗ (here refl)))
 
 progW : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
 progW ww w k =
-  mergeAllᵉ (scanᵉ (foldW ww) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+  flattenᵉ nothing (scanᵉ (foldW ww) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ nothing (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
                      ++ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ [])))))
 
 sucGW : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
@@ -319,8 +320,8 @@ sucGW ds ks j ww w k =
 
 progU : ℕ → ℕ → Closed Γ₂ natᵗ
 progU d k =
-  mergeAllᵉ (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (concatAllᵉ (ofᵉ (strmᵗ (input (fsuc fzero))
+  flattenᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (flattenᵉ (just 1) (ofᵉ (strmᵗ (input (fsuc fzero))
                     ∷ strmᵗ (input fzero)
                     ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
 
@@ -345,7 +346,7 @@ obsN (suc j) = obs (obsN j)
 
 pathN : ∀ {n} {Γ : Ctx n} (j : ℕ) → Path Γ (obsN j) natᵗ
 pathN 0       = root
-pathN (suc j) = thru-outer mergeᵒ 0 ↠ pathN j
+pathN (suc j) = thru-outer flattenᵒ 0 ↠ pathN j
 
 -- THE SUBJECT MUST NEST ON ITS OWN, and two constructors in a row make
 -- that easy to get wrong.  `ofᵉ` the measure sends to zero outright — a
@@ -354,7 +355,7 @@ pathN (suc j) = thru-outer mergeᵒ 0 ↠ pathN j
 -- the `thru-outer` above the subject is charged by the CALLER rather
 -- than by the subject's own descent.  Either way every row is
 -- degenerate however deep the path is.  So the scan's source is the
--- program itself, whose `mergeAllᵉ` is what puts a level on.
+-- program itself, whose `flattenᵉ` is what puts a level on.
 subjN : ∀ {n} {Γ : Ctx n} (j d k : ℕ) → Closed Γ (obsN j)
 subjN 0       d k = progD d k
 subjN (suc j) d k =

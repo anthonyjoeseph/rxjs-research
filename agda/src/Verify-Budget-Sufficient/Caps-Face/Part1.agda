@@ -88,6 +88,7 @@
 module Verify-Budget-Sufficient.Caps-Face.Part1 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Maybe   using (Maybe)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-suc; +-identityʳ; +-comm; +-assoc; +-monoˡ-≤;
   *-monoˡ-≤; *-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ;
@@ -118,13 +119,13 @@ open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEv
   Gas; Timed; after_,_; hot; cold)
 open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
-  ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; merge-st; concat-st;
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; flatten-st;
   switch-st; exhaust-st; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f;
-  from-inner; thru-outer; Stream; Path; subscribeInner; concatᵒ; concatDrain; sizeStep;
+  from-inner; thru-outer; Stream; Path; subscribeInner; flattenᵒ; flattenDrain; hasRoom; sizeStep;
   iterSize; foldStep; iterFold)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 
@@ -203,20 +204,19 @@ widLive {n = n} W sl l =
   all (λ tv → pWᵛ n sl (LiveSource.elemTy l) (proj₂ tv) ≤ᵇ W)
       (LiveSource.pending l)
 
--- THE CONCAT CLAUSE CARRIES A CARDINALITY as well as the pointwise
--- bound, and it has to: `concatDrain` subscribes one inner per queued
+-- THE FLATTEN CLAUSE CARRIES A CARDINALITY as well as the pointwise
+-- bound, and it has to: `flattenDrain` subscribes one inner per queued
 -- observable, so the drain's receipt is a sum over the queue, and
 -- NOTHING else in the tree bounds how long that queue is — the
--- hypothesis concatDrain-caps is given admits a queue of any length at
+-- hypothesis flattenDrain-caps is given admits a queue of any length at
 -- all, and so does an `all` (Rung-Count-Probe § 2, both rows).  One
 -- level of width pays for one cons, with the same `suc w ≤ foldStep S w`
 -- margin the count receipts already spend
 widNode : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
 widNode {n = n} W sl (scan-st {t} v)   = pWᵛ n sl t v ≤ᵇ W
-widNode {n = n} W sl (concat-st q _ _) =
+widNode {n = n} W sl (flatten-st _ _ q _) =
   all (λ o → pWᵉ n sl o ≤ᵇ W) q ∧ (length q ≤ᵇ W)
 widNode W sl (take-st _)               = true
-widNode W sl (merge-st _ _)            = true
 widNode W sl (switch-st _ _)           = true
 widNode W sl (exhaust-st _ _)          = true
 
@@ -339,13 +339,12 @@ widLive-widen {n = n} sl l le =
 widNode-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (ns : NodeState Γ) {W W′ : ℕ} →
   W ≤ W′ → widNode W sl ns ≡ true → widNode W′ sl ns ≡ true
 widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (pWᵛ n sl t v) le h
-widNode-widen {n = n} sl (concat-st q _ _) {W} {W′} le h
+widNode-widen {n = n} sl (flatten-st _ _ q _) {W} {W′} le h
   with ∧-true (all (λ o → pWᵉ n sl o ≤ᵇ W) q) (length q ≤ᵇ W) h
 ... | hall , hlen =
   ∧-intro (all-impl _ _ (λ o → ≤ᵇ-widen (pWᵉ n sl o) le) q hall)
           (≤ᵇ-widen (length q) le hlen)
 widNode-widen sl (take-st _)     le h = refl
-widNode-widen sl (merge-st _ _)  le h = refl
 widNode-widen sl (switch-st _ _) le h = refl
 widNode-widen sl (exhaust-st _ _) le h = refl
 
@@ -702,7 +701,7 @@ burstCount? c str =
   (length str ≤ᵇ suc (Caps.cWid c))
   ∧ all (λ em → valCountᵉ (InstEmit.events em) ≤ᵇ suc (Caps.cWid c)) str
 
--- observables in a concat queue: the caps side of concatDrain's
+-- observables in a flatten queue: the caps side of flattenDrain's
 -- `all (λ o → sizeᵉ o ≤ᵇ …)` pair
 obsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → Closed Γ s → Bool
 obsCaps? {n = n} c sl o =
@@ -953,13 +952,13 @@ wid-suc-step c L hS =
         (suc≤foldStep (Caps.cSize c) (Caps.cWid (frameStep L c)) hS)
 
 widNode-push : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (L : ℕ) (sl : Slots Γ)
-  (q : List (Closed Γ s)) (o : Closed Γ s) (act od : Bool) →
+  (lim : Maybe ℕ) (q : List (Closed Γ s)) (o : Closed Γ s) (act : ℕ) (od : Bool) →
   2 ≤ Caps.cSize c →
-  widNode (Caps.cWid (frameStep L c)) sl (concat-st q act od) ≡ true →
+  widNode (Caps.cWid (frameStep L c)) sl (flatten-st lim act q od) ≡ true →
   (pWᵉ n sl o ≤ᵇ Caps.cWid (frameStep L c)) ≡ true →
-  widNode (Caps.cWid (frameStep (suc L) c)) sl (concat-st (q ++ o ∷ []) act od)
+  widNode (Caps.cWid (frameStep (suc L) c)) sl (flatten-st lim act (q ++ o ∷ []) od)
     ≡ true
-widNode-push {n = n} c L sl q o act od hS hq ho
+widNode-push {n = n} c L sl lim q o act od hS hq ho
   with ∧-true (all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep L c)) q)
               (length q ≤ᵇ Caps.cWid (frameStep L c)) hq
 ... | hall , hlen = ∧-intro pw card
@@ -982,21 +981,25 @@ widNode-push {n = n} c L sl q o act od hS hq ho
                                    (wid-suc-step c L hS))))
 
 -- AND THE DRAIN ONLY EVER SHORTENS, which is the row that reinstalls
--- the residue.  `concatDrain` returns `[]` when it runs the queue out,
--- the recursive residue when the head completed, and the TAIL when it
--- did not — never anything longer than what it was given, so the
--- cardinality conjunct survives the reinstall by widening alone
-concatDrain-qlen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+-- the residue.  `flattenDrain` returns `[]` when it runs the queue out,
+-- the recursive residue while lanes remain free, and the QUEUE IT WAS
+-- GIVEN when the capacity gate shuts — never anything longer than that,
+-- so the cardinality conjunct survives the reinstall by widening alone
+flattenDrain-qlen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-  length (proj₁ (proj₂ (proj₂ (proj₂ (concatDrain g allNid κ id now q sched st)))))
+  length (proj₁ (proj₂ (proj₂ (proj₂ (flattenDrain g allNid κ id now lim act q sched st)))))
     ≤ length q
-concatDrain-qlen g allNid κ id now []      sched st = z≤n
-concatDrain-qlen g allNid κ id now (o ∷ q) sched st
-  with subscribeInner g concatᵒ allNid κ id now o sched st
-... | _ , vs , bs , false , sched₁ , st₁ = n≤1+n (length q)
-... | _ , vs , bs , true  , sched₁ , st₁ =
-  ≤-trans (concatDrain-qlen g allNid κ id now q sched₁ st₁) (n≤1+n (length q))
+flattenDrain-qlen g allNid κ id now lim act []      sched st = z≤n
+flattenDrain-qlen g allNid κ id now lim act (o ∷ q) sched st
+  with hasRoom lim act
+... | false = ≤-refl
+... | true  with subscribeInner g flattenᵒ allNid κ id now o sched st
+...   | _ , vs , bs , done , sched₁ , st₁ =
+      ≤-trans (flattenDrain-qlen g allNid κ id now lim
+                 (if done then act else suc act) q sched₁ st₁)
+              (n≤1+n (length q))
 
 
 -- and iterFold is monotone in the SEED as well as in the count
@@ -1261,15 +1264,10 @@ module Red {n} {Γ : Ctx n} {vs : List (Fin n)} where
   oW-scan zero    sl f z e = refl
   oW-scan (suc _) sl f z e = refl
 
-  oW-merge : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWⱽ q vs sl (mergeAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
-  oW-merge zero    sl e = refl
-  oW-merge (suc _) sl e = refl
-
-  oW-concat : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWⱽ q vs sl (concatAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
-  oW-concat zero    sl e = refl
-  oW-concat (suc _) sl e = refl
+  oW-flatten : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    outWⱽ q vs sl (flattenᵉ lim e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
+  oW-flatten zero    sl lim e = refl
+  oW-flatten (suc _) sl lim e = refl
 
   oW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
     outWⱽ q vs sl (switchAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
@@ -1321,15 +1319,10 @@ module Red {n} {Γ : Ctx n} {vs : List (Fin n)} where
   iW-scan zero    sl f z e = refl
   iW-scan (suc _) sl f z e = refl
 
-  iW-merge : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWⱽ q vs sl (mergeAllᵉ e) ≡ innWⱽ q vs sl e
-  iW-merge zero    sl e = refl
-  iW-merge (suc _) sl e = refl
-
-  iW-concat : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWⱽ q vs sl (concatAllᵉ e) ≡ innWⱽ q vs sl e
-  iW-concat zero    sl e = refl
-  iW-concat (suc _) sl e = refl
+  iW-flatten : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    innWⱽ q vs sl (flattenᵉ lim e) ≡ innWⱽ q vs sl e
+  iW-flatten zero    sl lim e = refl
+  iW-flatten (suc _) sl lim e = refl
 
   iW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
     innWⱽ q vs sl (switchAllᵉ e) ≡ innWⱽ q vs sl e

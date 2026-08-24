@@ -1394,8 +1394,7 @@ takeDispatch-caps c nid vals fin sl sched st (just (take-st k)) slEq inv vC
             , refl
 takeDispatch-caps c nid vals fin sl sched st nothing slEq inv vC = inv , refl , refl
 takeDispatch-caps c nid vals fin sl sched st (just (scan-st _)) slEq inv vC = inv , refl , refl
-takeDispatch-caps c nid vals fin sl sched st (just (merge-st _ _)) slEq inv vC = inv , refl , refl
-takeDispatch-caps c nid vals fin sl sched st (just (concat-st _ _ _)) slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (flatten-st _ _ _ _)) slEq inv vC = inv , refl , refl
 takeDispatch-caps c nid vals fin sl sched st (just (switch-st _ _)) slEq inv vC = inv , refl , refl
 takeDispatch-caps c nid vals fin sl sched st (just (exhaust-st _ _)) slEq inv vC = inv , refl , refl
 
@@ -1480,8 +1479,7 @@ thruWrap-caps c switchᵒ nid true sl (vs , bs , sd , st) inv vC eC
 ... | nothing              = inv , vC , eC
 ... | just (scan-st _)     = inv , vC , eC
 ... | just (take-st _)     = inv , vC , eC
-... | just (merge-st _ _)  = inv , vC , eC
-... | just (concat-st _ _ _) = inv , vC , eC
+... | just (flatten-st _ _ _ _)  = inv , vC , eC
 ... | just (exhaust-st _ _) = inv , vC , eC
 thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
   with lookupNode nid (EvalSt.nodes st)
@@ -1490,8 +1488,7 @@ thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
 ... | nothing              = inv , vC , eC
 ... | just (scan-st _)     = inv , vC , eC
 ... | just (take-st _)     = inv , vC , eC
-... | just (merge-st _ _)  = inv , vC , eC
-... | just (concat-st _ _ _) = inv , vC , eC
+... | just (flatten-st _ _ _ _)  = inv , vC , eC
 ... | just (switch-st _ _) = inv , vC , eC
 
 ------------------------------------------------------------------

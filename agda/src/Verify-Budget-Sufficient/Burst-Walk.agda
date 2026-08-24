@@ -845,8 +845,7 @@ wet-take {e = e} {s = s} c sl Ψ J sf id now nid path′ vals fin sched st
               , takeVals-Ψ Ψ k vals vΨ
               , rΨ , refl
   go (just (scan-st _))       = wet-nil {u = s} c sl Ψ J fin sched st ok rg
-  go (just (merge-st _ _))    = wet-nil {u = s} c sl Ψ J fin sched st ok rg
-  go (just (concat-st _ _ _)) = wet-nil {u = s} c sl Ψ J fin sched st ok rg
+  go (just (flatten-st _ _ _ _))    = wet-nil {u = s} c sl Ψ J fin sched st ok rg
   go (just (switch-st _ _))   = wet-nil {u = s} c sl Ψ J fin sched st ok rg
   go (just (exhaust-st _ _))  = wet-nil {u = s} c sl Ψ J fin sched st ok rg
   go nothing                  = wet-nil {u = s} c sl Ψ J fin sched st ok rg
@@ -882,8 +881,7 @@ wet-scan {s = s} {u = u} c sl Ψ J sf id now fn nid path′ vals fin sched st
      | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st (proj₂ ok))
 ... | nothing                | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
 ... | just (take-st _)       | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
-... | just (merge-st _ _)    | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
-... | just (concat-st _ _ _) | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
+... | just (flatten-st _ _ _ _)    | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
 ... | just (switch-st _ _)   | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
 ... | just (exhaust-st _ _)  | _ = wet-nil {u = u} c sl Ψ J fin sched st ok rg
 -- the accumulator type must match the frame's output type, and when it
@@ -1354,8 +1352,7 @@ thruConsume-Ψ sl Ψ g switchᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
 ... | nothing                = slEq , fc , rg , refl , refl
 ... | just (scan-st _)       = slEq , fc , rg , refl , refl
 ... | just (take-st _)       = slEq , fc , rg , refl , refl
-... | just (merge-st _ _)    = slEq , fc , rg , refl , refl
-... | just (concat-st _ _ _) = slEq , fc , rg , refl , refl
+... | just (flatten-st _ _ _ _)    = slEq , fc , rg , refl , refl
 ... | just (exhaust-st _ _)  = slEq , fc , rg , refl , refl
 thruConsume-Ψ sl Ψ g exhaustᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
   with lookupNode nid (EvalSt.nodes st)
@@ -1380,8 +1377,7 @@ thruConsume-Ψ sl Ψ g exhaustᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
 ... | nothing                    = slEq , fc , rg , refl , refl
 ... | just (scan-st _)           = slEq , fc , rg , refl , refl
 ... | just (take-st _)           = slEq , fc , rg , refl , refl
-... | just (merge-st _ _)        = slEq , fc , rg , refl , refl
-... | just (concat-st _ _ _)     = slEq , fc , rg , refl , refl
+... | just (flatten-st _ _ _ _)        = slEq , fc , rg , refl , refl
 ... | just (switch-st _ _)       = slEq , fc , rg , refl , refl
 
 thruWalk-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1474,8 +1470,7 @@ thruWrap-Ψ sl Ψ switchᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
   , rg , vsΨ , bsΨ
 ... | just (scan-st _)       = slEq , fc , rg , vsΨ , bsΨ
 ... | just (take-st _)       = slEq , fc , rg , vsΨ , bsΨ
-... | just (merge-st _ _)    = slEq , fc , rg , vsΨ , bsΨ
-... | just (concat-st _ _ _) = slEq , fc , rg , vsΨ , bsΨ
+... | just (flatten-st _ _ _ _)    = slEq , fc , rg , vsΨ , bsΨ
 ... | just (exhaust-st _ _)  = slEq , fc , rg , vsΨ , bsΨ
 ... | nothing                = slEq , fc , rg , vsΨ , bsΨ
 thruWrap-Ψ sl Ψ exhaustᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
@@ -1488,8 +1483,7 @@ thruWrap-Ψ sl Ψ exhaustᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bs�
   , rg , vsΨ , bsΨ
 ... | just (scan-st _)       = slEq , fc , rg , vsΨ , bsΨ
 ... | just (take-st _)       = slEq , fc , rg , vsΨ , bsΨ
-... | just (merge-st _ _)    = slEq , fc , rg , vsΨ , bsΨ
-... | just (concat-st _ _ _) = slEq , fc , rg , vsΨ , bsΨ
+... | just (flatten-st _ _ _ _)    = slEq , fc , rg , vsΨ , bsΨ
 ... | just (switch-st _ _)   = slEq , fc , rg , vsΨ , bsΨ
 ... | nothing                = slEq , fc , rg , vsΨ , bsΨ
 
@@ -2913,8 +2907,7 @@ thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf switch�
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl
-... | just (merge-st _ _) = refl
-... | just (concat-st _ _ _) = refl
+... | just (flatten-st _ _ _ _) = refl
 ... | just (exhaust-st _ _) = refl
 
 -- EXHAUST active=true: drops the payload, emits []
@@ -2928,8 +2921,7 @@ thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf exhaust
 ... | nothing = refl
 ... | just (scan-st _) = refl
 ... | just (take-st _) = refl
-... | just (merge-st _ _) = refl
-... | just (concat-st _ _ _) = refl
+... | just (flatten-st _ _ _ _) = refl
 ... | just (switch-st _ _) = refl
 
 ------------------------------------------------------------------
@@ -3114,16 +3106,14 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
 ...     | switchᵒ | nothing                       = refl
 ...     | switchᵒ | just (scan-st _)              = refl
 ...     | switchᵒ | just (take-st _)              = refl
-...     | switchᵒ | just (merge-st _ _)           = refl
-...     | switchᵒ | just (concat-st _ _ _)        = refl
+...     | switchᵒ | just (flatten-st _ _ _ _)           = refl
 ...     | switchᵒ | just (exhaust-st _ _)         = refl
 -- EXHAUST: innerFinish emits []
 ...     | exhaustᵒ | just (exhaust-st act od)     = refl
 ...     | exhaustᵒ | nothing                      = refl
 ...     | exhaustᵒ | just (scan-st _)             = refl
 ...     | exhaustᵒ | just (take-st _)             = refl
-...     | exhaustᵒ | just (merge-st _ _)          = refl
-...     | exhaustᵒ | just (concat-st _ _ _)       = refl
+...     | exhaustᵒ | just (flatten-st _ _ _ _)          = refl
 ...     | exhaustᵒ | just (switch-st _ _)         = refl
 -- CONCAT, type-matching: THE ONLY arm that calls concatDrain →
 -- subscribeInner, and so the only one where subscribeInner-nodry is
@@ -3267,8 +3257,7 @@ takeDispatch-nodry nid vals fin sched st (just (take-st k))
 ... | false = refl
 takeDispatch-nodry nid vals fin sched st nothing                  = refl
 takeDispatch-nodry nid vals fin sched st (just (scan-st _))       = refl
-takeDispatch-nodry nid vals fin sched st (just (merge-st _ _))    = refl
-takeDispatch-nodry nid vals fin sched st (just (concat-st _ _ _)) = refl
+takeDispatch-nodry nid vals fin sched st (just (flatten-st _ _ _ _))    = refl
 takeDispatch-nodry nid vals fin sched st (just (switch-st _ _))   = refl
 takeDispatch-nodry nid vals fin sched st (just (exhaust-st _ _))  = refl
 
@@ -3305,8 +3294,7 @@ stepFrame-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {u = u} sf id now
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                  = refl
 ... | just (take-st _)         = refl
-... | just (merge-st _ _)      = refl
-... | just (concat-st _ _ _)   = refl
+... | just (flatten-st _ _ _ _)      = refl
 ... | just (switch-st _ _)     = refl
 ... | just (exhaust-st _ _)    = refl
 ... | just (scan-st {w} acc) with w ≟ᵗ u

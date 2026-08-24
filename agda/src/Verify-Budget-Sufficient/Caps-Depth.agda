@@ -53,7 +53,7 @@
 
 -- SOME CLAUSES ARE DELIBERATELY TOO BIG, and that is free.  Where the
 -- evaluator dispatches on a Bool whose branches subscribe the same
--- things or nothing (`concatDrain`'s `if done`, `innerReact`'s
+-- things or nothing (`flattenDrain`'s capacity gate, `innerReact`'s
 -- liveness test, `subscribeSharedSlot`'s two joins, `thruConsume`'s
 -- concat/exhaust node reads), the mirror ignores the test and reports
 -- the SPENDING branch.  A mirror above the truth only ever demands more
@@ -95,11 +95,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim  using (Gas; g0; gs; Id; Tick; Source;
                             InstEmit; InstEvent; close; exhausted)
 open import Rx.Exp   using (Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-  mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+  flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; Arrival; NodeId; RegId; Path; Frame; AllOp; Stream; NodeState; scan-st;
-  take-st; merge-st; concat-st; switch-st; exhaust-st; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+  take-st; flatten-st; switch-st; exhaust-st; flattenᵒ; switchᵒ; exhaustᵒ;
   root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer; mintNode; installNode;
   lookupNode; register; splitEvents; switchKill; shareLatch; shareAdmit; subscribeE;
   subscribeInner; thruConsume; stepFrame; foldPath; chainStep; arrVal; arrSource; arrTick;
@@ -228,10 +228,8 @@ depthE fuel (scanᵉ f seed b) κ id now sched st =
   st₀    = installNode nid (scan-st (evalTm seed)) st
   r      = subscribeE fuel b (scan-f f nid ↠ κ) id now sched₁ st₀
 -- the four *All edges delegate whole
-depthE fuel (mergeAllᵉ b)   κ id now sched st =
-  depthAll fuel mergeᵒ (merge-st 0 false) b κ id now sched st
-depthE {u = u} fuel (concatAllᵉ b) κ id now sched st =
-  depthAll fuel concatᵒ (concat-st {t = u} [] false false) b κ id now sched st
+depthE {u = u} fuel (flattenᵉ lim b) κ id now sched st =
+  depthAll fuel flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st
 depthE fuel (switchAllᵉ b)  κ id now sched st =
   depthAll fuel switchᵒ (switch-st nothing false) b κ id now sched st
 depthE fuel (exhaustAllᵉ b) κ id now sched st =
@@ -295,13 +293,11 @@ depthWalk fuel op nid κ id now (o ∷ os) sched₀ st₀ =
       (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
   where r = thruConsume fuel op nid κ id now o sched₀ st₀
 
--- merge always subscribes; concat's park and exhaust's busy-drop
--- subscribe nothing, and both non-parking branches subscribe at the
--- INCOMING state, so those two node reads are ignored
-depthConsume fuel mergeᵒ   nid κ id now o sched₀ st₀ =
-  depthInner fuel mergeᵒ   nid κ id now o sched₀ st₀
-depthConsume fuel concatᵒ  nid κ id now o sched₀ st₀ =
-  depthInner fuel concatᵒ  nid κ id now o sched₀ st₀
+-- a flatten with a free lane always subscribes; its park and exhaust's
+-- busy-drop subscribe nothing, and both non-parking branches subscribe
+-- at the INCOMING state, so those two node reads are ignored
+depthConsume fuel flattenᵒ nid κ id now o sched₀ st₀ =
+  depthInner fuel flattenᵒ nid κ id now o sched₀ st₀
 depthConsume fuel exhaustᵒ nid κ id now o sched₀ st₀ =
   depthInner fuel exhaustᵒ nid κ id now o sched₀ st₀
 depthConsume fuel switchᵒ  nid κ id now o sched₀ st₀ =
@@ -318,17 +314,18 @@ depthConsumeS fuel nid κ id now o sched₀ st₀ _ = 0
 -- clause nothing
 depthDrain fuel allNid κ id now []      sched₀ st₀ = 0
 depthDrain fuel allNid κ id now (o ∷ q) sched₀ st₀ =
-  depthInner fuel concatᵒ allNid κ id now o sched₀ st₀
+  depthInner fuel flattenᵒ allNid κ id now o sched₀ st₀
   ⊔ depthDrain fuel allNid κ id now q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
-  where r = subscribeInner fuel concatᵒ allNid κ id now o sched₀ st₀
+  where r = subscribeInner fuel flattenᵒ allNid κ id now o sched₀ st₀
 
--- merge decrements a counter, switch clears a slot, exhaust clears a
--- flag, and every catch-all hands the payload straight back: concatAll's
--- drain is the only finish that subscribes anything
-depthFin {s = s} fuel concatᵒ allNid inst κ id now vals sched st
-         (just (concat-st {t = w} q act od)) =
+-- switch clears a slot, exhaust clears a flag, and every catch-all
+-- hands the payload straight back: the flatten drain is the only finish
+-- that subscribes anything, and at an unbounded limit its queue is
+-- empty, which is the counter decrement the merge face used to be
+depthFin {s = s} fuel flattenᵒ allNid inst κ id now vals sched st
+         (just (flatten-st {t = w} lim act q od)) =
   depthFinC fuel allNid κ id now q sched st (w ≟ᵗ s)
 depthFin fuel op allNid inst κ id now vals sched st nd = 0
 
@@ -492,24 +489,3 @@ lub3-m a b c h = ≤-trans (m≤m⊔n b c) (≤-trans (m≤n⊔m a (b ⊔ c)) h)
 
 lub3-r : ∀ a b c {d} → a ⊔ (b ⊔ c) ≤ d → c ≤ d
 lub3-r a b c h = ≤-trans (m≤n⊔m b c) (≤-trans (m≤n⊔m a (b ⊔ c)) h)
-
-------------------------------------------------------------------
--- A TAKE'S PUSH COSTS NO DEPTH AT ALL, and it lives beside the measure
--- rather than beside a bound: `takeDispatch` subscribes nothing, so the
--- frame clause is `0` and the burst is a fold of `0`s.  Nothing about
--- the currency a consumer bounds this by enters the statement
-------------------------------------------------------------------
-
-burst-takef-zero : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (fuel : Gas) (bid : Id) (now : Tick)
-  (nid : NodeId) (κ : Path Γ s t)
-  (stream : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-  depthBurst fuel bid now (take-f nid) κ stream sched st ≤ 0
-burst-takef-zero fuel bid now nid κ [] sched st = z≤n
-burst-takef-zero {Γ = Γ} {s = s} fuel bid now nid κ (em ∷ ems) sched st =
-  ⊔-lub z≤n (burst-takef-zero fuel bid now nid κ ems sched' st')
-  where
-  sp     = splitEvents {A = Val Γ s} (InstEmit.events em)
-  r      = stepFrame fuel bid now (take-f nid) κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
-  sched' = proj₁ (proj₂ (proj₂ (proj₂ r)))
-  st'    = proj₂ (proj₂ (proj₂ (proj₂ r)))

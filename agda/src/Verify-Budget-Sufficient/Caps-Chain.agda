@@ -73,7 +73,7 @@ open import Verify-Budget-Sufficient.Caps-Sadd using (opIterD-sadd; sIterD-sadd)
 -- § 1.  THE FIVE CLAUSE SHAPES.
 ------------------------------------------------------------------
 
--- ONE PAYLOAD of a thruWalk / concatDrain: the head subscribes an inner
+-- ONE PAYLOAD of a thruWalk / flattenDrain: the head subscribes an inner
 -- under one more frame (`subscribeInner-caps` recurses at `suc j`), and
 -- the tail is the walk's own IH at the level the head left
 walk-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
@@ -597,7 +597,7 @@ walk-last S W d k m j j₁ 2≤S hd =
 -- whose walk premise is indexed at the full `suc (widAt S W j)`; a
 -- thru-outer's witness is the walk's own j′ and meets it by `walk-index`
 -- alone, but `innerFinish-caps`'s concat clause reinstalls the drained
--- node and so reports `suc j′` — one MORE than `concatDrain-caps` hands
+-- node and so reports `suc j′` — one MORE than `flattenDrain-caps` hands
 -- back.  The room is real, and it is the unused payload slot: the queue
 -- is bounded by `widAt S W j` (`widNode`'s length conjunct) while the
 -- premise admits `suc (widAt S W j)` payloads, and one payload of a walk
@@ -625,7 +625,7 @@ j≤fLvl : ∀ (S W j : ℕ) → j ≤ fLvl S W j
 j≤fLvl S W j = m≤m+n j (fCharge S W j)
 
 -- A DRAIN INSIDE A FRAME, which is `walk-room` carried the rest of the
--- way home.  `concatDrain-caps` reports its walk in `sIterD` currency at
+-- way home.  `flattenDrain-caps` reports its walk in `sIterD` currency at
 -- the budget the frame RE-READ; the enclosing `innerFinish-caps` has to
 -- report in `fLvlD` at one higher depth, and this is that conversion.
 --

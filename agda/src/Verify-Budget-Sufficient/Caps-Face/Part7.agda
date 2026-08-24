@@ -247,8 +247,7 @@ innerFinish-face _ c d j g switchᵒ allNid inst κ id now vals sl sched st
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (merge-st _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (concat-st _ _ _) = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (flatten-st _ _ _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (exhaust-st _ _)  = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st nothing od) = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st (just cur) od) with cur ≡ᵇ inst
@@ -267,8 +266,7 @@ innerFinish-face _ c d j g exhaustᵒ allNid inst κ id now vals sl sched st
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (merge-st _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (concat-st _ _ _) = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (flatten-st _ _ _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st _ _)   = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (exhaust-st act od) =
   innerFinish-face-keep c d j sl vals od sched
@@ -360,8 +358,7 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
          (capsOK?-nodeWid (frameStep j c) sched st inv)
 ... | nothing                | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (take-st _)       | _ = stepFrame-face-zero c d j u sl fin sched st inv
-... | just (merge-st _ _)    | _ = stepFrame-face-zero c d j u sl fin sched st inv
-... | just (concat-st _ _ _) | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (flatten-st _ _ _ _)    | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (switch-st _ _)   | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (exhaust-st _ _)  | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u

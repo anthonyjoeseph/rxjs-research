@@ -51,7 +51,7 @@ open import Rx.Exp using (Ty; Ctx; Val; Tm; Exp; Ren∈; ext∈;
                           subΘExp; subΘTm; subΘTms; lookupEnv; varIx;
                           unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
+                          flattenᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
@@ -108,8 +108,7 @@ add3≤mul3 x y z hx hy hz =
 1≤spnᵉ (mapᵉ f e)      = s≤s z≤n
 1≤spnᵉ (takeᵉ c e)     = s≤s z≤n
 1≤spnᵉ (scanᵉ f z e)   = s≤s z≤n
-1≤spnᵉ (mergeAllᵉ e)   = s≤s z≤n
-1≤spnᵉ (concatAllᵉ e)  = s≤s z≤n
+1≤spnᵉ (flattenᵉ _ e)   = s≤s z≤n
 1≤spnᵉ (switchAllᵉ e)  = s≤s z≤n
 1≤spnᵉ (exhaustAllᵉ e) = s≤s z≤n
 1≤spnᵉ (μᵉ e)          = s≤s z≤n
@@ -177,8 +176,7 @@ mutual
     cong suc (cong₂ _+_ (cong₂ _+_ (spn-renᵗ ρg ρd (ext∈ ρt) f)
                                    (spn-renᵗ ρg ρd ρt z))
                         (spn-renᵉ ρg ρd ρt e))
-  spn-renᵉ ρg ρd ρt (mergeAllᵉ e)   = cong suc (spn-renᵉ ρg ρd ρt e)
-  spn-renᵉ ρg ρd ρt (concatAllᵉ e)  = cong suc (spn-renᵉ ρg ρd ρt e)
+  spn-renᵉ ρg ρd ρt (flattenᵉ _ e)   = cong suc (spn-renᵉ ρg ρd ρt e)
   spn-renᵉ ρg ρd ρt (switchAllᵉ e)  = cong suc (spn-renᵉ ρg ρd ρt e)
   spn-renᵉ ρg ρd ρt (exhaustAllᵉ e) = cong suc (spn-renᵉ ρg ρd ρt e)
   spn-renᵉ ρg ρd ρt (μᵉ e)     = cong suc (spn-renᵉ (ext∈ ρg) ρd ρt e)
@@ -649,8 +647,7 @@ mutual
             (slope (λ j → pmᵉ V (length Θloc + j) e)
                    (λ j → lst3 (pmᵗ V (suc (length Θloc + j)) f) (pmᵗ V (length Θloc + j) z)
                             (pmᵉ V (length Θloc + j) e)))
-  hopD-sub-spnᵉ V η P B c Θloc σ (mergeAllᵉ e)   hB hσ = hop V η P B c Θloc σ e hB hσ
-  hopD-sub-spnᵉ V η P B c Θloc σ (concatAllᵉ e)  hB hσ = hop V η P B c Θloc σ e hB hσ
+  hopD-sub-spnᵉ V η P B c Θloc σ (flattenᵉ _ e)   hB hσ = hop V η P B c Θloc σ e hB hσ
   hopD-sub-spnᵉ V η P B c Θloc σ (switchAllᵉ e)  hB hσ = hop V η P B c Θloc σ e hB hσ
   hopD-sub-spnᵉ V η P B c Θloc σ (exhaustAllᵉ e) hB hσ = hop V η P B c Θloc σ e hB hσ
   hopD-sub-spnᵉ V η P B c Θloc σ (μᵉ e) hB hσ =

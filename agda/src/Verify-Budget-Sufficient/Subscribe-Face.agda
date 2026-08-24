@@ -646,8 +646,7 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = z≤n
 ... | just (take-st _)       = z≤n
-... | just (merge-st _ _)    = z≤n
-... | just (concat-st _ _ _) = z≤n
+... | just (flatten-st _ _ _ _)    = z≤n
 ... | just (switch-st _ _)   = z≤n
 ... | just (exhaust-st _ _)  = z≤n
 ... | just (scan-st {w} ac) with w ≟ᵗ u
@@ -1834,8 +1833,7 @@ innerFinish-caps c dep bud j g switchᵒ allNid inst κ id now vals sl sched st
 ... | nothing                = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (scan-st _)       = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (take-st _)       = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
-... | just (merge-st _ _)    = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
-... | just (concat-st _ _ _) = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
+... | just (flatten-st _ _ _ _)    = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (exhaust-st _ _)  = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (switch-st nothing od) = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (switch-st (just cur) od) with cur ≡ᵇ inst
@@ -1858,8 +1856,7 @@ innerFinish-caps c dep bud j g exhaustᵒ allNid inst κ id now vals sl sched st
 ... | nothing                = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (scan-st _)       = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (take-st _)       = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
-... | just (merge-st _ _)    = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
-... | just (concat-st _ _ _) = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
+... | just (flatten-st _ _ _ _)    = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (switch-st _ _)   = innerFinish-zero′ c dep j sl vals sched st 2≤S inv vC
 ... | just (exhaust-st act od) =
   0 , subst (λ x → capsOK? (frameStep x c) sched

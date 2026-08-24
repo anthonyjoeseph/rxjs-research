@@ -24,6 +24,7 @@ open import Data.Vec     using (lookup)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst; subst₂)
 open import Data.List    using (List; []; _∷_; map)
+open import Data.Maybe   using (nothing)
 -- `all` is the list action on Bool, not Data.List's `All`-valued one;
 -- added in the commit that spends it, per this file's own rule
 open import Data.Bool.ListAction using (all)
@@ -32,7 +33,7 @@ open import Rx.Prim      using (Tick; Id; value; Gas; ObservableInput; hot; cold
 open import Rx.Exp       using (Ty; obs; Ctx; Closed; Val; inputsBelowᵉ; isData; sizeᵉ; sizeᵛ; syncSizeᵉ; deferᵉ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ)
 open import Rx.Slot-Hop  using (slotHop; slotHop-scripted)
-open import Rx.Evaluator using (Sched; EvalSt; memberSource; Path; _↠_; subscribeE; mergeᵒ; merge-st; hasDry; opIterD;
+open import Rx.Evaluator using (Sched; EvalSt; memberSource; Path; _↠_; subscribeE; flattenᵒ; flatten-st; hasDry; opIterD;
   thru-outer; LiveSource; installNode; register; mintNode; mintSource; mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared; Slots; slotsSize)
 
@@ -798,7 +799,7 @@ input-wet-core c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j j′ g wl i b κ bid now sl
 
 
 ------------------------------------------------------------------
--- THE defer CLAUSE'S LEAF, ASSEMBLED.  Install the merge node, mint the
+-- THE defer CLAUSE'S LEAF, ASSEMBLED.  Install the flatten node, mint the
 -- source and ordinal, park the body as a one-element pending, register
 -- the thru-outer chain; the burst is `init src ∷ []` and nothing else.
 --
@@ -850,8 +851,8 @@ walk-defer-eight {Γ = Γ} {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g 
   B′ = Caps.cSize (frameStep (j + j′) c)
   nid  = Sched.nextNode sched
   SRC  = Sched.nextSource sched
-  PATH = thru-outer mergeᵒ nid ↠ κ
-  ST₀  = installNode nid (merge-st 0 false) st
+  PATH = thru-outer flattenᵒ nid ↠ κ
+  ST₀  = installNode nid (flatten-st {t = u} nothing 0 [] false) st
   ST   = register SRC PATH ST₀
   SCHED₃ = record (record (record sched { nextNode = suc (Sched.nextNode sched) })
                           { nextSource = suc (Sched.nextSource sched) })
@@ -860,7 +861,7 @@ walk-defer-eight {Γ = Γ} {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g 
   NEW = record { source = SRC ; ordinal = Sched.nextOrdinal sched
                ; elemTy = obs u ; pending = (suc now , body) ∷ [] }
   INV₀ : INV? Ψ B SCHED₃ ST₀ ≡ true
-  INV₀ = INV?-install Ψ B B nid (merge-st 0 false) sched SCHED₃ st
+  INV₀ = INV?-install Ψ B B nid (flatten-st {t = u} nothing 0 [] false) sched SCHED₃ st
            ≤-refl refl refl refl refl invW
   pB′ : pathB? B Ψ PATH ≡ true
   pB′ = ∧-intro refl pB
@@ -892,8 +893,8 @@ walk-defer body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
           2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
           s2 fS rS ceil lb dmd gas lℓ rgs
   in j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈
-   , register-regsLen ℓ _ (thru-outer mergeᵒ (proj₁ (mintNode sched)) ↠ κ)
-       (installNode (proj₁ (mintNode sched)) (merge-st 0 false) st)
+   , register-regsLen ℓ _ (thru-outer flattenᵒ (proj₁ (mintNode sched)) ↠ κ)
+       (installNode (proj₁ (mintNode sched)) (flatten-st {t = u} nothing 0 [] false) st)
        (subst (_≤ ℓ) (+-comm (pathLen κ) 1)
               (≤-trans (+-monoʳ-≤ (pathLen κ) (≤-trans (s≤s z≤n) dmd)) lℓ))
        rgs

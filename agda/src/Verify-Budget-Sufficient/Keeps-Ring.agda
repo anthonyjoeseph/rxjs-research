@@ -600,8 +600,7 @@ takeDispatch-keeps nid vals fin sched st (just (take-st k))
 ... | false = keeps refl (λ s p → p)
 takeDispatch-keeps nid vals fin sched st nothing                  = keeps-refl
 takeDispatch-keeps nid vals fin sched st (just (scan-st _))       = keeps-refl
-takeDispatch-keeps nid vals fin sched st (just (merge-st _ _))    = keeps-refl
-takeDispatch-keeps nid vals fin sched st (just (concat-st _ _ _)) = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (flatten-st _ _ _ _))    = keeps-refl
 takeDispatch-keeps nid vals fin sched st (just (switch-st _ _))   = keeps-refl
 takeDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))  = keeps-refl
 
@@ -629,16 +628,14 @@ thruWrap-keeps switchᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nod
 ... | just (switch-st cur _)   = keeps refl (λ s p → p)
 ... | just (scan-st _)         = keeps-refl
 ... | just (take-st _)         = keeps-refl
-... | just (merge-st _ _)      = keeps-refl
-... | just (concat-st _ _ _)   = keeps-refl
+... | just (flatten-st _ _ _ _)      = keeps-refl
 ... | just (exhaust-st _ _)    = keeps-refl
 ... | nothing                  = keeps-refl
 thruWrap-keeps exhaustᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st act _)  = keeps refl (λ s p → p)
 ... | just (scan-st _)         = keeps-refl
 ... | just (take-st _)         = keeps-refl
-... | just (merge-st _ _)      = keeps-refl
-... | just (concat-st _ _ _)   = keeps-refl
+... | just (flatten-st _ _ _ _)      = keeps-refl
 ... | just (switch-st _ _)     = keeps-refl
 ... | nothing                  = keeps-refl
 
@@ -676,8 +673,7 @@ thruConsume-keeps g switchᵒ nid κ id now o sched st
                      (proj₂ (proj₂ (switchKill cur sched st))))
 ... | just (scan-st _)       = keeps-refl
 ... | just (take-st _)       = keeps-refl
-... | just (merge-st _ _)    = keeps-refl
-... | just (concat-st _ _ _) = keeps-refl
+... | just (flatten-st _ _ _ _)    = keeps-refl
 ... | just (exhaust-st _ _)  = keeps-refl
 ... | nothing                = keeps-refl
 thruConsume-keeps g exhaustᵒ nid κ id now o sched st
@@ -687,8 +683,7 @@ thruConsume-keeps g exhaustᵒ nid κ id now o sched st
       subscribeInner-keeps g exhaustᵒ nid κ id now o sched st
 ... | just (scan-st _)       = keeps-refl
 ... | just (take-st _)       = keeps-refl
-... | just (merge-st _ _)    = keeps-refl
-... | just (concat-st _ _ _) = keeps-refl
+... | just (flatten-st _ _ _ _)    = keeps-refl
 ... | just (switch-st _ _)   = keeps-refl
 ... | nothing                = keeps-refl
 
@@ -763,8 +758,7 @@ stepFrame-keeps {u = u} g id now (scan-f fn nid) κ vals fin sched st
 ...   | no _     = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | nothing = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (take-st _) = keeps-refl
-stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (merge-st _ _) = keeps-refl
-stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (concat-st _ _ _) = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (flatten-st _ _ _ _) = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (switch-st _ _) = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (exhaust-st _ _) = keeps-refl
 stepFrame-keeps g id now (take-f nid) κ vals fin sched st =
@@ -1010,9 +1004,7 @@ mutual
       (sum3 (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) (sizeᵉ cl)
             (size-elimGᵗ x cl f) (size-elimGᵗ x cl z) (size-elimGᵉ x cl e))
       (sizeᵉ-pos cl)
-  size-elimGᵉ x cl (mergeAllᵉ e)   =
-    sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimGᵉ x cl e) (sizeᵉ-pos cl)
-  size-elimGᵉ x cl (concatAllᵉ e)  =
+  size-elimGᵉ x cl (flattenᵉ _ e)   =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimGᵉ x cl e) (sizeᵉ-pos cl)
   size-elimGᵉ x cl (switchAllᵉ e)  =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimGᵉ x cl e) (sizeᵉ-pos cl)
@@ -1049,9 +1041,7 @@ mutual
       (sum3 (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) (sizeᵉ cl)
             (size-elimDᵗ x cl f) (size-elimDᵗ x cl z) (size-elimDᵉ x cl e))
       (sizeᵉ-pos cl)
-  size-elimDᵉ x cl (mergeAllᵉ e)   =
-    sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimDᵉ x cl e) (sizeᵉ-pos cl)
-  size-elimDᵉ x cl (concatAllᵉ e)  =
+  size-elimDᵉ x cl (flattenᵉ _ e)   =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimDᵉ x cl e) (sizeᵉ-pos cl)
   size-elimDᵉ x cl (switchAllᵉ e)  =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimDᵉ x cl e) (sizeᵉ-pos cl)

@@ -730,8 +730,7 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
          (capsOK?-nodeWid (frameStep j c) sched st inv)
 ... | nothing                | _ = stepFrame-zero-caps c j u sl sched st inv
 ... | just (take-st _)       | _ = stepFrame-zero-caps c j u sl sched st inv
-... | just (merge-st _ _)    | _ = stepFrame-zero-caps c j u sl sched st inv
-... | just (concat-st _ _ _) | _ = stepFrame-zero-caps c j u sl sched st inv
+... | just (flatten-st _ _ _ _)    | _ = stepFrame-zero-caps c j u sl sched st inv
 ... | just (switch-st _ _)   | _ = stepFrame-zero-caps c j u sl sched st inv
 ... | just (exhaust-st _ _)  | _ = stepFrame-zero-caps c j u sl sched st inv
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
@@ -804,8 +803,7 @@ takeDispatch-len nid vals fin sched st (just (take-st k))
 ... | false = takeVals-len k vals
 takeDispatch-len nid vals fin sched st nothing                  = z≤n
 takeDispatch-len nid vals fin sched st (just (scan-st _))       = z≤n
-takeDispatch-len nid vals fin sched st (just (merge-st _ _))    = z≤n
-takeDispatch-len nid vals fin sched st (just (concat-st _ _ _)) = z≤n
+takeDispatch-len nid vals fin sched st (just (flatten-st _ _ _ _))    = z≤n
 takeDispatch-len nid vals fin sched st (just (switch-st _ _))   = z≤n
 takeDispatch-len nid vals fin sched st (just (exhaust-st _ _))  = z≤n
 

@@ -103,7 +103,7 @@ open import Verify-Budget-Sufficient.Caps-Nest
 open import Verify-Budget-Sufficient.Node-Fresh
   using (mint-install-survives)
 -- take's push costs no depth at all: takeDispatch subscribes nothing
-open import Verify-Budget-Sufficient.Caps-Depth
+open import Verify-Budget-Sufficient.Caps-Depth.Take-Zero
   using (burst-takef-zero)
 open import Verify-Budget-Sufficient.Walk-Level.Statement using
   (inputᶜ; WalkStmt; WalkStmtAt; WalkStmtAt⁻ᴴ; WalkStmtᴴˢ; WalkStmtᴴˢˢ;
@@ -834,8 +834,7 @@ stepTake-wet {s = s} Ψ B F ℓ r̂ η g bid now nid κ vals fin sched st invW v
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = invW , refl , refl , refl , rgs
 ... | just (scan-st _)       = invW , refl , refl , refl , rgs
-... | just (merge-st _ _)    = invW , refl , refl , refl , rgs
-... | just (concat-st _ _ _) = invW , refl , refl , refl , rgs
+... | just (flatten-st _ _ _ _)    = invW , refl , refl , refl , rgs
 ... | just (switch-st _ _)   = invW , refl , refl , refl , rgs
 ... | just (exhaust-st _ _)  = invW , refl , refl , refl , rgs
 ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
@@ -1518,8 +1517,7 @@ stepScan-wet {u = u} Ψ B ℓ g bid now fn nid κ vals fin sched st hfn h vΨ rg
          (fcB-nodes Ψ sched st (proj₁ (INV⁻?-parts Ψ B sched st h)))
 ... | nothing                | _ = h , refl , refl , rgs
 ... | just (take-st _)       | _ = h , refl , refl , rgs
-... | just (merge-st _ _)    | _ = h , refl , refl , rgs
-... | just (concat-st _ _ _) | _ = h , refl , refl , rgs
+... | just (flatten-st _ _ _ _)    | _ = h , refl , refl , rgs
 ... | just (switch-st _ _)   | _ = h , refl , refl , rgs
 ... | just (exhaust-st _ _)  | _ = h , refl , refl , rgs
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
@@ -2026,8 +2024,7 @@ thruWrap-pass mergeᵒ nid true (vs , bs , sd , st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (merge-st _ _)    = refl , refl
-... | just (concat-st _ _ _) = refl , refl
+... | just (flatten-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 thruWrap-pass concatᵒ nid true (vs , bs , sd , st′)
@@ -2035,8 +2032,7 @@ thruWrap-pass concatᵒ nid true (vs , bs , sd , st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (merge-st _ _)    = refl , refl
-... | just (concat-st _ _ _) = refl , refl
+... | just (flatten-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 thruWrap-pass switchᵒ nid true (vs , bs , sd , st′)
@@ -2044,8 +2040,7 @@ thruWrap-pass switchᵒ nid true (vs , bs , sd , st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (merge-st _ _)    = refl , refl
-... | just (concat-st _ _ _) = refl , refl
+... | just (flatten-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 thruWrap-pass exhaustᵒ nid true (vs , bs , sd , st′)
@@ -2053,8 +2048,7 @@ thruWrap-pass exhaustᵒ nid true (vs , bs , sd , st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (merge-st _ _)    = refl , refl
-... | just (concat-st _ _ _) = refl , refl
+... | just (flatten-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 
@@ -2103,8 +2097,7 @@ thruWrap-INV Ψ B switchᵒ nid true (vs , bs , sd , st′) inv
 ... | nothing                = inv
 ... | just (scan-st _)       = inv
 ... | just (take-st _)       = inv
-... | just (merge-st _ _)    = inv
-... | just (concat-st _ _ _) = inv
+... | just (flatten-st _ _ _ _)    = inv
 ... | just (exhaust-st _ _)  = inv
 thruWrap-INV Ψ B exhaustᵒ nid true (vs , bs , sd , st′) inv
   with lookupNode nid (EvalSt.nodes st′)
@@ -2113,7 +2106,6 @@ thruWrap-INV Ψ B exhaustᵒ nid true (vs , bs , sd , st′) inv
 ... | nothing                = inv
 ... | just (scan-st _)       = inv
 ... | just (take-st _)       = inv
-... | just (merge-st _ _)    = inv
-... | just (concat-st _ _ _) = inv
+... | just (flatten-st _ _ _ _)    = inv
 ... | just (switch-st _ _)   = inv
 

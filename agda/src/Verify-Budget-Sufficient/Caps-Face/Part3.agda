@@ -30,7 +30,7 @@ open import Rx.Prim      using (Source; InstEmit; _at_from_as_; InstEvent; init;
   after_,_)
 open import Rx.Exp       using (Ty; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; subΘExp; subΘTm; subΘTms; Exp;
   Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-  add; sub; mul; eqᵖ; ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ;
+  add; sub; mul; eqᵖ; ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn; lookupEnv)
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; outWᵉ; innWᵉ; innWᵗ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Frame; map-f; scan-f; take-f; from-inner; thru-outer; Stream; Path; sizeStep;
@@ -173,14 +173,10 @@ module _ (S M : ℕ) (hS : 2 ≤ S) (hM : 1 ≤ M) where
                (s≤s (m≤n+m (sizeᵉ e₀) (sizeᵗ c₀)))
       up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ c₀ + sizeᵉ e₀)) M
       up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
-    wsᵉ {n = n} sl hI Θloc σ hσ (mergeAllᵉ e₀) =
+    wsᵉ {n = n} sl hI Θloc σ hσ (flattenᵉ lim e₀) =
       wsAll sl (sizeᵉ e₀) (sizeᵉ-pos e₀) (subΘExp Θloc σ e₀)
-            (mergeAllᵉ (subΘExp Θloc σ e₀)) (wsᵉ sl hI Θloc σ hσ e₀)
-            (Red.oW-merge n sl _) (Red.iW-merge n sl _) (λ k → refl) (λ k → refl)
-    wsᵉ {n = n} sl hI Θloc σ hσ (concatAllᵉ e₀) =
-      wsAll sl (sizeᵉ e₀) (sizeᵉ-pos e₀) (subΘExp Θloc σ e₀)
-            (concatAllᵉ (subΘExp Θloc σ e₀)) (wsᵉ sl hI Θloc σ hσ e₀)
-            (Red.oW-concat n sl _) (Red.iW-concat n sl _) (λ k → refl) (λ k → refl)
+            (flattenᵉ lim (subΘExp Θloc σ e₀)) (wsᵉ sl hI Θloc σ hσ e₀)
+            (Red.oW-flatten n sl lim _) (Red.iW-flatten n sl lim _) (λ k → refl) (λ k → refl)
     wsᵉ {n = n} sl hI Θloc σ hσ (switchAllᵉ e₀) =
       wsAll sl (sizeᵉ e₀) (sizeᵉ-pos e₀) (subΘExp Θloc σ e₀)
             (switchAllᵉ (subΘExp Θloc σ e₀)) (wsᵉ sl hI Θloc σ hσ e₀)
@@ -489,8 +485,7 @@ module _ (S M : ℕ) (hS : 2 ≤ S) (hM : 1 ≤ M) where
       up-f = ≤-trans (m≤m⊔n (sizeᵗ f₀) (sizeᵗ z₀)) (m≤m⊔n _ (sizeᵉ e₀))
       up-z = ≤-trans (m≤n⊔m (sizeᵗ f₀) (sizeᵗ z₀)) (m≤m⊔n _ (sizeᵉ e₀))
       up-e = m≤n⊔m (sizeᵗ f₀ ⊔ sizeᵗ z₀) (sizeᵉ e₀)
-    wsdᵉ sl hI Θloc σ hσ (mergeAllᵉ e₀)   = wsPass (sizeᵉ e₀) (wsdᵉ sl hI Θloc σ hσ e₀)
-    wsdᵉ sl hI Θloc σ hσ (concatAllᵉ e₀)  = wsPass (sizeᵉ e₀) (wsdᵉ sl hI Θloc σ hσ e₀)
+    wsdᵉ sl hI Θloc σ hσ (flattenᵉ _ e₀)   = wsPass (sizeᵉ e₀) (wsdᵉ sl hI Θloc σ hσ e₀)
     wsdᵉ sl hI Θloc σ hσ (switchAllᵉ e₀)  = wsPass (sizeᵉ e₀) (wsdᵉ sl hI Θloc σ hσ e₀)
     wsdᵉ sl hI Θloc σ hσ (exhaustAllᵉ e₀) = wsPass (sizeᵉ e₀) (wsdᵉ sl hI Θloc σ hσ e₀)
     wsdᵉ sl hI Θloc σ hσ (μᵉ e₀)          = wsPass (sizeᵉ e₀) (wsdᵉ sl hI Θloc σ hσ e₀)

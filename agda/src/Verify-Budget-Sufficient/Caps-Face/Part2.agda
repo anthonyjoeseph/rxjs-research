@@ -30,7 +30,7 @@ open import Rx.Prim      using (_at_from_as_; after_,_)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Ctx; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; varIx; renExp;
   renTm; renTms; Ren∈; ext∈; ++Ren; wkTm; reify; Exp; Tm; varᵗ; unit̂; bool̂; nat̂; pairᵗ;
   fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-  mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; lookupEnv)
+  flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; lookupEnv)
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; dWᵛ; outWᵛ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ;
   pmIᵗˢ; _∈ᵇ_; outWⱽ; innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmOⱽ; pmOᵗⱽ; pmIⱽ; pmIᵗⱽ; pmIᵗˢⱽ; dWⱽ; dWᵗⱽ;
   dWᵗˢⱽ)
@@ -155,11 +155,8 @@ module _ (S M : ℕ) (hS : 2 ≤ S) (hM : 1 ≤ M) where
                (s≤s (m≤n+m (sizeᵉ e) (sizeᵗ c)))
       up0 : ∀ {x} → x ≤ Tb → x ≤ iterFold S (suc (sizeᵗ c + sizeᵉ e)) M
       up0 h = ≤-trans (≤-trans h (foldStep-infl S Tb hS)) step
-    widᵉ {n = n} sl hI (mergeAllᵉ e) =
-      allClause sl hI e (mergeAllᵉ e) (Red.oW-merge n sl e) (Red.iW-merge n sl e)
-                (λ k → refl) (λ k → refl)
-    widᵉ {n = n} sl hI (concatAllᵉ e) =
-      allClause sl hI e (concatAllᵉ e) (Red.oW-concat n sl e) (Red.iW-concat n sl e)
+    widᵉ {n = n} sl hI (flattenᵉ lim e) =
+      allClause sl hI e (flattenᵉ lim e) (Red.oW-flatten n sl lim e) (Red.iW-flatten n sl lim e)
                 (λ k → refl) (λ k → refl)
     widᵉ {n = n} sl hI (switchAllᵉ e) =
       allClause sl hI e (switchAllᵉ e) (Red.oW-switch n sl e) (Red.iW-switch n sl e)
@@ -430,8 +427,7 @@ module _ (S M : ℕ) (hS : 2 ≤ S) (hM : 1 ≤ M) where
       up-f = ≤-trans (m≤m⊔n (sizeᵗ f) (sizeᵗ z)) (m≤m⊔n _ (sizeᵉ e))
       up-z = ≤-trans (m≤n⊔m (sizeᵗ f) (sizeᵗ z)) (m≤m⊔n _ (sizeᵉ e))
       up-e = m≤n⊔m (sizeᵗ f ⊔ sizeᵗ z) (sizeᵉ e)
-    wdᵉ sl hI (mergeAllᵉ e)   = pass sl hI e
-    wdᵉ sl hI (concatAllᵉ e)  = pass sl hI e
+    wdᵉ sl hI (flattenᵉ _ e)   = pass sl hI e
     wdᵉ sl hI (switchAllᵉ e)  = pass sl hI e
     wdᵉ sl hI (exhaustAllᵉ e) = pass sl hI e
     wdᵉ sl hI (μᵉ e)          = pass sl hI e
@@ -623,25 +619,13 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
                       (⊔-mono-≤ (proj₂ (proj₂ IHf) 0) ≤-refl))
                     (powʳ1 (pmIᵗⱽ q′ vs′ sl 0 f ⊔ 1)
                            (m≤n⊔m (pmIᵗⱽ q′ vs′ sl 0 f) 1) (proj₁ IHe))
-    monoᵉ q {q′} le hv (mergeAllᵉ e) =
-      ≤-trans (≤-reflexive (Red.oW-merge q sl e))
+    monoᵉ q {q′} le hv (flattenᵉ lim e) =
+      ≤-trans (≤-reflexive (Red.oW-flatten q sl lim e))
               (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
-                       (≤-reflexive (sym (Red.oW-merge q′ sl e))))
-      , ≤-trans (≤-reflexive (Red.iW-merge q sl e))
+                       (≤-reflexive (sym (Red.oW-flatten q′ sl lim e))))
+      , ≤-trans (≤-reflexive (Red.iW-flatten q sl lim e))
                 (≤-trans (proj₁ (proj₂ IHe))
-                         (≤-reflexive (sym (Red.iW-merge q′ sl e))))
-      , (λ k → +-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
-                        (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
-                                  (proj₁ (proj₂ IHe))))
-      , (λ k → proj₂ (proj₂ (proj₂ IHe)) k)
-      where IHe = monoᵉ q le hv e
-    monoᵉ q {q′} le hv (concatAllᵉ e) =
-      ≤-trans (≤-reflexive (Red.oW-concat q sl e))
-              (≤-trans (*-mono-≤ (proj₁ IHe) (proj₁ (proj₂ IHe)))
-                       (≤-reflexive (sym (Red.oW-concat q′ sl e))))
-      , ≤-trans (≤-reflexive (Red.iW-concat q sl e))
-                (≤-trans (proj₁ (proj₂ IHe))
-                         (≤-reflexive (sym (Red.iW-concat q′ sl e))))
+                         (≤-reflexive (sym (Red.iW-flatten q′ sl lim e))))
       , (λ k → +-mono-≤ (*-mono-≤ (proj₁ IHe) (proj₂ (proj₂ (proj₂ IHe)) k))
                         (*-mono-≤ (proj₁ (proj₂ (proj₂ IHe)) k)
                                   (proj₁ (proj₂ IHe))))
@@ -757,8 +741,7 @@ module _ {n} {Γ : Ctx n} (sl : Slots Γ) where
     monoᴰᵉ q le hv (takeᵉ c e)     = ⊔-mono-≤ (monoᴰᵗ q le hv c) (monoᴰᵉ q le hv e)
     monoᴰᵉ q le hv (scanᵉ f z e)   =
       ⊔-mono-≤ (⊔-mono-≤ (monoᴰᵗ q le hv f) (monoᴰᵗ q le hv z)) (monoᴰᵉ q le hv e)
-    monoᴰᵉ q le hv (mergeAllᵉ e)   = monoᴰᵉ q le hv e
-    monoᴰᵉ q le hv (concatAllᵉ e)  = monoᴰᵉ q le hv e
+    monoᴰᵉ q le hv (flattenᵉ _ e)   = monoᴰᵉ q le hv e
     monoᴰᵉ q le hv (switchAllᵉ e)  = monoᴰᵉ q le hv e
     monoᴰᵉ q le hv (exhaustAllᵉ e) = monoᴰᵉ q le hv e
     monoᴰᵉ q le hv (μᵉ e)          = monoᴰᵉ q le hv e
@@ -978,11 +961,8 @@ mutual
   ren-oWᵉ q sl ρg ρd ρt hp (scanᵉ f z e) =
     bridge (Red.oW-scan q sl _ _ _) (Red.oW-scan q sl f z e)
            (ren-oWᵉ q sl ρg ρd ρt hp e)
-  ren-oWᵉ q sl ρg ρd ρt hp (mergeAllᵉ e) =
-    bridge (Red.oW-merge q sl _) (Red.oW-merge q sl e)
-           (cong₂ _*_ (ren-oWᵉ q sl ρg ρd ρt hp e) (ren-iWᵉ q sl ρg ρd ρt hp e))
-  ren-oWᵉ q sl ρg ρd ρt hp (concatAllᵉ e) =
-    bridge (Red.oW-concat q sl _) (Red.oW-concat q sl e)
+  ren-oWᵉ q sl ρg ρd ρt hp (flattenᵉ lim e) =
+    bridge (Red.oW-flatten q sl lim _) (Red.oW-flatten q sl lim e)
            (cong₂ _*_ (ren-oWᵉ q sl ρg ρd ρt hp e) (ren-iWᵉ q sl ρg ρd ρt hp e))
   ren-oWᵉ q sl ρg ρd ρt hp (switchAllᵉ e) =
     bridge (Red.oW-switch q sl _) (Red.oW-switch q sl e)
@@ -1024,10 +1004,8 @@ mutual
                                                  (ext∈-IxPres hp) f)
                                               (ren-iWᵗ q sl ρg ρd ρt hp z))
                                    (ren-iWᵉ q sl ρg ρd ρt hp e))))
-  ren-iWᵉ q sl ρg ρd ρt hp (mergeAllᵉ e) =
-    bridge (Red.iW-merge q sl _) (Red.iW-merge q sl e) (ren-iWᵉ q sl ρg ρd ρt hp e)
-  ren-iWᵉ q sl ρg ρd ρt hp (concatAllᵉ e) =
-    bridge (Red.iW-concat q sl _) (Red.iW-concat q sl e) (ren-iWᵉ q sl ρg ρd ρt hp e)
+  ren-iWᵉ q sl ρg ρd ρt hp (flattenᵉ lim e) =
+    bridge (Red.iW-flatten q sl lim _) (Red.iW-flatten q sl lim e) (ren-iWᵉ q sl ρg ρd ρt hp e)
   ren-iWᵉ q sl ρg ρd ρt hp (switchAllᵉ e) =
     bridge (Red.iW-switch q sl _) (Red.iW-switch q sl e) (ren-iWᵉ q sl ρg ρd ρt hp e)
   ren-iWᵉ q sl ρg ρd ρt hp (exhaustAllᵉ e) =
@@ -1047,8 +1025,7 @@ mutual
   ren-pOᵉ q sl ρg ρd ρt hp k (mapᵉ f e)   = ren-pOᵉ q sl ρg ρd ρt hp k e
   ren-pOᵉ q sl ρg ρd ρt hp k (takeᵉ c e)  = ren-pOᵉ q sl ρg ρd ρt hp k e
   ren-pOᵉ q sl ρg ρd ρt hp k (scanᵉ f z e) = ren-pOᵉ q sl ρg ρd ρt hp k e
-  ren-pOᵉ q sl ρg ρd ρt hp k (mergeAllᵉ e) = allPO q sl ρg ρd ρt hp k e
-  ren-pOᵉ q sl ρg ρd ρt hp k (concatAllᵉ e) = allPO q sl ρg ρd ρt hp k e
+  ren-pOᵉ q sl ρg ρd ρt hp k (flattenᵉ _ e) = allPO q sl ρg ρd ρt hp k e
   ren-pOᵉ q sl ρg ρd ρt hp k (switchAllᵉ e) = allPO q sl ρg ρd ρt hp k e
   ren-pOᵉ q sl ρg ρd ρt hp k (exhaustAllᵉ e) = allPO q sl ρg ρd ρt hp k e
   ren-pOᵉ q sl ρg ρd ρt hp k (μᵉ e) = ren-pOᵉ q sl (ext∈ ρg) ρd ρt hp k e
@@ -1086,8 +1063,7 @@ mutual
                                        (ext∈-IxPres hp) (suc k) f)
                                     (ren-pIᵗ q sl ρg ρd ρt hp k z))
                          (ren-pIᵉ q sl ρg ρd ρt hp k e))
-  ren-pIᵉ q sl ρg ρd ρt hp k (mergeAllᵉ e)   = ren-pIᵉ q sl ρg ρd ρt hp k e
-  ren-pIᵉ q sl ρg ρd ρt hp k (concatAllᵉ e)  = ren-pIᵉ q sl ρg ρd ρt hp k e
+  ren-pIᵉ q sl ρg ρd ρt hp k (flattenᵉ _ e)   = ren-pIᵉ q sl ρg ρd ρt hp k e
   ren-pIᵉ q sl ρg ρd ρt hp k (switchAllᵉ e)  = ren-pIᵉ q sl ρg ρd ρt hp k e
   ren-pIᵉ q sl ρg ρd ρt hp k (exhaustAllᵉ e) = ren-pIᵉ q sl ρg ρd ρt hp k e
   ren-pIᵉ q sl ρg ρd ρt hp k (μᵉ e) = ren-pIᵉ q sl (ext∈ ρg) ρd ρt hp k e
@@ -1184,10 +1160,7 @@ mutual
   pO-ren0ᵉ q k sl ρg ρd ρt h (takeᵉ c e)   = pO-ren0ᵉ q k sl ρg ρd ρt h e
   pO-ren0ᵉ q k sl ρg ρd ρt h (scanᵉ f z e) = pO-ren0ᵉ q k sl ρg ρd ρt h e
   pO-ren0ᵉ q k sl ρg ρd ρt h (μᵉ e) = pO-ren0ᵉ q k sl (ext∈ ρg) ρd ρt h e
-  pO-ren0ᵉ q k sl ρg ρd ρt h (mergeAllᵉ e)
-    rewrite pI-ren0ᵉ q k sl ρg ρd ρt h e | pO-ren0ᵉ q k sl ρg ρd ρt h e =
-    zeroSum (outWᵉ q sl (renExp ρg ρd ρt e)) (innWᵉ q sl (renExp ρg ρd ρt e))
-  pO-ren0ᵉ q k sl ρg ρd ρt h (concatAllᵉ e)
+  pO-ren0ᵉ q k sl ρg ρd ρt h (flattenᵉ _ e)
     rewrite pI-ren0ᵉ q k sl ρg ρd ρt h e | pO-ren0ᵉ q k sl ρg ρd ρt h e =
     zeroSum (outWᵉ q sl (renExp ρg ρd ρt e)) (innWᵉ q sl (renExp ρg ρd ρt e))
   pO-ren0ᵉ q k sl ρg ρd ρt h (switchAllᵉ e)
@@ -1207,8 +1180,7 @@ mutual
   pI-ren0ᵉ q k sl ρg ρd ρt h (deferᵉ e) = refl
   pI-ren0ᵉ q k sl ρg ρd ρt h (ofᵉ ts)   = pI-ren0ᵗˢ q k sl ρg ρd ρt h ts
   pI-ren0ᵉ q k sl ρg ρd ρt h (takeᵉ c e)   = pI-ren0ᵉ q k sl ρg ρd ρt h e
-  pI-ren0ᵉ q k sl ρg ρd ρt h (mergeAllᵉ e)   = pI-ren0ᵉ q k sl ρg ρd ρt h e
-  pI-ren0ᵉ q k sl ρg ρd ρt h (concatAllᵉ e)  = pI-ren0ᵉ q k sl ρg ρd ρt h e
+  pI-ren0ᵉ q k sl ρg ρd ρt h (flattenᵉ _ e)   = pI-ren0ᵉ q k sl ρg ρd ρt h e
   pI-ren0ᵉ q k sl ρg ρd ρt h (switchAllᵉ e)  = pI-ren0ᵉ q k sl ρg ρd ρt h e
   pI-ren0ᵉ q k sl ρg ρd ρt h (exhaustAllᵉ e) = pI-ren0ᵉ q k sl ρg ρd ρt h e
   pI-ren0ᵉ q k sl ρg ρd ρt h (μᵉ e) = pI-ren0ᵉ q k sl (ext∈ ρg) ρd ρt h e
@@ -1299,8 +1271,7 @@ mutual
     cong₂ _⊔_ (cong₂ _⊔_ (ren-dWᵗ q sl ρg ρd (ext∈ ρt) (ext∈-IxPres hp) f)
                          (ren-dWᵗ q sl ρg ρd ρt hp z))
               (ren-dWᵉ q sl ρg ρd ρt hp e)
-  ren-dWᵉ q sl ρg ρd ρt hp (mergeAllᵉ e)   = ren-dWᵉ q sl ρg ρd ρt hp e
-  ren-dWᵉ q sl ρg ρd ρt hp (concatAllᵉ e)  = ren-dWᵉ q sl ρg ρd ρt hp e
+  ren-dWᵉ q sl ρg ρd ρt hp (flattenᵉ _ e)   = ren-dWᵉ q sl ρg ρd ρt hp e
   ren-dWᵉ q sl ρg ρd ρt hp (switchAllᵉ e)  = ren-dWᵉ q sl ρg ρd ρt hp e
   ren-dWᵉ q sl ρg ρd ρt hp (exhaustAllᵉ e) = ren-dWᵉ q sl ρg ρd ρt hp e
   ren-dWᵉ q sl ρg ρd ρt hp (μᵉ e) = ren-dWᵉ q sl (ext∈ ρg) ρd ρt hp e

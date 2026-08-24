@@ -99,7 +99,7 @@ postulate
   -- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain
   -- never lengthens the queue.  Anything the budget tree already proves
   -- by walking concat's queue is stated over its LENGTH, and at limit 1
-  -- this reduces to the suffix fact `concatDrain` had structurally.
+  -- this reduces to the suffix fact the capacity-one drain had structurally.
   -- Above 1 it does not — the loop shifts several elements in one
   -- instant — so the fact has to be claimed rather than read off the
   -- recursion

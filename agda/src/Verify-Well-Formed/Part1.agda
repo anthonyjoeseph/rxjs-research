@@ -52,7 +52,7 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Prim      using (Source; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp       using (Ctx; Closed; Ty; _≟ᵗ_)
 open import Rx.Evaluator using (EvalSt; Arrival; RegId; Chain; Path; root; share-sink; _↠_; Frame; from-inner; thru-outer;
-  NodeId; NodeState; scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st; LiveSource;
+  NodeId; NodeState; scan-st; take-st; flatten-st; switch-st; exhaust-st; LiveSource;
   arrTy; arrSource; dryEvent; hasDry; dropSource)
 open import Rx.Protocol  using (ProtocolSt; Owed; stepProtocol; runProtocol; paidUp; checkFinal; Accepted; accepted)
 open import Decide using (true≢false)
@@ -202,11 +202,11 @@ allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
 -- NODE-CACHE VALIDITY (the first GLOBAL coherence field).
 --
 -- UNIFYING PRINCIPLE: the registry is GROUND TRUTH; node counters
--- (merge-st's activeInners, concat's innerActive, switch's cur, exhaust's
+-- (flatten-st's active count, switch's cur, exhaust's
 -- act) are WRITER-ASSERTED CACHES of a fact the registry already holds.
 -- This field asserts cache validity WHERE THE CACHE IS STILL READABLE —
 -- the same writer-asserts / reader-checks discipline as the protocol
--- itself, one level down.  It is NOT seed-provable: merge-st's k is
+-- itself, one level down.  It is NOT seed-provable: flatten-st's k is
 -- cross-cascade state (set by bumps/decrements in earlier instants,
 -- summarising registrations that live across cascades), which a fold's
 -- seed and emits carry no information about.  So Inv carries it between
@@ -216,7 +216,7 @@ allShareSunk ((_ , _ , (u , p)) ∷ r) = sinksToShare p ∧ allShareSunk r
 -- (one instance can hold several registrations — a multi-source inner —
 -- so we count DISTINCT inst indices in `from-inner _ nid inst` frames,
 -- not registrations).  GUARDED by reachability: `cutThrough` removes the
--- registrations under nid without touching merge-st k (Evaluator take-f),
+-- registrations under nid without touching flatten-st's k (Evaluator take-f),
 -- leaving the counter overcounting but HARMLESS — the merge's own chains
 -- died in the same cut, so no future fold reads its gate.  So the honest
 -- assertion is "IF some live registration still passes `thru-outer nid`,
@@ -272,16 +272,24 @@ mergeReachable nid []                    = false
 mergeReachable nid ((_ , _ , (_ , p)) ∷ r) = pathThruOuter nid p ∨ mergeReachable nid r
 
 -- one clause per NodeState constructor; only merge populated today.
--- concat/switch/exhaust are the SAME cache-validity story (innerActive /
--- cur / act) and each will be forced when its wrap clause is reached —
--- given a `true` clause now so those land as clause edits, not new fields.
+-- switch/exhaust are the SAME cache-validity story (cur / act) and each
+-- will be forced when its wrap clause is reached — given a `true` clause
+-- now so those land as clause edits, not new fields.
+--
+-- THE FLATTEN CLAUSE IS UNIFORM IN THE LIMIT, and that is a strengthening
+-- over what the two old faces asserted between them.  The merge face
+-- carried the count and the concat face was given a placeholder `true`,
+-- because concat's `innerActive` was a BOOL and a flag has no count to
+-- validate.  Unification replaced the flag with the same `active` count
+-- merge already had — at limit one it ranges over zero and one — so the
+-- cache-validity story the placeholder was deferring is now literally the
+-- merge story, at every limit, and one clause states it.
 nodeCacheOK : ∀ {n} {Γ : Ctx n} {t}
             → NodeId → NodeState Γ → List (RegId × Source × Chain Γ t) → Bool
-nodeCacheOK nid (merge-st k _)    reg = not (mergeReachable nid reg)
-                                        ∨ (k ≡ᵇ countLiveInners nid reg)
+nodeCacheOK nid (flatten-st _ k _ _) reg = not (mergeReachable nid reg)
+                                           ∨ (k ≡ᵇ countLiveInners nid reg)
 nodeCacheOK nid (scan-st _)       reg = true
 nodeCacheOK nid (take-st _)       reg = true
-nodeCacheOK nid (concat-st _ _ _) reg = true
 nodeCacheOK nid (switch-st _ _)   reg = true
 nodeCacheOK nid (exhaust-st _ _)  reg = true
 
@@ -293,7 +301,7 @@ cachesValid ((nid , s) ∷ ns) reg = nodeCacheOK nid s reg ∧ cachesValid ns re
 ------------------------------------------------------------------
 -- the Mid (mid-cascade) shadow of cachesValid — the ps-INDEXED
 -- pending-adjustment (see the Mid record NOTE).  During arrSource a's
--- cascade an inner's `finish` pred-decrements merge-st k while its
+-- cascade an inner's `finish` pred-decrements flatten-st's k while its
 -- registrations linger until cascadeFinish, so k leads the raw registry.
 -- The base is the registry cascadeFinish WILL keep (drop arrSource iff
 -- isLast), and the adjustment adds back the arrSource inner-instances
@@ -337,7 +345,7 @@ mergeAdjust nid a ps st =
 nodeCacheMid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   → NodeId → (a : Arrival Γ) → List (RegId × Path Γ (arrTy a) t)
   → NodeState Γ → EvalSt e → Bool
-nodeCacheMid nid a ps (merge-st k _) st =
+nodeCacheMid nid a ps (flatten-st _ k _ _) st =
   not (mergeReachable nid
         (if Arrival.isLast a then dropSource (arrSource a) (EvalSt.registry st)
          else EvalSt.registry st))
@@ -347,7 +355,6 @@ nodeCacheMid nid a ps (merge-st k _) st =
                   else EvalSt.registry st)))
 nodeCacheMid nid a ps (scan-st _)       st = true
 nodeCacheMid nid a ps (take-st _)       st = true
-nodeCacheMid nid a ps (concat-st _ _ _) st = true
 nodeCacheMid nid a ps (switch-st _ _)   st = true
 nodeCacheMid nid a ps (exhaust-st _ _)  st = true
 
@@ -386,7 +393,7 @@ cachesValidMid-skip a rid p ps ((nid , s) ∷ ns) st h =
   cong₂ _∧_ (nc s) (cachesValidMid-skip a rid p ps ns st h)
   where
   nc : (s : NodeState _) → nodeCacheMid nid a ((rid , p) ∷ ps) s st ≡ nodeCacheMid nid a ps s st
-  nc (merge-st k od) =
+  nc (flatten-st _ k _ _) =
     cong (λ z → not (mergeReachable nid
                        (if Arrival.isLast a then dropSource (arrSource a) (EvalSt.registry st)
                         else EvalSt.registry st))
@@ -397,7 +404,6 @@ cachesValidMid-skip a rid p ps ((nid , s) ∷ ns) st h =
          (mergeAdjust-skip nid a rid p ps st h)
   nc (scan-st _)       = refl
   nc (take-st _)       = refl
-  nc (concat-st _ _ _) = refl
   nc (switch-st _ _)   = refl
   nc (exhaust-st _ _)  = refl
 
@@ -418,12 +424,11 @@ cachesValidMid-nil a ((nid , s) ∷ ns) st = cong₂ _∧_ (nc s) (cachesValidMi
          ≡ nodeCacheOK nid s (if Arrival.isLast a
                               then dropSource (arrSource a) (EvalSt.registry st)
                               else EvalSt.registry st)
-  nc (merge-st k od) with Arrival.isLast a
+  nc (flatten-st _ k _ _) with Arrival.isLast a
   ... | true  = refl
   ... | false = refl
   nc (scan-st _)       = refl
   nc (take-st _)       = refl
-  nc (concat-st _ _ _) = refl
   nc (switch-st _ _)   = refl
   nc (exhaust-st _ _)  = refl
 

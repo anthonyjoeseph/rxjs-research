@@ -35,7 +35,7 @@ open import Relation.Binary.PropositionalEquality
 -- clock.
 open import Rx.Prim      using (Gas; g0; gs; Tick; Id; Source; InstEvent; value; complete; EmitKind; delivery; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Val; mapᵉ; natᵗ; Tm; scanᵉ; takeᵉ; evalTm; input; ofᵉ; emptyᵉ; varᵉ; deferᵉ;
-  mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
+  flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; _↠_; map-f; scan-f; take-f; takeVals; setNode;
   memberSource; NodeId; lookupNode; scan-st; take-st; sched-init; st-init; foldPath;
   subscribeE; splitEvents; pushBurst; installNode; mintNode; sameSource; hasDry; budgetAt)
@@ -56,11 +56,10 @@ open import Verify-Well-Formed.Part3 using (map-nodry-push; map-valsLast-push;
                                             scan-binv-adapt; scan-node;
                                             scan-nodry-push;
                                             scan-valsLast-push;
-                                            subscribeE-concatAll-wf;
                                             subscribeE-defer-wf;
                                             subscribeE-exhaustAll-wf;
                                             subscribeE-input-wf;
-                                            subscribeE-mergeAll-wf;
+                                            subscribeE-flatten-wf;
                                             subscribeE-switchAll-wf;
                                             take-binv-adapt; take-node;
                                             take-nodry-push)
@@ -384,10 +383,8 @@ subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv deq nodry =
   in S″ , run , binv″ , scan-valsLast-push fuel f seed b κ id now sched st vl₀
 
 -- ── *All ─────────────────────────────────────────────────────────────────────
-subscribeE-wf fuel (mergeAllᵉ b)   κ id now sched st S binv deq nodry =
-  subscribeE-mergeAll-wf  fuel b κ id now sched st S binv deq nodry
-subscribeE-wf fuel (concatAllᵉ b)  κ id now sched st S binv deq nodry =
-  subscribeE-concatAll-wf fuel b κ id now sched st S binv deq nodry
+subscribeE-wf fuel (flattenᵉ lim b) κ id now sched st S binv deq nodry =
+  subscribeE-flatten-wf lim fuel b κ id now sched st S binv deq nodry
 subscribeE-wf fuel (switchAllᵉ b)  κ id now sched st S binv deq nodry =
   subscribeE-switchAll-wf fuel b κ id now sched st S binv deq nodry
 subscribeE-wf fuel (exhaustAllᵉ b) κ id now sched st S binv deq nodry =
@@ -790,7 +787,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       ESTABLISHMENT: from-inner comes nearly free — fin passes it only when
 --       the evaluator's own `any aliveThrough ≡ false` scrutinee holds, an
 --       operational certificate the proof converts into the invariant.  thru-
---       outer wrap gates on NODE counts (merge-st k / concat queue / switch
+--       outer wrap gates on NODE counts (flatten-st count and queue / switch
 --       Maybe), so they force a node↔registry coherence fact — added MINIMALLY
 --       as threaded FoldInv fields per wrap clause as forced (same discipline as
 
@@ -799,12 +796,12 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
 --       MERGE COHERENCE — candidate FALSIFIED by the guardrail-3
 --       hand-check.  The identified candidate field
---         merge k@nid : (merge-st k _ at nid) ⇒ k ≡ countRegsUnder nid registry
+--         merge k@nid : (flatten-st _ k _ _ at nid) ⇒ k ≡ countRegsUnder nid registry
 --       (k ≡ #live registrations whose path threads nid, via pathHasNode) is
 
 --       FALSE — THREE independent reasons, each a concrete counterexample:
 
---        (1) The OUTER stream itself flows through `thru-outer mergeᵒ nid`, so
+--        (1) The OUTER stream itself flows through `thru-outer flattenᵒ nid`, so
 --            the outer registration threads nid too (frameNodes (thru-outer _ k)
 --            = k ∷ []), yet `k` counts only ACTIVE INNERS.  Whenever the outer is
 --            live, countRegsUnder nid ≥ 1 while k may be 0.  Airtight, needs no
@@ -813,11 +810,11 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --        (2) An inner obs is an ARBITRARY closed Exp (Rx.Exp: Val Γ (obs u) =
 --            Exp Γ [] [] [] u), so a multi-source inner — e.g. `mergeAll(of(
 --            merge(a,b)))` — makes subscribeE register TWO chains threading nid
---            (subscribeInner path = from-inner mergeᵒ nid inst ↠ κ, and
+--            (subscribeInner path = from-inner flattenᵒ nid inst ↠ κ, and
 --            pathHasNode nid fires on the from-inner allNid), but `bump`
 --            (Evaluator 609-611) does a single `suc k` for the whole inner.
 
---        (3) `finish mergeᵒ` (Evaluator 568-570) does `merge-st (pred k)` and
+--        (3) `finish flattenᵒ` drains at `pred act` and
 --            does NOT touch the registry, so a completed inner's registrations
 --            LINGER (dropped only at cut/cascadeFinish).  k decrements; the raw
 --            structural count does not.
@@ -852,7 +849,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       Hence at ANY flip the live registry splits into: (a) envSrc's own regs
 --       (removed by dropSource envSrc), (b) share-sunk regs, (c) other-source LIVE
 --       root-sinkers — but a live root-sinking sibling ABSORBS fin (from-inner
---       react true / merge-st k>0 / concat queue), so it could not have let fin
+--       react true / flatten-st count>0 or queue non-empty), so it could not have let fin
 --       reach root in the first place.  (c)-root-sinking is thus incompatible with
 --       the flip; only (a)+(b) coexist with it ⇒ allShareSunk(dropSource envSrc).
 
@@ -862,9 +859,9 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --       GATE CERTIFICATES along the fold path.  Two ingredients:
 
 --        (i) TOPOLOGY (verified): there is no binary static merge —
---            mergeAllᵉ is the ONLY merge (Evtr 896), so `merge(a,b)` desugars to
---            mergeAll(of(a,b)) with a,b inners of ONE node nid (from-inner mergeᵒ
---            nid _).  concat/switch/exhaust likewise.  Hence ANY two root-sinking
+--            flattenᵉ is the ONLY merge, so `merge(a,b)` desugars to
+--            flattenᵉ nothing (of(a,b)) with a,b inners of ONE node nid (from-inner
+--            flattenᵒ nid _).  switch/exhaust likewise.  Hence ANY two root-sinking
 --            sources that must jointly-complete-before-root are inners under a
 --            COMMON *All gate; there are no independent root-sinkers whose fins
 --            race to root ungated.  (foldPath root emits `if fin complete` with no
@@ -883,7 +880,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --                Sibling inners carry DISTINCT insts, so aliveThrough does NOT see
 --                them; only k does.  So the count is NOT fully avoidable — but the
 --                needed fact is one-directional and liveness-aware:
---                  merge-cert : (merge-st k _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough
+--                  merge-cert : (flatten-st _ k _ _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough
 --                               inner INSTANCE under nid survives
 --                (the CORRECTED coherence: key on from-inner allNid=nid, dedup by
 --                inst, exclude spent — NOT the false raw countRegsUnder equality).
@@ -906,7 +903,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
 --       ALIVE from-inner instances while countLiveInners counts PRESENT ones, so
 --       a dead-but-present instance defeats it.  Full finding on
---       Part4.root-mergeCache; RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda.
+--       Part4.root-flattenCache; RECOVERY: git show 5cf9397:agda/src/Verify-Well-Formed/Part4.agda.
 --       Whatever is threaded here must close that alive-vs-present gap too.
 
 --     - Option 2 (derive from Inv.done-plumbed) is STRUCTURALLY DEAD: its premise

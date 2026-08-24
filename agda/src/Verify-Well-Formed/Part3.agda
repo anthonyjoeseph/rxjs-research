@@ -27,7 +27,7 @@ open import Data.Vec     using (lookup)
 open import Data.Nat     using (ℕ; suc; _≤_; _≡ᵇ_; _+_)
 open import Data.Nat.Properties using (1+n≢0; +-comm; +-identityʳ)
 open import Data.List    using (List; []; _∷_; _++_; map)
-open import Data.Maybe   using (just; nothing)
+open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Empty   using (⊥)
@@ -42,7 +42,7 @@ open import Verify-Budget-Sufficient.Node-Fresh using (mint-install-survives)
 open import Rx.Prim      using (Gas; g0; Tick; Id; Source; init; value; close; complete; subscribe; exhausted; Timed; hot;
   cold; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; Val; Fn; obs; mapᵉ; natᵗ; _×ᵗ_; Tm; scanᵉ; takeᵉ; evalTm; input; emptyᵉ;
-  deferᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ)
+  deferᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; map-f; scan-f; take-f; cutThrough;
   memberSource; NodeId; lookupNode; scan-st; take-st; st-init; LiveSource; subscribeE;
   mintSource; register; installNode; mintNode; sameSource; hasDry; subscribeSharedSlot;
@@ -163,7 +163,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --     NO such helper is stated, and cannot usefully be: see the NOTE at the *All
 --     gap postulates.  installNode adds a fresh scan/take node — caches-neutral.
 --   · WRAP (subscribeAll = mintNode + subscribeE b (thru-outer op nid ↠ κ) + pushBurst
---     (thru-outer op nid)): mergeAllᵉ/concatAllᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
+--     (thru-outer op nid)): flattenᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
 --     as FRAME with f = thru-outer op nid and a minted *All node installed at its
 --     initial state — so it reuses the FRAME obligation above at f = thru-outer
 --     op nid.  This is where the
@@ -175,7 +175,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- subscribeE-take-wf.  The gap postulates further down cover the blocked
 -- clauses — the map-/scan-/take- shape gaps, the four *All wrap clauses,
 -- subscribeE-input-wf/defer-wf/takeᵉ-wf — while dispatchShare-wf and the
--- stepFrame-wf-inner-concat/outer residues are blocked on merge-cert, the
+-- stepFrame-wf-inner-flatten/outer residues are blocked on merge-cert, the
 -- SKETCH in Part8's establishment block rather than a Part4 postulate.
 --
 -- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other
@@ -222,7 +222,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- BurstInv.caches asserted cachesValid of every intermediate burst state.  It is
 -- FALSE there, and — unlike done-plumbed, which merely failed on one path — it
 -- fails in BOTH DIRECTIONS, so no weakening rescues it:
---   · thruConsume mergeᵒ runs subscribeInner FIRST and applies mergeBump only
+--   · thruConsume flattenᵒ runs subscribeInner FIRST and applies flattenBump only
 --     after, so for the whole of an inner's subscribe burst the inner's
 --     registrations exist while activeInners has not been incremented — the
 --     counter TRAILS the registry.
@@ -236,7 +236,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --   burst-final (root frame-0 exit → Inv.caches).
 --   SO IT IS NOT A FIELD EITHER.  It is re-established once at burst-final
 --   from the `root-caches` postulate — the settled state, by which point every
---   mergeBump has landed.  root-caches is the same merge-coherence content
+--   flattenBump has landed.  root-caches is the same cache-coherence content
 --   root-done-plumbed waits on, so the two discharge together, once the *All
 --   wrap clauses acquire real proofs.
 -- ════════════════════════════════════════════════════════════════════════
@@ -543,7 +543,7 @@ postulate
   -- (Rx.Evaluator):
   --   burst  = ((init src ∷ []) at id from src as subscribe) ∷ []
   --   sched' = sched₄ (after mintNode, mintSource, mintOrdinal, live ∷= entry)
-  --   st'    = register src (thru-outer mergeᵒ nid ↠ κ) (installNode nid (merge-st 0 false) st)
+  --   st'    = register src (thru-outer flattenᵒ nid ↠ κ) (installNode nid (flatten-st lim 0 [] false) st)
   --
   -- Three of the four conclusion conjuncts are immediate:
   --   · hasDry premise is VACUOUS: `init src` is not `close _ dried`, so
@@ -592,26 +592,20 @@ postulate
   -- necessarily an orphan, and no wiring fixes it.  It gets a consumer only
   -- when one of those clauses acquires a real proof; state it then.
 
-  subscribeE-mergeAll-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  -- ONE STATEMENT FOR EVERY LIMIT.  The merge and concat faces of this
+  -- were textually identical but for the constructor, so the collapse is
+  -- a rename and not a weakening: the limit is a parameter the statement
+  -- never reads, which is exactly why one postulate covers the bounded
+  -- case the two old faces could not express between them.
+  subscribeE-flatten-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (mergeAllᵉ b) κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel (flattenᵉ lim b) κ id now sched st)) ≡ false →
     Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (mergeAllᵉ b) κ id now sched st
-      in (runProtocol S (proj₁ r) ≡ just S′)
-         × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
-         × (valsLast? (proj₁ r) ≡ true)
-
-  subscribeE-concatAll-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
-    BurstInv id sched st S →
-    ProtocolSt.done S ≡ false →
-    hasDry (proj₁ (subscribeE fuel (concatAllᵉ b) κ id now sched st)) ≡ false →
-    Σ ProtocolSt λ S′ →
-      let r = subscribeE fuel (concatAllᵉ b) κ id now sched st
+      let r = subscribeE fuel (flattenᵉ lim b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)

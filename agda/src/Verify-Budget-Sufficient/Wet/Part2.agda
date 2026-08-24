@@ -1319,8 +1319,7 @@ thruConsume-wet Ψ W g switchᵒ nid κ id now o sched st E 3≤E inv oB pB
 ... | nothing                = E , ≤-refl , inv , refl , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)       = E , ≤-refl , inv , refl , refl
-... | just (merge-st _ _)    = E , ≤-refl , inv , refl , refl
-... | just (concat-st _ _ _) = E , ≤-refl , inv , refl , refl
+... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _)  = E , ≤-refl , inv , refl , refl
 thruConsume-wet Ψ W g exhaustᵒ nid κ id now o sched st E 3≤E inv oB pB
   with lookupNode nid (EvalSt.nodes st)
@@ -1343,8 +1342,7 @@ thruConsume-wet Ψ W g exhaustᵒ nid κ id now o sched st E 3≤E inv oB pB
 ... | nothing                = E , ≤-refl , inv , refl , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)       = E , ≤-refl , inv , refl , refl
-... | just (merge-st _ _)    = E , ≤-refl , inv , refl , refl
-... | just (concat-st _ _ _) = E , ≤-refl , inv , refl , refl
+... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)   = E , ≤-refl , inv , refl , refl
 
 thruWalk-wet Ψ W g op nid κ id now [] sched st E 3≤E inv pB vB =
@@ -1496,6 +1494,5 @@ innerFinish-wet Ψ W g exhaustᵒ allNid inst κ id now vals sched st E 3≤E in
 ... | nothing                = E , ≤-refl , inv , vB , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , vB , refl
 ... | just (take-st _)       = E , ≤-refl , inv , vB , refl
-... | just (merge-st _ _)    = E , ≤-refl , inv , vB , refl
-... | just (concat-st _ _ _) = E , ≤-refl , inv , vB , refl
+... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , vB , refl
 ... | just (switch-st _ _)   = E , ≤-refl , inv , vB , refl

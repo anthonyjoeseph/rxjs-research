@@ -291,8 +291,7 @@ abstract
   ... | false = refl
   takeDispatch-deliv nid vals fin sched st nothing                = refl
   takeDispatch-deliv nid vals fin sched st (just (scan-st _))     = refl
-  takeDispatch-deliv nid vals fin sched st (just (merge-st _ _))  = refl
-  takeDispatch-deliv nid vals fin sched st (just (concat-st _ _ _)) = refl
+  takeDispatch-deliv nid vals fin sched st (just (flatten-st _ _ _ _))  = refl
   takeDispatch-deliv nid vals fin sched st (just (switch-st _ _)) = refl
   takeDispatch-deliv nid vals fin sched st (just (exhaust-st _ _)) = refl
 
@@ -335,8 +334,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-deliv exhaustᵒ nid true vs bs sched st
     with lookupNode nid (EvalSt.nodes st)
@@ -344,8 +342,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
 
   ----------------------------------------------------------------
@@ -378,8 +375,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (exhaust-st _ _)  = refl
   thruConsume-deliv g exhaustᵒ nid κ id now o sched st
     with lookupNode nid (EvalSt.nodes st)
@@ -389,8 +385,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
 
   thruWalk-deliv g op nid κ id now []       sched st = refl
@@ -441,15 +436,13 @@ abstract
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st nothing = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (scan-st _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (take-st _)) = refl
-  innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (merge-st _ _)) = refl
-  innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _)) = refl
+  innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (switch-st nothing _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st nothing = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _)) = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (take-st _)) = refl
-  innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (merge-st _ _)) = refl
-  innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _)) = refl
+  innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = refl
 
   innerReact-deliv g op allNid inst κ id now vals sched st false = refl
@@ -468,8 +461,7 @@ abstract
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (take-st _)       = refl
-  ... | just (merge-st _ _)    = refl
-  ... | just (concat-st _ _ _) = refl
+  ... | just (flatten-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   ... | just (scan-st {w} ac) with w ≟ᵗ u

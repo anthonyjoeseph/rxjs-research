@@ -415,8 +415,7 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
 ... | nothing            | _ = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)   | _ = E , ≤-refl , inv , refl , refl
-... | just (merge-st _ _)   | _ = E , ≤-refl , inv , refl , refl
-... | just (concat-st _ _ _) | _ = E , ≤-refl , inv , refl , refl
+... | just (flatten-st _ _ _ _)   | _ = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)  | _ = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _) | _ = E , ≤-refl , inv , refl , refl
 ... | just (scan-st {w} ac) | nb with w ≟ᵗ u
@@ -514,8 +513,7 @@ stepFrame-take-wet {s = s} Ψ W g id now nid κ vals fin sched st E 3≤E inv pB
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = E , ≤-refl , inv , refl , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
-... | just (merge-st _ _)    = E , ≤-refl , inv , refl , refl
-... | just (concat-st _ _ _) = E , ≤-refl , inv , refl , refl
+... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)   = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _)  = E , ≤-refl , inv , refl , refl
 ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
@@ -688,8 +686,7 @@ thruWrap-wet Ψ B switchᵒ nid true vs bs sched st inv vB bB
 ... | nothing                = inv , vB , bB
 ... | just (scan-st _)       = inv , vB , bB
 ... | just (take-st _)       = inv , vB , bB
-... | just (merge-st _ _)    = inv , vB , bB
-... | just (concat-st _ _ _) = inv , vB , bB
+... | just (flatten-st _ _ _ _)    = inv , vB , bB
 ... | just (exhaust-st _ _)  = inv , vB , bB
 thruWrap-wet Ψ B exhaustᵒ nid true vs bs sched st inv vB bB
   with lookupNode nid (EvalSt.nodes st)
@@ -698,6 +695,5 @@ thruWrap-wet Ψ B exhaustᵒ nid true vs bs sched st inv vB bB
 ... | nothing                = inv , vB , bB
 ... | just (scan-st _)       = inv , vB , bB
 ... | just (take-st _)       = inv , vB , bB
-... | just (merge-st _ _)    = inv , vB , bB
-... | just (concat-st _ _ _) = inv , vB , bB
+... | just (flatten-st _ _ _ _)    = inv , vB , bB
 ... | just (switch-st _ _)   = inv , vB , bB

@@ -10,7 +10,7 @@
 --
 -- WHY IT IS TRUE, from the evaluator.  The only writers to a node are
 -- `stepFrame`'s scan-f and take-f clauses and the *All machinery
--- (`mergeBump`, `thruConsume`, `thruWrap`, `innerFinish`, `takeDispatch`),
+-- (`flattenBump`, `thruConsume`, `thruWrap`, `innerFinish`, `takeDispatch`),
 -- and EVERY ONE of them writes the nid CARRIED BY THE FRAME IT IS
 -- STEPPING — never another.  `pushBurst` applies `stepFrame` for ONE
 -- frame and returns the transformed burst; it does not walk the rest of
@@ -66,16 +66,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans)
 open import Rx.Prim   using (Gas; g0; gs; Tick; Id; InstEmit; InstEvent;
                              hot; cold)
 open import Data.Vec  using (lookup)
-open import Rx.Exp    using (Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
-  concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
+open import Rx.Exp    using (Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; Stream; Path;
                                 Frame; AllOp;
-                                mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ;
+                                flattenᵒ; switchᵒ; exhaustᵒ;
                                 map-f; scan-f; take-f; from-inner; thru-outer;
                                 share-sink; _↠_;
-                                scan-st; take-st; merge-st; concat-st;
+                                scan-st; take-st; flatten-st;
                                 switch-st; exhaust-st;
-                                lookupNode; setNode; mergeBump;
+                                lookupNode; setNode; flattenBump; hasRoom;
                                 mintNode; installNode; register;
                                 memberSource; takeVals; splitEvents;
                                 burstCompleted;
@@ -83,7 +83,7 @@ open import Rx.Evaluator using (Sched; EvalSt; NodeId; NodeState; Stream; Path;
                                 stepFrame; pushBurst;
                                 takeDispatch; switchKill;
                                 thruConsume; thruWalk; thruWrap;
-                                concatDrain; innerFinish; innerReact;
+                                flattenDrain; innerFinish; innerReact;
                                 sharedConnect; subscribeSharedSlot;
                                 aliveThroughᶠ)
 open import Rx.Slots using (scripted; shared)
@@ -129,15 +129,15 @@ frozen-setNode : ∀ {n} {Γ : Ctx n} (w nid : ℕ) (v : NodeState Γ)
 frozen-setNode w nid v ns hw k hk =
   lookupNode-setNode-other k nid v ns (sucle→≢ᵇ (≤-trans hk hw))
 
-frozen-mergeBump : ∀ {n} {Γ : Ctx n} (w nid : ℕ) (d : Bool)
+frozen-flattenBump : ∀ {n} {Γ : Ctx n} (w nid : ℕ) (d : Bool)
   (ns : List (NodeId × NodeState Γ)) → w ≤ nid →
-  ∀ k → suc k ≤ w → lookupNode k (mergeBump nid d ns) ≡ lookupNode k ns
-frozen-mergeBump w nid d ns hw k hk with lookupNode nid ns
-... | just (merge-st m od)   =
-      frozen-setNode w nid (merge-st (if d then m else suc m) od) ns hw k hk
+  ∀ k → suc k ≤ w → lookupNode k (flattenBump nid d ns) ≡ lookupNode k ns
+frozen-flattenBump w nid d ns hw k hk with lookupNode nid ns
+... | just (flatten-st lim m q od) =
+      frozen-setNode w nid
+        (flatten-st lim (if d then m else suc m) q od) ns hw k hk
 ... | just (scan-st _)       = refl
 ... | just (take-st _)       = refl
-... | just (concat-st _ _ _) = refl
 ... | just (switch-st _ _)   = refl
 ... | just (exhaust-st _ _)  = refl
 ... | nothing                = refl
@@ -193,11 +193,12 @@ thruWrap-fresh : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   in Fresh w sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
                       (proj₂ (proj₂ (proj₂ (proj₂ r))))
 
-concatDrain-fresh : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+flattenDrain-fresh : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (w : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
   w ≤ Sched.nextNode sched →
-  let r = concatDrain g allNid κ id now q sched st
+  let r = flattenDrain g allNid κ id now lim act q sched st
   in Fresh w sched st (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
                       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
 
@@ -289,8 +290,7 @@ takeDispatch-fresh w nid vals fin sched st (just (take-st k)) hn
                 (take-st (proj₁ (proj₂ (takeVals k vals)))) (EvalSt.nodes st) hn)
 takeDispatch-fresh w nid vals fin sched st nothing                  hn = fresh-refl
 takeDispatch-fresh w nid vals fin sched st (just (scan-st _))       hn = fresh-refl
-takeDispatch-fresh w nid vals fin sched st (just (merge-st _ _))    hn = fresh-refl
-takeDispatch-fresh w nid vals fin sched st (just (concat-st _ _ _)) hn = fresh-refl
+takeDispatch-fresh w nid vals fin sched st (just (flatten-st _ _ _ _)) hn = fresh-refl
 takeDispatch-fresh w nid vals fin sched st (just (switch-st _ _))   hn = fresh-refl
 takeDispatch-fresh w nid vals fin sched st (just (exhaust-st _ _))  hn = fresh-refl
 
@@ -298,23 +298,12 @@ switchKill-fresh w nothing  sched st = fresh-refl
 switchKill-fresh w (just v) sched st = fresh-refl
 
 thruWrap-fresh w op nid false vs bs sched st hn = fresh-refl
-thruWrap-fresh w mergeᵒ nid true vs bs sched st hn
+thruWrap-fresh w flattenᵒ nid true vs bs sched st hn
   with lookupNode nid (EvalSt.nodes st)
-... | just (merge-st k _)      = fresh ≤-refl (frozen-setNode w nid
-                                    (merge-st k true) (EvalSt.nodes st) hn)
+... | just (flatten-st lim act q _) = fresh ≤-refl (frozen-setNode w nid
+                                    (flatten-st lim act q true) (EvalSt.nodes st) hn)
 ... | just (scan-st _)         = fresh-refl
 ... | just (take-st _)         = fresh-refl
-... | just (concat-st _ _ _)   = fresh-refl
-... | just (switch-st _ _)     = fresh-refl
-... | just (exhaust-st _ _)    = fresh-refl
-... | nothing                  = fresh-refl
-thruWrap-fresh w concatᵒ nid true vs bs sched st hn
-  with lookupNode nid (EvalSt.nodes st)
-... | just (concat-st q act _) = fresh ≤-refl (frozen-setNode w nid
-                                    (concat-st q act true) (EvalSt.nodes st) hn)
-... | just (scan-st _)         = fresh-refl
-... | just (take-st _)         = fresh-refl
-... | just (merge-st _ _)      = fresh-refl
 ... | just (switch-st _ _)     = fresh-refl
 ... | just (exhaust-st _ _)    = fresh-refl
 ... | nothing                  = fresh-refl
@@ -324,8 +313,7 @@ thruWrap-fresh w switchᵒ nid true vs bs sched st hn
                                     (switch-st cur true) (EvalSt.nodes st) hn)
 ... | just (scan-st _)         = fresh-refl
 ... | just (take-st _)         = fresh-refl
-... | just (merge-st _ _)      = fresh-refl
-... | just (concat-st _ _ _)   = fresh-refl
+... | just (flatten-st _ _ _ _) = fresh-refl
 ... | just (exhaust-st _ _)    = fresh-refl
 ... | nothing                  = fresh-refl
 thruWrap-fresh w exhaustᵒ nid true vs bs sched st hn
@@ -334,8 +322,7 @@ thruWrap-fresh w exhaustᵒ nid true vs bs sched st hn
                                     (exhaust-st act true) (EvalSt.nodes st) hn)
 ... | just (scan-st _)         = fresh-refl
 ... | just (take-st _)         = fresh-refl
-... | just (merge-st _ _)      = fresh-refl
-... | just (concat-st _ _ _)   = fresh-refl
+... | just (flatten-st _ _ _ _) = fresh-refl
 ... | just (switch-st _ _)     = fresh-refl
 ... | nothing                  = fresh-refl
 
@@ -353,31 +340,25 @@ subscribeInner-fresh w (gs fuel) op allNid κ id now o sched st hw =
          (record sched { nextNode = suc (Sched.nextNode sched) }) st
          (≤-trans hw (n≤1+n _))
 
-thruConsume-fresh w g mergeᵒ nid κ id now o sched st hw hn =
-  fresh-trans (subscribeInner-fresh w g mergeᵒ nid κ id now o sched st hw)
-              (fresh ≤-refl (frozen-mergeBump w nid
-                 (proj₁ (proj₂ (proj₂ (proj₂ SI))))
-                 (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))) hn))
-  where SI = subscribeInner g mergeᵒ nid κ id now o sched st
-thruConsume-fresh {u = u} w g concatᵒ nid κ id now o sched st hw hn
+thruConsume-fresh {u = u} w g flattenᵒ nid κ id now o sched st hw hn
   with lookupNode nid (EvalSt.nodes st)
-... | just (concat-st {v} q true od) with v ≟ᵗ u
-...   | yes refl = fresh ≤-refl (frozen-setNode w nid
-                      (concat-st (q ++ o ∷ []) true od) (EvalSt.nodes st) hn)
+... | just (flatten-st {v} lim act q od) with v ≟ᵗ u
 ...   | no _     = fresh-refl
-thruConsume-fresh {u = u} w g concatᵒ nid κ id now o sched st hw hn
-    | just (concat-st q false od) =
-      fresh-trans (subscribeInner-fresh w g concatᵒ nid κ id now o sched st hw)
-                  (fresh ≤-refl (frozen-setNode w nid
-                     (concat-st {t = u} [] (not (proj₁ (proj₂ (proj₂ (proj₂ SI))))) od)
-                     (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))) hn))
-      where SI = subscribeInner g concatᵒ nid κ id now o sched st
-thruConsume-fresh w g concatᵒ nid κ id now o sched st hw hn | nothing = fresh-refl
-thruConsume-fresh w g concatᵒ nid κ id now o sched st hw hn | just (scan-st _) = fresh-refl
-thruConsume-fresh w g concatᵒ nid κ id now o sched st hw hn | just (take-st _) = fresh-refl
-thruConsume-fresh w g concatᵒ nid κ id now o sched st hw hn | just (merge-st _ _) = fresh-refl
-thruConsume-fresh w g concatᵒ nid κ id now o sched st hw hn | just (switch-st _ _) = fresh-refl
-thruConsume-fresh w g concatᵒ nid κ id now o sched st hw hn | just (exhaust-st _ _) = fresh-refl
+...   | yes refl with hasRoom lim act
+...     | false  = fresh ≤-refl (frozen-setNode w nid
+                      (flatten-st lim act (q ++ o ∷ []) od) (EvalSt.nodes st) hn)
+...     | true   =
+          fresh-trans (subscribeInner-fresh w g flattenᵒ nid κ id now o sched st hw)
+            (fresh ≤-refl (frozen-flattenBump w nid
+               (proj₁ (proj₂ (proj₂ (proj₂
+                 (subscribeInner g flattenᵒ nid κ id now o sched st)))))
+               (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+                 (subscribeInner g flattenᵒ nid κ id now o sched st))))))) hn))
+thruConsume-fresh w g flattenᵒ nid κ id now o sched st hw hn | nothing = fresh-refl
+thruConsume-fresh w g flattenᵒ nid κ id now o sched st hw hn | just (scan-st _) = fresh-refl
+thruConsume-fresh w g flattenᵒ nid κ id now o sched st hw hn | just (take-st _) = fresh-refl
+thruConsume-fresh w g flattenᵒ nid κ id now o sched st hw hn | just (switch-st _ _) = fresh-refl
+thruConsume-fresh w g flattenᵒ nid κ id now o sched st hw hn | just (exhaust-st _ _) = fresh-refl
 thruConsume-fresh w g switchᵒ nid κ id now o sched st hw hn
   with lookupNode nid (EvalSt.nodes st)
 ... | just (switch-st cur od) =
@@ -396,8 +377,7 @@ thruConsume-fresh w g switchᵒ nid κ id now o sched st hw hn
                    (proj₂ (proj₂ (switchKill cur sched st)))
 ... | just (scan-st _)       = fresh-refl
 ... | just (take-st _)       = fresh-refl
-... | just (merge-st _ _)    = fresh-refl
-... | just (concat-st _ _ _) = fresh-refl
+... | just (flatten-st _ _ _ _) = fresh-refl
 ... | just (exhaust-st _ _)  = fresh-refl
 ... | nothing                = fresh-refl
 thruConsume-fresh w g exhaustᵒ nid κ id now o sched st hw hn
@@ -411,8 +391,7 @@ thruConsume-fresh w g exhaustᵒ nid κ id now o sched st hw hn
       where SI = subscribeInner g exhaustᵒ nid κ id now o sched st
 ... | just (scan-st _)       = fresh-refl
 ... | just (take-st _)       = fresh-refl
-... | just (merge-st _ _)    = fresh-refl
-... | just (concat-st _ _ _) = fresh-refl
+... | just (flatten-st _ _ _ _) = fresh-refl
 ... | just (switch-st _ _)   = fresh-refl
 ... | nothing                = fresh-refl
 
@@ -425,47 +404,40 @@ thruWalk-fresh w g op nid κ id now (o ∷ os) sched st hw hn =
       (≤-trans hw (nxMono TC)) hn)
   where TC = thruConsume-fresh w g op nid κ id now o sched st hw hn
 
-concatDrain-fresh w g allNid κ id now [] sched st hw = fresh-refl
-concatDrain-fresh w g allNid κ id now (o ∷ q) sched st hw
-  with proj₁ (proj₂ (proj₂ (proj₂ (subscribeInner g concatᵒ allNid κ id now o sched st))))
+flattenDrain-fresh w g allNid κ id now lim act [] sched st hw = fresh-refl
+flattenDrain-fresh w g allNid κ id now lim act (o ∷ q) sched st hw
+  with hasRoom lim act
+... | false = fresh-refl
 ... | true  =
       fresh-trans SI
-        (concatDrain-fresh w g allNid κ id now q
+        (flattenDrain-fresh w g allNid κ id now lim
+          (if proj₁ (proj₂ (proj₂ (proj₂
+             (subscribeInner g flattenᵒ allNid κ id now o sched st))))
+           then act else suc act) q
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
-            (subscribeInner g concatᵒ allNid κ id now o sched st))))))
+            (subscribeInner g flattenᵒ allNid κ id now o sched st))))))
           (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-            (subscribeInner g concatᵒ allNid κ id now o sched st))))))
+            (subscribeInner g flattenᵒ allNid κ id now o sched st))))))
           (≤-trans hw (nxMono SI)))
-      where SI = subscribeInner-fresh w g concatᵒ allNid κ id now o sched st hw
-... | false = subscribeInner-fresh w g concatᵒ allNid κ id now o sched st hw
+      where SI = subscribeInner-fresh w g flattenᵒ allNid κ id now o sched st hw
 
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st
-                  (just (merge-st k od)) hw ha =
-  fresh ≤-refl (frozen-setNode w allNid (merge-st (pred k) od) (EvalSt.nodes st) ha)
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st nothing hw ha = fresh-refl
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st (just (scan-st _)) hw ha = fresh-refl
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st (just (take-st _)) hw ha = fresh-refl
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _)) hw ha = fresh-refl
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) hw ha = fresh-refl
-innerFinish-fresh w g mergeᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) hw ha = fresh-refl
-innerFinish-fresh {s = s} w g concatᵒ allNid inst κ id now vals sched st
-                  (just (concat-st {v} q act od)) hw ha with v ≟ᵗ s
+innerFinish-fresh {s = s} w g flattenᵒ allNid inst κ id now vals sched st
+                  (just (flatten-st {v} lim act q od)) hw ha with v ≟ᵗ s
 ... | yes refl =
-      fresh-trans CD
+      fresh-trans FD
         (fresh ≤-refl (frozen-setNode w allNid
-           (concat-st (proj₁ (proj₂ (proj₂ (proj₂ DR))))
-                      (proj₁ (proj₂ (proj₂ DR))) od)
+           (flatten-st lim (proj₁ (proj₂ (proj₂ DR)))
+                       (proj₁ (proj₂ (proj₂ (proj₂ DR)))) od)
            (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ DR)))))) ha))
       where
-      CD = concatDrain-fresh w g allNid κ id now q sched st hw
-      DR = concatDrain g allNid κ id now q sched st
+      FD = flattenDrain-fresh w g allNid κ id now lim (pred act) q sched st hw
+      DR = flattenDrain g allNid κ id now lim (pred act) q sched st
 ... | no _ = fresh-refl
-innerFinish-fresh w g concatᵒ allNid inst κ id now vals sched st nothing hw ha = fresh-refl
-innerFinish-fresh w g concatᵒ allNid inst κ id now vals sched st (just (scan-st _)) hw ha = fresh-refl
-innerFinish-fresh w g concatᵒ allNid inst κ id now vals sched st (just (take-st _)) hw ha = fresh-refl
-innerFinish-fresh w g concatᵒ allNid inst κ id now vals sched st (just (merge-st _ _)) hw ha = fresh-refl
-innerFinish-fresh w g concatᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) hw ha = fresh-refl
-innerFinish-fresh w g concatᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) hw ha = fresh-refl
+innerFinish-fresh w g flattenᵒ allNid inst κ id now vals sched st nothing hw ha = fresh-refl
+innerFinish-fresh w g flattenᵒ allNid inst κ id now vals sched st (just (scan-st _)) hw ha = fresh-refl
+innerFinish-fresh w g flattenᵒ allNid inst κ id now vals sched st (just (take-st _)) hw ha = fresh-refl
+innerFinish-fresh w g flattenᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) hw ha = fresh-refl
+innerFinish-fresh w g flattenᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) hw ha = fresh-refl
 innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st
                   (just (switch-st (just c) od)) hw ha with c ≡ᵇ inst
 ... | true  = fresh ≤-refl (frozen-setNode w allNid
@@ -475,8 +447,7 @@ innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (switc
 innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st nothing hw ha = fresh-refl
 innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (scan-st _)) hw ha = fresh-refl
 innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (take-st _)) hw ha = fresh-refl
-innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (merge-st _ _)) hw ha = fresh-refl
-innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _)) hw ha = fresh-refl
+innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) hw ha = fresh-refl
 innerFinish-fresh w g switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) hw ha = fresh-refl
 innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st
                   (just (exhaust-st act od)) hw ha =
@@ -484,8 +455,7 @@ innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st
 innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st nothing hw ha = fresh-refl
 innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _)) hw ha = fresh-refl
 innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st (just (take-st _)) hw ha = fresh-refl
-innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st (just (merge-st _ _)) hw ha = fresh-refl
-innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st (just (concat-st _ _ _)) hw ha = fresh-refl
+innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) hw ha = fresh-refl
 innerFinish-fresh w g exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) hw ha = fresh-refl
 
 innerReact-fresh w g op allNid inst κ id now vals sched st false hw ha = fresh-refl
@@ -505,8 +475,7 @@ stepFrame-fresh {u = u} w g id now (scan-f fn nid) κ vals fin sched st hw hf
 ...   | no _     = fresh-refl
 stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | nothing = fresh-refl
 stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | just (take-st _) = fresh-refl
-stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | just (merge-st _ _) = fresh-refl
-stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | just (concat-st _ _ _) = fresh-refl
+stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | just (flatten-st _ _ _ _) = fresh-refl
 stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | just (switch-st _ _) = fresh-refl
 stepFrame-fresh w g id now (scan-f fn nid) κ vals fin sched st hw hf | just (exhaust-st _ _) = fresh-refl
 stepFrame-fresh w g id now (take-f nid) κ vals fin sched st hw hf =
@@ -619,10 +588,8 @@ subscribeE-fresh w g (scanᵉ f z b) κ id now sched st hw =
           (record sched { nextNode = suc (Sched.nextNode sched) })
           (installNode (Sched.nextNode sched) (scan-st (evalTm z)) st)
           (≤-trans hw (n≤1+n _))
-subscribeE-fresh w g (mergeAllᵉ b) κ id now sched st hw =
-  subscribeAll-fresh w g mergeᵒ (merge-st 0 false) b κ id now sched st hw
-subscribeE-fresh {u = u} w g (concatAllᵉ b) κ id now sched st hw =
-  subscribeAll-fresh w g concatᵒ (concat-st {t = u} [] false false) b κ id now sched st hw
+subscribeE-fresh {u = u} w g (flattenᵉ lim b) κ id now sched st hw =
+  subscribeAll-fresh w g flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st hw
 subscribeE-fresh w g (switchAllᵉ b) κ id now sched st hw =
   subscribeAll-fresh w g switchᵒ (switch-st nothing false) b κ id now sched st hw
 subscribeE-fresh w g (exhaustAllᵉ b) κ id now sched st hw =
@@ -631,9 +598,9 @@ subscribeE-fresh w g0 (μᵉ body) κ id now sched st hw = fresh-refl
 subscribeE-fresh w (gs fuel) (μᵉ body) κ id now sched st hw =
   subscribeE-fresh w fuel (unfoldμ body) κ id now sched st hw
 subscribeE-fresh w g (varᵉ ()) κ id now sched st hw
-subscribeE-fresh w g (deferᵉ body) κ id now sched st hw =
+subscribeE-fresh {u = u} w g (deferᵉ body) κ id now sched st hw =
   fresh (n≤1+n _) (frozen-setNode w (Sched.nextNode sched)
-                     (merge-st 0 false) (EvalSt.nodes st) hw)
+                     (flatten-st {t = u} nothing 0 [] false) (EvalSt.nodes st) hw)
 
 ------------------------------------------------------------------
 -- THE FACE THE CONSUMERS SPEND

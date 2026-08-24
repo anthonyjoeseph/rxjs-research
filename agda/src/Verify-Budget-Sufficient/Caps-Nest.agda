@@ -44,6 +44,7 @@ open import Data.Nat.Properties
 open import Data.Fin  using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.List using (List; []; _∷_; tabulate)
+open import Data.Maybe using (Maybe)
 open import Data.Nat.ListAction  using (sum)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
@@ -51,7 +52,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim  using (Source)
 open import Rx.Exp
-  using (Ctx; Exp; Tm; Fn; Closed; obs; input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+  using (Ctx; Exp; Tm; Fn; Closed; obs; input; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ; inputsBelowᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
@@ -245,15 +246,10 @@ all-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (b k : ℕ) �
 all-step sl cs b k =
   ≤-trans (+-monoˡ-≤ (resid sl cs) (n≤1+n b))
 
-merge-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
+flatten-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (lim : Maybe ℕ) (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  nest (mergeAllᵉ b) sl cs ≤ k → nest b sl cs ≤ k
-merge-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
-
-concat-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
-  (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  nest (concatAllᵉ b) sl cs ≤ k → nest b sl cs ≤ k
-concat-step b sl cs k = all-step sl cs (syncSizeᵉ b) k
+  nest (flattenᵉ lim b) sl cs ≤ k → nest b sl cs ≤ k
+flatten-step lim b sl cs k = all-step sl cs (syncSizeᵉ b) k
 
 switch-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →

@@ -42,7 +42,7 @@ open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; hando
   cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; memberSource; NodeId; NodeState; scan-st;
-  take-st; merge-st; concat-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
+  take-st; flatten-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
   cascadeGo; subscribeE; sameSource; hasDry; dropSource; budgetAt)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init; stepProtocol; runProtocol; paidUp; settle;
@@ -165,7 +165,7 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- NO `merge-cert` POSTULATE LIVES HERE ANY MORE.  It existed
 -- ONLY as the hypothesis of `root-caches-core` / `root-done-plumbed-core`,
 -- and writing those two assemblies as real bodies showed that hypothesis
--- does not close: see the ALIVE-vs-PRESENT gap recorded on root-mergeCache
+-- does not close: see the ALIVE-vs-PRESENT gap recorded on root-flattenCache
 -- below.  `mergeCertAt` LEFT WITH IT, and that is the wiring law rather
 -- than a tidy-up: its only consumer was the probe, so once the probe moved
 -- to `agda/evidence/probed` this file held a definition no proof reached.
@@ -217,7 +217,7 @@ postulate
   -- ROOT-EXIT caches, migrated out of BurstInv for the reason recorded on the
   -- record: the merge count trails the registry inside an inner's burst and
   -- leads it after a take-cut, so only the SETTLED state at the root exit — by
-  -- which point every mergeBump has landed — satisfies cachesValid.
+  -- which point every flattenBump has landed — satisfies cachesValid.
   --
   -- IT IS A LEAF, on the same grounds as root-entry-sunk above.
   -- `cachesValid` is a conjunction fold
@@ -258,23 +258,26 @@ postulate
   --   edge a wrong cache would show at.
   --   COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
   --   levels, and a single slot context at most.
-  root-mergeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-    (nid : NodeId) (k : ℕ) (od : Bool) →
-    (nid , merge-st k od) ∈ EvalSt.nodes (rootExitSt e ins) →
-    nodeCacheOK nid (merge-st k od) (EvalSt.registry (rootExitSt e ins)) ≡ true
+  root-flattenCache : ∀ {n} {Γ : Ctx n} {t} {w} (e : Closed Γ t) (ins : Slots Γ)
+    (nid : NodeId) (lim : Maybe ℕ) (k : ℕ) (q : List (Closed Γ w)) (od : Bool) →
+    (nid , flatten-st lim k q od) ∈ EvalSt.nodes (rootExitSt e ins) →
+    nodeCacheOK nid (flatten-st lim k q od)
+      (EvalSt.registry (rootExitSt e ins)) ≡ true
 
--- the per-node residue, split on the constructor: five of nodeCacheOK's six
--- clauses are `true` outright, so the whole open content is the merge one.
+-- the per-node residue, split on the constructor: four of nodeCacheOK's
+-- five clauses are `true` outright, so the whole open content is the
+-- flatten one -- and it is now open at EVERY limit, the old concat face
+-- having been a `true` placeholder over the same count.
 root-nodeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (nid : NodeId) (s : NodeState Γ) →
   (nid , s) ∈ EvalSt.nodes (rootExitSt e ins) →
   nodeCacheOK nid s (EvalSt.registry (rootExitSt e ins)) ≡ true
 root-nodeCache e ins nid (scan-st _)       m = refl
 root-nodeCache e ins nid (take-st _)       m = refl
-root-nodeCache e ins nid (concat-st _ _ _) m = refl
 root-nodeCache e ins nid (switch-st _ _)   m = refl
 root-nodeCache e ins nid (exhaust-st _ _)  m = refl
-root-nodeCache e ins nid (merge-st k od)   m = root-mergeCache e ins nid k od m
+root-nodeCache e ins nid (flatten-st lim k q od) m =
+  root-flattenCache e ins nid lim k q od m
 
 root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →

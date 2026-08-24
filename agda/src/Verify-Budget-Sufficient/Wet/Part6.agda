@@ -136,7 +136,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro)
 --   subscribeInner-wet    THE HOP EDGE.  g0 is the dry stub; gs peels
 --     one and re-enters the walk on the inner observable VALUE under
 --     `from-inner op allNid inst ↠ κ`.
---   concatDrain-wet / innerFinish-wet / thruWrap-wet   structural.
+--   flattenDrain-wet / innerFinish-wet / thruWrap-wet  structural.
 --
 --   and one level out, the delivery clique: cascadeGo-walk →
 --   chainStep-wet → foldPath-wet → (at share-sink) dispatchShare-wet →

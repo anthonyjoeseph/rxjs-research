@@ -38,8 +38,8 @@ open import Relation.Binary.PropositionalEquality
 open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Id; Source)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; NodeId; NodeState; scan-st; take-st; merge-st;
-  concat-st; switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; NodeId; NodeState; scan-st; take-st; flatten-st;
+  switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
   chainsOf; cascadeLatch; cascadeGo; subscribeE; cascade; drain; evaluate; sameSource; hasDry;
   dropSource; budgetAt)
 open import Rx.Slots using (Slots)
@@ -113,10 +113,9 @@ mid-init-caches {Γ = Γ} a sched sched″ st rt eq h rewrite latch-nodes a st =
     nodeCacheMid nid a (chainsOf a st) s (cascadeLatch a st) ≡ true
   nodeOK→Mid nid (scan-st _)       hn = refl
   nodeOK→Mid nid (take-st _)       hn = refl
-  nodeOK→Mid nid (concat-st _ _ _) hn = refl
   nodeOK→Mid nid (switch-st _ _)   hn = refl
   nodeOK→Mid nid (exhaust-st _ _)  hn = refl
-  nodeOK→Mid nid (merge-st k od) hn with Arrival.isLast a
+  nodeOK→Mid nid (flatten-st lim k q od) hn with Arrival.isLast a
   ... | false = hn
   ... | true  with mergeReachable nid (EvalSt.registry st) in eqM
   ...   | false rewrite mergeReachable-drop-false nid (arrSource a) (EvalSt.registry st) eqM = refl
