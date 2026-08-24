@@ -1305,63 +1305,79 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     let r = cascadeGo a nextId chains sched st
-    in suc (delivN st (proj₂ (proj₂ r))) ≤ realWidAt e sl id
+    in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
 
--- ONE ARRIVAL'S CHAINS, CHARGED PER DELIVERY, over an ARBITRARY chain
--- list and an arbitrary state -- which is what makes it inductable at
--- all.  The consumer wants it at the cascade's own entry, and a
--- statement pinned there cannot recurse: its cons clause reports the
--- tail at a state the head's step produced, and the pinned form has no
--- way to say that.
+-- ONE ARRIVAL'S CHAINS, CHARGED PER CHAIN, over an ARBITRARY chain list
+-- and an arbitrary state -- which is what makes it inductable at all.
+-- The consumer wants it at the cascade's own entry, and a statement
+-- pinned there cannot recurse: its cons clause reports the tail at a
+-- state the head's step produced, and the pinned form has no way to say
+-- that.
 --
--- THE SKIP BRANCH IS WHERE THE TWO SIDES STOP AGREEING, and it is the
--- thing to know before attempting this induction.  `depthCascade` is
--- BRANCH-FREE -- its cons clause cannot with-abstract the cancellation
--- test, for the reason its own head in `.Caps-Depth` gives, so it
--- reports the chain at both states -- while `cascadeGo` skips a
--- cancelled chain outright and delivers nothing for it.  So on a skip
--- the left side charges a chainStep that never ran, and the whole
--- PHANTOM tail cascade behind it, against a budget denominated in real
--- deliveries.
+-- THE CURRENCY IS CHAINS AND NOT DELIVERIES, and that is forced by the
+-- cons clause rather than chosen.  `depthCascade` is BRANCH-FREE -- it
+-- cannot with-abstract the cancellation test, for `depthShareGo`'s
+-- reason -- so it reports its tail at BOTH states, the skip arm's and
+-- the live arm's, and only one of those is a state `cascadeGo` ever
+-- visits.  A delivery count is taken along a RUN, so at the phantom
+-- tail it is a count of a run the evaluator does not perform, and no
+-- induction hypothesis can be applied to it: whichever arm the test
+-- picks, one of the two summands is denominated in a run that is not
+-- there.  `length chains` has no such defect, being a function of the
+-- chain list alone, so both summands take the same hypothesis and the
+-- clause closes -- the head contributing exactly the one chain by which
+-- `suc (length chains)` exceeds the tails' `length chains`.
 --
--- WHICH IS WHY THE COUNT IS SUCCED, and it is not slack.  A skip is
--- affordable in a real cascade because `cascadeLatch` clears
--- `cancelled` at entry, so a chain is skipped only after an operator
--- CUT it during this same cascade -- and both cut sites sit inside a
--- dispatch, which runs after `cascadeGo` consed the cutting chain's own
--- delivery.  That is a property of the states a cascade STARTS from,
--- and generalising over `st` throws it away: an all-skipped instance
--- has no deliveries and the budget would collapse to its base terms.
--- The `suc` is that lost fact restored as arithmetic, and it is exactly
--- one chain's worth because that is what a phantom costs.
+-- AND IT IS THE CHEAPER STATEMENT, not merely the tractable one.  A
+-- per-delivery charge has to be widened to a width before the consumer
+-- can spend it, and the delivery count is a run quantity whose only
+-- proven bounds are cap-denominated inside the walk module.  A chain
+-- count is a state quantity, and `chainsOf-length` already carries it
+-- to the registry, so the conversion below is a plain invariant about
+-- how many registrations may stand at one instant.
 --
--- AND THE CHARGE DOES NOT COMPOUND, which is the measured half and the
--- part that was genuinely open.  `Harness.Main`'s SERIES P drives the
--- cut family -- a hot fan behind a `takeᵉ` that exhausts partway along
--- one arrival, the only shape that reaches the branch at all -- and
--- reads this statement's own two sides at each cascade, printing the
--- chain count, the delivery count and the cancellations so a row that
--- never entered the branch is visible as such.  Across the fold depth,
--- the fan width, the take count and the slot parameters, no row goes
--- over, and the left side is EXACTLY FLAT in the fan width while the
--- cancellations climb: eight skipped chains charge no more than two.
--- So the exposure is one chain's depth rather than a stack of them.
--- Measured, not rechecked, and it says nothing about a shape where
--- `depthFold` reads a store the phantom steps have deepened -- no row
--- produced one.
+-- PROBED: `Harness.Main`'s SERIES Q drives the cut family -- a hot fan
+--   behind a `takeᵉ` that exhausts partway along one arrival, the only
+--   shape that reaches the skip branch at all -- and reads this
+--   statement's own two sides at each cascade, printing the chain
+--   count, the delivery count, the registry and the width so a row
+--   that never entered the branch is visible as such.  Across the fold
+--   depth, the fan width, the take count and the slot parameters, no
+--   row goes over, and the skip-heavy rows are the roomiest: eight
+--   chains against a single delivery reads 7 of 88.  The conversion is
+--   covered on the same rows, at id 0 where the width is smallest, and
+--   clears by better than a factor of ten -- a registry of at most 8
+--   against a width of at least 84.  Measured, not rechecked.  No row
+--   reached a shape where `depthFold` reads a store the phantom steps
+--   have deepened.
 postulate
-  depthCascade-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  depthCascade-perChain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
-    let r = cascadeGo a nextId chains sched st
-    in depthCascade a nextId chains sched st
-       ≤ nestDᵛ (arrTy a) (arrVal a)
-         + chainsNestD chains
-         + storeNestMax sched st
-         + suc (delivN st (proj₂ (proj₂ r))) * nestSyn e sl
+    depthCascade a nextId chains sched st
+      ≤ nestDᵛ (arrTy a) (arrVal a)
+        + chainsNestD chains
+        + storeNestMax sched st
+        + length chains * nestSyn e sl
+
+-- HOW MANY CHAINS ONE ARRIVAL CAN HAVE, in the nesting currency rather
+-- than the caps.  `chainsOf-length` above already takes this to the
+-- registry, and `capsOK?-count` takes the registry to `cReg` -- but
+-- `cReg` is a BLOWN-UP cap while `realWidAt` at the entry index is the
+-- bare base, so the caps route overshoots the target and cannot be the
+-- one spent here.  What is left is a statement about the states a
+-- cascade starts from: how many registrations may stand at one instant,
+-- measured against the width the currency allows there.
+postulate
+  chainsOf-real : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    length (chainsOf a st) ≤ realWidAt e sl id
 
 cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -1374,7 +1390,7 @@ cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       + storeNestMax sched (cascadeLatch a st)
       + realWidAt e sl id * nestSyn e sl
 cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps =
-  ≤-trans (depthCascade-perDeliv sl id a nextId (chainsOf a st) sched stL
+  ≤-trans (depthCascade-perChain sl id a nextId (chainsOf a st) sched stL
              hsl hcapsL)
           (+-monoʳ-≤ A (*-mono-≤ cnt (≤-refl {nestSyn e sl})))
   where
@@ -1384,11 +1400,8 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps =
            + chainsNestD (chainsOf a st)
            + storeNestMax sched stL
 
-  cnt : suc (delivN stL
-              (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched stL))))
-          ≤ realWidAt e sl id
-  cnt = cascadeGo-deliv-real sl id a nextId (chainsOf a st) sched stL hsl
-          hcapsL
+  cnt : length (chainsOf a st) ≤ realWidAt e sl id
+  cnt = chainsOf-real sl id a sched st hsl hcaps
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

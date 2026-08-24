@@ -159,10 +159,13 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`depthCascade-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: the cascade face's
-  chain walk over an arbitrary chain list, charged one `nestSyn` per delivery
-  plus one. The `suc` is the SKIP branch: a branch-free left side charges a
-  phantom chain that no delivery pays for.
+- **`depthCascade-perChain`** (Caps-Face/Part7) — DIFFICULTY: the cascade face's
+  chain walk over an arbitrary chain list, charged one `nestSyn` per CHAIN. A
+  branch-free left side reports its tail at a state the evaluator never visits,
+  so a run quantity cannot close the cons clause and a list quantity can.
+- **`chainsOf-real`** (Caps-Face/Part7) — DIFFICULTY: how many chains one arrival
+  can have, under the real width. `chainsOf-length` carries it to the registry;
+  the caps route overshoots, `cReg` being blown up where the width is bare.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction. Only the SUBJECT axis can refute — the store and path move
   the bound alone — and the sweeps drive it at the tight index on a product,
@@ -172,10 +175,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   tight — the overshoot is a constant per delivery on both axes. Residue: a
   step that stores without delivering.
 - **`cascadeGo-deliv-real`** (Caps-Face/Part7) — DIFFICULTY: the walk's delivery
-  count, SUCCED, under the real width; both nest faces spend it. Measures safe
-  with wide slack, but
-  the proven counter is cap-denominated INSIDE its walk module, so this wants
-  new machinery — two dead routes recorded.
+  count under the real width; the STORE face spends it. Measures safe with wide
+  slack, but the proven counter is cap-denominated INSIDE its walk module, so
+  this wants new machinery — two dead routes recorded.
 - **`nest-height`** (Nest-Store, inside the seal) — DIFFICULTY: the arithmetic
   both depth rows spend, and no evaluator in it. One tower height for the
   currency's sum, one story below the caps height; the `blowH` conversion and

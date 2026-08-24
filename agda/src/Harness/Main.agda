@@ -492,6 +492,63 @@ cutWalk e sl (suc m) nextId sched st with sched-next sched
      ++ cutWalk e sl m (suc nextId)
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- SERIES Q (4000000): the PER-CHAIN currency, and the conversion it
+-- would need.  `depthCascade`'s cons clause reports its tail at TWO
+-- states -- the skip arm's and the live arm's -- and only one of them
+-- is a state `cascadeGo` visits, so a per-DELIVERY charge cannot close
+-- the induction: the phantom tail's delivery count is taken at a run
+-- the evaluator never performs.  `length chains` has no such defect,
+-- being a function of the chain list alone, so the same clause closes
+-- against it.  The price is the conversion, and that is what this
+-- series measures alongside: `chainsOf-length` already reduces it to
+-- the registry, so the open quantity is `reg` against `W`.
+--
+-- LOAD-BEARING where `c` exceeds `d`, exactly as SERIES P: those are
+-- the rows a skip actually reached.  `reg` and `W` are the conversion,
+-- and `W` is read at id 0, the SMALLEST width the currency ever takes,
+-- so a row that clears it there clears it everywhere above
+chainWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+          → ℕ → ℕ → Sched Γ → EvalSt e → String
+chainWalk e sl 0       nextId sched st = ""
+chainWalk e sl (suc m) nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      ch  = chainsOf a st
+      g   = cascadeGo a nextId ch sd stL
+      stG = proj₂ (proj₂ g)
+      lhs = depthCascade a nextId ch sd stL
+      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch
+            + storeNestMax sd stL + length ch * nestSyn e sl
+      r   = cascade a nextId sd st
+  in " | " ++ show lhs ++ "/" ++ show rhs
+     ++ " (c=" ++ show (length ch)
+     ++ " d=" ++ show (delivN stL stG)
+     ++ " reg=" ++ show (length (EvalSt.registry stG))
+     ++ " W=" ++ show (realWidAt e sl 0) ++ ")"
+     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
+     ++ (if length (EvalSt.registry stG) ≤ᵇ realWidAt e sl 0
+         then "" else " CONV-OVER")
+     ++ chainWalk e sl m (suc nextId)
+                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+chainRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+chainRow fam steps ds ks j w k =
+  let slF = insF ds ks j
+  in if fam ≡ᵇ 0
+     then (let p = progC ds w k
+               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else (let p = progF w k
+               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+
 cutRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 cutRow fam steps ds ks j w k =
   let slF = insF ds ks j
@@ -840,7 +897,12 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
 rowAt n =
-  if 3000000 ≤ᵇ n
+  if 4000000 ≤ᵇ n
+  then (let m = n ∸ 4000000
+        in chainRow (m / 100000) 16 ((m % 100000) / 10000)
+                    ((m % 10000) / 1000) ((m % 1000) / 100)
+                    ((m % 100) / 10) (m % 10))
+  else if 3000000 ≤ᵇ n
   then (let m = n ∸ 3000000
         in cutRow (m / 100000) 16 ((m % 100000) / 10000)
                   ((m % 10000) / 1000) ((m % 1000) / 100)
