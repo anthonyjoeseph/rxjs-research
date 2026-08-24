@@ -2,10 +2,10 @@
 -- thruOuter-face … reach-via-size-absurd
 module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
-open import Data.Bool    using (Bool; true; false; _∧_)
-open import Data.Nat     using (ℕ; suc; pred; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; suc; pred; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
-  *-mono-≤; +-monoʳ-≤)
+  *-mono-≤; +-monoʳ-≤; +-monoˡ-≤; +-mono-≤; ⊔-lub; m≤m⊔n; m≤n⊔m)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; map)
@@ -26,20 +26,20 @@ open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst)
 
-open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_)
+open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; Fn; μᵉ; unfoldμ; evalTm;
   applyFn)
 open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch;
-   nestOK?-store; nest-sum-3; storeNest-latch; realWidAt; nestSyn)
+   nestOK?-store; nest-sum-3; storeNest-latch; realWidAt; nestSyn; pathNestD)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; merge-st;
   concat-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
   scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
   chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeᵒ; concatᵒ;
   switchᵒ; exhaustᵒ; thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade;
-  sameSource; regAt; iterSize; fLvlD; lvls; sLvlD)
+  sameSource; regAt; iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -85,7 +85,8 @@ open import Verify-Budget-Sufficient.Caps-Nest using
 -- so each face passes its premise straight to the next and the absorbed
 -- branch needs nothing at all
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFrame; depthReact; depthFin; depthWalk; depthCascade)
+  using (depthInner; depthFrame; depthReact; depthFin; depthWalk; depthCascade;
+         depthChain)
 -- arithmetic lemmas consumed by thruOuter-face-core's walk helpers
 
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
@@ -98,7 +99,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps;
    scanVals-len; stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
+  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
    capsOK?-regs; capsOK?-setNode; dropSweep-caps; face-lift; frameBud;
    FrameFace; lookupNode-caps; pathSz?-len; pathSz?-tail; shareLatch-caps;
    slotsCaps?-capsAt; takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK;
@@ -1307,6 +1308,79 @@ postulate
     let r = cascadeGo a nextId chains sched st
     in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
 
+-- MARKING A CHAIN DELIVERED, which is what the evaluator does before
+-- stepping it and what the depth measure mirrors.  It is spelled out
+-- here because three statements below take the marked state as their
+-- subject, and a record update written three times is a place for the
+-- three to drift apart.
+markD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → RegId → EvalSt e → EvalSt e
+markD rid st = record st { delivered = rid ∷ EvalSt.delivered st }
+
+-- THE SLOT STORE SURVIVES A CHAIN STEP, one call into `foldPath` and so
+-- one composition of `foldPath-slots`.  It sits here rather than beside
+-- its sibling for the cascade fold, because the per-chain induction
+-- below needs it and lives one layer under that one.
+chainStep-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (chainStep id a path sched st))) ≡ Sched.slots sched
+chainStep-slots {n = n} {e = e} id a path sched st =
+  foldPath-slots (budgetAt e (Sched.slots sched) id) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
+                 (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+                 (Arrival.isLast a) sched st
+
+-- ONE CHAIN'S DELIVERY, which is the leaf the induction below turns on.
+-- The subject is the MARKED state, because that is the state the clause
+-- reports the head chain at, and the bound is read at the UNMARKED one
+-- -- folding in the fact that marking a chain delivered moves no value
+-- into the store and so cannot move the store measure.
+--
+-- ONE `nestSyn`, AND THAT IS THE WHOLE CONTENT.  The subscribe-side
+-- sibling `depth-nest-compositional` needs a whole `realWidAt` worth,
+-- because a subscribe may register a width of new observables; a
+-- delivery down one already-registered chain deepens by one operator's
+-- worth and no more.  If this needed a width the sum below would be
+-- `length chains` widths and the statement over it would be false.
+postulate
+  depthChain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (rid : RegId)
+    (c : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    depthChain nextId a c sched (markD rid st)
+      ≤ nestDᵛ (arrTy a) (arrVal a) + pathNestD c
+        + storeNestMax sched st + nestSyn e sl
+
+-- WHAT ONE CHAIN STEP COSTS THE STORE, in the same currency and for the
+-- same reason: a delivery stores one operator's worth deeper than what
+-- was already there.  This is the tail's half of the leaf above -- that
+-- one bounds the DEPTH the step reports, this one the STORE it leaves
+-- behind, and the induction needs both because its two tails are read
+-- at the state the step produced.
+postulate
+  chainStep-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (rid : RegId)
+    (c : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    let k = chainStep nextId a c sched (markD rid st)
+    in storeNestMax (proj₁ (proj₂ k)) (proj₂ (proj₂ k))
+         ≤ storeNestMax sched st + nestSyn e sl
+
+-- AND THE CAPS PREMISE AT THE STATE THE STEP PRODUCED, which is the one
+-- thing the induction cannot get from the state it started at.  The
+-- index MOVES: a step is not cap-preserving at a fixed index, and the
+-- walk's own preservation hands back a `frameStep`-blown cap, so the
+-- honest statement is the next index up.  That costs the induction
+-- nothing, because its conclusion does not mention the index at all --
+-- the caps appear only in the premise, so the hypothesis may be taken
+-- at whatever index the tail is actually good at.
+postulate
+  chainStep-caps-suc : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (rid : RegId)
+    (c : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    let k = chainStep nextId a c sched (markD rid st)
+    in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ k)) (proj₂ (proj₂ k)) ≡ true
+
 -- ONE ARRIVAL'S CHAINS, CHARGED PER CHAIN, over an ARBITRARY chain list
 -- and an arbitrary state -- which is what makes it inductable at all.
 -- The consumer wants it at the cascade's own entry, and a statement
@@ -1382,18 +1456,54 @@ postulate
 -- index.  `chainStep-slots` is the smaller half of the same problem
 -- and only needs moving down: it lives above this module and is a
 -- one-line composition of `foldPath-slots`, which lives below it.
-postulate
-  depthCascade-perChain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    depthCascade a nextId chains sched st
-      ≤ nestDᵛ (arrTy a) (arrVal a)
-        + chainsNestD chains
-        + storeNestMax sched st
-        + length chains * nestSyn e sl
+depthCascade-perChain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  depthCascade a nextId chains sched st
+    ≤ nestDᵛ (arrTy a) (arrVal a)
+      + chainsNestD chains
+      + storeNestMax sched st
+      + length chains * nestSyn e sl
+depthCascade-perChain sl id a nextId [] sched st hsl hcaps = z≤n
+depthCascade-perChain {e = e} sl id a nextId ((rid , c) ∷ cs) sched st hsl hcaps =
+  ⊔-lub X (⊔-lub Y Z)
+  where
+  N   = nestDᵛ (arrTy a) (arrVal a)
+  S   = storeNestMax sched st
+  ns  = nestSyn e sl
+  Ccs = chainsNestD cs
+  A   = pathNestD c ⊔ Ccs
+  L   = length cs
+  k   = chainStep nextId a c sched (markD rid st)
+  sd₁ = proj₁ (proj₂ k)
+  st₁ = proj₂ (proj₂ k)
+
+  X : depthCascade a nextId cs sched st ≤ N + A + S + suc L * ns
+  X = ≤-trans (depthCascade-perChain sl id a nextId cs sched st hsl hcaps)
+              (+-mono-≤ (+-monoˡ-≤ S (+-monoʳ-≤ N (m≤n⊔m _ _)))
+                        (*-mono-≤ (n≤1+n L) (≤-refl {ns})))
+
+  Y : depthChain nextId a c sched (markD rid st) ≤ N + A + S + suc L * ns
+  Y = ≤-trans (depthChain-nest sl a nextId rid c sched st hsl)
+              (+-mono-≤ (+-monoˡ-≤ S (+-monoʳ-≤ N (m≤m⊔n _ _)))
+                        (m≤m+n ns (L * ns)))
+
+  eqZ : ∀ B S′ ns′ M → (B + (S′ + ns′)) + M ≡ (B + S′) + (ns′ + M)
+  eqZ = solve 4 (λ B S′ ns′ M →
+                   ((B :+ (S′ :+ ns′)) :+ M) := ((B :+ S′) :+ (ns′ :+ M)))
+              refl
+
+  Z : depthCascade a nextId cs sd₁ st₁ ≤ N + A + S + suc L * ns
+  Z = ≤-trans (depthCascade-perChain sl (suc id) a nextId cs sd₁ st₁
+                 (trans (chainStep-slots nextId a c sched (markD rid st)) hsl)
+                 (chainStep-caps-suc sl id a nextId rid c sched st hsl hcaps))
+      (≤-trans (+-mono-≤ (+-mono-≤ (+-monoʳ-≤ N (m≤n⊔m _ _))
+                                   (chainStep-nest sl a nextId rid c sched st hsl))
+                         (≤-refl {L * ns}))
+               (≤-reflexive (eqZ (N + A) S ns (L * ns))))
 
 -- HOW MANY CHAINS ONE ARRIVAL CAN HAVE, in the nesting currency rather
 -- than the caps.  `chainsOf-length` above already takes this to the

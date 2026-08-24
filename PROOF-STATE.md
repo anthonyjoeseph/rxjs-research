@@ -159,10 +159,17 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`depthCascade-perChain`** (Caps-Face/Part7) — DIFFICULTY: the cascade face's
-  chain walk over an arbitrary chain list, charged one `nestSyn` per CHAIN. A
-  branch-free left side reports its tail at a state the evaluator never visits,
-  so a run quantity cannot close the cons clause and a list quantity can.
+- **`depthChain-nest`** (Caps-Face/Part7) — DIFFICULTY: one chain's delivery,
+  within the base terms plus exactly ONE `nestSyn`. The whole per-chain sum
+  rests on this: a delivery that needed a width instead would make the sum
+  `length chains` widths. Measured on every chain of every cut-family row.
+- **`chainStep-caps-suc`** (Caps-Face/Part7) — DIFFICULTY: the caps premise at
+  the state a chain step produced, at the NEXT index. A step is not
+  cap-preserving at a fixed index, and the walk hands back a `frameStep`-blown
+  cap; the induction can take the moving index because its conclusion is id-free.
+- **`chainStep-nest`** (Caps-Face/Part7) — DIFFICULTY: what one chain step costs
+  the store, one `nestSyn`. The tail's half of `depthChain-nest`: that one bounds
+  the depth a step reports, this one the store it leaves behind.
 - **`chainsOf-real`** (Caps-Face/Part7) — DIFFICULTY: how many chains one arrival
   can have, under the real width. `chainsOf-length` carries it to the registry;
   the caps route overshoots, `cReg` being blown up where the width is bare.

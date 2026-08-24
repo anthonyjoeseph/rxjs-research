@@ -29,7 +29,7 @@
 -- remaining postulate on this side is `sizeCount-mono-d` (§ D).
 module Verify-Budget-Sufficient.Caps-Bridge where
 
-open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤; *-monoˡ-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
@@ -44,15 +44,15 @@ open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
 
-open import Rx.Prim      using (Gas; Tick; Id; Fuel; close; exhausted)
+open import Rx.Prim      using (Gas; Tick; Id; Fuel)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
 open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; concat-st; RegId; Path; root; arrTy; arrVal; arrTick;
-  arrSource; cascade; cascadeGo; cascadeLatch; cascadeFinish; chainStep; chainsOf; hasDry;
-  subscribeE; budgetAt; opIterD; sizeStep; capsBase; sched-next; schedGo; schedHeadOf;
-  schedEarlier; drain; evaluate; sched-init; st-init)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; concat-st; RegId; Path; root; arrTy; arrVal; cascade;
+  cascadeGo; cascadeLatch; cascadeFinish; chainStep; chainsOf; hasDry; subscribeE; budgetAt;
+  opIterD; sizeStep; capsBase; sched-next; schedGo; schedHeadOf; schedEarlier; drain; evaluate;
+  sched-init; st-init)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
@@ -85,12 +85,11 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
   (cascadeGo-deliv-real; caps-tick; cascade-depth-capsH; cascadeLatch-caps; chainsOf-caps;
-   chainsOf-length)
+   chainsOf-length; chainStep-slots)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-parts; capsOK?-regs; foldPath-slots;
-   slotsCaps?-capsAt)
+  (capsOK?-count; capsOK?-parts; capsOK?-regs; slotsCaps?-capsAt)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
@@ -154,20 +153,14 @@ open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-wid
 -- the `slots` field.  Most of the clique's own slots-invariance is
 -- ALREADY PROVEN one layer down:
 -- `.Keeps-Ring` (`subscribeE-slots`) carries it through the
--- whole subscribe clique via the `Keeps` invariant, `Caps-Face.agda:
--- 3690+` (`foldPath-slots`/`dispatchShare-slots`/`shareGo-slots`) has
+-- whole subscribe clique via the `Keeps` invariant, `Caps-Face`
+-- (`foldPath-slots`/`dispatchShare-slots`/`shareGo-slots`) has
 -- the delivery side, and `.Measures` (`finish-slots`) covers
--- `cascadeFinish`.  Only two thin wrappers were missing — `chainStep`
--- (one call into `foldPath`) and `cascadeGo`'s own fold over chains —
--- and both are direct compositions of what already exists.
-chainStep-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots (proj₁ (proj₂ (chainStep id a path sched st))) ≡ Sched.slots sched
-chainStep-slots {n = n} {e = e} id a path sched st =
-  foldPath-slots (budgetAt e (Sched.slots sched) id) n id (arrTick a) (arrSource a) path (arrVal a ∷ [])
-                 (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-                 (Arrival.isLast a) sched st
-
+-- `cascadeFinish`.  Only two thin wrappers were missing -- `chainStep`
+-- (one call into `foldPath`, and it sits in `Caps-Face.Part7` now, with
+-- the per-chain induction that needs it) and `cascadeGo`'s own fold
+-- over chains -- and both are direct compositions of what already
+-- exists.
 cascadeGo-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (id : Id) (chains : List (RegId × Path Γ (arrTy a) t))
   (sched₀ : Sched Γ) (st₀ : EvalSt e) →
