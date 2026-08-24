@@ -585,6 +585,33 @@ depthWideRow ds ks j ww w =
      ++ "  one=" ++ show one ++ "  wide=" ++ show wid
      ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
 
+-- SERIES T (8000000): the CONCAT DRAIN arc, which is the one arc of the
+-- depth family whose `suc` the bound has no path term to pay.  A
+-- `thru-outer` frame's `suc` is paid by `pathNestD`, which charges that
+-- frame and only that frame — but `depthFinC`'s drain also spends a
+-- `suc`, and it is reached through a `from-inner` frame, which the path
+-- measure charges nothing for.  So on the accounting the drain's level
+-- has to come out of the single `nestSyn`, and whether that is enough is
+-- not something reading the definitions settles.  `progU` is the
+-- concatAll family — three inners queued behind one — so its root
+-- subscribe is where the drain actually fires.
+depthConcatRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
+depthConcatRow ds ks j d k =
+  let sl  = insT ds ks j
+      p   = progU d k
+      sd  = sched-init p sl
+      st  = st-init p
+      κ   = root
+      lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
+      bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
+      one = bas + nestSyn p sl
+      wid = bas + realWidAt p sl 0 * nestSyn p sl
+  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+     ++ " d=" ++ show d ++ " k=" ++ show k
+     ++ "  depthE=" ++ show lhs
+     ++ "  one=" ++ show one ++ "  wide=" ++ show wid
+     ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
+
 depthOneRow : ℕ → ℕ → ℕ → String
 depthOneRow j d k =
   let p   = progD d k
@@ -646,6 +673,14 @@ leafRow fam steps ds ks j w k =
            in "W ww=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
               ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 3
+     then (let slT = insT ds ks j
+               p   = progU w k
+               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                               (sched-init p slT) (st-init p)
+           in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ leafWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else (let p = progF w k
                r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
@@ -656,7 +691,15 @@ leafRow fam steps ds ks j w k =
 chainRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 chainRow fam steps ds ks j w k =
   let slF = insF ds ks j
-  in if fam ≡ᵇ 0
+  in if fam ≡ᵇ 3
+     then (let slT = insT ds ks j
+               p   = progU w k
+               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                               (sched-init p slT) (st-init p)
+           in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ chainWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 0
      then (let p = progC ds w k
                r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
@@ -1018,7 +1061,14 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
 rowAt n =
-  if 7000000 ≤ᵇ n
+  if 9000000 ≤ᵇ n
+  then (let m = n ∸ 9000000
+        in chainRow 3 16 1 2 1 m 2 ++ " || " ++ depthConcatRow 1 2 0 m 2)
+  else if 8000000 ≤ᵇ n
+  then (let m = n ∸ 8000000
+        in depthConcatRow (m / 10000) ((m % 10000) / 1000) ((m % 1000) / 100)
+                          ((m % 100) / 10) (m % 10))
+  else if 7000000 ≤ᵇ n
   then (let m = n ∸ 7000000
         in depthWideRow (m / 10000) ((m % 10000) / 1000) ((m % 1000) / 100)
                         ((m % 100) / 10) (m % 10))

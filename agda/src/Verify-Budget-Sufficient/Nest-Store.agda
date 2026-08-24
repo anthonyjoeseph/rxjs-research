@@ -50,7 +50,7 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-identityʳ; m^n>0)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-identityʳ)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -272,19 +272,6 @@ abstract
     nestCapAt e sl (suc id)
       ≡ nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
   nestCapAt-suc e sl id = refl
-
-  -- THE WIDTH IS POSITIVE, at every index, which is what lets a
-  -- statement charging ONE `nestSyn` be widened into one charging a
-  -- width.  It has to be proven here because both clauses need `nwAt`
-  -- to unfold: at the entry index the width IS the caps base, and above
-  -- it the width is a power of a successor, so neither reduces outside
-  -- the seal.
-  1≤realWidAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) → 1 ≤ realWidAt e sl id
-  1≤realWidAt e sl zero    = s≤s z≤n
-  1≤realWidAt e sl (suc id) =
-    m^n>0 (suc (realWidAt e sl id))
-          (suc (nestCapAt e sl id + realWidAt e sl id * nestSyn e sl))
 
   -- THE HEIGHT COMPARISON, and it is the entire bet this module carries,
   -- reduced to one number.  Both sides of the arithmetic obligation

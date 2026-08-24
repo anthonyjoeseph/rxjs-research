@@ -159,24 +159,14 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`depthChain-nest`** (Caps-Face/Part7) — DIFFICULTY: one chain's delivery,
-  within the base terms plus exactly ONE `nestSyn`. The whole per-chain sum
-  rests on this. Measured flat in the width a delivery subscribes, which is the
-  shape that could have refuted it — nesting depth does not see width.
-- **`chainStep-caps-suc`** (Caps-Face/Part7) — DIFFICULTY: the caps premise at
-  the state a chain step produced, at the NEXT index. A step is not
-  cap-preserving at a fixed index, and the walk hands back a `frameStep`-blown
-  cap; the induction can take the moving index because its conclusion is id-free.
-- **`chainStep-nest`** (Caps-Face/Part7) — DIFFICULTY: what one chain step costs
-  the store, one `nestSyn`. The tail's half of `depthChain-nest`: that one bounds
-  the depth a step reports, this one the store it leaves behind.
-- **`chainsOf-real`** (Caps-Face/Part7) — DIFFICULTY: how many chains one arrival
-  can have, under the real width. `chainsOf-length` carries it to the registry;
-  the caps route overshoots, `cReg` being blown up where the width is bare.
-- **`depthE-nest`** (Caps-Bridge) — DIFFICULTY: the subscribe-side depth
-  induction, at ONE `nestSyn` and no width at all. The width form is now a
-  widening off `1≤realWidAt`, so the two faces are one statement; measured flat
-  while the width term climbed past six billion.
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
+  whole cascade, in the width currency. The narrow and per-chain forms are both
+  REFUTED — concat's drain spends a level no path term pays for — so the width
+  factor is content, not decoration, and the per-chain route is dead.
+- **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
+  depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
+  at a fold depth of five; this form clears the same family by three orders of
+  magnitude. Nineteen mutual members, every level paid by a path term but one.
 - **`cascadeGo-nest-perDeliv`** (Caps-Bridge) — DIFFICULTY: the chain walk's
   induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
   tight — the overshoot is a constant per delivery on both axes. Residue: a
