@@ -20,7 +20,7 @@
 --      runProtocol's distribution over ++.
 module Verify-Well-Formed.Part3 where
 
-open import Data.Bool    using (true; false)
+open import Data.Bool    using (Bool; true; false)
 open import Data.Bool.Properties using (∨-identityʳ)
 open import Data.Fin     using (Fin; toℕ)
 open import Data.Vec     using (lookup)
@@ -46,6 +46,7 @@ open import Rx.Exp       using (Ctx; Closed; Ty; Val; Fn; obs; mapᵉ; natᵗ; _
 open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; map-f; scan-f; take-f; cutThrough;
   memberSource; NodeId; lookupNode; scan-st; take-st; st-init; LiveSource; subscribeE;
   mintSource; register; installNode; mintNode; sameSource; hasDry; subscribeSharedSlot;
+  flatten-st; flattenᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
@@ -586,29 +587,106 @@ postulate
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
 
-  -- NOTE: no `subscribeAll-wf` helper is stated here, and that is
-  -- deliberate.  A POSTULATE CANNOT CONSUME ANYTHING, so a helper written
-  -- for the four *All clauses — which are themselves postulated below — is
-  -- necessarily an orphan, and no wiring fixes it.  It gets a consumer only
-  -- when one of those clauses acquires a real proof; state it then.
+  -- NOTE: no `subscribeAll-wf` helper is stated here for the two
+  -- remaining *All clauses, and that is deliberate.  A POSTULATE CANNOT
+  -- CONSUME ANYTHING, so a helper written for clauses that are
+  -- themselves postulated below is necessarily an orphan, and no wiring
+  -- fixes it.  It gets a consumer only when one of those clauses
+  -- acquires a real proof; state it then.  The flatten clause has one,
+  -- which is why the four leaves below exist and the switch and exhaust
+  -- faces still have none.
 
-  -- ONE STATEMENT FOR EVERY LIMIT.  The merge and concat faces of this
-  -- were textually identical but for the constructor, so the collapse is
-  -- a rename and not a weakening: the limit is a parameter the statement
-  -- never reads, which is exactly why one postulate covers the bounded
-  -- case the two old faces could not express between them.
-  subscribeE-flatten-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  -- THE FLATTEN WRAP, LEAF BY LEAF.  `subscribeE (flattenᵉ lim b)`
+  -- reduces to `subscribeAll flattenᵒ (flatten-st lim 0 [] false) b`,
+  -- which mints a node, installs it, subscribes the SOURCE under a
+  -- `thru-outer flattenᵒ nid` frame, and pushes the resulting burst
+  -- back through that frame.  So the clause is the scan clause's shape
+  -- with the frame and the initial node state swapped, and it splits at
+  -- the same four joints: carry the invariant across the mint, carry
+  -- the dry premise inward, read the node the inner burst left, and
+  -- push the protocol run and `valsLast?` back out.
+  --
+  -- ONE STATEMENT FOR EVERY LIMIT, and the limit is why this is now
+  -- worth splitting at all.  The old merge and concat faces were
+  -- textually identical but for the constructor, so the collapse was a
+  -- rename rather than a weakening -- the limit is a parameter these
+  -- statements never read, which is exactly what lets one set of leaves
+  -- cover the bounded case neither old face could express.
+
+  flatten-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
-    ProtocolSt.done S ≡ false →
+    BurstInv id (proj₂ (mintNode sched))
+      (installNode (proj₁ (mintNode sched)) (flatten-st {t = u} lim 0 [] false) st) S
+
+  flatten-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (lim : Maybe ℕ)
+    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     hasDry (proj₁ (subscribeE fuel (flattenᵉ lim b) κ id now sched st)) ≡ false →
-    Σ ProtocolSt λ S′ →
+    hasDry (proj₁ (subscribeE fuel b (thru-outer flattenᵒ (proj₁ (mintNode sched)) ↠ κ)
+                     id now (proj₂ (mintNode sched))
+                     (installNode (proj₁ (mintNode sched))
+                        (flatten-st {t = u} lim 0 [] false) st)))
+           ≡ false
+
+  flatten-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (lim : Maybe ℕ)
+    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    valsLast? (proj₁ (subscribeE fuel b (thru-outer flattenᵒ (proj₁ (mintNode sched)) ↠ κ)
+                        id now (proj₂ (mintNode sched))
+                        (installNode (proj₁ (mintNode sched))
+                           (flatten-st {t = u} lim 0 [] false) st)))
+              ≡ true →
+    valsLast? (proj₁ (subscribeE fuel (flattenᵉ lim b) κ id now sched st)) ≡ true
+
+  -- THE NODE THE INNER BURST LEFT, and the one leaf of the four that
+  -- the limit reaches.  `emptyQueue?` is what a completion gate reads
+  -- alongside the active count, and at an unbounded limit the queue is
+  -- structurally dead -- which is the content of
+  -- `Rx.Flatten-Laws.unbounded-never-parks`, iterated over the burst's
+  -- emissions rather than applied at one of them.  The conjunct is
+  -- stated at every limit and claimed only at `nothing`, so a bounded
+  -- run yields the node's shape and no promise about its queue.
+  flatten-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (lim : Maybe ℕ)
+    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    let nid = proj₁ (mintNode sched)
+        r₀  = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now
+                (proj₂ (mintNode sched))
+                (installNode nid (flatten-st {t = u} lim 0 [] false) st)
+    in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
+         (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
+            ≡ just (flatten-st {t = u} lim act q od))
+         × (lim ≡ nothing → q ≡ [])
+
+  -- THE PUSH BACK OUT, the flatten twin of `subscribeE-scan-wf`: it
+  -- takes the inner subscription's whole receipt -- protocol run,
+  -- invariant and the node above -- and returns the outer's.
+  subscribeE-flatten-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (lim : Maybe ℕ)
+    (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
+    BurstInv id sched st S →
+    (let nid = proj₁ (mintNode sched)
+         r₀  = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now
+                 (proj₂ (mintNode sched))
+                 (installNode nid (flatten-st {t = u} lim 0 [] false) st)
+     in Σ ProtocolSt λ S′ →
+          (runProtocol S (proj₁ r₀) ≡ just S′)
+          × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
+          × (Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
+               (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
+                  ≡ just (flatten-st {t = u} lim act q od))
+               × (lim ≡ nothing → q ≡ []))) →
+    Σ ProtocolSt λ S″ →
       let r = subscribeE fuel (flattenᵉ lim b) κ id now sched st
-      in (runProtocol S (proj₁ r) ≡ just S′)
-         × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
-         × (valsLast? (proj₁ r) ≡ true)
+      in (runProtocol S (proj₁ r) ≡ just S″)
+         × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S″
 
   subscribeE-switchAll-wf : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)

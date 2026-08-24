@@ -151,11 +151,13 @@ GATE, and `Rx.Flatten-Laws` is the door it is stated behind.
 
 **ONE ROW LEFT, AND IT IS THE ONLY NON-LOCAL ONE.** Both un-rowed obligations
 are closed — the two trees no longer name the removed constructors, and the wf
-ledger's four-way *All split is one `subscribeE-flatten-wf`. Three of the four
+ledger's four-way *All split is one flatten face. Three of the four
 gate laws went with them: the drain scrutinises the GATE and nothing else, so
 saturation, the lane bound and shrinkage are one walk each, and the caps face
 had already proven the third under its own name. What is left is the claim
 about a node the inner's own burst can re-enter, which no hypothesis bounds.
+Its consumer exists — the flatten wrap is a real clause — but the leaf that
+would spend it is postulated, so the route home is a burst induction.
 
 - **`unbounded-never-parks`** (Flatten-Laws) — SHAPE: the conclusion is a
   predicate on a node LOOKUP rather than an equation, because `NodeState` holds
@@ -240,9 +242,10 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   counterexample can be built at. Coverage boundary in its header.
 - **`mid-readoff`** (Part11) — FALSITY: the FoldOut readoff, and FoldOut is a
   6-field invariant validated at exactly one clause.
-- **`subscribeE-flatten-wf` / `subscribeE-{switch,exhaust}All-wf`** (Part3) —
-  SHAPE: written against a flatten coherence whose statement is still open (the
-  cert sketch in Part8's establishment block).
+- **`subscribeE-{switch,exhaust}All-wf`** (Part3) — SHAPE: written against a
+  coherence whose statement is still open (the cert sketch in Part8's
+  establishment block). The flatten face is no longer among them: it is a real
+  clause, and its leaves are the five rows below.
 - **`stepFrame-wf-outer`** (Part9) — SHAPE, on a ROUTE claim rather than the
   statement: discharging it means enriching `stepFrame-wf` to carry FoldOut out,
   restating this family. GRIND it after `stepFrame-wf-inner-flatten`, which it
@@ -253,6 +256,13 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the sources the
   conclusions speak about. Restate over the (LAG) ledger; header carries the
   repair and why it was not ground here.
+- **`flatten-node`** (Part3) — DIFFICULTY: the node the wrap's inner burst
+  leaves, and the only one of the five the limit reaches. Its queue conjunct at
+  an unbounded limit is `unbounded-never-parks` iterated over the burst, which
+  is what gives that claim a consumer once this is a body.
+- **`subscribeE-flatten-push`** (Part3) — DIFFICULTY: the wrap's push half,
+  protocol run and invariant back out through `thru-outer`. Twin: the scan
+  face's `subscribeE-scan-wf`, same joint, and that one is proven.
 - **`dispatchShare-wf`** (Part9) — DIFFICULTY: the share arm's run equation,
   `foldPath-wf`'s third clause. Its FoldOut half belongs to
   `foldPath-share-out`, so the statement as written is what `foldPath-out`
@@ -287,6 +297,12 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   precedent, so being unblocked is not the same as being mechanical.
 - **`stepFrame-wf-inner-flatten`** (Part9) — DIFFICULTY: the drain grows the
   registry; re-establish FoldInv. Independent of the cert.
+- **`flatten-binv-adapt`** (Part3) — GRINDABLE: mint and install touch neither
+  registry nor live, so every BurstInv field survives. The scan twin is proven
+  at the same two operations.
+- **`flatten-nodry-push` / `flatten-valsLast-push`** (Part3) — GRINDABLE: carry
+  the dry premise in and `valsLast?` out through the wrap frame, clause for
+  clause against the map and scan pushes at the same frame shape.
 - **`map-nodry-push`** (Part3) — GRINDABLE: every ingredient is PROVEN —
   `pushBurst-map-char` (.Part5) and the dry family `splitEvents-nodry` /
   `retagEvents-dry` / `mapValue-dry` / `any-dry-++` (.Walk-Level). Only import

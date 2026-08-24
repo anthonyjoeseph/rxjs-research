@@ -38,7 +38,7 @@ open import Rx.Exp       using (Ctx; Closed; Val; mapᵉ; natᵗ; Tm; scanᵉ; t
   flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; unfoldμ)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; Path; root; _↠_; map-f; scan-f; take-f; takeVals; setNode;
   memberSource; NodeId; lookupNode; scan-st; take-st; sched-init; st-init; foldPath;
-  subscribeE; splitEvents; pushBurst; installNode; mintNode; sameSource; hasDry; budgetAt)
+  subscribeE; splitEvents; pushBurst; installNode; mintNode; sameSource; hasDry; budgetAt; flatten-st; flattenᵒ; thru-outer)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; protocol-init; stepProtocol; runProtocol; paidUp; settle;
   applyEvents; valsLast?)
@@ -59,7 +59,11 @@ open import Verify-Well-Formed.Part3 using (map-nodry-push; map-valsLast-push;
                                             subscribeE-defer-wf;
                                             subscribeE-exhaustAll-wf;
                                             subscribeE-input-wf;
-                                            subscribeE-flatten-wf;
+                                            flatten-binv-adapt;
+                                            flatten-node;
+                                            flatten-nodry-push;
+                                            flatten-valsLast-push;
+                                            subscribeE-flatten-push;
                                             subscribeE-switchAll-wf;
                                             take-binv-adapt; take-node;
                                             take-nodry-push)
@@ -383,8 +387,20 @@ subscribeE-wf fuel (scanᵉ f seed b) κ id now sched st S binv deq nodry =
   in S″ , run , binv″ , scan-valsLast-push fuel f seed b κ id now sched st vl₀
 
 -- ── *All ─────────────────────────────────────────────────────────────────────
-subscribeE-wf fuel (flattenᵉ lim b) κ id now sched st S binv deq nodry =
-  subscribeE-flatten-wf lim fuel b κ id now sched st S binv deq nodry
+-- ── flattenᵉ: a real body, the scan clause's shape at the wrap frame ─────────
+subscribeE-wf {u = u} fuel (flattenᵉ lim b) κ id now sched st S binv deq nodry =
+  let nid    = proj₁ (mintNode sched)
+      sched₁ = proj₂ (mintNode sched)
+      st₁    = installNode nid (flatten-st {t = u} lim 0 [] false) st
+      (S′ , run₀ , binv₀ , vl₀) =
+        subscribeE-wf fuel b (thru-outer flattenᵒ nid ↠ κ) id now sched₁ st₁ S
+          (flatten-binv-adapt lim fuel b κ id now sched st S binv)
+          deq
+          (flatten-nodry-push lim fuel b κ id now sched st nodry)
+      (S″ , run , binv″) =
+        subscribeE-flatten-push lim fuel b κ id now sched st S binv
+          (S′ , run₀ , binv₀ , flatten-node lim fuel b κ id now sched st)
+  in S″ , run , binv″ , flatten-valsLast-push lim fuel b κ id now sched st vl₀
 subscribeE-wf fuel (switchAllᵉ b)  κ id now sched st S binv deq nodry =
   subscribeE-switchAll-wf fuel b κ id now sched st S binv deq nodry
 subscribeE-wf fuel (exhaustAllᵉ b) κ id now sched st S binv deq nodry =
