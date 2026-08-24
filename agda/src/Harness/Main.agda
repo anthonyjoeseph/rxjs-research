@@ -568,6 +568,61 @@ splitWalk e sl (suc m) id nextId sched st with sched-next sched
      ++ splitWalk e sl m (suc id) (suc nextId)
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- SERIES Y (12000000): DOES THE WALK'S STORE GROWTH SATURATE OR
+-- ACCUMULATE?  This is the one question that decides the shape of the
+-- store row's induction, and it is decidable by instantiation because
+-- `storeNestMax` is a MAX -- a `⊔` of four `⊔`-folds -- so a walk that
+-- stores repeatedly need not grow repeatedly.  A row runs `cascadeGo`
+-- on every PREFIX of the arrival's chain list and prints the store
+-- after each, so the sequence itself is the answer: flat after the
+-- first step means the max absorbs every later one and the induction
+-- needs no budget, while a sequence that climbs per step means the
+-- growth has to be threaded and the width factor is what pays.
+--
+-- LOAD-BEARING only where the chain list has more than one entry; a
+-- one-chain family reports a two-element sequence that cannot
+-- distinguish the two readings, so `c` is printed and a row with `c`
+-- at one is evidence about nothing here.
+pfxL : ∀ {A : Set} → ℕ → List A → List A
+pfxL 0       xs       = []
+pfxL (suc i) []       = []
+pfxL (suc i) (x ∷ xs) = x ∷ pfxL i xs
+
+satGo : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (a : Arrival Γ) → ℕ
+      → List (RegId × Path Γ (arrTy a) t) → Sched Γ → EvalSt e → ℕ → String
+satGo a nextId ch sd stL 0       = ""
+satGo a nextId ch sd stL (suc i) =
+  let g = cascadeGo a nextId (pfxL (suc i) ch) sd stL
+  in " " ++ show (suc i) ++ ":"
+     ++ show (storeNestMax (proj₁ (proj₂ g)) (proj₂ (proj₂ g)))
+     ++ satGo a nextId ch sd stL i
+
+satWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+        → ℕ → ℕ → Sched Γ → EvalSt e → String
+satWalk e sl 0       nextId sched st = ""
+satWalk e sl (suc m) nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      ch  = chainsOf a st
+      g   = cascadeGo a nextId ch sd stL
+      aft = storeNestMax (proj₁ (proj₂ g)) (proj₂ (proj₂ g))
+      dep = depthCascade a nextId ch sd stL
+      nv  = nestDᵛ (arrTy a) (arrVal a)
+      cn  = chainsNestD ch
+      r   = cascade a nextId sd st
+  in " | c=" ++ show (length ch)
+     ++ " d=" ++ show (delivN stL (proj₂ (proj₂ g)))
+     ++ " S=" ++ show (storeNestMax sd stL)
+     ++ " ns=" ++ show (nestSyn e sl)
+     ++ " N=" ++ show nv ++ " C=" ++ show cn
+     ++ " D=" ++ show dep ++ " A=" ++ show aft
+     ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
+     ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
+     ++ " |" ++ satGo a nextId ch sd stL (length ch)
+     ++ satWalk e sl m (suc nextId)
+                (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
 -- SERIES Q (4000000): the PER-CHAIN currency, and the conversion it
 -- would need.  `depthCascade`'s cons clause reports its tail at TWO
 -- states -- the skip arm's and the live arm's -- and only one of them
@@ -889,6 +944,40 @@ cutRow fam steps ds ks j w k =
            in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
               ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+
+satRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+satRow fam ds ks j w k =
+  let slF = insF ds ks j
+  in if fam ≡ᵇ 0
+     then (let p = progC ds w k
+               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "C dd=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 4
+     then (let p = progU w k
+               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "Uh d=" ++ show w ++ " k=" ++ show k
+              ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 2
+     then (let p = progW ds w k
+               r = subscribeE (gasPad (sucGW ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "W ww=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 3
+     then (let slT = insT ds ks j
+               p   = progU w k
+               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                                (sched-init p slT) (st-init p)
+           in "U d=" ++ show w ++ " k=" ++ show k
+              ++ satWalk p slT 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else (let p = progF w k
+               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "F ds=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
 
 splitRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 splitRow fam steps ds ks j w k =
@@ -1257,6 +1346,11 @@ rowAt n =
   then (let m = n ∸ 20000000
         in depthFanRow (m / 1000) ((m % 1000) / 100)
                        ((m % 100) / 10) (m % 10))
+  else if 12000000 ≤ᵇ n
+  then (let m = n ∸ 12000000
+        in satRow (m / 100000) ((m % 100000) / 10000)
+                  ((m % 10000) / 1000) ((m % 1000) / 100)
+                  ((m % 100) / 10) (m % 10))
   else if 11000000 ≤ᵇ n
   then (let m = n ∸ 11000000
         in splitRow (m / 100000) 16 ((m % 100000) / 10000)

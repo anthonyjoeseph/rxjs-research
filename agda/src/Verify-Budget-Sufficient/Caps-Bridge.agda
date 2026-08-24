@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH;
+  (caps-tick; cascade-depth-capsH; cascadeGo-nest;
    cascadeLatch-caps; chainsOf-caps; chainsOf-length; chainStep-slots)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
@@ -800,61 +800,6 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- cascade's bookkeeping around it.  The split is what makes the fit
 -- checked: this body reduces, so the day the walk leaf is proven is the
 -- day we learn it was the right leaf.
-
--- THE WALK'S STORE GROWTH, IN THE WIDTH CURRENCY, AND IT IS PRIMITIVE.
--- One arrival's chain walk leaves the store measure no deeper than it
--- found it plus one `nestSyn` per unit of REAL WIDTH.  The width factor
--- is the content rather than decoration over a narrower truth, and the
--- mechanism is one arc: mergeAll's DRAIN stores each released inner in
--- turn, and it is reached through a `from-inner` frame, which the path
--- measure charges nothing for -- so ONE delivery can store arbitrarily
--- many times, and no charge that counts what the run DID can bound it.
--- `realWidAt` is the one term in this vocabulary that moves with the
--- axis that drives the drain, which is why the width form clears the
--- rows the narrow ones cross on.
---
--- REFUTED: `Refuted.Cascade-Nest-PerDeliv` kills the per-DELIVERY half
---   this was assembled from -- store 12 against a charge of 10, at ONE
---   delivery and no cancellation, so neither the count nor a cancelled
---   tail is what breaks it.  The ingredient is a BOUNDED mergeAll
---   crossed with a HOT slot: unbounded families park nothing and never
---   reach a drain at all, and the bounded families that existed
---   scripted a COLD slot and scheduled no arrival, so no row this face
---   had run could have seen it.
--- REFUTED: `Refuted.Cascade-Deliv-Depth` is the same arc one face over,
---   on the descent measure rather than the store.
--- DEAD ROUTE: counting the walk's deliveries with the proven
---   `cascadeGo-deliveries` and dominating its bound by this increment.
---   The bound is CAP-side and the increment is deliberately real, and
---   the denomination law rules the comparison out in that direction:
---   this increment's width at the entry index IS `capsBase`, which is
---   the fuel the entry cap's own blowup is run at, so the delivery cap
---   is a count taken above the number it would have to fit under.  Nor
---   does the gap close as the instants go -- the real width iterates an
---   exponential per instant while the cap height iterates a tower, so
---   the side that must be dominated is the side that grows faster.
--- DEAD ROUTE: settling that comparison by instantiation instead of by
---   the law.  The real width evaluates and so does the cascade depth
---   the cap is read at, but `capsAt` fails to terminate even in
---   compiled code, so the cap record cannot be reached at any program
---   at any index and the comparison has no instance at all.
---   Hypothesis side fine, conclusion side blocked.
--- RECOVERY: `git show eab5c1c` restores the two-leaf assembly -- the
---   refuted per-delivery leaf, and the delivery-count leaf
---   `cascadeGo-deliv-real` whose only consumer it was, with the four
---   dead routes its own header carried.
-postulate
-  cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    let r = cascadeGo a nextId chains sched st
-    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
 
 store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

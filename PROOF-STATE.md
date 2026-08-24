@@ -161,14 +161,14 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-nest`** (Caps-Bridge) — DIFFICULTY: the chain walk's store growth,
-  width-denominated and primitive. Its per-delivery half is machine-refuted at
-  ONE delivery: the drain stores many times per delivery, so no count pays.
-  The row below threads it as a budget, so this one goes first.
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
-  cascade descent, width-denominated and primitive: both narrow readings are
-  machine-refuted, and no constant multiple can stand in — the descent is a
-  PRODUCT of the axes, every narrow term moves with one. Behind the row above.
+- **`cascadeGo-nest`** (Caps-Face/Part7) — DIFFICULTY: the chain walk's store
+  growth, width-denominated and primitive. Its per-delivery half is
+  machine-refuted at ONE delivery: the drain stores many times per delivery, so
+  no count pays. It now carries the whole width of the depth face too.
+- **`cascade-nest-store`** (Caps-Face/Part7) — DIFFICULTY: the descent under its
+  base terms plus the store the walk LEAVES, premise-free. It is what makes the
+  cascade descent a corollary of the row above rather than a second width
+  argument; probed over five families, the drain and the skip branch.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of
