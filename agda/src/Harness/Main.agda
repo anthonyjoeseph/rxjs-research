@@ -1,7 +1,7 @@
 -- THE MEASUREMENT HARNESS — a COMPILED calculator for the machine's own
 -- arithmetic.  A MODULE_ROOT (`make harness-build` / `make harness`), so it
 -- lives in `src` under the wiring law rather than in a staging directory
--- outside the claim graph.  `src/Main.agda` never reaches it, so `make agda`
+-- outside the claim graph.  `src/Main.agda` never reaches it, so `make gate-heavy`
 -- does not pay for it.
 --
 -- WHY IT EXISTS.  Two of this machine's number families do not normalise in
@@ -435,7 +435,9 @@ delivWalk e sl (suc m) nextId sched st with sched-next sched
 -- Every quantity computes and none of them is a cap.  LOAD-BEARING: the
 -- charge is one `nestSyn` per delivery, so a walk that stores deeper
 -- than the syntactic ceiling, or stores on a step that delivers
--- nothing, drives the left side over.
+-- nothing, drives the left side over.  The `Uh` family is here because
+-- its two unbounded siblings cannot reach a DRAIN at all, which is the
+-- gap that hid the depth face's refutation from three series at once.
 perDelivWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
              → ℕ → ℕ → Sched Γ → EvalSt e → String
 perDelivWalk e sl 0       nextId sched st = ""
@@ -506,6 +508,55 @@ cutWalk e sl (suc m) id nextId sched st with sched-next sched
          then " V" else " v")
      ++ cutWalk e sl m (suc id) (suc nextId)
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+-- SERIES X (11000000): WHERE the per-delivery bound loses, decomposed.
+-- The crossing itself is pinned, but a pinned crossing says only that
+-- the statement is false, and what a replacement needs is the SHAPE of
+-- the loss.  The descent climbs six per fold layer against the bound's
+-- three, which is a FACTOR rather than a missing constant, so no term
+-- added once can close it however large the constant.  This prints
+-- every summand of the bound beside the descent, and three candidate
+-- repairs against it -- the chain measure counted twice, the
+-- per-delivery charge doubled, and the width form the consumer states
+-- -- so that a row says which of them TRACKS the descent rather than
+-- merely clearing it.
+--
+-- LOAD-BEARING wherever `1ns` reads OVER, which is where the refuted
+-- statement is actually false; a candidate that reads ok only on rows
+-- the refuted one also clears is evidence about nothing.  `W` is read at
+-- id 0, the smallest the currency ever takes, because the recurrence
+-- overflows the stack above it.
+splitWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+          → ℕ → ℕ → ℕ → Sched Γ → EvalSt e → String
+splitWalk e sl 0       id nextId sched st = ""
+splitWalk e sl (suc m) id nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let stL  = cascadeLatch a st
+      ch   = chainsOf a st
+      g    = cascadeGo a nextId ch sd stL
+      dn   = delivN stL (proj₂ (proj₂ g))
+      nv   = nestDᵛ (arrTy a) (arrVal a)
+      cn   = chainsNestD ch
+      sn   = storeNestMax sd stL
+      ns   = nestSyn e sl
+      w    = realWidAt e sl 0
+      dep  = depthCascade a nextId ch sd stL
+      b1   = nv + cn + sn + dn * ns
+      b2   = nv + (cn + cn) + sn + dn * ns
+      b3   = nv + cn + sn + (dn + dn) * ns
+      b4   = nv + cn + sn + w * ns
+      flag = λ b → if dep ≤ᵇ b then "/ok" else "/OVER"
+      r    = cascade a nextId sd st
+  in " | id=" ++ show id ++ " D=" ++ show dep
+     ++ " N=" ++ show nv ++ " C=" ++ show cn ++ " S=" ++ show sn
+     ++ " ns=" ++ show ns ++ " W=" ++ show w ++ " d=" ++ show dn
+     ++ " 1ns=" ++ show b1 ++ flag b1
+     ++ " 2C=" ++ show b2 ++ flag b2
+     ++ " 2ns=" ++ show b3 ++ flag b3
+     ++ " Wns=" ++ show b4 ++ flag b4
+     ++ splitWalk e sl m (suc id) (suc nextId)
+                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 -- SERIES Q (4000000): the PER-CHAIN currency, and the conversion it
 -- would need.  `depthCascade`'s cons clause reports its tail at TWO
@@ -829,9 +880,41 @@ cutRow fam steps ds ks j w k =
               ++ " w=" ++ show w ++ " k=" ++ show k
               ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
 
+splitRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+splitRow fam steps ds ks j w k =
+  let slF = insF ds ks j
+  in if fam ≡ᵇ 0
+     then (let p = progC ds w k
+               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ splitWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 4
+     then (let p = progU w k
+               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+              ++ " j=" ++ show j ++ " k=" ++ show k
+              ++ splitWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else (let p = progF w k
+               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ splitWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+
 perDelivRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 perDelivRow fam steps ds ks j d k =
-  if fam ≡ᵇ 2
+  if fam ≡ᵇ 4
+  then (let slF = insF ds ks j
+            p   = progU d k
+            r   = subscribeE (gasPad (sucGU ds ks j d k) g0) p root 0 0
+                             (sched-init p slF) (st-init p)
+        in "Uh d=" ++ show d ++ " ds=" ++ show ds ++ " ks=" ++ show ks
+           ++ " j=" ++ show j ++ " k=" ++ show k
+           ++ perDelivWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+  else if fam ≡ᵇ 2
   then (let slF = insF ds ks j
             p   = progF d k
             r   = subscribeE (gasPad (sucGF ds ks j d k) g0) p root 0 0
@@ -1164,6 +1247,11 @@ rowAt n =
   then (let m = n ∸ 20000000
         in depthFanRow (m / 1000) ((m % 1000) / 100)
                        ((m % 100) / 10) (m % 10))
+  else if 11000000 ≤ᵇ n
+  then (let m = n ∸ 11000000
+        in splitRow (m / 100000) 16 ((m % 100000) / 10000)
+                    ((m % 10000) / 1000) ((m % 1000) / 100)
+                    ((m % 100) / 10) (m % 10))
   else if 10000000 ≤ᵇ n
   then (let m = n ∸ 10000000
         in depthLimRow (m / 100000) ((m % 100000) / 10000)

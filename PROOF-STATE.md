@@ -162,21 +162,17 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
-  cascade descent, width-denominated, and primitive again: both narrow readings
-  are now machine-refuted, the per-delivery one at a single chain. Clears the
-  crossing family by two orders of magnitude.
+  cascade descent, width-denominated and primitive: both narrow readings are
+  machine-refuted, and no constant multiple of either can stand in — one axis
+  moves the descent five per element and every narrow term not at all.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of
   magnitude. Nineteen mutual members, every level paid by a path term but one.
-- **`cascadeGo-nest-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: the chain walk's
-  induction, one `nestSyn` per delivery off the evaluator's ledger. Measured
-  tight — the overshoot is a constant per delivery on both axes. Residue: a
-  step that stores without delivering.
-- **`cascadeGo-deliv-real`** (Caps-Face/Part7) — DIFFICULTY: the walk's delivery
-  count under the real width; the STORE face spends it. Measures safe with wide
-  slack, but the proven counter is cap-denominated INSIDE its walk module, so
-  this wants new machinery — two dead routes recorded.
+- **`cascadeGo-nest`** (Caps-Bridge) — DIFFICULTY: the chain walk's store growth,
+  width-denominated and primitive. Its per-delivery half is machine-refuted at
+  ONE delivery, and the counting leaf that would have widened it went too: the
+  drain stores many times per delivery, so no count pays.
 - **`nest-height`** (Nest-Store, inside the seal) — DIFFICULTY: the arithmetic
   both depth rows spend, and no evaluator in it. One tower height for the
   currency's sum, one story below the caps height; the `blowH` conversion and

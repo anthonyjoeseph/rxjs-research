@@ -1145,149 +1145,6 @@ chainsOf-length : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   length (chainsOf a st) ≤ length (EvalSt.registry st)
 chainsOf-length a st = chainsGo-length a (EvalSt.registry st)
 
-------------------------------------------------------------------
--- THE DELIVERY-SIDE DEPTH BOUND — the cascade axis's mirror of
--- `depthE≤capsH-root`, and the one genuinely NEW obligation the P3/#9
--- signature pass creates.
---
--- WHY IT IS A POSTULATE AND NOT A DERIVATION.  Its subscribe-side
--- sibling `subscribe-depth-capsH` (.Caps-Bridge) bounds `depthE`, and
--- reaches none of the DELIVERY side: `depthCascade` gets to frames
--- through `chainStep`/`foldPath`/`stepFrame`, and every one of those is
--- outside `depthE`'s induction.  So this is a real gap with a real
--- statement, not a repackaging of one already proven — and the sibling
--- is itself open, so neither is the other's precedent.
---
--- WHERE THE LEVELS COME FROM.  A cascade climbs one nesting level per
--- thru-outer frame — `depthFrame`'s only `suc` on this side — so the
--- quantity to bound is how many such frames one arrival can drive.  One
--- induction should cover this and the subscribe side together, and
--- neither home is where it will live.
---
--- AND COUNTING THEM BY THE PATH LENGTH IS THE TRAP.  `pathSz?` caps a
--- chain's frames at `sizeAt S J`, so the count is available — as a
--- SIZE, which sits exponentially above `capsH` at every level, and the
--- gap is not an arithmetic one.  The sibling carries that finding and
--- the four dead currencies behind it; this row inherits all of it,
--- including which measure replaced them.
---
--- SO IT IS STATED IN THE NESTING CURRENCY, and split the same way: the
--- leaf is the delivery induction, bounding the cascade by the RAW
--- nesting of the arriving payload, of the chains it fans out to, and of
--- the store, plus the instant's fresh growth `realWidAt · nestSyn` —
--- the layers its own deliveries pile onto accumulators after the entry
--- reading.  The arithmetic half is `nest-sum-3` (.Nest-Store), which
--- the subscribe side spends too — genuinely shared rather than
--- mirrored.  `capsOK?` is still a premise, because the delivery
--- induction's fresh-mint bookkeeping is expected to spend the walk's
--- receipts; the fact the conclusion needs comes from `nestOK?`.
---
--- THIS ONE PROBES CLEANLY, WHICH ITS SIBLING DOES NOT.  Its only
--- uncomputable premise is `capsOK?`, so a row is a straight comparison
--- with nothing to satisfy first — where the sibling's `nestOK?` premise
--- goes unsatisfiable on the programs worth testing.  `Harness.Main`
--- Series F takes the evaluator's own next arrival off the schedule the
--- root subscribe hands over and computes both sides at the entry index,
--- the one whose fresh term is `capsBase` rather than the wrap tower.
---
--- The margin GROWS, and by an order rather than a factor.  On the
--- family's diagonal the measure is quadratic in the parameter while the
--- bound is cubic, so the ratio bottoms out in the middle of the range
--- and rises after it — the opposite of the subscribe side, which settles
--- on a constant.  Nothing refuted.
---
--- THE INDEX IS THE BOUNDARY, exactly as it is for `store-growth`: the
--- entry index is the only one where a row can fail, and no run reaches
--- it, because the instant loop starts one above and only climbs.  Rows
--- at a reachable index are slack by construction and are not run.
-
--- THE STATE AXIS HOLDS TOO, AND ONE FAMILY IS NEEDED TO SEE THAT IT IS
--- SAYING ANYTHING.  The parameter sweep reads one state — the one the
--- root subscribe produced — so a bound that widened with the program
--- said nothing about a bound walked along a run, where the store is the
--- term that grows.  Stepping real cascades nine deep over the arrival
--- family, the measure climbs and the difference between the two sides
--- does not move by one: the store's growth enters both sides in the
--- same amount.  Read alone that is a WEAK row, because a difference
--- that never moves is equally what a statement insensitive to the run
--- would report.
---
--- A family that connects its shared slot MID-RUN rather than in the
--- subscribe burst is what separates the two.  There the measure jumps
--- at the connect instant and the difference really does shrink, so the
--- rows can fail and the invariance above is a finding rather than an
--- artefact.  It does not fail: sweeping the shared program's value
--- count, the jump grows by ONE per value while the bound grows
--- quadratically in the same parameter, so the one instant that spends
--- margin spends a linear amount of a quadratic supply.
--- `Harness.Main`, measured-not-rechecked.
--- AND THE REAL-WIDTH COMPARISON MEASURES SAFE, WITH ROOM THAT WIDENS.
--- Both sides of `delivN ≤ realWidAt` compute — the count off the
--- evaluator's own delivered ledger, the width off `nwAt` — which is
--- what makes the real-denominated question instantiable where the
--- cap-denominated one was not.  Measured in `Harness.Main`
--- (measured-not-rechecked, so this discharges nothing): at the entry
--- index the count runs at one per registered chain while the width runs
--- at ten per chain, and sweeping the fan alone leaves the count linear
--- against a width of ten times the slope.  Widening the async length,
--- the source list and the shared def's own size moves the width up by
--- hundreds and the count not at all.
-
--- WHAT MAKES THE ROWS ROWS is that the fan is on a HOT slot.  Every
--- other family here reaches the arriving slot through a cold source,
--- and a cold source is re-created per subscription — so fanning one out
--- buys separate arrival INSTANTS each carrying a single chain, and the
--- count sits at one however wide the fan.  A count that cannot vary is
--- not evidence about a bound on counts, whatever the margin under it.
--- Shared once, the same references land as that many chains on ONE
--- arrival and the count becomes free.
-
--- AND THE MARGIN HAS A REASON, WHICH IS WHY IT IS NOT LUCK.  A chain is
--- a registration, a registration is a syntactic reference, and the
--- entry width is seeded from `capsBase`, which counts the program's
--- size and its entry ceiling.  So the only way to buy another delivery
--- is to buy program size first, and the width is what size is spent on.
--- That is the argument the leaf would have to make; the rows say it is
--- worth making.
-
--- SO THE COUNT MUST COME FROM A REAL WIDTH, AND THAT IS THE OPEN DESIGN
--- QUESTION under this row.  The walk invariant is unaffected and is
--- still worth having in deliveries; what has no supplier is the step
--- from a delivery count to this increment.  A cap cannot supply it, and
--- the evaluator's own per-instant burst width is what the increment was
--- named after — so the fact to look for, or to state, is one bounding
--- the walk's deliveries by that width and not by a ceiling above it.
---
--- DEAD ROUTE: reusing the proven lemma's CORE and swapping its final
---   widening.  `cascadeGo-deliveries` reads as core-plus-three-widenings
---   — the walk at level zero, then the dispatch gas to `cSize`, the walk
---   length to `cReg`, and `dCapᶜ`'s unfolding — which invites keeping the
---   core and landing it somewhere real instead.  It does not work, and
---   the reason is one level deeper than the widenings: the walk module is
---   PARAMETERISED BY THE CAPS, so its result type already reads
---   `dWalkᶜ cSize cWid cReg …`.  The count is cap-denominated inside the
---   apparatus and `cDel` is only its final form.  Re-instantiating the
---   module at real numbers is not available either, since its invariants
---   are the `capsOK?` ones, true of the caps and of nothing else.  So a
---   real-width delivery bound needs new machinery rather than a different
---   exit from the old, and the proven lemma is not a transferable twin
---   however exactly its left side matches.
--- DEAD ROUTE: counting the walk's deliveries with `cascadeGo-deliveries`
---   and dominating its bound by this increment.  The bound is cap-side,
---   the increment is real, and the denomination law rules out the
---   comparison in that direction at the entry index and worse above it.
---   The lemma is proven and stays useful elsewhere; it is unspendable
---   HERE.
-postulate
-  cascadeGo-deliv-real : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    let r = cascadeGo a nextId chains sched st
-    in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
-
 -- THE SLOT STORE SURVIVES A CHAIN STEP, one call into `foldPath` and so
 -- one composition of `foldPath-slots`.  It sits here rather than beside
 -- its sibling for the cascade fold, because the per-chain induction
@@ -1301,57 +1158,21 @@ chainStep-slots {n = n} {e = e} id a path sched st =
                  (Arrival.isLast a) sched st
 
 
--- THE BOUNDED LIMIT WAS SWEPT AND FOUND NOTHING, AND THE REGION IS
--- WORTH NAMING because it is the one this campaign had no coverage of
--- at all: every earlier family predates mergeAll's `concurrent`
--- argument, so all of them sit at one of the two saturated ends.
--- `Harness.Main`'s SERIES V moves the limit alone over a source whose
--- width outruns it (measured-not-rechecked): limits one to four,
--- source widths three to twelve, fold depths and list lengths to nine.
--- Not one row crosses this bound, and the margin WIDENS in every
--- direction -- the descent grows by the fold depth per added lane
--- while the width factor grows by better than an order of magnitude
--- more.  What the sweep did NOT reach is a limit that binds while the
--- store is loaded: its slot table is the one-arrival table throughout,
--- so a bounded gate interacting with a shared def is uncovered.
--- THE WALK'S PER-DELIVERY HALF, which is the half that has to be an
--- induction.  It charges the store measure by what the walk actually
--- DID rather than by what it was allowed to do: one `nestSyn` per
--- delivery on the evaluator's own ledger, with no cap anywhere in the
--- statement.  That is what lets the counting half be a separate leaf —
--- and lets it be a comparison between two static quantities, which is
--- the only reason it can be settled without the run.
-
--- AND THE CHARGE OVERSHOOTS BY A CONSTANT PER DELIVERY, WHICH IS WHAT
--- SAYS THE SHAPE IS RIGHT RATHER THAN MERELY SAFE.  Every quantity here
--- computes and none is a cap, so the statement instantiates directly;
--- measured in `Harness.Main` (measured-not-rechecked, so this
--- discharges nothing).  Driving the stored values' nesting from one
--- wrap level to nine, the store measure and the charge rise in lockstep
--- and the margin sits at four the whole way — it never widens, so the
--- rows are tight enough to have broken.  Driving the delivery count
--- instead, the margin is four times the count, and the two axes compose
--- linearly rather than interacting.
---
--- THE REASON IS THE ONE THE CURRENCY WAS BUILT ON: `nestSyn` is a
--- SYNTACTIC ceiling on nesting, so deepening what a delivery stores
--- deepens the ceiling by the same step.  A per-delivery charge in this
--- currency cannot be outrun by depth, only by a step that stores
--- without delivering — which is the residue the induction owes, and
--- which no row in the sweep produced.
-postulate
-  cascadeGo-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    let r = cascadeGo a nextId chains sched st
-    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ storeNestMax sched st
-             + delivN st (proj₂ (proj₂ r)) * nestSyn e sl
+-- AND NO CONSTANT MULTIPLE OF THE SYNTACTIC CEILING CAN WORK, which is
+-- the difference between a width factor that is merely safe and one
+-- that is structural.  The two refutations below kill one narrow
+-- reading each, and either could be read as an off-by-a-constant that
+-- a larger constant would fix.  It is not one.  `Harness.Main`'s
+-- SERIES X decomposes the crossing instant and drives its two axes
+-- (measured-not-rechecked, so it discharges nothing).  Down the FOLD
+-- axis the descent climbs six a layer against one for `nestSyn` and
+-- one for `chainsNestD`, and the three candidates cross at depths
+-- three, four and six.  Down the SOURCE axis it climbs five per
+-- element while `nestSyn`, `chainsNestD` and `storeNestMax` do not
+-- move AT ALL -- so a fixed multiple of them is outrun by lengthening
+-- the source, whatever the multiple.  `realWidAt` is the one term in
+-- this vocabulary that moves with that axis, which is why the width
+-- form clears the same rows throughout.
 
 -- ONE ARRIVAL'S WHOLE CASCADE, IN THE WIDTH CURRENCY -- and the width
 -- factor is the content, not decoration over a narrower truth.  A

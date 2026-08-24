@@ -1,5 +1,5 @@
 -- THE REFUTATION ROOT.  `make refuted` checks this module, and nothing
--- else reaches it: `make agda` compiles `src/Main.agda`, which cannot
+-- else reaches it: `make gate-heavy` compiles `src/Main.agda`, which cannot
 -- import this tree, and `make wiring` scans `agda/src` only.
 --
 -- Naming each witness here is what keeps this tree honest: a refutation
@@ -29,3 +29,5 @@ open import Refuted.Nest-Depth-One
   using (descent≡21; oneSyn≡19; nest-one-syn-absurd)
 open import Refuted.Cascade-Deliv-Depth
   using (descent≡19; perDeliv≡16; val-hyp; cascade-deliv-depth-absurd)
+open import Refuted.Cascade-Nest-PerDeliv
+  using (grown≡12; perDeliv≡10; store-val-hyp; cascade-nest-perDeliv-absurd)
