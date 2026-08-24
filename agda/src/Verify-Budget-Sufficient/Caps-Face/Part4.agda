@@ -30,10 +30,10 @@ open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEv
   exhausted; Gas; after_,_)
 open import Rx.Exp       using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ)
 open import Rx.Frame-Width using (pWᵉ; slotsPW≤entryCeil; slotsIW≤entryCeil)
-open import Rx.Evaluator using (Sched; EvalSt; memberSource; RegId; Chain; NodeState; scan-st; take-st; flatten-st;
+open import Rx.Evaluator using (Sched; EvalSt; memberSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; root; share-sink; _↠_; Frame; AllOp;
   Stream; sweepLive; takeVals; takeDispatch; cutThrough; pathHasNode; dropSource; Path;
-  stepFrame; register; flattenᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; flattenBump;
+  stepFrame; register; mergeAllᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; mergeAllBump;
   switchKill; thruWrap; sizeAt; sharedPlumb; shareLatch; shareAdmit; shareFinish; shareGo;
   foldPath; dispatchShare; sameSource; fCharge; fLvlD)
 open import Rx.Slots using (Slots; slotsSize)
@@ -958,7 +958,7 @@ valsCaps?-lvl {s = s} c c′ sl vs le h =
 
 -- WHAT IS LEFT IS BOTH CONJUNCTS ON THE TWO *All EDGES, and (a) is the
 -- harder one, which is the opposite of what was written here before.
--- `flattenDrain` and `thruWalk` CONCATENATE the bursts of the inners
+-- `mergeAllDrain` and `thruWalk` CONCATENATE the bursts of the inners
 -- they subscribe, so (b), the output width, is a SUM over payloads of
 -- one subscribeE burst's VALUE COUNT — no caps-side companion reports
 -- one (`burstCaps?` bounds each event, never how many there are),
@@ -1394,7 +1394,7 @@ takeDispatch-caps c nid vals fin sl sched st (just (take-st k)) slEq inv vC
             , refl
 takeDispatch-caps c nid vals fin sl sched st nothing slEq inv vC = inv , refl , refl
 takeDispatch-caps c nid vals fin sl sched st (just (scan-st _)) slEq inv vC = inv , refl , refl
-takeDispatch-caps c nid vals fin sl sched st (just (flatten-st _ _ _ _)) slEq inv vC = inv , refl , refl
+takeDispatch-caps c nid vals fin sl sched st (just (mergeAll-st _ _ _ _)) slEq inv vC = inv , refl , refl
 takeDispatch-caps c nid vals fin sl sched st (just (switch-st _ _)) slEq inv vC = inv , refl , refl
 takeDispatch-caps c nid vals fin sl sched st (just (exhaust-st _ _)) slEq inv vC = inv , refl , refl
 
@@ -1448,12 +1448,12 @@ thruWrap-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (all (valCaps? c sl u) (proj₁ r) ≡ true)
      × (all (eventCaps? c sl) (proj₁ (proj₂ r)) ≡ true)
 thruWrap-caps c op nid false sl (vs , bs , sd , st) inv vC eC = inv , vC , eC
-thruWrap-caps c flattenᵒ nid true sl (vs , bs , sd , st) inv vC eC
+thruWrap-caps c mergeAllᵒ nid true sl (vs , bs , sd , st) inv vC eC
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps c (Sched.slots sd) nid (EvalSt.nodes st)
          (capsOK?-nodeSz c sd st inv) (capsOK?-nodeWid c sd st inv)
-... | just (flatten-st lim act q od) | (bn , wn) =
-      capsOK?-setNode c nid (flatten-st lim act q true) sd st bn wn inv , vC , eC
+... | just (mergeAll-st lim act q od) | (bn , wn) =
+      capsOK?-setNode c nid (mergeAll-st lim act q true) sd st bn wn inv , vC , eC
 ... | nothing              | _ = inv , vC , eC
 ... | just (scan-st _)     | _ = inv , vC , eC
 ... | just (take-st _)     | _ = inv , vC , eC
@@ -1466,7 +1466,7 @@ thruWrap-caps c switchᵒ nid true sl (vs , bs , sd , st) inv vC eC
 ... | nothing              = inv , vC , eC
 ... | just (scan-st _)     = inv , vC , eC
 ... | just (take-st _)     = inv , vC , eC
-... | just (flatten-st _ _ _ _)  = inv , vC , eC
+... | just (mergeAll-st _ _ _ _)  = inv , vC , eC
 ... | just (exhaust-st _ _) = inv , vC , eC
 thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
   with lookupNode nid (EvalSt.nodes st)
@@ -1475,7 +1475,7 @@ thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
 ... | nothing              = inv , vC , eC
 ... | just (scan-st _)     = inv , vC , eC
 ... | just (take-st _)     = inv , vC , eC
-... | just (flatten-st _ _ _ _)  = inv , vC , eC
+... | just (mergeAll-st _ _ _ _)  = inv , vC , eC
 ... | just (switch-st _ _) = inv , vC , eC
 
 ------------------------------------------------------------------
@@ -1489,8 +1489,8 @@ thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
 -- per payload, unchanged.
 --
 -- The per-op node bookkeeping stores nothing the caps do not already
--- bound: the flatten counter and switch's current-inner carry no
--- payload, exhaust's flag none either, and the flatten queue stores the
+-- bound: the mergeAll counter and switch's current-inner carry no
+-- payload, exhaust's flag none either, and the mergeAll queue stores the
 -- payload VERBATIM — so its bound is the valCaps? already in hand, appended to
 -- the queue's own by all-++-intro.  switchAll's cut is the only clause
 -- that moves the registry, and it is cutSweep-caps without the node.
@@ -1500,17 +1500,17 @@ thruWrap-caps c exhaustᵒ nid true sl (vs , bs , sd , st) inv vC eC
 -- is bounded by whatever bounded the node it read — which is what the
 -- lookup receipt hands over, and no longer `refl` now that the same
 -- constructor carries the queue
-capsOK?-flattenBump : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+capsOK?-mergeAllBump : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (nid : NodeId) (done : Bool) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true →
-  capsOK? c sched (record st { nodes = flattenBump nid done (EvalSt.nodes st) }) ≡ true
-capsOK?-flattenBump c nid done sched st inv
+  capsOK? c sched (record st { nodes = mergeAllBump nid done (EvalSt.nodes st) }) ≡ true
+capsOK?-mergeAllBump c nid done sched st inv
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-caps c (Sched.slots sched) nid (EvalSt.nodes st)
          (capsOK?-nodeSz c sched st inv) (capsOK?-nodeWid c sched st inv)
-... | just (flatten-st lim k q od) | (bn , wn) =
+... | just (mergeAll-st lim k q od) | (bn , wn) =
       capsOK?-setNode c nid
-        (flatten-st lim (if done then k else suc k) q od) sched st
+        (mergeAll-st lim (if done then k else suc k) q od) sched st
         bn wn inv
 ... | nothing                | _ = inv
 ... | just (scan-st _)       | _ = inv
@@ -1562,7 +1562,7 @@ switchKill-closes-caps c sl (just v) sched st =
     (EvalSt.dying st) (EvalSt.registry st)
 
 ------------------------------------------------------------------
--- flatten's DRAIN and the *All FINISH, ground.  The queue is the one
+-- mergeAll's DRAIN and the *All FINISH, ground.  The queue is the one
 -- node whose stored observables the size conjunct bounds directly —
 -- `obsCaps?` IS `valCaps? … (obs s)`, definitionally — so the residue
 -- goes back into the node with the bound it came out with, and the

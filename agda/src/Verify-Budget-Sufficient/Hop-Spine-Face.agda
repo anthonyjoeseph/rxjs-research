@@ -121,7 +121,7 @@ burstHopSpn-cap {u = u} V Ψ (suc base) B Bsz η str 1≤b hBsz hB hS =
 -- `obs`.  Nothing projects a component out of a stream value — the only
 -- eliminating term formers are `fstᵗ`, `sndᵗ` and `caseᵗ`, which take
 -- pairs and sums apart and nothing else.  Streams are only ever BUILT
--- (mapᵉ, flattenᵉ, …), and a builder needs its argument's headline
+-- (mapᵉ, mergeAllᵉ, …), and a builder needs its argument's headline
 -- bound, not its interior.  So pairs and sums are exactly the positions
 -- where a bound can be projected away, and exactly the positions the
 -- recursion covers.

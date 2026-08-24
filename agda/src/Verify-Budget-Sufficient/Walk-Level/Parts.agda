@@ -42,8 +42,8 @@ open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; Ctx; Closed; Val; Tm; Fn; i
 open import Rx.Frame-Width using (dWᵉ; dWᵗ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵗ)
 open import Rx.Slot-Hop  using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; memberSource; Path; _↠_; Stream; subscribeE; AllOp; flattenᵒ;
-  switchᵒ; exhaustᵒ; NodeState; flatten-st; switch-st; exhaust-st; scan-st;
+open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; memberSource; Path; _↠_; Stream; subscribeE; AllOp; mergeAllᵒ;
+  switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st; scan-st;
   take-st; map-f; scan-f; take-f; splitBurst; hasDry; dryEvent; pushBurst; stepFrame;
   splitEvents; retagEvents; thruWrap; switchKill; cutThrough; takeVals; scanVals; lookupNode;
   setNode; pathHasNode; installNode; NodeId; register; mintNode)
@@ -831,7 +831,7 @@ stepTake-wet {s = s} Ψ B F ℓ r̂ η g bid now nid κ vals fin sched st invW v
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = invW , refl , refl , refl , rgs
 ... | just (scan-st _)       = invW , refl , refl , refl , rgs
-... | just (flatten-st _ _ _ _)    = invW , refl , refl , refl , rgs
+... | just (mergeAll-st _ _ _ _)    = invW , refl , refl , refl , rgs
 ... | just (switch-st _ _)   = invW , refl , refl , refl , rgs
 ... | just (exhaust-st _ _)  = invW , refl , refl , refl , rgs
 ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
@@ -1514,7 +1514,7 @@ stepScan-wet {u = u} Ψ B ℓ g bid now fn nid κ vals fin sched st hfn h vΨ rg
          (fcB-nodes Ψ sched st (proj₁ (INV⁻?-parts Ψ B sched st h)))
 ... | nothing                | _ = h , refl , refl , rgs
 ... | just (take-st _)       | _ = h , refl , refl , rgs
-... | just (flatten-st _ _ _ _)    | _ = h , refl , refl , rgs
+... | just (mergeAll-st _ _ _ _)    | _ = h , refl , refl , rgs
 ... | just (switch-st _ _)   | _ = h , refl , refl , rgs
 ... | just (exhaust-st _ _)  | _ = h , refl , refl , rgs
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
@@ -2016,12 +2016,12 @@ thruWrap-pass : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ (thruWrap op nid fin r)))))
        ≡ EvalSt.registry (proj₂ (proj₂ (proj₂ r))))
 thruWrap-pass op nid false (vs , bs , sd , st′) = refl , refl
-thruWrap-pass flattenᵒ nid true (vs , bs , sd , st′)
+thruWrap-pass mergeAllᵒ nid true (vs , bs , sd , st′)
   with lookupNode nid (EvalSt.nodes st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (flatten-st _ _ _ _)    = refl , refl
+... | just (mergeAll-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 thruWrap-pass switchᵒ nid true (vs , bs , sd , st′)
@@ -2029,7 +2029,7 @@ thruWrap-pass switchᵒ nid true (vs , bs , sd , st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (flatten-st _ _ _ _)    = refl , refl
+... | just (mergeAll-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 thruWrap-pass exhaustᵒ nid true (vs , bs , sd , st′)
@@ -2037,7 +2037,7 @@ thruWrap-pass exhaustᵒ nid true (vs , bs , sd , st′)
 ... | nothing                = refl , refl
 ... | just (scan-st _)       = refl , refl
 ... | just (take-st _)       = refl , refl
-... | just (flatten-st _ _ _ _)    = refl , refl
+... | just (mergeAll-st _ _ _ _)    = refl , refl
 ... | just (switch-st _ _)   = refl , refl
 ... | just (exhaust-st _ _)  = refl , refl
 
@@ -2052,7 +2052,7 @@ thruWrap-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   INV? Ψ B (proj₁ (proj₂ (proj₂ (proj₂ (thruWrap op nid fin r)))))
            (proj₂ (proj₂ (proj₂ (proj₂ (thruWrap op nid fin r))))) ≡ true
 thruWrap-INV Ψ B op nid false (vs , bs , sd , st′) inv = inv
-thruWrap-INV Ψ B flattenᵒ nid true (vs , bs , sd , st′) inv
+thruWrap-INV Ψ B mergeAllᵒ nid true (vs , bs , sd , st′) inv
   with lookupNode nid (EvalSt.nodes st′)
      | lookupNode-B B Ψ nid (EvalSt.nodes st′)
          (proj₂ (∧-true (all (boundedLive B) (Sched.live sd))
@@ -2061,8 +2061,8 @@ thruWrap-INV Ψ B flattenᵒ nid true (vs , bs , sd , st′) inv
          (proj₂ (∧-true (all (fnCapLive Ψ) (Sched.live sd))
                         (all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st′))
                         (proj₁ (proj₂ (INV-parts Ψ B sd st′ inv)))))
-... | just (flatten-st lim act q od) | (bn , fn) =
-      INV?-setNode Ψ B nid (flatten-st lim act q true) sd st′ bn fn inv
+... | just (mergeAll-st lim act q od) | (bn , fn) =
+      INV?-setNode Ψ B nid (mergeAll-st lim act q true) sd st′ bn fn inv
 ... | nothing                | _ = inv
 ... | just (scan-st _)       | _ = inv
 ... | just (take-st _)       | _ = inv
@@ -2075,7 +2075,7 @@ thruWrap-INV Ψ B switchᵒ nid true (vs , bs , sd , st′) inv
 ... | nothing                = inv
 ... | just (scan-st _)       = inv
 ... | just (take-st _)       = inv
-... | just (flatten-st _ _ _ _)    = inv
+... | just (mergeAll-st _ _ _ _)    = inv
 ... | just (exhaust-st _ _)  = inv
 thruWrap-INV Ψ B exhaustᵒ nid true (vs , bs , sd , st′) inv
   with lookupNode nid (EvalSt.nodes st′)
@@ -2084,6 +2084,6 @@ thruWrap-INV Ψ B exhaustᵒ nid true (vs , bs , sd , st′) inv
 ... | nothing                = inv
 ... | just (scan-st _)       = inv
 ... | just (take-st _)       = inv
-... | just (flatten-st _ _ _ _)    = inv
+... | just (mergeAll-st _ _ _ _)    = inv
 ... | just (switch-st _ _)   = inv
 

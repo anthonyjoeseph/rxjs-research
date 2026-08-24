@@ -49,13 +49,13 @@ open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; subscr
   exhausted; Gas; g0; gs; after_,_; hot; cold)
 open import Rx.Exp       using (obs; _≟ᵗ_; inputsBelowᵉ; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; varᵗ; unit̂; bool̂;
   nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; input; ofᵉ; emptyᵉ; mapᵉ;
-  takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; elimGExp;
+  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; elimGExp;
   elimGTm; elimGTms; elimDExp; elimDTm; elimDTms; compare∈; ⊟-++ˡ; ⊟-++ʳ; unfoldμ; evalTm)
-open import Rx.Evaluator using (Sched; EvalSt; memberSource; NodeState; scan-st; take-st; flatten-st; switch-st;
+open import Rx.Evaluator using (Sched; EvalSt; memberSource; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; installNode; lookupNode; NodeId; share-sink; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; Stream; takeVals; takeDispatch; Path; subscribeE; stepFrame;
-  pushBurst; subscribeInner; subscribeAll; register; flattenᵒ; switchᵒ; exhaustᵒ; hasRoom;
-  splitEvents; splitBurst; switchKill; thruConsume; thruWalk; thruWrap; flattenDrain;
+  pushBurst; subscribeInner; subscribeAll; register; mergeAllᵒ; switchᵒ; exhaustᵒ; hasRoom;
+  splitEvents; splitBurst; switchKill; thruConsume; thruWalk; thruWrap; mergeAllDrain;
   innerFinish; innerReact; sharedConnect; subscribeSharedSlot; burstCompleted; aliveThroughᶠ;
   sameSource)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
@@ -168,7 +168,7 @@ open import Verify-Budget-Sufficient.Measures using
 
 -- Corpus-wide, via the burst probe's numeric hopLog (make
 -- the burst harness), testing the emitted-value invariant hopD v ≤ hopD b
--- that the hop edge consumes — with hopD (flattenᵉ l c) ≡ suc (hopD c),
+-- that the hop edge consumes — with hopD (mergeAllᵉ l c) ≡ suc (hopD c),
 -- that inequality is exactly what makes a hop strict:
 --
 --   A  generated, scripted slots     1000 progs   11010 obs   0 viol
@@ -427,7 +427,7 @@ share-spent-novals s id = refl
 -- the IH, or the one cons — and the one cons is `member-cons`.
 --
 -- The clique is subscribeE's own cone: subscribeE, subscribeInner,
--- thruConsume/-Walk/-Wrap, flattenDrain, innerFinish, innerReact,
+-- thruConsume/-Walk/-Wrap, mergeAllDrain, innerFinish, innerReact,
 -- stepFrame, pushBurst, subscribeAll, sharedConnect,
 -- subscribeSharedSlot, takeDispatch, switchKill.  (foldPath and the
 -- delivery clique are NOT in it — the burst leaves subscribeE and is
@@ -510,11 +510,11 @@ thruWrap-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ r))))
                     (proj₂ (proj₂ (proj₂ (proj₂ r))))
 
-flattenDrain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+mergeAllDrain-keeps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
   (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-  let r = flattenDrain g allNid κ id now lim act q sched st
+  let r = mergeAllDrain g allNid κ id now lim act q sched st
   in Keeps sched st (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
                     (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
 
@@ -601,7 +601,7 @@ takeDispatch-keeps nid vals fin sched st (just (take-st k))
 ... | false = keeps refl (λ s p → p)
 takeDispatch-keeps nid vals fin sched st nothing                  = keeps-refl
 takeDispatch-keeps nid vals fin sched st (just (scan-st _))       = keeps-refl
-takeDispatch-keeps nid vals fin sched st (just (flatten-st _ _ _ _))    = keeps-refl
+takeDispatch-keeps nid vals fin sched st (just (mergeAll-st _ _ _ _))    = keeps-refl
 takeDispatch-keeps nid vals fin sched st (just (switch-st _ _))   = keeps-refl
 takeDispatch-keeps nid vals fin sched st (just (exhaust-st _ _))  = keeps-refl
 
@@ -609,8 +609,8 @@ switchKill-keeps nothing  sched st = keeps-refl
 switchKill-keeps (just v) sched st = keeps refl (λ s p → p)
 
 thruWrap-keeps op nid false vs bs sched st = keeps-refl
-thruWrap-keeps flattenᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
-... | just (flatten-st lim act q _) = keeps refl (λ s p → p)
+thruWrap-keeps mergeAllᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
+... | just (mergeAll-st lim act q _) = keeps refl (λ s p → p)
 ... | just (scan-st _)         = keeps-refl
 ... | just (take-st _)         = keeps-refl
 ... | just (switch-st _ _)     = keeps-refl
@@ -620,14 +620,14 @@ thruWrap-keeps switchᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nod
 ... | just (switch-st cur _)   = keeps refl (λ s p → p)
 ... | just (scan-st _)         = keeps-refl
 ... | just (take-st _)         = keeps-refl
-... | just (flatten-st _ _ _ _)      = keeps-refl
+... | just (mergeAll-st _ _ _ _)      = keeps-refl
 ... | just (exhaust-st _ _)    = keeps-refl
 ... | nothing                  = keeps-refl
 thruWrap-keeps exhaustᵒ nid true vs bs sched st with lookupNode nid (EvalSt.nodes st)
 ... | just (exhaust-st act _)  = keeps refl (λ s p → p)
 ... | just (scan-st _)         = keeps-refl
 ... | just (take-st _)         = keeps-refl
-... | just (flatten-st _ _ _ _)      = keeps-refl
+... | just (mergeAll-st _ _ _ _)      = keeps-refl
 ... | just (switch-st _ _)     = keeps-refl
 ... | nothing                  = keeps-refl
 
@@ -640,19 +640,19 @@ subscribeInner-keeps (gs fuel) op allNid κ id now o sched st =
   subscribeE-keeps fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
     (record sched { nextNode = suc (Sched.nextNode sched) }) st
 
-thruConsume-keeps {u = u} g flattenᵒ nid κ id now o sched st
+thruConsume-keeps {u = u} g mergeAllᵒ nid κ id now o sched st
   with lookupNode nid (EvalSt.nodes st)
-... | just (flatten-st {w} lim act q od) with w ≟ᵗ u
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _     = keeps-refl
 ...   | yes refl with hasRoom lim act
-...     | true   = keeps-trans (subscribeInner-keeps g flattenᵒ nid κ id now o sched st)
+...     | true   = keeps-trans (subscribeInner-keeps g mergeAllᵒ nid κ id now o sched st)
                      (keeps refl (λ s p → p))
 ...     | false  = keeps refl (λ s p → p)
-thruConsume-keeps g flattenᵒ nid κ id now o sched st | nothing = keeps-refl
-thruConsume-keeps g flattenᵒ nid κ id now o sched st | just (scan-st _) = keeps-refl
-thruConsume-keeps g flattenᵒ nid κ id now o sched st | just (take-st _) = keeps-refl
-thruConsume-keeps g flattenᵒ nid κ id now o sched st | just (switch-st _ _) = keeps-refl
-thruConsume-keeps g flattenᵒ nid κ id now o sched st | just (exhaust-st _ _) = keeps-refl
+thruConsume-keeps g mergeAllᵒ nid κ id now o sched st | nothing = keeps-refl
+thruConsume-keeps g mergeAllᵒ nid κ id now o sched st | just (scan-st _) = keeps-refl
+thruConsume-keeps g mergeAllᵒ nid κ id now o sched st | just (take-st _) = keeps-refl
+thruConsume-keeps g mergeAllᵒ nid κ id now o sched st | just (switch-st _ _) = keeps-refl
+thruConsume-keeps g mergeAllᵒ nid κ id now o sched st | just (exhaust-st _ _) = keeps-refl
 thruConsume-keeps g switchᵒ nid κ id now o sched st
   with lookupNode nid (EvalSt.nodes st)
 ... | just (switch-st cur od) =
@@ -662,7 +662,7 @@ thruConsume-keeps g switchᵒ nid κ id now o sched st
                      (proj₂ (proj₂ (switchKill cur sched st))))
 ... | just (scan-st _)       = keeps-refl
 ... | just (take-st _)       = keeps-refl
-... | just (flatten-st _ _ _ _)    = keeps-refl
+... | just (mergeAll-st _ _ _ _)    = keeps-refl
 ... | just (exhaust-st _ _)  = keeps-refl
 ... | nothing                = keeps-refl
 thruConsume-keeps g exhaustᵒ nid κ id now o sched st
@@ -672,7 +672,7 @@ thruConsume-keeps g exhaustᵒ nid κ id now o sched st
       subscribeInner-keeps g exhaustᵒ nid κ id now o sched st
 ... | just (scan-st _)       = keeps-refl
 ... | just (take-st _)       = keeps-refl
-... | just (flatten-st _ _ _ _)    = keeps-refl
+... | just (mergeAll-st _ _ _ _)    = keeps-refl
 ... | just (switch-st _ _)   = keeps-refl
 ... | nothing                = keeps-refl
 
@@ -683,31 +683,31 @@ thruWalk-keeps g op nid κ id now (o ∷ os) sched st =
       (proj₁ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st))))
       (proj₂ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st)))))
 
-flattenDrain-keeps g allNid κ id now lim act [] sched st = keeps-refl
-flattenDrain-keeps g allNid κ id now lim act (o ∷ q) sched st
+mergeAllDrain-keeps g allNid κ id now lim act [] sched st = keeps-refl
+mergeAllDrain-keeps g allNid κ id now lim act (o ∷ q) sched st
   with hasRoom lim act
 ... | false = keeps-refl
 ... | true =
-      keeps-trans (subscribeInner-keeps g flattenᵒ allNid κ id now o sched st)
-        (flattenDrain-keeps g allNid κ id now lim
+      keeps-trans (subscribeInner-keeps g mergeAllᵒ allNid κ id now o sched st)
+        (mergeAllDrain-keeps g allNid κ id now lim
           (if proj₁ (proj₂ (proj₂ (proj₂
-             (subscribeInner g flattenᵒ allNid κ id now o sched st))))
+             (subscribeInner g mergeAllᵒ allNid κ id now o sched st))))
            then act else suc act) q
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
-            (subscribeInner g flattenᵒ allNid κ id now o sched st))))))
+            (subscribeInner g mergeAllᵒ allNid κ id now o sched st))))))
           (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-            (subscribeInner g flattenᵒ allNid κ id now o sched st)))))))
+            (subscribeInner g mergeAllᵒ allNid κ id now o sched st)))))))
 
-innerFinish-keeps {s = s} g flattenᵒ allNid inst κ id now vals sched st
-                  (just (flatten-st {w} lim act q od)) with w ≟ᵗ s
-... | yes refl = keeps-trans (flattenDrain-keeps g allNid κ id now lim (pred act) q sched st)
+innerFinish-keeps {s = s} g mergeAllᵒ allNid inst κ id now vals sched st
+                  (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
+... | yes refl = keeps-trans (mergeAllDrain-keeps g allNid κ id now lim (pred act) q sched st)
                    (keeps refl (λ s p → p))
 ... | no _     = keeps-refl
-innerFinish-keeps g flattenᵒ allNid inst κ id now vals sched st nothing                = keeps-refl
-innerFinish-keeps g flattenᵒ allNid inst κ id now vals sched st (just (scan-st _))     = keeps-refl
-innerFinish-keeps g flattenᵒ allNid inst κ id now vals sched st (just (take-st _))     = keeps-refl
-innerFinish-keeps g flattenᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = keeps-refl
-innerFinish-keeps g flattenᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _))= keeps-refl
+innerFinish-keeps g mergeAllᵒ allNid inst κ id now vals sched st nothing                = keeps-refl
+innerFinish-keeps g mergeAllᵒ allNid inst κ id now vals sched st (just (scan-st _))     = keeps-refl
+innerFinish-keeps g mergeAllᵒ allNid inst κ id now vals sched st (just (take-st _))     = keeps-refl
+innerFinish-keeps g mergeAllᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = keeps-refl
+innerFinish-keeps g mergeAllᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _))= keeps-refl
 innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od))
   with c ≡ᵇ inst
 ... | true  = keeps refl (λ s p → p)
@@ -716,13 +716,13 @@ innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (switch-
 innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st nothing                 = keeps-refl
 innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (scan-st _))      = keeps-refl
 innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (take-st _))      = keeps-refl
-innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) = keeps-refl
+innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = keeps-refl
 innerFinish-keeps g switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = keeps-refl
 innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (exhaust-st act od)) = keeps refl (λ s p → p)
 innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st nothing                 = keeps-refl
 innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _))      = keeps-refl
 innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (take-st _))      = keeps-refl
-innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) = keeps-refl
+innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = keeps-refl
 innerFinish-keeps g exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _))  = keeps-refl
 
 innerReact-keeps g op allNid inst κ id now vals sched st false = keeps-refl
@@ -740,7 +740,7 @@ stepFrame-keeps {u = u} g id now (scan-f fn nid) κ vals fin sched st
 ...   | no _     = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | nothing = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (take-st _) = keeps-refl
-stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (flatten-st _ _ _ _) = keeps-refl
+stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (mergeAll-st _ _ _ _) = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (switch-st _ _) = keeps-refl
 stepFrame-keeps g id now (scan-f fn nid) κ vals fin sched st | just (exhaust-st _ _) = keeps-refl
 stepFrame-keeps g id now (take-f nid) κ vals fin sched st =
@@ -839,8 +839,8 @@ subscribeE-keeps g (scanᵉ f z b) κ id now sched st =
   where SE = subscribeE g b (scan-f f (Sched.nextNode sched) ↠ κ) id now
                (record sched { nextNode = suc (Sched.nextNode sched) })
                (installNode (Sched.nextNode sched) (scan-st (evalTm z)) st)
-subscribeE-keeps {u = u} g (flattenᵉ lim b) κ id now sched st =
-  subscribeAll-keeps g flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st
+subscribeE-keeps {u = u} g (mergeAllᵉ lim b) κ id now sched st =
+  subscribeAll-keeps g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ id now sched st
 subscribeE-keeps g (switchAllᵉ b) κ id now sched st =
   subscribeAll-keeps g switchᵒ (switch-st nothing false) b κ id now sched st
 subscribeE-keeps g (exhaustAllᵉ b) κ id now sched st =
@@ -984,7 +984,7 @@ mutual
       (sum3 (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) (sizeᵉ cl)
             (size-elimGᵗ x cl f) (size-elimGᵗ x cl z) (size-elimGᵉ x cl e))
       (sizeᵉ-pos cl)
-  size-elimGᵉ x cl (flattenᵉ _ e)   =
+  size-elimGᵉ x cl (mergeAllᵉ _ e)   =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimGᵉ x cl e) (sizeᵉ-pos cl)
   size-elimGᵉ x cl (switchAllᵉ e)  =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimGᵉ x cl e) (sizeᵉ-pos cl)
@@ -1021,7 +1021,7 @@ mutual
       (sum3 (sizeᵗ f) (sizeᵗ z) (sizeᵉ e) (sizeᵉ cl)
             (size-elimDᵗ x cl f) (size-elimDᵗ x cl z) (size-elimDᵉ x cl e))
       (sizeᵉ-pos cl)
-  size-elimDᵉ x cl (flattenᵉ _ e)   =
+  size-elimDᵉ x cl (mergeAllᵉ _ e)   =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimDᵉ x cl e) (sizeᵉ-pos cl)
   size-elimDᵉ x cl (switchAllᵉ e)  =
     sucmul (sizeᵉ e) (sizeᵉ cl) (size-elimDᵉ x cl e) (sizeᵉ-pos cl)

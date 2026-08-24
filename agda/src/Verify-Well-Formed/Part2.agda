@@ -406,8 +406,8 @@ record BurstInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     -- cachesValid is not merely inconvenient mid-burst, it is FALSE there.
     -- nodeCacheOK's only load-bearing clause is merge — while the outer is
     -- registered, activeInners must equal countLiveInners — and a subscribe
-    -- burst breaks that equality in BOTH directions.  thruConsume flattenᵒ runs
-    -- subscribeInner FIRST and applies flattenBump only after, so throughout an
+    -- burst breaks that equality in BOTH directions.  thruConsume mergeAllᵒ runs
+    -- subscribeInner FIRST and applies mergeAllBump only after, so throughout an
     -- inner's burst the inner's registrations exist while activeInners has not
     -- been incremented (the count TRAILS the registry); and a take-cut strips
     -- registrations without touching activeInners (the count LEADS it).  No

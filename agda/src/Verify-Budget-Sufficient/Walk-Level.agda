@@ -90,12 +90,12 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Source; value; complete; InstEmit; _at_from_as_; Gas; g0; gs)
 open import Rx.Exp       using (obs; Ctx; Closed; Val; Exp; _≟ᵗ_; sizeᵉ; sizeᵛ; syncSizeᵉ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
-  scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
+  scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
 open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ; hopD-unfoldμ)
 open import Rx.Slot-Hop  using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; _↠_; Stream; subscribeE; subscribeAll; AllOp; flattenᵒ;
-  switchᵒ; exhaustᵒ; NodeState; flatten-st; switch-st; exhaust-st; scan-st; hasRoom;
+open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; _↠_; Stream; subscribeE; subscribeAll; AllOp; mergeAllᵒ;
+  switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st; scan-st; hasRoom;
   take-st; splitBurst; hasDry; dryEvent; opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
   sLvlD-suc; sIterD-suc; fLvlD-suc; widAt; thru-outer; from-inner; pushBurst; stepFrame;
   subscribeInner; splitEvents; retagEvents; thruConsume; thruWalk; thruWrap; switchKill;
@@ -131,7 +131,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
    sharedConnect-unconn; stepFrame-keeps; subscribeE-keeps; subscribeE-slots;
    switchKill-keeps; thruConsume-keeps)
 open import Verify-Budget-Sufficient.Wet.Part1 using
-  (INV?-widen; lookupNode-B; flattenBump-INV; splitBurst-vals-B)
+  (INV?-widen; lookupNode-B; mergeAllBump-INV; splitBurst-vals-B)
 open import Verify-Budget-Sufficient.Wet.Part2 using
   (finList-B)
 -- the caps face: only the five predicates the statement reads there
@@ -139,7 +139,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; eventCaps?; pathSz?; slotsCaps?; valCaps?;
   valCountᵉ; widNode; widNode-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-flattenBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
+  (capsOK?-mergeAllBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
   capsOK?-setNode; frameBud; lookupNode-caps; mList?; mList?-head; mList?-keeps; mList?-tail;
   pathSz?-len; slotsCaps?-capsAt; splitBurst-bk-caps; splitBurst-vals-caps;
   splitEvents-bk-caps; splitEvents-valsCaps; switchKill-caps; switchKill-closes-caps;
@@ -180,7 +180,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner; depthConsume; depthWalk)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step; exhaust-step; flatten-step; nest;
+  using (nest-keeps; mu-step; exhaust-step; mergeAll-step; nest;
          switch-step)
 open import Verify-Budget-Sufficient.Op-Budget
   using (opIterD-dominated)
@@ -209,7 +209,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- bounded the connect burst's hop by `hopDᵉ V (input i)`, which was
 -- 0 at every V — while `sharedConnect` passes the slot def's burst up
 -- with its values UNTOUCHED, so an obs-typed slot whose def emits
--- `strmᵗ (flattenᵉ nothing emptyᵉ)` put a hop-1 value against a bound of 0.
+-- `strmᵗ (mergeAllᵉ nothing emptyᵉ)` put a hop-1 value against a bound of 0.
 -- Demand-Probe series W discharges every hypothesis and derives ⊥; no
 -- entry hypothesis excluded it, because slotsCaps? is size/width and
 -- INV? is size/fnCap — the hop channel for slot defs was UNGUARDED.
@@ -230,7 +230,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- THE REPAIR IS A REPAIR, NOT A WEAKENED TEST — measured on the
 -- refutation's own program, flipped: at the obs-typed shared slot whose def emits
--- strmᵗ (flattenᵉ nothing emptyᵉ), the hop conjunct is now `true` at every
+-- strmᵗ (mergeAllᵉ nothing emptyᵉ), the hop conjunct is now `true` at every
 -- measurement index and every non-dry gas, and the OLD bound is pinned
 -- still rejecting the SAME burst — so the repair is a repair, not a
 -- weakened test.  slotHop-fix is pinned at that program too, so the
@@ -253,7 +253,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- NOT COVERED BY THE PROBES, and while the face was open this was its
 -- FALSITY region: series V holds TWO
--- axes flat — Ψ = 0 at every row (the def is flattenᵉ nothing emptyᵉ, so
+-- axes flat — Ψ = 0 at every row (the def is mergeAllᵉ nothing emptyᵉ, so
 -- slotsFnCap insᵂ = 0) and the exit registry is EMPTY (sharedConnect's
 -- burstCompleted branch drops the one entry), so regsLen? is vacuous
 -- there and the Ψ conjuncts of INV?/burstB? are satisfied by 0 ≤ 0.
@@ -429,7 +429,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 --   face (one postulate `pushBurst-walk`, generic in `f : Frame Γ s u`,
 --   committed 9fb13d3) carried a uniform hop conjunct — input receipts
 --   at r̂, output at suc r̂ — and that is REFUTABLE BY CONSTRUCTION at
---   f := map-f: a step function that wraps its input two flatten levels
+--   f := map-f: a step function that wraps its input two mergeAll levels
 --   deep sends a value of hop exactly r̂ to hop r̂ + 2 > suc r̂, with every
 --   hypothesis satisfiable (frameB? bounds the fn's SIZE and WEIGHT,
 --   never its hop growth).  The caps face is frame-generic because caps
@@ -1041,7 +1041,7 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
 -- half of the install must be funded.  (The SIZE half rides the caps
 -- boundedNode hypothesis already in the list — stBounded? reads the
 -- same node list.)  All three heads supply it by refl: switch-st and
--- exhaust-st are `true` outright, flatten-st with an empty queue is
+-- exhaust-st are `true` outright, mergeAll-st with an empty queue is
 -- `all _ []`.
 subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ)
@@ -1104,15 +1104,15 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- other hypothesis passes through untouched because the *All measures
 -- compute (sizeᵉ/hopDᵉ/syncSizeᵉ to suc, fnCapᵉ/dWᵉ to themselves,
 -- depthE to depthAll at this op and state).
-walk-flatten : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (lim : Maybe ℕ) (b : Closed Γ (obs u)) → WalkStmt {e = e} (flattenᵉ lim b)
-walk-flatten {u = u} lim b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (lim : Maybe ℕ) (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ lim b)
+walk-mergeAll {u = u} lim b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
-  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g flattenᵒ
-    (flatten-st {t = u} lim 0 [] false) b κ bid now sl sched st
+  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g mergeAllᵒ
+    (mergeAll-st {t = u} lim 0 [] false) b κ bid now sl sched st
     2≤S 1≤R hCR slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
-    (flatten-step lim _ sl _ bud nst) hidx dpt
+    (mergeAll-step lim _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
 
 walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1267,7 +1267,7 @@ walkFace (scanᵉ f z b) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g =
     (λ c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ →
        walkFace b c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ g)
     c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
-walkFace (flattenᵉ lim b) = walk-flatten lim b
+walkFace (mergeAllᵉ lim b) = walk-mergeAll lim b
 walkFace (switchAllᵉ b)  = walk-switchAll b
 walkFace (exhaustAllᵉ b) = walk-exhaustAll b
 walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g0 κ bid now sl sched st
@@ -1690,13 +1690,13 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
   R8 = splitBurst-nodry burst S8
 
 ------------------------------------------------------------------
--- ONE PAYLOAD — thruConsume-caps' clauses ⊗ the wet content.  flatten
+-- ONE PAYLOAD — thruConsume-caps' clauses ⊗ the wet content.  mergeAll
 -- subscribes and bumps while a lane is free and parks when none is;
 -- switch cuts then subscribes; exhaust drops while busy.  Every node
--- write goes through INV?-setNode/-flattenBump; switch's registry cut
+-- write goes through INV?-setNode/-mergeAllBump; switch's registry cut
 -- goes through the cutThrough kit above.
 ------------------------------------------------------------------
-thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g flattenᵒ
+thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ
                  nid κ bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC
                  lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   with lookupNode nid (EvalSt.nodes st)
@@ -1754,7 +1754,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g fl
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (flatten-st {w} lim act q od) | (bn , wn) | (bnW , fnW) with w ≟ᵗ u
+... | just (mergeAll-st {w} lim act q od) | (bn , wn) | (bnW , fnW) with w ≟ᵗ u
 ...   | no _ =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -1767,23 +1767,23 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g fl
 -- nothing else, which is exactly what the gate's true arm does now
 ...   | yes refl with hasRoom lim act
 ...     | true =
-  j′ , capsOK?-flattenBump (frameStep (j + j′) c) nid done sd₁ st₁ S1
+  j′ , capsOK?-mergeAllBump (frameStep (j + j′) c) nid done sd₁ st₁ S1
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))
-     , flattenBump-INV Ψ (Caps.cSize (frameStep (j + j′) c)) nid done sd₁ st₁
+     , mergeAllBump-INV Ψ (Caps.cSize (frameStep (j + j′) c)) nid done sd₁ st₁
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
      , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
   where
-  SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g flattenᵒ nid κ
+  SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeAllᵒ nid κ
          bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
          invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   j′   = proj₁ SI
   S1   = proj₁ (proj₂ SI)
-  R    = subscribeInner g flattenᵒ nid κ bid now o sched st
+  R    = subscribeInner g mergeAllᵒ nid κ bid now o sched st
   done = proj₁ (proj₂ (proj₂ (proj₂ R)))
   sd₁  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
   st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
@@ -1799,7 +1799,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g fl
             (sym lvl1) invPark
     , refl , refl , refl , rgs
   where
-  st₊ = record st { nodes = setNode nid (flatten-st lim act (q ++ o ∷ []) od)
+  st₊ = record st { nodes = setNode nid (mergeAll-st lim act (q ++ o ∷ []) od)
                               (EvalSt.nodes st) }
   lvl1 : j + 1 ≡ suc j
   lvl1 = +-comm j 1
@@ -1813,17 +1813,17 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g fl
          (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                 (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
   capsPark = capsOK?-setNode (frameStep (suc j) c)
-               nid (flatten-st lim act (q ++ o ∷ []) od)
+               nid (mergeAll-st lim act (q ++ o ∷ []) od)
                sched st BN WN
                (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
-  FN : fnCapNode Ψ (flatten-st lim act (q ++ o ∷ []) od) ≡ true
+  FN : fnCapNode Ψ (mergeAll-st lim act (q ++ o ∷ []) od) ≡ true
   FN = all-++-intro (λ x → fnCapᵉ x ≤ᵇ Ψ) q (o ∷ []) fnW
          (∧-intro (proj₂ (∧-true (sizeᵛ (obs u) o ≤ᵇ Caps.cSize (frameStep j c))
                                  (fnCapᵛ (obs u) o ≤ᵇ Ψ) vB))
                   refl)
   invPark = INV?-setNode Ψ (Caps.cSize (frameStep (suc j) c))
-              nid (flatten-st lim act (q ++ o ∷ []) od) sched st BN FN
+              nid (mergeAll-st lim act (q ++ o ∷ []) od) sched st BN FN
               (INV?-widen sched st
                  (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))) invW)
 
@@ -1855,7 +1855,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (flatten-st _ _ _ _) | dpt′ =
+... | just (mergeAll-st _ _ _ _) | dpt′ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -1955,7 +1955,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (flatten-st _ _ _ _) =
+... | just (mergeAll-st _ _ _ _) =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where

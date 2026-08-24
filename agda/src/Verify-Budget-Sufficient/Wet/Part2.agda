@@ -42,14 +42,14 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; subscribe; InstEvent; init; value; close; complete;
   exhausted; Gas; g0; gs; Timed; after_,_; hot; cold)
 open import Rx.Exp       using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ;
-  takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ;
+  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ;
   evalTm)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; resolve; arrVal; memberSource; RegId; Chain; NodeState;
-  scan-st; take-st; flatten-st; switch-st; exhaust-st; installNode; lookupNode;
+  scan-st; take-st; mergeAll-st; switch-st; exhaust-st; installNode; lookupNode;
   NodeId; root; share-sink; _↠_; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; dropSource; arrSource; Path; arrTy; subscribeE; stepFrame; pushBurst; subscribeInner;
-  chainStep; subscribeAll; mintNode; mintSource; mintOrdinal; register; flattenᵒ; hasRoom;
-  switchᵒ; exhaustᵒ; splitEvents; retagEvents; switchKill; thruConsume; thruWalk; flattenDrain;
+  chainStep; subscribeAll; mintNode; mintSource; mintOrdinal; register; mergeAllᵒ; hasRoom;
+  switchᵒ; exhaustᵒ; splitEvents; retagEvents; switchKill; thruConsume; thruWalk; mergeAllDrain;
   innerFinish; sharedPlumb; sharedConnect; subscribeSharedSlot; burstCompleted; shareLatch;
   shareAdmit; shareFinish; shareGo; foldPath; dispatchShare; arrTick; aliveThroughᶠ; hasDry;
   dryEvent; sameSource; budgetAt)
@@ -91,7 +91,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
 
 open import Verify-Budget-Sufficient.Wet.Part1 using
   (capᴱ-square; evalTm-cap; eventsB?-widen; install-INV; INV?-widen;
-   lookupNode-B; map-applyFn-B; flattenBump-INV; ofVals-B; register-INV;
+   lookupNode-B; map-applyFn-B; mergeAllBump-INV; ofVals-B; register-INV;
    splitBurst-bk-B; splitBurst-vals-B; stepFrame-scan-wet; stepFrame-take-wet;
    sweepLive-fnCap; switchKill-INV; thruWrap-wet)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
@@ -256,7 +256,7 @@ stepFrame-thruOuter-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                            (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
      × (all (valB? (capᴱ W E′) Ψ u) (proj₁ r) ≡ true)
      × (all (eventB? (capᴱ W E′) Ψ) (proj₁ (proj₂ r)) ≡ true)
-flattenDrain-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+mergeAllDrain-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (Ψ W : ℕ) (g : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
   (sched : Sched Γ) (st : EvalSt e) (E : ℕ) →
@@ -265,7 +265,7 @@ flattenDrain-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   pathB? (capᴱ W E) Ψ κ ≡ true →
   all (λ o → sizeᵉ o ≤ᵇ capᴱ W E) q ≡ true →
   all (λ o → fnCapᵉ o ≤ᵇ Ψ) q ≡ true →
-  let r = flattenDrain g allNid κ id now lim act q sched st
+  let r = mergeAllDrain g allNid κ id now lim act q sched st
   in Σ ℕ λ E′ → (E ≤ E′)
      × (INV? Ψ (capᴱ W E′) (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
                            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≡ true)
@@ -292,7 +292,7 @@ innerFinish-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
 
 -- the inner *All frame: a fin is either absorbed (a sibling
 -- registration still lives) or finishes the *All node.  Only
--- the flatten drain moves the ledger
+-- the mergeAll drain moves the ledger
 stepFrame-fromInner-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (Ψ W : ℕ) (g : Gas) (id : Id) (now : Tick)
   (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
@@ -317,7 +317,7 @@ stepFrame-fromInner-wet Ψ W g id now op allNid inst κ vals true sched st E
 ... | false = innerFinish-wet Ψ W g op allNid inst κ id now vals sched st E
                 3≤E inv pB vB
 
--- the flatten queue's stored outers only ever need widening upward
+-- the mergeAll queue's stored outers only ever need widening upward
 allsz-widen : ∀ {n} {Γ : Ctx n} {s} {B B′ : ℕ} (q : List (Closed Γ s)) → B ≤ B′ →
   all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true → all (λ o → sizeᵉ o ≤ᵇ B′) q ≡ true
 allsz-widen q B≤ h = all-impl _ _ (λ o → ≤ᵇ-widen (sizeᵉ o) B≤) q h
@@ -461,7 +461,7 @@ pushBurst-wet {Γ = Γ} {s = s} {u = u} Ψ W g id now f κ (em ∷ ems)
 ------------------------------------------------------------------
 -- (W9, deferᵉ) THE DEFER HOP, PROVEN.  deferᵉ is the one walk clause
 -- that mints machinery without recursing: a node, a source and an
--- ordinal are minted, the flatten node installed, the BODY itself
+-- ordinal are minted, the mergeAll node installed, the BODY itself
 -- parked as the single pending value of a fresh live source, and the
 -- outer chain registered.  The only ledger cost is register-INV's ×2
 -- length edge; the burst is a lone `init`, so it is bounded by refl.
@@ -700,7 +700,7 @@ subscribeE-defer-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 subscribeE-defer-wet {Γ = Γ} {u = u} Ψ W g body κ id now sched st E
                      3≤E inv szB fcB pB =
   2 * E , m≤m+n E (E + 0) ,
-  register-INV Ψ W E src (thru-outer flattenᵒ nid ↠ κ) sched₄ st₀
+  register-INV Ψ W E src (thru-outer mergeAllᵒ nid ↠ κ) sched₄ st₀
     (≤-trans (s≤s z≤n) 3≤E) inv₂ (∧-intro refl pB) ,
   refl
   where
@@ -714,9 +714,9 @@ subscribeE-defer-wet {Γ = Γ} {u = u} Ψ W g body κ id now sched st E
   hop = record { source = src ; ordinal = ord ; elemTy = obs u
                ; pending = (suc now , body) ∷ [] }
   sched₄ = record sched₃ { live = hop ∷ Sched.live sched₃ }
-  st₀    = installNode nid (flatten-st {t = u} nothing 0 [] false) st
+  st₀    = installNode nid (mergeAll-st {t = u} nothing 0 [] false) st
   inv₁   = install-INV Ψ (capᴱ W E) sched₃ st nid
-             (flatten-st {t = u} nothing 0 [] false)
+             (mergeAll-st {t = u} nothing 0 [] false)
              refl refl inv
   inv₂   = addLive-INV Ψ (capᴱ W E) sched₃ st₀ hop
              (∧-intro (T⇒≡true _ (≤⇒≤ᵇ szB)) refl)
@@ -907,8 +907,8 @@ subscribeE-walkS {Γ = Γ} {u = u} Ψ W g (scanᵉ f z b) κ id now sched st E 3
   inv₃  = proj₁ (proj₂ (proj₂ PB))
   b₃    = proj₂ (proj₂ (proj₂ PB))
 
-subscribeE-walkS {u = u} Ψ W g (flattenᵉ lim b) κ id now sched st E 3≤E inv szB fcB pB =
-  subscribeAll-wet Ψ W g flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st E
+subscribeE-walkS {u = u} Ψ W g (mergeAllᵉ lim b) κ id now sched st E 3≤E inv szB fcB pB =
+  subscribeAll-wet Ψ W g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ id now sched st E
     3≤E inv refl refl (≤-trans (n≤1+n (sizeᵉ b)) szB) fcB pB
 subscribeE-walkS Ψ W g (switchAllᵉ b) κ id now sched st E 3≤E inv szB fcB pB =
   subscribeAll-wet Ψ W g switchᵒ (switch-st nothing false) b κ id now sched st E
@@ -1231,17 +1231,17 @@ subscribeInner-wet {t = t} {u = u} Ψ W (gs fuel) op allNid κ id now o sched st
   inv′   = proj₁ (proj₂ (proj₂ IH))
   bB     = proj₂ (proj₂ (proj₂ IH))
 
-thruConsume-wet {u = u} Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
+thruConsume-wet {u = u} Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B (capᴱ W E) Ψ nid (EvalSt.nodes st)
          (stB-nodes (capᴱ W E) sched st (proj₁ (INV-parts Ψ (capᴱ W E) sched st inv)))
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
-... | just (flatten-st {w} lim act q od) | nb with w ≟ᵗ u
+... | just (mergeAll-st {w} lim act q od) | nb with w ≟ᵗ u
 ...   | no _ = E , ≤-refl , inv , refl , refl
 ...   | yes refl with hasRoom lim act
 ...     | false =
   E , ≤-refl ,
-  install-INV Ψ (capᴱ W E) sched st nid (flatten-st lim act (q ++ o ∷ []) od)
+  install-INV Ψ (capᴱ W E) sched st nid (mergeAll-st lim act (q ++ o ∷ []) od)
     (all-++-intro _ q _ (proj₁ nb)
       (∧-intro (proj₁ (∧-true _ _ oB)) refl))
     (all-++-intro _ q _ (proj₂ nb)
@@ -1249,11 +1249,11 @@ thruConsume-wet {u = u} Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv o
     inv ,
   refl , refl
 ...     | true =
-  E₁ , E≤E₁ , flattenBump-INV Ψ (capᴱ W E₁) nid done sched₁ st₁ inv₁ ,
+  E₁ , E≤E₁ , mergeAllBump-INV Ψ (capᴱ W E₁) nid done sched₁ st₁ inv₁ ,
   vsB , bsB
   where
-  SI   = subscribeInner-wet Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
-  SI₄  = subscribeInner g flattenᵒ nid κ id now o sched st
+  SI   = subscribeInner-wet Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
+  SI₄  = subscribeInner g mergeAllᵒ nid κ id now o sched st
   done = proj₁ (proj₂ (proj₂ (proj₂ SI₄)))
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
   st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI₄))))
@@ -1262,15 +1262,15 @@ thruConsume-wet {u = u} Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv o
   inv₁ = proj₁ (proj₂ (proj₂ SI))
   vsB  = proj₁ (proj₂ (proj₂ (proj₂ SI)))
   bsB  = proj₂ (proj₂ (proj₂ (proj₂ SI)))
-thruConsume-wet Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
+thruConsume-wet Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
     | nothing | _ = E , ≤-refl , inv , refl , refl
-thruConsume-wet Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
+thruConsume-wet Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
     | just (scan-st _) | _ = E , ≤-refl , inv , refl , refl
-thruConsume-wet Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
+thruConsume-wet Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
     | just (take-st _) | _ = E , ≤-refl , inv , refl , refl
-thruConsume-wet Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
+thruConsume-wet Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
     | just (switch-st _ _) | _ = E , ≤-refl , inv , refl , refl
-thruConsume-wet Ψ W g flattenᵒ nid κ id now o sched st E 3≤E inv oB pB
+thruConsume-wet Ψ W g mergeAllᵒ nid κ id now o sched st E 3≤E inv oB pB
     | just (exhaust-st _ _) | _ = E , ≤-refl , inv , refl , refl
 thruConsume-wet Ψ W g switchᵒ nid κ id now o sched st E 3≤E inv oB pB
   with lookupNode nid (EvalSt.nodes st)
@@ -1300,7 +1300,7 @@ thruConsume-wet Ψ W g switchᵒ nid κ id now o sched st E 3≤E inv oB pB
 ... | nothing                = E , ≤-refl , inv , refl , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)       = E , ≤-refl , inv , refl , refl
-... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
+... | just (mergeAll-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _)  = E , ≤-refl , inv , refl , refl
 thruConsume-wet Ψ W g exhaustᵒ nid κ id now o sched st E 3≤E inv oB pB
   with lookupNode nid (EvalSt.nodes st)
@@ -1323,7 +1323,7 @@ thruConsume-wet Ψ W g exhaustᵒ nid κ id now o sched st E 3≤E inv oB pB
 ... | nothing                = E , ≤-refl , inv , refl , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)       = E , ≤-refl , inv , refl , refl
-... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
+... | just (mergeAll-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)   = E , ≤-refl , inv , refl , refl
 
 thruWalk-wet Ψ W g op nid κ id now [] sched st E 3≤E inv pB vB =
@@ -1356,20 +1356,20 @@ thruWalk-wet {u = u} Ψ W g op nid κ id now (o ∷ os) sched st E 3≤E inv pB 
   cap₁₂ = capᴱ-mono W E₁≤E₂
 
 ------------------------------------------------------------------
--- the inner *All frame's drain and finish.  flatten is the only
+-- the inner *All frame's drain and finish.  mergeAll is the only
 -- op whose completion does more than flip a flag: it walks its
 -- parked queue, subscribing stored outers while a lane is free.
 ------------------------------------------------------------------
 
-flattenDrain-wet Ψ W g allNid κ id now lim act [] sched st E 3≤E inv pB qz qf =
+mergeAllDrain-wet Ψ W g allNid κ id now lim act [] sched st E 3≤E inv pB qz qf =
   E , ≤-refl , inv , refl , refl , refl , refl
-flattenDrain-wet {s = s} Ψ W g allNid κ id now lim act (o ∷ q) sched st E 3≤E inv pB qz qf
+mergeAllDrain-wet {s = s} Ψ W g allNid κ id now lim act (o ∷ q) sched st E 3≤E inv pB qz qf
   with hasRoom lim act
 -- the gate is shut: nothing runs, and the residue is the input queue
 ... | false = E , ≤-refl , inv , refl , refl , qz , qf
 ... | true
-  with subscribeInner g flattenᵒ allNid κ id now o sched st
-     | subscribeInner-wet Ψ W g flattenᵒ allNid κ id now o sched st E 3≤E inv
+  with subscribeInner g mergeAllᵒ allNid κ id now o sched st
+     | subscribeInner-wet Ψ W g mergeAllᵒ allNid κ id now o sched st E 3≤E inv
          (∧-intro (proj₁ (∧-true (sizeᵉ o ≤ᵇ capᴱ W E) _ qz))
                   (proj₁ (∧-true (fnCapᵉ o ≤ᵇ Ψ) _ qf))) pB
 ...   | (_ , vs , bs , done , sched₁ , st₁) | (E₁ , E≤E₁ , inv₁ , vsB , bsB) =
@@ -1378,7 +1378,7 @@ flattenDrain-wet {s = s} Ψ W g allNid κ id now lim act (o ∷ q) sched st E 3�
   all-++-intro _ bs _ (eventsB?-widen bs cap₁₂ bsB) bs′B ,
   q′z , q′f
   where
-  IH    = flattenDrain-wet Ψ W g allNid κ id now lim (if done then act else suc act)
+  IH    = mergeAllDrain-wet Ψ W g allNid κ id now lim (if done then act else suc act)
             q sched₁ st₁ E₁
             (≤-trans 3≤E E≤E₁) inv₁ (pathB?-widen κ (capᴱ-mono W E≤E₁) pB)
             (allsz-widen q (capᴱ-mono W E≤E₁) (proj₂ (∧-true _ _ qz)))
@@ -1392,23 +1392,23 @@ flattenDrain-wet {s = s} Ψ W g allNid κ id now lim act (o ∷ q) sched st E 3�
   q′f   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ IH)))))
   cap₁₂ = capᴱ-mono W E₁≤E₂
 
-innerFinish-wet {s = s} Ψ W g flattenᵒ allNid inst κ id now vals sched st E
+innerFinish-wet {s = s} Ψ W g mergeAllᵒ allNid inst κ id now vals sched st E
                 3≤E inv pB vB
   with lookupNode allNid (EvalSt.nodes st)
      | lookupNode-B (capᴱ W E) Ψ allNid (EvalSt.nodes st)
          (stB-nodes (capᴱ W E) sched st (proj₁ (INV-parts Ψ (capᴱ W E) sched st inv)))
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
-... | just (flatten-st {w} lim act q od) | nb with w ≟ᵗ s
+... | just (mergeAll-st {w} lim act q od) | nb with w ≟ᵗ s
 ...   | yes refl =
   E′ , E≤E′ ,
-  install-INV Ψ (capᴱ W E′) sched′ st′ allNid (flatten-st lim act′ q′ od)
+  install-INV Ψ (capᴱ W E′) sched′ st′ allNid (mergeAll-st lim act′ q′ od)
     q′z q′f inv′ ,
   all-++-intro _ vals _ (valsB?-widen s vals (capᴱ-mono W E≤E′) vB) vsB ,
   bsB
   where
-  DR    = flattenDrain-wet Ψ W g allNid κ id now lim (pred act) q sched st E 3≤E inv pB
+  DR    = mergeAllDrain-wet Ψ W g allNid κ id now lim (pred act) q sched st E 3≤E inv pB
             (proj₁ nb) (proj₂ nb)
-  dr    = flattenDrain g allNid κ id now lim (pred act) q sched st
+  dr    = mergeAllDrain g allNid κ id now lim (pred act) q sched st
   act′  = proj₁ (proj₂ (proj₂ dr))
   q′    = proj₁ (proj₂ (proj₂ (proj₂ dr)))
   sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
@@ -1421,15 +1421,15 @@ innerFinish-wet {s = s} Ψ W g flattenᵒ allNid inst κ id now vals sched st E
   q′z   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ DR)))))
   q′f   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ DR)))))
 ...   | no _ = E , ≤-refl , inv , vB , refl
-innerFinish-wet Ψ W g flattenᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+innerFinish-wet Ψ W g mergeAllᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | nothing               | _ = E , ≤-refl , inv , vB , refl
-innerFinish-wet Ψ W g flattenᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+innerFinish-wet Ψ W g mergeAllᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | just (scan-st _)      | _ = E , ≤-refl , inv , vB , refl
-innerFinish-wet Ψ W g flattenᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+innerFinish-wet Ψ W g mergeAllᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | just (take-st _)      | _ = E , ≤-refl , inv , vB , refl
-innerFinish-wet Ψ W g flattenᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+innerFinish-wet Ψ W g mergeAllᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | just (switch-st _ _)  | _ = E , ≤-refl , inv , vB , refl
-innerFinish-wet Ψ W g flattenᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
+innerFinish-wet Ψ W g mergeAllᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | just (exhaust-st _ _) | _ = E , ≤-refl , inv , vB , refl
 innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
   with lookupNode allNid (EvalSt.nodes st)
@@ -1448,7 +1448,7 @@ innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv
 innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | just (take-st _)       = E , ≤-refl , inv , vB , refl
 innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
-    | just (flatten-st _ _ _ _) = E , ≤-refl , inv , vB , refl
+    | just (mergeAll-st _ _ _ _) = E , ≤-refl , inv , vB , refl
 innerFinish-wet Ψ W g switchᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
     | just (exhaust-st _ _)  = E , ≤-refl , inv , vB , refl
 innerFinish-wet Ψ W g exhaustᵒ allNid inst κ id now vals sched st E 3≤E inv pB vB
@@ -1460,5 +1460,5 @@ innerFinish-wet Ψ W g exhaustᵒ allNid inst κ id now vals sched st E 3≤E in
 ... | nothing                = E , ≤-refl , inv , vB , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , vB , refl
 ... | just (take-st _)       = E , ≤-refl , inv , vB , refl
-... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , vB , refl
+... | just (mergeAll-st _ _ _ _)    = E , ≤-refl , inv , vB , refl
 ... | just (switch-st _ _)   = E , ≤-refl , inv , vB , refl

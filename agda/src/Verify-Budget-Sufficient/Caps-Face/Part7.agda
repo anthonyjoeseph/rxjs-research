@@ -34,9 +34,9 @@ open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
   storeNest-latch; realWidAt; nestSyn)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; flatten-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
   scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
-  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; flattenᵒ;
+  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ;
   switchᵒ; exhaustᵒ; thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade;
   sameSource; regAt; iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
@@ -88,7 +88,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- arithmetic lemmas consumed by thruOuter-face-core's walk helpers
 
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
-  (innerFinish-flatten-face; innerFinish-face-keep; thruOuter-face-core)
+  (innerFinish-mergeAll-face; innerFinish-face-keep; thruOuter-face-core)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; evalTm-iterSize; eventCaps?; frameSz?; iterSize-+;
    iterSize-2^; iterSize-mono-s; n≤capsAt-size; pathSz?; pathSz?-widen;
@@ -167,7 +167,7 @@ thruOuter-face siC =
     (λ {n} {Γ} {t} {e} → shareFinish-len {n} {Γ} {t} {e})
 
 -- the *All FINISH, face side.  Two of the three ops are the keep
--- above under one node write; flatten's is the drain, now landed
+-- above under one node write; mergeAll's is the drain, now landed
 innerFinish-face :
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
@@ -219,9 +219,9 @@ innerFinish-face :
 -- empty and the drain degenerates to the counter decrement the merge
 -- face used to state separately — one obligation now covers both, and
 -- the bounded limit between them that neither old face could express
-innerFinish-face ifc c d j g flattenᵒ allNid inst κ id now vals sl sched st
+innerFinish-face ifc c d j g mergeAllᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC inv pC lC vC slSz hD =
-  innerFinish-flatten-face ifc c d j g allNid inst κ id now vals sl sched st
+  innerFinish-mergeAll-face ifc c d j g allNid inst κ id now vals sl sched st
     2≤S 1≤R slEq slC inv pC lC vC slSz hD
 
 -- SWITCH: clear the current-inner slot if this was it
@@ -231,7 +231,7 @@ innerFinish-face _ c d j g switchᵒ allNid inst κ id now vals sl sched st
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (flatten-st _ _ _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (mergeAll-st _ _ _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (exhaust-st _ _)  = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st nothing od) = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st (just cur) od) with cur ≡ᵇ inst
@@ -250,7 +250,7 @@ innerFinish-face _ c d j g exhaustᵒ allNid inst κ id now vals sl sched st
 ... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (flatten-st _ _ _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
+... | just (mergeAll-st _ _ _ _)    = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (switch-st _ _)   = innerFinish-face-keep c d j sl vals false sched st inv vC
 ... | just (exhaust-st act od) =
   innerFinish-face-keep c d j sl vals od sched
@@ -342,7 +342,7 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
          (capsOK?-nodeWid (frameStep j c) sched st inv)
 ... | nothing                | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (take-st _)       | _ = stepFrame-face-zero c d j u sl fin sched st inv
-... | just (flatten-st _ _ _ _)    | _ = stepFrame-face-zero c d j u sl fin sched st inv
+... | just (mergeAll-st _ _ _ _)    | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (switch-st _ _)   | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (exhaust-st _ _)  | _ = stepFrame-face-zero c d j u sl fin sched st inv
 ... | just (scan-st {w} ac)  | nb with w ≟ᵗ u
@@ -1306,7 +1306,7 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- delivery walks an already-registered chain, so the tempting reading is
 -- that it deepens by one operator's worth and the sum over chains is
 -- `length chains` single `nestSyn`s.  Both halves of that reading are
--- false, and the mechanism is one arc: flatten's DRAIN spends a nesting
+-- false, and the mechanism is one arc: mergeAll's DRAIN spends a nesting
 -- level through `depthFinC`, and it is reached through a `from-inner`
 -- frame, which `pathNestD` charges nothing for.  Every other level this
 -- family spends is paid by a path term -- `pathNestD` charges the
@@ -1333,7 +1333,7 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 
 -- THE BOUNDED LIMIT WAS SWEPT AND FOUND NOTHING, AND THE REGION IS
 -- WORTH NAMING because it is the one this campaign had no coverage of
--- at all: every earlier family predates flatten's `concurrent`
+-- at all: every earlier family predates mergeAll's `concurrent`
 -- argument, so all of them sit at one of the two saturated ends.
 -- `Harness.Main`'s SERIES V moves the limit alone over a source whose
 -- width outruns it (measured-not-rechecked): limits one to four,

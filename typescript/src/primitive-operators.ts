@@ -16,7 +16,7 @@ import {
   cutLedgerStep,
   cutVictimCloses,
   emptyCutLedger,
-  flattenBurst,
+  mergeAllBurst,
   openAfter,
   reassemble,
   splitEmit,
@@ -24,7 +24,7 @@ import {
 import { Arrival, Driver } from "./driver.js";
 import { captureSync, cold, hot } from "./constructors.js";
 
-export { exhaustAll, flattenAll, switchAll } from "./join.js";
+export { exhaustAll, mergeAllAll, switchAll } from "./join.js";
 
 // a one-shot subscription burst (Agda's oneShotBurst): a source that
 // lives and dies inside its own subscribe frame — init, its values,
@@ -150,7 +150,7 @@ export const share = <A>(
     }));
     const burstFin =
       connect.completedSync ||
-      flattenBurst(connect.burst).done ||
+      mergeAllBurst(connect.burst).done ||
       (connect.burst.length > 0 && upstreamOpen.length === 0);
     if (burstFin) {
       // the def died inside its own connect burst: latch; this
@@ -188,7 +188,7 @@ const oneShotArrival = (driver: Driver, tick: number): Observable<Arrival> =>
 // emissions minting fresh ids (an async boundary). Mirrors Agda's
 // deferᵉ clause: init in the subscriber's instant; when the hop fires
 // the body is subscribed and its sync burst is grafted behind the
-// hop's close into ONE delivery emit (Agda's thru-outer flattenᵒ walk) —
+// hop's close into ONE delivery emit (Agda's thru-outer mergeAllᵒ walk) —
 // the body thunk runs AT FIRE TIME, which is what breaks μ's
 // unfolding regress: each unfolding costs a schedule hop.
 export const defer = <A>(
@@ -208,7 +208,7 @@ export const defer = <A>(
         mergeMap(({ instant }) =>
           cold<InstEmit<A>>((sink) => {
             const capture = captureSync(compileBody(), sink);
-            const flat = flattenBurst(capture.burst);
+            const flat = mergeAllBurst(capture.burst);
             sink.next(
               reassemble(
                 { instant, source, kind: "delivery" },

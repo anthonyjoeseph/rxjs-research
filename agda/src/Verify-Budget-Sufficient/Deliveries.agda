@@ -54,13 +54,13 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂)
 
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; InstEvent; close; exhausted; Gas; g0; gs; hot; cold)
-open import Rx.Exp       using (Ctx; Closed; Val; _≟ᵗ_; obs; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ;
+open import Rx.Exp       using (Ctx; Closed; Val; _≟ᵗ_; obs; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalTm; unfoldμ)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; NodeId; NodeState; scan-st; take-st; flatten-st;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; NodeId; NodeState; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; lookupNode; installNode; register; mintNode; root; share-sink; _↠_;
-  Path; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer; flattenᵒ; hasRoom; switchᵒ;
+  Path; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer; mergeAllᵒ; hasRoom; switchᵒ;
   exhaustᵒ; Stream; splitEvents; memberSource; burstCompleted; aliveThroughᶠ; takeVals;
-  takeDispatch; switchKill; thruConsume; thruWalk; thruWrap; flattenDrain; innerFinish;
+  takeDispatch; switchKill; thruConsume; thruWalk; thruWrap; mergeAllDrain; innerFinish;
   innerReact; stepFrame; pushBurst; subscribeAll; subscribeE; subscribeInner; sharedConnect;
   subscribeSharedSlot; shareLatch; shareAdmit; shareFinish; foldPath; dispatchShare; shareGo;
   chainStep; cascadeGo; budgetAt; arrTy; arrTick; arrSource; arrVal)
@@ -226,13 +226,13 @@ abstract
       (proj₂ (proj₂ (proj₂ (thruWalk g op nid κ id now vals sched st))))
       ≡ EvalSt.delivered st
 
-  flattenDrain-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  mergeAllDrain-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
     (lim : Maybe ℕ) (act : ℕ)
     (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
     EvalSt.delivered
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-        (flattenDrain g allNid κ id now lim act q sched st))))))
+        (mergeAllDrain g allNid κ id now lim act q sched st))))))
       ≡ EvalSt.delivered st
 
   innerFinish-deliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -292,7 +292,7 @@ abstract
   ... | false = refl
   takeDispatch-deliv nid vals fin sched st nothing                = refl
   takeDispatch-deliv nid vals fin sched st (just (scan-st _))     = refl
-  takeDispatch-deliv nid vals fin sched st (just (flatten-st _ _ _ _))  = refl
+  takeDispatch-deliv nid vals fin sched st (just (mergeAll-st _ _ _ _))  = refl
   takeDispatch-deliv nid vals fin sched st (just (switch-st _ _)) = refl
   takeDispatch-deliv nid vals fin sched st (just (exhaust-st _ _)) = refl
 
@@ -311,9 +311,9 @@ abstract
       (proj₂ (proj₂ (proj₂ (proj₂ (thruWrap op nid fin (vs , bs , sched , st))))))
       ≡ EvalSt.delivered st
   thruWrap-deliv op nid false vs bs sched st = refl
-  thruWrap-deliv flattenᵒ nid true vs bs sched st
+  thruWrap-deliv mergeAllᵒ nid true vs bs sched st
     with lookupNode nid (EvalSt.nodes st)
-  ... | just (flatten-st lim act q _) = refl
+  ... | just (mergeAll-st lim act q _) = refl
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
@@ -325,7 +325,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-deliv exhaustᵒ nid true vs bs sched st
     with lookupNode nid (EvalSt.nodes st)
@@ -333,25 +333,25 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
 
   ----------------------------------------------------------------
   -- the outer *All frame
   ----------------------------------------------------------------
 
-  thruConsume-deliv {u = u} g flattenᵒ nid κ id now o sched st
+  thruConsume-deliv {u = u} g mergeAllᵒ nid κ id now o sched st
     with lookupNode nid (EvalSt.nodes st)
-  ... | just (flatten-st {w} lim act q od) with w ≟ᵗ u
+  ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
   ...   | no _     = refl
   ...   | yes refl with hasRoom lim act
-  ...     | true   = subscribeInner-deliv g flattenᵒ nid κ id now o sched st
+  ...     | true   = subscribeInner-deliv g mergeAllᵒ nid κ id now o sched st
   ...     | false  = refl
-  thruConsume-deliv g flattenᵒ nid κ id now o sched st | nothing = refl
-  thruConsume-deliv g flattenᵒ nid κ id now o sched st | just (scan-st _) = refl
-  thruConsume-deliv g flattenᵒ nid κ id now o sched st | just (take-st _) = refl
-  thruConsume-deliv g flattenᵒ nid κ id now o sched st | just (switch-st _ _) = refl
-  thruConsume-deliv g flattenᵒ nid κ id now o sched st | just (exhaust-st _ _) = refl
+  thruConsume-deliv g mergeAllᵒ nid κ id now o sched st | nothing = refl
+  thruConsume-deliv g mergeAllᵒ nid κ id now o sched st | just (scan-st _) = refl
+  thruConsume-deliv g mergeAllᵒ nid κ id now o sched st | just (take-st _) = refl
+  thruConsume-deliv g mergeAllᵒ nid κ id now o sched st | just (switch-st _ _) = refl
+  thruConsume-deliv g mergeAllᵒ nid κ id now o sched st | just (exhaust-st _ _) = refl
   thruConsume-deliv g switchᵒ nid κ id now o sched st
     with lookupNode nid (EvalSt.nodes st)
   ... | just (switch-st cur od) =
@@ -362,7 +362,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (exhaust-st _ _)  = refl
   thruConsume-deliv g exhaustᵒ nid κ id now o sched st
     with lookupNode nid (EvalSt.nodes st)
@@ -372,7 +372,7 @@ abstract
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
 
   thruWalk-deliv g op nid κ id now []       sched st = refl
@@ -386,20 +386,20 @@ abstract
   -- the inner *All frame
   ----------------------------------------------------------------
 
-  flattenDrain-deliv g allNid κ id now lim act []      sched st = refl
-  flattenDrain-deliv g allNid κ id now lim act (o ∷ q) sched st
+  mergeAllDrain-deliv g allNid κ id now lim act []      sched st = refl
+  mergeAllDrain-deliv g allNid κ id now lim act (o ∷ q) sched st
     with hasRoom lim act
   ... | false = refl
   ... | true
-    with subscribeInner g flattenᵒ allNid κ id now o sched st
-       | subscribeInner-deliv g flattenᵒ allNid κ id now o sched st
+    with subscribeInner g mergeAllᵒ allNid κ id now o sched st
+       | subscribeInner-deliv g mergeAllᵒ allNid κ id now o sched st
   ...   | (_ , vs , bs , done , sched₁ , st₁) | si =
-        trans (flattenDrain-deliv g allNid κ id now lim
+        trans (mergeAllDrain-deliv g allNid κ id now lim
                  (if done then act else suc act) q sched₁ st₁) si
 
-  innerFinish-deliv {s = s} g flattenᵒ allNid inst κ id now vals sched st
-                    (just (flatten-st {w} lim act q od)) with w ≟ᵗ s
-  ... | yes refl = flattenDrain-deliv g allNid κ id now lim (pred act) q sched st
+  innerFinish-deliv {s = s} g mergeAllᵒ allNid inst κ id now vals sched st
+                    (just (mergeAll-st {w} lim act q od)) with w ≟ᵗ s
+  ... | yes refl = mergeAllDrain-deliv g allNid κ id now lim (pred act) q sched st
   ... | no _     = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st
                     (just (switch-st (just c) od))
@@ -409,21 +409,21 @@ abstract
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st
                     (just (exhaust-st act od)) = refl
   -- the catch-all, enumerated: a variable pattern would not reduce
-  innerFinish-deliv g flattenᵒ allNid inst κ id now vals sched st nothing = refl
-  innerFinish-deliv g flattenᵒ allNid inst κ id now vals sched st (just (scan-st _)) = refl
-  innerFinish-deliv g flattenᵒ allNid inst κ id now vals sched st (just (take-st _)) = refl
-  innerFinish-deliv g flattenᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = refl
-  innerFinish-deliv g flattenᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = refl
+  innerFinish-deliv g mergeAllᵒ allNid inst κ id now vals sched st nothing = refl
+  innerFinish-deliv g mergeAllᵒ allNid inst κ id now vals sched st (just (scan-st _)) = refl
+  innerFinish-deliv g mergeAllᵒ allNid inst κ id now vals sched st (just (take-st _)) = refl
+  innerFinish-deliv g mergeAllᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = refl
+  innerFinish-deliv g mergeAllᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st nothing = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (scan-st _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (take-st _)) = refl
-  innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) = refl
+  innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (switch-st nothing _)) = refl
   innerFinish-deliv g switchᵒ allNid inst κ id now vals sched st (just (exhaust-st _ _)) = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st nothing = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (scan-st _)) = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (take-st _)) = refl
-  innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (flatten-st _ _ _ _)) = refl
+  innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (mergeAll-st _ _ _ _)) = refl
   innerFinish-deliv g exhaustᵒ allNid inst κ id now vals sched st (just (switch-st _ _)) = refl
 
   innerReact-deliv g op allNid inst κ id now vals sched st false = refl
@@ -442,7 +442,7 @@ abstract
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   ... | just (scan-st {w} ac) with w ≟ᵗ u
@@ -541,8 +541,8 @@ abstract
              (proj₂ (mintNode sched))
              (installNode (proj₁ (mintNode sched)) (scan-st (evalTm seed)) st))
 
-  subscribeE-deliv {u = u} g (flattenᵉ lim b) κ id now sched st =
-    subscribeAll-deliv g flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st
+  subscribeE-deliv {u = u} g (mergeAllᵉ lim b) κ id now sched st =
+    subscribeAll-deliv g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ id now sched st
   subscribeE-deliv g (switchAllᵉ b) κ id now sched st =
     subscribeAll-deliv g switchᵒ (switch-st nothing false) b κ id now sched st
   subscribeE-deliv g (exhaustAllᵉ b) κ id now sched st =

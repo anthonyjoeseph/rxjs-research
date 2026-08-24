@@ -119,11 +119,11 @@ open import Rx.Prim      using (Source; InstEmit; _at_from_as_; InstEvent; init;
   after_,_; hot; cold)
 open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
-  ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ;
+  ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; flatten-st; switch-st;
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; Path; sizeStep; iterSize; foldStep; iterFold)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
@@ -204,16 +204,16 @@ widLive {n = n} W sl l =
       (LiveSource.pending l)
 
 -- THE FLATTEN CLAUSE CARRIES A CARDINALITY as well as the pointwise
--- bound, and it has to: `flattenDrain` subscribes one inner per queued
+-- bound, and it has to: `mergeAllDrain` subscribes one inner per queued
 -- observable, so the drain's receipt is a sum over the queue, and
 -- NOTHING else in the tree bounds how long that queue is — the
--- hypothesis flattenDrain-caps is given admits a queue of any length at
+-- hypothesis mergeAllDrain-caps is given admits a queue of any length at
 -- all, and so does an `all` (Rung-Count-Probe § 2, both rows).  One
 -- level of width pays for one cons, with the same `suc w ≤ foldStep S w`
 -- margin the count receipts already spend
 widNode : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
 widNode {n = n} W sl (scan-st {t} v)   = pWᵛ n sl t v ≤ᵇ W
-widNode {n = n} W sl (flatten-st _ _ q _) =
+widNode {n = n} W sl (mergeAll-st _ _ q _) =
   all (λ o → pWᵉ n sl o ≤ᵇ W) q ∧ (length q ≤ᵇ W)
 widNode W sl (take-st _)               = true
 widNode W sl (switch-st _ _)           = true
@@ -338,7 +338,7 @@ widLive-widen {n = n} sl l le =
 widNode-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (ns : NodeState Γ) {W W′ : ℕ} →
   W ≤ W′ → widNode W sl ns ≡ true → widNode W′ sl ns ≡ true
 widNode-widen {n = n} sl (scan-st {t} v)   le h = ≤ᵇ-widen (pWᵛ n sl t v) le h
-widNode-widen {n = n} sl (flatten-st _ _ q _) {W} {W′} le h
+widNode-widen {n = n} sl (mergeAll-st _ _ q _) {W} {W′} le h
   with ∧-true (all (λ o → pWᵉ n sl o ≤ᵇ W) q) (length q ≤ᵇ W) h
 ... | hall , hlen =
   ∧-intro (all-impl _ _ (λ o → ≤ᵇ-widen (pWᵉ n sl o) le) q hall)
@@ -700,7 +700,7 @@ burstCount? c str =
   (length str ≤ᵇ suc (Caps.cWid c))
   ∧ all (λ em → valCountᵉ (InstEmit.events em) ≤ᵇ suc (Caps.cWid c)) str
 
--- observables in a flatten queue: the caps side of flattenDrain's
+-- observables in a mergeAll queue: the caps side of mergeAllDrain's
 -- `all (λ o → sizeᵉ o ≤ᵇ …)` pair
 obsCaps? : ∀ {n} {Γ : Ctx n} {s} → Caps → Slots Γ → Closed Γ s → Bool
 obsCaps? {n = n} c sl o =
@@ -953,9 +953,9 @@ wid-suc-step c L hS =
 widNode-push : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (L : ℕ) (sl : Slots Γ)
   (lim : Maybe ℕ) (q : List (Closed Γ s)) (o : Closed Γ s) (act : ℕ) (od : Bool) →
   2 ≤ Caps.cSize c →
-  widNode (Caps.cWid (frameStep L c)) sl (flatten-st lim act q od) ≡ true →
+  widNode (Caps.cWid (frameStep L c)) sl (mergeAll-st lim act q od) ≡ true →
   (pWᵉ n sl o ≤ᵇ Caps.cWid (frameStep L c)) ≡ true →
-  widNode (Caps.cWid (frameStep (suc L) c)) sl (flatten-st lim act (q ++ o ∷ []) od)
+  widNode (Caps.cWid (frameStep (suc L) c)) sl (mergeAll-st lim act (q ++ o ∷ []) od)
     ≡ true
 widNode-push {n = n} c L sl lim q o act od hS hq ho
   with ∧-true (all (λ x → pWᵉ n sl x ≤ᵇ Caps.cWid (frameStep L c)) q)
@@ -1241,10 +1241,10 @@ module Red {n} {Γ : Ctx n} {vs : List (Fin n)} where
   oW-scan zero    sl f z e = refl
   oW-scan (suc _) sl f z e = refl
 
-  oW-flatten : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    outWⱽ q vs sl (flattenᵉ lim e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
-  oW-flatten zero    sl lim e = refl
-  oW-flatten (suc _) sl lim e = refl
+  oW-mergeAll : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    outWⱽ q vs sl (mergeAllᵉ lim e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
+  oW-mergeAll zero    sl lim e = refl
+  oW-mergeAll (suc _) sl lim e = refl
 
   oW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
     outWⱽ q vs sl (switchAllᵉ e) ≡ outWⱽ q vs sl e * innWⱽ q vs sl e
@@ -1296,10 +1296,10 @@ module Red {n} {Γ : Ctx n} {vs : List (Fin n)} where
   iW-scan zero    sl f z e = refl
   iW-scan (suc _) sl f z e = refl
 
-  iW-flatten : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t)) →
-    innWⱽ q vs sl (flattenᵉ lim e) ≡ innWⱽ q vs sl e
-  iW-flatten zero    sl lim e = refl
-  iW-flatten (suc _) sl lim e = refl
+  iW-mergeAll : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (lim : Maybe ℕ) (e : Exp Γ Δᵍ Δ Θ (obs t)) →
+    innWⱽ q vs sl (mergeAllᵉ lim e) ≡ innWⱽ q vs sl e
+  iW-mergeAll zero    sl lim e = refl
+  iW-mergeAll (suc _) sl lim e = refl
 
   iW-switch : ∀ (q : ℕ) (sl : Slots Γ) {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ (obs t)) →
     innWⱽ q vs sl (switchAllᵉ e) ≡ innWⱽ q vs sl e

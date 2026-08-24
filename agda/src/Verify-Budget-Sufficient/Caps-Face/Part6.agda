@@ -1,5 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part6
--- innerFinish-face-keep … innerFinish-flatten-face
+-- innerFinish-face-keep … innerFinish-mergeAll-face
 module Verify-Budget-Sufficient.Caps-Face.Part6 where
 
 open import Data.Bool    using (Bool; true; false; not; if_then_else_)
@@ -29,9 +29,9 @@ open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEv
 open import Rx.Exp       using (Ty; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; syncSizeᵉ; Exp)
 open import Rx.Frame-Width using (pWᵉ)
 open import Rx.Hop-Depth using (hopDᵉ)
-open import Rx.Evaluator using (Sched; EvalSt; RegId; NodeState; scan-st; take-st; flatten-st; switch-st;
+open import Rx.Evaluator using (Sched; EvalSt; RegId; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; setNode; lookupNode; NodeId; share-sink; AllOp; Stream; Path; subscribeInner;
-  flattenᵒ; switchᵒ; exhaustᵒ; switchKill; thruConsume; thruWalk; thruWrap; innerFinish; hasRoom;
+  mergeAllᵒ; switchᵒ; exhaustᵒ; switchKill; thruConsume; thruWalk; thruWrap; innerFinish; hasRoom;
   sizeAt; shareFinish; shareGo; foldPath; dispatchShare; foldStep; fLvlD; sIterD; sLvlD)
 open import Rx.Slots using (Slots; slotsSize)
 
@@ -87,7 +87,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
    frameStep-⊑-+; obsListCaps?-slots; pathSz?-⊑; valCaps?-size; valCaps?-wid;
    valsCaps?-slots; valsCaps?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-flattenBump; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode;
+  (capsOK?-mergeAllBump; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode;
    face-lift; frameBud; FrameFace; lookupNode-caps; mList?; mList?-head;
    mList?-keeps; mList?-tail; switchKill-caps; switchKill-closes-caps;
    thruWrap-caps; valsCaps?; valsCaps→mList-strict)
@@ -119,8 +119,8 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- of innerReact / innerFinish hands `vals` straight back — switch
 -- clears a slot, exhaust clears a flag, the absorb path and every
 -- catch-all return the payload untouched — and all of those are
--- ground below.  flatten's is the exception:
--- `innerFinish` returns `vals ++ flattenDrain …`, and flattenDrain
+-- ground below.  mergeAll's is the exception:
+-- `innerFinish` returns `vals ++ mergeAllDrain …`, and mergeAllDrain
 -- subscribes each parked inner and CONCATENATES the bursts, so its
 -- output width is a sum over the queue of one subscribeE burst's
 -- value count — conjunct (b) of the two named above.  Its receipt (a)
@@ -141,14 +141,14 @@ innerFinish-face-keep c d j sl vals b sched st inv vC =
 -- below passes `lookupNode allNid (EvalSt.nodes st)` with NO
 -- intervening with-abstraction and the premise's type is literally the
 -- one the goal wants.  This head dispatches every node case itself:
--- nothing / scan / take / switch / exhaust / flatten+no all go
--- to `innerFinish-face-keep` at j′ = 0, and flatten+yes is the one real
+-- nothing / scan / take / switch / exhaust / mergeAll+no all go
+-- to `innerFinish-face-keep` at j′ = 0, and mergeAll+yes is the one real
 -- obligation — `innerFinish-caps` (.Subscribe-Face), which is
 -- exactly what H1 and H2 were added to feed.
 -- `ifc` (IfcFace = innerFinish-caps' type) threads as the FIRST kit arg
 -- so the proof can call innerFinish-caps without creating a circular
 -- import — Subscribe-Face already imports Caps-Face.
-innerFinish-flatten-face-go :
+innerFinish-mergeAll-face-go :
     -- ifc  (innerFinish-caps, .Subscribe-Face)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
       (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
@@ -217,35 +217,35 @@ innerFinish-flatten-face-go :
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
     -- H1: the total slot store fits the size cap.  Every route through
-    -- the drain (`obsList→mList-strict`, `flattenDrain-caps`,
+    -- the drain (`obsList→mList-strict`, `mergeAllDrain-caps`,
     -- `innerFinish-caps`) wants it, and it is NOT derivable from
     -- `slotsCaps?`, which bounds per-element sizes and not the sum
     slotsSize sl ≤ Caps.cSize c →
     -- H2: this finish's depth fits the walk's budget.  `innerFinish-caps`'s
-    -- flatten+yes branch is unreachable at `dep = 0`, so its budget lands
+    -- mergeAll+yes branch is unreachable at `dep = 0`, so its budget lands
     -- in `fLvlD S W dep j` and widening to `d` needs exactly this
-    depthFin g flattenᵒ allNid inst κ id now vals sched st nd ≤ d →
+    depthFin g mergeAllᵒ allNid inst κ id now vals sched st nd ≤ d →
     nd ≡ lookupNode allNid (EvalSt.nodes st) →
-    FrameFace c d j sl (innerFinish g flattenᵒ allNid inst κ id now vals sched st nd)
+    FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st nd)
 
 -- § 1  TRIVIAL CASES — innerFinish returns vals , [] , false , sched , st
-innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     nothing _ _ _ _ inv _ _ vC _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
-innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (just (scan-st _)) _ _ _ _ inv _ _ vC _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
-innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (just (take-st _)) _ _ _ _ inv _ _ vC _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
-innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (just (switch-st _ _)) _ _ _ _ inv _ _ vC _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
-innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     (just (exhaust-st _ _)) _ _ _ _ inv _ _ vC _ _ _
   = innerFinish-face-keep c d j sl vals false sched st inv vC
@@ -253,23 +253,23 @@ innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
 -- § 2  FLATTEN CASE — delegate entirely to ifc (= innerFinish-caps).
 -- Both sub-cases (w ≠ s → trivial, w = s → drain) are handled inside
 -- ifc via its own `with w ≟ᵗ s | dpt` trick.
-innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
-    (just (flatten-st {w} lim act q od))
+    (just (mergeAll-st {w} lim act q od))
     2≤S 1≤R slEq slC inv pC lC vC slSz dpt ndEq
   = let
       -- Step 1: transport dpt from nd to (lookupNode …)
       dpt′ = subst
-               (λ nd′ → depthFin g flattenᵒ allNid inst κ id now vals sched st nd′ ≤ d)
+               (λ nd′ → depthFin g mergeAllᵒ allNid inst κ id now vals sched st nd′ ≤ d)
                ndEq dpt
       -- Step 2: call ifc (= innerFinish-caps) at dep=d, bud=frameBud c j
-      res = ifc c d (frameBud c j) j g flattenᵒ allNid inst κ id now vals
+      res = ifc c d (frameBud c j) j g mergeAllᵒ allNid inst κ id now vals
               sl sched st 2≤S 1≤R slEq slC slSz inv pC lC vC ≤-refl dpt′
       -- Step 3: rearrange tuple
       --   ifc returns: (j′ , capsOK , valsCaps , evts , level)
       --   FrameFace expects: (j′ , level , capsOK , valsCaps , evts)
       rearranged : FrameFace c d j sl
-                     (innerFinish g flattenᵒ allNid inst κ id now vals sched st
+                     (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
       rearranged =
         ( proj₁ res
@@ -280,7 +280,7 @@ innerFinish-flatten-face-go ifc k₁ k₂ k₃ k₄ k₅
     -- Step 4: transport conclusion from (lookupNode …) back to nd
     in subst
          (λ nd′ → FrameFace c d j sl
-                    (innerFinish g flattenᵒ allNid inst κ id now vals sched st nd′))
+                    (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st nd′))
          (sym ndEq)
          rearranged
 
@@ -347,12 +347,12 @@ private
                  (≤-reflexive (sym (+-suc j (a + b))))))
 
   thruWrap-vals op nid false _ = refl
-  thruWrap-vals flattenᵒ nid true (vs , bs , sd , st)
+  thruWrap-vals mergeAllᵒ nid true (vs , bs , sd , st)
     with lookupNode nid (EvalSt.nodes st)
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-vals switchᵒ nid true (vs , bs , sd , st)
@@ -360,7 +360,7 @@ private
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
   thruWrap-vals exhaustᵒ nid true (vs , bs , sd , st)
@@ -368,7 +368,7 @@ private
   ... | nothing                = refl
   ... | just (scan-st _)       = refl
   ... | just (take-st _)       = refl
-  ... | just (flatten-st _ _ _ _)    = refl
+  ... | just (mergeAll-st _ _ _ _)    = refl
   ... | just (switch-st _ _)   = refl
   ... | just (exhaust-st _ _)  = refl
 
@@ -436,7 +436,7 @@ private
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
        × (suc (j + j′) ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc j))
-  thruConsume-caps-go {n = n} {u = u} siC c dep bud j g flattenᵒ nid κ id now o sl sched st
+  thruConsume-caps-go {n = n} {u = u} siC c dep bud j g mergeAllᵒ nid κ id now o sl sched st
                       2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
     with lookupNode nid (EvalSt.nodes st)
        | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
@@ -452,7 +452,7 @@ private
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
   ... | just (exhaust-st _ _)  | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (flatten-st {w} lim act q od) | (bn , wn) with w ≟ᵗ u
+  ... | just (mergeAll-st {w} lim act q od) | (bn , wn) with w ≟ᵗ u
   ...   | no _ = 0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
                             (sym (+-identityʳ j)) inv
                 , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -461,7 +461,7 @@ private
   -- The queue rides through untouched, which is why the bump's receipt
   -- is the lookup's and no longer `refl`
   ...     | true =
-    proj₁ SI , capsOK?-flattenBump (frameStep (j + proj₁ SI) c) nid
+    proj₁ SI , capsOK?-mergeAllBump (frameStep (j + proj₁ SI) c) nid
            (proj₁ (proj₂ (proj₂ (proj₂ R))))
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
@@ -470,18 +470,18 @@ private
        , proj₁ (proj₂ (proj₂ (proj₂ SI)))
        , proj₂ (proj₂ (proj₂ (proj₂ SI)))
     where
-    SI = siC c dep bud j g flattenᵒ nid κ id now o sl sched st
+    SI = siC c dep bud j g mergeAllᵒ nid κ id now o sl sched st
            2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
-    R  = subscribeInner g flattenᵒ nid κ id now o sched st
+    R  = subscribeInner g mergeAllᵒ nid κ id now o sched st
   -- THE GATE IS SHUT: the payload is parked, and one level of width
   -- pays for the cons
   ...     | false =
     1 , subst (λ x → capsOK? (frameStep x c) sched
-                       (record st { nodes = setNode nid (flatten-st lim act (q ++ o ∷ []) od)
+                       (record st { nodes = setNode nid (mergeAll-st lim act (q ++ o ∷ []) od)
                                               (EvalSt.nodes st) }) ≡ true)
               (sym lvl)
               (capsOK?-setNode (frameStep (suc j) c)
-                 nid (flatten-st lim act (q ++ o ∷ []) od)
+                 nid (mergeAll-st lim act (q ++ o ∷ []) od)
                  sched st BN WN
                  (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                     (frameStep-mono-j c 2≤S (n≤1+n j)) inv))
@@ -508,7 +508,7 @@ private
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
   ... | just (take-st _)       | dpt′ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (flatten-st _ _ _ _) | dpt′ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+  ... | just (mergeAll-st _ _ _ _) | dpt′ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
   ... | just (exhaust-st _ _)  | dpt′ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -546,7 +546,7 @@ private
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
   ... | just (take-st _)       = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (flatten-st _ _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+  ... | just (mergeAll-st _ _ _ _) = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
   ... | just (switch-st _ _)   = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
@@ -861,7 +861,7 @@ abstract
     pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
-    -- H1 and H2, matching `innerFinish-flatten-face-go`'s.  Here H2 is the
+    -- H1 and H2, matching `innerFinish-mergeAll-face-go`'s.  Here H2 is the
     -- `suc` form: a thru-outer frame re-reads the budget, so its own walk
     -- runs one level DOWN and the premise must leave that unit spare
     slotsSize sl ≤ Caps.cSize c →
@@ -872,14 +872,14 @@ abstract
 
 -- the two faces, assembled over their cores
 -- P3's ASSEMBLY, landed from ``git show 360d562^:agda/probe/InnerFinish-Concat-Probe.agda``.
--- `innerFinish-flatten-face-core` is a REAL DEFINITION now: one call to
+-- `innerFinish-mergeAll-face-core` is a REAL DEFINITION now: one call to
 -- the sub-postulate at `nd = lookupNode allNid (EvalSt.nodes st)`, with
 -- no with-abstraction anywhere between, so `dpt`'s type and the
 -- sub-postulate's H2 are the same expression rather than merely equal
 -- ones.  The five kit hypotheses are passed STRAIGHT THROUGH rather than
 -- dropped: the drain is what eventually consumes them, and dropping them
 -- here would orphan `burstCaps?-∷` and the four `*-slots` transports
-innerFinish-flatten-face-core :
+innerFinish-mergeAll-face-core :
     -- ifc  (innerFinish-caps, .Subscribe-Face)
     (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
       (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
@@ -942,18 +942,18 @@ innerFinish-flatten-face-core :
     suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
     valsCaps? (frameStep j c) sl vals ≡ true →
     slotsSize sl ≤ Caps.cSize c →
-    depthFin g flattenᵒ allNid inst κ id now vals sched st
+    depthFin g mergeAllᵒ allNid inst κ id now vals sched st
       (lookupNode allNid (EvalSt.nodes st)) ≤ d →
-    FrameFace c d j sl (innerFinish g flattenᵒ allNid inst κ id now vals sched st
+    FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                           (lookupNode allNid (EvalSt.nodes st)))
-innerFinish-flatten-face-core ifc k₁ k₂ k₃ k₄ k₅
+innerFinish-mergeAll-face-core ifc k₁ k₂ k₃ k₄ k₅
     c d j g allNid inst κ id now vals sl sched st
     2≤S 1≤R slEq slC inv pC lC vC slSz dpt =
   -- the five kit hypotheses are ETA-EXPANDED, not passed bare: their
   -- implicits are not determined by any explicit argument, so a bare
   -- `k₂`/`k₅` leaves unsolved metas.  Fresh binder names so the lambdas
   -- do not shadow this clause's own `c`/`sl`
-  innerFinish-flatten-face-go ifc
+  innerFinish-mergeAll-face-go ifc
     (λ {n′} {Γ′} {u′} → k₁ {n′} {Γ′} {u′})
     (λ {n′} {Γ′} {c′} {sa} {sb} → k₂ {n′} {Γ′} {c′} {sa} {sb})
     (λ {n′} {Γ′} {u′} {c′} {sa} {sb} → k₃ {n′} {Γ′} {u′} {c′} {sa} {sb})
@@ -964,7 +964,7 @@ innerFinish-flatten-face-core ifc k₁ k₂ k₃ k₄ k₅
     2≤S 1≤R slEq slC inv pC lC vC slSz dpt
     refl
 
-innerFinish-flatten-face :
+innerFinish-mergeAll-face :
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
     (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -1004,12 +1004,12 @@ innerFinish-flatten-face :
   suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
   valsCaps? (frameStep j c) sl vals ≡ true →
   slotsSize sl ≤ Caps.cSize c →
-  depthFin g flattenᵒ allNid inst κ id now vals sched st
+  depthFin g mergeAllᵒ allNid inst κ id now vals sched st
     (lookupNode allNid (EvalSt.nodes st)) ≤ d →
-  FrameFace c d j sl (innerFinish g flattenᵒ allNid inst κ id now vals sched st
+  FrameFace c d j sl (innerFinish g mergeAllᵒ allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
-innerFinish-flatten-face ifc =
-  innerFinish-flatten-face-core ifc
+innerFinish-mergeAll-face ifc =
+  innerFinish-mergeAll-face-core ifc
     (λ {n} {Γ} {u} → burstCaps?-∷ {n} {Γ} {u})
     (λ {n} {Γ} {c} {sl} {sl′} → valsCaps?-slots {n} {Γ} {c} {sl} {sl′})
     (λ {n} {Γ} {u} {c} {sl} {sl′} → eventsCaps?-slots {n} {Γ} {u} {c} {sl} {sl′})

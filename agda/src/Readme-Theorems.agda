@@ -19,7 +19,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_; after_,_; hot)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; isData;
                                 inputsBelowᵉ;
-                                input; ofᵉ; mapᵉ; takeᵉ; flattenᵉ;
+                                input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
                                 exhaustAllᵉ; evalTm; applyFn)
 open import Rx.Evaluator using (evaluate)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
@@ -36,12 +36,12 @@ emitValues []                     = []
 emitValues ((es at _ from _ as _) ∷ xs) = valuesOf es ++ emitValues xs
 
 ------------------------------------------------------------------
--- shorthands: merge as an unbounded flatten of `of`, and the tiny slot assignments
+-- shorthands: merge as an unbounded mergeAll of `of`, and the tiny slot assignments
 -- the instances run against
 ------------------------------------------------------------------
 
 mergeOf : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → Closed Γ t
-mergeOf es = flattenᵉ nothing (ofᵉ (map strmᵗ es))
+mergeOf es = mergeAllᵉ nothing (ofᵉ (map strmᵗ es))
 
 -- scripted slots carry data only (Rx.Evaluator.Slot); these theorems
 -- therefore quantify over data types, which is every type they are read at
@@ -66,7 +66,7 @@ noSlots ()
 
 postulate
   -- Batch order is delivery order.  The flagship: batching only
-  -- GROUPS — never reorders, never drops.  Flattening the batches
+  -- GROUPS — never reorders, never drops.  MergeAlling the batches
   -- recovers the raw value stream, for every program and driver.
   readme-batch-order-is-delivery-order :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel) (e : Closed Γ t) (ins : Slots Γ) →
@@ -116,7 +116,7 @@ eachNextProgram f =
 --   merge(s, s.mergeMap(n => of(…n…)))  on s.next(v)  ≡  [[v, …v…]]
 cascadeProgram : ∀ {t} → List (Fn (t ∷ []) [] [] [] t t) → Closed (t ∷ []) t
 cascadeProgram ws =
-  mergeOf (input zero ∷ flattenᵉ nothing (mapᵉ (strmᵗ (ofᵉ ws)) (input zero)) ∷ [])
+  mergeOf (input zero ∷ mergeAllᵉ nothing (mapᵉ (strmᵗ (ofᵉ ws)) (input zero)) ∷ [])
 
 -- completion cascades inherit too: take(1) closes on the event, the
 -- concat's queued leg subscribes at that same instant — final value,
@@ -125,7 +125,7 @@ cascadeProgram ws =
 completionProgram : ∀ {t} → Tm (t ∷ []) [] [] [] t → Closed (t ∷ []) t
 completionProgram w =
   mergeOf (input zero
-          ∷ flattenᵉ (just 1) (ofᵉ (strmᵗ (takeᵉ (nat̂ 1) (input zero))
+          ∷ mergeAllᵉ (just 1) (ofᵉ (strmᵗ (takeᵉ (nat̂ 1) (input zero))
                             ∷ strmᵗ (ofᵉ (w ∷ [])) ∷ []))
           ∷ [])
 
@@ -146,7 +146,7 @@ growthCtx t = t ∷ t ∷ t ∷ []          -- src ∷ trigger ∷ shared src
 growthProgram : ∀ {t} → Closed (growthCtx t) t
 growthProgram =
   mergeOf (input (suc (suc zero))
-          ∷ flattenᵉ nothing (mapᵉ (strmᵗ (input (suc (suc zero)))) (input (suc zero)))
+          ∷ mergeAllᵉ nothing (mapᵉ (strmᵗ (input (suc (suc zero)))) (input (suc zero)))
           ∷ [])
 
 growthSlots : ∀ {t} {ok : T (isData t)} (u v w x : Val (growthCtx t) t) → Slots (growthCtx t)

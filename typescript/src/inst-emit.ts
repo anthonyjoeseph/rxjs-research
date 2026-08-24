@@ -82,10 +82,10 @@ export const reassemble = <B>(
   kind: envelope.kind,
 });
 
-// flatten a subscription's sync burst into grafts for the emit that
+// mergeAll a subscription's sync burst into grafts for the emit that
 // carries it (Agda's splitBurst): all bookkeeping in burst order, then
 // all values, complete events absorbed into the done bit
-export const flattenBurst = <A>(
+export const mergeAllBurst = <A>(
   burst: InstEmit<A>[],
 ): { bookkeeping: InstEvent<never>[]; values: A[]; done: boolean } =>
   burst.reduce<{ bookkeeping: InstEvent<never>[]; values: A[]; done: boolean }>(

@@ -409,7 +409,7 @@ burst-index S W d k m j J 2≤S hm =
 -- `suc (head + source)` (Rx.Exp), so ONE lemma covers the whole
 -- family: `hd := sizeᵗ f` for map and take, `hd := sizeᵗ f + sizeᵗ z`
 -- for scan (`+` associates left, so its head being a sum costs no
--- rewrite), and `hd := 0` for the headless five (flatten, switchAll,
+-- rewrite), and `hd := 0` for the headless five (mergeAll, switchAll,
 -- exhaustAll, μ, defer), where `0 + src` reduces to `src`
 -- definitionally and the lemma degenerates to `≤-pred`.
 --
@@ -578,7 +578,7 @@ frame-recv S W (suc d) j j₀ h =
 -- whose walk premise is indexed at the full `suc (widAt S W j)`; a
 -- thru-outer's witness is the walk's own j′ and meets it by `walk-index`
 -- alone, but `innerFinish-caps`'s concat clause reinstalls the drained
--- node and so reports `suc j′` — one MORE than `flattenDrain-caps` hands
+-- node and so reports `suc j′` — one MORE than `mergeAllDrain-caps` hands
 -- back.  The room is real, and it is the unused payload slot: the queue
 -- is bounded by `widAt S W j` (`widNode`'s length conjunct) while the
 -- premise admits `suc (widAt S W j)` payloads, and one payload of a walk
@@ -606,7 +606,7 @@ j≤fLvl : ∀ (S W j : ℕ) → j ≤ fLvl S W j
 j≤fLvl S W j = m≤m+n j (fCharge S W j)
 
 -- A DRAIN INSIDE A FRAME, which is `walk-room` carried the rest of the
--- way home.  `flattenDrain-caps` reports its walk in `sIterD` currency at
+-- way home.  `mergeAllDrain-caps` reports its walk in `sIterD` currency at
 -- the budget the frame RE-READ; the enclosing `innerFinish-caps` has to
 -- report in `fLvlD` at one higher depth, and this is that conversion.
 --

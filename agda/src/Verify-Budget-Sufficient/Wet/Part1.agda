@@ -71,9 +71,9 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; Gas; after_,_)
 open import Rx.Exp       using (Ty; _×ᵗ_; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; sizeᵗˢ; sizeᵛ; Tm; Fn; evalTm; applyFn)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; scanVals; memberSource; RegId; Chain; NodeState; scan-st; take-st;
-  flatten-st; switch-st; exhaust-st; installNode; setNode; lookupNode; NodeId; AllOp;
+  mergeAll-st; switch-st; exhaust-st; installNode; setNode; lookupNode; NodeId; AllOp;
   scan-f; take-f; Stream; sweepLive; takeVals; cutThrough; pathHasNode; Path; stepFrame;
-  register; flattenᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; flattenBump; switchKill;
+  register; mergeAllᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; mergeAllBump; switchKill;
   thruWrap)
 open import Rx.Slots using (slotsSize)
 
@@ -415,7 +415,7 @@ stepFrame-scan-wet {s = s} {u = u} Ψ W g id now fn nid κ vals fin sched st E
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ (capᴱ W E) sched st inv))))
 ... | nothing            | _ = E , ≤-refl , inv , refl , refl
 ... | just (take-st _)   | _ = E , ≤-refl , inv , refl , refl
-... | just (flatten-st _ _ _ _)   | _ = E , ≤-refl , inv , refl , refl
+... | just (mergeAll-st _ _ _ _)   | _ = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)  | _ = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _) | _ = E , ≤-refl , inv , refl , refl
 ... | just (scan-st {w} ac) | nb with w ≟ᵗ u
@@ -513,7 +513,7 @@ stepFrame-take-wet {s = s} Ψ W g id now nid κ vals fin sched st E 3≤E inv pB
   with lookupNode nid (EvalSt.nodes st)
 ... | nothing                = E , ≤-refl , inv , refl , refl
 ... | just (scan-st _)       = E , ≤-refl , inv , refl , refl
-... | just (flatten-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
+... | just (mergeAll-st _ _ _ _)    = E , ≤-refl , inv , refl , refl
 ... | just (switch-st _ _)   = E , ≤-refl , inv , refl , refl
 ... | just (exhaust-st _ _)  = E , ≤-refl , inv , refl , refl
 ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
@@ -586,22 +586,22 @@ splitBurst-bk-B {Γ = Γ} {u = u} B Ψ (em ∷ ems) =
     (splitEvents-bk-B {u = u} B Ψ (InstEmit.events em))
     (splitBurst-bk-B {u = u} B Ψ ems)
 
--- the flatten counter bump.  IT MOVES THE COUNTER AND LEAVES THE
+-- the mergeAll counter bump.  IT MOVES THE COUNTER AND LEAVES THE
 -- QUEUE, so the node written is bounded by whatever bounded the node
 -- read — which the lookup hands over, and is no longer `refl` now that
 -- one constructor carries both
-flattenBump-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+mergeAllBump-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
   (nid : NodeId) (d : Bool) (sched : Sched Γ) (st : EvalSt e) →
   INV? Ψ B sched st ≡ true →
-  INV? Ψ B sched (record st { nodes = flattenBump nid d (EvalSt.nodes st) }) ≡ true
-flattenBump-INV Ψ B nid d sched st inv
+  INV? Ψ B sched (record st { nodes = mergeAllBump nid d (EvalSt.nodes st) }) ≡ true
+mergeAllBump-INV Ψ B nid d sched st inv
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B B Ψ nid (EvalSt.nodes st)
          (stB-nodes B sched st (proj₁ (INV-parts Ψ B sched st inv)))
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ B sched st inv))))
-... | just (flatten-st lim k q od) | nb =
+... | just (mergeAll-st lim k q od) | nb =
       install-INV Ψ B sched st nid
-        (flatten-st lim (if d then k else suc k) q od)
+        (mergeAll-st lim (if d then k else suc k) q od)
         (proj₁ nb) (proj₂ nb) inv
 ... | nothing                | _ = inv
 ... | just (scan-st _)       | _ = inv
@@ -648,7 +648,7 @@ switchKill-INV Ψ W E (just v) sched st inv =
              (≤ᵇ⇒≤ _ _ (T-to rl))))
 
 -- the wrap: values and events pass through, only the *All node's
--- done-flag is written back (and flatten's queue is re-installed as-is)
+-- done-flag is written back (and mergeAll's queue is re-installed as-is)
 thruWrap-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ B : ℕ) (op : AllOp) (nid : NodeId) (fin : Bool)
   (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
@@ -662,13 +662,13 @@ thruWrap-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (all (valB? B Ψ u) (proj₁ r) ≡ true)
      × (all (eventB? B Ψ) (proj₁ (proj₂ r)) ≡ true)
 thruWrap-wet Ψ B op nid false vs bs sched st inv vB bB = inv , vB , bB
-thruWrap-wet Ψ B flattenᵒ nid true vs bs sched st inv vB bB
+thruWrap-wet Ψ B mergeAllᵒ nid true vs bs sched st inv vB bB
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B B Ψ nid (EvalSt.nodes st)
          (stB-nodes B sched st (proj₁ (INV-parts Ψ B sched st inv)))
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ B sched st inv))))
-... | just (flatten-st lim act q _) | nb =
-      install-INV Ψ B sched st nid (flatten-st lim act q true)
+... | just (mergeAll-st lim act q _) | nb =
+      install-INV Ψ B sched st nid (mergeAll-st lim act q true)
         (proj₁ nb) (proj₂ nb) inv , vB , bB
 ... | nothing                | _ = inv , vB , bB
 ... | just (scan-st _)       | _ = inv , vB , bB
@@ -682,7 +682,7 @@ thruWrap-wet Ψ B switchᵒ nid true vs bs sched st inv vB bB
 ... | nothing                = inv , vB , bB
 ... | just (scan-st _)       = inv , vB , bB
 ... | just (take-st _)       = inv , vB , bB
-... | just (flatten-st _ _ _ _)    = inv , vB , bB
+... | just (mergeAll-st _ _ _ _)    = inv , vB , bB
 ... | just (exhaust-st _ _)  = inv , vB , bB
 thruWrap-wet Ψ B exhaustᵒ nid true vs bs sched st inv vB bB
   with lookupNode nid (EvalSt.nodes st)
@@ -691,5 +691,5 @@ thruWrap-wet Ψ B exhaustᵒ nid true vs bs sched st inv vB bB
 ... | nothing                = inv , vB , bB
 ... | just (scan-st _)       = inv , vB , bB
 ... | just (take-st _)       = inv , vB , bB
-... | just (flatten-st _ _ _ _)    = inv , vB , bB
+... | just (mergeAll-st _ _ _ _)    = inv , vB , bB
 ... | just (switch-st _ _)   = inv , vB , bB

@@ -52,7 +52,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim  using (Source)
 open import Rx.Exp
-  using (Ctx; Exp; Tm; Fn; Closed; obs; input; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ;
+  using (Ctx; Exp; Tm; Fn; Closed; obs; input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; syncSizeᵉ; syncSizeᵗ; sizeᵉ; unfoldμ; inputsBelowᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
@@ -246,10 +246,10 @@ all-step : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (cs : List Source) (b k : ℕ) �
 all-step sl cs b k =
   ≤-trans (+-monoˡ-≤ (resid sl cs) (n≤1+n b))
 
-flatten-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (lim : Maybe ℕ) (b : Exp Γ Δᵍ Δ Θ (obs t))
+mergeAll-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (lim : Maybe ℕ) (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →
-  nest (flattenᵉ lim b) sl cs ≤ k → nest b sl cs ≤ k
-flatten-step lim b sl cs k = all-step sl cs (syncSizeᵉ b) k
+  nest (mergeAllᵉ lim b) sl cs ≤ k → nest b sl cs ≤ k
+mergeAll-step lim b sl cs k = all-step sl cs (syncSizeᵉ b) k
 
 switch-step : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (b : Exp Γ Δᵍ Δ Θ (obs t))
   (sl : Slots Γ) (cs : List Source) (k : ℕ) →

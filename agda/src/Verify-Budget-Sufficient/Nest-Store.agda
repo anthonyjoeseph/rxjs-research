@@ -2,7 +2,7 @@
 -- WHERE A RUN'S NESTING IS ACTUALLY HELD, and it is not in the subject.
 -- Four places, each of which can hand the sweep an observable the
 -- program's syntax never mentioned: a shared slot's definition, a
--- flatten's queue, a scan's accumulator, and a live source's pending
+-- mergeAll's queue, a scan's accumulator, and a live source's pending
 -- list.  `storeNestMax` is their MAX, because the sweep enters them one
 -- at a time and each from its own frame.
 --
@@ -58,7 +58,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_; RegId; NodeState;
-  scan-st; take-st; flatten-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
+  scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
   Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH)
 open import Rx.Prim using (Source; towerℕ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
@@ -92,7 +92,7 @@ slotsNestSum {n = n} sl = sum (tabulate {n = n} (λ i → slotNest (sl i)))
 
 nodeNest : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
 nodeNest (scan-st {t} v)    = nestDᵛ t v
-nodeNest (flatten-st _ _ q _) = foldr (λ o acc → nestDᵉ o ⊔ acc) 0 q
+nodeNest (mergeAll-st _ _ q _) = foldr (λ o acc → nestDᵉ o ⊔ acc) 0 q
 nodeNest (take-st _)        = 0
 nodeNest (switch-st _ _)    = 0
 nodeNest (exhaust-st _ _)   = 0

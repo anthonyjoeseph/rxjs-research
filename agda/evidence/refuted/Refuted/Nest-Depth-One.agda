@@ -19,14 +19,14 @@
 -- edge the bound is an equality, which is why one `nestSyn` reads as
 -- sufficient and why the width factor read as slack.
 --
--- WHERE IT BREAKS.  `depthFinC` spends a second `suc` — the flatten drain
+-- WHERE IT BREAKS.  `depthFinC` spends a second `suc` — the mergeAll drain
 -- runs as a WALK under the finishing frame — and that frame is a
 -- `from-inner`, which `pathNestD` charges NOTHING for.  So the drain's
 -- level has no path term to come out of, and the only place left is the
 -- single `nestSyn`.  One `nestSyn` pays for one such level.  A program
 -- whose folds nest can spend arbitrarily many.
 --
--- THE WITNESS is `progU 5 2` — a limit-1 flatten over three queued inners, so
+-- THE WITNESS is `progU 5 2` — a limit-1 mergeAll over three queued inners, so
 -- the drain actually fires, under a fold of depth 5 — at the two-slot
 -- vocabulary `insT 1 2 0`, read at the root subscribe.  Measured across
 -- the fold parameter the descent reads 4, 5, 9, 13, 17, 21 while the
@@ -59,7 +59,7 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (pathNestD; storeNestMax; nestSyn)
 open import Rx.Nest-Depth using (nestDᵉ)
 
--- the crossing point: the flatten drain under five nested folds
+-- the crossing point: the mergeAll drain under five nested folds
 prog : Closed Γ₂ natᵗ
 prog = progU 5 2
 

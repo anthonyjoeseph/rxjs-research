@@ -84,7 +84,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
                           Ctx; Exp; Tm; Val;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          flattenᵉ; switchAllᵉ; exhaustAllᵉ;
+                          mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
@@ -145,7 +145,7 @@ mutual
     (2 + pmᵗ V 0 f) ^ V * (pmᵗ V (suc k) f + pmᵗ V k z + pmᵉ V k e)
   -- the frame's own hop is a `suc` in hopD: added, so it is not part
   -- of the slope
-  pmᵉ V k (flattenᵉ lim e)   = pmᵉ V k e
+  pmᵉ V k (mergeAllᵉ lim e)   = pmᵉ V k e
   pmᵉ V k (switchAllᵉ e)  = pmᵉ V k e
   pmᵉ V k (exhaustAllᵉ e) = pmᵉ V k e
   pmᵉ V k (μᵉ e)          = pmᵉ V k e
@@ -181,7 +181,7 @@ mutual
 -- Verify-Budget-Sufficient.Walk-Level, Demand-Probe series W): an
 -- obs-typed shared slot's def emits values of positive hop, and a
 -- subscription that connects to the slot receives them, so a bound
--- that zeroes the share boundary is false at the first flattenᵉ over
+-- that zeroes the share boundary is false at the first mergeAllᵉ over
 -- an input.  The clause now reports η i — the caller's assignment of a
 -- hop depth to each slot.  The honest instantiation is Rx.Slot-Hop's
 -- slotHop, computable by recursion on the slot index because the
@@ -205,7 +205,7 @@ mutual
   hopDᵉ V η (scanᵉ f z e)   =
     (2 + pmᵗ V 0 f) ^ V * (hopDᵗ V η f + hopDᵗ V η z + hopDᵉ V η e)
   -- THE HOP EDGE: entering an inner costs exactly one
-  hopDᵉ V η (flattenᵉ lim e)   = suc (hopDᵉ V η e)
+  hopDᵉ V η (mergeAllᵉ lim e)   = suc (hopDᵉ V η e)
   hopDᵉ V η (switchAllᵉ e)  = suc (hopDᵉ V η e)
   hopDᵉ V η (exhaustAllᵉ e) = suc (hopDᵉ V η e)
   -- unfoldμ substitutes the ORIGINAL closed μ for a Δᵍ var, and Δᵍ
@@ -274,7 +274,7 @@ mutual
               (cong₂ _+_ (cong₂ _+_ (pm-elimGᵗ V (suc k) x cl f)
                                     (pm-elimGᵗ V k x cl z))
                          (pm-elimGᵉ V k x cl b))
-  pm-elimGᵉ V k x cl (flattenᵉ lim b)   = pm-elimGᵉ V k x cl b
+  pm-elimGᵉ V k x cl (mergeAllᵉ lim b)   = pm-elimGᵉ V k x cl b
   pm-elimGᵉ V k x cl (switchAllᵉ b)  = pm-elimGᵉ V k x cl b
   pm-elimGᵉ V k x cl (exhaustAllᵉ b) = pm-elimGᵉ V k x cl b
   pm-elimGᵉ V k x cl (μᵉ b)          = pm-elimGᵉ V k (there x) cl b
@@ -330,7 +330,7 @@ mutual
               (cong₂ _+_ (cong₂ _+_ (hopD-elimGᵗ V η x cl f)
                                     (hopD-elimGᵗ V η x cl z))
                          (hopD-elimGᵉ V η x cl b))
-  hopD-elimGᵉ V η x cl (flattenᵉ lim b)   = cong suc (hopD-elimGᵉ V η x cl b)
+  hopD-elimGᵉ V η x cl (mergeAllᵉ lim b)   = cong suc (hopD-elimGᵉ V η x cl b)
   hopD-elimGᵉ V η x cl (switchAllᵉ b)  = cong suc (hopD-elimGᵉ V η x cl b)
   hopD-elimGᵉ V η x cl (exhaustAllᵉ b) = cong suc (hopD-elimGᵉ V η x cl b)
   hopD-elimGᵉ V η x cl (μᵉ b)          = hopD-elimGᵉ V η (there x) cl b

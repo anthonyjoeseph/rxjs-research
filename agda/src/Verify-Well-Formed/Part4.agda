@@ -42,7 +42,7 @@ open import Rx.Prim      using (Id; Source; InstEvent; init; value; close; hando
   cut; cutPending; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; Path; root; memberSource; NodeId; NodeState; scan-st;
-  take-st; flatten-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
+  take-st; mergeAll-st; switch-st; exhaust-st; sched-init; st-init; arrTy; arrSource;
   cascadeGo; subscribeE; sameSource; hasDry; dropSource; budgetAt)
 open import Rx.Slots using (Slots)
 open import Rx.Protocol  using (ProtocolSt; Owed; countIn; allZero; protocol-init; stepProtocol; runProtocol; paidUp; settle;
@@ -146,7 +146,7 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- multi-source inner registers two chains under one bump), and
 -- exclude spent registrations (finish pred-decrements k while the
 -- registry entries linger to cascadeFinish).  That is exactly what
--- `Probed.Root`'s `hasAliveFromInner` / `flattenCertAt` compute — they
+-- `Probed.Root`'s `hasAliveFromInner` / `mergeAllCertAt` compute — they
 -- moved there with the probe that is their only consumer, so a
 -- restatement here states its own predicate rather than inheriting
 -- one whose evidence was earned against a different statement.  Do NOT
@@ -162,15 +162,15 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- consumers read meanwhile.
 ------------------------------------------------------------------
 
--- NO `flatten-cert` POSTULATE LIVES HERE ANY MORE.  It existed
+-- NO `mergeAll-cert` POSTULATE LIVES HERE ANY MORE.  It existed
 -- ONLY as the hypothesis of `root-caches-core` / `root-done-plumbed-core`,
 -- and writing those two assemblies as real bodies showed that hypothesis
--- does not close: see the ALIVE-vs-PRESENT gap recorded on root-flattenCache
--- below.  `flattenCertAt` LEFT WITH IT, and that is the wiring law rather
+-- does not close: see the ALIVE-vs-PRESENT gap recorded on root-mergeAllCache
+-- below.  `mergeAllCertAt` LEFT WITH IT, and that is the wiring law rather
 -- than a tidy-up: its only consumer was the probe, so once the probe moved
 -- to `agda/evidence/probed` this file held a definition no proof reached.
 -- It is now `Probed.Root`'s own decision procedure — see the reachability
--- receipt in that file, which travelled with it.  A restated flatten-cert
+-- receipt in that file, which travelled with it.  A restated mergeAll-cert
 -- states its predicate HERE, freshly; the probe's rows are evidence about
 -- the predicate they were written against, and inheriting them across a
 -- restatement is the extrapolation the probe rules forbid.
@@ -195,7 +195,7 @@ rootExitSt e ins =
 -- IT IS A LEAF AND MUST STAY ONE.  `allShareSunk` is a conjunction fold
 -- over the registry, so the assembly is writable: the fold's induction is
 -- below and the whole residue is the PER-ENTRY leaf.  A parent taking
--- flatten-cert instead would have its composition checked by nobody.
+-- mergeAll-cert instead would have its composition checked by nobody.
 -- Leaf-only also shrinks what is at risk — the residue no longer
 -- quantifies over the registry, so the FALSITY region the `Probed.Root` sweep
 -- could not reach is now a statement about ONE surviving entry — a size a
@@ -217,7 +217,7 @@ postulate
   -- ROOT-EXIT caches, migrated out of BurstInv for the reason recorded on the
   -- record: the merge count trails the registry inside an inner's burst and
   -- leads it after a take-cut, so only the SETTLED state at the root exit — by
-  -- which point every flattenBump has landed — satisfies cachesValid.
+  -- which point every mergeAllBump has landed — satisfies cachesValid.
   --
   -- IT IS A LEAF, on the same grounds as root-entry-sunk above.
   -- `cachesValid` is a conjunction fold
@@ -235,15 +235,15 @@ postulate
   -- statement, a mid-fold `FoldInv` form of it, and the consumer rewrites
   -- that spend it.
   --
-  -- DEAD ROUTE: `flatten-cert` (flattenCertAt at the root exit) does
+  -- DEAD ROUTE: `mergeAll-cert` (mergeAllCertAt at the root exit) does
   --   NOT discharge even the k ≡ 0 case of this clause, which is what the old
   --   `root-caches-core` hypothesis list silently claimed.  The two predicates
   --   count DIFFERENT things: `countLiveInners` is `nubLen ∘ innerInstsR`, and
   --   innerInstsP collects EVERY `from-inner _ nid j` frame on a registered
-  --   path with no aliveness test at all, while flattenCertAt only rules out the
+  --   path with no aliveness test at all, while mergeAllCertAt only rules out the
   --   ones with `aliveThroughᶠ`.  A registration whose path still mentions a
   --   DEAD instance of nid is therefore counted by countLiveInners and ignored
-  --   by flattenCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
+  --   by mergeAllCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
   --   Closing this needs the separate invariant that no dead-but-present
   --   from-inner instance survives in the root-exit registry; that fact does
   --   not exist in the repo today.  The gap was invisible while this was a
@@ -258,15 +258,15 @@ postulate
   --   edge a wrong cache would show at.
   --   COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
   --   levels, and a single slot context at most.
-  root-flattenCache : ∀ {n} {Γ : Ctx n} {t} {w} (e : Closed Γ t) (ins : Slots Γ)
+  root-mergeAllCache : ∀ {n} {Γ : Ctx n} {t} {w} (e : Closed Γ t) (ins : Slots Γ)
     (nid : NodeId) (lim : Maybe ℕ) (k : ℕ) (q : List (Closed Γ w)) (od : Bool) →
-    (nid , flatten-st lim k q od) ∈ EvalSt.nodes (rootExitSt e ins) →
-    nodeCacheOK nid (flatten-st lim k q od)
+    (nid , mergeAll-st lim k q od) ∈ EvalSt.nodes (rootExitSt e ins) →
+    nodeCacheOK nid (mergeAll-st lim k q od)
       (EvalSt.registry (rootExitSt e ins)) ≡ true
 
 -- the per-node residue, split on the constructor: four of nodeCacheOK's
 -- five clauses are `true` outright, so the whole open content is the
--- flatten one -- and it is now open at EVERY limit, the old concat face
+-- mergeAll one -- and it is now open at EVERY limit, the old concat face
 -- having been a `true` placeholder over the same count.
 root-nodeCache : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (nid : NodeId) (s : NodeState Γ) →
@@ -276,8 +276,8 @@ root-nodeCache e ins nid (scan-st _)       m = refl
 root-nodeCache e ins nid (take-st _)       m = refl
 root-nodeCache e ins nid (switch-st _ _)   m = refl
 root-nodeCache e ins nid (exhaust-st _ _)  m = refl
-root-nodeCache e ins nid (flatten-st lim k q od) m =
-  root-flattenCache e ins nid lim k q od m
+root-nodeCache e ins nid (mergeAll-st lim k q od) m =
+  root-mergeAllCache e ins nid lim k q od m
 
 root-done-plumbed : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
   (S : ProtocolSt) →

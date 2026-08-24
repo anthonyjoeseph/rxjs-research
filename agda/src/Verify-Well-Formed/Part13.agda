@@ -38,7 +38,7 @@ open import Relation.Binary.PropositionalEquality
 open import Verify-Budget-Sufficient.Caps-Bridge using (budget-sufficient)
 open import Rx.Prim      using (Fuel; Id; Source)
 open import Rx.Exp       using (Ctx; Closed)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; NodeId; NodeState; scan-st; take-st; flatten-st;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; root; memberSource; NodeId; NodeState; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; sched-init; st-init; sched-next; schedGo; arrSource;
   chainsOf; cascadeLatch; cascadeGo; subscribeE; cascade; drain; evaluate; sameSource; hasDry;
   dropSource; budgetAt)
@@ -115,7 +115,7 @@ mid-init-caches {Γ = Γ} a sched sched″ st rt eq h rewrite latch-nodes a st =
   nodeOK→Mid nid (take-st _)       hn = refl
   nodeOK→Mid nid (switch-st _ _)   hn = refl
   nodeOK→Mid nid (exhaust-st _ _)  hn = refl
-  nodeOK→Mid nid (flatten-st lim k q od) hn with Arrival.isLast a
+  nodeOK→Mid nid (mergeAll-st lim k q od) hn with Arrival.isLast a
   ... | false = hn
   ... | true  with mergeReachable nid (EvalSt.registry st) in eqM
   ...   | false rewrite mergeReachable-drop-false nid (arrSource a) (EvalSt.registry st) eqM = refl

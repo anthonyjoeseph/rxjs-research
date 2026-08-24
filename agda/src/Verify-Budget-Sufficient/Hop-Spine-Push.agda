@@ -36,7 +36,7 @@ open import Rx.Prim  using (InstEmit; InstEvent; init; value; close;
 open import Rx.Exp   using (Ty; Ctx; Val; Fn; Closed; _≟ᵗ_; _×ᵗ_)
 open import Rx.Hop-Depth using (hopDᵗ; pmᵗ)
 open import Rx.Evaluator using (Stream; EvalSt; Sched; Path; NodeId; NodeState;
-                                scan-st; take-st; flatten-st;
+                                scan-st; take-st; mergeAll-st;
                                 switch-st; exhaust-st; scan-f;
                                 lookupNode; setNode; splitEvents; retagEvents;
                                 pushBurst; stepFrame; scanVals)
@@ -59,7 +59,7 @@ nodeAccSpn? : ∀ {n} {Γ : Ctx n} → ℕ → (Fin n → ℕ) → ℕ → ℕ �
               (u : Ty) → Maybe (NodeState Γ) → Bool
 nodeAccSpn? V η P B u nothing                  = true
 nodeAccSpn? V η P B u (just (take-st _))       = true
-nodeAccSpn? V η P B u (just (flatten-st _ _ _ _))    = true
+nodeAccSpn? V η P B u (just (mergeAll-st _ _ _ _))    = true
 nodeAccSpn? V η P B u (just (switch-st _ _))   = true
 nodeAccSpn? V η P B u (just (exhaust-st _ _))  = true
 nodeAccSpn? V η P B u (just (scan-st {w} acc)) with w ≟ᵗ u
@@ -161,7 +161,7 @@ stepFrame-scan-hopSpn-at {u = u} V η P B g id now fn nid κ vals fin sched st
   (just (take-st _)) eq hnd hP hB hv rewrite eq =
     refl , refl , subst (λ z → nodeAccSpn? V η P B u z ≡ true) (sym eq) hnd
 stepFrame-scan-hopSpn-at {u = u} V η P B g id now fn nid κ vals fin sched st
-  (just (flatten-st _ _ _ _)) eq hnd hP hB hv rewrite eq =
+  (just (mergeAll-st _ _ _ _)) eq hnd hP hB hv rewrite eq =
     refl , refl , subst (λ z → nodeAccSpn? V η P B u z ≡ true) (sym eq) hnd
 stepFrame-scan-hopSpn-at {u = u} V η P B g id now fn nid κ vals fin sched st
   (just (switch-st _ _)) eq hnd hP hB hv rewrite eq =

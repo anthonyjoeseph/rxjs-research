@@ -49,7 +49,7 @@ open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
 open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; flatten-st; RegId; Path; root; arrTy; arrVal; cascade;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st; RegId; Path; root; arrTy; arrVal; cascade;
   cascadeGo; cascadeLatch; cascadeFinish; chainStep; chainsOf; hasDry; subscribeE; budgetAt;
   opIterD; sizeStep; capsBase; sched-next; schedGo; schedHeadOf; schedEarlier; drain; evaluate;
   sched-init; st-init)
@@ -374,10 +374,10 @@ fn-tick {e = e} a id sched st inv val =
 --
 -- ══ THAT REFUTATION IS NOW BUILT — see the anonymous pin
 -- ══ below, just above `dry-tick`.  The restatement is UNBLOCKED.
--- The witness is not a width at all but the flatten queue's LENGTH: INV?
+-- The witness is not a width at all but the mergeAll queue's LENGTH: INV?
 -- reaches a node only through boundedNode and fnCapNode, both `all`s
 -- over the queue's ELEMENTS, while capsOK?'s widNode also demands
--- `length q ≤ᵇ cWid`.  One flatten node holding cWid+1 copies of a single
+-- `length q ≤ᵇ cWid`.  One mergeAll node holding cWid+1 copies of a single
 -- small expression therefore satisfies INV? and fails capsOK?, at
 -- `capsAt e sl id` itself.  So dry-tick may not consume capsOK? from the
 -- INV? it is given, and "the call site happens to supply it" — which
@@ -405,17 +405,17 @@ _ = λ a id sched st → refl
 -- THE GAP IS NARROWER THAN THE HEADER SAYS.  That header names the two
 -- WIDTH conjuncts (widLive, widNode) as the place INV? has no
 -- counterpart.  True, but the cheapest witness is not a width at all —
--- it is the flatten queue's LENGTH:
+-- it is the mergeAll queue's LENGTH:
 --
---   boundedNode B (flatten-st _ _ q _) = all (λ o → sizeᵉ o ≤ᵇ B) q
---   fnCapNode   Ψ (flatten-st _ _ q _) = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
---   widNode   W sl (flatten-st _ _ q _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
+--   boundedNode B (mergeAll-st _ _ q _) = all (λ o → sizeᵉ o ≤ᵇ B) q
+--   fnCapNode   Ψ (mergeAll-st _ _ q _) = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
+--   widNode   W sl (mergeAll-st _ _ q _) = all (λ o → pWᵉ n sl o ≤ᵇ W) q
 --                                         ∧ (length q ≤ᵇ W)
 --
 -- INV? reads a node ONLY through boundedNode (inside stBounded?) and
 -- fnCapNode (inside fnCapBounded?).  Both are `all`s over the queue's
 -- ELEMENTS; NEITHER bounds how many elements there are.  capsOK? does.
--- So one flatten node holding W+1 copies of a single small expression
+-- So one mergeAll node holding W+1 copies of a single small expression
 -- satisfies INV? and fails capsOK? — and it fails at `capsAt e sl id`,
 -- the caps the assembly actually uses, not at caps chosen to break it.
 -- No value has to be made wide, and no numeral appears: the queue is
@@ -449,14 +449,14 @@ private
   -- (the refutation itself is `f≡t-absurd`, .Measures — strictly stronger,
   -- and imported here directly from .Measures.)
 
-  -- widNode W sl (flatten-st _ _ q _) = all (pWᵉ-bound) q ∧ (length q ≤ᵇ W).
+  -- widNode W sl (mergeAll-st _ _ q _) = all (pWᵉ-bound) q ∧ (length q ≤ᵇ W).
   -- Peeled HERE rather than at the use site because the RESULT type pins
   -- ∧-true's second Bool, leaving only the first to solve — and because
   -- `n` is in scope here, so the pWᵉ side needs no underscore (one there
   -- sends Agda inverting `_≤ᵇ_` to depth 50).
   widNode-len : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) {u}
                 (lim : Maybe ℕ) (a : ℕ) (q : List (Closed Γ u)) (b : Bool) →
-                widNode W sl (flatten-st lim a q b) ≡ true →
+                widNode W sl (mergeAll-st lim a q b) ≡ true →
                 (length q ≤ᵇ W) ≡ true
   widNode-len {n = n} W sl lim a q b h =
     proj₂ (∧-true (all (λ o′ → pWᵉ n sl o′ ≤ᵇ W) q) (length q ≤ᵇ W) h)
@@ -501,7 +501,7 @@ _ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) {u}
         B   = sizeCapAt e sl id
         c   = capsAt e sl id
         q   = repQ (suc (Caps.cWid c)) o
-        st  = record (st-init e) { nodes = (0 , flatten-st nothing 0 q false) ∷ [] }
+        st  = record (st-init e) { nodes = (0 , mergeAll-st nothing 0 q false) ∷ [] }
     in all (boundedLive B) (Sched.live sched) ≡ true →
        all (fnCapLive Ψ) (Sched.live sched) ≡ true →
        (slotsSize sl ≤ᵇ B) ≡ true →
@@ -516,7 +516,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       c  = capsAt e sl id
       W  = Caps.cWid c
       q  = repQ (suc W) o
-      st = record (st-init e) { nodes = (0 , flatten-st nothing 0 q false) ∷ [] }
+      st = record (st-init e) { nodes = (0 , mergeAll-st nothing 0 q false) ∷ [] }
       hNodeSz : all (λ o′ → sizeᵉ o′ ≤ᵇ B) q ≡ true
       hNodeSz = repQ-all (λ o′ → sizeᵉ o′ ≤ᵇ B) (suc W) o hsz
       hNodeFn : all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q ≡ true
@@ -533,7 +533,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       A5 = (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
       A2 = regsSz? B (EvalSt.registry st)
       A1 = stBounded? B sched st
-      WD = widNode W sl (flatten-st nothing 0 q false)
+      WD = widNode W sl (mergeAll-st nothing 0 q false)
   in ∧-intro (∧-intro hLive   (∧-intro hNodeSz refl))
              (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
                       (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
@@ -560,7 +560,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
 --
 -- `pre`/`valC` ADDED, which is a RESTATEMENT with the one sufficient
 -- justification: the unconditional form is REFUTED (the pin above — a
--- flatten node holding cWid+1 copies satisfies INV? and fails capsOK?, at
+-- mergeAll node holding cWid+1 copies satisfies INV? and fails capsOK?, at
 -- `capsAt e sl id` itself).  Its sole caller `cascade-wet-via-caps` holds
 -- both already, so nothing downstream had to be found; but "the call site
 -- happens to supply it" is not the reason, the refutation is.
@@ -722,7 +722,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- square per instant — while the width the count reads steps by
 -- `foldStep S w = S ^ suc w` per fold, a tower.  The witness that
 -- machine-refuted it: one shared slot whose def is a scan under a
--- `flattenᵉ nothing`, at the first tick, with the cap computing to the square.
+-- `mergeAllᵉ nothing`, at the first tick, with the cap computing to the square.
 -- And no other count can serve, because the squeeze is not about which
 -- index: any increment denominated in a cap-side quantity must fit
 -- under the fuel that quantity itself defines, and the count exceeds
@@ -757,7 +757,7 @@ sub-charge {n = n} c bud ops j g b κ bid now sl sched st
 -- IS NOW REACHED.  The scan family's slots are EMPTY, so `slotsNestSum`
 -- is zero there and the arm is never entered — while the witness that
 -- machine-refuted the count-parametric currency was precisely a shared
--- slot whose def is a scan under a `flattenᵉ nothing`.  `Harness.Main`'s
+-- slot whose def is a scan under a `mergeAllᵉ nothing`.  `Harness.Main`'s
 -- S-sweep puts a def of that shape in slot 0 and varies its depth and
 -- length independently of the root's.  The arm is not merely entered
 -- but LOAD-BEARING: at the deepest def the sweep reaches, the store's
@@ -1582,7 +1582,7 @@ abstract
 -- and wrong about what the factor is paying for.  The levels this
 -- family spends are paid by path terms: `pathNestD` charges a `suc` at
 -- `thru-outer` and at no other frame, and edge by edge the walk trades
--- subject for path exactly.  But flatten's DRAIN spends a level through
+-- subject for path exactly.  But mergeAll's DRAIN spends a level through
 -- `depthFinC` while sitting under a `from-inner` frame, which the path
 -- measure charges nothing for -- so those levels have no path term, and
 -- a program whose folds nest spends one per layer.  A single constant

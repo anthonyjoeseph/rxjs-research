@@ -154,7 +154,7 @@ caps-frame-boundary-absurd C hC h = <-irrefl refl (<-≤-trans C<step h)
 -- collapses them.  The tempting move is to carry size only and derive
 -- width from it — the way hopD-sizeᵉ derives hop depth from szB of size,
 -- which is exactly why cHop is NOT a field.  THAT ROUTE IS CIRCULAR for
--- width.  outW is not polynomial in size: pWᵉ (flattenᵉ lim e)
+-- width.  outW is not polynomial in size: pWᵉ (mergeAllᵉ lim e)
 -- is pWᵉ e * innWᵉ e and innWᵉ towers at a scanᵉ, so any size-to-width
 -- bound is at least exponential, and the cap would have to dominate an
 -- exponential of itself.

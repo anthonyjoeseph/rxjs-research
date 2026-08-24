@@ -62,7 +62,7 @@ open import Data.Sum   using (inj₁)
 open import Data.Fin   using (Fin)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ty; Ctx; natᵗ; obs; _×ᵗ_; _+ᵗ_; ofᵉ; emptyᵉ; flattenᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; inlᵗ; caseᵗ;
+open import Rx.Exp using (Ty; Ctx; natᵗ; obs; _×ᵗ_; _+ᵗ_; ofᵉ; emptyᵉ; mergeAllᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; inlᵗ; caseᵗ;
   pairᵗ; sizeᵛ; Fn; Val; applyFn)
 open import Rx.Hop-Depth using (hopDᵗ; hopDᵛ)
 open import Rx.Hop-Spine using (spnᵛ)
@@ -84,7 +84,7 @@ NoDeepenWithoutGrowth =
 
 -- depth 1, size 2 — the small deep component the step will wrap
 dᶻ : Val Γᶻ (obs natᵗ)
-dᶻ = flattenᵉ nothing emptyᵉ
+dᶻ = mergeAllᵉ nothing emptyᵉ
 
 -- a sum in the first slot so the step can SCRUTINISE it; a plain shallow
 -- payload in the second, which is what the step throws away
@@ -103,8 +103,8 @@ bigᶻ = ofᵉ (nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat�
 -- template, at size 1.
 fᶻ : Fn Γᶻ [] [] [] (Uᶻ ×ᵗ natᵗ) Uᶻ
 fᶻ = pairᵗ (caseᵗ (fstᵗ (fstᵗ (varᵗ (here refl))))
-             (inlᵗ (strmᵗ (flattenᵉ nothing (ofᵉ (varᵗ (here refl) ∷ [])))))
-             (inlᵗ (strmᵗ (flattenᵉ nothing (ofᵉ (varᵗ (here refl) ∷ []))))))
+             (inlᵗ (strmᵗ (mergeAllᵉ nothing (ofᵉ (varᵗ (here refl) ∷ [])))))
+             (inlᵗ (strmᵗ (mergeAllᵉ nothing (ofᵉ (varᵗ (here refl) ∷ []))))))
            (strmᵗ emptyᵉ)
 
 -- reached by iterating the step, not hand-built

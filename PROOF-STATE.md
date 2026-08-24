@@ -129,7 +129,7 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   └─ drain-dry   ← cascade-wet-via-caps     proven
      └─ the well-formedness branch       its own postulates — tier 2
 
-  every tier above is stated over Rx.Exp's syntax  Flatten-Laws.agda — tier 0
+  every tier above is stated over Rx.Exp's syntax  MergeAll-Laws.agda — tier 0
 ```
 
 The caps route does not replace the wet contract — it rests on it: both
@@ -142,12 +142,12 @@ Walk-Level tree holding no live postulate.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 0 — the anchor: `flattenᵉ` and bounded concurrency
+## Tier 0 — the anchor: `mergeAllᵉ` and bounded concurrency
 
 **Re-opened because the syntax moved.** `mergeAllᵉ` and `concatAllᵉ` are gone,
-replaced by ONE `flattenᵉ` carrying rxjs's `concurrent` argument, and every
+replaced by ONE `mergeAllᵉ` carrying rxjs's `concurrent` argument, and every
 tier below is stated over that syntax. What is genuinely new is the DRAIN
-GATE, and `Rx.Flatten-Laws` is the door it is stated behind.
+GATE, and `Rx.MergeAll-Laws` is the door it is stated behind.
 
 **ONE ROW LEFT, AND IT IS THE ONLY NON-LOCAL ONE.** Three of the four gate
 laws are proven walks: the drain scrutinises the GATE and nothing else, so
@@ -157,7 +157,7 @@ about a node the inner's own burst can re-enter, which no hypothesis bounds.
 It is SPENT, in a real body at the wrap clause, so its shape is settled and
 what remains is its truth.
 
-- **`unbounded-never-parks`** (Flatten-Laws) — DIFFICULTY: the queue stays dead
+- **`unbounded-never-parks`** (MergeAll-Laws) — DIFFICULTY: the queue stays dead
   at an unbounded limit across a whole subscribe burst, which the burst may
   re-enter. Local half in its header: the one appending site is unreachable
   there, and the other writer is bounded by a proven shrinkage walk.
@@ -230,7 +230,7 @@ sits in its cone.
 
 **MERGE COHERENCE IS UNSTATED** — the branch's own design question. What a
 statement owes, and why it would inherit no evidence from the probe that is the
-predicate's only consumer, is recorded on `Part4.root-flattenCache`.
+predicate's only consumer, is recorded on `Part4.root-mergeAllCache`.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 
@@ -242,11 +242,11 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   6-field invariant validated at exactly one clause.
 - **`subscribeE-{switch,exhaust}All-wf`** (Part3) — SHAPE: written against a
   coherence whose statement is still open (the cert sketch in Part8's
-  establishment block). The flatten face is no longer among them: it is a real
+  establishment block). The mergeAll face is no longer among them: it is a real
   clause, and its leaves are the five rows below.
 - **`stepFrame-wf-outer`** (Part9) — SHAPE, on a ROUTE claim rather than the
   statement: discharging it means enriching `stepFrame-wf` to carry FoldOut out,
-  restating this family. GRIND it after `stepFrame-wf-inner-flatten`, which it
+  restating this family. GRIND it after `stepFrame-wf-inner-mergeAll`, which it
   strictly contains — a work-order dependency only.
 - **`map-valsLast-push` / `scan-valsLast-push`** (Part3) — SHAPE: each papers
   over a recorded mismatch (the proven sub-lemmas don't return `valsLast?`).
@@ -254,20 +254,20 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the sources the
   conclusions speak about. Restate over the (LAG) ledger; header carries the
   repair and why it was not ground here.
-- **`flatten-node-shape`** (Part3) — DIFFICULTY: the wrap's node is still a
-  `flatten-st` at the type it was installed at, whatever the burst did to it.
+- **`mergeAll-node-shape`** (Part3) — DIFFICULTY: the wrap's node is still a
+  `mergeAll-st` at the type it was installed at, whatever the burst did to it.
   Limit-blind, which is what lets the queue claim be a separate fact rather
   than a conjunct only one limit can honour.
-- **`subscribeE-flatten-push`** (Part3) — DIFFICULTY: the wrap's push half,
+- **`subscribeE-mergeAll-push`** (Part3) — DIFFICULTY: the wrap's push half,
   protocol run and invariant back out through `thru-outer`. Twin: the scan
   face's `subscribeE-scan-wf`, same joint, and that one is proven.
 - **`dispatchShare-wf`** (Part9) — DIFFICULTY: the share arm's run equation,
   `foldPath-wf`'s third clause. Its FoldOut half belongs to
   `foldPath-share-out`, so the statement as written is what `foldPath-out`
   spends.
-- **`root-flattenCache`** (Part4) — DIFFICULTY: the per-node residue of
-  `root-caches`, split to the flatten clause alone and probed non-vacuously in
-  assembled form. Header carries the DEAD ROUTE through `flattenCertAt` and
+- **`root-mergeAllCache`** (Part4) — DIFFICULTY: the per-node residue of
+  `root-caches`, split to the mergeAll clause alone and probed non-vacuously in
+  assembled form. Header carries the DEAD ROUTE through `mergeAllCertAt` and
   the MISSING INVARIANT it leaves owed.
 - **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
   `foldPath-out`'s two undischarged arms, each the FoldOut readoff only (the
@@ -293,12 +293,12 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 - **`cut-owed`** (Part9) — DIFFICULTY: independent of every blocker, but its own
   header calls the owed-shape obligation "genuinely semantic" and names no
   precedent, so being unblocked is not the same as being mechanical.
-- **`stepFrame-wf-inner-flatten`** (Part9) — DIFFICULTY: the drain grows the
+- **`stepFrame-wf-inner-mergeAll`** (Part9) — DIFFICULTY: the drain grows the
   registry; re-establish FoldInv. Independent of the cert.
-- **`flatten-binv-adapt`** (Part3) — GRINDABLE: mint and install touch neither
+- **`mergeAll-binv-adapt`** (Part3) — GRINDABLE: mint and install touch neither
   registry nor live, so every BurstInv field survives. The scan twin is proven
   at the same two operations.
-- **`flatten-nodry-push` / `flatten-valsLast-push`** (Part3) — GRINDABLE: carry
+- **`mergeAll-nodry-push` / `mergeAll-valsLast-push`** (Part3) — GRINDABLE: carry
   the dry premise in and `valsLast?` out through the wrap frame, clause for
   clause against the map and scan pushes at the same frame shape.
 - **`map-nodry-push`** (Part3) — GRINDABLE: every ingredient is PROVEN —

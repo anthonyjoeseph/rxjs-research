@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold)
 open import Rx.Exp using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; inputsBelowᵉ; Ctx; Val; Exp; Tm;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Rx.Evaluator using (evaluate)
@@ -170,12 +170,12 @@ mutual
        getField "init" j >>=? decodeTm fuel Γ Δᵍ Δ Θ t >>=? λ ini →
        getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ s >>=? λ src →
        just (scanᵉ fn ini src))
-    else if tag is "flatten" then
+    else if tag is "mergeAll" then
       -- an ABSENT "limit" is rxjs's Infinity, so the Maybe the accessor
       -- already returns IS the concurrency argument and the JSON grammar
       -- needs no null
       (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src →
-       just (flattenᵉ (getField "limit" j >>=? asNum) src))
+       just (mergeAllᵉ (getField "limit" j >>=? asNum) src))
     else if tag is "switchAll" then
       (getField "src" j >>=? decodeExp fuel Γ Δᵍ Δ Θ (obs t) >>=? λ src → just (switchAllᵉ src))
     else if tag is "exhaustAll" then

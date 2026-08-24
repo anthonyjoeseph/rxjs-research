@@ -42,14 +42,14 @@ open import Verify-Budget-Sufficient.Node-Fresh using (mint-install-survives)
 open import Rx.Prim      using (Gas; g0; Tick; Id; Source; init; value; close; complete; subscribe; exhausted; Timed; hot;
   cold; _at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; Ty; Val; Fn; obs; mapᵉ; natᵗ; _×ᵗ_; Tm; scanᵉ; takeᵉ; evalTm; input; emptyᵉ;
-  deferᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ)
+  deferᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; map-f; scan-f; take-f; cutThrough;
   memberSource; NodeId; lookupNode; scan-st; take-st; st-init; LiveSource; subscribeE;
   mintSource; register; installNode; mintNode; sameSource; hasDry; subscribeSharedSlot;
-  flatten-st; flattenᵒ; thru-outer;
+  mergeAll-st; mergeAllᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
-open import Rx.Flatten-Laws using (emptyQueue?; lookup-installNode;
+open import Rx.MergeAll-Laws using (emptyQueue?; lookup-installNode;
   unbounded-never-parks)
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
 
@@ -166,7 +166,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --     NO such helper is stated, and cannot usefully be: see the NOTE at the *All
 --     gap postulates.  installNode adds a fresh scan/take node — caches-neutral.
 --   · WRAP (subscribeAll = mintNode + subscribeE b (thru-outer op nid ↠ κ) + pushBurst
---     (thru-outer op nid)): flattenᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
+--     (thru-outer op nid)): mergeAllᵉ/switchAllᵉ/exhaustAllᵉ.  Same shape
 --     as FRAME with f = thru-outer op nid and a minted *All node installed at its
 --     initial state — so it reuses the FRAME obligation above at f = thru-outer
 --     op nid.  This is where the
@@ -178,7 +178,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- subscribeE-take-wf.  The gap postulates further down cover the blocked
 -- clauses — the map-/scan-/take- shape gaps, the four *All wrap clauses,
 -- subscribeE-input-wf/defer-wf/takeᵉ-wf — while dispatchShare-wf and the
--- stepFrame-wf-inner-flatten/outer residues are blocked on flatten-cert, the
+-- stepFrame-wf-inner-mergeAll/outer residues are blocked on mergeAll-cert, the
 -- SKETCH in Part8's establishment block rather than a Part4 postulate.
 --
 -- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other
@@ -225,7 +225,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- BurstInv.caches asserted cachesValid of every intermediate burst state.  It is
 -- FALSE there, and — unlike done-plumbed, which merely failed on one path — it
 -- fails in BOTH DIRECTIONS, so no weakening rescues it:
---   · thruConsume flattenᵒ runs subscribeInner FIRST and applies flattenBump only
+--   · thruConsume mergeAllᵒ runs subscribeInner FIRST and applies mergeAllBump only
 --     after, so for the whole of an inner's subscribe burst the inner's
 --     registrations exist while activeInners has not been incremented — the
 --     counter TRAILS the registry.
@@ -239,7 +239,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 --   burst-final (root frame-0 exit → Inv.caches).
 --   SO IT IS NOT A FIELD EITHER.  It is re-established once at burst-final
 --   from the `root-caches` postulate — the settled state, by which point every
---   flattenBump has landed.  root-caches is the same cache-coherence content
+--   mergeAllBump has landed.  root-caches is the same cache-coherence content
 --   root-done-plumbed waits on, so the two discharge together, once the *All
 --   wrap clauses acquire real proofs.
 -- ════════════════════════════════════════════════════════════════════════
@@ -546,7 +546,7 @@ postulate
   -- (Rx.Evaluator):
   --   burst  = ((init src ∷ []) at id from src as subscribe) ∷ []
   --   sched' = sched₄ (after mintNode, mintSource, mintOrdinal, live ∷= entry)
-  --   st'    = register src (thru-outer flattenᵒ nid ↠ κ) (installNode nid (flatten-st lim 0 [] false) st)
+  --   st'    = register src (thru-outer mergeAllᵒ nid ↠ κ) (installNode nid (mergeAll-st lim 0 [] false) st)
   --
   -- Three of the four conclusion conjuncts are immediate:
   --   · hasDry premise is VACUOUS: `init src` is not `close _ dried`, so
@@ -594,14 +594,14 @@ postulate
   -- CONSUME ANYTHING, so a helper written for clauses that are
   -- themselves postulated below is necessarily an orphan, and no wiring
   -- fixes it.  It gets a consumer only when one of those clauses
-  -- acquires a real proof; state it then.  The flatten clause has one,
+  -- acquires a real proof; state it then.  The mergeAll clause has one,
   -- which is why the four leaves below exist and the switch and exhaust
   -- faces still have none.
 
-  -- THE FLATTEN WRAP, LEAF BY LEAF.  `subscribeE (flattenᵉ lim b)`
-  -- reduces to `subscribeAll flattenᵒ (flatten-st lim 0 [] false) b`,
+  -- THE FLATTEN WRAP, LEAF BY LEAF.  `subscribeE (mergeAllᵉ lim b)`
+  -- reduces to `subscribeAll mergeAllᵒ (mergeAll-st lim 0 [] false) b`,
   -- which mints a node, installs it, subscribes the SOURCE under a
-  -- `thru-outer flattenᵒ nid` frame, and pushes the resulting burst
+  -- `thru-outer mergeAllᵒ nid` frame, and pushes the resulting burst
   -- back through that frame.  So the clause is the scan clause's shape
   -- with the frame and the initial node state swapped, and it splits at
   -- the same four joints: carry the invariant across the mint, carry
@@ -615,75 +615,75 @@ postulate
   -- statements never read, which is exactly what lets one set of leaves
   -- cover the bounded case neither old face could express.
 
-  flatten-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  mergeAll-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     BurstInv id (proj₂ (mintNode sched))
-      (installNode (proj₁ (mintNode sched)) (flatten-st {t = u} lim 0 [] false) st) S
+      (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st) S
 
-  flatten-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  mergeAll-nodry-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    hasDry (proj₁ (subscribeE fuel (flattenᵉ lim b) κ id now sched st)) ≡ false →
-    hasDry (proj₁ (subscribeE fuel b (thru-outer flattenᵒ (proj₁ (mintNode sched)) ↠ κ)
+    hasDry (proj₁ (subscribeE fuel (mergeAllᵉ lim b) κ id now sched st)) ≡ false →
+    hasDry (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
                      id now (proj₂ (mintNode sched))
                      (installNode (proj₁ (mintNode sched))
-                        (flatten-st {t = u} lim 0 [] false) st)))
+                        (mergeAll-st {t = u} lim 0 [] false) st)))
            ≡ false
 
-  flatten-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  mergeAll-valsLast-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    valsLast? (proj₁ (subscribeE fuel b (thru-outer flattenᵒ (proj₁ (mintNode sched)) ↠ κ)
+    valsLast? (proj₁ (subscribeE fuel b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
                         id now (proj₂ (mintNode sched))
                         (installNode (proj₁ (mintNode sched))
-                           (flatten-st {t = u} lim 0 [] false) st)))
+                           (mergeAll-st {t = u} lim 0 [] false) st)))
               ≡ true →
-    valsLast? (proj₁ (subscribeE fuel (flattenᵉ lim b) κ id now sched st)) ≡ true
+    valsLast? (proj₁ (subscribeE fuel (mergeAllᵉ lim b) κ id now sched st)) ≡ true
 
   -- THE NODE THE INNER BURST LEFT, as a SHAPE and nothing more: the
-  -- wrap's node is still a `flatten-st` at the type it was installed
+  -- wrap's node is still a `mergeAll-st` at the type it was installed
   -- at, whatever the burst did to the counter, the queue and the
   -- outer-done flag.  Limit-blind by construction, which is what lets
   -- the queue claim be a separate fact rather than a conjunct only one
   -- limit can honour.
-  flatten-node-shape : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  mergeAll-node-shape : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     let nid = proj₁ (mintNode sched)
-        r₀  = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now
+        r₀  = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
                 (proj₂ (mintNode sched))
-                (installNode nid (flatten-st {t = u} lim 0 [] false) st)
+                (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
     in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
          lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
-           ≡ just (flatten-st {t = u} lim act q od)
+           ≡ just (mergeAll-st {t = u} lim act q od)
 
-  -- THE PUSH BACK OUT, the flatten twin of `subscribeE-scan-wf`: it
+  -- THE PUSH BACK OUT, the mergeAll twin of `subscribeE-scan-wf`: it
   -- takes the inner subscription's whole receipt -- protocol run,
   -- invariant and the node above -- and returns the outer's.
-  subscribeE-flatten-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  subscribeE-mergeAll-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) (S : ProtocolSt) →
     BurstInv id sched st S →
     (let nid = proj₁ (mintNode sched)
-         r₀  = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now
+         r₀  = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
                  (proj₂ (mintNode sched))
-                 (installNode nid (flatten-st {t = u} lim 0 [] false) st)
+                 (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
      in Σ ProtocolSt λ S′ →
           (runProtocol S (proj₁ r₀) ≡ just S′)
           × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
           × (Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
                (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
-                  ≡ just (flatten-st {t = u} lim act q od))
+                  ≡ just (mergeAll-st {t = u} lim act q od))
                × (lim ≡ nothing → q ≡ []))) →
     Σ ProtocolSt λ S″ →
-      let r = subscribeE fuel (flattenᵉ lim b) κ id now sched st
+      let r = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S″)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S″
 
@@ -713,7 +713,7 @@ postulate
 
 -- THE NODE THE INNER BURST LEFT, shape and queue together, which is the
 -- form the wrap clause consumes.  The queue half is claimed only at an
--- unbounded limit, where it is `Rx.Flatten-Laws.unbounded-never-parks`
+-- unbounded limit, where it is `Rx.MergeAll-Laws.unbounded-never-parks`
 -- and nothing else; a bounded run yields the shape and no promise about
 -- the queue, because at a bounded limit the burst legitimately parks.
 --
@@ -722,22 +722,22 @@ postulate
 -- `NodeState` holds the queue's element type existentially, so the two
 -- sides would not be at one type -- and it does not need to be: the
 -- shape leaf pins the lookup at the wrap's own `u`, and `emptyQueue?`
--- at a pinned `flatten-st` reduces to exactly the equation wanted.  One
+-- at a pinned `mergeAll-st` reduces to exactly the equation wanted.  One
 -- `subst` along the shape equation is the whole bridge.
-flatten-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+mergeAll-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (lim : Maybe ℕ)
   (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r₀  = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now
+      r₀  = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
               (proj₂ (mintNode sched))
-              (installNode nid (flatten-st {t = u} lim 0 [] false) st)
+              (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
   in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
        (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
-          ≡ just (flatten-st {t = u} lim act q od))
+          ≡ just (mergeAll-st {t = u} lim act q od))
        × (lim ≡ nothing → q ≡ [])
-flatten-node {u = u} lim fuel b κ id now sched st
-  with flatten-node-shape lim fuel b κ id now sched st
+mergeAll-node {u = u} lim fuel b κ id now sched st
+  with mergeAll-node-shape lim fuel b κ id now sched st
 ... | act , q , od , shapeEq = act , q , od , shapeEq , qnil
   where
   nid = proj₁ (mintNode sched)
@@ -747,8 +747,8 @@ flatten-node {u = u} lim fuel b κ id now sched st
     subst emptyQueue? shapeEq
       (unbounded-never-parks fuel nid b κ id now 0 false
         (proj₂ (mintNode sched))
-        (installNode nid (flatten-st {t = u} nothing 0 [] false) st)
-        (lookup-installNode nid (flatten-st {t = u} nothing 0 [] false) st))
+        (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
+        (lookup-installNode nid (mergeAll-st {t = u} nothing 0 [] false) st))
 
 -- takeᵉ WHOLE CASE.  The takeᵉ
 -- clause of `subscribeE-wf` (.Part8) is a real body that APPLIES

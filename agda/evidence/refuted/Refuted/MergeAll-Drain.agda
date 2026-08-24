@@ -20,7 +20,7 @@
 -- RESTATEMENT, and this refutation is what licenses it — the fact that
 -- today's only caller happens to have the tie in scope would not be.
 --
--- WHICH HYPOTHESIS.  `flattenDrain-nodry`, the sole consumer, carries
+-- WHICH HYPOTHESIS.  `mergeAllDrain-nodry`, the sole consumer, carries
 -- exactly the missing tie one argument along from the call it does not
 -- pass it to:
 --
@@ -32,7 +32,7 @@
 -- convenience.  Both are needed and for different conjuncts: the tie for
 -- the ceiling, the queue receipt to bound `nest` per element — a free
 -- `Closed Γ s` list has no nest bound at all, which is the retired
--- `flattenDrain-nodry-vb`'s defect arriving at the second conjunct.
+-- `mergeAllDrain-nodry-vb`'s defect arriving at the second conjunct.
 --
 -- NOTE WHAT THIS DOES NOT SHOW.  Nothing here says the CONDITIONED form
 -- is true.  With the tie in hand the ceiling conjunct still needs
@@ -41,7 +41,7 @@
 -- that is a bound on the WITNESS, so the two conjuncts are then in real
 -- tension.  That tension is the row's remaining content.
 -- ══════════════════════════════════════════════════════════════════
-module Refuted.Flatten-Drain where
+module Refuted.MergeAll-Drain where
 
 open import Data.Bool using (true)
 open import Data.Nat  using (ℕ; suc; _≤_; _≤ᵇ_)
@@ -98,7 +98,7 @@ c₀ = caps (suc N) 1 1
 -- conjunct is at least `cSize c₀ = suc N` against `N`.
 ----------------------------------------------------------------------
 
-flattenDrain-nodry-nestBud-absurd :
+mergeAllDrain-nodry-nestBud-absurd :
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      (c : Caps) (sl : Slots Γ) (Ψ dep J : ℕ) (id : Id) (allNid : NodeId)
      (q : List (Closed Γ s))
@@ -110,7 +110,7 @@ flattenDrain-nodry-nestBud-absurd :
                                                       dep bud (suc (sizeᵉ o)) (suc J)) c)
                           ≤ᵇ sizeCapAt e sl (suc id)) q ≡ true))
   → ⊥
-flattenDrain-nodry-nestBud-absurd nb
+mergeAllDrain-nodry-nestBud-absurd nb
   with nb {e = e₀} c₀ sl₀ 0 0 0 0 0 (e₀ ∷ []) (sched-init e₀ sl₀) (st-init e₀)
           ((refl , refl) , refl)
 ... | bud , _ , clQ = 1+n≰n (≤-trans (cSize≤frameStep c₀ K 2≤c₀) fits)

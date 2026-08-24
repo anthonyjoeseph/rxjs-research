@@ -593,7 +593,7 @@ depthWideRow ds ks j ww w =
 -- measure charges nothing for.  So on the accounting the drain's level
 -- has to come out of the single `nestSyn`, and whether that is enough is
 -- not something reading the definitions settles.  `progU` is the
--- limit-1 flatten family — three inners queued behind one — so its root
+-- limit-1 mergeAll family — three inners queued behind one — so its root
 -- subscribe is where the drain actually fires.
 depthConcatRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthConcatRow ds ks j d k =
@@ -614,7 +614,7 @@ depthConcatRow ds ks j d k =
 
 -- SERIES U (10000000): THE ONE REGION NEITHER REMOVED PRIMITIVE COULD
 -- REACH.  Every probe and every refutation in this campaign was built
--- on a family whose flattens are `nothing` or `just 1`, because until
+-- on a family whose limits are `nothing` or `just 1`, because until
 -- the syntax moved those were the only two that existed — so the
 -- bounded gate, the whole content of the change, has no coverage at
 -- all.  `progB` moves that axis alone: at `lim = 0` it is `progU`

@@ -6,12 +6,12 @@
 --
 -- WHAT IS WRONG.  `thruConsume-nodry-loop` claims `OKB c sl Ψ J` is
 -- preserved across ONE `thruConsume` step, at the SAME J on both sides.
--- But flatten's park clause is a pure growth step: with every lane of
+-- But mergeAll's park clause is a pure growth step: with every lane of
 -- the node's limit already spent it appends the element to the queue
--- (`flatten-st lim act (q ++ o ∷ []) od`) and emits nothing — which is
+-- (`mergeAll-st lim act (q ++ o ∷ []) od`) and emits nothing — which is
 -- exactly why the *nodry* conclusion is `refl` there, and why nothing
 -- else in that block notices.  Meanwhile `capsOK?`'s width conjunct
--- bounds that queue's LENGTH: `widNode W sl (flatten-st _ _ q _)` carries
+-- bounds that queue's LENGTH: `widNode W sl (mergeAll-st _ _ q _)` carries
 -- `length q ≤ᵇ W`.  So a queue sitting AT the width cap — which the
 -- hypothesis permits, since `length q ≤ᵇ W` is all it says — is one park
 -- away from breaching it, and no hypothesis forbids that state.
@@ -60,8 +60,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Id; Tick; Gas; g0)
 open import Rx.Exp  using (Ctx; Closed; Val; obs; natᵗ; ofᵉ; nat̂; sizeᵉ)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (Sched; EvalSt; NodeId; flatten-st;
-                               AllOp; flattenᵒ; Path; root;
+open import Rx.Evaluator using (Sched; EvalSt; NodeId; mergeAll-st;
+                               AllOp; mergeAllᵒ; Path; root;
                                sched-init; st-init; thruConsume)
 open import Rx.Frame-Width using (pWᵉ)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
@@ -79,7 +79,7 @@ false≢true ()
 -- the collision silently unwires a sibling refutation's helper.
 --
 -- The empty context, so the schedule and the registry are
--- empty and every conjunct about them is vacuous; ONE flatten node with
+-- empty and every conjunct about them is vacuous; ONE mergeAll node with
 -- every lane of its limit spent, holding a queue exactly as long as the
 -- width cap.
 --
@@ -121,7 +121,7 @@ schedₚ : Sched Γₚ
 schedₚ = sched-init eₚ slₚ
 
 stₚ : EvalSt eₚ
-stₚ = record (st-init eₚ) { nodes = (0 , flatten-st {t = natᵗ} (just 1) 1 qₚ false) ∷ [] }
+stₚ = record (st-init eₚ) { nodes = (0 , mergeAll-st {t = natᵗ} (just 1) 1 qₚ false) ∷ [] }
 
 -- every conjunct at the entry level, by computation
 okbₚ : OKB {e = eₚ} cₚ slₚ (fnCapᵉ eₚ) 0 schedₚ stₚ
@@ -149,5 +149,5 @@ thruConsume-nodry-loop-absurd :
   → ⊥
 thruConsume-nodry-loop-absurd lp =
   false≢true (proj₂ (proj₁ (proj₁
-    (lp {u = natᵗ} {e = eₚ} cₚ slₚ (fnCapᵉ eₚ) 0 g0 flattenᵒ 0 root 0 0 eₚ
+    (lp {u = natᵗ} {e = eₚ} cₚ slₚ (fnCapᵉ eₚ) 0 g0 mergeAllᵒ 0 root 0 0 eₚ
         schedₚ stₚ okbₚ refl))))

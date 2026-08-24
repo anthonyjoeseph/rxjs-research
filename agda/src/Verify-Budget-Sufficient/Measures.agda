@@ -80,13 +80,13 @@ open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; o
   sizeᵗˢ; sizeᵛ; syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; shellSizeᵉ; innerᵉ; innerᵗ; innerᵗˢ;
   subΘExp; subΘTm; subΘTms; varIx; renExp; renTm; renTms; Ren∈; ext∈; ++Ren; wkTm; reify; Exp;
   Tm; Fn; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-  add; sub; mul; eqᵖ; ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ;
+  add; sub; mul; eqᵖ; ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; elimGExp; elimGTm; elimGTms; elimDExp; elimDTm;
   elimDTms; compare∈; ⊟-++ˡ; ⊟-++ʳ; unfoldμ; evalWith; applyFn; lookupEnv)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵗ; hopDᵗˢ; hopDᵛ; pmᵉ; pmᵗ; pmᵗˢ)
 open import Rx.Slot-Hop using (slotHop; ηAt)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; resolve; mkHot; scanVals; memberSource; RegId; Chain;
-  NodeState; scan-st; take-st; flatten-st; switch-st; exhaust-st; installNode;
+  NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; installNode;
   setNode; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; sched-next; schedHeadOf; schedGo; schedEarlier; cascadeFinish; sweepLive; takeVals;
   cutThrough; pathHasNode; dropSource; Path; splitEvents; retagEvents; hasDry; dryEvent;
@@ -229,7 +229,7 @@ hasAtLeast-peel (hs h) = _ , refl , h
 
 ------------------------------------------------------------------
 -- the machine's value stores, bounded: schedule pendings, scan
--- accumulators, flatten queues.  Registry paths and slot defs are
+-- accumulators, mergeAll queues.  Registry paths and slot defs are
 -- fixed syntax — no growth, no clause
 ------------------------------------------------------------------
 
@@ -240,7 +240,7 @@ boundedLive B l =
 
 boundedNode : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
 boundedNode B (scan-st {t} v)      = sizeᵛ t v ≤ᵇ B
-boundedNode B (flatten-st _ _ q _) = all (λ o → sizeᵉ o ≤ᵇ B) q
+boundedNode B (mergeAll-st _ _ q _) = all (λ o → sizeᵉ o ≤ᵇ B) q
 boundedNode B (take-st _)          = true
 boundedNode B (switch-st _ _)      = true
 boundedNode B (exhaust-st _ _)     = true
@@ -341,7 +341,7 @@ boundedLive-widen le l =
 boundedNode-widen : ∀ {n} {Γ : Ctx n} {B B′ : ℕ} → B ≤ B′ →
   (ns : NodeState Γ) → boundedNode B ns ≡ true → boundedNode B′ ns ≡ true
 boundedNode-widen le (scan-st {t} v)   h = ≤ᵇ-widen (sizeᵛ t v) le h
-boundedNode-widen le (flatten-st _ _ q _) h =
+boundedNode-widen le (mergeAll-st _ _ q _) h =
   all-impl _ _ (λ o → ≤ᵇ-widen (sizeᵉ o) le) q h
 boundedNode-widen le (take-st _)       h = refl
 boundedNode-widen le (switch-st _ _)   h = refl
@@ -457,7 +457,7 @@ mutual
   syncSize≤sizeᵉ (scanᵉ f z e)   =
     s≤s (+-mono-≤ (+-mono-≤ (syncSize≤sizeᵗ f) (syncSize≤sizeᵗ z))
                   (syncSize≤sizeᵉ e))
-  syncSize≤sizeᵉ (flattenᵉ _ e)   = s≤s (syncSize≤sizeᵉ e)
+  syncSize≤sizeᵉ (mergeAllᵉ _ e)   = s≤s (syncSize≤sizeᵉ e)
   syncSize≤sizeᵉ (switchAllᵉ e)  = s≤s (syncSize≤sizeᵉ e)
   syncSize≤sizeᵉ (exhaustAllᵉ e) = s≤s (syncSize≤sizeᵉ e)
   syncSize≤sizeᵉ (μᵉ e)          = s≤s (syncSize≤sizeᵉ e)
@@ -515,7 +515,7 @@ mutual
     cong suc (cong₂ _+_ (cong₂ _+_ (syncSize-elimGᵗ x cl f)
                                    (syncSize-elimGᵗ x cl z))
                         (syncSize-elimG x cl e))
-  syncSize-elimG x cl (flattenᵉ _ e)   = cong suc (syncSize-elimG x cl e)
+  syncSize-elimG x cl (mergeAllᵉ _ e)   = cong suc (syncSize-elimG x cl e)
   syncSize-elimG x cl (switchAllᵉ e)  = cong suc (syncSize-elimG x cl e)
   syncSize-elimG x cl (exhaustAllᵉ e) = cong suc (syncSize-elimG x cl e)
   syncSize-elimG x cl (μᵉ e)          = cong suc (syncSize-elimG (there x) cl e)
@@ -575,7 +575,7 @@ shellSize-elimG x cl emptyᵉ          = refl
 shellSize-elimG x cl (mapᵉ f e)      = cong suc (shellSize-elimG x cl e)
 shellSize-elimG x cl (takeᵉ c e)     = cong suc (shellSize-elimG x cl e)
 shellSize-elimG x cl (scanᵉ f z e)   = cong suc (shellSize-elimG x cl e)
-shellSize-elimG x cl (flattenᵉ _ e)   = cong suc (shellSize-elimG x cl e)
+shellSize-elimG x cl (mergeAllᵉ _ e)   = cong suc (shellSize-elimG x cl e)
 shellSize-elimG x cl (switchAllᵉ e)  = cong suc (shellSize-elimG x cl e)
 shellSize-elimG x cl (exhaustAllᵉ e) = cong suc (shellSize-elimG x cl e)
 shellSize-elimG x cl (μᵉ e)          = cong suc (shellSize-elimG (there x) cl e)
@@ -596,7 +596,7 @@ mutual
   inner-elimG x cl (scanᵉ f z e)   =
     cong₂ _++_ (inner-elimGᵗ x cl f)
                (cong₂ _++_ (inner-elimGᵗ x cl z) (inner-elimG x cl e))
-  inner-elimG x cl (flattenᵉ _ e)   = inner-elimG x cl e
+  inner-elimG x cl (mergeAllᵉ _ e)   = inner-elimG x cl e
   inner-elimG x cl (switchAllᵉ e)  = inner-elimG x cl e
   inner-elimG x cl (exhaustAllᵉ e) = inner-elimG x cl e
   inner-elimG x cl (μᵉ e)          = inner-elimG (there x) cl e
@@ -812,7 +812,7 @@ sizeᵉ-pos emptyᵉ          = s≤s z≤n
 sizeᵉ-pos (mapᵉ f e)      = s≤s z≤n
 sizeᵉ-pos (takeᵉ c e)     = s≤s z≤n
 sizeᵉ-pos (scanᵉ f z e)   = s≤s z≤n
-sizeᵉ-pos (flattenᵉ _ e)   = s≤s z≤n
+sizeᵉ-pos (mergeAllᵉ _ e)   = s≤s z≤n
 sizeᵉ-pos (switchAllᵉ e)  = s≤s z≤n
 sizeᵉ-pos (exhaustAllᵉ e) = s≤s z≤n
 sizeᵉ-pos (μᵉ e)          = s≤s z≤n
@@ -1189,7 +1189,7 @@ mutual
     lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
     lee : sizeᵉ e ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
     lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
-  hopD-sizeᵉ V η (flattenᵉ _ e) hV hη =
+  hopD-sizeᵉ V η (mergeAllᵉ _ e) hV hη =
     ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e))
   hopD-sizeᵉ V η (switchAllᵉ e) hV hη =
     ≤-trans (s≤s (hopD-sizeᵉ V η e hV hη)) (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e))
@@ -1298,7 +1298,7 @@ mutual
     lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
     lee : sizeᵉ e ≤ sizeᵗ f + sizeᵗ z + sizeᵉ e
     lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
-  pm-sizeᵉ V k (flattenᵉ _ e)   hV =
+  pm-sizeᵉ V k (mergeAllᵉ _ e)   hV =
     ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
   pm-sizeᵉ V k (switchAllᵉ e)  hV =
     ≤-trans (pm-sizeᵉ V k e hV) (szB-mono V (n≤1+n (sizeᵉ e)))
@@ -1564,7 +1564,7 @@ slotDef-size sl i {d} eq =
 -- additive bound would not compose.
 --
 -- ⚠ `1 ≤ N` IS LOAD-BEARING AND IS NOT A CALL-SITE CONVENIENCE.  At
--- N = 0 the conclusion reads `hopDᵉ … ≤ 0`, which `flattenᵉ`'s
+-- N = 0 the conclusion reads `hopDᵉ … ≤ 0`, which `mergeAllᵉ`'s
 -- `suc (hopDᵉ e)` clause falsifies outright — and N = 0 is reachable,
 -- because at `n = 0` the η premise quantifies over no index and
 -- constrains nothing.  The same `1 ≤ N` is what pays for `suc` in all
@@ -1665,7 +1665,7 @@ hopD-relᵉ V η (scanᵉ f z e) N hV hN hη =
   lef = ≤-trans (m≤m+n (sizeᵗ f) (sizeᵗ z)) (m≤m+n _ (sizeᵉ e))
   lez = ≤-trans (m≤n+m (sizeᵗ z) (sizeᵗ f)) (m≤m+n _ (sizeᵉ e))
   lee = m≤n+m (sizeᵉ e) (sizeᵗ f + sizeᵗ z)
-hopD-relᵉ V η (flattenᵉ _ e) N hV hN hη =
+hopD-relᵉ V η (mergeAllᵉ _ e) N hV hN hη =
   ≤-trans (≤-trans (s≤s (hopD-relᵉ V η e N hV hN hη))
                    (+-monoˡ-≤ (szB V (sizeᵉ e) * N) hN))
           (*-monoˡ-≤ N (szB-suc V (sizeᵉ e) hV (sizeᵉ-pos e)))
@@ -2025,7 +2025,7 @@ mutual
           | pm-ren0ᵗ V k ρg ρd ρt h z
           | pm-ren0ᵉ V k ρg ρd ρt h e =
     *-zeroʳ (suc (suc (pmᵗ V 0 (renTm ρg ρd (ext∈ ρt) f))) ^ V)
-  pm-ren0ᵉ V k ρg ρd ρt h (flattenᵉ _ e)   = pm-ren0ᵉ V k ρg ρd ρt h e
+  pm-ren0ᵉ V k ρg ρd ρt h (mergeAllᵉ _ e)   = pm-ren0ᵉ V k ρg ρd ρt h e
   pm-ren0ᵉ V k ρg ρd ρt h (switchAllᵉ e)  = pm-ren0ᵉ V k ρg ρd ρt h e
   pm-ren0ᵉ V k ρg ρd ρt h (exhaustAllᵉ e) = pm-ren0ᵉ V k ρg ρd ρt h e
   pm-ren0ᵉ V k ρg ρd ρt h (μᵉ e)     = pm-ren0ᵉ V k (ext∈ ρg) ρd ρt h e
@@ -2099,7 +2099,7 @@ mutual
           | pm-renᵗ V 0 ρg ρd (ext∈ ρt) (ext-ix ρt p) f
           | pm-renᵗ V k ρg ρd ρt p z
           | pm-renᵉ V k ρg ρd ρt p e = refl
-  pm-renᵉ V k ρg ρd ρt p (flattenᵉ _ e)   = pm-renᵉ V k ρg ρd ρt p e
+  pm-renᵉ V k ρg ρd ρt p (mergeAllᵉ _ e)   = pm-renᵉ V k ρg ρd ρt p e
   pm-renᵉ V k ρg ρd ρt p (switchAllᵉ e)  = pm-renᵉ V k ρg ρd ρt p e
   pm-renᵉ V k ρg ρd ρt p (exhaustAllᵉ e) = pm-renᵉ V k ρg ρd ρt p e
   pm-renᵉ V k ρg ρd ρt p (μᵉ e)     = pm-renᵉ V k (ext∈ ρg) ρd ρt p e
@@ -2159,7 +2159,7 @@ mutual
           | hopD-renᵗ V η ρg ρd (ext∈ ρt) (ext-ix ρt p) f
           | hopD-renᵗ V η ρg ρd ρt p z
           | hopD-renᵉ V η ρg ρd ρt p e = refl
-  hopD-renᵉ V η ρg ρd ρt p (flattenᵉ _ e)   = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
+  hopD-renᵉ V η ρg ρd ρt p (mergeAllᵉ _ e)   = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
   hopD-renᵉ V η ρg ρd ρt p (switchAllᵉ e)  = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
   hopD-renᵉ V η ρg ρd ρt p (exhaustAllᵉ e) = cong suc (hopD-renᵉ V η ρg ρd ρt p e)
   hopD-renᵉ V η ρg ρd ρt p (μᵉ e)     = hopD-renᵉ V η (ext∈ ρg) ρd ρt p e
@@ -2264,7 +2264,7 @@ mutual
           | pm-subΘᵗ V 0 ((t ×ᵗ s) ∷ Θloc) σ f (s≤s z≤n)
           | pm-subΘᵗ V k Θloc σ z h
           | pm-subΘᵉ V k Θloc σ e h = refl
-  pm-subΘᵉ V k Θloc σ (flattenᵉ _ e)   h = pm-subΘᵉ V k Θloc σ e h
+  pm-subΘᵉ V k Θloc σ (mergeAllᵉ _ e)   h = pm-subΘᵉ V k Θloc σ e h
   pm-subΘᵉ V k Θloc σ (switchAllᵉ e)  h = pm-subΘᵉ V k Θloc σ e h
   pm-subΘᵉ V k Θloc σ (exhaustAllᵉ e) h = pm-subΘᵉ V k Θloc σ e h
   pm-subΘᵉ V k Θloc σ (μᵉ e)     h = pm-subΘᵉ V k Θloc σ e h
@@ -2485,7 +2485,7 @@ mutual
     Sf = sumW Gf Ds (length Θsub)
     Sz = sumW Gz Ds (length Θsub)
     Se = sumW Ge Ds (length Θsub)
-  hopD-subΘᵉ V η Ds Θloc σ (flattenᵉ _ e)   hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
+  hopD-subΘᵉ V η Ds Θloc σ (mergeAllᵉ _ e)   hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
   hopD-subΘᵉ V η Ds Θloc σ (switchAllᵉ e)  hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
   hopD-subΘᵉ V η Ds Θloc σ (exhaustAllᵉ e) hσ = s≤s (hopD-subΘᵉ V η Ds Θloc σ e hσ)
   hopD-subΘᵉ V η Ds Θloc σ (μᵉ e)     hσ = hopD-subΘᵉ V η Ds Θloc σ e hσ
@@ -2725,7 +2725,7 @@ hopD-applyFn {s = s} V η f v =
 -- emission sits under the mapᵉ's OWN hop depth, given only that the
 -- source's value sat under the source's.  That is burstHopD? at the
 -- mapᵉ clause, with the arithmetic already done — and with hopDᵉ
--- (flattenᵉ l c) ≡ suc (hopDᵉ c) definitional, it is also the hop
+-- (mergeAllᵉ l c) ≡ suc (hopDᵉ c) definitional, it is also the hop
 -- edge's strictness.
 hopD-map-emit : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (V : ℕ) (η : Fin n → ℕ)
   (f : Tm Γ Δᵍ Δ (s ∷ Θ) u) (b : Exp Γ Δᵍ Δ Θ s) (v : Val Γ s) →
@@ -2949,7 +2949,7 @@ mutual
   size-renᵉ ρg ρd ρt (scanᵉ f z e)   =
     cong suc (cong₂ _+_ (cong₂ _+_ (size-renᵗ ρg ρd (ext∈ ρt) f) (size-renᵗ ρg ρd ρt z))
                         (size-renᵉ ρg ρd ρt e))
-  size-renᵉ ρg ρd ρt (flattenᵉ _ e)   = cong suc (size-renᵉ ρg ρd ρt e)
+  size-renᵉ ρg ρd ρt (mergeAllᵉ _ e)   = cong suc (size-renᵉ ρg ρd ρt e)
   size-renᵉ ρg ρd ρt (switchAllᵉ e)  = cong suc (size-renᵉ ρg ρd ρt e)
   size-renᵉ ρg ρd ρt (exhaustAllᵉ e) = cong suc (size-renᵉ ρg ρd ρt e)
   size-renᵉ ρg ρd ρt (μᵉ e)          = cong suc (size-renᵉ (ext∈ ρg) ρd ρt e)
@@ -3062,7 +3062,7 @@ mutual
             (size-subΘᵗ V ((t ×ᵗ s) ∷ Θloc) σ f hσ)
             (size-subΘᵗ V Θloc σ i hσ) (size-subΘᵉ V Θloc σ e hσ))
       (s≤s z≤n)
-  size-subΘᵉ V Θloc σ (flattenᵉ _ e)   hσ =
+  size-subΘᵉ V Θloc σ (mergeAllᵉ _ e)   hσ =
     sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
   size-subΘᵉ V Θloc σ (switchAllᵉ e)  hσ =
     sucmul (sizeᵉ e) (suc (2 * V)) (size-subΘᵉ V Θloc σ e hσ) (s≤s z≤n)
@@ -3676,7 +3676,7 @@ mutual
   fnCapᵉ (takeᵉ c e)     = (caseWᵗ c ⊔ fnCapᵗ c) ⊔ fnCapᵉ e
   fnCapᵉ (scanᵉ f z e)   =
     (caseWᵗ f ⊔ fnCapᵗ f) ⊔ ((caseWᵗ z ⊔ fnCapᵗ z) ⊔ fnCapᵉ e)
-  fnCapᵉ (flattenᵉ _ e)   = fnCapᵉ e
+  fnCapᵉ (mergeAllᵉ _ e)   = fnCapᵉ e
   fnCapᵉ (switchAllᵉ e)  = fnCapᵉ e
   fnCapᵉ (exhaustAllᵉ e) = fnCapᵉ e
   fnCapᵉ (μᵉ e)          = fnCapᵉ e
@@ -3785,7 +3785,7 @@ mutual
     cong₂ _⊔_ (cong₂ _⊔_ (caseW-ren ρg ρd (ext∈ ρt) f) (fnCap-renᵗ ρg ρd (ext∈ ρt) f))
               (cong₂ _⊔_ (cong₂ _⊔_ (caseW-ren ρg ρd ρt z) (fnCap-renᵗ ρg ρd ρt z))
                          (fnCap-renᵉ ρg ρd ρt e))
-  fnCap-renᵉ ρg ρd ρt (flattenᵉ _ e)   = fnCap-renᵉ ρg ρd ρt e
+  fnCap-renᵉ ρg ρd ρt (mergeAllᵉ _ e)   = fnCap-renᵉ ρg ρd ρt e
   fnCap-renᵉ ρg ρd ρt (switchAllᵉ e)  = fnCap-renᵉ ρg ρd ρt e
   fnCap-renᵉ ρg ρd ρt (exhaustAllᵉ e) = fnCap-renᵉ ρg ρd ρt e
   fnCap-renᵉ ρg ρd ρt (μᵉ e)          = fnCap-renᵉ (ext∈ ρg) ρd ρt e
@@ -3869,7 +3869,7 @@ mutual
              (⊔-lub (⊔-lub (subst (_≤ Ψ) (sym (caseW-subΘ Θloc σ z)) (⊔ˡ (caseWᵗ z) (fnCapᵗ z) hz))
                            (fnCap-subΘᵗ Ψ Θloc σ z hσ (⊔ʳ (caseWᵗ z) (fnCapᵗ z) hz)))
                     (fnCap-subΘᵉ Ψ Θloc σ e hσ (⊔ʳ (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ e) hze)))
-  fnCap-subΘᵉ Ψ Θloc σ (flattenᵉ _ e)   hσ h = fnCap-subΘᵉ Ψ Θloc σ e hσ h
+  fnCap-subΘᵉ Ψ Θloc σ (mergeAllᵉ _ e)   hσ h = fnCap-subΘᵉ Ψ Θloc σ e hσ h
   fnCap-subΘᵉ Ψ Θloc σ (switchAllᵉ e)  hσ h = fnCap-subΘᵉ Ψ Θloc σ e hσ h
   fnCap-subΘᵉ Ψ Θloc σ (exhaustAllᵉ e) hσ h = fnCap-subΘᵉ Ψ Θloc σ e hσ h
   fnCap-subΘᵉ Ψ Θloc σ (μᵉ e)          hσ h = fnCap-subΘᵉ Ψ Θloc σ e hσ h
@@ -4019,7 +4019,7 @@ mutual
                 (⊔-elim-help (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ e) (fnCapᵉ cl)
                               (fn-comb-G x cl z (fnCapᵉ cl) (fnCap-elimGᵗ x cl z))
                               (fnCap-elimG x cl e))
-  fnCap-elimG x cl (flattenᵉ _ e)   = fnCap-elimG x cl e
+  fnCap-elimG x cl (mergeAllᵉ _ e)   = fnCap-elimG x cl e
   fnCap-elimG x cl (switchAllᵉ e)  = fnCap-elimG x cl e
   fnCap-elimG x cl (exhaustAllᵉ e) = fnCap-elimG x cl e
   fnCap-elimG x cl (μᵉ e)          = fnCap-elimG (there x) cl e
@@ -4049,7 +4049,7 @@ mutual
                 (⊔-elim-help (caseWᵗ z ⊔ fnCapᵗ z) (fnCapᵉ e) (fnCapᵉ cl)
                               (fn-comb-D x cl z (fnCapᵉ cl) (fnCap-elimDᵗ x cl z))
                               (fnCap-elimD x cl e))
-  fnCap-elimD x cl (flattenᵉ _ e)   = fnCap-elimD x cl e
+  fnCap-elimD x cl (mergeAllᵉ _ e)   = fnCap-elimD x cl e
   fnCap-elimD x cl (switchAllᵉ e)  = fnCap-elimD x cl e
   fnCap-elimD x cl (exhaustAllᵉ e) = fnCap-elimD x cl e
   fnCap-elimD x cl (μᵉ e)          = fnCap-elimD x cl e
@@ -4160,7 +4160,7 @@ mutual
         (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ z) (sym (caseW-elimGᵗ x cl z))))
                  (⊔-mono-≤ ≤-refl (fnCap-elimGᵗ-lower x cl z)))
         (fnCap-elimG-lower x cl e))
-  fnCap-elimG-lower x cl (flattenᵉ _ e)   = fnCap-elimG-lower x cl e
+  fnCap-elimG-lower x cl (mergeAllᵉ _ e)   = fnCap-elimG-lower x cl e
   fnCap-elimG-lower x cl (switchAllᵉ e)  = fnCap-elimG-lower x cl e
   fnCap-elimG-lower x cl (exhaustAllᵉ e) = fnCap-elimG-lower x cl e
   fnCap-elimG-lower x cl (μᵉ e)          = fnCap-elimG-lower (there x) cl e
@@ -4193,7 +4193,7 @@ mutual
         (≤-trans (≤-reflexive (cong (_⊔ fnCapᵗ z) (sym (caseW-elimDᵗ x cl z))))
                  (⊔-mono-≤ ≤-refl (fnCap-elimDᵗ-lower x cl z)))
         (fnCap-elimD-lower x cl e))
-  fnCap-elimD-lower x cl (flattenᵉ _ e)   = fnCap-elimD-lower x cl e
+  fnCap-elimD-lower x cl (mergeAllᵉ _ e)   = fnCap-elimD-lower x cl e
   fnCap-elimD-lower x cl (switchAllᵉ e)  = fnCap-elimD-lower x cl e
   fnCap-elimD-lower x cl (exhaustAllᵉ e) = fnCap-elimD-lower x cl e
   fnCap-elimD-lower x cl (μᵉ e)          = fnCap-elimD-lower x cl e
@@ -4697,7 +4697,7 @@ fnCapLive Ψ l =
 
 fnCapNode : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
 fnCapNode Ψ (scan-st {t} v)   = fnCapᵛ t v ≤ᵇ Ψ
-fnCapNode Ψ (flatten-st _ _ q _) = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
+fnCapNode Ψ (mergeAll-st _ _ q _) = all (λ o → fnCapᵉ o ≤ᵇ Ψ) q
 fnCapNode Ψ (take-st _)       = true
 fnCapNode Ψ (switch-st _ _)   = true
 fnCapNode Ψ (exhaust-st _ _)  = true
@@ -4786,9 +4786,9 @@ burstB? B Ψ = all (λ em → all (eventB? B Ψ) (InstEmit.events em))
 -- carries has hop depth at most `r`, the depth of the expression that
 -- was subscribed.  Stated here so subscribeE-walk can carry it as a
 -- conjunct, which is what makes the *All clause's hop edge STRICT with
--- no arithmetic at all: hopDᵉ (flattenᵉ l c) is DEFINITIONALLY suc
+-- no arithmetic at all: hopDᵉ (mergeAllᵉ l c) is DEFINITIONALLY suc
 -- (hopDᵉ c), so an inner drawn from a carrier's burst has hopD ≤
--- hopDᵉ c < hopDᵉ (flattenᵉ l c), and dBound-hop's r′ < r is discharged
+-- hopDᵉ c < hopDᵉ (mergeAllᵉ l c), and dBound-hop's r′ < r is discharged
 -- by the definition rather than by a lemma.
 --
 -- This conjunct was postulated, REFUTED the same day
@@ -5016,7 +5016,7 @@ mutual
   ofWᵉ (mapᵉ f e)      = ofWᵗ f ⊔ ofWᵉ e
   ofWᵉ (takeᵉ c e)     = ofWᵗ c ⊔ ofWᵉ e
   ofWᵉ (scanᵉ f z e)   = ofWᵗ f ⊔ (ofWᵗ z ⊔ ofWᵉ e)
-  ofWᵉ (flattenᵉ _ e)   = ofWᵉ e
+  ofWᵉ (mergeAllᵉ _ e)   = ofWᵉ e
   ofWᵉ (switchAllᵉ e)  = ofWᵉ e
   ofWᵉ (exhaustAllᵉ e) = ofWᵉ e
   ofWᵉ (μᵉ e)          = ofWᵉ e
@@ -5083,7 +5083,7 @@ mutual
   ofW-renᵉ ρg ρd ρt (scanᵉ f z e)   =
     cong₂ _⊔_ (ofW-renᵗ ρg ρd (ext∈ ρt) f)
               (cong₂ _⊔_ (ofW-renᵗ ρg ρd ρt z) (ofW-renᵉ ρg ρd ρt e))
-  ofW-renᵉ ρg ρd ρt (flattenᵉ _ e)   = ofW-renᵉ ρg ρd ρt e
+  ofW-renᵉ ρg ρd ρt (mergeAllᵉ _ e)   = ofW-renᵉ ρg ρd ρt e
   ofW-renᵉ ρg ρd ρt (switchAllᵉ e)  = ofW-renᵉ ρg ρd ρt e
   ofW-renᵉ ρg ρd ρt (exhaustAllᵉ e) = ofW-renᵉ ρg ρd ρt e
   ofW-renᵉ ρg ρd ρt (μᵉ e)          = ofW-renᵉ (ext∈ ρg) ρd ρt e
@@ -5154,7 +5154,7 @@ mutual
                     (⊔ˡ (ofWᵗ z) (ofWᵉ e) (⊔ʳ (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ e) h)))
                  (ofW-subΘᵉ Ω Θloc σ e hσ
                     (⊔ʳ (ofWᵗ z) (ofWᵉ e) (⊔ʳ (ofWᵗ f) (ofWᵗ z ⊔ ofWᵉ e) h))))
-  ofW-subΘᵉ Ω Θloc σ (flattenᵉ _ e)   hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
+  ofW-subΘᵉ Ω Θloc σ (mergeAllᵉ _ e)   hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
   ofW-subΘᵉ Ω Θloc σ (switchAllᵉ e)  hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
   ofW-subΘᵉ Ω Θloc σ (exhaustAllᵉ e) hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h
   ofW-subΘᵉ Ω Θloc σ (μᵉ e)          hσ h = ofW-subΘᵉ Ω Θloc σ e hσ h

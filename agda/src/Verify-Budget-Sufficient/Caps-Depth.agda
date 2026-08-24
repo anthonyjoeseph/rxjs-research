@@ -53,7 +53,7 @@
 
 -- SOME CLAUSES ARE DELIBERATELY TOO BIG, and that is free.  Where the
 -- evaluator dispatches on a Bool whose branches subscribe the same
--- things or nothing (`flattenDrain`'s capacity gate, `innerReact`'s
+-- things or nothing (`mergeAllDrain`'s capacity gate, `innerReact`'s
 -- liveness test, `subscribeSharedSlot`'s two joins, `thruConsume`'s
 -- concat/exhaust node reads), the mirror ignores the test and reports
 -- the SPENDING branch.  A mirror above the truth only ever demands more
@@ -95,11 +95,11 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim  using (Gas; g0; gs; Id; Tick; Source;
                             InstEmit; InstEvent; close; exhausted)
 open import Rx.Exp   using (Ctx; Closed; Val; obs; _≟ᵗ_; evalTm; unfoldμ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-  flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+  mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; Arrival; NodeId; RegId; Path; Frame; AllOp; Stream; NodeState; scan-st;
-  take-st; flatten-st; switch-st; exhaust-st; flattenᵒ; switchᵒ; exhaustᵒ;
+  take-st; mergeAll-st; switch-st; exhaust-st; mergeAllᵒ; switchᵒ; exhaustᵒ;
   root; share-sink; _↠_; map-f; scan-f; take-f; from-inner; thru-outer; mintNode; installNode;
   lookupNode; register; splitEvents; switchKill; shareLatch; shareAdmit; subscribeE;
   subscribeInner; thruConsume; stepFrame; foldPath; chainStep; arrVal; arrSource; arrTick;
@@ -228,8 +228,8 @@ depthE fuel (scanᵉ f seed b) κ id now sched st =
   st₀    = installNode nid (scan-st (evalTm seed)) st
   r      = subscribeE fuel b (scan-f f nid ↠ κ) id now sched₁ st₀
 -- the four *All edges delegate whole
-depthE {u = u} fuel (flattenᵉ lim b) κ id now sched st =
-  depthAll fuel flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st
+depthE {u = u} fuel (mergeAllᵉ lim b) κ id now sched st =
+  depthAll fuel mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ id now sched st
 depthE fuel (switchAllᵉ b)  κ id now sched st =
   depthAll fuel switchᵒ (switch-st nothing false) b κ id now sched st
 depthE fuel (exhaustAllᵉ b) κ id now sched st =
@@ -293,11 +293,11 @@ depthWalk fuel op nid κ id now (o ∷ os) sched₀ st₀ =
       (proj₁ (proj₂ (proj₂ r))) (proj₂ (proj₂ (proj₂ r)))
   where r = thruConsume fuel op nid κ id now o sched₀ st₀
 
--- a flatten with a free lane always subscribes; its park and exhaust's
+-- a mergeAll with a free lane always subscribes; its park and exhaust's
 -- busy-drop subscribe nothing, and both non-parking branches subscribe
 -- at the INCOMING state, so those two node reads are ignored
-depthConsume fuel flattenᵒ nid κ id now o sched₀ st₀ =
-  depthInner fuel flattenᵒ nid κ id now o sched₀ st₀
+depthConsume fuel mergeAllᵒ nid κ id now o sched₀ st₀ =
+  depthInner fuel mergeAllᵒ nid κ id now o sched₀ st₀
 depthConsume fuel exhaustᵒ nid κ id now o sched₀ st₀ =
   depthInner fuel exhaustᵒ nid κ id now o sched₀ st₀
 depthConsume fuel switchᵒ  nid κ id now o sched₀ st₀ =
@@ -324,18 +324,18 @@ depthConsumeS fuel nid κ id now o sched₀ st₀ _ = 0
 -- face; the only distinction it can draw is entered / not entered
 depthDrain fuel allNid κ id now []      sched₀ st₀ = 0
 depthDrain fuel allNid κ id now (o ∷ q) sched₀ st₀ =
-  depthInner fuel flattenᵒ allNid κ id now o sched₀ st₀
+  depthInner fuel mergeAllᵒ allNid κ id now o sched₀ st₀
   ⊔ depthDrain fuel allNid κ id now q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
-  where r = subscribeInner fuel flattenᵒ allNid κ id now o sched₀ st₀
+  where r = subscribeInner fuel mergeAllᵒ allNid κ id now o sched₀ st₀
 
 -- switch clears a slot, exhaust clears a flag, and every catch-all
--- hands the payload straight back: the flatten drain is the only finish
+-- hands the payload straight back: the mergeAll drain is the only finish
 -- that subscribes anything, and at an unbounded limit its queue is
 -- empty, which is the counter decrement the merge face used to be
-depthFin {s = s} fuel flattenᵒ allNid inst κ id now vals sched st
-         (just (flatten-st {t = w} lim act q od)) =
+depthFin {s = s} fuel mergeAllᵒ allNid inst κ id now vals sched st
+         (just (mergeAll-st {t = w} lim act q od)) =
   depthFinC fuel allNid κ id now q sched st (w ≟ᵗ s)
 depthFin fuel op allNid inst κ id now vals sched st nd = 0
 
