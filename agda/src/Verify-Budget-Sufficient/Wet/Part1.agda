@@ -71,9 +71,9 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; Gas; after_,_)
 open import Rx.Exp       using (Ty; _×ᵗ_; _≟ᵗ_; Ctx; Closed; Val; sizeᵗ; sizeᵗˢ; sizeᵛ; Tm; Fn; evalTm; applyFn)
 open import Rx.Evaluator using (Sched; EvalSt; LiveSource; scanVals; memberSource; RegId; Chain; NodeState; scan-st; take-st;
-  merge-st; concat-st; switch-st; exhaust-st; installNode; setNode; lookupNode; NodeId; AllOp;
+  flatten-st; switch-st; exhaust-st; installNode; setNode; lookupNode; NodeId; AllOp;
   scan-f; take-f; Stream; sweepLive; takeVals; cutThrough; pathHasNode; Path; stepFrame;
-  register; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; mergeBump; switchKill;
+  register; flattenᵒ; switchᵒ; exhaustᵒ; splitEvents; splitBurst; flattenBump; switchKill;
   thruWrap)
 open import Rx.Slots using (slotsSize)
 
@@ -586,21 +586,28 @@ splitBurst-bk-B {Γ = Γ} {u = u} B Ψ (em ∷ ems) =
     (splitEvents-bk-B {u = u} B Ψ (InstEmit.events em))
     (splitBurst-bk-B {u = u} B Ψ ems)
 
--- mergeAll's counter bump: whatever the lookup finds, the invariant
--- survives (merge-st is value-free, every other shape is a no-op)
-mergeBump-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
+-- the flatten counter bump.  IT MOVES THE COUNTER AND LEAVES THE
+-- QUEUE, so the node written is bounded by whatever bounded the node
+-- read — which the lookup hands over, and is no longer `refl` now that
+-- one constructor carries both
+flattenBump-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ B : ℕ)
   (nid : NodeId) (d : Bool) (sched : Sched Γ) (st : EvalSt e) →
   INV? Ψ B sched st ≡ true →
-  INV? Ψ B sched (record st { nodes = mergeBump nid d (EvalSt.nodes st) }) ≡ true
-mergeBump-INV Ψ B nid d sched st inv with lookupNode nid (EvalSt.nodes st)
-... | just (merge-st k od)   = install-INV Ψ B sched st nid
-                                 (merge-st (if d then k else suc k) od) refl refl inv
-... | nothing                = inv
-... | just (scan-st _)       = inv
-... | just (take-st _)       = inv
-... | just (concat-st _ _ _) = inv
-... | just (switch-st _ _)   = inv
-... | just (exhaust-st _ _)  = inv
+  INV? Ψ B sched (record st { nodes = flattenBump nid d (EvalSt.nodes st) }) ≡ true
+flattenBump-INV Ψ B nid d sched st inv
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-B B Ψ nid (EvalSt.nodes st)
+         (stB-nodes B sched st (proj₁ (INV-parts Ψ B sched st inv)))
+         (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ B sched st inv))))
+... | just (flatten-st lim k q od) | nb =
+      install-INV Ψ B sched st nid
+        (flatten-st lim (if d then k else suc k) q od)
+        (proj₁ nb) (proj₂ nb) inv
+... | nothing                | _ = inv
+... | just (scan-st _)       | _ = inv
+... | just (take-st _)       | _ = inv
+... | just (switch-st _ _)   | _ = inv
+... | just (exhaust-st _ _)  | _ = inv
 
 -- switchAll's cut: the same registry filter the take frame runs
 switchKill-INV : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (Ψ W E : ℕ)
@@ -641,7 +648,7 @@ switchKill-INV Ψ W E (just v) sched st inv =
              (≤ᵇ⇒≤ _ _ (T-to rl))))
 
 -- the wrap: values and events pass through, only the *All node's
--- done-flag is written back (and concat's queue is re-installed as-is)
+-- done-flag is written back (and flatten's queue is re-installed as-is)
 thruWrap-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (Ψ B : ℕ) (op : AllOp) (nid : NodeId) (fin : Bool)
   (vs : List (Val Γ u)) (bs : List (InstEvent (Val Γ t)))
@@ -655,28 +662,17 @@ thruWrap-wet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
      × (all (valB? B Ψ u) (proj₁ r) ≡ true)
      × (all (eventB? B Ψ) (proj₁ (proj₂ r)) ≡ true)
 thruWrap-wet Ψ B op nid false vs bs sched st inv vB bB = inv , vB , bB
-thruWrap-wet Ψ B mergeᵒ nid true vs bs sched st inv vB bB
-  with lookupNode nid (EvalSt.nodes st)
-... | just (merge-st k _)    =
-      install-INV Ψ B sched st nid (merge-st k true) refl refl inv , vB , bB
-... | nothing                = inv , vB , bB
-... | just (scan-st _)       = inv , vB , bB
-... | just (take-st _)       = inv , vB , bB
-... | just (concat-st _ _ _) = inv , vB , bB
-... | just (switch-st _ _)   = inv , vB , bB
-... | just (exhaust-st _ _)  = inv , vB , bB
-thruWrap-wet Ψ B concatᵒ nid true vs bs sched st inv vB bB
+thruWrap-wet Ψ B flattenᵒ nid true vs bs sched st inv vB bB
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-B B Ψ nid (EvalSt.nodes st)
          (stB-nodes B sched st (proj₁ (INV-parts Ψ B sched st inv)))
          (fcB-nodes Ψ sched st (proj₁ (proj₂ (INV-parts Ψ B sched st inv))))
-... | just (concat-st q act _) | nb =
-      install-INV Ψ B sched st nid (concat-st q act true)
+... | just (flatten-st lim act q _) | nb =
+      install-INV Ψ B sched st nid (flatten-st lim act q true)
         (proj₁ nb) (proj₂ nb) inv , vB , bB
 ... | nothing                | _ = inv , vB , bB
 ... | just (scan-st _)       | _ = inv , vB , bB
 ... | just (take-st _)       | _ = inv , vB , bB
-... | just (merge-st _ _)    | _ = inv , vB , bB
 ... | just (switch-st _ _)   | _ = inv , vB , bB
 ... | just (exhaust-st _ _)  | _ = inv , vB , bB
 thruWrap-wet Ψ B switchᵒ nid true vs bs sched st inv vB bB

@@ -145,33 +145,22 @@ research lives; where they disagree, the header wins.
 ## Tier 0 — the anchor: `flattenᵉ` and bounded concurrency
 
 **Re-opened because the syntax moved.** `mergeAllᵉ` and `concatAllᵉ` are gone,
-replaced by ONE `flattenᵉ` carrying rxjs's `concurrent` argument. Every tier
-below is stated over that syntax, so all of them are parked here. What is
-genuinely new is the DRAIN GATE — a drain at limit k refills several lanes in
-one instant and stops on a count rather than a flag — and `Rx.Flatten-Laws` is
-the door it is stated behind; the counter and the queue are merge's and
-concat's, unchanged.
+replaced by ONE `flattenᵉ` carrying rxjs's `concurrent` argument, and every
+tier below is stated over that syntax. What is genuinely new is the DRAIN
+GATE, and `Rx.Flatten-Laws` is the door it is stated behind.
 
-**THE TIER IS NOT ONLY ITS ROWS.** Two obligations carry no postulate and are
-invisible to the coverage check: the `Verify-Budget-Sufficient` and
-`Verify-Well-Formed` trees still case-split on the two removed constructors at
-roughly a thousand sites, and the ledger's
-`subscribeE-{merge,concat,switch,exhaust}All-wf` split becomes one flatten
-face. Both are repairs the typechecker enumerates.
+**ONE ROW LEFT, AND IT IS THE ONLY NON-LOCAL ONE.** Both un-rowed obligations
+are closed — the two trees no longer name the removed constructors, and the wf
+ledger's four-way *All split is one `subscribeE-flatten-wf`. Three of the four
+gate laws went with them: the drain scrutinises the GATE and nothing else, so
+saturation, the lane bound and shrinkage are one walk each, and the caps face
+had already proven the third under its own name. What is left is the claim
+about a node the inner's own burst can re-enter, which no hypothesis bounds.
 
 - **`unbounded-never-parks`** (Flatten-Laws) — SHAPE: the conclusion is a
   predicate on a node LOOKUP rather than an equation, because `NodeState` holds
   the queue's element type existentially; whether consumers can use it in that
   form is the open question. Statement and its shape argument in its header.
-- **`drain-saturates`** (Flatten-Laws) — DIFFICULTY: a drain stops having
-  emptied the queue or filled every lane, never for a third reason. Every
-  completion argument downstream reads it; concat got it free at limit 1.
-- **`drain-within-limit`** (Flatten-Laws) — DIFFICULTY: a legal live count
-  stays legal across a drain. Without it the limit decorates rather than binds,
-  and every Σ mentioning the post-drain count is upward-closed in it.
-- **`drain-queue-shrinks`** (Flatten-Laws) — DIFFICULTY: the residue never
-  lengthens. At limit 1 this is the suffix fact the old drain had structurally;
-  above 1 the loop shifts several elements per instant and it must be claimed.
 
 ## Tier 1 — `budget-sufficient` (parked behind tier 0)
 
@@ -241,7 +230,7 @@ sits in its cone.
 
 **MERGE COHERENCE IS UNSTATED** — the branch's own design question. What a
 statement owes, and why it would inherit no evidence from the probe that is the
-predicate's only consumer, is recorded on `Part4.root-mergeCache`.
+predicate's only consumer, is recorded on `Part4.root-flattenCache`.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
 
@@ -251,12 +240,12 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   counterexample can be built at. Coverage boundary in its header.
 - **`mid-readoff`** (Part11) — FALSITY: the FoldOut readoff, and FoldOut is a
   6-field invariant validated at exactly one clause.
-- **`subscribeE-{merge,concat,switch,exhaust}All-wf`** (Part3) — SHAPE:
-  written against a merge coherence whose statement is still open (the
-  merge-cert sketch in Part8's establishment block).
+- **`subscribeE-flatten-wf` / `subscribeE-{switch,exhaust}All-wf`** (Part3) —
+  SHAPE: written against a flatten coherence whose statement is still open (the
+  cert sketch in Part8's establishment block).
 - **`stepFrame-wf-outer`** (Part9) — SHAPE, on a ROUTE claim rather than the
   statement: discharging it means enriching `stepFrame-wf` to carry FoldOut out,
-  restating this family. GRIND it after `stepFrame-wf-inner-concat`, which it
+  restating this family. GRIND it after `stepFrame-wf-inner-flatten`, which it
   strictly contains — a work-order dependency only.
 - **`map-valsLast-push` / `scan-valsLast-push`** (Part3) — SHAPE: each papers
   over a recorded mismatch (the proven sub-lemmas don't return `valsLast?`).
@@ -268,9 +257,9 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   `foldPath-wf`'s third clause. Its FoldOut half belongs to
   `foldPath-share-out`, so the statement as written is what `foldPath-out`
   spends.
-- **`root-mergeCache`** (Part4) — DIFFICULTY: the per-node residue of
-  `root-caches`, split to the merge clause alone and probed non-vacuously in
-  assembled form. Header carries the DEAD ROUTE through `mergeCertAt` and
+- **`root-flattenCache`** (Part4) — DIFFICULTY: the per-node residue of
+  `root-caches`, split to the flatten clause alone and probed non-vacuously in
+  assembled form. Header carries the DEAD ROUTE through `flattenCertAt` and
   the MISSING INVARIANT it leaves owed.
 - **`foldPath-frame-out` / `foldPath-share-out`** (Part11) — DIFFICULTY:
   `foldPath-out`'s two undischarged arms, each the FoldOut readoff only (the
@@ -296,8 +285,8 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 - **`cut-owed`** (Part9) — DIFFICULTY: independent of every blocker, but its own
   header calls the owed-shape obligation "genuinely semantic" and names no
   precedent, so being unblocked is not the same as being mechanical.
-- **`stepFrame-wf-inner-concat`** (Part9) — DIFFICULTY: concat's drain grows
-  the registry; re-establish FoldInv. Independent of merge-cert.
+- **`stepFrame-wf-inner-flatten`** (Part9) — DIFFICULTY: the drain grows the
+  registry; re-establish FoldInv. Independent of the cert.
 - **`map-nodry-push`** (Part3) — GRINDABLE: every ingredient is PROVEN —
   `pushBurst-map-char` (.Part5) and the dry family `splitEvents-nodry` /
   `retagEvents-dry` / `mapValue-dry` / `any-dry-++` (.Walk-Level). Only import

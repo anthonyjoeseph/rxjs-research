@@ -885,7 +885,7 @@ walk-defer-eight {Γ = Γ} {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g 
 -- passes through unchanged.
 walk-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (body : Closed Γ u) → WalkStmt {e = e} (deferᵉ body)
-walk-defer body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+walk-defer {u = u} body c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB
   s2 fS rS ceil lb dmd gas lℓ rgs =
   let (j′ , a₁ , a₂ , a₃ , a₄ , a₅ , a₆ , a₇ , a₈) =

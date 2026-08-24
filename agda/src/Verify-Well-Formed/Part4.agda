@@ -146,7 +146,7 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- multi-source inner registers two chains under one bump), and
 -- exclude spent registrations (finish pred-decrements k while the
 -- registry entries linger to cascadeFinish).  That is exactly what
--- `Probed.Root`'s `hasAliveFromInner` / `mergeCertAt` compute — they
+-- `Probed.Root`'s `hasAliveFromInner` / `flattenCertAt` compute — they
 -- moved there with the probe that is their only consumer, so a
 -- restatement here states its own predicate rather than inheriting
 -- one whose evidence was earned against a different statement.  Do NOT
@@ -162,15 +162,15 @@ burst-final sched st S binv dyF dp cv = inv , paid (BurstInv.current-frame binv)
 -- consumers read meanwhile.
 ------------------------------------------------------------------
 
--- NO `merge-cert` POSTULATE LIVES HERE ANY MORE.  It existed
+-- NO `flatten-cert` POSTULATE LIVES HERE ANY MORE.  It existed
 -- ONLY as the hypothesis of `root-caches-core` / `root-done-plumbed-core`,
 -- and writing those two assemblies as real bodies showed that hypothesis
 -- does not close: see the ALIVE-vs-PRESENT gap recorded on root-flattenCache
--- below.  `mergeCertAt` LEFT WITH IT, and that is the wiring law rather
+-- below.  `flattenCertAt` LEFT WITH IT, and that is the wiring law rather
 -- than a tidy-up: its only consumer was the probe, so once the probe moved
 -- to `agda/evidence/probed` this file held a definition no proof reached.
 -- It is now `Probed.Root`'s own decision procedure — see the reachability
--- receipt in that file, which travelled with it.  A restated merge-cert
+-- receipt in that file, which travelled with it.  A restated flatten-cert
 -- states its predicate HERE, freshly; the probe's rows are evidence about
 -- the predicate they were written against, and inheriting them across a
 -- restatement is the extrapolation the probe rules forbid.
@@ -195,7 +195,7 @@ rootExitSt e ins =
 -- IT IS A LEAF AND MUST STAY ONE.  `allShareSunk` is a conjunction fold
 -- over the registry, so the assembly is writable: the fold's induction is
 -- below and the whole residue is the PER-ENTRY leaf.  A parent taking
--- merge-cert instead would have its composition checked by nobody.
+-- flatten-cert instead would have its composition checked by nobody.
 -- Leaf-only also shrinks what is at risk — the residue no longer
 -- quantifies over the registry, so the FALSITY region the `Probed.Root` sweep
 -- could not reach is now a statement about ONE surviving entry — a size a
@@ -235,15 +235,15 @@ postulate
   -- statement, a mid-fold `FoldInv` form of it, and the consumer rewrites
   -- that spend it.
   --
-  -- DEAD ROUTE: `merge-cert` (mergeCertAt at the root exit) does
+  -- DEAD ROUTE: `flatten-cert` (flattenCertAt at the root exit) does
   --   NOT discharge even the k ≡ 0 case of this clause, which is what the old
   --   `root-caches-core` hypothesis list silently claimed.  The two predicates
   --   count DIFFERENT things: `countLiveInners` is `nubLen ∘ innerInstsR`, and
   --   innerInstsP collects EVERY `from-inner _ nid j` frame on a registered
-  --   path with no aliveness test at all, while mergeCertAt only rules out the
+  --   path with no aliveness test at all, while flattenCertAt only rules out the
   --   ones with `aliveThroughᶠ`.  A registration whose path still mentions a
   --   DEAD instance of nid is therefore counted by countLiveInners and ignored
-  --   by mergeCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
+  --   by flattenCertAt, so cert ≡ true is consistent with countLiveInners ≢ 0.
   --   Closing this needs the separate invariant that no dead-but-present
   --   from-inner instance survives in the root-exit registry; that fact does
   --   not exist in the repo today.  The gap was invisible while this was a

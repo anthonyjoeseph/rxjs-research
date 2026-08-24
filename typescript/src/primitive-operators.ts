@@ -188,7 +188,7 @@ const oneShotArrival = (driver: Driver, tick: number): Observable<Arrival> =>
 // emissions minting fresh ids (an async boundary). Mirrors Agda's
 // deferᵉ clause: init in the subscriber's instant; when the hop fires
 // the body is subscribed and its sync burst is grafted behind the
-// hop's close into ONE delivery emit (Agda's thru-outer mergeᵒ walk) —
+// hop's close into ONE delivery emit (Agda's thru-outer flattenᵒ walk) —
 // the body thunk runs AT FIRE TIME, which is what breaks μ's
 // unfolding regress: each unfolding costs a schedule hop.
 export const defer = <A>(

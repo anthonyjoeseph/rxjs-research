@@ -82,8 +82,8 @@
 module Verify-Budget-Sufficient.Caps-Depth where
 
 open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≤_; z≤n)
-open import Data.Nat.Properties using (≤-trans; m≤m⊔n; m≤n⊔m; ⊔-lub)
+open import Data.Nat     using (ℕ; zero; suc; _⊔_; _≤_)
+open import Data.Nat.Properties using (≤-trans; m≤m⊔n; m≤n⊔m)
 open import Data.List    using (List; []; _∷_; _++_)
 open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Fin     using (Fin; toℕ)

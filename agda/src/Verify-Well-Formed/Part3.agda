@@ -175,7 +175,7 @@ initReg-wf {Γ = Γ} {u = u} src κ id st sched S binv ltok =
 -- subscribeE-take-wf.  The gap postulates further down cover the blocked
 -- clauses — the map-/scan-/take- shape gaps, the four *All wrap clauses,
 -- subscribeE-input-wf/defer-wf/takeᵉ-wf — while dispatchShare-wf and the
--- stepFrame-wf-inner-flatten/outer residues are blocked on merge-cert, the
+-- stepFrame-wf-inner-flatten/outer residues are blocked on flatten-cert, the
 -- SKETCH in Part8's establishment block rather than a Part4 postulate.
 --
 -- TERMINATION: lexicographic (Gas, Closed Γ u) — μ drops Gas, every other

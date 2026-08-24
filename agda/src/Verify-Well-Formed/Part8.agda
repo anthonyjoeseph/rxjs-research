@@ -880,26 +880,26 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 --                Sibling inners carry DISTINCT insts, so aliveThrough does NOT see
 --                them; only k does.  So the count is NOT fully avoidable — but the
 --                needed fact is one-directional and liveness-aware:
---                  merge-cert : (flatten-st _ k _ _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough
+--                  flatten-cert : (flatten-st _ k _ _ at nid) ⇒ k ≡ 0 ⇒ no aliveThrough
 --                               inner INSTANCE under nid survives
 --                (the CORRECTED coherence: key on from-inner allNid=nid, dedup by
 --                inst, exclude spent — NOT the false raw countRegsUnder equality).
 --       So a live non-envSrc root-sinker r must share a gate g with envSrc's path
 --       (topology); envSrc's fin passing g fired g's certificate; the certificate
---       (aliveThrough=false for r's own inst, or merge-cert via k for a sibling
+--       (aliveThrough=false for r's own inst, or flatten-cert via k for a sibling
 --       inst) says r is not live — contradiction.  ⇒ allShareSunk(dropSource
 --       envSrc).  OPEN (next), both operational (guardrail 1), carried by the
---       enriched stepFrame-wf: (a) the aliveThrough=false / merge-cert certificate
+--       enriched stepFrame-wf: (a) the aliveThrough=false / flatten-cert certificate
 --       as from-inner/thru-outer's enriched conclusion; (b) the "root-sinker shares
 --       a gate with envSrc's path" topology lemma over Path (pathHasNode /
---       frameNodes).  The merge-cert still needs the CORRECTED k↔live-inst
+--       frameNodes).  The flatten-cert still needs the CORRECTED k↔live-inst
 --       coherence as a threaded FoldInv field — its exact statement (and whether
 --       k≡0⇒none is seed-provable) is the remaining design point, NOT countRegsUnder.
 
---       NAME NOTE: `merge-cert` above is this SKETCH, not a postulate —
+--       NAME NOTE: `flatten-cert` above is this SKETCH, not a postulate —
 --       the Part4 postulate of that name is gone.  It existed only as the
 --       hypothesis of the two root-exit -cores, and writing those as real bodies
---       showed it does not close even their k ≡ 0 case: mergeCertAt rules out
+--       showed it does not close even their k ≡ 0 case: flattenCertAt rules out
 
 --       ALIVE from-inner instances while countLiveInners counts PRESENT ones, so
 --       a dead-but-present instance defeats it.  Full finding on

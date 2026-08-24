@@ -36,7 +36,7 @@ emitValues []                     = []
 emitValues ((es at _ from _ as _) ∷ xs) = valuesOf es ++ emitValues xs
 
 ------------------------------------------------------------------
--- shorthands: merge as mergeAll∘of, and the tiny slot assignments
+-- shorthands: merge as an unbounded flatten of `of`, and the tiny slot assignments
 -- the instances run against
 ------------------------------------------------------------------
 

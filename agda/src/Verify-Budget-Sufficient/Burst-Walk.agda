@@ -104,10 +104,10 @@ open import Rx.Evaluator
   thru-outer; Stream; stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; hasDry;
   dryEvent; budgetAt; capsHgo; capsBase; arrTy; arrVal; fLvlD; opIterD; regAt; subscribeInner;
   subscribeE; splitBurst; splitEvents; sLvlD; sIterD; sIterD-suc; sizeAt; fLvlD-suc; widAt;
-  AllOp; mergeᵒ; concatᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals;
-  cutThrough; lookupNode; pathHasNode; memberSource; scanVals; innerFinish; concatDrain;
-  aliveThroughᶠ; mergeBump; switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st;
-  merge-st; concat-st; switch-st; exhaust-st)
+  AllOp; flattenᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals;
+  cutThrough; lookupNode; pathHasNode; memberSource; scanVals; innerFinish; flattenDrain;
+  aliveThroughᶠ; flattenBump; switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st;
+  hasRoom; flatten-st; switch-st; exhaust-st)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk
@@ -242,8 +242,8 @@ module _ {n} {Γ : Ctx n} {t : Ty} where
 -- is the head projection stated again at one instantiation (`Val Γ (obs u)` IS
 -- `Closed Γ s`, per Rx/Exp's definition of `Val`).  Both are `all` over a cons
 -- and nothing more, so they are proven here once and the callers spend them —
--- which is what the concat side does: one receipt minted per node lookup
--- (`concatNode-vb`), then projected down the drain's recursion.
+-- which is what the flatten side does: one receipt minted per node lookup
+-- (`flattenNode-vb`), then projected down the drain's recursion.
 --
 -- The length conjunct is why these are lemmas rather than `refl`: `valsCaps?`
 -- carries `length vs ≤ᵇ suc (cWid c)` beside the per-element `all`, so the
@@ -296,7 +296,7 @@ VbB-tail {s = s} c sl Ψ J o os h
     (proj₂ (∧-true (valΨ? Ψ s o) (all (valΨ? Ψ s) os) hΨ))
 
 -- ONE ELEMENT'S SIZE, at the level `inner-desc` reads it.  Spent by both
--- payload walks — the thru walk over a value list and the concat drain over
+-- payload walks — the thru walk over a value list and the flatten drain over
 -- a queue — which is why it is named for neither.  `valsCaps?`
 -- carries a per-element `valCaps?`, whose size half bounds the element at
 -- `Caps.cSize (frameStep J c)` — which IS `sizeAt (cSize c) J`; `inner-desc`
@@ -372,7 +372,7 @@ thruWalk-nodry-dep dep sf op nid κ id now o os sched₀ st₀ h =
 -- `k` slot is `≤-refl` whenever the bud is pinned to the frame's own refresh.
 -- Both frame boundaries that open a payload traversal spend this: the
 -- thru-outer frame over a value list, and the from-inner frame over a
--- concat queue.
+-- flatten queue.
 --
 -- THE FUEL IS TAKEN AS `pred d`, NOT BY SPLITTING `d`, and that is what
 -- makes it usable at both.  A frame charges itself one level before opening
@@ -561,7 +561,7 @@ WetFace sl Ψ r =
 -- from-inner edge is now a REAL DEFINITION all the way down to ONE
 -- postulate: `wet-inner` proves the two inert paths,
 -- `wet-innerFinish` proves merge/switch/exhaust/mismatch and
--- reduces concat+yes through the PROVEN `concatDrain-Ψ` walk to
+-- reduces flatten+yes through the PROVEN `flattenDrain-Ψ` walk to
 -- `subscribeInner-Ψ` below — the Ψ face of the one function all three
 -- *All-edge postulates bottom out in (`wet-thru` and
 -- `subscribeInner-demand` (.Anchor-Dry) are the other two).
@@ -933,25 +933,30 @@ wet-pass c sl Ψ J vs fin sched st ok hv rg =
 ------------------------------------------------------------------
 -- THE COMPLETION PATH — a REAL DEFINITION down to
 -- `subscribeInner-Ψ`.  Mirrors the caps side's proven
--- decomposition (`innerFinish-caps` over `concatDrain-caps` over
--- `subscribeInner-caps`, Subscribe-Face): merge/switch/exhaust rewrite
+-- decomposition (`innerFinish-caps` over `flattenDrain-caps` over
+-- `subscribeInner-caps`, Subscribe-Face): switch/exhaust rewrite
 -- one node field on which `fnCapNode` is `true` outright, every
--- mismatched read is the evaluator's catch-all pass, and concat+yes is
--- the drain.
+-- mismatched read is the evaluator's catch-all pass, and flatten+yes
+-- is the drain.
 
 -- the drain walk: one `subscribeInner-Ψ` receipt per queued inner,
 -- threading the Ψ state invariant; the residue queue is a suffix of
--- the input, so its bound rides along rather than being re-derived
-concatDrain-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+-- the input, so its bound rides along rather than being re-derived.
+-- AN INNER THAT STAYS OPEN NO LONGER STOPS THE WALK — it spends a
+-- lane, and the walk stops on the LIMIT instead, so the recursion is
+-- over the queue in both arms and the residue is whatever the gate
+-- shut on
+flattenDrain-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (allNid : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   fnCapBounded? Ψ sched st ≡ true →
   regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
   all (λ o → fnCapᵉ o ≤ᵇ Ψ) q ≡ true →
   pathBΨ? Ψ κ ≡ true →
-  let r      = concatDrain g allNid κ id now q sched st
+  let r      = flattenDrain g allNid κ id now lim act q sched st
       sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
       st′    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
   in (Sched.slots sched′ ≡ sl)
@@ -960,27 +965,26 @@ concatDrain-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
    × (valsΨ? Ψ (proj₁ r) ≡ true)
    × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
    × (all (λ o → fnCapᵉ o ≤ᵇ Ψ) (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
-concatDrain-Ψ sl Ψ g allNid κ id now [] sched st slEq fc rg qB pB =
+flattenDrain-Ψ sl Ψ g allNid κ id now lim act [] sched st slEq fc rg qB pB =
   slEq , fc , rg , refl , refl , refl
-concatDrain-Ψ sl Ψ g allNid κ id now (o ∷ q) sched st slEq fc rg qB pB
-  with subscribeInner g concatᵒ allNid κ id now o sched st
-     | subscribeInner-Ψ sl Ψ g concatᵒ allNid κ id now o sched st slEq fc rg
+flattenDrain-Ψ sl Ψ g allNid κ id now lim act (o ∷ q) sched st slEq fc rg qB pB
+  with hasRoom lim act
+-- the gate is shut: nothing runs, and the residue is the input
+... | false = slEq , fc , rg , refl , refl , qB
+... | true
+  with subscribeInner g flattenᵒ allNid κ id now o sched st
+     | subscribeInner-Ψ sl Ψ g flattenᵒ allNid κ id now o sched st slEq fc rg
          (proj₁ (∧-true (fnCapᵉ o ≤ᵇ Ψ) (all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q) qB)) pB
--- the inner completed synchronously: keep draining the tail
-... | (inst , vs , bs , true , sched₁ , st₁) | (slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ)
-  with concatDrain g allNid κ id now q sched₁ st₁
-     | concatDrain-Ψ sl Ψ g allNid κ id now q sched₁ st₁ slEq₁ fc₁ rg₁
+...   | (inst , vs , bs , done , sched₁ , st₁) | (slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ)
+  with flattenDrain g allNid κ id now lim (if done then act else suc act) q sched₁ st₁
+     | flattenDrain-Ψ sl Ψ g allNid κ id now lim (if done then act else suc act)
+         q sched₁ st₁ slEq₁ fc₁ rg₁
          (proj₂ (∧-true (fnCapᵉ o ≤ᵇ Ψ) (all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q) qB)) pB
-...   | (vs′ , bs′ , act , q′ , sched₂ , st₂) | (slEq₂ , fc₂ , rg₂ , vsΨ′ , bsΨ′ , qB′) =
+...     | (vs′ , bs′ , act′ , q′ , sched₂ , st₂) | (slEq₂ , fc₂ , rg₂ , vsΨ′ , bsΨ′ , qB′) =
       slEq₂ , fc₂ , rg₂
     , all-++-intro _ vs vs′ vsΨ vsΨ′
     , all-++-intro _ bs bs′ bsΨ bsΨ′
     , qB′
--- the inner stayed open: the drain stops with the tail as residue
-concatDrain-Ψ sl Ψ g allNid κ id now (o ∷ q) sched st slEq fc rg qB pB
-    | (inst , vs , bs , false , sched₁ , st₁) | (slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ) =
-      slEq₁ , fc₁ , rg₁ , vsΨ , bsΨ
-    , proj₂ (∧-true (fnCapᵉ o ≤ᵇ Ψ) (all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) q) qB)
 
 -- FROM-INNER's completion, per (op, node-read) clause.  `fin` is
 -- already pinned `true` and the absorb test already resolved by
@@ -998,38 +1002,11 @@ wet-innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   WetFace sl Ψ (innerFinish sf op allNid instNid path′ id now vals sched st
                   (lookupNode allNid (EvalSt.nodes st)))
 
--- MERGE: decrement the counter — `fnCapNode Ψ (merge-st _ _)` is `true`
-wet-innerFinish c sl Ψ J sf id now mergeᵒ allNid instNid path′ vals sched st ok pb vb rg
-  with lookupNode allNid (EvalSt.nodes st)
-... | just (merge-st k od) =
-      proj₁ (proj₁ ok)
-    , ∧-intro (fcB-live Ψ sched st (proj₂ ok))
-              (setNode-fnCap Ψ allNid (merge-st (pred k) od) (EvalSt.nodes st) refl
-                (fcB-nodes Ψ sched st (proj₂ ok)))
-    , proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb)
-    , regP?-Ψ c Ψ J (EvalSt.registry st) rg
-    , refl
-... | nothing                = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (scan-st _)       = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (take-st _)       = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (concat-st _ _ _) = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (switch-st _ _)   = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (exhaust-st _ _)  = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-
--- CONCAT: the drain — the one clause with real content
-wet-innerFinish {s = s} c sl Ψ J sf id now concatᵒ allNid instNid path′ vals sched st ok pb vb rg
+-- FLATTEN: the drain — the one clause with real content.  THE
+-- UNBOUNDED LIMIT IS NOT A CLAUSE OF ITS OWN: it parks nothing, so its
+-- queue is empty and the drain is the counter decrement the merge face
+-- used to state separately
+wet-innerFinish {s = s} c sl Ψ J sf id now flattenᵒ allNid instNid path′ vals sched st ok pb vb rg
   with lookupNode allNid (EvalSt.nodes st)
      | lookupNode-fnCap Ψ allNid (EvalSt.nodes st) (fcB-nodes Ψ sched st (proj₂ ok))
 ... | nothing                | _ = wet-pass c sl Ψ J vals false sched st ok
@@ -1041,23 +1018,20 @@ wet-innerFinish {s = s} c sl Ψ J sf id now concatᵒ allNid instNid path′ val
 ... | just (take-st _)       | _ = wet-pass c sl Ψ J vals false sched st ok
                                      (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                     (valsΨ? Ψ vals) vb)) rg
-... | just (merge-st _ _)    | _ = wet-pass c sl Ψ J vals false sched st ok
-                                     (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                    (valsΨ? Ψ vals) vb)) rg
 ... | just (switch-st _ _)   | _ = wet-pass c sl Ψ J vals false sched st ok
                                      (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                     (valsΨ? Ψ vals) vb)) rg
 ... | just (exhaust-st _ _)  | _ = wet-pass c sl Ψ J vals false sched st ok
                                      (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                     (valsΨ? Ψ vals) vb)) rg
-... | just (concat-st {w} q act od) | nb with w ≟ᵗ s
+... | just (flatten-st {w} lim act q od) | nb with w ≟ᵗ s
 ...   | no _     = wet-pass c sl Ψ J vals false sched st ok
                      (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                     (valsΨ? Ψ vals) vb)) rg
 ...   | yes refl =
         proj₁ D
       , ∧-intro (fcB-live Ψ sched′ st′ (proj₁ (proj₂ D)))
-                (setNode-fnCap Ψ allNid (concat-st q′ act′ od) (EvalSt.nodes st′)
+                (setNode-fnCap Ψ allNid (flatten-st lim act′ q′ od) (EvalSt.nodes st′)
                   q′B (fcB-nodes Ψ sched′ st′ (proj₁ (proj₂ D))))
       , all-++-intro _ vals (proj₁ dr)
           (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals) (valsΨ? Ψ vals) vb))
@@ -1065,14 +1039,14 @@ wet-innerFinish {s = s} c sl Ψ J sf id now concatᵒ allNid instNid path′ val
       , proj₁ (proj₂ (proj₂ D))
       , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ D))))
     where
-    D = concatDrain-Ψ sl Ψ sf allNid path′ id now q sched st
+    D = flattenDrain-Ψ sl Ψ sf allNid path′ id now lim (pred act) q sched st
           (proj₁ (proj₁ ok)) (proj₂ ok)
           (regP?-Ψ c Ψ J (EvalSt.registry st) rg)
           nb
           (proj₂ (∧-true (pathSz? (Caps.cSize (frameStep J c))
-                           (from-inner concatᵒ allNid instNid ↠ path′))
-                         (pathBΨ? Ψ (from-inner concatᵒ allNid instNid ↠ path′)) pb))
-    dr     = concatDrain sf allNid path′ id now q sched st
+                           (from-inner flattenᵒ allNid instNid ↠ path′))
+                         (pathBΨ? Ψ (from-inner flattenᵒ allNid instNid ↠ path′)) pb))
+    dr     = flattenDrain sf allNid path′ id now lim (pred act) q sched st
     act′   = proj₁ (proj₂ (proj₂ dr))
     q′     = proj₁ (proj₂ (proj₂ (proj₂ dr)))
     sched′ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ dr))))
@@ -1092,10 +1066,7 @@ wet-innerFinish c sl Ψ J sf id now switchᵒ allNid instNid path′ vals sched 
 ... | just (take-st _)       = wet-pass c sl Ψ J vals false sched st ok
                                  (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                 (valsΨ? Ψ vals) vb)) rg
-... | just (merge-st _ _)    = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (concat-st _ _ _) = wet-pass c sl Ψ J vals false sched st ok
+... | just (flatten-st _ _ _ _) = wet-pass c sl Ψ J vals false sched st ok
                                  (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                 (valsΨ? Ψ vals) vb)) rg
 ... | just (exhaust-st _ _)  = wet-pass c sl Ψ J vals false sched st ok
@@ -1137,10 +1108,7 @@ wet-innerFinish c sl Ψ J sf id now exhaustᵒ allNid instNid path′ vals sched
 ... | just (take-st _)       = wet-pass c sl Ψ J vals false sched st ok
                                  (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                 (valsΨ? Ψ vals) vb)) rg
-... | just (merge-st _ _)    = wet-pass c sl Ψ J vals false sched st ok
-                                 (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
-                                                (valsΨ? Ψ vals) vb)) rg
-... | just (concat-st _ _ _) = wet-pass c sl Ψ J vals false sched st ok
+... | just (flatten-st _ _ _ _) = wet-pass c sl Ψ J vals false sched st ok
                                  (proj₂ (∧-true (valsCaps? (frameStep J c) sl vals)
                                                 (valsΨ? Ψ vals) vb)) rg
 ... | just (switch-st _ _)   = wet-pass c sl Ψ J vals false sched st ok
@@ -1175,22 +1143,25 @@ wet-inner c sl Ψ J sf id now op a i path′ vals true sched st ok pb vb rg
 ------------------------------------------------------------------
 -- THE THRU-OUTER LEAF.  `stepFrame (thru-outer op nid) =
 -- thruWrap op nid fin (thruWalk …)`.  Helpers in dependency order:
--- mergeBump-fnCap, switchKill-Ψ, concatConsume-Ψ, thruConsume-Ψ,
+-- flattenBump-fnCap, switchKill-Ψ, flattenConsume-Ψ, thruConsume-Ψ,
 -- thruWalk-Ψ, thruWrap-Ψ, then the assembly `wet-thru`.
 
-mergeBump-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (nid : NodeId) (done : Bool)
+-- the bump moves the counter and leaves the queue, so the node written
+-- carries the bound the node read carried — which the lookup hands
+-- over, and is no longer `refl` now that one constructor holds both
+flattenBump-fnCap : ∀ {n} {Γ : Ctx n} (Ψ : ℕ) (nid : NodeId) (done : Bool)
   (nodes : List (NodeId × NodeState Γ)) →
   all (λ kv → fnCapNode Ψ (proj₂ kv)) nodes ≡ true →
-  all (λ kv → fnCapNode Ψ (proj₂ kv)) (mergeBump nid done nodes) ≡ true
-mergeBump-fnCap Ψ nid done nodes h with lookupNode nid nodes
-... | just (merge-st k od) =
-    setNode-fnCap Ψ nid (merge-st (if done then k else suc k) od) nodes refl h
-... | just (scan-st _)       = h
-... | just (take-st _)       = h
-... | just (switch-st _ _)   = h
-... | just (concat-st _ _ _) = h
-... | just (exhaust-st _ _)  = h
-... | nothing                = h
+  all (λ kv → fnCapNode Ψ (proj₂ kv)) (flattenBump nid done nodes) ≡ true
+flattenBump-fnCap Ψ nid done nodes h
+  with lookupNode nid nodes | lookupNode-fnCap Ψ nid nodes h
+... | just (flatten-st lim k q od) | qB =
+    setNode-fnCap Ψ nid (flatten-st lim (if done then k else suc k) q od) nodes qB h
+... | just (scan-st _)       | _ = h
+... | just (take-st _)       | _ = h
+... | just (switch-st _ _)   | _ = h
+... | just (exhaust-st _ _)  | _ = h
+... | nothing                | _ = h
 
 switchKill-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (Ψ : ℕ) (cur : Maybe NodeId)
@@ -1222,7 +1193,7 @@ switchKill-Ψ sl Ψ (just v) sched st slEq fc rg =
   kept = proj₁ (cutThrough v (EvalSt.delivered st) (EvalSt.regWatermark st)
                   (EvalSt.dying st) (EvalSt.registry st))
 
-concatConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+flattenConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
@@ -1231,7 +1202,7 @@ concatConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st) ≡ true →
   valΨ? Ψ (obs u) o ≡ true →
   pathBΨ? Ψ κ ≡ true →
-  let r      = thruConsume g concatᵒ nid κ id now o sched st
+  let r      = thruConsume g flattenᵒ nid κ id now o sched st
       sched′ = proj₁ (proj₂ (proj₂ r))
       st′    = proj₂ (proj₂ (proj₂ r))
   in (Sched.slots sched′ ≡ sl)
@@ -1239,48 +1210,49 @@ concatConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
    × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
    × (valsΨ? Ψ (proj₁ r) ≡ true)
    × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
-concatConsume-Ψ {u = u} sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+flattenConsume-Ψ {u = u} sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st fc)
-... | just (concat-st {w} q true od) | qB with w ≟ᵗ u
-...   | yes refl =
+... | just (flatten-st {w} lim act q od) | qB with w ≟ᵗ u
+...   | no _     = slEq , fc , rg , refl , refl
+...   | yes refl with hasRoom lim act
+-- a lane is free: subscribe, and the bump leaves the queue alone
+...     | true =
+    slEq₁
+    , ∧-intro (fcB-live Ψ sched₁ st₁ fc₁)
+               (flattenBump-fnCap Ψ nid done (EvalSt.nodes st₁)
+                  (fcB-nodes Ψ sched₁ st₁ fc₁))
+    , rg₁ , vsΨ , bsΨ
+    where
+    R      = subscribeInner g flattenᵒ nid κ id now o sched st
+    sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+    st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+    done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+    SI     = subscribeInner-Ψ sl Ψ g flattenᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
+    slEq₁  = proj₁ SI
+    fc₁    = proj₁ (proj₂ SI)
+    rg₁    = proj₁ (proj₂ (proj₂ SI))
+    vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
+    bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+-- the gate is shut: the payload joins the queue, and its own bound is
+-- the one conjunct the append needs
+...     | false =
     slEq
     , ∧-intro (fcB-live Ψ sched st fc)
-               (setNode-fnCap Ψ nid (concat-st (q ++ o ∷ []) true od)
+               (setNode-fnCap Ψ nid (flatten-st lim act (q ++ o ∷ []) od)
                   (EvalSt.nodes st)
                   (all-++-intro _ q (o ∷ []) qB (∧-intro oΨ refl))
                   (fcB-nodes Ψ sched st fc))
     , rg , refl , refl
-...   | no _     = slEq , fc , rg , refl , refl
-concatConsume-Ψ {u = u} sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
-    | just (concat-st q false od) | _ =
-  slEq₁
-  , ∧-intro (fcB-live Ψ sched₁ st₁ fc₁)
-             (setNode-fnCap Ψ nid (concat-st {t = u} [] (not done) od)
-                (EvalSt.nodes st₁) refl (fcB-nodes Ψ sched₁ st₁ fc₁))
-  , rg₁ , vsΨ , bsΨ
-  where
-  R      = subscribeInner g concatᵒ nid κ id now o sched st
-  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
-  SI     = subscribeInner-Ψ sl Ψ g concatᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
-  slEq₁  = proj₁ SI
-  fc₁    = proj₁ (proj₂ SI)
-  rg₁    = proj₁ (proj₂ (proj₂ SI))
-  vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
-  bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
-concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+flattenConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
     | nothing                | _ = slEq , fc , rg , refl , refl
-concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+flattenConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
     | just (scan-st _)       | _ = slEq , fc , rg , refl , refl
-concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+flattenConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
     | just (take-st _)       | _ = slEq , fc , rg , refl , refl
-concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
-    | just (merge-st _ _)    | _ = slEq , fc , rg , refl , refl
-concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+flattenConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
     | just (switch-st _ _)   | _ = slEq , fc , rg , refl , refl
-concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
+flattenConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
     | just (exhaust-st _ _)  | _ = slEq , fc , rg , refl , refl
 
 thruConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1300,24 +1272,8 @@ thruConsume-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
    × (regP? (λ {v} p → pathBΨ? Ψ p) (EvalSt.registry st′) ≡ true)
    × (valsΨ? Ψ (proj₁ r) ≡ true)
    × (eventsΨ? Ψ (proj₁ (proj₂ r)) ≡ true)
-thruConsume-Ψ sl Ψ g concatᵒ nid κ id now o sched st slEq fc rg oΨ pΨ =
-  concatConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
-thruConsume-Ψ sl Ψ g mergeᵒ nid κ id now o sched st slEq fc rg oΨ pΨ =
-  slEq₁
-  , ∧-intro (fcB-live Ψ sched₁ st₁ fc₁)
-             (mergeBump-fnCap Ψ nid done (EvalSt.nodes st₁) (fcB-nodes Ψ sched₁ st₁ fc₁))
-  , rg₁ , vsΨ , bsΨ
-  where
-  R      = subscribeInner g mergeᵒ nid κ id now o sched st
-  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
-  SI     = subscribeInner-Ψ sl Ψ g mergeᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
-  slEq₁  = proj₁ SI
-  fc₁    = proj₁ (proj₂ SI)
-  rg₁    = proj₁ (proj₂ (proj₂ SI))
-  vsΨ    = proj₁ (proj₂ (proj₂ (proj₂ SI)))
-  bsΨ    = proj₂ (proj₂ (proj₂ (proj₂ SI)))
+thruConsume-Ψ sl Ψ g flattenᵒ nid κ id now o sched st slEq fc rg oΨ pΨ =
+  flattenConsume-Ψ sl Ψ g nid κ id now o sched st slEq fc rg oΨ pΨ
 thruConsume-Ψ sl Ψ g switchᵒ nid κ id now o sched st slEq fc rg oΨ pΨ
   with lookupNode nid (EvalSt.nodes st)
 ... | just (switch-st cur od) =
@@ -1431,32 +1387,17 @@ thruWrap-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
    × (eventsΨ? Ψ (proj₁ (proj₂ w)) ≡ true)
 thruWrap-Ψ sl Ψ op nid false (vs , bs , sched , st) slEq fc rg vsΨ bsΨ =
   slEq , fc , rg , vsΨ , bsΨ
-thruWrap-Ψ sl Ψ mergeᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
-  with lookupNode nid (EvalSt.nodes st)
-... | just (merge-st k od) =
-    slEq
-  , ∧-intro (fcB-live Ψ sched st fc)
-             (setNode-fnCap Ψ nid (merge-st k true) (EvalSt.nodes st) refl
-               (fcB-nodes Ψ sched st fc))
-  , rg , vsΨ , bsΨ
-... | just (scan-st _)       = slEq , fc , rg , vsΨ , bsΨ
-... | just (take-st _)       = slEq , fc , rg , vsΨ , bsΨ
-... | just (switch-st _ _)   = slEq , fc , rg , vsΨ , bsΨ
-... | just (concat-st _ _ _) = slEq , fc , rg , vsΨ , bsΨ
-... | just (exhaust-st _ _)  = slEq , fc , rg , vsΨ , bsΨ
-... | nothing                = slEq , fc , rg , vsΨ , bsΨ
-thruWrap-Ψ sl Ψ concatᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
+thruWrap-Ψ sl Ψ flattenᵒ nid true (vs , bs , sched , st) slEq fc rg vsΨ bsΨ
   with lookupNode nid (EvalSt.nodes st)
      | lookupNode-fnCap Ψ nid (EvalSt.nodes st) (fcB-nodes Ψ sched st fc)
-... | just (concat-st q act od) | qB =
+... | just (flatten-st lim act q od) | qB =
     slEq
   , ∧-intro (fcB-live Ψ sched st fc)
-             (setNode-fnCap Ψ nid (concat-st q act true) (EvalSt.nodes st) qB
+             (setNode-fnCap Ψ nid (flatten-st lim act q true) (EvalSt.nodes st) qB
                (fcB-nodes Ψ sched st fc))
   , rg , vsΨ , bsΨ
 ... | just (scan-st _)       | _ = slEq , fc , rg , vsΨ , bsΨ
 ... | just (take-st _)       | _ = slEq , fc , rg , vsΨ , bsΨ
-... | just (merge-st _ _)    | _ = slEq , fc , rg , vsΨ , bsΨ
 ... | just (switch-st _ _)   | _ = slEq , fc , rg , vsΨ , bsΨ
 ... | just (exhaust-st _ _)  | _ = slEq , fc , rg , vsΨ , bsΨ
 ... | nothing                | _ = slEq , fc , rg , vsΨ , bsΨ
@@ -1652,7 +1593,7 @@ fnCapB-finish Ψ i true  out h =
 --              (`cutThrough-nodry` — every close it
 --              makes is `cut`/`cutPending`).                 PROVEN
 --   from-inner — `innerReact` → `innerFinish`, whose only
---              emitting arm is concatᵒ's `concatDrain`.      via SiNodry
+--              emitting arm is flattenᵒ's `flattenDrain`.     via SiNodry
 --   thru-outer — `thruWrap`/`thruWalk`/`thruConsume`, whose
 --              events are `switchKill`'s closes (cutThrough
 --              again, free) plus `subscribeInner`'s.         via SiNodry
@@ -1660,7 +1601,7 @@ fnCapB-finish Ψ i true  out h =
 -- ═══ THE CONSOLIDATION THAT FALLS OUT, and it is the finding ═══
 
 -- Chase those two frames to their leaves and they MEET:
--- `concatDrain` (Rx.Evaluator) emits nothing of its own — its `bs`
+-- `flattenDrain` (Rx.Evaluator) emits nothing of its own — its `bs`
 -- is `subscribeInner`'s, appended down the queue.  `switchKill` is
 -- cutThrough.  So after the three proven frames, EVERY remaining
 -- dried-close risk in the whole cascade is `subscribeInner`, whose two
@@ -1678,14 +1619,14 @@ fnCapB-finish Ψ i true  out h =
 --
 -- ═══ THE LOOP QUESTION, RULED ═══
 
--- The two remaining frames are NOT one-step: `concatDrain` and
+-- The two remaining frames are NOT one-step: `flattenDrain` and
 -- `thruWalk` LOOP, calling `subscribeInner` at a state that has
 -- already moved.  So the leaf's hypotheses (capsOK? and friends, all
 -- state-dependent) must be RE-ESTABLISHED per iteration — which is
 -- what the caps route's Σ-witness does and what a bare `≡ false`
 -- conclusion cannot.  The gas hypothesis is the one part that threads
 -- for FREE: `fuel` is passed unchanged by every one of innerReact,
--- innerFinish, concatDrain, thruWalk, thruConsume and thruWrap
+-- innerFinish, flattenDrain, thruWalk, thruConsume and thruWrap
 -- (checked), so the `g0` exclusion never has to be re-won.
 
 -- TWO ROUTES WERE ON THE TABLE.  (A) take the already-proven caps
@@ -2249,14 +2190,14 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g o
 
 -- THE CONCAT NODE'S STORED QUEUE IS VbB-BOUNDED, and this is a real body: the
 -- leaves it stands on are all proven, so nothing here is postulated.  It is the
--- receipt `concatDrain-nodry` drains against, and the whole reason that drain is
+-- receipt `flattenDrain-nodry` drains against, and the whole reason that drain is
 -- allowed to take one: the queue it is handed is not an arbitrary list but the
--- `q` of a `concat-st` READ OUT OF THE NODE TABLE, which `capsOK?` bounds.
+-- `q` of a `flatten-st` READ OUT OF THE NODE TABLE, which `capsOK?` bounds.
 -- `innerReact-nodry` is the single site that performs the lookup, so the receipt
 -- is minted there once and projected per element afterwards (`VbB-head` for the
 -- element, `VbB-tail` for the recursive call).
 --
--- ⚠ THIS REPLACES `concatDrain-nodry-vb`, WHICH WAS REFUTABLE AS WRITTEN.  That
+-- ⚠ THIS REPLACES `flattenDrain-nodry-vb`, WHICH WAS REFUTABLE AS WRITTEN.  That
 -- statement concluded `VbB c sl Ψ J (o ∷ [])` for an ARBITRARY `o : Closed Γ s`
 -- from a hypothesis mentioning only `sched` and `st`, so it quantified over
 -- expressions far larger than `cSize c` — a conclusion needing information no
@@ -2287,20 +2228,20 @@ subscribeInner-nodry {e = e} c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc J g o
 -- consumer of capsOK?.  The second found those two and concluded the LENGTH had
 -- no source above it, guessing the bound would have to come from an arrival-
 -- ledger induction over the pushes.  Both were false, and for the same reason:
--- the reading stopped early.  `widNode`'s concat clause COUNTS the queue
+-- the reading stopped early.  `widNode`'s flatten clause COUNTS the queue
 -- outright.  Read the whole record before concluding a conjunct is unreachable.
 --
 -- Sealed per the budget-sufficient-spine rule; the `with` on the slots equation
 -- is why it is private-impl + abstract-alias rather than a plain block.
 private
-  concatNode-vb-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  flattenNode-vb-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
-    (q : List (Closed Γ s)) (act od : Bool)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
-    lookupNode allNid (EvalSt.nodes st) ≡ just (concat-st q act od) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (flatten-st lim act q od) →
     VbB c sl Ψ J q ≡ true
-  concatNode-vb-go {n = n} c sl Ψ J allNid q act od sched st ok eqN
+  flattenNode-vb-go {n = n} c sl Ψ J allNid lim act q od sched st ok eqN
     with proj₁ (proj₁ ok)
   ... | refl =
     let C   = frameStep J c
@@ -2325,14 +2266,14 @@ private
          nf
 
 abstract
-  concatNode-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  flattenNode-vb : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (Ψ J : ℕ) (allNid : NodeId)
-    (q : List (Closed Γ s)) (act od : Bool)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
     OKB {e = e} c sl Ψ J sched st →
-    lookupNode allNid (EvalSt.nodes st) ≡ just (concat-st q act od) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (flatten-st lim act q od) →
     VbB c sl Ψ J q ≡ true
-  concatNode-vb = concatNode-vb-go
+  flattenNode-vb = flattenNode-vb-go
 
 -- ─────────────────────────────────────────────────────────────────
 -- THE NODRY RESIDUE, NOW EMPTY.  `innerReact-nodry` / `thruOuter-nodry` are
@@ -2381,7 +2322,7 @@ abstract
 -- is REFUTED (Refuted.Thru-Loop): `switchKill` only ever DROPS.  It filters
 -- the registry through `cutThrough`, sweeps `live` against the survivors and
 -- grows `cancelled` — and `capsOK?` reads none of the last.  `thruConsume`'s
--- concat park GROWS a node's queue, which is what `capsOK?`'s width conjunct
+-- the flatten park GROWS a node's queue, which is what `capsOK?`'s width conjunct
 -- bounds, so there a post-state need not satisfy the invariant at the level
 -- its pre-state did.  Dropping cannot break an upper bound; appending can.
 
@@ -2430,12 +2371,12 @@ switchKill-context c sl Ψ J cur sched₀ st₀ ((slEq , cOK) , fcb) rp =
 -- `regP?-of-parts`.
 --
 -- THE LEVEL IS REPORTED AND NOT ASSUMED, for the reason the thru side's
--- same-level form was refuted (Refuted.Thru-Loop): concat's park clause GROWS
+-- same-level form was refuted (Refuted.Thru-Loop): the park clause GROWS
 -- the node's queue, and `capsOK?`'s width conjunct bounds that queue's length,
 -- so a step's post-state need not satisfy the invariant at the level its
 -- pre-state did.  `subscribeInner-caps` reports STRICTLY (`suc (j + j′) ≤ …`);
 -- one `n≤1+n` relaxes it to the form the drain's own descent consumes.
-concatDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+flattenDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (Ψ dep bud J : ℕ) (sf : Gas)
   (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (o : Closed Γ s) (q : List (Closed Γ s))
@@ -2449,16 +2390,16 @@ concatDrain-nodry-loop : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
   VbB c sl Ψ J (o ∷ q) ≡ true →
   nest o sl (EvalSt.connectedShares st₀) ≤ bud →
-  depthInner sf concatᵒ allNid κ id now o sched₀ st₀ ≤ dep →
+  depthInner sf flattenᵒ allNid κ id now o sched₀ st₀ ≤ dep →
   regP? (PbB c Ψ J) (EvalSt.registry st₀) ≡ true →
-  let r      = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
+  let r      = subscribeInner sf flattenᵒ allNid κ id now o sched₀ st₀
       sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
       st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
   in Σ ℕ (λ j′ →
           OKB {e = e} c sl Ψ (J + j′) sched₁ st₁
         × regP? (PbB c Ψ (J + j′)) (EvalSt.registry st₁) ≡ true
         × (J + j′ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (suc J)))
-concatDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
+flattenDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
                        2≤S 1≤R slC slSz ok pb sspLen vb nst hD rg =
   j′
   , ((slEq₁ , inv₁) , fc₁)
@@ -2475,14 +2416,14 @@ concatDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched�
                         (all (valCaps? (frameStep J c) sl (obs s)) q)
                         (valsOf (frameStep J c) sl (o ∷ q) vb-c))
   oΨ    = proj₁ (∧-true (valΨ? Ψ (obs s) o) (all (valΨ? Ψ (obs s)) q) vb-Ψ)
-  SI    = subscribeInner-caps c dep bud J sf concatᵒ allNid κ id now o sl sched₀ st₀
+  SI    = subscribeInner-caps c dep bud J sf flattenᵒ allNid κ id now o sl sched₀ st₀
             2≤S 1≤R slEq slC slSz inv oC pb-sz sspLen nst hD
   j′ = proj₁ SI ; inv₁ = proj₁ (proj₂ SI)
   lvl = proj₂ (proj₂ (proj₂ (proj₂ SI)))
-  SΨ    = subscribeInner-Ψ sl Ψ sf concatᵒ allNid κ id now o sched₀ st₀
+  SΨ    = subscribeInner-Ψ sl Ψ sf flattenᵒ allNid κ id now o sched₀ st₀
             slEq fc (regP?-Ψ c Ψ J (EvalSt.registry st₀) rg) oΨ pb-bΨ
   slEq₁ = proj₁ SΨ ; fc₁ = proj₁ (proj₂ SΨ) ; rg₁ = proj₁ (proj₂ (proj₂ SΨ))
-  r = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
+  r = subscribeInner sf flattenᵒ allNid κ id now o sched₀ st₀
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r))))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
 
@@ -2490,28 +2431,28 @@ concatDrain-nodry-loop {s = s} c sl Ψ dep bud J sf allNid κ id now o q sched�
 -- the connected set and `subscribeInner` only ever enlarges it, which is
 -- exactly what the share-ledger ring proves per step; `mList?-keeps` lifts it
 -- over the whole queue.  Nothing about the step's own element is needed.
-concatDrain-nodry-nestRec : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+flattenDrain-nodry-nestRec : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sl : Slots Γ) (bud : ℕ) (sf : Gas)
   (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (o : Closed Γ s) (q : List (Closed Γ s))
   (sched₀ : Sched Γ) (st₀ : EvalSt e) →
   mList? bud sl (EvalSt.connectedShares st₀) q ≡ true →
   let st₁ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-              (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))
+              (subscribeInner sf flattenᵒ allNid κ id now o sched₀ st₀)))))
   in mList? bud sl (EvalSt.connectedShares st₁) q ≡ true
-concatDrain-nodry-nestRec sl bud sf allNid κ id now o q sched₀ st₀ h =
+flattenDrain-nodry-nestRec sl bud sf allNid κ id now o q sched₀ st₀ h =
   mList?-keeps bud sl (EvalSt.connectedShares st₀)
     (EvalSt.connectedShares
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-        (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀)))))))
-    q (KeepsC.connMono (subscribeInner-keeps sf concatᵒ allNid κ id now o sched₀ st₀)) h
+        (subscribeInner sf flattenᵒ allNid κ id now o sched₀ st₀)))))))
+    q (KeepsC.connMono (subscribeInner-keeps sf flattenᵒ allNid κ id now o sched₀ st₀)) h
 
 ------------------------------------------------------------------
--- concatDrain-nodry — structural recursion over the concat queue.
+-- flattenDrain-nodry — structural recursion over the flatten queue.
 -- Applies subscribeInner-nodry at each element (THE FIT TEST).
 --
 -- slFc is taken as a direct parameter, threaded from module BurstWalk.
-concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+flattenDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (Ψ dep bud L̂ : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   Caps.cReg c ≤ Caps.cSize c →
@@ -2519,15 +2460,16 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   slotsSize sl ≤ Caps.cSize c →
   slotsFnCap sl ≤ Ψ →
   ∀ (J : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
-  (id : Id) (now : Tick) (q : List (Closed Γ s))
+  (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
   (sched : Sched Γ) (st : EvalSt e) →
   OKB {e = e} c sl Ψ J sched st →
   PbB c Ψ J κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep J c) →
-  -- THE QUEUE'S RECEIPT, minted once by `concatNode-vb` at the node lookup in
+  -- THE QUEUE'S RECEIPT, minted once by `flattenNode-vb` at the node lookup in
   -- `innerReact-nodry` and projected per element here.  A genuine
   -- precondition and not a convenience of the call site: the unconditional
-  -- per-element form (the retired `concatDrain-nodry-vb`) is refutable,
+  -- per-element form (the retired `flattenDrain-nodry-vb`, git history) is
+  -- refutable,
   -- because nothing ties a free `Closed Γ s` to this state.
   VbB c sl Ψ J q ≡ true →
   regP? (PbB c Ψ J) (EvalSt.registry st) ≡ true →
@@ -2535,9 +2477,9 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   depthDrain sf allNid κ id now q sched st ≤ dep →
   -- THE DRAIN'S THREE CHANNELS, and all three arrive from the caller — which
   -- is a RESTATEMENT and not a convenience.  The bud-and-ceiling pair used to
-  -- be manufactured out of `ok` alone by `concatDrain-nodry-nestBud`, and both
+  -- be manufactured out of `ok` alone by `flattenDrain-nodry-nestBud`, and both
   -- of its conjuncts are refutable that way
-  -- (`Refuted.Concat-Drain.concatDrain-nodry-nestBud-absurd`): a free
+  -- (`Refuted.Flatten-Drain.flattenDrain-nodry-nestBud-absurd`): a free
   -- `Closed Γ s` has no nest bound, and OKB relates a `c`-derived cap to
   -- `sizeCapAt e sl` not at all.  What the refutation also showed is that the
   -- two must be DECOUPLED — one conjunct wanted the bud large, the other small
@@ -2545,46 +2487,33 @@ concatDrain-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   -- meeting only through the proven Caps-Chain descents.
   --
   -- `sIterD … (length q) J` is the level this drain climbs to, one `sLvlD` per
-  -- queue element, which is exactly what the caps face's `concatDrain-caps`
+  -- queue element, which is exactly what the caps face's `flattenDrain-caps`
   -- (.Subscribe-Face) already measures the same drain against.
   mList? bud sl (EvalSt.connectedShares st) q ≡ true →
   Caps.cSize (frameStep L̂ c) ≤ sizeCapAt e sl (suc id) →
   sIterD (Caps.cSize c) (Caps.cWid c) dep (suc bud) (length q) J ≤ L̂ →
-  any dryEvent (proj₁ (proj₂ (concatDrain sf allNid κ id now q sched st))) ≡ false
+  any dryEvent (proj₁ (proj₂ (flattenDrain sf allNid κ id now lim act q sched st))) ≡ false
 
-concatDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  [] sched st _ _ _ _ _ _ _ _ _ _ = refl
+flattenDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
+                  lim act [] sched st _ _ _ _ _ _ _ _ _ _ = refl
 
-concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
-                  (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk hD nst clL̂ dsc
-  -- Scrutinise only `done` (4th component).  This preserves
-  -- `proj₁ (proj₂ (proj₂ (subscribeInner ...)))` (3rd component) in the goal
-  -- so that subscribeInner-nodry's return type matches directly.
-  with proj₁ (proj₂ (proj₂ (proj₂ (subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀))))
--- done=false: concatDrain returns the element's events; goal = subscribeInner-nodry's type
-... | false =
-  subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
-    J sf concatᵒ allNid κ id now o sched₀ st₀
-    ok pb sspLen (VbB-head c sl Ψ J o q vbq) rg
-    (mList?-head bud sl (EvalSt.connectedShares st₀) o q nst)
-    (≤-trans (m≤m⊔n _ _) hD)
-    (≤-trans (proj₁ (frameStep-mono-j c 2≤S
-                       (≤-trans (inner-desc (Caps.cSize c) (Caps.cWid c) dep bud J (sizeᵉ o) 2≤S
-                                   (nodry-elem-size c sl Ψ J o q 2≤S vbq))
-                                (≤-trans (walk-desc (Caps.cSize c) (Caps.cWid c) dep
-                                            (suc bud) (length q) J)
-                                         dsc))))
-              clL̂)
-    gk
--- done=true: concatDrain appends element events ++ tail events.
+flattenDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf allNid κ id now
+                  lim act (o ∷ q) sched₀ st₀ ok pb sspLen vbq rg gk hD nst clL̂ dsc
+  -- THE ONLY SCRUTINY IS THE GATE.  An inner that stays open no longer
+  -- ends the walk — it spends a lane — so `done` never branches the
+  -- drain, and is read only as the counter the tail is called at
+  with hasRoom lim act
+-- the gate is shut: the drain emits nothing at all
+... | false = refl
 --
 -- The head's outputs are LET-BOUND PROJECTIONS, never `with`-scrutinised —
 -- the same reason as `thruWalk-nodry`'s cons arm: abstracting the tuple
 -- rebinds `sched₁`/`st₁` as fresh variables while `ok₁`/`rg₁` keep mentioning
 -- a `proj… (subscribeInner …)` the abstraction never touched.
 ... | true =
-  let step   = subscribeInner sf concatᵒ allNid κ id now o sched₀ st₀
+  let step   = subscribeInner sf flattenᵒ allNid κ id now o sched₀ st₀
       bs     = proj₁ (proj₂ (proj₂ step))
+      done   = proj₁ (proj₂ (proj₂ (proj₂ step)))
       sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ step))))
       st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ step))))
       S      = Caps.cSize c
@@ -2602,10 +2531,10 @@ concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
                        (≤-trans (walk-desc S W dep (suc bud) (length q) J) dsc)
       hDo    = ≤-trans (m≤m⊔n _ _) hD
       h-head = subscribeInner-nodry c sl Ψ dep bud 2≤S 1≤R hCR slC slSz slFc
-                 J sf concatᵒ allNid κ id now o sched₀ st₀
+                 J sf flattenᵒ allNid κ id now o sched₀ st₀
                  ok pb sspLen (VbB-head c sl Ψ J o q vbq) rg nBst hDo
                  (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc₀)) clL̂) gk
-      loop   = concatDrain-nodry-loop c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
+      loop   = flattenDrain-nodry-loop c sl Ψ dep bud J sf allNid κ id now o q sched₀ st₀
                  2≤S 1≤R slC slSz ok pb sspLen vbq nBst hDo rg
       j₁     = proj₁ loop
       ok₁    = proj₁ (proj₂ loop)
@@ -2628,13 +2557,14 @@ concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
                                          (valsΨ? Ψ q) vbT)))
                        (proj₂ (∧-true (valsCaps? (frameStep J c) sl q)
                                       (valsΨ? Ψ q) vbT))
-      nst₁   = concatDrain-nodry-nestRec sl bud sf allNid κ id now o q sched₀ st₀ nstT
+      nst₁   = flattenDrain-nodry-nestRec sl bud sf allNid κ id now o q sched₀ st₀ nstT
       dsc₁   = ≤-trans (sIterD-mono (length q) (length q) dep dep (suc bud) (suc bud)
                           2≤S ≤-refl ≤-refl hj₁ ≤-refl ≤-refl ≤-refl)
                        (≤-trans (≤-reflexive (sym (sIterD-suc S W dep (suc bud) (length q) J)))
                                 dsc)
-      h-tail = concatDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc (J + j₁) sf
-                 allNid κ id now q sched₁ st₁ ok₁ pb₁ sspL₁ vb₁ rg₁ gk
+      h-tail = flattenDrain-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc (J + j₁) sf
+                 allNid κ id now lim (if done then act else suc act)
+                 q sched₁ st₁ ok₁ pb₁ sspL₁ vb₁ rg₁ gk
                  (≤-trans (m≤n⊔m _ _) hD) nst₁ clL̂ dsc₁
   in any-dry-++ bs _ h-head h-tail
 
@@ -2642,8 +2572,8 @@ concatDrain-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf
 -- the step LANDS at, with that level reported.
 --
 --
--- WHY.  Concat's park clause is a pure GROWTH step: with the node's
--- inner already active, `thruConsume` appends the element to the node's
+-- WHY.  The park clause is a pure GROWTH step: with the node's lanes
+-- all taken, `thruConsume` appends the element to the node's
 -- queue and emits nothing — which is exactly why the nodry conclusion
 -- is `refl` there, and why nothing else in this block notices.  And
 -- `capsOK?`'s width conjunct bounds that queue's LENGTH
@@ -2794,7 +2724,7 @@ thruConsume-nodry : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
 -- DELIBERATELY ABSENT: the body derives both element-level facts from
 -- `ok` via thruConsume-nodry-dep / -nestBud, so neither was ever an
 -- ingredient.  Carrying them was not merely redundant — `depthFrame`
--- unfolds through `thruConsume`, so in the concat/exhaust arms (whose
+-- unfolds through `thruConsume`, so in the flatten/exhaust arms (whose
 -- clauses sit under a `with` on `lookupNode`) the premise's type is
 -- stated against the ABSTRACTED scrutinee while the caller's `hD` is
 -- stated against the unabstracted one, and the two are compared at
@@ -2819,7 +2749,7 @@ thruConsume-nodry-apply : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
   depthInner sf op nid κ id now o sched st ≤ dep →
   -- THE CEILING, threaded rather than conjured, and now at an abstract
   -- level: the *-nestBud form that manufactured a bud AND a ceiling out of
-  -- `ok` alone was refutable in both halves (Refuted.Concat-Drain), so both
+  -- `ok` alone was refutable in both halves (`Refuted.Flatten-Drain`), so both
   -- arrive from the caller and the level descent does the rest.
   nest o sl (EvalSt.connectedShares st) ≤ bud →
   Caps.cSize (frameStep L̂ c) ≤ sizeCapAt e sl (suc id) →
@@ -2831,46 +2761,35 @@ thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf o
     ok pb sspLen (VbB-head c sl Ψ J o os vb) rg nBst hD-elem
     (≤-trans (proj₁ (frameStep-mono-j c 2≤S dsc)) clL̂) gk
 
--- MERGE: one subscribeInner call, events = bs
-thruConsume-nodry c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc =
-  thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf mergeᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
-    (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc
-
--- CONCAT: dispatch on node state
+-- FLATTEN: dispatch on node state.
 -- The scrutinee and the clause ORDER both mirror Rx.Evaluator's own
 -- `with w ≟ᵗ u` exactly.  Writing `w ≟ᵗ _` here does not abstract the
 -- goal's occurrence (the metavariable is not syntactically the
 -- evaluator's `u`), leaving the with-function stuck and `refl` red.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
   with lookupNode nid (EvalSt.nodes st)
--- concat active=true + type match: parks the element, emits []
-... | just (concat-st {w} q true od) with w ≟ᵗ u
-...   | yes refl = refl
-...   | no _    = refl
--- concat active=false: subscribes, emits bs.  The `{u = u}` binder is
--- repeated on every full-LHS clause of this with-block: the nested
--- `with` above forces the repeats, and an LHS that omits it does not
--- line up with the first clause, leaving the goal's `thruConsume`
--- stuck on its own `lookupNode` with-scrutinee.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
-    | just (concat-st q false od) =
-  thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
+... | just (flatten-st {w} lim act q od) with w ≟ᵗ u
+...   | no _     = refl
+...   | yes refl with hasRoom lim act
+-- a lane is free: one subscribeInner call, events = bs
+...     | true  =
+  thruConsume-nodry-apply c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk
     (≤-trans (m≤m⊔n _ _) hD) nBst clL̂ dsc
+-- the gate is shut: the element is parked and nothing is emitted
+...     | false = refl
 -- other node shapes: thruConsume's own catch-all emits [].  These are
 -- enumerated rather than written `| _`, because a VARIABLE scrutinee
 -- leaves the evaluator's with-function stuck — its catch-all only fires
--- once Agda knows the shape is none of the concat cases.
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+-- once Agda knows the shape is none of the flatten cases.
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
     | nothing = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
     | just (scan-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
     | just (take-st _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
-    | just (merge-st _ _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
     | just (switch-st _ _) = refl
-thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf concatᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
+thruConsume-nodry {u = u} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf flattenᵒ nid κ id now o os sched st ok pb sspLen vb rg gk hD nBst clL̂ dsc
     | just (exhaust-st _ _) = refl
 
 -- SWITCH: switchKill (closes only, nodry by switchKill-closes-nodry)
@@ -3021,8 +2940,9 @@ thruWalk-nodry {e = e} c sl Ψ dep bud L̂ 2≤S 1≤R hCR slC slSz slFc J sf op
                 h-head h-tail
 
 ------------------------------------------------------------------
--- innerReact-nodry — from-inner frame; real body applying concatDrain-nodry.
--- All arms except concatᵒ + (just (concat-st q act od)) + yes refl emit [].
+-- innerReact-nodry — from-inner frame; real body applying flattenDrain-nodry.
+-- All arms except flattenᵒ + (just (flatten-st lim act q od)) + yes refl
+-- emit [].
 innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (Ψ d : ℕ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
@@ -3049,7 +2969,7 @@ innerReact-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 
 -- switch's innerFinish arm, lifted OUT of innerReact-nodry.  Agda cannot
 -- return to an outer `with` level with `...` once a nested `with` has been
--- opened, so innerReact-nodry is allowed exactly ONE nested `with` (concat's
+-- opened, so innerReact-nodry is allowed exactly ONE nested `with` (flatten's
 -- `w ≟ᵗ s`) and it must be the LAST clause.  switch's `c₀ ≡ᵇ inst` test lives
 -- here instead; both of its branches emit [].
 innerFinish-switch-nodry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
@@ -3078,27 +2998,18 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
 -- `| _`.  innerFinish's own catch-all clause only fires once Agda can
 -- rule out its four specific (op, node) clauses, which a variable
 -- scrutinee never does — it stays stuck and `refl` is red.
--- `in eqN` CAPTURES THE LOOKUP EQUATION, which is what `concatNode-vb` needs
--- in the concat arm below and what a plain `with` discards.  It costs no
+-- `in eqN` CAPTURES THE LOOKUP EQUATION, which is what `flattenNode-vb` needs
+-- in the flatten arm below and what a plain `with` discards.  It costs no
 -- clause changes anywhere in this 30-arm block: `in` NAMES the proof, it does
 -- not add a pattern position — nor a `with` nesting level, which this
 -- function has no room for (see the note above).
 ...   | false with op | lookupNode allNid (EvalSt.nodes st) in eqN
--- MERGE: innerFinish emits []
-...     | mergeᵒ  | just (merge-st k od)          = refl
-...     | mergeᵒ  | nothing                       = refl
-...     | mergeᵒ  | just (scan-st _)              = refl
-...     | mergeᵒ  | just (take-st _)              = refl
-...     | mergeᵒ  | just (concat-st _ _ _)        = refl
-...     | mergeᵒ  | just (switch-st _ _)          = refl
-...     | mergeᵒ  | just (exhaust-st _ _)         = refl
--- CONCAT: every arm EXCEPT the type-matching one emits []
-...     | concatᵒ | nothing                       = refl
-...     | concatᵒ | just (scan-st _)              = refl
-...     | concatᵒ | just (take-st _)              = refl
-...     | concatᵒ | just (merge-st _ _)           = refl
-...     | concatᵒ | just (switch-st _ _)          = refl
-...     | concatᵒ | just (exhaust-st _ _)         = refl
+-- FLATTEN: every arm EXCEPT the type-matching one emits []
+...     | flattenᵒ | nothing                      = refl
+...     | flattenᵒ | just (scan-st _)             = refl
+...     | flattenᵒ | just (take-st _)             = refl
+...     | flattenᵒ | just (switch-st _ _)         = refl
+...     | flattenᵒ | just (exhaust-st _ _)        = refl
 -- SWITCH: innerFinish emits []
 ...     | switchᵒ | just (switch-st (just c₀) od) =
             innerFinish-switch-nodry sf allNid inst c₀ path′ id now vals od sched st
@@ -3115,11 +3026,11 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
 ...     | exhaustᵒ | just (take-st _)             = refl
 ...     | exhaustᵒ | just (flatten-st _ _ _ _)          = refl
 ...     | exhaustᵒ | just (switch-st _ _)         = refl
--- CONCAT, type-matching: THE ONLY arm that calls concatDrain →
+-- FLATTEN, type-matching: THE ONLY arm that calls flattenDrain →
 -- subscribeInner, and so the only one where subscribeInner-nodry is
 -- APPLIED.  It opens the function's single nested `with` and therefore
 -- must be the LAST clause — nothing may follow it.
-...     | concatᵒ | just (concat-st {w} q act od) with w ≟ᵗ s
+...     | flattenᵒ | just (flatten-st {w} lim act q od) with w ≟ᵗ s
 ...       | no _    = refl
 ...       | yes refl =
               let -- Strip the from-inner frame from pb to get PbB for path′.
@@ -3140,7 +3051,7 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
                   sspLen  = pathSz?-len (Caps.cSize (frameStep J c)) (from-inner op allNid inst ↠ path′) pb-sz
                   S       = Caps.cSize c
                   W       = Caps.cWid  c
-                  vbq     = concatNode-vb c sl Ψ J allNid q act od sched st ok eqN
+                  vbq     = flattenNode-vb c sl Ψ J allNid lim act q od sched st ok eqN
                   vbq-c   = proj₁ (∧-true (valsCaps? (frameStep J c) sl q)
                                           (valsΨ? Ψ q) vbq)
                   -- THE DRAIN'S BUD IS THE FRAME'S REFRESH, exactly as at the
@@ -3163,9 +3074,9 @@ innerReact-nodry c sl Ψ d 2≤S 1≤R hCR slC slSz slFc J {s} sf id now op allN
               -- `fLvlD S W (suc d′) J` IS an `sIterD` at `d′`.  Relaxing the
               -- `suc` away instead (the earlier `n≤1+n`) left the drain at the
               -- frame's own fuel and made the room conjunct unprovable.
-              in concatDrain-nodry c sl Ψ (pred d) (sizeAt S (suc J)) (fLvlD S W d J)
+              in flattenDrain-nodry c sl Ψ (pred d) (sizeAt S (suc J)) (fLvlD S W d J)
                    2≤S 1≤R hCR slC slSz slFc J sf allNid path′ id now
-                   q sched st ok pb′ sspLen vbq rg gk
+                   lim (pred act) q sched st ok pb′ sspLen vbq rg gk
                    (fuel-pred hD) nst cl
                    (frame-room S W d (length q) J 2≤S (≤-trans (s≤s z≤n) hD)
                       (valsLen (frameStep J c) sl q vbq-c))

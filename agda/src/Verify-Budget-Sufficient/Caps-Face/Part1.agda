@@ -115,18 +115,17 @@ open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete;
-  Gas; Timed; after_,_; hot; cold)
+open import Rx.Prim      using (Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete; Timed;
+  after_,_; hot; cold)
 open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
   ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
 open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; flatten-st;
-  switch-st; exhaust-st; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f;
-  from-inner; thru-outer; Stream; Path; subscribeInner; flattenᵒ; flattenDrain; hasRoom; sizeStep;
-  iterSize; foldStep; iterFold)
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; flatten-st; switch-st;
+  exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
+  Stream; Path; sizeStep; iterSize; foldStep; iterFold)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -979,28 +978,6 @@ widNode-push {n = n} c L sl lim q o act od hS hq ho
            (≤⇒≤ᵇ (≤-trans (≤-reflexive (trans (length-++ q) (+-comm (length q) 1)))
                           (≤-trans (s≤s (≤ᵇ⇒≤ (length q) W (T-to hlen)))
                                    (wid-suc-step c L hS))))
-
--- AND THE DRAIN ONLY EVER SHORTENS, which is the row that reinstalls
--- the residue.  `flattenDrain` returns `[]` when it runs the queue out,
--- the recursive residue while lanes remain free, and the QUEUE IT WAS
--- GIVEN when the capacity gate shuts — never anything longer than that,
--- so the cardinality conjunct survives the reinstall by widening alone
-flattenDrain-qlen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-  (lim : Maybe ℕ) (act : ℕ)
-  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-  length (proj₁ (proj₂ (proj₂ (proj₂ (flattenDrain g allNid κ id now lim act q sched st)))))
-    ≤ length q
-flattenDrain-qlen g allNid κ id now lim act []      sched st = z≤n
-flattenDrain-qlen g allNid κ id now lim act (o ∷ q) sched st
-  with hasRoom lim act
-... | false = ≤-refl
-... | true  with subscribeInner g flattenᵒ allNid κ id now o sched st
-...   | _ , vs , bs , done , sched₁ , st₁ =
-      ≤-trans (flattenDrain-qlen g allNid κ id now lim
-                 (if done then act else suc act) q sched₁ st₁)
-              (n≤1+n (length q))
-
 
 -- and iterFold is monotone in the SEED as well as in the count
 foldStep-mono-w : ∀ (S : ℕ) {w w′ : ℕ} → 2 ≤ S → w ≤ w′ →

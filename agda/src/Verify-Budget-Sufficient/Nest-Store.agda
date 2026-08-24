@@ -2,7 +2,7 @@
 -- WHERE A RUN'S NESTING IS ACTUALLY HELD, and it is not in the subject.
 -- Four places, each of which can hand the sweep an observable the
 -- program's syntax never mentioned: a shared slot's definition, a
--- concatAll's queue, a scan's accumulator, and a live source's pending
+-- flatten's queue, a scan's accumulator, and a live source's pending
 -- list.  `storeNestMax` is their MAX, because the sweep enters them one
 -- at a time and each from its own frame.
 --

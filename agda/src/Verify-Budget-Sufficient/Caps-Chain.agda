@@ -65,30 +65,24 @@ open import Verify-Budget-Sufficient.Caps
          fLvlD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl;
          sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
 -- the payload edge's three rungs are lifted with +1-superadditivity, the
--- only place outside `walk-step-suc` that needs to move a report to a
--- HIGHER entry level rather than to a wider transformer
+-- only place that needs to move a report to a HIGHER entry level rather
+-- than to a wider transformer
 open import Verify-Budget-Sufficient.Caps-Sadd using (opIterD-sadd; sIterD-sadd)
 
 ------------------------------------------------------------------
 -- § 1.  THE FIVE CLAUSE SHAPES.
 ------------------------------------------------------------------
 
--- ONE PAYLOAD of a thruWalk / flattenDrain: the head subscribes an inner
--- under one more frame (`subscribeInner-caps` recurses at `suc j`), and
--- the tail is the walk's own IH at the level the head left
-walk-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
-  j + j₁ ≤ sLvlD S W d k (suc j) →
-  (j + j₁) + j₂ ≤ sIterD S W d k m (j + j₁) →
-  j + (j₁ + j₂) ≤ sIterD S W d k (suc m) j
-walk-step S W d k m j j₁ j₂ 2≤S hd tl =
-  ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (+-assoc j j₁ j₂))) tl)
-                   (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl hd ≤-refl ≤-refl ≤-refl))
-          (≤-reflexive (sym (sIterD-suc S W d k m j)))
-
 -- and an empty payload list leaves the level where it found it
 walk-nil : ∀ (S W d k j : ℕ) → j + 0 ≤ sIterD S W d k 0 j
 walk-nil S W d k j =
   ≤-trans (≤-reflexive (+-identityʳ j)) (≤-reflexive (sym (sIterD-0 S W d k j)))
+
+-- and a drain whose gate is shut runs nothing, at whatever length the
+-- queue it declined to touch happens to have
+walk-none : ∀ (S W d k m j : ℕ) → j + 0 ≤ sIterD S W d k m j
+walk-none S W d k m j =
+  ≤-trans (≤-reflexive (+-identityʳ j)) (sIterD-infl S W d k m j)
 
 -- a dry payload subscribe, which does not move the level either
 inner-nil : ∀ (S W d k j : ℕ) → suc (j + 0) ≤ sLvlD S W d k (suc j)
@@ -101,7 +95,7 @@ leaf-lvl : ∀ (S W d k m j : ℕ) → j + 0 ≤ opIterD S W d k m j
 leaf-lvl S W d k m j =
   ≤-trans (≤-reflexive (+-identityʳ j)) (opIterD-infl S W d k m j)
 
--- ONE EMIT of a pushBurst, and it is the fIterD twin of `walk-step`:
+-- ONE EMIT of a pushBurst, and it is the fIterD twin of `walk-step-suc`:
 -- the emit is stepped through the ONE frame just built (`stepFrame-caps`,
 -- which reports the level that frame LEAVES) and the rest of the burst
 -- runs from there.  The gate had no fIterD row at all — .Caps-Face's pass
@@ -415,8 +409,8 @@ burst-index S W d k m j J 2≤S hm =
 -- `suc (head + source)` (Rx.Exp), so ONE lemma covers the whole
 -- family: `hd := sizeᵗ f` for map and take, `hd := sizeᵗ f + sizeᵗ z`
 -- for scan (`+` associates left, so its head being a sum costs no
--- rewrite), and `hd := 0` for the headless six (mergeAll, concatAll,
--- switchAll, exhaustAll, μ, defer), where `0 + src` reduces to `src`
+-- rewrite), and `hd := 0` for the headless five (flatten, switchAll,
+-- exhaustAll, μ, defer), where `0 + src` reduces to `src`
 -- definitionally and the lemma degenerates to `≤-pred`.
 --
 -- The zero case needs nothing at all: `suc x ≤ zero` is uninhabited by
@@ -577,19 +571,6 @@ frame-recv S W (suc d) j j₀ h =
                    (sIterD-infl S W d (suc (sizeAt S (suc j)))
                                 (suc (widAt S W j)) (fLvl S W j)))
           (≤-reflexive (sym (fLvlD-suc S W d j)))
-
--- THE LAST PAYLOAD of a walk, where the queue behind it is bounded by
--- inflation rather than by a recursive report.  `walk-step` at `j₂ := 0`,
--- with the `j₁ + 0` its conclusion carries absorbed here once instead of
--- at the clause
-walk-last : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S →
-  j + j₁ ≤ sLvlD S W d k (suc j) →
-  j + j₁ ≤ sIterD S W d k (suc m) j
-walk-last S W d k m j j₁ 2≤S hd =
-  ≤-trans (≤-reflexive (cong (j +_) (sym (+-identityʳ j₁))))
-          (walk-step S W d k m j j₁ 0 2≤S hd
-            (≤-trans (≤-reflexive (+-identityʳ (j + j₁)))
-                     (sIterD-infl S W d k m (j + j₁))))
 
 -- AND A WALK THAT HAS NOT SPENT ITS WHOLE PAYLOAD ALLOWANCE HAS ONE
 -- LEVEL IN HAND — which is what the concat FINISH needs and the

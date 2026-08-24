@@ -3,7 +3,7 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; suc; pred; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; suc; _+_; _*_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
   *-mono-≤; +-monoʳ-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
@@ -34,10 +34,9 @@ open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
   storeNest-latch; realWidAt; nestSyn)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; merge-st;
-  concat-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; flatten-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
   scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
-  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeᵒ; concatᵒ;
+  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; flattenᵒ;
   switchᵒ; exhaustᵒ; thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade;
   sameSource; regAt; iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
@@ -89,7 +88,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 -- arithmetic lemmas consumed by thruOuter-face-core's walk helpers
 
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
-  (innerFinish-concat-face; innerFinish-face-keep; thruOuter-face-core)
+  (innerFinish-flatten-face; innerFinish-face-keep; thruOuter-face-core)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; evalTm-iterSize; eventCaps?; frameSz?; iterSize-+;
    iterSize-2^; iterSize-mono-s; n≤capsAt-size; pathSz?; pathSz?-widen;
@@ -167,8 +166,8 @@ thruOuter-face siC =
     (λ {n} {Γ} {t} {e} → shareGo-cons-N {n} {Γ} {t} {e})
     (λ {n} {Γ} {t} {e} → shareFinish-len {n} {Γ} {t} {e})
 
--- the *All FINISH, face side.  Three of the four ops are the keep
--- above under one node write; concatAll's is the drain, now landed
+-- the *All FINISH, face side.  Two of the three ops are the keep
+-- above under one node write; flatten's is the drain, now landed
 innerFinish-face :
   (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
@@ -214,30 +213,15 @@ innerFinish-face :
   FrameFace c d j sl (innerFinish g op allNid inst κ id now vals sched st
                         (lookupNode allNid (EvalSt.nodes st)))
 
--- MERGE: decrement the active-inner counter, which carries no payload.
--- `depthFin`'s only non-zero head is concatᵒ + `concat-st`, so on this op
--- the measure is 0 whatever the node read returns — no stuck premise
-innerFinish-face _ c d j g mergeᵒ allNid inst κ id now vals sl sched st
-                 2≤S 1≤R slEq slC inv pC lC vC _ _
-  with lookupNode allNid (EvalSt.nodes st)
-... | just (merge-st k od) =
-  innerFinish-face-keep c d j sl vals (od ∧ (pred k ≡ᵇ 0)) sched
-    (record st { nodes = setNode allNid (merge-st (pred k) od) (EvalSt.nodes st) })
-    (capsOK?-setNode (frameStep j c) allNid (merge-st (pred k) od)
-       sched st refl refl inv)
-    vC
-... | nothing                = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (scan-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (take-st _)       = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (concat-st _ _ _) = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (switch-st _ _)   = innerFinish-face-keep c d j sl vals false sched st inv vC
-... | just (exhaust-st _ _)  = innerFinish-face-keep c d j sl vals false sched st inv vC
-
--- CONCAT: the queue drain, and the one clause of the whole *All face
--- that appends a burst it did not already have
-innerFinish-face ifc c d j g concatᵒ allNid inst κ id now vals sl sched st
+-- FLATTEN: the queue drain, and the one clause of the whole *All face
+-- that appends a burst it did not already have.  THE UNBOUNDED LIMIT
+-- IS NO LONGER A CLAUSE OF ITS OWN: it parks nothing, so its queue is
+-- empty and the drain degenerates to the counter decrement the merge
+-- face used to state separately — one obligation now covers both, and
+-- the bounded limit between them that neither old face could express
+innerFinish-face ifc c d j g flattenᵒ allNid inst κ id now vals sl sched st
                  2≤S 1≤R slEq slC inv pC lC vC slSz hD =
-  innerFinish-concat-face ifc c d j g allNid inst κ id now vals sl sched st
+  innerFinish-flatten-face ifc c d j g allNid inst κ id now vals sl sched st
     2≤S 1≤R slEq slC inv pC lC vC slSz hD
 
 -- SWITCH: clear the current-inner slot if this was it
@@ -1322,7 +1306,7 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- delivery walks an already-registered chain, so the tempting reading is
 -- that it deepens by one operator's worth and the sum over chains is
 -- `length chains` single `nestSyn`s.  Both halves of that reading are
--- false, and the mechanism is one arc: concat's DRAIN spends a nesting
+-- false, and the mechanism is one arc: flatten's DRAIN spends a nesting
 -- level through `depthFinC`, and it is reached through a `from-inner`
 -- frame, which `pathNestD` charges nothing for.  Every other level this
 -- family spends is paid by a path term -- `pathNestD` charges the

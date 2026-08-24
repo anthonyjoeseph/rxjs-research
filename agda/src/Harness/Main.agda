@@ -593,7 +593,7 @@ depthWideRow ds ks j ww w =
 -- measure charges nothing for.  So on the accounting the drain's level
 -- has to come out of the single `nestSyn`, and whether that is enough is
 -- not something reading the definitions settles.  `progU` is the
--- concatAll family — three inners queued behind one — so its root
+-- limit-1 flatten family — three inners queued behind one — so its root
 -- subscribe is where the drain actually fires.
 depthConcatRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthConcatRow ds ks j d k =

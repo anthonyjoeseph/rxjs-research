@@ -13,10 +13,14 @@
 -- one instant and stop on a count rather than on a flag, and that is
 -- the only place a proof about the old two faces does not transfer.
 --
--- These are the facts the two verification trees will draw on.  They
--- are stated here rather than at their consumers because both
--- consumers need them and neither can import the other, which is the
--- lowest-module rule `make dup-check` exists to enforce.
+-- These are the facts the two verification trees draw on.  They are
+-- stated here rather than at their consumers because both consumers
+-- need them and neither can import the other, which is the
+-- lowest-module rule `make dup-check` exists to enforce.  Three of the
+-- four turn out to be structural rather than semantic: the drain
+-- scrutinises the GATE and nothing else, so shrinkage, saturation and
+-- the lane bound all fall out of the same walk, and the queue bound the
+-- caps face had proven under its own name is one of them.
 --
 -- WHAT IS DELIBERATELY NOT HERE.  A bound on the QUEUE's length.  A
 -- parked inner is retained state that no width measure reads, which
@@ -28,19 +32,21 @@
 -- ══════════════════════════════════════════════════════════════════
 module Rx.Flatten-Laws where
 
-open import Data.Bool  using (Bool; true; false)
+open import Data.Bool  using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥)
-open import Data.List  using (List; []; length)
+open import Data.List  using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat   using (ℕ; _≤_; _≤ᵇ_)
-open import Data.Product using (proj₁; proj₂)
-open import Data.Sum   using (_⊎_)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; z≤n)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n)
+open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Sum   using (_⊎_; inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; Id; Tick)
 open import Rx.Exp  using (Ctx; Closed; obs; Val)
 open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; Sched;
-  flatten-st; flattenDrain; flattenᵒ; hasRoom; lookupNode; thruConsume)
+  flatten-st; flattenDrain; flattenᵒ; hasRoom; lookupNode; subscribeInner;
+  thruConsume)
 
 -- `hasRoom` says a lane is FREE; this says the count is LEGAL.  They
 -- are not negations of each other at the boundary — at `just m` with
@@ -59,68 +65,88 @@ emptyQueue? : ∀ {n} {Γ : Ctx n} → Maybe (NodeState Γ) → Set
 emptyQueue? (just (flatten-st lim act q od)) = q ≡ []
 emptyQueue? _                                = ⊥
 
+-- A FREE LANE MAKES THE NEXT COUNT LEGAL, and that is the whole
+-- content of the two predicates being different: `hasRoom` is `<`
+-- against the limit and `withinLimit` is `≤`, so the step from one to
+-- the other is where the bump is paid for
+room⇒legal : ∀ (lim : Maybe ℕ) (act : ℕ) →
+  hasRoom lim act ≡ true → withinLimit lim (suc act) ≡ true
+room⇒legal nothing  act h = refl
+room⇒legal (just m) act h = h
+
+-- THE DRAIN GATE, stated and walked.  A drain stops for exactly one of
+-- two reasons and never for a third: it ran out of parked inners, or it
+-- ran out of lanes.  Every completion argument downstream reads this —
+-- `thruWrap` and `innerFinish` both report done on
+-- `active ≡ 0 ∧ null queue`, and without saturation a flatten could
+-- report not-done while holding a queue nothing will ever drain
+drain-saturates :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+    (sched : Sched Γ) (st : EvalSt e) →
+  let r    = flattenDrain g allNid κ id now lim act q sched st
+      act′ = proj₁ (proj₂ (proj₂ r))
+      q′   = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  in (q′ ≡ []) ⊎ (hasRoom lim act′ ≡ false)
+drain-saturates g allNid κ id now lim act []      sched st = inj₁ refl
+drain-saturates g allNid κ id now lim act (o ∷ q) sched st
+  with hasRoom lim act in eq
+... | false = inj₂ eq
+... | true  with subscribeInner g flattenᵒ allNid κ id now o sched st
+...   | _ , vs , bs , done , sched₁ , st₁ =
+      drain-saturates g allNid κ id now lim
+        (if done then act else suc act) q sched₁ st₁
+
+-- THE LANE BOUND.  A legal count stays legal across a drain.  This is
+-- what makes the limit MEAN anything: without it, `flattenᵉ (just 2)`
+-- is a merge with a decoration.  It is also the conjunct that pins the
+-- drain's Σ-shaped receipts — `act′` is otherwise upward-closed in
+-- every statement that mentions it, which is the vacuity shape
+drain-within-limit :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+    (sched : Sched Γ) (st : EvalSt e) →
+  withinLimit lim act ≡ true →
+  let r    = flattenDrain g allNid κ id now lim act q sched st
+      act′ = proj₁ (proj₂ (proj₂ r))
+  in withinLimit lim act′ ≡ true
+drain-within-limit g allNid κ id now lim act []      sched st h = h
+drain-within-limit g allNid κ id now lim act (o ∷ q) sched st h
+  with hasRoom lim act in eq
+... | false = h
+... | true  with subscribeInner g flattenᵒ allNid κ id now o sched st
+...   | _ , vs , bs , false , sched₁ , st₁ =
+      drain-within-limit g allNid κ id now lim (suc act) q sched₁ st₁
+        (room⇒legal lim act eq)
+...   | _ , vs , bs , true  , sched₁ , st₁ =
+      drain-within-limit g allNid κ id now lim act q sched₁ st₁ h
+
 postulate
-
-  -- THE DRAIN GATE, stated.  A drain stops for exactly one of two
-  -- reasons and never for a third: it ran out of parked inners, or it
-  -- ran out of lanes.  Every completion argument downstream reads this
-  -- — `thruWrap` and `innerFinish` both report done on
-  -- `active ≡ 0 ∧ null queue`, and without saturation a flatten could
-  -- report not-done while holding a queue nothing will ever drain.
-  -- The concat face got this for free: at limit 1 the two disjuncts
-  -- are the loop's own two exits, so nobody had to name it
-  drain-saturates :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-      (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-      (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
-      (sched : Sched Γ) (st : EvalSt e) →
-    let r    = flattenDrain g allNid κ id now lim act q sched st
-        act′ = proj₁ (proj₂ (proj₂ r))
-        q′   = proj₁ (proj₂ (proj₂ (proj₂ r)))
-    in (q′ ≡ []) ⊎ (hasRoom lim act′ ≡ false)
-
-  -- THE LANE BOUND.  A legal count stays legal across a drain.  This is
-  -- what makes the limit MEAN anything: without it, `flattenᵉ (just 2)`
-  -- is a merge with a decoration.  It is also the conjunct that pins
-  -- the drain's Σ-shaped receipts — `act′` is otherwise upward-closed
-  -- in every statement that mentions it, which is the vacuity shape.
-  -- At `just 1` this specialises to concat's `innerActive` boolean,
-  -- which is what transports the well-formed tree's concat clauses
-  drain-within-limit :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-      (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-      (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
-      (sched : Sched Γ) (st : EvalSt e) →
-    withinLimit lim act ≡ true →
-    let r    = flattenDrain g allNid κ id now lim act q sched st
-        act′ = proj₁ (proj₂ (proj₂ r))
-    in withinLimit lim act′ ≡ true
-
-  -- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain
-  -- never lengthens the queue.  Anything the budget tree already proves
-  -- by walking concat's queue is stated over its LENGTH, and at limit 1
-  -- this reduces to the suffix fact the capacity-one drain had structurally.
-  -- Above 1 it does not — the loop shifts several elements in one
-  -- instant — so the fact has to be claimed rather than read off the
-  -- recursion
-  drain-queue-shrinks :
-    ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-      (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-      (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
-      (sched : Sched Γ) (st : EvalSt e) →
-    let r  = flattenDrain g allNid κ id now lim act q sched st
-        q′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
-    in length q′ ≤ length q
 
   -- CONSERVATIVITY AT INFINITY.  At `nothing` the queue is dead: every
   -- arriving inner is subscribed on the spot, so a node that starts
-  -- with an empty queue keeps one forever.  This is what transports the
-  -- whole merge face — every proof there was written against a state
-  -- with no queue at all, and this says the field it now carries is
-  -- never populated.  Note the shape: the hypothesis is a LOOKUP and
-  -- not a `flatten-st` pattern, because the caller holds a node table
-  -- and not a state, and threading the table is what made the merge
-  -- face's clauses read the way they do
+  -- with an empty queue keeps one forever.  Note the shape: the
+  -- hypothesis is a LOOKUP and not a `flatten-st` pattern, because the
+  -- caller holds a node table and not a state.
+  --
+  -- IT IS THE ONE OF THE FOUR THAT IS NOT LOCAL, and that is why it is
+  -- the tier's SHAPE row rather than a walk like its siblings.  The
+  -- `nothing` gate is open, so the consume subscribes and the queue it
+  -- must report on is the one in the state the INNER left — and the
+  -- inner's synchronous burst can route back through this very node.
+  -- Nothing about that re-entry is bounded by this statement's
+  -- hypotheses, so a proof of it is a clause of an induction over the
+  -- evaluator and not a fact about `thruConsume`.
+  --
+  -- DEAD ROUTE: it was minted to transport the merge face, and the
+  --   transport did not need it — every proof written against a queueless
+  --   merge state migrated to `flattenᵉ` by taking the CONCAT clause as the
+  --   general one, which reasons about the queue rather than assuming it
+  --   away.  So its consumer is not the budget tree; the nameable one is the
+  --   well-formed tree's flatten clause, which reads a node's completion off
+  --   `active ≡ 0 ∧ null queue`.
   unbounded-never-parks :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       (g : Gas) (nid : NodeId) (κ : Path Γ u t) (id : Id) (now : Tick)
@@ -130,3 +156,30 @@ postulate
     let r   = thruConsume g flattenᵒ nid κ id now o sched st
         st′ = proj₂ (proj₂ (proj₂ r))
     in emptyQueue? (lookupNode nid (EvalSt.nodes st′))
+
+-- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain
+-- never lengthens the queue.  `flattenDrain` returns `[]` when it runs
+-- the queue out, the recursive residue while lanes remain free, and the
+-- QUEUE IT WAS GIVEN when the capacity gate shuts — never anything
+-- longer than that, so a cardinality conjunct survives a reinstall by
+-- widening alone.  The claim was drafted as a postulate on the reading
+-- that above limit 1 the loop shifts several elements per instant and
+-- so could not be read off the recursion; it can, because the gate and
+-- not the lane count is what the recursion scrutinises
+drain-queue-shrinks :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+    (sched : Sched Γ) (st : EvalSt e) →
+  let r  = flattenDrain g allNid κ id now lim act q sched st
+      q′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  in length q′ ≤ length q
+drain-queue-shrinks g allNid κ id now lim act []      sched st = z≤n
+drain-queue-shrinks g allNid κ id now lim act (o ∷ q) sched st
+  with hasRoom lim act
+... | false = ≤-refl
+... | true  with subscribeInner g flattenᵒ allNid κ id now o sched st
+...   | _ , vs , bs , done , sched₁ , st₁ =
+      ≤-trans (drain-queue-shrinks g allNid κ id now lim
+                 (if done then act else suc act) q sched₁ st₁)
+              (n≤1+n (length q))

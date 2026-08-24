@@ -31,8 +31,8 @@ open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; Timed; after_,_)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; Ctx; Closed; Val; sizeᵗ; sizeᵛ; Fn;
   applyFn)
 open import Rx.Frame-Width using (pWᵛ; dWᵛ; outWᵛ)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; resolve; scanVals; NodeState; scan-st; take-st; merge-st;
-  concat-st; switch-st; exhaust-st; lookupNode; NodeId; scan-f; takeVals; takeDispatch; Path;
+open import Rx.Evaluator using (Sched; EvalSt; LiveSource; resolve; scanVals; NodeState; scan-st; take-st;
+  flatten-st; switch-st; exhaust-st; lookupNode; NodeId; scan-f; takeVals; takeDispatch; Path;
   stepFrame; fCharge; sizeStep; iterSize; iterFold)
 open import Rx.Slots using (Slots)
 
@@ -118,7 +118,7 @@ innerFinish-zero c j sl vals sched st inv vC =
 
 -- BLOCKAGE 1 — THE JOINT BOUND — IS RESOLVED, by a design ruling whose
 -- evidence is Joint-Probe.  What blocked here (and
--- at thruWalk / concatDrain / innerFinish) was that subscribeE-caps
+-- at thruWalk / flattenDrain / innerFinish) was that subscribeE-caps
 -- demanded `pathLen κ + sizeᵉ b ≤ cSize` while the delivery side
 -- carries the two bounds SEPARATELY.  The natural-looking repair —
 -- thread round 3's ℓ ledger through the delivery clique too — was
@@ -161,7 +161,7 @@ innerFinish-zero c j sl vals sched st inv vC =
 -- chainStep — is no longer postulated: it is GROUND, below the block,
 -- on stepFrame-caps and the three share-bookkeeping leaves.  Neither
 -- is the *All edge: subscribeInner-caps, thruConsume-caps,
--- thruWalk-caps, concatDrain-caps and innerFinish-caps are all ground
+-- thruWalk-caps, flattenDrain-caps and innerFinish-caps are all ground
 -- below, once the joint bound stopped blocking them.
 
 -- a data type has no observable inside it, so it has neither a
@@ -866,7 +866,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 --
 --   (a) THE RECEIPT, AND IT HAS NO SUPPLIER AT ALL.  `FrameFace`
 --       demands `j′ ≤ fCharge (cSize c) (cWid c) j` — ONE frame's
---       receipt — and `thruWalk-caps` / `concatDrain-caps` produce their
+--       receipt — and `thruWalk-caps` / `flattenDrain-caps` produce their
 --       j′ by SUMMING `subscribeInner-caps`'s, which comes from
 --       `subscribeE-caps`, whose j′ is existential and BOUNDED BY
 --       NOTHING.  .Wet's own GAP note says the same thing from the wet
@@ -883,7 +883,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- operator, `sizeᵉ o ≤ cSize` of them, so ~2·cSize per subscribe and
 -- ~2·cWid·cSize per thru-outer frame — a CONSTANT factor over `fCharge
 -- = suc (suc widAt * suc sizeAt)`.  That reading is wrong, and not by a
--- constant: a subscribe of `mergeAllᵉ b` INSTALLS A thru-outer FRAME and
+-- constant: a subscribe of `flattenᵉ l b` INSTALLS A thru-outer FRAME and
 -- pushes b's burst back through it, `thruWalk` subscribes one inner per
 -- payload, and that inner's subscribe runs frames of its own.  So
 --
@@ -947,7 +947,7 @@ stepFrame-face-zero c d j u sl fin sched st inv =
 -- gain the matching conjunct.  The arithmetic each clause SHAPE needs
 -- is proven ahead of the grind, and now against the LANDED family
 -- rather than a mirror of it (`git show 94a5a3c^:agda/probe/Sub-Charge-Probe.agda` § 5, five
--- steps: `walk-step` a payload of thruWalk / concatDrain, `frame-step`
+-- steps: `walk-step` a payload of thruWalk / flattenDrain, `frame-step`
 -- the refresh itself — a frame's payload walk stops taking its nesting
 -- hypothesis from the subscribe that installed it and reads its own —
 -- `op-step` map / take / the four *All, `op-step-eval` scan, and

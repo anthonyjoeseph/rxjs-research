@@ -80,7 +80,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; z≤n
 open import Data.List    using (List; []; _∷_; _++_; length; map)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; ≤-pred; m≤m+n; m≤n+m; n≤1+n; +-suc; +-assoc; +-comm; +-mono-≤;
   +-monoʳ-≤; *-mono-≤; +-identityʳ; m≤m⊔n; m≤n⊔m; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
-open import Data.Maybe   using (just; nothing)
+open import Data.Maybe   using (Maybe; just; nothing)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin)
 open import Data.Vec     using (lookup)
@@ -90,12 +90,12 @@ open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim      using (Tick; Id; Source; value; complete; InstEmit; _at_from_as_; Gas; g0; gs)
 open import Rx.Exp       using (obs; Ctx; Closed; Val; Exp; _≟ᵗ_; sizeᵉ; sizeᵛ; syncSizeᵉ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
-  scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
+  scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
 open import Rx.Frame-Width using (dWᵉ; pWᵉ; pWᵛ)
 open import Rx.Hop-Depth using (hopDᵉ; hopDᵛ; hopD-unfoldμ)
 open import Rx.Slot-Hop  using (slotHop)
-open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; _↠_; Stream; subscribeE; subscribeAll; AllOp; mergeᵒ;
-  concatᵒ; switchᵒ; exhaustᵒ; NodeState; merge-st; concat-st; switch-st; exhaust-st; scan-st;
+open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; _↠_; Stream; subscribeE; subscribeAll; AllOp; flattenᵒ;
+  switchᵒ; exhaustᵒ; NodeState; flatten-st; switch-st; exhaust-st; scan-st; hasRoom;
   take-st; splitBurst; hasDry; dryEvent; opIterD; fIterD; fLvlD; sLvlD; sIterD; sizeAt;
   sLvlD-suc; sIterD-suc; fLvlD-suc; widAt; thru-outer; from-inner; pushBurst; stepFrame;
   subscribeInner; splitEvents; retagEvents; thruConsume; thruWalk; thruWrap; switchKill;
@@ -131,7 +131,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
    sharedConnect-unconn; stepFrame-keeps; subscribeE-keeps; subscribeE-slots;
    switchKill-keeps; thruConsume-keeps)
 open import Verify-Budget-Sufficient.Wet.Part1 using
-  (INV?-widen; lookupNode-B; mergeBump-INV; splitBurst-vals-B)
+  (INV?-widen; lookupNode-B; flattenBump-INV; splitBurst-vals-B)
 open import Verify-Budget-Sufficient.Wet.Part2 using
   (finList-B)
 -- the caps face: only the five predicates the statement reads there
@@ -139,7 +139,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; eventCaps?; pathSz?; slotsCaps?; valCaps?;
   valCountᵉ; widNode; widNode-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-mergeBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
+  (capsOK?-flattenBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
   capsOK?-setNode; frameBud; lookupNode-caps; mList?; mList?-head; mList?-keeps; mList?-tail;
   pathSz?-len; slotsCaps?-capsAt; splitBurst-bk-caps; splitBurst-vals-caps;
   splitEvents-bk-caps; splitEvents-valsCaps; switchKill-caps; switchKill-closes-caps;
@@ -180,7 +180,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner; depthConsume; depthWalk)
 open import Verify-Budget-Sufficient.Caps-Nest
-  using (nest-keeps; mu-step; concat-step; exhaust-step; merge-step; nest;
+  using (nest-keeps; mu-step; exhaust-step; flatten-step; nest;
          switch-step)
 open import Verify-Budget-Sufficient.Op-Budget
   using (opIterD-dominated)
@@ -209,7 +209,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- bounded the connect burst's hop by `hopDᵉ V (input i)`, which was
 -- 0 at every V — while `sharedConnect` passes the slot def's burst up
 -- with its values UNTOUCHED, so an obs-typed slot whose def emits
--- `strmᵗ (mergeAllᵉ emptyᵉ)` put a hop-1 value against a bound of 0.
+-- `strmᵗ (flattenᵉ nothing emptyᵉ)` put a hop-1 value against a bound of 0.
 -- Demand-Probe series W discharges every hypothesis and derives ⊥; no
 -- entry hypothesis excluded it, because slotsCaps? is size/width and
 -- INV? is size/fnCap — the hop channel for slot defs was UNGUARDED.
@@ -230,7 +230,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- THE REPAIR IS A REPAIR, NOT A WEAKENED TEST — measured on the
 -- refutation's own program, flipped: at the obs-typed shared slot whose def emits
--- strmᵗ (mergeAllᵉ emptyᵉ), the hop conjunct is now `true` at every
+-- strmᵗ (flattenᵉ nothing emptyᵉ), the hop conjunct is now `true` at every
 -- measurement index and every non-dry gas, and the OLD bound is pinned
 -- still rejecting the SAME burst — so the repair is a repair, not a
 -- weakened test.  slotHop-fix is pinned at that program too, so the
@@ -253,7 +253,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- NOT COVERED BY THE PROBES, and while the face was open this was its
 -- FALSITY region: series V holds TWO
--- axes flat — Ψ = 0 at every row (the def is mergeAllᵉ emptyᵉ, so
+-- axes flat — Ψ = 0 at every row (the def is flattenᵉ nothing emptyᵉ, so
 -- slotsFnCap insᵂ = 0) and the exit registry is EMPTY (sharedConnect's
 -- burstCompleted branch drops the one entry), so regsLen? is vacuous
 -- there and the Ψ conjuncts of INV?/burstB? are satisfied by 0 ≤ 0.
@@ -429,7 +429,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 --   face (one postulate `pushBurst-walk`, generic in `f : Frame Γ s u`,
 --   committed 9fb13d3) carried a uniform hop conjunct — input receipts
 --   at r̂, output at suc r̂ — and that is REFUTABLE BY CONSTRUCTION at
---   f := map-f: a step function that wraps its input two mergeAll levels
+--   f := map-f: a step function that wraps its input two flatten levels
 --   deep sends a value of hop exactly r̂ to hop r̂ + 2 > suc r̂, with every
 --   hypothesis satisfiable (frameB? bounds the fn's SIZE and WEIGHT,
 --   never its hop growth).  The caps face is frame-generic because caps
@@ -1040,8 +1040,8 @@ pushThru-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ
 -- conjunct reads EvalSt.nodes, which installNode extends, so the Ψ
 -- half of the install must be funded.  (The SIZE half rides the caps
 -- boundedNode hypothesis already in the list — stBounded? reads the
--- same node list.)  All four heads supply it by refl: merge-st /
--- switch-st / exhaust-st are `true` outright, concat-st [] is
+-- same node list.)  All three heads supply it by refl: switch-st and
+-- exhaust-st are `true` outright, flatten-st with an empty queue is
 -- `all _ []`.
 subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j : ℕ)
@@ -1104,26 +1104,15 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- other hypothesis passes through untouched because the *All measures
 -- compute (sizeᵉ/hopDᵉ/syncSizeᵉ to suc, fnCapᵉ/dWᵉ to themselves,
 -- depthE to depthAll at this op and state).
-walk-mergeAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (b : Closed Γ (obs u)) → WalkStmt {e = e} (mergeAllᵉ b)
-walk-mergeAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
+walk-flatten : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (lim : Maybe ℕ) (b : Closed Γ (obs u)) → WalkStmt {e = e} (flattenᵉ lim b)
+walk-flatten {u = u} lim b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
-  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g mergeᵒ (merge-st 0 false)
-    b κ bid now sl sched st
+  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g flattenᵒ
+    (flatten-st {t = u} lim 0 [] false) b κ bid now sl sched st
     2≤S 1≤R hCR slEq slC slSz inv refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
-    (merge-step _ sl _ bud nst) hidx dpt
-    invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
-
-walk-concatAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (b : Closed Γ (obs u)) → WalkStmt {e = e} (concatAllᵉ b)
-walk-concatAll {u = u} b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
-  subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g concatᵒ
-    (concat-st {t = u} [] false false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl
-    (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
-    (concat-step _ sl _ bud nst) hidx dpt
+    (flatten-step lim _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
 
 walk-switchAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1278,8 +1267,7 @@ walkFace (scanᵉ f z b) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g =
     (λ c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ →
        walkFace b c′ Ψ′ F′ Ŝ′ R̂′ G″ ℓ′ L̂′ dep′ bud′ ops′ j″ g)
     c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
-walkFace (mergeAllᵉ b)   = walk-mergeAll b
-walkFace (concatAllᵉ b)  = walk-concatAll b
+walkFace (flattenᵉ lim b) = walk-flatten lim b
 walkFace (switchAllᵉ b)  = walk-switchAll b
 walkFace (exhaustAllᵉ b) = walk-exhaustAll b
 walkFace (μᵉ body) c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g0 κ bid now sl sched st
@@ -1702,37 +1690,13 @@ subscribeInner-walk {n = n} {Γ = Γ} {t = t} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U 
   R8 = splitBurst-nodry burst S8
 
 ------------------------------------------------------------------
--- ONE PAYLOAD — thruConsume-caps' twenty-five clauses ⊗ the wet
--- content.  merge subscribes then bumps; concat parks or subscribes;
+-- ONE PAYLOAD — thruConsume-caps' clauses ⊗ the wet content.  flatten
+-- subscribes and bumps while a lane is free and parks when none is;
 -- switch cuts then subscribes; exhaust drops while busy.  Every node
--- write goes through INV?-setNode/-mergeBump; switch's registry cut
+-- write goes through INV?-setNode/-flattenBump; switch's registry cut
 -- goes through the cutThrough kit above.
 ------------------------------------------------------------------
-thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ bid now o
-                 sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-                 invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs =
-  j′ , capsOK?-mergeBump (frameStep (j + j′) c) nid done sd₁ st₁ S1
-     , proj₁ (proj₂ (proj₂ SI))
-     , proj₁ (proj₂ (proj₂ (proj₂ SI)))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))
-     , mergeBump-INV Ψ (Caps.cSize (frameStep (j + j′) c)) nid done sd₁ st₁
-         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
-     , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
-  where
-  SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g mergeᵒ nid κ
-         bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
-  j′   = proj₁ SI
-  S1   = proj₁ (proj₂ SI)
-  R    = subscribeInner g mergeᵒ nid κ bid now o sched st
-  done = proj₁ (proj₂ (proj₂ (proj₂ R)))
-  sd₁  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-
-thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g concatᵒ
+thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g flattenᵒ
                  nid κ bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC
                  lC nst dpt invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
   with lookupNode nid (EvalSt.nodes st)
@@ -1774,14 +1738,6 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (merge-st _ _)    | _ | _ =
-  0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
-    , ZW , refl , refl , refl , rgs
-  where
-  ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
-             (sym (+-identityʳ j)) inv
-  ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
-             (sym (+-identityʳ j)) invW
 ... | just (switch-st _ _)   | _ | _ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
@@ -1798,30 +1754,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (concat-st {w} q false od) | (bn , wn) | _ =
-  j′ , capsOK?-setNode (frameStep (j + j′) c) nid
-         (concat-st {t = u} [] (not done) od) sd₁ st₁ refl refl S1
-     , proj₁ (proj₂ (proj₂ SI))
-     , proj₁ (proj₂ (proj₂ (proj₂ SI)))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))
-     , INV?-setNode Ψ (Caps.cSize (frameStep (j + j′) c)) nid
-         (concat-st {t = u} [] (not done) od) sd₁ st₁ refl refl
-         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))))
-     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
-     , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
-  where
-  SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g concatᵒ nid κ
-         bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
-         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
-  j′   = proj₁ SI
-  S1   = proj₁ (proj₂ SI)
-  R    = subscribeInner g concatᵒ nid κ bid now o sched st
-  done = proj₁ (proj₂ (proj₂ (proj₂ R)))
-  sd₁  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-... | just (concat-st {w} q true od) | (bn , wn) | (bnW , fnW) with w ≟ᵗ u
+... | just (flatten-st {w} lim act q od) | (bn , wn) | (bnW , fnW) with w ≟ᵗ u
 ...   | no _ =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -1829,11 +1762,36 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
     , subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
             (sym (+-identityʳ j)) invW
     , refl , refl , refl , rgs
--- THE PARK — the one write that grows a concat queue.  The caps side
--- is the caps clause verbatim; the wet side's queue bound comes from
--- the state's own INV? through the lookup (fnW), extended with the
+-- A LANE IS FREE — subscribe and bump the live count.  This is where
+-- the merge face's whole clause went: its node write was the bump and
+-- nothing else, which is exactly what the gate's true arm does now
+...   | yes refl with hasRoom lim act
+...     | true =
+  j′ , capsOK?-flattenBump (frameStep (j + j′) c) nid done sd₁ st₁ S1
+     , proj₁ (proj₂ (proj₂ SI))
+     , proj₁ (proj₂ (proj₂ (proj₂ SI)))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))
+     , flattenBump-INV Ψ (Caps.cSize (frameStep (j + j′) c)) nid done sd₁ st₁
+         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI)))))))
+     , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
+     , proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ SI))))))))
+  where
+  SI = subscribeInner-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g flattenᵒ nid κ
+         bid now o sl sched st 2≤S 1≤R hCR slEq slC slSz inv vC pC lC nst dpt
+         invW vB pB hR s2 fS rS ceil lb hU dmd gas lℓ rgs
+  j′   = proj₁ SI
+  S1   = proj₁ (proj₂ SI)
+  R    = subscribeInner g flattenᵒ nid κ bid now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  sd₁  = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₁  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+-- THE PARK — the one write that grows the queue.  The caps side is the
+-- caps clause verbatim; the wet side's queue bound comes from the
+-- state's own INV? through the lookup (fnW), extended with the
 -- payload's valB? receipt, which is level-free on the Ψ half
-...   | yes refl =
+...     | false =
   1 , subst (λ x → capsOK? (frameStep x c) sched st₊ ≡ true) (sym lvl1) capsPark
     , refl , refl
     , queue-push (Caps.cSize c) (Caps.cWid c) dep (suc bud) j (s≤s z≤n)
@@ -1841,7 +1799,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
             (sym lvl1) invPark
     , refl , refl , refl , rgs
   where
-  st₊ = record st { nodes = setNode nid (concat-st (q ++ o ∷ []) true od)
+  st₊ = record st { nodes = setNode nid (flatten-st lim act (q ++ o ∷ []) od)
                               (EvalSt.nodes st) }
   lvl1 : j + 1 ≡ suc j
   lvl1 = +-comm j 1
@@ -1851,21 +1809,21 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g co
          (∧-intro (≤ᵇ-widen (sizeᵉ o) (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j)))
                     (valCaps?-size (frameStep j c) sl (obs u) o vC))
                   refl)
-  WN = widNode-push c j (Sched.slots sched) q o true od 2≤S wn
+  WN = widNode-push c j (Sched.slots sched) lim q o act od 2≤S wn
          (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                 (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
   capsPark = capsOK?-setNode (frameStep (suc j) c)
-               nid (concat-st (q ++ o ∷ []) true od)
+               nid (flatten-st lim act (q ++ o ∷ []) od)
                sched st BN WN
                (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
-  FN : fnCapNode Ψ (concat-st (q ++ o ∷ []) true od) ≡ true
+  FN : fnCapNode Ψ (flatten-st lim act (q ++ o ∷ []) od) ≡ true
   FN = all-++-intro (λ x → fnCapᵉ x ≤ᵇ Ψ) q (o ∷ []) fnW
          (∧-intro (proj₂ (∧-true (sizeᵛ (obs u) o ≤ᵇ Caps.cSize (frameStep j c))
                                  (fnCapᵛ (obs u) o ≤ᵇ Ψ) vB))
                   refl)
   invPark = INV?-setNode Ψ (Caps.cSize (frameStep (suc j) c))
-              nid (concat-st (q ++ o ∷ []) true od) sched st BN FN
+              nid (flatten-st lim act (q ++ o ∷ []) od) sched st BN FN
               (INV?-widen sched st
                  (proj₁ (frameStep-mono-j c 2≤S (n≤1+n j))) invW)
 
@@ -1897,15 +1855,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (merge-st _ _)    | dpt′ =
-  0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
-    , ZW , refl , refl , refl , rgs
-  where
-  ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
-             (sym (+-identityʳ j)) inv
-  ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
-             (sym (+-identityʳ j)) invW
-... | just (concat-st _ _ _) | dpt′ =
+... | just (flatten-st _ _ _ _) | dpt′ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -2005,15 +1955,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (merge-st _ _)    =
-  0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
-    , ZW , refl , refl , refl , rgs
-  where
-  ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
-             (sym (+-identityʳ j)) inv
-  ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
-             (sym (+-identityʳ j)) invW
-... | just (concat-st _ _ _) =
+... | just (flatten-st _ _ _ _) =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where

@@ -197,8 +197,11 @@ indexed by four contexts:
 
 ### 5.1 The primitives
 
-`input`, `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ`, `scanᵉ`, `mergeAllᵉ`,
-`concatAllᵉ`, `switchAllᵉ`, `exhaustAllᵉ`, `μᵉ`/`varᵉ`, `deferᵉ`.
+`input`, `ofᵉ`, `emptyᵉ`, `mapᵉ`, `takeᵉ`, `scanᵉ`, `flattenᵉ`,
+`switchAllᵉ`, `exhaustAllᵉ`, `μᵉ`/`varᵉ`, `deferᵉ`.
+
+`flattenᵉ` carries rxjs's `concurrent` argument as a `Maybe ℕ`: `nothing` is
+Infinity and is the old `mergeAllᵉ`, `just 1` is the old `concatAllᵉ`.
 
 This set was chosen so that (nearly) all of rxjs is derivable — the claim
 being: if `batchSimultaneous` is correct on every combination of these, it is
@@ -243,9 +246,9 @@ Derived expand (`X = merge(s, mergeMap f (defer X))`):
 
 ```agda
 expandᵈ f s =
-  μᵉ (mergeAllᵉ (ofᵉ
+  μᵉ (flattenᵉ nothing (ofᵉ
        ( strmᵗ (wkᵍ s)
-       ∷ strmᵗ (mergeAllᵉ (mapᵉ (wkᵍ f) (deferᵉ (varᵉ (here refl)))))
+       ∷ strmᵗ (flattenᵉ nothing (mapᵉ (wkᵍ f) (deferᵉ (varᵉ (here refl)))))
        ∷ [])))
 ```
 
@@ -265,7 +268,7 @@ strmᵗ : Exp Γ Δᵍ Δ Θ t → Tm Γ Δᵍ Δ Θ (obs t)
 operators work:
 
 ```
-mergeMap f = mergeAllᵉ ∘ mapᵉ f      -- where f's body ends in strmᵗ
+mergeMap f = flattenᵉ nothing ∘ mapᵉ f   -- where f's body ends in strmᵗ
 ```
 
 The bound emission reaches the inner observable through `varᵗ` at `Tm` leaves.
@@ -276,10 +279,10 @@ deliberately, since it keeps the dataflow graph static.
 ### 5.4 Worked derivations
 
 ```
-merge a b     = mergeAllᵉ (ofᵉ (strmᵗ a ∷ strmᵗ b ∷ []))
+merge a b     = flattenᵉ nothing (ofᵉ (strmᵗ a ∷ strmᵗ b ∷ []))
 filter p      = mergeMap (λ v → if p v then of v else empty)
-completionOf s = concatAllᵉ (ofᵉ (strmᵗ (mergeMap (λ _ → emptyᵉ) s)
-                                ∷ strmᵗ (ofᵉ (unit̂ ∷ [])) ∷ []))
+completionOf s = flattenᵉ (just 1) (ofᵉ (strmᵗ (mergeMap (λ _ → emptyᵉ) s)
+                                       ∷ strmᵗ (ofᵉ (unit̂ ∷ [])) ∷ []))
 
 -- takeUntil needs fan-out, so its source must be a SHARED SLOT (§5.5):
 -- allocate slot j = shared s, then reference it twice
@@ -293,7 +296,7 @@ the source completes while the notifier stays silent — **in real rxjs too**;
 the model faithfully reproduced a real behavioral gap of the encoding rather
 than papering over it. The fix reifies "completion of s" as an emission using
 the completion machinery already in the primitive set: **take**
-(count-triggered completion) + **concatAll** (completion-triggered
+(count-triggered completion) + **flatten at limit 1** (completion-triggered
 subscription) + a **shared slot** (safe fan-out). Together these make
 completion a first-class value — the load-bearing trio behind takeWhile,
 endWith, skipUntil, etc. If a derived operator ever can't be written, expect

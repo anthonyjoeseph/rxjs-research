@@ -5,17 +5,17 @@
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 -- Receipts live in the headers of `root-caches` / `root-done-plumbed`
 -- (.Part4), whose residues are the two leaves named below.
--- TARGET: root-mergeCache
+-- TARGET: root-flattenCache
 -- TARGET: root-entry-sunk
 --
 -- WHAT IS BEING TESTED, and why it is testable at all: both postulates'
 -- CONCLUSIONS are decidable Bool functions of a run — `cachesValid` and
 -- `allShareSunk` over the settled root-exit state — so instantiating at
 -- concrete programs either refutes them or gives a real receipt.  Their
--- former shared merge-cert HYPOTHESIS is decidable too (`mergeCertAt`), so
+-- former shared flatten-cert HYPOTHESIS is decidable too (`flattenCertAt`), so
 -- it is pinned at the same states rather than assumed.  That postulate was
 -- retired when the two assemblies became real bodies (it does not
--- close their k ≡ 0 case — see Part4.root-mergeCache); the pins stay, since
+-- close their k ≡ 0 case — see Part4.root-flattenCache); the pins stay, since
 -- they are the evidence base a restated merge coherence will be built on.
 --
 -- EVERY ROW IS LABELLED.  A row that could not have failed is not a row:
@@ -37,10 +37,10 @@ open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (hot; Source)
-open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; nat̂; input; ofᵉ; takeᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ;
+open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; nat̂; input; ofᵉ; takeᵉ; flattenᵉ; switchAllᵉ;
   exhaustAllᵉ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; budgetAt; root; EvalSt; NodeId; Chain; RegId; lookupNode;
-  merge-st; aliveThroughᶠ)
+  flatten-st; aliveThroughᶠ)
 open import Rx.Slots using (scripted; shared; Slots)
 open import Verify-Well-Formed.Part1 using (cachesValid; allShareSunk; innerInstsP)
 open import Rx.Protocol using (ProtocolSt; runProtocol; protocol-init)
@@ -61,12 +61,12 @@ ins₀ = λ ()
 -- entry made this file read as reachable from Main; with the probes out
 -- of that table the definition had no proof consumer, which is the
 -- wiring law reporting the truth rather than a new problem.  A restated
--- merge-cert in .Part4 states its own predicate; these rows are evidence
+-- flatten-cert in .Part4 states its own predicate; these rows are evidence
 -- about THIS one.
 -- WHY IT SURVIVES ITS OWN COUNTEREXAMPLE SHAPE (probed;
 -- the probe is deleted — this header is the receipt).  A hand-built
 -- state with k = 0 and a live from-inner registration (dying /
--- delivered / cancelled all empty) makes mergeCertAt FALSE, so the
+-- delivered / cancelled all empty) makes flattenCertAt FALSE, so the
 -- whole question is that shape's REACHABILITY — and the cascade
 -- ordering answers it:
 --   1. cascadeLatch fires FIRST, setting dying = [arrSource a] before
@@ -80,10 +80,10 @@ ins₀ = λ ()
 --      mark alone leaves the registration alive.
 -- The bad shape is unreachable by this path.  REACHED coverage (rows
 -- driven through subscribeE → cascadeLatch → cascadeGo, not
--- hand-built): the single-inner mergeAll shape, mid-cascade and
--- post-cascadeFinish — the decisive rows.  STILL UNCOVERED: the
--- multi-source inner reached only at hand-built states, concat /
--- switch / exhaust and nested *All, and the CUT route to k ≡ 0
+-- hand-built): the single-inner unbounded-flatten shape, mid-cascade
+-- and post-cascadeFinish — the decisive rows.  STILL UNCOVERED: the
+-- multi-source inner reached only at hand-built states, a BOUNDED limit
+-- / switch / exhaust and nested *All, and the CUT route to k ≡ 0
 -- (registrations also drop at take-cuts — a distinct path).
 
 -- a registration carries an ALIVE from-inner instance of mnid: its
@@ -94,13 +94,13 @@ hasAliveFromInner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 hasAliveFromInner mnid st c@(_ , _ , (_ , p)) =
   any (λ inst → aliveThroughᶠ inst st c) (innerInstsP mnid p)
 
--- merge-cert at one node: when merge-st sits at k ≡ 0, no registry
--- entry has an alive from-inner instance of this node.  k ≢ 0 and
--- non-merge nodes are trivially certified.
-mergeCertAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+-- flatten-cert at one node: when flatten-st's live count sits at 0, no
+-- registry entry has an alive from-inner instance of this node.  A
+-- positive count and non-flatten nodes are trivially certified.
+flattenCertAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   → NodeId → EvalSt e → Bool
-mergeCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
-... | just (merge-st zero od) =
+flattenCertAt mnid st with lookupNode mnid (EvalSt.nodes st)
+... | just (flatten-st lim zero q od) =
         not (any (hasAliveFromInner mnid st) (EvalSt.registry st))
 ... | _ = true
 
@@ -117,17 +117,17 @@ RUN e = proj₂ (proj₂ (subscribeE (budgetAt e ins₀ 0) e root 0 0
 P0 : Closed Γ₀ natᵗ                       -- no *All: no nodes at all
 P0 = ofᵉ (nat̂ 1 ∷ [])
 
-P1 : Closed Γ₀ natᵗ                       -- one merge-st (activeInners)
-P1 = mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ []))
+P1 : Closed Γ₀ natᵗ                       -- one flatten-st (live count)
+P1 = flattenᵉ nothing (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ []))
 
-P2 : Closed Γ₀ natᵗ                       -- merge over TWO inners
-P2 = mergeAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ strmᵗ (ofᵉ (nat̂ 2 ∷ [])) ∷ []))
+P2 : Closed Γ₀ natᵗ                       -- unbounded flatten over TWO inners
+P2 = flattenᵉ nothing (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ strmᵗ (ofᵉ (nat̂ 2 ∷ [])) ∷ []))
 
-P3 : Closed Γ₀ natᵗ                       -- nested merge: two merge nodes
-P3 = mergeAllᵉ (ofᵉ (strmᵗ P1 ∷ []))
+P3 : Closed Γ₀ natᵗ                       -- nested: two flatten nodes
+P3 = flattenᵉ nothing (ofᵉ (strmᵗ P1 ∷ []))
 
-P4 : Closed Γ₀ natᵗ                       -- concat-st (innerActive + queue)
-P4 = concatAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ strmᵗ (ofᵉ (nat̂ 2 ∷ [])) ∷ []))
+P4 : Closed Γ₀ natᵗ                       -- flatten-st at limit 1: a QUEUE
+P4 = flattenᵉ (just 1) (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ strmᵗ (ofᵉ (nat̂ 2 ∷ [])) ∷ []))
 
 P5 : Closed Γ₀ natᵗ                       -- switch-st (cur)
 P5 = switchAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 1 ∷ [])) ∷ strmᵗ (ofᵉ (nat̂ 2 ∷ [])) ∷ []))
@@ -236,9 +236,9 @@ RUN₁ : (e : Closed Γ₁ natᵗ) → EvalSt e
 RUN₁ e = proj₂ (proj₂ (subscribeE (budgetAt e sh 0) e root 0 0
                                    (sched-init e sh) (st-init e)))
 
--- the README's own share program: merge(shared, shared)
+-- the README's own share program: an unbounded flatten of (shared, shared)
 S1 : Closed Γ₁ natᵗ
-S1 = mergeAllᵉ (ofᵉ (strmᵗ (input zero) ∷ strmᵗ (input zero) ∷ []))
+S1 = flattenᵉ nothing (ofᵉ (strmᵗ (input zero) ∷ strmᵗ (input zero) ∷ []))
 
 _ : null (EvalSt.registry (RUN₁ S1)) ≡ true
 _ = refl
@@ -264,7 +264,7 @@ RUN₂ e = proj₂ (proj₂ (subscribeE (budgetAt e sh₂ 0) e root 0 0
                                    (sched-init e sh₂) (st-init e)))
 
 S2 : Closed Γ₂ natᵗ
-S2 = mergeAllᵉ (ofᵉ (strmᵗ (input (suc zero)) ∷ strmᵗ (input (suc zero)) ∷ []))
+S2 = flattenᵉ nothing (ofᵉ (strmᵗ (input (suc zero)) ∷ strmᵗ (input (suc zero)) ∷ []))
 
 _ : null (EvalSt.registry (RUN₂ S2)) ≡ false   -- LOAD-BEARING at last
 _ = refl
@@ -345,15 +345,15 @@ _ = refl
 -- the record that none of the obvious constructions produces one.
 ----------------------------------------------------------------------
 
--- THE FORMER SHARED HYPOTHESIS.  Both -cores took merge-cert; neither
--- assembly takes it now.  mergeCertAt is decidable, so
+-- THE FORMER SHARED HYPOTHESIS.  Both -cores took flatten-cert; neither
+-- assembly takes it now.  flattenCertAt is decidable, so
 -- it is pinned rather than assumed — at every node id the merge programs
--- actually mint, plus one that does not exist (where mergeCertAt is true by
+-- actually mint, plus one that does not exist (where flattenCertAt is true by
 -- its catch-all, hence DEGENERATE).  These rows are now evidence for a
 -- FUTURE statement rather than for a live hypothesis, and they are what
--- keeps mergeCertAt honest while it has no consumer in a proof.
-_ : mergeCertAt 0 (RUN P1) ∷ mergeCertAt 0 (RUN P2) ∷ mergeCertAt 1 (RUN P3)
-  ∷ mergeCertAt 0 (RUN P3) ∷ mergeCertAt 0 (RUN P7) ∷ mergeCertAt 0 (RUN₂ S2)
-  ∷ mergeCertAt 99 (RUN P1) ∷ []
+-- keeps flattenCertAt honest while it has no consumer in a proof.
+_ : flattenCertAt 0 (RUN P1) ∷ flattenCertAt 0 (RUN P2) ∷ flattenCertAt 1 (RUN P3)
+  ∷ flattenCertAt 0 (RUN P3) ∷ flattenCertAt 0 (RUN P7) ∷ flattenCertAt 0 (RUN₂ S2)
+  ∷ flattenCertAt 99 (RUN P1) ∷ []
   ≡ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ []
 _ = refl
