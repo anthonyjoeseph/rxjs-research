@@ -177,6 +177,18 @@ postulate
   --   away.  So its consumer is not the budget tree; it is the well-formed
   --   tree's mergeAll clause, which reads a node's completion off
   --   `active ≡ 0 ∧ null queue`.
+  --
+  -- PROBED: `Probed.MergeAll-Queue`, at two and three OPEN inners, each
+  --   row paired with the same program at `just 1` pinned FALSE — so the
+  --   greens are not the vacuous kind a family of synchronously-completing
+  --   inners would give, where no limit parks and every row passes.
+  --   NOT REACHED, and it is the region the statement is actually about:
+  --   RE-ENTRY.  Every inner in these programs is a plain scripted source,
+  --   so no inner's burst routes back through the wrap's own node, and the
+  --   consumes stay sequential.  The rows therefore cover the shape where
+  --   the claim is easy and say nothing about the shape where it is hard.
+  --   The class stands at DIFFICULTY on exactly that ground.
+  --
   unbounded-never-parks :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
       (fuel : Gas) (nid : NodeId) (b : Closed Γ (obs u)) (κ : Path Γ u t)

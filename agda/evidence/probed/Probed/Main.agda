@@ -16,4 +16,5 @@
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 module Probed.Main where
 
+open import Probed.MergeAll-Queue using ()
 open import Probed.Root using ()
