@@ -161,18 +161,18 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
+- **`cascadeGo-nest`** (Caps-Bridge) — DIFFICULTY: the chain walk's store growth,
+  width-denominated and primitive. Its per-delivery half is machine-refuted at
+  ONE delivery: the drain stores many times per delivery, so no count pays.
+  The row below threads it as a budget, so this one goes first.
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — DIFFICULTY: one arrival's
   cascade descent, width-denominated and primitive: both narrow readings are
   machine-refuted, and no constant multiple can stand in — the descent is a
-  PRODUCT of the two axes and every narrow term moves with one of them.
+  PRODUCT of the axes, every narrow term moves with one. Behind the row above.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction, width-denominated. Its one-`nestSyn` form is machine-refuted
   at a fold depth of five; this form clears the same family by three orders of
   magnitude. Nineteen mutual members, every level paid by a path term but one.
-- **`cascadeGo-nest`** (Caps-Bridge) — DIFFICULTY: the chain walk's store growth,
-  width-denominated and primitive. Its per-delivery half is machine-refuted at
-  ONE delivery, and the counting leaf that would have widened it went too: the
-  drain stores many times per delivery, so no count pays.
 - **`nest-height`** (Nest-Store, inside the seal) — DIFFICULTY: the arithmetic
   both depth rows spend, and no evaluator in it. One tower height for the
   currency's sum, one story below the caps height; the `blowH` conversion and

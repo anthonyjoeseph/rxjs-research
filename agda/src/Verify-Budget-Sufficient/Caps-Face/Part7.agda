@@ -1214,6 +1214,25 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- REFUTED: `Refuted.Nest-Depth-One` kills the subscribe-side sibling
 --   of the same narrow reading, descent 21 against 19, which is where
 --   the arc above was first read off.
+-- DEAD ROUTE: a plain structural induction on the chain list, with the
+--   bound stated at the entry store.  The cons clause's THIRD arm reads
+--   the tail at the state the head's `chainStep` left, and that state's
+--   store is strictly deeper -- measured at three before the step and
+--   twelve after it, on one chain and one delivery -- so the induction
+--   hypothesis is being applied at a store the conclusion does not
+--   mention.  Nothing about the arm can be repaired locally: the two
+--   surviving arms close against the entry store and this one cannot,
+--   whatever the head-arm leaf says.  What it needs is a generalisation
+--   that THREADS the store growth as a budget, and the quantity it
+--   would thread is `cascadeGo-nest`'s (.Caps-Bridge) -- so that row is
+--   a genuine prerequisite of this one rather than a sibling.
+-- DEAD ROUTE: the head arm without a width term, `depthChain` under the
+--   payload nesting plus the path's plus the store's.  It is attractive
+--   because the drain's unpaid levels come out of what is STORED, which
+--   is the one term that already accounts for them.  The grid refutes it
+--   without a new probe: at a single chain the whole cascade IS its head
+--   arm, and the descent moves with the source length while the payload
+--   nesting, the path measure and the store are each flat in it.
 -- DEAD ROUTE: charging per CHAIN instead.  That clause CLOSES, which
 --   the per-delivery one does not -- both tails take the hypothesis at
 --   `length chains`, and the head is the one chain by which `suc`
