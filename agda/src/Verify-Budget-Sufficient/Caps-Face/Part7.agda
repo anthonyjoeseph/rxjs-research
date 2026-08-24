@@ -1199,6 +1199,30 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- axis that drives the drain, which is why the width form clears the
 -- rows the narrow ones cross on.
 --
+-- AND THE BOUND IS NOT TIGHT, WHICH IS THE MOST USEFUL THING KNOWN
+-- ABOUT IT.  At the entry index the real width IS `capsBase`, which
+-- already carries the program's own size and the slot store's, so the
+-- charge is a hundred-odd `nestSyn` against a store that in fact
+-- deepens by a handful.  Measured across the bounded-drain grid the
+-- two sides sit two ORDERS OF MAGNITUDE apart.  So whatever count the
+-- induction ends up threading does not have to be sharp, and the
+-- expensive instinct here -- find the exact quantity the drain
+-- deepens by -- is the wrong one: any real, program-shaped count that
+-- dominates the deepening events will clear it.
+--
+-- AND THE RECURRENCE WAS BUILT FOR THAT INDUCTION, which is worth
+-- saying because it reads as an arbitrary budget until you look.
+-- `realWidAt` steps by raising the stored width to the nesting cap,
+-- and the bet its own definition site records is that ONE ARRIVAL
+-- FANS THROUGH INSTALLED NODES, multiplying by at most a stored width
+-- per layer crossed.  That is the shape the store growth actually
+-- has: on the grid the store after a cascade tracks fold depth TIMES
+-- source length, a product of layers and values, while the registry
+-- stays flat -- so the deepening is per layer crossed per value, and
+-- neither factor alone is it.  The induction is therefore over the
+-- fan and the layers, not over the chain list, and that is why every
+-- chain-list route in this header died.
+--
 -- REFUTED: `Refuted.Cascade-Nest-PerDeliv` kills the per-DELIVERY half
 --   this was assembled from -- store 12 against a charge of 10, at ONE
 --   delivery and no cancellation, so neither the count nor a cancelled
