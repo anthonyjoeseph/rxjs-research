@@ -1210,18 +1210,25 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- deepens by -- is the wrong one: any real, program-shaped count that
 -- dominates the deepening events will clear it.
 --
--- AND THE RECURRENCE WAS BUILT FOR THAT INDUCTION, which is worth
--- saying because it reads as an arbitrary budget until you look.
--- `realWidAt` steps by raising the stored width to the nesting cap,
--- and the bet its own definition site records is that ONE ARRIVAL
--- FANS THROUGH INSTALLED NODES, multiplying by at most a stored width
--- per layer crossed.  That is the shape the store growth actually
--- has: on the grid the store after a cascade tracks fold depth TIMES
--- source length, a product of layers and values, while the registry
--- stays flat -- so the deepening is per layer crossed per value, and
--- neither factor alone is it.  The induction is therefore over the
--- fan and the layers, not over the chain list, and that is why every
--- chain-list route in this header died.
+-- AND THE COUNT IS SEQUENTIAL RELEASES, NOT FAN -- which is the
+-- distinction the whole induction turns on, and it is not the one the
+-- width term's name suggests.  `storeNestMax` is a MAX of nesting
+-- DEPTHS, so two inners installed side by side at the same depth move
+-- it by nothing: doubling the parallel fan of the family whose width
+-- is its own axis leaves the store after the cascade UNCHANGED.  What
+-- moves it is a release landing INSIDE the frame the previous release
+-- left, which is what a BOUNDED drain does and an unbounded one never
+-- does -- the same ingredient the ledger below turns on throughout.
+-- So the quantity to thread is how many times the drain
+-- refills, and on the bounded grid the store tracks that count times
+-- the fold depth, with the registry flat throughout.  The width term
+-- pays because a refill count is bounded by the values an instant
+-- really carries, which is what `realWidAt` counts; the layers are
+-- already inside `nestSyn`.  A per-chain budget is still needed --
+-- the growth SUMS along the chain list, one per step on families that
+-- deliver -- so the chain-list induction closes in the relative form
+-- once the budget SPLITS, which is what the entry-store version of it
+-- could not do.
 --
 -- REFUTED: `Refuted.Cascade-Nest-PerDeliv` kills the per-DELIVERY half
 --   this was assembled from -- store 12 against a charge of 10, at ONE
