@@ -1336,20 +1336,52 @@ postulate
 -- to the registry, so the conversion below is a plain invariant about
 -- how many registrations may stand at one instant.
 --
--- PROBED: `Harness.Main`'s SERIES Q drives the cut family -- a hot fan
---   behind a `takeᵉ` that exhausts partway along one arrival, the only
---   shape that reaches the skip branch at all -- and reads this
---   statement's own two sides at each cascade, printing the chain
---   count, the delivery count, the registry and the width so a row
---   that never entered the branch is visible as such.  Across the fold
---   depth, the fan width, the take count and the slot parameters, no
---   row goes over, and the skip-heavy rows are the roomiest: eight
---   chains against a single delivery reads 7 of 88.  The conversion is
---   covered on the same rows, at id 0 where the width is smallest, and
---   clears by better than a factor of ten -- a registry of at most 8
---   against a width of at least 84.  Measured, not rechecked.  No row
---   reached a shape where `depthFold` reads a store the phantom steps
---   have deepened.
+-- BOTH SIDES READ AT REAL RUNS, and read by harness rather than by
+-- probe, so nothing here is rechecked and no proof may lean on it.
+-- `Harness.Main`'s SERIES Q drives the cut family -- a hot fan
+-- behind a `takeᵉ` that exhausts partway along one arrival, the only
+-- shape that reaches the skip branch at all -- and reads this
+-- statement's own two sides at each cascade, printing the chain count,
+-- the delivery count, the registry and the width so a row that never
+-- entered the branch is visible as such.  Across the fold depth, the
+-- fan width, the take count and the slot parameters no row goes over,
+-- and the skip-heavy rows are the roomiest: eight chains against a
+-- single delivery reads 7 of 88, where a per-delivery charge would
+-- have allowed one.  The conversion is covered on the same rows, at id
+-- 0 where the width is smallest, and clears by better than a factor of
+-- ten -- a registry of at most 8 against a width of at least 84.  No
+-- row reached a shape where `depthFold` reads a store the phantom
+-- steps have deepened.
+
+-- THE ROUTE, and the leaf it turns on.  The cons clause splits as
+-- `X ⊔ (Y ⊔ Z)` -- the skip arm's tail, the head chain, and the live
+-- arm's tail -- and the two tails take the induction hypothesis at
+-- `length chains`, leaving the head to be paid for by the one chain
+-- separating that from `suc (length chains)`.  So the leaf under this
+-- statement is `depthChain` within the base terms plus exactly ONE
+-- `nestSyn`, and that is not obvious: the subscribe-side sibling
+-- `depth-nest-compositional` needs a whole `realWidAt` worth, and if a
+-- delivery down one chain needed a width too, the per-chain sum would
+-- be `length chains` widths and this statement would be false.
+-- SERIES R reads that leaf one chain at a time, threading the state
+-- through `chainStep` exactly as the clause threads it, so a later
+-- chain is read at the store the earlier ones deepened.  No chain goes
+-- over, and the margin does not erode along the list -- it sits near
+-- ten from the first chain to the eighth, because the store term grows
+-- at the same rate the left side does.  One `nestSyn` per chain is
+-- enough, and it is enough for the reason the statement needs.
+
+-- WHAT BLOCKS THE BODY TODAY is neither of those: it is the caps
+-- premise.  The live arm's tail takes the hypothesis at the state
+-- `chainStep` produced, and `capsOK?` is not preserved THERE at the
+-- same caps -- the walk's own preservation result hands back a
+-- `frameStep j c`, a cap at a larger index, which is the wrong shape
+-- to feed an induction that must recur at a fixed one.  Either the
+-- premise is dropped, which strengthens the statement and has to be
+-- earned rather than measured, or the statement recurs at a moving
+-- index.  `chainStep-slots` is the smaller half of the same problem
+-- and only needs moving down: it lives above this module and is a
+-- one-line composition of `foldPath-slots`, which lives below it.
 postulate
   depthCascade-perChain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

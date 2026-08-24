@@ -54,16 +54,16 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
-open import Data.Product using (proj₁; proj₂; _,_)
+open import Data.Product using (proj₁; proj₂; _,_; _×_)
 open import Data.Sum using (inj₁; inj₂)
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Prim using (towerℕ; gasPad; g0)
+open import Rx.Prim using (towerℕ; gasPad; g0; Id)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root;
   Sched; EvalSt; sched-next; cascade; arrTy; arrVal)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
-open import Rx.Evaluator using (budgetAt; chainsOf; cascadeLatch; cascadeGo)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthCascade)
+open import Rx.Evaluator using (budgetAt; chainsOf; cascadeLatch; cascadeGo; chainStep; Arrival; RegId; Path)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthCascade; depthChain)
 open import Verify-Budget-Sufficient.Caps using (cDel; capsAt; Caps)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
@@ -532,6 +532,63 @@ chainWalk e sl (suc m) nextId sched st with sched-next sched
      ++ chainWalk e sl m (suc nextId)
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- SERIES R (5000000): the LEAF the per-chain clause needs, read one
+-- chain at a time.  `depthCascade-perChain` closes its cons clause by
+-- charging the head chain exactly one `nestSyn`, so the leaf under it
+-- has to be `depthChain` within the base terms plus ONE -- and that is
+-- not obvious, because the subscribe-side sibling
+-- `depth-nest-compositional` needs a whole `realWidAt` worth.  If a
+-- delivery down one chain also needs a width, the per-chain sum is
+-- `length chains` widths and the statement above it is false.
+--
+-- LOAD-BEARING on every chain it prints, and it prints them ALL: the
+-- state is threaded through `chainStep` exactly as the clause threads
+-- it, so a later chain is read at the store the earlier ones deepened,
+-- which is where a per-chain charge would break first.  A row with no
+-- bracket had no chains and is evidence about nothing
+chainsRep : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+          → (a : Arrival Γ) → Id → List (RegId × Path Γ (arrTy a) t)
+          → Sched Γ → EvalSt e → String
+chainsRep e sl a nid []              sched st = ""
+chainsRep e sl a nid ((rid , c) ∷ cs) sched st =
+  let st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+      lhs = depthChain nid a c sched st₀
+      rhs = nestDᵛ (arrTy a) (arrVal a) + pathNestD c
+            + storeNestMax sched st₀ + nestSyn e sl
+      k   = chainStep nid a c sched st₀
+  in " [" ++ show lhs ++ "/" ++ show rhs
+     ++ (if lhs ≤ᵇ rhs then "" else " CHAIN-OVER") ++ "]"
+     ++ chainsRep e sl a nid cs (proj₁ (proj₂ k)) (proj₂ (proj₂ k))
+
+leafWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+         → ℕ → ℕ → Sched Γ → EvalSt e → String
+leafWalk e sl 0       nextId sched st = ""
+leafWalk e sl (suc m) nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      r   = cascade a nextId sd st
+  in " |" ++ chainsRep e sl a nextId (chainsOf a st) sd stL
+     ++ leafWalk e sl m (suc nextId)
+                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+leafRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+leafRow fam steps ds ks j w k =
+  let slF = insF ds ks j
+  in if fam ≡ᵇ 0
+     then (let p = progC ds w k
+               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else (let p = progF w k
+               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+
 chainRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 chainRow fam steps ds ks j w k =
   let slF = insF ds ks j
@@ -897,7 +954,12 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
 rowAt n =
-  if 4000000 ≤ᵇ n
+  if 5000000 ≤ᵇ n
+  then (let m = n ∸ 5000000
+        in leafRow (m / 100000) 16 ((m % 100000) / 10000)
+                   ((m % 10000) / 1000) ((m % 1000) / 100)
+                   ((m % 100) / 10) (m % 10))
+  else if 4000000 ≤ᵇ n
   then (let m = n ∸ 4000000
         in chainRow (m / 100000) 16 ((m % 100000) / 10000)
                     ((m % 10000) / 1000) ((m % 1000) / 100)
