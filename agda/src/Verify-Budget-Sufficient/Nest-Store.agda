@@ -274,6 +274,27 @@ abstract
 --   currency-independent: `sum2H`/`sum3H`/`sucH`/`hUp`/`hIn`/`1≤3x`/
 --   `payL`/`payR` for moving a bound up a tower, and `tower-sum-tab` for
 --   a slot telescope.
+
+-- THE ROUTE IS A RECOVERY, AND ITS PAYLOAD STILL COMPILES — which was
+-- the expensive unknown about it.  `capsH` is `blowH` of something at
+-- every index, and the only handle anything has ever had on `blowH` is
+-- `tower-le-blowH`, which went out of the tree with the face that
+-- consumed it; the pointer to it is in `.Caps-Bridge`'s depth row.  Its
+-- two hundred lines of pool growth-rate arithmetic were replayed against
+-- today's tree and typecheck unchanged, needing no import edits, so what
+-- the pointer promises is real rather than merely recorded.
+--
+-- WHAT BLOCKS SPENDING IT IS THE SEAL, NOT THE ARITHMETIC.  `nwAt` is
+-- abstract — for the measured performance reason its own block states —
+-- and it exports equations for the nesting cap but NONE for the width,
+-- so the width side of this statement cannot be unfolded where the
+-- statement lives.  The assembly therefore starts inside the block, with
+-- the two missing width equations, and only then can a height leaf carry
+-- both sides to a tower that `tower-le-blowH` converts.  Recovering the
+-- arithmetic before that exists would park two hundred lines with no
+-- consumer, which the wiring law refuses and which is the right refusal:
+-- the seal is the design decision here and the arithmetic is downstream
+-- of it.
 postulate
   nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
