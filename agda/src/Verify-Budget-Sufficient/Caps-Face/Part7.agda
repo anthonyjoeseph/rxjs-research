@@ -1305,8 +1305,15 @@ postulate
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     let r = cascadeGo a nextId chains sched st
-    in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
+    in suc (delivN st (proj₂ (proj₂ r))) ≤ realWidAt e sl id
 
+-- ONE ARRIVAL'S CHAINS, CHARGED PER DELIVERY, over an ARBITRARY chain
+-- list and an arbitrary state -- which is what makes it inductable at
+-- all.  The consumer wants it at the cascade's own entry, and a
+-- statement pinned there cannot recurse: its cons clause reports the
+-- tail at a state the head's step produced, and the pinned form has no
+-- way to say that.
+--
 -- THE SKIP BRANCH IS WHERE THE TWO SIDES STOP AGREEING, and it is the
 -- thing to know before attempting this induction.  `depthCascade` is
 -- BRANCH-FREE -- its cons clause cannot with-abstract the cancellation
@@ -1317,18 +1324,16 @@ postulate
 -- PHANTOM tail cascade behind it, against a budget denominated in real
 -- deliveries.
 --
--- A SKIP IS ALWAYS PRECEDED BY A DELIVERY, which is why the branch is
--- survivable at all.  `cascadeLatch` clears `cancelled` at every
--- cascade's entry, so a chain can only be skipped because an operator
--- CUT it during this same cascade; both cut sites sit inside a
--- dispatch, and a dispatch runs only after `cascadeGo` has consed the
--- cutting chain's own delivery.  The consequence is a warning about
--- GENERALISING: that fact is a property of the states a cascade
--- actually starts from, and a lemma stated over an arbitrary `st` with
--- an arbitrary `cancelled` loses it -- an all-skipped instance has zero
--- deliveries and the budget collapses to its base terms.  The general
--- form to reach for therefore carries `suc` of the count, not the
--- count.
+-- WHICH IS WHY THE COUNT IS SUCCED, and it is not slack.  A skip is
+-- affordable in a real cascade because `cascadeLatch` clears
+-- `cancelled` at entry, so a chain is skipped only after an operator
+-- CUT it during this same cascade -- and both cut sites sit inside a
+-- dispatch, which runs after `cascadeGo` consed the cutting chain's own
+-- delivery.  That is a property of the states a cascade STARTS from,
+-- and generalising over `st` throws it away: an all-skipped instance
+-- has no deliveries and the budget would collapse to its base terms.
+-- The `suc` is that lost fact restored as arithmetic, and it is exactly
+-- one chain's worth because that is what a phantom costs.
 --
 -- AND THE CHARGE DOES NOT COMPOUND, which is the measured half and the
 -- part that was genuinely open.  `Harness.Main`'s SERIES P drives the
@@ -1345,18 +1350,18 @@ postulate
 -- `depthFold` reads a store the phantom steps have deepened -- no row
 -- produced one.
 postulate
-  cascade-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  depthCascade-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
-    let stL = cascadeLatch a st
-        g   = cascadeGo a nextId (chainsOf a st) sched stL
-    in depthCascade a nextId (chainsOf a st) sched stL
+    let r = cascadeGo a nextId chains sched st
+    in depthCascade a nextId chains sched st
        ≤ nestDᵛ (arrTy a) (arrVal a)
-         + chainsNestD (chainsOf a st)
-         + storeNestMax sched stL
-         + delivN stL (proj₂ (proj₂ g)) * nestSyn e sl
+         + chainsNestD chains
+         + storeNestMax sched st
+         + suc (delivN st (proj₂ (proj₂ r))) * nestSyn e sl
 
 cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -1369,19 +1374,21 @@ cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       + storeNestMax sched (cascadeLatch a st)
       + realWidAt e sl id * nestSyn e sl
 cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps =
-  ≤-trans (cascade-nest-perDeliv sl id a nextId sched st hsl hcaps)
+  ≤-trans (depthCascade-perDeliv sl id a nextId (chainsOf a st) sched stL
+             hsl hcapsL)
           (+-monoʳ-≤ A (*-mono-≤ cnt (≤-refl {nestSyn e sl})))
   where
-  stL = cascadeLatch a st
-  A   = nestDᵛ (arrTy a) (arrVal a)
-        + chainsNestD (chainsOf a st)
-        + storeNestMax sched stL
+  stL    = cascadeLatch a st
+  hcapsL = cascadeLatch-caps (capsAt e sl id) a sched st hcaps
+  A      = nestDᵛ (arrTy a) (arrVal a)
+           + chainsNestD (chainsOf a st)
+           + storeNestMax sched stL
 
-  cnt : delivN stL
-          (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched stL)))
+  cnt : suc (delivN stL
+              (proj₂ (proj₂ (cascadeGo a nextId (chainsOf a st) sched stL))))
           ≤ realWidAt e sl id
   cnt = cascadeGo-deliv-real sl id a nextId (chainsOf a st) sched stL hsl
-          (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
+          hcapsL
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

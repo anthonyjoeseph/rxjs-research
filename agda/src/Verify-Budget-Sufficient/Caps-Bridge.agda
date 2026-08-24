@@ -905,8 +905,9 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval =
              hsl hcaps hnest hval)
           (+-monoʳ-≤ (storeNestMax sched st)
              (*-monoˡ-≤ (nestSyn e sl)
-                (cascadeGo-deliv-real sl id a nextId chains sched st
-                   hsl hcaps)))
+                (≤-trans (n≤1+n (delivN st (proj₂ (proj₂ (cascadeGo a nextId chains sched st)))))
+                         (cascadeGo-deliv-real sl id a nextId chains sched st
+                            hsl hcaps))))
 
 store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
