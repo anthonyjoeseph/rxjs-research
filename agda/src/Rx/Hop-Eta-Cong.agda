@@ -31,7 +31,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Exp using (Ctx; Exp; Tm;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
+                          flattenᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
@@ -81,8 +81,7 @@ mutual
     where
     zbe  = inputsBelowᵗ k z ∧ inputsBelowᵉ k e
     rest = ∧ʳ (inputsBelowᵗ k f) zbe ok
-  hopD-η-congᵉ V k ag (mergeAllᵉ e)   ok = cong suc (hopD-η-congᵉ V k ag e ok)
-  hopD-η-congᵉ V k ag (concatAllᵉ e)  ok = cong suc (hopD-η-congᵉ V k ag e ok)
+  hopD-η-congᵉ V k ag (flattenᵉ lim e)   ok = cong suc (hopD-η-congᵉ V k ag e ok)
   hopD-η-congᵉ V k ag (switchAllᵉ e)  ok = cong suc (hopD-η-congᵉ V k ag e ok)
   hopD-η-congᵉ V k ag (exhaustAllᵉ e) ok = cong suc (hopD-η-congᵉ V k ag e ok)
   hopD-η-congᵉ V k ag (μᵉ e)          ok = hopD-η-congᵉ V k ag e ok

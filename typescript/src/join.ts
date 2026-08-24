@@ -15,14 +15,22 @@ import {
 } from "./inst-emit.js";
 import { captureSync, cold } from "./constructors.js";
 
-// ---- the one join engine: mergeAll/concatAll/switchAll/exhaustAll ----
+// ---- the one join engine: flattenAll/switchAll/exhaustAll ----
 // (the TS mirror of Agda's subscribeAll + stepFrame thru-outer/from-inner)
 //
-// The four ops differ ONLY in two decisions — what to do with a newly
-// arrived inner (subscribe / queue behind the active one / cut the
-// current one / drop), and how to react when an inner finishes (concat
-// advances its queue; the others just bookkeep) — plus the completion
-// condition. Everything else is shared:
+// flattenAll carries rxjs's `concurrent` argument: undefined is
+// Infinity, which is mergeAll; 1 is concatAll; k >= 2 is the bounded
+// mergeMap(f, k) that has no name of its own in rxjs. There is no
+// separate merge and concat op — they are two points of one operator's
+// parameter, and the middle point is not reachable by combining them,
+// because a bounded flatten assigns an arriving inner to the NEXT FREE
+// lane and no static partition of the outer into k merges does that.
+//
+// The three ops differ ONLY in two decisions — what to do with a newly
+// arrived inner (subscribe if a lane is free / park it / cut the
+// current one / drop), and how to react when an inner finishes (flatten
+// drains its queue into the freed lanes; the others just bookkeep) —
+// plus the completion condition. Everything else is shared:
 //
 // - a subscribed inner's SYNC burst is captured and flattened into the
 //   emit that carried it (Agda's splitBurst): all bookkeeping in walk
@@ -38,7 +46,7 @@ import { captureSync, cold } from "./constructors.js";
 //   registrations it still holds (Agda's cutThrough), and its rx
 //   teardown cancels whatever it had scheduled (sweepLive).
 
-type JoinOp = "merge" | "concat" | "switch" | "exhaust";
+type JoinOp = "flatten" | "switch" | "exhaust";
 
 type InnerHandle = {
   open: SourceId[]; // this inner's live registrations — its fin bit
@@ -49,15 +57,18 @@ type InnerHandle = {
 type Grafts<A> = { bookkeeping: InstEvent<never>[]; values: A[] };
 
 const joinAll =
-  (op: JoinOp) =>
+  (op: JoinOp, limit: number | undefined) =>
   <A>(
     outer: Observable<InstEmit<Observable<InstEmit<A>>>>,
   ): Observable<InstEmit<A>> =>
     cold<InstEmit<A>>((sink) => {
       let outerDone = false;
       let finished = false;
-      const active: InnerHandle[] = []; // merge: all; the rest keep at most one
-      const queue: Observable<InstEmit<A>>[] = []; // concat only
+      const active: InnerHandle[] = []; // flatten: up to `limit`; the rest at most one
+      const queue: Observable<InstEmit<A>>[] = []; // flatten only
+
+      // is there a free lane? an absent limit is rxjs's Infinity
+      const hasRoom = () => limit === undefined || active.length < limit;
 
       const joinDone = () =>
         outerDone && active.length === 0 && queue.length === 0;
@@ -85,7 +96,7 @@ const joinAll =
         let grafts: Grafts<A> = { bookkeeping: [], values: [] };
         if (innerDone) {
           removeHandle(handle);
-          if (op === "concat") grafts = drainQueue();
+          if (op === "flatten") grafts = drainQueue();
         }
         sink.next(
           reassemble(
@@ -129,10 +140,16 @@ const joinAll =
         return { bookkeeping: flat.bookkeeping, values: flat.values, done };
       };
 
-      // concat: subscribe queued inners until one survives its burst
+      // flatten: subscribe parked inners while a lane is free. The
+      // gate is hasRoom() and NOT "until one survives its burst" —
+      // subscribeInner pushes to `active` exactly when the inner is
+      // still open, so at limit 1 the two coincide, and above 1 the
+      // loop keeps filling lanes across several parked inners in one
+      // instant, which is what mergeMap(f, k) does when several
+      // finish together
       const drainQueue = (): Grafts<A> => {
         let grafts: Grafts<A> = { bookkeeping: [], values: [] };
-        while (queue.length > 0) {
+        while (queue.length > 0 && hasRoom()) {
           const nextInner = queue.shift();
           if (nextInner === undefined) break;
           const result = subscribeInner(nextInner);
@@ -140,7 +157,6 @@ const joinAll =
             bookkeeping: [...grafts.bookkeeping, ...result.bookkeeping],
             values: [...grafts.values, ...result.values],
           };
-          if (!result.done) break;
         }
         return grafts;
       };
@@ -162,10 +178,8 @@ const joinAll =
         cuttingInstant: Provenance,
       ): Grafts<A> => {
         switch (op) {
-          case "merge":
-            return subscribeInner(innerObs);
-          case "concat": {
-            if (active.length > 0) {
+          case "flatten": {
+            if (!hasRoom()) {
               queue.push(innerObs);
               return { bookkeeping: [], values: [] };
             }
@@ -235,7 +249,10 @@ const joinAll =
       };
     });
 
-export const mergeAll = joinAll("merge");
-export const concatAll = joinAll("concat");
-export const switchAll = joinAll("switch");
-export const exhaustAll = joinAll("exhaust");
+// `limit` is fixed when the pipeline is BUILT, never per subscription —
+// that is what rxjs's `concurrent` argument is, and a limit that varied
+// per subscription would be a capability the real operator lacks
+export const flattenAll = (limit: number | undefined) =>
+  joinAll("flatten", limit);
+export const switchAll = joinAll("switch", undefined);
+export const exhaustAll = joinAll("exhaust", undefined);

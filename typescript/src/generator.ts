@@ -248,14 +248,15 @@ const genExp = (
         src: genExp(rng, s, ctx, depth - 1),
       };
     },
-    mergeAll: () => ({
-      type: "mergeAll",
+    // the limit axis is where bounded concurrency gets exercised:
+    // absent is the old mergeAll, 1 is the old concatAll, 2/3 are the
+    // middle that nothing in this development could previously reach.
+    // Two lanes with three parked inners is the smallest shape whose
+    // drain refills more than one lane in a single instant
+    flatten: () => ({
+      type: "flatten",
       ty,
-      src: genExp(rng, obsOf, ctx, depth - 1),
-    }),
-    concatAll: () => ({
-      type: "concatAll",
-      ty,
+      limit: pick(rng, [undefined, 1, 1, 2, 3] as (number | undefined)[]),
       src: genExp(rng, obsOf, ctx, depth - 1),
     }),
     switchAll: () => ({

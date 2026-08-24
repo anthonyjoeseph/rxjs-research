@@ -88,7 +88,7 @@ open import Data.Sum     using (inj₁; inj₂)
 
 open import Rx.Exp using (Ctx; Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Val;
   Exp; Tm; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
-  scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ;
   strmᵗ)
 
@@ -102,8 +102,7 @@ mutual
   -- THE PRODUCT: one re-wrap per delivered payload
   nestDᵉ (scanᵉ f z e)   = nestDᵗ z + nestDᵗ f + nestDᵉ e
   -- THE SPENDING ARC: one suc per *All layer
-  nestDᵉ (mergeAllᵉ e)   = suc (nestDᵉ e)
-  nestDᵉ (concatAllᵉ e)  = suc (nestDᵉ e)
+  nestDᵉ (flattenᵉ lim e)   = suc (nestDᵉ e)
   nestDᵉ (switchAllᵉ e)  = suc (nestDᵉ e)
   nestDᵉ (exhaustAllᵉ e) = suc (nestDᵉ e)
   nestDᵉ (μᵉ e)          = nestDᵉ e

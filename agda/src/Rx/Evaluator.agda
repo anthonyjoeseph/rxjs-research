@@ -17,7 +17,7 @@ open import Rx.Prim using (Tick; Fuel; Ordinal; Id; Source; Gas; g0; gs; gasTowe
   cold; InstEvent; init; value; close; handoff; complete; cut; cutPending; exhausted; dried;
   subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 open import Rx.Exp  using (Ty; obs; _×ᵗ_; _≟ᵗ_; Ctx; Val; Closed; Fn; applyFn; evalTm; unfoldμ; sizeᵉ; input; ofᵉ;
-  emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+  emptyᵉ; mapᵉ; takeᵉ; scanᵉ; flattenᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 -- for `entryCeil`: the caps recurrence's BASE width, which `budgetAt`
 -- must know because it must dominate the recurrence
 open import Rx.Frame-Width using (entryCeil)
@@ -156,9 +156,19 @@ NodeId = ℕ            -- numbered in subscription order
 data NodeState {n} (Γ : Ctx n) : Set where
   scan-st    : ∀ {t} → Val Γ t → NodeState Γ    -- current accumulator
   take-st    : ℕ → NodeState Γ                  -- emissions remaining
-  merge-st   : (activeInners : ℕ) (outerDone : Bool) → NodeState Γ
-  concat-st  : ∀ {t} → (queued : List (Closed Γ t)) (innerActive outerDone : Bool)
-             → NodeState Γ
+  flatten-st : ∀ {t} → (limit : Maybe ℕ) (active : ℕ)
+               (queued : List (Closed Γ t)) (outerDone : Bool) → NodeState Γ
+               -- ONE state for every concurrency.  The two states this
+               -- replaced were each a projection of it: unbounded merge kept
+               -- a counter and no queue (`nothing`, q ≡ []), concat kept a
+               -- queue and a one-bit counter (`just 1`, active ≤ 1).  Neither
+               -- could express the middle, which is where `mergeMap(f , k)`
+               -- lives, and the middle is not reachable by combining them:
+               -- a bounded flatten assigns an arriving inner to the NEXT FREE
+               -- lane, and no static partition of the outer into k merges
+               -- does that.  The queue carries its element type
+               -- existentially, so every read pays a `_≟ᵗ_` — the unbounded
+               -- face did not pay one before and its clauses now do.
   switch-st  : (currentInner : Maybe NodeId) (outerDone : Bool) → NodeState Γ
   exhaust-st : (innerActive outerDone : Bool) → NodeState Γ
 
@@ -179,8 +189,11 @@ setNode nid s ((k , s′) ∷ r) =
 -- Registration chains: the dynamic topology, rootward
 ------------------------------------------------------------------
 
+-- the flattening operator carries NO limit: the limit lives in the node
+-- state, which every consumer already reads, and a second copy in the
+-- frame is a copy that can drift from it
 data AllOp : Set where
-  mergeᵒ concatᵒ switchᵒ exhaustᵒ : AllOp
+  flattenᵒ switchᵒ exhaustᵒ : AllOp
 
 -- one operator the emission passes through, rootward.  deferᵉ
 -- contributes NO frame (it merely relays its body), and share is not
@@ -679,14 +692,14 @@ fLvl S W J = J + fCharge S W J
 --     `subscribeE (gs fuel) (μᵉ body) → subscribeE fuel (unfoldμ body)`;
 --   · and EVERY other route through the pipeline keeps the gas fixed
 --     because it stays at ONE nesting level — `subscribeE fuel` walking
---     its own operator chain (map / take / scan / the four *All), the
+--     its own operator chain (map / take / scan / the three *All), the
 --     `pushBurst fuel → stepFrame fuel → thruWalk fuel → thruConsume
---     fuel` re-entry of a burst, `concatDrain fuel` off `innerFinish`,
+--     fuel` re-entry of a burst, `flattenDrain fuel` off `innerFinish`,
 --     and `foldPath sf → dispatchShare sf → shareGo sf → stepFrame sf`,
 --     which threads the SYNC fuel unchanged through a delivery.
 --
 --   So no path reaches `subscribeInner` at the gas it was called with:
---   the four `thruConsume` sites and the one `concatDrain` site are
+--   the three `thruConsume` sites and the one `flattenDrain` site are
 --   reached from a `stepFrame` running at the caller's gas, and the peel
 --   happens INSIDE `subscribeInner` before control reaches `subscribeE`.
 --   `deferᵉ` is not a nesting edge at all — it parks the body for
@@ -1104,11 +1117,23 @@ takeDispatch nid vals fin sched st _ = [] , [] , fin , sched , st
 -- the outer *All frame's machinery, lifted out of stepFrame so the
 -- budget proof can reason about its reduction.  One walk for all four
 -- ops (they differ only in the per-emit step and the wrap's node read)
-mergeBump : ∀ {n} {Γ : Ctx n} → NodeId → Bool
-          → List (NodeId × NodeState Γ) → List (NodeId × NodeState Γ)
-mergeBump nid done ns with lookupNode nid ns
-... | just (merge-st k od) = setNode nid (merge-st (if done then k else suc k) od) ns
-... | _                    = ns
+-- is there a free lane?  `nothing` is rxjs's Infinity, so always
+hasRoom : Maybe ℕ → ℕ → Bool
+hasRoom nothing  active = true
+hasRoom (just m) active = active <ᵇ m
+
+-- bump the live count on whatever state the node holds NOW.  Re-reading
+-- the table rather than writing back a count captured before the
+-- subscription is not fastidiousness: the inner's own synchronous burst
+-- can route back through THIS node and finish there, and a captured
+-- count silently discards that drain — the freed lane is refilled and
+-- then un-freed by a stale write
+flattenBump : ∀ {n} {Γ : Ctx n} → NodeId → Bool
+            → List (NodeId × NodeState Γ) → List (NodeId × NodeState Γ)
+flattenBump nid done ns with lookupNode nid ns
+... | just (flatten-st lim act q od) =
+      setNode nid (flatten-st lim (if done then act else suc act) q od) ns
+... | _ = ns
 
 -- switchAll's cut: the outgoing inner's registrations are severed
 switchKill : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -1128,24 +1153,21 @@ thruConsume : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
             → Gas → AllOp → NodeId → Path Γ u t → Id → Tick
             → Val Γ (obs u) → Sched Γ → EvalSt e
             → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
-thruConsume fuel mergeᵒ nid κ id now o sched₀ st₀ =
-  let (_ , vs , bs , done , sched₁ , st₁) =
-        subscribeInner fuel mergeᵒ nid κ id now o sched₀ st₀
-  in vs , bs , sched₁ , record st₁ { nodes = mergeBump nid done (EvalSt.nodes st₁) }
-thruConsume {u = u} fuel concatᵒ nid κ id now o sched₀ st₀
+thruConsume {u = u} fuel flattenᵒ nid κ id now o sched₀ st₀
   with lookupNode nid (EvalSt.nodes st₀)
-... | just (concat-st {w} q true od) with w ≟ᵗ u
-...   | yes refl =
-        [] , [] , sched₀ ,
-        record st₀ { nodes = setNode nid (concat-st (q ++ o ∷ []) true od) (EvalSt.nodes st₀) }
+... | just (flatten-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _ = [] , [] , sched₀ , st₀
-thruConsume {u = u} fuel concatᵒ nid κ id now o sched₀ st₀
-    | just (concat-st q false od) =
-  let (_ , vs , bs , done , sched₁ , st₁) =
-        subscribeInner fuel concatᵒ nid κ id now o sched₀ st₀
-  in vs , bs , sched₁ ,
-     record st₁ { nodes = setNode nid (concat-st {t = u} [] (not done) od) (EvalSt.nodes st₁) }
-thruConsume fuel concatᵒ nid κ id now o sched₀ st₀ | _ = [] , [] , sched₀ , st₀
+...   | yes refl with hasRoom lim act
+...     | true =
+          let (_ , vs , bs , done , sched₁ , st₁) =
+                subscribeInner fuel flattenᵒ nid κ id now o sched₀ st₀
+          in vs , bs , sched₁ ,
+             record st₁ { nodes = flattenBump nid done (EvalSt.nodes st₁) }
+...     | false =
+          [] , [] , sched₀ ,
+          record st₀ { nodes = setNode nid (flatten-st lim act (q ++ o ∷ []) od)
+                                 (EvalSt.nodes st₀) }
+thruConsume fuel flattenᵒ nid κ id now o sched₀ st₀ | _ = [] , [] , sched₀ , st₀
 thruConsume fuel switchᵒ nid κ id now o sched₀ st₀
   with lookupNode nid (EvalSt.nodes st₀)
 ... | just (switch-st cur od) =
@@ -1181,17 +1203,11 @@ thruWrap : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e
          → List (Val Γ u) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
 thruWrap op nid false (vs , bs , sched′ , st′) = vs , bs , false , sched′ , st′
-thruWrap mergeᵒ nid true (vs , bs , sched′ , st′)
+thruWrap flattenᵒ nid true (vs , bs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
-... | just (merge-st k _) =
-      vs , bs , (k ≡ᵇ 0) , sched′ ,
-      record st′ { nodes = setNode nid (merge-st k true) (EvalSt.nodes st′) }
-... | _ = vs , bs , true , sched′ , st′
-thruWrap concatᵒ nid true (vs , bs , sched′ , st′)
-  with lookupNode nid (EvalSt.nodes st′)
-... | just (concat-st q act _) =
-      vs , bs , not act ∧ null q , sched′ ,
-      record st′ { nodes = setNode nid (concat-st q act true) (EvalSt.nodes st′) }
+... | just (flatten-st lim act q _) =
+      vs , bs , (act ≡ᵇ 0) ∧ null q , sched′ ,
+      record st′ { nodes = setNode nid (flatten-st lim act q true) (EvalSt.nodes st′) }
 ... | _ = vs , bs , true , sched′ , st′
 thruWrap switchᵒ nid true (vs , bs , sched′ , st′)
   with lookupNode nid (EvalSt.nodes st′)
@@ -1207,37 +1223,53 @@ thruWrap exhaustᵒ nid true (vs , bs , sched′ , st′)
 ... | _ = vs , bs , true , sched′ , st′
 
 -- the inner *All frame's machinery, lifted out of stepFrame so the
--- budget proof can reason about its reduction.  concatAll's drain
--- walks the queue, subscribing each parked inner until one stays open
-concatDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-            → Gas → NodeId → Path Γ s t → Id → Tick
-            → List (Closed Γ s) → Sched Γ → EvalSt e
-            → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool
-              × List (Closed Γ s) × Sched Γ × EvalSt e
-concatDrain fuel allNid κ id now []      sched₀ st₀ = [] , [] , false , [] , sched₀ , st₀
-concatDrain fuel allNid κ id now (o ∷ q) sched₀ st₀ =
-  let (_ , vs , bs , done , sched₁ , st₁) =
-        subscribeInner fuel concatᵒ allNid κ id now o sched₀ st₀
-  in if done
-     then (let (vs′ , bs′ , act , q′ , sched₂ , st₂) =
-                 concatDrain fuel allNid κ id now q sched₁ st₁
-           in vs ++ vs′ , bs ++ bs′ , act , q′ , sched₂ , st₂)
-     else (vs , bs , true , q , sched₁ , st₁)
+-- budget proof can reason about its reduction.  The drain walks the
+-- parked queue, subscribing while a lane is free and stopping the
+-- instant one is not.  This is the ONE behaviour bounded concurrency
+-- adds that neither face it replaces had: unbounded merge never
+-- queues, so it never drains, and concat's drain could stop only at
+-- the first inner that stayed open because its capacity was one.  The
+-- accumulator is the live count and NOT a flag, so the walk keeps
+-- filling lanes across several parked inners in one instant, which is
+-- precisely what `mergeMap(f , k)` does when several finish together
+
+-- The count is THREADED and not re-read from the node table between
+-- iterations, so a drained inner whose own synchronous burst routes
+-- back through THIS node and finishes there is not seen by the rest of
+-- the walk.  The face this replaced threaded a flag with the same
+-- blind spot, so nothing regresses — but the loss is now quantitative
+-- rather than one bit, which is what makes it worth naming: at limit 1
+-- a missed self-finish costs the drain its only lane, at limit k it
+-- can cost several, and the two do not fail the same way
+flattenDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+             → Gas → NodeId → Path Γ s t → Id → Tick
+             → Maybe ℕ → ℕ → List (Closed Γ s) → Sched Γ → EvalSt e
+             → List (Val Γ s) × List (InstEvent (Val Γ t)) × ℕ
+               × List (Closed Γ s) × Sched Γ × EvalSt e
+flattenDrain fuel allNid κ id now lim act []      sched₀ st₀ =
+  [] , [] , act , [] , sched₀ , st₀
+flattenDrain fuel allNid κ id now lim act (o ∷ q) sched₀ st₀
+  with hasRoom lim act
+... | false = [] , [] , act , o ∷ q , sched₀ , st₀
+... | true =
+      let (_ , vs , bs , done , sched₁ , st₁) =
+            subscribeInner fuel flattenᵒ allNid κ id now o sched₀ st₀
+          (vs′ , bs′ , act′ , q′ , sched₂ , st₂) =
+            flattenDrain fuel allNid κ id now lim
+              (if done then act else suc act) q sched₁ st₁
+      in vs ++ vs′ , bs ++ bs′ , act′ , q′ , sched₂ , st₂
 
 innerFinish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
             → Gas → AllOp → NodeId → NodeId → Path Γ s t → Id → Tick
             → List (Val Γ s) → Sched Γ → EvalSt e → Maybe (NodeState Γ)
             → List (Val Γ s) × List (InstEvent (Val Γ t)) × Bool × Sched Γ × EvalSt e
-innerFinish fuel mergeᵒ allNid inst κ id now vals sched st (just (merge-st k od)) =
-  vals , [] , od ∧ (pred k ≡ᵇ 0) , sched ,
-  record st { nodes = setNode allNid (merge-st (pred k) od) (EvalSt.nodes st) }
-innerFinish {s = s} fuel concatᵒ allNid inst κ id now vals sched st
-            (just (concat-st {w} q act od)) with w ≟ᵗ s
+innerFinish {s = s} fuel flattenᵒ allNid inst κ id now vals sched st
+            (just (flatten-st {w} lim act q od)) with w ≟ᵗ s
 ... | yes refl =
       let (vs , bs , act′ , q′ , sched′ , st′) =
-            concatDrain fuel allNid κ id now q sched st
-      in vals ++ vs , bs , od ∧ not act′ ∧ null q′ , sched′ ,
-         record st′ { nodes = setNode allNid (concat-st q′ act′ od) (EvalSt.nodes st′) }
+            flattenDrain fuel allNid κ id now lim (pred act) q sched st
+      in vals ++ vs , bs , od ∧ (act′ ≡ᵇ 0) ∧ null q′ , sched′ ,
+         record st′ { nodes = setNode allNid (flatten-st lim act′ q′ od) (EvalSt.nodes st′) }
 ... | no _ = vals , [] , false , sched , st
 innerFinish fuel switchᵒ allNid inst κ id now vals sched st (just (switch-st (just c) od)) =
   if c ≡ᵇ inst
@@ -1359,7 +1391,7 @@ sharedPlumb = map (λ em → record em { kind = plumbing })
 -- subscribed.  Fuel is matched here, not at subscribeSharedSlot's
 -- branches: joining an already-connected share costs nothing.
 -- Lifted out of subscribeSharedSlot's where block so the budget
--- proof can name it (as with takeVals / thruConsume / concatDrain)
+-- proof can name it (as with takeVals / thruConsume / flattenDrain)
 sharedConnect : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
               → Gas → (i : Fin n) → Closed Γ (lookup Γ i)
               → Path Γ (lookup Γ i) t → Id → Tick
@@ -1460,10 +1492,8 @@ subscribeE fuel (scanᵉ f seed b) κ id now sched st =
                    (installNode nid (scan-st (evalTm seed)) st)
   in pushBurst fuel id now (scan-f f nid) κ burst sched₂ st₁
 
-subscribeE fuel (mergeAllᵉ b) κ id now sched st =
-  subscribeAll fuel mergeᵒ (merge-st 0 false) b κ id now sched st
-subscribeE {u = u} fuel (concatAllᵉ b) κ id now sched st =
-  subscribeAll fuel concatᵒ (concat-st {t = u} [] false false) b κ id now sched st
+subscribeE {u = u} fuel (flattenᵉ lim b) κ id now sched st =
+  subscribeAll fuel flattenᵒ (flatten-st {t = u} lim 0 [] false) b κ id now sched st
 subscribeE fuel (switchAllᵉ b) κ id now sched st =
   subscribeAll fuel switchᵒ (switch-st nothing false) b κ id now sched st
 subscribeE fuel (exhaustAllᵉ b) κ id now sched st =
@@ -1495,8 +1525,8 @@ subscribeE {u = u} fuel (deferᵉ body) κ id now sched st =
                         ; pending = (suc now , body) ∷ [] }
                  ∷ Sched.live sched₃ }
   in ((init src ∷ []) at id from src as subscribe) ∷ [] , sched₄ ,
-     register src (thru-outer mergeᵒ nid ↠ κ)
-              (installNode nid (merge-st 0 false) st)
+     register src (thru-outer flattenᵒ nid ↠ κ)
+              (installNode nid (flatten-st {t = u} nothing 0 [] false) st)
 
 -- delivery at a share boundary re-enters chain evaluation: foldPath
 -- and dispatchShare are mutually recursive.  The recursion is bounded

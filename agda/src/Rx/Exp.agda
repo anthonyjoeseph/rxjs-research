@@ -9,6 +9,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Relation.Unary.All using (All) renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.Vec     using (Vec; lookup)
 open import Data.Fin     using (Fin; toℕ)
+open import Data.Maybe   using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_)
 open import Data.Unit    using (⊤; tt)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
@@ -71,7 +72,24 @@ mutual
                -- binding, not an expression.  Shared observables live in the
                -- slot telescope (Rx.Evaluator.Slot) and are referenced with
                -- `input`, exactly like scripted inputs
-    mergeAllᵉ concatAllᵉ switchAllᵉ exhaustAllᵉ :
+    flattenᵉ   : ∀ {t} → Maybe ℕ → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
+                 -- ONE higher-order flattening primitive, parameterised by
+                 -- rxjs's `concurrent` argument.  `nothing` is Infinity, which
+                 -- is `mergeAll`; `just 1` is `concatAll`; `just k` for k ≥ 2
+                 -- is the bounded `mergeMap(f , k)` that has no name of its
+                 -- own in rxjs and that nothing in this development could
+                 -- previously express.  The limit is a `Maybe ℕ` and NOT a
+                 -- `Tm`, unlike `takeᵉ`'s count: rxjs fixes `concurrent` when
+                 -- the pipeline is BUILT, not when it is subscribed, so a
+                 -- limit that varied per subscription would be a capability
+                 -- the real operator does not have.  `just 0` is degenerate
+                 -- but well defined — the queue grows and nothing is ever
+                 -- subscribed — and is left representable rather than ruled
+                 -- out by a side condition, which would have to be threaded
+                 -- through every well-formedness face to buy the exclusion
+                 -- of one program already indistinguishable from `emptyᵉ` on
+                 -- its outputs.
+    switchAllᵉ exhaustAllᵉ :
                  ∀ {t} → Exp Γ Δᵍ Δ Θ (obs t) → Exp Γ Δᵍ Δ Θ t
     μᵉ         : ∀ {t} → Exp Γ (t ∷ Δᵍ) Δ Θ t → Exp Γ Δᵍ Δ Θ t
     varᵉ       : ∀ {t} → t ∈ Δ → Exp Γ Δᵍ Δ Θ t
@@ -190,8 +208,7 @@ mutual
   renExp ρg ρd ρt (mapᵉ f e)     = mapᵉ (renTm ρg ρd (ext∈ ρt) f) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (takeᵉ n e)    = takeᵉ (renTm ρg ρd ρt n) (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (scanᵉ f i e)  = scanᵉ (renTm ρg ρd (ext∈ ρt) f) (renTm ρg ρd ρt i) (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (mergeAllᵉ e)  = mergeAllᵉ (renExp ρg ρd ρt e)
-  renExp ρg ρd ρt (concatAllᵉ e) = concatAllᵉ (renExp ρg ρd ρt e)
+  renExp ρg ρd ρt (flattenᵉ lim e) = flattenᵉ lim (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (switchAllᵉ e) = switchAllᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (exhaustAllᵉ e) = exhaustAllᵉ (renExp ρg ρd ρt e)
   renExp ρg ρd ρt (μᵉ e)         = μᵉ (renExp (ext∈ ρg) ρd ρt e)
@@ -255,8 +272,7 @@ mutual
   subΘExp Θloc σ (takeᵉ n e)    = takeᵉ (subΘTm Θloc σ n) (subΘExp Θloc σ e)
   subΘExp Θloc σ (scanᵉ {s = s} {t = t} f i e) =
     scanᵉ (subΘTm ((t ×ᵗ s) ∷ Θloc) σ f) (subΘTm Θloc σ i) (subΘExp Θloc σ e)
-  subΘExp Θloc σ (mergeAllᵉ e)  = mergeAllᵉ (subΘExp Θloc σ e)
-  subΘExp Θloc σ (concatAllᵉ e) = concatAllᵉ (subΘExp Θloc σ e)
+  subΘExp Θloc σ (flattenᵉ lim e) = flattenᵉ lim (subΘExp Θloc σ e)
   subΘExp Θloc σ (switchAllᵉ e) = switchAllᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (exhaustAllᵉ e) = exhaustAllᵉ (subΘExp Θloc σ e)
   subΘExp Θloc σ (μᵉ e)         = μᵉ (subΘExp Θloc σ e)
@@ -341,8 +357,7 @@ mutual
   elimGExp x cl (mapᵉ f e)     = mapᵉ (elimGTm x cl f) (elimGExp x cl e)
   elimGExp x cl (takeᵉ n e)    = takeᵉ (elimGTm x cl n) (elimGExp x cl e)
   elimGExp x cl (scanᵉ f i e)  = scanᵉ (elimGTm x cl f) (elimGTm x cl i) (elimGExp x cl e)
-  elimGExp x cl (mergeAllᵉ e)  = mergeAllᵉ (elimGExp x cl e)
-  elimGExp x cl (concatAllᵉ e) = concatAllᵉ (elimGExp x cl e)
+  elimGExp x cl (flattenᵉ lim e) = flattenᵉ lim (elimGExp x cl e)
   elimGExp x cl (switchAllᵉ e) = switchAllᵉ (elimGExp x cl e)
   elimGExp x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimGExp x cl e)
   elimGExp x cl (μᵉ e)         = μᵉ (elimGExp (there x) cl e)
@@ -379,8 +394,7 @@ mutual
   elimDExp x cl (mapᵉ f e)     = mapᵉ (elimDTm x cl f) (elimDExp x cl e)
   elimDExp x cl (takeᵉ n e)    = takeᵉ (elimDTm x cl n) (elimDExp x cl e)
   elimDExp x cl (scanᵉ f i e)  = scanᵉ (elimDTm x cl f) (elimDTm x cl i) (elimDExp x cl e)
-  elimDExp x cl (mergeAllᵉ e)  = mergeAllᵉ (elimDExp x cl e)
-  elimDExp x cl (concatAllᵉ e) = concatAllᵉ (elimDExp x cl e)
+  elimDExp x cl (flattenᵉ lim e) = flattenᵉ lim (elimDExp x cl e)
   elimDExp x cl (switchAllᵉ e) = switchAllᵉ (elimDExp x cl e)
   elimDExp x cl (exhaustAllᵉ e) = exhaustAllᵉ (elimDExp x cl e)
   elimDExp x cl (μᵉ e)         = μᵉ (elimDExp x cl e)
@@ -462,8 +476,7 @@ mutual
   sizeᵉ (mapᵉ f e)       = suc (sizeᵗ f + sizeᵉ e)
   sizeᵉ (takeᵉ c e)      = suc (sizeᵗ c + sizeᵉ e)
   sizeᵉ (scanᵉ f z e)    = suc (sizeᵗ f + sizeᵗ z + sizeᵉ e)
-  sizeᵉ (mergeAllᵉ e)    = suc (sizeᵉ e)
-  sizeᵉ (concatAllᵉ e)   = suc (sizeᵉ e)
+  sizeᵉ (flattenᵉ lim e)   = suc (sizeᵉ e)
   sizeᵉ (switchAllᵉ e)   = suc (sizeᵉ e)
   sizeᵉ (exhaustAllᵉ e)  = suc (sizeᵉ e)
   sizeᵉ (μᵉ e)           = suc (sizeᵉ e)
@@ -518,8 +531,7 @@ mutual
   syncSizeᵉ (mapᵉ f e)       = suc (syncSizeᵗ f + syncSizeᵉ e)
   syncSizeᵉ (takeᵉ c e)      = suc (syncSizeᵗ c + syncSizeᵉ e)
   syncSizeᵉ (scanᵉ f z e)    = suc (syncSizeᵗ f + syncSizeᵗ z + syncSizeᵉ e)
-  syncSizeᵉ (mergeAllᵉ e)    = suc (syncSizeᵉ e)
-  syncSizeᵉ (concatAllᵉ e)   = suc (syncSizeᵉ e)
+  syncSizeᵉ (flattenᵉ lim e)   = suc (syncSizeᵉ e)
   syncSizeᵉ (switchAllᵉ e)   = suc (syncSizeᵉ e)
   syncSizeᵉ (exhaustAllᵉ e)  = suc (syncSizeᵉ e)
   syncSizeᵉ (μᵉ e)           = suc (syncSizeᵉ e)
@@ -580,8 +592,7 @@ shellSizeᵉ emptyᵉ          = 1
 shellSizeᵉ (mapᵉ f e)      = suc (shellSizeᵉ e)
 shellSizeᵉ (takeᵉ c e)     = suc (shellSizeᵉ e)
 shellSizeᵉ (scanᵉ f z e)   = suc (shellSizeᵉ e)
-shellSizeᵉ (mergeAllᵉ e)   = suc (shellSizeᵉ e)
-shellSizeᵉ (concatAllᵉ e)  = suc (shellSizeᵉ e)
+shellSizeᵉ (flattenᵉ lim e)  = suc (shellSizeᵉ e)
 shellSizeᵉ (switchAllᵉ e)  = suc (shellSizeᵉ e)
 shellSizeᵉ (exhaustAllᵉ e) = suc (shellSizeᵉ e)
 shellSizeᵉ (μᵉ e)          = suc (shellSizeᵉ e)
@@ -596,8 +607,7 @@ mutual
   innerᵉ (mapᵉ f e)      = innerᵗ f ++ innerᵉ e
   innerᵉ (takeᵉ c e)     = innerᵗ c ++ innerᵉ e
   innerᵉ (scanᵉ f z e)   = innerᵗ f ++ innerᵗ z ++ innerᵉ e
-  innerᵉ (mergeAllᵉ e)   = innerᵉ e
-  innerᵉ (concatAllᵉ e)  = innerᵉ e
+  innerᵉ (flattenᵉ lim e)  = innerᵉ e
   innerᵉ (switchAllᵉ e)  = innerᵉ e
   innerᵉ (exhaustAllᵉ e) = innerᵉ e
   innerᵉ (μᵉ e)          = innerᵉ e
@@ -661,8 +671,7 @@ mutual
   inputsBelowᵉ k (takeᵉ c e)     = inputsBelowᵗ k c ∧ inputsBelowᵉ k e
   inputsBelowᵉ k (scanᵉ f z e)   =
     inputsBelowᵗ k f ∧ inputsBelowᵗ k z ∧ inputsBelowᵉ k e
-  inputsBelowᵉ k (mergeAllᵉ e)   = inputsBelowᵉ k e
-  inputsBelowᵉ k (concatAllᵉ e)  = inputsBelowᵉ k e
+  inputsBelowᵉ k (flattenᵉ lim e) = inputsBelowᵉ k e
   inputsBelowᵉ k (switchAllᵉ e)  = inputsBelowᵉ k e
   inputsBelowᵉ k (exhaustAllᵉ e) = inputsBelowᵉ k e
   inputsBelowᵉ k (μᵉ e)          = inputsBelowᵉ k e

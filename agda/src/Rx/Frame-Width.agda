@@ -15,11 +15,24 @@
 --   outWᵉ e   how many payloads e's subscribe frame can deliver
 --   innWᵉ e   the widest observable that frame can EMIT
 --
---     outWᵉ (mergeAllᵉ e) = outWᵉ e * innWᵉ e
+--     outWᵉ (flattenᵉ lim e) = outWᵉ e * innWᵉ e
 --
 -- entering every inner that every payload carries.  Neither bounds the
 -- other, so both are needed, and each needs its own plug slope — hence
 -- four functions rather than two.
+
+-- EVERY WIDTH CLAUSE IGNORES THE CONCURRENCY LIMIT, AND THAT IS SOUND
+-- RATHER THAN SLOPPY.  A width here is a per-frame payload CEILING, and
+-- capping concurrency can only remove inners from an instant — a parked
+-- inner delivers nothing until it is drained, and the drain happens at
+-- a LATER frame, under this same ceiling.  So the unbounded reading
+-- dominates every finite limit, uniformly, and the measure is a
+-- constant function of the limit rather than a case split on it.  This
+-- is not an accident of the new primitive: the two clauses this one
+-- replaced were already textually identical, so the merge bound was
+-- already what the concat face was paying.  What a finite limit DOES
+-- move is the QUEUE, which is a length and not a width, and which no
+-- measure in this module reads.
 
 -- AND TWO SLOPES, for the reason hopD needed pm and for the reason
 -- three drafts of hopD's coefficient were refuted: a template may use
@@ -28,7 +41,7 @@
 -- variable, never an occurrence count.  pmO is outW's slope, pmI is
 -- innW's, and the *All clause needs BOTH by the product rule:
 --
---   pmOᵉ k (mergeAllᵉ e) = outWᵉ e * pmIᵉ k e + pmOᵉ k e * innWᵉ e
+--   pmOᵉ k (flattenᵉ lim e) = outWᵉ e * pmIᵉ k e + pmOᵉ k e * innWᵉ e
 --
 -- A draft with one slope cannot state that clause at all.
 
@@ -92,9 +105,9 @@ open import Data.List using (List; []; _∷_; length; tabulate)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
 
-open import Rx.Exp using (_+ᵗ_; _×ᵗ_; bool̂; boolᵗ; caseᵗ; concatAllᵉ; Ctx;
+open import Rx.Exp using (_+ᵗ_; _×ᵗ_; bool̂; boolᵗ; caseᵗ; Ctx;
                           deferᵉ; emptyᵉ; exhaustAllᵉ; Exp; fstᵗ; ifᵗ; inlᵗ;
-                          input; inrᵗ; mapᵉ; mergeAllᵉ; nat̂; natᵗ; obs; ofᵉ;
+                          input; inrᵗ; flattenᵉ; mapᵉ; nat̂; natᵗ; obs; ofᵉ;
                           pairᵗ; primᵗ; scanᵉ; sndᵗ; strmᵗ; switchAllᵉ; takeᵉ;
                           Tm; Ty; unit̂; unitᵗ; Val; varIx; varᵉ; varᵗ; μᵉ)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
@@ -114,8 +127,7 @@ mutual
   pmOⱽ j vs sl k (takeᵉ c e)     = pmOⱽ j vs sl k e
   pmOⱽ j vs sl k (scanᵉ f z e)   = pmOⱽ j vs sl k e
   -- product rule: outW (mergeAll e) = outW e * innW e
-  pmOⱽ j vs sl k (mergeAllᵉ e)   = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
-  pmOⱽ j vs sl k (concatAllᵉ e)  = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
+  pmOⱽ j vs sl k (flattenᵉ lim e)   = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
   pmOⱽ j vs sl k (switchAllᵉ e)  = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
   pmOⱽ j vs sl k (exhaustAllᵉ e) = outWⱽ j vs sl e * pmIⱽ j vs sl k e + pmOⱽ j vs sl k e * innWⱽ j vs sl e
   pmOⱽ j vs sl k (μᵉ e)          = pmOⱽ j vs sl k e
@@ -148,8 +160,7 @@ mutual
   -- the refold: the slope compounds once per fold
   pmIⱽ j vs sl k (scanᵉ f z e)   = (pmIᵗⱽ j vs sl 0 f ⊔ 1) ^ (outWⱽ j vs sl e)
                          * (pmIᵗⱽ j vs sl (suc k) f + pmIᵗⱽ j vs sl k z + pmIⱽ j vs sl k e)
-  pmIⱽ j vs sl k (mergeAllᵉ e)   = pmIⱽ j vs sl k e
-  pmIⱽ j vs sl k (concatAllᵉ e)  = pmIⱽ j vs sl k e
+  pmIⱽ j vs sl k (flattenᵉ lim e)   = pmIⱽ j vs sl k e
   pmIⱽ j vs sl k (switchAllᵉ e)  = pmIⱽ j vs sl k e
   pmIⱽ j vs sl k (exhaustAllᵉ e) = pmIⱽ j vs sl k e
   pmIⱽ j vs sl k (μᵉ e)          = pmIⱽ j vs sl k e
@@ -199,8 +210,7 @@ mutual
   outWⱽ j vs sl (takeᵉ c e)     = outWⱽ j vs sl e
   outWⱽ j vs sl (scanᵉ f z e)   = outWⱽ j vs sl e
   -- THE *All EDGE: every payload's inner is entered
-  outWⱽ j vs sl (mergeAllᵉ e)   = outWⱽ j vs sl e * innWⱽ j vs sl e
-  outWⱽ j vs sl (concatAllᵉ e)  = outWⱽ j vs sl e * innWⱽ j vs sl e
+  outWⱽ j vs sl (flattenᵉ lim e)   = outWⱽ j vs sl e * innWⱽ j vs sl e
   outWⱽ j vs sl (switchAllᵉ e)  = outWⱽ j vs sl e * innWⱽ j vs sl e
   outWⱽ j vs sl (exhaustAllᵉ e) = outWⱽ j vs sl e * innWⱽ j vs sl e
   outWⱽ j vs sl (μᵉ e)          = outWⱽ j vs sl e
@@ -225,8 +235,7 @@ mutual
   -- per fold, and the fold count is the SOURCE's payload count
   innWⱽ j vs sl (scanᵉ f z e)   = (pmIᵗⱽ j vs sl 0 f ⊔ 1) ^ (outWⱽ j vs sl e)
                         * (innWᵗⱽ j vs sl f + innWᵗⱽ j vs sl z + innWⱽ j vs sl e + 1)
-  innWⱽ j vs sl (mergeAllᵉ e)   = innWⱽ j vs sl e
-  innWⱽ j vs sl (concatAllᵉ e)  = innWⱽ j vs sl e
+  innWⱽ j vs sl (flattenᵉ lim e)   = innWⱽ j vs sl e
   innWⱽ j vs sl (switchAllᵉ e)  = innWⱽ j vs sl e
   innWⱽ j vs sl (exhaustAllᵉ e) = innWⱽ j vs sl e
   innWⱽ j vs sl (μᵉ e)          = innWⱽ j vs sl e
@@ -322,7 +331,7 @@ outWᵛ j sl (obs t)  e        = outWᵉ j sl e
 --
 -- It COLLECTS rather than multiplies.  A parked body is not entered at
 -- park time — the *All above it sees a pending, not a payload — so a
--- `mergeAllᵉ` over a defer does not compound the parked width the way it
+-- a `flattenᵉ` over a defer does not compound the parked width the way it
 -- compounds a delivered one.  Every other constructor is therefore a
 -- plain ⊔ over its subterms, uniformly, including the ones outW/innW
 -- may drop (a prim's argument, an `ifᵗ` scrutinee): dW is an upper
@@ -351,8 +360,7 @@ mutual
   dWⱽ j vs sl (mapᵉ f e)      = dWᵗⱽ j vs sl f ⊔ dWⱽ j vs sl e
   dWⱽ j vs sl (takeᵉ c e)     = dWᵗⱽ j vs sl c ⊔ dWⱽ j vs sl e
   dWⱽ j vs sl (scanᵉ f z e)   = dWᵗⱽ j vs sl f ⊔ dWᵗⱽ j vs sl z ⊔ dWⱽ j vs sl e
-  dWⱽ j vs sl (mergeAllᵉ e)   = dWⱽ j vs sl e
-  dWⱽ j vs sl (concatAllᵉ e)  = dWⱽ j vs sl e
+  dWⱽ j vs sl (flattenᵉ lim e)   = dWⱽ j vs sl e
   dWⱽ j vs sl (switchAllᵉ e)  = dWⱽ j vs sl e
   dWⱽ j vs sl (exhaustAllᵉ e) = dWⱽ j vs sl e
   dWⱽ j vs sl (μᵉ e)          = dWⱽ j vs sl e
@@ -472,7 +480,7 @@ slotsIW {n = n} j sl = slotsIWgo j sl (tabulate {n = n} (λ i → i))
 -- WHY IT EXISTS.  The five measures above are STATIC: they read the
 -- program's syntax and nothing else.  They also TOWER in it —
 -- `innWᵉ (scanᵉ f z e)` puts `outWᵉ e` in an EXPONENT and
--- `outWᵉ (mergeAllᵉ e)` multiplies that straight back into an outW, so
+-- `outWᵉ (flattenᵉ lim e)` multiplies that straight back into an outW, so
 -- nesting the two exponentiates once per level (Mult-Width-Probe §5:
 -- forty-six syntax nodes carrying a width above 2 ^ 10485760).  A cap
 -- recurrence whose per-instant width step is MULTIPLICATIVE cannot pay
@@ -509,8 +517,7 @@ mutual
   pmO♯ⱽ j vs sl (mapᵉ f e)      = pmO♯ⱽ j vs sl e
   pmO♯ⱽ j vs sl (takeᵉ c e)     = pmO♯ⱽ j vs sl e
   pmO♯ⱽ j vs sl (scanᵉ f z e)   = pmO♯ⱽ j vs sl e
-  pmO♯ⱽ j vs sl (mergeAllᵉ e)   = outWⱽ j vs sl e * pmI♯ⱽ j vs sl e + pmO♯ⱽ j vs sl e * innWⱽ j vs sl e
-  pmO♯ⱽ j vs sl (concatAllᵉ e)  = outWⱽ j vs sl e * pmI♯ⱽ j vs sl e + pmO♯ⱽ j vs sl e * innWⱽ j vs sl e
+  pmO♯ⱽ j vs sl (flattenᵉ lim e)   = outWⱽ j vs sl e * pmI♯ⱽ j vs sl e + pmO♯ⱽ j vs sl e * innWⱽ j vs sl e
   pmO♯ⱽ j vs sl (switchAllᵉ e)  = outWⱽ j vs sl e * pmI♯ⱽ j vs sl e + pmO♯ⱽ j vs sl e * innWⱽ j vs sl e
   pmO♯ⱽ j vs sl (exhaustAllᵉ e) = outWⱽ j vs sl e * pmI♯ⱽ j vs sl e + pmO♯ⱽ j vs sl e * innWⱽ j vs sl e
   pmO♯ⱽ j vs sl (μᵉ e)          = pmO♯ⱽ j vs sl e
@@ -541,8 +548,7 @@ mutual
   pmI♯ⱽ j vs sl (takeᵉ c e)     = pmI♯ⱽ j vs sl e
   pmI♯ⱽ j vs sl (scanᵉ f z e)   = (pmI♯ᵗⱽ j vs sl f ⊔ 1) ^ (outWⱽ j vs sl e)
                          * (pmI♯ᵗⱽ j vs sl f + pmI♯ᵗⱽ j vs sl z + pmI♯ⱽ j vs sl e)
-  pmI♯ⱽ j vs sl (mergeAllᵉ e)   = pmI♯ⱽ j vs sl e
-  pmI♯ⱽ j vs sl (concatAllᵉ e)  = pmI♯ⱽ j vs sl e
+  pmI♯ⱽ j vs sl (flattenᵉ lim e)   = pmI♯ⱽ j vs sl e
   pmI♯ⱽ j vs sl (switchAllᵉ e)  = pmI♯ⱽ j vs sl e
   pmI♯ⱽ j vs sl (exhaustAllᵉ e) = pmI♯ⱽ j vs sl e
   pmI♯ⱽ j vs sl (μᵉ e)          = pmI♯ⱽ j vs sl e
@@ -594,8 +600,7 @@ mutual
   kidsᵉ j sl (mapᵉ f e)      = ceilᵗ j sl f ⊔ ceilᵉ j sl e
   kidsᵉ j sl (takeᵉ c e)     = ceilᵗ j sl c ⊔ ceilᵉ j sl e
   kidsᵉ j sl (scanᵉ f z e)   = ceilᵗ j sl f ⊔ ceilᵗ j sl z ⊔ ceilᵉ j sl e
-  kidsᵉ j sl (mergeAllᵉ e)   = ceilᵉ j sl e
-  kidsᵉ j sl (concatAllᵉ e)  = ceilᵉ j sl e
+  kidsᵉ j sl (flattenᵉ lim e)   = ceilᵉ j sl e
   kidsᵉ j sl (switchAllᵉ e)  = ceilᵉ j sl e
   kidsᵉ j sl (exhaustAllᵉ e) = ceilᵉ j sl e
   kidsᵉ j sl (μᵉ e)          = ceilᵉ j sl e

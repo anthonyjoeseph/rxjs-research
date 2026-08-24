@@ -64,8 +64,15 @@ export type Exp =
   // an expression. Shared observables live in the slot telescope
   // (prop-test's Slot) and are referenced with `input`, exactly like
   // scripted inputs.
-  | { type: "mergeAll"; ty: Ty; src: Exp }
-  | { type: "concatAll"; ty: Ty; src: Exp }
+  // ONE flattening primitive carrying rxjs's `concurrent` argument:
+  // ABSENT is Infinity (mergeAll), 1 is concatAll, k >= 2 is the bounded
+  // mergeMap(f, k) that has no name of its own in rxjs. The limit is a
+  // literal and NOT a Tm, unlike take's count: rxjs fixes `concurrent`
+  // when the pipeline is BUILT, not when it is subscribed. Unbounded is
+  // an ABSENT field rather than null so that JSON.stringify drops it and
+  // the Agda decoder reads the limit as `getField "limit" >>=? asNum` —
+  // a Maybe with no null constructor needed in the JSON grammar.
+  | { type: "flatten"; ty: Ty; limit?: number; src: Exp }
   | { type: "switchAll"; ty: Ty; src: Exp }
   | { type: "exhaustAll"; ty: Ty; src: Exp }
   | { type: "mu"; ty: Ty; body: Exp } // binds a μ-var, GUARDED (Agda's Δᵍ)
@@ -280,8 +287,7 @@ const closeExp = (exp: Exp, env: Val[], depth: number): Exp => {
         init: closeTm(exp.init, env, depth),
         src: closeExp(exp.src, env, depth),
       };
-    case "mergeAll":
-    case "concatAll":
+    case "flatten":
     case "switchAll":
     case "exhaustAll":
       return { ...exp, src: closeExp(exp.src, env, depth) };
@@ -391,8 +397,7 @@ const substMuExp = (exp: Exp, st: MuSt, knot: Exp): Exp => {
         init: substMuTm(exp.init, st, knot),
         src: substMuExp(exp.src, st, knot),
       };
-    case "mergeAll":
-    case "concatAll":
+    case "flatten":
     case "switchAll":
     case "exhaustAll":
       return { ...exp, src: substMuExp(exp.src, st, knot) };

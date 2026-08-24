@@ -20,6 +20,7 @@ open import Data.List using (List; []; _∷_; map; length)
                       renaming (_++_ to _++ᴸ_)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
+open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Data.String using (String; _++_; toList)
 open import Data.Vec using () renaming (_∷_ to _∷ⱽ_; [] to []ⱽ)
@@ -31,7 +32,7 @@ open import Rx.Prim using (Timed; after_,_; ObservableInput; hot; cold;
                            CloseReason; cut; cutPending; exhausted; EmitKind;
                            subscribe; delivery; plumbing; InstEmit; _at_from_as_)
 open import Rx.Exp using (Ty; natᵗ; obs; _×ᵗ_; Ctx; Exp; Tm; Fn; PrimOp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-  mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ; unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
+  flattenᵉ; switchAllᵉ; exhaustAllᵉ; unit̂; bool̂; nat̂; primᵗ; pairᵗ; fstᵗ; sndᵗ;
   strmᵗ; varᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ)
 open import Data.List.Membership.Propositional using (_∈_)
 open import Rx.Evaluator using (evaluate)
@@ -182,8 +183,14 @@ genExpAt src w (suc d) = genB 10 >>=G λ c →
   else if c ≡ᵇ 3 then (genB 4 >>=G λ k → genExpAt src w d >>=G λ e → pureG (takeᵉ (nat̂ k) e))
   else if c ≡ᵇ 4 then
     (genScanFn >>=G λ f → genNat >>=G λ s → genExpAt src w d >>=G λ e → pureG (scanᵉ f (nat̂ s) e))
-  else if c ≡ᵇ 5 then (genObsAt src w d >>=G λ s → pureG (mergeAllᵉ s))
-  else if c ≡ᵇ 6 then (genObsAt src w d >>=G λ s → pureG (concatAllᵉ s))
+  else if c ≡ᵇ 5 then (genObsAt src w d >>=G λ s → pureG (flattenᵉ nothing s))
+  else if c ≡ᵇ 6 then
+    -- the limit axis, which is where bounded concurrency gets sampled:
+    -- 1 is the old concat, 2 and 3 are the middle nothing here could
+    -- previously reach.  Two lanes with three parked inners is the
+    -- smallest shape whose drain refills more than one lane in a
+    -- single instant, so `genB 3` is the floor and not a taste
+    (genB 3 >>=G λ k → genObsAt src w d >>=G λ s → pureG (flattenᵉ (just (suc k)) s))
   else if c ≡ᵇ 7 then (genObsAt src w d >>=G λ s → pureG (switchAllᵉ s))
   else if c ≡ᵇ 8 then (genObsAt src w d >>=G λ s → pureG (exhaustAllᵉ s))
   else genLeafAt src
@@ -363,8 +370,8 @@ showExp emptyᵉ          = "emptyᵉ"
 showExp (mapᵉ f e)      = "(mapᵉ " ++ showTm f ++ " " ++ showExp e ++ ")"
 showExp (takeᵉ n e)     = "(takeᵉ " ++ showTm n ++ " " ++ showExp e ++ ")"
 showExp (scanᵉ f s e)   = "(scanᵉ " ++ showTm f ++ " " ++ showTm s ++ " " ++ showExp e ++ ")"
-showExp (mergeAllᵉ s)   = "(mergeAllᵉ " ++ showExp s ++ ")"
-showExp (concatAllᵉ s)  = "(concatAllᵉ " ++ showExp s ++ ")"
+showExp (flattenᵉ nothing s)  = "(flattenᵉ ∞ " ++ showExp s ++ ")"
+showExp (flattenᵉ (just k) s) = "(flattenᵉ " ++ show k ++ " " ++ showExp s ++ ")"
 showExp (switchAllᵉ s)  = "(switchAllᵉ " ++ showExp s ++ ")"
 showExp (exhaustAllᵉ s) = "(exhaustAllᵉ " ++ showExp s ++ ")"
 showExp _               = "PLACEHOLDER-exp"

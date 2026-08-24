@@ -13,13 +13,14 @@ open import Data.Nat     using (ℕ; _≤_)
 open import Data.List    using (List; []; _∷_; _++_; map; take; concat; length)
 open import Data.Vec     using ([]; _∷_)     -- contexts are Vecs; ∷/[] overload per type
 open import Data.Fin     using (zero; suc)
+open import Data.Maybe using (nothing; just)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
 open import Rx.Prim      using (Fuel; InstEmit; _at_from_as_; after_,_; hot)
 open import Rx.Exp       using (Ty; Ctx; Closed; Val; Fn; Tm; nat̂; strmᵗ; isData;
                                 inputsBelowᵉ;
-                                input; ofᵉ; mapᵉ; takeᵉ; mergeAllᵉ;
-                                concatAllᵉ; exhaustAllᵉ; evalTm; applyFn)
+                                input; ofᵉ; mapᵉ; takeᵉ; flattenᵉ;
+                                exhaustAllᵉ; evalTm; applyFn)
 open import Rx.Evaluator using (evaluate)
 open import Rx.Slots using (scripted; shared; Slot; Slots)
 open import Data.Bool using (T)
@@ -40,7 +41,7 @@ emitValues ((es at _ from _ as _) ∷ xs) = valuesOf es ++ emitValues xs
 ------------------------------------------------------------------
 
 mergeOf : ∀ {n} {Γ : Ctx n} {t} → List (Closed Γ t) → Closed Γ t
-mergeOf es = mergeAllᵉ (ofᵉ (map strmᵗ es))
+mergeOf es = flattenᵉ nothing (ofᵉ (map strmᵗ es))
 
 -- scripted slots carry data only (Rx.Evaluator.Slot); these theorems
 -- therefore quantify over data types, which is every type they are read at
@@ -115,7 +116,7 @@ eachNextProgram f =
 --   merge(s, s.mergeMap(n => of(…n…)))  on s.next(v)  ≡  [[v, …v…]]
 cascadeProgram : ∀ {t} → List (Fn (t ∷ []) [] [] [] t t) → Closed (t ∷ []) t
 cascadeProgram ws =
-  mergeOf (input zero ∷ mergeAllᵉ (mapᵉ (strmᵗ (ofᵉ ws)) (input zero)) ∷ [])
+  mergeOf (input zero ∷ flattenᵉ nothing (mapᵉ (strmᵗ (ofᵉ ws)) (input zero)) ∷ [])
 
 -- completion cascades inherit too: take(1) closes on the event, the
 -- concat's queued leg subscribes at that same instant — final value,
@@ -124,7 +125,7 @@ cascadeProgram ws =
 completionProgram : ∀ {t} → Tm (t ∷ []) [] [] [] t → Closed (t ∷ []) t
 completionProgram w =
   mergeOf (input zero
-          ∷ concatAllᵉ (ofᵉ (strmᵗ (takeᵉ (nat̂ 1) (input zero))
+          ∷ flattenᵉ (just 1) (ofᵉ (strmᵗ (takeᵉ (nat̂ 1) (input zero))
                             ∷ strmᵗ (ofᵉ (w ∷ [])) ∷ []))
           ∷ [])
 
@@ -145,7 +146,7 @@ growthCtx t = t ∷ t ∷ t ∷ []          -- src ∷ trigger ∷ shared src
 growthProgram : ∀ {t} → Closed (growthCtx t) t
 growthProgram =
   mergeOf (input (suc (suc zero))
-          ∷ mergeAllᵉ (mapᵉ (strmᵗ (input (suc (suc zero)))) (input (suc zero)))
+          ∷ flattenᵉ nothing (mapᵉ (strmᵗ (input (suc (suc zero)))) (input (suc zero)))
           ∷ [])
 
 growthSlots : ∀ {t} {ok : T (isData t)} (u v w x : Val (growthCtx t) t) → Slots (growthCtx t)

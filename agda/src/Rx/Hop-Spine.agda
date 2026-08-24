@@ -43,7 +43,7 @@ open import Data.Sum     using (inj₁; inj₂)
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val;
                           unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_;
                           input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ;
-                          mergeAllᵉ; concatAllᵉ; switchAllᵉ; exhaustAllᵉ;
+                          flattenᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
@@ -57,8 +57,7 @@ mutual
   spnᵉ (mapᵉ f e)       = suc (spnᵗ f + spnᵉ e)
   spnᵉ (takeᵉ c e)      = suc (spnᵗ c + spnᵉ e)
   spnᵉ (scanᵉ f z e)    = suc (spnᵗ f + spnᵗ z + spnᵉ e)
-  spnᵉ (mergeAllᵉ e)    = suc (spnᵉ e)
-  spnᵉ (concatAllᵉ e)   = suc (spnᵉ e)
+  spnᵉ (flattenᵉ lim e)    = suc (spnᵉ e)
   spnᵉ (switchAllᵉ e)   = suc (spnᵉ e)
   spnᵉ (exhaustAllᵉ e)  = suc (spnᵉ e)
   spnᵉ (μᵉ e)           = suc (spnᵉ e)
@@ -112,8 +111,7 @@ mutual
   spn≤sizeᵉ (takeᵉ c e)     = s≤s (+-mono-≤ (spn≤sizeᵗ c) (spn≤sizeᵉ e))
   spn≤sizeᵉ (scanᵉ f z e)   =
     s≤s (+-mono-≤ (+-mono-≤ (spn≤sizeᵗ f) (spn≤sizeᵗ z)) (spn≤sizeᵉ e))
-  spn≤sizeᵉ (mergeAllᵉ e)   = s≤s (spn≤sizeᵉ e)
-  spn≤sizeᵉ (concatAllᵉ e)  = s≤s (spn≤sizeᵉ e)
+  spn≤sizeᵉ (flattenᵉ lim e)   = s≤s (spn≤sizeᵉ e)
   spn≤sizeᵉ (switchAllᵉ e)  = s≤s (spn≤sizeᵉ e)
   spn≤sizeᵉ (exhaustAllᵉ e) = s≤s (spn≤sizeᵉ e)
   spn≤sizeᵉ (μᵉ e)          = s≤s (spn≤sizeᵉ e)

@@ -24,7 +24,7 @@ import {
 import { Arrival, Driver } from "./driver.js";
 import { captureSync, cold, hot } from "./constructors.js";
 
-export { concatAll, exhaustAll, mergeAll, switchAll } from "./join.js";
+export { exhaustAll, flattenAll, switchAll } from "./join.js";
 
 // a one-shot subscription burst (Agda's oneShotBurst): a source that
 // lives and dies inside its own subscribe frame — init, its values,

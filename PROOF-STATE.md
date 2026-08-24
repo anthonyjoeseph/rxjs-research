@@ -128,6 +128,8 @@ formal-verification-batchSimultaneous    The-Proof.agda — REAL, module postula
      │   │                                  ← subscribeE-walk-level   proven
      │   └─ drain-dry   ← cascade-wet-via-caps     proven
      └─ the well-formedness branch       its own postulates — tier 2
+
+  every tier above is stated over Rx.Exp's syntax  Flatten-Laws.agda — tier 0
 ```
 
 The caps route does not replace the wet contract — it rests on it: both
@@ -140,7 +142,38 @@ Walk-Level tree holding no live postulate.
 A row's class must agree with its postulate's header, which is where the
 research lives; where they disagree, the header wins.
 
-## Tier 1 — `budget-sufficient` (the lowest open tier)
+## Tier 0 — the anchor: `flattenᵉ` and bounded concurrency
+
+**Re-opened because the syntax moved.** `mergeAllᵉ` and `concatAllᵉ` are gone,
+replaced by ONE `flattenᵉ` carrying rxjs's `concurrent` argument. Every tier
+below is stated over that syntax, so all of them are parked here. What is
+genuinely new is the DRAIN GATE — a drain at limit k refills several lanes in
+one instant and stops on a count rather than a flag — and `Rx.Flatten-Laws` is
+the door it is stated behind; the counter and the queue are merge's and
+concat's, unchanged.
+
+**THE TIER IS NOT ONLY ITS ROWS.** Two obligations carry no postulate and are
+invisible to the coverage check: the `Verify-Budget-Sufficient` and
+`Verify-Well-Formed` trees still case-split on the two removed constructors at
+roughly a thousand sites, and the ledger's
+`subscribeE-{merge,concat,switch,exhaust}All-wf` split becomes one flatten
+face. Both are repairs the typechecker enumerates.
+
+- **`unbounded-never-parks`** (Flatten-Laws) — SHAPE: the conclusion is a
+  predicate on a node LOOKUP rather than an equation, because `NodeState` holds
+  the queue's element type existentially; whether consumers can use it in that
+  form is the open question. Statement and its shape argument in its header.
+- **`drain-saturates`** (Flatten-Laws) — DIFFICULTY: a drain stops having
+  emptied the queue or filled every lane, never for a third reason. Every
+  completion argument downstream reads it; concat got it free at limit 1.
+- **`drain-within-limit`** (Flatten-Laws) — DIFFICULTY: a legal live count
+  stays legal across a drain. Without it the limit decorates rather than binds,
+  and every Σ mentioning the post-drain count is upward-closed in it.
+- **`drain-queue-shrinks`** (Flatten-Laws) — DIFFICULTY: the residue never
+  lengthens. At limit 1 this is the suffix fact the old drain had structurally;
+  above 1 the loop shifts several elements per instant and it must be claimed.
+
+## Tier 1 — `budget-sufficient` (parked behind tier 0)
 
 **The tier is ONE statement, not a directory.** `budget-sufficient`
 (Caps-Bridge) says `hasDry (evaluate fuel e ins) ≡ false`, and it is the only

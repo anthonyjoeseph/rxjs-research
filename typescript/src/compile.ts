@@ -47,10 +47,8 @@ export const compile = (
       return P.scan(recur(exp.src), evalTm(exp.init), (acc: Val, cur: Val) =>
         applyFn(exp.fn, [acc, cur]),
       );
-    case "mergeAll":
-      return P.mergeAll(inner(exp.src));
-    case "concatAll":
-      return P.concatAll(inner(exp.src));
+    case "flatten":
+      return P.flattenAll(exp.limit)(inner(exp.src));
     case "switchAll":
       return P.switchAll(inner(exp.src));
     case "exhaustAll":
