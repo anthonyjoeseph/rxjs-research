@@ -1340,6 +1340,24 @@ chainStep-slots {n = n} {e = e} id a path sched st =
 -- delivery down one already-registered chain deepens by one operator's
 -- worth and no more.  If this needed a width the sum below would be
 -- `length chains` widths and the statement over it would be false.
+-- AND THE SHAPE THAT COULD HAVE REFUTED IT IS THE ONE WHERE A DELIVERY
+-- SUBSCRIBES A WIDTH.  Every other program family here wraps its scan
+-- accumulator with a SINGLETON merge, so one emission hands the outer
+-- `*All` one inner and a per-delivery charge cannot be told apart from
+-- a per-width one.  `progW` merges the accumulator with itself instead,
+-- so a single emission hands over `suc ww` inners at one instant, and
+-- `Harness.Main`'s SERIES R reads this bound on it.  The left side is
+-- EXACTLY FLAT in that width -- 4 at every `ww` from one to seven --
+-- while the bound climbs from 10 to 22, so the margin widens rather
+-- than closing.  That is the reason behind the statement and not just a
+-- number: nesting DEPTH does not see width, and the subscribe side's
+-- `realWidAt` is charged for how many registrations a subscribe makes,
+-- which is a different quantity from how deep any one of them goes.
+-- Bounded coverage, and harness output rather than a probe, so nothing
+-- here is rechecked: the width axis was driven alone, at a fan and a
+-- take count of one, and jointly with those only at `ww` of one --
+-- `ww` of two upward with both at three does not finish inside a
+-- minute.
 postulate
   depthChain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (rid : RegId)

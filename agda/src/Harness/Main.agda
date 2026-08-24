@@ -70,7 +70,7 @@ open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
          progT; sucGT; progU; sucGU; progF; sucGF; insF; insT; subjN; pathN;
-         progC; sucGC)
+         progC; sucGC; progW; sucGW)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
          pathNestD; chainsNestD)
@@ -580,6 +580,13 @@ leafRow fam steps ds ks j w k =
                r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
                               (sched-init p slF) (st-init p)
            in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 2
+     then (let p = progW ds w k
+               r = subscribeE (gasPad (sucGW ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "W ww=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " w=" ++ show w ++ " k=" ++ show k
               ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else (let p = progF w k

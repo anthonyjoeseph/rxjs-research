@@ -161,8 +161,8 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 - **`depthChain-nest`** (Caps-Face/Part7) — DIFFICULTY: one chain's delivery,
   within the base terms plus exactly ONE `nestSyn`. The whole per-chain sum
-  rests on this: a delivery that needed a width instead would make the sum
-  `length chains` widths. Measured on every chain of every cut-family row.
+  rests on this. Measured flat in the width a delivery subscribes, which is the
+  shape that could have refuted it — nesting depth does not see width.
 - **`chainStep-caps-suc`** (Caps-Face/Part7) — DIFFICULTY: the caps premise at
   the state a chain step produced, at the NEXT index. A step is not
   cap-preserving at a fixed index, and the walk hands back a `frameStep`-blown
