@@ -76,6 +76,29 @@ exists to prevent, arriving one level up.
 TERMINAL, so its nonzero can only mean RED — the one thing `bg-check` cannot offer
 at any exit code.
 
+## Counting the builds — `ps aux | grep "[b]in/agda"`
+
+The concurrency rule the campaign runs under ("while a gate is live, run no other
+check") is only enforceable if you can SEE the live one, and the obvious pattern
+does not: Agda's command line is `.../bin/agda -W error src/Main.agda`, with no
+`--` in it, so a grep for `agda --` counts zero however many builds are running.
+A zero that means "my pattern is wrong" and a zero that means "the machine is
+quiet" are indistinguishable, and the wrong one licenses a second launch.
+
+Measured cost of getting this wrong once: three builds racing on one interface
+cache, each dying at a later module than the last with no error text, read three
+times as a build being KILLED. It is what a race looks like from outside, and
+the reading sends you at the module the log happens to name.
+
+```
+ps aux | grep "[b]in/agda" | wc -l     0 means quiet, and means it
+pkill -9 -f "libexec/ghc"              what actually reaps a wedged one
+```
+
+The second line is there because `pkill -f "bin/agda"` misses: the binary lives
+under a `libexec/ghc-*-inplace` path, and one process survived two rounds of the
+narrower pattern.
+
 ## macOS
 
 `setsid` and `timeout` DO NOT EXIST. Piped to `tail`, the `$?` you read is `tail`'s

@@ -550,6 +550,15 @@ alone, or read what sits AROUND a neighbouring lemma, since related facts cluste
 file; and **read the SIGNATURE, never the header prose** — a header saying a route is dead
 is a claim about an attempt, the signature is a fact.
 
+**AND `make find-prose` FOR A FINDING, WHICH IS NOT A TYPE.** `make find` cannot see a
+dead route, a coverage boundary, a ruling or a measured trap — those are prose by
+construction, and the search that misses them reports a clean all-clear. Run it before
+picking up any row that is not GRINDABLE, and before commissioning a probe: the question
+it answers is *has anyone already been here*, and the answer is in a comment block or a
+document rather than in a type. It returns the BLOCK, because one line out of a
+forty-line header is a hit and not an answer. Two phrasings before believing a miss.
+→ [docs/find-prose.md](docs/find-prose.md)
+
 **AND THE CHECK BEHIND IT: `make dup-check`** fails the build when two declarations prove
 the same fact, up to binder spelling and atomic type synonyms. **A FINDING IS TWO SITES,
 NOT TWO NAMES** — Agda's `ClashingDefinition` says nothing when either copy is `private`

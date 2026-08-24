@@ -149,20 +149,18 @@ replaced by ONE `flattenᵉ` carrying rxjs's `concurrent` argument, and every
 tier below is stated over that syntax. What is genuinely new is the DRAIN
 GATE, and `Rx.Flatten-Laws` is the door it is stated behind.
 
-**ONE ROW LEFT, AND IT IS THE ONLY NON-LOCAL ONE.** Both un-rowed obligations
-are closed — the two trees no longer name the removed constructors, and the wf
-ledger's four-way *All split is one flatten face. Three of the four
-gate laws went with them: the drain scrutinises the GATE and nothing else, so
+**ONE ROW LEFT, AND IT IS THE ONLY NON-LOCAL ONE.** Three of the four gate
+laws are proven walks: the drain scrutinises the GATE and nothing else, so
 saturation, the lane bound and shrinkage are one walk each, and the caps face
 had already proven the third under its own name. What is left is the claim
 about a node the inner's own burst can re-enter, which no hypothesis bounds.
-Its consumer exists — the flatten wrap is a real clause — but the leaf that
-would spend it is postulated, so the route home is a burst induction.
+It is SPENT, in a real body at the wrap clause, so its shape is settled and
+what remains is its truth.
 
-- **`unbounded-never-parks`** (Flatten-Laws) — SHAPE: the conclusion is a
-  predicate on a node LOOKUP rather than an equation, because `NodeState` holds
-  the queue's element type existentially; whether consumers can use it in that
-  form is the open question. Statement and its shape argument in its header.
+- **`unbounded-never-parks`** (Flatten-Laws) — DIFFICULTY: the queue stays dead
+  at an unbounded limit across a whole subscribe burst, which the burst may
+  re-enter. Local half in its header: the one appending site is unreachable
+  there, and the other writer is bounded by a proven shrinkage walk.
 
 ## Tier 1 — `budget-sufficient` (parked behind tier 0)
 
@@ -256,10 +254,10 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   both REFUTED (`Refuted.Cut-Through`), `L₁` free at exactly the sources the
   conclusions speak about. Restate over the (LAG) ledger; header carries the
   repair and why it was not ground here.
-- **`flatten-node`** (Part3) — DIFFICULTY: the node the wrap's inner burst
-  leaves, and the only one of the five the limit reaches. Its queue conjunct at
-  an unbounded limit is `unbounded-never-parks` iterated over the burst, which
-  is what gives that claim a consumer once this is a body.
+- **`flatten-node-shape`** (Part3) — DIFFICULTY: the wrap's node is still a
+  `flatten-st` at the type it was installed at, whatever the burst did to it.
+  Limit-blind, which is what lets the queue claim be a separate fact rather
+  than a conjunct only one limit can honour.
 - **`subscribeE-flatten-push`** (Part3) — DIFFICULTY: the wrap's push half,
   protocol run and invariant back out through `thru-outer`. Twin: the scan
   face's `subscribeE-scan-wf`, same joint, and that one is proven.

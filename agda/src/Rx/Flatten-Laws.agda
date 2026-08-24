@@ -36,17 +36,18 @@ open import Data.Bool  using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.List  using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; z≤n)
+open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum   using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; Id; Tick)
-open import Rx.Exp  using (Ctx; Closed; obs; Val)
-open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; Sched;
-  flatten-st; flattenDrain; flattenᵒ; hasRoom; lookupNode; subscribeInner;
-  thruConsume)
+open import Rx.Exp  using (Ctx; Closed; obs)
+open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; Sched; _↠_;
+  flatten-st; flattenDrain; flattenᵒ; hasRoom; installNode; lookupNode;
+  setNode; subscribeE; subscribeInner; thru-outer)
+open import Decide using (≡ᵇ-refl)
 
 -- `hasRoom` says a lane is FREE; this says the count is LEGAL.  They
 -- are not negations of each other at the boundary — at `just m` with
@@ -123,6 +124,21 @@ drain-within-limit g allNid κ id now lim act (o ∷ q) sched st h
 ...   | _ , vs , bs , true  , sched₁ , st₁ =
       drain-within-limit g allNid κ id now lim act q sched₁ st₁ h
 
+-- INSTALLING A NODE MAKES IT FINDABLE.  The one step between a caller
+-- holding a node it just minted and a law stated over a LOOKUP, and
+-- the reason the law can be stated over a lookup at all
+lookup-installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (s : NodeState Γ) (st : EvalSt e) →
+  lookupNode nid (EvalSt.nodes (installNode nid s st)) ≡ just s
+lookup-installNode {Γ = Γ} nid s st = go (EvalSt.nodes st)
+  where
+  go : ∀ (ns : List (NodeId × NodeState Γ)) →
+       lookupNode nid (setNode nid s ns) ≡ just s
+  go []             rewrite ≡ᵇ-refl nid = refl
+  go ((k , s′) ∷ r) with k ≡ᵇ nid in eq
+  ... | true  rewrite ≡ᵇ-refl nid = refl
+  ... | false rewrite eq          = go r
+
 postulate
 
   -- CONSERVATIVITY AT INFINITY.  At `nothing` the queue is dead: every
@@ -132,29 +148,43 @@ postulate
   -- caller holds a node table and not a state.
   --
   -- IT IS THE ONE OF THE FOUR THAT IS NOT LOCAL, and that is why it is
-  -- the tier's SHAPE row rather than a walk like its siblings.  The
-  -- `nothing` gate is open, so the consume subscribes and the queue it
-  -- must report on is the one in the state the INNER left — and the
-  -- inner's synchronous burst can route back through this very node.
-  -- Nothing about that re-entry is bounded by this statement's
-  -- hypotheses, so a proof of it is a clause of an induction over the
-  -- evaluator and not a fact about `thruConsume`.
+  -- the tier's risk row rather than a walk like its siblings.  The
+  -- `nothing` gate is open, so every consume subscribes, and the queue
+  -- the statement must report on is the one in the state the INNERS
+  -- left — each inner's synchronous burst free to route back through
+  -- this very node.  Nothing about that re-entry is bounded by these
+  -- hypotheses, so a proof is a clause of an induction over the
+  -- evaluator.  What IS local, and is why the claim is credible at
+  -- all: `hasRoom nothing act` is `true` by its first clause, so the
+  -- single syntactic site that appends to a queue — `thruConsume`'s
+  -- capacity-shut branch — is unreachable at this limit, and the only
+  -- other writer reinstalls a queue that `drain-queue-shrinks` bounds
+  -- by the one it was given.
+  --
+  -- STATED OVER THE BURST AND NOT OVER ONE CONSUME, which is what its
+  -- consumer can actually spend: `flatten-node` reports on the node a
+  -- whole `subscribeE` left, so a per-`thruConsume` law would have to
+  -- be iterated by the caller over emissions the caller cannot see.
+  -- The predicate is a predicate for the reason its own definition
+  -- gives, and that costs the consumer nothing: the shape conjunct
+  -- pins the lookup, and `emptyQueue?` at a pinned `flatten-st`
+  -- reduces to the equation.
   --
   -- DEAD ROUTE: it was minted to transport the merge face, and the
   --   transport did not need it — every proof written against a queueless
   --   merge state migrated to `flattenᵉ` by taking the CONCAT clause as the
   --   general one, which reasons about the queue rather than assuming it
-  --   away.  So its consumer is not the budget tree; the nameable one is the
-  --   well-formed tree's flatten clause, which reads a node's completion off
+  --   away.  So its consumer is not the budget tree; it is the well-formed
+  --   tree's flatten clause, which reads a node's completion off
   --   `active ≡ 0 ∧ null queue`.
   unbounded-never-parks :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (g : Gas) (nid : NodeId) (κ : Path Γ u t) (id : Id) (now : Tick)
-      (o : Val Γ (obs u)) (act : ℕ) (od : Bool)
+      (fuel : Gas) (nid : NodeId) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+      (id : Id) (now : Tick) (act : ℕ) (od : Bool)
       (sched : Sched Γ) (st : EvalSt e) →
     lookupNode nid (EvalSt.nodes st) ≡ just (flatten-st {t = u} nothing act [] od) →
-    let r   = thruConsume g flattenᵒ nid κ id now o sched st
-        st′ = proj₂ (proj₂ (proj₂ r))
+    let r   = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now sched st
+        st′ = proj₂ (proj₂ r)
     in emptyQueue? (lookupNode nid (EvalSt.nodes st′))
 
 -- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain

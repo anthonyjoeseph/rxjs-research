@@ -32,7 +32,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (_⊎_; inj₁; inj₂)
 open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong)
+  using (_≡_; refl; sym; trans; cong; subst)
 
 
 -- from .Caps-Bridge, not from the top module: the top module is the
@@ -49,6 +49,8 @@ open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; 
   flatten-st; flattenᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
+open import Rx.Flatten-Laws using (emptyQueue?; lookup-installNode;
+  unbounded-never-parks)
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
 
 ------------------------------------------------------------------
@@ -643,15 +645,13 @@ postulate
               ≡ true →
     valsLast? (proj₁ (subscribeE fuel (flattenᵉ lim b) κ id now sched st)) ≡ true
 
-  -- THE NODE THE INNER BURST LEFT, and the one leaf of the four that
-  -- the limit reaches.  `emptyQueue?` is what a completion gate reads
-  -- alongside the active count, and at an unbounded limit the queue is
-  -- structurally dead -- which is the content of
-  -- `Rx.Flatten-Laws.unbounded-never-parks`, iterated over the burst's
-  -- emissions rather than applied at one of them.  The conjunct is
-  -- stated at every limit and claimed only at `nothing`, so a bounded
-  -- run yields the node's shape and no promise about its queue.
-  flatten-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  -- THE NODE THE INNER BURST LEFT, as a SHAPE and nothing more: the
+  -- wrap's node is still a `flatten-st` at the type it was installed
+  -- at, whatever the burst did to the counter, the queue and the
+  -- outer-done flag.  Limit-blind by construction, which is what lets
+  -- the queue claim be a separate fact rather than a conjunct only one
+  -- limit can honour.
+  flatten-node-shape : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -660,9 +660,8 @@ postulate
                 (proj₂ (mintNode sched))
                 (installNode nid (flatten-st {t = u} lim 0 [] false) st)
     in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
-         (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
-            ≡ just (flatten-st {t = u} lim act q od))
-         × (lim ≡ nothing → q ≡ [])
+         lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
+           ≡ just (flatten-st {t = u} lim act q od)
 
   -- THE PUSH BACK OUT, the flatten twin of `subscribeE-scan-wf`: it
   -- takes the inner subscription's whole receipt -- protocol run,
@@ -711,6 +710,45 @@ postulate
       in (runProtocol S (proj₁ r) ≡ just S′)
          × BurstInv id (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) S′
          × (valsLast? (proj₁ r) ≡ true)
+
+-- THE NODE THE INNER BURST LEFT, shape and queue together, which is the
+-- form the wrap clause consumes.  The queue half is claimed only at an
+-- unbounded limit, where it is `Rx.Flatten-Laws.unbounded-never-parks`
+-- and nothing else; a bounded run yields the shape and no promise about
+-- the queue, because at a bounded limit the burst legitimately parks.
+--
+-- THE PREDICATE COSTS THE CONSUMER NOTHING, which was the open question
+-- about the law's shape.  `emptyQueue?` cannot be an equation --
+-- `NodeState` holds the queue's element type existentially, so the two
+-- sides would not be at one type -- and it does not need to be: the
+-- shape leaf pins the lookup at the wrap's own `u`, and `emptyQueue?`
+-- at a pinned `flatten-st` reduces to exactly the equation wanted.  One
+-- `subst` along the shape equation is the whole bridge.
+flatten-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (lim : Maybe ℕ)
+  (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  let nid = proj₁ (mintNode sched)
+      r₀  = subscribeE fuel b (thru-outer flattenᵒ nid ↠ κ) id now
+              (proj₂ (mintNode sched))
+              (installNode nid (flatten-st {t = u} lim 0 [] false) st)
+  in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
+       (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
+          ≡ just (flatten-st {t = u} lim act q od))
+       × (lim ≡ nothing → q ≡ [])
+flatten-node {u = u} lim fuel b κ id now sched st
+  with flatten-node-shape lim fuel b κ id now sched st
+... | act , q , od , shapeEq = act , q , od , shapeEq , qnil
+  where
+  nid = proj₁ (mintNode sched)
+
+  qnil : lim ≡ nothing → q ≡ []
+  qnil refl =
+    subst emptyQueue? shapeEq
+      (unbounded-never-parks fuel nid b κ id now 0 false
+        (proj₂ (mintNode sched))
+        (installNode nid (flatten-st {t = u} nothing 0 [] false) st)
+        (lookup-installNode nid (flatten-st {t = u} nothing 0 [] false) st))
 
 -- takeᵉ WHOLE CASE.  The takeᵉ
 -- clause of `subscribeE-wf` (.Part8) is a real body that APPLIES
