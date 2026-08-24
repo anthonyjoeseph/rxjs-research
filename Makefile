@@ -1,4 +1,4 @@
-.PHONY: gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -108,6 +108,10 @@ help:
 	@echo "                  the failure this prevents was a search scoped to two"
 	@echo "                  files.  Run it BEFORE proving anything"
 	@echo "                  make find Q='≤ slotsSize'"
+	@echo "  find-prose    the same search over PROSE, because a FINDING is not a"
+	@echo "                  type: dead routes, coverage boundaries, rulings and"
+	@echo "                  measured traps.  Returns the BLOCK, not the line"
+	@echo "                  make find-prose Q='phantom'"
 	@echo "  dup-check     no fact proven twice: compares declared TYPES up to"
 	@echo "                  renaming of bound variables, binder spelling"
 	@echo "                  (bare/annotated, explicit/implicit) and atomic type"
@@ -485,6 +489,16 @@ dup-selftest:
 #   make find Q='≤ slotsSize'      make find Q='1 ≤ sizeᵉ'
 find:
 	@scripts/find-lemma.py "$(Q)"
+
+# THE SAME SEARCH OVER PROSE, because a FINDING is not a type.  `find` cannot
+# see a dead route, a coverage boundary, a ruling or a measured trap -- those
+# live in comment blocks and in the documents -- and plain grep returns one
+# line out of a forty-line header, which is a hit and not an answer.  This
+# returns the BLOCK, which is the unit a finding is written in, and for an
+# agda hit the declaration the block sits above.  Q is a REGEX, case-blind.
+#   make find-prose Q='phantom'   make find-prose Q='never parks|unbounded'
+find-prose:
+	@scripts/find-prose.py "$(Q)"
 
 # THE REMAINING-WORK LEDGER: every postulate in agda/src, by name.  A grep for
 # `^postulate` finds the 32 BLOCK HEADERS, not the 110 names inside them, so it
