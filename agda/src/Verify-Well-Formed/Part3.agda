@@ -49,8 +49,7 @@ open import Rx.Evaluator using (Sched; EvalSt; RegId; Chain; Path; root; _↠_; 
   mergeAll-st; mergeAllᵒ; thru-outer;
   mintOrdinal; resolve)
 open import Rx.Slots using (scripted; shared)
-open import Rx.MergeAll-Laws using (emptyQueue?; lookup-installNode;
-  unbounded-never-parks)
+open import Rx.MergeAll-Laws using (emptyQueue?; unbounded-never-parks)
 open import Rx.Protocol  using (ProtocolSt; countIn; runProtocol; valsLast?)
 
 ------------------------------------------------------------------
@@ -656,16 +655,23 @@ postulate
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     let nid = proj₁ (mintNode sched)
-        r₀  = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
-                (proj₂ (mintNode sched))
-                (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
+        r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
     in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
-         lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
+         lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
            ≡ just (mergeAll-st {t = u} lim act q od)
 
   -- THE PUSH BACK OUT, the mergeAll twin of `subscribeE-scan-wf`: it
-  -- takes the inner subscription's whole receipt -- protocol run,
-  -- invariant and the node above -- and returns the outer's.
+  -- takes the inner subscription's protocol receipt and, SEPARATELY,
+  -- the node the finished wrap leaves behind, and returns the outer's.
+  --
+  -- The two hypotheses sit at DIFFERENT INSTANTS and that is deliberate.
+  -- The protocol run is a fact about the inner burst, which is what the
+  -- outer's run is assembled from; the node fact is about the wrap's own
+  -- result, which is the state `BurstInv` in the conclusion is quantified
+  -- over.  Stating the node at the inner instant instead reads as the
+  -- tighter hypothesis and is in fact the DEGENERATE one -- the wrap's
+  -- queue cannot have been written yet at a point before the only call
+  -- that can write it.
   subscribeE-mergeAll-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
@@ -677,11 +683,13 @@ postulate
                  (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
      in Σ ProtocolSt λ S′ →
           (runProtocol S (proj₁ r₀) ≡ just S′)
-          × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′
-          × (Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
-               (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
-                  ≡ just (mergeAll-st {t = u} lim act q od))
-               × (lim ≡ nothing → q ≡ []))) →
+          × BurstInv id (proj₁ (proj₂ r₀)) (proj₂ (proj₂ r₀)) S′) →
+    (let nid = proj₁ (mintNode sched)
+         r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
+     in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
+          (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
+             ≡ just (mergeAll-st {t = u} lim act q od))
+          × (lim ≡ nothing → q ≡ [])) →
     Σ ProtocolSt λ S″ →
       let r = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
       in (runProtocol S (proj₁ r) ≡ just S″)
@@ -729,26 +737,19 @@ mergeAll-node : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   let nid = proj₁ (mintNode sched)
-      r₀  = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now
-              (proj₂ (mintNode sched))
-              (installNode nid (mergeAll-st {t = u} lim 0 [] false) st)
+      r   = subscribeE fuel (mergeAllᵉ lim b) κ id now sched st
   in Σ ℕ λ act → Σ (List (Closed Γ u)) λ q → Σ Bool λ od →
-       (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r₀)))
+       (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
           ≡ just (mergeAll-st {t = u} lim act q od))
        × (lim ≡ nothing → q ≡ [])
-mergeAll-node {u = u} lim fuel b κ id now sched st
+mergeAll-node lim fuel b κ id now sched st
   with mergeAll-node-shape lim fuel b κ id now sched st
 ... | act , q , od , shapeEq = act , q , od , shapeEq , qnil
   where
-  nid = proj₁ (mintNode sched)
-
   qnil : lim ≡ nothing → q ≡ []
   qnil refl =
     subst emptyQueue? shapeEq
-      (unbounded-never-parks fuel nid b κ id now 0 false
-        (proj₂ (mintNode sched))
-        (installNode nid (mergeAll-st {t = u} nothing 0 [] false) st)
-        (lookup-installNode nid (mergeAll-st {t = u} nothing 0 [] false) st))
+      (unbounded-never-parks fuel b κ id now sched st)
 
 -- takeᵉ WHOLE CASE.  The takeᵉ
 -- clause of `subscribeE-wf` (.Part8) is a real body that APPLIES

@@ -399,7 +399,8 @@ subscribeE-wf {u = u} fuel (mergeAllᵉ lim b) κ id now sched st S binv deq nod
           (mergeAll-nodry-push lim fuel b κ id now sched st nodry)
       (S″ , run , binv″) =
         subscribeE-mergeAll-push lim fuel b κ id now sched st S binv
-          (S′ , run₀ , binv₀ , mergeAll-node lim fuel b κ id now sched st)
+          (S′ , run₀ , binv₀)
+          (mergeAll-node lim fuel b κ id now sched st)
   in S″ , run , binv″ , mergeAll-valsLast-push lim fuel b κ id now sched st vl₀
 subscribeE-wf fuel (switchAllᵉ b)  κ id now sched st S binv deq nodry =
   subscribeE-switchAll-wf fuel b κ id now sched st S binv deq nodry

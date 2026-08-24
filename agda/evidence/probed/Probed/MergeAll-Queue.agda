@@ -35,8 +35,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (cold; after_,_)
 open import Rx.Exp  using (Ctx; Closed; natᵗ; strmᵗ; input; ofᵉ; mergeAllᵉ)
-open import Rx.Evaluator using (EvalSt; NodeState; mergeAll-st; subscribeE;
-  sched-init; st-init; budgetAt; root; lookupNode; mintNode)
+open import Rx.Evaluator using (EvalSt; NodeState; mergeAll-st; mergeAllᵒ;
+  subscribeE; sched-init; st-init; budgetAt; root; lookupNode; mintNode;
+  installNode; thru-outer; _↠_)
 open import Rx.Slots using (scripted; Slots)
 
 ----------------------------------------------------------------------
@@ -113,4 +114,36 @@ _ : nodeThere? (NODE (P2 (just 1))) ≡ true
 _ = refl
 
 _ : nodeThere? (NODE (P3 (just 1))) ≡ true
+_ = refl
+
+----------------------------------------------------------------------
+-- WHERE THE CLAIM IS PINNED, which is not where its consumer reads.
+-- `subscribeAll` is mint, then `subscribeE` on the OUTER under a
+-- `thru-outer` frame, then `pushBurst` of that burst through the frame
+-- -- and `pushBurst` is the only thing that reaches `thruConsume`, so
+-- it is the only thing that can ever park.  These rows run the outer
+-- subscribe ALONE, at the limit where parking is known to happen.
+----------------------------------------------------------------------
+
+-- the node after the OUTER subscribe only -- the earlier instant, kept
+-- because the rows below are what rule it out as a place to pin
+INTER : Maybe ℕ → Maybe (NodeState Γ₂)
+INTER lim =
+  let e   = P2 lim
+      sd  = sched-init e ins
+      nid = proj₁ (mintNode sd)
+  in lookupNode nid (EvalSt.nodes (proj₂ (proj₂
+       (subscribeE (budgetAt e ins 0) (ofᵉ (strmᵗ (input zero) ∷ strmᵗ (input (suc zero)) ∷ []))
+         (thru-outer mergeAllᵒ nid ↠ root) 0 0 (proj₂ (mintNode sd))
+         (installNode nid (mergeAll-st {t = natᵗ} lim 0 [] false) (st-init e))))))
+
+-- DEGENERATE BY CONSTRUCTION, and pinning it is the finding: at `just 1`
+-- the finished wrap parks (the control above is FALSE) while the same
+-- program at the same limit reports an EMPTY queue here.  So the
+-- difference between the two limits is invisible at this instant, and a
+-- statement pinned here cannot be the one its consumer spends.
+_ : queueNull? (INTER (just 1)) ≡ true
+_ = refl
+
+_ : queueNull? (INTER nothing) ≡ true
 _ = refl

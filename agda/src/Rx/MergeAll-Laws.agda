@@ -36,18 +36,17 @@ open import Data.Bool  using (Bool; true; false; if_then_else_)
 open import Data.Empty using (⊥)
 open import Data.List  using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; nothing; just)
-open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
+open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum   using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; Id; Tick)
-open import Rx.Exp  using (Ctx; Closed; obs)
-open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; Sched; _↠_;
-  mergeAll-st; mergeAllDrain; mergeAllᵒ; hasRoom; installNode; lookupNode;
-  setNode; subscribeE; subscribeInner; thru-outer)
-open import Decide using (≡ᵇ-refl)
+open import Rx.Exp  using (Ctx; Closed; obs; mergeAllᵉ)
+open import Rx.Evaluator using (EvalSt; NodeId; NodeState; Path; Sched;
+  mergeAll-st; mergeAllDrain; mergeAllᵒ; hasRoom; lookupNode; mintNode;
+  subscribeE; subscribeInner)
 
 -- `hasRoom` says a lane is FREE; this says the count is LEGAL.  They
 -- are not negations of each other at the boundary — at `just m` with
@@ -124,21 +123,6 @@ drain-within-limit g allNid κ id now lim act (o ∷ q) sched st h
 ...   | _ , vs , bs , true  , sched₁ , st₁ =
       drain-within-limit g allNid κ id now lim act q sched₁ st₁ h
 
--- INSTALLING A NODE MAKES IT FINDABLE.  The one step between a caller
--- holding a node it just minted and a law stated over a LOOKUP, and
--- the reason the law can be stated over a lookup at all
-lookup-installNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (nid : NodeId) (s : NodeState Γ) (st : EvalSt e) →
-  lookupNode nid (EvalSt.nodes (installNode nid s st)) ≡ just s
-lookup-installNode {Γ = Γ} nid s st = go (EvalSt.nodes st)
-  where
-  go : ∀ (ns : List (NodeId × NodeState Γ)) →
-       lookupNode nid (setNode nid s ns) ≡ just s
-  go []             rewrite ≡ᵇ-refl nid = refl
-  go ((k , s′) ∷ r) with k ≡ᵇ nid in eq
-  ... | true  rewrite ≡ᵇ-refl nid = refl
-  ... | false rewrite eq          = go r
-
 postulate
 
   -- CONSERVATIVITY AT INFINITY.  At `nothing` the queue is dead: every
@@ -151,20 +135,36 @@ postulate
   -- the tier's risk row rather than a walk like its siblings.  The
   -- `nothing` gate is open, so every consume subscribes, and the queue
   -- the statement must report on is the one in the state the INNERS
-  -- left — each inner's synchronous burst free to route back through
-  -- this very node.  Nothing about that re-entry is bounded by these
-  -- hypotheses, so a proof is a clause of an induction over the
-  -- evaluator.  What IS local, and is why the claim is credible at
-  -- all: `hasRoom nothing act` is `true` by its first clause, so the
-  -- single syntactic site that appends to a queue — `thruConsume`'s
+  -- left.  What IS local, and is why the claim is credible at all:
+  -- `hasRoom nothing act` is `true` by its first clause, so the single
+  -- syntactic site that appends to a queue — `thruConsume`'s
   -- capacity-shut branch — is unreachable at this limit, and the only
   -- other writer reinstalls a queue that `drain-queue-shrinks` bounds
   -- by the one it was given.
   --
-  -- STATED OVER THE BURST AND NOT OVER ONE CONSUME, which is what its
-  -- consumer can actually spend: `mergeAll-node` reports on the node a
-  -- whole `subscribeE` left, so a per-`thruConsume` law would have to
-  -- be iterated by the caller over emissions the caller cannot see.
+  -- AND THE INNERS CANNOT COME BACK, which is what bounds the induction.
+  -- Read off the evaluator rather than instantiated: `subscribeInner`
+  -- hands every inner a `from-inner` frame and never the wrap's own
+  -- `thru-outer`, and only `thru-outer` reaches `thruConsume`, so no
+  -- inner's synchronous burst can park at the node that spawned it.  The
+  -- other way back in would be a registration under this wrap's frame
+  -- firing mid-burst, and neither route delivers one: a registration is
+  -- served on ARRIVAL at a later instant, and a shared definition's
+  -- connect burst flows up the connecting subscriber's own frames rather
+  -- than dispatching to registered chains.  So the obligation is an
+  -- induction over `pushBurst`'s emit list and `thruWalk`'s value list —
+  -- the same walk shape as the two drain laws above, which are proven —
+  -- and not over the evaluator.
+  --
+  -- STATED OVER THE WHOLE WRAP, and the instant is the entire content.
+  -- `subscribeAll` is mint, then `subscribeE` on the OUTER under a
+  -- `thru-outer` frame, then `pushBurst` of that burst back through the
+  -- frame -- and `pushBurst` is the only thing reaching `thruConsume`,
+  -- so it is the only thing that can ever park.  A claim pinned before
+  -- it is DEGENERATE — every limit reports an empty queue at that
+  -- instant, including the ones this statement exists to exclude.  No
+  -- lookup hypothesis survives the move, because the wrap installs the
+  -- node itself.
   -- The predicate is a predicate for the reason its own definition
   -- gives, and that costs the consumer nothing: the shape conjunct
   -- pins the lookup, and `emptyQueue?` at a pinned `mergeAll-st`
@@ -188,16 +188,18 @@ postulate
   --   consumes stay sequential.  The rows therefore cover the shape where
   --   the claim is easy and say nothing about the shape where it is hard.
   --   The class stands at DIFFICULTY on exactly that ground.
+  --   The same module pins the instant BEFORE `pushBurst` at both
+  --   `nothing` and `just 1`, both reporting an empty queue while the
+  --   finished wrap at `just 1` parks — which is the degeneracy the
+  --   explanation above states, measured rather than argued.
   --
   unbounded-never-parks :
     ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-      (fuel : Gas) (nid : NodeId) (b : Closed Γ (obs u)) (κ : Path Γ u t)
-      (id : Id) (now : Tick) (act : ℕ) (od : Bool)
-      (sched : Sched Γ) (st : EvalSt e) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} nothing act [] od) →
-    let r   = subscribeE fuel b (thru-outer mergeAllᵒ nid ↠ κ) id now sched st
-        st′ = proj₂ (proj₂ r)
-    in emptyQueue? (lookupNode nid (EvalSt.nodes st′))
+      (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+      (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    let nid = proj₁ (mintNode sched)
+        r   = subscribeE fuel (mergeAllᵉ nothing b) κ id now sched st
+    in emptyQueue? (lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r))))
 
 -- THE RESIDUE SHRINKS, in the one form the caps face needs: a drain
 -- never lengthens the queue.  `mergeAllDrain` returns `[]` when it runs

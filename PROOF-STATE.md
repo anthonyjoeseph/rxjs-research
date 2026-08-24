@@ -158,9 +158,9 @@ It is SPENT, in a real body at the wrap clause, so its shape is settled and
 what remains is its truth.
 
 - **`unbounded-never-parks`** (MergeAll-Laws) — DIFFICULTY: the queue stays dead
-  at an unbounded limit across a whole subscribe burst, which the burst may
-  re-enter. Local half in its header: the one appending site is unreachable
-  there, and the other writer is bounded by a proven shrinkage walk.
+  at an unbounded limit across a whole subscribe burst. The appending site is
+  unreachable there and no inner can re-enter the node, so its header reduces
+  the obligation to a burst-list walk of the shape the drain laws already have.
 
 ## Tier 1 — `budget-sufficient` (parked behind tier 0)
 
@@ -259,8 +259,9 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   Limit-blind, which is what lets the queue claim be a separate fact rather
   than a conjunct only one limit can honour.
 - **`subscribeE-mergeAll-push`** (Part3) — DIFFICULTY: the wrap's push half,
-  protocol run and invariant back out through `thru-outer`. Twin: the scan
-  face's `subscribeE-scan-wf`, same joint, and that one is proven.
+  protocol run and invariant back out through `thru-outer`, over the inner's
+  receipt plus the FINISHED wrap's node. Twin: the scan face's
+  `subscribeE-scan-wf`, same joint, and that one is proven.
 - **`dispatchShare-wf`** (Part9) — DIFFICULTY: the share arm's run equation,
   `foldPath-wf`'s third clause. Its FoldOut half belongs to
   `foldPath-share-out`, so the statement as written is what `foldPath-out`
