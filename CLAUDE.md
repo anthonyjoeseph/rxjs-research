@@ -217,6 +217,24 @@ session's own scheduling. Work the tier order from its lowest open tier upward, 
 end, and when a row is genuinely blocked take the next one rather than stopping on it —
 a blocked row is a row to report and route around, not a stop condition.
 
+**AND THE ORDER INSIDE A TURN IS ACT FIRST, REPORT SECOND (Anthony).** The stop
+conditions are the three above, and none of them is "a good report is ready". But a
+report is where a run actually stops, because a finished paragraph feels like a finished
+unit of work in a way a half-applied edit does not — so the session writes up what it
+just learned, and the action that finding implied is left as a sentence in the future
+tense.
+
+**A SENTENCE IN THE FUTURE TENSE ABOUT YOUR OWN NEXT STEP IS A WORK ORDER, AND ITS
+DEADLINE IS THIS TURN.** "Next I will commit this", "the following row is the one to
+pick up", "that wants one more sweep before it is written down" — each of those is
+something to DO, and writing it instead of doing it converts a queued action into prose
+that nothing executes. This is **CODE BEATS PROSE** arriving at the turn boundary rather
+than at a header, and it is the same failure for the same reason: the insight is
+genuinely worth having, and recording it leaves the tree in exactly the state it was in.
+
+So: run the queued action, then report what it did. A report that ends by naming the
+next action has not finished the turn — it has described it.
+
 ## Division of labor: the design session directs, Sonnet workers grind
 
 The design-authority session delegates the bulk of the work — clause grinds, falsity
