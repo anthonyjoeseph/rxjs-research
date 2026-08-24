@@ -32,8 +32,18 @@ computed x = x
 
 postulate eta-parent : (Nat → Nat) → (Nat → Nat) → Nat → Nat
 
+-- A GAP INSIDE A SEAL.  A nested block opener must be sliced off the
+-- STRIPPED line: slicing the raw one cuts the keyword's length off a line
+-- that starts with indent, leaving a tail of the keyword itself.  That
+-- tail is non-empty, so it registers as a phantom member and the block is
+-- never recursed into — every real member is then invisible to the
+-- ledger, which is a postulate hiding inside an `abstract`.
+abstract
+  postulate
+    sealed-gap : Nat → Nat
+
 other : Nat → Nat
-other y = good-lemma (via-with y)
+other y = good-lemma (sealed-gap (via-with y))
 
 -- USED ONLY INSIDE A `with` ARM.  A column-0 `... | p = body` continues the
 -- clause above it, so it has to be a registered head or its lines are

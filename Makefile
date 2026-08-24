@@ -513,7 +513,10 @@ wiring-selftest:
 	    echo "$$out" | grep -q "    $$n$$" && { echo "SELFTEST FAIL: $$n reported, but it is legitimately wired"; fail=1; }; \
 	  done; \
 	  echo "$$out" | grep -q "^    \.\.\." && { echo "SELFTEST FAIL: a bare \`...\` node surfaced as a definition — with-arm owners must be per-site and exempt"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes)"; \
+	  led=$$(scripts/check-wiring.py --postulates --src scripts/wiring-selftest 2>&1); \
+	  echo "$$led" | grep -q "^sealed-gap " || { echo "SELFTEST FAIL: sealed-gap missing from the ledger — a nested block opener is being sliced off the RAW line, so members of a postulate block inside a seal are invisible"; fail=1; }; \
+	  echo "$$led" | grep -qE "^(te|ct|al|te) " && { echo "SELFTEST FAIL: a keyword tail registered as a postulate — the nested opener is sliced off the RAW line"; fail=1; }; \
+	  if [ $$fail -eq 0 ]; then echo "wiring-selftest: PASS (R2 fires on the passed-only lemma and on its eta-expansion, and on nothing else; module applications conduct; \`with\` arms conduct at both scopes; a postulate block nested in a seal reaches the ledger)"; \
 	  else echo "$$out"; exit 1; fi
 
 # THE ACCEPTANCE TEST, cheap checks FIRST.  Ordering is the point: an orphan

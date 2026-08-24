@@ -49,21 +49,21 @@ module Verify-Budget-Sufficient.Nest-Store where
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-identityʳ)
 open import Data.Nat.ListAction using (sum)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_; RegId; NodeState;
   scan-st; take-st; merge-st; concat-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
-  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish)
-open import Rx.Prim using (Source)
+  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH)
+open import Rx.Prim using (Source; towerℕ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsH)
+open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -189,6 +189,26 @@ nestSyn e sl = suc (nestDᵉ e + slotsNestSum sl)
 -- so a probe of this bet takes its cap value through those or
 -- hypothesises the growth side, as the expired probe series did.
 --
+-- `capsH` IS `blowH` OF SOMETHING AT EVERY INDEX, and this names that
+-- something: the height the caps recurrence had reached one instant
+-- earlier, which at the entry is its base.  It exists because the only
+-- handle anything has ever had on `blowH` is a lemma taking that
+-- argument, and the caps recurrence itself never needs to say it -- it
+-- iterates, so it never looks back one step.
+capsHpred : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
+capsHpred e sl zero     = capsBase e sl
+capsHpred e sl (suc id) = capsH e sl id
+
+capsH-blow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  capsH e sl id ≡ blowH (capsHpred e sl id)
+capsH-blow e sl zero     = refl
+capsH-blow e sl (suc id) = refl
+
+1≤capsHpred : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  1 ≤ capsHpred e sl id
+1≤capsHpred e sl zero     = s≤s z≤n
+1≤capsHpred e sl (suc id) = ≤-trans (s≤s z≤n) (3≤capsH e sl id)
+
 -- THE BASE WIDTH IS `capsBase` BECAUSE IT CARRIES THE ENTRY CEILING —
 -- the one static width reading the tower already pays for — and the
 -- base cap is the program's own layers, spent by the root subscribe.
@@ -253,6 +273,38 @@ abstract
       ≡ nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
   nestCapAt-suc e sl id = refl
 
+  -- THE HEIGHT COMPARISON, and it is the entire bet this module carries,
+  -- reduced to one number.  Both sides of the arithmetic obligation
+  -- below are tower-VALUED, so the comparison between them is a
+  -- comparison of HEIGHTS, and `h` is the height the nesting currency
+  -- has reached at this instant.  The second conjunct is where the bet
+  -- lives: the caps recurrence must have climbed strictly past it, with
+  -- one story to spare, since converting a tower into `blowH` costs
+  -- exactly that story.
+  --
+  -- IT IS STATED INSIDE THE SEAL BECAUSE ONLY IN HERE CAN IT BE PROVEN.
+  -- Discharging it means unfolding `nwAt` on both axes, and the block
+  -- exports equations for the cap but none for the width; stating it
+  -- outside would oblige a future proof to export two more, widening
+  -- the seal for no reason other than where a postulate was typed.
+  --
+  -- AND THE Σ HAS CONTENT: the first conjunct is upward-closed in `h`
+  -- and the second downward-closed, so no witness satisfies both by
+  -- being large enough.
+  --
+  -- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
+  --   holds height arithmetic written for exactly this shape and
+  --   currency-independent: `sum2H`/`sum3H`/`sucH`/`hUp`/`hIn`/`1≤3x`/
+  --   `payL`/`payR` for moving a bound up a tower, and `tower-sum-tab`
+  --   for a slot telescope.
+  postulate
+    nest-height : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+      (id : ℕ) →
+      Σ ℕ λ h →
+        (3 * nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+           ≤ towerℕ h)
+        × (suc h ≤ towerℕ (capsHpred e sl id))
+
 ------------------------------------------------------------------
 -- THE ONE ARITHMETIC OBLIGATION THE WHOLE CURRENCY RESTS ON, and it
 -- mentions no evaluator: three quantities each under `nestCapAt`, plus
@@ -269,37 +321,23 @@ abstract
 -- against an exponential per instant, so the sum is dominated with
 -- stories to spare rather than by a constant-factor squeeze.
 --
--- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
---   holds height arithmetic written for exactly this shape and
---   currency-independent: `sum2H`/`sum3H`/`sucH`/`hUp`/`hIn`/`1≤3x`/
---   `payL`/`payR` for moving a bound up a tower, and `tower-sum-tab` for
---   a slot telescope.
-
--- THE ROUTE IS A RECOVERY, AND ITS PAYLOAD STILL COMPILES — which was
--- the expensive unknown about it.  `capsH` is `blowH` of something at
--- every index, and the only handle anything has ever had on `blowH` is
--- `tower-le-blowH`, which went out of the tree with the face that
--- consumed it; the pointer to it is in `.Caps-Bridge`'s depth row.  Its
--- two hundred lines of pool growth-rate arithmetic were replayed against
--- today's tree and typecheck unchanged, needing no import edits, so what
--- the pointer promises is real rather than merely recorded.
---
--- WHAT BLOCKS SPENDING IT IS THE SEAL, NOT THE ARITHMETIC.  `nwAt` is
--- abstract — for the measured performance reason its own block states —
--- and it exports equations for the nesting cap but NONE for the width,
--- so the width side of this statement cannot be unfolded where the
--- statement lives.  The assembly therefore starts inside the block, with
--- the two missing width equations, and only then can a height leaf carry
--- both sides to a tower that `tower-le-blowH` converts.  Recovering the
--- arithmetic before that exists would park two hundred lines with no
--- consumer, which the wiring law refuses and which is the right refusal:
--- the seal is the design decision here and the arithmetic is downstream
--- of it.
-postulate
-  nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    3 * nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
-      ≤ capsH e sl id
+-- AND THE WHOLE OF IT IS NOW A HEIGHT QUESTION.  `capsH` is `blowH` of
+-- the previous height at every index, and `tower-le-blowH` turns a
+-- tower one story below that height into `blowH` of it, so the sum's
+-- own tower height is the only thing left to establish -- which is
+-- `nest-height`, inside the seal, where the two axes unfold.
+nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  3 * nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+    ≤ capsH e sl id
+nestCap-3≤capsH e sl id =
+  ≤-trans lo (subst (towerℕ h ≤_) (sym (capsH-blow e sl id))
+                (tower-le-blowH h (capsHpred e sl id)
+                                (1≤capsHpred e sl id) hi))
+  where
+  h  = proj₁ (nest-height e sl id)
+  lo = proj₁ (proj₂ (nest-height e sl id))
+  hi = proj₂ (proj₂ (nest-height e sl id))
 
 -- three parts each under the cap, the fresh term on top, paid out of
 -- the height

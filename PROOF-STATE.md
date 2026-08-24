@@ -174,9 +174,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   count under the real width; both nest faces now spend it. Measures safe, but
   the proven counter is cap-denominated INSIDE its walk module, so this wants
   new machinery — two dead routes recorded.
-- **`nestCap-3≤capsH`** (Nest-Store) — DIFFICULTY: the arithmetic both depth
-  rows spend, and no evaluator in it. Exponential-per-instant recurrences
-  against `blowH`'s pooled tower per instant; a cone is recoverable.
+- **`nest-height`** (Nest-Store, inside the seal) — DIFFICULTY: the arithmetic
+  both depth rows spend, and no evaluator in it. One tower height for the
+  currency's sum, one story below the caps height; the `blowH` conversion and
+  the recurrence's own base are now proven around it.
 - **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY: the entry state's nesting
   receipt. `init-capsOK?` is its route, but a scripted slot's obs-freeness only
   reduces at a concrete type, so an `isData` inversion is owed first.

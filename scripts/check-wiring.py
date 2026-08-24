@@ -576,7 +576,15 @@ def extract_definitions(src_dir, files):
             if tok0 in BLOCK_OPENERS:
                 # nested block opener (e.g. a postulate/mutual inside a
                 # private block) — recurse the same way scan_block does.
-                rest = vline[len(tok0) :].strip()
+                # SLICE THE STRIPPED LINE.  Slicing `vline` cuts `len(tok0)`
+                # characters off a line that starts with INDENT, so an
+                # indented opener leaves a tail of its own keyword — which
+                # is non-empty, so the member gets registered under that
+                # tail and the block is never recursed into.  Every real
+                # member of a nested postulate block was then invisible to
+                # the ledger: a gap could hide inside an `abstract` block,
+                # which is the one thing the coverage law exists to stop.
+                rest = vline.strip()[len(tok0) :].strip()
                 if rest == "":
                     j = i + 1
                     inner_base = None
