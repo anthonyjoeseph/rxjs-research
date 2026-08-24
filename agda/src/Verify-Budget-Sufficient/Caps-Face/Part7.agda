@@ -1307,6 +1307,43 @@ postulate
     let r = cascadeGo a nextId chains sched st
     in delivN st (proj₂ (proj₂ r)) ≤ realWidAt e sl id
 
+-- THE SKIP BRANCH IS WHERE THE TWO SIDES STOP AGREEING, and it is the
+-- thing to know before attempting this induction.  `depthCascade` is
+-- BRANCH-FREE -- its cons clause cannot with-abstract the cancellation
+-- test, for the reason its own head in `.Caps-Depth` gives, so it
+-- reports the chain at both states -- while `cascadeGo` skips a
+-- cancelled chain outright and delivers nothing for it.  So on a skip
+-- the left side charges a chainStep that never ran, and the whole
+-- PHANTOM tail cascade behind it, against a budget denominated in real
+-- deliveries.
+--
+-- A SKIP IS ALWAYS PRECEDED BY A DELIVERY, which is why the branch is
+-- survivable at all.  `cascadeLatch` clears `cancelled` at every
+-- cascade's entry, so a chain can only be skipped because an operator
+-- CUT it during this same cascade; both cut sites sit inside a
+-- dispatch, and a dispatch runs only after `cascadeGo` has consed the
+-- cutting chain's own delivery.  The consequence is a warning about
+-- GENERALISING: that fact is a property of the states a cascade
+-- actually starts from, and a lemma stated over an arbitrary `st` with
+-- an arbitrary `cancelled` loses it -- an all-skipped instance has zero
+-- deliveries and the budget collapses to its base terms.  The general
+-- form to reach for therefore carries `suc` of the count, not the
+-- count.
+--
+-- AND THE CHARGE DOES NOT COMPOUND, which is the measured half and the
+-- part that was genuinely open.  `Harness.Main`'s SERIES P drives the
+-- cut family -- a hot fan behind a `takeᵉ` that exhausts partway along
+-- one arrival, the only shape that reaches the branch at all -- and
+-- reads this statement's own two sides at each cascade, printing the
+-- chain count, the delivery count and the cancellations so a row that
+-- never entered the branch is visible as such.  Across the fold depth,
+-- the fan width, the take count and the slot parameters, no row goes
+-- over, and the left side is EXACTLY FLAT in the fan width while the
+-- cancellations climb: eight skipped chains charge no more than two.
+-- So the exposure is one chain's depth rather than a stack of them.
+-- Measured, not rechecked, and it says nothing about a shape where
+-- `depthFold` reads a store the phantom steps have deepened -- no row
+-- produced one.
 postulate
   cascade-nest-perDeliv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

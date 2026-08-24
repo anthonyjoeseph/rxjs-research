@@ -45,7 +45,7 @@ module Harness.Main where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Char using (toℕ)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map; length)
 open import Data.Nat using (_≡ᵇ_; ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_)
 open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
@@ -69,7 +69,8 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
-         progT; sucGT; progU; sucGU; progF; sucGF; insF; insT; subjN; pathN)
+         progT; sucGT; progU; sucGU; progF; sucGF; insF; insT; subjN; pathN;
+         progC; sucGC)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
          pathNestD; chainsNestD)
@@ -454,6 +455,60 @@ perDelivWalk e sl (suc m) nextId sched st with sched-next sched
      ++ perDelivWalk e sl m (suc nextId)
                      (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- SERIES P (3000000): `cascade-nest-perDeliv` itself, over a family
+-- built to reach `cascadeGo`'s SKIP branch.  The skip is the one place
+-- the two sides are denominated differently: `depthCascade` is
+-- BRANCH-FREE -- it cannot with-abstract the cancellation test, so it
+-- charges the skipped chain and the whole PHANTOM tail cascade that
+-- would have followed it -- while `cascadeGo` skips both and delivers
+-- nothing for either.  So the skip branch must pay for a hypothetical
+-- run out of a budget that counts only real deliveries.
+--
+-- LOAD-BEARING, and the row says so itself: `c` is the chain count, `d`
+-- the deliveries and `x` the cancellations standing at the end of the
+-- cascade.  A row with `c` equal to `d` never entered the skip branch
+-- and is evidence about the live branch only, whatever its margin; the
+-- rows that bear on this statement are the ones where `c` exceeds `d`
+-- and `x` is positive.  What refutes it is such a row going OVER.
+cutWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+        → ℕ → ℕ → Sched Γ → EvalSt e → String
+cutWalk e sl 0       nextId sched st = ""
+cutWalk e sl (suc m) nextId sched st with sched-next sched
+... | inj₁ _        = " [done]"
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      ch  = chainsOf a st
+      g   = cascadeGo a nextId ch sd stL
+      stG = proj₂ (proj₂ g)
+      lhs = depthCascade a nextId ch sd stL
+      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch
+            + storeNestMax sd stL + delivN stL stG * nestSyn e sl
+      r   = cascade a nextId sd st
+  in " | " ++ show lhs ++ "/" ++ show rhs
+     ++ " (c=" ++ show (length ch)
+     ++ " d=" ++ show (delivN stL stG)
+     ++ " x=" ++ show (length (EvalSt.cancelled stG)) ++ ")"
+     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
+     ++ cutWalk e sl m (suc nextId)
+                (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+cutRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
+cutRow fam steps ds ks j w k =
+  let slF = insF ds ks j
+  in if fam ≡ᵇ 0
+     then (let p = progC ds w k
+               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ cutWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else (let p = progF w k
+               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
+                              (sched-init p slF) (st-init p)
+           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
+              ++ " w=" ++ show w ++ " k=" ++ show k
+              ++ cutWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+
 perDelivRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 perDelivRow fam steps ds ks j d k =
   if fam ≡ᵇ 2
@@ -536,6 +591,132 @@ nestRow 4 = "nestCapAt (progD 1 1) ins₀ 1 = "   ++ show (nestCapAt (progD 1 1)
 nestRow 5 = "realWidAt (progD 1 1) ins₀ 1 = "   ++ show (realWidAt (progD 1 1) ins₀ 1)
 nestRow 6 = "nestCapAt (progD 1 1) ins₀ 2 = "   ++ show (nestCapAt (progD 1 1) ins₀ 2)
 nestRow _ = "(no such row)"
+
+-- the pre-existing ladder, left exactly as it was: a `with` chain
+-- carries its nesting in the width of the gap after `...`, so widening
+-- it to add one arm at the top re-indents every arm below and is how a
+-- purely additive change becomes a parse error
+rowAt′ : ℕ → String
+rowAt′ n with 2000000 ≤ᵇ n
+... | true  = perDelivRow (m / 100000) 16 ((m % 100000) / 10000)
+                          ((m % 10000) / 1000) ((m % 1000) / 100)
+                          ((m % 100) / 10) (m % 10)
+  where m = n ∸ 2000000
+... | false with 1000000 ≤ᵇ n
+...   | true  = delivWalkRow (m / 100000) 16 ((m % 100000) / 10000)
+                           ((m % 10000) / 1000) ((m % 1000) / 100)
+                           ((m % 100) / 10) (m % 10)
+  where m = n ∸ 1000000
+...   | false with 900000 ≤ᵇ n
+...     | true  = denomRow ((m % 100000) / 10000) ((m % 10000) / 1000)
+                       ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+  where m = n ∸ 900000
+...     | false with 800000 ≤ᵇ n
+...       | true  = cascWalkRowU 16 ((m % 100000) / 10000)
+                                ((m % 10000) / 1000) ((m % 1000) / 100)
+                                ((m % 100) / 10) (m % 10)
+  where m = n ∸ 800000
+...       | false with 700000 ≤ᵇ n
+...         | true  = depthRunWalkRowU 16 ((m % 100000) / 10000)
+                                    ((m % 10000) / 1000) ((m % 1000) / 100)
+                                    ((m % 100) / 10) (m % 10)
+  where m = n ∸ 700000
+...         | false with 600000 ≤ᵇ n
+...           | true  = depthRunWalkRow 12 ((m % 100000) / 10000)
+                                    ((m % 10000) / 1000) ((m % 1000) / 100)
+                                    ((m % 100) / 10) (m % 10)
+  where m = n ∸ 600000
+...           | false with 500000 ≤ᵇ n
+...             | true  = cascWalkRow 12 ((m % 100000) / 10000)
+                               ((m % 10000) / 1000) ((m % 1000) / 100)
+                               ((m % 100) / 10) (m % 10)
+  where m = n ∸ 500000
+...            | false with 400000 ≤ᵇ n
+...              | true  = cascRow (m / 100000) ((m % 100000) / 10000)
+                        ((m % 10000) / 1000) ((m % 1000) / 100)
+                        ((m % 100) / 10) (m % 10)
+  where m = n ∸ 400000
+...              | false with 300000 ≤ᵇ n
+...                | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
+  where m = n ∸ 300000
+...                | false with 200000 ≤ᵇ n
+...                  | true  = depthRow (m / 100) (m % 100)
+  where m = n ∸ 200000
+...                  | false with 100000 ≤ᵇ n
+...                    | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
+                             ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+  where m = n ∸ 100000
+...                    | false with 20000 ≤ᵇ n
+...                      | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
+  where m = n ∸ 20000
+...                      | false with 13000 ≤ᵇ n
+...                        | true  = cascadeRow 6 (m / 100) (m % 100)
+  where m = n ∸ 13000
+...                        | false with 3000 ≤ᵇ n
+...                          | true  = sharedSweep (n ∸ 3000)
+  where
+  sharedSweep : ℕ → String
+  sharedSweep m =
+    let ds = m / 1000
+        ks = (m % 1000) / 100
+        d  = (m % 100) / 10
+        k  = m % 10
+        g  = storeAfterRootS ds ks d k
+        A  = allowanceS ds ks d k
+    in "ds=" ++ show ds ++ " ks=" ++ show ks
+       ++ " d=" ++ show d ++ " k=" ++ show k
+       ++ "  slotsNestSum = " ++ show (slotsNestSum (insS ds ks))
+       ++ "  storeNestMax after root = " ++ show g
+       ++ "  allowance = " ++ show A
+       ++ "  over = " ++ showB (A ≤ᵇ g)
+       ++ "  dry = " ++ showB (runDryS ds ks d k)
+...                          | false with 2000 ≤ᵇ n
+...                            | true  = nestSweep (n ∸ 2000)
+  where
+  nestSweep : ℕ → String
+  nestSweep dk =
+    let d = dk / 100
+        k = dk % 100
+        g = storeAfterRoot d k
+        A = allowance d k
+    in "d=" ++ show d ++ " k=" ++ show k
+       ++ "  storeNestMax after root = " ++ show g
+       ++ "  burst cap = " ++ show (nestCapAt (progD d k) ins₀ 1)
+       ++ "  burst-over = " ++ showB (nestCapAt (progD d k) ins₀ 1 <ᵇ g)
+       ++ "  allowance = " ++ show A
+       ++ "  over = " ++ showB (A ≤ᵇ g)
+       ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
+...                            | false with 1000 ≤ᵇ n
+...                              | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
+...                         | true  =
+  let dk = n ∸ 1000
+      d  = dk / 100
+      k  = dk % 100
+      p  = progD d k
+      G  = sucG p
+  in "d=" ++ show d ++ " k=" ++ show k
+     ++ "  sucG=" ++ show G
+     ++ "  runDry G p = " ++ showB (runDry G p)
+     ++ "   [true = REFUTES WalkStmt]"
+
+------------------------------------------------------------------
+-- stdin: a single row index.  Anything unparseable reads as 0, which is
+-- the calibration row — the safe default, since a mis-typed index then
+-- reports the one number whose expected value is written down.
+------------------------------------------------------------------
+
+private
+  isDigit : ℕ → Bool
+  isDigit c = if 48 ≤ᵇ c then c ≤ᵇ 57 else false
+
+  digits : List ℕ → ℕ → ℕ
+  digits []       acc = acc
+  digits (c ∷ cs) acc =
+    if isDigit c then digits cs (acc * 10 + (c ∸ 48)) else acc
+
+  skipToDigit : List ℕ → List ℕ
+  skipToDigit []       = []
+  skipToDigit (c ∷ cs) = if isDigit c then (c ∷ cs) else skipToDigit cs
 
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
@@ -658,126 +839,13 @@ rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
 -- them could be trusted to terminate, and a rebuild per point is not a
 -- measurement loop.  Prints the sum side and the verdict together, so a
 -- row is readable without cross-referencing row 5.
-rowAt n with 2000000 ≤ᵇ n
-... | true  = perDelivRow (m / 100000) 16 ((m % 100000) / 10000)
-                          ((m % 10000) / 1000) ((m % 1000) / 100)
-                          ((m % 100) / 10) (m % 10)
-  where m = n ∸ 2000000
-... | false with 1000000 ≤ᵇ n
-...   | true  = delivWalkRow (m / 100000) 16 ((m % 100000) / 10000)
-                           ((m % 10000) / 1000) ((m % 1000) / 100)
-                           ((m % 100) / 10) (m % 10)
-  where m = n ∸ 1000000
-...   | false with 900000 ≤ᵇ n
-...     | true  = denomRow ((m % 100000) / 10000) ((m % 10000) / 1000)
-                       ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
-  where m = n ∸ 900000
-...     | false with 800000 ≤ᵇ n
-...       | true  = cascWalkRowU 16 ((m % 100000) / 10000)
-                                ((m % 10000) / 1000) ((m % 1000) / 100)
-                                ((m % 100) / 10) (m % 10)
-  where m = n ∸ 800000
-...       | false with 700000 ≤ᵇ n
-...         | true  = depthRunWalkRowU 16 ((m % 100000) / 10000)
-                                    ((m % 10000) / 1000) ((m % 1000) / 100)
-                                    ((m % 100) / 10) (m % 10)
-  where m = n ∸ 700000
-...         | false with 600000 ≤ᵇ n
-...           | true  = depthRunWalkRow 12 ((m % 100000) / 10000)
-                                    ((m % 10000) / 1000) ((m % 1000) / 100)
-                                    ((m % 100) / 10) (m % 10)
-  where m = n ∸ 600000
-...           | false with 500000 ≤ᵇ n
-...             | true  = cascWalkRow 12 ((m % 100000) / 10000)
-                               ((m % 10000) / 1000) ((m % 1000) / 100)
-                               ((m % 100) / 10) (m % 10)
-  where m = n ∸ 500000
-...            | false with 400000 ≤ᵇ n
-...              | true  = cascRow (m / 100000) ((m % 100000) / 10000)
-                        ((m % 10000) / 1000) ((m % 1000) / 100)
-                        ((m % 100) / 10) (m % 10)
-  where m = n ∸ 400000
-...              | false with 300000 ≤ᵇ n
-...                | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
-  where m = n ∸ 300000
-...                | false with 200000 ≤ᵇ n
-...                  | true  = depthRow (m / 100) (m % 100)
-  where m = n ∸ 200000
-...                  | false with 100000 ≤ᵇ n
-...                    | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
-                             ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
-  where m = n ∸ 100000
-...                    | false with 20000 ≤ᵇ n
-...                      | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
-  where m = n ∸ 20000
-...                      | false with 13000 ≤ᵇ n
-...                        | true  = cascadeRow 6 (m / 100) (m % 100)
-  where m = n ∸ 13000
-...                        | false with 3000 ≤ᵇ n
-...                          | true  = sharedSweep (n ∸ 3000)
-  where
-  sharedSweep : ℕ → String
-  sharedSweep m =
-    let ds = m / 1000
-        ks = (m % 1000) / 100
-        d  = (m % 100) / 10
-        k  = m % 10
-        g  = storeAfterRootS ds ks d k
-        A  = allowanceS ds ks d k
-    in "ds=" ++ show ds ++ " ks=" ++ show ks
-       ++ " d=" ++ show d ++ " k=" ++ show k
-       ++ "  slotsNestSum = " ++ show (slotsNestSum (insS ds ks))
-       ++ "  storeNestMax after root = " ++ show g
-       ++ "  allowance = " ++ show A
-       ++ "  over = " ++ showB (A ≤ᵇ g)
-       ++ "  dry = " ++ showB (runDryS ds ks d k)
-...                          | false with 2000 ≤ᵇ n
-...                            | true  = nestSweep (n ∸ 2000)
-  where
-  nestSweep : ℕ → String
-  nestSweep dk =
-    let d = dk / 100
-        k = dk % 100
-        g = storeAfterRoot d k
-        A = allowance d k
-    in "d=" ++ show d ++ " k=" ++ show k
-       ++ "  storeNestMax after root = " ++ show g
-       ++ "  burst cap = " ++ show (nestCapAt (progD d k) ins₀ 1)
-       ++ "  burst-over = " ++ showB (nestCapAt (progD d k) ins₀ 1 <ᵇ g)
-       ++ "  allowance = " ++ show A
-       ++ "  over = " ++ showB (A ≤ᵇ g)
-       ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...                            | false with 1000 ≤ᵇ n
-...                              | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...                         | true  =
-  let dk = n ∸ 1000
-      d  = dk / 100
-      k  = dk % 100
-      p  = progD d k
-      G  = sucG p
-  in "d=" ++ show d ++ " k=" ++ show k
-     ++ "  sucG=" ++ show G
-     ++ "  runDry G p = " ++ showB (runDry G p)
-     ++ "   [true = REFUTES WalkStmt]"
-
-------------------------------------------------------------------
--- stdin: a single row index.  Anything unparseable reads as 0, which is
--- the calibration row — the safe default, since a mis-typed index then
--- reports the one number whose expected value is written down.
-------------------------------------------------------------------
-
-private
-  isDigit : ℕ → Bool
-  isDigit c = if 48 ≤ᵇ c then c ≤ᵇ 57 else false
-
-  digits : List ℕ → ℕ → ℕ
-  digits []       acc = acc
-  digits (c ∷ cs) acc =
-    if isDigit c then digits cs (acc * 10 + (c ∸ 48)) else acc
-
-  skipToDigit : List ℕ → List ℕ
-  skipToDigit []       = []
-  skipToDigit (c ∷ cs) = if isDigit c then (c ∷ cs) else skipToDigit cs
+rowAt n =
+  if 3000000 ≤ᵇ n
+  then (let m = n ∸ 3000000
+        in cutRow (m / 100000) 16 ((m % 100000) / 10000)
+                  ((m % 10000) / 1000) ((m % 1000) / 100)
+                  ((m % 100) / 10) (m % 10))
+  else rowAt′ n
 
 main : IO Unit
 main = getContents >>= λ s →

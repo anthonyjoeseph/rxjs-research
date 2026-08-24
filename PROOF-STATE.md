@@ -160,8 +160,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 - **`cascade-nest-perDeliv`** (Caps-Face/Part7) — DIFFICULTY: the cascade face's
-  chain walk, charged one `nestSyn` per delivery. Same decomposition the store
-  face takes; the count converts to a width through the shared leaf.
+  chain walk, charged one `nestSyn` per delivery. The obstacle is the SKIP
+  branch: a branch-free left side charges a phantom chain against a real
+  budget, and a general form must carry `suc` of the count.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY: the subscribe-side
   depth induction. Only the SUBJECT axis can refute — the store and path move
   the bound alone — and the sweeps drive it at the tight index on a product,

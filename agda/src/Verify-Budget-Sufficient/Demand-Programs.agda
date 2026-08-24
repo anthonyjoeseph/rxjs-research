@@ -39,7 +39,7 @@ open import Data.Product using (proj₁)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
 open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold; hot)
-open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; concatAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
+open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; concatAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; takeᵉ; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
 open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root;
   Path; _↠_; thru-outer; mergeᵒ)
@@ -237,6 +237,59 @@ sucGF : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
 sucGF ds ks j w k =
   suc (syncSizeᵉ (progF w k)
        + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progF w k))
+
+----------------------------------------------------------------------
+-- THE CUT FAMILY.  The fan of `progF`, with a `takeᵉ 1` between the fan
+-- and the root, and it exists for one reason: it is the only shape that
+-- reaches `cascadeGo`'s SKIP branch.  `cascadeLatch` clears `cancelled`
+-- at every cascade's entry, so a chain can only be skipped because an
+-- operator CUT it during this same cascade -- and both cut sites sit
+-- inside a dispatch, which runs only after the cutting chain's own
+-- delivery.  So a skip is always preceded by a delivery, and a family
+-- wanting skips must buy them with a take that exhausts mid-fan.
+--
+-- WHY THE FAN MUST BE WIDE.  Two chains put the cut on the last one and
+-- leave nothing behind it, which is the degenerate case: what the skip
+-- branch charges and cannot pay for is the phantom TAIL cascade after
+-- the skipped chain, so the rows need at least a third chain sitting
+-- past the cut.
+--
+-- AND THE TAKE COUNT IS THE SWEPT PARAMETER, not a constant.  A take
+-- tight enough to be interesting exhausts inside the SUBSCRIBE frame,
+-- on the synchronous emissions the shared slot and the seed make, and
+-- then it has cut the whole registry before any arrival exists -- the
+-- rows come back with no chains at all.  What is wanted is a count that
+-- survives the frame and runs out partway along one arrival's fan, and
+-- where that sits is a property of the program rather than something to
+-- guess, so `k` IS the count and the sweep finds it.
+-- AND THE FOLD DEPTH IS SWEPT TOO, because it is the axis the skip
+-- branch is actually at risk on.  `foldD dd` wraps the scan's
+-- accumulator `dd` levels deeper per value, so a chainStep DEEPENS THE
+-- STORE -- and in the skip branch the evaluator runs no such step while
+-- `depthCascade` charges one anyway, plus every phantom step stacked
+-- behind it.  At depth one the charge is invisible under the base
+-- terms; the question is whether it stays so as the per-value wrap
+-- grows against a delivery count that does not.
+--
+-- AND THE TAKE SITS BELOW THE SCAN, WHICH IS THE WHOLE POINT OF THE
+-- ORDER.  Above it, an exhausted take gates the scan: the phantom step
+-- carries no value through, the accumulator never wraps, and the rows
+-- come back flat in the fan width however deep the fold -- measured,
+-- and it is what a first arrangement of this family did.  Below it, a
+-- skipped chain still runs the merge and the scan before meeting the
+-- exhausted take, so each phantom step deepens the store and the
+-- charges stack behind the cut with no delivery paying for them.
+progC : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
+progC dd w k =
+  mergeAllᵉ (takeᵉ (nat̂ (suc k))
+    (scanᵉ (foldD dd) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+      (mergeAllᵉ (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+                       ++ (strmᵗ (input fzero) ∷ []))))))
+
+sucGC : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGC ds ks j dd w k =
+  suc (syncSizeᵉ (progC dd w k)
+       + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progC dd w k))
 
 progU : ℕ → ℕ → Closed Γ₂ natᵗ
 progU d k =
