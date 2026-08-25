@@ -224,22 +224,22 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   stage of every chain's walk under the width cap. `valsCaps?` is this bound,
   propagated across the feared `thru` hop already; the grind carries it flat,
   not moving.
-- **`stepFrame-nodes-take`** (Nest-Walk) — GRINDABLE, `NO EVIDENCE`:
+- **`stepFrame-nodes-take`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`:
   `takeDispatch` re-points a counter and forwards what it was handed, so
   neither side of the `⊔` deepens.
+- **`chainsNest≤store`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: a
+  `⊔`-fold dominates the selection it folds; `chainsOf-caps` is the same
+  recursion at a size.
+- **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `NO EVIDENCE`, large: the Ψ
+  mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
+  `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names
+  no undecided index.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
   cascade only shortens lists, and every summand of the store measure is a
   `⊔`-fold over one. Its header names the proven twin at the same two branches.
 - **`pop-nest`, `pop-head-nest`** (Caps-Bridge) — GRINDABLE, `TWIN×2`: the pop
   mirrors, clause for clause against the proven `pop-caps` and
   `pop-head-valCaps`.
-- **`chainsNest≤store`** (Caps-Face/Part7) — GRINDABLE, `NO EVIDENCE`: a
-  `⊔`-fold dominates the selection it folds; `chainsOf-caps` is the same
-  recursion at a size.
-- **`subscribeE-Ψ`** (Burst-Walk) — GRINDABLE, `NO EVIDENCE`, large: the Ψ
-  mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
-  `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names
-  no undecided index.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
@@ -324,32 +324,32 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   mechanical.
 - **`stepFrame-wf-inner-mergeAll`** (Part9) — DIFFICULTY, `NO EVIDENCE`: the
   drain grows the registry; re-establish FoldInv. Independent of the cert.
-- **`mergeAll-binv-adapt`** (Part3) — GRINDABLE, `NO EVIDENCE`: mint and
+- **`mergeAll-binv-adapt`** (Part3) — DIFFICULTY, `NO EVIDENCE`: mint and
   install touch neither registry nor live, so every BurstInv field survives.
   The scan twin is proven at the same two operations.
-- **`mergeAll-nodry-push` / `mergeAll-valsLast-push`** (Part3) — GRINDABLE,
+- **`mergeAll-nodry-push` / `mergeAll-valsLast-push`** (Part3) — DIFFICULTY,
   `NO EVIDENCE`: carry the dry premise in and `valsLast?` out through the wrap
   frame, clause for clause against the map and scan pushes at the same frame
   shape.
-- **`map-nodry-push`** (Part3) — GRINDABLE, `NO EVIDENCE`: every ingredient is
+- **`map-nodry-push`** (Part3) — DIFFICULTY, `NO EVIDENCE`: every ingredient is
   PROVEN — `pushBurst-map-char` (.Part5) and the dry family `splitEvents-nodry`
   / `retagEvents-dry` / `mapValue-dry` / `any-dry-++` (.Walk-Level). Only
   import wiring remains, and Part3 already reaches that cone through
   Caps-Bridge.
-- **`input-hot-spent-wf`** (Part3) — GRINDABLE, `NO EVIDENCE`: the PROVEN
+- **`input-hot-spent-wf`** (Part3) — DIFFICULTY, `NO EVIDENCE`: the PROVEN
   `oneShotBurst-wf` (.Part2) is the same init/close/complete balance one
   source-state over, and the header carries the whole argument with nothing
   left open.
-- **`take-nodry-push`** (Part3) — GRINDABLE, `NO EVIDENCE`, and NOT by the scan
-  twin its header names: `cutThrough` emits only `close src cut`/`cutPending`
-  while `dryEvent` fires on `dried` alone, so dryness is structural, and
-  `retagEvents-dry` (.Walk-Level) is proven. `ecEq` comes from the outer
-  pushBurst's node lookup.
-- **`subscribeE-dying`** (Part8) — GRINDABLE, `NO EVIDENCE`, large:
+- **`take-nodry-push`** (Part3) — DIFFICULTY, `NO EVIDENCE`, and NOT by the
+  scan twin its header names: `cutThrough` emits only `close src
+  cut`/`cutPending` while `dryEvent` fires on `dried` alone, so dryness is
+  structural, and `retagEvents-dry` (.Walk-Level) is proven. `ecEq` comes from
+  the outer pushBurst's node lookup.
+- **`subscribeE-dying`** (Part8) — DIFFICULTY, `NO EVIDENCE`, large:
   `subscribeE` never writes `dying` — two writers, neither reachable from it,
   both named in its header. Nothing undecided; the cost is that the induction
   covers every clause.
-- **`HotLive`'s preservation leaves** (Part2) — GRINDABLE, `NO EVIDENCE`, all
+- **`HotLive`'s preservation leaves** (Part2) — DIFFICULTY, `NO EVIDENCE`, all
   five: `sched-init-hot-live`, `mintSource-hot-live`, `subscribeE-hot-live`,
   `cascadeFinish-hot-live`, `sched-next-hot-live`. Every header states a
   slots-untouched / prepend-only route with nothing undecided; `sched-next`'s

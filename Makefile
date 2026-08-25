@@ -652,6 +652,17 @@ roadmap-selftest:
 	    echo "$$stl2" | grep -q "EVIDENCE FIELD IS STALE" \
 	      || { echo "SELFTEST FAIL: a stale evidence field was rejected for the wrong reason"; fail=1; }; \
 	  fi; \
+	  une=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-unearned.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-notwin.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-unearned.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-notwin.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a GRINDABLE row naming no proven twin PASSED — the class is a parking space again"; fail=1; \
+	  else \
+	    echo "$$une" | grep -q "NAME NO PROVEN TWIN" \
+	      || { echo "SELFTEST FAIL: an unearned GRINDABLE was rejected for the wrong reason"; fail=1; }; \
+	  fi; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and

@@ -1,4 +1,4 @@
-# fixture — a correctly sorted roadmap whose rows cover the whole ledger
+# fixture — a GRINDABLE row whose postulate names no proven twin: must FAIL
 
 ## Tier 0 — anchor
 
@@ -15,10 +15,11 @@
   naming both.
 - **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY, `NO EVIDENCE`: a leading-dash
   suffix after a sibling in the same row counts as naming `suf-nodry-nestRec`.
-- **`f-grindable`** — GRINDABLE, `TWIN`: mechanical because the PROVEN twin
-  `a-proven-citation` did the same thing at the same indices. A name CITED in a
-  hook is not a name the row claims, so the staleness check must NOT fire on it
-  — earning GRINDABLE requires naming a precedent, and a precedent is proven.
+- **`f-grindable`** — GRINDABLE, `NO EVIDENCE`: mechanical because the PROVEN
+  twin `a-proven-citation` did the same thing at the same indices. A name CITED
+  in a hook is not a name the row claims, so the staleness check must NOT fire
+  on it — earning GRINDABLE requires naming a precedent, and a precedent is
+  proven.
 - **the `glob-*` family** — GRINDABLE, `TWIN×2`: a glob covers the family it
   names.
 - **`g-unclassified`** — carried, not counted.

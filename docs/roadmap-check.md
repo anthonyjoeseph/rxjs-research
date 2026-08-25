@@ -5,7 +5,7 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Seven checks
+## Eight checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
@@ -28,6 +28,8 @@ can see into build failures.
 7. **The evidence field** — every classed row carries a backticked field directly after
    its risk class, naming the durable markers its postulates' own headers carry, and
    matching them. `make roadmap-evidence` writes it; nobody types it.
+8. **An unearned GRINDABLE** — a GRINDABLE row whose postulates carry no `TWIN` fails.
+   The class means "here is the worked instance"; absent one the row is DIFFICULTY.
 
 ## What the preamble check charges, and the one bug it was written after
 
@@ -92,7 +94,8 @@ check, beside a clean fixture whose rows deliberately cite a proven precedent an
 a descriptive head, so the two exemptions are pinned as load-bearing rather than
 assumed. Two further fixtures pin the evidence field in both of its failing directions —
 a row with no field at all, and a row whose field disagrees with the census — against a
-`--census` fixture standing in for a scan of `agda/src`.
+`--census` fixture standing in for a scan of `agda/src`. A third pins the unearned
+GRINDABLE, against a second census in which the fixture's twin is absent.
 
 ## The evidence field, and why a derived field may be mandatory
 
@@ -117,6 +120,13 @@ rules stated elsewhere:
 - **A count is not a copy.** Moving receipts themselves into the roadmap would
   duplicate content, and duplicated content drifts. A count is a function of the
   headers, so the two cannot disagree without the gate saying so.
+
+The field is also what makes check 8 possible. A precedent named in a row's PROSE
+resolves nowhere, so GRINDABLE drifted into the place rows nobody wants to think about
+get parked — ten of twelve carried no `TWIN` at all when the check was added, and were
+demoted to DIFFICULTY. Re-earning the class means putting a `TWIN:` section in the
+postulate's own header, where `comments-check` refuses a twin that is itself still a
+postulate.
 
 There are deliberately **no aggregates** — no per-tier or whole-file totals. The
 per-row blank carries the signal; a total is a number someone has to keep true for no

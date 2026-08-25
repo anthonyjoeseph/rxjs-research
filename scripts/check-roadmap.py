@@ -152,6 +152,17 @@ from an ordinary qualifier: a row already reads `— GRINDABLE, large:`, and
 NO AGGREGATES.  A per-tier or whole-file total was considered and rejected: the
 per-row blank carries the whole signal, and a total is a number someone has to
 keep true for no decision it changes.
+
+SEVENTH CHECK — AN UNEARNED GRINDABLE: a GRINDABLE row whose postulates carry no
+`TWIN` fails.  This mechanises a rule that was already stated and already being
+broken -- GRINDABLE means "here is the worked instance", and absent one the row
+is DIFFICULTY.  Ten of twelve GRINDABLE rows named no twin when this was
+written, several of them naming a precedent in ROW PROSE, which resolves
+nowhere and is exactly the unchecked claim the class exists to prevent.  `TWIN`
+is the marker `make comments-check` refuses when its referent is itself still a
+postulate, so requiring it is what makes the precedent a WALKED route rather
+than a believed one.  It is checkable only now, because it needs the field
+above.
 """
 
 import argparse
@@ -557,11 +568,25 @@ def evidence_token(counts):
 def row_evidence(label, cen):
     """-> merged counts for every live postulate a row head names."""
     merged = {}
+
+    def add(counts):
+        for k, v in counts.items():
+            merged[k] = merged.get(k, 0) + v
+
     for group in head_groups(label):
         for name in group:
-            if name in cen:
-                for k, v in cen[name].items():
-                    merged[k] = merged.get(k, 0) + v
+            # the roadmap's glob shorthand names a FAMILY, and the coverage
+            # check already reads it that way -- so must this, or a family row
+            # can never carry evidence however marked its members are
+            if "*" in name:
+                hit = [n for n in cen if re.fullmatch(
+                    re.escape(name).replace(r"\*", ".*"), n)]
+                if hit:
+                    for n in hit:
+                        add(cen[n])
+                    break
+            elif name in cen:
+                add(cen[name])
                 break
     return merged
 
@@ -657,6 +682,27 @@ def check_evidence(path, tiers, cen):
             elif have.strip() != want:
                 bad.append((tier, label, lineno, have.strip(), want))
     return bad, missing
+
+
+def unearned_grindable(path, tiers, cen):
+    """-> [(tier, label, lineno)] — GRINDABLE rows naming no proven twin.
+
+    CLAUDE.md already rules that a row without a named worked instance IS
+    DIFFICULTY; until the evidence field existed there was nothing to check it
+    against, and the class drifted into the place everything nobody wants to
+    think about gets parked -- ten of twelve GRINDABLE rows had no `TWIN:`
+    anywhere in their postulates\' headers when this check was written, several
+    naming a precedent in ROW PROSE, which no machine resolves.  `TWIN:` is the
+    one marker `make comments-check` refuses when its referent is itself still a
+    postulate, so requiring it here is what makes "name the precedent" mean a
+    walked route rather than a believed one.
+    """
+    out = []
+    for tier, rows, _pre in tiers:
+        for label, cls, lineno, _cost in rows:
+            if cls == "GRINDABLE" and "TWIN" not in row_evidence(label, cen):
+                out.append((tier, label, lineno))
+    return out
 
 
 def fix_evidence(path, tiers, cen):
@@ -832,7 +878,19 @@ def main():
                 print(f"    headers say `{want}`")
             print("\nThe headers are the authority — a marker was added, deleted or")
             print("retargeted and the row did not follow. Run  make roadmap-evidence")
-        if missing or bad:
+        unearned = unearned_grindable(path, tiers, cen)
+        if unearned:
+            print(f"\nGRINDABLE ROWS THAT NAME NO PROVEN TWIN — {len(unearned)}:")
+            for tier, label, lineno in unearned:
+                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
+            print("\nGRINDABLE is not 'feels easy', it is 'here is the worked")
+            print("instance' — and absent one the row is DIFFICULTY. A precedent")
+            print("named in this row's PROSE does not count: it resolves nowhere.")
+            print("Put a `TWIN:` section in the postulate's own header naming a")
+            print("PROVEN counterpart (comments-check refuses a twin that is itself")
+            print("still a postulate), then run  make roadmap-evidence . Or demote")
+            print("the row to DIFFICULTY, which is what it is until then.")
+        if missing or bad or unearned:
             failures.append(None)
 
     date_targets = [path]
@@ -919,7 +977,8 @@ def main():
           + ("" if unscheduled is None
              else "; every live postulate is on the roadmap, and every row head "
                   "names one; every classed row's evidence field matches its "
-                  "postulates' own headers"))
+                  "postulates' own headers, and every GRINDABLE row names a "
+                  "proven twin"))
     return 0
 
 
