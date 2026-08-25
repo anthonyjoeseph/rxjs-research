@@ -26,10 +26,12 @@ open import Refuted.Thru-Loop
 open import Refuted.Inner-Nodry
   using (inner-nodry-inv-regLen-absurd)
 open import Refuted.Nest-Depth-One
-  using (descent≡21; oneSyn≡19; nest-one-syn-absurd)
+  using (descent≡81; oneSyn≡74; nest-one-syn-absurd)
 open import Refuted.Cascade-Deliv-Depth
-  using (descent≡19; perDeliv≡16; val-hyp; cascade-deliv-depth-absurd)
+  using (descent≡49; perDeliv≡44; val-hyp; cascade-deliv-depth-absurd)
 open import Refuted.Cascade-Nest-PerDeliv
-  using (grown≡12; perDeliv≡10; store-val-hyp; cascade-nest-perDeliv-absurd)
+  using (grown≡48; perDeliv≡35; store-val-hyp; cascade-nest-perDeliv-absurd)
 open import Refuted.Chain-Step-Nodes
-  using (grown≡11; charge≡9; chainStep-nodes-absurd)
+  using (grown≡22; charge≡15; chainStep-nodes-absurd)
+open import Refuted.Share-Sink-Nodes
+  using (grown≡3; charge≡1; share-sink-nodes-absurd)

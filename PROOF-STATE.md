@@ -161,15 +161,11 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`dispatchShare-nodes`** (Nest-Walk) — DIFFICULTY: the share sink fans the
-  same values into every registration and the path measure gives it NOTHING to
-  spend, so the arm rests on the registrations touching disjoint nodes — which
-  an induction over the admitted list cannot see. No family in reach fires it.
-- **`stepFrame-nodes`** (Nest-Walk) — DIFFICULTY: one frame moves its node and
-  its emission together by its own wrap, stated under one `⊔` because a scan
-  emits the accumulator it stored. The walk above it telescopes, proven.
+- **`chainStep-nodes`** (Caps-Face/Part7) — DIFFICULTY: one chain's step under
+  the path's own charge plus one unit, the second unit being the share sink's
+  fan-out, which walks registry paths the chain never had. Two forms refuted.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY: the selection's
-  paths and the arrival's payload land inside `nestSyn` — the fact that ties
+  paths and the arrival's payload land inside one unit — the fact that ties
   the walk's charge back to the program. Free-list form refuted; probeable.
 - **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY: the walk's pending
   sources under the same width. The one arm of the store no instantiation has

@@ -203,6 +203,27 @@ sucGF ds ks j w k =
   suc (syncSizeᵉ (progF w k)
        + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progF w k))
 
+-- THE SHARE-SINK VOCABULARY, and the arrangement is the content.  A
+-- shared slot's def may only reference inputs BELOW its own index, so
+-- the shared slot every other family here installs -- at index zero --
+-- can reference nothing, and no arrival ever flows INTO it.  Its share
+-- therefore fans out only during the connect burst, at subscribe time,
+-- and a DELIVERY never reaches a `share-sink`.  Putting the shared slot
+-- above the async one instead is what lets an arrival travel through
+-- the def and fan out to every registration on the share, which is the
+-- one arm of the walk no other vocabulary reaches.
+shareDef : Closed Γ₂ natᵗ
+shareDef = mergeAllᵉ nothing (ofᵉ (strmᵗ (input fzero) ∷ []))
+
+insS : ℕ → Slots Γ₂
+insS j fzero        = scripted (hot (asyncNats j))
+insS j (fsuc fzero) = shared shareDef {ok = tt}
+
+sucGS : ℕ → ℕ → ℕ → ℕ
+sucGS j w k =
+  suc (syncSizeᵉ (progF w k)
+       + hopDᵉ 0 (slotHop 0 (insS j)) (progF w k))
+
 ----------------------------------------------------------------------
 -- THE CUT FAMILY.  The fan of `progF`, with a `takeᵉ 1` between the fan
 -- and the root, and it exists for one reason: it is the only shape that

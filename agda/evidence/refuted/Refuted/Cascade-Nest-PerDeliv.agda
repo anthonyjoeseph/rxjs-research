@@ -32,13 +32,13 @@
 -- whole ingredient, and it is the same gap that hid the depth face's
 -- refutation from three series at once.
 --
--- THE WITNESS is `progU 2 2` — a limit-1 mergeAll over three inners, so
+-- THE WITNESS is `progU 8 2` — a limit-1 mergeAll over three inners, so
 -- the drain fires — at the two-slot vocabulary `insF 1 2 2`, whose
 -- second slot is HOT, which is what makes the program cascade at all.
 -- Read at the SECOND cascade, where the drain has something to release.
--- Across the fold parameter the store after the walk reads 6, 12, 18,
--- 24, 30, 36 against a charge of 8, 10, 12, 14, 16, 18: six per fold
--- layer against two, clearing at depth one and crossing at two.
+-- Forty-eight against thirty-five.  Across the fold parameter the store
+-- after the walk climbs SIX per layer against the charge's four, so the
+-- gap widens without limit and the row sits well past the crossing.
 --
 -- WHAT IS PINNED HERE AND WHAT IS NOT.  The slots premise is discharged
 -- by construction — the statement's vocabulary is the one the run
@@ -80,13 +80,13 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; nestSyn; nestOK?; nestCapAt)
 
 prog : Closed Γ₂ natᵗ
-prog = progU 2 2
+prog = progU 8 2
 
 slots : Slots Γ₂
 slots = insF 1 2 2
 
 sub : Sched Γ₂ × EvalSt prog
-sub = let r = subscribeE (gasPad (sucGU 1 2 2 2 2) g0) prog root 0 0
+sub = let r = subscribeE (gasPad (sucGU 1 2 2 8 2) g0) prog root 0 0
                          (sched-init prog slots) (st-init prog)
       in proj₁ (proj₂ r) , proj₂ (proj₂ r)
 
@@ -117,15 +117,15 @@ row with sched-next (proj₁ after1)
 -- THE FIGURES, PINNED.  Spelled out rather than left inline so that any
 -- repair moving either measure fails here, naming the number, instead
 -- of quietly turning the crossing into an equality
-grown≡12 : proj₁ row ≡ 12
-grown≡12 = refl
+grown≡48 : proj₁ row ≡ 48
+grown≡48 = refl
 
-perDeliv≡10 : proj₁ (proj₂ row) ≡ 10
-perDeliv≡10 = refl
+perDeliv≡35 : proj₁ (proj₂ row) ≡ 35
+perDeliv≡35 = refl
 
 store-val-hyp : proj₂ (proj₂ (proj₂ row)) ≡ true
 store-val-hyp = refl
 
 cascade-nest-perDeliv-absurd : proj₁ row ≤ proj₁ (proj₂ row) → ⊥
--- `12 ≤ᵇ 10` reduces to `false`, so `T` of it IS the empty type
+-- `48 ≤ᵇ 35` reduces to `false`, so `T` of it IS the empty type
 cascade-nest-perDeliv-absurd h = ≤⇒≤ᵇ h

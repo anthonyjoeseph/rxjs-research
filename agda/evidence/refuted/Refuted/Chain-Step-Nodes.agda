@@ -24,11 +24,12 @@
 --
 -- THE WITNESS is `progF 1 1` at `insF 1 2 2`, the smallest family in
 -- reach, walked at a path built here rather than taken from the run:
--- one scan frame carrying `foldD 9`, then a constant map back to the
--- root type.  Eleven against a charge of nine.  The left side is the
--- fold depth plus two and the right side does not move at all, so the
--- gap is unbounded in `d` and the crossing is at seven; the row is
--- pinned at nine to sit clear of it.
+-- one scan frame carrying `foldD 20`, then a constant map back to the
+-- root type.  Twenty-two against a charge of fifteen.  The left side is
+-- the fold depth plus two and the right side does not move at all, so
+-- the gap is unbounded in `d`; the row is pinned well clear of the
+-- crossing, since a charge that grows by a constant factor moves the
+-- crossing and not the verdict.
 --
 -- WHAT DIES AND WHAT DOES NOT.  The premise-free form dies outright.
 -- The claim about the runs is untouched, and the repair the numbers
@@ -81,17 +82,17 @@ deep d = scan-f (foldD d) 7 ↠ (map-f (nat̂ 0) ↠ root)
 
 row : ℕ × ℕ
 row = let st = proj₂ sub
-          r  = chainStep 1 arr (deep 9) (proj₁ sub) st
+          r  = chainStep 1 arr (deep 20) (proj₁ sub) st
       in nodesMax (proj₂ (proj₂ r)) , nodesMax st + nestSyn prog slots
 
 -- THE FIGURES, PINNED, so that a repair moving either side fails here
 -- naming the number instead of turning the crossing into an equality
-grown≡11 : proj₁ row ≡ 11
-grown≡11 = refl
+grown≡22 : proj₁ row ≡ 22
+grown≡22 = refl
 
-charge≡9 : proj₂ row ≡ 9
-charge≡9 = refl
+charge≡15 : proj₂ row ≡ 15
+charge≡15 = refl
 
 chainStep-nodes-absurd : proj₁ row ≤ proj₂ row → ⊥
--- `11 ≤ᵇ 9` reduces to `false`, so `T` of it IS the empty type
+-- `22 ≤ᵇ 15` reduces to `false`, so `T` of it IS the empty type
 chainStep-nodes-absurd h = ≤⇒≤ᵇ h

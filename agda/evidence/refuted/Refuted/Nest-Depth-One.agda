@@ -26,14 +26,15 @@
 -- single `nestSyn`.  One `nestSyn` pays for one such level.  A program
 -- whose folds nest can spend arbitrarily many.
 --
--- THE WITNESS is `progU 5 2` — a limit-1 mergeAll over three queued inners, so
--- the drain actually fires, under a fold of depth 5 — at the two-slot
--- vocabulary `insT 1 2 0`, read at the root subscribe.  Measured across
--- the fold parameter the descent reads 4, 5, 9, 13, 17, 21 while the
--- bound reads 9, 11, 13, 15, 17, 19: the descent climbs about four per
--- fold layer against the bound's flat two, TIES at depth 4, and crosses
--- at depth 5.  A linear crossing in a parameter the bound does see, not
--- a degenerate corner.
+-- THE WITNESS is `progU 20 2` — a limit-1 mergeAll over three queued
+-- inners, so the drain actually fires, under a fold of depth 20 — at the
+-- two-slot vocabulary `insT 1 2 0`, read at the root subscribe.
+-- Eighty-one against seventy-four.  Measured across the fold parameter
+-- the descent climbs FOUR per layer and the bound THREE, so the gap
+-- widens without limit and the crossing is linear in a parameter the
+-- bound does see, not a degenerate corner.  The row is pinned well past
+-- the crossing, since a charge that grows by a constant factor moves
+-- where the two meet and not which one wins.
 --
 -- WHAT THIS DOES NOT SHOW.  Nothing here touches the WIDTH form, which
 -- is the statement the caps face actually consumes and which the same
@@ -61,7 +62,7 @@ open import Rx.Nest-Depth using (nestDᵉ)
 
 -- the crossing point: the mergeAll drain under five nested folds
 prog : Closed Γ₂ natᵗ
-prog = progU 5 2
+prog = progU 20 2
 
 slots : Slots Γ₂
 slots = insT 1 2 0
@@ -87,11 +88,11 @@ oneSyn = nestDᵉ prog + pathNestD κ + storeNestMax sd st + nestSyn prog slots
 -- THE FIGURES, PINNED.  Spelled out rather than left inline so that any
 -- repair moving either measure fails here, naming the number, instead of
 -- quietly turning the crossing into an equality.
-descent≡21 : descent ≡ 21
-descent≡21 = refl
+descent≡81 : descent ≡ 81
+descent≡81 = refl
 
-oneSyn≡19 : oneSyn ≡ 19
-oneSyn≡19 = refl
+oneSyn≡74 : oneSyn ≡ 74
+oneSyn≡74 = refl
 
 nest-one-syn-absurd : descent ≤ oneSyn → ⊥
 -- `descent ≤ᵇ oneSyn` reduces to `false`, so `T` of it IS the empty type

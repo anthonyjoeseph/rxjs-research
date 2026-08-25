@@ -22,18 +22,18 @@
 -- charges nothing for.  So the drain's levels have no path term to come
 -- out of and must come out of the per-delivery charge, and a program
 -- whose folds nest spends arbitrarily many of them on ONE delivery.
--- The witness below reads ONE chain, ONE delivery and NO cancellation:
--- the skip branch that the statement's recorded dead route is about is
--- not entered at all, and the live arm alone is enough.
+-- The witness below reads ONE chain, ONE delivery and NO cancellation,
+-- so the live arm alone is enough.
 --
--- THE WITNESS is `progU 3 2` — a limit-1 mergeAll over three inners, so
+-- THE WITNESS is `progU 8 2` — a limit-1 mergeAll over three inners, so
 -- the drain fires — at the two-slot vocabulary `insF 1 2 2`, whose
 -- second slot is HOT, which is what makes the program produce cascades
 -- at all.  Read at the SECOND cascade, where the drain has something to
--- release.  Across the fold parameter the descent reads 7, 13, 19, 25,
--- 31 while the bound reads 10, 13, 16, 19, 22: six per fold layer
--- against three, TYING at depth two and crossing at depth three.  A
--- linear crossing in a parameter the bound does see.
+-- release.  Forty-nine against forty-four.  Across the fold parameter
+-- the descent climbs SIX per layer and the bound FOUR, so the gap
+-- widens without limit: a linear crossing in a parameter the bound
+-- does see, pinned clear of where the two meet, since a charge that
+-- grows by a constant factor moves that point and not the verdict.
 --
 -- WHAT IS PINNED HERE AND WHAT IS NOT.  The slots premise is
 -- discharged by construction — the statement's vocabulary is taken to
@@ -79,13 +79,13 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (chainsNestD; storeNestMax; nestSyn; nestOK?; nestCapAt)
 
 prog : Closed Γ₂ natᵗ
-prog = progU 3 2
+prog = progU 8 2
 
 slots : Slots Γ₂
 slots = insF 1 2 2
 
 sub : Sched Γ₂ × EvalSt prog
-sub = let r = subscribeE (gasPad (sucGU 1 2 2 3 2) g0) prog root 0 0
+sub = let r = subscribeE (gasPad (sucGU 1 2 2 8 2) g0) prog root 0 0
                          (sched-init prog slots) (st-init prog)
       in proj₁ (proj₂ r) , proj₂ (proj₂ r)
 
@@ -119,15 +119,15 @@ row with sched-next (proj₁ after1)
 -- THE FIGURES, PINNED.  Spelled out rather than left inline so that any
 -- repair moving either measure fails here, naming the number, instead
 -- of quietly turning the crossing into an equality
-descent≡19 : proj₁ row ≡ 19
-descent≡19 = refl
+descent≡49 : proj₁ row ≡ 49
+descent≡49 = refl
 
-perDeliv≡16 : proj₁ (proj₂ row) ≡ 16
-perDeliv≡16 = refl
+perDeliv≡44 : proj₁ (proj₂ row) ≡ 44
+perDeliv≡44 = refl
 
 val-hyp : proj₂ (proj₂ (proj₂ row)) ≡ true
 val-hyp = refl
 
 cascade-deliv-depth-absurd : proj₁ row ≤ proj₁ (proj₂ row) → ⊥
--- `19 ≤ᵇ 16` reduces to `false`, so `T` of it IS the empty type
+-- `49 ≤ᵇ 44` reduces to `false`, so `T` of it IS the empty type
 cascade-deliv-depth-absurd h = ≤⇒≤ᵇ h

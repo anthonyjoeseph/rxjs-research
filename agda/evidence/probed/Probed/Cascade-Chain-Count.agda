@@ -22,8 +22,7 @@
 -- reading below hands the step exactly that, and the path-denominated
 -- charge covers it where a program-denominated one does not.
 --
--- TARGET: stepFrame-nodes
--- TARGET: dispatchShare-nodes
+-- TARGET: chainStep-nodes
 -- TARGET: arr-chains-nest-syn
 module Probed.Cascade-Chain-Count where
 
@@ -43,10 +42,10 @@ open import Rx.Evaluator
          _↠_; scan-f; map-f)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nodeNest; pathNestD; chainsNestD; nestSyn)
+  using (nodeNest; pathNestD; chainsNestD; nestUnit)
 
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progU; progC; progF; progW; foldD; insF; sucGU; sucGC; sucGF; sucGW)
+  using (Γ₂; progU; progC; progF; progW; foldD; insF; insS; sucGS; sucGU; sucGC; sucGF; sucGW)
 
 ----------------------------------------------------------------------
 -- The walk, taken at the arrival the root subscribe leaves behind,
@@ -80,7 +79,8 @@ readCh e sl sched st with sched-next sched
       ch  = chainsOf a st
       g   = cascadeGo a 1 ch sd stL
       lhs = nodesMax (proj₂ (proj₂ g))
-      rhs = nodesMax stL + length ch * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch)
+      rhs = nodesMax stL
+              + length ch * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch + nestUnit e sl)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 chRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ × ℕ × Bool
@@ -111,7 +111,7 @@ ChC-fits = refl
 -- AND THE CHAIN LIST IS A FREE ARGUMENT OF THE TARGET, so the honest
 -- selection is not the adversarial case.  Handing the walk the
 -- arrival's own chains over and over drives the left side and the right
--- side together, and the right side moves faster: a whole `nestSyn` per
+-- side together, and the right side moves faster: a whole unit per
 -- chain against whatever one more pass through the same chains adds to
 -- a MAX.
 ----------------------------------------------------------------------
@@ -129,7 +129,8 @@ readDup e sl k sched st with sched-next sched
       ch  = rep k (chainsOf a st)
       g   = cascadeGo a 1 ch sd stL
       lhs = nodesMax (proj₂ (proj₂ g))
-      rhs = nodesMax stL + length ch * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch)
+      rhs = nodesMax stL
+              + length ch * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch + nestUnit e sl)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 dupRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ → ℕ × ℕ × Bool
@@ -154,7 +155,7 @@ stepOn sl a []            sched st = 0 , 0 , false
 stepOn {e = e} sl a ((rid , c) ∷ _) sched st =
   let r   = chainStep 1 a c sched st
       lhs = nodesMax (proj₂ (proj₂ r))
-      rhs = nodesMax st + (nestDᵛ (arrTy a) (arrVal a) + pathNestD c)
+      rhs = nodesMax st + (nestDᵛ (arrTy a) (arrVal a) + pathNestD c + nestUnit e sl)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 readS : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
@@ -220,7 +221,8 @@ readAdv : (e : Closed Γ₂ natᵗ) (sl : Slots Γ₂) → ℕ
 readAdv e sl d sched st =
   let r   = chainStep 1 advArr (advPath d) sched st
       lhs = nodesMax (proj₂ (proj₂ r))
-      rhs = nodesMax st + (nestDᵛ {Γ = Γ₂} (arrTy advArr) (arrVal advArr) + pathNestD (advPath d))
+      rhs = nodesMax st + (nestDᵛ {Γ = Γ₂} (arrTy advArr) (arrVal advArr)
+                             + pathNestD (advPath d) + nestUnit e sl)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 advRow : ℕ → ℕ × ℕ × Bool
@@ -245,13 +247,13 @@ readTie e sl sched st with sched-next sched
 ... | inj₁ _        = 0 , 0 , false
 ... | inj₂ (a , sd) =
   let lhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st)
-      rhs = nestSyn e sl
+      rhs = nestUnit e sl
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 -- AND THE ENTRY INSTANT IS THE SHALLOW ONE, which is what makes the
 -- iterated rows the load-bearing half: at the first arrival the
 -- registry holds only what the root subscribe put there, and the
--- reading comes back at 2 against a whole `nestSyn`.  A registration
+-- reading comes back at 2 against a whole unit.  A registration
 -- deepens when a release SUBSCRIBES an inner, so the chains that could
 -- cross this bound exist only after the walk has run.
 after : ∀ {t} {e : Closed Γ₂ t} → ℕ → ℕ → Sched Γ₂ → EvalSt e
@@ -297,3 +299,34 @@ TieW-fits = refl
 -- together rather than one that is merely slack.
 TieC4-fits : proj₂ (proj₂ (tieRow (progC 4 2 2) sl₅ (sucGC 1 2 6 4 2 2) 3)) ≡ true
 TieC4-fits = refl
+
+----------------------------------------------------------------------
+-- READING FIVE — THE SHARE SINK, which no other row here reaches.  A
+-- shared slot may only reference inputs below its own index, so the
+-- vocabulary every family above uses -- shared at index zero -- has a
+-- share nothing can arrive into, and its fan-out happens once, at
+-- subscribe time.  `insS` puts the share ABOVE the async slot instead,
+-- so an arrival travels through the def and `dispatchShare` fans it to
+-- every registration on the share INSIDE a delivery.  `progF w` puts
+-- `suc w` registrations there, which is the axis the fan-out arm is
+-- about.
+----------------------------------------------------------------------
+
+shRow : ℕ → ℕ → ℕ → ℕ × ℕ × Bool
+shRow j w k = let e₀ = entry (progF w k) (insS j) (sucGS j w k)
+              in readS (progF w k) (insS j) (proj₁ e₀) (proj₂ e₀)
+
+shChRow : ℕ → ℕ → ℕ → ℕ × ℕ × Bool
+shChRow j w k = let e₀ = entry (progF w k) (insS j) (sucGS j w k)
+                in readCh (progF w k) (insS j) (proj₁ e₀) (proj₂ e₀)
+
+-- the crossing the one-unit charge fails at, `Refuted.Share-Sink-Nodes`,
+-- read here against the charge that carries the unit: three against six
+Sh1-fits : shRow 2 1 1 ≡ (3 , 6 , true)
+Sh1-fits = refl
+
+Sh3-fits : proj₂ (proj₂ (shRow 2 3 1)) ≡ true
+Sh3-fits = refl
+
+ShCh3-fits : proj₂ (proj₂ (shChRow 2 3 1)) ≡ true
+ShCh3-fits = refl

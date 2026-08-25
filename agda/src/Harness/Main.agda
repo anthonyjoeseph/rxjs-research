@@ -69,9 +69,9 @@ open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (progD; sucG; ins₀; progT; sucGT; progU; sucGU; progB; sucGB; progN; sucGN; progF; sucGF;
-  insF; insT; subjN; pathN; progC; sucGC; progW; sucGW; progO; sucGO)
+  insF; insT; insS; sucGS; subjN; pathN; progC; sucGC; progW; sucGW; progO; sucGO)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nestSyn; nestCapAt; storeNestMax; slotsNestSum; nestOK?; pathNestD; chainsNestD; liveNest;
+  using (nestSyn; nestUnit; nestCapAt; storeNestMax; slotsNestSum; nestOK?; pathNestD; chainsNestD; liveNest;
   nodeNest; regsNestMax)
 
 ------------------------------------------------------------------
@@ -524,12 +524,34 @@ satRow fam ds ks j w k =
                               (sched-init p slF) (st-init p)
            in "F ds=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
               ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+-- SERIES SH — THE SHARE SINK'S OWN STORE, which is the corner the
+-- per-chain charge had to grow a second unit for.  A shared slot may
+-- only reference inputs below its own index, so every family whose
+-- share sits at index zero has one nothing can arrive into; `insS`
+-- puts the share above the async slot, and these rows read what the
+-- entry leaves standing there against the unit that is supposed to
+-- cover a delivery through it.  Coverage only: the growth side is
+-- read by `Probed.Cascade-Chain-Count`, at the typechecker, where a
+-- row can be pinned.
+--
+-- TARGET: chainStep-nodes
+shareNestRow : ℕ → ℕ → ℕ → String
+shareNestRow j w k =
+  let p = progF w k
+      r = subscribeE (gasPad (sucGS j w k) g0) p root 0 0
+                     (sched-init p (insS j)) (st-init p)
+  in "SH j=" ++ show j ++ " w=" ++ show w ++ " k=" ++ show k
+     ++ " unit=" ++ show (nestUnit p (insS j))
+     ++ " store=" ++ show (storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
 nestRow 2 = "nestCapAt (progD 1 1) ins₀ 0 = "   ++ show (nestCapAt (progD 1 1) ins₀ 0)
 nestRow 4 = "nestCapAt (progD 1 1) ins₀ 1 = "   ++ show (nestCapAt (progD 1 1) ins₀ 1)
 nestRow 6 = "nestCapAt (progD 1 1) ins₀ 2 = "   ++ show (nestCapAt (progD 1 1) ins₀ 2)
+nestRow 7 = shareNestRow 2 1 1
+nestRow 8 = shareNestRow 2 3 1
 nestRow _ = "(no such row)"
 
 -- the second half of the dispatch, split off only because one function

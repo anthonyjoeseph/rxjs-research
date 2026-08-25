@@ -151,8 +151,26 @@ postulate
 -- THE SYNTACTIC FACTOR: the most any single fold can wrap an
 -- accumulator by, read off the program and its shared defs — a step
 -- function is syntax from one of exactly those two places.
+nestUnit : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → ℕ
+nestUnit e sl = suc (nestDᵉ e + slotsNestSum sl)
+
+-- AND A CHAIN IS CHARGED TWO OF THEM, WHICH IS NOT SLACK.  A delivery
+-- pays the unit once for the wraps its own walk installs, and a second
+-- time for the ones the SHARE SINK installs on its behalf: the sink
+-- fans the arriving values into every registration on the share, each
+-- walking a path that lives in the registry rather than in the chain
+-- being charged, and the path measure charges a sink zero.  A one-unit
+-- charge is refuted at exactly that arm — `Refuted.Share-Sink-Nodes`,
+-- three against one — and the second unit covers it because a
+-- registered path's wraps are the program's wraps like any other.
+--
+-- THE BUDGET IS WHERE THE FACTOR HAS TO LAND, not the unit, and that
+-- is why this is stated as a product here rather than by enlarging the
+-- unit: the per-chain charge and the per-instant budget are compared
+-- against each other, so doubling both would cancel.  Everything above
+-- reads this symbolically, so the factor propagates on its own.
 nestSyn : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → ℕ
-nestSyn e sl = suc (nestDᵉ e + slotsNestSum sl)
+nestSyn e sl = 2 * nestUnit e sl
 
 ------------------------------------------------------------------
 -- THE PER-INSTANT NESTING CAP AND THE REAL-WIDTH BUDGET, one paired
@@ -236,7 +254,7 @@ abstract
   realWidAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
   realWidAt e sl id = Caps.cReg (capsAt e sl id)
 
-  nestCapAt e sl zero    = nestSyn e sl
+  nestCapAt e sl zero    = nestUnit e sl
   nestCapAt e sl (suc id) = nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
