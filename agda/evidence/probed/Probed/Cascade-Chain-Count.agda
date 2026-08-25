@@ -3,18 +3,10 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 --
--- TWO STATEMENTS, ONE WALK, and that is why they share a file.  One says
--- the nodes map deepens at most once per chain the walk was handed; the
--- other says an arrival cannot present more chains than the entry width.
--- Both are read off the same `cascadeGo`, at the same arrival, on the
--- same families, so a row that moves one moves the other.
---
--- WHICH SIDE IS BLOCKED, since only one is.  The first statement is
--- premise-free and computes on both sides.  The second's CONCLUSION
--- computes -- `chainsOf` filters the registry, `capsBase` is a syntactic
--- reading -- but its `capsOK?` premise does not, reading a cap record no
--- instantiation terminates on, so those rows cannot certify that their
--- states are ones the target admits.  What a row here can do is REFUTE.
+-- NOTHING IS BLOCKED HERE, which is unusual in this neighbourhood and
+-- is why the rows are worth taking: the target is premise-free and both
+-- sides compute off the evaluator, so a row that reads false is a
+-- refutation outright rather than a candidate modulo a cap record.
 --
 -- EVERY ROW IS LOAD-BEARING, AND THE AXIS IS THE ONE THAT KILLED THE
 -- PREDECESSOR.  `progF w` registers `suc w` copies of one input, so an
@@ -24,7 +16,6 @@
 -- does not hold at the crossing shape is no candidate.
 --
 -- TARGET: cascadeGo-nodes-chains
--- TARGET: chains-count-base
 module Probed.Cascade-Chain-Count where
 
 open import Data.List using (List; []; _++_; length; foldr)
@@ -38,7 +29,7 @@ open import Rx.Exp using (Closed)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascadeLatch; cascadeGo; chainsOf; capsBase)
+         cascadeLatch; cascadeGo; chainsOf)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nodeNest; nestSyn)
@@ -138,32 +129,3 @@ Dup1-fits = refl
 
 Dup4-fits : proj₂ (proj₂ (dupRow (progF 1 1) (sucGF 1 2 2 1 1) 4)) ≡ true
 Dup4-fits = refl
-
-----------------------------------------------------------------------
--- READING TWO — the chain count against the entry width.  The width is
--- `capsBase`, which is what `realWidAt` reduces to at this index, so
--- this is the second target's conclusion verbatim.
-----------------------------------------------------------------------
-
-readK : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
-      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
-readK e sl sched st with sched-next sched
-... | inj₁ _        = 0 , 0 , false
-... | inj₂ (a , sd) =
-  let k = length (chainsOf a st)
-  in k , capsBase e sl , (k ≤ᵇ capsBase e sl)
-
-kRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ × ℕ × Bool
-kRow e g = let e₀ = entry e sl₁ g in readK e sl₁ (proj₁ e₀) (proj₂ e₀)
-
-K22-fits : proj₂ (proj₂ (kRow (progF 22 1) (sucGF 1 2 2 22 1))) ≡ true
-K22-fits = refl
-
-K1-fits : proj₂ (proj₂ (kRow (progF 1 1) (sucGF 1 2 2 1 1))) ≡ true
-K1-fits = refl
-
-KU-fits : proj₂ (proj₂ (kRow (progU 2 2) (sucGU 1 2 2 2 2))) ≡ true
-KU-fits = refl
-
-KC-fits : proj₂ (proj₂ (kRow (progC 1 2 2) (sucGC 1 2 2 1 2 2))) ≡ true
-KC-fits = refl

@@ -71,8 +71,8 @@ open import Verify-Budget-Sufficient.Demand-Programs
   using (progD; sucG; ins₀; progT; sucGT; progU; sucGU; progB; sucGB; progN; sucGN; progF; sucGF;
   insF; insT; subjN; pathN; progC; sucGC; progW; sucGW; progO; sucGO)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
-         pathNestD; chainsNestD; liveNest; nodeNest; regsNestMax)
+  using (nestSyn; nestCapAt; storeNestMax; slotsNestSum; nestOK?; pathNestD; chainsNestD; liveNest;
+  nodeNest; regsNestMax)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -112,6 +112,18 @@ _ = refl
 -- literal pattern to that many constructors), so Series N dispatches on
 -- an offset instead.  Row 20+k is `nestRow k`.
 
+-- THE WIDTH READ AS A LOWER BOUND, because the real one stopped
+-- rendering when it became the registry cap and `capsAt` does not
+-- terminate.  Every charge below that used to spell `realWidAt e sl 0`
+-- now spells the REGISTRY LENGTH, which the true width dominates
+-- wherever `capsOK?` holds -- the same premise no row here can
+-- discharge anyway.  So a row reading `ok` is evidence for its target a
+-- fortiori, and a row reading OVER is INCONCLUSIVE rather than a
+-- refutation: it says the honest width was needed, not that the bound
+-- is short.
+regW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
+regW st = length (EvalSt.registry st)
+
 -- SERIES D — `depth-nest-compositional`'s conclusion at the ROOT call,
 -- which is the instance `depthE≤capsH-root` spends and the one index
 -- where the fresh term is `capsBase` rather than the wrap tower.  Both
@@ -128,7 +140,7 @@ depthRow d k =
       st  = st-init p
       lhs = depthE (budgetAt p ins₀ 0) p root 0 0 sd st
       rhs = nestDᵉ p + storeNestMax sd st
-            + realWidAt p ins₀ 0 * nestSyn p ins₀
+            + regW st * nestSyn p ins₀
   in "d=" ++ show d ++ " k=" ++ show k
      ++ "  depthE = " ++ show lhs
      ++ "  bound = " ++ show rhs
@@ -152,7 +164,7 @@ depthRowInner j d k =
       κ   = pathN j
       lhs = depthE (budgetAt p ins₀ 0) b κ 0 0 sd st
       rhs = nestDᵉ b + pathNestD κ + storeNestMax sd st
-            + realWidAt p ins₀ 0 * nestSyn p ins₀
+            + regW st * nestSyn p ins₀
   in "j=" ++ show j ++ " d=" ++ show d ++ " k=" ++ show k
      ++ "  depthE = " ++ show lhs
      ++ "  bound = " ++ show rhs
@@ -175,7 +187,7 @@ depthRunWalk e sl (suc m) nextId sched st with sched-next sched
 ... | inj₂ (a , sd) =
   let lhs = depthE (budgetAt e sl 0) e root 0 0 sched st
       rhs = nestDᵉ e + storeNestMax sched st
-            + realWidAt e sl 0 * nestSyn e sl
+            + regW st * nestSyn e sl
       r   = cascade a nextId sd st
   in " | " ++ show lhs ++ "/" ++ show rhs
      ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
@@ -278,11 +290,8 @@ satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
              ndA = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ g)))
              mm  = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
          in (if ndA ≤ᵇ ndB + mm * nestSyn e sl then " MINT-ok" else " MINT-FAIL")
-            ++ " m=" ++ show mm ++ " W0=" ++ show (realWidAt e sl 0)
-            ++ (if mm ≤ᵇ realWidAt e sl 0 then " W0-ok" else " W0-OVER")
-            ++ (let rg = length (EvalSt.registry (proj₂ (proj₂ g)))
-                in " reg=" ++ show rg
-                   ++ (if rg ≤ᵇ realWidAt e sl 0 then " REG-ok" else " REG-OVER"))
+            ++ " m=" ++ show mm
+            ++ " reg=" ++ show (regW (proj₂ (proj₂ g)))
             ++ (if nestOK? e sl 0 sd stL then " NEST0-holds" else " NEST0-fails")
             ++ (let sz = sizeᵉ e + slotsSize sl
                 in " sz=" ++ show sz
@@ -334,7 +343,7 @@ depthWideRow ds ks j ww w =
       lhs = depthE (budgetAt p slF 0) p κ 0 0 sd st
       bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
       one = bas + nestSyn p slF
-      wid = bas + realWidAt p slF 0 * nestSyn p slF
+      wid = bas + regW st * nestSyn p slF
   in "ww=" ++ show ww ++ " w=" ++ show w
      ++ "  depthE=" ++ show lhs
      ++ "  one=" ++ show one ++ "  wide=" ++ show wid
@@ -362,7 +371,7 @@ depthConcatRow ds ks j d k =
       lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
       bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
       one = bas + nestSyn p sl
-      wid = bas + realWidAt p sl 0 * nestSyn p sl
+      wid = bas + regW st * nestSyn p sl
   in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
      ++ " d=" ++ show d ++ " k=" ++ show k
      ++ "  depthE=" ++ show lhs
@@ -396,7 +405,7 @@ depthLimRow lim ds ks j d k =
       lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
       bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
       one = bas + nestSyn p sl
-      wid = bas + realWidAt p sl 0 * nestSyn p sl
+      wid = bas + regW st * nestSyn p sl
       r   = subscribeE (gasPad (sucGB ds ks j lim d k) g0) p root 0 0 sd st
   in "lim=" ++ show (suc lim) ++ " ds=" ++ show ds ++ " ks=" ++ show ks
      ++ " j=" ++ show j ++ " d=" ++ show d ++ " k=" ++ show k
@@ -423,7 +432,7 @@ depthFanRow lim w d k =
       lhs = depthE (budgetAt p sl 0) p κ 0 0 sd st
       bas = nestDᵉ p + pathNestD κ + storeNestMax sd st
       one = bas + nestSyn p sl
-      wid = bas + realWidAt p sl 0 * nestSyn p sl
+      wid = bas + regW st * nestSyn p sl
       r   = subscribeE (gasPad (sucGN 1 1 1 lim w d k) g0) p root 0 0 sd st
   in "lim=" ++ show (suc lim) ++ " w=" ++ show (2 + suc w)
      ++ " d=" ++ show d ++ " k=" ++ show k
@@ -444,7 +453,7 @@ depthOneRow j d k =
       lhs = depthE (budgetAt p ins₀ 0) b κ 0 0 sd st
       bas = nestDᵉ b + pathNestD κ + storeNestMax sd st
       one = bas + nestSyn p ins₀
-      wid = bas + realWidAt p ins₀ 0 * nestSyn p ins₀
+      wid = bas + regW st * nestSyn p ins₀
   in "j=" ++ show j ++ " d=" ++ show d ++ " k=" ++ show k
      ++ "  depthE=" ++ show lhs
      ++ "  one=" ++ show one ++ "  wide=" ++ show wid
@@ -519,9 +528,7 @@ nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
 nestRow 2 = "nestCapAt (progD 1 1) ins₀ 0 = "   ++ show (nestCapAt (progD 1 1) ins₀ 0)
-nestRow 3 = "realWidAt (progD 1 1) ins₀ 0 = "   ++ show (realWidAt (progD 1 1) ins₀ 0)
 nestRow 4 = "nestCapAt (progD 1 1) ins₀ 1 = "   ++ show (nestCapAt (progD 1 1) ins₀ 1)
-nestRow 5 = "realWidAt (progD 1 1) ins₀ 1 = "   ++ show (realWidAt (progD 1 1) ins₀ 1)
 nestRow 6 = "nestCapAt (progD 1 1) ins₀ 2 = "   ++ show (nestCapAt (progD 1 1) ins₀ 2)
 nestRow _ = "(no such row)"
 
@@ -588,15 +595,13 @@ rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
 -- not evidence for any inequality, because the side these caps would
 -- have to fit under is the anchor and the anchor does not compute.
 --
--- WHAT WOULD MAKE A ROW INTERESTING.  Row 20 is load-bearing in the
--- weakest sense that matters here — `capsBase` reaches `entryCeil`,
--- and if THAT diverges then the whole nesting currency is
--- symbolic-only and the roadmap's instruction to probe it first is not
--- executable as written.  Rows 22-26 are load-bearing on the GROWTH
--- RATE: `realWidAt` squares its own width each instant, so the row
--- that fails to print is the instant at which no probe of this
--- currency can reach, and that index is the coverage boundary every
--- later receipt has to state.
+-- AND THE ANSWER IS NOW HALF NO, WHICH IS THE FINDING.  The width is
+-- the registry cap, so it sits ON the caps recurrence after all and no
+-- row of it renders at any index; the rows that read it are gone.  What
+-- is left is the CAP side, which is a syntactic reading and does
+-- compute — row 20 load-bearing in the weakest sense that matters
+-- here, since `capsBase` reaches `entryCeil` and a divergence there
+-- would make even the cap symbolic-only.
 --
 -- TARGET: nest-height
 ------------------------------------------------------------------

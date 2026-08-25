@@ -49,10 +49,10 @@ module Verify-Budget-Sufficient.Nest-Store where
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-identityʳ)
 open import Data.Nat.ListAction using (sum)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (Σ; _×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Exp using (Ctx; Closed)
@@ -63,7 +63,7 @@ open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; P
 open import Rx.Prim using (Source; towerℕ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH)
+open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -208,23 +208,36 @@ capsH-blow e sl (suc id) = refl
 1≤capsHpred e sl zero     = s≤s z≤n
 1≤capsHpred e sl (suc id) = ≤-trans (s≤s z≤n) (3≤capsH e sl id)
 
--- THE BASE WIDTH IS `capsBase` BECAUSE IT CARRIES THE ENTRY CEILING —
--- the one static width reading the tower already pays for — and the
--- base cap is the program's own layers, spent by the root subscribe.
+-- THE WIDTH IS THE REGISTRY CAP, AND IT IS THE ONLY QUANTITY THAT CAN
+-- BE ONE.  What the width pays for is a walk deepening the store once
+-- per chain it was handed, and a chain list is a SELECTION FROM THE
+-- REGISTRY -- so whatever bounds the width has to bound the registry,
+-- and the only thing that does is `capsOK?`'s own fifth conjunct.  Read
+-- that way the comparison is definitional and the two leaves under it
+-- are two lines each.
+--
+-- AND THE PREDECESSOR WAS A WIDTH OF THIS MODULE'S OWN INVENTION, which
+-- is what made it dangerous.  It read `capsBase` at the entry and
+-- squared itself each instant, a shape chosen to dominate rather than
+-- to be established, so nothing anywhere related it to the quantity a
+-- walk actually spends.  The leaves that had to bridge the gap were
+-- stated, ranked FALSITY, and are gone with it.
+--
+-- THE COST IS INSTANTIABILITY, AND IT IS PAID KNOWINGLY.  `capsBase` is
+-- a syntactic reading that renders, so the entry index of this currency
+-- used to be reachable by a `refl`; `capsAt` sits on the caps
+-- recurrence and no instantiation of it terminates, so the currency is
+-- now symbolic-only at every index.  What that reach bought was the
+-- refutation above -- a made-up width is cheap to evaluate and cheap to
+-- be wrong about, and this trades the second for the first.
 abstract
-  nwAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ × ℕ
-  nwAt e sl zero    = nestSyn e sl , capsBase e sl
-  nwAt e sl (suc id) =
-    let c = proj₁ (nwAt e sl id)
-        w = proj₂ (nwAt e sl id)
-        c′ = c + w * nestSyn e sl
-    in c′ , suc w ^ suc c′
-
   nestCapAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
-  nestCapAt e sl id = proj₁ (nwAt e sl id)
 
   realWidAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
-  realWidAt e sl id = proj₂ (nwAt e sl id)
+  realWidAt e sl id = Caps.cReg (capsAt e sl id)
+
+  nestCapAt e sl zero    = nestSyn e sl
+  nestCapAt e sl (suc id) = nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool
@@ -236,17 +249,14 @@ abstract
     nestCapAt e sl 0 ≡ suc (nestDᵉ e + slotsNestSum sl)
   nestCapAt-0 e sl = refl
 
-  -- THE WIDTH'S OWN BASE, AND WHAT IT BUYS IS INSTANTIABILITY.  The cap
-  -- equation beside it has had a consumer since the face was stated;
-  -- this one had none, so the entry width stayed sealed and no probe
-  -- could evaluate the right-hand side of any statement charging
-  -- against it -- while the LEFT sides all compute off the evaluator.
-  -- `capsBase` is a plain syntactic reading and reduces, so exporting
-  -- the equation puts the entry index within reach of a `refl`, which
-  -- is the one index where the charge is small enough to bind.
-  realWidAt-0 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
-    realWidAt e sl 0 ≡ capsBase e sl
-  realWidAt-0 e sl = refl
+  -- THE WIDTH READ BACK OUT OF THE SEAL, which is what lets a consumer
+  -- spend the registry conjunct of `capsOK?` against it.  The seal is
+  -- for cost and the equation costs nothing: `capsAt` is already in
+  -- every type this module's consumers mention.
+  realWidAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    realWidAt e sl id ≡ Caps.cReg (capsAt e sl id)
+  realWidAt-def e sl id = refl
 
   nestOK?-latch : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →

@@ -806,7 +806,7 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
       (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
       (trans (nestOK?-latch e sl id a sched st) hnest)
       hval
-      (chains-count-width sl id a sched st hsl hcaps)
+      (chains-count-width sl id a sched st hcaps)
 
 nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

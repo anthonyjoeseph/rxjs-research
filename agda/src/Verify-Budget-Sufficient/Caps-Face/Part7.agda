@@ -33,12 +33,13 @@ open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
-  storeNest-latch; realWidAt; realWidAt-0; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
-  scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
-  chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ;
-  switchᵒ; exhaustᵒ; thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade;
-  sameSource; regAt; capsBase; iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
+  storeNest-latch; realWidAt; realWidAt-def; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
+  switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
+  from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
+  chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
+  thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
+  iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -1288,60 +1289,26 @@ postulate
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
         + length chains * nestSyn e sl
 
--- AND THE SELECTION IS WITHIN THE REAL WIDTH, WHICH IS WHERE EVERY
--- PREMISE OF THIS FACE IS SPENT.  The row above says the store deepens
--- at most once per chain the walk was handed; this one says an arrival
--- cannot present more chains than its width, and between them the arm
--- closes.  The split is what makes the hard half a statement about the
--- REGISTRY rather than about the store, and the registry is what the
--- caps face is built to bound.
+-- AND THE SELECTION IS WITHIN THE REAL WIDTH, WHICH IS NOW A TWO-LINE
+-- READING RATHER THAN A FACE OF ITS OWN.  A cascade's chain list is a
+-- filter of the registry, and the width IS the registry cap, so the
+-- fact the row above needs is `capsOK?`'s own fifth conjunct composed
+-- with the filter's length bound -- both already proven.
 --
--- AND THE ENTRY IS THE ONLY INDEX A ROW CAN REACH, so it is stated
--- there separately.  At the entry the width IS `capsBase`, a syntactic
--- reading that renders; one index up it is a width raised to a cap and
--- nothing prints it.  The entry is also the tight index -- the width
--- squares each instant while the registry grows by what one walk
--- subscribed -- so the case that can be instantiated is the case worth
--- instantiating.
---
--- PROBED: `Probed.Cascade-Chain-Count` reads the chain count against
---   `capsBase` across the same width sweep: twenty-three chains
---   against 690 at the crossing shape, and no family reaching a fifth
---   of its charge.  COVERED is the CONCLUSION only; the `capsOK?`
---   premise cannot be reached at all, reading a cap record no
---   instantiation terminates on.
-postulate
-  chains-count-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl 0) sched st ≡ true →
-    length (chainsOf a st) ≤ capsBase e sl
-
--- AND ABOVE THE ENTRY THE WIDTH IS AN EXPONENTIAL OF THE INDEX BELOW
--- IT, so the same fact is a different proof and gets its own leaf.  The
--- registry at instant `suc id` is what the walk at `id` left, and the
--- width at `suc id` is `suc w ^ suc c′` for the previous width `w` --
--- room the entry case does not have and does not need.  Nothing here
--- computes, which is why the two halves are separate: a single
--- statement over all indices would put the instantiable case behind the
--- one that is symbolic-only.
-postulate
-  chains-count-tower : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl (suc id)) sched st ≡ true →
-    length (chainsOf a st) ≤ realWidAt e sl (suc id)
-
+-- WHAT THAT REPLACED IS THE POINT.  The width used to be a quantity
+-- this development invented, `capsBase` at the entry squaring itself
+-- each instant, and bridging it to anything a walk spends took two
+-- leaves that were ranked FALSITY and could not be instantiated.
+-- Choosing the width to BE the thing that is bounded is what makes the
+-- bridge disappear instead of being ground.
 chains-count-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
   length (chainsOf a st) ≤ realWidAt e sl id
-chains-count-width {e = e} sl 0 a sched st hsl hcaps =
-  subst (length (chainsOf a st) ≤_) (sym (realWidAt-0 e sl))
-        (chains-count-base sl a sched st hsl hcaps)
-chains-count-width sl (suc id) a sched st hsl hcaps =
-  chains-count-tower sl id a sched st hsl hcaps
+chains-count-width {e = e} sl id a sched st hcaps =
+  subst (length (chainsOf a st) ≤_) (sym (realWidAt-def e sl id))
+        (≤-trans (chainsOf-length a st)
+                 (capsOK?-count (capsAt e sl id) sched st hcaps))
 
 -- THE NODE-STATE COMPONENT, WHICH IS WHERE THE WIDTH IS ACTUALLY SPENT.
 -- A `scan` node stores its accumulator and a bounded `mergeAll` node
@@ -1579,7 +1546,7 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
       (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
       (trans (nestOK?-latch e sl id a sched st) hnest)
       hval
-      (chains-count-width sl id a sched st hsl hcaps)
+      (chains-count-width sl id a sched st hcaps)
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store
