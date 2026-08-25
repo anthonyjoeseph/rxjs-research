@@ -161,18 +161,18 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-mint-pW`** (Caps-Face/Part7) — FALSITY: REFUTED by rows on the
-  chain axis, and so is every width its family could be charged in. The count is
-  quadratic where the currency is linear. The fact underneath survives, so the
-  repair is a max-shaped route with no count in it.
-- **`cascadeGo-mint-tower`** (Caps-Face/Part7) — FALSITY: the same count one
-  index up, where the charge is a width raised to a cap and no row renders. The
-  entry's per-chain decomposition does NOT carry: one chain, one delivery, over
-  sixteen hundred mints. The count is a burst width, nothing syntactic.
-- **`cascadeGo-nodes-mint`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens the
-  node arm at most one `nestSyn` per instance it mints, premise-free, with the
-  count PINNED by an equation rather than bounded. Both storing sites sit behind
-  an inner subscription, and the queue is a max, so only the mint can pay.
+- **`chains-count-base`** (Caps-Face/Part7) — FALSITY: an arrival presents no
+  more chains than the entry width. It replaces a mint count refuted on the
+  chain axis, and it is the one half of that repair a row can reach: both
+  sides render at the entry, and no family measured reaches a fifth of it.
+- **`chains-count-tower`** (Caps-Face/Part7) — FALSITY: the same fact above the
+  entry, where the width is an exponential of the index below and nothing
+  renders. Symbolic-only, and the predecessor at this index died on a count
+  the currency does not carry.
+- **`cascadeGo-nodes-chains`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens
+  the node arm at most one `nestSyn` per chain it was handed, premise-free.
+  Both storing sites sit under one chain's step, so a MAX moves once however
+  many inners it subscribes. Probed at the width that killed the mint form.
 - **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY: the walk's pending
   sources under the same width. The one arm of the store no instantiation has
   ever reached — every family reads it zero — so its cheapness is a guess.

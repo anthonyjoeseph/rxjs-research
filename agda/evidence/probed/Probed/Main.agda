@@ -21,14 +21,7 @@ open import Probed.Cascade-Nest-Store
   using (U-chains; U-descent; U-holds;
          C-chains; C-descent; C-holds;
          F-chains; F-descent; F-holds)
-open import Probed.Cascade-Mint-Base
-  using (U-mint; U-charge; U-fits;
-         C-mint; C-charge; C-fits;
-         F-mint; F-charge; F-fits;
-         U-pw; U-pw-fits; C-pw; C-pw-fits; F-pw; F-pw-fits;
-         F2-mint; F3-mint; F4-mint; F2-pw; F3-pw;
-         F18-pw-fits; F18-fits; F18-base; F3-base;
-         B22-mint; B22-base; B22-fits;
-         P22-charge; P22-fits; P1-charge; P1-fits; N22-fits;
-         M22-A; M22-B; MU-A; MU-B; M22-lhs; M22-store; M22-syn;
-         Ch22-fits; Ch1-fits; ChU-fits; ChC-fits)
+open import Probed.Cascade-Chain-Count
+  using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
+         Dup1-fits; Dup4-fits;
+         K22-fits; K1-fits; KU-fits; KC-fits)

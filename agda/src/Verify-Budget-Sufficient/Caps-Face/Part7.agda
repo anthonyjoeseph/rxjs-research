@@ -29,8 +29,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; Fn; μᵉ; unfoldμ; evalTm;
   applyFn)
-open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; entryCeil; ceilᵉ; slotsCeil;
-  outWⱽ; dWⱽ; pW≤ceil)
+open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
@@ -1233,360 +1232,116 @@ postulate
     in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
 
--- THE STORE'S ONE ACCUMULATING CORNER, AND THE COUNTER THAT PAYS FOR
--- IT.  Within the node arm the width is spent at two sites, not five.
--- Three
--- `switch` and `exhaust` cannot move it whatever they store.  A bounded
--- `mergeAll`'s queue cannot either, and that one is worth the sentence
--- because it looks like the accumulating one: the measure over it is a
--- MAX, parking adds the single observable that arrived, and the drain
--- returns a SUFFIX of the queue it was handed -- so the queue is bounded
--- by what a delivery brings in and never by how many deliveries there
--- were.  What is left is a `scan`'s accumulator, which the fold over an
--- instant's values genuinely deepens once per value; and the inners a
--- drain SUBSCRIBES, which install their own nodes.  The second is the
--- drain arc arriving in this currency, and it routes into the subscribe
--- side -- where the matching statement about the store does not exist,
--- only the one about the depth.
+-- THE STORE'S ONE ACCUMULATING CORNER, AND WHAT PAYS FOR IT IS THE
+-- SELECTION.  Within the node arm the store deepens at two sites, not
+-- five: `switch` and `exhaust` cannot move it whatever they store, and
+-- a bounded `mergeAll`'s queue cannot either -- the measure over it is
+-- a MAX, parking adds the single observable that arrived, and the
+-- drain returns a SUFFIX of the queue it was handed.  What is left is
+-- a `scan`'s accumulator, which the fold over an instant's values
+-- genuinely deepens, and the inners a drain SUBSCRIBES, which install
+-- their own nodes.
 --
--- SO THE QUANTITY TO CHARGE IS A COUNTER THE EVALUATOR ALREADY KEEPS.
--- Both storing sites sit behind an inner SUBSCRIPTION, and every one of
--- those mints a node instance from the schedule's own monotone counter
--- -- so the number of times a walk can deepen the store is the number
--- of instances it minted, which is a real quantity, additive along the
--- chain fold because the counter never runs backwards, and readable off
--- the two schedules this statement already mentions.  The witness is
--- PINNED by the equation rather than merely bounded by it, which is
--- what keeps the pair from being satisfied by taking it large.
-
--- AND IT IS NOT USEFULLY INSTANTIABLE, WHICH IS A FINDING AND NOT A GAP
--- IN THE SWEEP.  Both sides compute and the statement is premise-free, so
--- rows are free to take; a hundred and ten of them across six families,
--- both bounds, several depths and several instants, produce no
--- counterexample and no NEAR one.  That is the problem.  The rows where
--- the count is zero -- the only rows where the bound demands anything at
--- all, since it then forbids growth outright -- are exactly the rows
--- where the walk selected no chain, so they are empty by construction and
--- could not have failed.  Everywhere a chain IS walked the count runs an
--- order of magnitude past the growth it has to pay for, and no axis in
--- this vocabulary closes that: a value can only reach a storing site by
--- being RELEASED from a flattener, and a release is a subscription, so
--- the count and the growth move together by construction.  Reaching the
--- falsifying region needs a program that deepens the store without a
--- release, and the outer-bounded family built to try it does not, because
--- the inner flattener mints anyway.  So the risk here is not measured,
--- and no receipt claims it is.
+-- SO THE QUANTITY TO CHARGE IS THE LENGTH OF THE CHAIN LIST THE WALK
+-- WAS HANDED.  Both storing sites sit under one chain's step, and the
+-- fold visits each chain once, so a walk deepens the store at most once
+-- per chain it was given -- with everything a single chain does to the
+-- store, however many inners it subscribes, invisible to a MAX that
+-- moves once.  The count is an argument of the statement rather than a
+-- reading of the run, which is what makes the charge legible at the
+-- call site and what makes the row above it a two-line assembly.
+--
+-- DEAD ROUTE: charging per MINTED INSTANCE, the same statement with the
+--   schedule's own node counter in place of the length.  The count is
+--   quadratic in the chain axis -- 20, 33, 48, 65 as `progF`'s width
+--   climbs -- while every width in this development is linear in it, so
+--   the charge is crossed by construction rather than by a constant:
+--   at eighteen copies the path width and the entry ceiling are both
+--   past, at twenty-two `capsBase` is too, 713 against 690.  The
+--   counting is what fails and not the currency, the parent's own
+--   conclusion holding at the crossing shape.  Do not re-derive a
+--   tighter width for a mint count.
+-- DEAD ROUTE: the two max-shaped charges, `store ⊔ nestSyn` and
+--   `store + nestSyn`, which drop the count entirely on the reading
+--   that a MAX cannot move more than one level per instant.  Both are
+--   false at the same shape, the nodes map reading 26 against a store
+--   of 3 and a `nestSyn` of 6.  A walk deepens once per CHAIN, so the
+--   count that survives is a count of chains and there is no
+--   count-free form of this row.
+-- PROBED: `Probed.Cascade-Chain-Count` pins this conclusion by `refl` at
+--   the crossing width and on three further families -- the bounded
+--   drain, the skip branch and the deliver-on-every-chain family.
+--   Twenty-three chains against a max of 26 is the tight row and it is
+--   the one the mint form fails.  Rows are also taken with the chain
+--   list DUPLICATED, since it is a free argument: the max climbs two a
+--   copy while the charge climbs a whole `nestSyn` per chain, so the
+--   adversarial list is further inside the bound than the honest one.
+--   COVERED is the CONCLUSION only, which is premise-free.  NOT
+--   covered: `Γ₂` alone, at one slot shape.
 postulate
-  cascadeGo-nodes-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     let r = cascadeGo a nextId chains sched st in
-    Σ ℕ λ m →
-      (Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched)
-      × (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-           ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) + m * nestSyn e sl)
+    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
+      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+        + length chains * nestSyn e sl
 
--- AND THE MINT COUNT IS WITHIN THE REAL WIDTH, WHICH IS WHERE EVERY
+-- AND THE SELECTION IS WITHIN THE REAL WIDTH, WHICH IS WHERE EVERY
 -- PREMISE OF THIS FACE IS SPENT.  The row above says the store deepens
--- at most once per minted instance; this one says an instant cannot
--- mint more instances than its width, and between them the arm closes.
--- Splitting here is what makes the hard half a statement about a
--- COUNTER rather than about the store, and a counter is the kind of
--- thing the caps face is already built to bound.
+-- at most once per chain the walk was handed; this one says an arrival
+-- cannot present more chains than its width, and between them the arm
+-- closes.  The split is what makes the hard half a statement about the
+-- REGISTRY rather than about the store, and the registry is what the
+-- caps face is built to bound.
 --
--- AND THE BOUND IS NOT TIGHT, WHICH IS THE MOST USEFUL THING KNOWN
--- ABOUT IT.  At the entry index the real width IS `capsBase`, which
--- already carries the program's own size and the slot store's, so the
--- charge is a hundred-odd `nestSyn` against a store that in fact
--- deepens by a handful.  Measured across the bounded-drain grid the
--- two sides sit two ORDERS OF MAGNITUDE apart.  So whatever count the
--- induction ends up threading does not have to be sharp, and the
--- expensive instinct here -- find the exact quantity the drain
--- deepens by -- is the wrong one: any real, program-shaped count that
--- dominates the deepening events will clear it.
+-- AND THE ENTRY IS THE ONLY INDEX A ROW CAN REACH, so it is stated
+-- there separately.  At the entry the width IS `capsBase`, a syntactic
+-- reading that renders; one index up it is a width raised to a cap and
+-- nothing prints it.  The entry is also the tight index -- the width
+-- squares each instant while the registry grows by what one walk
+-- subscribed -- so the case that can be instantiated is the case worth
+-- instantiating.
 --
--- AND THE COUNT IS SEQUENTIAL RELEASES, NOT FAN -- which is the
--- distinction the whole induction turns on, and it is not the one the
--- width term's name suggests.  `storeNestMax` is a MAX of nesting
--- DEPTHS, so two inners installed side by side at the same depth move
--- it by nothing: doubling the parallel fan of the family whose width
--- is its own axis leaves the store after the cascade UNCHANGED.  What
--- moves it is a release landing INSIDE the frame the previous release
--- left, which is what a BOUNDED drain does and an unbounded one never
--- does -- the same ingredient the ledger below turns on throughout.
--- So the quantity to thread is how many times the drain
--- refills, and on the bounded grid the store tracks that count times
--- the fold depth, with the registry flat throughout.  The width term
--- pays because a refill count is bounded by the values an instant
--- really carries, which is what `realWidAt` counts; the layers are
--- already inside `nestSyn`.  A per-chain budget is still needed --
--- the growth SUMS along the chain list, one per step on families that
--- deliver -- so the chain-list induction closes in the relative form
--- once the budget SPLITS, which is what the entry-store version of it
--- could not do.
-
--- AND THE PER-CHAIN BUDGET IS WHERE THE ONE MISSING FACT NOW SITS,
--- WHICH IS A SMALLER THING THAN THE ROW.  The chain list is bounded by
--- a REAL quantity already: `chainsOf-length` is proven, and it bounds
--- the chains this walk is handed by the registry's own length.  So the
--- count decomposes into a per-chain mint, which is syntactic, times a
--- registry length -- and the registry is the single place the
--- decomposition still leaves cap-denominated, because `capsOK?-count`
--- is the ONLY bound on that length anywhere in the tower and it reads
--- the cap record.  That is one nameable fact rather than a route: a
--- REAL-denominated bound on how many registrations a state satisfying
--- the invariants can hold.
---
--- Its home is not this signature.  A hypothesis here would be the
--- laundering the file of record forbids -- tracked debt into untracked
--- -- and it would oblige only today's single caller; the fact is a
--- property of every reachable state, so it belongs as a conjunct
--- alongside the store bound the nesting invariant already carries.
--- What that costs is a cascade through the invariant's producers and
--- consumers, and what makes it worth paying rather than routing around
--- is that nothing else in this vocabulary can supply a count: every
--- other candidate has been tried and each one lands on the caps side.
---
--- AND THE DECOMPOSITION IS AN ENTRY FACT, NOT A GENERAL ONE, WHICH IS
--- THE SECOND THING THE SPLIT BOUGHT.  A per-chain budget is only worth
--- having if a chain's own mint is small, and one index up it is not:
--- the harness reaches a state where a SINGLE chain taking a SINGLE
--- delivery advances the counter by more than sixteen hundred, on a
--- program whose whole syntax is a couple of dozen nodes.  A release is
--- a subscription and a drain releases a value at a time, so what one
--- chain mints tracks the values that have PILED UP behind it, which is
--- a burst width and nothing syntactic.  At the entry nothing has piled
--- up yet -- the same family mints nineteen, tracking its own fold
--- depth -- which is why the chain decomposition is stated here and
--- must not be carried across to the tower leaf.
-
--- REFUTED: `Refuted.Cascade-Nest-PerDeliv` kills the per-DELIVERY half
---   this was assembled from -- store 12 against a charge of 10, at ONE
---   delivery and no cancellation, so neither the count nor a cancelled
---   tail is what breaks it.  The ingredient is a BOUNDED mergeAll
---   crossed with a HOT slot: unbounded families park nothing and never
---   reach a drain at all, and the bounded families that existed
---   scripted a COLD slot and scheduled no arrival, so no row this face
---   had run could have seen it.
--- REFUTED: `Refuted.Cascade-Deliv-Depth` is the same arc one face over,
---   on the descent measure rather than the store.
--- DEAD ROUTE: counting the walk's deliveries with the proven
---   `cascadeGo-deliveries` and dominating its bound by this increment.
---   The bound is CAP-side and the increment is deliberately real, and
---   the denomination law rules the comparison out in that direction:
---   this increment's width at the entry index IS `capsBase`, which is
---   the fuel the entry cap's own blowup is run at, so the delivery cap
---   is a count taken above the number it would have to fit under.  Nor
---   does the gap close as the instants go -- the real width iterates an
---   exponential per instant while the cap height iterates a tower, so
---   the side that must be dominated is the side that grows faster.
--- DEAD ROUTE: instantiating the PROVEN walk rather than writing a new
---   induction.  `Walk` (.Delivery-Walk) folds this very list with its
---   state predicate as a PARAMETER, so a nesting flavour of `walkOK`
---   reading the store under a base plus the level's worth of `nestSyn`
---   looks like it inherits the whole induction for the price of one
---   per-frame fact -- and it would also answer the drain, since `lvls`
---   iterates per delivery AND per frame where a raw delivery count
---   iterates only per delivery.  It dies on CURRENCY, one line further
---   on.  The predicate comes back at `Res.lvl` and the only bound on
---   that level is `Res.hi`, which is `lvls`-denominated, so the route
---   ends needing the walk's level cap under the real width -- the
---   comparison the dead route directly above rules out, in the same
---   direction, for the same reason.  Nothing about the nesting flavour
---   repairs it: the record forces ONE level, so a counter threaded
---   more slowly than the caps level cannot be read back out.
--- DEAD ROUTE: settling that comparison by instantiation instead of by
---   the law.  The real width evaluates and so does the cascade depth
---   the cap is read at, but `capsAt` fails to terminate even in
---   compiled code, so the cap record cannot be reached at any program
---   at any index and the comparison has no instance at all.
---   Hypothesis side fine, conclusion side blocked.
--- DEAD ROUTE: reading the count off the caps invariant, which is the
---   one place a count is actually recorded.  `capsOK?` bounds a
---   bounded `*All`'s parked queue by the caps width, so the releases
---   one drain can perform ARE capped, and that looks like the missing
---   ingredient -- the more so because the nesting invariant is no help,
---   bounding the store's DEPTH and carrying no count at all, and
---   because the caps predicate never reads the node counter, so nothing
---   else in the hypotheses mentions it.  It dies on CURRENCY, which is
---   the same wall as the three routes above and this is the fourth
---   direction onto it: the queue bound is CAP-denominated and the
---   conclusion is REAL-denominated, so spending it needs the caps
---   level against the real width -- ruled out directly above.  What is
---   new is where it leaves the question: every route to a count in this
---   vocabulary runs through the caps face, so the thing to reconsider
---   is the RIGHT-HAND SIDE this face is stated in, not the next route.
--- RECOVERY: `git show eab5c1c` restores the two-leaf assembly -- the
---   refuted per-delivery leaf, and the delivery-count leaf
---   `cascadeGo-deliv-real` whose only consumer it was, with the four
---   dead routes its own header carried.
-
--- AND IT SPLITS ON THE INDEX, BECAUSE THE TWO HALVES ARE NOT THE SAME
--- STATEMENT.  At the entry the charge is `capsBase`, a plain syntactic
--- reading in the low hundreds on every family the harness runs; one
--- index up it is a width raised to a cap, which no row renders.  So the
--- entry is the whole of the tightness and the only half a machine can
--- ever look at, and keeping the two under one head hid that -- the
--- statement read as uniformly hard when one half is a small real
--- inequality and the other has room to spare.  The halves also want
--- DIFFERENT ROUTES, which is the sharper reason: the entry count is
--- bounded per chain, and one index up a single chain's own count is
--- unbounded in anything syntactic.  The base leaf is stated
--- in `capsBase` rather than in the width, which is the point of the
--- split: both of ITS sides now reduce, where the width is sealed.
---
--- DEAD ROUTE: reading the mint budget as a SHARED PARKED POOL,
---   consumed across the chain list rather than allowed per chain.  The
---   shape is attractive because it explains a ceiling that is a MAX
---   rather than a sum -- releases would draw down one pool however many
---   chains draw on it -- and because a drain's output queue is always a
---   suffix of its input, so the pool provably only shrinks while a walk
---   runs.  It is dead on the FACTS: the total parked across all nodes
---   is 0 or 2 at the entry on every family measured, while the walk
---   mints up to 180.  The mints are not releases.  An inner arrives
---   already carrying its observable and gets subscribed on the spot,
---   which is why the queue never moves -- so the budget is the FAN-OUT
---   the path presents, and a pool quantity would have been defined,
---   threaded and found inert.
--- PROBED: `Probed.Cascade-Mint-Base` takes the entry walk on three
---   families and pins the COUNT, the CEILING and the verdict by `refl`:
---   the bounded drain mints 5 against 72, the skip family 7 against 96,
---   the deliver-on-every-chain family 20 against 96.  Every row is
---   load-bearing -- the count is whatever the run makes it and none of
---   the three is zero, so a family minting past its own ceiling would
---   have refuted here.  COVERED is the CONCLUSION only, at the entry
---   index, on `Γ₂` at one slot shape.  NOT covered: the premises, which
---   cannot be reached at all, `capsOK?` reading a cap record no
---   instantiation terminates on; and no index above the entry, the
---   charge there being a width raised to a cap.
---
---   AND THE SAME ROWS PIN THE CEILING AGAINST ITS PATH-WIDTH ARM:
---   `outWⱽ ⊔ dWⱽ` reads 72, 96 and 96, which is `entryCeil` EXACTLY at
---   all three.  So the `ownᵉ` and `slotsCeil` arms contribute nothing
---   at these shapes, and restating this leaf over the width form gives
---   up no room -- `pW≤ceil` carries it back, already proven.  What that
---   buys is a statement in the measure `foldPath` consumes rather than
---   one over the whole syntax tree.  NOT covered: whether the two
---   coincide at a shape where a slot is deeper than the subject, which
---   is where `slotsCeil` would be the arm that decides.
-
--- THE COUNT IS THE PART THAT IS WRONG, AND A CHAIN SWEEP SAYS SO.  The
--- axis is one no earlier row moved: `progF`'s width registers
--- one input several times, so an arrival there presents one chain per copy and
--- the walk's mint count is a SUM over them.  The count goes 20, 33, 48, 65 --
--- quadratic -- while every charge over it is linear: the path width reads 96,
--- 120, 144 and `capsBase` climbs by 26 a step.  Two linear charges against a
--- quadratic count cross, and the rows pin where.  At eighteen copies the width
--- and the ceiling are both past; at twenty-two `capsBase` is too, 713 against
--- 690.  Modulo the premises, which cannot be discharged at all -- `capsOK?`
--- reads a cap record no instantiation terminates on -- so these are refuting
--- rows and not a `⊥`.
---
--- AND THE FACT UNDERNEATH SURVIVES, WHICH IS WHAT MAKES THIS CHEAP.
--- `cascadeGo-nest-nodes`'s own conclusion, read at the refuting shape, HOLDS.  So the currency is not short and no cap has to grow; the COUNTING
--- DECOMPOSITION is what fails.  Its left side is a `⊔` over the nodes map and
--- its right side charges one `nestSyn` per mint, so a walk that mints many
--- nodes of the same depth pays for all of them while the max moves once.  The
--- repair is a max-shaped route, not a bigger charge -- and a max-shaped one
--- need not count at all.
---
--- DEAD ROUTE: every member of this family -- `-pW`, `-entryCeil`, `-base`,
---   `-width`, `-tower` -- bounds the MINT COUNT by a width.  The rows above
---   kill the shape rather than any one of its charges: the count is quadratic
---   in a chain axis nothing in the currency is, so no width this development
---   states can carry it.  Do not re-derive a tighter width.
---
--- PROBED: `Probed.Cascade-Mint-Base`.  The chain axis is swept at one, two,
---   three, four, eighteen and twenty-two copies on `progF`.  Two max-shaped
---   replacements are killed there too -- the walk deepens the nodes map past
---   both `store ⊔ nestSyn` and `store + nestSyn`, reading 26 against a store
---   of 3 and a `nestSyn` of 6 -- and the one that survives is the CHAIN-shaped
---   charge, `store + length chains * nestSyn`, green at the refuting width and
---   on three other families.  Twenty-three chains against a max of 26 is one
---   level per chain, with the mints inside a chain invisible to it.  COVERED
---   is the CONCLUSION only, at the entry index, on `Γ₂` at one slot shape.
---   NOT covered: the premises, and no index above the entry.
+-- PROBED: `Probed.Cascade-Chain-Count` reads the chain count against
+--   `capsBase` across the same width sweep: twenty-three chains
+--   against 690 at the crossing shape, and no family reaching a fifth
+--   of its charge.  COVERED is the CONCLUSION only; the `capsOK?`
+--   premise cannot be reached at all, reading a cap record no
+--   instantiation terminates on.
 postulate
-  cascadeGo-mint-pW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+  chains-count-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl 0) sched st ≡ true →
-    nestOK? e sl 0 sched st ≡ true →
-    let r = cascadeGo a nextId chains sched st in
-    Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-    m ≤ outWⱽ n [] sl e ⊔ dWⱽ n [] sl e
+    length (chainsOf a st) ≤ capsBase e sl
 
--- AND THE CEILING IS REACHED FROM THE WIDTH BY TWO PROVEN STEPS, so
--- this side of the leaf is spent rather than assumed.
-cascadeGo-mint-entryCeil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
-  (chains : List (RegId × Path Γ (arrTy a) t))
-  (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
-  Sched.slots sched ≡ sl →
-  capsOK? (capsAt e sl 0) sched st ≡ true →
-  nestOK? e sl 0 sched st ≡ true →
-  let r = cascadeGo a nextId chains sched st in
-  Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-  m ≤ entryCeil n sl e
-cascadeGo-mint-entryCeil {n = n} {e = e} sl a nextId chains sched st m
-                         hsl hcaps hnest heq =
-  ≤-trans (cascadeGo-mint-pW sl a nextId chains sched st m hsl hcaps hnest heq)
-          (≤-trans (pW≤ceil n sl e)
-                   (m≤m⊔n (ceilᵉ n sl e) (slotsCeil n sl)))
-
--- THE CEILING IS ALREADY INSIDE THE CHARGE, so the step from the leaf
--- to the base is arithmetic and belongs here rather than in anyone's
--- assumption.
-entryCeil≤capsBase : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
-  entryCeil n sl e ≤ capsBase e sl
-entryCeil≤capsBase {n = n} e sl =
-  ≤-trans (n≤1+n (entryCeil n sl e))
-          (m≤n+m (suc (entryCeil n sl e)) (3 + (sizeᵉ e + slotsSize sl)))
-
-cascadeGo-mint-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
-  (chains : List (RegId × Path Γ (arrTy a) t))
-  (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
-  Sched.slots sched ≡ sl →
-  capsOK? (capsAt e sl 0) sched st ≡ true →
-  nestOK? e sl 0 sched st ≡ true →
-  let r = cascadeGo a nextId chains sched st in
-  Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-  m ≤ capsBase e sl
-cascadeGo-mint-base {e = e} sl a nextId chains sched st m hsl hcaps hnest heq =
-  ≤-trans (cascadeGo-mint-entryCeil sl a nextId chains sched st m hsl hcaps hnest heq)
-          (entryCeil≤capsBase e sl)
-
+-- AND ABOVE THE ENTRY THE WIDTH IS AN EXPONENTIAL OF THE INDEX BELOW
+-- IT, so the same fact is a different proof and gets its own leaf.  The
+-- registry at instant `suc id` is what the walk at `id` left, and the
+-- width at `suc id` is `suc w ^ suc c′` for the previous width `w` --
+-- room the entry case does not have and does not need.  Nothing here
+-- computes, which is why the two halves are separate: a single
+-- statement over all indices would put the instantiable case behind the
+-- one that is symbolic-only.
 postulate
-  cascadeGo-mint-tower : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+  chains-count-tower : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl (suc id)) sched st ≡ true →
-    nestOK? e sl (suc id) sched st ≡ true →
-    let r = cascadeGo a nextId chains sched st in
-    Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-    m ≤ realWidAt e sl (suc id)
+    length (chainsOf a st) ≤ realWidAt e sl (suc id)
 
-cascadeGo-mint-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-  (chains : List (RegId × Path Γ (arrTy a) t))
-  (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+chains-count-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
-  nestOK? e sl id sched st ≡ true →
-  let r = cascadeGo a nextId chains sched st in
-  Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-  m ≤ realWidAt e sl id
-cascadeGo-mint-width {e = e} sl 0 a nextId chains sched st m hsl hcaps hnest heq =
-  subst (m ≤_) (sym (realWidAt-0 e sl))
-    (cascadeGo-mint-base sl a nextId chains sched st m hsl hcaps hnest heq)
-cascadeGo-mint-width sl (suc id) a nextId chains sched st m hsl hcaps hnest heq =
-  cascadeGo-mint-tower sl id a nextId chains sched st m hsl hcaps hnest heq
+  length (chainsOf a st) ≤ realWidAt e sl id
+chains-count-width {e = e} sl 0 a sched st hsl hcaps =
+  subst (length (chainsOf a st) ≤_) (sym (realWidAt-0 e sl))
+        (chains-count-base sl a sched st hsl hcaps)
+chains-count-width sl (suc id) a sched st hsl hcaps =
+  chains-count-tower sl id a sched st hsl hcaps
 
 -- THE NODE-STATE COMPONENT, WHICH IS WHERE THE WIDTH IS ACTUALLY SPENT.
 -- A `scan` node stores its accumulator and a bounded `mergeAll` node
@@ -1604,16 +1359,13 @@ cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  length chains ≤ realWidAt e sl id →
   let r = cascadeGo a nextId chains sched st
   in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
        ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
-cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval
-  with cascadeGo-nodes-mint sl a nextId chains sched st
-... | m , heq , hle =
-  ≤-trans hle
-    (+-mono-≤ nodes≤store
-      (*-mono-≤ (cascadeGo-mint-width sl id a nextId chains sched st m hsl hcaps hnest heq)
-                (≤-refl {nestSyn e sl})))
+cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt =
+  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sched st)
+    (+-mono-≤ nodes≤store (*-mono-≤ hcnt (≤-refl {nestSyn e sl})))
   where
   nodes≤store : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ storeNestMax sched st
   nodes≤store = ≤-trans (m≤n⊔m (NA ⊔ NB) NC) (m≤m⊔n ((NA ⊔ NB) ⊔ NC) ND)
@@ -1674,10 +1426,11 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  length chains ≤ realWidAt e sl id →
   let r = cascadeGo a nextId chains sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
-cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval =
+cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt =
   ⊔-lub (⊔-lub (⊔-lub SL LV) ND) RG
   where
   r   = cascadeGo a nextId chains sched st
@@ -1699,7 +1452,7 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval =
 
   ND : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st′)
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
-  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval
+  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval hcnt
 
   RG : regsNestMax (EvalSt.registry st′)
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
@@ -1826,6 +1579,7 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
       (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
       (trans (nestOK?-latch e sl id a sched st) hnest)
       hval
+      (chains-count-width sl id a sched st hsl hcaps)
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

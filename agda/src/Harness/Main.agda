@@ -212,34 +212,6 @@ depthRunWalkRowU steps ds ks j d k =
      ++ " d=" ++ show d ++ " k=" ++ show k
      ++ depthRunWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
-
--- SERIES L (1000000): the DELIVERY COUNT against the real width, which
--- is the one comparison the nest increment's counting half now rests
--- on.  Both sides compute — the count off the evaluator's own ledger,
--- the width off `nwAt` — which is what makes this probeable where the
--- cap-denominated comparison was not.  Only the entry width is printed:
--- above it the width is an exponential of a base of 64 and no row would
--- render, so the entry index is both the readable case and the tight
--- one.  LOAD-BEARING: a cascade delivering more than the entry width
--- refutes the leaf, and the count is free to be anything the run makes
--- it.
---
--- TARGET: cascadeGo-mint-pW
-delivWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-          → ℕ → ℕ → Sched Γ → EvalSt e → String
-delivWalk e sl 0       nextId sched st = ""
-delivWalk e sl (suc m) nextId sched st with sched-next sched
-... | inj₁ _        = " [done]"
-... | inj₂ (a , sd) =
-  let r   = cascade a nextId sd st
-      cnt = delivN st (proj₂ (proj₂ r))
-      w   = realWidAt e sl 0
-  in " | " ++ show cnt ++ "/" ++ show w
-     ++ (if cnt ≤ᵇ w then " ok" else " OVER")
-     ++ delivWalk e sl m (suc nextId)
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-
 -- SERIES Y (12000000): DOES THE WALK'S STORE GROWTH SATURATE OR
 -- ACCUMULATE?  This is the one question that decides the shape of the
 -- store row's induction, and it is decidable by instantiation because
@@ -543,30 +515,6 @@ satRow fam ds ks j w k =
                               (sched-init p slF) (st-init p)
            in "F ds=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
               ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-delivWalkRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-delivWalkRow fam steps ds ks j d k =
-  let sl = insT ds ks j
-  in if fam ≡ᵇ 0
-     then (let p = progT d k
-               r = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
-                              (sched-init p sl) (st-init p)
-           in "T ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " d=" ++ show d ++ " k=" ++ show k
-              ++ delivWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 2
-     then (let slF = insF ds ks j
-               p = progF d k
-               r = subscribeE (gasPad (sucGF ds ks j d k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show d ++ " k=" ++ show k
-              ++ delivWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else (let p = progU d k
-               r = subscribeE (gasPad (sucGU ds ks j d k) g0) p root 0 0
-                              (sched-init p sl) (st-init p)
-           in "U ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " d=" ++ show d ++ " k=" ++ show k
-              ++ delivWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
@@ -582,12 +530,7 @@ nestRow _ = "(no such row)"
 -- written down in a receipt has to keep meaning what it meant.
 rowAt′ : ℕ → String
 rowAt′ n =
-  if 1000000 ≤ᵇ n
-  then (let m = n ∸ 1000000
-        in delivWalkRow (m / 100000) 16 ((m % 100000) / 10000)
-                        ((m % 10000) / 1000) ((m % 1000) / 100)
-                        ((m % 100) / 10) (m % 10))
-  else if 700000 ≤ᵇ n
+  if 700000 ≤ᵇ n
   then (let m = n ∸ 700000
         in depthRunWalkRowU 16 ((m % 100000) / 10000)
                             ((m % 10000) / 1000) ((m % 1000) / 100)
@@ -655,7 +598,7 @@ rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
 -- currency can reach, and that index is the coverage boundary every
 -- later receipt has to state.
 --
--- TARGET: cascadeGo-mint-pW
+-- TARGET: nest-height
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------
