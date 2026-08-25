@@ -15,10 +15,10 @@
 -- this sweep, quadratic against a linear width -- so a candidate that
 -- does not hold at the crossing shape is no candidate.
 --
--- TARGET: cascadeGo-nodes-chains
+-- TARGET: chainStep-nodes
 module Probed.Cascade-Chain-Count where
 
-open import Data.List using (List; []; _++_; length; foldr)
+open import Data.List using (List; []; _∷_; _++_; length; foldr)
 open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ; suc; _≤ᵇ_; _⊔_; _*_; _+_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -29,7 +29,7 @@ open import Rx.Exp using (Closed)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascadeLatch; cascadeGo; chainsOf)
+         cascadeLatch; cascadeGo; chainsOf; chainStep; Arrival; arrTy; RegId; Path)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nodeNest; nestSyn)
@@ -129,3 +129,42 @@ Dup1-fits = refl
 
 Dup4-fits : proj₂ (proj₂ (dupRow (progF 1 1) (sucGF 1 2 2 1 1) 4)) ≡ true
 Dup4-fits = refl
+
+----------------------------------------------------------------------
+-- READING TWO — the leaf itself, ONE chain's step.  The rows above take
+-- the assembly, which is a real body over this and so refutable through
+-- it; this one takes the charge where it is actually claimed, at the
+-- head of the arrival's own selection.
+----------------------------------------------------------------------
+
+stepOn : ∀ {t} {e : Closed Γ₂ t} (sl : Slots Γ₂) (a : Arrival Γ₂)
+       → List (RegId × Path Γ₂ (arrTy a) t) → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+stepOn sl a []            sched st = 0 , 0 , false
+stepOn {e = e} sl a ((rid , c) ∷ _) sched st =
+  let r   = chainStep 1 a c sched st
+      lhs = nodesMax (proj₂ (proj₂ r))
+      rhs = nodesMax st + nestSyn e sl
+  in lhs , rhs , (lhs ≤ᵇ rhs)
+
+readS : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readS e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+  in stepOn sl a (chainsOf a stL) sd stL
+
+sRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ × ℕ × Bool
+sRow e g = let e₀ = entry e sl₁ g in readS e sl₁ (proj₁ e₀) (proj₂ e₀)
+
+S22-fits : proj₂ (proj₂ (sRow (progF 22 1) (sucGF 1 2 2 22 1))) ≡ true
+S22-fits = refl
+
+S1-fits : proj₂ (proj₂ (sRow (progF 1 1) (sucGF 1 2 2 1 1))) ≡ true
+S1-fits = refl
+
+SU-fits : proj₂ (proj₂ (sRow (progU 2 2) (sucGU 1 2 2 2 2))) ≡ true
+SU-fits = refl
+
+SC-fits : proj₂ (proj₂ (sRow (progC 1 2 2) (sucGC 1 2 2 1 2 2))) ≡ true
+SC-fits = refl

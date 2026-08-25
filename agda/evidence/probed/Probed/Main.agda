@@ -23,4 +23,5 @@ open import Probed.Cascade-Nest-Store
          F-chains; F-descent; F-holds)
 open import Probed.Cascade-Chain-Count
   using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
-         Dup1-fits; Dup4-fits)
+         Dup1-fits; Dup4-fits;
+         S22-fits; S1-fits; SU-fits; SC-fits)

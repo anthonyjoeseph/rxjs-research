@@ -161,10 +161,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-nodes-chains`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens
-  the node arm at most one `nestSyn` per chain it was handed, premise-free.
-  Both storing sites sit under one chain's step, so a MAX moves once however
-  many inners it subscribes. Probed at the width that killed the mint form.
+- **`chainStep-nodes`** (Caps-Face/Part7) — DIFFICULTY: ONE chain's step
+  deepens the node arm by at most one `nestSyn`, premise-free. Both storing
+  sites sit under it and a MAX moves once however many inners it subscribes;
+  the walk-level statement above it is an induction over the list, proven.
 - **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY: the walk's pending
   sources under the same width. The one arm of the store no instantiation has
   ever reached — every family reads it zero — so its cheapness is a guess.

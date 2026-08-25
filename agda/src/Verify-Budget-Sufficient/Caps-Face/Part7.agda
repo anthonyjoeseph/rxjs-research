@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
-  *-mono-≤; +-monoʳ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
+  *-mono-≤; *-monoˡ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; map; foldr)
@@ -1244,13 +1244,15 @@ postulate
 -- their own nodes.
 --
 -- SO THE QUANTITY TO CHARGE IS THE LENGTH OF THE CHAIN LIST THE WALK
--- WAS HANDED.  Both storing sites sit under one chain's step, and the
--- fold visits each chain once, so a walk deepens the store at most once
--- per chain it was given -- with everything a single chain does to the
--- store, however many inners it subscribes, invisible to a MAX that
--- moves once.  The count is an argument of the statement rather than a
--- reading of the run, which is what makes the charge legible at the
--- call site and what makes the row above it a two-line assembly.
+-- WAS HANDED, and the whole of the claim is ONE CHAIN'S STEP.  Both
+-- storing sites sit under a single `chainStep`, and the fold visits
+-- each chain once, so the walk-level statement is a plain induction
+-- over the list -- the skip arm weakens by a chain, the step arm spends
+-- this leaf and re-associates -- and everything a single chain does to
+-- the store, however many inners it subscribes, is invisible to a MAX
+-- that moves once.  The count being an ARGUMENT rather than a reading
+-- of the run is what makes both halves cheap: the charge is legible at
+-- the call site, and the induction never has to say what the run did.
 --
 -- DEAD ROUTE: charging per MINTED INSTANCE, the same statement with the
 --   schedule's own node counter in place of the length.  The count is
@@ -1269,25 +1271,52 @@ postulate
 --   of 3 and a `nestSyn` of 6.  A walk deepens once per CHAIN, so the
 --   count that survives is a count of chains and there is no
 --   count-free form of this row.
--- PROBED: `Probed.Cascade-Chain-Count` pins this conclusion by `refl` at
---   the crossing width and on three further families -- the bounded
---   drain, the skip branch and the deliver-on-every-chain family.
---   Twenty-three chains against a max of 26 is the tight row and it is
---   the one the mint form fails.  Rows are also taken with the chain
---   list DUPLICATED, since it is a free argument: the max climbs two a
---   copy while the charge climbs a whole `nestSyn` per chain, so the
---   adversarial list is further inside the bound than the honest one.
---   COVERED is the CONCLUSION only, which is premise-free.  NOT
---   covered: `Γ₂` alone, at one slot shape.
+-- PROBED: `Probed.Cascade-Chain-Count` pins this leaf by `refl` at the
+--   head of the arrival's own selection, at the crossing width and on
+--   three further families -- the bounded drain, the skip branch and
+--   the deliver-on-every-chain family.  It also pins the WALK-level
+--   conclusion the induction above draws from it, at the same four
+--   shapes and again with the chain list DUPLICATED: the max climbs two
+--   a copy while the charge climbs a whole `nestSyn` per chain, so the
+--   adversarial list sits further inside the bound than the honest one.
+--   Twenty-three chains against a max of 26 is the tight row, and it is
+--   the one the mint-counting predecessor fails.  COVERED is the
+--   CONCLUSION, which is premise-free.  NOT covered: `Γ₂` alone, at one
+--   slot shape.
 postulate
-  cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
+  chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
     (sched : Sched Γ) (st : EvalSt e) →
-    let r = cascadeGo a nextId chains sched st in
+    let r = chainStep id a path sched st in
     foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-        + length chains * nestSyn e sl
+        + nestSyn e sl
+
+cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = cascadeGo a nextId chains sched st in
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
+    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+      + length chains * nestSyn e sl
+cascadeGo-nodes-chains sl a nextId [] sched st = m≤m+n _ _
+cascadeGo-nodes-chains {e = e} sl a nextId ((rid , c) ∷ chains) sched st
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true =
+  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sched st)
+          (+-monoʳ-≤ _ (*-monoˡ-≤ (nestSyn e sl) (n≤1+n (length chains))))
+... | false =
+  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sd₁ st₁)
+          (≤-trans (+-monoˡ-≤ (length chains * nestSyn e sl)
+                              (chainStep-nodes sl nextId a c sched st′))
+                   (≤-reflexive (+-assoc _ (nestSyn e sl)
+                                           (length chains * nestSyn e sl))))
+  where
+  st′ = record st { delivered = rid ∷ EvalSt.delivered st }
+  r₁  = chainStep nextId a c sched st′
+  sd₁ = proj₁ (proj₂ r₁)
+  st₁ = proj₂ (proj₂ r₁)
 
 -- AND THE SELECTION IS WITHIN THE REAL WIDTH, WHICH IS NOW A TWO-LINE
 -- READING RATHER THAN A FACE OF ITS OWN.  A cascade's chain list is a
