@@ -161,10 +161,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-mint-base`** (Caps-Face/Part7) — DIFFICULTY: at the ENTRY index an
-  instant mints no more instances than `capsBase`. The tight half, and the only
-  half whose two sides both reduce. One missing fact: a real-denominated
-  registry bound, owed to the nesting invariant.
+- **`cascadeGo-mint-entryCeil`** (Caps-Face/Part7) — DIFFICULTY: at the ENTRY the
+  walk mints no more than the program's width CEILING. The tight half, and the
+  only one whose two sides both reduce. The smaller candidate — program size —
+  is refuted by rows; ceiling to charge is proven arithmetic.
 - **`cascadeGo-mint-tower`** (Caps-Face/Part7) — DIFFICULTY: the same count one
   index up, where the charge is a width raised to a cap and no row renders. The
   entry's per-chain decomposition does NOT carry: one chain, one delivery, over

@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; Fn; μᵉ; unfoldμ; evalTm;
   applyFn)
-open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
+open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; entryCeil)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
@@ -1436,18 +1436,18 @@ postulate
 -- split: both of ITS sides now reduce, where the width is sealed.
 --
 -- PROBED: `Probed.Cascade-Mint-Base` takes the entry walk on three
---   families and pins the COUNT, the CHARGE and the verdict by `refl`:
---   the bounded drain mints 5 against 123, the skip family 7 against
---   144, the deliver-on-every-chain family 20 against 144.  Every row
---   is load-bearing -- the count is whatever the run makes it and none
---   of the three is zero, so a family minting past its own `capsBase`
---   would have refuted here.  COVERED is the CONCLUSION only, at the
---   entry index, on `Γ₂` at one slot shape.  NOT covered: the premises,
---   which cannot be reached at all, `capsOK?` reading a cap record no
+--   families and pins the COUNT, the CEILING and the verdict by `refl`:
+--   the bounded drain mints 5 against 72, the skip family 7 against 96,
+--   the deliver-on-every-chain family 20 against 96.  Every row is
+--   load-bearing -- the count is whatever the run makes it and none of
+--   the three is zero, so a family minting past its own ceiling would
+--   have refuted here.  COVERED is the CONCLUSION only, at the entry
+--   index, on `Γ₂` at one slot shape.  NOT covered: the premises, which
+--   cannot be reached at all, `capsOK?` reading a cap record no
 --   instantiation terminates on; and no index above the entry, the
 --   charge there being a width raised to a cap.
 postulate
-  cascadeGo-mint-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-mint-entryCeil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
@@ -1456,8 +1456,32 @@ postulate
     nestOK? e sl 0 sched st ≡ true →
     let r = cascadeGo a nextId chains sched st in
     Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-    m ≤ capsBase e sl
+    m ≤ entryCeil n sl e
 
+-- THE CEILING IS ALREADY INSIDE THE CHARGE, so the step from the leaf
+-- to the base is arithmetic and belongs here rather than in anyone's
+-- assumption.
+entryCeil≤capsBase : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  entryCeil n sl e ≤ capsBase e sl
+entryCeil≤capsBase {n = n} e sl =
+  ≤-trans (n≤1+n (entryCeil n sl e))
+          (m≤n+m (suc (entryCeil n sl e)) (3 + (sizeᵉ e + slotsSize sl)))
+
+cascadeGo-mint-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl 0) sched st ≡ true →
+  nestOK? e sl 0 sched st ≡ true →
+  let r = cascadeGo a nextId chains sched st in
+  Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
+  m ≤ capsBase e sl
+cascadeGo-mint-base {e = e} sl a nextId chains sched st m hsl hcaps hnest heq =
+  ≤-trans (cascadeGo-mint-entryCeil sl a nextId chains sched st m hsl hcaps hnest heq)
+          (entryCeil≤capsBase e sl)
+
+postulate
   cascadeGo-mint-tower : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))

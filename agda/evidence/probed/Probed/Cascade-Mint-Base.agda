@@ -2,14 +2,20 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: cascadeGo-mint-base
+-- TARGET: cascadeGo-mint-entryCeil
 --
 -- WHY THIS INDEX AND NO OTHER, and it is the reason the target was split
--- off from its tower half.  The charge here is `capsBase`, a syntactic
--- reading that reduces; one index up the charge is a width raised to a
--- cap and nothing renders it, so the entry is the only place a row can be
--- taken at all -- and it is also the tight place, the charge being in the
--- low hundreds where the count is in the low tens.
+-- off from its tower half.  The charge here is a WIDTH CEILING, a
+-- syntactic reading that reduces; one index up the charge is a width
+-- raised to a cap and nothing renders it, so the entry is the only place
+-- a row can be taken at all -- and it is also the tight place.
+--
+-- AND THE CEILING IS THE CHARGE BECAUSE THE SMALLER CANDIDATE IS FALSE.
+-- The obvious leaf is the program's own size, and rows kill it: two
+-- families mint past their whole syntax at the entry -- 64 against 50,
+-- and 140 against 46 -- so a size-denominated leaf would have been
+-- stated and refuted.  The ceiling is what the entry charge actually
+-- carries, and it survives everywhere the smaller reading dies.
 --
 -- WHICH SIDE IS BLOCKED, since only one is.  The CONCLUSION computes
 -- fully: the count comes off the schedule's own counter across a real
@@ -40,8 +46,9 @@ open import Rx.Exp using (Closed; natᵗ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascadeLatch; cascadeGo; chainsOf; capsBase)
+         cascadeLatch; cascadeGo; chainsOf)
 open import Rx.Slots using (Slots)
+open import Rx.Frame-Width using (entryCeil)
 
 open import Verify-Budget-Sufficient.Demand-Programs
   using (Γ₂; progU; progC; progF; insF; sucGU; sucGC; sucGF)
@@ -59,7 +66,7 @@ readM e sl sched st with sched-next sched
 ... | inj₂ (a , sd) =
   let g = cascadeGo a 1 (chainsOf a st) sd (cascadeLatch a st)
       m = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
-  in m , capsBase e sl , (m ≤ᵇ capsBase e sl)
+  in m , entryCeil 2 sl e , (m ≤ᵇ entryCeil 2 sl e)
 
 entry : ∀ {t} (e : Closed Γ₂ t) → Slots Γ₂ → ℕ → Sched Γ₂ × EvalSt e
 entry e sl g =
@@ -86,7 +93,7 @@ rowU = let e₀ = entry pU sl₁ (sucGU 1 2 2 2 2)
 U-mint : proj₁ rowU ≡ 5
 U-mint = refl
 
-U-charge : proj₁ (proj₂ rowU) ≡ 123
+U-charge : proj₁ (proj₂ rowU) ≡ 72
 U-charge = refl
 
 U-fits : proj₂ (proj₂ rowU) ≡ true
@@ -108,7 +115,7 @@ rowC = let e₀ = entry pC sl₁ (sucGC 1 2 2 1 2 2)
 C-mint : proj₁ rowC ≡ 7
 C-mint = refl
 
-C-charge : proj₁ (proj₂ rowC) ≡ 144
+C-charge : proj₁ (proj₂ rowC) ≡ 96
 C-charge = refl
 
 C-fits : proj₂ (proj₂ rowC) ≡ true
@@ -130,7 +137,7 @@ rowF = let e₀ = entry pF sl₁ (sucGF 1 2 2 1 1)
 F-mint : proj₁ rowF ≡ 20
 F-mint = refl
 
-F-charge : proj₁ (proj₂ rowF) ≡ 144
+F-charge : proj₁ (proj₂ rowF) ≡ 96
 F-charge = refl
 
 F-fits : proj₂ (proj₂ rowF) ≡ true

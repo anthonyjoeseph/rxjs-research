@@ -56,8 +56,9 @@ open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 open import Data.Product using (proj₁; proj₂; _,_; _×_)
 open import Data.Sum using (inj₁; inj₂)
-open import Rx.Exp using (Ctx; Closed)
-open import Rx.Slots using (Slots)
+open import Rx.Exp using (Ctx; Closed; sizeᵉ)
+open import Rx.Slots using (Slots; slotsSize)
+open import Rx.Frame-Width using (entryCeil)
 open import Rx.Prim using (towerℕ; gasPad; g0; Id)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase; subscribeE; sched-init; st-init; root;
   Sched; EvalSt; sched-next; cascade; arrTy; arrVal)
@@ -627,7 +628,7 @@ four sched st =
 satWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
         → ℕ → ℕ → Sched Γ → EvalSt e → String
 satWalk e sl 0       nextId sched st = ""
-satWalk e sl (suc m) nextId sched st with sched-next sched
+satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
 ... | inj₁ _        = " [done]"
 ... | inj₂ (a , sd) =
   let stL = cascadeLatch a st
@@ -657,7 +658,13 @@ satWalk e sl (suc m) nextId sched st with sched-next sched
             ++ (let rg = length (EvalSt.registry (proj₂ (proj₂ g)))
                 in " reg=" ++ show rg
                    ++ (if rg ≤ᵇ realWidAt e sl 0 then " REG-ok" else " REG-OVER"))
-            ++ (if nestOK? e sl 0 sd stL then " NEST0-holds" else " NEST0-fails"))
+            ++ (if nestOK? e sl 0 sd stL then " NEST0-holds" else " NEST0-fails")
+            ++ (let sz = sizeᵉ e + slotsSize sl
+                in " sz=" ++ show sz
+                   ++ (if mm ≤ᵇ sz then " SZ-ok" else " SZ-OVER"))
+            ++ (let ec = entryCeil n sl e
+                in " ec=" ++ show ec
+                   ++ (if mm ≤ᵇ ec then " EC-ok" else " EC-OVER")))
      ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
      ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
      ++ " |" ++ satGo a nextId ch sd stL (length ch)
