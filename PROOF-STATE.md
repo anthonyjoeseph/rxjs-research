@@ -161,12 +161,24 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
+- **`arr-chains-nest-fac`** (Caps-Face/Part7) — FALSITY: a registered chain
+  list's FANOUT product under the instant's ceiling. A frame multiplies rather
+  than adds — both halves of the additive reading are machine-refuted — so this
+  is the bet that a geometric per-instant cap still sits under `capsH`.
+- **`applyFn-nest`** (Nest-Walk) — DIFFICULTY: substitution multiplies the
+  payload's nesting by two per unit of the function's syntax. The additive form
+  is refuted at one `mapᵉ`; both proven twins on this face are multiplicative.
+- **`stepFrame-nodes-scan`** (Nest-Walk) — DIFFICULTY: the scan frame stores the
+  accumulator it emits, so its node and its emission move together under one
+  `⊔`. The four sibling arms of the same frame split are named below.
+- **`stepFrame-nodes-inner`** (Nest-Walk) — DIFFICULTY: an inner's release
+  forwards through the `from-inner` frame, the one frame the path measure
+  charges nothing for — so the arm has to be paid by what the inner already was.
+- **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY: the outer wrap, which is
+  the one frame `pathNestD` does charge, against `thruWalk`'s own store.
 - **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY: the share sink's fan-out over
   the admitted registrations, under one unit. They touch disjoint nodes, so
   the map moves by the deepest and not the sum — which the fold cannot see.
-- **`stepFrame-nodes`** (Nest-Walk) — DIFFICULTY: one frame moves its node and
-  its emission together by its own wrap, stated under one `⊔` because a scan
-  emits the accumulator it stored. The walk above it telescopes, proven.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY: the selection's
   paths and the arrival's payload land inside one unit — the fact that ties
   the walk's charge back to the program. Free-list form refuted; probeable.
@@ -195,6 +207,8 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   receipt at instant 1, and the one place the currency is really bet — every
   cascade instance is slack. `burst-caps` is the shape, but `burst-all`
   produces no nesting conjunct yet, so the producing lemma is owed first.
+- **`stepFrame-nodes-take`** (Nest-Walk) — GRINDABLE: `takeDispatch` re-points a
+  counter and forwards what it was handed, so neither side of the `⊔` deepens.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE: the far end of a cascade only
   shortens lists, and every summand of the store measure is a `⊔`-fold over one.
   Its header names the proven twin at the same two branches.

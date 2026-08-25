@@ -49,15 +49,16 @@ module Verify-Budget-Sufficient.Nest-Store where
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-identityʳ)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ;
+  *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-distribˡ-+; m^n>0)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Exp using (Ctx; Closed)
+open import Rx.Exp using (Ctx; Closed; sizeᵗ)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
-open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_; RegId; NodeState;
+open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId; NodeState;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
   Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH)
 open import Rx.Prim using (Source; towerℕ)
@@ -74,11 +75,88 @@ pathNestD (take-f _ ↠ p)          = pathNestD p
 pathNestD (from-inner _ _ _ ↠ p)  = pathNestD p
 pathNestD (thru-outer _ _ ↠ p)    = suc (pathNestD p)
 
+-- THE PER-FRAME FACTOR, AND IT IS A FACTOR BECAUSE NO SUMMAND
+-- SURVIVES.  A step function may name its payload more than once, and
+-- `nestDᵉ` is additive at `mapᵉ`, so the value a frame hands on is read
+-- at as many copies of the payload's own nesting as the function has
+-- occurrences of it.  A charge that adds the function's syntax cannot
+-- see the count; a charge that MULTIPLIES by two to the size dominates
+-- it, since occurrences are bounded by size and binder nesting raises
+-- the power rather than the base.
+--
+-- THE MEASURE OVER-COUNTS AND THE DYNAMICS DO NOT, which is why the
+-- repair is priced here rather than in `Rx.Nest-Depth`.  The value a
+-- duplicating map really emits is exactly as deep as its payload; it is
+-- the syntactic measure of the closed result that doubles.  Two
+-- predecessors of that measure died of being re-designed, so the
+-- doubling is paid for in the cap instead.
+--
+-- REFUTED: `Refuted.Apply-Fn-Nest` at the substitution itself, and
+--   `Refuted.Step-Frame-Nest-Dup` at the frame that consumes it.
+frameNestF : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
+frameNestF (map-f f)          = 2 ^ sizeᵗ f
+frameNestF (scan-f f _)       = 2 ^ sizeᵗ f
+frameNestF (take-f _)         = 1
+frameNestF (from-inner _ _ _) = 1
+frameNestF (thru-outer _ _)   = 1
+
+1≤frameNestF : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) → 1 ≤ frameNestF f
+1≤frameNestF (map-f f)          = m^n>0 2 (sizeᵗ f)
+1≤frameNestF (scan-f f _)       = m^n>0 2 (sizeᵗ f)
+1≤frameNestF (take-f _)         = s≤s z≤n
+1≤frameNestF (from-inner _ _ _) = s≤s z≤n
+1≤frameNestF (thru-outer _ _)   = s≤s z≤n
+
+-- the walk telescopes by MULTIPLYING these, one per frame
+pathNestF : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+pathNestF root           = 1
+pathNestF (share-sink _) = 1
+pathNestF (f ↠ p)        = frameNestF f * pathNestF p
+
+1≤pathNestF : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) → 1 ≤ pathNestF p
+1≤pathNestF root           = s≤s z≤n
+1≤pathNestF (share-sink _) = s≤s z≤n
+1≤pathNestF (f ↠ p)        = *-mono-≤ (1≤frameNestF f) (1≤pathNestF p)
+
+-- THE ARITHMETIC BOTH TELESCOPES RUN ON, and the only place a factor
+-- and a summand meet: one step's factor multiplies everything the rest
+-- of the walk will charge, which is sound exactly because a factor is
+-- never below one.
+nest-telescope : ∀ (F G B X Y : ℕ) → 1 ≤ F →
+  G * (F * (B + X) + Y) ≤ F * G * (B + (X + Y))
+nest-telescope F G B X Y 1≤F =
+  ≤-trans (*-monoʳ-≤ G (+-monoʳ-≤ (F * (B + X)) grow)) (≤-reflexive eq)
+  where
+  grow : Y ≤ F * Y
+  grow = ≤-trans (≤-reflexive (sym (*-identityˡ Y))) (*-monoˡ-≤ Y 1≤F)
+  eq : G * (F * (B + X) + F * Y) ≡ F * G * (B + (X + Y))
+  eq = trans (cong (G *_) (sym (*-distribˡ-+ F (B + X) Y)))
+       (trans (sym (*-assoc G F ((B + X) + Y)))
+       (trans (cong (_* ((B + X) + Y)) (*-comm G F))
+              (cong (F * G *_) (+-assoc B X Y))))
+
+nest-inflate : ∀ (F X : ℕ) → 1 ≤ F → X ≤ F * X
+nest-inflate F X 1≤F =
+  ≤-trans (≤-reflexive (sym (*-identityˡ X))) (*-monoˡ-≤ X 1≤F)
+
+nest-scale : ∀ (F G Z : ℕ) → 1 ≤ F → G * Z ≤ F * G * Z
+nest-scale F G Z 1≤F =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (G * Z))))
+                   (*-monoˡ-≤ (G * Z) 1≤F))
+          (≤-reflexive (sym (*-assoc F G Z)))
+
 -- A CASCADE'S CHAINS ARE A MAX, not a sum: `depthCascade` folds them
 -- with `⊔`, each from the same arrival.
 chainsNestD : ∀ {n} {Γ : Ctx n} {s t} →
   List (RegId × Path Γ s t) → ℕ
 chainsNestD = foldr (λ rc acc → pathNestD (proj₂ rc) ⊔ acc) 0
+
+-- THE FACTORS ARE A PRODUCT, not a max, because the fold runs the
+-- chains in sequence and each one's factor multiplies whatever the ones
+-- after it will charge.
+chainsNestF : ∀ {n} {Γ : Ctx n} {s t} →
+  List (RegId × Path Γ s t) → ℕ
+chainsNestF = foldr (λ rc acc → pathNestF (proj₂ rc) * acc) 1
 
 -- A SCRIPTED SLOT IS OBS-FREE BY CONSTRUCTION (`isData`), so no
 -- observable enters a run from outside the program and the clause is 0
@@ -254,8 +332,24 @@ abstract
   realWidAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
   realWidAt e sl id = Caps.cReg (capsAt e sl id)
 
+  -- THE PER-INSTANT FANOUT FACTOR.  A chain walk does not ADD its
+  -- frames' charges to the store depth, it MULTIPLIES by them: a step
+  -- function may name its payload twice, so one frame can double the
+  -- nesting of what it emits, and a path composes those doublings.
+  -- The factor is `2` per unit of step-function syntax along a path,
+  -- and a cascade compounds one path's worth per chain -- so real
+  -- width in the exponent, size in the base.
+  nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → ℕ
+  nestFacAt e sl id = 2 ^ (realWidAt e sl id * Caps.cSize (capsAt e sl id))
+
   nestCapAt e sl zero    = nestUnit e sl
-  nestCapAt e sl (suc id) = nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+  nestCapAt e sl (suc id) =
+    nestFacAt e sl id * (nestCapAt e sl id + realWidAt e sl id * nestSyn e sl)
+
+  1≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → 1 ≤ nestFacAt e sl id
+  1≤nestFacAt e sl id = m^n>0 2 (realWidAt e sl id * Caps.cSize (capsAt e sl id))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool
@@ -309,7 +403,8 @@ abstract
   nestCapAt-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestCapAt e sl (suc id)
-      ≡ nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+      ≡ nestFacAt e sl id
+        * (nestCapAt e sl id + realWidAt e sl id * nestSyn e sl)
   nestCapAt-suc e sl id = refl
 
   -- THE HEIGHT COMPARISON, and it is the entire bet this module carries,
@@ -340,8 +435,7 @@ abstract
     nest-height : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
       (id : ℕ) →
       Σ ℕ λ h →
-        (3 * nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
-           ≤ towerℕ h)
+        (2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ towerℕ h)
         × (suc h ≤ towerℕ (capsHpred e sl id))
 
 ------------------------------------------------------------------
@@ -367,8 +461,7 @@ abstract
 -- `nest-height`, inside the seal, where the two axes unfold.
 nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  3 * nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
-    ≤ capsH e sl id
+  2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id
 nestCap-3≤capsH e sl id =
   ≤-trans lo (subst (towerℕ h ≤_) (sym (capsH-blow e sl id))
                 (tower-le-blowH h (capsHpred e sl id)
@@ -378,6 +471,21 @@ nestCap-3≤capsH e sl id =
   lo = proj₁ (proj₂ (nest-height e sl id))
   hi = proj₂ (proj₂ (nest-height e sl id))
 
+-- the instant's own cap sits under the next one, the factor being at
+-- least one
+nestCap-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+    ≤ nestCapAt e sl (suc id)
+nestCap-mono e sl id =
+  ≤-trans (nest-inflate (nestFacAt e sl id) _ (1≤nestFacAt e sl id))
+          (≤-reflexive (sym (nestCapAt-suc e sl id)))
+
+2*-fold : ∀ (m x y : ℕ) → x ≤ m → y ≤ m → x + y ≤ 2 * m
+2*-fold m x y hx hy =
+  ≤-trans (+-mono-≤ hx hy)
+          (≤-reflexive (cong (m +_) (sym (+-identityʳ m))))
+
 -- three parts each under the cap, the fresh term on top, paid out of
 -- the height
 nest-sum-3 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -385,12 +493,25 @@ nest-sum-3 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   x ≤ nestCapAt e sl id → y ≤ nestCapAt e sl id → z ≤ nestCapAt e sl id →
   x + y + z + realWidAt e sl id * nestSyn e sl ≤ capsH e sl id
 nest-sum-3 e sl id x y z hx hy hz =
-  ≤-trans (+-mono-≤ (+-mono-≤ (+-mono-≤ hx hy) hz)
-                    (≤-reflexive {x = realWidAt e sl id * nestSyn e sl} refl))
-          (≤-trans (≤-reflexive (cong (_+ realWidAt e sl id * nestSyn e sl)
-                                      (3*-expand (nestCapAt e sl id))))
-                   (nestCap-3≤capsH e sl id))
-  where
-  3*-expand : ∀ (m : ℕ) → m + m + m ≡ 3 * m
-  3*-expand m =
-    trans (+-assoc m m m) (cong (λ x → m + (m + x)) (sym (+-identityʳ m)))
+  ≤-trans (≤-reflexive (+-assoc (x + y) z (realWidAt e sl id * nestSyn e sl)))
+    (≤-trans (+-mono-≤ (2*-fold (nestCapAt e sl id) x y hx hy)
+                       (≤-trans (+-monoˡ-≤ (realWidAt e sl id * nestSyn e sl) hz)
+                                (nestCap-mono e sl id)))
+             (nestCap-3≤capsH e sl id))
+
+-- THE SAME SUM, WITH THE WALK'S FANOUT FACTOR ON THE STORE TERM.  A
+-- chain walk multiplies rather than adds -- a step function may name
+-- its payload twice -- so the store arm of a cascade's descent arrives
+-- already scaled by `nestFacAt`, and that scaled arm is exactly the
+-- next instant's cap.
+nest-sum-fac : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) (x y z : ℕ) →
+  x ≤ nestCapAt e sl id → y ≤ nestCapAt e sl id → z ≤ nestCapAt e sl id →
+  x + y + nestFacAt e sl id * (z + realWidAt e sl id * nestSyn e sl)
+    ≤ capsH e sl id
+nest-sum-fac e sl id x y z hx hy hz =
+  ≤-trans (+-mono-≤ (2*-fold (nestCapAt e sl id) x y hx hy)
+                    (≤-trans (*-monoʳ-≤ (nestFacAt e sl id)
+                                        (+-monoˡ-≤ (realWidAt e sl id * nestSyn e sl) hz))
+                             (≤-reflexive (sym (nestCapAt-suc e sl id)))))
+          (nestCap-3≤capsH e sl id)

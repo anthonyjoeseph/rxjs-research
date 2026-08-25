@@ -345,12 +345,18 @@ many minutes and the Bash tool's ceiling is 600 s per foreground call, so iterat
   a comment edit is free.** **Never run `agda` against `agda/src` directly** — that
   builds a second interface cache and every alternation invalidates the other's cone.
   → [docs/agda-build.md](docs/agda-build.md)
-- **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`; READ IT BACK WITH `make bg-check
-  T=<target>`; WAIT WITH `make bg-wait T=<target>`. Never hand-roll the wrapper** — the
-  obvious `(cmd > log; echo EXIT=$?)` exits with `echo`'s status and reports every build
-  green. `make bg` always exits non-zero by design, so **a completion notification is
-  never a result**; and **never loop on `bg-check`**, whose exit status make collapses
-  into its own exit 2, making still-running and failed the same number.
+- **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>` AND WAIT ON IT WITH `make bg-wait
+  T=<target>`, WHICH IS THE ONLY WAITING MECHANISM.** `bg-wait` blocks until the log is
+  terminal and exits 0 GREEN / non-zero RED, so one call replaces every poll — it cannot
+  return while the run is alive, and that is the property nothing you write yourself has.
+  `make bg-check T=<target>` is for a verdict you want WITHOUT waiting, and it is never
+  looped: make collapses its exit status into its own exit 2, so still-running and failed
+  read as the same number. **A `sleep N; tail` loop is that same mistake in different
+  clothes** — a turn burnt per tick, reading a log buffered until the run ends, unable to
+  tell a live build from a dead one. **Never hand-roll the wrapper either** — the obvious
+  `(cmd > log; echo EXIT=$?)` exits with `echo`'s status and reports every build green.
+  `make bg` always exits non-zero by design, so **a completion notification is never a
+  result**.
   **AND TYPE IT BARE — NO `&`, NO REDIRECT (Anthony).** `make bg` detaches on its own
   and owns its log, so a trailing `&` backgrounds a wrapper that has already
   backgrounded itself, and a `>/dev/null 2>&1` throws away the one thing the launch
@@ -450,7 +456,7 @@ make agda-dev ARGS='<file>'            one module, every member
 make agda-dev ARGS='--list <file>'     free: which members are in which block
 ```
 
-**Use it throughout development and `make gate` once at the end.** Two rules you must
+**Use it throughout development and `make gate` once at the end.** Three rules you must
 carry before opening the doc:
 
 - **DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID — but only where
@@ -461,6 +467,16 @@ carry before opening the doc:
   a proof-shape failure and not a typo — and **postulates do not reduce**, so a clause
   needing a sibling to unfold can pass dev and fail for real. **Never report a result as
   verified on a dev run, never commit on one alone, never call dev-green "typechecks".**
+- **A DEV CHECK THAT IS NOT SECONDS IS A FINDING, NOT A BUDGET TO RAISE.** The budget
+  exists to SAY the loop has stopped being the loop; raising it converts a diagnosis into
+  a wait. **Read `typecheck-performance-numbers.md` FIRST** — it carries a per-module row,
+  so a slow reading is checkable in seconds against a recorded best, and it marks a run
+  the budget killed as a FLOOR rather than a measurement. Two causes, both cheap to rule
+  out: a second Agda on the same interface cache, measured at 140× and forbidden anyway;
+  or a CONE you just invalidated, since the loop stubs mutual blocks in the TARGET only
+  and checks every dependency for real. **So work BOTTOM-UP: the module you edited, then
+  its consumers.** Asking for a root-ward module right after a leaf-ward edit hands the
+  seconds-scale loop the gate's bill, and the gate is what should pay it.
 - **A RED `agda-dev` ON ANY FILE IN `src` IS A CRITICAL FAILURE — FIX IT IMMEDIATELY.**
   It is a P0 defect in the tooling, fixed *before* the work you were doing. Never route
   around it — not with a skip list, not with "it's just the tool", not by falling back to
