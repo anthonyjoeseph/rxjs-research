@@ -1324,7 +1324,29 @@ postulate
 -- deliver -- so the chain-list induction closes in the relative form
 -- once the budget SPLITS, which is what the entry-store version of it
 -- could not do.
+
+-- AND THE PER-CHAIN BUDGET IS WHERE THE ONE MISSING FACT NOW SITS,
+-- WHICH IS A SMALLER THING THAN THE ROW.  The chain list is bounded by
+-- a REAL quantity already: `chainsOf-length` is proven, and it bounds
+-- the chains this walk is handed by the registry's own length.  So the
+-- count decomposes into a per-chain mint, which is syntactic, times a
+-- registry length -- and the registry is the single place the
+-- decomposition still leaves cap-denominated, because `capsOK?-count`
+-- is the ONLY bound on that length anywhere in the tower and it reads
+-- the cap record.  That is one nameable fact rather than a route: a
+-- REAL-denominated bound on how many registrations a state satisfying
+-- the invariants can hold.
 --
+-- Its home is not this signature.  A hypothesis here would be the
+-- laundering the file of record forbids -- tracked debt into untracked
+-- -- and it would oblige only today's single caller; the fact is a
+-- property of every reachable state, so it belongs as a conjunct
+-- alongside the store bound the nesting invariant already carries.
+-- What that costs is a cascade through the invariant's producers and
+-- consumers, and what makes it worth paying rather than routing around
+-- is that nothing else in this vocabulary can supply a count: every
+-- other candidate has been tried and each one lands on the caps side.
+
 -- REFUTED: `Refuted.Cascade-Nest-PerDeliv` kills the per-DELIVERY half
 --   this was assembled from -- store 12 against a charge of 10, at ONE
 --   delivery and no cancellation, so neither the count nor a cancelled

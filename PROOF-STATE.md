@@ -162,9 +162,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 - **`cascadeGo-mint-width`** (Caps-Face/Part7) — DIFFICULTY: an instant mints no
-  more node instances than its real width. Where every premise of this face is
-  spent. Its per-delivery ancestor is machine-refuted at ONE delivery, which is
-  what moved the count off deliveries and onto the schedule's own counter.
+  more node instances than its real width. Four routes die on a currency
+  comparison now known uninstantiable. Localised to one missing fact: a
+  real-denominated registry bound, owed to the nesting invariant.
 - **`cascadeGo-nodes-mint`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens the
   node arm at most one `nestSyn` per instance it mints, premise-free, with the
   count PINNED by an equation rather than bounded. Both storing sites sit behind
