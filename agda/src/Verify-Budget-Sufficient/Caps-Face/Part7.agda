@@ -1366,6 +1366,21 @@ postulate
 --   compiled code, so the cap record cannot be reached at any program
 --   at any index and the comparison has no instance at all.
 --   Hypothesis side fine, conclusion side blocked.
+-- DEAD ROUTE: reading the count off the caps invariant, which is the
+--   one place a count is actually recorded.  `capsOK?` bounds a
+--   bounded `*All`'s parked queue by the caps width, so the releases
+--   one drain can perform ARE capped, and that looks like the missing
+--   ingredient -- the more so because the nesting invariant is no help,
+--   bounding the store's DEPTH and carrying no count at all, and
+--   because the caps predicate never reads the node counter, so nothing
+--   else in the hypotheses mentions it.  It dies on CURRENCY, which is
+--   the same wall as the three routes above and this is the fourth
+--   direction onto it: the queue bound is CAP-denominated and the
+--   conclusion is REAL-denominated, so spending it needs the caps
+--   level against the real width -- ruled out directly above.  What is
+--   new is where it leaves the question: every route to a count in this
+--   vocabulary runs through the caps face, so the thing to reconsider
+--   is the RIGHT-HAND SIDE this face is stated in, not the next route.
 -- RECOVERY: `git show eab5c1c` restores the two-leaf assembly -- the
 --   refuted per-delivery leaf, and the delivery-count leaf
 --   `cascadeGo-deliv-real` whose only consumer it was, with the four
