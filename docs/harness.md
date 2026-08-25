@@ -44,6 +44,31 @@ does to probes.
 proven definition nothing reaches, and `make wiring-gate` correctly fails it; an
 anonymous one is a reachability seed and is never reported.
 
+## Every series declares a `-- TARGET:`, and expires with it
+
+`make evidence-check`'s E4 reads every `-- SERIES` block in `agda/src/Harness` and
+requires a `-- TARGET: <postulate>` naming a live postulate — the same law E2 puts on a
+probe, and CLAUDE.md carries the reason it had to be extended here.
+
+Mechanics:
+
+- **A block is the run of comment lines the marker opens**, ending at the first line
+  that is not a comment. Put the `-- TARGET:` last, after the explanation and after any
+  `LOAD-BEARING` note — evidence sits last, as in a source header.
+- **Two series whose headers abut with no code between them are ONE run**, and each
+  marker is charged its own target. A single target at the end of the run credits only
+  the marker it follows; the earlier one is reported as missing. Separate them with a
+  blank line and give each its own.
+- **Several `-- TARGET:` lines in one block are fine** where a series' rows really are
+  evidence about more than one statement — the same allowance a probe has.
+- The check is on the MARKER, so a findings block that is not a series (the QUARANTINE
+  note, the calibration note) needs no target and is not scanned.
+
+When a target dies, the repair is to delete the series and move whatever the rows
+established into the header of the statement it constrains. Retarget only when the
+rows genuinely instantiate the new statement — a series green against `A + B + C` is
+not evidence about `(A + B) ⊔ C`.
+
 ## What it cannot do
 
 **Compiling a family does not make it measurable.** Unsealing buys opacity, not

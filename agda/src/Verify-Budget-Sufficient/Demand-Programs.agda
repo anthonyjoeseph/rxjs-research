@@ -30,20 +30,18 @@ module Verify-Budget-Sufficient.Demand-Programs where
 
 open import Data.List using (List; []; _∷_; replicate; _++_)
 open import Data.Nat using (ℕ; suc; _+_)
-open import Data.Bool using (Bool; T; true)
+open import Data.Bool using (T; true)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.Unit using (tt)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Product using (proj₁)
 open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
-open import Rx.Prim using (g0; gasPad; Timed; after_,_; cold; hot)
+open import Rx.Prim using (Timed; after_,_; cold; hot)
 open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; takeᵉ; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
-open import Rx.Evaluator using (subscribeE; sched-init; st-init; hasDry; root;
-  Path; _↠_; thru-outer; mergeAllᵒ)
+open import Rx.Evaluator using (root; Path; _↠_; thru-outer; mergeAllᵒ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
@@ -63,19 +61,6 @@ ins₀ = λ ()
 -- evaluator's OWN initial schedule and state, so these are states the
 -- evaluator reaches by running rather than states built by hand.
 ----------------------------------------------------------------------
-
-runDry : ∀ {t} (h : ℕ) (e : Closed Γ₀ t) → Bool
-runDry h e =
-  hasDry (proj₁ (subscribeE (gasPad h g0) e root 0 0
-                             (sched-init e ins₀) (st-init e)))
-
-----------------------------------------------------------------------
--- THE FAMILY.  `progD d k` scans a k-element list with a fold that
--- wraps its accumulator d mergeAll-levels deeper per value, so accᵢ
--- carries d·i nested levels and the outer *All subscribes all of them.
-----------------------------------------------------------------------
-
--- wrap a term d mergeAll-levels deeper
 wrapD : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
   Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
 wrapD 0       t = t
@@ -109,16 +94,6 @@ sucG b = suc (syncSizeᵉ b + hopDᵉ 0 (slotHop 0 ins₀) b)
 -- reaches it: one slot, whose def is a scan under a `mergeAllᵉ`, and a
 -- root that both references the slot and carries its own d and k.
 ----------------------------------------------------------------------
-
-Γ₁ : Ctx 1
-Γ₁ = natᵗ ∷ⱽ []ⱽ
-
--- STRATIFICATION HOLDS AT EVERY INDEX, INCLUDING ZERO, because the
--- family mentions no `input` at all — which is what lets slot 0 (whose
--- side condition admits nothing) hold a def of the family's full shape.
--- The three inductions are what make the def's d and k PARAMETERS: the
--- side condition is an implicit solved by unification, so without them
--- the sweep could only vary the def by literal dispatch.
 wrapD-below : ∀ {n} {Γ : Ctx n} {Θ} (j d : ℕ)
   (t : Tm Γ [] [] Θ (obs natᵗ)) →
   inputsBelowᵗ j t ≡ true → inputsBelowᵗ j (wrapD d t) ≡ true
@@ -136,40 +111,6 @@ progD-below {Γ = Γ} j d k
   rewrite wrapD-below {Γ = Γ} {Θ = ((obs natᵗ) ×ᵗ natᵗ) ∷ []} j d
             (fstᵗ (varᵗ (here refl))) refl =
   natsD-below {Γ = Γ} j k
-
-insS : ℕ → ℕ → Slots Γ₁
-insS ds ks fzero =
-  shared (progD ds ks) {ok = subst T (sym (progD-below 0 ds ks)) tt}
-
--- the root: the same scan, over the slot's emissions MERGED with its
--- own k-element list, so d and k vary the root independently of the
--- def's ds and ks
-progS : ℕ → ℕ → Closed Γ₁ natᵗ
-progS d k =
-  mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ nothing (ofᵉ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
-
-sucGS : ℕ → ℕ → ℕ → ℕ → ℕ
-sucGS ds ks d k =
-  suc (syncSizeᵉ (progS d k)
-       + hopDᵉ 0 (slotHop 0 (insS ds ks)) (progS d k))
-
-runDryS : ℕ → ℕ → ℕ → ℕ → Bool
-runDryS ds ks d k =
-  hasDry (proj₁ (subscribeE (gasPad (sucGS ds ks d k) g0) (progS d k) root 0 0
-                            (sched-init (progS d k) (insS ds ks))
-                            (st-init (progS d k))))
-
-----------------------------------------------------------------------
--- THE ARRIVAL FAMILY.  Q and S are ALL-SYNCHRONOUS: every source is an
--- `ofᵉ` list, so the whole run happens in the subscribe burst and
--- `sched-next` reports an empty schedule immediately.  Neither family
--- can produce a cascade at all, which is what a delivery instant is.
--- T adds a scripted slot carrying async values, so the schedule is
--- non-empty when the burst hands over and the evaluator's own next
--- arrival is available to step.
-----------------------------------------------------------------------
-
 Γ₂ : Ctx 2
 Γ₂ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 

@@ -43,10 +43,10 @@
 --     make harness ARGS='1'       just row 1
 module Harness.Main where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; false; if_then_else_)
 open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map; length; foldr)
-open import Data.Nat using (_≡ᵇ_; ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _<ᵇ_; _⊔_)
+open import Data.Nat using (_≡ᵇ_; ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_; _⊔_)
 open import Data.Nat.DivMod using (_/_; _%_)
 open import Data.Nat.Show using (show)
 open import Data.String using (String; _++_; toList)
@@ -65,13 +65,11 @@ open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL; capsBase
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using (budgetAt; chainsOf; cascadeLatch; cascadeGo; chainStep; Arrival; RegId; Path)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthCascade; depthChain)
-open import Verify-Budget-Sufficient.Caps using (cDel; capsAt; Caps)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
-         progT; sucGT; progU; sucGU; progB; sucGB; progN; sucGN; progF; sucGF; insF; insT; subjN; pathN;
-         progC; sucGC; progW; sucGW; progO; sucGO)
+  using (progD; sucG; ins₀; progT; sucGT; progU; sucGU; progB; sucGB; progN; sucGN; progF; sucGF;
+  insF; insT; subjN; pathN; progC; sucGC; progW; sucGW; progO; sucGO)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
          pathNestD; chainsNestD; liveNest; nodeNest; regsNestMax)
@@ -100,17 +98,6 @@ calibration = towerℕ 4
 _ : calibration ≡ 65536
 _ = refl
 
--- THE FAMILY CALIBRATION, pinned.  `towerℕ` agreement says the backend
--- does arithmetic; it says nothing about whether it runs `subscribeE`.
--- These two pin the dry threshold of `progD 1 2` exactly, and rows 3-4
--- print the same two expressions from the compiled binary.  Cheap
--- because the PROGRAM is small (d·k(k+1)/2 = 3 subscription levels), not
--- because drying exits early — it does not.
-_ : runDry 2 (progD 1 2) ≡ true
-_ = refl
-_ : runDry 3 (progD 1 2) ≡ false
-_ = refl
-
 ------------------------------------------------------------------
 -- THE ROWS.  Add rows freely; keep row 0 where it is.  State for each
 -- what it would take to make the row INTERESTING — a row that could not
@@ -121,123 +108,19 @@ _ = refl
 -- ROWS 10+ ARE THE QUARANTINE: measured non-terminating, kept because
 -- they are the exact expressions someone will want to retry.  They are
 -- NOT in the default sweep — running them is an explicit `ARGS=10`.
-
-showB : Bool → String
-showB true  = "true"
-showB false = "false"
-
 -- Indices 20+ cannot be literal PATTERNS (Agda expands a numeric
 -- literal pattern to that many constructors), so Series N dispatches on
 -- an offset instead.  Row 20+k is `nestRow k`.
--- SERIES N-SWEEP — how deep an instant ACTUALLY drives the store, against
--- what the currency allows it.  `progD d k` scans k values with a fold
--- wrapping its accumulator d mergeAll-levels deeper each time, so the
--- stored accumulator is the one object in reach whose nesting grows with
--- the run rather than with the syntax — which is exactly the growth the
--- increment has to cover.
---
--- WHAT IS MEASURED, precisely, because the coverage claim is the whole
--- value of a row: this is the ROOT SUBSCRIBE frame, not `cascade`.  So it
--- constrains the subscribe side of the currency and is INDICATIVE ONLY
--- for `store-growth`, whose own instant is a delivery.  The allowance
--- printed beside it is the increment at instant 0 with `realWidAt`
--- unfolded to its base — the recurrence is sealed, and its zero clause
--- IS `capsBase`.
---
--- A ROW FAILS INTERESTINGLY when `over` reads true: the store went
--- deeper in one instant than the instant was allowed to buy.  That is a
--- lead to chase to a type-level witness, never itself the finding.
-storeAfterRoot : ℕ → ℕ → ℕ
-storeAfterRoot d k =
-  let p = progD d k
-      r = subscribeE (gasPad (sucG p) g0) p root 0 0
-                     (sched-init p ins₀) (st-init p)
-  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-allowance : ℕ → ℕ → ℕ
-allowance d k = capsBase (progD d k) ins₀ * nestSyn (progD d k) ins₀
-
--- SERIES S — the same two numbers over the SHARED-SLOT family, whose
--- one slot holds a def of the family's own shape.  The row prints
--- `slotsNestSum` beside them because that is the arm Series Q cannot
--- enter: a zero there says the sweep measured the same thing again.
-storeAfterRootS : ℕ → ℕ → ℕ → ℕ → ℕ
-storeAfterRootS ds ks d k =
-  let p = progS d k
-      r = subscribeE (gasPad (sucGS ds ks d k) g0) p root 0 0
-                     (sched-init p (insS ds ks)) (st-init p)
-  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-allowanceS : ℕ → ℕ → ℕ → ℕ → ℕ
-allowanceS ds ks d k =
-  capsBase (progS d k) (insS ds ks) * nestSyn (progS d k) (insS ds ks)
-
--- SERIES C — `store-growth`'s OWN conclusion, at states the evaluator
--- reaches by running.  The subscribe frame hands over a schedule and a
--- state; `sched-next` then yields the arrival the evaluator would take
--- next, and `cascade` is the statement's own instant.  Each step prints
--- the store before and after, the increment the currency allows, and a
--- verdict.
---
--- THE HYPOTHESIS SIDE IS HALF BLOCKED, and that is the coverage
--- boundary: `capsOK?` reads `capsAt`, which sits on the caps recurrence
--- and does not terminate even in native code, so no row can discharge
--- it.  The two that DO compute are checked and reported as `H`.  A row
--- reading `OVER H` is a refutation candidate modulo the caps premise;
--- a row reading `OVER h` is not a candidate at all.
-walkC : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-      → ℕ → ℕ → ℕ → Sched Γ → EvalSt e → String
-walkC e sl 0       id nextId sched st = ""
-walkC e sl (suc m) id nextId sched st with sched-next sched
-... | inj₁ _          = " [done]"
-... | inj₂ (a , sd) =
-  let before = storeNestMax sd st
-      r      = cascade a nextId sd st
-      after  = storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-      bound  = before + realWidAt e sl id * nestSyn e sl
-  in " | id=" ++ show id ++ " " ++ show before ++ "→" ++ show after
-     ++ "/cap" ++ show (nestCapAt e sl id)
-     ++ (if after ≤ᵇ bound then " ok" else " OVER")
-     ++ (if nestOK? e sl id sd st then " N" else " n")
-     ++ (if nestDᵛ (arrTy a) (arrVal a) ≤ᵇ nestCapAt e sl id
-         then " V" else " v")
-     ++ walkC e sl m (suc id) (suc nextId)
-              (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-cascadeRow : ℕ → ℕ → ℕ → String
-cascadeRow steps d k =
-  let p = progD d k
-      r = subscribeE (gasPad (sucG p) g0) p root 0 0
-                     (sched-init p ins₀) (st-init p)
-  in "d=" ++ show d ++ " k=" ++ show k
-     ++ walkC p ins₀ steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-cascadeRowS : ℕ → ℕ → ℕ → ℕ → ℕ → String
-cascadeRowS steps ds ks d k =
-  let sl = insS ds ks
-      p  = progS d k
-      r  = subscribeE (gasPad (sucGS ds ks d k) g0) p root 0 0
-                      (sched-init p sl) (st-init p)
-  in "ds=" ++ show ds ++ " ks=" ++ show ks
-     ++ " d=" ++ show d ++ " k=" ++ show k
-     ++ walkC p sl steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-cascadeRowT : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-cascadeRowT steps ds ks j d k =
-  let sl = insT ds ks j
-      p  = progT d k
-      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
-                      (sched-init p sl) (st-init p)
-  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-     ++ " d=" ++ show d ++ " k=" ++ show k
-     ++ walkC p sl steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 -- SERIES D — `depth-nest-compositional`'s conclusion at the ROOT call,
 -- which is the instance `depthE≤capsH-root` spends and the one index
 -- where the fresh term is `capsBase` rather than the wrap tower.  Both
--- sides compute; only the `capsOK?` premise does not, for the reason
--- Series C's block gives.  A row reading OVER is a refutation
--- candidate modulo that premise.
+-- sides compute; only the `capsOK?` premise does not: `capsOK?` reads
+-- `capsAt`, which sits on the caps recurrence and does not terminate
+-- even in native code, so no row can discharge it.  A row reading OVER
+-- is a refutation candidate modulo that premise.
+--
+-- TARGET: depth-nest-compositional
 depthRow : ℕ → ℕ → String
 depthRow d k =
   let p   = progD d k
@@ -256,6 +139,8 @@ depthRow d k =
 -- root subscribe hands over, so it is reached by running; only the
 -- subject and the path are chosen, and the statement quantifies over
 -- both.  `thru-outer` peels one `obs`, so the two move together.
+--
+-- TARGET: depth-nest-compositional
 depthRowInner : ℕ → ℕ → ℕ → String
 depthRowInner j d k =
   let p   = progD d k
@@ -273,58 +158,15 @@ depthRowInner j d k =
      ++ "  bound = " ++ show rhs
      ++ (if lhs ≤ᵇ rhs then "  ok" else "  OVER")
 
--- SERIES F — `cascade-nest-compositional`, the delivery half.  It probes
--- more cleanly than its subscribe sibling: its only uncomputable premise
--- is `capsOK?`, so at any index the row is a straight comparison with
--- nothing to satisfy first.  The arrival is the evaluator's own next one,
--- taken off the schedule the root subscribe hands over.
---
--- The index is printed because it decides whether the row means
--- anything.  At zero the fresh term is `capsBase` and a row can fail; at
--- one and above it is the wrap tower and the row cannot.  Zero is not an
--- index a run reaches, which is the same boundary `store-growth` carries.
-cascNest : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-         → ℕ → Sched Γ → EvalSt e → String
-cascNest e sl id sched st with sched-next sched
-... | inj₁ _        = " [no arrival]"
-... | inj₂ (a , sd) =
-  let stL = cascadeLatch a st
-      lhs = depthCascade a 1 (chainsOf a st) sd stL
-      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st)
-            + storeNestMax sd stL + realWidAt e sl id * nestSyn e sl
-  in " | id=" ++ show id ++ " depthCascade = " ++ show lhs
-     ++ " bound = " ++ show rhs
-     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
-
--- SERIES G — the axis both depth series leave open: a state DEEP INTO A
--- RUN rather than the one the subscribe frame produced.  The walk steps
--- real cascades and re-reads the comparison after each, holding the
--- index at the entry value so that a slack row means the state moved the
--- bound rather than that the tower did.  Decoupling those two is the
--- whole point: a row deep in a run at a reachable index would be
--- degenerate for the tower's reasons and would say nothing about state.
-cascWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-         → ℕ → ℕ → Sched Γ → EvalSt e → String
-cascWalk e sl 0       nextId sched st = ""
-cascWalk e sl (suc m) nextId sched st with sched-next sched
-... | inj₁ _        = " [done]"
-... | inj₂ (a , sd) =
-  let stL = cascadeLatch a st
-      lhs = depthCascade a nextId (chainsOf a st) sd stL
-      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st)
-            + storeNestMax sd stL + realWidAt e sl 0 * nestSyn e sl
-      r   = cascade a nextId sd st
-  in " | " ++ show lhs ++ "/" ++ show rhs
-     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
-     ++ cascWalk e sl m (suc nextId)
-                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 -- SERIES H — the same walk read against the DEPTH face rather than the
 -- delivery face, which is the half Series D and E left at the state the
 -- subscribe frame produced.  Re-descending the root subject from a state
--- deep in a run is a real question and not a repeat of Series G: the two
+-- deep in a run is a real question and not a repeat of the delivery face: the two
 -- faces charge different things, so a margin that is invariant for one
 -- carries nothing about the other.
+--
+-- TARGET: depth-nest-compositional
 depthRunWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
           → ℕ → ℕ → Sched Γ → EvalSt e → String
 depthRunWalk e sl 0       nextId sched st = ""
@@ -358,6 +200,8 @@ depthRunWalkRow steps ds ks j d k =
 -- J is where the depth face's state axis is actually load-bearing: if
 -- the mid-run connect raises the descent above the bound, this is the
 -- row that says so.
+--
+-- TARGET: depth-nest-compositional
 depthRunWalkRowU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthRunWalkRowU steps ds ks j d k =
   let sl = insT ds ks j
@@ -368,62 +212,6 @@ depthRunWalkRowU steps ds ks j d k =
      ++ " d=" ++ show d ++ " k=" ++ show k
      ++ depthRunWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
--- SERIES K — the denomination question the walk leaf turns on.  A
--- PROVEN lemma already bounds one walk's delivery count, but it bounds
--- it by `cDel`, which is cap-side, and the increment the leaf must fit
--- under is `realWidAt`, which is real.  Whether the proven bound can be
--- spent at all is therefore one inequality between two computable
--- numbers, and it decides between a route and a dead route.  Printed
--- left to right so a stall names which side did not terminate.
--- MODE selects ONE quantity, because the binary emits a row as a single
--- line and a row that does not terminate loses everything printed before
--- the stall.  0 the real width, 1 the cascade depth, 2 the cap record's
--- size field, 3 the delivery cap at depth zero, 4 the delivery cap at
--- the real depth.
---
--- AND THE CAP SIDE DOES NOT COMPUTE, WHICH IS THE ANSWER AND NOT A GAP
--- IN THE SERIES.  The comparison was commissioned as one inequality
--- between two computable numbers; it is not one.  `realWid0` renders
--- instantly at every shape -- 79 at the smallest -- while the cap
--- record's size and delivery fields at the SAME instant do not render
--- at all, at any shape reached here, down to the smallest the series
--- can express.  The reason is structural rather than a matter of
--- patience: a frame's three fields are each an ITERATION whose count is
--- `sizeCount`, which is exponential in the registry cap, so the loop
--- does not finish however the numbers are represented.  Mode 4 is the
--- one that returns, and only because it short-circuits on a state with
--- no arrival before reaching the cap at all.
---
--- The consequence is worth more than a row would have been: every route
--- that would spend a cap-side count against a real-side width is not
--- merely unproven but UNINSTANTIABLE, so no probe can ever adjudicate
--- one, and the dead routes recorded against those statements are as
--- much evidence as this question admits.  Do not commission a sweep to
--- settle a caps-against-real comparison -- this is that sweep.
-denomTail : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-          → ℕ → Sched Γ → EvalSt e → String
-denomTail e sl 0 sd st = "realWid0=" ++ show (realWidAt e sl 0)
-denomTail e sl 2 sd st = "cSize=" ++ show (Caps.cSize (capsAt e sl 0))
-denomTail e sl 3 sd st = "cDel@0=" ++ show (cDel (capsAt e sl 0) 0)
-denomTail e sl m sd st with sched-next sd
-... | inj₁ _         = "[no arrival]"
-... | inj₂ (a , sd₁) =
-  let dep = depthCascade a 1 (chainsOf a st) sd₁ (cascadeLatch a st)
-  in if m ≡ᵇ 1 then "dep=" ++ show dep
-     else "cDel@dep=" ++ show (cDel (capsAt e sl 0) dep)
-
-denomRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
-denomRow ds ks j d k =
-  let sl = insT ds ks j
-      p  = progT d k
-      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
-                      (sched-init p sl) (st-init p)
-      sd = proj₁ (proj₂ r)
-      st = proj₂ (proj₂ r)
-  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-     ++ " d=" ++ show d ++ " k=" ++ show k
-     ++ "  realWid0=" ++ show (realWidAt p sl 0)
-     ++ "  " ++ denomTail p sl ds sd st
 
 -- SERIES L (1000000): the DELIVERY COUNT against the real width, which
 -- is the one comparison the nest increment's counting half now rests
@@ -435,6 +223,8 @@ denomRow ds ks j d k =
 -- one.  LOAD-BEARING: a cascade delivering more than the entry width
 -- refutes the leaf, and the count is free to be anything the run makes
 -- it.
+--
+-- TARGET: cascadeGo-mint-entryCeil
 delivWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
           → ℕ → ℕ → Sched Γ → EvalSt e → String
 delivWalk e sl 0       nextId sched st = ""
@@ -449,145 +239,6 @@ delivWalk e sl (suc m) nextId sched st with sched-next sched
      ++ delivWalk e sl m (suc nextId)
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
--- SERIES M (2000000): the PER-DELIVERY charge on the chain walk, which
--- is the induction the counting leaf was separated out of.  Stated over
--- `cascadeGo` at the latched state — the same decomposition the body
--- uses — so a row instantiates the leaf and not a paraphrase of it.
--- Every quantity computes and none of them is a cap.  LOAD-BEARING: the
--- charge is one `nestSyn` per delivery, so a walk that stores deeper
--- than the syntactic ceiling, or stores on a step that delivers
--- nothing, drives the left side over.  The `Uh` family is here because
--- its two unbounded siblings cannot reach a DRAIN at all, which is the
--- gap that hid the depth face's refutation from three series at once.
-perDelivWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-             → ℕ → ℕ → Sched Γ → EvalSt e → String
-perDelivWalk e sl 0       nextId sched st = ""
-perDelivWalk e sl (suc m) nextId sched st with sched-next sched
-... | inj₁ _        = " [done]"
-... | inj₂ (a , sd) =
-  let stL = cascadeLatch a st
-      g   = cascadeGo a nextId (chainsOf a st) sd stL
-      sg  = proj₁ (proj₂ g)
-      stG = proj₂ (proj₂ g)
-      lhs = storeNestMax sg stG
-      rhs = storeNestMax sd stL + delivN stL stG * nestSyn e sl
-      r   = cascade a nextId sd st
-  in " | " ++ show lhs ++ "/" ++ show rhs
-     ++ " (d=" ++ show (delivN stL stG) ++ ")"
-     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
-     ++ perDelivWalk e sl m (suc nextId)
-                     (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
--- SERIES P (3000000): `cascade-nest-perDeliv` itself, over a family
--- built to reach `cascadeGo`'s SKIP branch.  The skip is the one place
--- the two sides are denominated differently: `depthCascade` is
--- BRANCH-FREE -- it cannot with-abstract the cancellation test, so it
--- charges the skipped chain and the whole PHANTOM tail cascade that
--- would have followed it -- while `cascadeGo` skips both and delivers
--- nothing for either.  So the skip branch must pay for a hypothetical
--- run out of a budget that counts only real deliveries.
---
--- LOAD-BEARING, and the row says so itself: `c` is the chain count, `d`
--- the deliveries and `x` the cancellations standing at the end of the
--- cascade.  A row with `c` equal to `d` never entered the skip branch
--- and is evidence about the live branch only, whatever its margin; the
--- rows that bear on this statement are the ones where `c` exceeds `d`
--- and `x` is positive.  What refutes it is such a row going OVER.
--- AND THE FAMILY THAT ACTUALLY BROKE IT IS `Uh`, WHICH IS `progU`
--- READ THROUGH THE HOT VOCABULARY.  Every family these three series
--- had until then leaves its mergeAll UNBOUNDED, so nothing ever parks
--- and the drain -- the one nesting level no path term pays for -- is
--- never entered during a delivery at all.  `progU` bounds it, but its
--- own vocabulary scripts a COLD slot, so it schedules no arrival and
--- every row reads `[done]`.  Crossing the two is the whole ingredient:
--- a bounded limit for the drain, a hot slot for the cascade.  Read at
--- the SECOND cascade, where something is parked, all three series go
--- over together at a fold depth of three, and `Refuted.Cascade-Deliv-Depth`
--- pins that row.  The skip branch is not involved -- one chain, one
--- delivery, no cancellation.
-cutWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-        → ℕ → ℕ → ℕ → Sched Γ → EvalSt e → String
-cutWalk e sl 0       id nextId sched st = ""
-cutWalk e sl (suc m) id nextId sched st with sched-next sched
-... | inj₁ _        = " [done]"
-... | inj₂ (a , sd) =
-  let stL = cascadeLatch a st
-      ch  = chainsOf a st
-      g   = cascadeGo a nextId ch sd stL
-      stG = proj₂ (proj₂ g)
-      lhs = depthCascade a nextId ch sd stL
-      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch
-            + storeNestMax sd stL + delivN stL stG * nestSyn e sl
-      r   = cascade a nextId sd st
-  in " | id=" ++ show id ++ " " ++ show lhs ++ "/" ++ show rhs
-     ++ " (c=" ++ show (length ch)
-     ++ " d=" ++ show (delivN stL stG)
-     ++ " x=" ++ show (length (EvalSt.cancelled stG)) ++ ")"
-     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
-     ++ (if nestOK? e sl id sd stL then " N" else " n")
-     ++ (if nestDᵛ (arrTy a) (arrVal a) ≤ᵇ nestCapAt e sl id
-         then " V" else " v")
-     ++ cutWalk e sl m (suc id) (suc nextId)
-                (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
--- SERIES X (11000000): WHERE the per-delivery bound loses, decomposed.
--- The crossing itself is pinned, but a pinned crossing says only that
--- the statement is false, and what a replacement needs is the SHAPE of
--- the loss.  The descent climbs six per fold layer against the bound's
--- three, which is a FACTOR rather than a missing constant, so no term
--- added once can close it however large the constant.  This prints
--- every summand of the bound beside the descent, and three candidate
--- repairs against it -- the chain measure counted twice, the
--- per-delivery charge doubled, and the width form the consumer states
--- -- so that a row says which of them TRACKS the descent rather than
--- merely clearing it.
---
--- `c` AND `reg` ARE HERE TO SEPARATE TWO MECHANISMS, since the source
--- axis moves the descent while every narrow term is flat and the
--- measurement alone cannot say from where.  The chain count is a
--- function of the registry selection and the source list is ONE
--- inner's values, so `c` flat while the descent climbs puts the growth
--- inside the state-threaded fold rather than in more chains -- and
--- `reg` climbing with it says what the fold is accumulating.
---
--- LOAD-BEARING wherever `1ns` reads OVER, which is where the refuted
--- statement is actually false; a candidate that reads ok only on rows
--- the refuted one also clears is evidence about nothing.  `W` is read at
--- id 0, the smallest the currency ever takes, because the recurrence
--- overflows the stack above it.
-splitWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-          → ℕ → ℕ → ℕ → Sched Γ → EvalSt e → String
-splitWalk e sl 0       id nextId sched st = ""
-splitWalk e sl (suc m) id nextId sched st with sched-next sched
-... | inj₁ _        = " [done]"
-... | inj₂ (a , sd) =
-  let stL  = cascadeLatch a st
-      ch   = chainsOf a st
-      g    = cascadeGo a nextId ch sd stL
-      dn   = delivN stL (proj₂ (proj₂ g))
-      nv   = nestDᵛ (arrTy a) (arrVal a)
-      cn   = chainsNestD ch
-      sn   = storeNestMax sd stL
-      ns   = nestSyn e sl
-      w    = realWidAt e sl 0
-      dep  = depthCascade a nextId ch sd stL
-      b1   = nv + cn + sn + dn * ns
-      b2   = nv + (cn + cn) + sn + dn * ns
-      b3   = nv + cn + sn + (dn + dn) * ns
-      b4   = nv + cn + sn + w * ns
-      flag = λ b → if dep ≤ᵇ b then "/ok" else "/OVER"
-      r    = cascade a nextId sd st
-  in " | id=" ++ show id ++ " D=" ++ show dep
-     ++ " N=" ++ show nv ++ " C=" ++ show cn ++ " S=" ++ show sn
-     ++ " ns=" ++ show ns ++ " W=" ++ show w ++ " d=" ++ show dn
-     ++ " c=" ++ show (length ch)
-     ++ " reg=" ++ show (length (EvalSt.registry (proj₂ (proj₂ g))))
-     ++ " 1ns=" ++ show b1 ++ flag b1
-     ++ " 2C=" ++ show b2 ++ flag b2
-     ++ " 2ns=" ++ show b3 ++ flag b3
-     ++ " Wns=" ++ show b4 ++ flag b4
-     ++ splitWalk e sl m (suc id) (suc nextId)
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 -- SERIES Y (12000000): DOES THE WALK'S STORE GROWTH SATURATE OR
 -- ACCUMULATE?  This is the one question that decides the shape of the
@@ -604,6 +255,8 @@ splitWalk e sl (suc m) id nextId sched st with sched-next sched
 -- one-chain family reports a two-element sequence that cannot
 -- distinguish the two readings, so `c` is printed and a row with `c`
 -- at one is evidence about nothing here.
+--
+-- TARGET: cascade-nest-store
 pfxL : ∀ {A : Set} → ℕ → List A → List A
 pfxL 0       xs       = []
 pfxL (suc i) []       = []
@@ -671,60 +324,6 @@ satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
      ++ satWalk e sl m (suc nextId)
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
--- SERIES Q (4000000): the PER-CHAIN currency, and the conversion it
--- would need.  `depthCascade`'s cons clause reports its tail at TWO
--- states -- the skip arm's and the live arm's -- and only one of them
--- is a state `cascadeGo` visits, so a per-DELIVERY charge cannot close
--- the induction: the phantom tail's delivery count is taken at a run
--- the evaluator never performs.  `length chains` has no such defect,
--- being a function of the chain list alone, so the same clause closes
--- against it.  The price is the conversion, and that is what this
--- series measures alongside: `chainsOf-length` already reduces it to
--- the registry, so the open quantity is `reg` against `W`.
---
--- LOAD-BEARING where `c` exceeds `d`, exactly as SERIES P: those are
--- the rows a skip actually reached.  `reg` and `W` are the conversion,
--- and `W` is read at id 0, the SMALLEST width the currency ever takes,
--- so a row that clears it there clears it everywhere above
-chainWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-          → ℕ → ℕ → Sched Γ → EvalSt e → String
-chainWalk e sl 0       nextId sched st = ""
-chainWalk e sl (suc m) nextId sched st with sched-next sched
-... | inj₁ _        = " [done]"
-... | inj₂ (a , sd) =
-  let stL = cascadeLatch a st
-      ch  = chainsOf a st
-      g   = cascadeGo a nextId ch sd stL
-      stG = proj₂ (proj₂ g)
-      lhs = depthCascade a nextId ch sd stL
-      rhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch
-            + storeNestMax sd stL + length ch * nestSyn e sl
-      r   = cascade a nextId sd st
-  in " | " ++ show lhs ++ "/" ++ show rhs
-     ++ " (c=" ++ show (length ch)
-     ++ " d=" ++ show (delivN stL stG)
-     ++ " reg=" ++ show (length (EvalSt.registry stG))
-     ++ " W=" ++ show (realWidAt e sl 0) ++ ")"
-     ++ (if lhs ≤ᵇ rhs then " ok" else " OVER")
-     ++ (if length (EvalSt.registry stG) ≤ᵇ realWidAt e sl 0
-         then "" else " CONV-OVER")
-     ++ chainWalk e sl m (suc nextId)
-                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
--- SERIES R (5000000): the LEAF the per-chain clause needs, read one
--- chain at a time.  `depthCascade-perChain` closes its cons clause by
--- charging the head chain exactly one `nestSyn`, so the leaf under it
--- has to be `depthChain` within the base terms plus ONE -- and that is
--- not obvious, because the subscribe-side sibling
--- `depth-nest-compositional` needs a whole `realWidAt` worth.  If a
--- delivery down one chain also needs a width, the per-chain sum is
--- `length chains` widths and the statement above it is false.
---
--- LOAD-BEARING on every chain it prints, and it prints them ALL: the
--- state is threaded through `chainStep` exactly as the clause threads
--- it, so a later chain is read at the store the earlier ones deepened,
--- which is where a per-chain charge would break first.  A row with no
--- bracket had no chains and is evidence about nothing
 -- SERIES S (6000000): is the SUBSCRIBE side also width-blind?  The
 -- delivery leaf turned out to need one `nestSyn` and no width, for a
 -- reason that says nothing about deliveries in particular -- nesting
@@ -738,6 +337,9 @@ chainWalk e sl (suc m) nextId sched st with sched-next sched
 -- LOAD-BEARING wherever `one` is smaller than `wide`, which is
 -- everywhere the width exceeds one; a row where they coincide is
 -- evidence about nothing
+--
+-- TARGET: depth-nest-compositional
+
 -- SERIES S2 (7000000): the same question with the WIDTH actually
 -- driven.  SERIES S runs on `progD`, whose subscribe registers one
 -- thing at a time, so a one-`nestSyn` bound and a width-scaled one
@@ -746,6 +348,8 @@ chainWalk e sl (suc m) nextId sched st with sched-next sched
 -- hands over `suc ww` inners, so the registration count the width term
 -- is charged for is the swept axis.  If the subscribe side needs its
 -- width anywhere, it needs it here
+--
+-- TARGET: depth-nest-compositional
 depthWideRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthWideRow ds ks j ww w =
   let slF = insF ds ks j
@@ -774,6 +378,8 @@ depthWideRow ds ks j ww w =
 -- not something reading the definitions settles.  `progU` is the
 -- limit-1 mergeAll family — three inners queued behind one — so its root
 -- subscribe is where the drain actually fires.
+--
+-- TARGET: depth-nest-compositional
 depthConcatRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthConcatRow ds ks j d k =
   let sl  = insT ds ks j
@@ -800,14 +406,14 @@ depthConcatRow ds ks j d k =
 -- exactly, which makes the row its own control, and above that the
 -- drain has to refill several lanes in one instant.
 --
--- LOAD-BEARING on both halves, and they fail differently.  The depth
--- half asks whether the drain arc still fits the single `nestSyn` —
--- `ONE-OVER` is the answer SERIES T was built to look for.  The cascade
--- half reads `cascade-nest-compositional`'s own conclusion, whose bound
--- is the WIDE one, so `OVER` there is a refutation of a live row rather
--- than of a narrow form already refuted.  A row where the two `lim`
--- values print the same numbers is the finding that the gate costs
--- nothing, which is what the depth mirror's over-approximation predicts.
+-- LOAD-BEARING: the row asks whether the drain arc still fits the single
+-- `nestSyn` once the gate has to refill several lanes at once, and
+-- `ONE-OVER` is the answer SERIES T was built to look for.  A row where
+-- the two `lim` values print the same numbers is the finding that the
+-- gate costs nothing, which is what the depth mirror's
+-- over-approximation predicts.
+--
+-- TARGET: depth-nest-compositional
 depthLimRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthLimRow lim ds ks j d k =
   let sl  = insT ds ks j
@@ -826,14 +432,15 @@ depthLimRow lim ds ks j d k =
      ++ "  wide=" ++ show wid
      ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
      ++ (if lhs ≤ᵇ wid then "" else "  WIDE-OVER")
-     ++ " ||" ++ cascNest p sl 0 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
--- SERIES V.  The same two verdicts as SERIES U, over `progN`, whose
+-- SERIES V.  The same verdict as SERIES U, over `progN`, whose
 -- source width is an axis of its own.  This is the only family in which
 -- the gate is a gate: at `w` inners and limit `l` with `l < w` the drain
 -- parks, refills, and parks again, which is the state no probe in this
 -- campaign has ever reached -- every earlier family predates the limit
 -- argument and so sits at one of the two saturated ends.
+--
+-- TARGET: depth-nest-compositional
 depthFanRow : ℕ → ℕ → ℕ → ℕ → String
 depthFanRow lim w d k =
   let sl  = insT 1 1 1
@@ -852,7 +459,6 @@ depthFanRow lim w d k =
      ++ "  wide=" ++ show wid
      ++ (if lhs ≤ᵇ one then "  ok" else "  ONE-OVER")
      ++ (if lhs ≤ᵇ wid then "" else "  WIDE-OVER")
-     ++ " ||" ++ cascNest p sl 0 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 depthOneRow : ℕ → ℕ → ℕ → String
 depthOneRow j d k =
@@ -897,102 +503,6 @@ leafWalk e sl (suc m) nextId sched st with sched-next sched
   in " |" ++ chainsRep e sl a nextId (chainsOf a st) sd stL
      ++ leafWalk e sl m (suc nextId)
                  (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-leafRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-leafRow fam steps ds ks j w k =
-  let slF = insF ds ks j
-  in if fam ≡ᵇ 0
-     then (let p = progC ds w k
-               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 2
-     then (let p = progW ds w k
-               r = subscribeE (gasPad (sucGW ds ks j ds w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "W ww=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 3
-     then (let slT = insT ds ks j
-               p   = progU w k
-               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
-                               (sched-init p slT) (st-init p)
-           in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-              ++ " j=" ++ show j ++ " k=" ++ show k
-              ++ leafWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 4
-     then (let p = progU w k
-               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-              ++ " j=" ++ show j ++ " k=" ++ show k
-              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else (let p = progF w k
-               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ leafWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
-chainRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-chainRow fam steps ds ks j w k =
-  let slF = insF ds ks j
-  in if fam ≡ᵇ 3
-     then (let slT = insT ds ks j
-               p   = progU w k
-               r   = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
-                               (sched-init p slT) (st-init p)
-           in "U d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-              ++ " j=" ++ show j ++ " k=" ++ show k
-              ++ chainWalk p slT steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 0
-     then (let p = progC ds w k
-               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 4
-     then (let p = progU w k
-               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-              ++ " j=" ++ show j ++ " k=" ++ show k
-              ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else (let p = progF w k
-               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ chainWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
-cutRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-cutRow fam steps ds ks j w k =
-  let slF = insF ds ks j
-  in if fam ≡ᵇ 0
-     then (let p = progC ds w k
-               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 4
-     then (let p = progU w k
-               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-              ++ " j=" ++ show j ++ " k=" ++ show k
-              ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else (let p = progF w k
-               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ cutWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
 satRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 satRow fam ds ks j w k =
   let slF = insF ds ks j
@@ -1033,57 +543,6 @@ satRow fam ds ks j w k =
                               (sched-init p slF) (st-init p)
            in "F ds=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
               ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
-splitRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-splitRow fam steps ds ks j w k =
-  let slF = insF ds ks j
-  in if fam ≡ᵇ 0
-     then (let p = progC ds w k
-               r = subscribeE (gasPad (sucGC ds ks j ds w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "C dd=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ splitWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else if fam ≡ᵇ 4
-     then (let p = progU w k
-               r = subscribeE (gasPad (sucGU ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "Uh d=" ++ show w ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-              ++ " j=" ++ show j ++ " k=" ++ show k
-              ++ splitWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-     else (let p = progF w k
-               r = subscribeE (gasPad (sucGF ds ks j w k) g0) p root 0 0
-                              (sched-init p slF) (st-init p)
-           in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-              ++ " w=" ++ show w ++ " k=" ++ show k
-              ++ splitWalk p slF steps 1 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
-perDelivRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-perDelivRow fam steps ds ks j d k =
-  if fam ≡ᵇ 4
-  then (let slF = insF ds ks j
-            p   = progU d k
-            r   = subscribeE (gasPad (sucGU ds ks j d k) g0) p root 0 0
-                             (sched-init p slF) (st-init p)
-        in "Uh d=" ++ show d ++ " ds=" ++ show ds ++ " ks=" ++ show ks
-           ++ " j=" ++ show j ++ " k=" ++ show k
-           ++ perDelivWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-  else if fam ≡ᵇ 2
-  then (let slF = insF ds ks j
-            p   = progF d k
-            r   = subscribeE (gasPad (sucGF ds ks j d k) g0) p root 0 0
-                             (sched-init p slF) (st-init p)
-        in "F ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-           ++ " w=" ++ show d ++ " k=" ++ show k
-           ++ perDelivWalk p slF steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-  else (let sl = insT ds ks j
-            p  = progT d k
-            r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
-                            (sched-init p sl) (st-init p)
-        in "T ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-           ++ " d=" ++ show d ++ " k=" ++ show k
-           ++ perDelivWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
 delivWalkRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 delivWalkRow fam steps ds ks j d k =
   let sl = insT ds ks j
@@ -1108,37 +567,6 @@ delivWalkRow fam steps ds ks j d k =
            in "U ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
               ++ " d=" ++ show d ++ " k=" ++ show k
               ++ delivWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-
-cascWalkRowU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-cascWalkRowU steps ds ks j d k =
-  let sl = insT ds ks j
-      p  = progU d k
-      r  = subscribeE (gasPad (sucGU ds ks j d k) g0) p root 0 0
-                      (sched-init p sl) (st-init p)
-  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-     ++ " d=" ++ show d ++ " k=" ++ show k
-     ++ cascWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-cascWalkRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-cascWalkRow steps ds ks j d k =
-  let sl = insT ds ks j
-      p  = progT d k
-      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
-                      (sched-init p sl) (st-init p)
-  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-     ++ " d=" ++ show d ++ " k=" ++ show k
-     ++ cascWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
-cascRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
-cascRow id ds ks j d k =
-  let sl = insT ds ks j
-      p  = progT d k
-      r  = subscribeE (gasPad (sucGT ds ks j d k) g0) p root 0 0
-                      (sched-init p sl) (st-init p)
-  in "ds=" ++ show ds ++ " ks=" ++ show ks ++ " j=" ++ show j
-     ++ " d=" ++ show d ++ " k=" ++ show k
-     ++ cascNest p sl id (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-
 nestRow : ℕ → String
 nestRow 0 = "capsBase (progD 1 1) ins₀ = "      ++ show (capsBase (progD 1 1) ins₀)
 nestRow 1 = "nestSyn (progD 1 1) ins₀ = "       ++ show (nestSyn (progD 1 1) ins₀)
@@ -1149,112 +577,34 @@ nestRow 5 = "realWidAt (progD 1 1) ins₀ 1 = "   ++ show (realWidAt (progD 1 1)
 nestRow 6 = "nestCapAt (progD 1 1) ins₀ 2 = "   ++ show (nestCapAt (progD 1 1) ins₀ 2)
 nestRow _ = "(no such row)"
 
--- the pre-existing ladder, left exactly as it was: a `with` chain
--- carries its nesting in the width of the gap after `...`, so widening
--- it to add one arm at the top re-indents every arm below and is how a
--- purely additive change becomes a parse error
+-- the second half of the dispatch, split off only because one function
+-- with this many arms is unreadable.  Ranges are stable: a row index
+-- written down in a receipt has to keep meaning what it meant.
 rowAt′ : ℕ → String
-rowAt′ n with 2000000 ≤ᵇ n
-... | true  = perDelivRow (m / 100000) 16 ((m % 100000) / 10000)
-                          ((m % 10000) / 1000) ((m % 1000) / 100)
-                          ((m % 100) / 10) (m % 10)
-  where m = n ∸ 2000000
-... | false with 1000000 ≤ᵇ n
-...   | true  = delivWalkRow (m / 100000) 16 ((m % 100000) / 10000)
-                           ((m % 10000) / 1000) ((m % 1000) / 100)
-                           ((m % 100) / 10) (m % 10)
-  where m = n ∸ 1000000
-...   | false with 900000 ≤ᵇ n
-...     | true  = denomRow ((m % 100000) / 10000) ((m % 10000) / 1000)
-                       ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
-  where m = n ∸ 900000
-...     | false with 800000 ≤ᵇ n
-...       | true  = cascWalkRowU 16 ((m % 100000) / 10000)
-                                ((m % 10000) / 1000) ((m % 1000) / 100)
-                                ((m % 100) / 10) (m % 10)
-  where m = n ∸ 800000
-...       | false with 700000 ≤ᵇ n
-...         | true  = depthRunWalkRowU 16 ((m % 100000) / 10000)
-                                    ((m % 10000) / 1000) ((m % 1000) / 100)
-                                    ((m % 100) / 10) (m % 10)
-  where m = n ∸ 700000
-...         | false with 600000 ≤ᵇ n
-...           | true  = depthRunWalkRow 12 ((m % 100000) / 10000)
-                                    ((m % 10000) / 1000) ((m % 1000) / 100)
-                                    ((m % 100) / 10) (m % 10)
-  where m = n ∸ 600000
-...           | false with 500000 ≤ᵇ n
-...             | true  = cascWalkRow 12 ((m % 100000) / 10000)
-                               ((m % 10000) / 1000) ((m % 1000) / 100)
-                               ((m % 100) / 10) (m % 10)
-  where m = n ∸ 500000
-...            | false with 400000 ≤ᵇ n
-...              | true  = cascRow (m / 100000) ((m % 100000) / 10000)
+rowAt′ n =
+  if 1000000 ≤ᵇ n
+  then (let m = n ∸ 1000000
+        in delivWalkRow (m / 100000) 16 ((m % 100000) / 10000)
                         ((m % 10000) / 1000) ((m % 1000) / 100)
-                        ((m % 100) / 10) (m % 10)
-  where m = n ∸ 400000
-...              | false with 300000 ≤ᵇ n
-...                | true  = depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100)
-  where m = n ∸ 300000
-...                | false with 200000 ≤ᵇ n
-...                  | true  = depthRow (m / 100) (m % 100)
-  where m = n ∸ 200000
-...                  | false with 100000 ≤ᵇ n
-...                    | true  = cascadeRowT 8 (m / 10000) ((m % 10000) / 1000)
-                             ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
-  where m = n ∸ 100000
-...                    | false with 20000 ≤ᵇ n
-...                      | true  = cascadeRowS 6 (m / 1000) ((m % 1000) / 100) ((m % 100) / 10) (m % 10)
-  where m = n ∸ 20000
-...                      | false with 13000 ≤ᵇ n
-...                        | true  = cascadeRow 6 (m / 100) (m % 100)
-  where m = n ∸ 13000
-...                        | false with 3000 ≤ᵇ n
-...                          | true  = sharedSweep (n ∸ 3000)
-  where
-  sharedSweep : ℕ → String
-  sharedSweep m =
-    let ds = m / 1000
-        ks = (m % 1000) / 100
-        d  = (m % 100) / 10
-        k  = m % 10
-        g  = storeAfterRootS ds ks d k
-        A  = allowanceS ds ks d k
-    in "ds=" ++ show ds ++ " ks=" ++ show ks
-       ++ " d=" ++ show d ++ " k=" ++ show k
-       ++ "  slotsNestSum = " ++ show (slotsNestSum (insS ds ks))
-       ++ "  storeNestMax after root = " ++ show g
-       ++ "  allowance = " ++ show A
-       ++ "  over = " ++ showB (A ≤ᵇ g)
-       ++ "  dry = " ++ showB (runDryS ds ks d k)
-...                          | false with 2000 ≤ᵇ n
-...                            | true  = nestSweep (n ∸ 2000)
-  where
-  nestSweep : ℕ → String
-  nestSweep dk =
-    let d = dk / 100
-        k = dk % 100
-        g = storeAfterRoot d k
-        A = allowance d k
-    in "d=" ++ show d ++ " k=" ++ show k
-       ++ "  storeNestMax after root = " ++ show g
-       ++ "  burst cap = " ++ show (nestCapAt (progD d k) ins₀ 1)
-       ++ "  burst-over = " ++ showB (nestCapAt (progD d k) ins₀ 1 <ᵇ g)
-       ++ "  allowance = " ++ show A
-       ++ "  over = " ++ showB (A ≤ᵇ g)
-       ++ "  dry = " ++ showB (runDry (sucG (progD d k)) (progD d k))
-...                            | false with 1000 ≤ᵇ n
-...                              | false = if 20 ≤ᵇ n then nestRow (n ∸ 20) else "(no such row)"
-...                         | true  =
-  let dk = n ∸ 1000
-      d  = dk / 100
-      k  = dk % 100
-      p  = progD d k
-      G  = sucG p
-  in "d=" ++ show d ++ " k=" ++ show k
-     ++ "  sucG=" ++ show G
-     ++ "  runDry G p = " ++ showB (runDry G p)
-     ++ "   [true = REFUTES WalkStmt]"
+                        ((m % 100) / 10) (m % 10))
+  else if 700000 ≤ᵇ n
+  then (let m = n ∸ 700000
+        in depthRunWalkRowU 16 ((m % 100000) / 10000)
+                            ((m % 10000) / 1000) ((m % 1000) / 100)
+                            ((m % 100) / 10) (m % 10))
+  else if 600000 ≤ᵇ n
+  then (let m = n ∸ 600000
+        in depthRunWalkRow 12 ((m % 100000) / 10000)
+                           ((m % 10000) / 1000) ((m % 1000) / 100)
+                           ((m % 100) / 10) (m % 10))
+  else if 300000 ≤ᵇ n
+  then (let m = n ∸ 300000
+        in depthRowInner (m / 10000) ((m % 10000) / 100) (m % 100))
+  else if 200000 ≤ᵇ n
+  then (let m = n ∸ 200000
+        in depthRow (m / 100) (m % 100))
+  else if 20 ≤ᵇ n then nestRow (n ∸ 20)
+  else "(no such row)"
 
 ------------------------------------------------------------------
 -- stdin: a single row index.  Anything unparseable reads as 0, which is
@@ -1304,53 +654,9 @@ rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
 -- that fails to print is the instant at which no probe of this
 -- currency can reach, and that index is the coverage boundary every
 -- later receipt has to state.
-------------------------------------------------------------------
-
-
-------------------------------------------------------------------
--- SERIES Q, THE CROSSOVER — rows 3-8.  The one region this campaign
--- has named FALSITY and left unmeasured, and the reason it was left is
--- exactly the reason this harness exists: `runDry` short-circuits in
--- NEITHER direction (`hasDry` reads the stream `subscribeE` returns, so
--- the whole run normalises before the first dry event is visible), the
--- cost is d·k(k+1)/2 subscription levels, and at the cheapest crossing
--- point that is ~250 — where the typechecker burned 56 min CPU at (8,8)
--- without finishing.  The blowup here is NORMALISER OVERHEAD, not the
--- computational blowup that quarantined rows 10+: ~250 subscription
--- levels is nothing for native code.
 --
--- WHAT A ROW MEANS.  `sucG p` is the gas the walk face's demand
--- hypothesis supplies at the adversarial instantiation (Ŝ = R̂ = F = 0,
--- no shares), where `hasAtLeast-pad` makes the gas hypothesis hold
--- EXACTLY.  Every other hypothesis of the face is satisfiable there.
--- So the face asserts `runDry (sucG p) p ≡ false`, and a TRUE row
--- REFUTES WalkStmt itself — not merely a leaf.
---
--- ROWS 3-4 ARE THE FAMILY CALIBRATION and they are load-bearing in both
--- directions: they pin the dry threshold of `progD 1 2` EXACTLY (true at
--- 2, false at 3), and both are ALSO `refl`-pinned in this module below.
--- Row 0 calibrates `towerℕ`, which says nothing about whether the
--- backend runs `subscribeE` the way the typechecker does; these do.
+-- TARGET: cascadeGo-mint-entryCeil
 ------------------------------------------------------------------
-
--- the sum side, so a crossover row is self-documenting
-rowAt 3 = "CALIBRATION runDry 2 (progD 1 2) [refl-pinned true here] = "
-            ++ showB (runDry 2 (progD 1 2))
-rowAt 4 = "CALIBRATION runDry 3 (progD 1 2) [refl-pinned false here] = "
-            ++ showB (runDry 3 (progD 1 2))
-rowAt 5 = "sucG (progD 6 8) = " ++ show (sucG (progD 6 8))
-            ++ "   sucG (progD 6 9) = " ++ show (sucG (progD 6 9))
-            ++ "   sucG (progD 7 8) = " ++ show (sucG (progD 7 8))
--- (6,8): model says the LAST SAFE point — sucG 50 against demand 49.
--- INTERESTING either way: `true` refutes, `false` is the tight safe row.
-rowAt 6 = "runDry (sucG (progD 6 8)) (progD 6 8)  [false = safe] = "
-            ++ showB (runDry (sucG (progD 6 8)) (progD 6 8))
--- (6,9): model says the FIRST REFUTING point — sucG 51 against demand 55.
-rowAt 7 = "runDry (sucG (progD 6 9)) (progD 6 9)  [TRUE = REFUTES] = "
-            ++ showB (runDry (sucG (progD 6 9)) (progD 6 9))
--- (7,8): the second crossing, independent of (6,9) in both d and k.
-rowAt 8 = "runDry (sucG (progD 7 8)) (progD 7 8)  [TRUE = REFUTES] = "
-            ++ showB (runDry (sucG (progD 7 8)) (progD 7 8))
 
 ------------------------------------------------------------------
 -- QUARANTINE.  The caps counting family is UNREACHABLE BY MEASUREMENT,
@@ -1406,19 +712,11 @@ rowAt n =
         in satRow (m / 100000) ((m % 100000) / 10000)
                   ((m % 10000) / 1000) ((m % 1000) / 100)
                   ((m % 100) / 10) (m % 10))
-  else if 11000000 ≤ᵇ n
-  then (let m = n ∸ 11000000
-        in splitRow (m / 100000) 16 ((m % 100000) / 10000)
-                    ((m % 10000) / 1000) ((m % 1000) / 100)
-                    ((m % 100) / 10) (m % 10))
   else if 10000000 ≤ᵇ n
   then (let m = n ∸ 10000000
         in depthLimRow (m / 100000) ((m % 100000) / 10000)
                        ((m % 10000) / 1000) ((m % 1000) / 100)
                        ((m % 100) / 10) (m % 10))
-  else if 9000000 ≤ᵇ n
-  then (let m = n ∸ 9000000
-        in chainRow 3 16 1 2 1 m 2 ++ " || " ++ depthConcatRow 1 2 0 m 2)
   else if 8000000 ≤ᵇ n
   then (let m = n ∸ 8000000
         in depthConcatRow (m / 10000) ((m % 10000) / 1000) ((m % 1000) / 100)
@@ -1430,21 +728,6 @@ rowAt n =
   else if 6000000 ≤ᵇ n
   then (let m = n ∸ 6000000
         in depthOneRow (m / 10000) ((m % 10000) / 100) (m % 100))
-  else if 5000000 ≤ᵇ n
-  then (let m = n ∸ 5000000
-        in leafRow (m / 100000) 16 ((m % 100000) / 10000)
-                   ((m % 10000) / 1000) ((m % 1000) / 100)
-                   ((m % 100) / 10) (m % 10))
-  else if 4000000 ≤ᵇ n
-  then (let m = n ∸ 4000000
-        in chainRow (m / 100000) 16 ((m % 100000) / 10000)
-                    ((m % 10000) / 1000) ((m % 1000) / 100)
-                    ((m % 100) / 10) (m % 10))
-  else if 3000000 ≤ᵇ n
-  then (let m = n ∸ 3000000
-        in cutRow (m / 100000) 16 ((m % 100000) / 10000)
-                  ((m % 10000) / 1000) ((m % 1000) / 100)
-                  ((m % 100) / 10) (m % 10))
   else rowAt′ n
 
 main : IO Unit

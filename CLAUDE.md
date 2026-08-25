@@ -118,7 +118,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `wiring-refuted` | same law over `agda/evidence/refuted`, rooted at `Refuted.Main` — every witness is claimed | [docs/wiring.md](docs/wiring.md), EVIDENCE.md |
 | `wiring-probed` | same law over `agda/evidence/probed`, rooted at `Probed.Main` — this is what replaced the probes' old self-granted reachability exemptions | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `evidence-selftest` | E1 and E2 still fire | [docs/evidence.md](docs/evidence.md) |
-| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, whose statement must still be a POSTULATE, so DISCHARGING one fails the gate until the receipt above it has been re-read and DELETED. A receipt has exactly one tense, and no dated variant of the marker: the theorem says more than the probe ever did, so on discharge the coverage claim is superseded rather than historicised, and whatever harness is worth keeping becomes a `RECOVERY:` pointer. Every NEAR MISS is a finding too, because a receipt a strict pattern walks past leaves the check reporting a tidy zero — which is what a requirement for a DATE in the marker did, silently, from the day its sibling check outlawed dates in source comments | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
+| `evidence-check` | E1: no `src` file imports the evidence trees — the `.agda-lib` layout already makes such an import UNRESOLVABLE, so this is the fast legible failure on top of the mechanism. E2: every probe declares a `-- TARGET:` and every target is a LIVE postulate, because a probe whose target is discharged stays green forever while being evidence for nothing. E3: the RECEIPT is held to the same discipline, since it outlives the probe and is usually the only trace left — it sits above a declaration, whose statement must still be a POSTULATE, so DISCHARGING one fails the gate until the receipt above it has been re-read and DELETED. A receipt has exactly one tense, and no dated variant of the marker: the theorem says more than the probe ever did, so on discharge the coverage claim is superseded rather than historicised, and whatever harness is worth keeping becomes a `RECOVERY:` pointer. Every NEAR MISS is a finding too, because a receipt a strict pattern walks past leaves the check reporting a tidy zero — which is what a requirement for a DATE in the marker did, silently, from the day its sibling check outlawed dates in source comments . E4 holds the HARNESS to the same expiry law, series by series, for a stronger reason than the probes have: nothing depends on a row and the gate never builds that tree | [docs/evidence.md](docs/evidence.md), EVIDENCE.md |
 | `unsafe-check` | no `TERMINATING` / `NO_POSITIVITY_CHECK` / `REWRITE` / `--type-in-type` etc. on the proof path. The build is not `--safe`, so this is the only thing stopping a soundness hole | [docs/unsafe-check.md](docs/unsafe-check.md) |
 | `dup-selftest` | the duplicate checker still fires | [docs/find.md](docs/find.md) |
 | `dup-check` | no two declarations proving the same fact, up to binder spelling and type synonyms | [docs/find.md](docs/find.md) |
@@ -478,6 +478,23 @@ it, and reporting one as "verified" is the same false-green failure as calling a
 a gate. Its two legitimate uses are to **AIM the grind** and to **REFUTE** — and a row
 contradicting a postulate is a lead to chase back to a type-level witness, not itself
 the finding. → [docs/harness.md](docs/harness.md)
+
+**AND A SERIES EXPIRES LIKE A PROBE (Anthony).** Every `-- SERIES` declares a
+`-- TARGET:` and `make evidence-check` fails the moment that name leaves the postulate
+ledger; the series is then DELETED or retargeted, and the check is never relaxed. Its
+FINDINGS do not go with it — a coverage boundary, a blocked verdict or a dead route
+belongs in the header of the statement it CONSTRAINS, which is where it was owed in the
+first place.
+
+**AND IT DECAYS WORSE THAN THE PROBE TREE IT BORROWS THE LAW FROM, WHICH IS WHY THE LAW
+HAD TO BE BORROWED.** A probe at least sits in a tree the gate typechecks; nothing
+depends on a harness row, and the gate never builds this MODULE_ROOT, so a series
+measuring a statement that was proven months ago goes on printing numbers with nothing
+anywhere going red — the silent-decay failure of the probe tree, with the one check that
+would notice it absent as well. Measured on the sweep that set this rule: twenty-four
+series, ZERO target declarations, and TWELVE of them evidence about statements that were
+by then proven definitions or deleted outright. Half the file, and every line of it read
+as live.
 
 ## Module granularity: keep typechecks short
 

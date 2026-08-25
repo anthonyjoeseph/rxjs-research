@@ -30,6 +30,22 @@ whole point of the tree is that neither can become part of it.
       A probe that has outlived its target is either deleted or retargeted.
       If what it actually pins is the EVALUATOR rather than a statement, it is
       not a probe at all — it is a unit test, and its home is the bug cache.
+
+  E4  A HARNESS SERIES EXPIRES LIKE A PROBE.  Every `-- SERIES` block in the
+      harness declares a `-- TARGET: <postulate>` naming a live postulate, on
+      exactly the reasoning E2 rests on — a harness row is a probe that ran
+      natively instead of in the typechecker, and it decays the same silent
+      way.  It decays WORSE, in fact: the harness is a MODULE_ROOT the gate
+      never builds, so its rows keep printing numbers about a statement that
+      has been proven for months and nothing anywhere goes red.  Measured on
+      the sweep that added this check, twenty-four series carried zero target
+      declarations and TWELVE of them were evidence about statements that were
+      by then proven definitions or had been deleted outright — half the file.
+
+      A series is deleted or retargeted the moment its target dies.  Its
+      FINDINGS do not die with it: a coverage boundary, a blocked verdict or a
+      dead route belongs in the header of the statement it constrains, which
+      is where it should have been written in the first place.
 """
 
 import argparse
@@ -39,10 +55,13 @@ import subprocess
 import sys
 
 SRC = "agda/src"
+HARNESS = "agda/src/Harness"
 EVIDENCE = "agda/evidence"
 # The module namespace each evidence root owns.  A `src` file naming one of
 # these is an E1 violation whatever path it uses to say it.
 NAMESPACES = {"refuted": "Refuted", "probed": "Probed"}
+
+SERIES = re.compile(r"^--\s*SERIES\b\s*(.*?)\s*$")
 
 IMPORT = re.compile(r"^\s*(?:open\s+import|import)\s+([\w.\-]+)")
 TARGET = re.compile(r"^\s*--\s*TARGET:\s*(.+?)\s*$")
@@ -236,10 +255,46 @@ def check_e3(src, postulates):
     return orphaned, mismarked, n
 
 
-def report(src, evidence, namespaces, postulates, gate):
+def check_e4(harness, postulates):
+    """Every `-- SERIES` block names a live postulate.
+
+    A block is the run of comment lines the SERIES marker opens; it ends at
+    the first line that is not a comment.  Two series whose headers abut with
+    no code between them are ONE run, and the second one's marker is what the
+    scan sees next -- so a target is credited to the marker it follows, and a
+    run holding two markers needs two targets.
+    """
+    missing, dead, n = [], [], 0
+    for path in agda_files(harness):
+        lines = open(path, encoding="utf-8").read().split("\n")
+        open_at = None          # a SERIES marker still owed a target
+        for i, line in enumerate(lines, 1):
+            m = SERIES.match(line)
+            if m:
+                if open_at is not None:
+                    missing.append((path, open_at[0], open_at[1]))
+                open_at = (i, m.group(1)[:40])
+                n += 1
+                continue
+            t = TARGET.match(line)
+            if t and open_at is not None:
+                if t.group(1) not in postulates:
+                    dead.append((path, i, t.group(1), open_at[1]))
+                open_at = None
+                continue
+            if not line.startswith("--") and open_at is not None:
+                missing.append((path, open_at[0], open_at[1]))
+                open_at = None
+        if open_at is not None:
+            missing.append((path, open_at[0], open_at[1]))
+    return missing, dead, n
+
+
+def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
     e1 = check_e1(src, namespaces)
     missing, dead, nprobes = check_e2(evidence, postulates)
     orphaned, mismarked, nreceipts = check_e3(src, postulates)
+    smissing, sdead, nseries = check_e4(harness, postulates)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -263,6 +318,23 @@ def report(src, evidence, namespaces, postulates, gate):
         print("    EVALUATOR and not a statement, it is a unit test — its "
               "home is the")
         print("    bug cache.")
+
+    for p, i, name in smissing:
+        print(f"{p}:{i}: E4 — series {name!r} declares no `-- TARGET: "
+              f"<postulate>`")
+        print("    A harness row is a probe that ran natively.  Without a "
+              "target nothing")
+        print("    can say when it stopped being evidence, and the gate never "
+              "builds this")
+        print("    tree, so nothing else will notice either.")
+    for p, i, t, name in sdead:
+        print(f"{p}:{i}: E4 — series {name!r} targets {t!r}, which is not a "
+              f"live postulate")
+        print("    DELETE the series, or retarget it.  Its FINDINGS are not "
+              "deleted with")
+        print("    it: a coverage boundary or a blocked verdict belongs in the "
+              "header of")
+        print("    the statement it constrains.")
 
     for p, i in orphaned:
         print(f"{p}:{i}: E3 — receipt sits above no declaration")
@@ -295,12 +367,14 @@ def report(src, evidence, namespaces, postulates, gate):
         print("    left a harness worth recovering, that is a `RECOVERY:` "
               "pointer.")
 
-    n = len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
+    n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
+         + len(smissing) + len(sdead))
     if n == 0:
         print(f"check-evidence: clean — {nprobes} probe(s), every one naming a "
               f"live postulate; {nreceipts} receipt(s), every one above its "
               f"subject and marked for that subject's state; no src file "
-              f"imports the evidence tree")
+              f"imports the evidence tree; {nseries} harness series, every "
+              f"one naming a live postulate")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -313,12 +387,13 @@ def selftest():
     fx = os.path.join(here, "evidence-selftest")
     fails = []
 
-    def run(src, ev, posts, want, label):
+    def run(src, ev, posts, want, label, harness=None):
         import io
         import contextlib
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            rc = report(src, ev, NAMESPACES, posts, True)
+            rc = report(src, ev, NAMESPACES, posts, True,
+                        harness if harness else os.path.join(fx, "empty"))
         got = buf.getvalue()
         if want and want not in got:
             fails.append(f"{label}: expected {want!r}, got:\n{got}")
@@ -339,6 +414,21 @@ def selftest():
     run(os.path.join(fx, "empty"), os.path.join(fx, "live-target"),
         set(), "is not a live postulate",
         "E2 fires when the target is discharged out from under the probe")
+
+    empty = os.path.join(fx, "empty")
+    run(empty, empty, {"live-one"}, "E4 — series 'A —",
+        "E4 fires on a series with no target",
+        harness=os.path.join(fx, "harness-no-target"))
+    run(empty, empty, {"live-one"}, "which is not a live postulate",
+        "E4 fires on a series whose target is discharged",
+        harness=os.path.join(fx, "harness-dead-target"))
+    run(empty, empty, {"live-one"}, None,
+        "E4 quiet on a series naming a live postulate",
+        harness=os.path.join(fx, "harness-live-target"))
+    run(empty, empty, {"live-one"}, "E4 — series 'A —",
+        "E4 charges each of two ABUTTING series its own target, rather than "
+        "letting the second one's cover both",
+        harness=os.path.join(fx, "harness-abutting"))
 
     run(os.path.join(fx, "receipt-live"), os.path.join(fx, "empty"),
         {"live-one"}, None, "E3 quiet on a receipt above a live postulate")
@@ -385,7 +475,11 @@ def selftest():
           "own block member, not skipped and not credited to the member above "
           "it -- and a NEAR MISS is a finding rather than a skip, so a marker "
           "doubled into the comment text or written with no colon is reported "
-          "instead of dropping the receipt total to a tidy-looking zero)")
+          "instead of dropping the receipt total to a tidy-looking zero.  "
+          "E4 fires on a harness series with no target and on one whose "
+          "target has been discharged, charges each of two ABUTTING series "
+          "its own target, and is quiet on a series naming a live "
+          "postulate)")
     return 0
 
 
