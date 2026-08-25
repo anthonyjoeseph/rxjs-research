@@ -1418,6 +1418,18 @@ postulate
 -- inequality and the other has room to spare.  The base leaf is stated
 -- in `capsBase` rather than in the width, which is the point of the
 -- split: both of ITS sides now reduce, where the width is sealed.
+--
+-- PROBED: `Probed.Cascade-Mint-Base` takes the entry walk on three
+--   families and pins the COUNT, the CHARGE and the verdict by `refl`:
+--   the bounded drain mints 5 against 123, the skip family 7 against
+--   144, the deliver-on-every-chain family 20 against 144.  Every row
+--   is load-bearing -- the count is whatever the run makes it and none
+--   of the three is zero, so a family minting past its own `capsBase`
+--   would have refuted here.  COVERED is the CONCLUSION only, at the
+--   entry index, on `Γ₂` at one slot shape.  NOT covered: the premises,
+--   which cannot be reached at all, `capsOK?` reading a cap record no
+--   instantiation terminates on; and no index above the entry, the
+--   charge there being a width raised to a cap.
 postulate
   cascadeGo-mint-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)

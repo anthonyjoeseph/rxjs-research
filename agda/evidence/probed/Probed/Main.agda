@@ -21,3 +21,7 @@ open import Probed.Cascade-Nest-Store
   using (U-chains; U-descent; U-holds;
          C-chains; C-descent; C-holds;
          F-chains; F-descent; F-holds)
+open import Probed.Cascade-Mint-Base
+  using (U-mint; U-charge; U-fits;
+         C-mint; C-charge; C-fits;
+         F-mint; F-charge; F-fits)
