@@ -1346,6 +1346,19 @@ postulate
 -- consumers, and what makes it worth paying rather than routing around
 -- is that nothing else in this vocabulary can supply a count: every
 -- other candidate has been tried and each one lands on the caps side.
+--
+-- AND THE DECOMPOSITION IS AN ENTRY FACT, NOT A GENERAL ONE, WHICH IS
+-- THE SECOND THING THE SPLIT BOUGHT.  A per-chain budget is only worth
+-- having if a chain's own mint is small, and one index up it is not:
+-- the harness reaches a state where a SINGLE chain taking a SINGLE
+-- delivery advances the counter by more than sixteen hundred, on a
+-- program whose whole syntax is a couple of dozen nodes.  A release is
+-- a subscription and a drain releases a value at a time, so what one
+-- chain mints tracks the values that have PILED UP behind it, which is
+-- a burst width and nothing syntactic.  At the entry nothing has piled
+-- up yet -- the same family mints nineteen, tracking its own fold
+-- depth -- which is why the chain decomposition is stated here and
+-- must not be carried across to the tower leaf.
 
 -- REFUTED: `Refuted.Cascade-Nest-PerDeliv` kills the per-DELIVERY half
 --   this was assembled from -- store 12 against a charge of 10, at ONE
@@ -1415,7 +1428,10 @@ postulate
 -- entry is the whole of the tightness and the only half a machine can
 -- ever look at, and keeping the two under one head hid that -- the
 -- statement read as uniformly hard when one half is a small real
--- inequality and the other has room to spare.  The base leaf is stated
+-- inequality and the other has room to spare.  The halves also want
+-- DIFFERENT ROUTES, which is the sharper reason: the entry count is
+-- bounded per chain, and one index up a single chain's own count is
+-- unbounded in anything syntactic.  The base leaf is stated
 -- in `capsBase` rather than in the width, which is the point of the
 -- split: both of ITS sides now reduce, where the width is sealed.
 --

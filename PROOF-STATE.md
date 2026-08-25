@@ -166,8 +166,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   half whose two sides both reduce. One missing fact: a real-denominated
   registry bound, owed to the nesting invariant.
 - **`cascadeGo-mint-tower`** (Caps-Face/Part7) — DIFFICULTY: the same count one
-  index up, where the charge is a width raised to a cap and no row renders. Any
-  crude count would fit; it still needs one.
+  index up, where the charge is a width raised to a cap and no row renders. The
+  entry's per-chain decomposition does NOT carry: one chain, one delivery, over
+  sixteen hundred mints. The count is a burst width, nothing syntactic.
 - **`cascadeGo-nodes-mint`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens the
   node arm at most one `nestSyn` per instance it mints, premise-free, with the
   count PINNED by an equation rather than bounded. Both storing sites sit behind
