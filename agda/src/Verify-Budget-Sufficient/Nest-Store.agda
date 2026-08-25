@@ -466,7 +466,10 @@ abstract
   nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestIncAt e sl id =
-    realWidAt e sl id * (nestBurstAt e sl id * nestSyn e sl)
+    realWidAt e sl id
+      * (nestBurstAt e sl id
+         * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
+            * nestUnit e sl))
 
   -- READ BACK OUT OF THE SEAL for the same reason the width is: a
   -- consumer proving the fanout bound has to say what it proved.
@@ -480,7 +483,11 @@ abstract
 
   nestIncAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
-    nestIncAt e sl id ≡ realWidAt e sl id * (nestBurstAt e sl id * nestSyn e sl)
+    nestIncAt e sl id
+      ≡ realWidAt e sl id
+        * (nestBurstAt e sl id
+           * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
+              * nestUnit e sl))
   nestIncAt-def e sl id = refl
 
   nestCapAt e sl zero    = nestUnit e sl

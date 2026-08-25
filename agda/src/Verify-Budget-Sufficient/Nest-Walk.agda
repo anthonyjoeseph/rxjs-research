@@ -358,13 +358,13 @@ postulate
 --   on its own.
 postulate
   stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
+    (c : Caps) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
     (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    capsOK? c sched st ≡ true →
+    Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
     let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ 2 ^ Caps.cSize c * (nodesMax st ⊔ nestDᵛˢ vals)
+      ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -379,6 +379,18 @@ abstract
     ≤-trans (≤-trans (≤-reflexive (sym (+-identityʳ X)))
                      (≤-reflexive (cong (X +_) (sym (*-zeroʳ W)))))
             (one-pow W (X + W * 0))
+
+-- THE SLOTS TERM IS PAID ONCE PER FRAME AND EVERY FRAME BUT ONE HAS NO
+-- USE FOR IT, so it enters as pure slack for four of the five arms.
+-- What forces it into the shared statement is the fifth: a `from-inner`
+-- charges no wrap at all, so its arm has no term to widen and the
+-- summand is the only place a slot's nesting can come from.
+abstract
+  addU : ∀ (S X U : ℕ) → 2 ^ S * X ≤ 2 ^ S * (X + U)
+  addU S X U = *-monoʳ-≤ (2 ^ S) (m≤m+n X U)
+
+  raiseU : ∀ (S X U : ℕ) → X ≤ 2 ^ S * (X + U)
+  raiseU S X U = ≤-trans (pow-grow 2 S X (s≤s z≤n)) (addU S X U)
 
 -- ONE FRAME, AND THE `⊔` IS WHY THIS IS ONE STATEMENT RATHER THAN TWO.
 -- A frame moves its own node and the values it hands on TOGETHER, by
@@ -422,42 +434,47 @@ abstract
 --   on a wrap and the values are an inner's emissions.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (c : Caps) (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
+    (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick)
+    (f : Frame Γ s u) (p : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     let r = stepFrame sf id now f p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ 2 ^ Caps.cSize c
-        * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f))
-  stepFrame-nodes c W sf id now (map-f fn) p vals fin sched st 1≤W hlen hc =
+        * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
+           + nestUnit e sl)
+  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
                       (≤-trans (≤-reflexive (+-comm (nestDᵗ fn) (nestDᵛˢ vals)))
                                (+-mono-≤ (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
                                          (nest-inflate W (nestDᵗ fn) 1≤W))))))
-            (pow-grow 2 (Caps.cSize c) _ (s≤s z≤n))
+            (raiseU (Caps.cSize c) _ (nestUnit e sl))
     where
     X : ℕ
     X = (nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes c W sf id now (scan-f fn nid) p vals fin sched st 1≤W hlen hc =
+  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
-            (pow-grow 2 (Caps.cSize c) _ (s≤s z≤n))
-  stepFrame-nodes c W sf id now (take-f nid) p vals fin sched st 1≤W hlen hc =
+            (raiseU (Caps.cSize c) _ (nestUnit e sl))
+  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
-            (pow-grow 2 (Caps.cSize c) _ (s≤s z≤n))
-  stepFrame-nodes c W sf id now (from-inner op allNid inst) p vals fin sched st 1≤W hlen hc =
-    ≤-trans (stepFrame-nodes-inner c sf id now op allNid inst p vals fin sched st hc)
-            (*-monoʳ-≤ (2 ^ Caps.cSize c) (zero-charge W _))
-  stepFrame-nodes c W sf id now (thru-outer op nid) p vals fin sched st 1≤W hlen hc =
-    ≤-trans (stepFrame-nodes-thru c W sf id now op nid p vals fin sched st 1≤W hlen hc)
+            (raiseU (Caps.cSize c) _ (nestUnit e sl))
+  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc =
+    ≤-trans (stepFrame-nodes-inner c sl sf id now op allNid inst p vals fin sched st hsl hc)
             (*-monoʳ-≤ (2 ^ Caps.cSize c)
+              (+-monoˡ-≤ (nestUnit e sl) (zero-charge W _)))
+  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc =
+    ≤-trans (stepFrame-nodes-thru c W sf id now op nid p vals fin sched st 1≤W hlen hc)
+            (≤-trans (*-monoʳ-≤ (2 ^ Caps.cSize c)
               (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
                        (one-pow W (_ + W * 1))))
+              (addU (Caps.cSize c) _ (nestUnit e sl)))
 
 -- HOISTING THE SUBSTITUTION FACTOR PAST ONE FRAME'S CHARGE, which is
 -- the only arithmetic the caps rider adds to the telescope.  The factor
@@ -608,7 +625,8 @@ foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   nodesMax (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
     ≤ (2 ^ Caps.cSize c) ^ pathLen path
       * (pathNestF path ^ W
-         * ((nodesMax st ⊔ nestDᵛˢ vals) + W * (pathNestD path + nestUnit e sl)))
+         * ((nodesMax st ⊔ nestDᵛˢ vals)
+            + W * (pathNestD path + suc (pathLen path) * nestUnit e sl)))
 foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
                    (one-pow W _))
@@ -616,7 +634,9 @@ foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W 
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl)
                    (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
-                                       (nest-inflate W (nestUnit e sl) 1≤W))
+                              (≤-trans (nest-inflate W (nestUnit e sl) 1≤W)
+                                       (*-monoʳ-≤ W (≤-reflexive
+                                         (sym (*-identityˡ (nestUnit e sl)))))))
                             (one-pow W _)))
           (≤-reflexive (sym (*-identityˡ _)))
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
@@ -625,27 +645,40 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
              1≤W (proj₂ hb) (proj₂ hc))
     (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
                 (*-monoʳ-≤ (pathNestF p ^ W)
-                  (+-monoˡ-≤ (W * (pathNestD p + U))
-                             (stepFrame-nodes c W sf id now f p vals fin sched st
-                                1≤W (proj₁ hb) (proj₁ hc)))))
+                  (+-monoˡ-≤ (W * (pathNestD p + L * U))
+                             (stepFrame-nodes c W sl sf id now f p vals fin sched st
+                                hsl 1≤W (proj₁ hb) (proj₁ hc)))))
     (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
-                (fac-hoist (2 ^ S) (pathNestF p ^ W) A (W * (pathNestD p + U))
+                (fac-hoist (2 ^ S) (pathNestF p ^ W) (A + U) (W * (pathNestD p + L * U))
                            (1≤pow≤ 2 (Caps.cSize c) (s≤s z≤n))))
     (≤-trans (≤-reflexive (sym (*-assoc ((2 ^ S) ^ pathLen p) (2 ^ S) Inner)))
     (≤-trans (≤-reflexive (cong (_* Inner) (*-comm ((2 ^ S) ^ pathLen p) (2 ^ S))))
              (*-monoʳ-≤ ((2 ^ S) ^ suc (pathLen p))
+    (≤-trans (*-monoʳ-≤ (pathNestF p ^ W)
+               (≤-trans (≤-reflexive (+-assoc A U (W * (pathNestD p + L * U))))
+                        (+-monoʳ-≤ A widen)))
     (≤-trans (nest-telescope (frameNestF f ^ W) (pathNestF p ^ W) B
-                             (W * frameNestD f) (W * (pathNestD p + U))
+                             (W * frameNestD f) (W * (pathNestD p + L * U) + W * U)
                              (1≤pow≤ (frameNestF f) W (1≤frameNestF f)))
              (≤-reflexive
                (cong₂ _*_ (sym (pow-distrib-* W (frameNestF f) (pathNestF p)))
-                          (cong (B +_) charge)))))))))
+                          (cong (B +_) charge))))))))))
   where
   S      = Caps.cSize c
   A      = frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
-  Inner  = pathNestF p ^ W * (A + W * (pathNestD p + nestUnit e sl))
+  Inner  = pathNestF p ^ W * ((A + nestUnit e sl)
+                              + W * (pathNestD p + suc (pathLen p) * nestUnit e sl))
   B      = nodesMax st ⊔ nestDᵛˢ vals
   U      = nestUnit e sl
+  L      = suc (pathLen p)
+
+  -- the frame's own summand is paid out of the extra `W * U` the path's
+  -- coefficient gains at this level, and `1 ≤ W` is what makes it fit
+  widen : U + W * (pathNestD p + L * U) ≤ W * (pathNestD p + L * U) + W * U
+  widen = ≤-trans (≤-reflexive (+-comm U (W * (pathNestD p + L * U))))
+                  (+-monoʳ-≤ (W * (pathNestD p + L * U))
+                    (≤-trans (≤-reflexive (sym (*-identityˡ U)))
+                             (*-monoˡ-≤ U 1≤W)))
   step   = stepFrame sf id now f p vals fin sched st
   vals′  = proj₁ step
   evs′   = proj₁ (proj₂ step)
@@ -653,9 +686,19 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ step)))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ step)))
 
-  charge : W * frameNestD f + W * (pathNestD p + U) ≡ W * (pathNestD (f ↠ p) + U)
+  charge : W * frameNestD f + (W * (pathNestD p + L * U) + W * U)
+             ≡ W * (pathNestD (f ↠ p) + suc L * U)
   charge =
-    trans (sym (*-distribˡ-+ W (frameNestD f) (pathNestD p + U)))
-          (cong (W *_)
-            (trans (sym (+-assoc (frameNestD f) (pathNestD p) U))
-                   (cong (_+ U) (sym (pathNestD-cons f p)))))
+    trans (cong (W * frameNestD f +_)
+            (sym (*-distribˡ-+ W (pathNestD p + L * U) U)))
+    (trans (sym (*-distribˡ-+ W (frameNestD f) ((pathNestD p + L * U) + U)))
+           (cong (W *_) inner))
+    where
+    inner : frameNestD f + ((pathNestD p + L * U) + U)
+              ≡ pathNestD (f ↠ p) + (U + L * U)
+    inner =
+      trans (cong (frameNestD f +_)
+              (trans (+-assoc (pathNestD p) (L * U) U)
+                     (cong (pathNestD p +_) (+-comm (L * U) U))))
+      (trans (sym (+-assoc (frameNestD f) (pathNestD p) (U + L * U)))
+             (cong (_+ (U + L * U)) (sym (pathNestD-cons f p))))

@@ -173,10 +173,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-inner`** (Nest-Walk) — FALSITY, `REFUTED×3`: refuted AGAIN
-  at the restated form, by a share slot the node table cannot see — forty
-  delivered against a charge of zero, so no factor repairs it. Owed is the
-  slots summand the walk above it already carries.
+- **`stepFrame-nodes-inner`** (Nest-Walk) — FALSITY, `REFUTED×3`: the three
+  refutations now pin the shape from both sides, a caps factor AND a slots
+  summand, each dead on its own. Restated to carry both; unprobed there,
+  which is what holds the class.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED`: restated with
   the row above and by the same repair, the wrap's own subscribe being the same
   descent. Measured multiplicative in the incoming depth, which is what the
