@@ -325,3 +325,94 @@ rowN22 = let e₀ = entry (progF 22 1) sl₁ (sucGF 1 2 2 22 1)
 
 N22-fits : proj₂ (proj₂ rowN22) ≡ true
 N22-fits = refl
+
+----------------------------------------------------------------------
+-- THE TWO MAX-SHAPED CANDIDATES, read where the counting route died.
+-- If the walk only ever deepens the nodes map by what one instant's
+-- syntax allows, the count drops out of the statement entirely and the
+-- charge is a single `nestSyn` however many chains fire.  `A` asks
+-- whether it does not deepen the store at all past that; `B` allows it
+-- one level.  LOAD-BEARING: the counting route was green at these
+-- shapes too until the chain axis moved, so both are read at the
+-- refuting width and at a deep-fold family, not at the entry alone.
+----------------------------------------------------------------------
+
+readMax : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+        → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool × Bool
+readMax e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false , false
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      g   = cascadeGo a 1 (chainsOf a st) sd stL
+      lhs = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+                  (EvalSt.nodes (proj₂ (proj₂ g)))
+      s   = storeNestMax sd stL
+  in lhs , s , (lhs ≤ᵇ s ⊔ nestSyn e sl) , (lhs ≤ᵇ s + nestSyn e sl)
+
+rowM22 : ℕ × ℕ × Bool × Bool
+rowM22 = let e₀ = entry (progF 22 1) sl₁ (sucGF 1 2 2 22 1)
+         in readMax (progF 22 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+rowMU : ℕ × ℕ × Bool × Bool
+rowMU = let e₀ = entry pU sl₁ (sucGU 1 2 2 2 2)
+        in readMax pU sl₁ (proj₁ e₀) (proj₂ e₀)
+
+M22-A : proj₁ (proj₂ (proj₂ rowM22)) ≡ false
+M22-A = refl
+
+M22-B : proj₂ (proj₂ (proj₂ rowM22)) ≡ false
+M22-B = refl
+
+MU-A : proj₁ (proj₂ (proj₂ rowMU)) ≡ true
+MU-A = refl
+
+MU-B : proj₂ (proj₂ (proj₂ rowMU)) ≡ true
+MU-B = refl
+
+M22-lhs : proj₁ rowM22 ≡ 26
+M22-lhs = refl
+
+M22-store : proj₁ (proj₂ rowM22) ≡ 3
+M22-store = refl
+
+M22-syn : nestSyn (progF 22 1) sl₁ ≡ 6
+M22-syn = refl
+
+----------------------------------------------------------------------
+-- THE CHAIN-SHAPED CANDIDATE, which mirrors the consumer exactly: the
+-- charge stays `store + W * nestSyn` and only W changes, from a count
+-- of MINTS to a count of CHAINS.  That is the substitution the rows
+-- point at -- at twenty-two copies the nodes map reads 26 against a
+-- store of 3 and twenty-three chains, so each chain deepens it by one
+-- and nothing about the mints inside a chain is visible in the max.
+-- It is also the form the caps premise can pay: the chain list comes
+-- from the registry, which is what `capsOK?` bounds by the width.
+----------------------------------------------------------------------
+
+readCh : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+       → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readCh e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      ch  = chainsOf a st
+      g   = cascadeGo a 1 ch sd stL
+      lhs = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+                  (EvalSt.nodes (proj₂ (proj₂ g)))
+      rhs = storeNestMax sd stL + length ch * nestSyn e sl
+  in lhs , rhs , (lhs ≤ᵇ rhs)
+
+chRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ × ℕ × Bool
+chRow e g = let e₀ = entry e sl₁ g in readCh e sl₁ (proj₁ e₀) (proj₂ e₀)
+
+Ch22-fits : proj₂ (proj₂ (chRow (progF 22 1) (sucGF 1 2 2 22 1))) ≡ true
+Ch22-fits = refl
+
+Ch1-fits : proj₂ (proj₂ (chRow pF (sucGF 1 2 2 1 1))) ≡ true
+Ch1-fits = refl
+
+ChU-fits : proj₂ (proj₂ (chRow pU (sucGU 1 2 2 2 2))) ≡ true
+ChU-fits = refl
+
+ChC-fits : proj₂ (proj₂ (chRow pC (sucGC 1 2 2 1 2 2))) ≡ true
+ChC-fits = refl

@@ -29,4 +29,6 @@ open import Probed.Cascade-Mint-Base
          F2-mint; F3-mint; F4-mint; F2-pw; F3-pw;
          F18-pw-fits; F18-fits; F18-base; F3-base;
          B22-mint; B22-base; B22-fits;
-         P22-charge; P22-fits; P1-charge; P1-fits; N22-fits)
+         P22-charge; P22-fits; P1-charge; P1-fits; N22-fits;
+         M22-A; M22-B; MU-A; MU-B; M22-lhs; M22-store; M22-syn;
+         Ch22-fits; Ch1-fits; ChU-fits; ChC-fits)

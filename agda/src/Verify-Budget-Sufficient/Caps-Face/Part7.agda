@@ -1498,11 +1498,15 @@ postulate
 --   states can carry it.  Do not re-derive a tighter width.
 --
 -- PROBED: `Probed.Cascade-Mint-Base`.  The chain axis is swept at one, two,
---   three, four, eighteen and twenty-two copies on `progF`, and the candidate
---   replacement -- the charge taken per chain -- is pinned at both ends, 20
---   against 192 and 713 against 13800.  COVERED is the CONCLUSION only, at the
---   entry index, on `Γ₂` at one slot shape.  NOT covered: the premises, and no
---   index above the entry.
+--   three, four, eighteen and twenty-two copies on `progF`.  Two max-shaped
+--   replacements are killed there too -- the walk deepens the nodes map past
+--   both `store ⊔ nestSyn` and `store + nestSyn`, reading 26 against a store
+--   of 3 and a `nestSyn` of 6 -- and the one that survives is the CHAIN-shaped
+--   charge, `store + length chains * nestSyn`, green at the refuting width and
+--   on three other families.  Twenty-three chains against a max of 26 is one
+--   level per chain, with the mints inside a chain invisible to it.  COVERED
+--   is the CONCLUSION only, at the entry index, on `Γ₂` at one slot shape.
+--   NOT covered: the premises, and no index above the entry.
 postulate
   cascadeGo-mint-pW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
