@@ -224,7 +224,7 @@ depthRunWalkRowU steps ds ks j d k =
 -- refutes the leaf, and the count is free to be anything the run makes
 -- it.
 --
--- TARGET: cascadeGo-mint-entryCeil
+-- TARGET: cascadeGo-mint-pW
 delivWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
           → ℕ → ℕ → Sched Γ → EvalSt e → String
 delivWalk e sl 0       nextId sched st = ""
@@ -655,7 +655,7 @@ rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
 -- currency can reach, and that index is the coverage boundary every
 -- later receipt has to state.
 --
--- TARGET: cascadeGo-mint-entryCeil
+-- TARGET: cascadeGo-mint-pW
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------

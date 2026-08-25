@@ -161,10 +161,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-mint-entryCeil`** (Caps-Face/Part7) — DIFFICULTY: at the ENTRY the
-  walk mints no more than the program's width CEILING. The tight half, and the
-  only one whose two sides both reduce. The smaller candidate — program size —
-  is refuted by rows; ceiling to charge is proven arithmetic.
+- **`cascadeGo-mint-pW`** (Caps-Face/Part7) — DIFFICULTY: at the ENTRY the walk
+  mints no more than the PATH WIDTH. The tight half, and the only one whose two
+  sides both reduce. Program size is refuted by rows; width to charge is proven
+  throughout, and rows pin the width AS the ceiling at three families.
 - **`cascadeGo-mint-tower`** (Caps-Face/Part7) — DIFFICULTY: the same count one
   index up, where the charge is a width raised to a cap and no row renders. The
   entry's per-chain decomposition does NOT carry: one chain, one delivery, over

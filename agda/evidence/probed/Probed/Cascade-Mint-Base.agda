@@ -2,7 +2,7 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: cascadeGo-mint-entryCeil
+-- TARGET: cascadeGo-mint-pW
 --
 -- WHY THIS INDEX AND NO OTHER, and it is the reason the target was split
 -- off from its tower half.  The charge here is a WIDTH CEILING, a

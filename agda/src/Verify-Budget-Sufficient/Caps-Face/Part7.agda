@@ -29,7 +29,8 @@ open import Relation.Binary.PropositionalEquality
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; Exp; Tm; Fn; μᵉ; unfoldμ; evalTm;
   applyFn)
-open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; entryCeil)
+open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ; entryCeil; ceilᵉ; slotsCeil;
+  outWⱽ; dWⱽ; pW≤ceil)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
@@ -1470,7 +1471,7 @@ postulate
 --   coincide at a shape where a slot is deeper than the subject, which
 --   is where `slotsCeil` would be the arm that decides.
 postulate
-  cascadeGo-mint-entryCeil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-mint-pW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
@@ -1479,7 +1480,25 @@ postulate
     nestOK? e sl 0 sched st ≡ true →
     let r = cascadeGo a nextId chains sched st in
     Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-    m ≤ entryCeil n sl e
+    m ≤ outWⱽ n [] sl e ⊔ dWⱽ n [] sl e
+
+-- AND THE CEILING IS REACHED FROM THE WIDTH BY TWO PROVEN STEPS, so
+-- this side of the leaf is spent rather than assumed.
+cascadeGo-mint-entryCeil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl 0) sched st ≡ true →
+  nestOK? e sl 0 sched st ≡ true →
+  let r = cascadeGo a nextId chains sched st in
+  Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
+  m ≤ entryCeil n sl e
+cascadeGo-mint-entryCeil {n = n} {e = e} sl a nextId chains sched st m
+                         hsl hcaps hnest heq =
+  ≤-trans (cascadeGo-mint-pW sl a nextId chains sched st m hsl hcaps hnest heq)
+          (≤-trans (pW≤ceil n sl e)
+                   (m≤m⊔n (ceilᵉ n sl e) (slotsCeil n sl)))
 
 -- THE CEILING IS ALREADY INSIDE THE CHARGE, so the step from the leaf
 -- to the base is arithmetic and belongs here rather than in anyone's
