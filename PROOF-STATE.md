@@ -173,9 +173,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-inner`** (Nest-Walk) — FALSITY, `REFUTED×3`: the three
-  refutations now pin the shape from both sides, a caps factor AND a slots
-  summand, each dead on its own. Restated to carry both; unprobed there,
+- **`mergeAllDrain-nest`** (Nest-Walk) — FALSITY, `REFUTED×3`: the drain leaf
+  the inner arm now reduces to, and where the three refutations land — a caps
+  factor AND a slots summand, each dead on its own. Unprobed at the new form,
   which is what holds the class.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED`: restated with
   the row above and by the same repair, the wrap's own subscribe being the same
