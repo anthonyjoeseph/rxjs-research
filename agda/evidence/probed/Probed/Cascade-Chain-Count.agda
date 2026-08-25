@@ -23,6 +23,7 @@
 -- charge covers it where a program-denominated one does not.
 --
 -- TARGET: chainStep-nodes
+-- TARGET: arr-chains-nest-syn
 module Probed.Cascade-Chain-Count where
 
 open import Data.List using (List; []; _∷_; _++_; length; foldr)
@@ -37,11 +38,11 @@ open import Rx.Nest-Depth using (nestDᵛ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascadeLatch; cascadeGo; chainsOf; chainStep; Arrival; arrTy; arrVal; RegId; Path;
+         cascade; cascadeLatch; cascadeGo; chainsOf; chainStep; Arrival; arrTy; arrVal; RegId; Path;
          _↠_; scan-f; map-f)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nodeNest; pathNestD; chainsNestD)
+  using (nodeNest; pathNestD; chainsNestD; nestSyn)
 
 open import Verify-Budget-Sufficient.Demand-Programs
   using (Γ₂; progU; progC; progF; progW; foldD; insF; sucGU; sucGC; sucGF; sucGW)
@@ -227,3 +228,71 @@ advRow d = let e₀ = entry (progF 1 1) sl₁ (sucGF 1 2 2 1 1)
 
 Adv-fits : proj₂ (proj₂ (advRow 9)) ≡ true
 Adv-fits = refl
+
+----------------------------------------------------------------------
+-- READING FOUR — the tie-back, which is the half the path currency
+-- moved OUT of the leaf.  A registered chain's wraps and the arriving
+-- payload's nesting have to land inside the program's own ceiling, or
+-- the walk's charge never reaches the width the consumer spends.  Both
+-- sides compute; the premises do not, so a green row is evidence about
+-- the CONCLUSION at states the entry walk actually reaches.
+----------------------------------------------------------------------
+
+readTie : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+        → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readTie e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false
+... | inj₂ (a , sd) =
+  let lhs = nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st)
+      rhs = nestSyn e sl
+  in lhs , rhs , (lhs ≤ᵇ rhs)
+
+-- AND THE ENTRY INSTANT IS THE SHALLOW ONE, which is what makes the
+-- iterated rows the load-bearing half: at the first arrival the
+-- registry holds only what the root subscribe put there, and the
+-- reading comes back at 2 against a whole `nestSyn`.  A registration
+-- deepens when a release SUBSCRIBES an inner, so the chains that could
+-- cross this bound exist only after the walk has run.
+after : ∀ {t} {e : Closed Γ₂ t} → ℕ → ℕ → Sched Γ₂ → EvalSt e
+      → Sched Γ₂ × EvalSt e
+after 0       nid sched st = sched , st
+after (suc m) nid sched st with sched-next sched
+... | inj₁ _        = sched , st
+... | inj₂ (a , sd) =
+  let r = cascade a nid sd st
+  in after m (suc nid) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+-- a LONGER script, so the walk has instants to run: the sweep's own
+-- vocabulary runs dry after two arrivals and a row that lands past the
+-- end reads its verdict `false`, which is how the short ones announce
+-- themselves rather than passing quietly
+sl₅ : Slots Γ₂
+sl₅ = insF 1 2 6
+
+tieRow : ∀ {t} (e : Closed Γ₂ t) → Slots Γ₂ → ℕ → ℕ → ℕ × ℕ × Bool
+tieRow e sl g m = let e₀ = entry e sl g
+                      w  = after m 1 (proj₁ e₀) (proj₂ e₀)
+                  in readTie e sl (proj₁ w) (proj₂ w)
+
+Tie22-fits : proj₂ (proj₂ (tieRow (progF 22 1) sl₁ (sucGF 1 2 2 22 1) 0)) ≡ true
+Tie22-fits = refl
+
+Tie1-fits : proj₂ (proj₂ (tieRow (progF 1 1) sl₅ (sucGF 1 2 6 1 1) 3)) ≡ true
+Tie1-fits = refl
+
+TieU-fits : proj₂ (proj₂ (tieRow (progU 2 2) sl₅ (sucGU 1 2 6 2 2) 3)) ≡ true
+TieU-fits = refl
+
+TieC-fits : proj₂ (proj₂ (tieRow (progC 1 2 2) sl₅ (sucGC 1 2 6 1 2 2) 3)) ≡ true
+TieC-fits = refl
+
+TieW-fits : proj₂ (proj₂ (tieRow (progW 1 0 0) sl₅ (sucGW 1 2 6 1 0 0) 2)) ≡ true
+TieW-fits = refl
+
+-- AND THE FOLD DEPTH, which is the axis that moves BOTH sides: the
+-- wrap sits in the scan's own function, so it lands in `pathNestD` of
+-- every chain through that frame and in `nestDᵉ` of the program at the
+-- same time.  A charge that survives it is one whose two sides move
+-- together rather than one that is merely slack.
+TieC4-fits : proj₂ (proj₂ (tieRow (progC 4 2 2) sl₅ (sucGC 1 2 6 4 2 2) 3)) ≡ true
+TieC4-fits = refl

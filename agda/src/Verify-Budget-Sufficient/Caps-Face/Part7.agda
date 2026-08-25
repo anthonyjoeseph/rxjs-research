@@ -1588,6 +1588,20 @@ postulate
 --
 -- REFUTED: `Refuted.Chain-Step-Nodes`, the free-path form, eleven
 --   against nine and unbounded in the frame's fold depth.
+-- PROBED: `Probed.Cascade-Chain-Count` reads this by `refl` on five
+--   families AFTER the walk has run several instants, which is the only
+--   half worth having: at the ENTRY arrival the registry holds nothing
+--   but what the root subscribe put there and the reading comes back at
+--   2 against a whole `nestSyn`, so a sweep of first instants cannot
+--   fail.  Registrations deepen when a release SUBSCRIBES an inner, so
+--   the chains that could cross this sit past the first cascade.  One
+--   row drives the FOLD DEPTH, which is the axis that moves both sides
+--   at once -- the wrap is in the scan's own function, so it lands in
+--   `pathNestD` of every chain through that frame and in `nestDᵉ` of
+--   the program together.  COVERED is the conclusion; the premises
+--   compute nowhere.  NOT covered: `Γ₂`, and the vocabulary runs dry
+--   after a handful of arrivals -- a row past the end announces itself,
+--   reading its verdict false rather than passing quietly.
 postulate
   arr-chains-nest-syn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →

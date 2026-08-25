@@ -25,4 +25,5 @@ open import Probed.Cascade-Chain-Count
   using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
          Dup1-fits; Dup4-fits;
          S22-fits; S1-fits; SU-fits; SC-fits;
-         SW-fits; ChW-fits; ChW2-fits; Adv-fits)
+         SW-fits; ChW-fits; ChW2-fits; Adv-fits;
+         Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits)
