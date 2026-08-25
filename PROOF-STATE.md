@@ -173,14 +173,14 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-inner`** (Nest-Walk) — SHAPE, `REFUTED×2`: the free form
-  is machine-refuted, and the assembly with it. The drain under this frame
-  SUBSCRIBES, so the arm is the subscribe descent inside the walk and no
-  function of the frame can pay it; restate, do not grind.
-- **`stepFrame-nodes-thru`** (Nest-Walk) — SHAPE, `REFUTED`: machine-refuted
-  with its assembly. The wrap takes OBSERVABLES and `thruWalk` subscribes each,
-  so a unit per value prices a layer and not the descent under it. Same defect
-  as the row above, so one repair covers both.
+- **`stepFrame-nodes-inner`** (Nest-Walk) — FALSITY, `REFUTED×2`: restated, so
+  the refutations are why the caps hypothesis is there rather than open work.
+  The drain SUBSCRIBES, so the arm now takes a factor in the substituted
+  function's size; unprobed at the new form, which is what holds the class.
+- **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED`: restated with
+  the row above and by the same repair, the wrap's own subscribe being the
+  same descent. Measured multiplicative in the incoming depth, which is what
+  the factor is; unprobed at the new form.
 - **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED, DEAD ROUTE`: the
   share sink's fan-out over the admitted registrations, under one unit. They
   touch disjoint nodes, so the map moves by the deepest and not the sum — which
@@ -224,6 +224,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   stage of every chain's walk under the width cap. `valsCaps?` is this bound,
   propagated across the feared `thru` hop already; the grind carries it flat,
   not moving.
+- **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: the caps
+  the two `*All` frames spend, held at every state the selection's walk passes
+  through. The caps face proves exactly this frame by frame with its own level
+  counter, so what is owed is that receipt re-read at a flat cap.
 - **`stepFrame-nodes-take`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`:
   `takeDispatch` re-points a counter and forwards what it was handed, so
   neither side of the `⊔` deepens.

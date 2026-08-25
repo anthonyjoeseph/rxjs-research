@@ -440,10 +440,23 @@ abstract
     (id : ℕ) → 1 ≤ nestBurstAt e sl id
   1≤nestBurstAt e sl id = s≤s z≤n
 
+  -- ONE CASCADE'S WHOLE FANOUT, AND THE EXPONENT HAS TWO TENANTS.  The
+  -- burst copies are the walk's own: a chain spends its wrap factor
+  -- once per value it carries, and the selection's total wrap is two to
+  -- its summed frame sizes, which the registry's size cap holds under
+  -- the width times a square.  The extra copy pays the SUBSCRIBE
+  -- factor, which is a different charge at the same frames: an `*All`
+  -- frame re-enters the subscribe machinery, and what it emits is
+  -- deeper than what it was handed by the number of times the
+  -- substituted function names its payload.  That is one factor per
+  -- FRAME rather than per value, so the exponent it needs is the
+  -- selection's frame COUNT times the size cap -- bounded by the same
+  -- width times the same square, which is why one more copy is exactly
+  -- enough and why the two tenants do not interleave.
   nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestFacAt e sl id =
-    2 ^ (nestBurstAt e sl id
+    2 ^ (suc (nestBurstAt e sl id)
          * (realWidAt e sl id
             * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
 
@@ -460,7 +473,7 @@ abstract
   nestFacAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestFacAt e sl id
-      ≡ 2 ^ (nestBurstAt e sl id
+      ≡ 2 ^ (suc (nestBurstAt e sl id)
              * (realWidAt e sl id
                 * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
   nestFacAt-def e sl id = refl
@@ -477,7 +490,7 @@ abstract
   1≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → 1 ≤ nestFacAt e sl id
   1≤nestFacAt e sl id =
-    m^n>0 2 (nestBurstAt e sl id
+    m^n>0 2 (suc (nestBurstAt e sl id)
              * (realWidAt e sl id
                 * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
 

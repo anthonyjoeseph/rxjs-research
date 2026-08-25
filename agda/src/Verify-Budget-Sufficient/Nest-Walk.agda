@@ -29,7 +29,9 @@ open import Rx.Evaluator using
    NodeId; AllOp; NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
    lookupNode; setNode; scanVals)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
-open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
+open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
+open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
@@ -256,22 +258,26 @@ postulate
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals)
 
--- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is what
--- a per-value unit does not price.  `pathNestD` charges this frame and
--- only this frame, and what it charges is the `suc` a `*All` layer
--- adds -- exactly right for the LAYER, and silent about what the layer
--- DOES.  `thruWalk` subscribes each observable it is handed, so the
--- values leaving the frame are an inner's emissions rather than the
--- argument rewrapped, and the descent that produced them is not a
--- function of the wrap.
+-- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
+-- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
+-- frame the `suc` a `*All` layer adds -- exactly right for the LAYER,
+-- and silent about what the layer DOES.  `thruWalk` subscribes each
+-- observable it is handed, so the values leaving the frame are an
+-- inner's emissions, and a subscription SUBSTITUTES: the emitted depth
+-- is the argument's depth times the number of times the step function
+-- names its payload.  Multiplicative, so no summand is the shape.
 --
--- AND IT FAILS WITH THE INNER ARM, FOR ONE REASON.  Both *All frames
--- re-enter the subscribe machinery and both are charged as though they
--- forwarded: the argument is priced by `nestDᵉ`, additive at `mapᵉ`,
--- while a subscription SUBSTITUTES and is not.  So what is owed is ONE
--- repair rather than two widenings at two frames -- the subscribe
--- descent charged in the currency `depth-nest-compositional` already
--- states it in.
+-- AND THE FACTOR COMES FROM THE STORE BECAUSE THE FRAME CANNOT CARRY
+-- IT.  A frame holds an op and node ids and no syntax, so no function
+-- of it can see what the subscription will substitute; the occurrence
+-- count is bounded by two to the substituted function's SIZE, and size
+-- is what `capsOK?` bounds -- on the queued observables and on the
+-- arriving values alike.  Hence the caps hypothesis: the unconditional
+-- form is not a stronger claim available here, it is a false one.
+--
+-- AND THE INNER ARM IS THE SAME STATEMENT AT THE OTHER `*All` FRAME.
+-- Both re-enter the subscribe machinery and both were charged as though
+-- they forwarded, so one repair covers two arms.
 --
 -- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
 --   eighty against forty-one, at a payload forty layers deep; the gap
@@ -280,13 +286,13 @@ postulate
 --   smallest admissible width IS this bound.
 postulate
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (c : Caps) (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (p : Path Γ u t)
     (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    1 ≤ W → length vals ≤ W →
+    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals) + W
+      ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
 
 -- THE INNER RELEASE IS NOT A FREE FRAME, and the reason is structural
 -- rather than arithmetic.  A `from-inner` at `fin` with no live
@@ -296,20 +302,17 @@ postulate
 -- arm is the subscribe face's descent arriving inside the walk, which
 -- is why it cannot be paid by what the inner already was.
 --
--- WHY THE FREE FORM READ AS RIGHT.  `pathNestD` charges a `from-inner`
--- nothing, so there was no term for a charge to come out of, and the
--- arm was written to the measure that existed.  The caps face never had
--- the gap: `frame-room` opens an allowance at BOTH boundaries that
+-- WHY THE CHARGE IS A PREMISE AND NOT A MEASURE.  A `from-inner`
+-- carries an op and two node ids and no syntax, while the queue it
+-- drains lives in the STATE -- so `frameNestF` cannot see what the
+-- drain will substitute, however it is redefined.  The caps face never
+-- had the gap: `frame-room` opens an allowance at BOTH boundaries that
 -- traverse a payload list, the thru-outer over its value list and the
--- from-inner over the mergeAll queue.  Only the nesting currency reads
--- the second one as free.
---
--- AND NO FUNCTION OF THE FRAME CAN REPAIR IT.  A `from-inner` carries
--- an op and two node ids and no syntax, while the queue it drains lives
--- in the STATE -- so `frameNestF` cannot see what the drain will
--- substitute, however it is redefined.  Whatever pays for this arm is a
--- premise about the store or a new component of the measure, which is
--- what makes the repair a restatement rather than a widening.
+-- from-inner over the mergeAll queue, and only the nesting currency
+-- read the second one as free.  So the factor arrives as `capsOK?`,
+-- which bounds the size of every queued observable, and the arm is
+-- charged two to that size -- the ceiling on how many times a step
+-- function can name what it is substituting into.
 --
 -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
 --   against forty, at a queued `mapᵉ` whose step function names its
@@ -327,12 +330,13 @@ postulate
 --   summand in a depth currency is one.
 postulate
   stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
+    (c : Caps) (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
     (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    capsOK? c sched st ≡ true →
     let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
+      ≤ 2 ^ Caps.cSize c * (nodesMax st ⊔ nestDᵛˢ vals)
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -363,7 +367,10 @@ abstract
 -- two *All frames are the subscribe machinery, where a frame reaches
 -- the walk again through an inner.  `frameNestF` charges the two that
 -- SUBSTITUTE and reads the other three as one, which holds for take and
--- fails at both *All arms -- whose own headers carry why.
+-- cannot hold at either *All arm -- a frame carries no syntax and the
+-- subscribe machinery substitutes, so those two are paid instead by a
+-- factor in the store's own size cap, uniform across all five arms and
+-- spent by only two of them.  Their own headers carry why.
 --
 -- AND THE BURST IS IN THE EXPONENT BECAUSE ONE OF THE TWO THREADS.  A
 -- map applies its step function to each value INDEPENDENTLY and the
@@ -379,7 +386,7 @@ abstract
 --   against 64, at the smallest step function that deepens its own
 --   accumulator; the gap is unbounded in the burst, so no constant
 --   repairs it, and `scanVals-nest` is the iteration that replaced it.
--- REFUTED: `Refuted.Inner-Drain-Nest` kills this statement at the
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills the caps-free form at the
 --   from-inner frame, eighty against forty, where the charge reduces to
 --   the state it started from and the drain under it subscribes.
 -- REFUTED: `Refuted.Thru-Subscribe-Nest` kills it at the thru-outer
@@ -387,37 +394,59 @@ abstract
 --   on a wrap and the values are an inner's emissions.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
+    (c : Caps) (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    1 ≤ W → length vals ≤ W →
+    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     let r = stepFrame sf id now f p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
-  stepFrame-nodes W sf id now (map-f fn) p vals fin sched st 1≤W hlen =
-    ⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
+      ≤ 2 ^ Caps.cSize c
+        * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f))
+  stepFrame-nodes c W sf id now (map-f fn) p vals fin sched st 1≤W hlen hc =
+    ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
                       (≤-trans (≤-reflexive (+-comm (nestDᵗ fn) (nestDᵛˢ vals)))
                                (+-mono-≤ (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
-                                         (nest-inflate W (nestDᵗ fn) 1≤W)))))
+                                         (nest-inflate W (nestDᵗ fn) 1≤W))))))
+            (pow-grow 2 (Caps.cSize c) _ (s≤s z≤n))
     where
     X : ℕ
     X = (nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes W sf id now (scan-f fn nid) p vals fin sched st 1≤W hlen =
-    stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen
-  stepFrame-nodes W sf id now (take-f nid) p vals fin sched st 1≤W hlen =
-    ≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
-            (zero-charge W _)
-  stepFrame-nodes W sf id now (from-inner op allNid inst) p vals fin sched st 1≤W hlen =
-    ≤-trans (stepFrame-nodes-inner sf id now op allNid inst p vals fin sched st)
-            (zero-charge W _)
-  stepFrame-nodes W sf id now (thru-outer op nid) p vals fin sched st 1≤W hlen =
-    ≤-trans (stepFrame-nodes-thru W sf id now op nid p vals fin sched st 1≤W hlen)
-            (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
-                     (one-pow W (_ + W * 1)))
+  stepFrame-nodes c W sf id now (scan-f fn nid) p vals fin sched st 1≤W hlen hc =
+    ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
+            (pow-grow 2 (Caps.cSize c) _ (s≤s z≤n))
+  stepFrame-nodes c W sf id now (take-f nid) p vals fin sched st 1≤W hlen hc =
+    ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
+                     (zero-charge W _))
+            (pow-grow 2 (Caps.cSize c) _ (s≤s z≤n))
+  stepFrame-nodes c W sf id now (from-inner op allNid inst) p vals fin sched st 1≤W hlen hc =
+    ≤-trans (stepFrame-nodes-inner c sf id now op allNid inst p vals fin sched st hc)
+            (*-monoʳ-≤ (2 ^ Caps.cSize c) (zero-charge W _))
+  stepFrame-nodes c W sf id now (thru-outer op nid) p vals fin sched st 1≤W hlen hc =
+    ≤-trans (stepFrame-nodes-thru c W sf id now op nid p vals fin sched st 1≤W hlen hc)
+            (*-monoʳ-≤ (2 ^ Caps.cSize c)
+              (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
+                       (one-pow W (_ + W * 1))))
+
+-- HOISTING THE SUBSTITUTION FACTOR PAST ONE FRAME'S CHARGE, which is
+-- the only arithmetic the caps rider adds to the telescope.  The factor
+-- multiplies what the frame emitted and nothing else, so paying it on
+-- the path's remaining charge as well is slack -- and buying that slack
+-- is what lets one factor per frame come out as a power of the path's
+-- length rather than interleaving with the wrap product.
+abstract
+  fac-hoist : ∀ (F Y A Z : ℕ) → 1 ≤ F → Y * (F * A + Z) ≤ F * (Y * (A + Z))
+  fac-hoist F Y A Z 1≤F =
+    ≤-trans (*-monoʳ-≤ Y (+-monoʳ-≤ (F * A) (pow-grow F 1 Z 1≤F)))
+      (≤-trans (≤-reflexive (cong (λ w → Y * (F * A + w))
+                                  (trans (cong (_* Z) (*-identityʳ F)) refl)))
+        (≤-trans (≤-reflexive (cong (Y *_) (sym (*-distribˡ-+ F A Z))))
+                 (≤-reflexive (trans (sym (*-assoc Y F (A + Z)))
+                                (trans (cong (_* (A + Z)) (*-comm Y F))
+                                       (*-assoc F Y (A + Z)))))))
 
 -- THE SHARE SINK, WHICH IS WHERE THE PATH MEASURE HAS NOTHING LEFT TO
 -- SPEND, and the whole reason the walk is charged a UNIT on top of its
@@ -518,40 +547,75 @@ burstsOK W sf id now (f ↠ p)        vals fin sched st =
       (proj₂ (proj₂ (proj₂ (proj₂ step))))
   where step = stepFrame sf id now f p vals fin sched st
 
+-- AND THE CAPS THE TWO `*All` FRAMES SPEND, carried the same way and for
+-- the same reason.  A frame that re-enters the subscribe machinery is
+-- charged in the SIZE of what it substitutes, and that size lives in the
+-- store rather than in the frame -- so the walk has to be handed the
+-- store's bound at every state it passes through, not just at the one it
+-- starts from.  Stating it by recursion on the path is what lets the
+-- induction take its own hypothesis apart instead of re-deriving the
+-- caps face's frame counter in a second currency.
+capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
+  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+capsWalkOK c sf id now root           vals fin sched st = capsOK? c sched st ≡ true
+capsWalkOK c sf id now (share-sink _) vals fin sched st = capsOK? c sched st ≡ true
+capsWalkOK c sf id now (f ↠ p)        vals fin sched st =
+  (capsOK? c sched st ≡ true)
+  × capsWalkOK c sf id now p (proj₁ step)
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step))))
+  where step = stepFrame sf id now f p vals fin sched st
+
 foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (W : ℕ) (sl : Slots Γ)
+  (c : Caps) (W : ℕ) (sl : Slots Γ)
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u))
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → 1 ≤ W →
   burstsOK W sf id now path vals fin sched st →
+  capsWalkOK c sf id now path vals fin sched st →
   nodesMax (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
-    ≤ pathNestF path ^ W
-      * ((nodesMax st ⊔ nestDᵛˢ vals) + W * (pathNestD path + nestUnit e sl))
-foldPath-nodes W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W hb =
-  ≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
-          (one-pow W _)
-foldPath-nodes {e = e} W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb =
-  ≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl)
-          (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
-                              (nest-inflate W (nestUnit e sl) 1≤W))
+    ≤ (2 ^ Caps.cSize c) ^ pathLen path
+      * (pathNestF path ^ W
+         * ((nodesMax st ⊔ nestDᵛˢ vals) + W * (pathNestD path + nestUnit e sl)))
+foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W hb hc =
+  ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
                    (one-pow W _))
-foldPath-nodes {e = e} W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb =
-  ≤-trans (foldPath-nodes W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
+          (≤-reflexive (sym (*-identityˡ _)))
+foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb hc =
+  ≤-trans (≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl)
+                   (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
+                                       (nest-inflate W (nestUnit e sl) 1≤W))
+                            (one-pow W _)))
+          (≤-reflexive (sym (*-identityˡ _)))
+foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
+  ≤-trans (foldPath-nodes c W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
              (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-             1≤W (proj₂ hb))
-    (≤-trans (*-monoʳ-≤ (pathNestF p ^ W)
-                (+-monoˡ-≤ (W * (pathNestD p + U))
-                           (stepFrame-nodes W sf id now f p vals fin sched st
-                              1≤W (proj₁ hb))))
+             1≤W (proj₂ hb) (proj₂ hc))
+    (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
+                (*-monoʳ-≤ (pathNestF p ^ W)
+                  (+-monoˡ-≤ (W * (pathNestD p + U))
+                             (stepFrame-nodes c W sf id now f p vals fin sched st
+                                1≤W (proj₁ hb) (proj₁ hc)))))
+    (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
+                (fac-hoist (2 ^ S) (pathNestF p ^ W) A (W * (pathNestD p + U))
+                           (1≤pow≤ 2 (Caps.cSize c) (s≤s z≤n))))
+    (≤-trans (≤-reflexive (sym (*-assoc ((2 ^ S) ^ pathLen p) (2 ^ S) Inner)))
+    (≤-trans (≤-reflexive (cong (_* Inner) (*-comm ((2 ^ S) ^ pathLen p) (2 ^ S))))
+             (*-monoʳ-≤ ((2 ^ S) ^ suc (pathLen p))
     (≤-trans (nest-telescope (frameNestF f ^ W) (pathNestF p ^ W) B
                              (W * frameNestD f) (W * (pathNestD p + U))
                              (1≤pow≤ (frameNestF f) W (1≤frameNestF f)))
              (≤-reflexive
                (cong₂ _*_ (sym (pow-distrib-* W (frameNestF f) (pathNestF p)))
-                          (cong (B +_) charge)))))
+                          (cong (B +_) charge)))))))))
   where
+  S      = Caps.cSize c
+  A      = frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
+  Inner  = pathNestF p ^ W * (A + W * (pathNestD p + nestUnit e sl))
   B      = nodesMax st ⊔ nestDᵛˢ vals
   U      = nestUnit e sl
   step   = stepFrame sf id now f p vals fin sched st
