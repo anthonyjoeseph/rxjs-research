@@ -314,6 +314,25 @@ postulate
 -- charged two to that size -- the ceiling on how many times a step
 -- function can name what it is substituting into.
 --
+-- WHAT INSTANTIATION CAN AND CANNOT SETTLE HERE, decided before any
+-- sweep because the answer is readable off the types.  The emitted
+-- depth is LINEAR in how many times the step function names its
+-- payload, that count is at most the function's size, and the charge is
+-- TWO to the size cap -- so the two sides are separated by an
+-- exponential, and no program can cross it.  A sweep over
+-- payload depth, occurrence count or queue length is unfalsifiable by
+-- construction, however tight its rows read.
+--
+-- SO THE RISK THAT REMAINS IS STRUCTURAL AND IT IS NAMED: whether one
+-- frame's drain can emit deeper than the factor times what it was
+-- handed.  It cannot do so by COMPOUNDING -- `mergeAllDrain` recurses
+-- across the queue and concatenates, and both measures in the
+-- conclusion are `⊔`-folds, so the queue combines by max and not by
+-- product -- which leaves the single subscription as the whole
+-- question.  `applyFn-nest` (.Nest-Subst) is that question answered for
+-- ONE substitution, at this exact factor and proven; what is owed is
+-- that bound lifted through the descent the drain performs.
+--
 -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
 --   against forty, at a queued `mapᵉ` whose step function names its
 --   payload on both sides of the sum: `nestDᵉ` is additive there and the
