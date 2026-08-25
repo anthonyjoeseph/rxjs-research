@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
-  *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
+  *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; map; foldr)
@@ -31,6 +31,8 @@ open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; size�
   applyFn)
 open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
+open import Verify-Budget-Sufficient.Nest-Walk using
+  (foldPath-nodes; nodesMax)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
   storeNest-latch; realWidAt; realWidAt-def; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
@@ -1283,26 +1285,25 @@ postulate
 -- REFUTED: `Refuted.Chain-Step-Nodes` kills the `nestSyn` form of this
 --   very statement, eleven against nine, and the gap is unbounded in
 --   the fold depth of a frame the program never mentions.
--- PROBED: `Probed.Cascade-Chain-Count` pins this leaf by `refl` at the
---   head of the arrival's own selection, at the crossing width and on
---   four further families -- the bounded drain, the skip branch, the
---   deliver-on-every-chain family and the only one in reach whose
---   stored value is observable-typed, so that the left side can move at
---   all.  It also pins the WALK-level conclusion the induction below
---   draws from it, at the same shapes and again with the chain list
---   DUPLICATED, where the max climbs one a copy and the charge climbs a
---   whole chain's worth.  And it pins the free PATH, at the frame that
---   refutes the program-denominated charge, which is the region the
---   `nestSyn` form left open.  COVERED is the CONCLUSION, which is
---   premise-free.  NOT covered: `Γ₂` alone, at one slot shape.
-postulate
-  chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
-    (sched : Sched Γ) (st : EvalSt e) →
-    let r = chainStep id a path sched st in
-    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-        + (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = chainStep id a path sched st in
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
+    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+      + (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+chainStep-nodes {n = n} {e = e} id a path sched st =
+  ≤-trans (foldPath-nodes (budgetAt e (Sched.slots sched) id) n id
+             (arrTick a) (arrSource a) path (arrVal a ∷ [])
+             (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+             (Arrival.isLast a) sched st)
+    (≤-trans (+-monoˡ-≤ (pathNestD path)
+                        (≤-trans (⊔-mono-≤ (≤-refl {nodesMax st})
+                                           (≤-reflexive (⊔-identityʳ V)))
+                                 (m⊔n≤m+n (nodesMax st) V)))
+             (≤-reflexive (+-assoc (nodesMax st) V (pathNestD path))))
+  where
+  V = nestDᵛ (arrTy a) (arrVal a)
 
 cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (a : Arrival Γ) (nextId : Id)

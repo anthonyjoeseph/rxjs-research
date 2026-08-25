@@ -161,10 +161,13 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`chainStep-nodes`** (Caps-Face/Part7) — DIFFICULTY: ONE chain's step
-  deepens the node arm by at most the payload's nesting plus the PATH's own,
-  premise-free. The `nestSyn` form is refuted; the path form covers the frame
-  that killed it, and the walk-level induction over the list is proven.
+- **`dispatchShare-nodes`** (Nest-Walk) — DIFFICULTY: the share sink fans the
+  same values into every registration and the path measure gives it NOTHING to
+  spend, so the arm rests on the registrations touching disjoint nodes — which
+  an induction over the admitted list cannot see. No family in reach fires it.
+- **`stepFrame-nodes`** (Nest-Walk) — DIFFICULTY: one frame moves its node and
+  its emission together by its own wrap, stated under one `⊔` because a scan
+  emits the accumulator it stored. The walk above it telescopes, proven.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY: the selection's
   paths and the arrival's payload land inside `nestSyn` — the fact that ties
   the walk's charge back to the program. Free-list form refuted; probeable.
