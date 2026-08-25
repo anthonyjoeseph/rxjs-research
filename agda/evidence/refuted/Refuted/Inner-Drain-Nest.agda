@@ -1,0 +1,138 @@
+-- ══════════════════════════════════════════════════════════════════
+-- THE INNER FRAME CHARGES NOTHING AND THE DRAIN UNDER IT SUBSCRIBES,
+-- so the free per-frame bound at `from-inner` is FALSE.
+--
+-- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
+-- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE` notes.
+--
+-- WHAT THE STATEMENT SAID.  A `from-inner` frame moves neither its node
+-- table nor the values it hands on: `nodesMax st′ ⊔ nestDᵛˢ out ≤
+-- nodesMax st ⊔ nestDᵛˢ vals`, a bound with no charge in it at all.  It
+-- is the arm that reads as free among the five, and the reason it reads
+-- that way is real -- `pathNestD` charges a `from-inner` nothing, so a
+-- charge here would have nowhere to come from.
+--
+-- WHERE IT BREAKS.  A `from-inner` at `fin` with no live registration is
+-- exactly where `innerFinish` runs `mergeAllDrain`, and the drain
+-- SUBSCRIBES a queued inner.  The values that subscription emits leave
+-- through this frame, and the queue is priced by `nestDᵉ` -- which is
+-- ADDITIVE at `mapᵉ`, while the substitution the subscription performs
+-- is not.  So a queued `mapᵉ` whose step function names its payload
+-- twice emits a value deeper than the whole queue is charged, and one
+-- element is enough: two against one.
+--
+-- WHAT DIES AND WHAT DOES NOT.  The zero-charge form dies.  Nothing here
+-- says the walk cannot be bounded -- it says the bound cannot be free at
+-- this frame, so either `pathNestD` grows a term at `from-inner` or the
+-- arm takes the drain's charge from somewhere its hypotheses carry.  The
+-- gap is the occurrence count of a step function this statement does not
+-- mention at all, which is the same repair `Refuted.Apply-Fn-Nest`
+-- forced on the map frame: a factor the syntax can see.
+--
+-- WHAT IS HAND-BUILT, AND WHY IT DOES NOT SOFTEN THE FINDING.  The state
+-- is `st-init` plus ONE `installNode`, and the statement quantifies over
+-- every `st`, so this refutes it as written -- the same freedom
+-- `Refuted.Chain-Step-Nodes` spends on the path.  Nor is the queue an
+-- unreachable shape: its one element is a literal an outer `ofᵉ` emits,
+-- so a run reaches this table.  What a run does NOT hand over cheaply is
+-- an `inst` the registry does not keep alive, and that argument is free
+-- in the statement too.
+-- ══════════════════════════════════════════════════════════════════
+module Refuted.Inner-Drain-Nest where
+
+open import Data.Bool using (true)
+open import Data.Empty using (⊥)
+open import Data.List using (List; []; _∷_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Maybe using (nothing)
+open import Data.Nat using (ℕ; _+_; _*_; _^_; _≤_; _⊔_)
+open import Data.Nat.Properties using (≤⇒≤ᵇ)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+
+open import Rx.Prim using (Gas; g0; gs)
+open import Rx.Exp
+  using (Closed; Val; Fn; natᵗ; obs; emptyᵉ; ofᵉ; mapᵉ; switchAllᵉ;
+         varᵗ; nat̂; strmᵗ)
+open import Rx.Slots using (Slots)
+open import Rx.Evaluator
+  using (Sched; EvalSt; mergeAll-st; Frame; from-inner; mergeAllᵒ; root; stepFrame; sched-init;
+  st-init; installNode)
+open import Verify-Budget-Sufficient.Nest-Store using (frameNestF)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (nodesMax; nestDᵛˢ; frameNestD)
+open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+
+----------------------------------------------------------------------
+-- THE WITNESS.  `Refuted.Apply-Fn-Nest`'s pair verbatim -- a payload one
+-- `switchAllᵉ` deep and a step function naming it on both sides of a
+-- `mapᵉ` sum -- packaged as the observable a drain would subscribe.
+----------------------------------------------------------------------
+
+v : Val Γ₂ (obs natᵗ)
+v = switchAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))
+
+fn : Fn Γ₂ [] [] [] (obs natᵗ) (obs (obs natᵗ))
+fn = strmᵗ (mapᵉ (varᵗ (there (here refl))) (ofᵉ (varᵗ (here refl) ∷ [])))
+
+-- the queued inner: one emit, and that emit is the substitution
+o : Closed Γ₂ (obs (obs natᵗ))
+o = mapᵉ fn (ofᵉ (strmᵗ v ∷ []))
+
+e : Closed Γ₂ (obs (obs natᵗ))
+e = emptyᵉ
+
+slots : Slots Γ₂
+slots = insT 0 0 0
+
+sched₀ : Sched Γ₂
+sched₀ = sched-init e slots
+
+-- one lane taken, one inner parked, the outer already done
+st₀ : EvalSt e
+st₀ = installNode 0 (mergeAll-st nothing 1 (o ∷ []) true) (st-init e)
+
+gas : Gas
+gas = gs (gs (gs (gs (gs (gs g0)))))
+
+-- the frame is reached carrying nothing of its own: every value in the
+-- conclusion comes out of the drain
+vals : List (Val Γ₂ (obs (obs natᵗ)))
+vals = []
+
+f : Frame Γ₂ (obs (obs natᵗ)) (obs (obs natᵗ))
+f = from-inner mergeAllᵒ 0 1
+
+row : ℕ × ℕ
+row = let r = stepFrame gas 0 0 f root vals true sched₀ st₀
+      in nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r)
+       , nodesMax st₀ ⊔ nestDᵛˢ vals
+
+-- THE FIGURES, PINNED, so that a repair moving either side fails here
+-- naming the number instead of turning the crossing into an equality
+drained≡2 : proj₁ row ≡ 2
+drained≡2 = refl
+
+queued≡1 : proj₂ row ≡ 1
+queued≡1 = refl
+
+stepFrame-nodes-inner-absurd : proj₁ row ≤ proj₂ row → ⊥
+-- `2 ≤ᵇ 1` reduces to `false`, so `T` of it IS the empty type
+stepFrame-nodes-inner-absurd h = ≤⇒≤ᵇ h
+
+----------------------------------------------------------------------
+-- AND THE ASSEMBLY FALLS TO THE SAME WITNESS, which is the half worth
+-- having: `frameNestF` reads a `from-inner` as one and `frameNestD` as
+-- zero, so the parent's charge at this frame IS the leaf's bound, at
+-- the smallest width it admits.  A leaf refuted under a parent that
+-- still typechecks is a repair with nowhere to land.
+----------------------------------------------------------------------
+
+parentCharge : ℕ
+parentCharge = frameNestF f ^ 1 * (proj₂ row + 1 * frameNestD f)
+
+parent≡1 : parentCharge ≡ 1
+parent≡1 = refl
+
+stepFrame-nodes-at-inner-absurd : proj₁ row ≤ parentCharge → ⊥
+stepFrame-nodes-at-inner-absurd h = ≤⇒≤ᵇ h

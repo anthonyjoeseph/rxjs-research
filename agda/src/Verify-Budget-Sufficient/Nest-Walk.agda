@@ -256,14 +256,6 @@ postulate
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals)
 
-  stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
-    (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
-    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
-
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (p : Path Γ u t)
@@ -272,6 +264,44 @@ postulate
     let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals) + W
+
+-- THE INNER RELEASE IS NOT A FREE FRAME, and the reason is structural
+-- rather than arithmetic.  A `from-inner` at `fin` with no live
+-- registration is exactly where `innerFinish` runs `mergeAllDrain`, and
+-- the drain SUBSCRIBES a queued inner -- so the values leaving this
+-- frame were produced by a subscription, not forwarded by a step.  The
+-- arm is the subscribe face's descent arriving inside the walk, which
+-- is why it cannot be paid by what the inner already was.
+--
+-- WHY THE FREE FORM READ AS RIGHT.  `pathNestD` charges a `from-inner`
+-- nothing, so there was no term for a charge to come out of, and the
+-- arm was written to the measure that existed.  The caps face never had
+-- the gap: `frame-room` opens an allowance at BOTH boundaries that
+-- traverse a payload list, the thru-outer over its value list and the
+-- from-inner over the mergeAll queue.  Only the nesting currency reads
+-- the second one as free.
+--
+-- AND NO FUNCTION OF THE FRAME CAN REPAIR IT.  A `from-inner` carries
+-- an op and two node ids and no syntax, while the queue it drains lives
+-- in the STATE -- so `frameNestF` cannot see what the drain will
+-- substitute, however it is redefined.  Whatever pays for this arm is a
+-- premise about the store or a new component of the measure, which is
+-- what makes the repair a restatement rather than a widening.
+--
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, two against
+--   one, at a queued `mapᵉ` whose step function names its payload on
+--   both sides of the sum: `nestDᵉ` is additive there and the
+--   substitution is not, so the emitted value is deeper than the whole
+--   queue is charged.  The same witness kills the ASSEMBLY at this
+--   frame, whose charge reduces to exactly the leaf's bound.
+postulate
+  stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
+    (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
+    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -300,9 +330,9 @@ abstract
 -- map frame is a substitution lemma, the scan frame is that plus the
 -- store it makes, the take frame is a filter and must be free, and the
 -- two *All frames are the subscribe machinery, where a frame reaches
--- the walk again through an inner.  Only the two that SUBSTITUTE carry
--- the factor; the other three are charged one, and `frameNestF` is
--- where that split is written down.
+-- the walk again through an inner.  `frameNestF` charges the two that
+-- SUBSTITUTE and reads the other three as one, which holds for take and
+-- fails at the inner arm -- whose own header carries why.
 --
 -- AND THE BURST IS IN THE EXPONENT BECAUSE ONE OF THE TWO THREADS.  A
 -- map applies its step function to each value INDEPENDENTLY and the
@@ -318,6 +348,9 @@ abstract
 --   against 64, at the smallest step function that deepens its own
 --   accumulator; the gap is unbounded in the burst, so no constant
 --   repairs it, and `scanVals-nest` is the iteration that replaced it.
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills this statement at the
+--   from-inner frame, two against one, where the charge reduces to the
+--   state it started from and the drain under it subscribes.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)

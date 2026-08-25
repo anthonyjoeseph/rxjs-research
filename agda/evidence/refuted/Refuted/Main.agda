@@ -41,3 +41,6 @@ open import Refuted.Step-Frame-Nest-Dup
   using (dup≡80; perFrame≡40; stepFrame-nest-dup-absurd)
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
+open import Refuted.Inner-Drain-Nest
+  using (drained≡2; queued≡1; stepFrame-nodes-inner-absurd;
+         parent≡1; stepFrame-nodes-at-inner-absurd)
