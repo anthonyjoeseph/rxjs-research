@@ -51,7 +51,7 @@ open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤;
-  *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
+  *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
@@ -64,7 +64,7 @@ open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; F
 open import Rx.Prim using (Source; towerℕ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps)
+open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -152,6 +152,32 @@ nest-telescope F G B X Y 1≤F =
        (trans (sym (*-assoc G F ((B + X) + Y)))
        (trans (cong (_* ((B + X) + Y)) (*-comm G F))
               (cong (F * G *_) (+-assoc B X Y))))
+
+-- A FACTOR RAISED TO THE BURST IS STILL A FACTOR, and it is still at
+-- least the factor -- the two properties the telescope needs of the
+-- burst exponent, and the only two.
+pow-grow¹ : ∀ (F W : ℕ) → 1 ≤ F → 1 ≤ W → F ≤ F ^ W
+pow-grow¹ F (suc W) h _ =
+  ≤-trans (≤-reflexive (sym (*-identityʳ F)))
+          (*-monoʳ-≤ F (1≤pow≤ F W h))
+
+-- AND THE BASE-SIDE POWER LAW, WHICH THE STDLIB DOES NOT CARRY: it has
+-- the exponent-side distribution and not this one, and the walk needs
+-- this one, because the burst factor is raised over a PRODUCT of frame
+-- factors and has to come apart along the path.
+mul-shuffle : ∀ (a b c d : ℕ) → a * b * (c * d) ≡ a * c * (b * d)
+mul-shuffle a b c d =
+  trans (*-assoc a b (c * d))
+  (trans (cong (a *_) (trans (sym (*-assoc b c d))
+                      (trans (cong (_* d) (*-comm b c))
+                             (*-assoc c b d))))
+         (sym (*-assoc a c (b * d))))
+
+pow-distrib-* : ∀ (k m n : ℕ) → (m * n) ^ k ≡ m ^ k * n ^ k
+pow-distrib-* zero    m n = refl
+pow-distrib-* (suc k) m n =
+  trans (cong (m * n *_) (pow-distrib-* k m n))
+        (mul-shuffle m n (m ^ k) (n ^ k))
 
 frameNestF≡ : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) →
   frameNestF f ≡ 2 ^ frameSzD f
@@ -384,30 +410,66 @@ abstract
   -- The factor is `2` per unit of step-function syntax along a path,
   -- and a cascade compounds one path's worth per chain -- so real
   -- width in the exponent, size in the base.
+  -- THE BURST, WHICH IS A WIDTH READ AS A COUNT.  A frame's charge has
+  -- to see how many values it was handed, because a THREADING frame --
+  -- a scan -- applies its step function once per value and what the
+  -- function piles onto its accumulator accrues once per application.
+  -- The count of values one instant can carry is the width cap, so the
+  -- burst is that cap and not a quantity of this module's own.
+  --
+  -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free reading of
+  --   the walk's per-frame charge, 65 against 64, at the smallest step
+  --   function that deepens its own accumulator; the gap is unbounded
+  --   in the burst, so no constant repairs it and the factor below is
+  --   what the numbers point at.
+  nestBurstAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → ℕ
+  nestBurstAt e sl id = suc (Caps.cWid (capsAt e sl id))
+
+  1≤nestBurstAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → 1 ≤ nestBurstAt e sl id
+  1≤nestBurstAt e sl id = s≤s z≤n
+
   nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestFacAt e sl id =
-    2 ^ (realWidAt e sl id
-         * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+    2 ^ (nestBurstAt e sl id
+         * (realWidAt e sl id
+            * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
+
+  -- ONE INSTANT'S FRESH GROWTH, NAMED, because it is what the
+  -- recurrence adds and what every preservation step has to match
+  -- against -- and because it now has three factors rather than two.
+  nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → ℕ
+  nestIncAt e sl id =
+    realWidAt e sl id * (nestBurstAt e sl id * nestSyn e sl)
 
   -- READ BACK OUT OF THE SEAL for the same reason the width is: a
   -- consumer proving the fanout bound has to say what it proved.
   nestFacAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestFacAt e sl id
-      ≡ 2 ^ (realWidAt e sl id
-             * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+      ≡ 2 ^ (nestBurstAt e sl id
+             * (realWidAt e sl id
+                * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
   nestFacAt-def e sl id = refl
+
+  nestIncAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    nestIncAt e sl id ≡ realWidAt e sl id * (nestBurstAt e sl id * nestSyn e sl)
+  nestIncAt-def e sl id = refl
 
   nestCapAt e sl zero    = nestUnit e sl
   nestCapAt e sl (suc id) =
-    nestFacAt e sl id * (nestCapAt e sl id + realWidAt e sl id * nestSyn e sl)
+    nestFacAt e sl id * (nestCapAt e sl id + nestIncAt e sl id)
 
   1≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → 1 ≤ nestFacAt e sl id
   1≤nestFacAt e sl id =
-    m^n>0 2 (realWidAt e sl id
-             * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+    m^n>0 2 (nestBurstAt e sl id
+             * (realWidAt e sl id
+                * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool
@@ -462,7 +524,7 @@ abstract
     (id : ℕ) →
     nestCapAt e sl (suc id)
       ≡ nestFacAt e sl id
-        * (nestCapAt e sl id + realWidAt e sl id * nestSyn e sl)
+        * (nestCapAt e sl id + nestIncAt e sl id)
   nestCapAt-suc e sl id = refl
 
   -- THE HEIGHT COMPARISON, and it is the entire bet this module carries,
@@ -533,7 +595,7 @@ nestCap-3≤capsH e sl id =
 -- least one
 nestCap-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  nestCapAt e sl id + realWidAt e sl id * nestSyn e sl
+  nestCapAt e sl id + nestIncAt e sl id
     ≤ nestCapAt e sl (suc id)
 nestCap-mono e sl id =
   ≤-trans (nest-inflate (nestFacAt e sl id) _ (1≤nestFacAt e sl id))
@@ -549,11 +611,11 @@ nestCap-mono e sl id =
 nest-sum-3 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) (x y z : ℕ) →
   x ≤ nestCapAt e sl id → y ≤ nestCapAt e sl id → z ≤ nestCapAt e sl id →
-  x + y + z + realWidAt e sl id * nestSyn e sl ≤ capsH e sl id
+  x + y + z + nestIncAt e sl id ≤ capsH e sl id
 nest-sum-3 e sl id x y z hx hy hz =
-  ≤-trans (≤-reflexive (+-assoc (x + y) z (realWidAt e sl id * nestSyn e sl)))
+  ≤-trans (≤-reflexive (+-assoc (x + y) z (nestIncAt e sl id)))
     (≤-trans (+-mono-≤ (2*-fold (nestCapAt e sl id) x y hx hy)
-                       (≤-trans (+-monoˡ-≤ (realWidAt e sl id * nestSyn e sl) hz)
+                       (≤-trans (+-monoˡ-≤ (nestIncAt e sl id) hz)
                                 (nestCap-mono e sl id)))
              (nestCap-3≤capsH e sl id))
 
@@ -565,11 +627,11 @@ nest-sum-3 e sl id x y z hx hy hz =
 nest-sum-fac : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) (x y z : ℕ) →
   x ≤ nestCapAt e sl id → y ≤ nestCapAt e sl id → z ≤ nestCapAt e sl id →
-  x + y + nestFacAt e sl id * (z + realWidAt e sl id * nestSyn e sl)
+  x + y + nestFacAt e sl id * (z + nestIncAt e sl id)
     ≤ capsH e sl id
 nest-sum-fac e sl id x y z hx hy hz =
   ≤-trans (+-mono-≤ (2*-fold (nestCapAt e sl id) x y hx hy)
                     (≤-trans (*-monoʳ-≤ (nestFacAt e sl id)
-                                        (+-monoˡ-≤ (realWidAt e sl id * nestSyn e sl) hz))
+                                        (+-monoˡ-≤ (nestIncAt e sl id) hz))
                              (≤-reflexive (sym (nestCapAt-suc e sl id)))))
           (nestCap-3≤capsH e sl id)

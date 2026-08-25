@@ -161,10 +161,13 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-scan`** (Nest-Walk) — FALSITY, REFUTED AS WRITTEN: a scan
-  applies its step function once per value, so a burst of k accrues k times
-  against a charge that cannot see k. Restate with the burst bound; the parent
-  and the walk above it inherit the repair.
+- **`arr-chains-bursts`** (Caps-Face/Part7) — FALSITY: every stage of every
+  chain's walk under the width cap. Only a `thru` frame expands a burst, and by
+  a product the caps face pays a square for — so the flat cap may be the wrong
+  currency rather than the wrong number.
+- **`stepFrame-nodes-scan`** (Nest-Walk) — DIFFICULTY: a scan threads, so the
+  burst factor is spent once per value. Burst-free form refuted; the restated
+  charge is geometric in the burst and the iteration is the proof.
 - **`stepFrame-nodes-inner`** (Nest-Walk) — DIFFICULTY: an inner's release
   forwards through the `from-inner` frame, the one frame the path measure
   charges nothing for — so the arm has to be paid by what the inner already was.

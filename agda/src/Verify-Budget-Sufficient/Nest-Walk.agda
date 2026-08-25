@@ -4,15 +4,16 @@ module Verify-Budget-Sufficient.Nest-Walk where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin)
-open import Data.List using (List; []; _∷_; _++_; map; foldr)
+open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
 open import Data.Nat.Properties using
   (≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
-   *-identityˡ; *-monoˡ-≤; *-monoʳ-≤;
+   *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤;
+   *-distribˡ-+; ^-zeroˡ; +-identityʳ;
    m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub)
 open import Data.Product using (_×_; proj₁; proj₂)
 open import Data.Vec using (lookup)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; InstEvent)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_; obs; sizeᵗ; applyFn)
@@ -24,8 +25,10 @@ open import Rx.Evaluator using
    foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
    NodeId; AllOp)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
+open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit)
+  (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
+   nest-inflate; pow-grow¹; pow-distrib-*)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
@@ -87,27 +90,30 @@ mapVals-nest {u = u} fn (v ∷ vs) =
 -- the factor; the other three are charged one, and `frameNestF` is
 -- where that split is written down.
 --
--- AND THE SCAN ARM BELOW IS FALSE AS WRITTEN, WHICH IS A FACT ABOUT
--- THE SPLIT AND NOT ABOUT THE ARM.  A map applies its step function to
--- each value INDEPENDENTLY, so one factor covers a burst of any
--- length; a scan THREADS, so the same factor is spent once per value
--- and the charge has no term that moves with the burst.  The frames
--- that need a burst-length factor are exactly the THREADING ones, and
--- the bound is available where the walk is consumed -- the width face
--- caps a burst already.
+-- AND THE BURST IS IN THE EXPONENT BECAUSE ONE OF THE TWO THREADS.  A
+-- map applies its step function to each value INDEPENDENTLY and the
+-- results are read by `⊔`, so one factor covers a burst of any length
+-- -- `mapVals-nest` is the proof, and it needs no bound.  A scan
+-- applies it to the PREVIOUS output, so a burst of k spends the factor
+-- k times and piles k copies of the function's own nesting onto the
+-- accumulator.  Charging every arm `F ^ W` against `X + W * D` is what
+-- makes one shape serve both: the three that charge nothing are
+-- unaffected, the map arm has slack, and the scan arm is tight.
 --
--- REFUTED: `Refuted.Scan-Fold-Burst` kills the scan arm's constant
---   factor, 65 against 64, at the smallest step function that deepens
---   its own accumulator; the same witness refutes `stepFrame-nodes`,
---   whose scan arm IS this leaf.
+-- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free form, 65
+--   against 64, at the smallest step function that deepens its own
+--   accumulator; the gap is unbounded in the burst, so no constant
+--   repairs it.  The same witness refutes `stepFrame-nodes`, whose
+--   scan arm IS this leaf.
 postulate
   stepFrame-nodes-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
     (nid : NodeId) (p : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    length vals ≤ W →
     let r = stepFrame sf id now (scan-f fn nid) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ 2 ^ sizeᵗ fn * ((nodesMax st ⊔ nestDᵛˢ vals) + nestDᵗ fn)
+      ≤ (2 ^ sizeᵗ fn) ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn)
 
   stepFrame-nodes-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
@@ -125,45 +131,58 @@ postulate
       ≤ (nodesMax st ⊔ nestDᵛˢ vals)
 
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (p : Path Γ u t)
     (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    1 ≤ W → length vals ≤ W →
     let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals) + 1
+      ≤ (nodesMax st ⊔ nestDᵛˢ vals) + W
+
+-- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
+-- EXPONENT, which is all that separates the three frames that charge
+-- nothing from the one that charges a wrap.
+one-pow : ∀ (W Y : ℕ) → Y ≤ 1 ^ W * Y
+one-pow W Y = ≤-reflexive (sym (trans (cong (_* Y) (^-zeroˡ W)) (*-identityˡ Y)))
+
+zero-charge : ∀ (W X : ℕ) → X ≤ 1 ^ W * (X + W * 0)
+zero-charge W X =
+  ≤-trans (≤-trans (≤-reflexive (sym (+-identityʳ X)))
+                   (≤-reflexive (cong (X +_) (sym (*-zeroʳ W)))))
+          (one-pow W (X + W * 0))
 
 stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
+  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  1 ≤ W → length vals ≤ W →
   let r = stepFrame sf id now f p vals fin sched st in
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-    ≤ frameNestF f * ((nodesMax st ⊔ nestDᵛˢ vals) + frameNestD f)
-stepFrame-nodes sf id now (map-f fn) p vals fin sched st =
+    ≤ frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
+stepFrame-nodes W sf id now (map-f fn) p vals fin sched st 1≤W hlen =
   ⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
         (≤-trans (mapVals-nest fn vals)
-                 (*-monoʳ-≤ (2 ^ sizeᵗ fn)
+                 (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
                     (≤-trans (≤-reflexive (+-comm (nestDᵗ fn) (nestDᵛˢ vals)))
-                             (+-monoˡ-≤ (nestDᵗ fn)
-                                        (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))))))
+                             (+-mono-≤ (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
+                                       (nest-inflate W (nestDᵗ fn) 1≤W)))))
   where
   X : ℕ
-  X = (nodesMax st ⊔ nestDᵛˢ vals) + nestDᵗ fn
-  up : X ≤ 2 ^ sizeᵗ fn * X
+  X = (nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn
+  up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
   up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
-               (*-monoˡ-≤ X (1≤frameNestF (map-f fn)))
-stepFrame-nodes sf id now (scan-f fn nid) p vals fin sched st =
-  stepFrame-nodes-scan sf id now fn nid p vals fin sched st
-stepFrame-nodes sf id now (take-f nid) p vals fin sched st =
-  ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
-                   (m≤m+n _ 0))
-          (≤-reflexive (sym (*-identityˡ _)))
-stepFrame-nodes sf id now (from-inner op allNid inst) p vals fin sched st =
-  ≤-trans (≤-trans (stepFrame-nodes-inner sf id now op allNid inst p vals fin sched st)
-                   (m≤m+n _ 0))
-          (≤-reflexive (sym (*-identityˡ _)))
-stepFrame-nodes sf id now (thru-outer op nid) p vals fin sched st =
-  ≤-trans (stepFrame-nodes-thru sf id now op nid p vals fin sched st)
-          (≤-reflexive (sym (*-identityˡ _)))
+               (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
+stepFrame-nodes W sf id now (scan-f fn nid) p vals fin sched st 1≤W hlen =
+  stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen
+stepFrame-nodes W sf id now (take-f nid) p vals fin sched st 1≤W hlen =
+  ≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
+          (zero-charge W _)
+stepFrame-nodes W sf id now (from-inner op allNid inst) p vals fin sched st 1≤W hlen =
+  ≤-trans (stepFrame-nodes-inner sf id now op allNid inst p vals fin sched st)
+          (zero-charge W _)
+stepFrame-nodes W sf id now (thru-outer op nid) p vals fin sched st 1≤W hlen =
+  ≤-trans (stepFrame-nodes-thru W sf id now op nid p vals fin sched st 1≤W hlen)
+          (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
+                   (one-pow W (_ + W * 1)))
 
 -- THE SHARE SINK, WHICH IS WHERE THE PATH MEASURE HAS NOTHING LEFT TO
 -- SPEND, and the whole reason the walk is charged a UNIT on top of its
@@ -243,33 +262,60 @@ dispatchShare-nodes sl sf (suc gas) id now i vals true sched st hsl =
 -- and the sink spends the unit the path measure cannot give it.  The
 -- unit is charged ONCE for the whole walk rather than once per frame,
 -- which is what the additive shape of the two leaves buys.
+-- THE BURST BOUND, ALONG THE RUN.  A frame's charge has to see how many
+-- times it fires, and a path's burst is not a syntactic quantity: only a
+-- THRU frame can hand on more values than it took, and how many is what
+-- the inners it subscribes happen to emit.  So the walk takes the bound
+-- as a hypothesis shaped like its own recursion -- each stage's value
+-- list under `W`, the next stage's list read off the frame that just
+-- ran -- and the consumer discharges it where the width face is, which
+-- is where a burst is capped at all.
+burstsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
+  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+burstsOK W sf id now root           vals fin sched st = length vals ≤ W
+burstsOK W sf id now (share-sink _) vals fin sched st = length vals ≤ W
+burstsOK W sf id now (f ↠ p)        vals fin sched st =
+  (length vals ≤ W)
+  × burstsOK W sf id now p (proj₁ step)
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step))))
+  where step = stepFrame sf id now f p vals fin sched st
+
 foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sl : Slots Γ)
+  (W : ℕ) (sl : Slots Γ)
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u))
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
+  Sched.slots sched ≡ sl → 1 ≤ W →
+  burstsOK W sf id now path vals fin sched st →
   nodesMax (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
-    ≤ pathNestF path * ((nodesMax st ⊔ nestDᵛˢ vals) + (pathNestD path + nestUnit e sl))
-foldPath-nodes sl sf gas id now envSrc root vals evs fin sched st hsl =
+    ≤ pathNestF path ^ W
+      * ((nodesMax st ⊔ nestDᵛˢ vals) + W * (pathNestD path + nestUnit e sl))
+foldPath-nodes W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W hb =
   ≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
-          (≤-reflexive (sym (*-identityˡ _)))
-foldPath-nodes sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl =
+          (one-pow W _)
+foldPath-nodes {e = e} W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb =
   ≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl)
-          (≤-reflexive (sym (*-identityˡ _)))
-foldPath-nodes {e = e} sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl =
-  ≤-trans (foldPath-nodes sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
-             (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl))
-    (≤-trans (*-monoʳ-≤ (pathNestF p)
-                (+-monoˡ-≤ (pathNestD p + U)
-                           (stepFrame-nodes sf id now f p vals fin sched st)))
-    (≤-trans (nest-telescope (frameNestF f) (pathNestF p) B (frameNestD f)
-                             (pathNestD p + U) (1≤frameNestF f))
+          (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
+                              (nest-inflate W (nestUnit e sl) 1≤W))
+                   (one-pow W _))
+foldPath-nodes {e = e} W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb =
+  ≤-trans (foldPath-nodes W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
+             (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
+             1≤W (proj₂ hb))
+    (≤-trans (*-monoʳ-≤ (pathNestF p ^ W)
+                (+-monoˡ-≤ (W * (pathNestD p + U))
+                           (stepFrame-nodes W sf id now f p vals fin sched st
+                              1≤W (proj₁ hb))))
+    (≤-trans (nest-telescope (frameNestF f ^ W) (pathNestF p ^ W) B
+                             (W * frameNestD f) (W * (pathNestD p + U))
+                             (1≤pow≤ (frameNestF f) W (1≤frameNestF f)))
              (≤-reflexive
-               (cong (λ z → frameNestF f * pathNestF p * (B + z))
-                     (trans (sym (+-assoc (frameNestD f) (pathNestD p) U))
-                            (cong (_+ U) (sym (pathNestD-cons f p))))))))
+               (cong₂ _*_ (sym (pow-distrib-* W (frameNestF f) (pathNestF p)))
+                          (cong (B +_) charge)))))
   where
   B      = nodesMax st ⊔ nestDᵛˢ vals
   U      = nestUnit e sl
@@ -279,3 +325,10 @@ foldPath-nodes {e = e} sl sf gas id now envSrc (f ↠ p) vals evs fin sched st h
   fin′   = proj₁ (proj₂ (proj₂ step))
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ step)))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ step)))
+
+  charge : W * frameNestD f + W * (pathNestD p + U) ≡ W * (pathNestD (f ↠ p) + U)
+  charge =
+    trans (sym (*-distribˡ-+ W (frameNestD f) (pathNestD p + U)))
+          (cong (W *_)
+            (trans (sym (+-assoc (frameNestD f) (pathNestD p) U))
+                   (cong (_+ U) (sym (pathNestD-cons f p)))))

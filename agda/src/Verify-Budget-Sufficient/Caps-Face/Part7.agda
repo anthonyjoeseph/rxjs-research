@@ -3,9 +3,10 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; <⇒≤;
-  *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n)
+open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m;
+  n≤1+n; *-identityʳ; <⇒≤; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n;
+  m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n; *-distribˡ-+; ^-*-assoc; *-comm)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; map; foldr)
@@ -32,11 +33,11 @@ open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; size�
 open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (foldPath-nodes; nodesMax)
+  (foldPath-nodes; nodesMax; burstsOK; one-pow)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; chainsNestF; chainsNestF≡; chainsSzSum; pathSzSum; frameSzD; pathNestD; pathNestF; 1≤pathNestF;
-  nest-telescope; nest-scale; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt; nest-inflate;
-  storeNest-latch; realWidAt; realWidAt-def; nestSyn; nestUnit; slotsNestSum; liveNest; nodeNest; regsNestMax)
+  nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt; nest-inflate;
+  storeNest-latch; realWidAt; realWidAt-def; nestSyn; nestIncAt; nestIncAt-def; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest; nodeNest; regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; root; share-sink; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
@@ -66,7 +67,7 @@ open import Verify-Budget-Sufficient.Delivery-Walk using
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN; foldPath-sink-N; shareGo-cons-N; shareGo-skip-N)
 open import Verify-Budget-Sufficient.Caps using
-  (1≤capsAt-reg; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsH; cDel;
+  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsH; cDel;
    cDel-body; dWalkᶜ-mono; frameStep; frameStep-0; frameStep-mono-j;
    iterFold-infl; iterFold-mono-count; iterSize-mono-count; lvls-mono;
    sizeCount; sizeCount-body)
@@ -1234,7 +1235,16 @@ postulate
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascadeGo a nextId chains sched st
     in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
-         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+         ≤ storeNestMax sched st + nestIncAt e sl id
+
+-- THE BURST BOUND AT THE INDICES A CHAIN STEP FIXES, so that the fold
+-- below and the caps face above name the same hypothesis.
+chainBurstOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (W : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (sched : Sched Γ) (st : EvalSt e) → Set
+chainBurstOK {n = n} {e = e} W id a path sched st =
+  burstsOK W (budgetAt e (Sched.slots sched) id) id (arrTick a) path
+           (arrVal a ∷ []) (Arrival.isLast a) sched st
 
 -- THE STORE'S ONE ACCUMULATING CORNER, AND WHAT PAYS FOR IT IS THE
 -- SELECTION.  Within the node arm the store deepens at two sites, not
@@ -1287,51 +1297,79 @@ postulate
 --   very statement, eleven against nine, and the gap is unbounded in
 --   the fold depth of a frame the program never mentions.
 chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (W : ℕ) (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
+  Sched.slots sched ≡ sl → 1 ≤ W → chainBurstOK W id a path sched st →
   let r = chainStep id a path sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-    ≤ pathNestF path
+    ≤ pathNestF path ^ W
       * (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-         + (nestDᵛ (arrTy a) (arrVal a) + pathNestD path + nestUnit e sl))
-chainStep-nodes {n = n} {e = e} sl id a path sched st hsl =
-  ≤-trans (foldPath-nodes sl (budgetAt e (Sched.slots sched) id) n id
+         + W * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path + nestUnit e sl))
+chainStep-nodes {n = n} {e = e} W sl id a path sched st hsl 1≤W hb =
+  ≤-trans (foldPath-nodes W sl (budgetAt e (Sched.slots sched) id) n id
              (arrTick a) (arrSource a) path (arrVal a ∷ [])
              (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-             (Arrival.isLast a) sched st hsl)
-    (*-monoʳ-≤ (pathNestF path)
-      (≤-trans (+-monoˡ-≤ (pathNestD path + U)
+             (Arrival.isLast a) sched st hsl 1≤W hb)
+    (*-monoʳ-≤ (pathNestF path ^ W)
+      (≤-trans (+-monoˡ-≤ (W * (pathNestD path + U))
                           (≤-trans (⊔-mono-≤ (≤-refl {nodesMax st})
                                              (≤-reflexive (⊔-identityʳ V)))
                                    (m⊔n≤m+n (nodesMax st) V)))
-      (≤-trans (≤-reflexive (+-assoc (nodesMax st) V (pathNestD path + U)))
-               (≤-reflexive (cong (nodesMax st +_)
-                                  (sym (+-assoc V (pathNestD path) U)))))))
+      (≤-trans (≤-reflexive (+-assoc (nodesMax st) V (W * (pathNestD path + U))))
+               (+-monoʳ-≤ (nodesMax st) spread))))
   where
   V = nestDᵛ (arrTy a) (arrVal a)
   U = nestUnit e sl
 
+  spread : V + W * (pathNestD path + U) ≤ W * (V + pathNestD path + U)
+  spread =
+    ≤-trans (+-monoˡ-≤ (W * (pathNestD path + U)) (nest-inflate W V 1≤W))
+      (≤-trans (≤-reflexive (sym (*-distribˡ-+ W V (pathNestD path + U))))
+               (≤-reflexive (cong (W *_) (sym (+-assoc V (pathNestD path) U)))))
+
+-- AND OVER A CASCADE'S CHAIN LIST, mirroring `cascadeGo`: a cancelled
+-- registration walks nothing and owes nothing, and a delivered one owes
+-- its own walk and then the rest of the fold at the state it left.
+chainsBurstOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (W : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+chainsBurstOK W a nextId []               sched st = ⊤
+chainsBurstOK W a nextId ((rid , c) ∷ chains) sched st =
+  if any (_≡ᵇ rid) (EvalSt.cancelled st)
+  then chainsBurstOK W a nextId chains sched st
+  else (chainBurstOK W nextId a c sched
+          (record st { delivered = rid ∷ EvalSt.delivered st })
+        × chainsBurstOK W a nextId chains
+            (proj₁ (proj₂ (chainStep nextId a c sched
+                             (record st { delivered = rid ∷ EvalSt.delivered st }))))
+            (proj₂ (proj₂ (chainStep nextId a c sched
+                             (record st { delivered = rid ∷ EvalSt.delivered st })))))
+
 cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+  (W : ℕ) (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
+  Sched.slots sched ≡ sl → 1 ≤ W → chainsBurstOK W a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-    ≤ chainsNestF chains
+    ≤ chainsNestF chains ^ W
       * (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
          + length chains
-             * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains + nestUnit e sl))
-cascadeGo-nodes-chains sl a nextId [] sched st hsl =
-  ≤-trans (m≤m+n _ 0) (≤-reflexive (sym (*-identityˡ _)))
-cascadeGo-nodes-chains {e = e} sl a nextId ((rid , c) ∷ chains) sched st hsl
-  with any (_≡ᵇ rid) (EvalSt.cancelled st)
-... | true =
-  ≤-trans (≤-trans (cascadeGo-nodes-chains sl a nextId chains sched st hsl)
-                   (*-monoʳ-≤ G (+-monoʳ-≤ M grow)))
-          (nest-scale (pathNestF c) G (M + suc (length chains) * (V + C′ + U))
-                      (1≤pathNestF c))
+             * (W * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains + nestUnit e sl)))
+cascadeGo-nodes-chains W sl a nextId [] sched st hsl 1≤W hb =
+  ≤-trans (m≤m+n _ 0) (one-pow W _)
+cascadeGo-nodes-chains {e = e} W sl a nextId ((rid , c) ∷ chains) sched st hsl 1≤W hb
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) | hb
+... | true | hb′ =
+  ≤-trans (≤-trans (cascadeGo-nodes-chains W sl a nextId chains sched st hsl 1≤W hb′)
+                   (*-monoʳ-≤ (G ^ W) (+-monoʳ-≤ M grow)))
+          (≤-trans (nest-scale (pathNestF c ^ W) (G ^ W)
+                      (M + suc (length chains) * (W * (V + C′ + U)))
+                      (1≤pow≤ (pathNestF c) W (1≤pathNestF c)))
+                   (≤-reflexive
+                     (cong (_* (M + suc (length chains) * (W * (V + C′ + U))))
+                           (sym (pow-distrib-* W (pathNestF c) G)))))
   where
   M  = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
   V  = nestDᵛ (arrTy a) (arrVal a)
@@ -1339,24 +1377,33 @@ cascadeGo-nodes-chains {e = e} sl a nextId ((rid , c) ∷ chains) sched st hsl
   C′ = pathNestD c ⊔ C
   U  = nestUnit e sl
   G  = chainsNestF chains
-  grow : length chains * (V + C + U) ≤ suc (length chains) * (V + C′ + U)
+  grow : length chains * (W * (V + C + U)) ≤ suc (length chains) * (W * (V + C′ + U))
   grow = *-mono-≤ (n≤1+n (length chains))
-                  (+-monoˡ-≤ U (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C)))
-... | false =
-  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sd₁ st₁
-             (trans (chainStep-slots nextId a c sched st′) hsl))
-          (≤-trans (*-monoʳ-≤ G
-                      (+-monoˡ-≤ (length chains * (V + C + U))
-                                 (chainStep-nodes sl nextId a c sched st′ hsl)))
-          (≤-trans (nest-telescope (pathNestF c) G M (V + pathNestD c + U)
-                                   (length chains * (V + C + U))
-                                   (1≤pathNestF c))
-                   (*-monoʳ-≤ (pathNestF c * G)
-                     (+-monoʳ-≤ M
-                       (+-mono-≤ (+-monoˡ-≤ U (+-monoʳ-≤ V (m≤m⊔n (pathNestD c) C)))
-                                 (*-monoʳ-≤ (length chains)
-                                   (+-monoˡ-≤ U
-                                     (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C))))))))) 
+                  (*-monoʳ-≤ W
+                    (+-monoˡ-≤ U (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C))))
+... | false | hb′ =
+  ≤-trans (cascadeGo-nodes-chains W sl a nextId chains sd₁ st₁
+             (trans (chainStep-slots nextId a c sched st′) hsl) 1≤W (proj₂ hb′))
+          (≤-trans (*-monoʳ-≤ (G ^ W)
+                      (+-monoˡ-≤ (length chains * (W * (V + C + U)))
+                                 (chainStep-nodes W sl nextId a c sched st′ hsl
+                                    1≤W (proj₁ hb′))))
+          (≤-trans (nest-telescope (pathNestF c ^ W) (G ^ W) M
+                                   (W * (V + pathNestD c + U))
+                                   (length chains * (W * (V + C + U)))
+                                   (1≤pow≤ (pathNestF c) W (1≤pathNestF c)))
+                   (≤-trans (≤-reflexive
+                               (cong (_* (M + (W * (V + pathNestD c + U)
+                                               + length chains * (W * (V + C + U)))))
+                                     (sym (pow-distrib-* W (pathNestF c) G))))
+                     (*-monoʳ-≤ ((pathNestF c * G) ^ W)
+                       (+-monoʳ-≤ M
+                         (+-mono-≤ (*-monoʳ-≤ W
+                                     (+-monoˡ-≤ U (+-monoʳ-≤ V (m≤m⊔n (pathNestD c) C))))
+                                   (*-monoʳ-≤ (length chains)
+                                     (*-monoʳ-≤ W
+                                       (+-monoˡ-≤ U
+                                         (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C)))))))))))
   where
   M   = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
   V   = nestDᵛ (arrTy a) (arrVal a)
@@ -1407,17 +1454,22 @@ cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   length chains ≤ realWidAt e sl id →
   nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains ≤ nestUnit e sl →
-  chainsNestF chains ≤ nestFacAt e sl id →
+  chainsNestF chains ^ nestBurstAt e sl id ≤ nestFacAt e sl id →
+  chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st
   in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
        ≤ nestFacAt e sl id
-         * (storeNestMax sched st + realWidAt e sl id * nestSyn e sl)
-cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hfac =
-  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sched st hsl)
+         * (storeNestMax sched st + nestIncAt e sl id)
+cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hfac hburst =
+  ≤-trans (cascadeGo-nodes-chains (nestBurstAt e sl id) sl a nextId chains sched st
+             hsl (1≤nestBurstAt e sl id) hburst)
     (*-mono-≤ hfac
       (+-mono-≤ nodes≤store
-        (≤-trans (*-mono-≤ hcnt (+-monoˡ-≤ (nestUnit e sl) hchg))
-                 (≤-reflexive (cong (realWidAt e sl id *_) (sym twoU))))))
+        (≤-trans (*-mono-≤ hcnt
+                    (*-monoʳ-≤ (nestBurstAt e sl id)
+                      (≤-trans (+-monoˡ-≤ (nestUnit e sl) hchg)
+                               (≤-reflexive (sym twoU)))))
+                 (≤-reflexive (sym (nestIncAt-def e sl id))))))
   where
   twoU : nestSyn e sl ≡ nestUnit e sl + nestUnit e sl
   twoU = cong (nestUnit e sl +_) (+-identityʳ (nestUnit e sl))
@@ -1451,7 +1503,7 @@ postulate
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascadeGo a nextId chains sched st
     in regsNestMax (EvalSt.registry (proj₂ (proj₂ r)))
-         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+         ≤ storeNestMax sched st + nestIncAt e sl id
 
 -- THE WALK'S STORE GROWTH, IN THE WIDTH CURRENCY, AND IT IS PRIMITIVE.
 -- One arrival's chain walk leaves the store measure no deeper than it
@@ -1483,12 +1535,13 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   length chains ≤ realWidAt e sl id →
   nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains ≤ nestUnit e sl →
-  chainsNestF chains ≤ nestFacAt e sl id →
+  chainsNestF chains ^ nestBurstAt e sl id ≤ nestFacAt e sl id →
+  chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
-         * (storeNestMax sched st + realWidAt e sl id * nestSyn e sl)
-cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hfac =
+         * (storeNestMax sched st + nestIncAt e sl id)
+cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hfac hburst =
   ⊔-lub (⊔-lub (⊔-lub SL LV) ND) RG
   where
   r   = cascadeGo a nextId chains sched st
@@ -1496,7 +1549,7 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt 
   st′ = proj₂ (proj₂ r)
 
   RHS : ℕ
-  RHS = storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+  RHS = storeNestMax sched st + nestIncAt e sl id
 
   up : RHS ≤ nestFacAt e sl id * RHS
   up = nest-inflate (nestFacAt e sl id) RHS (1≤nestFacAt e sl id)
@@ -1513,7 +1566,7 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt 
 
   ND : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st′)
          ≤ nestFacAt e sl id * RHS
-  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hfac
+  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hfac hburst
 
   RG : regsNestMax (EvalSt.registry st′) ≤ nestFacAt e sl id * RHS
   RG = ≤-trans (cascadeGo-nest-regs sl id a nextId chains sched st hsl hcaps hnest hval) up
@@ -1741,11 +1794,34 @@ arr-chains-nest-fac : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
-  chainsNestF (chainsOf a st) ≤ nestFacAt e sl id
+  chainsNestF (chainsOf a st) ^ nestBurstAt e sl id ≤ nestFacAt e sl id
 arr-chains-nest-fac {e = e} sl id a sched st hsl hcaps hnest =
-  ≤-trans (≤-reflexive (chainsNestF≡ (chainsOf a st)))
-    (≤-trans (^-monoʳ-≤ 2 (arr-chains-sz-sum sl id a sched st hsl hcaps))
+  ≤-trans (≤-reflexive
+             (trans (cong (_^ nestBurstAt e sl id) (chainsNestF≡ (chainsOf a st)))
+                    (^-*-assoc 2 (chainsSzSum (chainsOf a st)) (nestBurstAt e sl id))))
+    (≤-trans (^-monoʳ-≤ 2
+                (≤-trans (≤-reflexive
+                            (*-comm (chainsSzSum (chainsOf a st)) (nestBurstAt e sl id)))
+                         (*-monoʳ-≤ (nestBurstAt e sl id)
+                            (arr-chains-sz-sum sl id a sched st hsl hcaps))))
              (≤-reflexive (sym (nestFacAt-def e sl id))))
+
+-- THE BURST BOUND A CASCADE'S WALKS RUN UNDER, and it is a caps fact
+-- rather than a walk fact, which is why it is a leaf here and not a
+-- clause up there.  A chain starts from ONE value -- the arrival's --
+-- and only a `thru` frame can hand on more than it took, by however
+-- many its inners emit; what caps that is the width, and the width cap
+-- is `capsOK?`'s business.  So the walk takes the bound as a
+-- hypothesis shaped like its own recursion and this is where the
+-- hypothesis is met.
+postulate
+  arr-chains-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    chainsBurstOK (nestBurstAt e sl id) a nextId (chainsOf a st) sched
+      (cascadeLatch a st)
 
 cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -1759,7 +1835,7 @@ cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       + chainsNestD (chainsOf a st)
       + nestFacAt e sl id
         * (storeNestMax sched (cascadeLatch a st)
-           + realWidAt e sl id * nestSyn e sl)
+           + nestIncAt e sl id)
 cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval =
   ≤-trans (cascade-nest-store a nextId (chainsOf a st) sched st₀)
           (+-monoʳ-≤ BASE goNest)
@@ -1770,7 +1846,7 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
 
   goNest : storeNestMax (proj₁ (proj₂ GO)) (proj₂ (proj₂ GO))
              ≤ nestFacAt e sl id
-               * (storeNestMax sched st₀ + realWidAt e sl id * nestSyn e sl)
+               * (storeNestMax sched st₀ + nestIncAt e sl id)
   goNest =
     cascadeGo-nest sl id a nextId (chainsOf a st) sched st₀ hsl
       (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
@@ -1779,6 +1855,7 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
       (chains-count-width sl id a sched st hcaps)
       (arr-chains-nest-syn sl id a sched st hsl hcaps hnest)
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
+      (arr-chains-bursts sl id a nextId sched st hsl hcaps)
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

@@ -345,25 +345,42 @@ many minutes and the Bash tool's ceiling is 600 s per foreground call, so iterat
   a comment edit is free.** **Never run `agda` against `agda/src` directly** — that
   builds a second interface cache and every alternation invalidates the other's cone.
   → [docs/agda-build.md](docs/agda-build.md)
-- **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>` AND WAIT ON IT WITH `make bg-wait
-  T=<target>`, WHICH IS THE ONLY WAITING MECHANISM.** `bg-wait` blocks until the log is
-  terminal and exits 0 GREEN / non-zero RED, so one call replaces every poll — it cannot
-  return while the run is alive, and that is the property nothing you write yourself has.
-  `make bg-check T=<target>` is for a verdict you want WITHOUT waiting, and it is never
-  looped: make collapses its exit status into its own exit 2, so still-running and failed
-  read as the same number. **A `sleep N; tail` loop is that same mistake in different
-  clothes** — a turn burnt per tick, reading a log buffered until the run ends, unable to
-  tell a live build from a dead one. **Never hand-roll the wrapper either** — the obvious
+- **LAUNCH EVERY LONG BUILD WITH `make bg T=<target>`, AS A BACKGROUND TOOL CALL, AND
+  READ THE VERDICT WITH `make bg-check T=<target>`. THOSE ARE THE TWO COMMANDS A
+  SESSION NEEDS.** What each of the three does, since none of them is guessable:
+  **`make bg T=<target>`** runs the build, writes everything to a log, and appends a
+  terminal `EXIT=<code>` line — it BLOCKS until the build is done, which is why it is
+  launched in the background; **`make bg-check T=<target>`** reads that log and reports
+  GREEN / RED-with-the-failing-tail / STILL-RUNNING; **`make bg-wait T=<target>`**
+  blocks until the log is terminal and then exits 0 GREEN / non-zero RED — it is for a
+  human at a terminal, or for a caller that genuinely has to block, and a session
+  driving `make bg` in the background does not need it, because the completion
+  notification IS the wait. **One background call per build, and never a second while
+  one is live.** `bg-check` is never LOOPED: make collapses its exit status into its own
+  exit 2, so still-running and failed read as the same number. **A `sleep N; tail` loop,
+  or a `pgrep` for the waiter, is the whole apparatus re-implemented worse** — a turn
+  burnt per tick, reading a log buffered until the run ends, unable to tell a live build
+  from a dead one. **Never hand-roll the wrapper either** — the obvious
   `(cmd > log; echo EXIT=$?)` exits with `echo`'s status and reports every build green.
   `make bg` always exits non-zero by design, so **a completion notification is never a
-  result**.
-  **AND TYPE IT BARE — NO `&`, NO REDIRECT (Anthony).** `make bg` detaches on its own
-  and owns its log, so a trailing `&` backgrounds a wrapper that has already
-  backgrounded itself, and a `>/dev/null 2>&1` throws away the one thing the launch
-  prints: WHERE the log is and whether the launch took. Both dress up the by-design
-  non-zero exit as something to suppress, which is the same instinct the hand-rolled
-  wrapper above comes from — the exit status is not the result and hiding it is not
-  the fix. → [docs/bg.md](docs/bg.md)
+  result** — `bg-check` is.
+  **AND "DETACHED" MEANS THE BASH TOOL'S OWN BACKGROUND FLAG, NEVER SHELL SYNTAX
+  (Anthony).** Launch `make bg` as a BACKGROUND tool call and type the command
+  itself bare — no `&`, no redirect, NO PIPE. The flag is what gives the run no
+  time limit and a completion notification; a FOREGROUND call is capped at 600 s
+  and a build that outruns the cap is KILLED, which is the one failure the whole
+  apparatus is not immune to — a killed build's log gets its terminal marker only
+  from the recipe's signal trap. The three forbidden decorations are one mistake
+  wearing three faces: a trailing `&` backgrounds a wrapper the harness is already
+  managing, a `>/dev/null 2>&1` throws away the one thing the launch prints (WHERE
+  the log is), and **A PIPE IS THE WORST OF THEM, BECAUSE IT ANSWERS** — a pipeline
+  exits with the LAST command's status, so `make gate | tail` reports the tail's
+  success over a RED build. That is the hand-rolled wrapper's false green exactly,
+  arriving from outside rather than inside: the wrappers defend the LOG, and a pipe
+  goes around the log. The exit status is not the result and hiding it is not the
+  fix; `bg-check` reads the log and is. **AND ONE BUILD AT A TIME** — never launch a
+  second while one is live, since every check here shares one interface cache.
+  → [docs/bg.md](docs/bg.md)
 - **`setsid` and `timeout` DO NOT EXIST ON macOS.** Detach with the Bash tool's
   `run_in_background`. Pin the working directory in every build command and guard with
   `ls Makefile &&`; never pipe agda through `head`, which hides OOM kills.

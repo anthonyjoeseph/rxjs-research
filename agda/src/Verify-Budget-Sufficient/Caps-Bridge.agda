@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeGo-nest; chains-count-width; arr-chains-nest-syn; arr-chains-nest-fac; cascadeGo-slots; cascadeLatch-caps;
+  (caps-tick; cascade-depth-capsH; cascadeGo-nest; chains-count-width; arr-chains-nest-syn; arr-chains-nest-fac; arr-chains-bursts; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
@@ -97,9 +97,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0;
-   nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc; nest-sum-3; nestFacAt;
-   realWidAt; nestSyn; storeNest-latch; storeNest-finish; nestOK?-latch)
+  (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store;
+  nestOK?-intro; nestCapAt-suc; nest-sum-3; nestFacAt; nestIncAt; storeNest-latch;
+  storeNest-finish; nestOK?-latch)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
@@ -787,12 +787,12 @@ store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   let r = cascade a nextId sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
-         * (storeNestMax sched st + realWidAt e sl id * nestSyn e sl)
+         * (storeNestMax sched st + nestIncAt e sl id)
 store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
   ≤-trans (storeNest-finish a schedG stG)
           (subst (λ m → storeNestMax schedG stG
                           ≤ nestFacAt e sl id
-                            * (m + realWidAt e sl id * nestSyn e sl))
+                            * (m + nestIncAt e sl id))
                  (storeNest-latch a sched st)
                  goNest)
   where
@@ -803,7 +803,7 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
 
   goNest : storeNestMax schedG stG
              ≤ nestFacAt e sl id
-               * (storeNestMax sched st₀ + realWidAt e sl id * nestSyn e sl)
+               * (storeNestMax sched st₀ + nestIncAt e sl id)
   goNest =
     cascadeGo-nest sl id a nextId (chainsOf a st) sched st₀ hsl
       (cascadeLatch-caps (capsAt e sl id) a sched st hcaps)
@@ -812,6 +812,7 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
       (chains-count-width sl id a sched st hcaps)
       (arr-chains-nest-syn sl id a sched st hsl hcaps hnest)
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
+      (arr-chains-bursts sl id a nextId sched st hsl hcaps)
 
 nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -832,7 +833,7 @@ nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval =
            (≤-trans
              (store-growth sl id a nextId sched st hsl hcaps hnest hval)
              (*-monoʳ-≤ (nestFacAt e sl id)
-               (+-monoˡ-≤ (realWidAt e sl id * nestSyn e sl)
+               (+-monoˡ-≤ (nestIncAt e sl id)
                           (nestOK?-store e sl id sched st hnest)))))
 
 cascade-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -1534,7 +1535,7 @@ postulate
     depthE g b κ bid now sched st
       ≤ nestDᵉ b + pathNestD κ
         + storeNestMax sched st
-        + realWidAt e sl id * nestSyn e sl
+        + nestIncAt e sl id
 
 postulate
   init-nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
