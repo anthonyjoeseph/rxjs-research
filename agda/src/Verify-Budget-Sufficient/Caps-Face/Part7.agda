@@ -1435,6 +1435,19 @@ postulate
 -- in `capsBase` rather than in the width, which is the point of the
 -- split: both of ITS sides now reduce, where the width is sealed.
 --
+-- DEAD ROUTE: reading the mint budget as a SHARED PARKED POOL,
+--   consumed across the chain list rather than allowed per chain.  The
+--   shape is attractive because it explains a ceiling that is a MAX
+--   rather than a sum -- releases would draw down one pool however many
+--   chains draw on it -- and because a drain's output queue is always a
+--   suffix of its input, so the pool provably only shrinks while a walk
+--   runs.  It is dead on the FACTS: the total parked across all nodes
+--   is 0 or 2 at the entry on every family measured, while the walk
+--   mints up to 180.  The mints are not releases.  An inner arrives
+--   already carrying its observable and gets subscribed on the spot,
+--   which is why the queue never moves -- so the budget is the FAN-OUT
+--   the path presents, and a pool quantity would have been defined,
+--   threaded and found inert.
 -- PROBED: `Probed.Cascade-Mint-Base` takes the entry walk on three
 --   families and pins the COUNT, the CEILING and the verdict by `refl`:
 --   the bounded drain mints 5 against 72, the skip family 7 against 96,
