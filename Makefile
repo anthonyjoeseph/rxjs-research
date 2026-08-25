@@ -1,4 +1,4 @@
-.PHONY: find-prose gate gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -515,6 +515,15 @@ wiring-selftest:
 roadmap-check:
 	@scripts/check-roadmap.py
 
+# WRITES the evidence field on every classed row, from the postulates' own
+# headers.  The field is DERIVED -- which is the whole reason it may be
+# mandatory without producing filler.  A hand-typed census is the failure this
+# repo already paid for once: true when written, silently wrong later, read by
+# nobody who could tell.  `roadmap-check` recomputes it and fails on a
+# mismatch, so the roadmap cannot drift from the headers it summarises.
+roadmap-evidence:
+	@scripts/check-roadmap.py --fix-evidence
+
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
 # the failing path never runs on it and would rot untested.  The MUST-NOT row is
@@ -524,7 +533,7 @@ roadmap-check:
 roadmap-selftest:
 	@fail=0; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null \
+	      --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null \
 	    || { echo "SELFTEST FAIL: a correctly sorted, fully covered roadmap was rejected"; fail=1; }; \
 	  out=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/unsorted.md > /dev/null 2>&1; then \
@@ -537,9 +546,9 @@ roadmap-selftest:
 	  echo "$$out" | grep -q "a-grindable is" \
 	    && { echo "SELFTEST FAIL: the row a violation sits below was itself reported"; fail=1; }; \
 	  gap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger-gap.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	           --ledger scripts/roadmap-selftest/ledger-gap.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	       --ledger scripts/roadmap-selftest/ledger-gap.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	       --ledger scripts/roadmap-selftest/ledger-gap.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: an unscheduled postulate PASSED — the coverage check is dead"; fail=1; \
 	  fi; \
 	  echo "$$gap" | grep -q never-scheduled \
@@ -573,7 +582,7 @@ roadmap-selftest:
 	  echo "$$out" | grep -q "TIER PREAMBLES" \
 	    && { echo "SELFTEST FAIL: the preamble check fired on the sort fixture"; fail=1; }; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1 \
+	      --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt 2>&1 \
 	    | grep -q names-are-free \
 	    && { echo "SELFTEST FAIL: a nine-name row was charged for its names — shortening a row would mean dropping a name"; fail=1; }; \
 	  dat=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/dated.md 2>&1); \
@@ -589,24 +598,24 @@ roadmap-selftest:
 	  echo "$$out" | grep -q "DATED NARRATIVE" \
 	    && { echo "SELFTEST FAIL: the date check fired on the sort fixture"; fail=1; }; \
 	  rul=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt \
 	           --dates-only scripts/roadmap-selftest/dated-rules.md 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	       --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt \
 	       --dates-only scripts/roadmap-selftest/dated-rules.md > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a dated RULES file PASSED beside a clean roadmap — the CLAUDE.md half of the date check is dead"; fail=1; \
 	  fi; \
 	  echo "$$rul" | grep -q "dated-rules.md:" \
 	    || { echo "SELFTEST FAIL: the rules file was not named in the date report — a rowless file is being skipped"; fail=1; }; \
 	  scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	      --ledger scripts/roadmap-selftest/ledger.txt --src-names scripts/roadmap-selftest/src-names.txt \
+	      --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt --src-names scripts/roadmap-selftest/src-names.txt \
 	      --dates-only /dev/null > /dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a dateless extra file was rejected"; fail=1; }; \
 	  stl=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/stale.md \
-	           --ledger scripts/roadmap-selftest/ledger-stale.txt \
+	           --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
 	           --src-names scripts/roadmap-selftest/src-names-stale.txt 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/stale.md \
-	       --ledger scripts/roadmap-selftest/ledger-stale.txt \
+	       --ledger scripts/roadmap-selftest/ledger-stale.txt --census scripts/roadmap-selftest/census.txt \
 	       --src-names scripts/roadmap-selftest/src-names-stale.txt > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a roadmap naming discharged postulates PASSED — the staleness check is dead"; fail=1; \
 	  fi; \
@@ -617,10 +626,32 @@ roadmap-selftest:
 	  echo "$$stl" | grep -q "a-live" \
 	    && { echo "SELFTEST FAIL: a still-live postulate was reported stale"; fail=1; }; \
 	  cln=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/sorted.md \
-	           --ledger scripts/roadmap-selftest/ledger.txt \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
 	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
 	  echo "$$cln" | grep -q "STALE ROWS" \
 	    && { echo "SELFTEST FAIL: the staleness check fired on a clean roadmap — a CITED precedent or a descriptive head is being read as a claim, and earning GRINDABLE requires naming a proven precedent"; fail=1; }; \
+	  mis=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-missing.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-missing.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a row with NO evidence field PASSED — the field is optional again, which is the one thing it must not be"; fail=1; \
+	  else \
+	    echo "$$mis" | grep -q "NO EVIDENCE FIELD" \
+	      || { echo "SELFTEST FAIL: a missing evidence field was rejected for the wrong reason"; fail=1; }; \
+	  fi; \
+	  stl2=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-stale.md \
+	            --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	            --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-stale.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: an evidence field disagreeing with the headers PASSED — the field can rot, which is the whole reason it is derived"; fail=1; \
+	  else \
+	    echo "$$stl2" | grep -q "EVIDENCE FIELD IS STALE" \
+	      || { echo "SELFTEST FAIL: a stale evidence field was rejected for the wrong reason"; fail=1; }; \
+	  fi; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and

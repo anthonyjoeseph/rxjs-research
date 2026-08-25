@@ -1,8 +1,8 @@
-# fixture — a correctly sorted roadmap whose rows cover the whole ledger
+# fixture — one row has NO evidence field: the check must FAIL
 
 ## Tier 0 — anchor
 
-- **`a-falsity`** — FALSITY, `REFUTED, PROBED`: worst class goes first.
+- **`a-falsity`** — FALSITY: worst class goes first.
 - **`b-shape`** — SHAPE, `NO EVIDENCE`: a restatement is owed.
 - **`c-difficulty`** — DIFFICULTY, `NO EVIDENCE`: true, correctly stated, hard.
 - **`d-grindable`** — GRINDABLE, `TWIN`: the shape is already known.

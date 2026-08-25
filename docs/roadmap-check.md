@@ -5,7 +5,7 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Five checks
+## Seven checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
@@ -25,6 +25,9 @@ can see into build failures.
    header it belonged in. A check that only reads bullets cannot see that.
 6. **No calendar dates** — anywhere in PROOF-STATE.md, and anywhere in the files listed
    in `DATE_ONLY_FILES` (CLAUDE.md and `docs/*.md`), which get this check only.
+7. **The evidence field** — every classed row carries a backticked field directly after
+   its risk class, naming the durable markers its postulates' own headers carry, and
+   matching them. `make roadmap-evidence` writes it; nobody types it.
 
 ## What the preamble check charges, and the one bug it was written after
 
@@ -87,7 +90,42 @@ scan is proven to fire on a file the row parser cannot read, which is exactly
 CLAUDE.md's shape — and a **stale** fixture exercising all three arms of the staleness
 check, beside a clean fixture whose rows deliberately cite a proven precedent and carry
 a descriptive head, so the two exemptions are pinned as load-bearing rather than
-assumed.
+assumed. Two further fixtures pin the evidence field in both of its failing directions —
+a row with no field at all, and a row whose field disagrees with the census — against a
+`--census` fixture standing in for a scan of `agda/src`.
+
+## The evidence field, and why a derived field may be mandatory
+
+A row reads `— SHAPE, `REFUTED`:` or `— DIFFICULTY, `NO EVIDENCE`:`. The field lists
+`REFUTED`, `DEAD ROUTE`, `TWIN`, `PROBED`, `RECOVERY` in that order — the same
+vocabulary and the same rank order `make comments-check` validates — with `×N` when a
+header carries a marker more than once.
+
+**Write it with `make roadmap-evidence`.** The field is derived from the headers, and
+`roadmap-check` recomputes it and fails on any disagreement, so a hand-typed one is
+merely a slower way to reach the same answer or a wrong one.
+
+Two design points worth keeping straight, because they look like contradictions of
+rules stated elsewhere:
+
+- **A source header's `TWIN:` is optional-when-absent; this field is mandatory.** The
+  optionality argument is about AUTHORED sections, where a required field produces
+  filler and a filler `TWIN:` earns a class the row has not earned. A derived field
+  cannot be filled with anything. The blank is the product: `NO EVIDENCE` on a FALSITY
+  row is a statement nobody has instantiated or refuted a route through, which was
+  previously invisible because absence had no marker to be absent.
+- **A count is not a copy.** Moving receipts themselves into the roadmap would
+  duplicate content, and duplicated content drifts. A count is a function of the
+  headers, so the two cannot disagree without the gate saying so.
+
+There are deliberately **no aggregates** — no per-tier or whole-file totals. The
+per-row blank carries the signal; a total is a number someone has to keep true for no
+decision it changes.
+
+Which markers a block reaches is decided by indentation: a header associates with every
+declaration under it until the next comment run or the next construct at **column 0**.
+That is why splitting a refuted postulate out of a shared `postulate` block into its own
+is what gives it its own markers, and why siblings in one block share a header's `TWIN`.
 
 ## The hygiene rules a machine cannot check
 

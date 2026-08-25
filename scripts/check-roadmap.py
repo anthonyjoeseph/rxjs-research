@@ -111,16 +111,51 @@ the forward token set to heads would leave 49 live postulates unscheduled.  The
 way to bring a name under this check is to give it a head of its own.
 
 Where the dated thing belongs instead: a receipt or a dead route goes in the
-source header of the postulate it is about, and that is the ONLY place a date is
-wanted anywhere in this repo — such a receipt is only as good as the code being
-unmoved since, so its age is a signal about the evidence.  A ruling goes in
+source header of the postulate it is about, and WITHOUT a date — `make
+comments-check` refuses one there too, since a receipt's content is its
+coverage statement and coverage is re-runnable.  A ruling goes in
 CLAUDE.md with its attribution and WITHOUT its timestamp (a rule in the file of
 record is in force whatever its age); a timing figure goes in
 typecheck-performance-numbers.md; the rationale for a gate goes in the gate,
 which is this file.
+
+SIXTH CHECK — THE EVIDENCE FIELD: every classed row carries, directly after its
+risk class, a backticked field naming the durable markers its postulates' own
+headers carry — `REFUTED, PROBED`, `TWIN`, `REFUTED×2` — or `NO EVIDENCE`.
+
+WHY IT IS MANDATORY WHEN THE HEADER SECTIONS IT SUMMARISES ARE NOT.  A source
+header's `TWIN:` is optional-when-absent on purpose: requiring one would produce
+filler, and a filler `TWIN:` is worse than none because it earns a class the row
+has not earned.  That argument turns on the section being AUTHORED.  This field
+is DERIVED — recomputed from the headers on every run — so a mandatory field
+cannot be filled with anything, and the blank is the point rather than a defect.
+A row reading `DIFFICULTY, NO EVIDENCE` says nobody has instantiated this
+statement, refuted a route through it, or found it a twin: the cheapest
+unmanaged risk in the repo, and previously invisible, because absence had no
+marker to be absent.
+
+AND IT CANNOT ROT, WHICH IS THE ONLY REASON IT MAY LIVE HERE AT ALL.  Moving the
+receipts THEMSELVES into the roadmap would duplicate content, and duplicated
+content drifts — the failure that emptied this repo's memory directory, where
+three of six notes had aged silently past the change that invalidated them.  A
+count is not a copy: it is a function of the headers, so the check recomputes it
+and fails on any disagreement.  `make roadmap-evidence` writes it, and nobody
+types it.
+
+THE FIELD IS BACKTICKED, AND THAT IS LOAD-BEARING TWICE.  `prose_cost` subtracts
+backticked spans, so a mandatory field on every row costs two charged characters
+— the comma and the space — instead of pushing six rows past ROW_BUDGET, where
+the budget would win by eating the hooks.  And it is what separates the field
+from an ordinary qualifier: a row already reads `— GRINDABLE, large:`, and
+`large` is bare, so it is never read as evidence and never overwritten.
+
+NO AGGREGATES.  A per-tier or whole-file total was considered and rejected: the
+per-row blank carries the whole signal, and a total is a number someone has to
+keep true for no decision it changes.
 """
 
 import argparse
+import textwrap
 import re
 import sys
 import pathlib
@@ -424,6 +459,231 @@ def check_stale(tiers, live, srcnames):
     return discharged, vanished, gone_parents
 
 
+# ── THE EVIDENCE FIELD ────────────────────────────────────────────────
+# The five durable markers, in the order a header must carry them.  This
+# list is the SAME vocabulary `make comments-check` validates, and the
+# order is that check's rank order, so a row reads in the order its
+# header does.
+DURABLE_KINDS = ["REFUTED", "DEAD ROUTE", "TWIN", "PROBED", "RECOVERY"]
+DURABLE_MARK_RE = re.compile(
+    r"^(?:⚠\s*)?(REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)\b(?!-)"
+)
+NO_EVIDENCE = "NO EVIDENCE"
+
+# The field as it appears in a row: a backticked span directly after the
+# risk class.  BACKTICKED IS LOAD-BEARING TWICE.  It makes the field free
+# under `prose_cost`, so a mandatory field on every row costs two charged
+# characters (the comma and the space) instead of thirty; and it is what
+# distinguishes the field from an ordinary qualifier -- a row already
+# reads `— GRINDABLE, large:`, and `large` is not backticked, so it is
+# never mistaken for evidence and never overwritten.
+EVID_RE = re.compile(r"—\s*(?:" + "|".join(CLASSES) + r")\b")
+FIELD_RE = re.compile(r"\s*,\s*`([^`]*)`")
+EVID_TOKEN_RE = re.compile(
+    r"^(?:" + NO_EVIDENCE + r"|(?:REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)"
+    r"(?:×\d+)?(?:,\s*(?:REFUTED|DEAD ROUTE|TWIN|PROBED|RECOVERY)(?:×\d+)?)*)$"
+)
+
+
+def census(root, names, fixture=None):
+    """-> {postulate name: {marker kind: count}} read from agda/src headers.
+
+    A block is associated with EVERY declaration that follows it until the
+    next comment run or a line that is neither a declaration nor a block
+    keyword.  That is how a reader reads a shared `postulate` block, and it
+    is why splitting a refuted postulate into its own block is what gives it
+    its own markers -- the same locality the `-- REFUTED` convention rests
+    on, now with something reading it.
+    """
+    if fixture:
+        out = {n: {} for n in names}
+        for ln in pathlib.Path(fixture).read_text().splitlines():
+            if not ln.strip() or ln.startswith("#"):
+                continue
+            name, _, rest = ln.partition(":")
+            out[name.strip()] = {
+                k.strip().split("×")[0].strip():
+                    int(k.split("×")[1]) if "×" in k else 1
+                for k in rest.split(",") if k.strip()
+            }
+        return out
+
+    want = set(names)
+    out = {n: {} for n in names}
+    src = root / "agda" / "src"
+    for path in sorted(src.rglob("*.agda")) if src.exists() else []:
+        block, prev_comment = [], False
+        for line in path.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("--"):
+                if not prev_comment:
+                    block = []
+                block.append(re.sub(r"^\s*--\s?", "", line))
+                prev_comment = True
+                continue
+            prev_comment = False
+            md = DECL_RE.match(line)
+            if md and md.group(1) in want:
+                for b in block:
+                    mk = DURABLE_MARK_RE.match(b)
+                    if mk:
+                        c = out[md.group(1)]
+                        c[mk.group(1)] = c.get(mk.group(1), 0) + 1
+                continue
+            # An INDENTED line is inside the block the header opened -- a
+            # sibling declaration, a continuation of one's telescope, a body.
+            # Only a construct at column 0 ends the header's reach, which is
+            # why splitting a refuted postulate into its own column-0
+            # `postulate` block is what gives it its own markers.
+            if md or line[:1].isspace() or stripped in (
+                    "postulate", "abstract", "private", "mutual", ""):
+                continue
+            block = []
+    return out
+
+
+def evidence_token(counts):
+    """-> the field's text for one row's merged marker counts."""
+    parts = []
+    for k in DURABLE_KINDS:
+        n = counts.get(k, 0)
+        if n == 1:
+            parts.append(k)
+        elif n > 1:
+            parts.append(f"{k}×{n}")
+    return ", ".join(parts) if parts else NO_EVIDENCE
+
+
+def row_evidence(label, cen):
+    """-> merged counts for every live postulate a row head names."""
+    merged = {}
+    for group in head_groups(label):
+        for name in group:
+            if name in cen:
+                for k, v in cen[name].items():
+                    merged[k] = merged.get(k, 0) + v
+                break
+    return merged
+
+
+def row_span(lines, lineno):
+    """-> (start, end) physical line range of the row beginning at `lineno`."""
+    start = lineno - 1
+    i = start + 1
+    while i < len(lines):
+        if ROW_START_RE.match(lines[i]) or TIER_RE.match(lines[i]):
+            break
+        if not lines[i].strip():
+            break
+        if not (lines[i].startswith("  ") or lines[i].startswith("\t")):
+            break
+        i += 1
+    return start, i
+
+
+def unwrap(chunks):
+    """Physical row lines joined back into one string.
+
+    A trailing single hyphen is a manual word break (`machine-` / `refuted`),
+    so it closes up rather than taking a space -- joining on whitespace alone
+    turns every hand-wrapped word in the file into two.
+    """
+    out = ""
+    for c in chunks:
+        c = c.strip()
+        if not c:
+            continue
+        if out.endswith("-") and not out.endswith("--") and c[:1].islower():
+            out += c
+        else:
+            out = (out + " " + c) if out else c
+    return out
+
+
+NBSP = "\u00a0"
+
+
+def rewrap(text, keep=None, width=79):
+    """Re-flow one row, continuations indented two.
+
+    `keep` is a span the wrap may not break -- the evidence field contains a
+    space (`DEAD ROUTE`) and the field is read back by regex from a single
+    string, so a field split across two physical lines reads as ABSENT and the
+    check reports a row that is in fact correct.
+    """
+    if keep and keep in text:
+        text = text.replace(keep, keep.replace(" ", NBSP))
+    out = textwrap.wrap(text, width=width, subsequent_indent="  ",
+                        break_long_words=False, break_on_hyphens=False)
+    return [l.replace(NBSP, " ") for l in out]
+
+
+def evidence_edit(line, want):
+    """-> (line with the field set to `want`, field found or None).
+
+    THE ANCHOR IS NOT ALWAYS THE CLASS.  Some heads carry the class INSIDE the
+    bold label (`**Real, probed, awaiting proof — DIFFICULTY**`); writing the
+    field there would put it inside the row's NAME, where the coverage and
+    staleness checks read it as a claimed postulate.  So a class inside the
+    label anchors the field after the label's closing `**`.
+    """
+    mc = EVID_RE.search(line)
+    if mc is None:
+        return line, None
+    ml = LABEL_RE.search(line)
+    anchor = ml.end() if (ml and ml.start() < mc.start() < ml.end()) else mc.end()
+    mf = FIELD_RE.match(line, anchor)
+    have = mf.group(1) if mf else None
+    if have is not None and not EVID_TOKEN_RE.match(have.strip()):
+        have, end = None, anchor  # an ordinary qualifier, not the field
+    else:
+        end = mf.end() if mf else anchor
+    return line[:anchor] + f", `{want}`" + line[end:], have
+
+
+def check_evidence(path, tiers, cen):
+    """-> ([(tier,label,lineno,have,want)], [(tier,label,lineno)]) — mismatched, missing."""
+    lines = path.read_text().splitlines()
+    bad, missing = [], []
+    for tier, rows, _pre in tiers:
+        for label, cls, lineno, _cost in rows:
+            if cls is None:
+                continue
+            start, end = row_span(lines, lineno)
+            want = evidence_token(row_evidence(label, cen))
+            _, have = evidence_edit(unwrap(lines[start:end]), want)
+            if have is None:
+                missing.append((tier, label, lineno))
+            elif have.strip() != want:
+                bad.append((tier, label, lineno, have.strip(), want))
+    return bad, missing
+
+
+def fix_evidence(path, tiers, cen):
+    """Rewrite every classed row's evidence field from the headers. -> n changed."""
+    lines = path.read_text().splitlines()
+    changed = 0
+    # BOTTOM-UP, because a rewrap changes how many lines a row occupies and
+    # every row below it would shift under a top-down pass.
+    spans = []
+    for _tier, rows, _pre in tiers:
+        for label, cls, lineno, _cost in rows:
+            if cls is not None:
+                spans.append((lineno, label))
+    for lineno, label in sorted(spans, reverse=True):
+        start, end = row_span(lines, lineno)
+        want = evidence_token(row_evidence(label, cen))
+        text, _have = evidence_edit(unwrap(lines[start:end]), want)
+        new = rewrap(text, keep=f"`{want}`")
+        if new != lines[start:end]:
+            lines[start:end] = new
+            changed += 1
+    if changed:
+        path.write_text("\n".join(lines) + "\n")
+    return changed
+
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--file", help="roadmap to check (default: PROOF-STATE.md); "
@@ -433,6 +693,12 @@ def main():
     ap.add_argument("--src-names", help="file of names declared in agda/src, one "
                                        "per line, standing in for a scan of the "
                                        "tree; selftest only")
+    ap.add_argument("--census", help="file of 'name: MARKER, MARKER×2' lines "
+                                     "standing in for a scan of agda/src headers; "
+                                     "selftest only")
+    ap.add_argument("--fix-evidence", action="store_true",
+                    help="rewrite every classed row's evidence field from the "
+                         "source headers, then exit (make roadmap-evidence)")
     ap.add_argument("--dates-only", action="append", default=None, metavar="PATH",
                     help="also refuse dates in PATH (date check only, no rows). "
                          "Defaults to CLAUDE.md; repeatable; selftest passes fixtures.")
@@ -449,6 +715,18 @@ def main():
         print("check-roadmap: no '## Tier' sections found — parser or file is wrong",
               file=sys.stderr)
         return 2
+
+    if args.fix_evidence:
+        live = live_postulates(root, args.ledger)
+        if live is None and not args.census:
+            print("check-roadmap: cannot read the postulate ledger — "
+                  "the evidence field is DERIVED and cannot be written without it",
+                  file=sys.stderr)
+            return 2
+        cen = census(root, live or [], args.census)
+        n = fix_evidence(path, tiers, cen)
+        print(f"roadmap-evidence: {n} row(s) rewritten in {path.name}")
+        return 0
 
     failures = []
     unclassified = []
@@ -534,6 +812,29 @@ def main():
         if stale:
             failures.append(None)
 
+    if live is not None:
+        cen = census(root, live, args.census)
+        bad, missing = check_evidence(path, tiers, cen)
+        if missing:
+            print(f"\nROWS WITH NO EVIDENCE FIELD — {len(missing)}:")
+            for tier, label, lineno in missing:
+                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
+            print("\nEvery classed row carries a backticked evidence field directly")
+            print("after its risk class, naming the durable markers its postulates'")
+            print("own headers carry — or `NO EVIDENCE` when they carry none. The")
+            print("field is DERIVED, so do not type it: run")
+            print("  make roadmap-evidence")
+        if bad:
+            print(f"\nROWS WHOSE EVIDENCE FIELD IS STALE — {len(bad)}:")
+            for tier, label, lineno, have, want in bad:
+                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
+                print(f"    row says   `{have}`")
+                print(f"    headers say `{want}`")
+            print("\nThe headers are the authority — a marker was added, deleted or")
+            print("retargeted and the row did not follow. Run  make roadmap-evidence")
+        if missing or bad:
+            failures.append(None)
+
     date_targets = [path]
     if args.dates_only is not None:
         date_targets += [pathlib.Path(f) for f in args.dates_only]
@@ -617,7 +918,8 @@ def main():
                   + f" and {len(date_targets) - 2} more")
           + ("" if unscheduled is None
              else "; every live postulate is on the roadmap, and every row head "
-                  "names one"))
+                  "names one; every classed row's evidence field matches its "
+                  "postulates' own headers"))
     return 0
 
 
