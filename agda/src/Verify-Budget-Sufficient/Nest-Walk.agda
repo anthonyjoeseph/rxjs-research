@@ -256,6 +256,29 @@ postulate
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals)
 
+-- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is what
+-- a per-value unit does not price.  `pathNestD` charges this frame and
+-- only this frame, and what it charges is the `suc` a `*All` layer
+-- adds -- exactly right for the LAYER, and silent about what the layer
+-- DOES.  `thruWalk` subscribes each observable it is handed, so the
+-- values leaving the frame are an inner's emissions rather than the
+-- argument rewrapped, and the descent that produced them is not a
+-- function of the wrap.
+--
+-- AND IT FAILS WITH THE INNER ARM, FOR ONE REASON.  Both *All frames
+-- re-enter the subscribe machinery and both are charged as though they
+-- forwarded: the argument is priced by `nestDᵉ`, additive at `mapᵉ`,
+-- while a subscription SUBSTITUTES and is not.  So what is owed is ONE
+-- repair rather than two widenings at two frames -- the subscribe
+-- descent charged in the currency `depth-nest-compositional` already
+-- states it in.
+--
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
+--   eighty against forty-one, at a payload forty layers deep; the gap
+--   is that depth, so no constant per value closes it.  The same
+--   witness kills the ASSEMBLY at this frame, whose charge at the
+--   smallest admissible width IS this bound.
+postulate
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (p : Path Γ u t)
@@ -288,9 +311,9 @@ postulate
 -- premise about the store or a new component of the measure, which is
 -- what makes the repair a restatement rather than a widening.
 --
--- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, two against
---   one, at a queued `mapᵉ` whose step function names its payload on
---   both sides of the sum: `nestDᵉ` is additive there and the
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
+--   against forty, at a queued `mapᵉ` whose step function names its
+--   payload on both sides of the sum: `nestDᵉ` is additive there and the
 --   substitution is not, so the emitted value is deeper than the whole
 --   queue is charged.  The same witness kills the ASSEMBLY at this
 --   frame, whose charge reduces to exactly the leaf's bound.
@@ -332,7 +355,7 @@ abstract
 -- two *All frames are the subscribe machinery, where a frame reaches
 -- the walk again through an inner.  `frameNestF` charges the two that
 -- SUBSTITUTE and reads the other three as one, which holds for take and
--- fails at the inner arm -- whose own header carries why.
+-- fails at both *All arms -- whose own headers carry why.
 --
 -- AND THE BURST IS IN THE EXPONENT BECAUSE ONE OF THE TWO THREADS.  A
 -- map applies its step function to each value INDEPENDENTLY and the
@@ -349,8 +372,11 @@ abstract
 --   accumulator; the gap is unbounded in the burst, so no constant
 --   repairs it, and `scanVals-nest` is the iteration that replaced it.
 -- REFUTED: `Refuted.Inner-Drain-Nest` kills this statement at the
---   from-inner frame, two against one, where the charge reduces to the
---   state it started from and the drain under it subscribes.
+--   from-inner frame, eighty against forty, where the charge reduces to
+--   the state it started from and the drain under it subscribes.
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills it at the thru-outer
+--   frame, eighty against forty-one, where the unit per value is spent
+--   on a wrap and the values are an inner's emissions.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)

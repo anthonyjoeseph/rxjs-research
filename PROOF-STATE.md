@@ -165,8 +165,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   refuted, and the assembly with it. The drain under this frame SUBSCRIBES, so
   the arm is the subscribe descent inside the walk and no function of the frame
   can pay it; restate, do not grind.
-- **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY: the outer wrap, which is
-  the one frame `pathNestD` does charge, against `thruWalk`'s own store.
+- **`stepFrame-nodes-thru`** (Nest-Walk) — SHAPE: machine-refuted with its
+  assembly. The wrap takes OBSERVABLES and `thruWalk` subscribes each, so a unit
+  per value prices a layer and not the descent under it. Same defect as the row
+  above, so one repair covers both.
 - **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY: the share sink's fan-out over
   the admitted registrations, under one unit. They touch disjoint nodes, so
   the map moves by the deepest and not the sum — which the fold cannot see.

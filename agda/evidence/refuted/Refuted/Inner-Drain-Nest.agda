@@ -19,7 +19,9 @@
 -- ADDITIVE at `mapᵉ`, while the substitution the subscription performs
 -- is not.  So a queued `mapᵉ` whose step function names its payload
 -- twice emits a value deeper than the whole queue is charged, and one
--- element is enough: two against one.
+-- element is enough: eighty against forty, and the gap is the payload's
+-- own depth, so no constant and no summand fixed by the program repairs
+-- it.
 --
 -- WHAT DIES AND WHAT DOES NOT.  The zero-charge form dies.  Nothing here
 -- says the walk cannot be bounded -- it says the bound cannot be free at
@@ -43,9 +45,9 @@ module Refuted.Inner-Drain-Nest where
 open import Data.Bool using (true)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_)
-open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; _+_; _*_; _^_; _≤_; _⊔_)
+open import Data.List.Relation.Unary.Any using (here; there)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -64,20 +66,26 @@ open import Verify-Budget-Sufficient.Nest-Walk
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 ----------------------------------------------------------------------
--- THE WITNESS.  `Refuted.Apply-Fn-Nest`'s pair verbatim -- a payload one
--- `switchAllᵉ` deep and a step function naming it on both sides of a
+-- THE WITNESS.  `Refuted.Step-Frame-Nest-Dup`'s pair -- a payload forty
+-- `*All` layers deep and a step function naming it on both sides of a
 -- `mapᵉ` sum -- packaged as the observable a drain would subscribe.
+-- The depth is a free parameter, so the gap is unbounded rather than a
+-- corner: the queue is charged the payload and the emit carries two.
 ----------------------------------------------------------------------
 
-v : Val Γ₂ (obs natᵗ)
-v = switchAllᵉ (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))
+-- a payload k `*All` layers deep
+deepV : ℕ → Val Γ₂ (obs natᵗ)
+deepV zero    = ofᵉ (nat̂ 0 ∷ [])
+deepV (suc k) = switchAllᵉ (ofᵉ (strmᵗ (deepV k) ∷ []))
 
-fn : Fn Γ₂ [] [] [] (obs natᵗ) (obs (obs natᵗ))
-fn = strmᵗ (mapᵉ (varᵗ (there (here refl))) (ofᵉ (varᵗ (here refl) ∷ [])))
+-- the step function names its payload TWICE, once on each side of the
+-- `mapᵉ` sum: as the list the source emits, and as the mapped result
+dupFn : Fn Γ₂ [] [] [] (obs natᵗ) (obs (obs natᵗ))
+dupFn = strmᵗ (mapᵉ (varᵗ (there (here refl))) (ofᵉ (varᵗ (here refl) ∷ [])))
 
 -- the queued inner: one emit, and that emit is the substitution
 o : Closed Γ₂ (obs (obs natᵗ))
-o = mapᵉ fn (ofᵉ (strmᵗ v ∷ []))
+o = mapᵉ dupFn (ofᵉ (strmᵗ (deepV 40) ∷ []))
 
 e : Closed Γ₂ (obs (obs natᵗ))
 e = emptyᵉ
@@ -110,14 +118,14 @@ row = let r = stepFrame gas 0 0 f root vals true sched₀ st₀
 
 -- THE FIGURES, PINNED, so that a repair moving either side fails here
 -- naming the number instead of turning the crossing into an equality
-drained≡2 : proj₁ row ≡ 2
-drained≡2 = refl
+drained≡80 : proj₁ row ≡ 80
+drained≡80 = refl
 
-queued≡1 : proj₂ row ≡ 1
-queued≡1 = refl
+queued≡40 : proj₂ row ≡ 40
+queued≡40 = refl
 
 stepFrame-nodes-inner-absurd : proj₁ row ≤ proj₂ row → ⊥
--- `2 ≤ᵇ 1` reduces to `false`, so `T` of it IS the empty type
+-- `80 ≤ᵇ 40` reduces to `false`, so `T` of it IS the empty type
 stepFrame-nodes-inner-absurd h = ≤⇒≤ᵇ h
 
 ----------------------------------------------------------------------
@@ -131,8 +139,8 @@ stepFrame-nodes-inner-absurd h = ≤⇒≤ᵇ h
 parentCharge : ℕ
 parentCharge = frameNestF f ^ 1 * (proj₂ row + 1 * frameNestD f)
 
-parent≡1 : parentCharge ≡ 1
-parent≡1 = refl
+parent≡40 : parentCharge ≡ 40
+parent≡40 = refl
 
 stepFrame-nodes-at-inner-absurd : proj₁ row ≤ parentCharge → ⊥
 stepFrame-nodes-at-inner-absurd h = ≤⇒≤ᵇ h
