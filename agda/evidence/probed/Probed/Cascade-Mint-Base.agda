@@ -36,8 +36,9 @@
 -- much room the row had rather than merely that it fitted.
 module Probed.Cascade-Mint-Base where
 
+open import Data.List using ([])
 open import Data.Bool using (Bool; true; false)
-open import Data.Nat using (ℕ; _∸_; _≤ᵇ_)
+open import Data.Nat using (ℕ; _∸_; _≤ᵇ_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -48,7 +49,7 @@ open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
          cascadeLatch; cascadeGo; chainsOf)
 open import Rx.Slots using (Slots)
-open import Rx.Frame-Width using (entryCeil)
+open import Rx.Frame-Width using (entryCeil; outWⱽ; dWⱽ)
 
 open import Verify-Budget-Sufficient.Demand-Programs
   using (Γ₂; progU; progC; progF; insF; sucGU; sucGC; sucGF)
@@ -60,13 +61,14 @@ open import Verify-Budget-Sufficient.Demand-Programs
 ----------------------------------------------------------------------
 
 readM : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
-      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool × ℕ × Bool
 readM e sl sched st with sched-next sched
-... | inj₁ _        = 0 , 0 , false
+... | inj₁ _        = 0 , 0 , false , 0 , false
 ... | inj₂ (a , sd) =
-  let g = cascadeGo a 1 (chainsOf a st) sd (cascadeLatch a st)
-      m = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
-  in m , entryCeil 2 sl e , (m ≤ᵇ entryCeil 2 sl e)
+  let g  = cascadeGo a 1 (chainsOf a st) sd (cascadeLatch a st)
+      m  = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
+      pw = outWⱽ 2 [] sl e ⊔ dWⱽ 2 [] sl e
+  in m , entryCeil 2 sl e , (m ≤ᵇ entryCeil 2 sl e) , pw , (m ≤ᵇ pw)
 
 entry : ∀ {t} (e : Closed Γ₂ t) → Slots Γ₂ → ℕ → Sched Γ₂ × EvalSt e
 entry e sl g =
@@ -86,7 +88,7 @@ sl₁ = insF 1 2 2
 pU : Closed Γ₂ natᵗ
 pU = progU 2 2
 
-rowU : ℕ × ℕ × Bool
+rowU : ℕ × ℕ × Bool × ℕ × Bool
 rowU = let e₀ = entry pU sl₁ (sucGU 1 2 2 2 2)
        in readM pU sl₁ (proj₁ e₀) (proj₂ e₀)
 
@@ -96,7 +98,7 @@ U-mint = refl
 U-charge : proj₁ (proj₂ rowU) ≡ 72
 U-charge = refl
 
-U-fits : proj₂ (proj₂ rowU) ≡ true
+U-fits : proj₁ (proj₂ (proj₂ rowU)) ≡ true
 U-fits = refl
 
 ----------------------------------------------------------------------
@@ -108,7 +110,7 @@ U-fits = refl
 pC : Closed Γ₂ natᵗ
 pC = progC 1 2 2
 
-rowC : ℕ × ℕ × Bool
+rowC : ℕ × ℕ × Bool × ℕ × Bool
 rowC = let e₀ = entry pC sl₁ (sucGC 1 2 2 1 2 2)
        in readM pC sl₁ (proj₁ e₀) (proj₂ e₀)
 
@@ -118,7 +120,7 @@ C-mint = refl
 C-charge : proj₁ (proj₂ rowC) ≡ 96
 C-charge = refl
 
-C-fits : proj₂ (proj₂ rowC) ≡ true
+C-fits : proj₁ (proj₂ (proj₂ rowC)) ≡ true
 C-fits = refl
 
 ----------------------------------------------------------------------
@@ -130,7 +132,7 @@ C-fits = refl
 pF : Closed Γ₂ natᵗ
 pF = progF 1 1
 
-rowF : ℕ × ℕ × Bool
+rowF : ℕ × ℕ × Bool × ℕ × Bool
 rowF = let e₀ = entry pF sl₁ (sucGF 1 2 2 1 1)
        in readM pF sl₁ (proj₁ e₀) (proj₂ e₀)
 
@@ -140,5 +142,31 @@ F-mint = refl
 F-charge : proj₁ (proj₂ rowF) ≡ 96
 F-charge = refl
 
-F-fits : proj₂ (proj₂ rowF) ≡ true
+F-fits : proj₁ (proj₂ (proj₂ rowF)) ≡ true
 F-fits = refl
+
+----------------------------------------------------------------------
+-- THE WIDTH CHARGE, read beside the ceiling one.  `entryCeil` is a ⊔
+-- over the whole syntax tree and a proven family already bounds each
+-- width measure by it, so if the entry count fits under the PATH width
+-- the leaf can be restated there and the transport is spent rather
+-- than proven.  These rows are what say whether that is worth doing.
+----------------------------------------------------------------------
+
+U-pw : proj₁ (proj₂ (proj₂ (proj₂ rowU))) ≡ 72
+U-pw = refl
+
+U-pw-fits : proj₂ (proj₂ (proj₂ (proj₂ rowU))) ≡ true
+U-pw-fits = refl
+
+C-pw : proj₁ (proj₂ (proj₂ (proj₂ rowC))) ≡ 96
+C-pw = refl
+
+C-pw-fits : proj₂ (proj₂ (proj₂ (proj₂ rowC))) ≡ true
+C-pw-fits = refl
+
+F-pw : proj₁ (proj₂ (proj₂ (proj₂ rowF))) ≡ 96
+F-pw = refl
+
+F-pw-fits : proj₂ (proj₂ (proj₂ (proj₂ rowF))) ≡ true
+F-pw-fits = refl

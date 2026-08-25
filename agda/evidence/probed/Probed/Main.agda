@@ -24,4 +24,5 @@ open import Probed.Cascade-Nest-Store
 open import Probed.Cascade-Mint-Base
   using (U-mint; U-charge; U-fits;
          C-mint; C-charge; C-fits;
-         F-mint; F-charge; F-fits)
+         F-mint; F-charge; F-fits;
+         U-pw; U-pw-fits; C-pw; C-pw-fits; F-pw; F-pw-fits)

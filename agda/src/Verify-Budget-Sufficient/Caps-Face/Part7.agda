@@ -1459,6 +1459,16 @@ postulate
 --   cannot be reached at all, `capsOK?` reading a cap record no
 --   instantiation terminates on; and no index above the entry, the
 --   charge there being a width raised to a cap.
+--
+--   AND THE SAME ROWS PIN THE CEILING AGAINST ITS PATH-WIDTH ARM:
+--   `outWⱽ ⊔ dWⱽ` reads 72, 96 and 96, which is `entryCeil` EXACTLY at
+--   all three.  So the `ownᵉ` and `slotsCeil` arms contribute nothing
+--   at these shapes, and restating this leaf over the width form gives
+--   up no room -- `pW≤ceil` carries it back, already proven.  What that
+--   buys is a statement in the measure `foldPath` consumes rather than
+--   one over the whole syntax tree.  NOT covered: whether the two
+--   coincide at a shape where a slot is deeper than the subject, which
+--   is where `slotsCeil` would be the arm that decides.
 postulate
   cascadeGo-mint-entryCeil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
