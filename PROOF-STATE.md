@@ -161,9 +161,12 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`chainStep-nodes`** (Caps-Face/Part7) — DIFFICULTY: one chain's step under
-  the path's own charge plus one unit, the second unit being the share sink's
-  fan-out, which walks registry paths the chain never had. Two forms refuted.
+- **`dispatchShare-nodes`** (Nest-Walk) — DIFFICULTY: the share sink's fan-out
+  under one unit. The registrations touch disjoint nodes, so the map moves by
+  the deepest and not the sum — which the obvious induction cannot see.
+- **`stepFrame-nodes`** (Nest-Walk) — DIFFICULTY: one frame moves its node and
+  its emission together by its own wrap, stated under one `⊔` because a scan
+  emits the accumulator it stored. The walk above it telescopes, proven.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY: the selection's
   paths and the arrival's payload land inside one unit — the fact that ties
   the walk's charge back to the program. Free-list form refuted; probeable.

@@ -22,7 +22,7 @@
 -- reading below hands the step exactly that, and the path-denominated
 -- charge covers it where a program-denominated one does not.
 --
--- TARGET: chainStep-nodes
+-- TARGET: dispatchShare-nodes
 -- TARGET: arr-chains-nest-syn
 module Probed.Cascade-Chain-Count where
 
