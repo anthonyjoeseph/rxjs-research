@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; <⇒≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; <⇒≤;
   *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -34,12 +34,12 @@ open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (chainsNestD; chainsNestF; pathNestD; pathNestF; 1≤pathNestF;
-  nest-telescope; nest-scale; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-fac; nestFacAt; 1≤nestFacAt; nest-inflate;
+  (chainsNestD; chainsNestF; chainsNestF≡; chainsSzSum; pathSzSum; frameSzD; pathNestD; pathNestF; 1≤pathNestF;
+  nest-telescope; nest-scale; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt; nest-inflate;
   storeNest-latch; realWidAt; realWidAt-def; nestSyn; nestUnit; slotsNestSum; liveNest; nodeNest; regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
-  from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
+  from-inner; thru-outer; root; share-sink; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
   iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
@@ -1649,6 +1649,78 @@ postulate
     nestOK? e sl id sched st ≡ true →
     nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st) ≤ nestUnit e sl
 
+-- THE FANOUT'S EXPONENT, AND IT IS A READING OF THE SIZE INVARIANT
+-- RATHER THAN A NEW BET.  `capsOK?` carries `regsSz?` over the whole
+-- registry, and `pathSz?` is two conjuncts per frame: the step
+-- function's own size within the cap, and the path's LENGTH within the
+-- same cap.  A path therefore charges at most cap-many frames of at
+-- most cap-many units each, and a cascade's chain list is a selection
+-- within the real width -- so the sum is the width times the cap
+-- squared, with no appeal to what the run does.
+--
+-- IT IS STATED IN THE SIZE CURRENCY AND NOT THE FANOUT ONE, which is
+-- what keeps it provable: the exponential is peeled off by
+-- `chainsNestF≡` above the leaf, so nothing under here ever multiplies.
+-- a path charges at most one cap per frame
+frameSzD≤ : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ) (f : Frame Γ s u) →
+  frameSz? B f ≡ true → frameSzD f ≤ B
+frameSzD≤ B (map-f fn)          h = ≤ᵇ⇒≤ (sizeᵗ fn) B (T-to h)
+frameSzD≤ B (scan-f fn _)       h = ≤ᵇ⇒≤ (sizeᵗ fn) B (T-to h)
+frameSzD≤ B (take-f _)          h = z≤n
+frameSzD≤ B (from-inner _ _ _)  h = z≤n
+frameSzD≤ B (thru-outer _ _)    h = z≤n
+
+pathSzSum-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathSz? B p ≡ true → pathSzSum p ≤ pathLen p * B
+pathSzSum-len B root           h = z≤n
+pathSzSum-len B (share-sink i) h = z≤n
+pathSzSum-len B (f ↠ p)        h
+  with ∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
+... | hf , hr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hr
+... | _ , hp = +-mono-≤ (frameSzD≤ B f hf) (pathSzSum-len B p hp)
+
+pathSzSum-cap : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathSz? B p ≡ true → pathSzSum p ≤ B * B
+pathSzSum-cap B p h =
+  ≤-trans (pathSzSum-len B p h) (*-monoˡ-≤ B (pathSz?-len B p h))
+
+-- the selection inherits the registry's own size predicate, filter and
+-- retag alike
+chainsGo-sz : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (a : Arrival Γ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regsSz? B rs ≡ true →
+  All (λ c → pathSz? B (proj₂ c) ≡ true) (chainsGo a rs)
+chainsGo-sz B a [] h = []ᵃ
+chainsGo-sz B a ((rid , src , (u , p)) ∷ rs) h
+  with ∧-true (pathSz? B p) (all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en)))) rs) h
+... | hp , hrs with sameSource (arrSource a) src | u ≟ᵗ arrTy a
+... | false | _        = chainsGo-sz B a rs hrs
+... | true  | no  _    = chainsGo-sz B a rs hrs
+... | true  | yes refl = hp ∷ᵃ chainsGo-sz B a rs hrs
+
+chainsSzSum-bound : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ)
+  (cs : List (RegId × Path Γ s t)) →
+  All (λ c → pathSz? B (proj₂ c) ≡ true) cs →
+  chainsSzSum cs ≤ length cs * (B * B)
+chainsSzSum-bound B []       []ᵃ         = z≤n
+chainsSzSum-bound B (c ∷ cs) (hc ∷ᵃ hcs) =
+  +-mono-≤ (pathSzSum-cap B (proj₂ c) hc) (chainsSzSum-bound B cs hcs)
+
+arr-chains-sz-sum : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  chainsSzSum (chainsOf a st)
+    ≤ realWidAt e sl id
+      * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+arr-chains-sz-sum {e = e} sl id a sched st hsl hcaps =
+  ≤-trans (chainsSzSum-bound B (chainsOf a st) (chainsGo-sz B a (EvalSt.registry st) regsz))
+          (*-monoˡ-≤ (B * B) (chains-count-width sl id a sched st hcaps))
+  where
+  B = Caps.cSize (capsAt e sl id)
+  regsz : regsSz? B (EvalSt.registry st) ≡ true
+  regsz = capsOK?-regs (capsAt e sl id) sched st hcaps
+
 -- AND THE SAME SELECTION AGAINST THE FANOUT CEILING, which is the half
 -- the additive reading got wrong.  A frame does not ADD its function's
 -- charge to what it emits: a step function may name its payload twice,
@@ -1664,13 +1736,16 @@ postulate
 --   `mapᵉ` reads 2 against a charge of 0.  `Refuted.Step-Frame-Nest-Dup`
 --   carries the same witness up to the frame the walk actually steps,
 --   80 against 40, unbounded in the payload's own depth.
-postulate
-  arr-chains-nest-fac : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    chainsNestF (chainsOf a st) ≤ nestFacAt e sl id
+arr-chains-nest-fac : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  chainsNestF (chainsOf a st) ≤ nestFacAt e sl id
+arr-chains-nest-fac {e = e} sl id a sched st hsl hcaps hnest =
+  ≤-trans (≤-reflexive (chainsNestF≡ (chainsOf a st)))
+    (≤-trans (^-monoʳ-≤ 2 (arr-chains-sz-sum sl id a sched st hsl hcaps))
+             (≤-reflexive (sym (nestFacAt-def e sl id))))
 
 cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

@@ -48,13 +48,13 @@ module Verify-Budget-Sufficient.Nest-Store where
 
 open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
-open import Data.List using (List; foldr; tabulate)
+open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ;
-  *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-distribˡ-+; m^n>0)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤;
+  *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
 open import Data.Nat.ListAction using (sum)
-open import Data.Product using (Σ; _×_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Exp using (Ctx; Closed; sizeᵗ)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
@@ -74,6 +74,24 @@ pathNestD (scan-f f _ ↠ p)        = nestDᵗ f + pathNestD p
 pathNestD (take-f _ ↠ p)          = pathNestD p
 pathNestD (from-inner _ _ _ ↠ p)  = pathNestD p
 pathNestD (thru-outer _ _ ↠ p)    = suc (pathNestD p)
+
+-- THE SYNTAX A PATH CHARGES, which is the factor's exponent and the
+-- currency the invariant already speaks.  `pathSz?` bounds every step
+-- function on a registered path by the size cap AND the path's own
+-- length by the same cap, so this sum is within the cap SQUARED -- and
+-- that is a reading of a conjunct that is already carried, not a new
+-- bet about the dynamics.
+frameSzD : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
+frameSzD (map-f f)          = sizeᵗ f
+frameSzD (scan-f f _)       = sizeᵗ f
+frameSzD (take-f _)         = 0
+frameSzD (from-inner _ _ _) = 0
+frameSzD (thru-outer _ _)   = 0
+
+pathSzSum : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+pathSzSum root           = 0
+pathSzSum (share-sink _) = 0
+pathSzSum (f ↠ p)        = frameSzD f + pathSzSum p
 
 -- THE PER-FRAME FACTOR, AND IT IS A FACTOR BECAUSE NO SUMMAND
 -- SURVIVES.  A step function may name its payload more than once, and
@@ -135,6 +153,22 @@ nest-telescope F G B X Y 1≤F =
        (trans (cong (_* ((B + X) + Y)) (*-comm G F))
               (cong (F * G *_) (+-assoc B X Y))))
 
+frameNestF≡ : ∀ {n} {Γ : Ctx n} {s u} (f : Frame Γ s u) →
+  frameNestF f ≡ 2 ^ frameSzD f
+frameNestF≡ (map-f _)          = refl
+frameNestF≡ (scan-f _ _)       = refl
+frameNestF≡ (take-f _)         = refl
+frameNestF≡ (from-inner _ _ _) = refl
+frameNestF≡ (thru-outer _ _)   = refl
+
+pathNestF≡ : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) →
+  pathNestF p ≡ 2 ^ pathSzSum p
+pathNestF≡ root           = refl
+pathNestF≡ (share-sink _) = refl
+pathNestF≡ (f ↠ p)        =
+  trans (cong₂ _*_ (frameNestF≡ f) (pathNestF≡ p))
+        (sym (^-distribˡ-+-* 2 (frameSzD f) (pathSzSum p)))
+
 nest-inflate : ∀ (F X : ℕ) → 1 ≤ F → X ≤ F * X
 nest-inflate F X 1≤F =
   ≤-trans (≤-reflexive (sym (*-identityˡ X))) (*-monoˡ-≤ X 1≤F)
@@ -157,6 +191,17 @@ chainsNestD = foldr (λ rc acc → pathNestD (proj₂ rc) ⊔ acc) 0
 chainsNestF : ∀ {n} {Γ : Ctx n} {s t} →
   List (RegId × Path Γ s t) → ℕ
 chainsNestF = foldr (λ rc acc → pathNestF (proj₂ rc) * acc) 1
+
+chainsSzSum : ∀ {n} {Γ : Ctx n} {s t} →
+  List (RegId × Path Γ s t) → ℕ
+chainsSzSum = foldr (λ rc acc → pathSzSum (proj₂ rc) + acc) 0
+
+chainsNestF≡ : ∀ {n} {Γ : Ctx n} {s t} (cs : List (RegId × Path Γ s t)) →
+  chainsNestF cs ≡ 2 ^ chainsSzSum cs
+chainsNestF≡ []             = refl
+chainsNestF≡ ((_ , p) ∷ cs) =
+  trans (cong₂ _*_ (pathNestF≡ p) (chainsNestF≡ cs))
+        (sym (^-distribˡ-+-* 2 (pathSzSum p) (chainsSzSum cs)))
 
 -- A SCRIPTED SLOT IS OBS-FREE BY CONSTRUCTION (`isData`), so no
 -- observable enters a run from outside the program and the clause is 0
@@ -341,7 +386,18 @@ abstract
   -- width in the exponent, size in the base.
   nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
-  nestFacAt e sl id = 2 ^ (realWidAt e sl id * Caps.cSize (capsAt e sl id))
+  nestFacAt e sl id =
+    2 ^ (realWidAt e sl id
+         * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+
+  -- READ BACK OUT OF THE SEAL for the same reason the width is: a
+  -- consumer proving the fanout bound has to say what it proved.
+  nestFacAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    nestFacAt e sl id
+      ≡ 2 ^ (realWidAt e sl id
+             * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+  nestFacAt-def e sl id = refl
 
   nestCapAt e sl zero    = nestUnit e sl
   nestCapAt e sl (suc id) =
@@ -349,7 +405,9 @@ abstract
 
   1≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → 1 ≤ nestFacAt e sl id
-  1≤nestFacAt e sl id = m^n>0 2 (realWidAt e sl id * Caps.cSize (capsAt e sl id))
+  1≤nestFacAt e sl id =
+    m^n>0 2 (realWidAt e sl id
+             * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool

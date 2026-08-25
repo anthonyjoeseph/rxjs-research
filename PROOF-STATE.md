@@ -161,10 +161,6 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`arr-chains-nest-fac`** (Caps-Face/Part7) — FALSITY: a registered chain
-  list's FANOUT product under the instant's ceiling. A frame multiplies rather
-  than adds — both halves of the additive reading are machine-refuted — so this
-  is the bet that a geometric per-instant cap still sits under `capsH`.
 - **`applyFn-nest`** (Nest-Walk) — DIFFICULTY: substitution multiplies the
   payload's nesting by two per unit of the function's syntax. The additive form
   is refuted at one `mapᵉ`; both proven twins on this face are multiplicative.
