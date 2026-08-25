@@ -161,13 +161,6 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`arr-chains-bursts`** (Caps-Face/Part7) — FALSITY: every stage of every
-  chain's walk under the width cap. Only a `thru` frame expands a burst, and by
-  a product the caps face pays a square for — so the flat cap may be the wrong
-  currency rather than the wrong number.
-- **`stepFrame-nodes-scan`** (Nest-Walk) — DIFFICULTY: a scan threads, so the
-  burst factor is spent once per value. Burst-free form refuted; the restated
-  charge is geometric in the burst and the iteration is the proof.
 - **`stepFrame-nodes-inner`** (Nest-Walk) — DIFFICULTY: an inner's release
   forwards through the `from-inner` frame, the one frame the path measure
   charges nothing for — so the arm has to be paid by what the inner already was.
@@ -204,6 +197,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   receipt at instant 1, and the one place the currency is really bet — every
   cascade instance is slack. `burst-caps` is the shape, but `burst-all`
   produces no nesting conjunct yet, so the producing lemma is owed first.
+- **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY: every stage of every
+  chain's walk under the width cap. `valsCaps?` is this bound, propagated across
+  the feared `thru` hop already; the grind carries it flat, not moving.
 - **`stepFrame-nodes-take`** (Nest-Walk) — GRINDABLE: `takeDispatch` re-points a
   counter and forwards what it was handed, so neither side of the `⊔` deepens.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE: the far end of a cascade only

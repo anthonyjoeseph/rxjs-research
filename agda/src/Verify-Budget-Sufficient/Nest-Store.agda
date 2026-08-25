@@ -417,6 +417,16 @@ abstract
   -- The count of values one instant can carry is the width cap, so the
   -- burst is that cap and not a quantity of this module's own.
   --
+  -- AND IT IS THE WIDTH AT THE INSTANT'S EXIT, NOT AT ITS ENTRY, which
+  -- is the whole difference between a bound that survives a walk and
+  -- one that does not.  A `thru` frame hands on what its inners emit,
+  -- so it turns one value into as many as a burst can hold and the
+  -- entry width is crossed by a PRODUCT at the first such hop -- which
+  -- is why the caps face pays a square there.  `capsAt` at the next
+  -- index IS the full `frameStep` endpoint for this instant, so every
+  -- intermediate hop's width sits under it by monotonicity in the hop
+  -- count, and one number covers the whole walk.
+  --
   -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free reading of
   --   the walk's per-frame charge, 65 against 64, at the smallest step
   --   function that deepens its own accumulator; the gap is unbounded

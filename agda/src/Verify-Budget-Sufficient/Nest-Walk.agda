@@ -5,25 +5,29 @@ module Verify-Budget-Sufficient.Nest-Walk where
 open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using
-  (≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
+  (≤-refl; ≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
+   *-assoc; *-comm; m^n>0;
    *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤;
    *-distribˡ-+; ^-zeroˡ; +-identityʳ;
-   m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub)
-open import Data.Product using (_×_; proj₁; proj₂)
+   m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
+open import Data.Maybe using (just; nothing)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
+open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; InstEvent)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_; obs; sizeᵗ; applyFn)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; _×ᵗ_; obs; sizeᵗ; applyFn; _≟ᵗ_)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_;
    map-f; scan-f; take-f; from-inner; thru-outer;
    foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
-   NodeId; AllOp)
+   NodeId; AllOp; NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
+   lookupNode; setNode; scanVals)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
 open import Verify-Budget-Sufficient.Nest-Store using
@@ -61,17 +65,227 @@ pathNestD-cons (from-inner _ _ _) p = refl
 pathNestD-cons (thru-outer _ _)   p = refl
 
 -- and the same over a burst, which is the map frame's actual argument
-mapVals-nest : ∀ {n} {Γ : Ctx n} {s u}
-  (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
-  nestDᵛˢ (map (applyFn fn) vals) ≤ 2 ^ sizeᵗ fn * (nestDᵗ fn + nestDᵛˢ vals)
-mapVals-nest fn []           = z≤n
-mapVals-nest {u = u} fn (v ∷ vs) =
-  ⊔-lub (≤-trans (applyFn-nest fn v)
-                 (*-monoʳ-≤ (2 ^ sizeᵗ fn)
-                    (+-monoʳ-≤ (nestDᵗ fn) (m≤m⊔n (nestDᵛ _ v) (nestDᵛˢ vs)))))
-        (≤-trans (mapVals-nest fn vs)
-                 (*-monoʳ-≤ (2 ^ sizeᵗ fn)
-                    (+-monoʳ-≤ (nestDᵗ fn) (m≤n⊔m (nestDᵛ _ v) (nestDᵛˢ vs)))))
+abstract
+  mapVals-nest : ∀ {n} {Γ : Ctx n} {s u}
+    (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+    nestDᵛˢ (map (applyFn fn) vals) ≤ 2 ^ sizeᵗ fn * (nestDᵗ fn + nestDᵛˢ vals)
+  mapVals-nest fn []           = z≤n
+  mapVals-nest {u = u} fn (v ∷ vs) =
+    ⊔-lub (≤-trans (applyFn-nest fn v)
+                   (*-monoʳ-≤ (2 ^ sizeᵗ fn)
+                      (+-monoʳ-≤ (nestDᵗ fn) (m≤m⊔n (nestDᵛ _ v) (nestDᵛˢ vs)))))
+          (≤-trans (mapVals-nest fn vs)
+                   (*-monoʳ-≤ (2 ^ sizeᵗ fn)
+                      (+-monoʳ-≤ (nestDᵗ fn) (m≤n⊔m (nestDᵛ _ v) (nestDᵛˢ vs)))))
+
+-- THE NODE TABLE IS A `⊔`-FOLD, so a write moves it by at most what was
+-- written and a read is dominated by it.  Two one-screen inductions over
+-- the association list, and between them the only two facts the scan arm
+-- needs about the store -- it reads its accumulator out and writes the
+-- next one back, and nothing else in the table moves.
+nodesFold : ∀ {n} {Γ : Ctx n} → List (NodeId × NodeState Γ) → ℕ
+nodesFold = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+
+abstract
+  setNode-nodes : ∀ {n} {Γ : Ctx n} (nid : NodeId) (ns : NodeState Γ)
+    (nodes : List (NodeId × NodeState Γ)) →
+    nodesFold (setNode nid ns nodes) ≤ nodeNest ns ⊔ nodesFold nodes
+  setNode-nodes nid ns []             = ≤-refl
+  setNode-nodes nid ns ((k , s′) ∷ r) with k ≡ᵇ nid
+  ... | true  = ⊔-mono-≤ ≤-refl (m≤n⊔m (nodeNest s′) (nodesFold r))
+  ... | false =
+    ⊔-lub (≤-trans (m≤m⊔n (nodeNest s′) (nodesFold r))
+                   (m≤n⊔m (nodeNest ns) (nodeNest s′ ⊔ nodesFold r)))
+          (≤-trans (setNode-nodes nid ns r)
+                   (⊔-mono-≤ ≤-refl (m≤n⊔m (nodeNest s′) (nodesFold r))))
+
+abstract
+  lookupNode-nodes : ∀ {n} {Γ : Ctx n} (nid : NodeId) (ns : NodeState Γ)
+    (nodes : List (NodeId × NodeState Γ)) →
+    lookupNode nid nodes ≡ just ns → nodeNest ns ≤ nodesFold nodes
+  lookupNode-nodes nid ns ((k , s′) ∷ r) h with k ≡ᵇ nid | h
+  ... | true  | refl = m≤m⊔n (nodeNest ns) (nodesFold r)
+  ... | false | h′   = ≤-trans (lookupNode-nodes nid ns r h′)
+                               (m≤n⊔m (nodeNest s′) (nodesFold r))
+
+-- THE ITERATION, AND IT IS THE WHOLE CONTENT OF THE SCAN ARM.  A scan
+-- feeds its own output back in, so the step function's factor is spent
+-- once per value and its own nesting is piled on once per value:
+-- `x ↦ F * (x ⊔ V + D)` iterated k times.  What the burst exponent buys
+-- is that this closes at `F ^ k * (X + k * D)` -- one power and one
+-- multiple, both read off the same k -- which is why the charge is
+-- stated that way for every frame rather than only for this one.
+abstract
+  scanVals-nest : ∀ {n} {Γ : Ctx n} {s u} (W : ℕ)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (acc : Val Γ u) (vals : List (Val Γ s)) →
+    length vals ≤ W →
+    (nestDᵛˢ (proj₁ (scanVals fn acc vals))
+       ⊔ nestDᵛ u (proj₂ (scanVals fn acc vals)))
+      ≤ (2 ^ sizeᵗ fn) ^ W * ((nestDᵛ u acc ⊔ nestDᵛˢ vals) + W * nestDᵗ fn)
+  scanVals-nest {u = u} W fn acc [] hlen =
+    ≤-trans (⊔-lub z≤n (≤-trans (m≤m⊔n (nestDᵛ u acc) 0)
+                                (m≤m+n (nestDᵛ u acc ⊔ 0) (W * nestDᵗ fn))))
+            (≤-trans (≤-reflexive (sym (*-identityˡ Y)))
+                     (*-monoˡ-≤ Y (1≤pow≤ (2 ^ sizeᵗ fn) W (m^n>0 2 (sizeᵗ fn)))))
+    where
+    Y : ℕ
+    Y = (nestDᵛ u acc ⊔ 0) + W * nestDᵗ fn
+  scanVals-nest {Γ = Γ} {s = s} {u = u} (suc W) fn acc (v ∷ vs) (s≤s hlen) =
+    ≤-trans (≤-reflexive (⊔-assoc A′ (nestDᵛˢ outs) (nestDᵛ u last)))
+            (⊔-lub head-fits tail-fits)
+    where
+    F D A V VS X Z A′ : ℕ
+    acc′ : Val Γ u
+    outs : List (Val Γ u)
+    last : Val Γ u
+    F   = 2 ^ sizeᵗ fn
+    D   = nestDᵗ fn
+    A   = nestDᵛ u acc
+    V   = nestDᵛ s v
+    VS  = nestDᵛˢ vs
+    X   = A ⊔ (V ⊔ VS)
+    Z   = X + suc W * D
+    acc′ = applyFn fn (acc , v)
+    A′  = nestDᵛ u acc′
+    outs = proj₁ (scanVals fn acc′ vs)
+    last = proj₂ (scanVals fn acc′ vs)
+    1≤F : 1 ≤ F
+    1≤F = m^n>0 2 (sizeᵗ fn)
+    av≤X : A ⊔ V ≤ X
+    av≤X = ⊔-lub (m≤m⊔n A (V ⊔ VS))
+                 (≤-trans (m≤m⊔n V VS) (m≤n⊔m A (V ⊔ VS)))
+    -- one application, charged against the burst's own base
+    A′≤ : A′ ≤ F * (X + D)
+    A′≤ = ≤-trans (applyFn-nest fn (acc , v))
+                  (*-monoʳ-≤ F (≤-trans (+-monoʳ-≤ D av≤X)
+                                        (≤-reflexive (+-comm D X))))
+    head-fits : A′ ≤ F ^ suc W * Z
+    head-fits =
+      ≤-trans A′≤
+        (*-mono-≤ (pow-grow¹ F (suc W) 1≤F (s≤s z≤n))
+                  (+-monoʳ-≤ X (m≤m+n D (W * D))))
+    -- and the rest of the fold, one shorter and one factor cheaper
+    step : (A′ ⊔ VS) + W * D ≤ F * Z
+    step =
+      ≤-trans (+-mono-≤ (⊔-lub A′≤
+                               (≤-trans (≤-trans (m≤n⊔m V VS) (m≤n⊔m A (V ⊔ VS)))
+                                        (≤-trans (m≤m+n X D)
+                                                 (≤-trans (≤-reflexive (sym (*-identityˡ (X + D))))
+                                                          (*-monoˡ-≤ (X + D) 1≤F)))))
+                        (≤-trans (≤-reflexive (sym (*-identityˡ (W * D))))
+                                 (*-monoˡ-≤ (W * D) 1≤F)))
+              (≤-reflexive (trans (sym (*-distribˡ-+ F (X + D) (W * D)))
+                                  (cong (F *_) (+-assoc X D (W * D)))))
+    tail-fits : nestDᵛˢ outs ⊔ nestDᵛ u last ≤ F ^ suc W * Z
+    tail-fits =
+      ≤-trans (scanVals-nest W fn acc′ vs hlen)
+              (≤-trans (*-monoʳ-≤ (F ^ W) step)
+                       (≤-reflexive (trans (sym (*-assoc (F ^ W) F Z))
+                                           (cong (_* Z) (*-comm (F ^ W) F)))))
+
+-- A FACTOR OF AT LEAST ONE IS FREE, and the four arms where the scan's
+-- node is absent or mistyped need nothing else: they emit nothing and
+-- store nothing, so the whole charge is slack.
+abstract
+  pow-grow : ∀ (F W Y : ℕ) → 1 ≤ F → Y ≤ F ^ W * Y
+  pow-grow F W Y 1≤F =
+    ≤-trans (≤-reflexive (sym (*-identityˡ Y)))
+            (*-monoˡ-≤ Y (1≤pow≤ F W 1≤F))
+
+abstract
+  scan-stuck : ∀ {n} {Γ : Ctx n} {s u} (W : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (M VS : ℕ) → M ⊔ 0 ≤ (2 ^ sizeᵗ fn) ^ W * ((M ⊔ VS) + W * nestDᵗ fn)
+  scan-stuck W fn M VS =
+    ≤-trans (⊔-lub (≤-trans (m≤m⊔n M VS) (m≤m+n (M ⊔ VS) (W * nestDᵗ fn))) z≤n)
+            (pow-grow (2 ^ sizeᵗ fn) W ((M ⊔ VS) + W * nestDᵗ fn)
+                      (m^n>0 2 (sizeᵗ fn)))
+
+-- A SCAN ARM IS ITS NODE AND ITS OUTPUT AT ONCE, which is why the store
+-- lemmas above sit beside the iteration rather than anywhere else: the
+-- accumulator written back IS the last value emitted, so the `⊔` the
+-- statement is phrased over is the one the fold already computes.  The
+-- accumulator read out is under the table it was read from, which is
+-- what lets the iteration start from the same `⊔` the conclusion does.
+abstract
+  stepFrame-nodes-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (nid : NodeId) (p : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    length vals ≤ W →
+    let r = stepFrame sf id now (scan-f fn nid) p vals fin sched st in
+    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+      ≤ (2 ^ sizeᵗ fn) ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn)
+  stepFrame-nodes-scan {Γ = Γ} {u = u} W sf id now fn nid p vals fin sched st hlen
+    with lookupNode nid (EvalSt.nodes st) in eq
+  ... | nothing                  = scan-stuck W fn (nodesMax st) (nestDᵛˢ vals)
+  ... | just (take-st _)         = scan-stuck W fn (nodesMax st) (nestDᵛˢ vals)
+  ... | just (mergeAll-st _ _ _ _) = scan-stuck W fn (nodesMax st) (nestDᵛˢ vals)
+  ... | just (switch-st _ _)     = scan-stuck W fn (nodesMax st) (nestDᵛˢ vals)
+  ... | just (exhaust-st _ _)    = scan-stuck W fn (nodesMax st) (nestDᵛˢ vals)
+  ... | just (scan-st {w} a) with w ≟ᵗ u
+  ...   | no _     = scan-stuck W fn (nodesMax st) (nestDᵛˢ vals)
+  ...   | yes refl =
+    ⊔-lub (≤-trans (setNode-nodes nid (scan-st last) (EvalSt.nodes st))
+                   (⊔-lub (≤-trans (m≤n⊔m (nestDᵛˢ outs) (nestDᵛ u last)) fold-fits)
+                          (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
+                                            (m≤m+n (nodesMax st ⊔ nestDᵛˢ vals)
+                                                   (W * nestDᵗ fn)))
+                                   (pow-grow (2 ^ sizeᵗ fn) W _
+                                             (m^n>0 2 (sizeᵗ fn))))))
+          (≤-trans (m≤m⊔n (nestDᵛˢ outs) (nestDᵛ u last)) fold-fits)
+    where
+    outs : List (Val Γ u)
+    last : Val Γ u
+    outs = proj₁ (scanVals fn a vals)
+    last = proj₂ (scanVals fn a vals)
+    fold-fits : nestDᵛˢ outs ⊔ nestDᵛ u last
+                  ≤ (2 ^ sizeᵗ fn) ^ W
+                      * ((nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn)
+    fold-fits =
+      ≤-trans (scanVals-nest W fn a vals hlen)
+              (*-monoʳ-≤ ((2 ^ sizeᵗ fn) ^ W)
+                 (+-monoˡ-≤ (W * nestDᵗ fn)
+                    (⊔-mono-≤ (lookupNode-nodes nid (scan-st a) (EvalSt.nodes st) eq)
+                              ≤-refl)))
+
+postulate
+  stepFrame-nodes-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (take-f nid) p vals fin sched st in
+    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
+
+  stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
+    (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
+    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
+
+  stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (p : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    1 ≤ W → length vals ≤ W →
+    let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
+    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+      ≤ (nodesMax st ⊔ nestDᵛˢ vals) + W
+
+-- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
+-- EXPONENT, which is all that separates the three frames that charge
+-- nothing from the one that charges a wrap.
+abstract
+  one-pow : ∀ (W Y : ℕ) → Y ≤ 1 ^ W * Y
+  one-pow W Y = ≤-reflexive (sym (trans (cong (_* Y) (^-zeroˡ W)) (*-identityˡ Y)))
+
+abstract
+  zero-charge : ∀ (W X : ℕ) → X ≤ 1 ^ W * (X + W * 0)
+  zero-charge W X =
+    ≤-trans (≤-trans (≤-reflexive (sym (+-identityʳ X)))
+                     (≤-reflexive (cong (X +_) (sym (*-zeroʳ W)))))
+            (one-pow W (X + W * 0))
 
 -- ONE FRAME, AND THE `⊔` IS WHY THIS IS ONE STATEMENT RATHER THAN TWO.
 -- A frame moves its own node and the values it hands on TOGETHER, by
@@ -103,86 +317,40 @@ mapVals-nest {u = u} fn (v ∷ vs) =
 -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free form, 65
 --   against 64, at the smallest step function that deepens its own
 --   accumulator; the gap is unbounded in the burst, so no constant
---   repairs it.  The same witness refutes `stepFrame-nodes`, whose
---   scan arm IS this leaf.
-postulate
-  stepFrame-nodes-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
-    (nid : NodeId) (p : Path Γ u t)
+--   repairs it, and `scanVals-nest` is the iteration that replaced it.
+abstract
+  stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    length vals ≤ W →
-    let r = stepFrame sf id now (scan-f fn nid) p vals fin sched st in
-    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (2 ^ sizeᵗ fn) ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn)
-
-  stepFrame-nodes-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    let r = stepFrame sf id now (take-f nid) p vals fin sched st in
-    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
-
-  stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
-    (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
-    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals)
-
-  stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (p : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     1 ≤ W → length vals ≤ W →
-    let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
+    let r = stepFrame sf id now f p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals) + W
-
--- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
--- EXPONENT, which is all that separates the three frames that charge
--- nothing from the one that charges a wrap.
-one-pow : ∀ (W Y : ℕ) → Y ≤ 1 ^ W * Y
-one-pow W Y = ≤-reflexive (sym (trans (cong (_* Y) (^-zeroˡ W)) (*-identityˡ Y)))
-
-zero-charge : ∀ (W X : ℕ) → X ≤ 1 ^ W * (X + W * 0)
-zero-charge W X =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-identityʳ X)))
-                   (≤-reflexive (cong (X +_) (sym (*-zeroʳ W)))))
-          (one-pow W (X + W * 0))
-
-stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
-  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  1 ≤ W → length vals ≤ W →
-  let r = stepFrame sf id now f p vals fin sched st in
-  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-    ≤ frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
-stepFrame-nodes W sf id now (map-f fn) p vals fin sched st 1≤W hlen =
-  ⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
-        (≤-trans (mapVals-nest fn vals)
-                 (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
-                    (≤-trans (≤-reflexive (+-comm (nestDᵗ fn) (nestDᵛˢ vals)))
-                             (+-mono-≤ (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
-                                       (nest-inflate W (nestDᵗ fn) 1≤W)))))
-  where
-  X : ℕ
-  X = (nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn
-  up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
-  up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
-               (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-stepFrame-nodes W sf id now (scan-f fn nid) p vals fin sched st 1≤W hlen =
-  stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen
-stepFrame-nodes W sf id now (take-f nid) p vals fin sched st 1≤W hlen =
-  ≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
-          (zero-charge W _)
-stepFrame-nodes W sf id now (from-inner op allNid inst) p vals fin sched st 1≤W hlen =
-  ≤-trans (stepFrame-nodes-inner sf id now op allNid inst p vals fin sched st)
-          (zero-charge W _)
-stepFrame-nodes W sf id now (thru-outer op nid) p vals fin sched st 1≤W hlen =
-  ≤-trans (stepFrame-nodes-thru W sf id now op nid p vals fin sched st 1≤W hlen)
-          (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
-                   (one-pow W (_ + W * 1)))
+      ≤ frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
+  stepFrame-nodes W sf id now (map-f fn) p vals fin sched st 1≤W hlen =
+    ⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
+          (≤-trans (mapVals-nest fn vals)
+                   (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
+                      (≤-trans (≤-reflexive (+-comm (nestDᵗ fn) (nestDᵛˢ vals)))
+                               (+-mono-≤ (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
+                                         (nest-inflate W (nestDᵗ fn) 1≤W)))))
+    where
+    X : ℕ
+    X = (nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn
+    up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
+    up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
+                 (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
+  stepFrame-nodes W sf id now (scan-f fn nid) p vals fin sched st 1≤W hlen =
+    stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen
+  stepFrame-nodes W sf id now (take-f nid) p vals fin sched st 1≤W hlen =
+    ≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
+            (zero-charge W _)
+  stepFrame-nodes W sf id now (from-inner op allNid inst) p vals fin sched st 1≤W hlen =
+    ≤-trans (stepFrame-nodes-inner sf id now op allNid inst p vals fin sched st)
+            (zero-charge W _)
+  stepFrame-nodes W sf id now (thru-outer op nid) p vals fin sched st 1≤W hlen =
+    ≤-trans (stepFrame-nodes-thru W sf id now op nid p vals fin sched st 1≤W hlen)
+            (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
+                     (one-pow W (_ + W * 1)))
 
 -- THE SHARE SINK, WHICH IS WHERE THE PATH MEASURE HAS NOTHING LEFT TO
 -- SPEND, and the whole reason the walk is charged a UNIT on top of its
