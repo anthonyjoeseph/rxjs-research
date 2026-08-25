@@ -1470,6 +1470,39 @@ postulate
 --   one over the whole syntax tree.  NOT covered: whether the two
 --   coincide at a shape where a slot is deeper than the subject, which
 --   is where `slotsCeil` would be the arm that decides.
+
+-- THE COUNT IS THE PART THAT IS WRONG, AND A CHAIN SWEEP SAYS SO.  The
+-- axis is one no earlier row moved: `progF`'s width registers
+-- one input several times, so an arrival there presents one chain per copy and
+-- the walk's mint count is a SUM over them.  The count goes 20, 33, 48, 65 --
+-- quadratic -- while every charge over it is linear: the path width reads 96,
+-- 120, 144 and `capsBase` climbs by 26 a step.  Two linear charges against a
+-- quadratic count cross, and the rows pin where.  At eighteen copies the width
+-- and the ceiling are both past; at twenty-two `capsBase` is too, 713 against
+-- 690.  Modulo the premises, which cannot be discharged at all -- `capsOK?`
+-- reads a cap record no instantiation terminates on -- so these are refuting
+-- rows and not a `⊥`.
+--
+-- AND THE FACT UNDERNEATH SURVIVES, WHICH IS WHAT MAKES THIS CHEAP.
+-- `cascadeGo-nest-nodes`'s own conclusion, read at the refuting shape, HOLDS.  So the currency is not short and no cap has to grow; the COUNTING
+-- DECOMPOSITION is what fails.  Its left side is a `⊔` over the nodes map and
+-- its right side charges one `nestSyn` per mint, so a walk that mints many
+-- nodes of the same depth pays for all of them while the max moves once.  The
+-- repair is a max-shaped route, not a bigger charge -- and a max-shaped one
+-- need not count at all.
+--
+-- DEAD ROUTE: every member of this family -- `-pW`, `-entryCeil`, `-base`,
+--   `-width`, `-tower` -- bounds the MINT COUNT by a width.  The rows above
+--   kill the shape rather than any one of its charges: the count is quadratic
+--   in a chain axis nothing in the currency is, so no width this development
+--   states can carry it.  Do not re-derive a tighter width.
+--
+-- PROBED: `Probed.Cascade-Mint-Base`.  The chain axis is swept at one, two,
+--   three, four, eighteen and twenty-two copies on `progF`, and the candidate
+--   replacement -- the charge taken per chain -- is pinned at both ends, 20
+--   against 192 and 713 against 13800.  COVERED is the CONCLUSION only, at the
+--   entry index, on `Γ₂` at one slot shape.  NOT covered: the premises, and no
+--   index above the entry.
 postulate
   cascadeGo-mint-pW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)

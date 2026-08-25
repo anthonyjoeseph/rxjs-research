@@ -161,11 +161,11 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-mint-pW`** (Caps-Face/Part7) — DIFFICULTY: at the ENTRY the walk
-  mints no more than the PATH WIDTH. The tight half, and the only one whose two
-  sides both reduce. Program size is refuted by rows; width to charge is proven
-  throughout, and rows pin the width AS the ceiling at three families.
-- **`cascadeGo-mint-tower`** (Caps-Face/Part7) — DIFFICULTY: the same count one
+- **`cascadeGo-mint-pW`** (Caps-Face/Part7) — FALSITY: REFUTED by rows on the
+  chain axis, and so is every width its family could be charged in. The count is
+  quadratic where the currency is linear. The fact underneath survives, so the
+  repair is a max-shaped route with no count in it.
+- **`cascadeGo-mint-tower`** (Caps-Face/Part7) — FALSITY: the same count one
   index up, where the charge is a width raised to a cap and no row renders. The
   entry's per-chain decomposition does NOT carry: one chain, one delivery, over
   sixteen hundred mints. The count is a burst width, nothing syntactic.

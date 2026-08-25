@@ -36,9 +36,9 @@
 -- much room the row had rather than merely that it fitted.
 module Probed.Cascade-Mint-Base where
 
-open import Data.List using ([])
+open import Data.List using ([]; length; foldr)
 open import Data.Bool using (Bool; true; false)
-open import Data.Nat using (ℕ; _∸_; _≤ᵇ_; _⊔_)
+open import Data.Nat using (ℕ; _∸_; _≤ᵇ_; _⊔_; _*_; _+_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -47,8 +47,10 @@ open import Rx.Exp using (Closed; natᵗ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascadeLatch; cascadeGo; chainsOf)
+         cascadeLatch; cascadeGo; chainsOf; capsBase)
 open import Rx.Slots using (Slots)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (nodeNest; storeNestMax; nestSyn)
 open import Rx.Frame-Width using (entryCeil; outWⱽ; dWⱽ)
 
 open import Verify-Budget-Sufficient.Demand-Programs
@@ -170,3 +172,156 @@ F-pw = refl
 
 F-pw-fits : proj₂ (proj₂ (proj₂ (proj₂ rowF))) ≡ true
 F-pw-fits = refl
+
+----------------------------------------------------------------------
+-- THE CHAIN-COUNT AXIS, which is the one that can refute this leaf.
+-- The mint count is a SUM over the chains `cascadeGo` folds, and the
+-- charge is a MAX over the syntax; nothing in the shape of the two
+-- says the sum stays under it.  `progF`'s `w` registers `suc w` copies
+-- of one input, so an arrival there presents `suc w` chains and the
+-- sum is driven directly.  LOAD-BEARING on every row: if the count
+-- climbs per chain while the width does not, one of these fails, and
+-- that is a refutation of the statement rather than of a route.
+----------------------------------------------------------------------
+
+rowF2 : ℕ × ℕ × Bool × ℕ × Bool
+rowF2 = let e₀ = entry (progF 2 1) sl₁ (sucGF 1 2 2 2 1)
+        in readM (progF 2 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+rowF3 : ℕ × ℕ × Bool × ℕ × Bool
+rowF3 = let e₀ = entry (progF 3 1) sl₁ (sucGF 1 2 2 3 1)
+        in readM (progF 3 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+rowF4 : ℕ × ℕ × Bool × ℕ × Bool
+rowF4 = let e₀ = entry (progF 4 1) sl₁ (sucGF 1 2 2 4 1)
+        in readM (progF 4 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+F2-mint : proj₁ rowF2 ≡ 33
+F2-mint = refl
+
+F3-mint : proj₁ rowF3 ≡ 48
+F3-mint = refl
+
+F4-mint : proj₁ rowF4 ≡ 65
+F4-mint = refl
+
+F2-pw : proj₁ (proj₂ (proj₂ (proj₂ rowF2))) ≡ 120
+F2-pw = refl
+
+F3-pw : proj₁ (proj₂ (proj₂ (proj₂ rowF3))) ≡ 144
+F3-pw = refl
+
+rowF18 : ℕ × ℕ × Bool × ℕ × Bool
+rowF18 = let e₀ = entry (progF 18 1) sl₁ (sucGF 1 2 2 18 1)
+         in readM (progF 18 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+F18-pw-fits : proj₂ (proj₂ (proj₂ (proj₂ rowF18))) ≡ false
+F18-pw-fits = refl
+
+F18-fits : proj₁ (proj₂ (proj₂ rowF18)) ≡ false
+F18-fits = refl
+
+-- AND WHETHER IT REACHES THE CURRENCY.  `capsBase` pads the ceiling by
+-- the program's own size, so the question the margin decides is whether
+-- this is a restatement of one leaf or a refutation of the charge the
+-- caps face actually spends.
+F18-base : capsBase (progF 18 1) sl₁ ≡ 586
+F18-base = refl
+
+F3-base : capsBase (progF 3 1) sl₁ ≡ 196
+F3-base = refl
+
+-- AND THE DECISIVE ROW.  The count is quadratic in the chain axis and
+-- every charge over it is linear, so the only question was WHERE they
+-- cross, not whether.  This is the first shape past the crossing.
+readB : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readB e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false
+... | inj₂ (a , sd) =
+  let g = cascadeGo a 1 (chainsOf a st) sd (cascadeLatch a st)
+      m = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
+  in m , capsBase e sl , (m ≤ᵇ capsBase e sl)
+
+rowB22 : ℕ × ℕ × Bool
+rowB22 = let e₀ = entry (progF 22 1) sl₁ (sucGF 1 2 2 22 1)
+         in readB (progF 22 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+B22-mint : proj₁ rowB22 ≡ 713
+B22-mint = refl
+
+B22-base : proj₁ (proj₂ rowB22) ≡ 690
+B22-base = refl
+
+B22-fits : proj₂ (proj₂ rowB22) ≡ false
+B22-fits = refl
+
+----------------------------------------------------------------------
+-- THE CANDIDATE REPLACEMENT, read at the shape that refuted the old
+-- one.  The count is a SUM over chains, so the charge has to carry the
+-- chain count; `chainsOf-length` already reduces that count to the
+-- registry, which is what makes the factor payable rather than merely
+-- correct.  LOAD-BEARING: at the crossing shape the old charge is 690
+-- against 713, so a candidate that also fails here is no candidate.
+----------------------------------------------------------------------
+
+readP : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readP e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false
+... | inj₂ (a , sd) =
+  let ch = chainsOf a st
+      g  = cascadeGo a 1 ch sd (cascadeLatch a st)
+      m  = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
+      c  = length ch * entryCeil 2 sl e
+  in m , c , (m ≤ᵇ c)
+
+rowP22 : ℕ × ℕ × Bool
+rowP22 = let e₀ = entry (progF 22 1) sl₁ (sucGF 1 2 2 22 1)
+         in readP (progF 22 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+P22-charge : proj₁ (proj₂ rowP22) ≡ 13800
+P22-charge = refl
+
+P22-fits : proj₂ (proj₂ rowP22) ≡ true
+P22-fits = refl
+
+rowP1 : ℕ × ℕ × Bool
+rowP1 = let e₀ = entry pF sl₁ (sucGF 1 2 2 1 1)
+        in readP pF sl₁ (proj₁ e₀) (proj₂ e₀)
+
+P1-charge : proj₁ (proj₂ rowP1) ≡ 192
+P1-charge = refl
+
+P1-fits : proj₂ (proj₂ rowP1) ≡ true
+P1-fits = refl
+
+----------------------------------------------------------------------
+-- THE ASSEMBLY'S OWN CONCLUSION, which is the row that says how much
+-- the refutation above actually costs.  The count bound is one ROUTE
+-- to `cascadeGo-nest-nodes`; its conclusion is a MAX on the left and a
+-- SUM on the right, so a route that over-counts can fail while the
+-- fact stands.  LOAD-BEARING both ways: green here means the repair is
+-- a better decomposition, red means the currency itself is short.
+-- The entry width is spelled `capsBase`, which is what `realWidAt-0`
+-- proves it to be -- the family itself is sealed and does not reduce.
+----------------------------------------------------------------------
+
+readN : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
+      → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readN e sl sched st with sched-next sched
+... | inj₁ _        = 0 , 0 , false
+... | inj₂ (a , sd) =
+  let stL = cascadeLatch a st
+      g   = cascadeGo a 1 (chainsOf a st) sd stL
+      lhs = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+                  (EvalSt.nodes (proj₂ (proj₂ g)))
+      rhs = storeNestMax sd stL + capsBase e sl * nestSyn e sl
+  in lhs , rhs , (lhs ≤ᵇ rhs)
+
+rowN22 : ℕ × ℕ × Bool
+rowN22 = let e₀ = entry (progF 22 1) sl₁ (sucGF 1 2 2 22 1)
+         in readN (progF 22 1) sl₁ (proj₁ e₀) (proj₂ e₀)
+
+N22-fits : proj₂ (proj₂ rowN22) ≡ true
+N22-fits = refl
