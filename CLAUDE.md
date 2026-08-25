@@ -351,7 +351,13 @@ many minutes and the Bash tool's ceiling is 600 s per foreground call, so iterat
   green. `make bg` always exits non-zero by design, so **a completion notification is
   never a result**; and **never loop on `bg-check`**, whose exit status make collapses
   into its own exit 2, making still-running and failed the same number.
-  → [docs/bg.md](docs/bg.md)
+  **AND TYPE IT BARE — NO `&`, NO REDIRECT (Anthony).** `make bg` detaches on its own
+  and owns its log, so a trailing `&` backgrounds a wrapper that has already
+  backgrounded itself, and a `>/dev/null 2>&1` throws away the one thing the launch
+  prints: WHERE the log is and whether the launch took. Both dress up the by-design
+  non-zero exit as something to suppress, which is the same instinct the hand-rolled
+  wrapper above comes from — the exit status is not the result and hiding it is not
+  the fix. → [docs/bg.md](docs/bg.md)
 - **`setsid` and `timeout` DO NOT EXIST ON macOS.** Detach with the Bash tool's
   `run_in_background`. Pin the working directory in every build command and guard with
   `ls Makefile &&`; never pipe agda through `head`, which hides OOM kills.

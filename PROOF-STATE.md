@@ -161,9 +161,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`dispatchShare-nodes`** (Nest-Walk) — DIFFICULTY: the share sink's fan-out
-  under one unit. The registrations touch disjoint nodes, so the map moves by
-  the deepest and not the sum — which the obvious induction cannot see.
+- **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY: the share sink's fan-out over
+  the admitted registrations, under one unit. They touch disjoint nodes, so
+  the map moves by the deepest and not the sum — which the fold cannot see.
 - **`stepFrame-nodes`** (Nest-Walk) — DIFFICULTY: one frame moves its node and
   its emission together by its own wrap, stated under one `⊔` because a scan
   emits the accumulator it stored. The walk above it telescopes, proven.

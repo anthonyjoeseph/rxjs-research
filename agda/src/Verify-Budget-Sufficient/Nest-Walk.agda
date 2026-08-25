@@ -2,13 +2,13 @@
 -- foldPath-nodes … frameNestD
 module Verify-Budget-Sufficient.Nest-Walk where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (Bool; true; false)
 open import Data.Fin using (Fin)
 open import Data.List using (List; _++_; foldr)
-open import Data.Nat using (ℕ; _+_; _⊔_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_)
 open import Data.Nat.Properties using
   (≤-trans; ≤-reflexive; +-assoc; +-monoˡ-≤; m≤m+n; m≤m⊔n)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (_×_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
@@ -19,7 +19,7 @@ open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_;
    map-f; scan-f; take-f; from-inner; thru-outer;
-   foldPath; dispatchShare; stepFrame)
+   foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; pathNestD; nestUnit)
 
@@ -88,17 +88,39 @@ postulate
 -- state, so one sibling's growth lands in the next one's base -- which
 -- is what keeps this a leaf rather than a fold like the walk above it.
 --
--- REFUTED: `Refuted.Share-Sink-Nodes` kills the unit-free form of this
---   statement, three against one, and against two when the whole store
---   measure is charged in place of the nodes map.
+-- REFUTED: `Refuted.Share-Sink-Nodes` kills the unit-free form of the
+--   statement below, three against one, and against two when the whole
+--   store measure is charged in place of the nodes map.
 postulate
-  dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    nodesMax (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
+    nodesMax (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl
+
+-- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which
+-- touches the nodes map: out of dispatch gas the state is returned
+-- untouched, and the finishing arm latches the share's source into the
+-- dying and completed ledgers, which are not the map.  So the whole of
+-- the sink's growth is the fold's, and the leaf is the fold.
+dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  nodesMax (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
+    ≤ (nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl
+dispatchShare-nodes sl sf zero id now i vals fin sched st hsl =
+  ≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)
+dispatchShare-nodes sl sf (suc gas) id now i vals false sched st hsl =
+  shareGo-nodes sl sf gas id now i vals false
+    (shareAdmit i (EvalSt.registry st)) sched st hsl
+dispatchShare-nodes sl sf (suc gas) id now i vals true sched st hsl =
+  shareGo-nodes sl sf gas id now i vals true
+    (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) hsl
 
 -- THE WALK ITSELF, WHICH IS A TELESCOPE.  Each frame spends its own term
 -- of `pathNestD` and hands the rest of the path a state and a value list

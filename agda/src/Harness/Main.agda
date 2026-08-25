@@ -534,7 +534,7 @@ satRow fam ds ks j w k =
 -- read by `Probed.Cascade-Chain-Count`, at the typechecker, where a
 -- row can be pinned.
 --
--- TARGET: dispatchShare-nodes
+-- TARGET: shareGo-nodes
 shareNestRow : ℕ → ℕ → ℕ → String
 shareNestRow j w k =
   let p = progF w k
