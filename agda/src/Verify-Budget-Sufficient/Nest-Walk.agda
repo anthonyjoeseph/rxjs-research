@@ -26,6 +26,7 @@ open import Rx.Evaluator using
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit)
+open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
 -- the frame emits -- a `scan`'s accumulator IS its output -- so charging
@@ -55,26 +56,6 @@ pathNestD-cons (scan-f _ _)       p = refl
 pathNestD-cons (take-f _)         p = refl
 pathNestD-cons (from-inner _ _ _) p = refl
 pathNestD-cons (thru-outer _ _)   p = refl
-
--- APPLYING A STEP FUNCTION COSTS ITS OWN SYNTAX TIMES A FACTOR, and the
--- factor is the whole content: substituting a value into a term wraps
--- it by the term's own nesting once per OCCURRENCE, not once.  Two to
--- the size dominates that, since occurrences are bounded by size and
--- nesting a binder raises the power rather than the base.
---
--- TWIN: `applyFn-iterSize` — the same substitution over the same
---   `evalWith` induction on the SIZE face, proven, clause for clause;
---   its sibling `applyFn-iterFold` is the width face of it.  Both are
---   multiplicative for exactly this reason, which is what makes the
---   additive form below a mis-reading of the precedent rather than a
---   simplification of it.
--- REFUTED: `Refuted.Apply-Fn-Nest` kills the additive form — two
---   against one, at a step function naming its payload on both sides
---   of one `mapᵉ`.
-postulate
-  applyFn-nest : ∀ {n} {Γ : Ctx n} {s u}
-    (fn : Fn Γ [] [] [] s u) (v : Val Γ s) →
-    nestDᵛ u (applyFn fn v) ≤ 2 ^ sizeᵗ fn * (nestDᵗ fn + nestDᵛ s v)
 
 -- and the same over a burst, which is the map frame's actual argument
 mapVals-nest : ∀ {n} {Γ : Ctx n} {s u}

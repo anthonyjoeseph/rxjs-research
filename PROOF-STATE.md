@@ -161,9 +161,6 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`applyFn-nest`** (Nest-Walk) — DIFFICULTY: substitution multiplies the
-  payload's nesting by two per unit of the function's syntax. The additive form
-  is refuted at one `mapᵉ`; both proven twins on this face are multiplicative.
 - **`stepFrame-nodes-scan`** (Nest-Walk) — DIFFICULTY: the scan frame stores the
   accumulator it emits, so its node and its emission move together under one
   `⊔`. The four sibling arms of the same frame split are named below.
