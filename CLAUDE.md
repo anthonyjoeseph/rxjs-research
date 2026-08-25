@@ -328,12 +328,22 @@ directives, and report review. Standing protocol, per Anthony:
 
 **`make gate` IS THE MERGE GATE, AND IT ROUTES — TYPE IT AND LET IT DECIDE.** It takes
 the light path when the changed set is light-checkable and the full tower when it is not,
-and it prints which and why. Forcing `make gate-heavy` is for when you can NAME a reason
-the router cannot see; choosing the expensive path by habit is how the cheap checks — the
-ones that fail in seconds — get skipped in favour of many minutes. The heavy path takes
-many minutes and the Bash tool's ceiling is 600 s per foreground call, so iterate with
-**`make agda-dev`** (seconds) and reach for the gate to merge. Timings:
+and it prints which and why. Choosing the expensive path by habit is how the cheap
+checks — the ones that fail in seconds — get skipped in favour of many minutes. The heavy
+path takes many minutes and the Bash tool's ceiling is 600 s per foreground call, so
+iterate with **`make agda-dev`** (seconds) and reach for the gate to merge. Timings:
 `typecheck-performance-numbers.md`.
+
+**AND THE CARVE-OUT IS TERMINATION, NOT ANY NAMEABLE REASON (Anthony).** Forcing
+`make gate-heavy` is for a change that could have broken the TERMINATION CHECK — the one
+property the dev loop cannot see, since it stubs mutual blocks and the real mutual
+recursion is where the induction lives. A module with no multi-member block is emitted
+VERBATIM, so its dev check already covers termination and a heavy gate buys nothing
+there. Everything else is the router's call, a light path you expect to fail included:
+red costs minutes and says why. **AND A LIGHT PATH THAT FAILED ONCE IS NOT A REASON TO
+FORCE THE NEXT ONE** — carrying the verdict forward untested is how two heavy gates came
+to run back to back for one blocker, and the usual cause of such a blocker is a cache the
+first heavy gate has since made coherent.
 
 - **A WARNING IS A BUILD FAILURE.** Every Agda invocation goes through the Makefile's
   `AGDA` variable, which carries `-W error` (Agda exits 42). Never call bare `agda` in
