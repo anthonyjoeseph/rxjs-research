@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
-  *-mono-≤; +-monoʳ-≤; +-assoc; ⊔-lub; m≤m⊔n)
+  *-mono-≤; +-monoʳ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; map; foldr)
@@ -1232,17 +1232,9 @@ postulate
     in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
 
--- THE NODE-STATE COMPONENT, WHICH IS WHERE THE WIDTH IS ACTUALLY SPENT.
--- A `scan` node stores its accumulator and a bounded `mergeAll` node
--- stores its parked queue, so the nodes map is the only part of the
--- store a delivery can DEEPEN rather than merely re-point.  Measured
--- across every family the harness drives, the slot store, the pending
--- sources and the registry read the same before the walk and after,
--- and every unit of the growth is here -- which is what makes the
--- other three arms of the parent's `⊔` cheap and this one primitive.
-
--- AND WITHIN THIS ARM THE WIDTH IS SPENT AT TWO SITES, NOT FIVE.  Three
--- of the node measure's five clauses are the literal zero, so `take`,
+-- THE STORE'S ONE ACCUMULATING CORNER, AND THE COUNTER THAT PAYS FOR
+-- IT.  Within the node arm the width is spent at two sites, not five.
+-- Three
 -- `switch` and `exhaust` cannot move it whatever they store.  A bounded
 -- `mergeAll`'s queue cannot either, and that one is worth the sentence
 -- because it looks like the accumulating one: the measure over it is a
@@ -1255,6 +1247,34 @@ postulate
 -- drain arc arriving in this currency, and it routes into the subscribe
 -- side -- where the matching statement about the store does not exist,
 -- only the one about the depth.
+--
+-- SO THE QUANTITY TO CHARGE IS A COUNTER THE EVALUATOR ALREADY KEEPS.
+-- Both storing sites sit behind an inner SUBSCRIPTION, and every one of
+-- those mints a node instance from the schedule's own monotone counter
+-- -- so the number of times a walk can deepen the store is the number
+-- of instances it minted, which is a real quantity, additive along the
+-- chain fold because the counter never runs backwards, and readable off
+-- the two schedules this statement already mentions.  The witness is
+-- PINNED by the equation rather than merely bounded by it, which is
+-- what keeps the pair from being satisfied by taking it large.
+postulate
+  cascadeGo-nodes-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    let r = cascadeGo a nextId chains sched st in
+    Σ ℕ λ m →
+      (Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched)
+      × (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
+           ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) + m * nestSyn e sl)
+
+-- AND THE MINT COUNT IS WITHIN THE REAL WIDTH, WHICH IS WHERE EVERY
+-- PREMISE OF THIS FACE IS SPENT.  The row above says the store deepens
+-- at most once per minted instance; this one says an instant cannot
+-- mint more instances than its width, and between them the arm closes.
+-- Splitting here is what makes the hard half a statement about a
+-- COUNTER rather than about the store, and a counter is the kind of
+-- thing the caps face is already built to bound.
 --
 -- AND THE BOUND IS NOT TIGHT, WHICH IS THE MOST USEFUL THING KNOWN
 -- ABOUT IT.  At the entry index the real width IS `capsBase`, which
@@ -1333,17 +1353,51 @@ postulate
 --   `cascadeGo-deliv-real` whose only consumer it was, with the four
 --   dead routes its own header carried.
 postulate
-  cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-mint-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
-    (sched : Sched Γ) (st : EvalSt e) →
+    (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    let r = cascadeGo a nextId chains sched st
-    in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-         ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+    let r = cascadeGo a nextId chains sched st in
+    Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
+    m ≤ realWidAt e sl id
+
+-- THE NODE-STATE COMPONENT, WHICH IS WHERE THE WIDTH IS ACTUALLY SPENT.
+-- A `scan` node stores its accumulator and a bounded `mergeAll` node
+-- stores its parked queue, so the nodes map is the only part of the
+-- store a delivery can DEEPEN rather than merely re-point.  Measured
+-- across every family the harness drives, the slot store, the pending
+-- sources and the registry read the same before the walk and after,
+-- and every unit of the growth is here -- which is what makes the
+-- other three arms of the parent's `⊔` cheap and this one primitive.
+cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  let r = cascadeGo a nextId chains sched st
+  in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
+       ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
+cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval
+  with cascadeGo-nodes-mint sl a nextId chains sched st
+... | m , heq , hle =
+  ≤-trans hle
+    (+-mono-≤ nodes≤store
+      (*-mono-≤ (cascadeGo-mint-width sl id a nextId chains sched st m hsl hcaps hnest heq)
+                (≤-refl {nestSyn e sl})))
+  where
+  nodes≤store : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ storeNestMax sched st
+  nodes≤store = ≤-trans (m≤n⊔m (NA ⊔ NB) NC) (m≤m⊔n ((NA ⊔ NB) ⊔ NC) ND)
+    where
+    NA = slotsNestSum (Sched.slots sched)
+    NB = foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+    NC = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+    ND = regsNestMax (EvalSt.registry st)
 
 -- THE REGISTRY COMPONENT, whose paths only ever gain frames the path
 -- measure does not charge.  A walk registers the inners a release

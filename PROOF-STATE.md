@@ -161,10 +161,14 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-nest-nodes`** (Caps-Face/Part7) — DIFFICULTY: the walk's node
-  states, width-denominated and primitive. Its per-delivery half is
-  machine-refuted at ONE delivery: the drain stores many times per delivery, so
-  no count pays. Every unit of measured store growth is in this arm.
+- **`cascadeGo-mint-width`** (Caps-Face/Part7) — DIFFICULTY: an instant mints no
+  more node instances than its real width. Where every premise of this face is
+  spent. Its per-delivery ancestor is machine-refuted at ONE delivery, which is
+  what moved the count off deliveries and onto the schedule's own counter.
+- **`cascadeGo-nodes-mint`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens the
+  node arm at most one `nestSyn` per instance it mints, premise-free, with the
+  count PINNED by an equation rather than bounded. Both storing sites sit behind
+  an inner subscription, and the queue is a max, so only the mint can pay.
 - **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY: the walk's pending
   sources under the same width. The one arm of the store no instantiation has
   ever reached — every family reads it zero — so its cheapness is a guess.

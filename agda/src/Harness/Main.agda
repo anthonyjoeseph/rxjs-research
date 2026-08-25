@@ -625,6 +625,8 @@ satWalk e sl (suc m) nextId sched st with sched-next sched
      ++ " N=" ++ show nv ++ " C=" ++ show cn
      ++ " D=" ++ show dep ++ " A=" ++ show aft
      ++ " " ++ four (proj₁ (proj₂ g)) (proj₂ (proj₂ g))
+     ++ " nn=" ++ show (Sched.nextNode sd)
+     ++ "→" ++ show (Sched.nextNode (proj₁ (proj₂ g)))
      ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
      ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
      ++ " |" ++ satGo a nextId ch sd stL (length ch)
