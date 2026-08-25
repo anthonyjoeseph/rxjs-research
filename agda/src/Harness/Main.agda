@@ -379,6 +379,26 @@ depthRunWalkRowU steps ds ks j d k =
 -- the stall.  0 the real width, 1 the cascade depth, 2 the cap record's
 -- size field, 3 the delivery cap at depth zero, 4 the delivery cap at
 -- the real depth.
+--
+-- AND THE CAP SIDE DOES NOT COMPUTE, WHICH IS THE ANSWER AND NOT A GAP
+-- IN THE SERIES.  The comparison was commissioned as one inequality
+-- between two computable numbers; it is not one.  `realWid0` renders
+-- instantly at every shape -- 79 at the smallest -- while the cap
+-- record's size and delivery fields at the SAME instant do not render
+-- at all, at any shape reached here, down to the smallest the series
+-- can express.  The reason is structural rather than a matter of
+-- patience: a frame's three fields are each an ITERATION whose count is
+-- `sizeCount`, which is exponential in the registry cap, so the loop
+-- does not finish however the numbers are represented.  Mode 4 is the
+-- one that returns, and only because it short-circuits on a state with
+-- no arrival before reaching the cap at all.
+--
+-- The consequence is worth more than a row would have been: every route
+-- that would spend a cap-side count against a real-side width is not
+-- merely unproven but UNINSTANTIABLE, so no probe can ever adjudicate
+-- one, and the dead routes recorded against those statements are as
+-- much evidence as this question admits.  Do not commission a sweep to
+-- settle a caps-against-real comparison -- this is that sweep.
 denomTail : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
           → ℕ → Sched Γ → EvalSt e → String
 denomTail e sl 0 sd st = "realWid0=" ++ show (realWidAt e sl 0)
