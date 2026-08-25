@@ -33,12 +33,12 @@ open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
-  storeNest-latch; realWidAt; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
+  storeNest-latch; realWidAt; realWidAt-0; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f;
   scan-f; take-f; from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource;
   chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ;
   switchᵒ; exhaustᵒ; thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade;
-  sameSource; regAt; iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
+  sameSource; regAt; capsBase; iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -1407,17 +1407,55 @@ postulate
 --   refuted per-delivery leaf, and the delivery-count leaf
 --   `cascadeGo-deliv-real` whose only consumer it was, with the four
 --   dead routes its own header carried.
+
+-- AND IT SPLITS ON THE INDEX, BECAUSE THE TWO HALVES ARE NOT THE SAME
+-- STATEMENT.  At the entry the charge is `capsBase`, a plain syntactic
+-- reading in the low hundreds on every family the harness runs; one
+-- index up it is a width raised to a cap, which no row renders.  So the
+-- entry is the whole of the tightness and the only half a machine can
+-- ever look at, and keeping the two under one head hid that -- the
+-- statement read as uniformly hard when one half is a small real
+-- inequality and the other has room to spare.  The base leaf is stated
+-- in `capsBase` rather than in the width, which is the point of the
+-- split: both of ITS sides now reduce, where the width is sealed.
 postulate
-  cascadeGo-mint-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascadeGo-mint-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+    (chains : List (RegId × Path Γ (arrTy a) t))
+    (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl 0) sched st ≡ true →
+    nestOK? e sl 0 sched st ≡ true →
+    let r = cascadeGo a nextId chains sched st in
+    Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
+    m ≤ capsBase e sl
+
+  cascadeGo-mint-tower : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
     Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
+    capsOK? (capsAt e sl (suc id)) sched st ≡ true →
+    nestOK? e sl (suc id) sched st ≡ true →
     let r = cascadeGo a nextId chains sched st in
     Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
-    m ≤ realWidAt e sl id
+    m ≤ realWidAt e sl (suc id)
+
+cascadeGo-mint-width : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) (m : ℕ) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  let r = cascadeGo a nextId chains sched st in
+  Sched.nextNode (proj₁ (proj₂ r)) ≡ m + Sched.nextNode sched →
+  m ≤ realWidAt e sl id
+cascadeGo-mint-width {e = e} sl 0 a nextId chains sched st m hsl hcaps hnest heq =
+  subst (m ≤_) (sym (realWidAt-0 e sl))
+    (cascadeGo-mint-base sl a nextId chains sched st m hsl hcaps hnest heq)
+cascadeGo-mint-width sl (suc id) a nextId chains sched st m hsl hcaps hnest heq =
+  cascadeGo-mint-tower sl id a nextId chains sched st m hsl hcaps hnest heq
 
 -- THE NODE-STATE COMPONENT, WHICH IS WHERE THE WIDTH IS ACTUALLY SPENT.
 -- A `scan` node stores its accumulator and a bounded `mergeAll` node

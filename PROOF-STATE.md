@@ -161,10 +161,13 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`cascadeGo-mint-width`** (Caps-Face/Part7) — DIFFICULTY: an instant mints no
-  more node instances than its real width. Four routes die on a currency
-  comparison now known uninstantiable. Localised to one missing fact: a
-  real-denominated registry bound, owed to the nesting invariant.
+- **`cascadeGo-mint-base`** (Caps-Face/Part7) — DIFFICULTY: at the ENTRY index an
+  instant mints no more instances than `capsBase`. The tight half, and the only
+  half whose two sides both reduce. One missing fact: a real-denominated
+  registry bound, owed to the nesting invariant.
+- **`cascadeGo-mint-tower`** (Caps-Face/Part7) — DIFFICULTY: the same count one
+  index up, where the charge is a width raised to a cap and no row renders. Any
+  crude count would fit; it still needs one.
 - **`cascadeGo-nodes-mint`** (Caps-Face/Part7) — DIFFICULTY: the walk deepens the
   node arm at most one `nestSyn` per instance it mints, premise-free, with the
   count PINNED by an equation rather than bounded. Both storing sites sit behind

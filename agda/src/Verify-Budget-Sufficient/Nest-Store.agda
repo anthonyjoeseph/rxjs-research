@@ -236,6 +236,18 @@ abstract
     nestCapAt e sl 0 ≡ suc (nestDᵉ e + slotsNestSum sl)
   nestCapAt-0 e sl = refl
 
+  -- THE WIDTH'S OWN BASE, AND WHAT IT BUYS IS INSTANTIABILITY.  The cap
+  -- equation beside it has had a consumer since the face was stated;
+  -- this one had none, so the entry width stayed sealed and no probe
+  -- could evaluate the right-hand side of any statement charging
+  -- against it -- while the LEFT sides all compute off the evaluator.
+  -- `capsBase` is a plain syntactic reading and reduces, so exporting
+  -- the equation puts the entry index within reach of a `refl`, which
+  -- is the one index where the charge is small enough to bind.
+  realWidAt-0 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+    realWidAt e sl 0 ≡ capsBase e sl
+  realWidAt-0 e sl = refl
+
   nestOK?-latch : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
     nestOK? e sl id sched (cascadeLatch a st) ≡ nestOK? e sl id sched st

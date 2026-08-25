@@ -653,7 +653,11 @@ satWalk e sl (suc m) nextId sched st with sched-next sched
              mm  = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
          in (if ndA ≤ᵇ ndB + mm * nestSyn e sl then " MINT-ok" else " MINT-FAIL")
             ++ " m=" ++ show mm ++ " W0=" ++ show (realWidAt e sl 0)
-            ++ (if mm ≤ᵇ realWidAt e sl 0 then " W0-ok" else " W0-OVER"))
+            ++ (if mm ≤ᵇ realWidAt e sl 0 then " W0-ok" else " W0-OVER")
+            ++ (let rg = length (EvalSt.registry (proj₂ (proj₂ g)))
+                in " reg=" ++ show rg
+                   ++ (if rg ≤ᵇ realWidAt e sl 0 then " REG-ok" else " REG-OVER"))
+            ++ (if nestOK? e sl 0 sd stL then " NEST0-holds" else " NEST0-fails"))
      ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
      ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
      ++ " |" ++ satGo a nextId ch sd stL (length ch)
