@@ -173,14 +173,14 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-inner`** (Nest-Walk) — FALSITY, `REFUTED×2`: restated, so
-  the refutations are why the caps hypothesis is there rather than open work.
-  The drain SUBSCRIBES, so the arm now takes a factor in the substituted
-  function's size; unprobed at the new form, which is what holds the class.
+- **`stepFrame-nodes-inner`** (Nest-Walk) — FALSITY, `REFUTED×3`: refuted AGAIN
+  at the restated form, by a share slot the node table cannot see — forty
+  delivered against a charge of zero, so no factor repairs it. Owed is the
+  slots summand the walk above it already carries.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED`: restated with
-  the row above and by the same repair, the wrap's own subscribe being the
-  same descent. Measured multiplicative in the incoming depth, which is what
-  the factor is; unprobed at the new form.
+  the row above and by the same repair, the wrap's own subscribe being the same
+  descent. Measured multiplicative in the incoming depth, which is what the
+  factor is; unprobed at the new form.
 - **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED, DEAD ROUTE`: the
   share sink's fan-out over the admitted registrations, under one unit. They
   touch disjoint nodes, so the map moves by the deepest and not the sum — which

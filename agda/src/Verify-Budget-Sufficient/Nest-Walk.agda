@@ -323,7 +323,7 @@ postulate
 -- payload depth, occurrence count or queue length is unfalsifiable by
 -- construction, however tight its rows read.
 --
--- SO THE RISK THAT REMAINS IS STRUCTURAL AND IT IS NAMED: whether one
+-- SO THE FACTOR'S OWN RISK IS STRUCTURAL AND IT IS NAMED: whether one
 -- frame's drain can emit deeper than the factor times what it was
 -- handed.  It cannot do so by COMPOUNDING -- `mergeAllDrain` recurses
 -- across the queue and concatenates, and both measures in the
@@ -347,6 +347,15 @@ postulate
 --   function moves the emit and leaves the unit where it was, so what
 --   is owed is a FACTOR in the substituted function's SIZE and no
 --   summand in a depth currency is one.
+-- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled form
+--   from the other side, forty delivered against a charge of ZERO, at a
+--   queue holding nothing but a reference to an observable-typed share.
+--   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
+--   reference says nothing about the slot -- and the node table does not
+--   read the slots either, so the charged side is empty and every factor
+--   is a multiple of nothing.  Taken with the row above it this pins the
+--   shape exactly: the factor AND a slots summand, each of which is dead
+--   on its own.
 postulate
   stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
