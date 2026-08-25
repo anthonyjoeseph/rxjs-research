@@ -39,3 +39,5 @@ open import Refuted.Apply-Fn-Nest
   using (subbed≡2; oneWrap≡1; applyFn-nest-absurd)
 open import Refuted.Step-Frame-Nest-Dup
   using (dup≡80; perFrame≡40; stepFrame-nest-dup-absurd)
+open import Refuted.Scan-Fold-Burst
+  using (fold≡65; charge≡64; scan-fold-burst-absurd)

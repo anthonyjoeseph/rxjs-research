@@ -161,9 +161,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-scan`** (Nest-Walk) — DIFFICULTY: the scan frame stores the
-  accumulator it emits, so its node and its emission move together under one
-  `⊔`. The four sibling arms of the same frame split are named below.
+- **`stepFrame-nodes-scan`** (Nest-Walk) — FALSITY, REFUTED AS WRITTEN: a scan
+  applies its step function once per value, so a burst of k accrues k times
+  against a charge that cannot see k. Restate with the burst bound; the parent
+  and the walk above it inherit the repair.
 - **`stepFrame-nodes-inner`** (Nest-Walk) — DIFFICULTY: an inner's release
   forwards through the `from-inner` frame, the one frame the path measure
   charges nothing for — so the arm has to be paid by what the inner already was.

@@ -86,6 +86,20 @@ mapVals-nest {u = u} fn (v ∷ vs) =
 -- the walk again through an inner.  Only the two that SUBSTITUTE carry
 -- the factor; the other three are charged one, and `frameNestF` is
 -- where that split is written down.
+--
+-- AND THE SCAN ARM BELOW IS FALSE AS WRITTEN, WHICH IS A FACT ABOUT
+-- THE SPLIT AND NOT ABOUT THE ARM.  A map applies its step function to
+-- each value INDEPENDENTLY, so one factor covers a burst of any
+-- length; a scan THREADS, so the same factor is spent once per value
+-- and the charge has no term that moves with the burst.  The frames
+-- that need a burst-length factor are exactly the THREADING ones, and
+-- the bound is available where the walk is consumed -- the width face
+-- caps a burst already.
+--
+-- REFUTED: `Refuted.Scan-Fold-Burst` kills the scan arm's constant
+--   factor, 65 against 64, at the smallest step function that deepens
+--   its own accumulator; the same witness refutes `stepFrame-nodes`,
+--   whose scan arm IS this leaf.
 postulate
   stepFrame-nodes-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
