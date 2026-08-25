@@ -31,3 +31,5 @@ open import Refuted.Cascade-Deliv-Depth
   using (descent≡19; perDeliv≡16; val-hyp; cascade-deliv-depth-absurd)
 open import Refuted.Cascade-Nest-PerDeliv
   using (grown≡12; perDeliv≡10; store-val-hyp; cascade-nest-perDeliv-absurd)
+open import Refuted.Chain-Step-Nodes
+  using (grown≡11; charge≡9; chainStep-nodes-absurd)

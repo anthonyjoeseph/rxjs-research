@@ -15,14 +15,12 @@
 -- this sweep, quadratic against a linear width -- so a candidate that
 -- does not hold at the crossing shape is no candidate.
 --
--- THE SLOTS HALF OF THE CHARGE IS OUT OF REACH HERE, and it is a
--- property of the only slot builder these families have rather than of
--- the sweep: `insF` installs SCRIPTED slots at every index, whose
--- `slotNest` is zero by definition, so `nestSyn e sl` reads the same
--- number at every argument the probe can supply.  The free `sl` of the
--- target is therefore UNDRIVEN -- pinned, not swept -- and a row here is
--- evidence about `suc (nestDᵉ e)` alone.  Driving it wants a `shared`
--- slot, which is a program-family gap and not a harness one.
+-- AND THE ADVERSARIAL PATH IS SWEPT TOO, which is the axis that killed
+-- the charge this one replaced: the target quantifies over every path
+-- of the context, so a frame carrying a wrap the program never mentions
+-- is a legitimate instantiation and not a hand-built state.  The last
+-- reading below hands the step exactly that, and the path-denominated
+-- charge covers it where a program-denominated one does not.
 --
 -- TARGET: chainStep-nodes
 module Probed.Cascade-Chain-Count where
@@ -34,17 +32,19 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Closed)
+open import Rx.Exp using (Closed; natᵗ; nat̂)
+open import Rx.Nest-Depth using (nestDᵛ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascadeLatch; cascadeGo; chainsOf; chainStep; Arrival; arrTy; RegId; Path)
+         cascadeLatch; cascadeGo; chainsOf; chainStep; Arrival; arrTy; arrVal; RegId; Path;
+         _↠_; scan-f; map-f)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nodeNest; nestSyn)
+  using (nodeNest; pathNestD; chainsNestD)
 
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progU; progC; progF; progW; insF; sucGU; sucGC; sucGF; sucGW)
+  using (Γ₂; progU; progC; progF; progW; foldD; insF; sucGU; sucGC; sucGF; sucGW)
 
 ----------------------------------------------------------------------
 -- The walk, taken at the arrival the root subscribe leaves behind,
@@ -64,7 +64,7 @@ nodesMax st = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.node
 
 ----------------------------------------------------------------------
 -- READING ONE — the nodes map after the walk, against the map before it
--- plus one `nestSyn` per chain.  This is the target's own conclusion,
+-- plus one payload-and-chains charge per chain.  This is the target's own conclusion,
 -- with nothing weakened: the parent charges the whole store measure on
 -- the right, and the store measure dominates the nodes map.
 ----------------------------------------------------------------------
@@ -78,7 +78,7 @@ readCh e sl sched st with sched-next sched
       ch  = chainsOf a st
       g   = cascadeGo a 1 ch sd stL
       lhs = nodesMax (proj₂ (proj₂ g))
-      rhs = nodesMax stL + length ch * nestSyn e sl
+      rhs = nodesMax stL + length ch * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 chRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ × ℕ × Bool
@@ -127,7 +127,7 @@ readDup e sl k sched st with sched-next sched
       ch  = rep k (chainsOf a st)
       g   = cascadeGo a 1 ch sd stL
       lhs = nodesMax (proj₂ (proj₂ g))
-      rhs = nodesMax stL + length ch * nestSyn e sl
+      rhs = nodesMax stL + length ch * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 dupRow : ∀ {t} (e : Closed Γ₂ t) → ℕ → ℕ → ℕ × ℕ × Bool
@@ -152,7 +152,7 @@ stepOn sl a []            sched st = 0 , 0 , false
 stepOn {e = e} sl a ((rid , c) ∷ _) sched st =
   let r   = chainStep 1 a c sched st
       lhs = nodesMax (proj₂ (proj₂ r))
-      rhs = nodesMax st + nestSyn e sl
+      rhs = nodesMax st + (nestDᵛ (arrTy a) (arrVal a) + pathNestD c)
   in lhs , rhs , (lhs ≤ᵇ rhs)
 
 readS : ∀ {t} (e : Closed Γ₂ t) (sl : Slots Γ₂)
@@ -196,3 +196,34 @@ ChW-fits = refl
 -- accumulator and the per-chain charge has to cover each of them.
 ChW2-fits : proj₂ (proj₂ (chRow (progW 1 1 0) (sucGW 1 2 2 1 1 0))) ≡ true
 ChW2-fits = refl
+
+----------------------------------------------------------------------
+-- READING THREE -- THE PATH IS A FREE ARGUMENT TOO, and unlike the
+-- chain list it is not a list of things the run produced: the target
+-- quantifies over EVERY path of the context, while the charge names a
+-- quantity of `e` alone.  A scan frame carrying a deep wrap is then a
+-- node the step installs at whatever depth the frame asks for, against
+-- a program that never mentions it.
+----------------------------------------------------------------------
+
+advPath : ℕ → Path Γ₂ natᵗ natᵗ
+advPath d = scan-f (foldD d) 7 ↠ (map-f (nat̂ 0) ↠ root)
+
+advArr : Arrival Γ₂
+advArr = record { tick = 0 ; ordinal = 0 ; source = 1 ; elemTy = natᵗ
+                ; payload = 0 ; isLast = false }
+
+readAdv : (e : Closed Γ₂ natᵗ) (sl : Slots Γ₂) → ℕ
+        → Sched Γ₂ → EvalSt e → ℕ × ℕ × Bool
+readAdv e sl d sched st =
+  let r   = chainStep 1 advArr (advPath d) sched st
+      lhs = nodesMax (proj₂ (proj₂ r))
+      rhs = nodesMax st + (nestDᵛ {Γ = Γ₂} (arrTy advArr) (arrVal advArr) + pathNestD (advPath d))
+  in lhs , rhs , (lhs ≤ᵇ rhs)
+
+advRow : ℕ → ℕ × ℕ × Bool
+advRow d = let e₀ = entry (progF 1 1) sl₁ (sucGF 1 2 2 1 1)
+           in readAdv (progF 1 1) sl₁ d (proj₁ e₀) (proj₂ e₀)
+
+Adv-fits : proj₂ (proj₂ (advRow 9)) ≡ true
+Adv-fits = refl

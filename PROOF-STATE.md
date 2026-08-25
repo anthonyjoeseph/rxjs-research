@@ -162,9 +162,12 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 - **`chainStep-nodes`** (Caps-Face/Part7) — DIFFICULTY: ONE chain's step
-  deepens the node arm by at most one `nestSyn`, premise-free. Both storing
-  sites sit under it and a MAX moves once however many inners it subscribes;
-  the walk-level statement above it is an induction over the list, proven.
+  deepens the node arm by at most the payload's nesting plus the PATH's own,
+  premise-free. The `nestSyn` form is refuted; the path form covers the frame
+  that killed it, and the walk-level induction over the list is proven.
+- **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY: the selection's
+  paths and the arrival's payload land inside `nestSyn` — the fact that ties
+  the walk's charge back to the program. Free-list form refuted; probeable.
 - **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY: the walk's pending
   sources under the same width. The one arm of the store no instantiation has
   ever reached — every family reads it zero — so its cheapness is a guess.

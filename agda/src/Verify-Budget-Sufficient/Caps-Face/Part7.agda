@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; <⇒≤;
-  *-mono-≤; *-monoˡ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
+  *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; map; foldr)
@@ -32,7 +32,7 @@ open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; size�
 open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
+  (chainsNestD; pathNestD; storeNestMax; nestCapAt; nestOK?; nestOK?-latch; nestOK?-store; nest-sum-3;
   storeNest-latch; realWidAt; realWidAt-def; nestSyn; slotsNestSum; liveNest; nodeNest; regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
@@ -1243,16 +1243,25 @@ postulate
 -- genuinely deepens, and the inners a drain SUBSCRIBES, which install
 -- their own nodes.
 --
--- SO THE QUANTITY TO CHARGE IS THE LENGTH OF THE CHAIN LIST THE WALK
--- WAS HANDED, and the whole of the claim is ONE CHAIN'S STEP.  Both
--- storing sites sit under a single `chainStep`, and the fold visits
--- each chain once, so the walk-level statement is a plain induction
--- over the list -- the skip arm weakens by a chain, the step arm spends
--- this leaf and re-associates -- and everything a single chain does to
--- the store, however many inners it subscribes, is invisible to a MAX
--- that moves once.  The count being an ARGUMENT rather than a reading
--- of the run is what makes both halves cheap: the charge is legible at
--- the call site, and the induction never has to say what the run did.
+-- SO THE QUANTITY TO CHARGE IS THE CHAIN THE WALK IS WALKING, and the
+-- whole of the claim is ONE CHAIN'S STEP.  Both storing sites sit under
+-- a single `chainStep`, and the fold visits each chain once, so the
+-- walk-level statement is a plain induction over the list -- the skip
+-- arm weakens by a chain, the step arm spends this leaf and
+-- re-associates -- and everything a single chain does to the store,
+-- however many inners it subscribes, is invisible to a MAX that moves
+-- once.
+--
+-- AND THE CHARGE IS THE PATH'S OWN, NOT THE PROGRAM'S.  A `scan` frame
+-- carries its accumulator function, and the node the step installs is
+-- that function applied to what arrived -- so the two quantities a step
+-- can deepen by are the PAYLOAD's nesting and the wraps the frames
+-- below it add, which is exactly what `pathNestD` counts.  Charging a
+-- syntactic ceiling on `e` instead reads as tighter and is not even
+-- true: the path is a free argument, so it is under no obligation to be
+-- one of `e`'s.  Tying the two together is the CONSUMER's business,
+-- where the chain list comes from the registry and the payload from a
+-- slot, and it is a different fact from this one.
 --
 -- DEAD ROUTE: charging per MINTED INSTANCE, the same statement with the
 --   schedule's own node counter in place of the length.  The count is
@@ -1271,53 +1280,62 @@ postulate
 --   of 3 and a `nestSyn` of 6.  A walk deepens once per CHAIN, so the
 --   count that survives is a count of chains and there is no
 --   count-free form of this row.
+-- REFUTED: `Refuted.Chain-Step-Nodes` kills the `nestSyn` form of this
+--   very statement, eleven against nine, and the gap is unbounded in
+--   the fold depth of a frame the program never mentions.
 -- PROBED: `Probed.Cascade-Chain-Count` pins this leaf by `refl` at the
 --   head of the arrival's own selection, at the crossing width and on
---   three further families -- the bounded drain, the skip branch and
---   the deliver-on-every-chain family.  It also pins the WALK-level
---   conclusion the induction above draws from it, at the same four
---   shapes and again with the chain list DUPLICATED: the max climbs two
---   a copy while the charge climbs a whole `nestSyn` per chain, so the
---   adversarial list sits further inside the bound than the honest one.
---   Twenty-three chains against a max of 26 is the tight row, and it is
---   the one the mint-counting predecessor fails.  A fifth family carries
---   an OBSERVABLE-typed accumulator, which is the only stored value in
---   reach whose `nodeNest` is not identically zero, so the other four
---   drive the charge against a left side that cannot move.  COVERED is
---   the CONCLUSION, which is premise-free.  NOT covered: `Γ₂` alone; and
---   the SLOTS half of the charge, whose every argument in reach is
---   scripted and so contributes nothing -- the rows are evidence about
---   `suc (nestDᵉ e)` and not about `sl`.
+--   four further families -- the bounded drain, the skip branch, the
+--   deliver-on-every-chain family and the only one in reach whose
+--   stored value is observable-typed, so that the left side can move at
+--   all.  It also pins the WALK-level conclusion the induction below
+--   draws from it, at the same shapes and again with the chain list
+--   DUPLICATED, where the max climbs one a copy and the charge climbs a
+--   whole chain's worth.  And it pins the free PATH, at the frame that
+--   refutes the program-denominated charge, which is the region the
+--   `nestSyn` form left open.  COVERED is the CONCLUSION, which is
+--   premise-free.  NOT covered: `Γ₂` alone, at one slot shape.
 postulate
   chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+    (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
     (sched : Sched Γ) (st : EvalSt e) →
     let r = chainStep id a path sched st in
     foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-        + nestSyn e sl
+        + (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
 
 cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
+  (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   let r = cascadeGo a nextId chains sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
     ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-      + length chains * nestSyn e sl
-cascadeGo-nodes-chains sl a nextId [] sched st = m≤m+n _ _
-cascadeGo-nodes-chains {e = e} sl a nextId ((rid , c) ∷ chains) sched st
+      + length chains * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains)
+cascadeGo-nodes-chains a nextId [] sched st = m≤m+n _ _
+cascadeGo-nodes-chains a nextId ((rid , c) ∷ chains) sched st
   with any (_≡ᵇ rid) (EvalSt.cancelled st)
 ... | true =
-  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sched st)
-          (+-monoʳ-≤ _ (*-monoˡ-≤ (nestSyn e sl) (n≤1+n (length chains))))
-... | false =
-  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sd₁ st₁)
-          (≤-trans (+-monoˡ-≤ (length chains * nestSyn e sl)
-                              (chainStep-nodes sl nextId a c sched st′))
-                   (≤-reflexive (+-assoc _ (nestSyn e sl)
-                                           (length chains * nestSyn e sl))))
+  ≤-trans (cascadeGo-nodes-chains a nextId chains sched st)
+          (+-monoʳ-≤ M (*-mono-≤ (n≤1+n (length chains))
+                                 (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C))))
   where
+  M = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+  V = nestDᵛ (arrTy a) (arrVal a)
+  C = chainsNestD chains
+... | false =
+  ≤-trans (cascadeGo-nodes-chains a nextId chains sd₁ st₁)
+          (≤-trans (+-monoˡ-≤ (length chains * (V + C))
+                              (chainStep-nodes nextId a c sched st′))
+          (≤-trans (≤-reflexive (+-assoc M (V + pathNestD c)
+                                           (length chains * (V + C))))
+                   (+-monoʳ-≤ M (+-mono-≤ (+-monoʳ-≤ V (m≤m⊔n (pathNestD c) C))
+                                          (*-monoʳ-≤ (length chains)
+                                            (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C)))))))
+  where
+  M   = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+  V   = nestDᵛ (arrTy a) (arrVal a)
+  C   = chainsNestD chains
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
   r₁  = chainStep nextId a c sched st′
   sd₁ = proj₁ (proj₂ r₁)
@@ -1361,12 +1379,13 @@ cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   length chains ≤ realWidAt e sl id →
+  nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains ≤ nestSyn e sl →
   let r = cascadeGo a nextId chains sched st
   in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
        ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
-cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt =
-  ≤-trans (cascadeGo-nodes-chains sl a nextId chains sched st)
-    (+-mono-≤ nodes≤store (*-mono-≤ hcnt (≤-refl {nestSyn e sl})))
+cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg =
+  ≤-trans (cascadeGo-nodes-chains a nextId chains sched st)
+    (+-mono-≤ nodes≤store (*-mono-≤ hcnt hchg))
   where
   nodes≤store : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ storeNestMax sched st
   nodes≤store = ≤-trans (m≤n⊔m (NA ⊔ NB) NC) (m≤m⊔n ((NA ⊔ NB) ⊔ NC) ND)
@@ -1428,10 +1447,11 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   length chains ≤ realWidAt e sl id →
+  nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains ≤ nestSyn e sl →
   let r = cascadeGo a nextId chains sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
-cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt =
+cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg =
   ⊔-lub (⊔-lub (⊔-lub SL LV) ND) RG
   where
   r   = cascadeGo a nextId chains sched st
@@ -1453,7 +1473,7 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt 
 
   ND : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st′)
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
-  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval hcnt
+  ND = cascadeGo-nest-nodes sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg
 
   RG : regsNestMax (EvalSt.registry st′)
          ≤ storeNestMax sched st + realWidAt e sl id * nestSyn e sl
@@ -1551,6 +1571,31 @@ postulate
          ≤ nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains
            + storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
+-- AND THE SAME SELECTION AGAINST THE SYNTACTIC CEILING, which is the
+-- fact that ties a walk's charge back to the program.  A registration's
+-- path is a rootward walk through `e`'s own spine, and `pathNestD`
+-- charges the `thru-outer` frame and only that frame -- one per *All
+-- layer, which is exactly the `suc` `nestDᵉ` spends on the same layer --
+-- so the deepest registered chain is within `nestDᵉ e`.  The PAYLOAD is
+-- not in the registry at all: it came from a slot, so it is within that
+-- slot's own nesting and hence within `slotsNestSum`.  Adding the two
+-- lands inside `nestSyn`, which is their sum plus one.
+--
+-- IT IS STATED OVER THE SELECTION AND NOT OVER A FREE LIST, and that is
+-- the whole content: a path nobody registered may carry a `scan` frame
+-- whose function wraps deeper than the program it is being charged
+-- against, so the free-list form of this bound does not survive.
+--
+-- REFUTED: `Refuted.Chain-Step-Nodes`, the free-path form, eleven
+--   against nine and unbounded in the frame's fold depth.
+postulate
+  arr-chains-nest-syn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st) ≤ nestSyn e sl
+
 cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →
@@ -1581,6 +1626,7 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
       (trans (nestOK?-latch e sl id a sched st) hnest)
       hval
       (chains-count-width sl id a sched st hcaps)
+      (arr-chains-nest-syn sl id a sched st hsl hcaps hnest)
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store
@@ -1591,8 +1637,6 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
 -- schedule has already popped it — so that one stays a premise, exactly
 -- as `valCaps?` does beside it.
 --
--- TWIN: `chainsOf-caps` above takes `regsSz?` to the same bound over the
---   same selection, by recursion on the registry through `chainsGo-caps`.
 postulate
   chainsNest≤store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
