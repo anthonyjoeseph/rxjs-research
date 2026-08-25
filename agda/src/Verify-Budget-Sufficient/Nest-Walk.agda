@@ -317,6 +317,14 @@ postulate
 --   substitution is not, so the emitted value is deeper than the whole
 --   queue is charged.  The same witness kills the ASSEMBLY at this
 --   frame, whose charge reduces to exactly the leaf's bound.
+-- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
+--   invites -- charging the arm the `nestUnit e sl` its own parent
+--   already carries -- at a hundred and twenty against eighty-two, with
+--   the queued observable AS the program so the unit is as large as the
+--   currency admits.  A third occurrence of the payload in the step
+--   function moves the emit and leaves the unit where it was, so what
+--   is owed is a FACTOR in the substituted function's SIZE and no
+--   summand in a depth currency is one.
 postulate
   stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp)

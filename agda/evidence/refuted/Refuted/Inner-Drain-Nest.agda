@@ -60,7 +60,7 @@ open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (Sched; EvalSt; mergeAll-st; Frame; from-inner; mergeAllᵒ; root; stepFrame; sched-init;
   st-init; installNode)
-open import Verify-Budget-Sufficient.Nest-Store using (frameNestF)
+open import Verify-Budget-Sufficient.Nest-Store using (frameNestF; nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nodesMax; nestDᵛˢ; frameNestD)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
@@ -144,3 +144,57 @@ parent≡40 = refl
 
 stepFrame-nodes-at-inner-absurd : proj₁ row ≤ parentCharge → ⊥
 stepFrame-nodes-at-inner-absurd h = ≤⇒≤ᵇ h
+
+----------------------------------------------------------------------
+-- AND THE PROGRAM'S OWN NESTING UNIT DOES NOT PAY FOR IT EITHER, which
+-- is the repair this refutation most invites and the one worth closing
+-- here.  `foldPath-nodes` already carries a `nestUnit e sl` that the
+-- per-frame statement lacks, so the cheap reading is that the arm is
+-- merely missing the term its own parent has -- and at the witness
+-- above that reading FITS, eighty against a charge of eighty-two.
+--
+-- It fits by coincidence.  `nestUnit` is a DEPTH, and depth is additive
+-- under `mapᵉ`; what the drain's subscription performs is a
+-- SUBSTITUTION, whose cost is linear in the number of times the step
+-- function names its payload.  A third occurrence moves the emit to a
+-- hundred and twenty and leaves the unit at forty-two.  So the gap is
+-- unbounded in a quantity `nestUnit` does not measure, and no summand
+-- in this currency closes it: what is owed is a FACTOR in the SIZE of
+-- the substituted function, which is the shape `applyFn-nest` already
+-- charges the map frame and which the store -- not the frame -- is
+-- where this one would have to come from.
+----------------------------------------------------------------------
+
+-- the same payload, named THREE times instead of two
+tripFn : Fn Γ₂ [] [] [] (obs natᵗ) (obs (obs natᵗ))
+tripFn = strmᵗ (mapᵉ (varᵗ (there (here refl)))
+                 (ofᵉ (strmᵗ (mapᵉ (varᵗ (there (here refl)))
+                        (ofᵉ (varᵗ (here refl) ∷ []))) ∷ [])))
+
+o₃ : Closed Γ₂ (obs (obs natᵗ))
+o₃ = mapᵉ tripFn (ofᵉ (strmᵗ (deepV 40) ∷ []))
+
+st₃ : EvalSt e
+st₃ = installNode 0 (mergeAll-st nothing 1 (o₃ ∷ []) true) (st-init e)
+
+row₃ : ℕ × ℕ
+row₃ = let r = stepFrame gas 0 0 f root vals true sched₀ st₃
+       in nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r)
+        , nodesMax st₃ ⊔ nestDᵛˢ vals
+
+drained₃≡120 : proj₁ row₃ ≡ 120
+drained₃≡120 = refl
+
+queued₃≡40 : proj₂ row₃ ≡ 40
+queued₃≡40 = refl
+
+-- charged against the program that IS the queued observable, so the
+-- unit is as large as this currency can honestly make it
+unitCharge : ℕ
+unitCharge = proj₂ row₃ + 1 * nestUnit o₃ slots
+
+unitCharge≡82 : unitCharge ≡ 82
+unitCharge≡82 = refl
+
+stepFrame-nodes-inner-unit-absurd : proj₁ row₃ ≤ unitCharge → ⊥
+stepFrame-nodes-inner-unit-absurd h = ≤⇒≤ᵇ h

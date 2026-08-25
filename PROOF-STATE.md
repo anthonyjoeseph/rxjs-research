@@ -173,8 +173,8 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`stepFrame-nodes-inner`** (Nest-Walk) — SHAPE, `REFUTED`: the free form is
-  machine-refuted, and the assembly with it. The drain under this frame
+- **`stepFrame-nodes-inner`** (Nest-Walk) — SHAPE, `REFUTED×2`: the free form
+  is machine-refuted, and the assembly with it. The drain under this frame
   SUBSCRIBES, so the arm is the subscribe descent inside the walk and no
   function of the frame can pay it; restate, do not grind.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — SHAPE, `REFUTED`: machine-refuted
