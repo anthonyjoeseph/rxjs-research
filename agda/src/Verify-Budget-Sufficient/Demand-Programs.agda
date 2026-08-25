@@ -195,6 +195,29 @@ sucGT ds ks j d k =
   suc (syncSizeᵉ (progT d k)
        + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progT d k))
 
+-- THE OUTER-BOUNDED FAMILY, which is `progT` with the bound moved to the
+-- OUTER `*All` instead of the inner one.  Every other family here leaves
+-- the outer unbounded, so every value the scan emits is subscribed on the
+-- spot; here the outer fills after one and a later emission PARKS.  It
+-- was built to separate two things the others always do together --
+-- deepening the scan's accumulator, and minting a node instance for what
+-- it emitted -- and it DOES NOT separate them: the inner flattener still
+-- mints once per release, so a walk that deepens the store still mints.
+-- Kept because the outer-bounded shape is the axis any further attempt on
+-- that region has to drive, and because arriving at it again from nothing
+-- is most of the cost.
+progO : ℕ → ℕ → Closed Γ₂ natᵗ
+progO d k =
+  mergeAllᵉ (just 1) (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ nothing (ofᵉ (strmᵗ (input fzero)
+                   ∷ strmᵗ (input (fsuc fzero))
+                   ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+
+sucGO : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGO ds ks j d k =
+  suc (syncSizeᵉ (progO d k)
+       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progO d k))
+
 ----------------------------------------------------------------------
 -- THE LATE-CONNECT FAMILY.  Every other family here connects its shared
 -- slot inside the ROOT SUBSCRIBE, so from the first delivery instant

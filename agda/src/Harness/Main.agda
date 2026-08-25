@@ -70,7 +70,7 @@ open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Demand-Programs
   using (runDry; progD; sucG; ins₀; runDryS; progS; sucGS; insS;
          progT; sucGT; progU; sucGU; progB; sucGB; progN; sucGN; progF; sucGF; insF; insT; subjN; pathN;
-         progC; sucGC; progW; sucGW)
+         progC; sucGC; progW; sucGW; progO; sucGO)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nestSyn; nestCapAt; realWidAt; storeNestMax; slotsNestSum; nestOK?;
          pathNestD; chainsNestD; liveNest; nodeNest; regsNestMax)
@@ -624,9 +624,14 @@ satWalk e sl (suc m) nextId sched st with sched-next sched
      ++ " ns=" ++ show (nestSyn e sl)
      ++ " N=" ++ show nv ++ " C=" ++ show cn
      ++ " D=" ++ show dep ++ " A=" ++ show aft
-     ++ " " ++ four (proj₁ (proj₂ g)) (proj₂ (proj₂ g))
+     ++ " B" ++ four sd stL
+     ++ " A" ++ four (proj₁ (proj₂ g)) (proj₂ (proj₂ g))
      ++ " nn=" ++ show (Sched.nextNode sd)
      ++ "→" ++ show (Sched.nextNode (proj₁ (proj₂ g)))
+     ++ (let ndB = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes stL)
+             ndA = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ g)))
+             mm  = Sched.nextNode (proj₁ (proj₂ g)) ∸ Sched.nextNode sd
+         in if ndA ≤ᵇ ndB + mm * nestSyn e sl then " MINT-ok" else " MINT-FAIL")
      ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
      ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
      ++ " |" ++ satGo a nextId ch sd stL (length ch)
@@ -976,6 +981,13 @@ satRow fam ds ks j w k =
                               (sched-init p slF) (st-init p)
            in "W ww=" ++ show ds ++ " w=" ++ show w ++ " k=" ++ show k
               ++ satWalk p slF 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+     else if fam ≡ᵇ 5
+     then (let slO = insT ds ks j
+               p = progO w k
+               r = subscribeE (gasPad (sucGO ds ks j w k) g0) p root 0 0
+                              (sched-init p slO) (st-init p)
+           in "O d=" ++ show w ++ " k=" ++ show k
+              ++ satWalk p slO 3 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
      else if fam ≡ᵇ 3
      then (let slT = insT ds ks j
                p   = progU w k

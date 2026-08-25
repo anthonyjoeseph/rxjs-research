@@ -1257,6 +1257,24 @@ postulate
 -- the two schedules this statement already mentions.  The witness is
 -- PINNED by the equation rather than merely bounded by it, which is
 -- what keeps the pair from being satisfied by taking it large.
+
+-- AND IT IS NOT USEFULLY INSTANTIABLE, WHICH IS A FINDING AND NOT A GAP
+-- IN THE SWEEP.  Both sides compute and the statement is premise-free, so
+-- rows are free to take; a hundred and ten of them across six families,
+-- both bounds, several depths and several instants, produce no
+-- counterexample and no NEAR one.  That is the problem.  The rows where
+-- the count is zero -- the only rows where the bound demands anything at
+-- all, since it then forbids growth outright -- are exactly the rows
+-- where the walk selected no chain, so they are empty by construction and
+-- could not have failed.  Everywhere a chain IS walked the count runs an
+-- order of magnitude past the growth it has to pay for, and no axis in
+-- this vocabulary closes that: a value can only reach a storing site by
+-- being RELEASED from a flattener, and a release is a subscription, so
+-- the count and the growth move together by construction.  Reaching the
+-- falsifying region needs a program that deepens the store without a
+-- release, and the outer-bounded family built to try it does not, because
+-- the inner flattener mints anyway.  So the risk here is not measured,
+-- and no receipt claims it is.
 postulate
   cascadeGo-nodes-mint : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
