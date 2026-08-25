@@ -1280,9 +1280,14 @@ postulate
 --   a copy while the charge climbs a whole `nestSyn` per chain, so the
 --   adversarial list sits further inside the bound than the honest one.
 --   Twenty-three chains against a max of 26 is the tight row, and it is
---   the one the mint-counting predecessor fails.  COVERED is the
---   CONCLUSION, which is premise-free.  NOT covered: `Γ₂` alone, at one
---   slot shape.
+--   the one the mint-counting predecessor fails.  A fifth family carries
+--   an OBSERVABLE-typed accumulator, which is the only stored value in
+--   reach whose `nodeNest` is not identically zero, so the other four
+--   drive the charge against a left side that cannot move.  COVERED is
+--   the CONCLUSION, which is premise-free.  NOT covered: `Γ₂` alone; and
+--   the SLOTS half of the charge, whose every argument in reach is
+--   scripted and so contributes nothing -- the rows are evidence about
+--   `suc (nestDᵉ e)` and not about `sl`.
 postulate
   chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)

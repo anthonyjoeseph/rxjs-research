@@ -15,6 +15,15 @@
 -- this sweep, quadratic against a linear width -- so a candidate that
 -- does not hold at the crossing shape is no candidate.
 --
+-- THE SLOTS HALF OF THE CHARGE IS OUT OF REACH HERE, and it is a
+-- property of the only slot builder these families have rather than of
+-- the sweep: `insF` installs SCRIPTED slots at every index, whose
+-- `slotNest` is zero by definition, so `nestSyn e sl` reads the same
+-- number at every argument the probe can supply.  The free `sl` of the
+-- target is therefore UNDRIVEN -- pinned, not swept -- and a row here is
+-- evidence about `suc (nestDᵉ e)` alone.  Driving it wants a `shared`
+-- slot, which is a program-family gap and not a harness one.
+--
 -- TARGET: chainStep-nodes
 module Probed.Cascade-Chain-Count where
 
@@ -35,7 +44,7 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (nodeNest; nestSyn)
 
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progU; progC; progF; insF; sucGU; sucGC; sucGF)
+  using (Γ₂; progU; progC; progF; progW; insF; sucGU; sucGC; sucGF; sucGW)
 
 ----------------------------------------------------------------------
 -- The walk, taken at the arrival the root subscribe leaves behind,
@@ -168,3 +177,22 @@ SU-fits = refl
 
 SC-fits : proj₂ (proj₂ (sRow (progC 1 2 2) (sucGC 1 2 2 1 2 2))) ≡ true
 SC-fits = refl
+
+-- AND THE WRAPPING FAMILY, which is the only one here whose stored
+-- value is OBSERVABLE-typed: `progW`'s accumulator is re-merged into
+-- itself `suc ww` times per emission, so `nodeNest` of its scan node is
+-- the one quantity in the store that a step can actually deepen.  Every
+-- other family holds a `natᵗ` accumulator, whose nest is zero however
+-- long the run -- so without these rows the sweep drives the charge
+-- against a left side pinned at 0 and could not fail.  Here it reads 3
+-- against 8, so both halves move.
+SW-fits : proj₂ (proj₂ (sRow (progW 1 0 0) (sucGW 1 2 2 1 0 0))) ≡ true
+SW-fits = refl
+
+ChW-fits : proj₂ (proj₂ (chRow (progW 1 0 0) (sucGW 1 2 2 1 0 0))) ≡ true
+ChW-fits = refl
+
+-- ONE MORE CHAIN, so the arrival presents two chains into the same deepening
+-- accumulator and the per-chain charge has to cover each of them.
+ChW2-fits : proj₂ (proj₂ (chRow (progW 1 1 0) (sucGW 1 2 2 1 1 0))) ≡ true
+ChW2-fits = refl
