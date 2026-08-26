@@ -50,7 +50,7 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤;
   n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -276,6 +276,22 @@ storeNestMax sched st =
   ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
   ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
   ⊔ regsNestMax (EvalSt.registry st)
+
+-- THE STORE IS FOUR PLACES UNDER ONE `⊔`, so a bound on it IS four
+-- bounds and taking it apart costs nothing.  Named here rather than
+-- re-derived at each face because the four components are this
+-- module's own: a caller that splits the maximum otherwise has to
+-- write the folds out, and a fold written out at a call site is the
+-- one thing that drifts when a fifth place is added.
+storeNestMax-lub : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) (F : ℕ) →
+  slotsNestSum (Sched.slots sched) ≤ F →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ≤ F →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ F →
+  regsNestMax (EvalSt.registry st) ≤ F →
+  storeNestMax sched st ≤ F
+storeNestMax-lub sched st F hs hl hn hr =
+  ⊔-lub (⊔-lub (⊔-lub hs hl) hn) hr
 
 -- THE LATCH MOVES NO OBSERVABLE.  `cascadeLatch` resets the per-cascade
 -- bookkeeping and may add a completed source; it never touches `nodes`,

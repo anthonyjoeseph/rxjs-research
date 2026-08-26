@@ -17,7 +17,11 @@
 -- subscribe frame, which is the whole question at this instant, and
 -- which the wrap corpus below makes the descent actually work for.
 --
--- TARGET: burst-nest-floor
+-- The rows read the store's MAXIMUM, so each of the three components
+-- the floor is now assembled from is bounded by them one at a time.
+-- TARGET: burst-nest-live
+-- TARGET: burst-nest-nodes
+-- TARGET: burst-nest-regs
 module Probed.Burst-Nest-Unit where
 
 open import Data.Bool using (true)

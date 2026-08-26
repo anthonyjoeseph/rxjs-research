@@ -31,12 +31,12 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (Maybe; nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; length)
+open import Data.List    using (List; []; _∷_; length; foldr)
 open import Data.Bool.ListAction using (all)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
@@ -101,7 +101,8 @@ open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store;
   nestOK?-intro; nestCapAt-suc; nest-sum-3; nestFacAt; nestIncAt; storeNest-latch;
-  storeNest-finish; nestOK?-latch; nestUnit; nestOK?-from-floor)
+  storeNest-finish; nestOK?-latch; nestUnit; nestOK?-from-floor; storeNestMax-lub;
+  liveNest; nodeNest; regsNestMax)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
@@ -1996,12 +1997,6 @@ postulate
     nestDᵛ (arrTy a) (arrVal a)
       ≤ nestCapAt e (Sched.slots sched) id
 
--- THE BURST'S OWN NESTING RECEIPT, the mirror of `burst-caps`.  The
--- subscribe frame is the one place a run's nesting can jump without an
--- arrival driving it — every inner it subscribes is grafted from the
--- program's own syntax — so instant 1's cap is the base cap plus one
--- increment, which is what `nestCapAt`'s step supplies.
-
 -- AND THIS IS WHERE THE CURRENCY IS ACTUALLY BET.  The increment it
 -- spends is the one at instant zero, the only one that is not the wrap
 -- tower — `store-growth`'s header has the arithmetic and why every
@@ -2055,12 +2050,79 @@ postulate
 --   well, and it is two-sided rather than a weakening -- the merge
 --   head's store reads one at empty slots and four at these.
 --   NOT covered: the factor, which the route deliberately never reads.
+--   Every row reads the store's MAXIMUM, so what it says about a
+--   component is said about all four at once.
 postulate
-  burst-nest-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  burst-nest-live : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)
-    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
          ≤ nestUnit e ins + nestIncAt e ins 0
+
+  -- The node table, which is the place the wraps this frame installs
+  -- land.  It is the component the walk face's own grant speaks about,
+  -- and it is stated here at the FLOOR currency rather than that grant:
+  -- what a caller of this row needs is the store under one instant's
+  -- growth, and the walk's bound is keyed on a width this call site
+  -- never reads.
+  burst-nest-nodes : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    let r = subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)
+    in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+             (EvalSt.nodes (proj₂ (proj₂ r)))
+         ≤ nestUnit e ins + nestIncAt e ins 0
+
+  -- The registry's own paths.  `cascadeGo-nest-regs` is this component
+  -- one face over and in the same currency -- the registry against the
+  -- store the step began at plus one increment -- so the two are worth
+  -- reading together, though it is a leaf there as well.
+  burst-nest-regs : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    let r = subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)
+    in regsNestMax (EvalSt.registry (proj₂ (proj₂ r)))
+         ≤ nestUnit e ins + nestIncAt e ins 0
+
+-- THE BURST'S OWN NESTING RECEIPT, the mirror of `burst-caps`.  The
+-- subscribe frame is the one place a run's nesting can jump without an
+-- arrival driving it — every inner it subscribes is grafted from the
+-- program's own syntax — so instant 1's cap is the base cap plus one
+-- increment, which is what `nestCapAt`'s step supplies.
+--
+-- AND THE STORE IS FOUR PLACES, so this is four obligations and one of
+-- them is free.  The telescope is not written by a subscribe frame at
+-- all, so the slot component IS the sum the unit was built over and
+-- closes here; the other three are the leaves above, each stated at
+-- the component the cascade face already keeps apart.
+burst-nest-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ nestUnit e ins + nestIncAt e ins 0
+burst-nest-floor e ins =
+  storeNestMax-lub sched₁ st₁ (nestUnit e ins + nestIncAt e ins 0)
+    hslots (burst-nest-live e ins) (burst-nest-nodes e ins)
+    (burst-nest-regs e ins)
+  where
+  r      = subscribeE (budgetAt e ins 0) e root 0 0
+                      (sched-init e ins) (st-init e)
+  sched₁ = proj₁ (proj₂ r)
+  st₁    = proj₂ (proj₂ r)
+
+  slEq : Sched.slots sched₁ ≡ ins
+  slEq = subscribeE-slots (budgetAt e ins 0) e root 0 0
+                          (sched-init e ins) (st-init e)
+
+  -- the subscribe frame does not write the telescope, so the slot
+  -- component is the very sum the unit was built over
+  base : slotsNestSum ins ≤ nestUnit e ins + nestIncAt e ins 0
+  base = ≤-trans (≤-trans (m≤n+m (slotsNestSum ins) (nestDᵉ e))
+                          (n≤1+n (nestDᵉ e + slotsNestSum ins)))
+                 (m≤m+n (nestUnit e ins) (nestIncAt e ins 0))
+
+  hslots : slotsNestSum (Sched.slots sched₁)
+             ≤ nestUnit e ins + nestIncAt e ins 0
+  hslots = subst (λ sl → slotsNestSum sl ≤ nestUnit e ins + nestIncAt e ins 0)
+                 (sym slEq) base
 
 -- SEALED, and this is not optional: this body sits on the
 -- `budget-sufficient` spine, where an unsealed proof puts its whole

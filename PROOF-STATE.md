@@ -178,10 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`burst-nest-floor`** (Caps-Bridge) — DIFFICULTY, `PROBED`: the subscribe
-  frame's store against the unit PLUS `capsAt`'s size. The unit alone is
-  refuted by a defer-headed program; a proven lower bound on the size turns the
-  sealed conclusion into a stronger claim that computes, green there.
+- **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
+  DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
+  frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
+  the floor assembles all four. The unit alone is refuted by a
+  defer-headed program; a size bound makes it compute.
 - **`thruFit-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE, PROBED×5`: the `*All` heads are real bodies now; what is left is
   the fit of ONE consume step under the head's grant, per emit and per value,
