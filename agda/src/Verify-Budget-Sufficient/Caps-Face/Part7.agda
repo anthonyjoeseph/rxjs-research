@@ -2087,17 +2087,18 @@ arr-chains-nest-fac {e = e} sl id a sched st hsl hcaps hnest =
 --
 -- AND THE CAPS FACE ALREADY CARRIES THIS CONJUNCT, WHICH IS WHAT MAKES
 -- A FLAT CAP THE RIGHT CURRENCY RATHER THAN A HOPEFUL ONE.  `valsCaps?`
--- is `all valCaps?` conjoined with exactly this length bound, and the
--- walk face propagates it ACROSS THE FEARED HOP: `thruWalk-walk` takes
--- it in at one level and hands it back at another, with that level's
--- growth bounded in the same tuple.  The remaining distance is
--- arithmetic and not a walk: every level a cascade reaches is under
--- `sizeCount`, so `frameStep-mono-j` puts its width under
--- `frameStep sizeCount`, which `capsAt-suc-full` says IS the cap at
--- the next instant -- which is the one this burst is read from.  The
--- grind is the induction that carries a flat bound where the walk face
--- carries a moving one, and it is a transcription rather than a
--- discovery.
+-- is `all valCaps?` conjoined with exactly this length bound.  The
+-- remaining distance is arithmetic and not a walk: every level a
+-- cascade reaches is under `sizeCount`, so `frameStep-mono-j` puts its
+-- width under `frameStep sizeCount`, which `capsAt-suc-full` says IS
+-- the cap at the next instant -- which is the one this burst is read
+-- from.  The grind is the induction that carries a flat bound where the
+-- walk face carries a moving one, and it is a transcription rather than
+-- a discovery.
+--
+-- TWIN: `thruWalk-walk` propagates this conjunct ACROSS THE FEARED HOP
+--   and is proven -- taking it in at one level and handing it back at
+--   another, with that level's growth bounded in the same tuple.
 postulate
   arr-chains-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

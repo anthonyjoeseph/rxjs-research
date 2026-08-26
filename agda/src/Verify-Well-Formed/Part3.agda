@@ -616,6 +616,13 @@ postulate
   -- statements never read, which is exactly what lets one set of leaves
   -- cover the bounded case neither old face could express.
 
+  -- CARRY THE INVARIANT ACROSS THE MINT.  `mintNode` writes `nextNode`
+  -- and `installNode` writes `nodes`, so neither the registry nor the
+  -- live list moves and every `BurstInv` field transports by eta.
+  --
+  -- TWIN: `scan-binv-adapt` is that transport at the same two
+  --   operations, proven, and the argument does not read the node state
+  --   it installs.
   mergeAll-binv-adapt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
@@ -652,6 +659,10 @@ postulate
   -- outer-done flag.  Limit-blind by construction, which is what lets
   -- the queue claim be a separate fact rather than a conjunct only one
   -- limit can honour.
+  --
+  -- TWIN: `scan-node` reads its own freshly installed node back after
+  --   the inner burst and is proven, over a ring on the whole of
+  --   `subscribeE` that never reads which state was installed.
   mergeAll-node-shape : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
@@ -662,7 +673,7 @@ postulate
          lookupNode nid (EvalSt.nodes (proj₂ (proj₂ r)))
            ≡ just (mergeAll-st {t = u} lim act q od)
 
-  -- THE PUSH BACK OUT, the mergeAll twin of `subscribeE-scan-wf`: it
+  -- THE PUSH BACK OUT: it
   -- takes the inner subscription's protocol receipt and, SEPARATELY,
   -- the node the finished wrap leaves behind, and returns the outer's.
   --
@@ -674,6 +685,10 @@ postulate
   -- tighter hypothesis and is in fact the DEGENERATE one -- the wrap's
   -- queue cannot have been written yet at a point before the only call
   -- that can write it.
+  --
+  -- TWIN: `subscribeE-scan-wf` is this same joint on the scan face and
+  --   is proven -- inner receipt plus the finished node, out through the
+  --   frame, invariant back in.
   subscribeE-mergeAll-push : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (lim : Maybe ℕ)
     (fuel : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)

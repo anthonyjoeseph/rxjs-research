@@ -671,6 +671,19 @@ roadmap-selftest:
 	    echo "$$une" | grep -q "NAME NO PROVEN TWIN" \
 	      || { echo "SELFTEST FAIL: an unearned GRINDABLE was rejected for the wrong reason"; fail=1; }; \
 	  fi; \
+	  nof=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-nofloor.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-nofloor.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-nofloor.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-nofloor.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a DIFFICULTY row with NO EVIDENCE PASSED — the class with no floor under it is a parking space again"; fail=1; \
+	  else \
+	    echo "$$nof" | grep -q "DIFFICULTY ROWS WITH NO EVIDENCE" \
+	      || { echo "SELFTEST FAIL: an unevidenced DIFFICULTY was rejected for the wrong reason"; fail=1; }; \
+	  fi; \
+	  echo "$$nof" | grep -q "b-shape" \
+	    && { echo "SELFTEST FAIL: the no-floor check fired on a SHAPE row — the blank is legal on the classes that claim nothing"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and

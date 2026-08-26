@@ -1,10 +1,10 @@
 # fixture standing in for a scan of agda/src headers: which durable markers
 # each postulate's own comment block carries.  Absent names carry none.
+# (c-difficulty deliberately absent: the no-floor fixture reads this census)
 a-falsity: REFUTED, PROBED
 d-grindable: TWIN
 fam-alpha: DEAD ROUTE
 e-difficulty: REFUTED×2
-c-difficulty: PROBED
 suf-nodry-loop: PROBED
 f-grindable: TWIN
 glob-one: TWIN

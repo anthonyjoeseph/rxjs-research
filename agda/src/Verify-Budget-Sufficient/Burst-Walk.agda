@@ -576,17 +576,22 @@ WetFace sl Ψ r =
 -- CALL-SITE ARGUMENTS THESE ABSORB: none — every index is pinned by
 -- WetFace above.
 
--- subscribeE-Ψ — THE PENDING POSTULATE.
--- Proof sketch: Ψ = fnCapᵉ e + slotsFnCap sl is set once at init.
--- Slots never change (nextNode/live/ordinals never write the slots
--- field).  fnCapBounded? reads only .live and .nodes; every new live
--- entry fnCap ≤ Ψ (cold values come from a slot; deferᵉ body IS b
--- whose fnCapᵉ b ≤ Ψ); new nodes are take-st/scan-st/… all trivially
--- ≤ Ψ.  regP? grows only via `register` with path derived from κ;
--- pathBΨ? Ψ κ ≡ true guarantees each new entry.  burstΨ?: base cases
--- emit only init/close/complete (Ψ-bounded by definition); map/scan
--- use applyFn-fnCap; the *All family recurses through subscribeInner
--- (mutual structure — handled by the same descent as subscribeE-caps).
+-- THE Ψ RECEIPT A SUBSCRIBE FRAME HANDS BACK.  Ψ = fnCapᵉ e +
+-- slotsFnCap sl is set once at init and the slots never move
+-- (nextNode/live/ordinals never write that field), so the bound is a
+-- statement about what the frame ADDS.  `fnCapBounded?` reads only
+-- .live and .nodes; every new live entry has fnCap ≤ Ψ (a cold value
+-- comes from a slot, and a `deferᵉ` body IS the b whose fnCapᵉ b ≤ Ψ),
+-- and the new nodes are take-st/scan-st/… which are ≤ Ψ outright.
+-- `regP?` grows only through `register`, at a path derived from κ, so
+-- `pathBΨ? Ψ κ ≡ true` covers each new entry; `burstΨ?`'s base cases
+-- emit init/close/complete, Ψ-bounded by definition, and map/scan go
+-- through `applyFn-fnCap`.  The cost is that the induction covers every
+-- clause, not that any one of them is undecided.
+--
+-- TWIN: the same clique at the caps measure is proven -- `subscribeE-caps`
+--   over `subscribeInner-Ψ`'s descent, clause for clause, and the *All
+--   family recurses through the inner exactly as it does there.
 postulate
   subscribeE-Ψ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (Ψ : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)

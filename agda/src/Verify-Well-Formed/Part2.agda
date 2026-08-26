@@ -314,8 +314,10 @@ postulate
 
   -- STEP, scheduler pop.  `sched-next` pops one arrival off one live
   -- source and writes back the shortened pending list; `slots` is
-  -- untouched and no source's identity or elemTy changes.  Twin of the
-  -- proven `regTyped?-pop-sched` (.Part13's mid-init spends that one).
+  -- untouched and no source's identity or elemTy changes.
+  --
+  -- TWIN: `regTyped?-pop-sched` carries a per-entry `liveTypeOK?` fact
+  --   across this same pop, through `schedGo-liveTypeOK`, and is proven.
   sched-next-hot-live : ∀ {n} {Γ : Ctx n} (sched sched′ : Sched Γ) {a : Arrival Γ} →
     sched-next sched ≡ inj₂ (a , sched′) →
     HotLive sched → HotLive sched′

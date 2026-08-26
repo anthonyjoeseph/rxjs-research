@@ -1013,12 +1013,24 @@ postulate
   -- exactly in place, and `unfoldμ-shrinks` that the swap of
   -- `μᵉ body` for `unfoldμ body` strictly decreases it -- so the
   -- recursive call descends at a smaller key with fuel only breaking
-  -- the tie.  What is still owed to make that call: the depth premise
-  -- across the unfolding, where `nestDᵉ` truncates at every `deferᵉ`
-  -- exactly as the sync spine does, so the same elimG induction should
-  -- carry it unchanged; the width half of the `nestValOK?` premise
-  -- across the same substitution; and the `descW` premise at the
-  -- unfolded body.
+  -- the tie.  Two of the three premises the call needs are reachable
+  -- from here: the depth premise, where `nestDᵉ` truncates at every
+  -- `deferᵉ` exactly as the sync spine does, so the same elimG
+  -- induction carries it unchanged; and the `descW` premise at the
+  -- unfolded body, which `descW`'s own μ clause hands back as a
+  -- projection off the join it is defined by.
+  --
+  -- THE THIRD CANNOT BE MET, AND THAT IS A FINDING ABOUT THE PREMISE
+  -- RATHER THAN ABOUT THIS HEAD.  The width half of `nestValOK?` does
+  -- not survive the substitution: `dWᵉ (unfoldμ body) ≤ dWᵉ (μᵉ body)`
+  -- is FALSE -- the note on `unfoldμ-caps` carries the witness and why
+  -- no constant repairs it, the plug landing at `varᵉ` positions
+  -- exactly where dW declines to cut.  So the premise as written is
+  -- unre-establishable at the one head that has to re-establish it, and
+  -- the repair is a restatement of `nestValOK?` rather than a proof
+  -- here.  What makes that cheap is that the width conjunct has no
+  -- consumer -- only the size half is ever spent -- so deleting it
+  -- STRENGTHENS `NestAt`.
   subscribeE-nest-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

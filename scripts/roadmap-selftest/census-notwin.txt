@@ -4,6 +4,8 @@ a-falsity: REFUTED, PROBED
 d-grindable: TWIN
 fam-alpha: DEAD ROUTE
 e-difficulty: REFUTED×2
+c-difficulty: PROBED
+suf-nodry-loop: PROBED
 glob-one: TWIN
 glob-two: TWIN
 nonpostulate-parent: TWIN

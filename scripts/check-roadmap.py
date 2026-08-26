@@ -163,6 +163,16 @@ is the marker `make comments-check` refuses when its referent is itself still a
 postulate, so requiring it is what makes the precedent a WALKED route rather
 than a believed one.  It is checkable only now, because it needs the field
 above.
+
+EIGHTH CHECK — AN UNEVIDENCED DIFFICULTY: a DIFFICULTY row whose postulates
+carry no durable marker at all fails.  Same mechanisation one class up
+(Anthony: "mechanically outlaw a 'difficulty' or 'grindable' row with no
+evidence"): "true and correctly stated" is a claim about receipts exactly as
+GRINDABLE's is, and CLAUDE.md already rules that absent one the row is SHAPE
+if the gap is written down and FALSITY if nothing is.  DIFFICULTY is the class
+with no floor under it and the one that reads as safe, so it is where an
+unexamined row lands by gravity -- which is why the blank fires here and stays
+legal on FALSITY, SHAPE and VACUITY, the classes that CLAIM nothing.
 """
 
 import argparse
@@ -705,6 +715,24 @@ def unearned_grindable(path, tiers, cen):
     return out
 
 
+def unevidenced_difficulty(path, tiers, cen):
+    """-> [(tier, label, lineno)] — DIFFICULTY rows whose postulates carry
+    no durable marker at all.
+
+    "True and correctly stated" is earned exactly as GRINDABLE's class is —
+    a probe that reached the risky region, a refutation pinning this form, a
+    proven mirror — and CLAUDE.md already rules that absent one the row is
+    SHAPE if the gap is written down and FALSITY if nothing is.  The blank
+    stays legal on the three classes that claim nothing.
+    """
+    out = []
+    for tier, rows, _pre in tiers:
+        for label, cls, lineno, _cost in rows:
+            if cls == "DIFFICULTY" and not row_evidence(label, cen):
+                out.append((tier, label, lineno))
+    return out
+
+
 def fix_evidence(path, tiers, cen):
     """Rewrite every classed row's evidence field from the headers. -> n changed."""
     lines = path.read_text().splitlines()
@@ -890,7 +918,19 @@ def main():
             print("PROVEN counterpart (comments-check refuses a twin that is itself")
             print("still a postulate), then run  make roadmap-evidence . Or demote")
             print("the row to DIFFICULTY, which is what it is until then.")
-        if missing or bad or unearned:
+        unev = unevidenced_difficulty(path, tiers, cen)
+        if unev:
+            print(f"\nDIFFICULTY ROWS WITH NO EVIDENCE — {len(unev)}:")
+            for tier, label, lineno in unev:
+                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
+            print("\n'True and correctly stated' is a claim about EVIDENCE — a")
+            print("probe that reached the risky region, a refutation pinning this")
+            print("form, or a proven mirror in a `TWIN:` section. Absent one, the")
+            print("row is SHAPE if the statement's gap is written down and FALSITY")
+            print("if nothing is — that is CLAUDE.md's own rule, mechanised. Put")
+            print("the evidence in the postulate's header as a durable marker and")
+            print("run  make roadmap-evidence , or raise the class.")
+        if missing or bad or unearned or unev:
             failures.append(None)
 
     date_targets = [path]
@@ -977,8 +1017,8 @@ def main():
           + ("" if unscheduled is None
              else "; every live postulate is on the roadmap, and every row head "
                   "names one; every classed row's evidence field matches its "
-                  "postulates' own headers, and every GRINDABLE row names a "
-                  "proven twin"))
+                  "postulates' own headers, every GRINDABLE row names a "
+                  "proven twin, and no DIFFICULTY row stands on none"))
     return 0
 
 

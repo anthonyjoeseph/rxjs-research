@@ -30,6 +30,9 @@ can see into build failures.
    matching them. `make roadmap-evidence` writes it; nobody types it.
 8. **An unearned GRINDABLE** — a GRINDABLE row whose postulates carry no `TWIN` fails.
    The class means "here is the worked instance"; absent one the row is DIFFICULTY.
+9. **A DIFFICULTY row standing on nothing** — a DIFFICULTY row whose postulates carry no
+   marker at all fails. The class claims the statement is true and correctly stated, and
+   that is a claim about evidence; absent one the row is SHAPE or FALSITY.
 
 ## What the preamble check charges, and the one bug it was written after
 
@@ -95,7 +98,9 @@ a descriptive head, so the two exemptions are pinned as load-bearing rather than
 assumed. Two further fixtures pin the evidence field in both of its failing directions —
 a row with no field at all, and a row whose field disagrees with the census — against a
 `--census` fixture standing in for a scan of `agda/src`. A third pins the unearned
-GRINDABLE, against a second census in which the fixture's twin is absent.
+GRINDABLE, against a second census in which the fixture's twin is absent, and a fourth
+the unevidenced DIFFICULTY, against a third census with the marker removed — that one
+also pins the must-NOT direction, since the blank stays legal on a SHAPE row.
 
 ## The evidence field, and why a derived field may be mandatory
 
@@ -121,7 +126,7 @@ rules stated elsewhere:
   duplicate content, and duplicated content drifts. A count is a function of the
   headers, so the two cannot disagree without the gate saying so.
 
-The field is also what makes check 8 possible. A precedent named in a row's PROSE
+The field is also what makes checks 8 and 9 possible. A precedent named in a row's PROSE
 resolves nowhere, so GRINDABLE drifted into the place rows nobody wants to think about
 get parked — ten of twelve carried no `TWIN` at all when the check was added, and were
 demoted to DIFFICULTY. Re-earning the class means putting a `TWIN:` section in the
@@ -145,3 +150,27 @@ conjunct positions, source sections, timings), research in source headers rather
 here, completed items DELETED rather than marked done, no dated narrative. Re-read that
 header when you touch the file; every one of those rules exists because it was
 violated.
+
+## Why the two class checks are one law read from both ends
+
+Check 8 and check 9 police the same sentence — a class is a property of EVIDENCE, not of
+confidence — at the two classes that make a positive claim. GRINDABLE says the shape is
+already known, so it owes a worked instance and nothing else will do: `TWIN`. DIFFICULTY
+says the statement is true and correctly stated, which any of the durable markers can
+buy — a probe that reached the risky region, a refutation pinning this form, a proven
+mirror.
+
+The three classes below them are exempt, and that is not leniency. FALSITY, SHAPE and
+VACUITY assert nothing about the statement being right, so `NO EVIDENCE` is the honest
+reading of a row nobody has instantiated, and a check demanding evidence there would
+demand it precisely where there is none to have. It is also what the repair looks like:
+a DIFFICULTY row that cannot name its evidence does not acquire a marker, it is
+reclassified down — SHAPE where the statement's own gap is written down, FALSITY where
+nothing is.
+
+What the check cannot see is whether a marker is evidence about THIS row. A row naming
+several postulates merges their markers, so one marked sibling covers a family — which
+is correct where the row really is one statement and wrong where it is a bag. When the
+census answers a family row with a single marker, the question to ask is whether the row
+should be SPLIT, and the answer is usually yes.
+

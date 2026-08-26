@@ -31,11 +31,13 @@ open import Rx.Slots using (Slot; Slots)
 --     syncSize; see Rx/Exp.agda's header, which also records the refutation
 --     of the emissions-per-instant bound.
 --
--- PROBED: no refutation found for `fuel-coherent` or `μ-unfold`.  The probe
---   is spent and deleted;
---   `git show 1f1730e^:agda/probe/Battery-Eval-Laws.agda` recovers its rows.
 postulate
   -- fuel is arrivals: processing more arrivals only extends the stream
+  --
+  -- PROBED: the eval-laws battery instantiated this at every canonical
+  --   program and found no refutation.  The probe is spent and deleted;
+  --   `git show 1f1730e^:agda/probe/Battery-Eval-Laws.agda` recovers its
+  --   rows.
   fuel-coherent :
     ∀ {n} {Γ : Ctx n} {t} (f₁ f₂ : Fuel) → f₁ ≤ f₂ →
     (e : Closed Γ t) (ins : Slots Γ) →
@@ -55,6 +57,11 @@ postulate
       ≡ emittedBefore k (evaluate fuel e ins₂)
 
   -- μ laws
+  --
+  -- PROBED: the same battery ran this law beside the one above, at the
+  --   same programs, with no refutation.  The probe is spent and
+  --   deleted; `git show 1f1730e^:agda/probe/Battery-Eval-Laws.agda`
+  --   recovers its rows.
   μ-unfold :
     ∀ {n} {Γ : Ctx n} {t} (fuel : Fuel)
       (e : Exp Γ (t ∷ []) [] [] t) (ins : Slots Γ) →

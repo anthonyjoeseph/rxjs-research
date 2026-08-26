@@ -4,7 +4,7 @@
 
 - **`a-falsity`** — FALSITY, `REFUTED, PROBED`: worst class goes first.
 - **`b-shape`** — SHAPE, `NO EVIDENCE`: a restatement is owed.
-- **`c-difficulty`** — DIFFICULTY, `NO EVIDENCE`: true, correctly stated, hard.
+- **`c-difficulty`** — DIFFICULTY, `PROBED`: true, correctly stated, hard.
 - **`d-grindable`** — GRINDABLE, `TWIN`: the shape is already known.
 
 ## Tier 1 — parked
@@ -13,7 +13,7 @@
   later in its own prose, which must NOT be read as its class.
 - **`fam-{alpha,beta}`** — DIFFICULTY, `DEAD ROUTE`: brace expansion counts as
   naming both.
-- **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY, `NO EVIDENCE`: a leading-dash
+- **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY, `PROBED`: a leading-dash
   suffix after a sibling in the same row counts as naming `suf-nodry-nestRec`.
 - **`f-grindable`** — GRINDABLE, `NO EVIDENCE`: mechanical because the PROVEN
   twin `a-proven-citation` did the same thing at the same indices. A name CITED
