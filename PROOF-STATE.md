@@ -178,18 +178,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-scan`** (Nest-Walk) — SHAPE, `REFUTED, DEAD ROUTE,
-  PROBED`: the caps premise is repaired, but the head reads an accumulator
-  out of a node it minted, and `NestAt`'s burst conjunct may name no state.
-  The repair is a pointwise store conjunct beside the coarse one.
+- **`subscribeE-nest-scan`** (Nest-Walk) — SHAPE,
+  `REFUTED, DEAD ROUTE, PROBED`: the caps premise is repaired, but the head
+  reads an accumulator out of a node it minted, and `NestAt`'s burst conjunct
+  may name no state. The repair is a pointwise store conjunct beside the coarse
+  one.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — SHAPE,
   `NO EVIDENCE`: the three `*All` heads inherit the row above verbatim — each
   mints a queue node the drain reads back, so the state-free burst conjunct
   cannot be re-established at them either. One restatement covers all four.
 - **`subscribeE-nest-mu`** (Nest-Walk) — SHAPE, `NO EVIDENCE`: the last
-  substituting head, and its own header records the gap: the unfolding
-  contains the whole μ, so neither the grant's key nor the `valCaps?` premise
-  transfers. Only the FUEL decreases and the grant does not mention it.
+  substituting head, and its own header records the gap: the unfolding contains
+  the whole μ, so neither the grant's key nor the `valCaps?` premise transfers.
+  Only the FUEL decreases and the grant does not mention it.
 - **`subscribeE-nest-slot`** (Nest-Walk) — DIFFICULTY, `REFUTED`: the three
   slot heads under one leaf. A shared slot's charge is a multiple of nothing
   unless the unit is a summand, which is what the refutation pins — and the
@@ -235,8 +236,8 @@ does not fit is a finding about the shared statement, not about the head.
   measured-not-rechecked — and the probe route is sealed.
 - **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: every
   stage of every chain's walk under the width cap. The proven `thruWalk-walk`
-  carries the identical conjunct across the feared `thru` hop — the mirror
-  that holds the class — and its header calls the rest transcription.
+  carries the identical conjunct across the feared `thru` hop — the mirror that
+  holds the class — and its header calls the rest transcription.
 - **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the entry
   state's nesting receipt. `init-capsOK?` is its route, but a scripted slot's
   obs-freeness only reduces at a concrete type, so an `isData` inversion is
@@ -253,11 +254,12 @@ does not fit is a finding about the shared statement, not about the head.
   frame's push, all that is left of the take head. `pushBurst-caps` is the same
   fold over the same emits walked on the caps face, and `stepFrame-nodes-take`
   is the per-emit half — a take frame costs nothing.
-- **`pushBurst-nest-map`** (Nest-Walk) — GRINDABLE, `REFUTED×3, TWIN, PROBED`:
-  the substituting frame's push, all that is left of the map head. Same fold
-  as the row above over the same emits; `mapVals-nest` is the per-emit half
-  and fixes the factor, and three refutations pin why it is a factor in the
-  function's own size and not a summand.
+- **`pushBurst-nest-map`** (Nest-Walk) — GRINDABLE,
+  `REFUTED×3, TWIN, PROBED×2`: the substituting frame's push, all that is left
+  of the map head. Same fold as the row above over the same emits;
+  `mapVals-nest` is the per-emit half and fixes the factor, and three
+  refutations pin why it is a factor in the function's own size and not a
+  summand.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
   cascade only shortens lists, and every summand of the store measure is a
   `⊔`-fold over one. Its header names the proven twin at the same two branches.

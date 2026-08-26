@@ -796,6 +796,17 @@ postulate
 --   the doubling is outrun with six of every seven bits unspent.  Not
 --   covered: the FOLD, since every row hands back exactly one value,
 --   pinned rather than assumed; and any cap above the value's own.
+-- PROBED: `Probed.Sync-Factor` measures the factor's DENOMINATION --
+--   whether the exponent can be read in `syncSizeᵗ` rather than
+--   `sizeᵗ` -- at the duplicating family of `Refuted.Apply-Fn-Nest`
+--   plus the rows that split the two currencies: the same duplication
+--   under a `deferᵉ` gate contributes ZERO to the output's nesting,
+--   pinned as an equality, and a mixed function prices exactly its
+--   visible copy.  So substitution does not relocate content across a
+--   defer gate on any row, and the sync-denominated bound holds where
+--   the currencies disagree.  Not covered: `evalTm` at a closed seed,
+--   and stacked substitutions, which the receipt above reaches only in
+--   the full-size denomination.
 postulate
   pushBurst-nest-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)

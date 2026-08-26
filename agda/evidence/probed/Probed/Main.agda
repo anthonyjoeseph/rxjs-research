@@ -43,3 +43,8 @@ open import Probed.Chain-Caps-Flat
   using (U-row; C-row; F-row)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
+open import Probed.Sync-Factor
+  using (dupSync≡6; dupOut≡2; dupA-holds;
+         dupOut₃≡6; dupB-holds;
+         hidSync≡4; hidSize≡9; hidOut≡0;
+         mixOut≡3; mixD-holds)
