@@ -66,3 +66,5 @@ open import Refuted.Inner-Drain-Nest
          parent≡40; stepFrame-nodes-at-inner-absurd;
          drained₃≡120; queued₃≡40; unitCharge≡82;
          stepFrame-nodes-inner-unit-absurd)
+open import Refuted.Scan-Seed-Caps
+  using (syn≡39; val≡45; capsBefore; valOK; capsAfter; scan-seed-caps-absurd)

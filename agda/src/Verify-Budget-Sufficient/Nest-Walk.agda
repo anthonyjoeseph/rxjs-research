@@ -717,6 +717,18 @@ postulate
   -- factor PER VALUE and the reason the exponent carries the length
   -- rather than a constant.
   --
+  -- AND THE PREMISE SET IS WRONG, WHICH IS WHY THIS ROW IS NOT A GRIND.
+  -- The shared statement carries `capsOK? c` on the state it is handed
+  -- and every head re-establishes it for its child.  This is the only
+  -- head that installs an EVALUATED value: four install nothing, the
+  -- filter head installs a counter that `boundedNode` reads as bounded
+  -- at every cap, and the *All heads install their own empty state.
+  -- What has to fit under the cap here is the seed's VALUE size and
+  -- what the premise bounds is its TERM size, so the head cannot
+  -- recurse at the cap it was entered at.  The bound itself is
+  -- untouched by this -- an evaluated seed's DEPTH is `evalTm-nest`,
+  -- which is proven, and the grant has room for it.
+  --
   -- REFUTED: `Refuted.Scan-Burst-Nest` kills the un-indexed form
   --   outright, 16383 delivered against a charge of 12288, and the row
   --   one value shorter still holds -- so it is a crossing and not a
@@ -729,6 +741,20 @@ postulate
   --   the burst at fourteen values in ONE subscribe frame against a
   --   `pWᵛ` of one and an `entryCeil` of eight, which is why no wider
   --   reading of the ENTRY cap repairs it either.
+  -- REFUTED: `Refuted.Scan-Seed-Caps` pins that crossing at the
+  --   SMALLEST cap the premise admits: a seed whose `caseᵗ` arm names
+  --   its binder twice returns two copies of what it bound, thirty-nine
+  --   nodes of head syntax against a seed evaluating to forty-five,
+  --   with `capsOK?` green before the install and `false` after it.
+  -- DEAD ROUTE: stepping the cap the way the caps face does -- a scan
+  --   there reports `frameStep (j + j′)` and charges `j′` -- is dead
+  --   HERE and not merely unproven, because the grant is keyed on
+  --   `cSize`: a stepped cap is a LARGER key, hence a larger grant, and
+  --   the parent owes the smaller one.  What is left is to weaken the
+  --   premise rather than widen the cap, and the size conjunct is the
+  --   candidate: this face is about DEPTH, `boundedNode` is a SIZE
+  --   predicate, and the four heads that consume the premise take it
+  --   only to hand on.
   -- PROBED: `Probed.Scan-Burst-Nest` reads that witness against THIS
   --   form, at the same cold script and the same tight size cap --
   --   fourteen values, 16383 delivered, green here and pinned `false`

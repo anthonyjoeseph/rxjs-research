@@ -178,10 +178,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-scan`**, **`-mu`** (Nest-Walk) — DIFFICULTY, `REFUTED,
-  PROBED`: the substituting heads still standing. The map and one-shot heads
-  are worked instances, both keyed on one level of `sizeᵉ`; scan compounds
-  its factor across the burst, and μ cannot key on the term at all.
+- **`subscribeE-nest-scan`** (Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE,
+  PROBED`: the one head that installs an EVALUATED value, and `NestAt`'s
+  fixed-cap premise cannot survive it — the cap must bound the seed's value
+  size and the premise bounds its term size. Its header carries the crossing
+  and why widening the cap is the wrong direction.
+- **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the last
+  substituting head. The map and one-shot heads are worked instances, both
+  keyed on one level of `sizeᵉ`; μ cannot key on the term at all.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `NO EVIDENCE`: the three `*All` heads, a mint plus the outer's descent pushed
   through a `thru-outer` frame. Their drain is proven at the size cap; what is
