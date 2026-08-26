@@ -866,6 +866,19 @@ postulate
 -- is the same fact read at the node, and it is state-free exactly
 -- where it is spent, because the node in question was minted by the
 -- head that reads it.
+--
+-- AND THE GRANT NAMES `κ` NOWHERE, WHICH IS ONLY SOUND BECAUSE A PATH
+-- FRAME MINTS AT DELIVERY RATHER THAN AT SUBSCRIBE.  The reading that
+-- would break it is a `map-f`, whose `pathNestF` factor is `2 ^ sizeᵗ`
+-- of the function while every other frame's is one, and whose body is
+-- an observable that gets SUBSCRIBED when a value passes it: if that
+-- happened inside the frame, an arbitrarily deep body would install
+-- arbitrarily deep state under a bound that cannot see the path.
+-- `Probed.Wrap-Nest-Frame` asks it directly, at a deferred body two
+-- deep and the same body six deep, and both readings are the table
+-- the run started from -- the frame mints nothing here.  That is what
+-- puts the path factor on the DELIVERY face's bill and off this one,
+-- and it is why the omission is a property rather than an oversight.
 
 NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
@@ -992,9 +1005,26 @@ postulate
   --   all three conjuncts inside the grant.  The two zero-by-definition
   --   heads were pushed at the same outer and did not move off the
   --   incoming table, which is what unreachable reads like from outside
-  --   and is why no row can arm them.  NOT covered: a `share-sink`
-  --   frame, and any row where the burst side is nonzero -- the drain
-  --   that arms the store is exactly what keeps the burst empty here.
+  --   and is why no row can arm them.  A `map-f` frame is reached too,
+  --   for the κ-blindness of the grant rather than for a fit: its
+  --   readings are pinned INVARIANT in the depth of the mapped body,
+  --   not merely inside a bound, since the bound is astronomical there
+  --   and a `≤ᵇ` row could not have failed.  The region that CAN
+  --   refute is the one where the grant is blind: `nestDᵉ` and
+  --   `syncSizeᵉ` both stop at a `deferᵉ`, so a body hidden behind one
+  --   is worth nothing to `G`.  A subscribed inner turns out to leave
+  --   nothing behind at all -- what these conjuncts read is the QUEUE
+  --   the spent limit refused -- and the queue reading is blind at a
+  --   `deferᵉ` exactly where `G` is, pinned invariant from two deep to
+  --   eight while the same body undeferred reads its own depth.  That
+  --   alignment is why the blind region is not the refutation it looks
+  --   like.  The sighted direction, the one that can outrun a bound,
+  --   is taken to fourteen: installed exactly fourteen, inside the
+  --   grant.  NOT covered: a `share-sink` frame; any row where the
+  --   burst side is nonzero -- the drain that arms the store is what
+  --   keeps the burst empty here; and a MULTI-LEVEL descent, every row
+  --   being one subscribe rather than the recursion the grant shrinks
+  --   along.
   subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))

@@ -36,21 +36,21 @@ module Probed.Wrap-Nest-Frame where
 
 open import Data.Bool using (true; false)
 open import Data.List using ([]; _∷_)
-open import Data.Maybe using (just)
+open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
+  using (Closed; Val; Exp; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
          nat̂; strmᵗ; deferᵉ; syncSizeᵛ; syncSizeᵉ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
   using (subscribeE; splitBurst; root; sched-init; st-init; EvalSt; Stream; Sched;
-         Path; _↠_; thru-outer; from-inner; mergeAllᵒ; installNode; mergeAll-st)
+         Path; _↠_; thru-outer; from-inner; map-f; mergeAllᵒ; installNode; mergeAll-st)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
@@ -243,3 +243,104 @@ fitsF : ((burstF (oF 6) ≤ᵇ GF (oF 6)) ≡ true)
       × ((nodesF (oF 6) ≤ᵇ nodesMax st₀ ⊔ GF (oF 6)) ≡ true)
       × ((atF (oF 6) ≤ᵇ armed ⊔ GF (oF 6)) ≡ true)
 fitsF = refl , refl , refl
+
+-- ── the axis `G` cannot see at all ─────────────────────────────────
+
+-- `G` mentions `κ` NOWHERE, and every frame reached above has a
+-- `pathNestF` factor of one.  `map-f` does not: its factor is
+-- `2 ^ sizeᵗ` of the function, and its body is SUBSCRIBED when a value
+-- passes.  So if a path frame can install depth, a κ-blind grant is
+-- refutable -- and this is the row that asks.  The body must be
+-- DEFERRED or nothing is minted, which is the trap the delivery face
+-- already recorded.
+deepE : ∀ {Θ} → ℕ → Exp Γ₂ [] [] Θ natᵗ
+deepE zero    = ofᵉ (nat̂ 0 ∷ [])
+deepE (suc k) = switchAllᵉ (ofᵉ (strmᵗ (deepE k) ∷ []))
+
+κMap : ℕ → Path Γ₂ natᵗ natᵗ
+κMap k = map-f (strmᵗ (deferᵉ (deepE k))) ↠ (thru-outer mergeAllᵒ 0 ↠ root)
+
+-- a head that EMITS inside the frame, so the map frame actually fires
+oE : Closed Γ₂ natᵗ
+oE = mergeAllᵉ nothing (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))
+
+runM : ℕ → Stream Γ₂ natᵗ × Sched Γ₂ × EvalSt prog
+runM k = subscribeE gasBig oE (κMap k) 0 0 (sched-init prog slots) st₀
+
+nodesM : ℕ → ℕ
+nodesM k = nodesMax (proj₂ (proj₂ (runM k)))
+
+atM : ℕ → ℕ
+atM k = nodeNestAt 7 (proj₂ (proj₂ (runM k)))
+
+-- AND THE FIT IS NOT WHAT THIS ROW PINS.  `GF oE` here is on the order
+-- of ten to the fifteen, so no reading could have exceeded it and a
+-- `≤ᵇ` row would be unfalsifiable by construction.  What CAN fail is
+-- the invariance: a body two deep and a body six deep are asked, and
+-- if the frame minted at subscribe the second would read six.
+mapFigs : ℕ
+mapFigs = nodesM 2 + 100 * atM 2 + 10000 * nodesM 6 + 1000000 * atM 6
+
+mapFigs≡ : mapFigs ≡ 3030303
+mapFigs≡ = refl
+
+mapInvariant : (nodesM 2 ≡ nodesM 6) × (atM 2 ≡ atM 6)
+mapInvariant = refl , refl
+
+-- ── where the grant is SMALL and the store is deep ─────────────────
+
+-- Every fit above is taken against a grant in the millions or worse,
+-- so none of them could have failed on arithmetic.  The region that
+-- can is the one where `G` is BLIND: `nestDᵉ` and `syncSizeᵉ` both
+-- stop at a `deferᵉ`, so a deep body hidden behind one contributes
+-- nothing to the bound -- while an UNLIMITED merge subscribes that
+-- same inner inside the frame, which is what installs it.  If the two
+-- can be made to diverge, the head is refuted.
+hidden : ℕ → Closed Γ₂ natᵗ
+hidden k = mergeAllᵉ nothing (ofᵉ (strmᵗ (deferᵉ (deepV k)) ∷ []))
+
+-- and the SAME body with the `deferᵉ` taken off, which is what makes
+-- the row above load-bearing rather than a pair of equal numbers
+sighted : ℕ → Closed Γ₂ natᵗ
+sighted k = mergeAllᵉ nothing (ofᵉ (strmᵗ (deepV k) ∷ []))
+
+hidNodes : ℕ
+hidNodes = nodesF (hidden 2) + 100 * nodesF (hidden 8)
+         + 10000 * nodesF (sighted 2) + 1000000 * nodesF (sighted 8)
+
+hidNodes≡ : hidNodes ≡ 3030303
+hidNodes≡ = refl
+
+-- AND THAT RELOCATES THE ATTACK.  A subscribed inner finishes and
+-- leaves nothing behind, so neither reading above moves: the depth
+-- these conjuncts read is the QUEUE's, and a queue only holds what
+-- the limit refused.  So the row that can refute is a limit spent on
+-- a parked `deferᵉ` with a deep body queued BEHIND a second one --
+-- `G` is blind to that body, and the question is whether the node is
+-- too.
+parkedHid : ℕ → Val Γ₂ (obs (obs natᵗ))
+parkedHid k =
+  ofᵉ (strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ []))) ∷ strmᵗ (deferᵉ (deepV k)) ∷ [])
+
+oH : ℕ → Closed Γ₂ natᵗ
+oH k = mergeAllᵉ (just 1) (parkedHid k)
+
+hidQueue : ℕ
+hidQueue = nodesF (oH 2) + 100 * nodesF (oH 8)
+
+hidQueue≡ : hidQueue ≡ 303
+hidQueue≡ = refl
+
+hidAligned : nodesF (oH 2) ≡ nodesF (oH 8)
+hidAligned = refl
+
+-- AND THE FIT PUSHED ALONG THE ONE AXIS THAT CAN MOVE IT.  The
+-- sighted queue grows with `k` and so does `syncSizeᵉ`, so this is
+-- the direction where a bound could be outrun; it is asked well past
+-- the depth the rows above fit at.
+deepFit : ((nodesF (oF 14) ≤ᵇ nodesMax st₀ ⊔ GF (oF 14)) ≡ true)
+        × ((atF (oF 14) ≤ᵇ armed ⊔ GF (oF 14)) ≡ true)
+deepFit = refl , refl
+
+deepGrown : nodesF (oF 14) ≡ 14
+deepGrown = refl

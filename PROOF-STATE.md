@@ -178,15 +178,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
-  `PROBED×4`: the three `*All` heads at the restated `NestAt`. The burst
-  conjunct is instantiated at all three, and the merge's store half now too, a
-  `deferᵉ` inner holding the queue past the frame. `switch-st` and `exhaust-st`
-  carry zero node nest by definition — unreachable, not unreached.
 - **`burst-nest-floor`** (Caps-Bridge) — FALSITY, `PROBED`: the subscribe
   frame's store against the program's unit PLUS `capsAt`'s size — the leaf
   `burst-nest` is now a body over. The unit alone is refuted by a defer-headed
   program; the size is what sees the body, and the factor stays unread.
+- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
+  `PROBED×4`: the three `*All` heads at the restated `NestAt`. `G` names `κ`
+  nowhere and is blind past a `deferᵉ`; both reached — the path frame mints at
+  delivery, and the queue read is blind where `G` is. Unreached: a descent.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
   chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the
