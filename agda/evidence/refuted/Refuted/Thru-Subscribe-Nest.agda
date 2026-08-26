@@ -36,7 +36,7 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Thru-Subscribe-Nest where
 
-open import Data.Bool using (false)
+open import Data.Bool using (true; false)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
@@ -54,6 +54,8 @@ open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; mergeAll-st; thru-outer; mergeAllᵒ;
          root; stepFrame; sched-init; st-init; installNode)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
 open import Verify-Budget-Sufficient.Nest-Store using (frameNestF)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nodesMax; nestDᵛˢ; frameNestD)
@@ -139,3 +141,21 @@ parent≡41 = refl
 
 stepFrame-nodes-at-thru-absurd : proj₁ row ≤ parentCharge → ⊥
 stepFrame-nodes-at-thru-absurd h = ≤⇒≤ᵇ h
+
+c₀ : Caps
+c₀ = caps 0 0 0
+
+capsZeroThru : capsOK? c₀ sched₀ st₀ ≡ true
+capsZeroThru = refl
+
+capsCharge : ℕ
+capsCharge = 2 ^ Caps.cSize c₀ * ((nodesMax st₀ ⊔ nestDᵛˢ vals) + W)
+
+capsCharge≡41 : capsCharge ≡ 41
+capsCharge≡41 = refl
+
+stepFrame-nodes-thru-caps-absurd : proj₁ row ≤ capsCharge → ⊥
+stepFrame-nodes-thru-caps-absurd h = ≤⇒≤ᵇ h
+
+valCapsFails : valCaps? c₀ slots (obs (obs (obs natᵗ))) o ≡ false
+valCapsFails = refl

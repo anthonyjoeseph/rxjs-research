@@ -41,7 +41,8 @@ open import Refuted.Step-Frame-Nest-Dup
   using (dup≡80; perFrame≡40; stepFrame-nest-dup-absurd)
 open import Refuted.Thru-Subscribe-Nest
   using (emitted≡80; perValue≡41; stepFrame-nodes-thru-absurd;
-         parent≡41; stepFrame-nodes-at-thru-absurd)
+         parent≡41; stepFrame-nodes-at-thru-absurd;
+         capsZeroThru; capsCharge≡41; stepFrame-nodes-thru-caps-absurd; valCapsFails)
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
 open import Refuted.Subscribe-Caps-Nest

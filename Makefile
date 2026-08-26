@@ -482,6 +482,14 @@ find-prose:
 postulates:
 	@scripts/check-wiring.py --postulates
 
+# THE LEDGER'S SHAPE, PUSHED TO A PHONE.  A gate is the one moment the tree is
+# known-good and a commit is next, so the gate targets call this on the way out
+# -- green and red alike.  Typed by hand it prints the same census locally.  No
+# number here is stored anywhere: all of it is derived at send time, which is
+# why the roadmap can go on carrying no aggregates.  See docs/notify.md.
+notify:
+	@scripts/notify.py "$(or $(V),manual)"
+
 # PROVES THE WIRING CHECK IS LOAD-BEARING, against a fixture outside agda/src.
 # R2 fires on nothing in the real tree today, so without the fixture it would
 # rot untested.  See docs/wiring.md.
@@ -793,9 +801,10 @@ gate-cheap:
 # tree has touched — and `dev-changed` FAILS if the full build is still owed,
 # so this target cannot be used where it is not valid.  See docs/gate.md.
 gate-light:
-	@$(MAKE) --no-print-directory gate-cheap
-	@$(MAKE) --no-print-directory dev-changed
+	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (light)"; exit 1; }
+	@$(MAKE) --no-print-directory dev-changed || { scripts/notify.py "RED (light)"; exit 1; }
 	@echo "gate-light: ALL GREEN"
+	@scripts/notify.py "GREEN (light)"
 
 # THE GATE YOU TYPE, and it ROUTES.  `gate` is the name every session reaches
 # for, so it must not be the expensive one by default -- otherwise the habit is
@@ -830,7 +839,7 @@ gate:
 # build does not dirty the tree.  The recorded label is unchanged from when
 # this step was its own target, so the 47 rows already in that file continue.
 gate-heavy: stripped
-	@$(MAKE) --no-print-directory gate-cheap
+	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (cheap checks)"; exit 1; }
 	@t0=$$(date +%s); log=$$(mktemp); rc=$$(mktemp); \
 	 { (cd agda/_stripped-comments && $(AGDA) src/Main.agda); echo $$? > $$rc; } 2>&1 \
 	   | scripts/unmap-positions.py | tee $$log; \
@@ -839,12 +848,14 @@ gate-heavy: stripped
 	 if [ "$$st" -eq 0 ] && [ "$$n" -gt 0 ]; then \
 	   scripts/perf_record.py "make gate-heavy (full gate, $$n modules)" $$el; \
 	 fi; \
-	 rm -f $$log $$rc; [ "$$st" -eq 0 ]
+	 rm -f $$log $$rc; \
+	 [ "$$st" -eq 0 ] || { scripts/notify.py "RED (the tower)"; exit 1; }
 	@$(MAKE) --no-print-directory refuted
 	@$(MAKE) --no-print-directory probed
 	@$(MAKE) --no-print-directory bug-cache
 	@scripts/dev-changed.py --stamp
 	@echo "gate-heavy: ALL GREEN"
+	@scripts/notify.py "GREEN (heavy)"
 
 # The one way this driver can lie is by checking NOTHING and exiting 0 — an
 # empty changed set, or a multi-member block it failed to notice.  Both

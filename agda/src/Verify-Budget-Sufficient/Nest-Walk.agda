@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Nest-Walk where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
-open import Data.Bool.ListAction using (any)
+open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
@@ -282,13 +282,13 @@ abstract
 -- is the argument's depth times the number of times the step function
 -- names its payload.  Multiplicative, so no summand is the shape.
 --
--- AND THE FACTOR COMES FROM THE STORE BECAUSE THE FRAME CANNOT CARRY
--- IT.  A frame holds an op and node ids and no syntax, so no function
--- of it can see what the subscription will substitute; the occurrence
--- count is bounded by two to the substituted function's SIZE, and size
--- is what `capsOK?` bounds -- on the queued observables and on the
--- arriving values alike.  Hence the caps hypothesis: the unconditional
--- form is not a stronger claim available here, it is a false one.
+-- AND THE FACTOR COMES FROM THE CAP BECAUSE THE FRAME CANNOT CARRY IT.
+-- A frame holds an op and node ids and no syntax, so no function of it
+-- can see what the subscription will substitute; the occurrence count is
+-- bounded by two to the substituted function's SIZE.  But `capsOK?`
+-- bounds the STATE and the arriving values are not in it, so the cap has
+-- to be imposed on them separately -- which is what the `valCaps?`
+-- premise does, and why the caps hypothesis alone is not enough.
 --
 -- AND THE INNER ARM IS THE SAME STATEMENT AT THE OTHER `*All` FRAME.
 -- Both re-enter the subscribe machinery and both were charged as though
@@ -299,12 +299,21 @@ abstract
 --   is that depth, so no constant per value closes it.  The same
 --   witness kills the ASSEMBLY at this frame, whose charge at the
 --   smallest admissible width IS this bound.
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the caps-scaled form at
+--   the same eighty against forty-one, because `capsOK? (caps 0 0 0)`
+--   holds at the state it is asked about -- one ordinary installed node
+--   and nothing else -- so the factor is one and the caps premise buys
+--   the statement nothing at all.  The same file pins `valCaps?` FALSE
+--   at the arriving value, which is the premise that does buy it.
 postulate
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (c : Caps) (W : ℕ) (sl : Slots Γ)
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (p : Path Γ u t)
     (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+    all (valCaps? c sl (obs u)) vals ≡ true →
     let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
@@ -705,7 +714,9 @@ frameDrainOK {Γ = Γ} {u = u} c sl sf id now (from-inner op allNid inst) p sche
 --   the state it started from and the drain under it subscribes.
 -- REFUTED: `Refuted.Thru-Subscribe-Nest` kills it at the thru-outer
 --   frame, eighty against forty-one, where the unit per value is spent
---   on a wrap and the values are an inner's emissions.
+--   on a wrap and the values are an inner's emissions -- and kills the
+--   caps-scaled repair at the same figures, the cap being satisfied by
+--   a state the arriving values are no part of.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick)
@@ -713,13 +724,14 @@ abstract
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+    all (valCaps? c sl s) vals ≡ true →
     frameDrainOK c sl sf id now f p sched st →
     let r = stepFrame sf id now f p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ 2 ^ Caps.cSize c
         * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
            + nestUnit e sl)
-  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hfd =
+  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hfd =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
@@ -733,19 +745,19 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hfd =
+  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hfd =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseU (Caps.cSize c) _ (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hfd =
+  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hfd =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseU (Caps.cSize c) _ (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hfd =
+  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hfd =
     ≤-trans (stepFrame-nodes-inner c sl sf id now op allNid inst p vals fin sched st hsl hc hfd)
             (*-monoʳ-≤ (2 ^ Caps.cSize c)
               (+-monoˡ-≤ (nestUnit e sl) (zero-charge W _)))
-  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hfd =
-    ≤-trans (stepFrame-nodes-thru c W sf id now op nid p vals fin sched st 1≤W hlen hc)
+  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfd =
+    ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st hsl 1≤W hlen hc hv)
             (≤-trans (*-monoʳ-≤ (2 ^ Caps.cSize c)
               (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
                        (one-pow W (_ + W * 1))))
@@ -880,8 +892,9 @@ capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
 capsWalkOK c sl sf id now root           vals fin sched st = capsOK? c sched st ≡ true
 capsWalkOK c sl sf id now (share-sink _) vals fin sched st = capsOK? c sched st ≡ true
-capsWalkOK c sl sf id now (f ↠ p)        vals fin sched st =
+capsWalkOK {u = u} c sl sf id now (f ↠ p) vals fin sched st =
   (capsOK? c sched st ≡ true)
+  × (all (valCaps? c sl u) vals ≡ true)
   × frameDrainOK c sl sf id now f p sched st
   × capsWalkOK c sl sf id now p (proj₁ step)
       (proj₁ (proj₂ (proj₂ step)))
@@ -918,12 +931,12 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin s
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (foldPath-nodes c W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
              (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-             1≤W (proj₂ hb) (proj₂ (proj₂ hc)))
+             1≤W (proj₂ hb) (proj₂ (proj₂ (proj₂ hc))))
     (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
                 (*-monoʳ-≤ (pathNestF p ^ W)
                   (+-monoˡ-≤ (W * (pathNestD p + L * U))
                              (stepFrame-nodes c W sl sf id now f p vals fin sched st
-                                hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc))))))
+                                hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc)) (proj₁ (proj₂ (proj₂ hc)))))))
     (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
                 (fac-hoist (2 ^ S) (pathNestF p ^ W) (A + U) (W * (pathNestD p + L * U))
                            (1≤pow≤ 2 (Caps.cSize c) (s≤s z≤n))))

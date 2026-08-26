@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""PUSHES THE LEDGER'S SHAPE TO A PHONE AT THE MOMENT IT IS ABOUT TO MOVE.
+
+A gate run is the one point where the tree is known-good and a commit is next,
+so it is the only place a census is worth sending: any earlier and the numbers
+describe a tree that is still being edited.
+
+WHY THIS COMPUTES THE COUNTS RATHER THAN READING THEM.  PROOF-STATE.md carries
+no aggregates on purpose -- a hand-typed total is true when written and wrong
+later, with nothing checking it.  Every number here is derived from the roadmap
+and the postulate ledger at send time, so it cannot be stale; nothing is stored
+and no file is written.
+
+The topic is read from NTFY_TOPIC, falling back to `.ntfy-topic` at the repo
+root.  Absent both, this exits zero having sent nothing -- a notification is a
+convenience and may never fail a gate.
+"""
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import urllib.request
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import importlib.util
+
+spec = importlib.util.spec_from_file_location(
+    "check_roadmap", ROOT / "scripts" / "check-roadmap.py")
+cr = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(cr)
+
+CLASSES = cr.CLASSES
+
+
+def topic():
+    t = os.environ.get("NTFY_TOPIC", "").strip()
+    if t:
+        return t
+    f = ROOT / ".ntfy-topic"
+    if f.exists():
+        return f.read_text().strip()
+    return ""
+
+
+def git(*args, default=""):
+    try:
+        return subprocess.run(("git",) + args, cwd=ROOT, capture_output=True,
+                              text=True, check=True).stdout.strip()
+    except Exception:
+        return default
+
+
+def census():
+    tiers = cr.parse(ROOT / "PROOF-STATE.md")
+    out = []
+    for name, rows, _pre in tiers:
+        counts = {}
+        for _label, cls, _ln, _cost in rows:
+            if cls:
+                counts[cls] = counts.get(cls, 0) + 1
+        out.append((name, counts))
+    return out
+
+
+def fmt_counts(counts):
+    parts = [f"{counts[c]} {c.lower()}" for c in CLASSES if counts.get(c)]
+    return ", ".join(parts) if parts else "clear"
+
+
+def main():
+    verdict = sys.argv[1] if len(sys.argv) > 1 else "GATE"
+    path = sys.argv[2] if len(sys.argv) > 2 else ""
+
+    tiers = census()
+    open_tiers = [(n, c) for n, c in tiers if sum(c.values())]
+    lowest = open_tiers[0] if open_tiers else None
+
+    live = len(cr.live_postulates(ROOT) or [])
+    total = {}
+    for _n, c in tiers:
+        for k, v in c.items():
+            total[k] = total.get(k, 0) + v
+
+    branch = git("rev-parse", "--abbrev-ref", "HEAD", default="?")
+    head = git("log", "-1", "--format=%h %s", default="?")
+    dirty = git("status", "--porcelain", default="")
+    nfiles = len([l for l in dirty.splitlines() if l.strip()])
+
+    lines = []
+    if lowest:
+        name, counts = lowest
+        lines.append(f"Tier {name} is the lowest open — {fmt_counts(counts)}")
+        head_rows = [r for r in cr.parse(ROOT / "PROOF-STATE.md")
+                     if r[0] == name][0][1]
+        nxt = next((lab for lab, cls, _l, _c in head_rows if cls), None)
+        if nxt:
+            worst = next(cls for lab, cls, _l, _c in head_rows if cls)
+            lines.append(f"next up: {nxt} ({worst})")
+    else:
+        lines.append("no tier has a classed row left")
+
+    lines.append("")
+    for name, counts in tiers:
+        lines.append(f"  tier {name}: {fmt_counts(counts)}")
+    lines.append("")
+    lines.append(f"{live} live postulate(s) across the tree"
+                 f" — {fmt_counts(total)} on the roadmap")
+    lines.append(f"{nfiles} file(s) uncommitted on {branch}")
+    lines.append(f"HEAD {head}")
+    if path:
+        lines.append(f"log {path}")
+
+    body = "\n".join(lines)
+    t = topic()
+    if not t:
+        print("notify: no NTFY_TOPIC and no .ntfy-topic — nothing sent")
+        print(body)
+        return 0
+
+    green = verdict.upper().startswith("GREEN")
+    req = urllib.request.Request(
+        f"https://ntfy.sh/{t}",
+        data=body.encode("utf-8"),
+        headers={
+            "Title": f"gate {verdict} - about to commit",
+            "Priority": "default" if green else "high",
+            "Tags": "white_check_mark" if green else "x",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            r.read()
+        print(f"notify: sent to ntfy.sh/{t}")
+    except Exception as exc:
+        print(f"notify: send failed ({exc}) — gate unaffected")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

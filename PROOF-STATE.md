@@ -177,7 +177,7 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   descent's own nest bound, all the inner arm still rests on. Absolute, not
   relative to the store handed in, so the factor cannot compound per queued
   inner; charged in the size of what is subscribed. Unprobed at that form.
-- **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED`: restated with
+- **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED×2`: restated with
   the row above and by the same repair, the wrap's own subscribe being the same
   descent. Measured multiplicative in the incoming depth, which is what the
   factor is; unprobed at the new form.

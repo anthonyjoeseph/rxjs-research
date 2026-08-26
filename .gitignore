@@ -34,3 +34,7 @@ agda/_stripped-comments/
 
 # scripts/dev-changed.py records the last green `make gate` here; local state
 .gate-heavy-stamp
+
+# the ntfy topic is an ADDRESS, not config: anyone holding it can read the
+# gate notifications, so it stays out of the tree
+.ntfy-topic
