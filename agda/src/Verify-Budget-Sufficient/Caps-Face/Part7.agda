@@ -1222,22 +1222,46 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- component as ZERO at every instant -- and the reason is the FAMILIES,
 -- not the component: their sources script plain numerals, whose nesting
 -- is zero whatever a walk does with them, so reaching this corner at all
--- needs a source scripting OBSERVABLES.  That is why it is stated
--- separately rather than folded in: a component with no coverage is a
--- component whose cheapness is a guess, and guessing it cheap inside a
--- larger proof is how a corner stops being looked at.
+-- needs a source scripting OBSERVABLES.
+--
+-- AND THAT IS IMPOSSIBLE, WHICH TURNS "NO COVERAGE" INTO A STRUCTURAL
+-- FACT AND IS WHY THE ROW BELOW OWES NO INCREMENT.  A live source is
+-- minted only where a SCRIPTED slot is subscribed, and it takes its
+-- element type from that slot; `Slot`'s scripted constructor carries an
+-- `isData` side condition, which is FALSE at every observable type.  So
+-- the corner is not merely unvisited by this corpus -- no corpus can
+-- reach it, and the store measure already says as much by charging a
+-- scripted slot nothing.  The component cannot outrun what the store
+-- held, and the increment the wider row carries is slack here.
+--
+-- SO THE STATEMENT IS AN ASSEMBLY OVER A FLAT LEAF, and the leaf takes
+-- no premises at all: the caps, the nesting receipt and the payload
+-- bound were carried only to reach an increment nothing spends.  What
+-- remains is that a walk adds no live source deeper than the store it
+-- started from, which is a fact about where lives COME FROM.
 postulate
-  cascadeGo-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  cascadeGo-nest-live-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (a : Arrival Γ) (nextId : Id)
     (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     let r = cascadeGo a nextId chains sched st
     in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
-         ≤ storeNestMax sched st + nestIncAt e sl id
+         ≤ storeNestMax sched st
+
+cascadeGo-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  let r = cascadeGo a nextId chains sched st
+  in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
+       ≤ storeNestMax sched st + nestIncAt e sl id
+cascadeGo-nest-live {e = e} sl id a nextId chains sched st _ _ _ _ =
+  ≤-trans (cascadeGo-nest-live-flat a nextId chains sched st)
+          (m≤m+n (storeNestMax sched st) (nestIncAt e sl id))
 
 -- THE BURST BOUND AT THE INDICES A CHAIN STEP FIXES, so that the fold
 -- below and the caps face above name the same hypothesis.

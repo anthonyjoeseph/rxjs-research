@@ -189,10 +189,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   the selection's paths and the arrival's payload land inside one unit — the
   fact that ties the walk's charge back to the program. Free-list form refuted;
   probeable.
-- **`cascadeGo-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: the
-  walk's pending sources under the same width. The one arm of the store no
-  instantiation has ever reached — every family reads it zero — so its
-  cheapness is a guess.
+- **`cascadeGo-nest-live-flat`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`:
+  the walk's pending sources under the store it started from, premise-free. No
+  corpus can reach this arm — a live source's type comes from a scripted slot,
+  and `isData` is false at every observable — so the increment is slack.
 - **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: the
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for, and the component is measured flat on
