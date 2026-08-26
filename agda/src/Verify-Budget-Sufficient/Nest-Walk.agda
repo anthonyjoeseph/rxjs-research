@@ -1284,6 +1284,12 @@ postulate
   --   constant-factor form survives either.  The repaired statement
   --   must charge the arriving inner a `2 ^ syncSize` factor, which is
   --   what a substituting map is already charged for its values here.
+  --   Such a factor is AFFORDABLE, and that is the part the crossover
+  --   also settles: a doubling is bought rather than free, since the
+  --   head that substitutes spends key at least as fast as it doubles
+  --   -- so the emitted exponent is bounded BY the key instead of
+  --   running away from it, and the exponential column is the one the
+  --   repaired statement can carry.
   -- PROBED: `Probed.Subscribe-Nest-Wrap` instantiates the conclusion
   --   this leaf now carries the risk of, at `W = 0` -- the smallest
   --   grant the statement can be read at, so a green row is stronger

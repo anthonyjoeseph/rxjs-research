@@ -233,3 +233,24 @@ keyX2 = refl
 -- doubled form is false too, which is the tables' shape pinned as a row
 keyM3-2 : (emitSync (pM 3) ≤ᵇ 2 * syncSizeᵉ (pM 3)) ≡ false
 keyM3-2 = refl
+
+-- A FOURTH LEVEL, which turns the two columns into closed forms: the
+-- emitted key is `2 ^ (k + 4) - 9` and the head's is `15 * k + 14`,
+-- both exact at every level the family reaches.  The burst length is
+-- pinned beside them because a delivered figure over an empty burst
+-- measures nothing, and the gas has to carry a fifth boundary.
+deep4 : ℕ × ℕ × ℕ
+deep4 = emitSync (pM 4) , syncSizeᵉ (pM 4) , burstAt (pM 4)
+
+deep4≡ : deep4 ≡ (247 , 74 , 1)
+deep4≡ = refl
+
+-- NOT COVERED, and the closed forms are what say so: the repaired
+-- shape the crossover points at -- an emitted key under `2 ^` the
+-- head's -- CANNOT be refuted by this family, and no number of extra
+-- levels would change that.  A doubling here is bought with a whole
+-- map and a whole boundary, fifteen key units, so the emitted
+-- exponent runs at `k` while the bound's runs at `15 * k`; the two
+-- sides never approach and every row would be green by construction.
+-- Refuting it needs a family that spends key more cheaply per
+-- doubling, which is a different program shape and not a deeper one.
