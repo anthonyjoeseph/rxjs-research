@@ -173,10 +173,29 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`subscribeE-nest`** (Nest-Walk) — DIFFICULTY, `REFUTED×5, PROBED×2`: the
-  subscribe descent's own nest bound, all the inner arm still rests on.
-  Restated with the factor a power in the BURST it hands back; the witness that
-  killed the flat form is green at the new index, with room.
+- **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`: the
+  head where the burst index is bet — one step function applied once per value
+  of whatever arrives. The un-indexed form is refuted; the same witness is
+  green at the new index with eleven bits per value unspent.
+- **`subscribeE-nest-map`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
+  substituting head every witness of this family reaches first. Three forms
+  refuted — free, unit-charged, store-capped — and the survivor is probed at
+  the smallest cap the premise admits.
+- **`subscribeE-nest-slot`** (Nest-Walk) — DIFFICULTY, `REFUTED`: the three
+  slot heads under one leaf. A shared slot's charge is a multiple of nothing
+  unless the unit is a summand, which is what the refutation pins.
+- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED×3, PROBED×3`: the three `*All` heads, each a mint plus the outer's
+  descent pushed through a `thru-outer` frame. Their charge is the thru row's.
+- **`subscribeE-nest-take`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: a
+  filter head, which must be free — the count is evaluated once and the frame
+  charges nothing the path measure can see.
+- **`subscribeE-nest-of`** (Nest-Walk) — DIFFICULTY, `REFUTED`: a one-shot of
+  evaluated terms. `evalWith-nest` is the route and it costs a size factor,
+  which the `valCaps?` premise is what pays for.
+- **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the one
+  head that is not a subterm. A substituted body can be deeper than the body,
+  so the depth premise does not transfer and the fuel edge is all there is.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
   same descent arriving through the outer wrap. The flat factor died to the
   same cold-slot burst that killed the root form; restated as a power in the

@@ -5,7 +5,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-nest
+-- TARGET: subscribeE-nest-scan
 --
 -- WHAT IS BEING TESTED, AND IT IS THE AXIS AND NOT THE PROGRAM.  The
 -- statement's factor is now a power in the BURST the descent hands

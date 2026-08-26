@@ -22,7 +22,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; _×ᵗ_; obs; sizeᵗ; applyFn; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; applyFn; _≟ᵗ_;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using
@@ -424,117 +425,214 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
   where r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
 
--- THE SUBSCRIPTION'S OWN DESCENT, and the leaf the arm finally rests on.
--- `subscribeInner` mints an instance id and hands the inner to
--- `subscribeE` under a `from-inner` frame; out of gas it emits a dry
--- event and touches nothing, so the whole charge is the descent's.
--- The `valCaps?` premise is what puts the subscribed observable inside
--- the exponent: the factor is two to a SIZE cap, and a cap the value
--- itself is not held to bounds the state and nothing that enters it.
+-- THE SUBSCRIPTION'S OWN DESCENT, AND IT IS NOW A CASE SPLIT.  What was
+-- one postulate over the whole of `subscribeE` is a real body over one
+-- leaf per head, so a leaf's FIT is tested the moment it is proven and
+-- the three heads that cost nothing -- an empty source, a dry unfold, a
+-- `deferᵉ` whose only node is an empty queue -- are proven here rather
+-- than assumed alongside the rest.
 --
--- AND THE FACTOR IS KEYED ON THE BURST THE DESCENT HANDS BACK, WHICH IS
+-- THE FACTOR IS KEYED ON THE BURST THE DESCENT HANDS BACK, WHICH IS
 -- WHAT SPENDING IT ONCE GETS WRONG.  A subscribe frame can deliver a
 -- whole burst, and a `scanᵉ` refolds its accumulator once per value of
 -- one, so the demand is a factor per VALUE against a grant read off
 -- syntax no burst enlarges.  So the exponent is the emitted burst's
--- length and one copy for the descent itself, and the length enters as a
--- premise -- the frame face's own idiom, where a step's charge is
+-- length and one copy for the descent itself, and the length enters as
+-- a premise -- the frame face's own idiom, where a step's charge is
 -- already a power in the width it was handed rather than a constant.
 --
--- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
---   against forty, at a queued `mapᵉ` whose step function names its
---   payload on both sides of the sum: `nestDᵉ` is additive there and the
---   substitution is not, so the emitted value is deeper than the whole
---   queue is charged.  The same witness kills the ASSEMBLY at the frame
---   above, whose charge reduces to exactly this bound.
--- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
---   invites -- charging the arm the `nestUnit e sl` its own parent
---   already carries -- at a hundred and twenty against eighty-two, with
---   the queued observable AS the program so the unit is as large as the
---   currency admits.  A third occurrence of the payload in the step
---   function moves the emit and leaves the unit where it was, so what
---   is owed is a FACTOR in the substituted function's SIZE and no
---   summand in a depth currency is one.
--- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled form
---   from the other side, forty delivered against a charge of ZERO, at a
---   queue holding nothing but a reference to an observable-typed share.
---   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
---   reference says nothing about the slot -- and the node table does not
---   read the slots either, so the charged side is empty and every factor
---   is a multiple of nothing.  Taken with the row above it this pins the
---   shape exactly: the factor AND a slots summand, each of which is dead
---   on its own.
--- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent from
---   the STORE's cap alone, sixteen delivered against a charge of six at
---   `st-init`, where the node table is empty and so `capsOK? (caps 0 0
---   0)` holds outright and the factor collapses to one.  Each stacked
---   `mapᵉ` naming its payload twice doubles the delivered depth and
---   leaves the charge where it was -- eight, then sixteen -- so the gap
---   is unbounded rather than one crossing.  The same file pins
---   `valCaps?` FALSE at both programs, which is what makes the premise
---   load-bearing instead of merely present.
--- REFUTED: `Refuted.Scan-Burst-Nest` kills the form below outright,
---   16383 delivered against a charge of 12288, and the row one value
---   shorter still holds -- so it is a crossing and not a scale error.
---   The step function is a `scanᵉ` naming its accumulator in the two
---   additive slots an inner `scanᵉ` offers, written ONCE and applied
---   once per value of a burst that comes from a COLD SCRIPT: `sizeᵉ`
---   cannot see a script and `slotNest` is zero at every scripted slot,
---   so the burst is charged to neither the exponent nor the base while
---   it doubles the delivered depth per value.  The same file measures
---   the burst at fourteen values in ONE subscribe frame against a `pWᵛ`
---   of one and an `entryCeil` of eight, which is why no wider reading of
---   the ENTRY cap repairs it either.
--- PROBED: `Probed.Subscribe-Nest` clears the restated form on exactly
---   the family that refuted every earlier one, at the SMALLEST cap the
---   `valCaps?` premise admits -- the value's own size and width, so
---   there is no slack in the choice -- with `B` taken to be `nestDᵉ o`
---   exactly.  What it measures rather than merely asserts is the
---   exponent SPENT: two of the three programs cross, needing one bit and
---   two, against the twenty-one to thirty-five the cap grants, and the
---   demand rises by ONE per stacked frame while the size it is read off
---   rises by SEVEN.  So the shape outruns the doubling with six of every
---   seven bits unspent.  Not covered: every subscription is at `root`
---   from an empty node table, so the queue-facing descent under a
---   `from-inner` is untouched -- rows do descend under that frame, from
---   tables holding nothing, a forty-deep queue, and a hundred-deep one
---   that DECIDES the `⊔` over what the descent emits.  That last is the
---   axis that could still have refuted, since the store is in the
---   premise and in the conclusion's left and in the right-hand side
---   nowhere; it does not, and the crossing moves by exactly the one bit
---   the larger store costs, which is the factor absorbing it linearly
---   rather than compounding.  What the rows also turn up: `stBounded?`
---   is what refuses a store deeper than the cap, so the axis is CAPPED
---   and not free.  Not covered: any cap above the value's own, except in
---   the one row whose store forces a wider one -- and, the gap that
---   matters here, the BURST.  Every row hands back exactly one value,
---   pinned rather than assumed, so the exponent's index sits at its
---   floor and nothing covers the per-value refolding it exists to pay
---   for.
--- PROBED: `Probed.Scan-Burst-Nest` reads the witness that killed the
---   un-indexed form against THIS one, at the same cold script and the
---   same tight size cap -- fourteen values, 16383 delivered, green
---   here and pinned `false` at index zero in the same file.  What the
---   rows cannot do is refute it: the demand rises by ONE bit per value
---   of the burst and the grant by twelve, so once the index IS the
---   burst this family is carried with eleven bits per value unspent,
---   which is a reading about the currency rather than a margin.  Not
---   covered: the family's next crossing needs a script near twenty-six
---   and an accumulator of some sixty-seven million nodes, so nothing
---   here moves the index by more than one step.
+-- AND THE BOUND IS ABSOLUTE RATHER THAN RELATIVE TO THE STORE HANDED
+-- IN.  What a subscription installs is read off the expression, whose
+-- depth `B` bounds, and off the slots, which the unit covers -- so
+-- re-establishing the same bound is what stops the factor compounding
+-- once per queued inner.  A relative form would raise the drain's cost
+-- to a tower in the queue's length, which is not what a queue of
+-- independent inners costs.
+-- THE STATEMENT, NAMED ONCE.  Every leaf below re-states it at one of
+-- `subscribeE`'s heads, so writing the shared shape here is what keeps
+-- the leaves comparable and lets the body read as a case split rather
+-- than a wall of repeated telescopes.
+NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set
+NestAt {Γ = Γ} {t = t} {e = e} c sl B W g o κ id now sched st =
+  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  valCaps? c sl (obs _) o ≡ true →
+  nestDᵉ o ≤ B →
+  nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
+  let r = subscribeE g o κ id now sched st in
+  length (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ W →
+  (nodesMax (proj₂ (proj₂ r))
+     ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
+    ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
+
 postulate
-  subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
-    valCaps? c sl (obs u) o ≡ true →
-    nestDᵉ o ≤ B →
-    nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
-    let r = subscribeE g o κ id now sched st in
-    length (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ W →
-    (nodesMax (proj₂ (proj₂ r))
-       ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
-      ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
+  -- THE SLOT HEADS, where a subscription reads the telescope rather
+  -- than descending.  A hot slot emits bookkeeping and no values; a
+  -- cold one emits its script, which is charged to the unit and not to
+  -- the expression; a shared one connects and re-enters the walk.
+  --
+  -- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled
+  --   form, forty delivered against a charge of ZERO, at a queue
+  --   holding nothing but a reference to an observable-typed share.
+  --   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
+  --   reference says nothing about the slot -- and the node table does
+  --   not read the slots either, so the charged side is empty and every
+  --   factor is a multiple of nothing.  What that pins is the shape:
+  --   the factor AND a slots summand, each of which is dead on its own.
+  subscribeE-nest-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (i : Fin n)
+    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (input i) κ id now sched st
+  subscribeE-nest-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (ts : List (Tm Γ [] [] [] u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (ofᵉ ts) κ id now sched st
+  -- THE MAP HEAD, and the one this family's witnesses reach first: a
+  -- step function names its payload, so what leaves the frame is a
+  -- SUBSTITUTION into what entered it and the charge has to be a factor
+  -- rather than a summand.
+  --
+  -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
+  --   against forty, at a queued `mapᵉ` whose step function names its
+  --   payload on both sides of the sum: `nestDᵉ` is additive there and
+  --   the substitution is not, so the emitted value is deeper than the
+  --   whole queue is charged.
+  -- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
+  --   invites -- charging the arm the `nestUnit e sl` its own parent
+  --   already carries -- at a hundred and twenty against eighty-two,
+  --   with the queued observable AS the program so the unit is as large
+  --   as the currency admits.  A third occurrence of the payload in the
+  --   step function moves the emit and leaves the unit where it was, so
+  --   what is owed is a FACTOR in the substituted function's SIZE and
+  --   no summand in a depth currency is one.
+  -- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent
+  --   from the STORE's cap alone, sixteen delivered against a charge of
+  --   six at `st-init`, where the node table is empty and so `capsOK?
+  --   (caps 0 0 0)` holds outright and the factor collapses to one.
+  --   Each stacked `mapᵉ` naming its payload twice doubles the
+  --   delivered depth and leaves the charge where it was -- eight, then
+  --   sixteen -- so the gap is unbounded rather than one crossing.  The
+  --   same file pins `valCaps?` FALSE at both programs, which is what
+  --   makes the premise load-bearing instead of merely present.
+  -- PROBED: `Probed.Subscribe-Nest` clears this head on exactly the
+  --   family that refuted every earlier form, at the SMALLEST cap the
+  --   `valCaps?` premise admits -- the value's own size and width, so
+  --   there is no slack in the choice -- with `B` taken to be `nestDᵉ
+  --   o` exactly.  What it measures rather than merely asserts is the
+  --   exponent SPENT: two of the three programs cross, needing one bit
+  --   and two, against the twenty-one to thirty-five the cap grants,
+  --   and the demand rises by ONE per stacked frame while the size it
+  --   is read off rises by SEVEN.  So the shape outruns the doubling
+  --   with six of every seven bits unspent.  Rows also descend under a
+  --   `from-inner`, from tables holding nothing, a forty-deep queue,
+  --   and a hundred-deep one that DECIDES the `⊔` over what the descent
+  --   emits -- the axis that could still have refuted, since the store
+  --   is in the premise and in the conclusion's left and in the
+  --   right-hand side nowhere.  It does not, and the crossing moves by
+  --   exactly the one bit the larger store costs, which is the factor
+  --   absorbing it linearly rather than compounding.  What the rows
+  --   also turn up: `stBounded?` is what refuses a store deeper than
+  --   the cap, so the axis is CAPPED and not free.  Not covered: any
+  --   cap above the value's own, except in the one row whose store
+  --   forces a wider one -- and the BURST, since every row hands back
+  --   exactly one value, pinned rather than assumed.
+  subscribeE-nest-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (mapᵉ f b) κ id now sched st
+  subscribeE-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (takeᵉ cnt b) κ id now sched st
+  -- THE SCAN HEAD, WHICH IS WHERE THE BURST INDEX IS REALLY BET.  A
+  -- scan's step function is written once and applied once per value of
+  -- whatever burst arrives, so this is the head whose demand is a
+  -- factor PER VALUE and the reason the exponent carries the length
+  -- rather than a constant.
+  --
+  -- REFUTED: `Refuted.Scan-Burst-Nest` kills the un-indexed form
+  --   outright, 16383 delivered against a charge of 12288, and the row
+  --   one value shorter still holds -- so it is a crossing and not a
+  --   scale error.  The step function names its accumulator in the two
+  --   additive slots an inner `scanᵉ` offers, applied once per value of
+  --   a burst that comes from a COLD SCRIPT: `sizeᵉ` cannot see a
+  --   script and `slotNest` is zero at every scripted slot, so the
+  --   burst is charged to neither the exponent nor the base while it
+  --   doubles the delivered depth per value.  The same file measures
+  --   the burst at fourteen values in ONE subscribe frame against a
+  --   `pWᵛ` of one and an `entryCeil` of eight, which is why no wider
+  --   reading of the ENTRY cap repairs it either.
+  -- PROBED: `Probed.Scan-Burst-Nest` reads that witness against THIS
+  --   form, at the same cold script and the same tight size cap --
+  --   fourteen values, 16383 delivered, green here and pinned `false`
+  --   at index zero in the same file.  What the rows cannot do is
+  --   refute it: the demand rises by ONE bit per value of the burst and
+  --   the grant by twelve, so once the index IS the burst this family
+  --   is carried with eleven bits per value unspent, which is a reading
+  --   about the currency rather than a margin.  Not covered: the
+  --   family's next crossing needs a script near twenty-six and an
+  --   accumulator of some sixty-seven million nodes, so nothing here
+  --   moves the index by more than one step.
+  subscribeE-nest-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (scanᵉ f z b) κ id now sched st
+  subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (mergeAllᵉ lim b) κ id now sched st
+  subscribeE-nest-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (switchAllᵉ b) κ id now sched st
+  subscribeE-nest-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W g (exhaustAllᵉ b) κ id now sched st
+  -- THE UNFOLD, WHICH IS THE ONE HEAD THAT IS NOT A SUBTERM.  `unfoldμ`
+  -- substitutes the μ into its own body, so the recursion is on fuel
+  -- and the depth premise does not transfer for free -- a substituted
+  -- body can be deeper than the body was.
+  subscribeE-nest-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestAt c sl B W (gs fuel) (μᵉ body) κ id now sched st
+
+subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  NestAt c sl B W g o κ id now sched st
+subscribeE-nest c sl B W g (input i) κ id now sched st =
+  subscribeE-nest-slot c sl B W g i κ id now sched st
+subscribeE-nest c sl B W g (ofᵉ ts) κ id now sched st =
+  subscribeE-nest-of c sl B W g ts κ id now sched st
+subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hst hw =
+  ⊔-lub hst z≤n
+subscribeE-nest c sl B W g (mapᵉ f b) κ id now sched st =
+  subscribeE-nest-map c sl B W g f b κ id now sched st
+subscribeE-nest c sl B W g (takeᵉ cnt b) κ id now sched st =
+  subscribeE-nest-take c sl B W g cnt b κ id now sched st
+subscribeE-nest c sl B W g (scanᵉ f z b) κ id now sched st =
+  subscribeE-nest-scan c sl B W g f z b κ id now sched st
+subscribeE-nest c sl B W g (mergeAllᵉ lim b) κ id now sched st =
+  subscribeE-nest-merge c sl B W g lim b κ id now sched st
+subscribeE-nest c sl B W g (switchAllᵉ b) κ id now sched st =
+  subscribeE-nest-switch c sl B W g b κ id now sched st
+subscribeE-nest c sl B W g (exhaustAllᵉ b) κ id now sched st =
+  subscribeE-nest-exhaust c sl B W g b κ id now sched st
+subscribeE-nest c sl B W g0 (μᵉ body) κ id now sched st hsl hc hv hn hst hw =
+  ⊔-lub hst z≤n
+subscribeE-nest c sl B W (gs fuel) (μᵉ body) κ id now sched st =
+  subscribeE-nest-mu c sl B W fuel body κ id now sched st
+subscribeE-nest c sl B W g (varᵉ ()) κ id now sched st
+subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hst hw =
+  ⊔-lub (≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n hst)) z≤n
 
 -- ONE SUBSCRIPTION, AND THE BOUND IS ABSOLUTE.  What the subscription
 -- installs is read off `o`, whose depth the drain bounds by `B`, and off

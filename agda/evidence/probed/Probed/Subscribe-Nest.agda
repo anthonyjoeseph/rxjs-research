@@ -5,7 +5,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-nest
+-- TARGET: subscribeE-nest-map
 -- TARGET: stepFrame-nodes-thru
 --
 -- WHAT IS BEING TESTED.  `subscribeE-nest` charges a subscription
