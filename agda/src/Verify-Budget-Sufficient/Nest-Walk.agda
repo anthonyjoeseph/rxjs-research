@@ -1093,14 +1093,30 @@ pushBurst-nest-thru {Γ = Γ} {t = t} {u = u} G fuel op nid κ id now (em ∷ em
   N₂ j = ≤-trans (proj₂ (proj₂ WR) j) (proj₂ (proj₂ WK) j)
 
 
--- ONE CONSUME STEP, and the three heads differ only in which node
--- state they read.  This is what the frame's subscription genuinely
--- forces: an arriving inner is admitted, switched into, or queued, and
--- whichever happens the delivered values and the two store readings
--- stay inside the head's grant.  The invariant comes back out because
--- the walk hands it to the NEXT arrival -- a step-shaped statement
--- without it would be false, nothing stopping an inner from being
--- arbitrarily large.
+-- ONE CONSUME STEP, AND THE SINGLE GRANT DOES NOT HOLD.  Each head reads
+-- its own node, and every arm either leaves the state alone or runs
+-- the ONE `subscribeInner` all three share and writes one node -- so
+-- the three fall together, and they fall on the delivered values
+-- rather than on either store reading.
+--
+-- WHAT IS FALSE is naming ONE bound and using it for both what comes
+-- in and what goes out.  A map's step function may name its payload
+-- TWICE while the measure charges the map's two halves by SUM, so the
+-- substitution puts the payload's whole nesting in both copies and the
+-- delivery reads DOUBLE an arrival the grant admitted -- with no
+-- constant alongside it to absorb the gap.  The ratio is two at every
+-- depth, so this is not a corner.
+--
+-- WHAT SURVIVES is the shape the subscribe's own delivered bound
+-- already has in this file, and the contrast is the whole finding: it
+-- INFLATES the arrival's bound rather than reusing it, and is keyed to
+-- a grant that shrinks down the descent.  A flat grant has no index to
+-- spend, which is why it cannot be repaired by choosing a bigger one.
+-- The counterexample reaches `thruFitOK` too, whose per-step conjunct
+-- IS this inequality, and so reaches every statement below it that
+-- reads a fit off a burst claim at one `G`.
+--
+-- REFUTED: Refuted.Thru-Step-Nest
 postulate
   thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (G : ℕ) (fuel : Gas) (nid : NodeId) (κ : Path Γ u t)

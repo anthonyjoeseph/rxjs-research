@@ -70,3 +70,8 @@ open import Refuted.Inner-Drain-Nest
          stepFrame-nodes-inner-unit-absurd)
 open import Refuted.Scan-Seed-Caps
   using (syn≡39; val≡45; capsBefore; valOK; capsAfter; scan-seed-caps-absurd)
+open import Refuted.Thru-Step-Nest
+  using (burstLen≡1; prems≡; arrival≡6;
+         deliveredM≡12; deliveredS≡12; deliveredX≡12;
+         thru-step-merge-absurd; thru-step-switch-absurd;
+         thru-step-exhaust-absurd)
