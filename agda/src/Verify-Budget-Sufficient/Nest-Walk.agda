@@ -1272,6 +1272,18 @@ postulate
   --   a `deferᵉ` gate where the measure reads zero.  That is why the
   --   residue is stated per consume step and over the run's own
   --   states: the whole-frame forms are the ones the ratio kills.
+  -- DEAD ROUTE: and the KEY the ring must carry cannot be the head's
+  --   own, which was the first shape to try and the cheapest to kill.
+  --   `Probed.Nest-Multi-Level` measures the emitted key against the
+  --   emitter's down a stack of substituting boundaries: the emitted
+  --   column DOUBLES per level while the head's, reading a spine that
+  --   grows by one boundary and one map, rises by a constant -- so the
+  --   identity form survives two levels and is false from the third,
+  --   at all three heads and at the same figures.  Substitution is
+  --   what does it, and a subterm bound cannot see substitution, so no
+  --   constant-factor form survives either.  The repaired statement
+  --   must charge the arriving inner a `2 ^ syncSize` factor, which is
+  --   what a substituting map is already charged for its values here.
   -- PROBED: `Probed.Subscribe-Nest-Wrap` instantiates the conclusion
   --   this leaf now carries the risk of, at `W = 0` -- the smallest
   --   grant the statement can be read at, so a green row is stronger

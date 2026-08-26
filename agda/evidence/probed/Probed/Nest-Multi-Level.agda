@@ -40,8 +40,8 @@
 -- the three operators vary.
 module Probed.Nest-Multi-Level where
 
-open import Data.Bool using (Bool; true)
-open import Data.List using ([]; _∷_; length)
+open import Data.Bool using (Bool; true; false)
+open import Data.List using ([]; _∷_; length; foldr)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
@@ -165,3 +165,71 @@ fitsS2 = refl
 
 fitsX2 : (lhs (pX 2) ≤ᵇ rhs (pX 2)) ≡ true
 fitsX2 = refl
+-- THE EMITTED KEY, and the strongest form of it is REFUTED here.
+-- The grant shrinks along the SYNTACTIC descent -- every subterm head
+-- spends a `suc` of `syncSizeᵉ` -- but an inner arriving at a boundary
+-- is not a subterm of the head, and the only bound anywhere on its key
+-- is the CAP.  So the fit closes exactly when what comes OUT of a
+-- boundary is bounded relative to what went in, and the conjecture
+-- worth killing first was the strongest one: emitted key no larger
+-- than the emitter's.  It survives two levels and fails at the third.
+--
+-- WHAT KILLS IT is substitution, which is what a subterm bound cannot
+-- see: `dup` names its payload twice inside a map's step function, so
+-- the emitted column DOUBLES per level while the head column, reading
+-- a spine that grows by one boundary and one map, rises by a constant
+-- fifteen.  Linear against exponential -- so no `c * key + d` form
+-- survives either, and the factor a repaired statement needs is the
+-- `2 ^ syncSizeᵗˢ` a substituting map is already charged elsewhere in
+-- the walk, not a constant.
+--
+-- LOAD-BEARING, and NOT DEGENERATE: `delivered≡` above pins these same
+-- bursts at nonzero, doubling nesting, so their values carry
+-- observable content and `syncSizeᵛ` on them is not the constant 1.
+-- The crossover rows are what carry the finding -- two green then four
+-- false, at all three heads -- and a bound that held would have shown
+-- as six greens.
+
+emitSync : ∀ {t} (e : Closed Γ₂ t) → ℕ
+emitSync {t} e =
+  foldr (λ v acc → syncSizeᵛ t v ⊔ acc) 0
+    (proj₁ (splitBurst {A = Val Γ₂ t}
+      (proj₁ (subscribeE gasBig e root 0 0 (sched-init e slots) (st-init e)))))
+
+-- the emitted key, level by level: doubling
+emitted : ℕ × ℕ × ℕ × ℕ
+emitted = emitSync (pM 0) , emitSync (pM 1) , emitSync (pM 2) , emitSync (pM 3)
+
+emitted≡ : emitted ≡ (7 , 23 , 55 , 119)
+emitted≡ = refl
+
+-- the head's own key at the same programs: arithmetic, step fifteen
+heads : ℕ × ℕ × ℕ × ℕ
+heads = syncSizeᵉ (pM 0) , syncSizeᵉ (pM 1) , syncSizeᵉ (pM 2) , syncSizeᵉ (pM 3)
+
+heads≡ : heads ≡ (14 , 29 , 44 , 59)
+heads≡ = refl
+
+-- THE CROSSOVER, which is the finding: the strongest key-relative form
+-- holds while the doubling is still under the linear growth, and is
+-- false from the level it passes it
+keyM0 : (emitSync (pM 0) ≤ᵇ syncSizeᵉ (pM 0)) ≡ true
+keyM0 = refl
+keyM1 : (emitSync (pM 1) ≤ᵇ syncSizeᵉ (pM 1)) ≡ true
+keyM1 = refl
+keyM2 : (emitSync (pM 2) ≤ᵇ syncSizeᵉ (pM 2)) ≡ false
+keyM2 = refl
+keyM3 : (emitSync (pM 3) ≤ᵇ syncSizeᵉ (pM 3)) ≡ false
+keyM3 = refl
+
+-- and the two other heads fail at the same level and the same figures,
+-- so this is a property of the descent and not of `mergeAllᵉ`
+keyS2 : (emitSync (pS 2) ≤ᵇ syncSizeᵉ (pS 2)) ≡ false
+keyS2 = refl
+keyX2 : (emitSync (pX 2) ≤ᵇ syncSizeᵉ (pX 2)) ≡ false
+keyX2 = refl
+
+-- a constant factor is already spent at the deepest level reached: the
+-- doubled form is false too, which is the tables' shape pinned as a row
+keyM3-2 : (emitSync (pM 3) ≤ᵇ 2 * syncSizeᵉ (pM 3)) ≡ false
+keyM3-2 = refl

@@ -181,12 +181,13 @@ does not fit is a finding about the shared statement, not about the head.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
-  the floor assembles all four. The unit alone is refuted by a
-  defer-headed program; a size bound makes it compute.
+  the floor assembles all four. The unit alone is refuted by a defer-headed
+  program; a size bound makes it compute.
 - **`thruFit-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
-  `DEAD ROUTE, PROBED×5`: the `*All` heads are real bodies now; what is left is
-  the fit of ONE consume step under the head's grant, per emit and per value,
-  over the run's own states. Discharging it is where the true ring forms.
+  `DEAD ROUTE×2, PROBED×5`: the `*All` heads are real bodies now; what is left
+  is the fit of ONE consume step under the head's grant, over the run's own
+  states. The ring's key cannot be the head's own — the emitted key doubles
+  where the head's grows by a constant.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
   chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the
