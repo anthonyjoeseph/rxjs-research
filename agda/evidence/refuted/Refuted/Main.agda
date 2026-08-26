@@ -31,6 +31,8 @@ open import Refuted.Cascade-Deliv-Depth
   using (descent≡49; perDeliv≡44; val-hyp; cascade-deliv-depth-absurd)
 open import Refuted.Cascade-Nest-PerDeliv
   using (grown≡48; perDeliv≡35; store-val-hyp; cascade-nest-perDeliv-absurd)
+open import Refuted.Chain-Step-Live-Nest
+  using (grown≡3; charge≡1; grown₅≡5; chainStep-nest-live-absurd)
 open import Refuted.Chain-Step-Nodes
   using (grown≡22; charge≡15; chainStep-nodes-absurd)
 open import Refuted.Share-Sink-Nodes

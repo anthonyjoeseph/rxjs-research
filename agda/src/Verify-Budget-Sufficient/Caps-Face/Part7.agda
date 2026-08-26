@@ -1214,41 +1214,47 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- positive mechanism is not read off this grid and is not claimed
 -- here.
 
--- THE PENDING-SOURCE COMPONENT, and it is the one corner of the store
--- that no instantiation in this campaign has ever reached.  A live
--- source carries the values an emit has queued but not yet dispatched,
--- so the walk can in principle leave one holding a value nested deeper
--- than anything the store held before -- and the width term is there
--- to pay for exactly that.  Every family the harness drives reads this
--- component as ZERO at every instant -- and the reason is the FAMILIES,
--- not the component: their sources script plain numerals, whose nesting
--- is zero whatever a walk does with them, so reaching this corner at all
--- needs a source scripting OBSERVABLES.
+-- THE PENDING-SOURCE COMPONENT, which is where this statement is
+-- FALSE.  A live source carries the values an emit has queued but not
+-- yet dispatched, so a walk can leave one holding a value nested deeper
+-- than anything the store held before.  It does, and the constructor
+-- that does it is `deferᵉ`: its subscribe clause mints a live source of
+-- its own with `elemTy = obs u` and the deferred BODY as the pending
+-- payload, so `liveNest` reads the body's full depth.
 --
--- AND THAT IS IMPOSSIBLE, WHICH TURNS "NO COVERAGE" INTO A STRUCTURAL
--- FACT AND IS WHY THE ROW BELOW OWES NO INCREMENT.  A live source is
--- minted only where a SCRIPTED slot is subscribed, and it takes its
--- element type from that slot; `Slot`'s scripted constructor carries an
--- `isData` side condition, which is FALSE at every observable type.  So
--- the corner is not merely unvisited by this corpus -- no corpus can
--- reach it, and the store measure already says as much by charging a
--- scripted slot nothing.  The component cannot outrun what the store
--- held, and the increment the wider row carries is slack here.
+-- AND THE ARGUMENT THAT SAID OTHERWISE WAS STRUCTURAL, WHICH IS WHY IT
+-- HELD FOR SO LONG.  A live minted at a SCRIPTED slot takes its element
+-- type from that slot, and `Slot`'s scripted constructor carries an
+-- `isData` side condition that is false at every observable type -- so
+-- no slot-minted live can carry an observable, and every family the
+-- harness drives reads this component as zero.  All of that is true.
+-- It is not exhaustive: the slot is one of TWO mint sites, and the
+-- other one never meets `isData`.
 --
--- SO THE STATEMENT IS AN ASSEMBLY OVER A FLAT LEAF, and the leaf takes
--- no premises at all: the caps, the nesting receipt and the payload
--- bound were carried only to reach an increment nothing spends.  What
--- remains is that a walk adds no live source deeper than the store it
--- started from, which is a fact about where lives COME FROM.
--- AND THE FOLD IS THREADED IN THE LIVE COMPONENT'S OWN CURRENCY, not
--- in the store's, because the store is the one thing the induction
--- cannot carry: a walk GROWS the node table, so an inductive step
--- landing at `storeNestMax` of the state it produced could never be
--- brought back to the state it started from.  What does thread is the
--- pair the live component can actually reach -- the lives already
+-- THE OBVIOUS REPAIR IS ALSO DEAD, and it is dead for a reason worth
+-- carrying rather than rediscovering.  Charging the ARRIVAL's payload
+-- cannot cover the new live, because the payload IS the `deferᵉ` term
+-- and `nestDᵉ` is zero there by design -- a deferred body is not
+-- entered synchronously, so the synchronous measure declines to look
+-- inside it.  The measure's zero and the store's content therefore
+-- disagree at exactly one constructor, and every quantity built over
+-- `nestDᵉ` -- the unit, the syntactic ceiling -- inherits the blindness.
+-- What a repair must find is a term that sees a deferred body, or a
+-- premise placing that body's depth in the incoming store.
+--
+-- AND THE FOLD ABOVE IT IS THREADED IN THE LIVE COMPONENT'S OWN
+-- CURRENCY, not in the store's, because the store is the one thing the
+-- induction cannot carry: a walk GROWS the node table, so an inductive
+-- step landing at `storeNestMax` of the state it produced could never
+-- be brought back to the state it started from.  What does thread is
+-- the pair the live component can actually reach -- the lives already
 -- there, and the slots, which `cascadeGo-slots` proves the fold leaves
 -- untouched.  The statement the caller wants follows because both are
 -- summands of the same `⊔`.
+--
+-- REFUTED: `Refuted.Chain-Step-Live-Nest`, three against one at a body
+--   three layers deep and five against one at five, so the gap is
+--   unbounded in the body's depth and no constant repairs it.
 postulate
   chainStep-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)

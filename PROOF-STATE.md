@@ -184,11 +184,11 @@ does not fit is a finding about the shared statement, not about the head.
   be from an empty table — `switch-st` and `exhaust-st` carry zero node nest by
   definition, `mergeAll-st` reads a queue empty at subscribe, so the drain is
   still unreached.
-- **`chainStep-nest-live`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
-  delivery's pending sources under the store it started from. UNPROBEABLE — a
-  live source needs a slot scripting observables and `isData` forbids one — so
-  nothing can reach the arm and the header's slackness argument is all there
-  is.
+- **`chainStep-nest-live`** (Caps-Face/Part7) — FALSITY, `REFUTED`: one
+  delivery's pending sources under the store it started from. `deferᵉ` mints a
+  live carrying its own body, which `isData` never sees; and the payload cannot
+  pay, `nestDᵉ` being zero at `deferᵉ` by design. Needs a term seeing a
+  deferred body.
 - **`burst-nest`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the subscribe
   frame's nesting receipt at instant 1, the one place the currency is really
   bet. Its header names harness rows only — measured-not-rechecked, which
