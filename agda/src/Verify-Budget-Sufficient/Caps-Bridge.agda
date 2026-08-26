@@ -2003,6 +2003,18 @@ postulate
 -- `nestSyn`, so the margin widens in both.  Nothing was refuted, and
 -- these rows COULD have failed, which is what distinguishes them from
 -- the cascade ones.
+-- AND THE `deferᵉ` BLINDNESS DOES NOT REACH THIS ROW, which is worth
+-- saying because the argument that it does is short and wrong.  A
+-- subscribe of `deferᵉ D` mints a live source carrying `D` itself, so
+-- the live fold grows by `nestDᵉ D` while `nestDᵉ (deferᵉ D)` is zero --
+-- that is what refuted `chainStep-nest-live`.  Read at instant ZERO the
+-- cap is `suc (nestDᵉ e + slotsNestSum)` and the deficit is real.  This
+-- row is at instant ONE, where the cap is `nestFacAt` times the rest,
+-- `nestFacAt` is a power of two in the caps' own size, and `capsAt`
+-- reads `sizeᵉ` -- which DOES descend into a deferred body.  So the cap
+-- grows exponentially in `D` where the live fold grows linearly, and
+-- the corner the refutation exploits is paid for here by the caps half
+-- rather than the depth half.
 postulate
   burst-nest : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
