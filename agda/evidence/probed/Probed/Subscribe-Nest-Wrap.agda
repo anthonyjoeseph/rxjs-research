@@ -15,7 +15,22 @@
 -- any `W` its own `descW` premise would permit.  The cap is the value's
 -- own sync size, the smallest its `nestValOK?` premise admits; `B` is
 -- `nestDᵉ` exactly, so the depth premise is `refl`; and the store is
--- `st-init`, whose `capsOK?` is pinned rather than assumed.
+-- `st-init`, whose `nestCapsOK?` -- the premise the head actually
+-- names, which is NOT the caps face's `capsOK?` -- is pinned rather
+-- than assumed, since a row taken where it is false is evidence about
+-- nothing.
+
+-- WHAT THE `W = 0` READING RESTS ON, and it is not proven anywhere.
+-- These programs hand back a burst of two, so `descW ≤ 0` is FALSE at
+-- them: the rows are not instantiating the head at `W = 0`, they are
+-- clearing a SMALLER grant than the head would allow at the `W` the
+-- premise really forces.  That implies the head only because `nestB`
+-- rises with `W` -- it is `((2 ^ S) ^ suc W) ^ m * …`, so the
+-- dependence is a power of a base at least one.  True by inspection of
+-- a SEALED body, and there is no `nestB` monotonicity in `W` in the
+-- tree: `nestB-mono` moves the descent size, not the width.  The lemma
+-- cannot be added where it would be checked, because nothing in `src`
+-- would consume it and the wiring law counts that as dead weight.
 --
 -- ONLY THE BURST CONJUNCT IS LOAD-BEARING HERE, and the reason is
 -- structural rather than a gap in these programs.  `nodeNest` is ZERO by
@@ -44,7 +59,7 @@
 -- DEGENERATE on the exponent for that reason.
 module Probed.Subscribe-Nest-Wrap where
 
-open import Data.Bool using (true)
+open import Data.Bool using (Bool; true)
 open import Data.List using ([]; _∷_; length)
 open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
@@ -63,7 +78,7 @@ open import Rx.Evaluator
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
-open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
+open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ; nestCapsOK?)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -127,6 +142,19 @@ prem : ∀ {t} (e : Closed Γ₂ t) → Set
 prem {t} e =
   (nestValOK? (tight {obs t} e) (obs t) e ≡ true)
   × (capsOK? (tight {obs t} e) (sched-init e slots) (st-init e) ≡ true)
+
+-- AND THE PREMISE THE STATEMENT ACTUALLY NAMES, which is not the caps
+-- face's: a row taken where this is FALSE is evidence about nothing,
+-- since the head grants nothing there.
+nestPrem : ∀ {t} (e : Closed Γ₂ t) → Bool
+nestPrem {t} e =
+  nestCapsOK? (tight {obs t} e) (sched-init e slots) (st-init e)
+
+nestPrems : Bool × Bool × Bool
+nestPrems = nestPrem (rM 1 1) , nestPrem (qS 1) , nestPrem (qX 1)
+
+nestPrems≡ : nestPrems ≡ (true , true , true)
+nestPrems≡ = refl
 
 premM : prem (rM 1 1)
 premM = refl , refl

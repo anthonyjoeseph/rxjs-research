@@ -957,7 +957,10 @@ postulate
   --   any of the three, at `W = 0` -- the smallest grant the statement
   --   can be read at, so a green row is stronger than the head asks
   --   for -- with the cap at the value's own sync size, `B` at `nestDᵉ`
-  --   exactly and the store `st-init`, both premises pinned by `refl`.
+  --   exactly and the store `st-init`, with `nestCapsOK?` -- the
+  --   premise this statement names, not the caps face's -- pinned by
+  --   `refl` rather than assumed, so the rows are not evidence about a
+  --   region where the head grants nothing.
   --   Covered: the BURST conjunct, at two nested layers per head, each
   --   descent handing back two values; and the MERGE head's store half
   --   at a queue that survives the frame, reading 1 and 2 rather than

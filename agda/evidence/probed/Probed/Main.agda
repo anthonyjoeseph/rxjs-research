@@ -40,7 +40,7 @@ open import Probed.Subscribe-Nest
          premDeep; readDeep≡; spendDeep;
          premDeeper; readDeeper≡; spendDeeper)
 open import Probed.Subscribe-Nest-Wrap
-  using (premM; premS; premX; bursts≡; nodes≡; nodesH≡; premH; fitsH;
+  using (premM; premS; premX; bursts≡; nodes≡; nodesH≡; premH; fitsH; nestPrems≡;
          emits≡; emitsS≡; emitsX≡; base≡; fitsM; fitsS; fitsX)
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡)
