@@ -224,10 +224,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   stage of every chain's walk under the width cap. `valsCaps?` is this bound,
   propagated across the feared `thru` hop already; the grind carries it flat,
   not moving.
-- **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: the caps
-  the two `*All` frames spend, held at every state the selection's walk passes
-  through. The caps face proves exactly this frame by frame with its own level
-  counter, so what is owed is that receipt re-read at a flat cap.
+- **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the caps the
+  selection's walk spends, held at every state it passes through. Only the SIZE
+  component moves across a cascade — width and registry are preservation
+  outright — so the flat reading is a slack claim about one component.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `NO EVIDENCE`, large: the Ψ
   mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
   `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names

@@ -1982,6 +1982,29 @@ postulate
 -- caps face already proves exactly that, frame by frame and with its own
 -- level counter, so this is that receipt re-read at a flat cap rather
 -- than a fresh induction.
+--
+-- AND "RE-READ AT A FLAT CAP" IS THE WHOLE OBLIGATION, NOT A FORMALITY.
+-- The frame-wise receipt does not conclude at the cap it was handed:
+-- `stepFrame-caps` returns a level `j'` and restates the invariant at
+-- `frameStep (j + j')`, and composing a walk's levels is exactly what
+-- `capsAt-suc-full` identifies with the cap at the NEXT instant.  So
+-- the frame-wise route delivers the successor cap, and what is owed
+-- here is that one instant's whole growth already fits inside the
+-- single `frameBlowup` separating this instant's cap from the last --
+-- an argument about the recurrence, not another induction over frames.
+--
+-- PROBED: `Probed.Chain-Caps-Flat` measures what that asks for.  The
+--   cap itself cannot be instantiated -- it spends `capsH`, which the
+--   harness's own quarantine records as divergent in COMPILED code at
+--   the smallest arguments -- so the rows report the SMALLEST concrete
+--   cap each state fits, before the cascade and after it, one component
+--   at a time, over three families.  Only the SIZE ever moves: the
+--   width and the registry come back at or below where they started on
+--   every row, so two of the three conjuncts are preservation outright
+--   and the slack claim is about one component.  Not covered: the cap's
+--   own value, and therefore the verdict itself; and the `valCaps?`
+--   conjunct past the first frame, since a mid-walk value list is not
+--   addressable from outside the fold.
 postulate
   arr-chains-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
