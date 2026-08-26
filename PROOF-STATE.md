@@ -178,11 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-scan`**, **`-map`**, **`-of`**, **`-mu`** (Nest-Walk) —
-  DIFFICULTY, `REFUTED, PROBED`: the four substituting heads, each spending a
-  frame lemma whose factor is a power of the frame's own size. The room is
-  now there — one level of `sizeᵉ` per head — and what is owed is the
-  arithmetic that spends it.
+- **`subscribeE-nest-scan`**, **`-of`**, **`-mu`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED, PROBED`: the substituting heads still standing, each spending a
+  frame lemma whose factor is a power of the frame's own size. The map head
+  is the worked instance; the μ head cannot key on the term at all, for the
+  reason its own header now states.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `NO EVIDENCE`: the three `*All` heads, a mint plus the outer's descent pushed
   through a `thru-outer` frame. Their drain is proven at the size cap; what is
@@ -251,6 +251,11 @@ does not fit is a finding about the shared statement, not about the head.
   frame's push, all that is left of the take head. `pushBurst-caps` is the same
   fold over the same emits walked on the caps face, and `stepFrame-nodes-take`
   is the per-emit half — a take frame costs nothing.
+- **`pushBurst-nest-map`** (Nest-Walk) — GRINDABLE, `REFUTED×3, TWIN, PROBED`:
+  the substituting frame's push, all that is left of the map head. Same fold
+  as the row above over the same emits; `mapVals-nest` is the per-emit half
+  and fixes the factor, and three refutations pin why it is a factor in the
+  function's own size and not a summand.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
   cascade only shortens lists, and every summand of the store measure is a
   `⊔`-fold over one. Its header names the proven twin at the same two branches.

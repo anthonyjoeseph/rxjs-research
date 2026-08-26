@@ -24,8 +24,9 @@ module Verify-Budget-Sufficient.Nest-Cap where
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
-   +-monoʳ-≤; *-identityˡ)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+   +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
+   +-identityʳ; n≤1+n)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
 
@@ -93,3 +94,36 @@ abstract
                      (*-monoˡ-≤ (B + suc m * U)
                         (1≤pow≤ ((2 ^ S) ^ suc W) m
                            (1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n))))))
+
+  -- DOUBLING A POWER OF TWO IS ONE STEP OF ITS EXPONENT, and the step
+  -- is available because a head is at least one node bigger than the
+  -- function it installs.
+  pow2-dbl : ∀ (S k : ℕ) → suc k ≤ S → 2 ^ k + 2 ^ k ≤ 2 ^ S
+  pow2-dbl S k hk =
+    ≤-trans (≤-reflexive (cong (2 ^ k +_) (sym (+-identityʳ (2 ^ k)))))
+            (pow-mono-exp 2 (s≤s z≤n) hk)
+
+  -- ONE LEVEL OF THE KEY BUYS ONE FRAME, which is the whole reason the
+  -- grant is keyed on the term's size: a substituting frame charges two
+  -- to its own size, the head that installs it is at least one node
+  -- bigger than what it descends into, and the room a level releases is
+  -- a full copy of the per-frame factor.  The `+ B` is the frame's own
+  -- additive charge, which is under the depth the grant was opened at.
+  nestB-frame : ∀ (S W U B m k m′ : ℕ) → suc k ≤ S → suc m ≤ m′ →
+    2 ^ k * (B + nestB S W U B m) ≤ nestB S W U B m′
+  nestB-frame S W U B m k m′ hk hm =
+    ≤-trans (*-monoʳ-≤ (2 ^ k) (+-monoˡ-≤ (nestB S W U B m) (nestB-base S W U B m)))
+    (≤-trans (≤-reflexive
+               (trans (*-distribˡ-+ (2 ^ k) (nestB S W U B m) (nestB S W U B m))
+                      (sym (*-distribʳ-+ (nestB S W U B m) (2 ^ k) (2 ^ k)))))
+    (≤-trans (*-monoˡ-≤ (nestB S W U B m) (pow2-dbl S k hk))
+    (≤-trans (*-monoˡ-≤ (nestB S W U B m)
+               (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
+                        (*-monoʳ-≤ (2 ^ S) (1≤pow≤ (2 ^ S) W (1≤pow≤ 2 S (s≤s z≤n))))))
+    (≤-trans (≤-reflexive
+               (sym (*-assoc ((2 ^ S) ^ suc W) (((2 ^ S) ^ suc W) ^ m)
+                             (B + suc m * U))))
+             (*-mono-≤ (pow-mono-exp ((2 ^ S) ^ suc W)
+                          (1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n))) hm)
+                       (+-monoʳ-≤ B
+                         (*-monoˡ-≤ U (≤-trans hm (n≤1+n m′)))))))))

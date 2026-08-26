@@ -48,7 +48,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; Val; Tm; natᵗ; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  (Ctx; Closed; Val; Fn; Tm; natᵗ; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
@@ -130,6 +130,17 @@ abstract
           (record sched { nextNode = suc (Sched.nextNode sched) }) st
       ≤ innerW (gs fuel) allNid κ id now o sched st
   innerW-gs fuel allNid κ id now o sched st = ≤-refl
+
+  -- AND THE CHILD'S HALF AT THE SUBSTITUTING HEAD.  The clause already
+  -- names the child's descent as one side of its own join, so the fact
+  -- is a projection -- but the family is SEALED, so a consumer outside
+  -- this module cannot see that and needs the equation exported.
+  descW-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g b (map-f f ↠ κ) id now sched st
+      ≤ descW g (mapᵉ f b) κ id now sched st
+  descW-map g f b κ id now sched st = m≤n⊔m _ _
 
   -- AND THE CHILD'S HALF AT THE FILTER HEAD, under the count the source
   -- evaluates to.  The hypothesis is what lets this be stated at all:

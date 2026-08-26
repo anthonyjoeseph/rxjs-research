@@ -43,9 +43,9 @@ open import Verify-Budget-Sufficient.Nest-Store using
    nest-inflate; pow-grow¹; pow-distrib-*)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 open import Verify-Budget-Sufficient.Nest-Cap using
-  (nestB; nestB-mono; nestB-base; nestFac; 1≤nestFac; nestU; nestU-base; nestB-at)
+  (nestB; nestB-mono; nestB-base; nestB-frame; nestFac; 1≤nestFac; nestU; nestU-base; nestB-at)
 open import Verify-Budget-Sufficient.Nest-Burst using
-  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take)
+  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
 -- the frame emits -- a `scan`'s accumulator IS its output -- so charging
@@ -483,6 +483,32 @@ abstract
     valCaps? c sl (obs u) o ≡ true → sizeᵉ o ≤ Caps.cSize c
   valCaps?-size c sl o h = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
 
+  -- and the same at the substituting head, whose output width clause is
+  -- the child's verbatim while its delivery width joins the function's
+  -- in.  The fuel split is the same repair for the same clause-order
+  -- reason as the filter head's above.
+  outWᵉ-map : ∀ {n} {Γ : Ctx n} {s u} (j : ℕ) (sl : Slots Γ)
+    (f : Fn Γ [] [] [] s u) (b : Closed Γ s) →
+    outWᵉ j sl (mapᵉ f b) ≡ outWᵉ j sl b
+  outWᵉ-map zero    sl f b = refl
+  outWᵉ-map (suc j) sl f b = refl
+
+  valCaps?-map : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (sl : Slots Γ)
+    (f : Fn Γ [] [] [] s u) (b : Closed Γ s) →
+    valCaps? c sl (obs u) (mapᵉ f b) ≡ true →
+    valCaps? c sl (obs s) b ≡ true
+  valCaps?-map {n = n} {s = s} c sl f b h =
+    ∧-intro (≤ᵇ-true (sizeᵛ (obs s) b) (Caps.cSize c)
+              (≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f)) (n≤1+n _))
+                       (≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h)))))
+            (≤ᵇ-true (pWᵛ n sl (obs s) b) (Caps.cWid c)
+              (≤-trans pw≤ (≤ᵇ⇒≤ _ _ (T-to (∧-trueʳ h)))))
+    where
+    pw≤ : (outWᵉ n sl b ⊔ dWᵉ n sl b)
+            ≤ (outWᵉ n sl (mapᵉ f b) ⊔ (dWᵗ n sl f ⊔ dWᵉ n sl b))
+    pw≤ = ⊔-mono-≤ (≤-reflexive (sym (outWᵉ-map n sl f b)))
+                   (m≤n⊔m (dWᵗ n sl f) (dWᵉ n sl b))
+
   valCaps?-take : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
     valCaps? c sl (obs u) (takeᵉ cnt b) ≡ true →
@@ -521,6 +547,62 @@ postulate
     (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
        ≤ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
     × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
+
+-- AND THE SUBSTITUTING FRAME'S PUSH, WHICH IS WHERE THE FACTOR COMES
+-- FROM.  A `map-f` applies its function to every value going past and
+-- writes nothing, so the table is untouched and the values grow by
+-- exactly one substitution -- the per-emit cost `mapVals-nest` already
+-- charges, lifted across the fold.  The two halves are separate facts
+-- for the same reason the filter frame's are: neither bounds the other.
+--
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
+--   against forty, at a queued `mapᵉ` whose step function names its
+--   payload on both sides of the sum: `nestDᵉ` is additive there and
+--   the substitution is not, so the emitted value is deeper than the
+--   whole queue is charged.
+-- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
+--   invites -- charging the arm the `nestUnit e sl` its own parent
+--   already carries -- at a hundred and twenty against eighty-two,
+--   with the queued observable AS the program so the unit is as large
+--   as the currency admits.  A third occurrence of the payload in the
+--   step function moves the emit and leaves the unit where it was, so
+--   what is owed is a FACTOR in the substituted function's SIZE and
+--   no summand in a depth currency is one.
+-- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent
+--   from the STORE's cap instead, sixteen delivered against a charge
+--   of six at `st-init`, where the node table is empty and so
+--   `capsOK? (caps 0 0 0)` holds outright and the factor collapses to
+--   one.  Each stacked `mapᵉ` naming its payload twice doubles the
+--   delivered depth and leaves the charge where it was -- eight, then
+--   sixteen -- so the gap is unbounded rather than one crossing.  That
+--   is what fixes the exponent here to the FUNCTION's own size.
+-- TWIN: `mapVals-nest` is the per-emit half, proven, and it fixes the
+--   factor this statement carries; what remains is the fold, which is
+--   the same walk `pushBurst-caps` already makes over the same list.
+-- PROBED: `Probed.Subscribe-Nest` reaches this leaf through the head
+--   above rather than directly -- the head is a real body now, so the
+--   only map-specific thing its rows can still be measuring is this
+--   factor -- on exactly the family that refuted every earlier form:
+--   a stack of `mapᵉ` frames each naming its payload on both sides of
+--   a sum, so the delivered depth doubles per layer, read at the
+--   SMALLEST cap the `valCaps?` premise admits.  What it measures
+--   rather than asserts is the exponent SPENT: two of the three
+--   programs cross, needing one bit and two against the twenty-one to
+--   thirty-five the cap grants, and the demand rises by ONE per
+--   stacked frame while the size it is read off rises by SEVEN -- so
+--   the doubling is outrun with six of every seven bits unspent.  Not
+--   covered: the FOLD, since every row hands back exactly one value,
+--   pinned rather than assumed; and any cap above the value's own.
+postulate
+  pushBurst-nest-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
+    (κ : Path Γ u t) (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    let r = pushBurst g id now (map-f fn) κ str sched st in
+    (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
+       ≤ 2 ^ sizeᵗ fn
+         * (nestDᵗ fn + nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str))))
+    × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
+
 
 -- THE STATEMENT, NAMED ONCE.  Every leaf below re-states it at one of
 -- `subscribeE`'s heads, so writing the shared shape here is what keeps
@@ -597,60 +679,6 @@ postulate
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (ts : List (Tm Γ [] [] [] u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (ofᵉ ts) κ id now sched st
-  -- THE MAP HEAD, and the one this family's witnesses reach first: a
-  -- step function names its payload, so what leaves the frame is a
-  -- SUBSTITUTION into what entered it and the charge has to be a factor
-  -- rather than a summand.
-  --
-  -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
-  --   against forty, at a queued `mapᵉ` whose step function names its
-  --   payload on both sides of the sum: `nestDᵉ` is additive there and
-  --   the substitution is not, so the emitted value is deeper than the
-  --   whole queue is charged.
-  -- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
-  --   invites -- charging the arm the `nestUnit e sl` its own parent
-  --   already carries -- at a hundred and twenty against eighty-two,
-  --   with the queued observable AS the program so the unit is as large
-  --   as the currency admits.  A third occurrence of the payload in the
-  --   step function moves the emit and leaves the unit where it was, so
-  --   what is owed is a FACTOR in the substituted function's SIZE and
-  --   no summand in a depth currency is one.
-  -- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent
-  --   from the STORE's cap alone, sixteen delivered against a charge of
-  --   six at `st-init`, where the node table is empty and so `capsOK?
-  --   (caps 0 0 0)` holds outright and the factor collapses to one.
-  --   Each stacked `mapᵉ` naming its payload twice doubles the
-  --   delivered depth and leaves the charge where it was -- eight, then
-  --   sixteen -- so the gap is unbounded rather than one crossing.  The
-  --   same file pins `valCaps?` FALSE at both programs, which is what
-  --   makes the premise load-bearing instead of merely present.
-  -- PROBED: `Probed.Subscribe-Nest` clears this head on exactly the
-  --   family that refuted every earlier form, at the SMALLEST cap the
-  --   `valCaps?` premise admits -- the value's own size and width, so
-  --   there is no slack in the choice -- with `B` taken to be `nestDᵉ
-  --   o` exactly.  What it measures rather than merely asserts is the
-  --   exponent SPENT: two of the three programs cross, needing one bit
-  --   and two, against the twenty-one to thirty-five the cap grants,
-  --   and the demand rises by ONE per stacked frame while the size it
-  --   is read off rises by SEVEN.  So the shape outruns the doubling
-  --   with six of every seven bits unspent.  Rows also descend under a
-  --   `from-inner`, from tables holding nothing, a forty-deep queue,
-  --   and a hundred-deep one that DECIDES the `⊔` over what the descent
-  --   emits -- the axis that could still have refuted, since the store
-  --   is in the premise and in the conclusion's left and in the
-  --   right-hand side nowhere.  It does not, and the crossing moves by
-  --   exactly the one bit the larger store costs, which is the factor
-  --   absorbing it linearly rather than compounding.  What the rows
-  --   also turn up: `stBounded?` is what refuses a store deeper than
-  --   the cap, so the axis is CAPPED and not free.  Not covered: any
-  --   cap above the value's own, except in the one row whose store
-  --   forces a wider one -- and the BURST, since every row hands back
-  --   exactly one value, pinned rather than assumed.
-  subscribeE-nest-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
-    (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestAt c sl B W g (mapᵉ f b) κ id now sched st
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST INDEX IS REALLY BET.  A
   -- scan's step function is written once and applied once per value of
   -- whatever burst arrives, so this is the head whose demand is a
@@ -708,6 +736,17 @@ postulate
   -- substitutes the μ into its own body, so the recursion is on fuel
   -- and the depth premise does not transfer for free -- a substituted
   -- body can be deeper than the body was.
+  --
+  -- AND THE GRANT'S KEY DOES NOT TRANSFER HERE EITHER, WHICH IS WHAT
+  -- SEPARATES THIS HEAD FROM THE OTHER SUBSTITUTING ONES.  Every one of
+  -- those pays its frame out of one level of `sizeᵉ`, which it has
+  -- because the child is a strict subterm.  The unfolding is not: it
+  -- contains the whole μ, so `sizeᵉ (unfoldμ body)` is at least
+  -- `sizeᵉ (μᵉ body)` and the child's grant is no smaller than the
+  -- parent's.  The `valCaps?` premise has the same gap independently --
+  -- an unfolding can exceed the size cap a μ satisfies -- so what this
+  -- head needs is a measure the unfolding decreases, and the only one
+  -- in hand is the FUEL, which the grant does not mention.
   subscribeE-nest-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -723,8 +762,41 @@ subscribeE-nest c sl B W g (ofᵉ ts) κ id now sched st =
   subscribeE-nest-of c sl B W g ts κ id now sched st
 subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hw =
   z≤n , m≤m⊔n _ _
-subscribeE-nest c sl B W g (mapᵉ f b) κ id now sched st =
-  subscribeE-nest-map c sl B W g f b κ id now sched st
+subscribeE-nest {e = e} c sl B W g (mapᵉ f b) κ id now sched st hsl hc hv hn hw =
+  ≤-trans (proj₁ push)
+    (≤-trans (*-monoʳ-≤ (2 ^ sizeᵗ f) (+-mono-≤ hfB (proj₁ IH)))
+             (nestB-frame (Caps.cSize c) W (nestUnit e sl) B
+                (sizeᵉ b) (sizeᵗ f) (sizeᵉ (mapᵉ f b)) hk hm))
+  , ≤-trans (proj₂ push) (≤-trans (proj₂ IH) (⊔-mono-≤ ≤-refl grow))
+  where
+  res = subscribeE g b (map-f f ↠ κ) id now sched st
+
+  push = pushBurst-nest-map g id now f κ
+           (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+  IH = subscribeE-nest c sl B W g b (map-f f ↠ κ) id now sched st
+         hsl hc (valCaps?-map c sl f b hv)
+         (≤-trans (m≤n+m (nestDᵉ b) (nestDᵗ f)) hn)
+         (≤-trans (descW-map g f b κ id now sched st) hw)
+
+  -- the function's own nesting is one summand of the head's, so the
+  -- base the frame lemma adds is already paid for by the depth premise
+  hfB : nestDᵗ f ≤ B
+  hfB = ≤-trans (m≤m+n (nestDᵗ f) (nestDᵉ b)) hn
+
+  -- and the frame is a strict subterm of the head, which is the level
+  -- of the key this substitution spends
+  hk : suc (sizeᵗ f) ≤ Caps.cSize c
+  hk = ≤-trans (s≤s (m≤m+n (sizeᵗ f) (sizeᵉ b)))
+               (valCaps?-size c sl (mapᵉ f b) hv)
+
+  hm : suc (sizeᵉ b) ≤ sizeᵉ (mapᵉ f b)
+  hm = s≤s (m≤n+m (sizeᵉ b) (sizeᵗ f))
+
+  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ b)
+           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ (mapᵉ f b))
+  grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B
+           (≤-trans (n≤1+n (sizeᵉ b)) hm)
 subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv hn hw
   with evalTm cnt in eqc
 ... | zero  = z≤n , m≤m⊔n _ _

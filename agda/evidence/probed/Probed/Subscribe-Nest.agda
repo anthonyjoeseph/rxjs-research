@@ -5,15 +5,24 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-nest-map
+-- TARGET: pushBurst-nest-map
 -- TARGET: stepFrame-nodes-thru
 --
--- WHAT IS BEING TESTED.  `subscribeE-nest` charges a subscription
--- `2 ^ cSize` times what it was handed, and the whole question is where
--- the exponent comes from.  Taking it from the STORE's cap is refuted --
--- `Refuted.Subscribe-Caps-Nest`, sixteen against six -- so the statement
--- now takes it from a `valCaps?` on the observable being subscribed, and
+-- WHAT IS BEING TESTED.  A subscription is charged `2 ^ cSize` times
+-- what it was handed, and the whole question is where the exponent
+-- comes from.  Taking it from the STORE's cap is refuted --
+-- `Refuted.Subscribe-Caps-Nest`, sixteen against six -- so the charge
+-- takes it from a `valCaps?` on the observable being subscribed, and
 -- these rows are the first instantiation of THAT form.
+--
+-- AND THE MAP HEAD IS NOW A REAL BODY, so what these rows still reach
+-- is the frame's own factor and not the head.  The right-hand side
+-- below is the per-descent budget as it stood BEFORE the grant was
+-- keyed on the term's size, which is a LOWER bound on what the grant
+-- now allows -- the current form is that budget raised to the size and
+-- carrying a wider unit.  So a green row here is strictly stronger
+-- than the statement asks for, which is why the numbers were left at
+-- the tighter reading rather than relaxed to match.
 --
 -- HOW THE CAP IS CHOSEN, and it is the opposite of generous.  Each row
 -- sets `c` to the value's OWN size and width, which is the smallest cap
@@ -37,13 +46,9 @@
 -- emitted depth per layer.  The margin is pinned per row, so a repair
 -- that moves either side is visible as a number and not as a verdict.
 --
--- AND THE EXPONENT IS NOW INDEXED ON THE BURST, which is what these
--- rows do NOT reach.  The statement grants a factor per value the
--- descent hands back, because a stored step function is refolded once
--- per value of one; every program here hands back exactly ONE, pinned
--- by `bursts≡` rather than assumed, so the exponent sits at its floor
--- and the per-value axis is untested.  `Refuted.Scan-Burst-Nest` is the
--- file that moves it, and it is what the index exists to answer.
+-- AND THE PER-VALUE AXIS IS AT ITS FLOOR, so these rows do not reach
+-- it: every program hands back exactly ONE value, pinned by `bursts≡`
+-- rather than assumed.  `Refuted.Scan-Burst-Nest` is what moves it.
 --
 -- WHAT IS NOT COVERED.  Every row subscribes at `root` from `st-init`,
 -- so the queue-facing half -- a descent under a `from-inner` frame with
