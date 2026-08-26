@@ -173,10 +173,6 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`subscribeE-nest-take`** (Nest-Walk) — SHAPE, `DEAD ROUTE`: the one head
-  the shared premise does not reach. A filter DROPS, so a bound on the burst
-  this call emits is no bound on the inner one, and the premise owes a bound on
-  every burst the descent produces. Restate, do not grind.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`: the
   head where the burst index is bet — one step function applied once per value
   of whatever arrives. The un-indexed form is refuted; the same witness is
@@ -197,6 +193,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 - **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the one
   head that is not a subterm. A substituted body can be deeper than the body,
   so the depth premise does not transfer and the fuel edge is all there is.
+- **`subscribeE-nest-take`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the head
+  that forced the shared premise onto the whole descent, a filter having no
+  bound on its input from a bound on its output. Charge is zero; what is owed
+  is the inner bound across a `pushBurst` that only drops.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
   same descent arriving through the outer wrap. The flat factor died to the
   same cold-slot burst that killed the root form; restated as a power in the

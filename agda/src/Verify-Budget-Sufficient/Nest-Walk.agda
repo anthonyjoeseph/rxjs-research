@@ -8,12 +8,9 @@ open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
-   *-assoc; *-comm; m^n>0;
-   *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤;
-   *-distribˡ-+; ^-zeroˡ; +-identityʳ;
-   m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
-open import Data.List.Properties using (length-++)
+  (≤-refl; ≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
+  *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤; *-distribˡ-+;
+  ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
@@ -41,6 +38,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
+open import Verify-Budget-Sufficient.Nest-Burst using
+  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
 -- the frame emits -- a `scan`'s accumulator IS its output -- so charging
@@ -452,6 +451,17 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 -- `subscribeE`'s heads, so writing the shared shape here is what keeps
 -- the leaves comparable and lets the body read as a case split rather
 -- than a wall of repeated telescopes.
+--
+-- AND THE WIDTH PREMISE IS ABOUT THE WHOLE DESCENT, NOT THE OUTPUT.
+-- `descW` is the widest burst produced ANYWHERE under one subscribe,
+-- which is a strictly stronger hypothesis than a bound on the burst
+-- this call hands back and is what four of the five recursive heads
+-- would have given for free either way.  The fifth is why it is stated
+-- this way: a `take` DROPS, so the inner burst can be longer than the
+-- one that leaves, and the induction wants the inner descent at the
+-- INNER width while the conclusion is a power in that width.  Keying
+-- the premise on the descent makes every head's transfer a projection
+-- and costs the caller a measure it can compute.
 NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set
@@ -460,8 +470,8 @@ NestAt {Γ = Γ} {t = t} {e = e} c sl B W g o κ id now sched st =
   valCaps? c sl (obs _) o ≡ true →
   nestDᵉ o ≤ B →
   nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
+  descW g o κ id now sched st ≤ W →
   let r = subscribeE g o κ id now sched st in
-  length (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ W →
   (nodesMax (proj₂ (proj₂ r))
      ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
     ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
@@ -547,25 +557,17 @@ postulate
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (mapᵉ f b) κ id now sched st
-  -- THE FILTER HEAD, AND THE ONE THE SHARED PREMISE DOES NOT REACH.
+  -- THE FILTER HEAD, AND THE ONE THAT FIXED THE SHARED PREMISE'S SHAPE.
   -- Every other head either produces its own burst outright or hands
-  -- back one value per value it was given, so the shared premise --
-  -- which bounds the burst this call EMITS -- transfers to the inner
-  -- subscribe unchanged.  `take` DROPS, so the inner burst can be
-  -- longer than the one that leaves, and a bound on the output is no
-  -- bound on the input.  The charge itself is free here: the node's
-  -- nesting is zero and the frame substitutes nothing.
-  --
-  -- DEAD ROUTE: closing this from the shared premise alone is
-  --   STRUCTURALLY dead, and not for want of arithmetic.  The induction
-  --   wants the inner descent at the inner burst's width, whose
-  --   conclusion is a power in THAT width; converting it to a power in
-  --   the emitted width needs the inner width to be the smaller of the
-  --   two, and at a filter it is the larger.  What the premise has to
-  --   become is a bound on every burst the descent produces, not on the
-  --   one it hands back -- the shape `capsDrainOK` already has one face
-  --   over, and the shape the drain's own concatenation argument gets
-  --   for free because a concatenation only grows.
+  -- back one value per value it was given, so a premise about the burst
+  -- this call EMITS would have transferred to the inner subscribe
+  -- unchanged; `take` DROPS, so at this head alone the inner burst can
+  -- be the longer of the two.  That is why the premise is keyed on the
+  -- descent instead, and here it is `descW-take` applied under the
+  -- count the source evaluates to.  The charge itself is free: the
+  -- node's nesting is zero and the frame substitutes nothing, so what
+  -- remains is the inner bound transported across a `pushBurst` that
+  -- only filters.
   subscribeE-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
@@ -678,8 +680,8 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   valCaps? c sl (obs s) o ≡ true →
   nestDᵉ o ≤ B →
   nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
+  innerW sf allNid κ id now o sched st ≤ W →
   let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
-  length (proj₁ (proj₂ r)) ≤ W →
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ (proj₂ r)))
     ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
 subscribeInner-nest c sl B W g0 allNid κ id now o sched st hsl hc hv hn hst hw =
@@ -688,7 +690,8 @@ subscribeInner-nest c sl B W (gs fuel) allNid κ id now o sched st hsl hc hv hn 
   subscribeE-nest c sl B W fuel o
     (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
     (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
-    (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn hst hw
+    (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn hst
+    (≤-trans (innerW-gs fuel allNid κ id now o sched st) hw)
 
 -- THE DRAIN IS A WALK OVER THE QUEUE, and it costs what ONE subscription
 -- costs.  `mergeAllDrain` recurses across the parked inners and
@@ -708,8 +711,8 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   capsDrainOK c sl sf allNid κ id now lim act q sched st →
   queueNest q ≤ B →
   nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
+  drainW sf allNid κ id now q sched st ≤ W →
   let r = mergeAllDrain sf allNid κ id now lim act q sched st in
-  length (proj₁ r) ≤ W →
   ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ r))
      ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r)))))
     ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
@@ -739,18 +742,16 @@ mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched 
   q′    = proj₁ (proj₂ (proj₂ (proj₂ r₂)))
   st₂   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₂))))
 
-  -- THE BURST SPLITS THE WAY THE CONCATENATION DOES, which is what lets
-  -- ONE `W` serve the whole walk: the drain hands back `vs ++ vs′`, so
-  -- each half is no longer than the total and neither leg needs its own.
-  splitW : length vs ≤ W
-  splitW = ≤-trans (≤-trans (m≤m+n (length vs) (length vs′))
-                            (≤-reflexive (sym (length-++ vs))))
-                   hw
+  -- THE WIDTH SPLITS THE WAY THE QUEUE DOES, which is what lets ONE `W`
+  -- serve the whole walk: `drainW` is a `⊔` over the queued inners at
+  -- the states they are actually subscribed at, so the head's own
+  -- descent and the tail's whole drain are each under the total and
+  -- neither leg needs a width of its own.
+  splitW : innerW sf allNid κ id now o sched st ≤ W
+  splitW = ≤-trans (drainW-here sf allNid κ id now o q sched st) hw
 
-  splitW′ : length vs′ ≤ W
-  splitW′ = ≤-trans (≤-trans (m≤n+m (length vs′) (length vs))
-                             (≤-reflexive (sym (length-++ vs))))
-                    hw
+  splitW′ : drainW sf allNid κ id now q sched₁ st₁ ≤ W
+  splitW′ = ≤-trans (drainW-tail sf allNid κ id now o q sched st) hw
 
   SUB = subscribeInner-nest c sl B W sf allNid κ id now o sched st
           (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
@@ -779,9 +780,11 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
+  (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+     drainW sf allNid p id now q sched st ≤ W) →
   let r = innerFinish sf op allNid inst p id now vals sched st
             (lookupNode allNid (EvalSt.nodes st)) in
-  length (proj₁ r) ≤ W →
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
     ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
 
@@ -844,19 +847,18 @@ innerFinish-nest {e = e} {s = s} c sl W sf mergeAllᵒ allNid inst p id now vals
   qbnd : queueNest q ≤ nodesMax st
   qbnd = lookupNode-nodes allNid (mergeAll-st lim act q od) (EvalSt.nodes st) eq
 
-  -- the finish hands back `vals ++ vs`, so the drain's own burst is no
-  -- longer than the frame's and one `W` serves both
-  drainW : length vs ≤ W
-  drainW = ≤-trans (≤-trans (m≤n+m (length vs) (length vals))
-                            (≤-reflexive (sym (length-++ vals))))
-                   hw
+  -- the drain's own width is what the caller pinned, at the queue the
+  -- node table actually holds -- which is why the premise is quantified
+  -- over that queue the way the caps bundle beside it already is
+  dw : drainW sf allNid p id now q sched st ≤ W
+  dw = hw lim act q od refl
 
   D : ((nodesMax st′ ⊔ nestDᵛˢ vs) ⊔ queueNest q′)
         ≤ (2 ^ Caps.cSize c) ^ suc W * (nodesMax st + nestUnit e sl)
   D = mergeAllDrain-nest c sl (nodesMax st) W sf allNid p id now lim (pred act) q sched st
         (hdr lim act q od refl) qbnd
         (raiseUW (Caps.cSize c) W (nodesMax st) (nestUnit e sl))
-        drainW
+        dw
 
   up : (2 ^ Caps.cSize c) ^ suc W * (nodesMax st + nestUnit e sl)
          ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
@@ -914,8 +916,10 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
+  (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+     drainW sf allNid p id now q sched st ≤ W) →
   let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
-  length (proj₁ r) ≤ W →
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
     ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
 stepFrame-nodes-inner {e = e} c sl W sf id now op allNid inst p vals false sched st hsl hc hdr hw =
@@ -957,6 +961,24 @@ frameDrainOK {Γ = Γ} {u = u} c sl sf id now (from-inner op allNid inst) p sche
   ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     capsDrainOK c sl sf allNid p id now lim (pred act) q sched st
+
+-- AND THE DRAIN'S WIDTH, CARRIED THE SAME WAY AND AT THE SAME ONE
+-- FRAME.  It is a second predicate rather than a conjunct of the one
+-- above because the two say different things about the same queue --
+-- what the inners may reference, and how wide their descents may run --
+-- and a site that wants either would otherwise have to take the pair
+-- apart.
+frameDrainW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (W : ℕ) (sf : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (p : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) → Set
+frameDrainW W sf id now (map-f _)        p sched st = ⊤
+frameDrainW W sf id now (scan-f _ _)     p sched st = ⊤
+frameDrainW W sf id now (take-f _)       p sched st = ⊤
+frameDrainW W sf id now (thru-outer _ _) p sched st = ⊤
+frameDrainW {Γ = Γ} {u = u} W sf id now (from-inner op allNid inst) p sched st =
+  ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+    drainW sf allNid p id now q sched st ≤ W
 
 -- ONE FRAME, AND THE `⊔` IS WHY THIS IS ONE STATEMENT RATHER THAN TWO.
 -- A frame moves its own node and the values it hands on TOGETHER, by
@@ -1009,13 +1031,14 @@ abstract
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     all (valCaps? c sl s) vals ≡ true →
     frameDrainOK c sl sf id now f p sched st →
+    frameDrainW W sf id now f p sched st →
     let r = stepFrame sf id now f p vals fin sched st in
     length (proj₁ r) ≤ W →
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ (2 ^ Caps.cSize c) ^ suc W
         * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
            + nestUnit e sl)
-  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hfd hw =
+  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
@@ -1029,19 +1052,19 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hw =
+  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseUW (Caps.cSize c) W _ (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hw =
+  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseUW (Caps.cSize c) W _ (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hfd hw =
+  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-inner c sl W sf id now op allNid inst p vals fin sched st
-               hsl hc hfd hw)
+               hsl hc hfd hfw)
             (*-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
               (+-monoˡ-≤ (nestUnit e sl) (zero-charge W _)))
-  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hw =
+  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
                hsl 1≤W hlen hc hv hw)
             (≤-trans (*-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
@@ -1159,6 +1182,7 @@ burstsOK W sf id now root           vals fin sched st = length vals ≤ W
 burstsOK W sf id now (share-sink _) vals fin sched st = length vals ≤ W
 burstsOK W sf id now (f ↠ p)        vals fin sched st =
   (length vals ≤ W)
+  × frameDrainW W sf id now f p sched st
   × burstsOK W sf id now p (proj₁ step)
       (proj₁ (proj₂ (proj₂ step)))
       (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -1177,6 +1201,16 @@ burstsHead : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 burstsHead W sf id now root           vals fin sched st h = h
 burstsHead W sf id now (share-sink _) vals fin sched st h = h
 burstsHead W sf id now (_ ↠ _)        vals fin sched st h = proj₁ h
+
+-- AND THE DRAIN OBLIGATION AT THE SAME HEAD, projected out so the frame
+-- lemma's premise comes off the walk's own recursion rather than being
+-- owed a second time.
+burstsDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
+  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  burstsOK W sf id now (f ↠ p) vals fin sched st →
+  frameDrainW W sf id now f p sched st
+burstsDrain W sf id now f p vals fin sched st h = proj₁ (proj₂ h)
 
 -- AND THE CAPS THE TWO `*All` FRAMES SPEND, carried the same way and for
 -- the same reason.  A frame that re-enters the subscribe machinery is
@@ -1230,13 +1264,14 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin s
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (foldPath-nodes c W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
              (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-             1≤W (proj₂ hb) (proj₂ (proj₂ (proj₂ hc))))
+             1≤W (proj₂ (proj₂ hb)) (proj₂ (proj₂ (proj₂ hc))))
     (≤-trans (*-monoʳ-≤ (Q ^ pathLen p)
                 (*-monoʳ-≤ (pathNestF p ^ W)
                   (+-monoˡ-≤ (W * (pathNestD p + L * U))
                              (stepFrame-nodes c W sl sf id now f p vals fin sched st
                                 hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc)) (proj₁ (proj₂ (proj₂ hc)))
-                                (burstsHead W sf id now p vals′ fin′ sched₁ st₁ (proj₂ hb))))))
+                                (burstsDrain W sf id now f p vals fin sched st hb)
+                                (burstsHead W sf id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb)))))))
     (≤-trans (*-monoʳ-≤ (Q ^ pathLen p)
                 (fac-hoist Q (pathNestF p ^ W) (A + U) (W * (pathNestD p + L * U))
                            1≤Q))
