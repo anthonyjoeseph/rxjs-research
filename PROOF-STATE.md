@@ -179,13 +179,13 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`thruStep-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
-  `REFUTED×3`: one `thruConsume` at one grant, and the grant being ONE number
-  is refuted — a duplicating step function delivers double an arrival the grant
-  admitted. Restate indexed, do not grind.
-- **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — SHAPE,
+  `REFUTED×3`: one `thruConsume`, arrival at key `m` and delivery at `m′`, the
+  flat form refuted by a duplicating step. Nothing instantiates the indexed
+  form yet; probe before grinding.
+- **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
   `DEAD ROUTE×2, PROBED×5`: the outer's burst carries admissible values inside
-  the grant, emit by emit. Sound as a claim about INPUTS; what is dead is
-  reading the fit off it, the step between being refuted at one grant.
+  the grant, emit by emit. The fit reads off it again now the step is indexed,
+  but the arrival key dropped a level and no row has reached the new one.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and

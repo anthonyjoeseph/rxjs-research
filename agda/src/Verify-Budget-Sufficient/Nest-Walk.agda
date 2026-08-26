@@ -1093,120 +1093,141 @@ pushBurst-nest-thru {Γ = Γ} {t = t} {u = u} G fuel op nid κ id now (em ∷ em
   N₂ j = ≤-trans (proj₂ (proj₂ WR) j) (proj₂ (proj₂ WK) j)
 
 
--- ONE CONSUME STEP, AND THE SINGLE GRANT DOES NOT HOLD.  Each head reads
+-- ONE CONSUME STEP, AT TWO GRANT INDICES AND NOT ONE.  Each head reads
 -- its own node, and every arm either leaves the state alone or runs
 -- the ONE `subscribeInner` all three share and writes one node -- so
--- the three fall together, and they fall on the delivered values
--- rather than on either store reading.
+-- the three stand or fall together, and they do so on the delivered
+-- values rather than on either store reading.
 --
--- WHAT IS FALSE is naming ONE bound and using it for both what comes
--- in and what goes out.  A map's step function may name its payload
--- TWICE while the measure charges the map's two halves by SUM, so the
--- substitution puts the payload's whole nesting in both copies and the
--- delivery reads DOUBLE an arrival the grant admitted -- with no
--- constant alongside it to absorb the gap.  The ratio is two at every
--- depth, so this is not a corner.
+-- ONE BOUND FOR BOTH SIDES DOES NOT HOLD, which is why the arrival is
+-- read at `m` and the delivery at `m′`.  A map's step function may name
+-- its payload TWICE while the measure charges the map's two halves by
+-- SUM, so the substitution puts the payload's whole nesting in both
+-- copies and the delivery reads DOUBLE an arrival the flat grant
+-- admitted -- with no constant alongside it to absorb the gap.  The
+-- ratio is two at every depth, so this is not a corner.
 --
--- WHAT SURVIVES is the shape the subscribe's own delivered bound
--- already has in this file, and the contrast is the whole finding: it
--- INFLATES the arrival's bound rather than reusing it, and is keyed to
--- a grant that shrinks down the descent.  A flat grant has no index to
--- spend, which is why it cannot be repaired by choosing a bigger one.
--- The counterexample reaches `thruFitOK` too, whose per-step conjunct
--- IS this inequality, and so reaches every statement below it that
--- reads a fit off a burst claim at one `G`.
+-- AND THE LEVEL IS WHAT PAYS FOR IT, which is the whole reason the
+-- grant is keyed on the descent's size rather than being one number:
+-- `nestB-frame` absorbs a doubling and the frame's own additive charge
+-- into ONE step of the key, and an `All` head's `syncSizeᵉ` is exactly
+-- one above its body's, so the step the callers must supply is
+-- `≤-refl`.  A flat grant has no index to spend, which is why it could
+-- not have been repaired by choosing a bigger number.
+--
+-- AND THE SLOTS CONJUNCT IS NOT DECORATION: the walk re-enters at the
+-- state the previous arrival left, so without it the grant the next
+-- step is read at is a different one, and the chain does not compose.
 --
 -- REFUTED: Refuted.Thru-Step-Nest
 postulate
   thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (G : ℕ) (fuel : Gas) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
-    nestDᵛ (obs u) o ≤ G →
-    let rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st in
-    (nestDᵛˢ (proj₁ rc) ≤ G)
-    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G)
+    nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+    let rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
+        G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nestDᵛˢ (proj₁ rc) ≤ G′)
+    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
     × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G)
+         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
     × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
                      (proj₂ (proj₂ (proj₂ rc))) ≡ true)
+    × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
 
   thruStep-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (G : ℕ) (fuel : Gas) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
-    nestDᵛ (obs u) o ≤ G →
-    let rc = thruConsume fuel switchᵒ nid κ id now o sched st in
-    (nestDᵛˢ (proj₁ rc) ≤ G)
-    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G)
+    nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+    let rc = thruConsume fuel switchᵒ nid κ id now o sched st
+        G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nestDᵛˢ (proj₁ rc) ≤ G′)
+    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
     × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G)
+         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
     × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
                      (proj₂ (proj₂ (proj₂ rc))) ≡ true)
+    × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
 
   thruStep-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (G : ℕ) (fuel : Gas) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
-    nestDᵛ (obs u) o ≤ G →
-    let rc = thruConsume fuel exhaustᵒ nid κ id now o sched st in
-    (nestDᵛˢ (proj₁ rc) ≤ G)
-    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G)
+    nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+    let rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
+        G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nestDᵛˢ (proj₁ rc) ≤ G′)
+    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
     × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G)
+         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
     × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
                      (proj₂ (proj₂ (proj₂ rc))) ≡ true)
+    × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
 
 -- The fit over one emit's values is now CHECKED: each arrival spends
 -- its step, the invariant the step returns is what the next arrival
 -- runs under, and the per-value bound falls out of the joined one
 -- because `nestDᵛˢ` is a join.
 thruFit-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (G : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
   (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   all (nestValOK? c (obs u)) os ≡ true →
-  nestDᵛˢ os ≤ G →
-  thruFitOK G fuel op nid κ id now os sched st
-thruFit-vals c G fuel op nid κ id now [] sched st hc hv hn = tt
-thruFit-vals {u = u} c G fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hc hv hn =
+  nestDᵛˢ os ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+  thruFitOK (nestB (Caps.cSize c) W (nestUnit e sl) B m′)
+    fuel op nid κ id now os sched st
+thruFit-vals c sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hn = tt
+thruFit-vals {u = u} c sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
-  , thruFit-vals c G fuel mergeAllᵒ nid κ id now os
+  , thruFit-vals c sl B W m m′ fuel mergeAllᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
-      (proj₂ (proj₂ (proj₂ S))) (proj₂ (∧-true _ _ hv))
+      (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
-  S = thruStep-merge c G fuel nid κ id now o sched st hc
+  S = thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
         (proj₁ (∧-true _ _ hv))
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c G fuel switchᵒ nid κ id now (o ∷ os) sched st hc hv hn =
+thruFit-vals {u = u} c sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
-  , thruFit-vals c G fuel switchᵒ nid κ id now os
+  , thruFit-vals c sl B W m m′ fuel switchᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
-      (proj₂ (proj₂ (proj₂ S))) (proj₂ (∧-true _ _ hv))
+      (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel switchᵒ nid κ id now o sched st
-  S = thruStep-switch c G fuel nid κ id now o sched st hc
+  S = thruStep-switch c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
         (proj₁ (∧-true _ _ hv))
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c G fuel exhaustᵒ nid κ id now (o ∷ os) sched st hc hv hn =
+thruFit-vals {u = u} c sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
-  , thruFit-vals c G fuel exhaustᵒ nid κ id now os
+  , thruFit-vals c sl B W m m′ fuel exhaustᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
-      (proj₂ (proj₂ (proj₂ S))) (proj₂ (∧-true _ _ hv))
+      (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
-  S = thruStep-exhaust c G fuel nid κ id now o sched st hc
+  S = thruStep-exhaust c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
         (proj₁ (∧-true _ _ hv))
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
 
@@ -1216,15 +1237,16 @@ thruFit-vals {u = u} c G fuel exhaustᵒ nid κ id now (o ∷ os) sched st hc hv
 -- It mirrors `pushFitOK` exactly, which is what lets the fit be read
 -- off it rather than asserted alongside it.
 pushValsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (G : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (c : Caps) (sl : Slots Γ) (B W m : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) → Set
-pushValsOK c G fuel op nid κ id now [] sched st = ⊤
-pushValsOK {Γ = Γ} {u = u} c G fuel op nid κ id now (em ∷ ems) sched st =
-  (nestCapsOK? c sched st ≡ true)
+pushValsOK c sl B W m fuel op nid κ id now [] sched st = ⊤
+pushValsOK {Γ = Γ} {e = e} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sched st =
+  (Sched.slots sched ≡ sl)
+  × (nestCapsOK? c sched st ≡ true)
   × (all (nestValOK? c (obs u)) (proj₁ sp) ≡ true)
-  × (nestDᵛˢ (proj₁ sp) ≤ G)
-  × pushValsOK c G fuel op nid κ id now ems
+  × (nestDᵛˢ (proj₁ sp) ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m)
+  × pushValsOK c sl B W m fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
@@ -1234,17 +1256,19 @@ pushValsOK {Γ = Γ} {u = u} c G fuel op nid κ id now (em ∷ ems) sched st =
 -- and the lift, CHECKED: one emit's fit is its values' fit, and the
 -- rest runs at the frame the emit left
 pushFit-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (G : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
-  pushValsOK c G fuel op nid κ id now str sched st →
-  pushFitOK G fuel op nid κ id now str sched st
-pushFit-ems c G fuel op nid κ id now [] sched st vals = tt
-pushFit-ems {Γ = Γ} {u = u} c G fuel op nid κ id now (em ∷ ems) sched st
-            (hc , hv , hn , rest) =
-  thruFit-vals c G fuel op nid κ id now (proj₁ sp) sched st hc hv hn
-  , pushFit-ems c G fuel op nid κ id now ems
-      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) rest
+  suc m ≤ m′ →
+  pushValsOK c sl B W m fuel op nid κ id now str sched st →
+  pushFitOK (nestB (Caps.cSize c) W (nestUnit e sl) B m′)
+    fuel op nid κ id now str sched st
+pushFit-ems c sl B W m m′ fuel op nid κ id now [] sched st hm vals = tt
+pushFit-ems {Γ = Γ} {u = u} c sl B W m m′ fuel op nid κ id now (em ∷ ems) sched st hm
+            (hsl , hc , hv , hn , rest) =
+  thruFit-vals c sl B W m m′ fuel op nid κ id now (proj₁ sp) sched st hsl hm hc hv hn
+  , pushFit-ems c sl B W m m′ fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) hm rest
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
@@ -1524,7 +1548,12 @@ postulate
   --   level -- though no spendable rate crosses, the grant's exponent
   --   growing with the very spine the duplicator enlarges -- and a
   --   LIMITED merge under the stack, whose queue is the
-  --   `Probed.Wrap-Nest-Frame` region.
+  --   `Probed.Wrap-Nest-Frame` region.  AND NOT COVERED BY ANY ROW
+  --   ABOVE: the arrival index this statement is now read at.  Every
+  --   row measures the assembled head, whose key is the wrap's own
+  --   `syncSizeᵉ`; what this leaf asserts is one level BELOW that, at
+  --   the body's, so the grant the rows were green against is strictly
+  --   the larger of the two and their verdict does not transfer.
   pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -1537,8 +1566,7 @@ postulate
                 id now (proj₂ (mintNode sched))
                 (installNode (proj₁ (mintNode sched))
                              (mergeAll-st {t = u} lim 0 [] false) st)
-    in pushValsOK c (nestB (Caps.cSize c) W (nestUnit e sl) B
-                       (syncSizeᵉ (mergeAllᵉ lim b)))
+    in pushValsOK c sl B W (syncSizeᵉ b)
          g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- The switch wrap's fit, at its own initial state.
@@ -1554,8 +1582,7 @@ postulate
     let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
                 id now (proj₂ (mintNode sched))
                 (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
-    in pushValsOK c (nestB (Caps.cSize c) W (nestUnit e sl) B
-                       (syncSizeᵉ (switchAllᵉ b)))
+    in pushValsOK c sl B W (syncSizeᵉ b)
          g switchᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- The exhaust wrap's fit, at its own initial state.
@@ -1571,8 +1598,7 @@ postulate
     let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
                 id now (proj₂ (mintNode sched))
                 (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
-    in pushValsOK c (nestB (Caps.cSize c) W (nestUnit e sl) B
-                       (syncSizeᵉ (exhaustAllᵉ b)))
+    in pushValsOK c sl B W (syncSizeᵉ b)
          g exhaustᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
@@ -1598,10 +1624,9 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 thruFit-merge {e = e} {u = u} c sl B W g lim b κ id now sched st hsl hc hv hn hw =
-  pushFit-ems c (nestB (Caps.cSize c) W (nestUnit e sl) B
-                   (syncSizeᵉ (mergeAllᵉ lim b)))
+  pushFit-ems c sl B W (syncSizeᵉ b) (syncSizeᵉ (mergeAllᵉ lim b))
     g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
-    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (pushVals-merge c sl B W g lim b κ id now sched st hsl hc hv hn hw)
   where
   res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
@@ -1624,10 +1649,9 @@ thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 thruFit-switch {e = e} c sl B W g b κ id now sched st hsl hc hv hn hw =
-  pushFit-ems c (nestB (Caps.cSize c) W (nestUnit e sl) B
-                   (syncSizeᵉ (switchAllᵉ b)))
+  pushFit-ems c sl B W (syncSizeᵉ b) (syncSizeᵉ (switchAllᵉ b))
     g switchᵒ (proj₁ (mintNode sched)) κ id now
-    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (pushVals-switch c sl B W g b κ id now sched st hsl hc hv hn hw)
   where
   res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
@@ -1649,10 +1673,9 @@ thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 thruFit-exhaust {e = e} c sl B W g b κ id now sched st hsl hc hv hn hw =
-  pushFit-ems c (nestB (Caps.cSize c) W (nestUnit e sl) B
-                   (syncSizeᵉ (exhaustAllᵉ b)))
+  pushFit-ems c sl B W (syncSizeᵉ b) (syncSizeᵉ (exhaustAllᵉ b))
     g exhaustᵒ (proj₁ (mintNode sched)) κ id now
-    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
     (pushVals-exhaust c sl B W g b κ id now sched st hsl hc hv hn hw)
   where
   res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
@@ -1921,30 +1944,31 @@ subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hw =
 -- a tower in the queue's length, which is not what a queue of independent
 -- inners costs.
 subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (B W : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ s t)
   (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs s) o ≡ true →
   nestDᵉ o ≤ B →
-  innerW sf allNid κ id now o sched st ≤ W →
-  let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+  innerW sf op allNid κ id now o sched st ≤ W →
+  let r = subscribeInner sf op allNid κ id now o sched st
       G = nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c) in
   (nestDᵛˢ (proj₁ (proj₂ r)) ≤ G)
   × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
   × (∀ (j : NodeId) →
        nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt j st ⊔ G)
-subscribeInner-nest c sl B W g0 allNid κ id now o sched st hsl hc hv hn hw =
+subscribeInner-nest c sl B W g0 op allNid κ id now o sched st hsl hc hv hn hw =
   z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
-subscribeInner-nest {e = e} c sl B W (gs fuel) allNid κ id now o sched st hsl hc hv hn hw =
+subscribeInner-nest {e = e} c sl B W (gs fuel) op allNid κ id now o sched st hsl hc hv hn hw =
   ≤-trans (proj₁ IH) grow
   , ≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow)
   , (λ j → ≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ ≤-refl grow))
   where
   IH = subscribeE-nest c sl B W fuel o
-         (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
+         (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
          (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
          (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
-         (≤-trans (innerW-gs fuel allNid κ id now o sched st) hw)
+         (≤-trans (innerW-gs fuel op allNid κ id now o sched st) hw)
 
   -- the cap is what flattens the descent's own index here: an inner the
   -- caps premise admits is no larger than the cap, so the queue below
@@ -2002,13 +2026,13 @@ mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched 
   -- the states they are actually subscribed at, so the head's own
   -- descent and the tail's whole drain are each under the total and
   -- neither leg needs a width of its own.
-  splitW : innerW sf allNid κ id now o sched st ≤ W
+  splitW : innerW sf mergeAllᵒ allNid κ id now o sched st ≤ W
   splitW = ≤-trans (drainW-here sf allNid κ id now o q sched st) hw
 
   splitW′ : drainW sf allNid κ id now q sched₁ st₁ ≤ W
   splitW′ = ≤-trans (drainW-tail sf allNid κ id now o q sched st) hw
 
-  SUB = subscribeInner-nest c sl B W sf allNid κ id now o sched st
+  SUB = subscribeInner-nest c sl B W sf mergeAllᵒ allNid κ id now o sched st
           (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
           (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) splitW
 

@@ -52,7 +52,7 @@ open import Rx.Exp using
   exhaustAllᵉ; μᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
-   mergeAllᵒ; switchᵒ; exhaustᵒ; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
+   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
    mintNode; installNode; subscribeE; subscribeInner; splitBurst)
 
 abstract
@@ -116,20 +116,20 @@ abstract
   -- so an inlined premise would name a subscribe the out-of-gas clause
   -- never makes.
   innerW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    → Gas → NodeId → Path Γ s t → Id → Tick → Closed Γ s
+    → Gas → AllOp → NodeId → Path Γ s t → Id → Tick → Closed Γ s
     → Sched Γ → EvalSt e → ℕ
-  innerW g0 allNid κ id now o sched st = 0
-  innerW (gs fuel) allNid κ id now o sched st =
-    descW fuel o (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
+  innerW g0 op allNid κ id now o sched st = 0
+  innerW (gs fuel) op allNid κ id now o sched st =
+    descW fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
           (record sched { nextNode = suc (Sched.nextNode sched) }) st
 
   innerW-gs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (fuel : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
-    (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    descW fuel o (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
+    (fuel : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ s t) (id : Id)
+    (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    descW fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
           (record sched { nextNode = suc (Sched.nextNode sched) }) st
-      ≤ innerW (gs fuel) allNid κ id now o sched st
-  innerW-gs fuel allNid κ id now o sched st = ≤-refl
+      ≤ innerW (gs fuel) op allNid κ id now o sched st
+  innerW-gs fuel op allNid κ id now o sched st = ≤-refl
 
   -- AND THE CHILD'S HALF AT THE SUBSTITUTING HEAD.  The clause already
   -- names the child's descent as one side of its own join, so the fact
@@ -215,7 +215,7 @@ abstract
     (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → ℕ
   drainW sf allNid κ id now [] sched st = 0
   drainW sf allNid κ id now (o ∷ q) sched st =
-    innerW sf allNid κ id now o sched st
+    innerW sf mergeAllᵒ allNid κ id now o sched st
       ⊔ drainW sf allNid κ id now q
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
              (subscribeInner sf mergeAllᵒ allNid κ id now o sched st))))))
@@ -225,7 +225,7 @@ abstract
   drainW-here : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
     (o : Closed Γ s) (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-    innerW sf allNid κ id now o sched st
+    innerW sf mergeAllᵒ allNid κ id now o sched st
       ≤ drainW sf allNid κ id now (o ∷ q) sched st
   drainW-here sf allNid κ id now o q sched st = m≤m⊔n _ _
 
