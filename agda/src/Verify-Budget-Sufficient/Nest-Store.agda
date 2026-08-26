@@ -65,6 +65,7 @@ open import Rx.Prim using (Source; towerℕ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestU)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -465,8 +466,9 @@ abstract
     (id : ℕ) → ℕ
   nestFacAt e sl id =
     2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-         * (realWidAt e sl id
-            * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
+         * (suc (Caps.cSize (capsAt e sl id))
+            * (realWidAt e sl id
+               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))))
 
   -- ONE INSTANT'S FRESH GROWTH, NAMED, because it is what the
   -- recurrence adds and what every preservation step has to match
@@ -477,7 +479,7 @@ abstract
     realWidAt e sl id
       * (nestBurstAt e sl id
          * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
-            * nestUnit e sl))
+            * nestU (Caps.cSize (capsAt e sl id)) (nestUnit e sl)))
 
   -- READ BACK OUT OF THE SEAL for the same reason the width is: a
   -- consumer proving the fanout bound has to say what it proved.
@@ -485,8 +487,9 @@ abstract
     (id : ℕ) →
     nestFacAt e sl id
       ≡ 2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-             * (realWidAt e sl id
-                * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
+             * (suc (Caps.cSize (capsAt e sl id))
+                * (realWidAt e sl id
+                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))))
   nestFacAt-def e sl id = refl
 
   nestIncAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -495,7 +498,7 @@ abstract
       ≡ realWidAt e sl id
         * (nestBurstAt e sl id
            * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
-              * nestUnit e sl))
+              * nestU (Caps.cSize (capsAt e sl id)) (nestUnit e sl)))
   nestIncAt-def e sl id = refl
 
   nestCapAt e sl zero    = nestUnit e sl
@@ -506,8 +509,9 @@ abstract
     (id : ℕ) → 1 ≤ nestFacAt e sl id
   1≤nestFacAt e sl id =
     m^n>0 2 (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-             * (realWidAt e sl id
-                * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
+             * (suc (Caps.cSize (capsAt e sl id))
+                * (realWidAt e sl id
+                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool

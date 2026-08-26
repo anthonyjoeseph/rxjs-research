@@ -42,6 +42,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
+open import Verify-Budget-Sufficient.Nest-Cap using
+  (nestB; nestB-mono; nestB-base; nestFac; 1≤nestFac; nestU; nestU-base; nestB-at)
 open import Verify-Budget-Sufficient.Nest-Burst using
   (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take)
 
@@ -313,16 +315,19 @@ abstract
 -- charges no wrap at all, so its arm has no term to widen and the
 -- summand is the only place a slot's nesting can come from.
 abstract
-  -- THE POWERED BASE IS THE ONLY ONE LEFT.  A descent's charge is a
-  -- power in the BURST it emits, so every arm that used to widen `2 ^ S`
-  -- widens `(2 ^ S) ^ suc W` instead, and the only property either step
-  -- needs of the base is that it is positive.
-  addUW : ∀ (S W X U : ℕ) → (2 ^ S) ^ suc W * X ≤ (2 ^ S) ^ suc W * (X + U)
-  addUW S W X U = *-monoʳ-≤ ((2 ^ S) ^ suc W) (m≤m+n X U)
+  -- THE FLATTENED FACTOR IS THE ONLY BASE LEFT, and it is the one the
+  -- walk above this module carries: a descent charged per level spends a
+  -- power of the per-frame factor, and the frame layer receives it
+  -- whole.  Neither step needs anything of the base but positivity, so
+  -- these are the same proofs with the base named rather than built.
+  addN : ∀ (S W X U : ℕ) → nestFac S W * X ≤ nestFac S W * (X + U)
+  addN S W X U = *-monoʳ-≤ (nestFac S W) (m≤m+n X U)
 
-  raiseUW : ∀ (S W X U : ℕ) → X ≤ (2 ^ S) ^ suc W * (X + U)
-  raiseUW S W X U =
-    ≤-trans (pow-grow (2 ^ S) (suc W) X (m^n>0 2 S)) (addUW S W X U)
+  raiseN : ∀ (S W X U : ℕ) → X ≤ nestFac S W * (X + U)
+  raiseN S W X U =
+    ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ X)))
+                     (*-monoˡ-≤ X (1≤nestFac S W)))
+            (addN S W X U)
 
 -- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
 -- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
@@ -387,7 +392,7 @@ postulate
     let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
     length (proj₁ r) ≤ W →
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
+      ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
 
 -- A QUEUE'S NESTING, THE SAME `⊔`-FOLD `nodeNest` READS OFF A PARKED
 -- `mergeAll-st`, named so a statement about the drain can say what it
@@ -444,13 +449,15 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 -- a premise -- the frame face's own idiom, where a step's charge is
 -- already a power in the width it was handed rather than a constant.
 --
--- AND THE BOUND IS ABSOLUTE RATHER THAN RELATIVE TO THE STORE HANDED
--- IN.  What a subscription installs is read off the expression, whose
--- depth `B` bounds, and off the slots, which the unit covers -- so
--- re-establishing the same bound is what stops the factor compounding
--- once per queued inner.  A relative form would raise the drain's cost
--- to a tower in the queue's length, which is not what a queue of
--- independent inners costs.
+-- AND THE STORE IS CARRIED BY A JOIN RATHER THAN MULTIPLIED INTO.
+-- What a subscription installs is read off the expression, whose depth
+-- `B` bounds, and off the slots, which the unit covers -- so the store
+-- the caller handed in reappears under a `⊔` beside a grant that
+-- mentions it nowhere.  That is what stops the factor compounding once
+-- per queued inner: independent inners write independent nodes and
+-- combine by max, while a grant multiplied into the store would raise
+-- the drain to a tower in the queue's length.
+
 -- THE FILTER'S CAPS INVERSION, which is the one premise of the shared
 -- statement that does not simply transfer.  A `takeᵉ` is one node
 -- bigger than its source and its parked width is the source's joined
@@ -471,6 +478,11 @@ abstract
   outWᵉ-take zero    sl cnt b = refl
   outWᵉ-take (suc j) sl cnt b = refl
 
+  valCaps?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+    (o : Closed Γ u) →
+    valCaps? c sl (obs u) o ≡ true → sizeᵉ o ≤ Caps.cSize c
+  valCaps?-size c sl o h = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
+
   valCaps?-take : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
     valCaps? c sl (obs u) (takeᵉ cnt b) ≡ true →
@@ -490,10 +502,10 @@ abstract
 -- AND THE FILTER FRAME'S PUSH, WHICH MUST BE FREE.  A `take-f` writes a
 -- decremented counter and forwards or drops, so it neither substitutes
 -- into a value nor stores one -- the node's own nesting is zero and no
--- value leaves deeper than it arrived.  Stated ABSOLUTELY against the
--- state the burst was produced at, since that is the form the head
--- above spends: what the descent already bounded must not be re-spent
--- per emit.
+-- value leaves deeper than it arrived.  Stated as two
+-- separate facts because that is what the head above spends: the values
+-- are a prefix of what arrived and the table is the table that arrived,
+-- and neither half is bounded by the other.
 --
 -- TWIN: `pushBurst-caps` is this induction walked -- the same fold over
 --   the same emit list, threading the same evolving state and spending
@@ -506,9 +518,9 @@ postulate
     (g : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
     (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
     let r = pushBurst g id now (take-f nid) κ str sched st in
-    (nodesMax (proj₂ (proj₂ r))
-       ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
-      ≤ (nodesMax st ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
+    (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
+       ≤ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
+    × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
 
 -- THE STATEMENT, NAMED ONCE.  Every leaf below re-states it at one of
 -- `subscribeE`'s heads, so writing the shared shape here is what keeps
@@ -523,41 +535,28 @@ postulate
 -- this way: a `take` DROPS, so the inner burst can be longer than the
 -- one that leaves, and the induction wants the inner descent at the
 -- INNER width while the conclusion is a power in that width.  Keying
--- Keying
 -- the premise on the descent makes every head's transfer a projection
 -- and costs the caller a measure it can compute.
 
--- AND THE GRANT IS FIXED WHERE THE DESCENT MULTIPLIES, WHICH IS WHAT
--- SIX OF THE NINE HEADS ARE ACTUALLY WAITING ON.  Every head whose
--- frame SUBSTITUTES into the values passing through it -- the fold, the
--- map, and the three that drain a queue -- spends a frame lemma whose
--- factor is a power of the frame's own size, once per level.  The
--- filter head is the exception and the reason the take clause closed:
--- a frame that only forwards or drops has factor one, so it needs no
--- room at all.
--- The model for a bound that shrinks is already proven next door:
--- `subscribeE-caps` carries an index DOWN the descent and returns how
--- far it got in a `Σ`, bounding the total by a recurrence instead of
--- demanding the whole cap at every level.
---
--- DEAD ROUTE: re-establishing the conclusion at a substituting head
---   from this statement is STRUCTURALLY dead, and it is arithmetic
---   rather than a missing lemma.  The bound names no argument that
---   shrinks down the descent, so the child is granted exactly what the
---   parent must deliver, and the frame's factor then has nothing to be
---   paid out of.  Enlarging the grant does not help, because it
---   enlarges both sides at once; nor does the spare `suc`, which buys
---   one level and the descent has as many levels as the term is deep.
--- DEAD ROUTE: nor is it enough to key the exponent to the descent's
---   remaining SIZE, which is the obvious repair and does fix the
---   burst's half -- sizes strictly shrink at every head, and the room
---   released covers the frame's factor and its additive term.  It
---   reverses the STORE premise: a child with a smaller bound needs
---   `nodesMax` below a smaller number than the parent was handed, and
---   the store only grows as the walk proceeds.  So the two halves of
---   this conjunction cannot both be keyed the same way, and the
---   restatement has to separate them -- the store against a bound
---   fixed by the whole program, the nesting against one that shrinks.
+-- AND THE GRANT SHRINKS WITH THE TERM WHILE THE STORE DOES NOT, WHICH
+-- IS WHY THE CONCLUSION IS A PAIR.  Every head whose frame SUBSTITUTES
+-- into the values passing through it -- the fold, the map, and the
+-- three that drain a queue -- spends a frame lemma whose factor is a
+-- power of the frame's own size, once per level; the filter head is
+-- the exception, and the reason its clause closes, a frame that only
+-- forwards or drops having factor one.  A grant naming nothing that
+-- shrinks down the descent hands the child exactly what the parent
+-- owes, leaving the factor nothing to be paid out of -- enlarging it
+-- moves both sides together, and the spare `suc` buys one level
+-- against a descent as deep as the term is.  So the grant is keyed to
+-- `sizeᵉ o`, which strictly shrinks at every head and releases room
+-- for the factor and its additive term at each one.  The store cannot
+-- be keyed the same way: a child under a smaller grant would need
+-- `nodesMax` below a smaller number than the parent was handed, and
+-- the store only grows as the walk proceeds.  Hence the split -- the
+-- burst against a bound that shrinks and names no state at all, the
+-- store against that bound joined with the store it started from.
+
 NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set
@@ -565,12 +564,11 @@ NestAt {Γ = Γ} {t = t} {e = e} c sl B W g o κ id now sched st =
   Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
   valCaps? c sl (obs _) o ≡ true →
   nestDᵉ o ≤ B →
-  nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
   descW g o κ id now sched st ≤ W →
-  let r = subscribeE g o κ id now sched st in
-  (nodesMax (proj₂ (proj₂ r))
-     ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
-    ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
+  let r = subscribeE g o κ id now sched st
+      G = nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ o) in
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ G)
+  × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ G)
 
 postulate
   -- THE SLOT HEADS, where a subscription reads the telescope rather
@@ -723,19 +721,16 @@ subscribeE-nest c sl B W g (input i) κ id now sched st =
   subscribeE-nest-slot c sl B W g i κ id now sched st
 subscribeE-nest c sl B W g (ofᵉ ts) κ id now sched st =
   subscribeE-nest-of c sl B W g ts κ id now sched st
-subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hst hw =
-  ⊔-lub hst z≤n
+subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hw =
+  z≤n , m≤m⊔n _ _
 subscribeE-nest c sl B W g (mapᵉ f b) κ id now sched st =
   subscribeE-nest-map c sl B W g f b κ id now sched st
-subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv hn hst hw
+subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv hn hw
   with evalTm cnt in eqc
-... | zero  = ⊔-lub hst z≤n
+... | zero  = z≤n , m≤m⊔n _ _
 ... | suc k =
-  ≤-trans (pushBurst-nest-take g id now nid κ
-             (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)))
-          (subscribeE-nest c sl B W g b (take-f nid ↠ κ) id now sched₀ st₀
-             hsl inv₀ (valCaps?-take c sl cnt b hv) hn hst₀
-             (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw))
+  ≤-trans (proj₁ push) (≤-trans (proj₁ IH) grow)
+  , ≤-trans (proj₂ push) (≤-trans (proj₂ IH) (⊔-mono-≤ st₀≤ grow))
   where
   nid    = proj₁ (mintNode sched)
   sched₀ = proj₂ (mintNode sched)
@@ -746,9 +741,25 @@ subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv 
   inv₀ = capsOK?-setNode c nid (take-st (suc k)) sched₀ st refl refl
            (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
 
-  hst₀ : nodesMax st₀ ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
-  hst₀ = ≤-trans (setNode-nodes nid (take-st (suc k)) (EvalSt.nodes st))
-                 (⊔-lub z≤n hst)
+  push = pushBurst-nest-take g id now nid κ
+           (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+  IH = subscribeE-nest c sl B W g b (take-f nid ↠ κ) id now sched₀ st₀
+         hsl inv₀ (valCaps?-take c sl cnt b hv) hn
+         (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw)
+
+  -- the counter this head installs reads zero, so the table the child
+  -- descends from is the table this head was handed
+  st₀≤ : nodesMax st₀ ≤ nodesMax st
+  st₀≤ = ≤-trans (setNode-nodes nid (take-st (suc k)) (EvalSt.nodes st))
+                 (⊔-lub z≤n ≤-refl)
+
+  -- and a filter is bigger than what it filters, which is the whole of
+  -- what this head spends to lift the child's grant to its own
+  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ b)
+           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ (takeᵉ cnt b))
+  grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B
+           (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ cnt)) (n≤1+n _))
 subscribeE-nest c sl B W g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-scan c sl B W g f z b κ id now sched st
 subscribeE-nest c sl B W g (mergeAllᵉ lim b) κ id now sched st =
@@ -757,13 +768,14 @@ subscribeE-nest c sl B W g (switchAllᵉ b) κ id now sched st =
   subscribeE-nest-switch c sl B W g b κ id now sched st
 subscribeE-nest c sl B W g (exhaustAllᵉ b) κ id now sched st =
   subscribeE-nest-exhaust c sl B W g b κ id now sched st
-subscribeE-nest c sl B W g0 (μᵉ body) κ id now sched st hsl hc hv hn hst hw =
-  ⊔-lub hst z≤n
+subscribeE-nest c sl B W g0 (μᵉ body) κ id now sched st hsl hc hv hn hw =
+  z≤n , m≤m⊔n _ _
 subscribeE-nest c sl B W (gs fuel) (μᵉ body) κ id now sched st =
   subscribeE-nest-mu c sl B W fuel body κ id now sched st
 subscribeE-nest c sl B W g (varᵉ ()) κ id now sched st
-subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hst hw =
-  ⊔-lub (≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n hst)) z≤n
+subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hw =
+  z≤n
+  , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
 
 -- ONE SUBSCRIPTION, AND THE BOUND IS ABSOLUTE.  What the subscription
 -- installs is read off `o`, whose depth the drain bounds by `B`, and off
@@ -779,19 +791,28 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
   valCaps? c sl (obs s) o ≡ true →
   nestDᵉ o ≤ B →
-  nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
   innerW sf allNid κ id now o sched st ≤ W →
-  let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
-  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ (proj₂ r)))
-    ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
-subscribeInner-nest c sl B W g0 allNid κ id now o sched st hsl hc hv hn hst hw =
-  ⊔-lub hst z≤n
-subscribeInner-nest c sl B W (gs fuel) allNid κ id now o sched st hsl hc hv hn hst hw =
-  subscribeE-nest c sl B W fuel o
-    (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
-    (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
-    (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn hst
-    (≤-trans (innerW-gs fuel allNid κ id now o sched st) hw)
+  let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+      G = nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c) in
+  (nestDᵛˢ (proj₁ (proj₂ r)) ≤ G)
+  × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
+subscribeInner-nest c sl B W g0 allNid κ id now o sched st hsl hc hv hn hw =
+  z≤n , m≤m⊔n _ _
+subscribeInner-nest {e = e} c sl B W (gs fuel) allNid κ id now o sched st hsl hc hv hn hw =
+  ≤-trans (proj₁ IH) grow , ≤-trans (proj₂ IH) (⊔-mono-≤ ≤-refl grow)
+  where
+  IH = subscribeE-nest c sl B W fuel o
+         (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
+         (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
+         (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
+         (≤-trans (innerW-gs fuel allNid κ id now o sched st) hw)
+
+  -- the cap is what flattens the descent's own index here: an inner the
+  -- caps premise admits is no larger than the cap, so the queue below
+  -- can be walked at ONE exponent instead of one per element
+  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ o)
+           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c)
+  grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B (valCaps?-size c sl o hv)
 
 -- THE DRAIN IS A WALK OVER THE QUEUE, and it costs what ONE subscription
 -- costs.  `mergeAllDrain` recurses across the parked inners and
@@ -810,26 +831,23 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sched : Sched Γ) (st : EvalSt e) →
   capsDrainOK c sl sf allNid κ id now lim act q sched st →
   queueNest q ≤ B →
-  nodesMax st ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl) →
   drainW sf allNid κ id now q sched st ≤ W →
-  let r = mergeAllDrain sf allNid κ id now lim act q sched st in
-  ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ r))
-     ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r)))))
-    ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
-mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act [] sched st hcd hq hst hw =
-  ⊔-lub (⊔-lub hst z≤n) z≤n
-mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched st hcd hq hst hw
+  let r = mergeAllDrain sf allNid κ id now lim act q sched st
+      G = nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c) in
+  (nestDᵛˢ (proj₁ r) ≤ G)
+  × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+        ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
+mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act [] sched st hcd hq hw =
+  z≤n , ⊔-lub (m≤m⊔n _ _) z≤n
+mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched st hcd hq hw
   with hasRoom lim act
-... | false = ⊔-lub (⊔-lub hst z≤n)
-                    (≤-trans hq (raiseUW (Caps.cSize c) W B (nestUnit e sl)))
+... | false =
+  z≤n
+  , ⊔-mono-≤ (≤-refl {nodesMax st})
+             (≤-trans hq (nestB-base (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c)))
 ... | true  =
-  ⊔-lub (⊔-lub (≤-trans (m≤m⊔n (nodesMax st₂) (nestDᵛˢ vs′))
-                        (≤-trans (m≤m⊔n _ (queueNest q′)) IH))
-               (≤-trans (nestDᵛˢ-++ vs vs′)
-                        (⊔-lub (≤-trans (m≤n⊔m (nodesMax st₁) (nestDᵛˢ vs)) SUB)
-                               (≤-trans (m≤n⊔m (nodesMax st₂) (nestDᵛˢ vs′))
-                                        (≤-trans (m≤m⊔n _ (queueNest q′)) IH)))))
-        (≤-trans (m≤n⊔m (nodesMax st₂ ⊔ nestDᵛˢ vs′) (queueNest q′)) IH)
+  ≤-trans (nestDᵛˢ-++ vs vs′) (⊔-lub (proj₁ SUB) (proj₁ IH))
+  , ≤-trans (proj₂ IH) (⊔-lub (proj₂ SUB) (m≤n⊔m (nodesMax st) _))
   where
   r₁    = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
   vs    = proj₁ (proj₂ r₁)
@@ -839,8 +857,6 @@ mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched 
 
   r₂    = mergeAllDrain sf allNid κ id now lim (if done then act else suc act) q sched₁ st₁
   vs′   = proj₁ r₂
-  q′    = proj₁ (proj₂ (proj₂ (proj₂ r₂)))
-  st₂   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₂))))
 
   -- THE WIDTH SPLITS THE WAY THE QUEUE DOES, which is what lets ONE `W`
   -- serve the whole walk: `drainW` is a `⊔` over the queued inners at
@@ -855,13 +871,12 @@ mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched 
 
   SUB = subscribeInner-nest c sl B W sf allNid κ id now o sched st
           (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
-          (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) hst splitW
+          (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) splitW
 
   IH = mergeAllDrain-nest c sl B W sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
          (proj₂ (proj₂ (proj₂ hcd)))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
-         (≤-trans (m≤m⊔n (nodesMax st₁) (nestDᵛˢ vs)) SUB)
          splitW′
 
 -- THE FINISH DISPATCH, AND ALL OF IT IS CHECKED.  `innerReact` reaches
@@ -886,57 +901,51 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   let r = innerFinish sf op allNid inst p id now vals sched st
             (lookupNode allNid (EvalSt.nodes st)) in
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-    ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
+    ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
 
 innerFinish-nest {e = e} c sl W sf switchᵒ allNid inst p id now vals sched st hsl hc hdr hw
   with lookupNode allNid (EvalSt.nodes st)
-... | nothing                    = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (scan-st _)           = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (take-st _)           = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (mergeAll-st _ _ _ _) = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (exhaust-st _ _)      = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st nothing _) = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | nothing                    = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (scan-st _)           = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (take-st _)           = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (mergeAll-st _ _ _ _) = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (exhaust-st _ _)      = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (switch-st nothing _) = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (switch-st (just c₀) od) with c₀ ≡ᵇ inst
-...   | false = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+...   | false = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ...   | true  =
   ≤-trans (⊔-mono-≤ (setNode-nodes allNid (switch-st nothing od) (EvalSt.nodes st))
                     (≤-refl {nestDᵛˢ vals}))
-          (raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl))
+          (raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)))
 
 innerFinish-nest {e = e} c sl W sf exhaustᵒ allNid inst p id now vals sched st hsl hc hdr hw
   with lookupNode allNid (EvalSt.nodes st)
-... | nothing                    = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (scan-st _)           = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (take-st _)           = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (mergeAll-st _ _ _ _) = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st _ _)       = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | nothing                    = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (scan-st _)           = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (take-st _)           = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (mergeAll-st _ _ _ _) = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (switch-st _ _)       = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (exhaust-st _ od)     =
   ≤-trans (⊔-mono-≤ (setNode-nodes allNid (exhaust-st false od) (EvalSt.nodes st))
                     (≤-refl {nestDᵛˢ vals}))
-          (raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl))
+          (raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)))
 
 innerFinish-nest {e = e} {s = s} c sl W sf mergeAllᵒ allNid inst p id now vals sched st hsl hc hdr hw
   with lookupNode allNid (EvalSt.nodes st) in eq
-... | nothing                = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (scan-st _)       = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (take-st _)       = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st _ _)   = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (exhaust-st _ _)  = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | nothing                = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (scan-st _)       = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (take-st _)       = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (switch-st _ _)   = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
+... | just (exhaust-st _ _)  = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
-...   | no  _    = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+...   | no  _    = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ...   | yes refl =
   ⊔-lub (≤-trans (setNode-nodes allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes st′))
-        (≤-trans (⊔-lub (m≤n⊔m (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′))
-                        (≤-trans (m≤m⊔n (nodesMax st′) (nestDᵛˢ vs))
-                                 (m≤m⊔n (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′))))
-                 (≤-trans D up)))
+                 (≤-trans (⊔-lub (m≤n⊔m (nodesMax st′) (queueNest q′))
+                                 (m≤m⊔n (nodesMax st′) (queueNest q′)))
+                          drain≤))
         (≤-trans (nestDᵛˢ-++ vals vs)
-                 (⊔-lub (≤-trans (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
-                                 (raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals)
-                                          (nestUnit e sl)))
-                        (≤-trans (≤-trans (m≤n⊔m (nodesMax st′) (nestDᵛˢ vs))
-                                          (m≤m⊔n (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′)))
-                                 (≤-trans D up))))
+                 (⊔-lub vals≤ (≤-trans (proj₁ DR) G≤)))
   where
   r   = mergeAllDrain sf allNid p id now lim (pred act) q sched st
   vs   = proj₁ r
@@ -953,17 +962,29 @@ innerFinish-nest {e = e} {s = s} c sl W sf mergeAllᵒ allNid inst p id now vals
   dw : drainW sf allNid p id now q sched st ≤ W
   dw = hw lim act q od refl
 
-  D : ((nodesMax st′ ⊔ nestDᵛˢ vs) ⊔ queueNest q′)
-        ≤ (2 ^ Caps.cSize c) ^ suc W * (nodesMax st + nestUnit e sl)
-  D = mergeAllDrain-nest c sl (nodesMax st) W sf allNid p id now lim (pred act) q sched st
-        (hdr lim act q od refl) qbnd
-        (raiseUW (Caps.cSize c) W (nodesMax st) (nestUnit e sl))
-        dw
+  DR = mergeAllDrain-nest c sl (nodesMax st) W sf allNid p id now lim (pred act) q sched st
+         (hdr lim act q od refl) qbnd dw
 
-  up : (2 ^ Caps.cSize c) ^ suc W * (nodesMax st + nestUnit e sl)
-         ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
-  up = *-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
-         (+-monoˡ-≤ (nestUnit e sl) (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)))
+  base : (nodesMax st ⊔ nestDᵛˢ vals)
+           ≤ nestFac (Caps.cSize c) W
+               * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
+  base = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals)
+                (nestU (Caps.cSize c) (nestUnit e sl))
+
+  vals≤ = ≤-trans (m≤n⊔m (nodesMax st) (nestDᵛˢ vals)) base
+
+  -- the drain hands up its grant at the SIZE cap, which is exactly
+  -- where the flattened factor is definitionally what this face spends
+  G≤ : nestB (Caps.cSize c) W (nestUnit e sl) (nodesMax st) (Caps.cSize c)
+         ≤ nestFac (Caps.cSize c) W
+             * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
+  G≤ = ≤-trans (nestB-at (Caps.cSize c) W (nestUnit e sl) (nodesMax st))
+               (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
+                  (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl))
+                             (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))))
+
+  drain≤ = ≤-trans (proj₂ DR)
+             (⊔-lub (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) base) G≤)
 
 -- THE INNER RELEASE IS NOT A FREE FRAME, and the reason is structural
 -- rather than arithmetic.  A `from-inner` at `fin` with no live
@@ -1021,12 +1042,12 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      drainW sf allNid p id now q sched st ≤ W) →
   let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-    ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
+    ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
 stepFrame-nodes-inner {e = e} c sl W sf id now op allNid inst p vals false sched st hsl hc hdr hw =
-  raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+  raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 stepFrame-nodes-inner {e = e} c sl W sf id now op allNid inst p vals true sched st hsl hc hdr hw
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
-... | true  = raiseUW (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | true  = raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | false = innerFinish-nest c sl W sf op allNid inst p id now vals sched st hsl hc hdr hw
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
@@ -1135,9 +1156,9 @@ abstract
     let r = stepFrame sf id now f p vals fin sched st in
     length (proj₁ r) ≤ W →
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ (2 ^ Caps.cSize c) ^ suc W
+      ≤ nestFac (Caps.cSize c) W
         * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
-           + nestUnit e sl)
+           + nestU (Caps.cSize c) (nestUnit e sl))
   stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
@@ -1145,7 +1166,7 @@ abstract
                       (≤-trans (≤-reflexive (+-comm (nestDᵗ fn) (nestDᵛˢ vals)))
                                (+-mono-≤ (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
                                          (nest-inflate W (nestDᵗ fn) 1≤W))))))
-            (raiseUW (Caps.cSize c) W _ (nestUnit e sl))
+            (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
     where
     X : ℕ
     X = (nodesMax st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn
@@ -1154,23 +1175,23 @@ abstract
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
   stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
-            (raiseUW (Caps.cSize c) W _ (nestUnit e sl))
+            (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
   stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
-            (raiseUW (Caps.cSize c) W _ (nestUnit e sl))
+            (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
   stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-inner c sl W sf id now op allNid inst p vals fin sched st
                hsl hc hfd hfw)
-            (*-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
-              (+-monoˡ-≤ (nestUnit e sl) (zero-charge W _)))
+            (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
+              (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl)) (zero-charge W _)))
   stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
                hsl 1≤W hlen hc hv hw)
-            (≤-trans (*-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
+            (≤-trans (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
               (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
                        (one-pow W (_ + W * 1))))
-              (addUW (Caps.cSize c) W _ (nestUnit e sl)))
+              (addN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl))))
 
 -- HOISTING THE SUBSTITUTION FACTOR PAST ONE FRAME'S CHARGE, which is
 -- the only arithmetic the caps rider adds to the telescope.  The factor
@@ -1345,10 +1366,10 @@ foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   burstsOK W sf id now path vals fin sched st →
   capsWalkOK c sl sf id now path vals fin sched st →
   nodesMax (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
-    ≤ ((2 ^ Caps.cSize c) ^ suc W) ^ pathLen path
+    ≤ (nestFac (Caps.cSize c) W) ^ pathLen path
       * (pathNestF path ^ W
          * ((nodesMax st ⊔ nestDᵛˢ vals)
-            + W * (pathNestD path + suc (pathLen path) * nestUnit e sl)))
+            + W * (pathNestD path + suc (pathLen path) * nestU (Caps.cSize c) (nestUnit e sl))))
 foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
                    (one-pow W _))
@@ -1356,9 +1377,10 @@ foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W 
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl)
                    (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
-                              (≤-trans (nest-inflate W (nestUnit e sl) 1≤W)
+                              (≤-trans (nestU-base (Caps.cSize c) (nestUnit e sl))
+                               (≤-trans (nest-inflate W (nestU (Caps.cSize c) (nestUnit e sl)) 1≤W)
                                        (*-monoʳ-≤ W (≤-reflexive
-                                         (sym (*-identityˡ (nestUnit e sl)))))))
+                                         (sym (*-identityˡ (nestU (Caps.cSize c) (nestUnit e sl)))))))))
                             (one-pow W _)))
           (≤-reflexive (sym (*-identityˡ _)))
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
@@ -1389,13 +1411,13 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
                           (cong (B +_) charge))))))))))
   where
   S      = Caps.cSize c
-  Q      = (2 ^ S) ^ suc W
-  1≤Q    = 1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n))
+  Q      = nestFac S W
+  1≤Q    = 1≤nestFac S W
   A      = frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
-  Inner  = pathNestF p ^ W * ((A + nestUnit e sl)
-                              + W * (pathNestD p + suc (pathLen p) * nestUnit e sl))
+  Inner  = pathNestF p ^ W * ((A + nestU (Caps.cSize c) (nestUnit e sl))
+                              + W * (pathNestD p + suc (pathLen p) * nestU (Caps.cSize c) (nestUnit e sl)))
   B      = nodesMax st ⊔ nestDᵛˢ vals
-  U      = nestUnit e sl
+  U      = nestU (Caps.cSize c) (nestUnit e sl)
   L      = suc (pathLen p)
 
   -- the frame's own summand is paid out of the extra `W * U` the path's
