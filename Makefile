@@ -800,8 +800,17 @@ gate-cheap:
 # THE LIGHT GATE.  The cheap checks, plus a real dev check of every module this
 # tree has touched — and `dev-changed` FAILS if the full build is still owed,
 # so this target cannot be used where it is not valid.  See docs/gate.md.
+#
+# AND IT CHECKS WHICHEVER EVIDENCE TREE THE CHANGED SET TOUCHED, which is what
+# lets an evidence change stay on this path at all.  Neither tree is
+# dev-checkable, but neither can break the tower either — no `src` file may
+# import one — so the tower is the wrong thing to buy for a probe.  Its own
+# root is the right thing, and it is a real check rather than a stubbed one.
 gate-light:
 	@$(MAKE) --no-print-directory gate-cheap || { scripts/notify.py "RED (light)"; exit 1; }
+	@for t in $$(scripts/dev-changed.py --owed-only); do \
+	  $(MAKE) --no-print-directory $$t || { scripts/notify.py "RED (light)"; exit 1; }; \
+	done
 	@$(MAKE) --no-print-directory dev-changed || { scripts/notify.py "RED (light)"; exit 1; }
 	@echo "gate-light: ALL GREEN"
 	@scripts/notify.py "GREEN (light)"
@@ -896,7 +905,14 @@ dev-changed-selftest:
 	    || { echo "SELFTEST FAIL: drift is invisible to --verdict-only — \`make gate\` routes on that verdict, so it would take the light path with the consumers long unchecked"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
-	    || { echo "SELFTEST FAIL: a file outside agda/src did not escalate — nothing would have checked it"; fail=1; }; \
+	    && { echo "SELFTEST FAIL: an evidence file escalated to the tower — no src file may import that tree, so the tower cannot be broken by it and buying half an hour checks nothing about it"; fail=1; }; \
+	  echo "$$out" | grep -q 'OWED  make refuted' \
+	    || { echo "SELFTEST FAIL: an evidence change did not report its own tree's target as OWED — not escalating is only safe because the light gate then RUNS that target"; fail=1; }; \
+	  [ "$$(scripts/dev-changed.py --owed-only --files agda/evidence/probed/Probed/Main.agda)" = "probed" ] \
+	    || { echo "SELFTEST FAIL: --owed-only did not name the probed tree — gate-light reads exactly this to decide what to check"; fail=1; }; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files agda/nope/Other.agda 2>&1); \
+	  echo "$$out" | grep -q 'ESCALATE' \
+	    || { echo "SELFTEST FAIL: a file outside agda/src and outside every evidence tree did not escalate — nothing would have checked it"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'NOT the .* claim root(s) in the cone' \
 	    || { echo "SELFTEST FAIL: the cone sweep did not hold back the claim roots — EVERY cone contains them by the wiring law, so a sweep that checks them IS the tower it claims to be cheaper than"; fail=1; }; \
@@ -925,7 +941,7 @@ dev-changed-selftest:
 	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files 2>&1); \
 	  echo "$$out" | grep -q '0 changed .agda file(s)' \
 	    || { echo "SELFTEST FAIL: an empty changed set was not reported as empty — checking nothing must never read as a pass"; fail=1; }; \
-	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; a file outside agda/src escalates because no dev check can reach it; a cone member whose dev check would be STUBBED is named rather than silently dropped; a CHANGED claim root is held back exactly as a cone one is, since a root is a file and files get edited; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
+	  if [ $$fail -eq 0 ]; then echo "dev-changed-selftest: PASS (a multi-member block escalates and exits 2; a module without one does not; a changed set over --max-files escalates because N dev checks cost more than the full build; drift is visible to the verdict \`make gate\` routes on; a wide cone does NOT escalate, because checking the cone MINUS THE CLAIM ROOTS is cheaper than the tower, and a cone member over budget is skipped while a changed one over budget is red; the cone sweep stops at its TOTAL budget and names what it left; the changed set is measured from the last green heavy gate, not from HEAD, so committing before gating does not empty it; an evidence file does NOT escalate but reports its own tree's target as OWED, while a file outside agda/src and outside every evidence tree does escalate; a cone member whose dev check would be STUBBED is named rather than silently dropped; a CHANGED claim root is held back exactly as a cone one is, since a root is a file and files get edited; and an empty changed set says so rather than passing quietly; and every case PINS the drift axis it is not testing, so the selftest cannot go red on a clock)"; \
 	  else exit 1; fi
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is

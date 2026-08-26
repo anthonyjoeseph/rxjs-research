@@ -19,8 +19,13 @@ THE ESCALATION TRIGGERS, all three mechanical:
     postulates do not reduce — a bad measure passes dev and fails the gate.
     This is the case the dev loop is documented to lie about, and it is the
     only case the user's rule cares about.
-  · a changed file is NOT dev-checkable at all — anything under
-    `agda/evidence/refuted`, which has its own root and its own target.
+  · a changed file is NOT dev-checkable at all AND is in no evidence tree.
+    An evidence tree is not dev-checkable either -- each has its own claim
+    root -- but the TOWER is not what checks it: `src` cannot import either
+    tree (evidence-check E1, and the library layout makes the import
+    unresolvable), so a probe or a refutation cannot break the tower it
+    would be escalated for.  What such a change owes is its OWN tree's
+    target, which this reports as OWED and the light gate runs.
   · DRIFT: too many commits since the last green heavy gate.  A light gate is
     a bet that the consumers still typecheck, and a long run of unchecked bets
     is exactly how a tree gets far down a wrong road cheaply.
@@ -41,6 +46,25 @@ import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join("agda", "src")
+
+# THE EVIDENCE TREES, AND WHY THEY ARE NOT AN ESCALATION.  Neither is
+# dev-checkable, which is why this used to send them to the tower -- but the
+# tower is not what checks them either, and it cannot be broken by them: no
+# `src` file may import either tree.  In de-risk mode nearly every leg lands a
+# probe or a refutation, so that one trigger put almost every commit on the
+# expensive path for a change the expensive path does not even look at.
+EVIDENCE_TREES = {
+    os.path.join("agda", "evidence", "refuted"): "refuted",
+    os.path.join("agda", "evidence", "probed"): "probed",
+}
+
+
+def evidence_target(f):
+    """-> the make target that checks f's tree, or None if f is in neither."""
+    for root, target in EVIDENCE_TREES.items():
+        if f.startswith(root + os.sep):
+            return target
+    return None
 STAMP = os.path.join(REPO, ".gate-heavy-stamp")
 MULTI = re.compile(r"^\s*\d+ blocks?, (\d+) multi-member", re.M)
 
@@ -191,6 +215,12 @@ def main() -> int:
                          "stop.  Free: it runs no agda, which is what makes "
                          "the claim-root exclusion testable at gate-cheap "
                          "speed.")
+    ap.add_argument("--owed-only", action="store_true",
+                    help="print the bare make target of every evidence tree "
+                         "the changed set touches, one per line, and stop. "
+                         "Free -- a git query and a prefix test, no --list "
+                         "pass and no agda.  `gate-light` reads this to know "
+                         "which evidence tree to check.")
     ap.add_argument("--verdict-only", action="store_true",
                     help="decide escalation from the free --list pass; run no "
                          "real check")
@@ -208,6 +238,16 @@ def main() -> int:
     src_files = [f for f in files if f.startswith(SRC + os.sep)]
     other = [f for f in files if not f.startswith(SRC + os.sep)]
 
+    if a.owed_only:
+        seen = []
+        for f in other:
+            t = evidence_target(f)
+            if t and t not in seen:
+                seen.append(t)
+        for t in sorted(seen):
+            print(t)
+        return 0
+
     print(f"dev-changed: {len(files)} changed .agda file(s)"
           f" — {len(src_files)} in {SRC}, {len(other)} elsewhere")
     if not files:
@@ -223,9 +263,17 @@ def main() -> int:
         escalate.append(f"{len(src_files)} changed modules in {SRC} (limit "
                         f"{a.max_files}) — that many dev checks costs more "
                         f"than one full build, which checks the consumers too")
+    owed = []
     for f in other:
-        escalate.append(f"{f}: not dev-checkable (its tree has its own root) "
-                        f"— `make refuted` / `make gate` owns it")
+        t = evidence_target(f)
+        if t is None:
+            escalate.append(f"{f}: not dev-checkable and in no evidence tree "
+                            f"— nothing on the light path would check it")
+        elif t not in owed:
+            owed.append(t)
+    for t in sorted(owed):
+        print(f"dev-changed: OWED  make {t} — an evidence tree changed, and "
+              f"its own target is what checks it")
 
     fail = 0
     multi = {}

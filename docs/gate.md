@@ -42,8 +42,17 @@ which escalates:
   other members, so termination of the real mutual recursion is not checked and
   postulates do not reduce — and in this proof the mutual recursion IS the
   induction. This is the trigger the whole split exists for.
-- **A changed file is outside `agda/src`.** `agda/evidence/refuted` has its own include
-  root and its own target; no dev check reaches it.
+- **A changed file is outside `agda/src` AND in no evidence tree.** Nothing on
+  the light path would look at it at all.
+  An evidence tree is *not* one of these. Neither `agda/evidence/refuted` nor
+  `agda/evidence/probed` is dev-checkable — each has its own include root — but
+  the tower is not what checks either, and cannot be broken by either: no `src`
+  file may import one (`evidence-check` E1, and the library layout makes the
+  import unresolvable). So a changed evidence file reports its own tree's target
+  as **OWED** and `gate-light` runs it, which is a real check rather than a
+  stubbed one. This used to escalate, and in de-risk mode nearly every leg lands
+  a probe or a refutation — so that one trigger was putting almost every commit
+  on the tower for a change the tower does not read.
 - **The changed set exceeds `--max-files` (default 6).** A dev check is cheap
   *singly*: run N of them sequentially, each rebuilding its own cone, and the
   full build buys the entire tower for about the same money — and checks the
@@ -197,9 +206,19 @@ not checked. `DEPS=1` dev-checks the cone too, where its members have no
 multi-member block. (Cross-checked on one module: the tool reported 10 consumer
 modules and the subsequent full gate spent its time on 11.)
 
-The second thing it does not check: `refuted` and `bug-cache` both depend on
-`agda/src`, so running them would rebuild the cone the light gate is avoiding.
-They belong to the merge gate.
+The second thing it does not check: `bug-cache` depends on `agda/src`, so
+running it would rebuild the cone the light gate is avoiding. It belongs to the
+merge gate.
+
+`refuted` and `probed` depend on `agda/src` the same way, and are handled the
+other way round — the light gate runs whichever one the changed set touched.
+The asymmetry is not arbitrary. Their cone is what the evidence tree's own
+imports reach, which is a slice of `src` and never the tower; for an
+evidence-only change that slice is unchanged and warm, so the check is the
+tree itself. Bundle an evidence change with a `src` change low in the tower and
+it does rebuild that slice for real — which is a *stronger* check than the
+stubbed dev pass beside it, over strictly less than the tower, and it is the
+price of the tree being checked at all on this path.
 
 ## Flags and knobs
 
