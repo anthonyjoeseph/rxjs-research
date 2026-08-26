@@ -44,6 +44,10 @@ open import Refuted.Thru-Subscribe-Nest
          parent≡41; stepFrame-nodes-at-thru-absurd)
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
+open import Refuted.Subscribe-Caps-Nest
+  using (capsZero; capsZero₂; delivered≡16; charged≡6;
+         delivered₂≡8; charged₂≡6;
+         subscribeE-nest-absurd; subscribeE-nest-two-absurd; valCapsFails₃; valCapsFails₂)
 open import Refuted.Inner-Drain-Share-Nest
   using (delivered≡40; charged≡0; capsPin;
          stepFrame-nodes-inner-share-absurd; unit≡41)

@@ -32,7 +32,7 @@ open import Rx.Evaluator using
   mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using
@@ -339,8 +339,9 @@ capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
 capsDrainOK c sl sf allNid κ id now lim act [] sched st =
   (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
-capsDrainOK c sl sf allNid κ id now lim act (o ∷ q) sched st =
+capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
   (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
+  × (valCaps? c sl (obs s) o ≡ true)
   × capsDrainOK c sl sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
@@ -351,6 +352,9 @@ capsDrainOK c sl sf allNid κ id now lim act (o ∷ q) sched st =
 -- `subscribeInner` mints an instance id and hands the inner to
 -- `subscribeE` under a `from-inner` frame; out of gas it emits a dry
 -- event and touches nothing, so the whole charge is the descent's.
+-- The `valCaps?` premise is what puts the subscribed observable inside
+-- the exponent: the factor is two to a SIZE cap, and a cap the value
+-- itself is not held to bounds the state and nothing that enters it.
 --
 -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
 --   against forty, at a queued `mapᵉ` whose step function names its
@@ -375,11 +379,21 @@ capsDrainOK c sl sf allNid κ id now lim act (o ∷ q) sched st =
 --   is a multiple of nothing.  Taken with the row above it this pins the
 --   shape exactly: the factor AND a slots summand, each of which is dead
 --   on its own.
+-- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent from
+--   the STORE's cap alone, sixteen delivered against a charge of six at
+--   `st-init`, where the node table is empty and so `capsOK? (caps 0 0
+--   0)` holds outright and the factor collapses to one.  Each stacked
+--   `mapᵉ` naming its payload twice doubles the delivered depth and
+--   leaves the charge where it was -- eight, then sixteen -- so the gap
+--   is unbounded rather than one crossing.  The same file pins
+--   `valCaps?` FALSE at both programs, which is what makes the premise
+--   load-bearing instead of merely present.
 postulate
   subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+    valCaps? c sl (obs u) o ≡ true →
     nestDᵉ o ≤ B → nodesMax st ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl) →
     let r = subscribeE g o κ id now sched st in
     (nodesMax (proj₂ (proj₂ r))
@@ -398,17 +412,18 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  valCaps? c sl (obs s) o ≡ true →
   nestDᵉ o ≤ B → nodesMax st ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl) →
   let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ (proj₂ r)))
     ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl)
-subscribeInner-nest c sl B g0 allNid κ id now o sched st hsl hc hn hst =
+subscribeInner-nest c sl B g0 allNid κ id now o sched st hsl hc hv hn hst =
   ⊔-lub hst z≤n
-subscribeInner-nest c sl B (gs fuel) allNid κ id now o sched st hsl hc hn hst =
+subscribeInner-nest c sl B (gs fuel) allNid κ id now o sched st hsl hc hv hn hst =
   subscribeE-nest c sl B fuel o
     (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
     (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
-    (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hn hst
+    (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn hst
 
 -- THE DRAIN IS A WALK OVER THE QUEUE, and it costs what ONE subscription
 -- costs.  `mergeAllDrain` recurses across the parked inners and
@@ -457,12 +472,12 @@ mergeAllDrain-nest {e = e} c sl B sf allNid κ id now lim act (o ∷ q) sched st
   st₂   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₂))))
 
   SUB = subscribeInner-nest c sl B sf allNid κ id now o sched st
-          (proj₁ hcd) (proj₁ (proj₂ hcd))
+          (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
           (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) hst
 
   IH = mergeAllDrain-nest c sl B sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
-         (proj₂ (proj₂ hcd))
+         (proj₂ (proj₂ (proj₂ hcd)))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          (≤-trans (m≤m⊔n (nodesMax st₁) (nestDᵛˢ vs)) SUB)
 
