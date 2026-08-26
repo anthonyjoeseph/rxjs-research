@@ -27,7 +27,7 @@ open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
-  NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; mergeAll-st;
+  NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals; mergeAll-st;
   switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
   mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
@@ -253,13 +253,54 @@ abstract
                     (⊔-mono-≤ (lookupNode-nodes nid (scan-st a) (EvalSt.nodes st) eq)
                               ≤-refl)))
 
-postulate
+-- A PREFIX CANNOT BE DEEPER THAN THE LIST, and `takeVals` returns a
+-- prefix.  The induction is on the budget rather than the list because
+-- that is what `takeVals` recurses on, and its `suc zero` clause drops
+-- the whole tail in one step -- which is the clause that would fail were
+-- the measure a sum rather than a `⊔`.
+abstract
+  takeVals-nest : ∀ {n} {Γ : Ctx n} {s} (k : ℕ) (vals : List (Val Γ s)) →
+    nestDᵛˢ (proj₁ (takeVals k vals)) ≤ nestDᵛˢ vals
+  takeVals-nest zero          vals     = z≤n
+  takeVals-nest (suc k)       []       = z≤n
+  takeVals-nest (suc zero)    (v ∷ vs) = ⊔-mono-≤ ≤-refl z≤n
+  takeVals-nest (suc (suc k)) (v ∷ vs) = ⊔-mono-≤ ≤-refl (takeVals-nest (suc k) vs)
+
+-- THE ONE FRAME THAT CANNOT DEEPEN ANYTHING, and both halves of the `⊔`
+-- say why separately.  `takeVals` forwards a PREFIX of what it was
+-- handed, so no value it emits was built here; and the only node it
+-- writes is a `take-st`, which is a counter -- `nodeNest` reads it zero,
+-- so the table it leaves is bounded by the table it found whichever
+-- branch the cut flag takes.  The cutting branch also rewrites the
+-- registry and the live list, and neither is anything `nodesMax` reads.
+abstract
   stepFrame-nodes-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     let r = stepFrame sf id now (take-f nid) p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals)
+  stepFrame-nodes-take sf id now nid p vals fin sched st
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing               = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
+  ... | just (scan-st _)      = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
+  ... | just (mergeAll-st _ _ _ _) = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
+  ... | just (switch-st _ _)  = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
+  ... | just (exhaust-st _ _) = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
+  ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+  ... | true  = ⊔-mono-≤ (setZero zero) (takeVals-nest k vals)
+    where
+    setZero : ∀ (m : ℕ) →
+      nodesFold (setNode nid (take-st m) (EvalSt.nodes st)) ≤ nodesMax st
+    setZero m = ≤-trans (setNode-nodes nid (take-st m) (EvalSt.nodes st))
+                        (⊔-lub z≤n ≤-refl)
+  ... | false = ⊔-mono-≤ (setZero (proj₁ (proj₂ (takeVals k vals))))
+                         (takeVals-nest k vals)
+    where
+    setZero : ∀ (m : ℕ) →
+      nodesFold (setNode nid (take-st m) (EvalSt.nodes st)) ≤ nodesMax st
+    setZero m = ≤-trans (setNode-nodes nid (take-st m) (EvalSt.nodes st))
+                        (⊔-lub z≤n ≤-refl)
 
 -- THE SLOTS TERM IS PAID ONCE PER FRAME AND EVERY FRAME BUT ONE HAS NO
 -- USE FOR IT, so it enters as pure slack for four of the five arms.

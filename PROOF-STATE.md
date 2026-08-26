@@ -228,12 +228,6 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   the two `*All` frames spend, held at every state the selection's walk passes
   through. The caps face proves exactly this frame by frame with its own level
   counter, so what is owed is that receipt re-read at a flat cap.
-- **`stepFrame-nodes-take`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`:
-  `takeDispatch` re-points a counter and forwards what it was handed, so
-  neither side of the `⊔` deepens.
-- **`chainsNest≤store`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: a
-  `⊔`-fold dominates the selection it folds; `chainsOf-caps` is the same
-  recursion at a size.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `NO EVIDENCE`, large: the Ψ
   mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
   `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names

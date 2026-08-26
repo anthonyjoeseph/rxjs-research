@@ -2036,10 +2036,22 @@ cascade-nest-compositional {e = e} sl id a nextId sched st hsl hcaps hnest hval 
 -- schedule has already popped it — so that one stays a premise, exactly
 -- as `valCaps?` does beside it.
 --
-postulate
-  chainsNest≤store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    chainsNestD (chainsOf a st) ≤ storeNestMax sched st
+chainsGo-nest : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  chainsNestD (chainsGo a rs) ≤ regsNestMax rs
+chainsGo-nest a [] = z≤n
+chainsGo-nest a ((rid , s , (u , p)) ∷ r)
+  with sameSource (arrSource a) s | u ≟ᵗ arrTy a
+... | false | _        = ≤-trans (chainsGo-nest a r) (m≤n⊔m (pathNestD p) (regsNestMax r))
+... | true  | no  _    = ≤-trans (chainsGo-nest a r) (m≤n⊔m (pathNestD p) (regsNestMax r))
+... | true  | yes refl = ⊔-mono-≤ ≤-refl (chainsGo-nest a r)
+
+chainsNest≤store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  chainsNestD (chainsOf a st) ≤ storeNestMax sched st
+chainsNest≤store a sched st =
+  ≤-trans (chainsGo-nest a (EvalSt.registry st))
+          (m≤n⊔m _ (regsNestMax (EvalSt.registry st)))
 
 cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
