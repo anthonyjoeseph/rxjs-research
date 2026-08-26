@@ -1262,6 +1262,30 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- REFUTED: `Refuted.Chain-Step-Live-Nest`, three against one at a body
 --   three layers deep and five against one at five, so the gap is
 --   unbounded in the body's depth and no constant repairs it.
+-- PROBED: `Probed.Chain-Step-Live-Nest` re-runs that same adversarial
+--   family against THIS conclusion rather than a numeral standing in
+--   for it.  Covered: the deferred-body rows the old form died on --
+--   grown 3 against a charge of 16, grown 5 against 24 -- so the two
+--   sides now move together where they used to diverge, and each is
+--   pinned separately so a repair moving either fails naming a number.
+--   Also covered, and it is the reason the file is not two rows: the
+--   right side carries NO store term, so a step minting a live out of
+--   a PARKED value would exceed it with the arrival left shallow.  The
+--   attack is armed -- a limited merge whose first inner is a `deferᵉ`
+--   leaves the second genuinely pending, and the node reads depth 2
+--   and 4 -- and the grown fold stays at zero, so the drain does not
+--   run inside a step and the missing store term is not owed here.
+--   And the tight direction on the path: `frameNestF` is one at every
+--   frame but `map-f`/`scan-f`, so two merge frames give the step a
+--   second mint site while leaving the charge exactly where the
+--   one-frame rows left it -- grown 3 against 19, grown 5 against 27.
+--   And a `map-f`, the only frame that both exceeds a factor of one
+--   and hands the step a value the ARRIVAL never carried: a constant
+--   deferred body two and four deep, against a shallow arrival, mints
+--   at the body's depth and the factor pays for it.  The constant must
+--   be DEFERRED or the row cannot fail -- a plain deep observable
+--   finishes inside the step and the grown fold stays at zero.
+--   NOT covered: a share sink, whose mint site no row here reaches.
 postulate
   chainStep-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)

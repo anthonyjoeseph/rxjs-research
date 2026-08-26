@@ -53,3 +53,5 @@ open import Probed.Sync-Factor
          dupOut₃≡6; dupB-holds;
          hidSync≡4; hidSize≡9; hidOut≡0;
          mixOut≡3; mixD-holds)
+open import Probed.Chain-Step-Live-Nest
+  using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
