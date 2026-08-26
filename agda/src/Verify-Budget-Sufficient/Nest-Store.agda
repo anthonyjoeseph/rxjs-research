@@ -683,9 +683,9 @@ nestCapAt-1-floor e sl =
           (≤-trans (nest-inflate (nestFacAt e sl 0) _ (1≤nestFacAt e sl 0))
                    (≤-reflexive (sym (nestCapAt-suc e sl 0))))
 
--- AND THE CONSUMER'S FORM, kept here rather than at the call site: the
--- spine module that spends this pays many times over to elaborate the
--- subscribe term against the introduction, and this module does not.
+-- AND THE CONSUMER'S FORM, so the spine module that spends this applies
+-- ONE lemma rather than re-composing the floor with the introduction at
+-- a call site whose subscribe term it would have to spell out twice.
 nestOK?-from-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (sched : Sched Γ) (st : EvalSt e) →
   storeNestMax sched st ≤ nestUnit e sl + Caps.cSize (capsAt e sl 0) →
