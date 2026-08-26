@@ -173,6 +173,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
+- **`subscribeE-nest-take`** (Nest-Walk) — SHAPE, `DEAD ROUTE`: the one head
+  the shared premise does not reach. A filter DROPS, so a bound on the burst
+  this call emits is no bound on the inner one, and the premise owes a bound on
+  every burst the descent produces. Restate, do not grind.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`: the
   head where the burst index is bet — one step function applied once per value
   of whatever arrives. The un-indexed form is refuted; the same witness is
@@ -185,13 +189,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   slot heads under one leaf. A shared slot's charge is a multiple of nothing
   unless the unit is a summand, which is what the refutation pins.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED×3, PROBED×3`: the three `*All` heads, each a mint plus the outer's
-  descent pushed through a `thru-outer` frame. Their charge is the thru row's.
-- **`subscribeE-nest-take`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: a
-  filter head, which must be free — the count is evaluated once and the frame
-  charges nothing the path measure can see.
-- **`subscribeE-nest-of`** (Nest-Walk) — DIFFICULTY, `REFUTED`: a one-shot of
-  evaluated terms. `evalWith-nest` is the route and it costs a size factor,
+  `NO EVIDENCE`: the three `*All` heads, each a mint plus the outer's descent
+  pushed through a `thru-outer` frame. Their charge is the thru row's.
+- **`subscribeE-nest-of`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: a one-shot
+  of evaluated terms. `evalWith-nest` is the route and it costs a size factor,
   which the `valCaps?` premise is what pays for.
 - **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the one
   head that is not a subterm. A substituted body can be deeper than the body,

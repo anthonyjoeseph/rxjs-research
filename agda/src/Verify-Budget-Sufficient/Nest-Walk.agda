@@ -485,6 +485,10 @@ postulate
     (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (input i) κ id now sched st
+  -- A ONE-SHOT OF EVALUATED TERMS, whose whole burst is minted and
+  -- closed inside the subscription.  Evaluation is not free in this
+  -- currency -- a term substituted into is deeper than the term -- so
+  -- the size the `valCaps?` premise caps is what pays for it.
   subscribeE-nest-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (ts : List (Tm Γ [] [] [] u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -543,6 +547,25 @@ postulate
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (mapᵉ f b) κ id now sched st
+  -- THE FILTER HEAD, AND THE ONE THE SHARED PREMISE DOES NOT REACH.
+  -- Every other head either produces its own burst outright or hands
+  -- back one value per value it was given, so the shared premise --
+  -- which bounds the burst this call EMITS -- transfers to the inner
+  -- subscribe unchanged.  `take` DROPS, so the inner burst can be
+  -- longer than the one that leaves, and a bound on the output is no
+  -- bound on the input.  The charge itself is free here: the node's
+  -- nesting is zero and the frame substitutes nothing.
+  --
+  -- DEAD ROUTE: closing this from the shared premise alone is
+  --   STRUCTURALLY dead, and not for want of arithmetic.  The induction
+  --   wants the inner descent at the inner burst's width, whose
+  --   conclusion is a power in THAT width; converting it to a power in
+  --   the emitted width needs the inner width to be the smaller of the
+  --   two, and at a filter it is the larger.  What the premise has to
+  --   become is a bound on every burst the descent produces, not on the
+  --   one it hands back -- the shape `capsDrainOK` already has one face
+  --   over, and the shape the drain's own concatenation argument gets
+  --   for free because a concatenation only grows.
   subscribeE-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
@@ -582,15 +605,21 @@ postulate
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (scanᵉ f z b) κ id now sched st
+  -- THE THREE `*All` HEADS, which differ only in the node state they
+  -- install and are three statements for that reason alone: a mint, the
+  -- outer's own descent, and the burst pushed back through a
+  -- `thru-outer` frame, where the wrap re-enters the walk.
   subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (mergeAllᵉ lim b) κ id now sched st
+  -- The switch wrap, at its own initial state.
   subscribeE-nest-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (switchAllᵉ b) κ id now sched st
+  -- The exhaust wrap, at its own initial state.
   subscribeE-nest-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
