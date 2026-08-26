@@ -51,7 +51,7 @@ open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤;
-  *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
+  n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
@@ -64,8 +64,8 @@ open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; F
 open import Rx.Prim using (Source; towerℕ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestU)
+open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤; 1≤capsAt-reg)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -222,6 +222,14 @@ chainsNestF = foldr (λ rc acc → pathNestF (proj₂ rc) * acc) 1
 chainsSzSum : ∀ {n} {Γ : Ctx n} {s t} →
   List (RegId × Path Γ s t) → ℕ
 chainsSzSum = foldr (λ rc acc → pathSzSum (proj₂ rc) + acc) 0
+
+-- the selection's factor is a product of the paths' own, so it is at
+-- least one for the same reason each of them is -- and the walk needs
+-- exactly this to read one chain's charge against the whole list's
+1≤chainsNestF : ∀ {n} {Γ : Ctx n} {s t} (cs : List (RegId × Path Γ s t)) →
+  1 ≤ chainsNestF cs
+1≤chainsNestF []             = s≤s z≤n
+1≤chainsNestF ((_ , p) ∷ cs) = *-mono-≤ (1≤pathNestF p) (1≤chainsNestF cs)
 
 chainsNestF≡ : ∀ {n} {Γ : Ctx n} {s t} (cs : List (RegId × Path Γ s t)) →
   chainsNestF cs ≡ 2 ^ chainsSzSum cs
@@ -480,6 +488,58 @@ abstract
       * (nestBurstAt e sl id
          * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
             * nestU (Caps.cSize (capsAt e sl id)) (nestUnit e sl)))
+
+  -- THE SIZE CAP SITS UNDER ONE INSTANT'S GROWTH, which is what lets a
+  -- walk charge an arrival's own size to the increment rather than to
+  -- the store it arrived at.  Proven in here because every factor it
+  -- reads is sealed: the width is at least one, so the doubled term
+  -- already exceeds the size, and the remaining factors are each at
+  -- least one.
+  size≤nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → Caps.cSize (capsAt e sl id) ≤ nestIncAt e sl id
+  size≤nestIncAt e sl id =
+    ≤-trans S≤mid (≤-trans (≤-trans mid≤u u≤b) b≤r)
+    where
+    S : ℕ
+    S = Caps.cSize (capsAt e sl id)
+
+    R : ℕ
+    R = realWidAt e sl id
+
+    U : ℕ
+    U = nestU S (nestUnit e sl)
+
+    1≤U : 1 ≤ U
+    1≤U = ≤-trans (s≤s z≤n) (nestU-base S (nestUnit e sl))
+
+    S≤mid : S ≤ suc (suc (R * S))
+    S≤mid =
+      ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ S)))
+                       (*-monoˡ-≤ S (1≤capsAt-reg e sl id)))
+              (≤-trans (n≤1+n (R * S)) (n≤1+n (suc (R * S))))
+
+    mid≤u : suc (suc (R * S)) ≤ suc (suc (R * S)) * U
+    mid≤u = ≤-trans (≤-reflexive (sym (*-identityʳ (suc (suc (R * S))))))
+                    (*-monoʳ-≤ (suc (suc (R * S))) 1≤U)
+
+    u≤b : suc (suc (R * S)) * U ≤ nestBurstAt e sl id * (suc (suc (R * S)) * U)
+    u≤b = ≤-trans (≤-reflexive (sym (*-identityˡ (suc (suc (R * S)) * U))))
+                  (*-monoˡ-≤ (suc (suc (R * S)) * U) (1≤nestBurstAt e sl id))
+
+    b≤r : nestBurstAt e sl id * (suc (suc (R * S)) * U)
+            ≤ R * (nestBurstAt e sl id * (suc (suc (R * S)) * U))
+    b≤r = ≤-trans (≤-reflexive (sym (*-identityˡ _)))
+                  (*-monoˡ-≤ _ (1≤capsAt-reg e sl id))
+
+  -- AND A BASE SITS UNDER ITS OWN BURST POWER, the burst being a
+  -- successor by construction.  A consumer holding a bound on the
+  -- POWER needs this to spend it on the base, and cannot see that the
+  -- exponent is nonzero from outside.
+  m≤m^burst : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) (x : ℕ) → 1 ≤ x → x ≤ x ^ nestBurstAt e sl id
+  m≤m^burst e sl id x hx =
+    ≤-trans (≤-reflexive (sym (*-identityʳ x)))
+            (*-monoʳ-≤ x (1≤pow≤ x (Caps.cWid (capsAt e sl id)) hx))
 
   -- READ BACK OUT OF THE SEAL for the same reason the width is: a
   -- consumer proving the fanout bound has to say what it proved.

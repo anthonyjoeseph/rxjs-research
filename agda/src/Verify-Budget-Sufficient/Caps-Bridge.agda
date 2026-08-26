@@ -83,6 +83,8 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
    regsSz?; slotsCaps?; valCaps?; widLive; widNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using
+  (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
   (caps-tick; cascade-depth-capsH; cascadeGo-nest; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
@@ -576,7 +578,9 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC =
     regsΨ
     (n≤capsAt-size e sl id)
     (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
-    (cascade-depth-capsH sl id a id sched st refl pre nok bnd)
+    (cascade-depth-capsH sl id a id sched st refl pre nok bnd
+      (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
+            (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC))))
   where
   sl      = Sched.slots sched
   Ψ       = ΨAt e sl
@@ -784,11 +788,12 @@ store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   let r = cascade a nextId sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
          * (storeNestMax sched st + nestIncAt e sl id)
-store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
+store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
   ≤-trans (storeNest-finish a schedG stG)
           (subst (λ m → storeNestMax schedG stG
                           ≤ nestFacAt e sl id
@@ -813,6 +818,7 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval =
       (arr-chains-nest-syn sl id a sched st hsl hcaps hnest)
       (arr-chains-len-sum sl id a sched st hsl hcaps)
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
+      hsz
       (arr-chains-bursts sl id a nextId sched st hsl hcaps)
       (arr-chains-caps sl id a nextId sched st hsl hcaps)
 
@@ -823,9 +829,10 @@ nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   let r = cascade a nextId sched st
   in nestOK? e sl (suc id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval =
+nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
   nestOK?-intro e sl (suc id)
     (proj₁ (proj₂ (cascade a nextId sched st)))
     (proj₂ (proj₂ (cascade a nextId sched st)))
@@ -833,7 +840,7 @@ nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval =
                          (proj₂ (proj₂ (cascade a nextId sched st))) ≤_)
            (sym (nestCapAt-suc e sl id))
            (≤-trans
-             (store-growth sl id a nextId sched st hsl hcaps hnest hval)
+             (store-growth sl id a nextId sched st hsl hcaps hnest hval hsz)
              (*-monoʳ-≤ (nestFacAt e sl id)
                (+-monoˡ-≤ (nestIncAt e sl id)
                           (nestOK?-store e sl id sched st hnest)))))
@@ -903,7 +910,9 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC =
   nestOut : nestOK? e sl′ (suc id) sched′ st′ ≡ true
   nestOut =
     subst (λ s′ → nestOK? e s′ (suc id) sched′ st′ ≡ true) (sym slEq)
-          (nest-tick sl id a id sched st refl pre nok harr)
+          (nest-tick sl id a id sched st refl pre nok harr
+            (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
+                  (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC))))
 
   capsParts = capsOK?-parts (capsAt e sl′ (suc id)) sched′ st′ capsOut
 
@@ -2015,6 +2024,21 @@ postulate
 -- grows exponentially in `D` where the live fold grows linearly, and
 -- the corner the refutation exploits is paid for here by the caps half
 -- rather than the depth half.
+-- PROBED: `Probed.Burst-Nest-Unit` instantiates this conclusion --
+--   not a numeral standing in for it -- at the three `*All` heads over
+--   a two-layer wrap.  The grant itself cannot be reached: it is
+--   `nestFacAt` times the rest, and the seal exports no equation for
+--   `nestBurstAt`, so no transcription of the cap into numerals
+--   exists.  What the seal does export is a FLOOR -- the cap at
+--   instant zero IS the program's own unit, and the step lemma carries
+--   that under instant one whatever the factor is -- and the floor is
+--   computable, so a `≤ᵇ` row lifts through the exported introduction
+--   to the statement itself.  Covered: the store reads 1 at each head
+--   against a unit of 5, so the rows are neither vacuous nor tight.
+--   NOT covered: the factor, which no row here reads at all, and any
+--   program whose subscribe frame installs deeper than its own unit --
+--   that is the region the class is held for, and clearing the floor
+--   says nothing about it.
 postulate
   burst-nest : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0

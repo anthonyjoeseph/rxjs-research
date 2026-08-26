@@ -1054,7 +1054,18 @@ def dev_check(rel: str, args, focus_filter: str | None = None) -> bool:
             # Walk-Level clause whose error was invisible in both directions.
             lines = msg.split("\n")
             heads = [k for k, ln in enumerate(lines) if ERRLINE.search(ln)]
-            body = lines[heads[-1]:] if heads else lines[-40:]
+            # AND WHEN NOTHING MATCHES, SHOW BOTH ENDS.  A message with no
+            # `file:line: error:` header at all -- a promoted warning, a
+            # scope error reported against the module -- has its class in
+            # the FIRST line and its subject in the last, and the tail
+            # alone showed neither.  Observed on a sealed lemma whose
+            # whole diagnosis sat above a 40-line telescope dump.
+            if heads:
+                body = lines[heads[-1]:]
+            elif len(lines) > 40:
+                body = lines[:20] + ["… middle elided …"] + lines[-20:]
+            else:
+                body = lines
             if len(body) > 40:
                 body = body[:39] + [f"… {len(body) - 39} more line(s) elided"]
             for ln in body:

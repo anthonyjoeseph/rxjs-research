@@ -61,3 +61,16 @@ error message actively misdirects. Read the entry before reasoning from the erro
   head and write `inputᶜ {Γ = Γ} i`. The general form: **when an unsolved meta is
   reported at a function whose own arguments look fully determined, look for an argument
   whose type variable appears in ITS result only.**
+
+- **INSIDE `abstract`, EVERY `where` BINDING NEEDS AN EXPLICIT TYPE SIGNATURE, AND THE
+  ERROR IS A WARNING WITH NO POSITION YOU CAN USE.** A sealed lemma whose proof is
+  staged through `where`-bound steps fails with
+  `MissingTypeSignatureForOpaque: Missing type signature for abstract definition S` —
+  because Agda never infers the type of an abstract definition, and a `where` binding
+  under an `abstract` block is one. The message then prints the whole clause back
+  desugared, as `mutual / abstract / syntax S ... / postulate S : _`, which reads like a
+  tool generating broken code and is in fact Agda's own rendering. Two consequences: the
+  fix is one signature per binding, and the desugared dump is NOT evidence that anything
+  mangled your source. Since the tower runs `-W error`, the warning is a build failure.
+  This bites specifically on the `budget-sufficient` spine, where the seal is mandatory
+  and staging a bound through named steps is the natural way to write it.

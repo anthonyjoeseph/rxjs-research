@@ -54,7 +54,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-         nat̂; strmᵗ; syncSizeᵛ; syncSizeᵉ)
+         nat̂; strmᵗ; deferᵉ; syncSizeᵛ; syncSizeᵉ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵉ)
@@ -190,3 +190,44 @@ fitsS = refl , refl
 fitsX : ((lhs (qX 1) ≤ᵇ rhs (qX 1)) ≡ true)
       × ((lhs (qX 2) ≤ᵇ rhs (qX 2)) ≡ true)
 fitsX = refl , refl
+
+-- THE DRAIN, which every row above leaves unreached.  A limited merge
+-- pends nothing when its inners are synchronous: the first completes
+-- inside the frame and the second is dequeued before the descent
+-- returns, which is why `nodes≡` reads zero at the merge head with a
+-- limit of one.  A `deferᵉ` inner does not complete inside the frame --
+-- subscribing it mints a live source carrying the body as an unrun
+-- payload -- so the merge is still at its limit when the descent ends
+-- and the second inner is genuinely held.  Then `mergeAll-st`'s nest is
+-- the pending list's depth rather than zero, and the store half of the
+-- statement is instantiated instead of satisfied vacuously.
+pend : ℕ → Val Γ₂ (obs (obs natᵗ))
+pend k = ofᵉ (strmᵗ (deepV k) ∷ [])
+
+liveInner : Val Γ₂ (obs (obs natᵗ))
+liveInner = deferᵉ (ofᵉ (strmᵗ (deepV 0) ∷ []))
+
+held : ℕ → Val Γ₂ (obs (obs (obs natᵗ)))
+held k = ofᵉ (strmᵗ liveInner ∷ strmᵗ (pend k) ∷ [])
+
+rH : ℕ → Closed Γ₂ (obs natᵗ)
+rH k = mergeAllᵉ (just 1) (held k)
+
+-- LOAD-BEARING: a zero here says the queue drained anyway, which would
+-- be a finding about the head rather than about the statement.
+nodesH : ℕ × ℕ
+nodesH = nodesOf (rH 1) , nodesOf (rH 2)
+
+nodesH≡ : nodesH ≡ (1 , 2)
+nodesH≡ = refl
+
+-- AND THE STATEMENT AT THOSE PROGRAMS, which is what reaching the drain
+-- was for: the store half is a real summand here rather than a zero, so
+-- these are the first rows where the conclusion's `⊔` is decided by the
+-- node table instead of by the burst.
+premH : prem (rH 1) × prem (rH 2)
+premH = (refl , refl) , (refl , refl)
+
+fitsH : ((lhs (rH 1) ≤ᵇ rhs (rH 1)) ≡ true)
+      × ((lhs (rH 2) ≤ᵇ rhs (rH 2)) ≡ true)
+fitsH = refl , refl

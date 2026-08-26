@@ -180,19 +180,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
   `PROBED×3`: the three `*All` heads at the restated `NestAt`. The burst
-  conjunct is instantiated at all three; the store halves are not, and cannot
-  be from an empty table — `switch-st` and `exhaust-st` carry zero node nest by
-  definition, `mergeAll-st` reads a queue empty at subscribe, so the drain is
-  still unreached.
+  conjunct is instantiated at all three, and the merge's store half now too, a
+  `deferᵉ` inner holding the queue past the frame. `switch-st` and `exhaust-st`
+  carry zero node nest by definition — unreachable, not unreached.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — FALSITY, `REFUTED`: one
   delivery's pending sources under the store it started from. `deferᵉ` mints a
-  live carrying its own body, which `isData` never sees; and the payload cannot
-  pay, `nestDᵉ` being zero at `deferᵉ` by design. Needs a term seeing a
-  deferred body.
-- **`burst-nest`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the subscribe
-  frame's nesting receipt at instant 1, the one place the currency is really
-  bet. Its header names harness rows only — measured-not-rechecked, which
-  lowers no class — and the probe route is sealed.
+  live the depth measure cannot see, so the charge is now the arrival's
+  `sizeᵛ` per chain — sighted where `nestDᵉ` is blind, and already bounded by
+  `valCaps?` where the cascade is entered.
+- **`burst-nest`** (Caps-Bridge) — FALSITY, `PROBED`: the subscribe frame's
+  nesting receipt at instant 1, the one place the currency is really bet. The
+  cap cannot be transcribed; the seal exports a FLOOR at the program's own
+  unit, and rows against it lift to this conclusion. The factor is unread.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what

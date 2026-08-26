@@ -959,13 +959,16 @@ postulate
   --   for -- with the cap at the value's own sync size, `B` at `nestDᵉ`
   --   exactly and the store `st-init`, both premises pinned by `refl`.
   --   Covered: the BURST conjunct, at two nested layers per head, each
-  --   descent handing back two values.  NOT covered: the store halves,
-  --   which are `0 ≤ _` in every program reachable at `root` from an
-  --   empty table -- `nodeNest` is zero by definition on `switch-st`
-  --   and `exhaust-st`, and `mergeAll-st` reads its PENDING list, which
-  --   an unlimited merge never fills and a limited one over synchronous
-  --   inners has drained by the time the descent returns.  So the drain
-  --   the risk is named for is not reached here.  And the depth axis
+  --   descent handing back two values; and the MERGE head's store half
+  --   at a queue that survives the frame, reading 1 and 2 rather than
+  --   zero, with the conclusion holding there.  Reaching it needs the
+  --   merge's FIRST inner not to finish inside the frame, which no
+  --   synchronous inner manages -- a `deferᵉ` inner does, its body
+  --   being unrun at subscribe, so the limit is still spent when the
+  --   descent returns and the second inner is genuinely parked.  NOT
+  --   covered: the switch and exhaust store halves, which are `0 ≤ _`
+  --   for a reason no program can defeat -- `nodeNest` is zero by
+  --   definition on `switch-st` and `exhaust-st`.  And the depth axis
   --   cannot refute: delivered nesting is exactly the layer count while
   --   the grant's base alone is 106 at one layer and grows four times
   --   faster, so the rows are DEGENERATE on the exponent.
