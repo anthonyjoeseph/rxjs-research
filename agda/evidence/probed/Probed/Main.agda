@@ -43,7 +43,7 @@ open import Probed.Subscribe-Nest-Wrap
   using (premM; premS; premX; bursts≡; nodes≡; nodesH≡; premH; fitsH;
          emits≡; emitsS≡; emitsX≡; base≡; fitsM; fitsS; fitsX)
 open import Probed.Burst-Nest-Unit
-  using (figures≡; okM; okS; okX)
+  using (figures≡; okM; okS; okX; deferFigs≡)
 open import Probed.Chain-Caps-Flat
   using (U-row; C-row; F-row)
 open import Probed.Cascade-Store-Components

@@ -183,15 +183,15 @@ does not fit is a finding about the shared statement, not about the head.
   conjunct is instantiated at all three, and the merge's store half now too, a
   `deferᵉ` inner holding the queue past the frame. `switch-st` and `exhaust-st`
   carry zero node nest by definition — unreachable, not unreached.
-- **`burst-nest`** (Caps-Bridge) — FALSITY, `PROBED`: the subscribe frame's
-  nesting receipt at instant 1, the one place the currency is really bet. The
-  cap cannot be transcribed; the seal exports a FLOOR at the program's own
-  unit, and rows against it lift to this conclusion. The factor is unread.
+- **`burst-nest-floor`** (Caps-Bridge) — FALSITY, `PROBED`: the subscribe
+  frame's store against the program's unit PLUS `capsAt`'s size — the leaf
+  `burst-nest` is now a body over. The unit alone is refuted by a defer-headed
+  program; the size is what sees the body, and the factor stays unread.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
   chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the
-  cascade door — now instantiated at the family that killed the depth form,
-  and at the frames that mint past the arrival.
+  cascade door — now instantiated at the family that killed the depth form, and
+  at the frames that mint past the arrival.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what

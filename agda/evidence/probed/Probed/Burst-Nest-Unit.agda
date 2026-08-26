@@ -17,7 +17,7 @@
 -- subscribe frame, which is the whole question at this instant, and
 -- which the wrap corpus below makes the descent actually work for.
 --
--- TARGET: burst-nest
+-- TARGET: burst-nest-floor
 module Probed.Burst-Nest-Unit where
 
 open import Data.Bool using (true)
@@ -32,15 +32,14 @@ open import Decide using (T-to)
 
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-         nat̂; strmᵗ)
+         nat̂; strmᵗ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (subscribeE; root; sched-init; st-init; budgetAt; Sched; EvalSt)
 open import Rx.Nest-Depth using ()
 
 open import Verify-Budget-Sufficient.Nest-Store
-  using (storeNestMax; nestUnit; nestCapAt; nestCapAt-0; nestCap-mono;
-         nestOK?; nestOK?-intro)
+  using (storeNestMax; nestUnit; nestCapAt; nestCapAt-0; nestCap-mono; nestOK?; nestOK?-intro)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -131,3 +130,29 @@ okS = ok (pS 2) refl
 
 okX : nestOK? (pX 2) slots 1 (schedOf (pX 2)) (stOf (pX 2)) ≡ true
 okX = ok (pX 2) refl
+
+-- ── the region the floor cannot reach ──────────────────────────────
+
+-- `nestUnit` is `suc (nestDᵉ e + slotsNestSum sl)`, and `nestDᵉ` is
+-- the measure that reads zero through a `deferᵉ`.  So a program headed
+-- by a defer has a unit of one however deep the body is, while
+-- subscribing it mints a live source carrying that body -- the
+-- blindness that refuted the live fold, arriving at the FLOOR this
+-- file lifts through rather than at a walk.
+pD : ℕ → Closed Γ₂ natᵗ
+pD k = deferᵉ (deepV k)
+
+deferFigs : ℕ
+deferFigs = storeOf (pD 2) + 1000 * nestUnit (pD 2) slots
+          + 1000000 * storeOf (pD 4) + 1000000000 * nestUnit (pD 4) slots
+
+deferFigs≡ : deferFigs ≡ 2004002002
+deferFigs≡ = refl
+
+-- AND THE FLOOR THAT DOES REACH IT IS NOT INSTANTIABLE, which is why
+-- the crossing above is the whole product of these rows.  The repair
+-- is `nestCapAt-1-floor`: the instant-one cap dominates the unit PLUS
+-- `capsAt`'s own size, and the size reads `sizeᵉ`, which descends into
+-- a deferred body.  It is a theorem and not a row -- `capsAt`'s size
+-- is sealed through `capsBase`, so its right-hand side does not reduce
+-- at any program and no `≤ᵇ` can be taken against it.

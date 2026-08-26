@@ -660,6 +660,40 @@ abstract
         (2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ towerℕ h)
         × (suc h ≤ towerℕ (capsHpred e sl id))
 
+-- THE INSTANT-ONE FLOOR, STATED IN A SIGHTED CURRENCY.  The base cap
+-- IS the program's own unit, and the unit is built on `nestDᵉ` -- the
+-- measure that reads zero through a `deferᵉ`, so a program headed by a
+-- defer carries a unit of one however deep the body its subscribe
+-- frame installs.  What pays for that blindness is the increment,
+-- which dominates `capsAt`'s own size, and the size reads `sizeᵉ`,
+-- which DOES descend into a deferred body.  So a consumer needing the
+-- instant-one cap can charge the unit plus that size and never read
+-- the factor at all, which is the one quantity the seal exports no
+-- equation for.
+-- AND THE SUMMAND IS NOT SLACK, which `Probed.Burst-Nest-Unit`
+-- measures: a defer-headed program at a body four deep leaves a store
+-- of 4 against a unit of 2, so the unit alone does not carry it.  This
+-- conclusion is not itself instantiable -- `capsAt`'s size is sealed
+-- through `capsBase`, so the right-hand side reduces at no program.
+nestCapAt-1-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  nestUnit e sl + Caps.cSize (capsAt e sl 0) ≤ nestCapAt e sl 1
+nestCapAt-1-floor e sl =
+  ≤-trans (+-mono-≤ (≤-reflexive (sym (nestCapAt-0 e sl)))
+                    (size≤nestIncAt e sl 0))
+          (≤-trans (nest-inflate (nestFacAt e sl 0) _ (1≤nestFacAt e sl 0))
+                   (≤-reflexive (sym (nestCapAt-suc e sl 0))))
+
+-- AND THE CONSUMER'S FORM, kept here rather than at the call site: the
+-- spine module that spends this pays many times over to elaborate the
+-- subscribe term against the introduction, and this module does not.
+nestOK?-from-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  storeNestMax sched st ≤ nestUnit e sl + Caps.cSize (capsAt e sl 0) →
+  nestOK? e sl 1 sched st ≡ true
+nestOK?-from-floor e sl sched st h =
+  nestOK?-intro e sl 1 sched st (≤-trans h (nestCapAt-1-floor e sl))
+
+
 ------------------------------------------------------------------
 -- THE ONE ARITHMETIC OBLIGATION THE WHOLE CURRENCY RESTS ON, and it
 -- mentions no evaluator: three quantities each under `nestCapAt`, plus

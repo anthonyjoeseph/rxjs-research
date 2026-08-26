@@ -101,7 +101,7 @@ open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store;
   nestOK?-intro; nestCapAt-suc; nest-sum-3; nestFacAt; nestIncAt; storeNest-latch;
-  storeNest-finish; nestOK?-latch)
+  storeNest-finish; nestOK?-latch; nestUnit; nestOK?-from-floor)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
@@ -2024,26 +2024,42 @@ postulate
 -- grows exponentially in `D` where the live fold grows linearly, and
 -- the corner the refutation exploits is paid for here by the caps half
 -- rather than the depth half.
--- PROBED: `Probed.Burst-Nest-Unit` instantiates this conclusion --
---   not a numeral standing in for it -- at the three `*All` heads over
---   a two-layer wrap.  The grant itself cannot be reached: it is
---   `nestFacAt` times the rest, and the seal exports no equation for
---   `nestBurstAt`, so no transcription of the cap into numerals
---   exists.  What the seal does export is a FLOOR -- the cap at
---   instant zero IS the program's own unit, and the step lemma carries
---   that under instant one whatever the factor is -- and the floor is
---   computable, so a `≤ᵇ` row lifts through the exported introduction
---   to the statement itself.  Covered: the store reads 1 at each head
---   against a unit of 5, so the rows are neither vacuous nor tight.
---   NOT covered: the factor, which no row here reads at all, and any
---   program whose subscribe frame installs deeper than its own unit --
---   that is the region the class is held for, and clearing the floor
---   says nothing about it.
+-- AND THE SECOND SUMMAND IS WHY THIS LEAF IS NOT THE UNIT ALONE.  The
+-- unit is `suc (nestDᵉ e + slotsNestSum ins)`, built on the measure
+-- that reads zero through a `deferᵉ`, so a defer-headed program has a
+-- unit of one however deep the body its subscribe frame installs.
+-- `capsAt`'s size reads `sizeᵉ`, which descends into that body, and
+-- `nestCapAt-1-floor` is what carries the pair under the instant-one
+-- cap without the factor ever being read.
+-- PROBED: `Probed.Burst-Nest-Unit` instantiates the left half against
+--   the unit at the three `*All` heads over a two-layer wrap, where
+--   the store reads 1 against a unit of 5 -- neither vacuous nor
+--   tight.  And it REACHES the region that reading leaves open: a
+--   defer-headed program at a body two deep is tight, a store of 2
+--   against a unit of 2, and at four deep the unit FAILS, a store of 4
+--   against the same unit of 2.  That crossing is what the second
+--   summand exists for and it is load-bearing rather than slack.
+--   NOT covered: this conclusion itself, at any program -- `capsAt`'s
+--   size is sealed through `capsBase`, so the right-hand side reduces
+--   nowhere and no `≤ᵇ` row can be taken against it.  Nor the factor,
+--   which the route deliberately never reads.
 postulate
+  burst-nest-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    let r = subscribeE (budgetAt e ins 0) e root 0 0
+                       (sched-init e ins) (st-init e)
+    in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+         ≤ nestUnit e ins + Caps.cSize (capsAt e ins 0)
+
+-- SEALED, and this is not optional: this body sits on the
+-- `budget-sufficient` spine, where an unsealed proof puts its whole
+-- reduction into the types of every consumer above it.  No consumer
+-- needs more than the statement.
+abstract
   burst-nest : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)
     in nestOK? e ins 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+  burst-nest e ins = nestOK?-from-floor e ins _ _ (burst-nest-floor e ins)
 
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
