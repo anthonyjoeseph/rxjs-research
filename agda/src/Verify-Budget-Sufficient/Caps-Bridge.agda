@@ -2039,10 +2039,17 @@ postulate
 --   against a unit of 2, and at four deep the unit FAILS, a store of 4
 --   against the same unit of 2.  That crossing is what the second
 --   summand exists for and it is load-bearing rather than slack.
---   NOT covered: this conclusion itself, at any program -- `capsAt`'s
---   size is sealed through `capsBase`, so the right-hand side reduces
---   nowhere and no `≤ᵇ` row can be taken against it.  Nor the factor,
---   which the route deliberately never reads.
+--   The conclusion itself does not reduce -- `capsAt`'s size is sealed
+--   through `capsBase` -- but `capsAt-base-size⁺` is a PROVEN lower
+--   bound on it built from `sizeᵉ`, and putting that bound in the size's
+--   place gives a STRICTLY STRONGER claim that computes.  Green there
+--   is green here.  It is taken at the same defer-headed family that
+--   killed the unit form, four deep and nine and twenty, and at the
+--   three heads: the store rises one per level against a floor rising
+--   four, so the two do not converge.  The slot axis is off zero as
+--   well, and it is two-sided rather than a weakening -- the merge
+--   head's store reads one at empty slots and four at these.
+--   NOT covered: the factor, which the route deliberately never reads.
 postulate
   burst-nest-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0

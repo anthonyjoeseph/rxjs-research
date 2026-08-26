@@ -25,15 +25,15 @@ open import Data.List using ([]; _∷_)
 open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ≤-reflexive; m≤m+n; ≤ᵇ⇒≤)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Decide using (T-to)
 
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-         nat̂; strmᵗ; deferᵉ)
-open import Rx.Slots using (Slots)
+         nat̂; strmᵗ; deferᵉ; sizeᵉ)
+open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (subscribeE; root; sched-init; st-init; budgetAt; Sched; EvalSt)
 open import Rx.Nest-Depth using ()
@@ -156,3 +156,71 @@ deferFigs≡ = refl
 -- a deferred body.  It is a theorem and not a row -- `capsAt`'s size
 -- is sealed through `capsBase`, so its right-hand side does not reduce
 -- at any program and no `≤ᵇ` can be taken against it.
+
+-- ── the floor's OTHER summand, which is the sighted one ────────────
+
+-- The conclusion itself cannot be instantiated: `Caps.cSize (capsAt
+-- …)` is sealed through `capsBase`, and that is a boundary rather
+-- than a gap.  But `capsAt-base-size⁺` is a PROVEN lower bound on it
+-- built from `sizeᵉ`, which is sighted exactly where `nestUnit` is
+-- blind -- so replacing the size by that bound gives a STRICTLY
+-- STRONGER claim that does compute.  A green row here is evidence for
+-- the postulate; a red one would be a finding about the strong form
+-- and not by itself a refutation.
+floorOf : ∀ {t} (e : Closed Γ₂ t) → ℕ
+floorOf e = nestUnit e slots + (3 + sizeᵉ e + slotsSize slots)
+
+-- the defer-headed family that refuted the unit alone, re-asked here
+strongFigs : ℕ
+strongFigs = storeOf (pD 4) + 1000 * floorOf (pD 4)
+           + 1000000 * storeOf (pD 9) + 1000000000 * floorOf (pD 9)
+
+strongFigs≡ : strongFigs ≡ 56009036004
+strongFigs≡ = refl
+
+-- the store rises one per level and the floor four, so the two do not
+-- converge; asked again well past where the unit form died
+strongFits : ((storeOf (pD 4) ≤ᵇ floorOf (pD 4)) ≡ true)
+           × ((storeOf (pD 9) ≤ᵇ floorOf (pD 9)) ≡ true)
+           × ((storeOf (pD 20) ≤ᵇ floorOf (pD 20)) ≡ true)
+strongFits = refl , refl , refl
+
+-- and the heads the unit form was originally read at, under the
+-- strong floor rather than the blind one
+strongHeads : ((storeOf (pM 2) ≤ᵇ floorOf (pM 2)) ≡ true)
+            × ((storeOf (pS 2) ≤ᵇ floorOf (pS 2)) ≡ true)
+            × ((storeOf (pX 2) ≤ᵇ floorOf (pX 2)) ≡ true)
+strongHeads = refl , refl , refl
+
+-- AND THE SLOT AXIS, which is the one axis every row above holds at
+-- zero and the only remaining one that is TWO-SIDED: slots enter the
+-- floor through `slotsSize` and `slotsNestSum`, but they also install
+-- state the left side reads, so raising them is not automatically a
+-- weakening the way a pure bound-side parameter would be.
+richSlots : Slots Γ₂
+richSlots = insT 3 2 2
+
+richFloor : ∀ {t} (e : Closed Γ₂ t) → ℕ
+richFloor e = nestUnit e richSlots + (3 + sizeᵉ e + slotsSize richSlots)
+
+richStore : ∀ {t} (e : Closed Γ₂ t) → ℕ
+richStore e =
+  let r = subscribeE (budgetAt e richSlots 0) e root 0 0
+                     (sched-init e richSlots) (st-init e)
+  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+richFigs : ℕ
+richFigs = richStore (pD 4) + 1000 * richFloor (pD 4)
+         + 1000000 * richStore (pM 2) + 1000000000 * richFloor (pM 2)
+
+richFigs≡ : richFigs ≡ 71004055004
+richFigs≡ = refl
+
+-- the axis is LIVE and not decoration: the merge head's store reads
+-- one at empty slots and four at these, so the left side moved
+richFits : ((richStore (pD 4) ≤ᵇ richFloor (pD 4)) ≡ true)
+         × ((richStore (pD 9) ≤ᵇ richFloor (pD 9)) ≡ true)
+         × ((richStore (pM 2) ≤ᵇ richFloor (pM 2)) ≡ true)
+         × ((richStore (pS 2) ≤ᵇ richFloor (pS 2)) ≡ true)
+         × ((richStore (pX 2) ≤ᵇ richFloor (pX 2)) ≡ true)
+richFits = refl , refl , refl , refl , refl

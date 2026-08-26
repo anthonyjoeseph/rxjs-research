@@ -178,10 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`burst-nest-floor`** (Caps-Bridge) — FALSITY, `PROBED`: the subscribe
-  frame's store against the program's unit PLUS `capsAt`'s size — the leaf
-  `burst-nest` is now a body over. The unit alone is refuted by a defer-headed
-  program; the size is what sees the body, and the factor stays unread.
+- **`burst-nest-floor`** (Caps-Bridge) — DIFFICULTY, `PROBED`: the subscribe
+  frame's store against the unit PLUS `capsAt`'s size. The unit alone is
+  refuted by a defer-headed program; a proven lower bound on the size turns the
+  sealed conclusion into a stronger claim that computes, green there.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `PROBED×4`: the three `*All` heads at the restated `NestAt`. `G` names `κ`
   nowhere and is blind past a `deferᵉ`; both reached — the path frame mints at
