@@ -305,6 +305,15 @@ abstract
 --   and nothing else -- so the factor is one and the caps premise buys
 --   the statement nothing at all.  The same file pins `valCaps?` FALSE
 --   at the arriving value, which is the premise that does buy it.
+-- PROBED: `Probed.Subscribe-Nest` clears the restated form at the same
+--   witness and the same tight cap, at the width this statement's own
+--   hypotheses pin -- `1 ≤ W` and one value.  The crossing is the row
+--   that could have failed: eighty delivered against forty-one at a
+--   factor of one, which is the refutation directly above, and against
+--   eighty-two at a factor of two, while the cap the value's size grants
+--   is a hundred and seventy-three.  Not covered: one frame, one value,
+--   and a node table holding the single ordinary node a subscribe
+--   installs.
 postulate
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (W : ℕ) (sl : Slots Γ)
@@ -397,6 +406,28 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 --   is unbounded rather than one crossing.  The same file pins
 --   `valCaps?` FALSE at both programs, which is what makes the premise
 --   load-bearing instead of merely present.
+-- PROBED: `Probed.Subscribe-Nest` clears the restated form on exactly
+--   the family that refuted every earlier one, at the SMALLEST cap the
+--   `valCaps?` premise admits -- the value's own size and width, so
+--   there is no slack in the choice -- with `B` taken to be `nestDᵉ o`
+--   exactly.  What it measures rather than merely asserts is the
+--   exponent SPENT: two of the three programs cross, needing one bit and
+--   two, against the twenty-one to thirty-five the cap grants, and the
+--   demand rises by ONE per stacked frame while the size it is read off
+--   rises by SEVEN.  So the shape outruns the doubling with six of every
+--   seven bits unspent.  Not covered: every subscription is at `root`
+--   from an empty node table, so the queue-facing descent under a
+--   `from-inner` is untouched -- rows do descend under that frame, from
+--   tables holding nothing, a forty-deep queue, and a hundred-deep one
+--   that DECIDES the `⊔` over what the descent emits.  That last is the
+--   axis that could still have refuted, since the store is in the
+--   premise and in the conclusion's left and in the right-hand side
+--   nowhere; it does not, and the crossing moves by exactly the one bit
+--   the larger store costs, which is the factor absorbing it linearly
+--   rather than compounding.  What the rows also turn up: `stBounded?`
+--   is what refuses a store deeper than the cap, so the axis is CAPPED
+--   and not free.  Not covered: any cap above the value's own, except in
+--   the one row whose store forces a wider one.
 postulate
   subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)

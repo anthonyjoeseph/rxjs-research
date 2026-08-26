@@ -173,14 +173,14 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`subscribeE-nest`** (Nest-Walk) — FALSITY, `REFUTED×4`: the subscribe
-  descent's own nest bound, all the inner arm still rests on. Absolute, not
-  relative to the store handed in, so the factor cannot compound per queued
-  inner; charged in the size of what is subscribed. Unprobed at that form.
-- **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED×2`: restated with
-  the row above and by the same repair, the wrap's own subscribe being the same
-  descent. Measured multiplicative in the incoming depth, which is what the
-  factor is; unprobed at the new form.
+- **`subscribeE-nest`** (Nest-Walk) — DIFFICULTY, `REFUTED×4, PROBED`: the
+  subscribe descent's own nest bound, all the inner arm still rests on.
+  Absolute, not relative to the store handed in, so the factor cannot compound
+  per queued inner; charged in the size of what is subscribed.
+- **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, PROBED`: the
+  same descent arriving through the outer wrap, repaired by the same premise.
+  Its per-value unit is what a receipt at the root does not cover, so it is
+  instantiated separately.
 - **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED, DEAD ROUTE`: the
   share sink's fan-out over the admitted registrations, under one unit. They
   touch disjoint nodes, so the map moves by the deepest and not the sum — which
