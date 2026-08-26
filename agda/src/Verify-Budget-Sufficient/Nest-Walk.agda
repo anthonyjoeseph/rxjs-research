@@ -2,12 +2,12 @@
 -- foldPath-nodes … frameNestD
 module Verify-Budget-Sufficient.Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
 open import Data.List.Properties using (++-identityʳ)
 open import Data.Bool.ListAction using (any; all)
-open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
   *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤; *-distribˡ-+;
@@ -34,11 +34,11 @@ open import Rx.Evaluator using
   installNode; pushBurst; oneShotBurst; splitEvents)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-setNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Rx.Frame-Width using (pWᵛ; outWᵉ; dWᵉ; dWᵗ)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to)
-open import Verify-Budget-Sufficient.Measures using (pathLen)
+open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; boundedNode; all-impl; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
@@ -451,6 +451,169 @@ abstract
     ≤-trans (⊔-mono-≤ (≤-refl {nestDᵛ u x}) (nestDᵛˢ-++ xs ys))
             (≤-reflexive (sym (⊔-assoc (nestDᵛ u x) (nestDᵛˢ xs) (nestDᵛˢ ys))))
 
+-- THE CAPS PREMISE THIS FACE CARRIES, AND IT IS DELIBERATELY WEAKER
+-- THAN THE CAPS FACE'S.  A scan installs the EVALUATED seed, and
+-- `boundedNode` reads a scan node at the stored value's SIZE while the
+-- premise available at that head bounds the seed's TERM size.
+-- Evaluation grows size, so no head can re-establish `capsOK?` for its
+-- child at the cap it was entered at, and stepping the cap the way the
+-- caps face does is not available here -- the grant is keyed on
+-- `cSize`, so a stepped cap is a larger grant and the parent owes the
+-- smaller one.
+--
+-- Exempting the scan node is the repair, and it costs nothing HERE:
+-- this face measures DEPTH, and the one place a stored accumulator is
+-- read -- the frame-level scan bound -- reads it through
+-- `lookupNode-nodes` at its depth, never at its size or its width.
+-- What the exemption leaves standing is the flatten queue, which is
+-- the conjunct the *All heads actually spend.
+--
+-- Weakening a HYPOTHESIS strengthens every statement it appears in, so
+-- the boundary runs one way only: a caller holding the caps face's own
+-- predicate hands it in through `capsOK?⇒nest`, and nothing converts
+-- back.
+-- REFUTED: `Refuted.Scan-Seed-Caps` is the crossing, at the smallest
+--   cap the head's premise admits.
+nodeSzᴺ? : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
+nodeSzᴺ? B (scan-st _)                = true
+nodeSzᴺ? B (take-st _)                = true
+nodeSzᴺ? B (mergeAll-st lim act q od) = boundedNode B (mergeAll-st lim act q od)
+nodeSzᴺ? B (switch-st _ _)            = true
+nodeSzᴺ? B (exhaust-st _ _)           = true
+
+nodeWidᴺ? : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
+nodeWidᴺ? W sl (scan-st _)                = true
+nodeWidᴺ? W sl (take-st _)                = true
+nodeWidᴺ? W sl (mergeAll-st lim act q od) = widNode W sl (mergeAll-st lim act q od)
+nodeWidᴺ? W sl (switch-st _ _)            = true
+nodeWidᴺ? W sl (exhaust-st _ _)           = true
+
+nestStB? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → Sched Γ → EvalSt e → Bool
+nestStB? B sched st =
+  all (boundedLive B) (Sched.live sched)
+  ∧ all (λ kv → nodeSzᴺ? B (proj₂ kv)) (EvalSt.nodes st)
+
+nestCapsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+            → Caps → Sched Γ → EvalSt e → Bool
+nestCapsOK? c sched st =
+  nestStB? (Caps.cSize c) sched st
+  ∧ regsSz? (Caps.cSize c) (EvalSt.registry st)
+  ∧ all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
+  ∧ all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
+        (EvalSt.nodes st)
+  ∧ (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
+
+-- the five conjuncts back out, with their result types pinned so the
+-- booleans `∧-true` splits on are determined
+nestCapsOK?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  nestCapsOK? c sched st ≡ true →
+    (nestStB? (Caps.cSize c) sched st ≡ true)
+  × (regsSz? (Caps.cSize c) (EvalSt.registry st) ≡ true)
+  × (all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched) ≡ true)
+  × (all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
+         (EvalSt.nodes st) ≡ true)
+  × ((length (EvalSt.registry st) ≤ᵇ Caps.cReg c) ≡ true)
+nestCapsOK?-parts c sched st h with ∧-true _ _ h
+... | h0 , r1 with ∧-true _ _ r1
+... | h1 , r2 with ∧-true _ _ r2
+... | h2 , r3 with ∧-true _ _ r3
+... | h3 , h4 = h0 , h1 , h2 , h3 , h4
+
+nodeSzᴺ?-weaken : ∀ {n} {Γ : Ctx n} (B : ℕ) (ns : NodeState Γ) →
+  boundedNode B ns ≡ true → nodeSzᴺ? B ns ≡ true
+nodeSzᴺ?-weaken B (scan-st _)          h = refl
+nodeSzᴺ?-weaken B (take-st _)          h = refl
+nodeSzᴺ?-weaken B (mergeAll-st _ _ _ _) h = h
+nodeSzᴺ?-weaken B (switch-st _ _)      h = refl
+nodeSzᴺ?-weaken B (exhaust-st _ _)     h = refl
+
+nodeWidᴺ?-weaken : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) (ns : NodeState Γ) →
+  widNode W sl ns ≡ true → nodeWidᴺ? W sl ns ≡ true
+nodeWidᴺ?-weaken W sl (scan-st _)          h = refl
+nodeWidᴺ?-weaken W sl (take-st _)          h = refl
+nodeWidᴺ?-weaken W sl (mergeAll-st _ _ _ _) h = h
+nodeWidᴺ?-weaken W sl (switch-st _ _)      h = refl
+nodeWidᴺ?-weaken W sl (exhaust-st _ _)     h = refl
+
+capsOK?⇒nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true → nestCapsOK? c sched st ≡ true
+capsOK?⇒nest c sched st h =
+    ∧-intro (∧-intro (proj₁ hL)
+                     (all-impl _ _
+                        (λ kv → nodeSzᴺ?-weaken (Caps.cSize c) (proj₂ kv))
+                        (EvalSt.nodes st) (proj₂ hL)))
+    (∧-intro h1
+    (∧-intro h2
+    (∧-intro (all-impl _ _
+                (λ kv → nodeWidᴺ?-weaken (Caps.cWid c) (Sched.slots sched)
+                          (proj₂ kv))
+                (EvalSt.nodes st) h3)
+             h4)))
+  where
+  P  = capsOK?-parts c sched st h
+  h0 = proj₁ P
+  hL = ∧-true _ _ h0
+  h1 = proj₁ (proj₂ P)
+  h2 = proj₁ (proj₂ (proj₂ P))
+  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+-- minting an instance id touches the node counter and nothing this
+-- predicate reads
+nestCapsOK?-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (k : NodeId) (sched : Sched Γ) (st : EvalSt e) →
+  nestCapsOK? c sched st ≡ true →
+  nestCapsOK? c (record sched { nextNode = k }) st ≡ true
+nestCapsOK?-nextNode c k sched st h = h
+
+setNode-nodeSzᴺ? : ∀ {n} {Γ : Ctx n} (B : ℕ)
+  (nid : NodeId) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
+  nodeSzᴺ? B ns ≡ true →
+  all (λ kv → nodeSzᴺ? B (proj₂ kv)) nodes ≡ true →
+  all (λ kv → nodeSzᴺ? B (proj₂ kv)) (setNode nid ns nodes) ≡ true
+setNode-nodeSzᴺ? B nid ns []             bn h = ∧-intro bn refl
+setNode-nodeSzᴺ? B nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
+... | true  = ∧-intro bn (∧-trueʳ h)
+... | false = ∧-intro (∧-trueˡ h) (setNode-nodeSzᴺ? B nid ns r bn (∧-trueʳ h))
+
+setNode-nodeWidᴺ? : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ)
+  (nid : NodeId) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
+  nodeWidᴺ? W sl ns ≡ true →
+  all (λ kv → nodeWidᴺ? W sl (proj₂ kv)) nodes ≡ true →
+  all (λ kv → nodeWidᴺ? W sl (proj₂ kv)) (setNode nid ns nodes) ≡ true
+setNode-nodeWidᴺ? W sl nid ns []             bn h = ∧-intro bn refl
+setNode-nodeWidᴺ? W sl nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
+... | true  = ∧-intro bn (∧-trueʳ h)
+... | false = ∧-intro (∧-trueˡ h)
+                      (setNode-nodeWidᴺ? W sl nid ns r bn (∧-trueʳ h))
+
+nestCapsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
+  nodeSzᴺ? (Caps.cSize c) ns ≡ true →
+  nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns ≡ true →
+  nestCapsOK? c sched st ≡ true →
+  nestCapsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
+nestCapsOK?-setNode c nid ns sched st bn wn inv =
+    ∧-intro (∧-intro (proj₁ hL)
+                     (setNode-nodeSzᴺ? (Caps.cSize c) nid ns (EvalSt.nodes st) bn
+                        (proj₂ hL)))
+    (∧-intro h1
+    (∧-intro h2
+    (∧-intro (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
+                (EvalSt.nodes st) wn h3)
+             h4)))
+  where
+  P  = nestCapsOK?-parts c sched st inv
+  h0 = proj₁ P
+  hL = ∧-true _ _ h0
+  h1 = proj₁ (proj₂ P)
+  h2 = proj₁ (proj₂ (proj₂ P))
+  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+
+
 -- AND THE CAPS THE DRAIN SPENDS, HANDED AT EVERY STATE IT PASSES
 -- THROUGH, for the reason `capsWalkOK` is shaped that way one face over:
 -- a subscription installs nodes the caps did not previously have to
@@ -463,9 +626,9 @@ capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
 capsDrainOK c sl sf allNid κ id now lim act [] sched st =
-  (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
+  (Sched.slots sched ≡ sl) × (nestCapsOK? c sched st ≡ true)
 capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
-  (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
+  (Sched.slots sched ≡ sl) × (nestCapsOK? c sched st ≡ true)
   × (valCaps? c sl (obs s) o ≡ true)
   × capsDrainOK c sl sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
@@ -683,7 +846,7 @@ NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set
 NestAt {Γ = Γ} {t = t} {e = e} c sl B W g o κ id now sched st =
-  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   valCaps? c sl (obs _) o ≡ true →
   nestDᵉ o ≤ B →
   descW g o κ id now sched st ≤ W →
@@ -717,17 +880,14 @@ postulate
   -- factor PER VALUE and the reason the exponent carries the length
   -- rather than a constant.
   --
-  -- AND THE PREMISE SET IS WRONG, WHICH IS WHY THIS ROW IS NOT A GRIND.
-  -- The shared statement carries `capsOK? c` on the state it is handed
-  -- and every head re-establishes it for its child.  This is the only
-  -- head that installs an EVALUATED value: four install nothing, the
-  -- filter head installs a counter that `boundedNode` reads as bounded
-  -- at every cap, and the *All heads install their own empty state.
-  -- What has to fit under the cap here is the seed's VALUE size and
-  -- what the premise bounds is its TERM size, so the head cannot
-  -- recurse at the cap it was entered at.  The bound itself is
-  -- untouched by this -- an evaluated seed's DEPTH is `evalTm-nest`,
-  -- which is proven, and the grant has room for it.
+  -- AND IT IS THE HEAD THE WEAKENED CAPS PREMISE WAS SHAPED FOR.  This
+  -- is the only one that installs an EVALUATED value -- four install
+  -- nothing, the filter head a counter `boundedNode` reads as bounded
+  -- at every cap, the *All heads their own empty state -- and
+  -- `nestCapsOK?` exempts a stored accumulator's size for exactly that
+  -- reason, so the head recurses at the cap it was entered at.  The
+  -- bound is untouched by any of it: an evaluated seed's DEPTH is
+  -- `evalTm-nest`, which is proven, and the grant has room for it.
   --
   -- REFUTED: `Refuted.Scan-Burst-Nest` kills the un-indexed form
   --   outright, 16383 delivered against a charge of 12288, and the row
@@ -741,20 +901,11 @@ postulate
   --   the burst at fourteen values in ONE subscribe frame against a
   --   `pWᵛ` of one and an `entryCeil` of eight, which is why no wider
   --   reading of the ENTRY cap repairs it either.
-  -- REFUTED: `Refuted.Scan-Seed-Caps` pins that crossing at the
-  --   SMALLEST cap the premise admits: a seed whose `caseᵗ` arm names
-  --   its binder twice returns two copies of what it bound, thirty-nine
-  --   nodes of head syntax against a seed evaluating to forty-five,
-  --   with `capsOK?` green before the install and `false` after it.
   -- DEAD ROUTE: stepping the cap the way the caps face does -- a scan
   --   there reports `frameStep (j + j′)` and charges `j′` -- is dead
   --   HERE and not merely unproven, because the grant is keyed on
   --   `cSize`: a stepped cap is a LARGER key, hence a larger grant, and
-  --   the parent owes the smaller one.  What is left is to weaken the
-  --   premise rather than widen the cap, and the size conjunct is the
-  --   candidate: this face is about DEPTH, `boundedNode` is a SIZE
-  --   predicate, and the four heads that consume the premise take it
-  --   only to hand on.
+  --   the parent owes the smaller one.
   -- PROBED: `Probed.Scan-Burst-Nest` reads that witness against THIS
   --   form, at the same cold script and the same tight size cap --
   --   fourteen values, 16383 delivered, green here and pinned `false`
@@ -876,9 +1027,9 @@ subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv 
   st₀    = installNode nid (take-st (suc k)) st
   res    = subscribeE g b (take-f nid ↠ κ) id now sched₀ st₀
 
-  inv₀ : capsOK? c sched₀ st₀ ≡ true
-  inv₀ = capsOK?-setNode c nid (take-st (suc k)) sched₀ st refl refl
-           (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
+  inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
+  inv₀ = nestCapsOK?-setNode c nid (take-st (suc k)) sched₀ st refl refl
+           (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
 
   push = pushBurst-nest-take g id now nid κ
            (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -927,7 +1078,7 @@ subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hw =
 subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   valCaps? c sl (obs s) o ≡ true →
   nestDᵉ o ≤ B →
   innerW sf allNid κ id now o sched st ≤ W →
@@ -943,7 +1094,7 @@ subscribeInner-nest {e = e} c sl B W (gs fuel) allNid κ id now o sched st hsl h
   IH = subscribeE-nest c sl B W fuel o
          (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
          (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
-         (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
+         (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
          (≤-trans (innerW-gs fuel allNid κ id now o sched st) hw)
 
   -- the cap is what flattens the descent's own index here: an inner the
@@ -1030,7 +1181,7 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
   (id : Id) (now : Tick)
   (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
@@ -1172,7 +1323,7 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
   (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
@@ -1321,7 +1472,7 @@ abstract
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
   stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =
     ≤-trans (stepFrame-nodes-inner c sl W sf id now op allNid inst p vals fin sched st
-               hsl hc hfd hfw)
+               hsl (capsOK?⇒nest c sched st hc) hfd hfw)
             (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
               (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl)) (zero-charge W _)))
   stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hfw hw =

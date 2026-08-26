@@ -178,18 +178,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-scan`** (Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE,
-  PROBED`: the one head that installs an EVALUATED value, and `NestAt`'s
-  fixed-cap premise cannot survive it — the cap must bound the seed's value
-  size and the premise bounds its term size. Its header carries the crossing
-  and why widening the cap is the wrong direction.
-- **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the last
-  substituting head. The map and one-shot heads are worked instances, both
-  keyed on one level of `sizeᵉ`; μ cannot key on the term at all.
-- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
-  `NO EVIDENCE`: the three `*All` heads, a mint plus the outer's descent pushed
-  through a `thru-outer` frame. Their drain is proven at the size cap; what is
-  owed is the outer wrap above it.
+- **`subscribeE-nest-scan`** (Nest-Walk) — SHAPE, `REFUTED, DEAD ROUTE,
+  PROBED`: the caps premise is repaired, but the head reads an accumulator
+  out of a node it minted, and `NestAt`'s burst conjunct may name no state.
+  The repair is a pointwise store conjunct beside the coarse one.
+- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — SHAPE,
+  `NO EVIDENCE`: the three `*All` heads inherit the row above verbatim — each
+  mints a queue node the drain reads back, so the state-free burst conjunct
+  cannot be re-established at them either. One restatement covers all four.
+- **`subscribeE-nest-mu`** (Nest-Walk) — SHAPE, `NO EVIDENCE`: the last
+  substituting head, and its own header records the gap: the unfolding
+  contains the whole μ, so neither the grant's key nor the `valCaps?` premise
+  transfers. Only the FUEL decreases and the grant does not mention it.
 - **`subscribeE-nest-slot`** (Nest-Walk) — DIFFICULTY, `REFUTED`: the three
   slot heads under one leaf. A shared slot's charge is a multiple of nothing
   unless the unit is a summand, which is what the refutation pins — and the
@@ -207,9 +207,9 @@ does not fit is a finding about the shared statement, not about the head.
   fact that ties the walk's charge back to the program. Free-list form refuted;
   probeable.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: one
-  delivery's pending sources under the store it started from. No corpus can
-  reach this arm — a live source's type comes from a scripted slot, and
-  `isData` is false at every observable — so the increment is slack.
+  delivery's pending sources under the store it started from. UNPROBEABLE — no
+  corpus reaches this arm — so the class rests on a slackness argument rather
+  than on evidence.
 - **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for; the component reads zero after every
@@ -229,27 +229,26 @@ does not fit is a finding about the shared statement, not about the head.
   arithmetic both depth rows spend, and no evaluator in it. One tower height
   for the currency's sum, one story below the caps height; the `blowH`
   conversion and the recurrence's own base are now proven around it.
+- **`burst-nest`** (Caps-Bridge) — DIFFICULTY, `NO EVIDENCE`: the subscribe
+  frame's nesting receipt at instant 1, the one place the currency is really
+  bet. Its header names harness rows reading the store beside this cap —
+  measured-not-rechecked — and the probe route is sealed.
+- **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: every
+  stage of every chain's walk under the width cap. The proven `thruWalk-walk`
+  carries the identical conjunct across the feared `thru` hop — the mirror
+  that holds the class — and its header calls the rest transcription.
 - **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the entry
   state's nesting receipt. `init-capsOK?` is its route, but a scripted slot's
   obs-freeness only reduces at a concrete type, so an `isData` inversion is
   owed first.
-- **`burst-nest`** (Caps-Bridge) — DIFFICULTY, `NO EVIDENCE`: the subscribe
-  frame's nesting receipt at instant 1, and the one place the currency is
-  really bet — every cascade instance is slack. `burst-caps` is the shape, but
-  `burst-all` produces no nesting conjunct yet, so the producing lemma is owed
-  first.
-- **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: every
-  stage of every chain's walk under the width cap. `valsCaps?` is this bound,
-  propagated across the feared `thru` hop already; the grind carries it flat,
-  not moving.
 - **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the caps the
   selection's walk spends, held at every state it passes through. Only the SIZE
   component moves across a cascade — width and registry are preservation
   outright — so the flat reading is a slack claim about one component.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `NO EVIDENCE`, large: the Ψ
   mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
-  `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names
-  no undecided index.
+  `subscribeInner-Ψ` descent. The mirror is what holds the class — it is
+  evidence about statedness — and its header names no undecided index.
 - **`pushBurst-nest-take`** (Nest-Walk) — GRINDABLE, `TWIN×2`: the filter
   frame's push, all that is left of the take head. `pushBurst-caps` is the same
   fold over the same emits walked on the caps face, and `stepFrame-nodes-take`

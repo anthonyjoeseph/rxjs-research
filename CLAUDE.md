@@ -762,19 +762,32 @@ postulates' own headers); read it before picking up any postulate.
 class is what orders the work; PROOF-STATE.md assigns them, this file defines them.
 
 - **FALSITY** — the statement may be false. Worst because it is retroactive: everything
-  ground above it is wasted, not merely delayed.
+  ground above it is wasted, not merely delayed. **This is also where a statement nothing
+  has ever instantiated sits**, however plausible it reads: "may be false" is a claim
+  about what is KNOWN, and nothing is known about an unprobed row. So this is the class a
+  new postulate is born into, and a probe reaching its risky region is what moves it.
 - **SHAPE** — the statement is wrong as written and a restatement is *guaranteed*
   (typically a conclusion needing information no hypothesis carries). Not FALSITY,
   because it is already known; worse than DIFFICULTY, because restating cascades through
   a family and can INTRODUCE falsity — you are changing statements, not discharging them.
-  Never grind a SHAPE row; restate it.
+  Never grind a SHAPE row; restate it. **A header recording a gap between what the
+  hypotheses carry and what the conclusion needs has ALREADY put its row here**, whatever
+  class the roadmap says: the finding is the classification, not an input to it.
 - **VACUITY** — it typechecks and asserts nothing. Worse than DIFFICULTY because it reads
   as discharged. The two live shapes are ⊤-typed postulates and Σ-statements
   upward-closed in their witness; check both before landing anything.
 - **DIFFICULTY** — true and correctly stated; the proof is just hard. Labour, but labour
   with a DESIGN decision still inside it: the shape of the induction, the measure that
   decreases, the index the statement belongs at. Grinding is the right response, and the
-  deciding is the expensive half.
+  deciding is the expensive half. **"True and correctly stated" is a claim about EVIDENCE
+  and is earned exactly as GRINDABLE's is** — a probe that reached the risky region, a
+  refutation of the alternatives that pins this form, a proven mirror. Absent one the row
+  is not DIFFICULTY: it is SHAPE if the gap is written down and FALSITY if nothing is.
+  **This class is the one with no floor under it and the one that reads as safe**, so it
+  is where an unexamined row lands by gravity and then sits, scheduled behind rows whose
+  proofs are merely long. Measured on the sweep that set this: one tier held seven rows at
+  `DIFFICULTY, NO EVIDENCE`, not one of them instantiated, and re-reading their own headers
+  moved five.
 - **GRINDABLE** — true, correctly stated, and the shape is ALREADY KNOWN: a proven twin
   exists whose clauses correspond, or the route is mechanical — transport a hypothesis,
   widen a bound, re-establish an invariant a sibling face already preserves at the same
