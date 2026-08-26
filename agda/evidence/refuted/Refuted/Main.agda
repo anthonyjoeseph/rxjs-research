@@ -46,6 +46,12 @@ open import Refuted.Thru-Subscribe-Nest
 open import Refuted.Scan-Burst-Nest
   using (premises; burst≡14; delivered≡16383; charged≡12288;
          delivered₁₃≡8191; charged₁₃≡12288; subscribeE-nest-burst-absurd)
+open import Refuted.Thru-Scan-Burst-Nest
+  using (charged≡8192; charged₁₃≡8192; stepFrame-nodes-thru-burst-absurd)
+  renaming (premises to thruBurstPremises;
+            burst≡14 to thruBurst≡14;
+            delivered≡16383 to thruDelivered≡16383;
+            delivered₁₃≡8191 to thruDelivered₁₃≡8191)
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
 open import Refuted.Subscribe-Caps-Nest

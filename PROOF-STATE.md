@@ -177,10 +177,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   subscribe descent's own nest bound, all the inner arm still rests on.
   Restated with the factor a power in the BURST it hands back; the witness that
   killed the flat form is green at the new index, with room.
-- **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, PROBED`: the
-  same descent arriving through the outer wrap, repaired by the same premise.
-  Its per-value unit is what a receipt at the root does not cover, so it is
-  instantiated separately.
+- **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
+  same descent arriving through the outer wrap. The flat factor died to the
+  same cold-slot burst that killed the root form; restated as a power in the
+  burst the frame hands back, with the length premise stated.
 - **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED, DEAD ROUTE`: the
   share sink's fan-out over the admitted registrations, under one unit. They
   touch disjoint nodes, so the map moves by the deepest and not the sum — which

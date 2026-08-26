@@ -270,7 +270,17 @@ deliveredThru =
 baseThru : ℕ
 baseThru = (nodesMax stThru ⊔ nestDᵛˢ valsThru) + WThru
 
-fitsThru : (deliveredThru ≤ᵇ 2 ^ Caps.cSize cThru * baseThru) ≡ true
+-- the OUTPUT burst, which the statement now takes as a premise: the
+-- exponent is a power in what the frame hands back, so a receipt that
+-- does not pin this length is a receipt at an unknown index.
+burstThru : ℕ
+burstThru =
+  length (proj₁ (stepFrame gas 0 0 fThru root valsThru false schedThru stThru))
+
+burstThru≡ : burstThru ≡ 1
+burstThru≡ = refl
+
+fitsThru : (deliveredThru ≤ᵇ (2 ^ Caps.cSize cThru) ^ suc WThru * baseThru) ≡ true
 fitsThru = refl
 
 -- AND THE SAME MEASUREMENT HERE, where the margin is wider still: the
@@ -279,6 +289,13 @@ fitsThru = refl
 -- program demands is ONE.  The crossing is the pair below, and it is the
 -- row that could have failed -- at a factor of one the frame delivers
 -- eighty against forty-one, which is the refutation this repair answers.
+--
+-- WHAT THESE ROWS DO NOT REACH IS THE BURST AXIS, and saying so is the
+-- point of pinning the length: the frame hands back ONE value here, so
+-- the powered factor is exercised at its smallest exponent and the
+-- second copy the statement grants is pure slack.  The burst axis is
+-- covered instead by `Refuted.Thru-Scan-Burst-Nest`, which is what
+-- killed the flat form these rows used to be written against.
 thruFigs : ℕ × ℕ × ℕ
 thruFigs = deliveredThru , baseThru , Caps.cSize cThru
 

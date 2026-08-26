@@ -309,10 +309,7 @@ abstract
 -- charges no wrap at all, so its arm has no term to widen and the
 -- summand is the only place a slot's nesting can come from.
 abstract
-  addU : ∀ (S X U : ℕ) → 2 ^ S * X ≤ 2 ^ S * (X + U)
-  addU S X U = *-monoʳ-≤ (2 ^ S) (m≤m+n X U)
-
-  -- AND THE RAISING STEP AT THE POWERED BASE.  A descent's charge is a
+  -- THE POWERED BASE IS THE ONLY ONE LEFT.  A descent's charge is a
   -- power in the BURST it emits, so every arm that used to widen `2 ^ S`
   -- widens `(2 ^ S) ^ suc W` instead, and the only property either step
   -- needs of the base is that it is positive.
@@ -322,15 +319,6 @@ abstract
   raiseUW : ∀ (S W X U : ℕ) → X ≤ (2 ^ S) ^ suc W * (X + U)
   raiseUW S W X U =
     ≤-trans (pow-grow (2 ^ S) (suc W) X (m^n>0 2 S)) (addUW S W X U)
-
-  -- AND THE STEP THAT LETS A FLAT BOUND FEED A POWERED ONE.  A frame
-  -- that never re-enters the subscribe machinery is bounded at the bare
-  -- factor and is not restated for it; the exponent is pure slack there,
-  -- so one widening carries such an arm into the shared conclusion.
-  widenPow : ∀ (S W X : ℕ) → 2 ^ S * X ≤ (2 ^ S) ^ suc W * X
-  widenPow S W X =
-    *-monoˡ-≤ X (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
-                         (*-monoʳ-≤ (2 ^ S) (1≤pow≤ (2 ^ S) W (m^n>0 2 S))))
 
 -- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
 -- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
@@ -364,15 +352,25 @@ abstract
 --   and nothing else -- so the factor is one and the caps premise buys
 --   the statement nothing at all.  The same file pins `valCaps?` FALSE
 --   at the arriving value, which is the premise that does buy it.
--- PROBED: `Probed.Subscribe-Nest` clears the restated form at the same
---   witness and the same tight cap, at the width this statement's own
---   hypotheses pin -- `1 ≤ W` and one value.  The crossing is the row
---   that could have failed: eighty delivered against forty-one at a
---   factor of one, which is the refutation directly above, and against
---   eighty-two at a factor of two, while the cap the value's size grants
---   is a hundred and seventy-three.  Not covered: one frame, one value,
---   and a node table holding the single ordinary node a subscribe
---   installs.
+-- REFUTED: `Refuted.Thru-Scan-Burst-Nest` kills the FLAT factor, at a
+--   cold scripted slot whose sync list is charged to neither side: the
+--   frame's own burst doubles the delivered depth per value while the
+--   cap and the incoming state stay fixed, so the crossing arrives at
+--   sixteen thousand three hundred and eighty-three against eight
+--   thousand one hundred and ninety-two -- one value earlier, the two
+--   sides are eight thousand one hundred and ninety-one against the same
+--   eight thousand one hundred and ninety-two.  That is why the factor
+--   is a power in the OUTPUT burst and the length premise is stated.
+-- PROBED: `Probed.Subscribe-Nest` clears the burst-powered form at the
+--   same witness and the same tight cap, at the width this statement's
+--   own hypotheses pin -- `1 ≤ W`, one value in, one value back.  The
+--   crossing is the row that could have failed: eighty delivered
+--   against forty-one at a factor of one, which is the first refutation
+--   above, and against eighty-two at a factor of two, while the cap the
+--   value's size grants is a hundred and seventy-three.  Not covered:
+--   the BURST axis -- the frame hands back a single value there, so the
+--   second copy of the base is slack, and the refutation directly above
+--   is what covers that axis instead.
 postulate
   stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (W : ℕ) (sl : Slots Γ)
@@ -383,8 +381,9 @@ postulate
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     all (valCaps? c sl (obs u)) vals ≡ true →
     let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
+    length (proj₁ r) ≤ W →
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
+      ≤ (2 ^ Caps.cSize c) ^ suc W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
 
 -- A QUEUE'S NESTING, THE SAME `⊔`-FOLD `nodeNest` READS OFF A PARKED
 -- `mergeAll-st`, named so a statement about the drain can say what it
@@ -916,12 +915,12 @@ abstract
             (*-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
               (+-monoˡ-≤ (nestUnit e sl) (zero-charge W _)))
   stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfd hw =
-    ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st hsl 1≤W hlen hc hv)
-            (≤-trans (*-monoʳ-≤ (2 ^ Caps.cSize c)
+    ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
+               hsl 1≤W hlen hc hv hw)
+            (≤-trans (*-monoʳ-≤ ((2 ^ Caps.cSize c) ^ suc W)
               (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
                        (one-pow W (_ + W * 1))))
-              (≤-trans (addU (Caps.cSize c) _ (nestUnit e sl))
-                       (widenPow (Caps.cSize c) W _)))
+              (addUW (Caps.cSize c) W _ (nestUnit e sl)))
 
 -- HOISTING THE SUBSTITUTION FACTOR PAST ONE FRAME'S CHARGE, which is
 -- the only arithmetic the caps rider adds to the telescope.  The factor

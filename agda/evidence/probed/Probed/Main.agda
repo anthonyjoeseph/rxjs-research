@@ -35,7 +35,7 @@ open import Probed.Subscribe-Nest
          fits₁; fits₂; fits₃;
          sizes≡; bases≡; bursts≡; emits≡;
          spend₁; spend₂; spend₃;
-         premThru; fitsThru; thruFigs≡; spendThru;
+         premThru; burstThru≡; fitsThru; thruFigs≡; spendThru;
          premInner; readInner≡; spendInner;
          premDeep; readDeep≡; spendDeep;
          premDeeper; readDeeper≡; spendDeeper)
