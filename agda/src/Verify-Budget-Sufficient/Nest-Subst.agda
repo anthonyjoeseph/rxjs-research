@@ -40,7 +40,7 @@ open import Rx.Exp using
   takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂;
   pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ; Ren∈;
   ext∈; renExp; renTm; renTms; reify; lookupEnv; subΘExp; subΘTm; subΘTms; evalWith; applyFn; syncSizeᵗ;
-  sizeᵉ; sizeᵗ; sizeᵗˢ)
+  sizeᵉ; sizeᵗ; sizeᵗˢ; Closed; elimGExp; elimGTm; elimGTms; unfoldμ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵗˢ; nestDᵛ)
 open import Verify-Budget-Sufficient.Measures using (n<2^n)
 open import Verify-Budget-Sufficient.Nest-Store using (nest-inflate)
@@ -416,3 +416,68 @@ applyFn-nest {s = s} fn v =
 postulate
   evalTm-nest-sync : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
     nestDᵛ t (evalTm tm) ≤ 2 ^ syncSizeᵗ tm * nestDᵗ tm
+
+-- THE DEPTH READING IS UNMOVED BY A μ-UNFOLDING, and that is the fact
+-- the nest walk's own recursion turns on.  `elimG` substitutes only
+-- where the guarded variable is reachable, which is under a `deferᵉ`,
+-- and `nestDᵉ` reads a `deferᵉ` as a zero leaf -- so every clause is
+-- homomorphic and the substituted positions are never looked at.  The
+-- μ node is TRANSPARENT here, unlike the sync spine's `suc`, so the
+-- unfolding is an outright equality of readings rather than a
+-- decrement.
+--
+-- TWIN: `syncSize-elimG` is this same induction at the sync size,
+--   proven, clause for clause; the two measures differ only in which
+--   constructors they charge.
+mutual
+  nestD-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (e : Exp Γ Δᵍ Δ Θ u) →
+    nestDᵉ (elimGExp x cl e) ≡ nestDᵉ e
+  nestD-elimG x cl (input i)       = refl
+  nestD-elimG x cl (ofᵉ ts)        = nestD-elimGᵗˢ x cl ts
+  nestD-elimG x cl emptyᵉ          = refl
+  nestD-elimG x cl (mapᵉ f e)      =
+    cong₂ _+_ (nestD-elimGᵗ x cl f) (nestD-elimG x cl e)
+  nestD-elimG x cl (takeᵉ c e)     = nestD-elimG x cl e
+  nestD-elimG x cl (scanᵉ f z e)   =
+    cong₂ _+_ (cong₂ _+_ (nestD-elimGᵗ x cl z) (nestD-elimGᵗ x cl f))
+              (nestD-elimG x cl e)
+  nestD-elimG x cl (mergeAllᵉ _ e)   = cong suc (nestD-elimG x cl e)
+  nestD-elimG x cl (switchAllᵉ e)  = cong suc (nestD-elimG x cl e)
+  nestD-elimG x cl (exhaustAllᵉ e) = cong suc (nestD-elimG x cl e)
+  nestD-elimG x cl (μᵉ e)          = nestD-elimG (there x) cl e
+  nestD-elimG x cl (varᵉ y)        = refl
+  nestD-elimG x cl (deferᵉ e)      = refl
+
+  nestD-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (f : Tm Γ Δᵍ Δ Θ u) →
+    nestDᵗ (elimGTm x cl f) ≡ nestDᵗ f
+  nestD-elimGᵗ x cl (varᵗ y)      = refl
+  nestD-elimGᵗ x cl unit̂          = refl
+  nestD-elimGᵗ x cl (bool̂ b)      = refl
+  nestD-elimGᵗ x cl (nat̂ k)       = refl
+  nestD-elimGᵗ x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (nestD-elimGᵗ x cl a) (nestD-elimGᵗ x cl b)
+  nestD-elimGᵗ x cl (fstᵗ p)      = nestD-elimGᵗ x cl p
+  nestD-elimGᵗ x cl (sndᵗ p)      = nestD-elimGᵗ x cl p
+  nestD-elimGᵗ x cl (inlᵗ a)      = nestD-elimGᵗ x cl a
+  nestD-elimGᵗ x cl (inrᵗ a)      = nestD-elimGᵗ x cl a
+  nestD-elimGᵗ x cl (caseᵗ s l r) =
+    cong₂ _+_ (nestD-elimGᵗ x cl s)
+              (cong₂ _⊔_ (nestD-elimGᵗ x cl l) (nestD-elimGᵗ x cl r))
+  nestD-elimGᵗ x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (cong₂ _⊔_ (nestD-elimGᵗ x cl c) (nestD-elimGᵗ x cl a))
+              (nestD-elimGᵗ x cl b)
+  nestD-elimGᵗ x cl (primᵗ op a)  = nestD-elimGᵗ x cl a
+  nestD-elimGᵗ x cl (strmᵗ e)     = nestD-elimG x cl e
+
+  nestD-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Closed Γ t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    nestDᵗˢ (elimGTms x cl ts) ≡ nestDᵗˢ ts
+  nestD-elimGᵗˢ x cl []       = refl
+  nestD-elimGᵗˢ x cl (y ∷ ys) =
+    cong₂ _⊔_ (nestD-elimGᵗ x cl y) (nestD-elimGᵗˢ x cl ys)
+
+nestD-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  nestDᵉ (unfoldμ body) ≡ nestDᵉ body
+nestD-unfoldμ body = nestD-elimG (here refl) (μᵉ body) body

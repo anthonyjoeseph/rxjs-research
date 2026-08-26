@@ -48,7 +48,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; Val; Fn; Tm; natᵗ; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
@@ -141,6 +141,20 @@ abstract
     descW g b (map-f f ↠ κ) id now sched st
       ≤ descW g (mapᵉ f b) κ id now sched st
   descW-map g f b κ id now sched st = m≤n⊔m _ _
+
+  -- AND THE UNFOLDING'S HALF AT THE μ HEAD, which is the one place the
+  -- child is not a subterm.  That is exactly why the width premise is
+  -- this family and not a syntactic reading: `descW` prices the
+  -- unfolding by construction, naming the unfolded body's own descent
+  -- as one side of the join, so the recursive call's premise is a
+  -- projection where a syntactic width would need a transfer that is
+  -- refuted.
+  descW-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW fuel (unfoldμ body) κ id now sched st
+      ≤ descW (gs fuel) (μᵉ body) κ id now sched st
+  descW-mu fuel body κ id now sched st = m≤n⊔m _ _
 
   -- AND THE CHILD'S HALF AT THE FILTER HEAD, under the count the source
   -- evaluates to.  The hypothesis is what lets this be stated at all:

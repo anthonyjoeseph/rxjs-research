@@ -25,7 +25,7 @@
 -- the tighter reading rather than relaxed to match.
 --
 -- HOW THE CAP IS CHOSEN, and it is the opposite of generous.  Each row
--- sets `c` to the value's OWN sync size and width, the smallest cap its
+-- sets `c` to the value's OWN sync size, the smallest cap its
 -- `nestValOK?` premise admits: `syncSizeᵛ ≤ᵇ syncSizeᵛ` is `true` by refl and
 -- there is no slack anywhere in the choice.  A larger cap would make
 -- every row pass by making the right-hand side astronomical, which is
@@ -141,7 +141,7 @@ read {t} e =
 -- the premises, pinned rather than assumed
 prem : ∀ {t} (e : Closed Γ₂ t) → Set
 prem {t} e =
-  (nestValOK? (tight {obs t} e) slots (obs t) e ≡ true)
+  (nestValOK? (tight {obs t} e) (obs t) e ≡ true)
   × (capsOK? (tight {obs t} e) (sched-init e slots) (st-init e) ≡ true)
 
 premises₁ : prem p₁
@@ -263,7 +263,7 @@ WThru = 1
 
 -- the premises, pinned rather than assumed: the cap is again the value's
 -- own size and width, and the state is one ordinary installed node
-premThru : (nestValOK? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premThru : (nestValOK? cThru (obs (obs (obs natᵗ))) oThru ≡ true)
          × (capsOK? cThru schedThru stThru ≡ true)
 premThru = refl , refl
 
@@ -331,7 +331,7 @@ readInner =
    , nodesMax stThru
    , nestDᵉ oThru + nestUnit eThru slots
 
-premInner : (nestValOK? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premInner : (nestValOK? cThru (obs (obs (obs natᵗ))) oThru ≡ true)
           × (capsOK? cThru schedThru stThru ≡ true)
 premInner = refl , refl
 
@@ -370,7 +370,7 @@ readDeep =
    , nodesMax stDeep
    , nestDᵉ oThru + nestUnit eThru slots
 
-premDeep : (nestValOK? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premDeep : (nestValOK? cThru (obs (obs (obs natᵗ))) oThru ≡ true)
          × (capsOK? cThru schedThru stDeep ≡ true)
 premDeep = refl , refl
 
@@ -411,7 +411,7 @@ readDeeper =
 cDeeper : Caps
 cDeeper = caps 2000 2000 2000
 
-premDeeper : (nestValOK? cDeeper slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premDeeper : (nestValOK? cDeeper (obs (obs (obs natᵗ))) oThru ≡ true)
            × (capsOK? cDeeper schedThru stDeeper ≡ true)
 premDeeper = refl , refl
 

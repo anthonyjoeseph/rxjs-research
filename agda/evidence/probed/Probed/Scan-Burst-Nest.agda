@@ -109,7 +109,7 @@ charged : ℕ → ℕ
 charged k =
   (2 ^ Caps.cSize cap) ^ suc (burst k) * (nestDᵉ prog + nestUnit prog (slots k))
 
-premises : (nestValOK? cap (slots 14) (obs (obs natᵗ)) prog ≡ true)
+premises : (nestValOK? cap (obs (obs natᵗ)) prog ≡ true)
          × (capsOK? cap (sched-init prog (slots 14)) (st-init prog) ≡ true)
 premises = refl , refl
 

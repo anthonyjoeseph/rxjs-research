@@ -171,7 +171,7 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
-**THE `subscribeE-nest-*` ROWS ARE ONE STATEMENT, NOT EIGHT.** They all
+**THE `subscribeE-nest-*` ROWS ARE ONE STATEMENT, NOT ONE PER HEAD.** They all
 instantiate `NestAt`, whose grant now shrinks with the term and whose store
 half is a join; why it is shaped that way is in its own header. A head that
 does not fit is a finding about the shared statement, not about the head.
@@ -191,10 +191,6 @@ does not fit is a finding about the shared statement, not about the head.
   frame's nesting receipt at instant 1, the one place the currency is really
   bet. Its header names harness rows only — measured-not-rechecked, which
   lowers no class — and the probe route is sealed.
-- **`subscribeE-nest-mu`** (Nest-Walk) — SHAPE, `NO EVIDENCE`: the key and cap
-  premise cross the unfolding and shrink, and depth and `descW` are reachable —
-  but the width half of `nestValOK?` is refuted across the substitution. The
-  repair is `NestAt`'s premise, not this head.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what

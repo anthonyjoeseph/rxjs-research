@@ -648,15 +648,21 @@ valCaps? : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u 
 valCaps? {n = n} c sl u v =
   (sizeᵛ u v ≤ᵇ Caps.cSize c) ∧ (pWᵛ n sl u v ≤ᵇ Caps.cWid c)
 
--- THE SAME PAIR OF NUMBERS READ ON THE SYNC SPINE, which is the
--- currency the nest face's grant is keyed in: substitution's charge is
--- blind to what a `deferᵉ` gate hides, and a μ-unfolding moves the full
--- size while leaving this reading exactly where it was.  The width half
--- is the full reading unchanged -- a slot reference under a defer is
--- still a slot reference.
-nestValOK? : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
-nestValOK? {n = n} c sl u v =
-  (syncSizeᵛ u v ≤ᵇ Caps.cSize c) ∧ (pWᵛ n sl u v ≤ᵇ Caps.cWid c)
+-- ONE NUMBER, READ ON THE SYNC SPINE, which is the currency the nest
+-- face's grant is keyed in: substitution's charge is blind to what a
+-- `deferᵉ` gate hides, and a μ-unfolding moves the full size while
+-- leaving this reading exactly where it was.
+--
+-- AND IT IS ONE NUMBER RATHER THAN THE PAIR ITS CAPS SIBLING CARRIES,
+-- because a syntactic width cannot survive the walk's own μ recursion:
+-- `dWᵉ (unfoldμ body) ≤ dWᵉ (μᵉ body)` is FALSE, and the note on
+-- `unfoldμ-caps` carries the witness and why no constant repairs it.
+-- The nest walk was never spending this half -- the width it actually
+-- charges is `descW`, which is semantic and prices the unfolding by
+-- construction -- so the conjunct was an unpayable premise on every
+-- head, and dropping it STRENGTHENS every statement that took it.
+nestValOK? : ∀ {n} {Γ : Ctx n} → Caps → (u : Ty) → Val Γ u → Bool
+nestValOK? c u v = syncSizeᵛ u v ≤ᵇ Caps.cSize c
 
 eventCaps? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ u) → Bool
 eventCaps? {u = u} c sl (value v) = valCaps? c sl u v
