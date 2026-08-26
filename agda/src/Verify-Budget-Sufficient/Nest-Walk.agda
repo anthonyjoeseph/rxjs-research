@@ -5,6 +5,7 @@ module Verify-Budget-Sufficient.Nest-Walk where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
+open import Data.List.Properties using (++-identityʳ)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using
@@ -18,19 +19,19 @@ open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent)
+open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; value)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; sizeᵉ; sizeᵛ;
-  applyFn; _≟ᵗ_; evalTm;
+  applyFn; _≟ᵗ_; evalTm; sizeᵗˢ;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
-open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ; nestDᵉ)
+open import Rx.Nest-Depth using (nestDᵗ; nestDᵗˢ; nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals; mergeAll-st;
   switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
   mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst; Stream; mintNode;
-  installNode; pushBurst)
+  installNode; pushBurst; oneShotBurst; splitEvents)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
@@ -41,7 +42,8 @@ open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
-open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
+open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest)
+  renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
   (nestB; nestB-mono; nestB-base; nestB-frame; nestFac; 1≤nestFac; nestU; nestU-base; nestB-at)
 open import Verify-Budget-Sufficient.Nest-Burst using
@@ -89,6 +91,44 @@ abstract
           (≤-trans (mapVals-nest fn vs)
                    (*-monoʳ-≤ (2 ^ sizeᵗ fn)
                       (+-monoʳ-≤ (nestDᵗ fn) (m≤n⊔m (nestDᵛ _ v) (nestDᵛˢ vs)))))
+
+-- AND OVER A ONE-SHOT'S PAYLOADS, where nothing is substituted IN and
+-- the charge is read off the terms alone.  The list combines by `⊔`
+-- while its size combines by `+`, so one exponent covers every element.
+abstract
+  ofVals-nest : ∀ {n} {Γ : Ctx n} {u}
+    (ts : List (Tm Γ [] [] [] u)) →
+    nestDᵛˢ (map (λ tm → evalTm tm) ts) ≤ 2 ^ sizeᵗˢ ts * nestDᵗˢ ts
+  ofVals-nest []       = z≤n
+  ofVals-nest (y ∷ ys) =
+    ⊔-lub (≤-trans (evalTm-nest y)
+                   (pow-grow-both (sizeᵗ y) (sizeᵗ y + sizeᵗˢ ys) _ _
+                     (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))
+                     (m≤m⊔n (nestDᵗ y) (nestDᵗˢ ys))))
+          (≤-trans (ofVals-nest ys)
+                   (pow-grow-both (sizeᵗˢ ys) (sizeᵗ y + sizeᵗˢ ys) _ _
+                     (m≤n+m (sizeᵗˢ ys) (sizeᵗ y))
+                     (m≤n⊔m (nestDᵗ y) (nestDᵗˢ ys))))
+
+-- AND WHAT A ONE-SHOT'S BURST SPLITS TO IS ITS PAYLOAD LIST, VERBATIM.
+-- The `init`, the `close` and the `complete` are bookkeeping, so the
+-- value side of the split is exactly what went in -- which is what lets
+-- the head above read its conclusion off the terms rather than off the
+-- stream.
+abstract
+  splitEvents-vals : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+    (vals : List (Val Γ u)) (es : List (InstEvent (Val Γ u))) →
+    proj₁ (splitEvents {A = A} (map value vals ++ es))
+      ≡ vals ++ proj₁ (splitEvents {A = A} es)
+  splitEvents-vals []         es = refl
+  splitEvents-vals (v ∷ vals) es = cong (v ∷_) (splitEvents-vals vals es)
+
+  oneShot-vals : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+    (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
+    proj₁ (splitBurst {A = A} (proj₁ (oneShotBurst vals id sched))) ≡ vals
+  oneShot-vals vals id sched =
+    trans (cong (_++ []) (splitEvents-vals vals _))
+          (trans (cong (_++ []) (++-identityʳ vals)) (++-identityʳ vals))
 
 -- THE NODE TABLE IS A `⊔`-FOLD, so a write moves it by at most what was
 -- written and a read is dominated by it.  Two one-screen inductions over
@@ -671,14 +711,6 @@ postulate
     (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (input i) κ id now sched st
-  -- A ONE-SHOT OF EVALUATED TERMS, whose whole burst is minted and
-  -- closed inside the subscription.  Evaluation is not free in this
-  -- currency -- a term substituted into is deeper than the term -- so
-  -- the size the `valCaps?` premise caps is what pays for it.
-  subscribeE-nest-of : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (ts : List (Tm Γ [] [] [] u))
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestAt c sl B W g (ofᵉ ts) κ id now sched st
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST INDEX IS REALLY BET.  A
   -- scan's step function is written once and applied once per value of
   -- whatever burst arrives, so this is the head whose demand is a
@@ -758,8 +790,17 @@ subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   NestAt c sl B W g o κ id now sched st
 subscribeE-nest c sl B W g (input i) κ id now sched st =
   subscribeE-nest-slot c sl B W g i κ id now sched st
-subscribeE-nest c sl B W g (ofᵉ ts) κ id now sched st =
-  subscribeE-nest-of c sl B W g ts κ id now sched st
+subscribeE-nest {Γ = Γ} {t = t} {e = e} {u = u} c sl B W g (ofᵉ ts) κ id now sched st
+  hsl hc hv hn hw =
+  ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
+             (oneShot-vals {A = Val Γ t} (map (λ tm → evalTm tm) ts) id sched)))
+    (≤-trans (≤-trans (ofVals-nest ts) (*-monoʳ-≤ (2 ^ sizeᵗˢ ts) hn))
+      (≤-trans (*-monoʳ-≤ (2 ^ sizeᵗˢ ts)
+                  (m≤m+n B (nestB (Caps.cSize c) W (nestUnit e sl) B 0)))
+               (nestB-frame (Caps.cSize c) W (nestUnit e sl) B
+                  0 (sizeᵗˢ ts) (sizeᵉ (ofᵉ ts))
+                  (valCaps?-size c sl (ofᵉ ts) hv) (s≤s z≤n))))
+  , m≤m⊔n _ _
 subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hw =
   z≤n , m≤m⊔n _ _
 subscribeE-nest {e = e} c sl B W g (mapᵉ f b) κ id now sched st hsl hc hv hn hw =

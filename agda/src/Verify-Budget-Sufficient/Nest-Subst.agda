@@ -27,7 +27,7 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
-  (≤-trans; ≤-reflexive; ≤-refl; <⇒≤; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-assoc; +-comm;
+  (≤-trans; ≤-reflexive; ≤-refl; <⇒≤; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-assoc; +-comm; +-identityʳ;
    *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-distribˡ-+; *-distribʳ-+;
    *-assoc; *-comm; ^-distribˡ-+-*;
    ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m; n≤1+n; ^-monoʳ-≤; m^n>0)
@@ -37,7 +37,7 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 
 open import Rx.Exp using
-  (Ctx; Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Exp; Tm; Val; Fn; input; ofᵉ; emptyᵉ; mapᵉ;
+  (Ctx; Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Exp; Tm; Val; Fn; evalTm; input; ofᵉ; emptyᵉ; mapᵉ;
   takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂;
   pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ; Ren∈;
   ext∈; renExp; renTm; renTms; reify; lookupEnv; subΘExp; subΘTm; subΘTms; evalWith; applyFn;
@@ -392,3 +392,14 @@ applyFn-nest : ∀ {n} {Γ : Ctx n} {s u}
   nestDᵛ u (applyFn fn v) ≤ 2 ^ sizeᵗ fn * (nestDᵗ fn + nestDᵛ s v)
 applyFn-nest {s = s} fn v =
   evalWith-nest (nestDᵛ s v) fn (v ∷ᵃ []ᵃ) (≤-refl , tt)
+
+-- AND THE SAME WITH NOTHING SUBSTITUTED IN, which is what a one-shot
+-- source's payloads cost.  Evaluation is not free in this currency even
+-- at a closed term -- a `caseᵗ` duplicates its scrutinee's value into
+-- the arm it picks -- so the factor stays and only the environment's
+-- contribution goes to zero.
+evalTm-nest : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
+  nestDᵛ t (evalTm tm) ≤ 2 ^ sizeᵗ tm * nestDᵗ tm
+evalTm-nest tm =
+  ≤-trans (evalWith-nest 0 tm []ᵃ tt)
+          (≤-reflexive (cong (2 ^ sizeᵗ tm *_) (+-identityʳ (nestDᵗ tm))))

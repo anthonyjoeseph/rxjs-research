@@ -178,11 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-scan`**, **`-of`**, **`-mu`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, PROBED`: the substituting heads still standing, each spending a
-  frame lemma whose factor is a power of the frame's own size. The map head
-  is the worked instance; the μ head cannot key on the term at all, for the
-  reason its own header now states.
+- **`subscribeE-nest-scan`**, **`-mu`** (Nest-Walk) — DIFFICULTY, `REFUTED,
+  PROBED`: the substituting heads still standing. The map and one-shot heads
+  are worked instances, both keyed on one level of `sizeᵉ`; scan compounds
+  its factor across the burst, and μ cannot key on the term at all.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `NO EVIDENCE`: the three `*All` heads, a mint plus the outer's descent pushed
   through a `thru-outer` frame. Their drain is proven at the size cap; what is
