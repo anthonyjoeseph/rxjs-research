@@ -39,7 +39,7 @@
 module Verify-Budget-Sufficient.Nest-Burst where
 
 open import Data.List using (List; []; _∷_; length)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (Maybe; nothing)
 open import Data.Bool using (false)
 open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
 open import Data.Nat.Properties using (≤-refl; m≤m⊔n; m≤n⊔m)
@@ -48,7 +48,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
@@ -170,6 +170,38 @@ abstract
       ≤ descW g (takeᵉ cnt b) κ id now sched st
   descW-take g cnt b κ id now sched st k h with evalTm cnt | h
   ... | .(suc k) | refl = m≤n⊔m _ _
+
+  -- AND THE CHILD'S HALF AT THE THREE `*All` HEADS, each the projection
+  -- of the head clause's own join at the child's freshly minted node and
+  -- installed initial state.  Exported for the reason `descW-map` is:
+  -- the family is SEALED, so the clause's shape is invisible outside.
+  descW-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (lim : Maybe ℕ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ) id now
+          (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched))
+                       (mergeAll-st {t = u} lim 0 [] false) st)
+      ≤ descW g (mergeAllᵉ lim b) κ id now sched st
+  descW-merge g lim b κ id now sched st = m≤n⊔m _ _
+
+  descW-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ) id now
+          (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+      ≤ descW g (switchAllᵉ b) κ id now sched st
+  descW-switch g b κ id now sched st = m≤n⊔m _ _
+
+  descW-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ) id now
+          (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
+      ≤ descW g (exhaustAllᵉ b) κ id now sched st
+  descW-exhaust g b κ id now sched st = m≤n⊔m _ _
 
   -- AND THE WHOLE DRAIN'S WORTH, one `⊔` per queued inner at the state
   -- that inner is actually subscribed at.  It is a SEPARATE measure

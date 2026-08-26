@@ -2,9 +2,9 @@
 -- THE `*All` HEADS AWAY FROM THE ROOT, AND FROM A NODE TABLE THAT IS
 -- ALREADY CARRYING SOMETHING.
 --
--- TARGET: subscribeE-nest-merge
--- TARGET: subscribeE-nest-switch
--- TARGET: subscribeE-nest-exhaust
+-- TARGET: thruFit-merge
+-- TARGET: thruFit-switch
+-- TARGET: thruFit-exhaust
 --
 -- WHY THIS AXIS.  `Probed.Subscribe-Nest-Wrap` reads all three heads at
 -- `κ = root` from `st-init`, and says so: the store conjuncts are
