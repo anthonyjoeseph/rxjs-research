@@ -523,8 +523,41 @@ postulate
 -- this way: a `take` DROPS, so the inner burst can be longer than the
 -- one that leaves, and the induction wants the inner descent at the
 -- INNER width while the conclusion is a power in that width.  Keying
+-- Keying
 -- the premise on the descent makes every head's transfer a projection
 -- and costs the caller a measure it can compute.
+
+-- AND THE GRANT IS FIXED WHERE THE DESCENT MULTIPLIES, WHICH IS WHAT
+-- SIX OF THE NINE HEADS ARE ACTUALLY WAITING ON.  Every head whose
+-- frame SUBSTITUTES into the values passing through it -- the fold, the
+-- map, and the three that drain a queue -- spends a frame lemma whose
+-- factor is a power of the frame's own size, once per level.  The
+-- filter head is the exception and the reason the take clause closed:
+-- a frame that only forwards or drops has factor one, so it needs no
+-- room at all.
+-- The model for a bound that shrinks is already proven next door:
+-- `subscribeE-caps` carries an index DOWN the descent and returns how
+-- far it got in a `Σ`, bounding the total by a recurrence instead of
+-- demanding the whole cap at every level.
+--
+-- DEAD ROUTE: re-establishing the conclusion at a substituting head
+--   from this statement is STRUCTURALLY dead, and it is arithmetic
+--   rather than a missing lemma.  The bound names no argument that
+--   shrinks down the descent, so the child is granted exactly what the
+--   parent must deliver, and the frame's factor then has nothing to be
+--   paid out of.  Enlarging the grant does not help, because it
+--   enlarges both sides at once; nor does the spare `suc`, which buys
+--   one level and the descent has as many levels as the term is deep.
+-- DEAD ROUTE: nor is it enough to key the exponent to the descent's
+--   remaining SIZE, which is the obvious repair and does fix the
+--   burst's half -- sizes strictly shrink at every head, and the room
+--   released covers the frame's factor and its additive term.  It
+--   reverses the STORE premise: a child with a smaller bound needs
+--   `nodesMax` below a smaller number than the parent was handed, and
+--   the store only grows as the walk proceeds.  So the two halves of
+--   this conjunction cannot both be keyed the same way, and the
+--   restatement has to separate them -- the store against a bound
+--   fixed by the whole program, the nesting against one that shrinks.
 NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set

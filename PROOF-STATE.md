@@ -171,28 +171,25 @@ rather than a postulate; the rows below are the leaves still under it. Reading
 a real body as a discharged cone is how a row gets mis-ranked, and a row whose
 OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
+**THE `subscribeE-nest-*` ROWS ARE ONE RESTATEMENT, NOT EIGHT GRINDS.** They
+all instantiate one shared statement, `NestAt`, and the obstruction that stops
+every substituting head is in that statement's own header. Restate it first.
 
 
-- **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`: the
-  head where the burst index is bet — one step function applied once per value
-  of whatever arrives. The un-indexed form is refuted; the same witness is
-  green at the new index with eleven bits per value unspent.
-- **`subscribeE-nest-map`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
-  substituting head every witness of this family reaches first. Three forms
-  refuted — free, unit-charged, store-capped — and the survivor is probed at
-  the smallest cap the premise admits.
-- **`subscribeE-nest-slot`** (Nest-Walk) — DIFFICULTY, `REFUTED`: the three
-  slot heads under one leaf. A shared slot's charge is a multiple of nothing
-  unless the unit is a summand, which is what the refutation pins.
-- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
-  `NO EVIDENCE`: the three `*All` heads, each a mint plus the outer's descent
-  pushed through a `thru-outer` frame. Their charge is the thru row's.
-- **`subscribeE-nest-of`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: a one-shot
-  of evaluated terms. `evalWith-nest` is the route and it costs a size factor,
-  which the `valCaps?` premise is what pays for.
-- **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the one
-  head that is not a subterm. A substituted body can be deeper than the body,
-  so the depth premise does not transfer and the fuel edge is all there is.
+
+- **`subscribeE-nest-scan`**, **`-map`**, **`-of`**, **`-mu`** (Nest-Walk) —
+  SHAPE, `REFUTED, PROBED`: the four substituting heads, each spending a frame
+  lemma whose factor is a power of the frame's own size. They are what the
+  fixed grant cannot pay, and the restatement is owed before any of them is
+  opened.
+- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — SHAPE,
+  `NO EVIDENCE`: the three `*All` heads, a mint plus the outer's descent pushed
+  through a `thru-outer` frame. Same obstruction, arriving once per queued
+  inner.
+- **`subscribeE-nest-slot`** (Nest-Walk) — SHAPE, `REFUTED`: the three slot
+  heads under one leaf. A shared slot's charge is a multiple of nothing unless
+  the unit is a summand, which is what the refutation pins — and the summand is
+  on the side the restatement moves.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
   same descent arriving through the outer wrap. The flat factor died to the
   same cold-slot burst that killed the root form; restated as a power in the
@@ -250,9 +247,9 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names
   no undecided index.
 - **`pushBurst-nest-take`** (Nest-Walk) — GRINDABLE, `TWIN×2`: the filter
-  frame's push, all that is left of the take head. `pushBurst-caps` is the
-  same fold over the same emits walked on the caps face, and
-  `stepFrame-nodes-take` is the per-emit half — a take frame costs nothing.
+  frame's push, all that is left of the take head. `pushBurst-caps` is the same
+  fold over the same emits walked on the caps face, and `stepFrame-nodes-take`
+  is the per-emit half — a take frame costs nothing.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
   cascade only shortens lists, and every summand of the store measure is a
   `⊔`-fold over one. Its header names the proven twin at the same two branches.
