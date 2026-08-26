@@ -39,6 +39,9 @@ open import Probed.Subscribe-Nest
          premInner; readInner≡; spendInner;
          premDeep; readDeep≡; spendDeep;
          premDeeper; readDeeper≡; spendDeeper)
+open import Probed.Subscribe-Nest-Wrap
+  using (premM; premS; premX; bursts≡; nodes≡;
+         emits≡; emitsS≡; emitsX≡; base≡; fitsM; fitsS; fitsX)
 open import Probed.Chain-Caps-Flat
   using (U-row; C-row; F-row)
 open import Probed.Cascade-Store-Components

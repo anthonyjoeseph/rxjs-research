@@ -952,17 +952,38 @@ postulate
   -- install and are three statements for that reason alone: a mint, the
   -- outer's own descent, and the burst pushed back through a
   -- `thru-outer` frame, where the wrap re-enters the walk.
+  --
+  -- PROBED: `Probed.Subscribe-Nest-Wrap` is the first instantiation of
+  --   any of the three, at `W = 0` -- the smallest grant the statement
+  --   can be read at, so a green row is stronger than the head asks
+  --   for -- with the cap at the value's own sync size, `B` at `nestDᵉ`
+  --   exactly and the store `st-init`, both premises pinned by `refl`.
+  --   Covered: the BURST conjunct, at two nested layers per head, each
+  --   descent handing back two values.  NOT covered: the store halves,
+  --   which are `0 ≤ _` in every program reachable at `root` from an
+  --   empty table -- `nodeNest` is zero by definition on `switch-st`
+  --   and `exhaust-st`, and `mergeAll-st` reads its PENDING list, which
+  --   an unlimited merge never fills and a limited one over synchronous
+  --   inners has drained by the time the descent returns.  So the drain
+  --   the risk is named for is not reached here.  And the depth axis
+  --   cannot refute: delivered nesting is exactly the layer count while
+  --   the grant's base alone is 106 at one layer and grows four times
+  --   faster, so the rows are DEGENERATE on the exponent.
   subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (mergeAllᵉ lim b) κ id now sched st
   -- The switch wrap, at its own initial state.
+  -- PROBED: `Probed.Subscribe-Nest-Wrap`, whose coverage and its
+  --   boundary are stated at `subscribeE-nest-merge` above.
   subscribeE-nest-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (switchAllᵉ b) κ id now sched st
   -- The exhaust wrap, at its own initial state.
+  -- PROBED: `Probed.Subscribe-Nest-Wrap`, whose coverage and its
+  --   boundary are stated at `subscribeE-nest-merge` above.
   subscribeE-nest-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

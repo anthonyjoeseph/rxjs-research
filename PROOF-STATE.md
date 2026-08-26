@@ -179,9 +179,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
-  `NO EVIDENCE`: the three `*All` heads at the restated `NestAt`. Nothing has
-  ever instantiated one — each mints a queue node and re-enters through its own
-  drain, and the pointwise conjunct is where the drain would have to be paid.
+  `PROBED×3`: the three `*All` heads at the restated `NestAt`. The burst
+  conjunct is instantiated at all three; the store halves are not, and cannot
+  be from an empty table — `switch-st` and `exhaust-st` carry zero node nest by
+  definition, `mergeAll-st` reads a queue empty at subscribe, so the drain is
+  still unreached.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
   delivery's pending sources under the store it started from. UNPROBEABLE — a
   live source needs a slot scripting observables and `isData` forbids one — so
