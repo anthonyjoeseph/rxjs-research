@@ -37,6 +37,14 @@
 -- emitted depth per layer.  The margin is pinned per row, so a repair
 -- that moves either side is visible as a number and not as a verdict.
 --
+-- AND THE EXPONENT IS NOW INDEXED ON THE BURST, which is what these
+-- rows do NOT reach.  The statement grants a factor per value the
+-- descent hands back, because a stored step function is refolded once
+-- per value of one; every program here hands back exactly ONE, pinned
+-- by `bursts≡` rather than assumed, so the exponent sits at its floor
+-- and the per-value axis is untested.  `Refuted.Scan-Burst-Nest` is the
+-- file that moves it, and it is what the index exists to answer.
+--
 -- WHAT IS NOT COVERED.  Every row subscribes at `root` from `st-init`,
 -- so the queue-facing half -- a descent under a `from-inner` frame with
 -- a non-empty node table -- is untouched here, and so is every `c` whose
@@ -44,7 +52,7 @@
 module Probed.Subscribe-Nest where
 
 open import Data.Bool using (true; false)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (nothing)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
@@ -101,6 +109,20 @@ p₃ = mapᵉ dup₃ p₂
 tight : ∀ {u} → Val Γ₂ u → Caps
 tight {u} v = caps (sizeᵛ u v) (pWᵛ 2 slots u v) 0
 
+-- THE BURST THE DESCENT HANDS BACK, which the restated form makes the
+-- exponent's index -- so it is pinned per row rather than assumed, and
+-- the statement's own premise is discharged by these numbers.
+burst : ∀ {t} (e : Closed Γ₂ t) → ℕ
+burst {t} e =
+  length (proj₁ (splitBurst {A = Val Γ₂ t}
+            (proj₁ (subscribeE gas e root 0 0 (sched-init e slots) (st-init e)))))
+
+bursts : ℕ × ℕ × ℕ
+bursts = burst p₁ , burst p₂ , burst p₃
+
+bursts≡ : bursts ≡ (1 , 1 , 1)
+bursts≡ = refl
+
 -- the two sides, at the cap above and at `B = nestDᵉ o` exactly
 read : ∀ {t} (e : Closed Γ₂ t) → ℕ × ℕ
 read {t} e =
@@ -108,7 +130,8 @@ read {t} e =
       r = subscribeE gas e root 0 0 (sched-init e slots) (st-init e)
   in nodesMax (proj₂ (proj₂ r))
        ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ₂ t} (proj₁ r)))
-   , 2 ^ Caps.cSize (tight {obs t} e) * (nestDᵉ e + nestUnit e slots)
+   , (2 ^ Caps.cSize (tight {obs t} e)) ^ suc (burst e)
+       * (nestDᵉ e + nestUnit e slots)
 
 -- the premises, pinned rather than assumed
 prem : ∀ {t} (e : Closed Γ₂ t) → Set

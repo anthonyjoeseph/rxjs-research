@@ -444,19 +444,27 @@ abstract
   -- burst copies are the walk's own: a chain spends its wrap factor
   -- once per value it carries, and the selection's total wrap is two to
   -- its summed frame sizes, which the registry's size cap holds under
-  -- the width times a square.  The extra copy pays the SUBSCRIBE
+  -- the width times a square.  The other tenant pays the SUBSCRIBE
   -- factor, which is a different charge at the same frames: an `*All`
   -- frame re-enters the subscribe machinery, and what it emits is
   -- deeper than what it was handed by the number of times the
-  -- substituted function names its payload.  That is one factor per
-  -- FRAME rather than per value, so the exponent it needs is the
-  -- selection's frame COUNT times the size cap -- bounded by the same
-  -- width times the same square, which is why one more copy is exactly
-  -- enough and why the two tenants do not interleave.
+  -- substituted function names its payload.
+  --
+  -- AND THAT SECOND CHARGE IS PER VALUE OF THE BURST RATHER THAN PER
+  -- FRAME, WHICH IS WHY THE COPIES ARE A SQUARE.  A descent hands back a
+  -- whole burst, and a stored step function is refolded once per value
+  -- in it, so the frame's factor is spent `suc burst` times and not
+  -- once.  The frame COUNT is under the width times the size either
+  -- way, so this tenant costs `suc burst` copies of the same
+  -- width-times-square the first tenant costs one of -- and the square
+  -- covers both sums without the two interleaving.
+  -- REFUTED: `Refuted.Scan-Burst-Nest` is what rules the per-frame
+  --   reading out, at a burst of fourteen against a charge that does
+  --   not move with it at all.
   nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestFacAt e sl id =
-    2 ^ (suc (nestBurstAt e sl id)
+    2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
          * (realWidAt e sl id
             * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
 
@@ -476,7 +484,7 @@ abstract
   nestFacAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestFacAt e sl id
-      ≡ 2 ^ (suc (nestBurstAt e sl id)
+      ≡ 2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
              * (realWidAt e sl id
                 * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
   nestFacAt-def e sl id = refl
@@ -497,7 +505,7 @@ abstract
   1≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → 1 ≤ nestFacAt e sl id
   1≤nestFacAt e sl id =
-    m^n>0 2 (suc (nestBurstAt e sl id)
+    m^n>0 2 (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
              * (realWidAt e sl id
                 * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
 

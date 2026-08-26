@@ -28,10 +28,12 @@ open import Probed.Cascade-Chain-Count
          SW-fits; ChW-fits; ChW2-fits; Adv-fits;
          Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits;
          Sh1-fits; Sh3-fits; ShCh3-fits)
+open import Probed.Scan-Burst-Nest
+  using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
 open import Probed.Subscribe-Nest
   using (premises₁; premises₂; premises₃;
          fits₁; fits₂; fits₃;
-         sizes≡; bases≡; emits≡;
+         sizes≡; bases≡; bursts≡; emits≡;
          spend₁; spend₂; spend₃;
          premThru; fitsThru; thruFigs≡; spendThru;
          premInner; readInner≡; spendInner;
