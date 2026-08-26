@@ -985,11 +985,16 @@ postulate
   --   module does not stop at them: a merge whose FIRST inner is a
   --   `deferᵉ` parks its second past the frame, and then the subscribe
   --   installs SIX against an incoming three, so all three conjuncts
-  --   are taken where the grant is what pays.  NOT covered: a
-  --   `from-inner` frame, which is the constructor this head's own risk
-  --   names and not the one reached; and the switch and exhaust heads
-  --   off-root with a subscribe that installs, their rows there
-  --   reading equal to the table they started from.
+  --   are taken where the grant is what pays.  The `from-inner` frame
+  --   -- the constructor the drain exits under, and the one this head's
+  --   risk actually names -- is taken the same way, at the root TYPE
+  --   rather than one `obs` up: six installed against an incoming three,
+  --   all three conjuncts inside the grant.  The two zero-by-definition
+  --   heads were pushed at the same outer and did not move off the
+  --   incoming table, which is what unreachable reads like from outside
+  --   and is why no row can arm them.  NOT covered: a `share-sink`
+  --   frame, and any row where the burst side is nonzero -- the drain
+  --   that arms the store is exactly what keeps the burst empty here.
   subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))

@@ -54,6 +54,6 @@ open import Probed.Sync-Factor
          hidSync≡4; hidSize≡9; hidOut≡0;
          mixOut≡3; mixD-holds)
 open import Probed.Wrap-Nest-Frame
-  using (premM; premS; premX; figures≡; premP; parked≡; fitsP)
+  using (premM; premS; premX; figures≡; premP; parked≡; fitsP; premF; frameFigs≡; fitsF)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)

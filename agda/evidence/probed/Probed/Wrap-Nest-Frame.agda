@@ -49,8 +49,8 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
-  using (subscribeE; splitBurst; root; sched-init; st-init; EvalSt;
-         Path; _↠_; thru-outer; mergeAllᵒ; installNode; mergeAll-st)
+  using (subscribeE; splitBurst; root; sched-init; st-init; EvalSt; Stream; Sched;
+         Path; _↠_; thru-outer; from-inner; mergeAllᵒ; installNode; mergeAll-st)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
@@ -174,3 +174,72 @@ fitsP : ((burstOf (oP 6) ≤ᵇ G (oP 6)) ≡ true)
       × ((nodesOf (oP 6) ≤ᵇ nodesMax st₀ ⊔ G (oP 6)) ≡ true)
       × ((atOf (oP 6) ≤ᵇ armed ⊔ G (oP 6)) ≡ true)
 fitsP = refl , refl , refl
+
+-- ── the frame the head's own risk actually names ───────────────────
+
+-- `from-inner` is the exit of a subscribed inner, so it carries the
+-- `*All`'s own node and this inner's instance.  It is the constructor
+-- the drain reaches under, and it takes the head at the ROOT type
+-- rather than one `obs` up -- which is why it is a second setup and
+-- not another row of the first.
+parkedFlat : ℕ → Val Γ₂ (obs (obs natᵗ))
+parkedFlat k =
+  ofᵉ (strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ []))) ∷ strmᵗ (deepV k) ∷ [])
+
+oF : ℕ → Closed Γ₂ natᵗ
+oF k = mergeAllᵉ (just 1) (parkedFlat k)
+
+κF : Path Γ₂ natᵗ natᵗ
+κF = from-inner mergeAllᵒ 7 1 ↠ root
+
+runF : ∀ (o : Closed Γ₂ natᵗ)
+     → Stream Γ₂ natᵗ × Sched Γ₂ × EvalSt prog
+runF o = subscribeE gasBig o κF 0 0 (sched-init prog slots) st₀
+
+premF : (nestValOK? (tight {obs natᵗ} (oF 6)) (obs natᵗ) (oF 6) ≡ true)
+      × (nestCapsOK? (tight {obs natᵗ} (oF 6)) (sched-init prog slots) st₀ ≡ true)
+premF = refl , refl
+
+GF : (o : Closed Γ₂ natᵗ) → ℕ
+GF o =
+  let S = Caps.cSize (tight {obs natᵗ} o)
+      m = syncSizeᵉ o
+  in (2 ^ S) ^ m * (nestDᵉ o + suc m * nestUnit prog slots)
+
+nodesF : (o : Closed Γ₂ natᵗ) → ℕ
+nodesF o = nodesMax (proj₂ (proj₂ (runF o)))
+
+burstF : (o : Closed Γ₂ natᵗ) → ℕ
+burstF o = nestDᵛˢ {Γ = Γ₂} {u = natᵗ}
+             (proj₁ (splitBurst {Γ = Γ₂} {u = natᵗ} {A = Val Γ₂ natᵗ}
+                                (proj₁ (runF o))))
+
+-- AND THE TWO HEADS WHOSE NODE STATE IS ZERO BY DEFINITION, taken
+-- under the same installing outer: if these move at all, `nodeNest`
+-- being zero on `switch-st` and `exhaust-st` is not the whole story.
+oSP : ℕ → Closed Γ₂ (obs natᵗ)
+oSP k = switchAllᵉ (parkedOuter k)
+
+oXP : ℕ → Closed Γ₂ (obs natᵗ)
+oXP k = exhaustAllᵉ (parkedOuter k)
+
+frameFigs : ℕ
+frameFigs = nodesF (oF 6) + 100 * burstF (oF 6)
+          + 10000 * nodesOf (oSP 6) + 1000000 * nodesOf (oXP 6)
+
+frameFigs≡ : frameFigs ≡ 3030006
+frameFigs≡ = refl
+
+-- nodes 6 against the 3 the table came in with, so the `from-inner`
+-- row is carried by the GRANT and not by `⊔ nodesMax st₀`; burst 0,
+-- since the drain parks the second inner.  The two zero-by-definition
+-- heads read 3 and 3 -- EXACTLY the incoming table under an outer that
+-- moved the merge head by six, which is what unreachable looks like
+-- from the outside and is why no row here can arm them.
+atF : (o : Closed Γ₂ natᵗ) → ℕ
+atF o = nodeNestAt 7 (proj₂ (proj₂ (runF o)))
+
+fitsF : ((burstF (oF 6) ≤ᵇ GF (oF 6)) ≡ true)
+      × ((nodesF (oF 6) ≤ᵇ nodesMax st₀ ⊔ GF (oF 6)) ≡ true)
+      × ((atF (oF 6) ≤ᵇ armed ⊔ GF (oF 6)) ≡ true)
+fitsF = refl , refl , refl
