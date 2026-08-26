@@ -193,10 +193,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   the walk's pending sources under the store it started from, premise-free. No
   corpus can reach this arm — a live source's type comes from a scripted slot,
   and `isData` is false at every observable — so the increment is slack.
-- **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY, `NO EVIDENCE`: the
-  walk's registry paths under the same width. Registration adds the one frame
-  the path measure charges nothing for, and the component is measured flat on
-  every family.
+- **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the walk's
+  registry paths under the same width. Registration adds the one frame the path
+  measure charges nothing for; the component reads zero after every cascade, so
+  a walk leaving a deeper registration standing is the unreached region.
 - **`cascade-nest-store`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   descent under its base terms plus the store the walk LEAVES, premise-free. It
   is what makes the cascade descent a corollary of the row above rather than a

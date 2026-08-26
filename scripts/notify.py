@@ -33,6 +33,18 @@ cr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cr)
 
 CLASSES = cr.CLASSES
+DURABLE_KINDS = cr.DURABLE_KINDS
+
+# how a marker kind reads when it is being COUNTED rather than named.  The
+# roadmap's field is a vocabulary and stays upper-case there; a total is
+# prose and reads as one.
+EVID_WORD = {
+    "REFUTED": ("refutation", "refutations"),
+    "DEAD ROUTE": ("dead route", "dead routes"),
+    "TWIN": ("twin", "twins"),
+    "PROBED": ("probe", "probes"),
+    "RECOVERY": ("recovery", "recoveries"),
+}
 
 
 def topic():
@@ -53,15 +65,29 @@ def git(*args, default=""):
         return default
 
 
-def census():
+def census(live):
+    """-> [(tier, {risk class: rows}, {marker kind: markers})]
+
+    The evidence half is summed from the postulates' OWN HEADERS, by the same
+    reader the gate's evidence check uses -- not from the roadmap's fields.
+    Both say the same thing today because `roadmap-check` fails when they
+    disagree, and reading the headers is what makes that true rather than
+    assumed.  Markers are counted with multiplicity: a row carrying
+    `REFUTED×4` contributes four.
+    """
     tiers = cr.parse(ROOT / "PROOF-STATE.md")
+    cen = cr.census(ROOT, live)
     out = []
     for name, rows, _pre in tiers:
         counts = {}
-        for _label, cls, _ln, _cost in rows:
-            if cls:
-                counts[cls] = counts.get(cls, 0) + 1
-        out.append((name, counts))
+        evid = {}
+        for label, cls, _ln, _cost in rows:
+            if not cls:
+                continue
+            counts[cls] = counts.get(cls, 0) + 1
+            for k, v in cr.row_evidence(label, cen).items():
+                evid[k] = evid.get(k, 0) + v
+        out.append((name, counts, evid))
     return out
 
 
@@ -70,19 +96,33 @@ def fmt_counts(counts):
     return ", ".join(parts) if parts else "clear"
 
 
+def fmt_evid(evid):
+    parts = []
+    for k in DURABLE_KINDS:
+        n = evid.get(k, 0)
+        if n:
+            one, many = EVID_WORD[k]
+            parts.append(f"{n} {one if n == 1 else many}")
+    return ", ".join(parts) if parts else "no evidence"
+
+
 def main():
     verdict = sys.argv[1] if len(sys.argv) > 1 else "GATE"
     path = sys.argv[2] if len(sys.argv) > 2 else ""
 
-    tiers = census()
-    open_tiers = [(n, c) for n, c in tiers if sum(c.values())]
+    live_names = cr.live_postulates(ROOT) or []
+    tiers = census(live_names)
+    open_tiers = [(n, c, e) for n, c, e in tiers if sum(c.values())]
     lowest = open_tiers[0] if open_tiers else None
 
-    live = len(cr.live_postulates(ROOT) or [])
+    live = len(live_names)
     total = {}
-    for _n, c in tiers:
+    total_evid = {}
+    for _n, c, e in tiers:
         for k, v in c.items():
             total[k] = total.get(k, 0) + v
+        for k, v in e.items():
+            total_evid[k] = total_evid.get(k, 0) + v
 
     branch = git("rev-parse", "--abbrev-ref", "HEAD", default="?")
     head = git("log", "-1", "--format=%h %s", default="?")
@@ -91,8 +131,9 @@ def main():
 
     lines = []
     if lowest:
-        name, counts = lowest
+        name, counts, evid = lowest
         lines.append(f"Tier {name} is the lowest open — {fmt_counts(counts)}")
+        lines.append(f"standing on {fmt_evid(evid)}")
         head_rows = [r for r in cr.parse(ROOT / "PROOF-STATE.md")
                      if r[0] == name][0][1]
         nxt = next((lab for lab, cls, _l, _c in head_rows if cls), None)
@@ -103,11 +144,13 @@ def main():
         lines.append("no tier has a classed row left")
 
     lines.append("")
-    for name, counts in tiers:
+    for name, counts, evid in tiers:
         lines.append(f"  tier {name}: {fmt_counts(counts)}")
+        lines.append(f"    evidence: {fmt_evid(evid)}")
     lines.append("")
     lines.append(f"{live} live postulate(s) across the tree"
                  f" — {fmt_counts(total)} on the roadmap")
+    lines.append(f"evidence standing under them: {fmt_evid(total_evid)}")
     lines.append(f"{nfiles} file(s) uncommitted on {branch}")
     lines.append(f"HEAD {head}")
     if path:

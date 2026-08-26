@@ -26,21 +26,39 @@ app and add the topic there.
 ```
 Title:  gate GREEN (heavy) - about to commit
 
-Tier 1 is the lowest open — 2 falsity, 14 difficulty, 2 grindable
-next up: `subscribeE-nest` (FALSITY)
+Tier 1 is the lowest open — 14 difficulty, 2 grindable
+standing on 10 refutations, 1 dead route, 3 twins, 7 probes, 1 recovery
+next up: `subscribeE-nest` (DIFFICULTY)
 
-  tier 1: 2 falsity, 14 difficulty, 2 grindable
+  tier 1: 14 difficulty, 2 grindable
+    evidence: 10 refutations, 1 dead route, 3 twins, 7 probes, 1 recovery
   tier 2: 2 falsity, 4 shape, 19 difficulty
+    evidence: 1 refutation, 1 dead route, 1 probe
   tier 3: 2 vacuity, 1 difficulty
+    evidence: no evidence
 
-89 live postulate(s) across the tree — … on the roadmap
-8 file(s) uncommitted on main
+87 live postulate(s) across the tree — … on the roadmap
+evidence standing under them: 11 refutations, 2 dead routes, 3 twins, 8 probes, 1 recovery
+3 file(s) uncommitted on main
 HEAD <sha> <subject>
 ```
 
 The lowest open tier and its next row are the two figures that decide what gets
 worked next, so they lead; the per-tier breakdown says how far the tier has to
-go. A red gate sends the same body at high priority with the failing stage in
+go.
+
+**The evidence line is the other half of a risk class, and it is why the two
+are printed together.** A tier of fourteen DIFFICULTY rows standing on ten
+refutations and seven probes is a tier whose statements have been tested; the
+same fourteen rows with `no evidence` under them is a tier whose classes are
+opinions. Markers count with multiplicity — a row carrying `REFUTED×4`
+contributes four — because four refutations pinning one statement's shape is
+four findings, not one.
+
+**They are summed from the postulates' own headers, not from the roadmap's
+evidence fields**, by the same reader `make roadmap-check` uses. The two agree
+today only because that check fails when they do not, and reading the headers
+is what makes the agreement a fact rather than an assumption. A red gate sends the same body at high priority with the failing stage in
 the title (`RED (the tower)`, `RED (cheap checks)`, `RED (light)`), so a build
 that dies while nobody is watching still reports.
 

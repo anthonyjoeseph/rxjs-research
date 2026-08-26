@@ -1601,6 +1601,19 @@ cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval
 -- parent's right-hand side rather than at the tighter bound that
 -- reading suggests, because the tighter form needs the chain list to
 -- come FROM the registry and this statement takes it free.
+--
+-- PROBED: `Probed.Cascade-Store-Components` pins this component by
+--   `refl` beside the store the walk started from, over three families.
+--   It reads ZERO on every one -- every registration the walk touched
+--   is retired by the time the cascade ends -- while the node summand
+--   in the same rows goes to four times the starting store.  So the
+--   increment this row carries is not being spent HERE, and the growth
+--   the wider statement pays for is the node table's.  Not covered, and
+--   it is the only region that could move this component: a walk that
+--   leaves a registration STANDING whose path is deeper than any the
+--   store held, which is what the `nestUnit` factor of the increment
+--   would have to pay for.  No family reaches it, so the reading is a
+--   receipt about retirement rather than about the bound.
 postulate
   cascadeGo-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

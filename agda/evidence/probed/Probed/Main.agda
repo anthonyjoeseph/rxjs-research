@@ -39,3 +39,5 @@ open import Probed.Subscribe-Nest
          premDeeper; readDeeper≡; spendDeeper)
 open import Probed.Chain-Caps-Flat
   using (U-row; C-row; F-row)
+open import Probed.Cascade-Store-Components
+  using (U-parts; C-parts; F-parts)
