@@ -178,19 +178,20 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-scan`** (Nest-Walk) — SHAPE,
-  `REFUTED, DEAD ROUTE, PROBED`: the caps premise is repaired, but the head
-  reads an accumulator out of a node it minted, and `NestAt`'s burst conjunct
-  may name no state. The repair is a pointwise store conjunct beside the coarse
-  one.
-- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — SHAPE,
-  `NO EVIDENCE`: the three `*All` heads inherit the row above verbatim — each
-  mints a queue node the drain reads back, so the state-free burst conjunct
-  cannot be re-established at them either. One restatement covers all four.
-- **`subscribeE-nest-mu`** (Nest-Walk) — SHAPE, `NO EVIDENCE`: the last
-  substituting head, and its own header records the gap: the unfolding contains
-  the whole μ, so neither the grant's key nor the `valCaps?` premise transfers.
-  Only the FUEL decreases and the grant does not mention it.
+- **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
+  conjunct this head's accumulator read demanded, so the shape is settled; what
+  remains is the fold arithmetic at the sync-keyed grant and the seed's
+  `evalTm-nest-sync` spend.
+- **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
+  `NO EVIDENCE`: the three `*All` heads at the restated `NestAt` — each mints a
+  queue node and re-enters through its own drain, and none of the three
+  wrap-frame walks has been designed at the pointwise conjunct.
+- **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the grant's
+  key and cap premise now transfer across the unfolding by `syncSize-elimG` and
+  shrink by `unfoldμ-shrinks`; still owed at the recursive call: the depth
+  premise, the width half, and `descW` across the unfolding — each named in the
+  head's header.
 - **`subscribeE-nest-slot`** (Nest-Walk) — DIFFICULTY, `REFUTED`: the three
   slot heads under one leaf. A shared slot's charge is a multiple of nothing
   unless the unit is a summand, which is what the refutation pins — and the
@@ -250,16 +251,19 @@ does not fit is a finding about the shared statement, not about the head.
   mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
   `subscribeInner-Ψ` descent. The mirror is what holds the class — it is
   evidence about statedness — and its header names no undecided index.
+- **`evalTm-nest-sync`** (Nest-Subst) — GRINDABLE, `TWIN`: the closed-term
+  substitution charge with its exponent read on the sync spine. `evalWith-nest`
+  is the same induction at the full measure, clause for clause, and the probe
+  of the shared factor covers the rows where the two currencies disagree.
 - **`pushBurst-nest-take`** (Nest-Walk) — GRINDABLE, `TWIN×2`: the filter
   frame's push, all that is left of the take head. `pushBurst-caps` is the same
   fold over the same emits walked on the caps face, and `stepFrame-nodes-take`
   is the per-emit half — a take frame costs nothing.
 - **`pushBurst-nest-map`** (Nest-Walk) — GRINDABLE,
-  `REFUTED×3, TWIN, PROBED×2`: the substituting frame's push, all that is left
-  of the map head. Same fold as the row above over the same emits;
-  `mapVals-nest` is the per-emit half and fixes the factor, and three
-  refutations pin why it is a factor in the function's own size and not a
-  summand.
+  `REFUTED×3, TWIN, PROBED×2`: the substituting frame's push. Same fold as the
+  row above; `mapVals-nest` is the per-emit half at the full measure, the sync
+  denomination of the factor is probed where the currencies split, and the
+  refutations pin why it is a factor and not a summand.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
   cascade only shortens lists, and every summand of the store measure is a
   `⊔`-fold over one. Its header names the proven twin at the same two branches.

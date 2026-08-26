@@ -12,7 +12,7 @@ open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
   *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤; *-distribˡ-+;
   ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
-open import Data.Maybe using (Maybe; just; nothing)
+open import Data.Maybe using (Maybe; just; nothing; maybe)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤)
 open import Data.Vec using (lookup)
@@ -20,9 +20,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; value)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; sizeᵉ; sizeᵛ;
-  applyFn; _≟ᵗ_; evalTm; sizeᵗˢ;
-  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; applyFn; _≟ᵗ_; evalTm; syncSizeᵉ;
+  syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵗˢ; nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using
@@ -34,15 +34,15 @@ open import Rx.Evaluator using
   installNode; pushBurst; oneShotBurst; splitEvents)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?; nestValOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Rx.Frame-Width using (pWᵛ; outWᵉ; dWᵉ; dWᵗ)
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; boundedNode; all-impl; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
-open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest)
+open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest-sync)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
   (nestB; nestB-mono; nestB-base; nestB-frame; nestFac; 1≤nestFac; nestU; nestU-base; nestB-at)
@@ -94,20 +94,21 @@ abstract
 
 -- AND OVER A ONE-SHOT'S PAYLOADS, where nothing is substituted IN and
 -- the charge is read off the terms alone.  The list combines by `⊔`
--- while its size combines by `+`, so one exponent covers every element.
+-- while its sync size combines by `+`, so one exponent covers every
+-- element.
 abstract
-  ofVals-nest : ∀ {n} {Γ : Ctx n} {u}
+  ofVals-nest-sync : ∀ {n} {Γ : Ctx n} {u}
     (ts : List (Tm Γ [] [] [] u)) →
-    nestDᵛˢ (map (λ tm → evalTm tm) ts) ≤ 2 ^ sizeᵗˢ ts * nestDᵗˢ ts
-  ofVals-nest []       = z≤n
-  ofVals-nest (y ∷ ys) =
-    ⊔-lub (≤-trans (evalTm-nest y)
-                   (pow-grow-both (sizeᵗ y) (sizeᵗ y + sizeᵗˢ ys) _ _
-                     (m≤m+n (sizeᵗ y) (sizeᵗˢ ys))
+    nestDᵛˢ (map (λ tm → evalTm tm) ts) ≤ 2 ^ syncSizeᵗˢ ts * nestDᵗˢ ts
+  ofVals-nest-sync []       = z≤n
+  ofVals-nest-sync (y ∷ ys) =
+    ⊔-lub (≤-trans (evalTm-nest-sync y)
+                   (pow-grow-both (syncSizeᵗ y) (syncSizeᵗ y + syncSizeᵗˢ ys) _ _
+                     (m≤m+n (syncSizeᵗ y) (syncSizeᵗˢ ys))
                      (m≤m⊔n (nestDᵗ y) (nestDᵗˢ ys))))
-          (≤-trans (ofVals-nest ys)
-                   (pow-grow-both (sizeᵗˢ ys) (sizeᵗ y + sizeᵗˢ ys) _ _
-                     (m≤n+m (sizeᵗˢ ys) (sizeᵗ y))
+          (≤-trans (ofVals-nest-sync ys)
+                   (pow-grow-both (syncSizeᵗˢ ys) (syncSizeᵗ y + syncSizeᵗˢ ys) _ _
+                     (m≤n+m (syncSizeᵗˢ ys) (syncSizeᵗ y))
                      (m≤n⊔m (nestDᵗ y) (nestDᵗˢ ys))))
 
 -- AND WHAT A ONE-SHOT'S BURST SPLITS TO IS ITS PAYLOAD LIST, VERBATIM.
@@ -159,6 +160,38 @@ abstract
   ... | true  | refl = m≤m⊔n (nodeNest ns) (nodesFold r)
   ... | false | h′   = ≤-trans (lookupNode-nodes nid ns r h′)
                                (m≤n⊔m (nodeNest s′) (nodesFold r))
+
+-- ONE NODE'S NESTING, ZERO WHERE THE TABLE HAS NO SUCH NODE.  The
+-- maximum over the table is the honest bound for a walk that may write
+-- anywhere; it is a gross over-reading for a frame that reads exactly
+-- ONE accumulator, and that gap is what would put an incoming store
+-- inside a bound whose whole job is to mention none.
+nodeNestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → NodeId → EvalSt e → ℕ
+nodeNestAt nid st = maybe nodeNest 0 (lookupNode nid (EvalSt.nodes st))
+
+abstract
+  -- a write moves any one reading by at most what was written,
+  -- which is `setNode-nodes` at a point
+  lookupNode-set-at : ∀ {n} {Γ : Ctx n} (j nid : NodeId) (ns : NodeState Γ)
+    (nodes : List (NodeId × NodeState Γ)) →
+    maybe nodeNest 0 (lookupNode j (setNode nid ns nodes))
+      ≤ nodeNest ns ⊔ maybe nodeNest 0 (lookupNode j nodes)
+  lookupNode-set-at j nid ns [] with nid ≡ᵇ j
+  ... | true  = m≤m⊔n _ _
+  ... | false = z≤n
+  lookupNode-set-at j nid ns ((k , s′) ∷ r) with k ≡ᵇ nid in eq
+  ... | true rewrite ≡ᵇ→≡ k nid eq with nid ≡ᵇ j
+  ...   | true  = m≤m⊔n _ _
+  ...   | false = m≤n⊔m _ _
+  lookupNode-set-at j nid ns ((k , s′) ∷ r) | false
+    with k ≡ᵇ j
+  ...   | true  = m≤n⊔m _ _
+  ...   | false = lookupNode-set-at j nid ns r
+
+  nodeNestAt-set : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (j nid : NodeId) (ns : NodeState Γ) (st : EvalSt e) →
+    nodeNestAt j (installNode nid ns st) ≤ nodeNest ns ⊔ nodeNestAt j st
+  nodeNestAt-set j nid ns st = lookupNode-set-at j nid ns (EvalSt.nodes st)
 
 -- THE ITERATION, AND IT IS THE WHOLE CONTENT OF THE SCAN ARM.  A scan
 -- feeds its own output back in, so the step function's factor is spent
@@ -629,7 +662,7 @@ capsDrainOK c sl sf allNid κ id now lim act [] sched st =
   (Sched.slots sched ≡ sl) × (nestCapsOK? c sched st ≡ true)
 capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
   (Sched.slots sched ≡ sl) × (nestCapsOK? c sched st ≡ true)
-  × (valCaps? c sl (obs s) o ≡ true)
+  × (nestValOK? c sl (obs s) o ≡ true)
   × capsDrainOK c sl sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
@@ -681,10 +714,10 @@ abstract
   outWᵉ-take zero    sl cnt b = refl
   outWᵉ-take (suc j) sl cnt b = refl
 
-  valCaps?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  nestValOK?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
     (o : Closed Γ u) →
-    valCaps? c sl (obs u) o ≡ true → sizeᵉ o ≤ Caps.cSize c
-  valCaps?-size c sl o h = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
+    nestValOK? c sl (obs u) o ≡ true → syncSizeᵉ o ≤ Caps.cSize c
+  nestValOK?-size c sl o h = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
 
   -- and the same at the substituting head, whose output width clause is
   -- the child's verbatim while its delivery width joins the function's
@@ -696,13 +729,13 @@ abstract
   outWᵉ-map zero    sl f b = refl
   outWᵉ-map (suc j) sl f b = refl
 
-  valCaps?-map : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (sl : Slots Γ)
+  nestValOK?-map : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (sl : Slots Γ)
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s) →
-    valCaps? c sl (obs u) (mapᵉ f b) ≡ true →
-    valCaps? c sl (obs s) b ≡ true
-  valCaps?-map {n = n} {s = s} c sl f b h =
-    ∧-intro (≤ᵇ-true (sizeᵛ (obs s) b) (Caps.cSize c)
-              (≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f)) (n≤1+n _))
+    nestValOK? c sl (obs u) (mapᵉ f b) ≡ true →
+    nestValOK? c sl (obs s) b ≡ true
+  nestValOK?-map {n = n} {s = s} c sl f b h =
+    ∧-intro (≤ᵇ-true (syncSizeᵛ (obs s) b) (Caps.cSize c)
+              (≤-trans (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f)) (n≤1+n _))
                        (≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h)))))
             (≤ᵇ-true (pWᵛ n sl (obs s) b) (Caps.cWid c)
               (≤-trans pw≤ (≤ᵇ⇒≤ _ _ (T-to (∧-trueʳ h)))))
@@ -712,13 +745,13 @@ abstract
     pw≤ = ⊔-mono-≤ (≤-reflexive (sym (outWᵉ-map n sl f b)))
                    (m≤n⊔m (dWᵗ n sl f) (dWᵉ n sl b))
 
-  valCaps?-take : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  nestValOK?-take : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
     (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
-    valCaps? c sl (obs u) (takeᵉ cnt b) ≡ true →
-    valCaps? c sl (obs u) b ≡ true
-  valCaps?-take {n = n} {u = u} c sl cnt b h =
-    ∧-intro (≤ᵇ-true (sizeᵛ (obs u) b) (Caps.cSize c)
-              (≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ cnt)) (n≤1+n _))
+    nestValOK? c sl (obs u) (takeᵉ cnt b) ≡ true →
+    nestValOK? c sl (obs u) b ≡ true
+  nestValOK?-take {n = n} {u = u} c sl cnt b h =
+    ∧-intro (≤ᵇ-true (syncSizeᵛ (obs u) b) (Caps.cSize c)
+              (≤-trans (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ cnt)) (n≤1+n _))
                        (≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h)))))
             (≤ᵇ-true (pWᵛ n sl (obs u) b) (Caps.cWid c)
               (≤-trans pw≤ (≤ᵇ⇒≤ _ _ (T-to (∧-trueʳ h)))))
@@ -750,6 +783,7 @@ postulate
     (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
        ≤ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
     × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
+    × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st)
 
 -- AND THE SUBSTITUTING FRAME'S PUSH, WHICH IS WHERE THE FACTOR COMES
 -- FROM.  A `map-f` applies its function to every value going past and
@@ -779,16 +813,17 @@ postulate
 --   delivered depth and leaves the charge where it was -- eight, then
 --   sixteen -- so the gap is unbounded rather than one crossing.  That
 --   is what fixes the exponent here to the FUNCTION's own size.
--- TWIN: `mapVals-nest` is the per-emit half, proven, and it fixes the
---   factor this statement carries; what remains is the fold, which is
---   the same walk `pushBurst-caps` already makes over the same list.
+-- TWIN: `mapVals-nest` is the per-emit half at the full measure,
+--   proven, with the fold the same walk `pushBurst-caps` already makes
+--   over the same list; the factor's SYNC denomination is the probed
+--   re-run of that per-emit induction, not a new shape.
 -- PROBED: `Probed.Subscribe-Nest` reaches this leaf through the head
 --   above rather than directly -- the head is a real body now, so the
 --   only map-specific thing its rows can still be measuring is this
 --   factor -- on exactly the family that refuted every earlier form:
 --   a stack of `mapᵉ` frames each naming its payload on both sides of
 --   a sum, so the delivered depth doubles per layer, read at the
---   SMALLEST cap the `valCaps?` premise admits.  What it measures
+--   SMALLEST cap the `nestValOK?` premise admits.  What it measures
 --   rather than asserts is the exponent SPENT: two of the three
 --   programs cross, needing one bit and two against the twenty-one to
 --   thirty-five the cap grants, and the demand rises by ONE per
@@ -813,9 +848,10 @@ postulate
     (κ : Path Γ u t) (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
     let r = pushBurst g id now (map-f fn) κ str sched st in
     (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
-       ≤ 2 ^ sizeᵗ fn
+       ≤ 2 ^ syncSizeᵗ fn
          * (nestDᵗ fn + nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str))))
     × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
+    × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st)
 
 
 -- THE STATEMENT, NAMED ONCE.  Every leaf below re-states it at one of
@@ -835,7 +871,7 @@ postulate
 -- and costs the caller a measure it can compute.
 
 -- AND THE GRANT SHRINKS WITH THE TERM WHILE THE STORE DOES NOT, WHICH
--- IS WHY THE CONCLUSION IS A PAIR.  Every head whose frame SUBSTITUTES
+-- IS WHY THE CONCLUSION SPLITS.  Every head whose frame SUBSTITUTES
 -- into the values passing through it -- the fold, the map, and the
 -- three that drain a queue -- spends a frame lemma whose factor is a
 -- power of the frame's own size, once per level; the filter head is
@@ -845,26 +881,44 @@ postulate
 -- owes, leaving the factor nothing to be paid out of -- enlarging it
 -- moves both sides together, and the spare `suc` buys one level
 -- against a descent as deep as the term is.  So the grant is keyed to
--- `sizeᵉ o`, which strictly shrinks at every head and releases room
--- for the factor and its additive term at each one.  The store cannot
+-- `syncSizeᵉ o`, which shrinks at every subterm head exactly as the
+-- full size does -- the two spines share every `suc` outside a
+-- `deferᵉ` -- and, unlike the full size, is left EXACTLY IN PLACE by a
+-- μ-unfolding (`syncSize-unfoldμ`), which is what lets the unfold head
+-- descend at a strictly smaller key (`unfoldμ-shrinks`) instead of a
+-- larger one.  The currency is honest for the factor too: what a
+-- substitution charges is blind to defer-hidden bulk, and
+-- `Probed.Sync-Factor` pins the hidden copy at zero.  The store cannot
 -- be keyed the same way: a child under a smaller grant would need
 -- `nodesMax` below a smaller number than the parent was handed, and
 -- the store only grows as the walk proceeds.  Hence the split -- the
 -- burst against a bound that shrinks and names no state at all, the
 -- store against that bound joined with the store it started from.
+--
+-- AND THE STORE IS READ TWICE, ONCE COARSELY AND ONCE PER NODE.  The
+-- maximum is what a caller wants when it is about to take a maximum
+-- itself -- the drain, whose inners combine by join.  It is useless to
+-- a head that reads ONE node: a threading frame's output depends on
+-- its own accumulator and on nothing else in the table, so bounding
+-- that accumulator by the table's maximum imports the incoming store
+-- into a conclusion that must name no state.  The pointwise conjunct
+-- is the same fact read at the node, and it is state-free exactly
+-- where it is spent, because the node in question was minted by the
+-- head that reads it.
 
 NestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set
 NestAt {Γ = Γ} {t = t} {e = e} c sl B W g o κ id now sched st =
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  valCaps? c sl (obs _) o ≡ true →
+  nestValOK? c sl (obs _) o ≡ true →
   nestDᵉ o ≤ B →
   descW g o κ id now sched st ≤ W →
   let r = subscribeE g o κ id now sched st
-      G = nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ o) in
+      G = nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ o) in
   (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ G)
   × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ G)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ G)
 
 postulate
   -- THE SLOT HEADS, where a subscription reads the telescope rather
@@ -897,8 +951,8 @@ postulate
   -- at every cap, the *All heads their own empty state -- and
   -- `nestCapsOK?` exempts a stored accumulator's size for exactly that
   -- reason, so the head recurses at the cap it was entered at.  The
-  -- bound is untouched by any of it: an evaluated seed's DEPTH is
-  -- `evalTm-nest`, which is proven, and the grant has room for it.
+  -- bound is untouched by any of it: an evaluated seed's DEPTH is what
+  -- `evalTm-nest-sync` bounds, and the grant has room for it.
   --
   -- REFUTED: `Refuted.Scan-Burst-Nest` kills the un-indexed form
   --   outright, 16383 delivered against a charge of 12288, and the row
@@ -952,21 +1006,19 @@ postulate
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (exhaustAllᵉ b) κ id now sched st
-  -- THE UNFOLD, WHICH IS THE ONE HEAD THAT IS NOT A SUBTERM.  `unfoldμ`
-  -- substitutes the μ into its own body, so the recursion is on fuel
-  -- and the depth premise does not transfer for free -- a substituted
-  -- body can be deeper than the body was.
-  --
-  -- AND THE GRANT'S KEY DOES NOT TRANSFER HERE EITHER, WHICH IS WHAT
-  -- SEPARATES THIS HEAD FROM THE OTHER SUBSTITUTING ONES.  Every one of
-  -- those pays its frame out of one level of `sizeᵉ`, which it has
-  -- because the child is a strict subterm.  The unfolding is not: it
-  -- contains the whole μ, so `sizeᵉ (unfoldμ body)` is at least
-  -- `sizeᵉ (μᵉ body)` and the child's grant is no smaller than the
-  -- parent's.  The `valCaps?` premise has the same gap independently --
-  -- an unfolding can exceed the size cap a μ satisfies -- so what this
-  -- head needs is a measure the unfolding decreases, and the only one
-  -- in hand is the FUEL, which the grant does not mention.
+  -- THE UNFOLD, WHICH IS THE ONE HEAD THAT IS NOT A SUBTERM -- and the
+  -- head the grant's currency was chosen for.  `unfoldμ` substitutes
+  -- the μ into its own body, which inflates the FULL size, but the key
+  -- is the sync spine: `syncSize-elimG` says the unfolding leaves it
+  -- exactly in place, and `unfoldμ-shrinks` that the swap of
+  -- `μᵉ body` for `unfoldμ body` strictly decreases it -- so the
+  -- recursive call descends at a smaller key with fuel only breaking
+  -- the tie.  What is still owed to make that call: the depth premise
+  -- across the unfolding, where `nestDᵉ` truncates at every `deferᵉ`
+  -- exactly as the sync spine does, so the same elimG induction should
+  -- carry it unchanged; the width half of the `nestValOK?` premise
+  -- across the same substitution; and the `descW` premise at the
+  -- unfolded body.
   subscribeE-nest-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -982,21 +1034,24 @@ subscribeE-nest {Γ = Γ} {t = t} {e = e} {u = u} c sl B W g (ofᵉ ts) κ id no
   hsl hc hv hn hw =
   ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
              (oneShot-vals {A = Val Γ t} (map (λ tm → evalTm tm) ts) id sched)))
-    (≤-trans (≤-trans (ofVals-nest ts) (*-monoʳ-≤ (2 ^ sizeᵗˢ ts) hn))
-      (≤-trans (*-monoʳ-≤ (2 ^ sizeᵗˢ ts)
+    (≤-trans (≤-trans (ofVals-nest-sync ts) (*-monoʳ-≤ (2 ^ syncSizeᵗˢ ts) hn))
+      (≤-trans (*-monoʳ-≤ (2 ^ syncSizeᵗˢ ts)
                   (m≤m+n B (nestB (Caps.cSize c) W (nestUnit e sl) B 0)))
                (nestB-frame (Caps.cSize c) W (nestUnit e sl) B
-                  0 (sizeᵗˢ ts) (sizeᵉ (ofᵉ ts))
-                  (valCaps?-size c sl (ofᵉ ts) hv) (s≤s z≤n))))
-  , m≤m⊔n _ _
+                  0 (syncSizeᵗˢ ts) (syncSizeᵉ (ofᵉ ts))
+                  (nestValOK?-size c sl (ofᵉ ts) hv) (s≤s z≤n))))
+  , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hw =
-  z≤n , m≤m⊔n _ _
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest {e = e} c sl B W g (mapᵉ f b) κ id now sched st hsl hc hv hn hw =
   ≤-trans (proj₁ push)
-    (≤-trans (*-monoʳ-≤ (2 ^ sizeᵗ f) (+-mono-≤ hfB (proj₁ IH)))
+    (≤-trans (*-monoʳ-≤ (2 ^ syncSizeᵗ f) (+-mono-≤ hfB (proj₁ IH)))
              (nestB-frame (Caps.cSize c) W (nestUnit e sl) B
-                (sizeᵉ b) (sizeᵗ f) (sizeᵉ (mapᵉ f b)) hk hm))
-  , ≤-trans (proj₂ push) (≤-trans (proj₂ IH) (⊔-mono-≤ ≤-refl grow))
+                (syncSizeᵉ b) (syncSizeᵗ f) (syncSizeᵉ (mapᵉ f b)) hk hm))
+  , ≤-trans (proj₁ (proj₂ push))
+      (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow))
+  , (λ j → ≤-trans (proj₂ (proj₂ push) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ ≤-refl grow)))
   where
   res = subscribeE g b (map-f f ↠ κ) id now sched st
 
@@ -1004,7 +1059,7 @@ subscribeE-nest {e = e} c sl B W g (mapᵉ f b) κ id now sched st hsl hc hv hn 
            (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
   IH = subscribeE-nest c sl B W g b (map-f f ↠ κ) id now sched st
-         hsl hc (valCaps?-map c sl f b hv)
+         hsl hc (nestValOK?-map c sl f b hv)
          (≤-trans (m≤n+m (nestDᵉ b) (nestDᵗ f)) hn)
          (≤-trans (descW-map g f b κ id now sched st) hw)
 
@@ -1015,23 +1070,26 @@ subscribeE-nest {e = e} c sl B W g (mapᵉ f b) κ id now sched st hsl hc hv hn 
 
   -- and the frame is a strict subterm of the head, which is the level
   -- of the key this substitution spends
-  hk : suc (sizeᵗ f) ≤ Caps.cSize c
-  hk = ≤-trans (s≤s (m≤m+n (sizeᵗ f) (sizeᵉ b)))
-               (valCaps?-size c sl (mapᵉ f b) hv)
+  hk : suc (syncSizeᵗ f) ≤ Caps.cSize c
+  hk = ≤-trans (s≤s (m≤m+n (syncSizeᵗ f) (syncSizeᵉ b)))
+               (nestValOK?-size c sl (mapᵉ f b) hv)
 
-  hm : suc (sizeᵉ b) ≤ sizeᵉ (mapᵉ f b)
-  hm = s≤s (m≤n+m (sizeᵉ b) (sizeᵗ f))
+  hm : suc (syncSizeᵉ b) ≤ syncSizeᵉ (mapᵉ f b)
+  hm = s≤s (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))
 
-  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ b)
-           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ (mapᵉ f b))
+  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ b)
+           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ (mapᵉ f b))
   grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B
-           (≤-trans (n≤1+n (sizeᵉ b)) hm)
+           (≤-trans (n≤1+n (syncSizeᵉ b)) hm)
 subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv hn hw
   with evalTm cnt in eqc
-... | zero  = z≤n , m≤m⊔n _ _
+... | zero  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 ... | suc k =
   ≤-trans (proj₁ push) (≤-trans (proj₁ IH) grow)
-  , ≤-trans (proj₂ push) (≤-trans (proj₂ IH) (⊔-mono-≤ st₀≤ grow))
+  , ≤-trans (proj₁ (proj₂ push))
+      (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ st₀≤ grow))
+  , (λ j → ≤-trans (proj₂ (proj₂ push) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ (st₀at j) grow)))
   where
   nid    = proj₁ (mintNode sched)
   sched₀ = proj₂ (mintNode sched)
@@ -1046,7 +1104,7 @@ subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv 
            (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
   IH = subscribeE-nest c sl B W g b (take-f nid ↠ κ) id now sched₀ st₀
-         hsl inv₀ (valCaps?-take c sl cnt b hv) hn
+         hsl inv₀ (nestValOK?-take c sl cnt b hv) hn
          (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw)
 
   -- the counter this head installs reads zero, so the table the child
@@ -1055,12 +1113,16 @@ subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv 
   st₀≤ = ≤-trans (setNode-nodes nid (take-st (suc k)) (EvalSt.nodes st))
                  (⊔-lub z≤n ≤-refl)
 
+  st₀at : ∀ (j : NodeId) → nodeNestAt j st₀ ≤ nodeNestAt j st
+  st₀at j = ≤-trans (nodeNestAt-set j nid (take-st (suc k)) st)
+                    (⊔-lub z≤n ≤-refl)
+
   -- and a filter is bigger than what it filters, which is the whole of
   -- what this head spends to lift the child's grant to its own
-  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ b)
-           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ (takeᵉ cnt b))
+  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ b)
+           ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ (takeᵉ cnt b))
   grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B
-           (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ cnt)) (n≤1+n _))
+           (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ cnt)) (n≤1+n _))
 subscribeE-nest c sl B W g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-scan c sl B W g f z b κ id now sched st
 subscribeE-nest c sl B W g (mergeAllᵉ lim b) κ id now sched st =
@@ -1070,13 +1132,14 @@ subscribeE-nest c sl B W g (switchAllᵉ b) κ id now sched st =
 subscribeE-nest c sl B W g (exhaustAllᵉ b) κ id now sched st =
   subscribeE-nest-exhaust c sl B W g b κ id now sched st
 subscribeE-nest c sl B W g0 (μᵉ body) κ id now sched st hsl hc hv hn hw =
-  z≤n , m≤m⊔n _ _
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest c sl B W (gs fuel) (μᵉ body) κ id now sched st =
   subscribeE-nest-mu c sl B W fuel body κ id now sched st
 subscribeE-nest c sl B W g (varᵉ ()) κ id now sched st
 subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hw =
   z≤n
   , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
+  , (λ j → ≤-trans (nodeNestAt-set j _ _ st) (⊔-lub z≤n (m≤m⊔n _ _)))
 
 -- ONE SUBSCRIPTION, AND THE BOUND IS ABSOLUTE.  What the subscription
 -- installs is read off `o`, whose depth the drain bounds by `B`, and off
@@ -1090,17 +1153,21 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  valCaps? c sl (obs s) o ≡ true →
+  nestValOK? c sl (obs s) o ≡ true →
   nestDᵉ o ≤ B →
   innerW sf allNid κ id now o sched st ≤ W →
   let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
       G = nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c) in
   (nestDᵛˢ (proj₁ (proj₂ r)) ≤ G)
   × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
+  × (∀ (j : NodeId) →
+       nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt j st ⊔ G)
 subscribeInner-nest c sl B W g0 allNid κ id now o sched st hsl hc hv hn hw =
-  z≤n , m≤m⊔n _ _
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeInner-nest {e = e} c sl B W (gs fuel) allNid κ id now o sched st hsl hc hv hn hw =
-  ≤-trans (proj₁ IH) grow , ≤-trans (proj₂ IH) (⊔-mono-≤ ≤-refl grow)
+  ≤-trans (proj₁ IH) grow
+  , ≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow)
+  , (λ j → ≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ ≤-refl grow))
   where
   IH = subscribeE-nest c sl B W fuel o
          (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
@@ -1111,9 +1178,9 @@ subscribeInner-nest {e = e} c sl B W (gs fuel) allNid κ id now o sched st hsl h
   -- the cap is what flattens the descent's own index here: an inner the
   -- caps premise admits is no larger than the cap, so the queue below
   -- can be walked at ONE exponent instead of one per element
-  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (sizeᵉ o)
+  grow : nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ o)
            ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c)
-  grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B (valCaps?-size c sl o hv)
+  grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B (nestValOK?-size c sl o hv)
 
 -- THE DRAIN IS A WALK OVER THE QUEUE, and it costs what ONE subscription
 -- costs.  `mergeAllDrain` recurses across the parked inners and
@@ -1148,7 +1215,7 @@ mergeAllDrain-nest {e = e} c sl B W sf allNid κ id now lim act (o ∷ q) sched 
              (≤-trans hq (nestB-base (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c)))
 ... | true  =
   ≤-trans (nestDᵛˢ-++ vs vs′) (⊔-lub (proj₁ SUB) (proj₁ IH))
-  , ≤-trans (proj₂ IH) (⊔-lub (proj₂ SUB) (m≤n⊔m (nodesMax st) _))
+  , ≤-trans (proj₂ IH) (⊔-lub (proj₁ (proj₂ SUB)) (m≤n⊔m (nodesMax st) _))
   where
   r₁    = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
   vs    = proj₁ (proj₂ r₁)

@@ -25,8 +25,8 @@
 -- admits is already too small by six.
 --
 -- WHAT DIES AND WHAT DOES NOT.  The scan head's own bound is untouched:
--- the DEPTH of an evaluated seed is bounded by `evalTm-nest`, which is
--- proven, and the grant has room for it.  What dies is recursing at a
+-- the DEPTH of an evaluated seed is what `evalTm-nest-sync` bounds, and
+-- the grant has room for it.  What dies is recursing at a
 -- FIXED cap.  The caps face reached the same wall and answered it by
 -- STEPPING the cap -- a scan reports `frameStep (j + j′)` and charges
 -- `j′` -- and a stepped cap is the wrong direction for a grant keyed on

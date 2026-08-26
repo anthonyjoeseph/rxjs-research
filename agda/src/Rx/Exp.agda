@@ -570,6 +570,18 @@ sizeᵛ (s ×ᵗ t) (a , b)  = suc (sizeᵛ s a + sizeᵛ t b)
 sizeᵛ (s +ᵗ t) (inj₁ a) = suc (sizeᵛ s a)
 sizeᵛ (s +ᵗ t) (inj₂ b) = suc (sizeᵛ t b)
 sizeᵛ (obs t)  e        = sizeᵉ e
+
+-- and the value reading of the sync spine, delegating to `syncSizeᵉ` at
+-- an observable exactly as `sizeᵛ` delegates to `sizeᵉ` -- ground values
+-- have no defers to truncate at, so the two readings differ only there
+syncSizeᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+syncSizeᵛ unitᵗ    _        = 1
+syncSizeᵛ boolᵗ    _        = 1
+syncSizeᵛ natᵗ     _        = 1
+syncSizeᵛ (s ×ᵗ t) (a , b)  = suc (syncSizeᵛ s a + syncSizeᵛ t b)
+syncSizeᵛ (s +ᵗ t) (inj₁ a) = suc (syncSizeᵛ s a)
+syncSizeᵛ (s +ᵗ t) (inj₂ b) = suc (syncSizeᵛ t b)
+syncSizeᵛ (obs t)  e        = syncSizeᵉ e
 ------------------------------------------------------------------
 -- Shells: the shell of an expression is its OPERATOR skeleton —
 -- Exp constructors only, with deferᵉ a leaf, embedded observables

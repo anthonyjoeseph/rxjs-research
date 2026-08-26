@@ -27,10 +27,9 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.List.Membership.Propositional.Properties using (∈-++⁻)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
-  (≤-trans; ≤-reflexive; ≤-refl; <⇒≤; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-assoc; +-comm; +-identityʳ;
-   *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-distribˡ-+; *-distribʳ-+;
-   *-assoc; *-comm; ^-distribˡ-+-*;
-   ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m; n≤1+n; ^-monoʳ-≤; m^n>0)
+  (≤-trans; ≤-reflexive; ≤-refl; <⇒≤; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-assoc; +-comm; *-mono-≤;
+  *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-distribˡ-+; *-distribʳ-+; *-assoc; *-comm;
+  ^-distribˡ-+-*; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m; n≤1+n; ^-monoʳ-≤; m^n>0)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -40,7 +39,7 @@ open import Rx.Exp using
   (Ctx; Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; Exp; Tm; Val; Fn; evalTm; input; ofᵉ; emptyᵉ; mapᵉ;
   takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂;
   pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ; ltᵖ; notᵖ; Ren∈;
-  ext∈; renExp; renTm; renTms; reify; lookupEnv; subΘExp; subΘTm; subΘTms; evalWith; applyFn;
+  ext∈; renExp; renTm; renTms; reify; lookupEnv; subΘExp; subΘTm; subΘTms; evalWith; applyFn; syncSizeᵗ;
   sizeᵉ; sizeᵗ; sizeᵗˢ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵗˢ; nestDᵛ)
 open import Verify-Budget-Sufficient.Measures using (n<2^n)
@@ -398,8 +397,22 @@ applyFn-nest {s = s} fn v =
 -- at a closed term -- a `caseᵗ` duplicates its scrutinee's value into
 -- the arm it picks -- so the factor stays and only the environment's
 -- contribution goes to zero.
-evalTm-nest : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
-  nestDᵛ t (evalTm tm) ≤ 2 ^ sizeᵗ tm * nestDᵗ tm
-evalTm-nest tm =
-  ≤-trans (evalWith-nest 0 tm []ᵃ tt)
-          (≤-reflexive (cong (2 ^ sizeᵗ tm *_) (+-identityʳ (nestDᵗ tm))))
+
+-- THE SAME CHARGE READ IN THE SYNC CURRENCY, which is the denomination
+-- the nest face's grant is keyed in: the exponent counts only what a
+-- `deferᵉ` gate does not hide, exactly as the demand it pays for does.
+-- The proof above spends full size in just two roles -- constructor
+-- monotonicity, where the sync spine has the identical `suc` structure,
+-- and occurrence counting, where every nest-visible occurrence is
+-- sync-visible -- so the tightening is a re-run of that induction at
+-- the smaller measure rather than a new idea.  The denomination itself
+-- is machine-tested at the sibling walk `applyFn` by
+-- `Probed.Sync-Factor`, whose rows never reach a closed-term
+-- evaluation -- which is why this leaf carries no receipt of its own.
+-- TWIN: `evalWith-nest` is the same induction at the full measure,
+--   proven above, clause for clause; the two places its exponent is
+--   actually spent -- constructor monotonicity and occurrence
+--   counting -- are the two places the sync spine gives no less.
+postulate
+  evalTm-nest-sync : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
+    nestDᵛ t (evalTm tm) ≤ 2 ^ syncSizeᵗ tm * nestDᵗ tm

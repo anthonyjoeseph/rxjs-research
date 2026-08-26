@@ -25,7 +25,7 @@
 -- THE PREMISES ARE PINNED AND NOT ASSUMED.  `B` is `nestDᵉ prog`
 -- exactly, the store is `st-init` so its `nodesMax` is zero and the
 -- store premise holds at every index, and the size cap is the
--- program's own -- the smallest `valCaps?` admits.  The burst premise
+-- program's own -- the smallest `nestValOK?` admits.  The burst premise
 -- is met by the measured length rather than by a chosen `W`.
 --
 -- NO ROW HERE COULD HAVE FAILED, AND THAT IS THE FINDING RATHER THAN A
@@ -58,13 +58,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Gas; g0; gasPad; cold)
 open import Rx.Exp
   using (Closed; Val; Fn; natᵗ; obs; _×ᵗ_; scanᵉ; mergeAllᵉ; emptyᵉ; input;
-         varᵗ; fstᵗ; strmᵗ; sizeᵉ)
+         varᵗ; fstᵗ; strmᵗ; syncSizeᵉ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
   using (subscribeE; splitBurst; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂)
@@ -90,7 +90,7 @@ gas : Gas
 gas = gasPad 400 g0
 
 cap : Caps
-cap = caps (sizeᵉ prog) 4000 4000
+cap = caps (syncSizeᵉ prog) 4000 4000
 
 burst : ℕ → ℕ
 burst k =
@@ -109,7 +109,7 @@ charged : ℕ → ℕ
 charged k =
   (2 ^ Caps.cSize cap) ^ suc (burst k) * (nestDᵉ prog + nestUnit prog (slots k))
 
-premises : (valCaps? cap (slots 14) (obs (obs natᵗ)) prog ≡ true)
+premises : (nestValOK? cap (slots 14) (obs (obs natᵗ)) prog ≡ true)
          × (capsOK? cap (sched-init prog (slots 14)) (st-init prog) ≡ true)
 premises = refl , refl
 

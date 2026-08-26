@@ -12,7 +12,7 @@
 -- what it was handed, and the whole question is where the exponent
 -- comes from.  Taking it from the STORE's cap is refuted --
 -- `Refuted.Subscribe-Caps-Nest`, sixteen against six -- so the charge
--- takes it from a `valCaps?` on the observable being subscribed, and
+-- takes it from a `nestValOK?` on the observable being subscribed, and
 -- these rows are the first instantiation of THAT form.
 --
 -- AND THE MAP HEAD IS NOW A REAL BODY, so what these rows still reach
@@ -25,8 +25,8 @@
 -- the tighter reading rather than relaxed to match.
 --
 -- HOW THE CAP IS CHOSEN, and it is the opposite of generous.  Each row
--- sets `c` to the value's OWN size and width, which is the smallest cap
--- its `valCaps?` premise admits: `sizeᵛ ≤ᵇ sizeᵛ` is `true` by refl and
+-- sets `c` to the value's OWN sync size and width, the smallest cap its
+-- `nestValOK?` premise admits: `syncSizeᵛ ≤ᵇ syncSizeᵛ` is `true` by refl and
 -- there is no slack anywhere in the choice.  A larger cap would make
 -- every row pass by making the right-hand side astronomical, which is
 -- the way this probe would lie.
@@ -66,7 +66,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; switchAllᵉ; varᵗ; nat̂; strmᵗ; emptyᵉ; sizeᵛ)
+  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; switchAllᵉ; varᵗ; nat̂; strmᵗ; emptyᵉ; syncSizeᵛ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵉ)
@@ -74,7 +74,7 @@ open import Rx.Evaluator
   using (Path; _↠_; from-inner; Sched; EvalSt; Frame; mergeAll-st; thru-outer; mergeAllᵒ; stepFrame;
          installNode; subscribeE; splitBurst; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
@@ -112,7 +112,7 @@ p₃ = mapᵉ dup₃ p₂
 
 -- THE SMALLEST CAP THE PREMISE ADMITS: the value's own size and width.
 tight : ∀ {u} → Val Γ₂ u → Caps
-tight {u} v = caps (sizeᵛ u v) (pWᵛ 2 slots u v) 0
+tight {u} v = caps (syncSizeᵛ u v) (pWᵛ 2 slots u v) 0
 
 -- THE BURST THE DESCENT HANDS BACK, which the restated form makes the
 -- exponent's index -- so it is pinned per row rather than assumed, and
@@ -141,7 +141,7 @@ read {t} e =
 -- the premises, pinned rather than assumed
 prem : ∀ {t} (e : Closed Γ₂ t) → Set
 prem {t} e =
-  (valCaps? (tight {obs t} e) slots (obs t) e ≡ true)
+  (nestValOK? (tight {obs t} e) slots (obs t) e ≡ true)
   × (capsOK? (tight {obs t} e) (sched-init e slots) (st-init e) ≡ true)
 
 premises₁ : prem p₁
@@ -263,7 +263,7 @@ WThru = 1
 
 -- the premises, pinned rather than assumed: the cap is again the value's
 -- own size and width, and the state is one ordinary installed node
-premThru : (valCaps? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premThru : (nestValOK? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
          × (capsOK? cThru schedThru stThru ≡ true)
 premThru = refl , refl
 
@@ -331,7 +331,7 @@ readInner =
    , nodesMax stThru
    , nestDᵉ oThru + nestUnit eThru slots
 
-premInner : (valCaps? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premInner : (nestValOK? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
           × (capsOK? cThru schedThru stThru ≡ true)
 premInner = refl , refl
 
@@ -370,7 +370,7 @@ readDeep =
    , nodesMax stDeep
    , nestDᵉ oThru + nestUnit eThru slots
 
-premDeep : (valCaps? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premDeep : (nestValOK? cThru slots (obs (obs (obs natᵗ))) oThru ≡ true)
          × (capsOK? cThru schedThru stDeep ≡ true)
 premDeep = refl , refl
 
@@ -411,7 +411,7 @@ readDeeper =
 cDeeper : Caps
 cDeeper = caps 2000 2000 2000
 
-premDeeper : (valCaps? cDeeper slots (obs (obs (obs natᵗ))) oThru ≡ true)
+premDeeper : (nestValOK? cDeeper slots (obs (obs (obs natᵗ))) oThru ≡ true)
            × (capsOK? cDeeper schedThru stDeeper ≡ true)
 premDeeper = refl , refl
 

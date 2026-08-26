@@ -117,7 +117,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete; Timed;
   after_,_; hot; cold)
-open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
+open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
   ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
@@ -647,6 +647,16 @@ evalTm-iterSize S hS z = evalWith-iterSize S 0 hS z []ᵃ tt
 valCaps? : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
 valCaps? {n = n} c sl u v =
   (sizeᵛ u v ≤ᵇ Caps.cSize c) ∧ (pWᵛ n sl u v ≤ᵇ Caps.cWid c)
+
+-- THE SAME PAIR OF NUMBERS READ ON THE SYNC SPINE, which is the
+-- currency the nest face's grant is keyed in: substitution's charge is
+-- blind to what a `deferᵉ` gate hides, and a μ-unfolding moves the full
+-- size while leaving this reading exactly where it was.  The width half
+-- is the full reading unchanged -- a slot reference under a defer is
+-- still a slot reference.
+nestValOK? : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
+nestValOK? {n = n} c sl u v =
+  (syncSizeᵛ u v ≤ᵇ Caps.cSize c) ∧ (pWᵛ n sl u v ≤ᵇ Caps.cWid c)
 
 eventCaps? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ u) → Bool
 eventCaps? {u = u} c sl (value v) = valCaps? c sl u v
