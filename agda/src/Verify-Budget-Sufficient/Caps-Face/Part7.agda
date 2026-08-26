@@ -1251,10 +1251,10 @@ chainBurstOK {n = n} {e = e} W id a path sched st =
 -- AND THE SAME PACKAGING FOR THE CAPS THE `*All` FRAMES SPEND, so a
 -- consumer states one hypothesis per walk rather than one per frame.
 chainCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
+  (c : Caps) (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) → Set
-chainCapsOK {n = n} {e = e} c id a path sched st =
-  capsWalkOK c (budgetAt e (Sched.slots sched) id) id (arrTick a) path
+chainCapsOK {n = n} {e = e} c sl id a path sched st =
+  capsWalkOK c sl (budgetAt e (Sched.slots sched) id) id (arrTick a) path
              (arrVal a ∷ []) (Arrival.isLast a) sched st
 
 -- THE EXPONENT THE CAPS RIDER TELESCOPES TO OVER A CHAIN LIST.  One
@@ -1321,7 +1321,7 @@ chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (W : ℕ) (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → 1 ≤ W → chainBurstOK W id a path sched st →
-  chainCapsOK c id a path sched st →
+  chainCapsOK c sl id a path sched st →
   let r = chainStep id a path sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
     ≤ (2 ^ Caps.cSize c) ^ pathLen path
@@ -1375,16 +1375,16 @@ chainsBurstOK W a nextId ((rid , c) ∷ chains) sched st =
 -- hypothesis above: a cancelled registration walks nothing, so it owes
 -- nothing here either.
 chainsCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (cp : Caps) (a : Arrival Γ) (nextId : Id)
+  (cp : Caps) (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) → Set
-chainsCapsOK cp a nextId []               sched st = ⊤
-chainsCapsOK cp a nextId ((rid , c) ∷ chains) sched st =
+chainsCapsOK cp sl a nextId []               sched st = ⊤
+chainsCapsOK cp sl a nextId ((rid , c) ∷ chains) sched st =
   if any (_≡ᵇ rid) (EvalSt.cancelled st)
-  then chainsCapsOK cp a nextId chains sched st
-  else (chainCapsOK cp nextId a c sched
+  then chainsCapsOK cp sl a nextId chains sched st
+  else (chainCapsOK cp sl nextId a c sched
           (record st { delivered = rid ∷ EvalSt.delivered st })
-        × chainsCapsOK cp a nextId chains
+        × chainsCapsOK cp sl a nextId chains
             (proj₁ (proj₂ (chainStep nextId a c sched
                              (record st { delivered = rid ∷ EvalSt.delivered st }))))
             (proj₂ (proj₂ (chainStep nextId a c sched
@@ -1395,7 +1395,7 @@ cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → 1 ≤ W → chainsBurstOK W a nextId chains sched st →
-  chainsCapsOK cp a nextId chains sched st →
+  chainsCapsOK cp sl a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
     ≤ (2 ^ Caps.cSize cp) ^ chainsLenSum chains
@@ -1539,7 +1539,7 @@ cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (2 ^ Caps.cSize (capsAt e sl id)) ^ chainsLenSum chains
     * chainsNestF chains ^ nestBurstAt e sl id ≤ nestFacAt e sl id →
   chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
-  chainsCapsOK (capsAt e sl id) a nextId chains sched st →
+  chainsCapsOK (capsAt e sl id) sl a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st
   in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
        ≤ nestFacAt e sl id
@@ -1624,7 +1624,7 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (2 ^ Caps.cSize (capsAt e sl id)) ^ chainsLenSum chains
     * chainsNestF chains ^ nestBurstAt e sl id ≤ nestFacAt e sl id →
   chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
-  chainsCapsOK (capsAt e sl id) a nextId chains sched st →
+  chainsCapsOK (capsAt e sl id) sl a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
@@ -1988,7 +1988,7 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
-    chainsCapsOK (capsAt e sl id) a nextId (chainsOf a st) sched
+    chainsCapsOK (capsAt e sl id) sl a nextId (chainsOf a st) sched
       (cascadeLatch a st)
 
 cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

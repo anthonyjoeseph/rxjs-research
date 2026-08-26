@@ -173,10 +173,11 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`mergeAllDrain-nest`** (Nest-Walk) — FALSITY, `REFUTED×3`: the drain leaf
-  the inner arm now reduces to, and where the three refutations land — a caps
-  factor AND a slots summand, each dead on its own. Unprobed at the new form,
-  which is what holds the class.
+- **`subscribeInner-nest`** (Nest-Walk) — FALSITY, `REFUTED×3`: one
+  subscription, which is the whole of the inner arm's risk now that the drain
+  is a body over it. The bound is ABSOLUTE rather than relative to the store
+  handed in, which is what stops the factor compounding once per queued inner.
+  Unprobed at that form.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — FALSITY, `REFUTED`: restated with
   the row above and by the same repair, the wrap's own subscribe being the same
   descent. Measured multiplicative in the incoming depth, which is what the

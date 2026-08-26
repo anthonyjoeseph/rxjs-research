@@ -2,7 +2,7 @@
 -- foldPath-nodes … frameNestD
 module Verify-Budget-Sufficient.Nest-Walk where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
 open import Data.Bool.ListAction using (any)
@@ -15,6 +15,7 @@ open import Data.Nat.Properties using
    m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (⊤)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 open import Relation.Nullary using (yes; no)
@@ -28,7 +29,7 @@ open import Rx.Evaluator using
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
-  mergeAllDrain)
+  mergeAllDrain; subscribeInner; hasRoom)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
@@ -324,19 +325,216 @@ abstract
     ≤-trans (⊔-mono-≤ (≤-refl {nestDᵛ u x}) (nestDᵛˢ-++ xs ys))
             (≤-reflexive (sym (⊔-assoc (nestDᵛ u x) (nestDᵛˢ xs) (nestDᵛˢ ys))))
 
--- THE DRAIN IS WHERE THE SUBSCRIPTION HAPPENS, so it is where the
--- factor is owed and this is the leaf.  It is stated over what it was
--- HANDED rather than over the node it came from -- a queue bound, a
--- store bound and the caps -- because the frame above it reads the
--- queue out of the table and hands it over, and a leaf that names the
--- table cannot be re-used by the walk's other entry into the same
--- machinery.
+-- AND THE CAPS THE DRAIN SPENDS, HANDED AT EVERY STATE IT PASSES
+-- THROUGH, for the reason `capsWalkOK` is shaped that way one face over:
+-- a subscription installs nodes the caps did not previously have to
+-- cover, so the bundle is not preserved at a fixed `c` and re-deriving
+-- the caps face's frame counter in a second currency is the alternative
+-- nobody wants.  Recursion on the QUEUE is what lets the drain's own
+-- induction take its hypothesis apart.
+capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
+  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
+capsDrainOK c sl sf allNid κ id now lim act [] sched st =
+  (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
+capsDrainOK c sl sf allNid κ id now lim act (o ∷ q) sched st =
+  (Sched.slots sched ≡ sl) × (capsOK? c sched st ≡ true)
+  × capsDrainOK c sl sf allNid κ id now lim
+      (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
+      (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+  where r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+
+-- ONE SUBSCRIPTION, AND IT IS THE WHOLE OF THE ARM'S RISK.  The bound is
+-- ABSOLUTE rather than relative to the store it is handed -- what the
+-- subscription installs is read off `o`, whose depth the drain bounds by
+-- `B`, and off the slots, which the unit covers -- so re-establishing the
+-- same bound is exactly what stops the factor compounding once per
+-- queued inner.  A relative form would read `2 ^ cSize` times the
+-- PREVIOUS store and raise the drain's cost to a tower in the queue's
+-- length, which is not what a queue of independent inners costs.
+--
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
+--   against forty, at a queued `mapᵉ` whose step function names its
+--   payload on both sides of the sum: `nestDᵉ` is additive there and the
+--   substitution is not, so the emitted value is deeper than the whole
+--   queue is charged.  The same witness kills the ASSEMBLY at the frame
+--   above, whose charge reduces to exactly this bound.
+-- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
+--   invites -- charging the arm the `nestUnit e sl` its own parent
+--   already carries -- at a hundred and twenty against eighty-two, with
+--   the queued observable AS the program so the unit is as large as the
+--   currency admits.  A third occurrence of the payload in the step
+--   function moves the emit and leaves the unit where it was, so what
+--   is owed is a FACTOR in the substituted function's SIZE and no
+--   summand in a depth currency is one.
+-- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled form
+--   from the other side, forty delivered against a charge of ZERO, at a
+--   queue holding nothing but a reference to an observable-typed share.
+--   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
+--   reference says nothing about the slot -- and the node table does not
+--   read the slots either, so the charged side is empty and every factor
+--   is a multiple of nothing.  Taken with the row above it this pins the
+--   shape exactly: the factor AND a slots summand, each of which is dead
+--   on its own.
+postulate
+  subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+    (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+    nestDᵉ o ≤ B → nodesMax st ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl) →
+    let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
+    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ (proj₂ r)))
+      ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl)
+
+-- THE DRAIN IS A WALK OVER THE QUEUE, and it costs what ONE subscription
+-- costs.  `mergeAllDrain` recurses across the parked inners and
+-- CONCATENATES, and both measures in the conclusion are `⊔`-folds, so the
+-- queue combines by max and not by product -- which is why the bound
+-- above can be re-established at every step instead of accumulating.
 --
 -- AND THE RESIDUAL QUEUE IS IN THE CONCLUSION, which is not decoration:
 -- what the drain leaves parked is written straight back into the node
 -- table by the frame above, so a bound that covers the emitted values
 -- and the state but not the leftovers does not bound the table the
 -- caller ends up with.
+mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  capsDrainOK c sl sf allNid κ id now lim act q sched st →
+  queueNest q ≤ B → nodesMax st ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl) →
+  let r = mergeAllDrain sf allNid κ id now lim act q sched st in
+  ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ r))
+     ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r)))))
+    ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl)
+mergeAllDrain-nest {e = e} c sl B sf allNid κ id now lim act [] sched st hcd hq hst =
+  ⊔-lub (⊔-lub hst z≤n) z≤n
+mergeAllDrain-nest {e = e} c sl B sf allNid κ id now lim act (o ∷ q) sched st hcd hq hst
+  with hasRoom lim act
+... | false = ⊔-lub (⊔-lub hst z≤n) (≤-trans hq (raiseU (Caps.cSize c) B (nestUnit e sl)))
+... | true  =
+  ⊔-lub (⊔-lub (≤-trans (m≤m⊔n (nodesMax st₂) (nestDᵛˢ vs′))
+                        (≤-trans (m≤m⊔n _ (queueNest q′)) IH))
+               (≤-trans (nestDᵛˢ-++ vs vs′)
+                        (⊔-lub (≤-trans (m≤n⊔m (nodesMax st₁) (nestDᵛˢ vs)) SUB)
+                               (≤-trans (m≤n⊔m (nodesMax st₂) (nestDᵛˢ vs′))
+                                        (≤-trans (m≤m⊔n _ (queueNest q′)) IH)))))
+        (≤-trans (m≤n⊔m (nodesMax st₂ ⊔ nestDᵛˢ vs′) (queueNest q′)) IH)
+  where
+  r₁    = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+  vs    = proj₁ (proj₂ r₁)
+  done  = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+  st₁   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+
+  r₂    = mergeAllDrain sf allNid κ id now lim (if done then act else suc act) q sched₁ st₁
+  vs′   = proj₁ r₂
+  q′    = proj₁ (proj₂ (proj₂ (proj₂ r₂)))
+  st₂   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₂))))
+
+  SUB = subscribeInner-nest c sl B sf allNid κ id now o sched st
+          (proj₁ hcd) (proj₁ (proj₂ hcd))
+          (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) hst
+
+  IH = mergeAllDrain-nest c sl B sf allNid κ id now lim
+         (if done then act else suc act) q sched₁ st₁
+         (proj₂ (proj₂ hcd))
+         (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
+         (≤-trans (m≤m⊔n (nodesMax st₁) (nestDᵛˢ vs)) SUB)
+
+-- THE FINISH DISPATCH, AND ALL OF IT IS CHECKED.  `innerReact` reaches
+-- here along exactly one route -- a `fin` whose inner is not held open
+-- by a live registration -- so the frame's whole charge is this
+-- statement's; and of the finish's own arms, every one but the
+-- `mergeAllᵒ` drain either hands its inputs straight back or writes a
+-- node whose `nodeNest` is zero, so the drain is the sole leaf and the
+-- rest reduces.
+innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (sf : Gas) (op : AllOp)
+  (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
+  (id : Id) (now : Tick)
+  (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+     capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
+  let r = innerFinish sf op allNid inst p id now vals sched st
+            (lookupNode allNid (EvalSt.nodes st)) in
+  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+    ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
+
+innerFinish-nest {e = e} c sl sf switchᵒ allNid inst p id now vals sched st hsl hc hdr
+  with lookupNode allNid (EvalSt.nodes st)
+... | nothing                    = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (scan-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (take-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (mergeAll-st _ _ _ _) = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (exhaust-st _ _)      = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (switch-st nothing _) = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (switch-st (just c₀) od) with c₀ ≡ᵇ inst
+...   | false = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+...   | true  =
+  ≤-trans (⊔-mono-≤ (setNode-nodes allNid (switch-st nothing od) (EvalSt.nodes st))
+                    (≤-refl {nestDᵛˢ vals}))
+          (raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl))
+
+innerFinish-nest {e = e} c sl sf exhaustᵒ allNid inst p id now vals sched st hsl hc hdr
+  with lookupNode allNid (EvalSt.nodes st)
+... | nothing                    = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (scan-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (take-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (mergeAll-st _ _ _ _) = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (switch-st _ _)       = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (exhaust-st _ od)     =
+  ≤-trans (⊔-mono-≤ (setNode-nodes allNid (exhaust-st false od) (EvalSt.nodes st))
+                    (≤-refl {nestDᵛˢ vals}))
+          (raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl))
+
+innerFinish-nest {e = e} {s = s} c sl sf mergeAllᵒ allNid inst p id now vals sched st hsl hc hdr
+  with lookupNode allNid (EvalSt.nodes st) in eq
+... | nothing                = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (scan-st _)       = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (take-st _)       = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (switch-st _ _)   = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (exhaust-st _ _)  = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
+...   | no  _    = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
+...   | yes refl =
+  ⊔-lub (≤-trans (setNode-nodes allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes st′))
+        (≤-trans (⊔-lub (m≤n⊔m (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′))
+                        (≤-trans (m≤m⊔n (nodesMax st′) (nestDᵛˢ vs))
+                                 (m≤m⊔n (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′))))
+                 (≤-trans D up)))
+        (≤-trans (nestDᵛˢ-++ vals vs)
+                 (⊔-lub (≤-trans (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
+                                 (raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals)
+                                         (nestUnit e sl)))
+                        (≤-trans (≤-trans (m≤n⊔m (nodesMax st′) (nestDᵛˢ vs))
+                                          (m≤m⊔n (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′)))
+                                 (≤-trans D up))))
+  where
+  r   = mergeAllDrain sf allNid p id now lim (pred act) q sched st
+  vs   = proj₁ r
+  act′ = proj₁ (proj₂ (proj₂ r))
+  q′   = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st′  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+  qbnd : queueNest q ≤ nodesMax st
+  qbnd = lookupNode-nodes allNid (mergeAll-st lim act q od) (EvalSt.nodes st) eq
+
+  D : ((nodesMax st′ ⊔ nestDᵛˢ vs) ⊔ queueNest q′)
+        ≤ 2 ^ Caps.cSize c * (nodesMax st + nestUnit e sl)
+  D = mergeAllDrain-nest c sl (nodesMax st) sf allNid p id now lim (pred act) q sched st
+        (hdr lim act q od refl) qbnd
+        (raiseU (Caps.cSize c) (nodesMax st) (nestUnit e sl))
+
+  up : 2 ^ Caps.cSize c * (nodesMax st + nestUnit e sl)
+         ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
+  up = *-monoʳ-≤ (2 ^ Caps.cSize c)
+         (+-monoˡ-≤ (nestUnit e sl) (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)))
+
 -- THE INNER RELEASE IS NOT A FREE FRAME, and the reason is structural
 -- rather than arithmetic.  A `from-inner` at `fin` with no live
 -- registration is exactly where `innerFinish` runs `mergeAllDrain`, and
@@ -376,127 +574,6 @@ abstract
 -- ONE substitution, at this exact factor and proven; what is owed is
 -- that bound lifted through the descent the drain performs.
 --
--- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
---   against forty, at a queued `mapᵉ` whose step function names its
---   payload on both sides of the sum: `nestDᵉ` is additive there and the
---   substitution is not, so the emitted value is deeper than the whole
---   queue is charged.  The same witness kills the ASSEMBLY at this
---   frame, whose charge reduces to exactly the leaf's bound.
--- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
---   invites -- charging the arm the `nestUnit e sl` its own parent
---   already carries -- at a hundred and twenty against eighty-two, with
---   the queued observable AS the program so the unit is as large as the
---   currency admits.  A third occurrence of the payload in the step
---   function moves the emit and leaves the unit where it was, so what
---   is owed is a FACTOR in the substituted function's SIZE and no
---   summand in a depth currency is one.
--- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled form
---   from the other side, forty delivered against a charge of ZERO, at a
---   queue holding nothing but a reference to an observable-typed share.
---   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
---   reference says nothing about the slot -- and the node table does not
---   read the slots either, so the charged side is empty and every factor
---   is a multiple of nothing.  Taken with the row above it this pins the
---   shape exactly: the factor AND a slots summand, each of which is dead
---   on its own.
-postulate
-  mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
-    queueNest q ≤ nodesMax st →
-    let r = mergeAllDrain sf allNid κ id now lim act q sched st in
-    ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ r))
-       ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r)))))
-      ≤ 2 ^ Caps.cSize c * (nodesMax st + nestUnit e sl)
-
--- THE FINISH DISPATCH, AND ALL OF IT IS CHECKED.  `innerReact` reaches
--- here along exactly one route -- a `fin` whose inner is not held open
--- by a live registration -- so the frame's whole charge is this
--- statement's; and of the finish's own arms, every one but the
--- `mergeAllᵒ` drain either hands its inputs straight back or writes a
--- node whose `nodeNest` is zero, so the drain is the sole leaf and the
--- rest reduces.
-innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (sf : Gas) (op : AllOp)
-  (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
-  (id : Id) (now : Tick)
-  (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
-  let r = innerFinish sf op allNid inst p id now vals sched st
-            (lookupNode allNid (EvalSt.nodes st)) in
-  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-    ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
-
-innerFinish-nest {e = e} c sl sf switchᵒ allNid inst p id now vals sched st hsl hc
-  with lookupNode allNid (EvalSt.nodes st)
-... | nothing                    = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (scan-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (take-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (mergeAll-st _ _ _ _) = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (exhaust-st _ _)      = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st nothing _) = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st (just c₀) od) with c₀ ≡ᵇ inst
-...   | false = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-...   | true  =
-  ≤-trans (⊔-mono-≤ (setNode-nodes allNid (switch-st nothing od) (EvalSt.nodes st))
-                    (≤-refl {nestDᵛˢ vals}))
-          (raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl))
-
-innerFinish-nest {e = e} c sl sf exhaustᵒ allNid inst p id now vals sched st hsl hc
-  with lookupNode allNid (EvalSt.nodes st)
-... | nothing                    = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (scan-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (take-st _)           = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (mergeAll-st _ _ _ _) = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st _ _)       = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (exhaust-st _ od)     =
-  ≤-trans (⊔-mono-≤ (setNode-nodes allNid (exhaust-st false od) (EvalSt.nodes st))
-                    (≤-refl {nestDᵛˢ vals}))
-          (raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl))
-
-innerFinish-nest {e = e} {s = s} c sl sf mergeAllᵒ allNid inst p id now vals sched st hsl hc
-  with lookupNode allNid (EvalSt.nodes st) in eq
-... | nothing                = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (scan-st _)       = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (take-st _)       = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (switch-st _ _)   = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (exhaust-st _ _)  = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
-...   | no  _    = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-...   | yes refl =
-  ⊔-lub (≤-trans (setNode-nodes allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes st′))
-        (≤-trans (⊔-lub (m≤n⊔m (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′))
-                        (≤-trans (m≤m⊔n (nodesMax st′) (nestDᵛˢ vs))
-                                 (m≤m⊔n (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′))))
-                 (≤-trans D up)))
-        (≤-trans (nestDᵛˢ-++ vals vs)
-                 (⊔-lub (≤-trans (m≤n⊔m (nodesMax st) (nestDᵛˢ vals))
-                                 (raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals)
-                                         (nestUnit e sl)))
-                        (≤-trans (≤-trans (m≤n⊔m (nodesMax st′) (nestDᵛˢ vs))
-                                          (m≤m⊔n (nodesMax st′ ⊔ nestDᵛˢ vs) (queueNest q′)))
-                                 (≤-trans D up))))
-  where
-  r   = mergeAllDrain sf allNid p id now lim (pred act) q sched st
-  vs   = proj₁ r
-  act′ = proj₁ (proj₂ (proj₂ r))
-  q′   = proj₁ (proj₂ (proj₂ (proj₂ r)))
-  st′  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
-
-  qbnd : queueNest q ≤ nodesMax st
-  qbnd = lookupNode-nodes allNid (mergeAll-st lim act q od) (EvalSt.nodes st) eq
-
-  D : ((nodesMax st′ ⊔ nestDᵛˢ vs) ⊔ queueNest q′)
-        ≤ 2 ^ Caps.cSize c * (nodesMax st + nestUnit e sl)
-  D = mergeAllDrain-nest c sl sf allNid p id now lim (pred act) q sched st hsl hc qbnd
-
-  up : 2 ^ Caps.cSize c * (nodesMax st + nestUnit e sl)
-         ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
-  up = *-monoʳ-≤ (2 ^ Caps.cSize c)
-         (+-monoˡ-≤ (nestUnit e sl) (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)))
-
 -- THE FRAME'S DISPATCH, AND IT IS CHECKED: the two routes that hand
 -- their inputs straight back -- a step that is not a `fin`, and a
 -- `fin` whose inner is still held open by a live registration -- are
@@ -506,15 +583,18 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+     capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
   let r = stepFrame sf id now (from-inner op allNid inst) p vals fin sched st in
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
     ≤ 2 ^ Caps.cSize c * ((nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl)
-stepFrame-nodes-inner {e = e} c sl sf id now op allNid inst p vals false sched st hsl hc =
+stepFrame-nodes-inner {e = e} c sl sf id now op allNid inst p vals false sched st hsl hc hdr =
   raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-stepFrame-nodes-inner {e = e} c sl sf id now op allNid inst p vals true sched st hsl hc
+stepFrame-nodes-inner {e = e} c sl sf id now op allNid inst p vals true sched st hsl hc hdr
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  = raiseU (Caps.cSize c) (nodesMax st ⊔ nestDᵛˢ vals) (nestUnit e sl)
-... | false = innerFinish-nest c sl sf op allNid inst p id now vals sched st hsl hc
+... | false = innerFinish-nest c sl sf op allNid inst p id now vals sched st hsl hc hdr
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -529,6 +609,25 @@ abstract
     ≤-trans (≤-trans (≤-reflexive (sym (+-identityʳ X)))
                      (≤-reflexive (cong (X +_) (sym (*-zeroʳ W)))))
             (one-pow W (X + W * 0))
+
+-- THE DRAIN'S CAPS, HANDED AT THE ONE FRAME THAT CAN REACH IT.  Only a
+-- `from-inner` runs `mergeAllDrain`, and only when the node it names is
+-- a `mergeAll-st` -- so the obligation is stated as a function of the
+-- lookup rather than of the frame, and every other frame carries
+-- nothing.  Quantifying over the queue instead of reading it out is
+-- what keeps this a plain premise a caller can discharge without
+-- inspecting the table.
+frameDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (p : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) → Set
+frameDrainOK c sl sf id now (map-f _)        p sched st = ⊤
+frameDrainOK c sl sf id now (scan-f _ _)     p sched st = ⊤
+frameDrainOK c sl sf id now (take-f _)       p sched st = ⊤
+frameDrainOK c sl sf id now (thru-outer _ _) p sched st = ⊤
+frameDrainOK {Γ = Γ} {u = u} c sl sf id now (from-inner op allNid inst) p sched st =
+  ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+    capsDrainOK c sl sf allNid p id now lim (pred act) q sched st
 
 -- ONE FRAME, AND THE `⊔` IS WHY THIS IS ONE STATEMENT RATHER THAN TWO.
 -- A frame moves its own node and the values it hands on TOGETHER, by
@@ -577,12 +676,13 @@ abstract
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+    frameDrainOK c sl sf id now f p sched st →
     let r = stepFrame sf id now f p vals fin sched st in
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ 2 ^ Caps.cSize c
         * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
            + nestUnit e sl)
-  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc =
+  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hfd =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
@@ -596,18 +696,18 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc =
+  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hfd =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseU (Caps.cSize c) _ (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc =
+  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hfd =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseU (Caps.cSize c) _ (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc =
-    ≤-trans (stepFrame-nodes-inner c sl sf id now op allNid inst p vals fin sched st hsl hc)
+  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hfd =
+    ≤-trans (stepFrame-nodes-inner c sl sf id now op allNid inst p vals fin sched st hsl hc hfd)
             (*-monoʳ-≤ (2 ^ Caps.cSize c)
               (+-monoˡ-≤ (nestUnit e sl) (zero-charge W _)))
-  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc =
+  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hfd =
     ≤-trans (stepFrame-nodes-thru c W sf id now op nid p vals fin sched st 1≤W hlen hc)
             (≤-trans (*-monoʳ-≤ (2 ^ Caps.cSize c)
               (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
@@ -739,13 +839,14 @@ burstsOK W sf id now (f ↠ p)        vals fin sched st =
 -- induction take its own hypothesis apart instead of re-deriving the
 -- caps face's frame counter in a second currency.
 capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
+  (c : Caps) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
-capsWalkOK c sf id now root           vals fin sched st = capsOK? c sched st ≡ true
-capsWalkOK c sf id now (share-sink _) vals fin sched st = capsOK? c sched st ≡ true
-capsWalkOK c sf id now (f ↠ p)        vals fin sched st =
+capsWalkOK c sl sf id now root           vals fin sched st = capsOK? c sched st ≡ true
+capsWalkOK c sl sf id now (share-sink _) vals fin sched st = capsOK? c sched st ≡ true
+capsWalkOK c sl sf id now (f ↠ p)        vals fin sched st =
   (capsOK? c sched st ≡ true)
-  × capsWalkOK c sf id now p (proj₁ step)
+  × frameDrainOK c sl sf id now f p sched st
+  × capsWalkOK c sl sf id now p (proj₁ step)
       (proj₁ (proj₂ (proj₂ step)))
       (proj₁ (proj₂ (proj₂ (proj₂ step))))
       (proj₂ (proj₂ (proj₂ (proj₂ step))))
@@ -759,7 +860,7 @@ foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → 1 ≤ W →
   burstsOK W sf id now path vals fin sched st →
-  capsWalkOK c sf id now path vals fin sched st →
+  capsWalkOK c sl sf id now path vals fin sched st →
   nodesMax (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
     ≤ (2 ^ Caps.cSize c) ^ pathLen path
       * (pathNestF path ^ W
@@ -780,12 +881,12 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin s
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
   ≤-trans (foldPath-nodes c W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
              (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-             1≤W (proj₂ hb) (proj₂ hc))
+             1≤W (proj₂ hb) (proj₂ (proj₂ hc)))
     (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
                 (*-monoʳ-≤ (pathNestF p ^ W)
                   (+-monoˡ-≤ (W * (pathNestD p + L * U))
                              (stepFrame-nodes c W sl sf id now f p vals fin sched st
-                                hsl 1≤W (proj₁ hb) (proj₁ hc)))))
+                                hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc))))))
     (≤-trans (*-monoʳ-≤ ((2 ^ S) ^ pathLen p)
                 (fac-hoist (2 ^ S) (pathNestF p ^ W) (A + U) (W * (pathNestD p + L * U))
                            (1≤pow≤ 2 (Caps.cSize c) (s≤s z≤n))))
