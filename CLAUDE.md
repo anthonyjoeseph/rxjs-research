@@ -367,9 +367,9 @@ first heavy gate has since made coherent.
   driving `make bg` in the background does not need it, because the completion
   notification IS the wait. **One background call per build, and never a second while
   one is live.** `bg-check` is never LOOPED: make collapses its exit status into its own
-  exit 2, so still-running and failed read as the same number. **A `sleep N; tail` loop,
-  or a `pgrep` for the waiter, is the whole apparatus re-implemented worse** — a turn
-  burnt per tick, reading a log buffered until the run ends, unable to tell a live build
+  exit 2, so still-running and failed read as the same number. **A `sleep N; tail` loop, an
+  `until` loop, or a `pgrep` for the waiter, is the whole apparatus re-implemented
+  worse** — a turn burnt per tick, reading a log buffered until the run ends, unable to tell a live build
   from a dead one. **Never hand-roll the wrapper either** — the obvious
   `(cmd > log; echo EXIT=$?)` exits with `echo`'s status and reports every build green.
   `make bg` always exits non-zero by design, so **a completion notification is never a
