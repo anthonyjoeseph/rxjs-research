@@ -1239,14 +1239,70 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- bound were carried only to reach an increment nothing spends.  What
 -- remains is that a walk adds no live source deeper than the store it
 -- started from, which is a fact about where lives COME FROM.
+-- AND THE FOLD IS THREADED IN THE LIVE COMPONENT'S OWN CURRENCY, not
+-- in the store's, because the store is the one thing the induction
+-- cannot carry: a walk GROWS the node table, so an inductive step
+-- landing at `storeNestMax` of the state it produced could never be
+-- brought back to the state it started from.  What does thread is the
+-- pair the live component can actually reach -- the lives already
+-- there, and the slots, which `cascadeGo-slots` proves the fold leaves
+-- untouched.  The statement the caller wants follows because both are
+-- summands of the same `⊔`.
 postulate
-  cascadeGo-nest-live-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (nextId : Id)
-    (chains : List (RegId × Path Γ (arrTy a) t))
+  chainStep-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
     (sched : Sched Γ) (st : EvalSt e) →
-    let r = cascadeGo a nextId chains sched st
+    let r = chainStep id a path sched st
     in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
-         ≤ storeNestMax sched st
+         ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+           ⊔ slotsNestSum (Sched.slots sched)
+
+cascadeGo-live-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (id : Id) (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched₀ : Sched Γ) (st₀ : EvalSt e) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0
+        (Sched.live (proj₁ (proj₂ (cascadeGo a id chains sched₀ st₀))))
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched₀)
+      ⊔ slotsNestSum (Sched.slots sched₀)
+cascadeGo-live-nest a id [] sched₀ st₀ = m≤m⊔n _ _
+cascadeGo-live-nest a id ((rid , c) ∷ chains) sched₀ st₀
+  with any (_≡ᵇ rid) (EvalSt.cancelled st₀)
+... | true = cascadeGo-live-nest a id chains sched₀ st₀
+... | false =
+  ≤-trans (cascadeGo-live-nest a id chains sched₁ st₁)
+          (⊔-lub (chainStep-nest-live id a c sched₀ st₀′)
+                 (≤-trans (≤-reflexive (cong slotsNestSum slotsEq))
+                          (m≤n⊔m (foldr (λ l acc → liveNest l ⊔ acc) 0
+                                        (Sched.live sched₀))
+                                 (slotsNestSum (Sched.slots sched₀)))))
+  where
+  st₀′ = record st₀ { delivered = rid ∷ EvalSt.delivered st₀ }
+  step = chainStep id a c sched₀ st₀′
+  sched₁ = proj₁ (proj₂ step)
+  st₁    = proj₂ (proj₂ step)
+
+  slotsEq : Sched.slots sched₁ ≡ Sched.slots sched₀
+  slotsEq = chainStep-slots id a c sched₀ st₀′
+
+-- AND THE CALLER'S FORM IS THE SAME FACT READ AGAINST THE WHOLE `⊔`,
+-- since the two terms the induction threads are both summands of it.
+cascadeGo-nest-live-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  let r = cascadeGo a nextId chains sched st
+  in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
+       ≤ storeNestMax sched st
+cascadeGo-nest-live-flat a nextId chains sched st =
+  ≤-trans (cascadeGo-live-nest a nextId chains sched st)
+          (⊔-lub (into (m≤n⊔m (slotsNestSum (Sched.slots sched)) _))
+                 (into (m≤m⊔n (slotsNestSum (Sched.slots sched)) _)))
+  where
+  into : ∀ {m} →
+    m ≤ slotsNestSum (Sched.slots sched)
+        ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) →
+    m ≤ storeNestMax sched st
+  into h = ≤-trans h (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _))
 
 cascadeGo-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
