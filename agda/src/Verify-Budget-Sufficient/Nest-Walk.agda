@@ -8,7 +8,7 @@ open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
+  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
   *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤; *-distribˡ-+;
   ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -19,7 +19,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Relation.Nullary using (yes; no)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; applyFn; _≟ᵗ_;
+open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; sizeᵉ; sizeᵛ;
+  applyFn; _≟ᵗ_; evalTm;
   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ; nestDᵉ)
@@ -28,18 +29,21 @@ open import Rx.Evaluator using
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals; mergeAll-st;
   switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
-  mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst)
+  mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst; Stream; mintNode;
+  installNode; pushBurst)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-setNode)
+open import Rx.Frame-Width using (pWᵛ; outWᵉ; dWᵉ; dWᵗ)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 open import Verify-Budget-Sufficient.Nest-Burst using
-  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail)
+  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
 -- the frame emits -- a `scan`'s accumulator IS its output -- so charging
@@ -447,6 +451,65 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 -- once per queued inner.  A relative form would raise the drain's cost
 -- to a tower in the queue's length, which is not what a queue of
 -- independent inners costs.
+-- THE FILTER'S CAPS INVERSION, which is the one premise of the shared
+-- statement that does not simply transfer.  A `takeᵉ` is one node
+-- bigger than its source and its parked width is the source's joined
+-- with the count's, so both halves of the cap survive being narrowed to
+-- the source -- and the descent below needs them at the source, since
+-- that is what it subscribes.
+abstract
+  -- AND THE ONE EQUATION IT NEEDS IS NOT FREE, for a reason that is a
+  -- property of the clause ORDER and not of the measure.  `outWⱽ` cases
+  -- on its fuel FIRST -- its slot clauses lead -- so at the variable
+  -- fuel every caller actually has, `outWⱽ j vs sl (takeᵉ …)` is STUCK,
+  -- while its sibling `dWⱽ` puts the slot clause LAST and reduces at
+  -- every other head.  One split on the fuel is the whole repair, and
+  -- it is a clause-order fix nobody has to make in a core module.
+  outWᵉ-take : ∀ {n} {Γ : Ctx n} {u} (j : ℕ) (sl : Slots Γ)
+    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
+    outWᵉ j sl (takeᵉ cnt b) ≡ outWᵉ j sl b
+  outWᵉ-take zero    sl cnt b = refl
+  outWᵉ-take (suc j) sl cnt b = refl
+
+  valCaps?-take : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) →
+    valCaps? c sl (obs u) (takeᵉ cnt b) ≡ true →
+    valCaps? c sl (obs u) b ≡ true
+  valCaps?-take {n = n} {u = u} c sl cnt b h =
+    ∧-intro (≤ᵇ-true (sizeᵛ (obs u) b) (Caps.cSize c)
+              (≤-trans (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ cnt)) (n≤1+n _))
+                       (≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h)))))
+            (≤ᵇ-true (pWᵛ n sl (obs u) b) (Caps.cWid c)
+              (≤-trans pw≤ (≤ᵇ⇒≤ _ _ (T-to (∧-trueʳ h)))))
+    where
+    pw≤ : (outWᵉ n sl b ⊔ dWᵉ n sl b)
+            ≤ (outWᵉ n sl (takeᵉ cnt b) ⊔ (dWᵗ n sl cnt ⊔ dWᵉ n sl b))
+    pw≤ = ⊔-mono-≤ (≤-reflexive (sym (outWᵉ-take n sl cnt b)))
+                   (m≤n⊔m (dWᵗ n sl cnt) (dWᵉ n sl b))
+
+-- AND THE FILTER FRAME'S PUSH, WHICH MUST BE FREE.  A `take-f` writes a
+-- decremented counter and forwards or drops, so it neither substitutes
+-- into a value nor stores one -- the node's own nesting is zero and no
+-- value leaves deeper than it arrived.  Stated ABSOLUTELY against the
+-- state the burst was produced at, since that is the form the head
+-- above spends: what the descent already bounded must not be re-spent
+-- per emit.
+--
+-- TWIN: `pushBurst-caps` is this induction walked -- the same fold over
+--   the same emit list, threading the same evolving state and spending
+--   a per-emit frame lemma at each step -- on the caps face, where it
+--   is proven and carries an index the nest face does not need.
+-- TWIN: `stepFrame-nodes-take` is the per-emit half, proven, and it
+--   already says exactly what one filter frame costs: nothing.
+postulate
+  pushBurst-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (g : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+    (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    let r = pushBurst g id now (take-f nid) κ str sched st in
+    (nodesMax (proj₂ (proj₂ r))
+       ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
+      ≤ (nodesMax st ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
+
 -- THE STATEMENT, NAMED ONCE.  Every leaf below re-states it at one of
 -- `subscribeE`'s heads, so writing the shared shape here is what keeps
 -- the leaves comparable and lets the body read as a case split rather
@@ -557,22 +620,6 @@ postulate
     (f : Fn Γ [] [] [] s u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (mapᵉ f b) κ id now sched st
-  -- THE FILTER HEAD, AND THE ONE THAT FIXED THE SHARED PREMISE'S SHAPE.
-  -- Every other head either produces its own burst outright or hands
-  -- back one value per value it was given, so a premise about the burst
-  -- this call EMITS would have transferred to the inner subscribe
-  -- unchanged; `take` DROPS, so at this head alone the inner burst can
-  -- be the longer of the two.  That is why the premise is keyed on the
-  -- descent instead, and here it is `descW-take` applied under the
-  -- count the source evaluates to.  The charge itself is free: the
-  -- node's nesting is zero and the frame substitutes nothing, so what
-  -- remains is the inner bound transported across a `pushBurst` that
-  -- only filters.
-  subscribeE-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
-    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestAt c sl B W g (takeᵉ cnt b) κ id now sched st
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST INDEX IS REALLY BET.  A
   -- scan's step function is written once and applied once per value of
   -- whatever burst arrives, so this is the head whose demand is a
@@ -647,8 +694,28 @@ subscribeE-nest c sl B W g emptyᵉ κ id now sched st hsl hc hv hn hst hw =
   ⊔-lub hst z≤n
 subscribeE-nest c sl B W g (mapᵉ f b) κ id now sched st =
   subscribeE-nest-map c sl B W g f b κ id now sched st
-subscribeE-nest c sl B W g (takeᵉ cnt b) κ id now sched st =
-  subscribeE-nest-take c sl B W g cnt b κ id now sched st
+subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv hn hst hw
+  with evalTm cnt in eqc
+... | zero  = ⊔-lub hst z≤n
+... | suc k =
+  ≤-trans (pushBurst-nest-take g id now nid κ
+             (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)))
+          (subscribeE-nest c sl B W g b (take-f nid ↠ κ) id now sched₀ st₀
+             hsl inv₀ (valCaps?-take c sl cnt b hv) hn hst₀
+             (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw))
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₀ = proj₂ (mintNode sched)
+  st₀    = installNode nid (take-st (suc k)) st
+  res    = subscribeE g b (take-f nid ↠ κ) id now sched₀ st₀
+
+  inv₀ : capsOK? c sched₀ st₀ ≡ true
+  inv₀ = capsOK?-setNode c nid (take-st (suc k)) sched₀ st refl refl
+           (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
+
+  hst₀ : nodesMax st₀ ≤ (2 ^ Caps.cSize c) ^ suc W * (B + nestUnit e sl)
+  hst₀ = ≤-trans (setNode-nodes nid (take-st (suc k)) (EvalSt.nodes st))
+                 (⊔-lub z≤n hst)
 subscribeE-nest c sl B W g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-scan c sl B W g f z b κ id now sched st
 subscribeE-nest c sl B W g (mergeAllᵉ lim b) κ id now sched st =

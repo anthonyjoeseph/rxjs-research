@@ -193,10 +193,6 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 - **`subscribeE-nest-mu`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the one
   head that is not a subterm. A substituted body can be deeper than the body,
   so the depth premise does not transfer and the fuel edge is all there is.
-- **`subscribeE-nest-take`** (Nest-Walk) — DIFFICULTY, `NO EVIDENCE`: the head
-  that forced the shared premise onto the whole descent, a filter having no
-  bound on its input from a bound on its output. Charge is zero; what is owed
-  is the inner bound across a `pushBurst` that only drops.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
   same descent arriving through the outer wrap. The flat factor died to the
   same cold-slot burst that killed the root form; restated as a power in the
@@ -253,6 +249,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
   mirror of the PROVEN `subscribeE-caps` clique over the PROVEN
   `subscribeInner-Ψ` descent; the clause-by-clause sketch in its header names
   no undecided index.
+- **`pushBurst-nest-take`** (Nest-Walk) — GRINDABLE, `TWIN×2`: the filter
+  frame's push, all that is left of the take head. `pushBurst-caps` is the
+  same fold over the same emits walked on the caps face, and
+  `stepFrame-nodes-take` is the per-emit half — a take frame costs nothing.
 - **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
   cascade only shortens lists, and every summand of the store measure is a
   `⊔`-fold over one. Its header names the proven twin at the same two branches.

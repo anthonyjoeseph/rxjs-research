@@ -44,11 +44,12 @@ open import Data.Bool using (false)
 open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
 open import Data.Nat.Properties using (≤-refl; m≤m⊔n; m≤n⊔m)
 open import Data.Product using (proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; Val; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
-  μᵉ)
+  (Ctx; Closed; Val; Tm; natᵗ; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
+  exhaustAllᵉ; μᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
    mergeAllᵒ; switchᵒ; exhaustᵒ; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
@@ -129,6 +130,21 @@ abstract
           (record sched { nextNode = suc (Sched.nextNode sched) }) st
       ≤ innerW (gs fuel) allNid κ id now o sched st
   innerW-gs fuel allNid κ id now o sched st = ≤-refl
+
+  -- AND THE CHILD'S HALF AT THE FILTER HEAD, under the count the source
+  -- evaluates to.  The hypothesis is what lets this be stated at all:
+  -- `descW`'s own take clause splits on that count, so the equation has
+  -- to be in hand before the two sides are comparable.
+  descW-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (k : ℕ) → evalTm cnt ≡ suc k →
+    descW g b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
+          (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)
+      ≤ descW g (takeᵉ cnt b) κ id now sched st
+  descW-take g cnt b κ id now sched st k h with evalTm cnt | h
+  ... | .(suc k) | refl = m≤n⊔m _ _
 
   -- AND THE WHOLE DRAIN'S WORTH, one `⊔` per queued inner at the state
   -- that inner is actually subscribed at.  It is a SEPARATE measure
