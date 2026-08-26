@@ -20,7 +20,7 @@ open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 open import Relation.Nullary using (yes; no)
 
-open import Rx.Prim using (Tick; Id; Source; Gas; InstEvent)
+open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; _×ᵗ_; obs; sizeᵗ; applyFn; _≟ᵗ_)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ; nestDᵉ)
@@ -29,10 +29,11 @@ open import Rx.Evaluator using
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
-  mergeAllDrain; subscribeInner; hasRoom)
+  mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
@@ -346,14 +347,10 @@ capsDrainOK c sl sf allNid κ id now lim act (o ∷ q) sched st =
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
   where r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
 
--- ONE SUBSCRIPTION, AND IT IS THE WHOLE OF THE ARM'S RISK.  The bound is
--- ABSOLUTE rather than relative to the store it is handed -- what the
--- subscription installs is read off `o`, whose depth the drain bounds by
--- `B`, and off the slots, which the unit covers -- so re-establishing the
--- same bound is exactly what stops the factor compounding once per
--- queued inner.  A relative form would read `2 ^ cSize` times the
--- PREVIOUS store and raise the drain's cost to a tower in the queue's
--- length, which is not what a queue of independent inners costs.
+-- THE SUBSCRIPTION'S OWN DESCENT, and the leaf the arm finally rests on.
+-- `subscribeInner` mints an instance id and hands the inner to
+-- `subscribeE` under a `from-inner` frame; out of gas it emits a dry
+-- event and touches nothing, so the whole charge is the descent's.
 --
 -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
 --   against forty, at a queued `mapᵉ` whose step function names its
@@ -379,14 +376,39 @@ capsDrainOK c sl sf allNid κ id now lim act (o ∷ q) sched st =
 --   shape exactly: the factor AND a slots summand, each of which is dead
 --   on its own.
 postulate
-  subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
-    (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
     nestDᵉ o ≤ B → nodesMax st ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl) →
-    let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
-    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ (proj₂ r)))
+    let r = subscribeE g o κ id now sched st in
+    (nodesMax (proj₂ (proj₂ r))
+       ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))))
       ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl)
+
+-- ONE SUBSCRIPTION, AND THE BOUND IS ABSOLUTE.  What the subscription
+-- installs is read off `o`, whose depth the drain bounds by `B`, and off
+-- the slots, which the unit covers -- so re-establishing the same bound
+-- rather than one relative to the store handed in is exactly what stops
+-- the factor compounding once per queued inner.  A relative form would
+-- read `2 ^ cSize` times the PREVIOUS store and raise the drain's cost to
+-- a tower in the queue's length, which is not what a queue of independent
+-- inners costs.
+subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → capsOK? c sched st ≡ true →
+  nestDᵉ o ≤ B → nodesMax st ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl) →
+  let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
+  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ⊔ nestDᵛˢ (proj₁ (proj₂ r)))
+    ≤ 2 ^ Caps.cSize c * (B + nestUnit e sl)
+subscribeInner-nest c sl B g0 allNid κ id now o sched st hsl hc hn hst =
+  ⊔-lub hst z≤n
+subscribeInner-nest c sl B (gs fuel) allNid κ id now o sched st hsl hc hn hst =
+  subscribeE-nest c sl B fuel o
+    (from-inner mergeAllᵒ allNid (Sched.nextNode sched) ↠ κ) id now
+    (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
+    (capsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hn hst
 
 -- THE DRAIN IS A WALK OVER THE QUEUE, and it costs what ONE subscription
 -- costs.  `mergeAllDrain` recurses across the parked inners and
