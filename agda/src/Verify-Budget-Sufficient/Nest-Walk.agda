@@ -975,6 +975,21 @@ postulate
   --   cannot refute: delivered nesting is exactly the layer count while
   --   the grant's base alone is 106 at one layer and grows four times
   --   faster, so the rows are DEGENERATE on the exponent.
+  -- PROBED: `Probed.Wrap-Nest-Frame` reads the axis the receipt above
+  --   leaves open: `G` mentions `κ` nowhere, and every row there is at
+  --   the root from an empty table.  Covered: all three heads under a
+  --   `thru-outer` frame from a table already holding a merge node
+  --   whose queue is three deep, with `nestCapsOK?` pinned there too --
+  --   so the store conjuncts read 3 against 3 rather than `0 ≤ _`.
+  --   Those are carried by the incoming summand alone, which is why the
+  --   module does not stop at them: a merge whose FIRST inner is a
+  --   `deferᵉ` parks its second past the frame, and then the subscribe
+  --   installs SIX against an incoming three, so all three conjuncts
+  --   are taken where the grant is what pays.  NOT covered: a
+  --   `from-inner` frame, which is the constructor this head's own risk
+  --   names and not the one reached; and the switch and exhaust heads
+  --   off-root with a subscribe that installs, their rows there
+  --   reading equal to the table they started from.
   subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))

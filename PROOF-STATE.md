@@ -179,7 +179,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
-  `PROBED×3`: the three `*All` heads at the restated `NestAt`. The burst
+  `PROBED×4`: the three `*All` heads at the restated `NestAt`. The burst
   conjunct is instantiated at all three, and the merge's store half now too, a
   `deferᵉ` inner holding the queue past the frame. `switch-st` and `exhaust-st`
   carry zero node nest by definition — unreachable, not unreached.
