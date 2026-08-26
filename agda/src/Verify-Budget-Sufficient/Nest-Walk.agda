@@ -415,6 +415,15 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 -- the exponent: the factor is two to a SIZE cap, and a cap the value
 -- itself is not held to bounds the state and nothing that enters it.
 --
+-- AND THE FORM BELOW IS FALSE, WHICH THE LAST RECEIPT SETTLES.  Spending
+-- the factor ONCE for a whole descent is what dies: a subscribe frame
+-- can deliver a burst, and a `scanᵉ` refolds its accumulator once per
+-- value of it, so the demand is a factor per VALUE against a grant read
+-- off syntax that the burst does not enlarge.  The repair is the one the
+-- twin already carries -- a conclusion at a GROWN index rather than at
+-- the entry quantity -- since the caps face bounds such a burst by
+-- growing its cap and not by reading a wider one at entry.
+--
 -- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
 --   against forty, at a queued `mapᵉ` whose step function names its
 --   payload on both sides of the sum: `nestDᵉ` is additive there and the
@@ -447,6 +456,18 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 --   is unbounded rather than one crossing.  The same file pins
 --   `valCaps?` FALSE at both programs, which is what makes the premise
 --   load-bearing instead of merely present.
+-- REFUTED: `Refuted.Scan-Burst-Nest` kills the form below outright,
+--   16383 delivered against a charge of 12288, and the row one value
+--   shorter still holds -- so it is a crossing and not a scale error.
+--   The step function is a `scanᵉ` naming its accumulator in the two
+--   additive slots an inner `scanᵉ` offers, written ONCE and applied
+--   once per value of a burst that comes from a COLD SCRIPT: `sizeᵉ`
+--   cannot see a script and `slotNest` is zero at every scripted slot,
+--   so the burst is charged to neither the exponent nor the base while
+--   it doubles the delivered depth per value.  The same file measures
+--   the burst at fourteen values in ONE subscribe frame against a `pWᵛ`
+--   of one and an `entryCeil` of eight, which is why no wider reading of
+--   the ENTRY cap repairs it either.
 -- PROBED: `Probed.Subscribe-Nest` clears the restated form on exactly
 --   the family that refuted every earlier one, at the SMALLEST cap the
 --   `valCaps?` premise admits -- the value's own size and width, so

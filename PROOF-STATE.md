@@ -173,10 +173,10 @@ OBSTACLE is written down is not thereby a row whose STATEMENT is right.
 
 
 
-- **`subscribeE-nest`** (Nest-Walk) — DIFFICULTY, `REFUTED×4, PROBED`: the
-  subscribe descent's own nest bound, all the inner arm still rests on.
-  Absolute, not relative to the store handed in, so the factor cannot compound
-  per queued inner; charged in the size of what is subscribed.
+- **`subscribeE-nest`** (Nest-Walk) — SHAPE, `REFUTED×5, PROBED`: the subscribe
+  descent's own nest bound, all the inner arm still rests on. REFUTED as
+  written — a burst refolds a scan once per value while the grant is read off
+  syntax no burst enlarges, so the conclusion is owed at a GROWN index.
 - **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, PROBED`: the
   same descent arriving through the outer wrap, repaired by the same premise.
   Its per-value unit is what a receipt at the root does not cover, so it is
