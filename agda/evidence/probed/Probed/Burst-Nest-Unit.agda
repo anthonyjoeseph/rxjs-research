@@ -159,12 +159,13 @@ deferFigs≡ = refl
 
 -- ── the floor's OTHER summand, which is the sighted one ────────────
 
--- The conclusion itself cannot be instantiated: `Caps.cSize (capsAt
--- …)` is sealed through `capsBase`, and that is a boundary rather
--- than a gap.  But `capsAt-base-size⁺` is a PROVEN lower bound on it
--- built from `sizeᵉ`, which is sighted exactly where `nestUnit` is
--- blind -- so replacing the size by that bound gives a STRICTLY
--- STRONGER claim that does compute.  A green row here is evidence for
+-- The conclusion itself cannot be instantiated: the increment is
+-- built over `Caps.cSize (capsAt …)`, sealed through `capsBase`, and
+-- that is a boundary rather than a gap.  But `capsAt-base-size⁺` and
+-- `size≤nestIncAt` are PROVEN and compose into a lower bound on the
+-- increment built from `sizeᵉ`, which is sighted exactly where
+-- `nestUnit` is blind -- so putting that bound in the increment's
+-- place gives a STRICTLY STRONGER claim that does compute.  A green row here is evidence for
 -- the postulate; a red one would be a finding about the strong form
 -- and not by itself a refutation.
 floorOf : ∀ {t} (e : Closed Γ₂ t) → ℕ

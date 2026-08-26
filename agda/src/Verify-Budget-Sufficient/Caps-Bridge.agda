@@ -2027,10 +2027,14 @@ postulate
 -- AND THE SECOND SUMMAND IS WHY THIS LEAF IS NOT THE UNIT ALONE.  The
 -- unit is `suc (nestDᵉ e + slotsNestSum ins)`, built on the measure
 -- that reads zero through a `deferᵉ`, so a defer-headed program has a
--- unit of one however deep the body its subscribe frame installs.
--- `capsAt`'s size reads `sizeᵉ`, which descends into that body, and
--- `nestCapAt-1-floor` is what carries the pair under the instant-one
--- cap without the factor ever being read.
+-- unit of one however deep the body its subscribe frame installs.  The
+-- increment dominates `capsAt`'s size, which reads `sizeᵉ` and does
+-- descend into that body, so the blindness is paid for -- and the
+-- summand is the INCREMENT rather than the size, because a summand
+-- here is an obligation on whoever supplies the store bound and the
+-- smaller of the two would be the harder leaf for no consumer's sake.
+-- `nestCapAt-1-floor` carries the pair under the instant-one cap
+-- without the factor ever being read.
 -- PROBED: `Probed.Burst-Nest-Unit` instantiates the left half against
 --   the unit at the three `*All` heads over a two-layer wrap, where
 --   the store reads 1 against a unit of 5 -- neither vacuous nor
@@ -2039,11 +2043,12 @@ postulate
 --   against a unit of 2, and at four deep the unit FAILS, a store of 4
 --   against the same unit of 2.  That crossing is what the second
 --   summand exists for and it is load-bearing rather than slack.
---   The conclusion itself does not reduce -- `capsAt`'s size is sealed
---   through `capsBase` -- but `capsAt-base-size⁺` is a PROVEN lower
---   bound on it built from `sizeᵉ`, and putting that bound in the size's
---   place gives a STRICTLY STRONGER claim that computes.  Green there
---   is green here.  It is taken at the same defer-headed family that
+--   The conclusion itself does not reduce -- the increment is built
+--   over `capsAt`'s size, which is sealed through `capsBase` -- but
+--   `capsAt-base-size⁺` and `size≤nestIncAt` are PROVEN and compose
+--   into a lower bound on it built from `sizeᵉ`, and putting that bound
+--   in the increment's place gives a STRICTLY STRONGER claim that
+--   computes.  Green there is green here.  It is taken at the same defer-headed family that
 --   killed the unit form, four deep and nine and twenty, and at the
 --   three heads: the store rises one per level against a floor rising
 --   four, so the two do not converge.  The slot axis is off zero as
@@ -2055,7 +2060,7 @@ postulate
     let r = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)
     in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-         ≤ nestUnit e ins + Caps.cSize (capsAt e ins 0)
+         ≤ nestUnit e ins + nestIncAt e ins 0
 
 -- SEALED, and this is not optional: this body sits on the
 -- `budget-sufficient` spine, where an unsealed proof puts its whole
