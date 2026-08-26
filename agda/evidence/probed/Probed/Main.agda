@@ -53,6 +53,8 @@ open import Probed.Sync-Factor
          dupOut₃≡6; dupB-holds;
          hidSync≡4; hidSize≡9; hidOut≡0;
          mixOut≡3; mixD-holds)
+open import Probed.Nest-Multi-Level
+  using (lens≡; nestPrems≡; valPrems≡; delivered≡; fitsM0; fitsM1; fitsM2; fitsM3; fitsS2; fitsX2)
 open import Probed.Wrap-Nest-Frame
   using (premM; premS; premX; figures≡; premP; parked≡; fitsP; premF; frameFigs≡; fitsF; mapFigs≡; mapInvariant; hidNodes≡; hidQueue≡; hidAligned; deepFit; deepGrown)
 open import Probed.Chain-Step-Live-Nest

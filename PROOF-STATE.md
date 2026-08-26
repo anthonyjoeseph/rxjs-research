@@ -183,9 +183,9 @@ does not fit is a finding about the shared statement, not about the head.
   refuted by a defer-headed program; a proven lower bound on the size turns the
   sealed conclusion into a stronger claim that computes, green there.
 - **`subscribeE-nest-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
-  `PROBED×4`: the three `*All` heads at the restated `NestAt`. `G` names `κ`
-  nowhere and is blind past a `deferᵉ`; both reached — the path frame mints at
-  delivery, and the queue read is blind where `G` is. Unreached: a descent.
+  `DEAD ROUTE, PROBED×5`: the three `*All` heads at the restated `NestAt`. The
+  descent is now reached — delivered DOUBLING per crossed boundary, under the
+  grant. The twin-shaped body is dead; the route left is a serial-keyed ring.
 - **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
   chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the

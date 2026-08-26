@@ -966,6 +966,31 @@ postulate
   -- outer's own descent, and the burst pushed back through a
   -- `thru-outer` frame, where the wrap re-enters the walk.
   --
+  -- DEAD ROUTE: the takeᵉ-shaped body -- mint, the outer's own descent
+  --   as the IH, and a `pushBurst` leaf for the `thru-outer` frame --
+  --   is STRUCTURALLY DEAD at every choice of leaf, because the grant's
+  --   per-key-unit ratio cannot pay for the push.  That frame
+  --   SUBSCRIBES the values the outer hands back, and an admitted
+  --   inner's own sync size is bounded only by the CAP, never by the
+  --   head's key -- so a leaf charging the arriving inner its own
+  --   instance of this statement asks the boundary's one-unit ratio,
+  --   `(2 ^ S) ^ suc W`, to cover that same ratio raised to the
+  --   inner's sync, up to `S` units.  Rescaling the key conserves the
+  --   gap: an index `c * m` gives the boundary `L ^ c` while the
+  --   admitted inner claims `L ^ (c * S)`; and the flat form that DOES
+  --   self-compose -- `subscribeInner-nest`'s, keyed at the cap --
+  --   starves the map and μ clauses, whose growth is paid exactly out
+  --   of the keyed headroom.  What survives the arithmetic: the
+  --   delivered currency is SERIAL -- `nestDᵉ` reads `⊔` at every
+  --   parallel slot and `+` only along composition, so duplication
+  --   widens without deepening, and serial machinery cannot replicate
+  --   within one frame, a `μᵉ` unfold landing behind a `deferᵉ` gate
+  --   where the measure reads zero.  So the route left open is the
+  --   drain's own shape one flight up: a mutual RING in the
+  --   `Queue-Dead` style over the evaluator's subscribe clique, its
+  --   members carrying a strengthened conclusion -- the emitted
+  --   values' serial content bounded through the key -- and an
+  --   admission premise threaded the way `capsDrainOK` threads one.
   -- PROBED: `Probed.Subscribe-Nest-Wrap` is the first instantiation of
   --   any of the three, at `W = 0` -- the smallest grant the statement
   --   can be read at, so a green row is stronger than the head asks
@@ -1025,6 +1050,20 @@ postulate
   --   keeps the burst empty here; and a MULTI-LEVEL descent, every row
   --   being one subscribe rather than the recursion the grant shrinks
   --   along.
+  -- PROBED: `Probed.Nest-Multi-Level` reaches the region both
+  --   receipts above name unreached: the MULTI-LEVEL descent, three
+  --   boundaries deep under the head, with substitution between the
+  --   levels -- a step function naming its payload at the measure's
+  --   one additive slot, so the delivered figure DOUBLES per level,
+  --   one then two then four then eight, where every earlier row
+  --   moved linearly.  All six rows hold inside the head's own grant
+  --   at `W = 0`, both premises pinned true, every burst non-empty.
+  --   Covered: the merge head at every level, switch and exhaust at
+  --   the outermost.  Not covered: a duplication rate above two per
+  --   level -- though no spendable rate crosses, the grant's exponent
+  --   growing with the very spine the duplicator enlarges -- and a
+  --   LIMITED merge under the stack, whose queue is the
+  --   `Probed.Wrap-Nest-Frame` region.
   subscribeE-nest-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
