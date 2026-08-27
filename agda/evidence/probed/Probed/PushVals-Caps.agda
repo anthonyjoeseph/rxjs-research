@@ -33,12 +33,12 @@ open import Data.Nat.Properties using (_≤?_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary.Decidable using (True; toWitness)
 
-open import Rx.Prim using (Gas; g0; gs; Id; Tick)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; hot)
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; nat̂; strmᵗ; deferᵉ;
   syncSizeᵛ; mapᵉ; input; Fn; varᵗ)
 open import Rx.Frame-Width using (pWᵛ)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator
   using (subscribeE; root; sched-init; st-init; mintNode; installNode; thru-outer; _↠_; mergeAllᵒ;
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
@@ -249,14 +249,126 @@ census = length (EvalSt.registry (proj₂ (proj₂ (resM 1 1))))
 census≡ : census ≡ (0 , 0 , 1)
 census≡ = refl
 
--- THE COVERAGE BOUNDARY, and it is a fact about the STATEMENT rather
--- than about this harness: the list these predicates recurse over is
--- the SUBSCRIBE FRAME's own burst, and every program shape reachable
--- here hands back exactly ONE instant -- a two-armed synchronous
--- source, a `deferᵉ` gate whose second arm fires a tick later, and a
--- scripted slot delivering j values over j ticks, at j = 1, 2, 3.  So
--- the recursive tail of `pushValsCapsOK` is `⊤` at every row above,
--- and nothing here is evidence about a walk of length two.
+-- THE SHARE-FREE SHAPES HAND BACK ONE INSTANT, so every row above has
+-- a `⊤` tail: a two-armed synchronous source, a `deferᵉ` gate whose
+-- second arm fires a tick later, and a scripted slot delivering j
+-- values over j ticks, at j = 1, 2, 3, all return a single-instant
+-- burst.  The ONE route to a longer subscribe-frame burst is a share
+-- CONNECT -- `sharedConnect` conses its own head instant in front of
+-- the def's plumbed burst -- and `pushBurst` preserves instant count,
+-- so the multi-instant region of these targets is reachable exactly
+-- through an inner that connects a share.  The rows below walk it:
+-- the burst is pinned at length TWO, and the second instant's bundle
+-- is read at the state the first instant's step leaves, which is the
+-- recursive tail every other row's `⊤` never reaches.
+-- the minimal connecting vocabulary: a share at index zero whose def
+-- is a one-value synchronous source, so the connect burst is one
+-- instant and the whole subscribe-frame burst is exactly two
+insSh : Slots Γ₂
+insSh fzero        = shared (ofᵉ (nat̂ 0 ∷ [])) {ok = tt}
+insSh (fsuc fzero) = scripted (hot [])
+
+liftS : Fn Γ₂ [] [] [] natᵗ (obs natᵗ)
+liftS = strmᵗ (ofᵉ (varᵗ (here refl) ∷ []))
+
+bSh : Closed Γ₂ (obs natᵗ)
+bSh = mapᵉ liftS (input fzero)
+
+rSh : Closed Γ₂ natᵗ
+rSh = mergeAllᵉ nothing bSh
+
+resSh : Stream Γ₂ (obs natᵗ) × Sched Γ₂ × EvalSt rSh
+resSh =
+  subscribeE gasBig bSh
+    (thru-outer mergeAllᵒ (proj₁ (mintNode (sched-init rSh insSh))) ↠ root) 0 0
+    (proj₂ (mintNode (sched-init rSh insSh)))
+    (installNode (proj₁ (mintNode (sched-init rSh insSh)))
+       (mergeAll-st {t = natᵗ} nothing 0 [] false)
+       (st-init rSh))
+
+-- LOAD-BEARING: two instants is the whole point of the row
+lenSh≡ : length (proj₁ resSh) ≡ 2
+lenSh≡ = refl
+
+-- `tight` reads the module-level slot table, so the Sh row carries its
+-- own cap at the same tightest recipe over `insSh`
+tightSh : Caps
+tightSh = caps (syncSizeᵛ (obs natᵗ) rSh) (pWᵛ 2 insSh (obs natᵗ) rSh) 0
+
+capsSh : (W : ℕ) → Set
+capsSh W =
+  pushValsCapsOK tightSh insSh W gasBig mergeAllᵒ
+    (proj₁ (mintNode (sched-init rSh insSh))) root 0 0
+    (proj₁ resSh) (proj₁ (proj₂ resSh)) (proj₂ (proj₂ resSh))
+
+capsSh-2 : ∀ {W} → Widths W → capsSh W
+capsSh-2 hw = refl , refl , refl , refl , tt
+        , (refl , refl , refl , refl
+          , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+          , tt)
+
+-- the same two-instant walk at the other two heads: the switch
+-- subscribes and records the current inner, the exhaust subscribes
+-- into an idle gate, and both second-instant bundles are read at the
+-- state the head instant's step leaves, exactly as the merge's
+qSh : Closed Γ₂ natᵗ
+qSh = switchAllᵉ bSh
+
+xSh : Closed Γ₂ natᵗ
+xSh = exhaustAllᵉ bSh
+
+tightShS : Caps
+tightShS = caps (syncSizeᵛ (obs natᵗ) qSh) (pWᵛ 2 insSh (obs natᵗ) qSh) 0
+
+tightShX : Caps
+tightShX = caps (syncSizeᵛ (obs natᵗ) xSh) (pWᵛ 2 insSh (obs natᵗ) xSh) 0
+
+resShS : Stream Γ₂ (obs natᵗ) × Sched Γ₂ × EvalSt qSh
+resShS =
+  subscribeE gasBig bSh
+    (thru-outer switchᵒ (proj₁ (mintNode (sched-init qSh insSh))) ↠ root) 0 0
+    (proj₂ (mintNode (sched-init qSh insSh)))
+    (installNode (proj₁ (mintNode (sched-init qSh insSh)))
+       (switch-st nothing false) (st-init qSh))
+
+resShX : Stream Γ₂ (obs natᵗ) × Sched Γ₂ × EvalSt xSh
+resShX =
+  subscribeE gasBig bSh
+    (thru-outer exhaustᵒ (proj₁ (mintNode (sched-init xSh insSh))) ↠ root) 0 0
+    (proj₂ (mintNode (sched-init xSh insSh)))
+    (installNode (proj₁ (mintNode (sched-init xSh insSh)))
+       (exhaust-st false false) (st-init xSh))
+
+lenShS≡ : length (proj₁ resShS) ≡ 2
+lenShS≡ = refl
+
+lenShX≡ : length (proj₁ resShX) ≡ 2
+lenShX≡ = refl
+
+capsShS : (W : ℕ) → Set
+capsShS W =
+  pushValsCapsOK tightShS insSh W gasBig switchᵒ
+    (proj₁ (mintNode (sched-init qSh insSh))) root 0 0
+    (proj₁ resShS) (proj₁ (proj₂ resShS)) (proj₂ (proj₂ resShS))
+
+capsShS-2 : ∀ {W} → Widths W → capsShS W
+capsShS-2 hw = refl , refl , refl , refl , tt
+        , (refl , refl , refl , refl
+          , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
+          , tt)
+
+capsShX : (W : ℕ) → Set
+capsShX W =
+  pushValsCapsOK tightShX insSh W gasBig exhaustᵒ
+    (proj₁ (mintNode (sched-init xSh insSh))) root 0 0
+    (proj₁ resShX) (proj₁ (proj₂ resShX)) (proj₂ (proj₂ resShX))
+
+capsShX-2 : ∀ {W} → Widths W → capsShX W
+capsShX-2 hw = refl , refl , refl , refl , tt
+        , (refl , refl , refl , refl
+          , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+          , tt)
+
 slotsA : ℕ → Slots Γ₂
 slotsA j = insT 0 0 j
 

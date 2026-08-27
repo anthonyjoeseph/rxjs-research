@@ -55,7 +55,7 @@ open import Probed.PushVals-Body-Key
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
          capsX-1; capsX-2; heads≡; entry≡; headsClos≡; left-starved≡; census≡;
-         burstOne≡)
+         burstOne≡; lenSh≡; capsSh-2; lenShS≡; capsShS-2; lenShX≡; capsShX-2)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed

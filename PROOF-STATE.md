@@ -194,7 +194,8 @@ does not fit is a finding about the shared statement, not about the head.
 - **`pushVals-merge-caps`, `pushVals-switch-caps`, `pushVals-exhaust-caps`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the bundle the burst carries beside the
   measure — slots, invariant, admissibility, room at the node — at every frame
-  the descent leaves. Inhabited at the frame it leaves; the walk is untested.
+  the descent leaves. Inhabited at one- and two-instant bursts, the second
+  through the one route there is: a share connect.
 - **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
   `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
   bundle and the slots equation across the arm that subscribes, the measures

@@ -2962,15 +2962,16 @@ postulate
   --   depths and at limits 0 and 1, with the queue-room arm resolved
   --   through a real node lookup at the merge and through an absurd
   --   one at the other two, and with the head's CLOSURE premise pinned
-  --   beside its written one.  NOT covered, and both are readings the
-  --   probe makes rather than gaps it leaves: the recursion, since the
-  --   list walked is the SUBSCRIBE FRAME's burst and every shape
-  --   reachable there -- a two-armed synchronous source, a `deferᵉ`
-  --   gate, a scripted slot delivering over three ticks -- hands back
-  --   exactly ONE instant, so the tail is `⊤` at every row; and the
-  --   invariant conjunct's discrimination, since the state the
-  --   descent leaves carries one node and an empty registry and live
-  --   set, so it reads true even at a cap granting nothing.
+  --   beside its written one.  The RECURSION is covered too, at all
+  --   three heads: the one route to a subscribe-frame burst longer
+  --   than one instant is a share CONNECT, whose head instant rides in
+  --   front of the def's plumbed burst, and the probe's share-headed
+  --   rows pin that burst at length TWO and inhabit the second
+  --   instant's bundle at the state the first instant's step leaves.
+  --   NOT covered, a reading the probe makes rather than a gap it
+  --   leaves: the invariant conjunct's discrimination, since the state
+  --   the descent leaves carries one node and an empty registry and
+  --   live set, so it reads true even at a cap granting nothing.
   pushVals-merge-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
