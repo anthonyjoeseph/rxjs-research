@@ -178,15 +178,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
+- **`subscribeE-nest-arr-slot`, `subscribeE-nest-arr-take`,
+  `subscribeE-nest-arr-scan`, `subscribeE-nest-arr-mu`,
+  `subscribeE-nest-arr-defer`** (Nest-Walk) — FALSITY, `PROBED×2`: the arr
+  descent's non-boundary heads. Nothing has instantiated `NestArrAt` at any of
+  them; the boundary heads below carry the only rows this grant has.
+- **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
+  `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
+  boundary heads, where the doubling per boundary is charged and where the
+  recursion the old cycle-breaker hid actually lives.
 - **`pushVals-merge-caps`, `pushVals-switch-caps`, `pushVals-exhaust-caps`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the bundle the burst carries beside the
   measure — slots, invariant, admissibility, room at the node — at every frame
   the descent leaves. Inhabited at the frame it leaves; the walk is untested.
-- **`subscribeInner-nest-arr`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×2, PROBED×2`: one subscription charged a DOUBLING per
-  boundary of its arrival rather than a whole grant per level. This is the
-  residue both dead routes name, and it is what the three consume steps now
-  spend.
 - **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
   `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
   bundle and the slots equation across the arm that subscribes, the measures

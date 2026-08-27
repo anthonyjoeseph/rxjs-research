@@ -2,7 +2,9 @@
 -- ONE SUBSCRIPTION'S STORE HALVES, WHICH ARE THE REGION THE DOUBLING
 -- PROBE LEFT OPEN AND SAID SO.
 --
--- TARGET: subscribeInner-nest-arr
+-- TARGET: subscribeE-nest-arr-merge
+-- TARGET: subscribeE-nest-arr-switch
+-- TARGET: subscribeE-nest-arr-exhaust
 --
 -- WHY THIS AXIS.  The bound this statement carries is read on three
 -- things: the values the subscription hands back, the whole node

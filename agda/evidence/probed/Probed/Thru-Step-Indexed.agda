@@ -26,7 +26,9 @@
 -- once per level against a `syncSizeᵛ` that grows by a constant per
 -- level.  The rows below do not reach it.
 --
--- TARGET: subscribeInner-nest-arr
+-- TARGET: subscribeE-nest-arr-merge
+-- TARGET: subscribeE-nest-arr-switch
+-- TARGET: subscribeE-nest-arr-exhaust
 -- TARGET: thruStep-merge-inner-caps
 -- TARGET: thruStep-switch-inner-caps
 -- TARGET: thruStep-exhaust-inner-caps

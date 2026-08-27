@@ -50,7 +50,8 @@ open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
   (nestB; nestB-mono; nestB-base; nestB-frame; nestB-frame-dbl; nestB-unit;
-   nestFac; 1≤nestFac; nestU; nestU-base; nestB-at)
+   nestFac; 1≤nestFac; nestU; nestU-base; nestB-at;
+   arrD; arrD-mono; arrD-frame; arrD-flat)
 open import Verify-Budget-Sufficient.Nest-Burst using
   (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-mu;
    descW-merge; descW-switch; descW-exhaust)
@@ -1299,6 +1300,14 @@ abstract
 -- conclusion are `⊔`-folds over depths, so how MANY values a burst
 -- carries does not enter, and a premise the conclusion cannot mention
 -- would be satisfiable at any width and assert nothing.
+-- THE DESCENT AT THE ARRIVAL'S OWN SIZE, which is the shape the
+-- consume steps need and the one the cap-keyed descent deliberately
+-- does not have.  `arrD` charges two per UNIT of term size rather
+-- than a whole per-level factor per boundary, and `syncSizeᵉ` is a
+-- full term size -- a map's own function counts -- so every clause
+-- has exactly the factor its frame charges and no more.  That is why
+-- the frame law here needs no premise relating the frame to the cap:
+-- the exponent and the frame's size are the same quantity.
 -- REFUTED: Refuted.Thru-Step-Nest
 -- DEAD ROUTE: spending the proven subscribe bound is STRUCTURALLY
 --   DEAD, and it is the route the indexed shape most invites, so it is
@@ -1327,44 +1336,180 @@ abstract
 --   where the composition charges a full factor.  The gap is the
 --   subscribe bound's slack, so the residue is a delivery bound tight
 --   in the arrival rather than a bigger grant.
--- PROBED: `Probed.Thru-Step-Indexed` takes the one axis on which the
---   two sides move at comparable rates -- the arrival's own term, where
---   the delivery is whatever the substitution emits.  Nesting a
---   duplicating step delivers two, four and eight against arrivals of
---   two, three and four, every fit inside the grant and both premises
---   pinned by `refl`, which is the DOUBLING PER BOUNDARY this statement
---   charges for.  Covered LOAD-BEARING: the value conjunct at that
---   family.
--- PROBED: `Probed.Subscribe-Nest-Arr-Store` takes the store halves,
---   which the doubling rows leave at `0 ≤ _`: the subscription is
---   taken under a `from-inner` frame from a table already holding a
---   merge node three deep, and the arrival is a LIMITED merge whose
---   first inner is deferred, so its limit is still spent on return and
---   the second inner is genuinely parked and INSTALLS.  Covered: both
---   store conjuncts at the shallowest and deepest arrivals the harness
---   reaches, premises pinned by `refl`.  DEGENERATE, and this is the
---   finding rather than a gap in the sweep: over that column the
---   installed depth rises by one per level while the bound rises as
---   two to the arrival's own sync size, so the two ends read 3 and 6
---   against bounds of 768 and about 3.9e10.  The store halves cannot
---   be refuted on this axis, and a subscription installing depth
---   faster than its own key is what would be needed.
+NestArrAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) → Set
+NestArrAt {Γ = Γ} {t = t} {e = e} c sl B g o κ id now sched st =
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs _) o ≡ true →
+  nestDᵉ o ≤ B →
+  let r = subscribeE g o κ id now sched st
+      D = arrD (nestUnit e sl) B (syncSizeᵉ o) in
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
+  × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
+
+-- a size is positive at every head, which is the one thing the frame
+-- law asks and the one thing no clause has to establish
+syncSizeᵉ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (x : Exp Γ Δᵍ Δ Θ t) →
+  1 ≤ syncSizeᵉ x
+syncSizeᵉ-pos x = ≤-trans (s≤s z≤n) (≤-reflexive (syncSizeᵉ-suc-pred x))
+
 postulate
-  subscribeInner-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (o : Closed Γ s)
+  -- THE HEADS THIS DESCENT STILL OWES.  Each is the arr-keyed twin of
+  -- a clause the cap-keyed descent already discharges, so what is open
+  -- is the transport and not the shape.
+  subscribeE-nest-arr-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
+    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs s) o ≡ true →
-    nestDᵉ o ≤ B →
-    let r = subscribeInner sf op allNid κ id now o sched st
-        D = 2 ^ pred (syncSizeᵉ o) * (nestUnit e sl + B) in
-    (nestDᵛˢ (proj₁ (proj₂ r)) ≤ D)
-    × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ D)
-    × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
-           ≤ nodeNestAt j st ⊔ D)
+    NestArrAt c sl B g (input i) κ id now sched st
+
+  subscribeE-nest-arr-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
+    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (takeᵉ cnt b) κ id now sched st
+
+  subscribeE-nest-arr-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (scanᵉ f z b) κ id now sched st
+
+  -- PROBED: `Probed.Thru-Step-Indexed` takes the one axis on which the
+  --   two sides move at comparable rates -- the arrival's own term, where
+  --   the delivery is whatever the substitution emits.  Nesting a
+  --   duplicating step delivers two, four and eight against arrivals of
+  --   two, three and four, every fit inside the grant and both premises
+  --   pinned by `refl`, which is the DOUBLING PER BOUNDARY this statement
+  --   charges for.  Covered LOAD-BEARING: the value conjunct at that
+  --   family.
+  -- PROBED: `Probed.Subscribe-Nest-Arr-Store` takes the store halves,
+  --   which the doubling rows leave at `0 ≤ _`: the subscription is
+  --   taken under a `from-inner` frame from a table already holding a
+  --   merge node three deep, and the arrival is a LIMITED merge whose
+  --   first inner is deferred, so its limit is still spent on return and
+  --   the second inner is genuinely parked and INSTALLS.  Covered: both
+  --   store conjuncts at the shallowest and deepest arrivals the harness
+  --   reaches, premises pinned by `refl`.  DEGENERATE, and this is the
+  --   finding rather than a gap in the sweep: over that column the
+  --   installed depth rises by one per level while the bound rises as
+  --   two to the arrival's own sync size, so the two ends read 3 and 6
+  --   against bounds of 768 and about 3.9e10.  The store halves cannot
+  --   be refuted on this axis, and a subscription installing depth
+  --   faster than its own key is what would be needed.
+  subscribeE-nest-arr-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
+    (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (mergeAllᵉ lim b) κ id now sched st
+
+  -- PROBED: `Probed.Thru-Step-Indexed` and
+  --   `Probed.Subscribe-Nest-Arr-Store`, whose coverage is stated at
+  --   `subscribeE-nest-arr-merge` above.
+  subscribeE-nest-arr-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (switchAllᵉ b) κ id now sched st
+
+  -- PROBED: `Probed.Thru-Step-Indexed` and
+  --   `Probed.Subscribe-Nest-Arr-Store`, whose coverage is stated at
+  --   `subscribeE-nest-arr-merge` above.
+  subscribeE-nest-arr-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (exhaustAllᵉ b) κ id now sched st
+
+  subscribeE-nest-arr-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Exp Γ (u ∷ []) [] [] u)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (μᵉ b) κ id now sched st
+
+  subscribeE-nest-arr-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Exp Γ [] [] [] u)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    NestArrAt c sl B g (deferᵉ b) κ id now sched st
+
+subscribeE-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  NestArrAt c sl B g o κ id now sched st
+subscribeE-nest-arr c sl B g (input i) κ id now sched st =
+  subscribeE-nest-arr-slot c sl B g i κ id now sched st
+subscribeE-nest-arr {Γ = Γ} {t = t} {e = e} {u = u} c sl B g (ofᵉ ts) κ id now sched st
+  hsl hc hv hn =
+  ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
+             (oneShot-vals {A = Val Γ t} (map (λ tm → evalTm tm) ts) id sched)))
+    (≤-trans (≤-trans (ofVals-nest-sync ts) (*-monoʳ-≤ (2 ^ syncSizeᵗˢ ts) hn))
+             (arrD-flat (nestUnit e sl) B (syncSizeᵗˢ ts)))
+  , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeE-nest-arr c sl B g emptyᵉ κ id now sched st hsl hc hv hn =
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeE-nest-arr {e = e} c sl B g (mapᵉ f b) κ id now sched st hsl hc hv hn =
+  ≤-trans (proj₁ push)
+    (≤-trans (*-monoʳ-≤ (2 ^ syncSizeᵗ f) (+-mono-≤ hfB (proj₁ IH)))
+             (arrD-frame (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵗ f)
+                (syncSizeᵉ-pos b) (m≤n+m B (nestUnit e sl))))
+  , ≤-trans (proj₁ (proj₂ push))
+      (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow))
+  , (λ j → ≤-trans (proj₂ (proj₂ push) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ ≤-refl grow)))
+  where
+  res = subscribeE g b (map-f f ↠ κ) id now sched st
+
+  push = pushBurst-nest-map g id now f κ
+           (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+  IH = subscribeE-nest-arr c sl B g b (map-f f ↠ κ) id now sched st
+         hsl hc (nestValOK?-map c f b hv)
+         (≤-trans (m≤n+m (nestDᵉ b) (nestDᵗ f)) hn)
+
+  hfB : nestDᵗ f ≤ B
+  hfB = ≤-trans (m≤m+n (nestDᵗ f) (nestDᵉ b)) hn
+
+  grow : arrD (nestUnit e sl) B (syncSizeᵉ b)
+           ≤ arrD (nestUnit e sl) B (syncSizeᵉ (mapᵉ f b))
+  grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵉ (mapᵉ f b))
+           (≤-trans (n≤1+n (syncSizeᵉ b)) (s≤s (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))))
+subscribeE-nest-arr c sl B g (takeᵉ cnt b) κ id now sched st =
+  subscribeE-nest-arr-take c sl B g cnt b κ id now sched st
+subscribeE-nest-arr c sl B g (scanᵉ f z b) κ id now sched st =
+  subscribeE-nest-arr-scan c sl B g f z b κ id now sched st
+subscribeE-nest-arr c sl B g (mergeAllᵉ lim b) κ id now sched st =
+  subscribeE-nest-arr-merge c sl B g lim b κ id now sched st
+subscribeE-nest-arr c sl B g (switchAllᵉ b) κ id now sched st =
+  subscribeE-nest-arr-switch c sl B g b κ id now sched st
+subscribeE-nest-arr c sl B g (exhaustAllᵉ b) κ id now sched st =
+  subscribeE-nest-arr-exhaust c sl B g b κ id now sched st
+subscribeE-nest-arr c sl B g (μᵉ b) κ id now sched st =
+  subscribeE-nest-arr-mu c sl B g b κ id now sched st
+subscribeE-nest-arr c sl B g (deferᵉ b) κ id now sched st =
+  subscribeE-nest-arr-defer c sl B g b κ id now sched st
+
+subscribeInner-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick) (o : Closed Γ s)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs s) o ≡ true →
+  nestDᵉ o ≤ B →
+  let r = subscribeInner sf op allNid κ id now o sched st
+      D = 2 ^ pred (syncSizeᵉ o) * (nestUnit e sl + B) in
+  (nestDᵛˢ (proj₁ (proj₂ r)) ≤ D)
+  × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ D)
+  × ((j : NodeId) →
+       nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+         ≤ nodeNestAt j st ⊔ D)
+subscribeInner-nest-arr c sl B g0 op allNid κ id now o sched st hsl hc hv hn =
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeInner-nest-arr c sl B (gs fuel) op allNid κ id now o sched st
+                        hsl hc hv hn =
+  subscribeE-nest-arr c sl B fuel o
+    (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+    (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
+    (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
 
 -- ONE CONSUME STEP, AT TWO GRANT INDICES AND NOT ONE.  Each head reads
 -- its own node, and every arm either leaves the state alone or runs

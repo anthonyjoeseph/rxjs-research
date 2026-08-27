@@ -21,12 +21,13 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Nest-Cap where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; suc; pred; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
    +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
-   +-identityʳ; n≤1+n; m≤n+m)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
+   +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤)
+open import Relation.Binary.PropositionalEquality
+  using (_≡_; refl; sym; trans; cong)
 
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
 
@@ -37,6 +38,14 @@ open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
 pow-mono-exp : ∀ (F : ℕ) → 1 ≤ F → ∀ {m m′ : ℕ} → m ≤ m′ → F ^ m ≤ F ^ m′
 pow-mono-exp F 1≤F {m′ = m′} z≤n     = 1≤pow≤ F m′ 1≤F
 pow-mono-exp F 1≤F           (s≤s le) = *-monoʳ-≤ F (pow-mono-exp F 1≤F le)
+
+-- THE ARRIVAL'S OWN GRANT, and it is deliberately NOT sealed.  The
+-- sealing rule is about a body that reaches the caps recurrence and so
+-- lands in every premise that names it; this is one multiplication,
+-- and its consumers read it against a `nestB`-shaped frame charge that
+-- can only be discharged by unfolding both sides.
+arrD : ℕ → ℕ → ℕ → ℕ
+arrD U B m = 2 ^ pred m * (U + B)
 
 abstract
   -- THE GRANT AT A DESCENT OF SIZE `m`, over a base `S`, a burst width
@@ -158,3 +167,46 @@ abstract
     ≤-trans (*-monoʳ-≤ (2 ^ k)
                (+-monoˡ-≤ (nestB S W U B m) (nestB-base S W U B m)))
             (nestB-frame-dbl S W U B m k m′ hk hm)
+
+  -- THE SAME LAW WITHOUT A CAP, which is what a bound tight in the
+  -- ARRIVAL costs and what it buys.  `arrD` charges two per unit of
+  -- term size rather than a whole per-level factor, so a frame of
+  -- local size `k` sitting above a subterm of size `m` lands at
+  -- `suc (k + m)` and the doubling that the extra `suc (k + m) - m`
+  -- units release is EXACTLY the frame's charge -- no slack, and no
+  -- premise relating `k` to any cap.  That is the difference the
+  -- consume steps spend: `nestB-frame` must be told `suc k ≤ S`
+  -- because its per-level factor is fixed by the cap and the frame's
+  -- size is not, while here the exponent and the size are the same
+  -- quantity.  The one thing it needs is that a subterm's size is
+  -- POSITIVE, which every clause of `syncSizeᵉ` gives.
+  arrD-mono : ∀ (U B m m′ : ℕ) → m ≤ m′ → arrD U B m ≤ arrD U B m′
+  arrD-mono U B m m′ hm =
+    *-monoˡ-≤ (U + B) (pow-mono-exp 2 (s≤s z≤n) (pred-mono-≤ hm))
+
+  arrD-frame : ∀ (U B m k : ℕ) → 1 ≤ m → B ≤ U + B →
+    2 ^ k * (B + arrD U B m) ≤ arrD U B (suc (k + m))
+  arrD-frame U B (suc m) k _ hB =
+    ≤-trans (≤-reflexive (*-distribˡ-+ (2 ^ k) B (arrD U B (suc m))))
+            (≤-trans (+-mono-≤ lo hi) dbl)
+    where
+    lo : 2 ^ k * B ≤ 2 ^ (k + m) * (U + B)
+    lo = *-mono-≤ (pow-mono-exp 2 (s≤s z≤n) (m≤m+n k m)) hB
+    hi : 2 ^ k * arrD U B (suc m) ≤ 2 ^ (k + m) * (U + B)
+    hi = ≤-reflexive (trans (sym (*-assoc (2 ^ k) (2 ^ m) (U + B)))
+                            (cong (_* (U + B)) (sym (^-distribˡ-+-* 2 k m))))
+    two : 2 ^ (k + suc m) ≡ 2 ^ (k + m) + 2 ^ (k + m)
+    two = trans (cong (2 ^_) (+-suc k m))
+                (cong (2 ^ (k + m) +_) (+-identityʳ (2 ^ (k + m))))
+    dbl : 2 ^ (k + m) * (U + B) + 2 ^ (k + m) * (U + B)
+            ≤ arrD U B (suc (k + suc m))
+    dbl = ≤-reflexive
+            (trans (sym (*-distribʳ-+ (U + B) (2 ^ (k + m)) (2 ^ (k + m))))
+                   (cong (_* (U + B)) (sym two)))
+
+  -- and the FLAT head, where there is no subterm to have a size: a
+  -- one-shot emits its own terms and nothing descends, so the whole
+  -- charge is the head's own and the grant it lands in is the head's
+  -- own size.
+  arrD-flat : ∀ (U B k : ℕ) → 2 ^ k * B ≤ arrD U B (suc k)
+  arrD-flat U B k = *-monoʳ-≤ (2 ^ k) (m≤n+m B U)
