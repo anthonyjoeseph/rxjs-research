@@ -2342,6 +2342,15 @@ subscribeInner-nest-arr c sl B W (gs fuel) op allNid κ id now o sched st
 -- to a state the width predicate reads identically, a kill touches no
 -- node and no slot, and each arm's own write-back is a state the
 -- predicate reads as true outright.
+-- PROBED: `Probed.Subscribe-Inner-Caps` instantiates both conjuncts
+--   directly at the descent, over merge, switch and exhaust nodes, at
+--   the smallest cap each arrival's own premise admits -- the caps
+--   invariant and the slot telescope, neither an inequality, both
+--   LOAD-BEARING.  Not covered: the ARMED store, and the boundary is
+--   pinned as a figure rather than described -- a limited merge with
+--   more sources than room leaves a table reading ZERO nesting at
+--   every node, so the rows hold the predicate over a store with
+--   nothing parked in it.  Nor is any cap above the arrival's own.
 postulate
   subscribeInner-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (fuel : Gas) (op : AllOp) (nid : NodeId)
