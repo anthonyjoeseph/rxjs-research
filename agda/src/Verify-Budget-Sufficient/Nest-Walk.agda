@@ -2103,6 +2103,22 @@ postulate
   -- them.  It mirrors what the caps face already carries along a burst,
   -- which is why it is stated apart from the measure: nothing here can
   -- be outrun by a substituting frame.
+  -- PROBED: `Probed.PushVals-Caps` builds the conclusion itself -- it
+  --   is `Set`-valued, so the row is an INHABITANT and not a pinned
+  --   boolean -- at all three heads, at the cap the value's own sync
+  --   size gives, with the head's premises pinned by `refl` rather
+  --   than assumed.  Covered: all five conjuncts, at two nesting
+  --   depths and at limits 0 and 1, with the queue-room arm resolved
+  --   through a real node lookup at the merge and through an absurd
+  --   one at the other two.  NOT covered, and both are readings the
+  --   probe makes rather than gaps it leaves: the recursion, since the
+  --   list walked is the SUBSCRIBE FRAME's burst and every shape
+  --   reachable there -- a two-armed synchronous source, a `deferᵉ`
+  --   gate, a scripted slot delivering over three ticks -- hands back
+  --   exactly ONE instant, so the tail is `⊤` at every row; and the
+  --   invariant conjunct's discrimination, since the state the
+  --   descent leaves carries one node and an empty registry and live
+  --   set, so it reads true even at a cap granting nothing.
   pushVals-merge-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -2284,6 +2300,8 @@ postulate
     in pushValsNestOK c sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- The switch wrap's bundle, at its own initial state.
+  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its two
+  --   boundaries are stated at `pushVals-merge-caps` above.
   pushVals-switch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (b : Closed Γ (obs u))
@@ -2313,6 +2331,8 @@ postulate
     in pushValsNestOK c sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- The exhaust wrap's bundle, at its own initial state.
+  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its two
+  --   boundaries are stated at `pushVals-merge-caps` above.
   pushVals-exhaust-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (b : Closed Γ (obs u))

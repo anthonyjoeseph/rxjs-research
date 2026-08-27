@@ -179,10 +179,9 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`pushVals-merge-caps`, `pushVals-switch-caps`, `pushVals-exhaust-caps`**
-  (Nest-Walk) — FALSITY, `NO EVIDENCE`: the bundle the burst carries beside the
+  (Nest-Walk) — DIFFICULTY, `PROBED×3`: the bundle the burst carries beside the
   measure — slots, invariant, admissibility, room at the node — at every frame
-  the descent leaves. Nothing has instantiated it: every probe here pins
-  `nestCapsOK?` at the INITIAL state, which is the premise and not this.
+  the descent leaves. Inhabited at the frame it leaves; the walk is untested.
 - **`subscribeInner-nest-arr`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×2, PROBED`: one subscription charged a DOUBLING per
   boundary of its arrival rather than a whole grant per level. This is the
