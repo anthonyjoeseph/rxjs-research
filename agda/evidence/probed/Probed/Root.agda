@@ -5,8 +5,8 @@
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 -- Receipts live in the headers of `root-caches` / `root-done-plumbed`
 -- (.Part4), whose residues are the two leaves named below.
--- TARGET: root-mergeAllCache
--- TARGET: root-entry-sunk
+-- TARGET: root-mergeAllCache @cd3c15
+-- TARGET: root-entry-sunk @301cfb
 --
 -- WHAT IS BEING TESTED, and why it is testable at all: both postulates'
 -- CONCLUSIONS are decidable Bool functions of a run — `cachesValid` and

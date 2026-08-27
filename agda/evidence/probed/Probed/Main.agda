@@ -39,9 +39,6 @@ open import Probed.Subscribe-Nest
          premInner; readInner≡; spendInner;
          premDeep; readDeep≡; spendDeep;
          premDeeper; readDeeper≡; spendDeeper)
-open import Probed.Subscribe-Nest-Wrap
-  using (premM; premS; premX; bursts≡; nodes≡; nodesH≡; premH; fitsH; nestPrems≡;
-         emits≡; emitsS≡; emitsX≡; base≡; fitsM; fitsS; fitsX)
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
 open import Probed.Chain-Caps-Flat
@@ -53,18 +50,14 @@ open import Probed.Sync-Factor
          dupOut₃≡6; dupB-holds;
          hidSync≡4; hidSize≡9; hidOut≡0;
          mixOut≡3; mixD-holds)
-open import Probed.Nest-Multi-Level
-  using (lens≡; nestPrems≡; valPrems≡; delivered≡; fitsM0; fitsM1; fitsM2; fitsM3; fitsS2; fitsX2; emitted≡; heads≡; keyM0; keyM1; keyM2; keyM3; keyS2; keyX2; keyM3-2; deep4≡)
 open import Probed.PushVals-Body-Key
-  using (premTow; premDup; lensBK≡; deliveredTow≡; deliveredDup≡; fitTow0; fitTow1; fitTow2; fitDup1; fitDup2; fitDup3; fitS; fitX; deliveredD₂≡; premD₂; lenD₂≡; fitD₂1; fitD₂2; fitD₂3)
+  using (premTow; premDup; lensBK≡; deliveredTow≡; deliveredDup≡; fitTow0; fitTow1; fitTow2; fitDup1; fitDup2; fitDup3; fitS; fitX; deliveredD₂≡; premD₂; lenD₂≡; fitD₂1; fitD₂2; fitD₂3; armed≡; premA; lenA≡; deliveredA≡; fitA1; fitA3; fitAD₂3)
 open import Probed.Subscribe-Nest-Arr-Store
   using (premF-6; installed≡; fits-0; fits-6)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
          capsX-1; capsX-2; heads≡; entry≡; left-starved≡; census≡;
          burstOne≡)
-open import Probed.Wrap-Nest-Frame
-  using (premM; premS; premX; figures≡; premP; parked≡; fitsP; premF; frameFigs≡; fitsF; mapFigs≡; mapInvariant; hidNodes≡; hidQueue≡; hidAligned; deepFit; deepGrown)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed

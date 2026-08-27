@@ -2,7 +2,7 @@
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
--- TARGET: cascade-nest-store
+-- TARGET: cascade-nest-store @5903c7
 --
 -- WHY IT IS TESTABLE AT ALL, and it is the whole reason this statement was
 -- worth stating: both sides COMPUTE.  The target is premise-free -- it reads

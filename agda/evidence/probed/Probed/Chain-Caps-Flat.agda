@@ -3,7 +3,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: arr-chains-caps
+-- TARGET: arr-chains-caps @884c2e
 --
 -- WHAT IS BEING TESTED.  The target asserts `chainsCapsOK` at ONE cap --
 -- the one read at the instant the cascade starts -- and that predicate

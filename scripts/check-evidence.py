@@ -46,9 +46,32 @@ whole point of the tree is that neither can become part of it.
       FINDINGS do not die with it: a coverage boundary, a blocked verdict or a
       dead route belongs in the header of the statement it constrains, which
       is where it should have been written in the first place.
+
+  E5  A TARGET MAY NOT BE RESTATED UNDER THE SAME NAME.  Every `-- TARGET:`
+      carries a FINGERPRINT of the statement it names — `-- TARGET: foo @a1b2c3`
+      — and the check recomputes it from the declaration in src, normalised up
+      to binder spelling.  A mismatch means the statement moved while its name
+      did not, so the rows below are evidence about a statement that no longer
+      exists.
+
+      This is the hole E2 cannot see, and it is not hypothetical.  E2 expires a
+      probe when its target is DISCHARGED or DELETED, both of which remove the
+      name; a RESTATEMENT keeps the name and changes what it says, so every
+      check in this file stays green while the coverage claim quietly stops
+      being true.  Measured on the sweep that added E5: three probes, 863
+      lines, keyed their grant at the assembled head while the statement they
+      named had been re-keyed to the BODY — a strictly smaller grant, so not
+      one of their greens transferred, and the roadmap read their receipts as
+      live coverage the row did not have.  A false coverage claim is worse than
+      no receipt: the next reader budgets nothing for a region nothing covered.
+
+      The repair is never to update the fingerprint alone.  Re-run the probe
+      against the statement as it now reads — a red row there is a REFUTATION
+      and worth more than the green it replaces — or delete it.
 """
 
 import argparse
+import io
 import os
 import re
 import subprocess
@@ -65,6 +88,74 @@ SERIES = re.compile(r"^--\s*SERIES\b\s*(.*?)\s*$")
 
 IMPORT = re.compile(r"^\s*(?:open\s+import|import)\s+([\w.\-]+)")
 TARGET = re.compile(r"^\s*--\s*TARGET:\s*(.+?)\s*$")
+# A target's name and, optionally, the fingerprint of the statement the rows
+# below were taken against.  Split rather than folded into TARGET so that E2
+# keeps reading a bare name and E5 owns the whole of the fingerprint law.
+STAMP = re.compile(r"^(\S+)\s*@\s*([0-9a-f]{6})$")
+
+
+def _dupcheck():
+    """`check-duplicates` loaded by path: its module name is not an
+    identifier, and its normaliser is the one thing E5 must agree with."""
+    global _DUP
+    if _DUP is None:
+        import importlib.util
+        here = os.path.dirname(os.path.abspath(__file__))
+        spec = importlib.util.spec_from_file_location(
+            "dupcheck", os.path.join(here, "check-duplicates.py"))
+        _DUP = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_DUP)
+    return _DUP
+
+
+_DUP = None
+
+
+def fingerprint(ty):
+    """Six hex of the statement, normalised up to binder spelling.
+
+    Binder-insensitive because a rename says nothing about what is asserted,
+    and a check that fires on one teaches people to update stamps by reflex —
+    which is the one repair E5 exists to forbid."""
+    import hashlib
+    return hashlib.sha256(
+        _dupcheck().alpha(ty).encode("utf-8")).hexdigest()[:6]
+
+
+def statements(src):
+    """name -> fingerprint, for every top-level declaration in src."""
+    mod = _dupcheck()
+    out = {}
+    for path in agda_files(src):
+        for name, _line, ty in mod.declarations(path):
+            out[name] = fingerprint(ty)
+    return out
+
+
+def check_e5(evidence, stmts, harness=None):
+    """Every `-- TARGET:` stamps the statement its rows were taken against."""
+    unstamped, stale, n = [], [], 0
+    roots = list(evidence) + ([harness] if harness else [])
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for path in agda_files(root):
+            for i, line in enumerate(
+                    io.open(path, encoding="utf-8").read().split("\n"), 1):
+                m = TARGET.match(line)
+                if not m:
+                    continue
+                n += 1
+                st = STAMP.match(m.group(1))
+                if not st:
+                    name = m.group(1).split()[0]
+                    unstamped.append((path, i, name, stmts.get(name)))
+                    continue
+                name, got = st.group(1), st.group(2)
+                want = stmts.get(name)
+                if want is not None and want != got:
+                    stale.append((path, i, name, got, want))
+    return unstamped, stale, n
 
 
 def agda_files(root):
@@ -122,6 +213,10 @@ def check_e2(evidence, postulates):
             m = TARGET.match(line)
             if m:
                 for t in re.split(r"[,\s]+", m.group(1)):
+                    # a STAMP is E5's business, and it is written beside the
+                    # name rather than instead of it -- so drop it here rather
+                    # than letting a fingerprint be read as a second target
+                    t = t.split("@")[0].strip()
                     if t:
                         targets.append((i, t))
         if not targets:
@@ -278,7 +373,7 @@ def check_e4(harness, postulates):
                 continue
             t = TARGET.match(line)
             if t and open_at is not None:
-                if t.group(1) not in postulates:
+                if t.group(1).split('@')[0].strip() not in postulates:
                     dead.append((path, i, t.group(1), open_at[1]))
                 open_at = None
                 continue
@@ -295,6 +390,10 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
     missing, dead, nprobes = check_e2(evidence, postulates)
     orphaned, mismarked, nreceipts = check_e3(src, postulates)
     smissing, sdead, nseries = check_e4(harness, postulates)
+    unstamped, stale, ntargets = check_e5(
+        [os.path.join(evidence, d) for d in NAMESPACES]
+        if isinstance(evidence, str) else list(evidence),
+        statements(src), harness)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -367,14 +466,38 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         print("    left a harness worth recovering, that is a `RECOVERY:` "
               "pointer.")
 
+    for p_, i_, name, want in unstamped:
+        print(f"{p_}:{i_}: E5 — target {name!r} carries no statement "
+              f"fingerprint")
+        if want:
+            print(f"    Write it as `-- TARGET: {name} @{want}` — but only "
+                  f"after reading the")
+            print("    statement as it now stands, since the stamp is a claim "
+                  "that these rows")
+            print("    were taken against THAT text.")
+        else:
+            print(f"    {name!r} is not a declaration in src at all.")
+    for p_, i_, name, got, want in stale:
+        print(f"{p_}:{i_}: E5 — {name!r} was RESTATED under the same name: "
+              f"rows stamped @{got}, statement now @{want}")
+        print("    The name survived and the statement did not, so E2 saw "
+              "nothing and these")
+        print("    rows are evidence about text that is gone.  RE-RUN them "
+              "against the")
+        print("    statement as it now reads and restamp, or DELETE the probe. "
+              " Never restamp")
+        print("    alone: that converts a false coverage claim into a "
+              "certified one.")
+
     n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
-         + len(smissing) + len(sdead))
+         + len(smissing) + len(sdead) + len(unstamped) + len(stale))
     if n == 0:
         print(f"check-evidence: clean — {nprobes} probe(s), every one naming a "
               f"live postulate; {nreceipts} receipt(s), every one above its "
               f"subject and marked for that subject's state; no src file "
               f"imports the evidence tree; {nseries} harness series, every "
-              f"one naming a live postulate")
+              f"one naming a live postulate; {ntargets} target(s), every "
+              f"one stamped with the statement its rows were taken against")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -430,6 +553,26 @@ def selftest():
         "letting the second one's cover both",
         harness=os.path.join(fx, "harness-abutting"))
 
+    src5 = os.path.join(fx, "stamp-src")
+    run(src5, os.path.join(fx, "live-target"),
+        {"live-one"}, None,
+        "E5 quiet on a stamp that matches the statement in src")
+    run(src5, os.path.join(fx, "target-unstamped"),
+        {"live-one"}, "carries no statement fingerprint",
+        "E5 fires on a target with no stamp, and prints the one to write")
+    run(src5, os.path.join(fx, "target-unstamped"),
+        {"live-one"}, "@b6f6f3",
+        "E5's repair line carries the CURRENT fingerprint, so adopting it is "
+        "a copy rather than a computation")
+    run(src5, os.path.join(fx, "target-stale"),
+        {"live-one"}, "was RESTATED under the same name",
+        "E5 fires when the name resolves and the statement under it has "
+        "changed -- the one shape E2 is blind to")
+    run(src5, os.path.join(fx, "target-stale"),
+        {"live-one"}, None if False else "statement now @b6f6f3",
+        "E5 names BOTH fingerprints, since a reader has to find the rows' "
+        "own statement in the history to know what was covered")
+
     run(os.path.join(fx, "receipt-live"), os.path.join(fx, "empty"),
         {"live-one"}, None, "E3 quiet on a receipt above a live postulate")
     run(os.path.join(fx, "receipt-hist"), os.path.join(fx, "empty"),
@@ -479,7 +622,11 @@ def selftest():
           "E4 fires on a harness series with no target and on one whose "
           "target has been discharged, charges each of two ABUTTING series "
           "its own target, and is quiet on a series naming a live "
-          "postulate)")
+          "postulate.  E5 fires on a target carrying no fingerprint -- "
+          "printing the current one, so adopting it is a copy and not a "
+          "computation -- and on a stamp whose statement has since been "
+          "rewritten under the same name, naming BOTH fingerprints; and is "
+          "quiet on a stamp that still matches)")
     return 0
 
 

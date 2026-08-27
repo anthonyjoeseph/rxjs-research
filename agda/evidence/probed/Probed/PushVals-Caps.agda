@@ -10,9 +10,9 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-merge-caps
--- TARGET: pushVals-switch-caps
--- TARGET: pushVals-exhaust-caps
+-- TARGET: pushVals-merge-caps @41ce21
+-- TARGET: pushVals-switch-caps @794562
+-- TARGET: pushVals-exhaust-caps @c4cd9e
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)

@@ -38,16 +38,16 @@
 -- factor is a power -- and a duplication rate that DOES survive a
 -- frame is the region still open.
 --
--- TARGET: pushVals-merge-nest
--- TARGET: pushVals-switch-nest
--- TARGET: pushVals-exhaust-nest
+-- TARGET: pushVals-merge-nest @c12ae2
+-- TARGET: pushVals-switch-nest @158593
+-- TARGET: pushVals-exhaust-nest @163a8b
 -- ══════════════════════════════════════════════════════════════════
 module Probed.PushVals-Body-Key where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.List using ([]; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -67,7 +67,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nodesMax; nestDᵛˢ; nestCapsOK?)
+  using (nodesMax; nestDᵛˢ; nestCapsOK?; nodeNestAt)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -261,3 +261,54 @@ fitD₂2 = refl
 
 fitD₂3 : (lhsM (D₂ 3) ≤ᵇ G (mergeAllᵉ nothing (D₂ 3)) (D₂ 3)) ≡ true
 fitD₂3 = refl
+
+-- ── THE TABLE THE DESCENT STARTS FROM, ARMED ──────────────────────
+
+-- Every row above leaves from `st-init`, so the store readings start at
+-- zero and the frame is the only thing that can raise them.  What the
+-- heads' own risk names is a descent from a table ALREADY carrying
+-- something, which is this axis.  The node sits at an id the frame does
+-- not claim -- put it at the frame's own and the subscribe overwrites
+-- it, and the rows go back to reading zero.
+stA : EvalSt prog
+stA = installNode 7 (mergeAll-st {t = natᵗ} (just 1) 1 (deepV 3 ∷ []) false)
+                  (st-init prog)
+
+armed : ℕ
+armed = nodeNestAt 7 stA
+
+armed≡ : armed ≡ 3
+armed≡ = refl
+
+resA : Closed Γ₂ (obs (obs natᵗ)) → _
+resA b = subscribeE gasBig b (thru-outer mergeAllᵒ nid ↠ κ) 0 0
+           (proj₂ (mintNode sched₀))
+           (installNode nid (mergeAll-st {t = obs natᵗ} nothing 0 [] false) stA)
+
+lhsA : Closed Γ₂ (obs (obs natᵗ)) → ℕ
+lhsA b = nodesMax (proj₂ (proj₂ (resA b)))
+           ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ (resA b))))
+
+premA : nestCapsOK? (tight (mergeAllᵉ nothing (bDup 3))) sched₀ stA ≡ true
+premA = refl
+
+lenA : ℕ
+lenA = length (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ (resA (bDup 3)))))
+
+lenA≡ : lenA ≡ 1
+lenA≡ = refl
+
+deliveredA : ℕ × ℕ × ℕ × ℕ
+deliveredA = lhsA (bDup 0) , lhsA (bDup 1) , lhsA (bDup 2) , lhsA (bDup 3)
+
+deliveredA≡ : deliveredA ≡ (3 , 3 , 3 , 4)
+deliveredA≡ = refl
+
+fitA1 : (lhsA (bDup 1) ≤ᵇ G (mergeAllᵉ nothing (bDup 1)) (bDup 1)) ≡ true
+fitA1 = refl
+
+fitA3 : (lhsA (bDup 3) ≤ᵇ G (mergeAllᵉ nothing (bDup 3)) (bDup 3)) ≡ true
+fitA3 = refl
+
+fitAD₂3 : (lhsA (D₂ 3) ≤ᵇ G (mergeAllᵉ nothing (D₂ 3)) (D₂ 3)) ≡ true
+fitAD₂3 = refl

@@ -26,12 +26,12 @@
 -- once per level against a `syncSizeᵛ` that grows by a constant per
 -- level.  The rows below do not reach it.
 --
--- TARGET: subscribeE-nest-arr-merge
--- TARGET: subscribeE-nest-arr-switch
--- TARGET: subscribeE-nest-arr-exhaust
--- TARGET: thruStep-merge-inner-caps
--- TARGET: thruStep-switch-inner-caps
--- TARGET: thruStep-exhaust-inner-caps
+-- TARGET: subscribeE-nest-arr-merge @ea9c61
+-- TARGET: subscribeE-nest-arr-switch @52c64b
+-- TARGET: subscribeE-nest-arr-exhaust @185435
+-- TARGET: thruStep-merge-inner-caps @cafb22
+-- TARGET: thruStep-switch-inner-caps @3402c0
+-- TARGET: thruStep-exhaust-inner-caps @d49656
 -- REFUTED: Refuted.Thru-Step-Caps
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Thru-Step-Indexed where
@@ -191,8 +191,8 @@ rM = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr 6) sched₀ stM
 -- leaves the node in the table, but an unlimited merge still parks
 -- nothing -- so both readings are zero at both, pinned below rather
 -- than dressed up as a fit.  The region where a subscribe DOES arm the
--- store is a LIMITED merge under the frame, and `Probed.Wrap-Nest-Frame`
--- is where it is taken.
+-- store is a LIMITED merge under the frame, which no row here
+-- reaches.
 arrD : ℕ → Val Γ₂ (obs (obs natᵗ))
 arrD k = mapᵉ dup (ofᵉ (strmᵗ (deferᵉ (E k)) ∷ []))
 

@@ -5,8 +5,8 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushBurst-nest-map
--- TARGET: stepFrame-nodes-thru
+-- TARGET: pushBurst-nest-map @349bc6
+-- TARGET: stepFrame-nodes-thru @cb3c4a
 --
 -- WHAT IS BEING TESTED.  A subscription is charged `2 ^ cSize` times
 -- what it was handed, and the whole question is where the exponent

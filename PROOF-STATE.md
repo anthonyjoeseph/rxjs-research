@@ -195,8 +195,8 @@ does not fit is a finding about the shared statement, not about the head.
   bundle and the slots equation across the arm that subscribes, the measures
   around them now being checked bodies. The switch's covers its kill too.
 - **`pushVals-merge-nest`, `pushVals-switch-nest`, `pushVals-exhaust-nest`**
-  (Nest-Walk) — DIFFICULTY, `DEAD ROUTE×2, PROBED×6`: the outer's burst is
-  inside the grant, emit by emit, at the BODY's key. This is where the burst
+  (Nest-Walk) — DIFFICULTY, `DEAD ROUTE×2, PROBED, RECOVERY`: the outer's burst
+  is inside the grant, emit by emit, at the BODY's key. This is where the burst
   statement's risk is; the body key and the rate that survives the frame are
   both taken.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —

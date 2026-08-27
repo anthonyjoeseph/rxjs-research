@@ -22,8 +22,8 @@
 -- reading below hands the step exactly that, and the path-denominated
 -- charge covers it where a program-denominated one does not.
 --
--- TARGET: shareGo-nodes
--- TARGET: arr-chains-nest-syn
+-- TARGET: shareGo-nodes @2a6eb5
+-- TARGET: arr-chains-nest-syn @f18ea2
 module Probed.Cascade-Chain-Count where
 
 open import Data.List using (List; []; _∷_; _++_; length; foldr)

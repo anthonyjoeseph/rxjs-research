@@ -5,7 +5,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushBurst-nest-map
+-- TARGET: pushBurst-nest-map @349bc6
 --
 -- WHAT IS BEING TESTED.  The per-emit substitution charge is a factor
 -- `2 ^ sizeᵗ fn`, and the whole question is which SIZE CLASS the

@@ -3,7 +3,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: cascadeGo-nest-regs
+-- TARGET: cascadeGo-nest-regs @4149d3
 --
 -- WHY THE COMPONENTS ARE READ SEPARATELY.  The store measure is a
 -- four-way `⊔` and the walk is charged one increment for the whole of

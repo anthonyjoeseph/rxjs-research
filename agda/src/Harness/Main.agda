@@ -132,7 +132,7 @@ regW st = length (EvalSt.registry st)
 -- even in native code, so no row can discharge it.  A row reading OVER
 -- is a refutation candidate modulo that premise.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthRow : ℕ → ℕ → String
 depthRow d k =
   let p   = progD d k
@@ -152,7 +152,7 @@ depthRow d k =
 -- subject and the path are chosen, and the statement quantifies over
 -- both.  `thru-outer` peels one `obs`, so the two move together.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthRowInner : ℕ → ℕ → ℕ → String
 depthRowInner j d k =
   let p   = progD d k
@@ -178,7 +178,7 @@ depthRowInner j d k =
 -- faces charge different things, so a margin that is invariant for one
 -- carries nothing about the other.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthRunWalk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
           → ℕ → ℕ → Sched Γ → EvalSt e → String
 depthRunWalk e sl 0       nextId sched st = ""
@@ -213,7 +213,7 @@ depthRunWalkRow steps ds ks j d k =
 -- the mid-run connect raises the descent above the bound, this is the
 -- row that says so.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthRunWalkRowU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthRunWalkRowU steps ds ks j d k =
   let sl = insT ds ks j
@@ -240,7 +240,7 @@ depthRunWalkRowU steps ds ks j d k =
 -- distinguish the two readings, so `c` is printed and a row with `c`
 -- at one is evidence about nothing here.
 --
--- TARGET: cascade-nest-store
+-- TARGET: cascade-nest-store @5903c7
 pfxL : ∀ {A : Set} → ℕ → List A → List A
 pfxL 0       xs       = []
 pfxL (suc i) []       = []
@@ -319,7 +319,7 @@ satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
 -- everywhere the width exceeds one; a row where they coincide is
 -- evidence about nothing
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 
 -- SERIES S2 (7000000): the same question with the WIDTH actually
 -- driven.  SERIES S runs on `progD`, whose subscribe registers one
@@ -330,7 +330,7 @@ satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
 -- is charged for is the swept axis.  If the subscribe side needs its
 -- width anywhere, it needs it here
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthWideRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthWideRow ds ks j ww w =
   let slF = insF ds ks j
@@ -360,7 +360,7 @@ depthWideRow ds ks j ww w =
 -- limit-1 mergeAll family — three inners queued behind one — so its root
 -- subscribe is where the drain actually fires.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthConcatRow : ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthConcatRow ds ks j d k =
   let sl  = insT ds ks j
@@ -394,7 +394,7 @@ depthConcatRow ds ks j d k =
 -- gate costs nothing, which is what the depth mirror's
 -- over-approximation predicts.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthLimRow : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → String
 depthLimRow lim ds ks j d k =
   let sl  = insT ds ks j
@@ -421,7 +421,7 @@ depthLimRow lim ds ks j d k =
 -- campaign has ever reached -- every earlier family predates the limit
 -- argument and so sits at one of the two saturated ends.
 --
--- TARGET: depth-nest-compositional
+-- TARGET: depth-nest-compositional @393fb4
 depthFanRow : ℕ → ℕ → ℕ → ℕ → String
 depthFanRow lim w d k =
   let sl  = insT 1 1 1
@@ -534,7 +534,7 @@ satRow fam ds ks j w k =
 -- read by `Probed.Cascade-Chain-Count`, at the typechecker, where a
 -- row can be pinned.
 --
--- TARGET: shareGo-nodes
+-- TARGET: shareGo-nodes @2a6eb5
 shareNestRow : ℕ → ℕ → ℕ → String
 shareNestRow j w k =
   let p = progF w k
@@ -625,7 +625,7 @@ rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
 -- here, since `capsBase` reaches `entryCeil` and a divergence there
 -- would make even the cap symbolic-only.
 --
--- TARGET: nest-height
+-- TARGET: nest-height @43d640
 ------------------------------------------------------------------
 
 ------------------------------------------------------------------

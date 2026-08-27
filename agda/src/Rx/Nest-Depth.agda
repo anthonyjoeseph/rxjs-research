@@ -64,6 +64,21 @@
 -- measure per unfold and no bound survives.  Same design as the
 -- synchronous size, which truncates at the gate for the same reason.
 --
+-- AND THE TRUNCATION IS SAFE ON THE STORE SIDE BECAUSE THE EVALUATOR IS
+-- BLIND IN THE SAME PLACE.  The reading that would refute a bound keyed
+-- on this measure is a deep body hidden behind a gate: the measure is
+-- worth nothing there, so an arbitrarily deep body would be granted
+-- nothing.  Instantiated, the node state a subscribed inner leaves
+-- behind is not the inner's depth at all -- it is the QUEUE a spent
+-- limit refused -- and that reading is pinned INVARIANT from a body two
+-- deep to one eight deep, while the same body undeferred reads its own
+-- depth.  The alignment is exact, which is why the blind region is not
+-- the refutation it looks like; the sighted direction was taken to
+-- fourteen and stayed inside its bound.  Measured at `ce6597b` in a
+-- probe deleted there for keying its grant at the wrong index -- the
+-- alignment is a property of the definitions and survives that, the
+-- fits do not.
+--
 -- THE `input` CLAUSE CONTRIBUTES NOTHING, AND A DESCENDING ONE IS
 -- STRUCTURALLY DEAD.  Descending into the slot definition on slot fuel
 -- with a visited set — how the width family does it — does not work

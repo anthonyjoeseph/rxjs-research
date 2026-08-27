@@ -2292,9 +2292,9 @@ pushFit-ems {Γ = Γ} {u = u} c sl B W m m′ fuel op nid κ id now (em ∷ ems)
 -- an observable that gets SUBSCRIBED when a value passes it: if that
 -- happened inside the frame, an arbitrarily deep body would install
 -- arbitrarily deep state under a bound that cannot see the path.
--- `Probed.Wrap-Nest-Frame` asks it directly, at a deferred body two
--- deep and the same body six deep, and both readings are the table
--- the run started from -- the frame mints nothing here.  That is what
+-- Asked directly, at a deferred body two deep and the same body six
+-- deep, both readings come back as the table the run started from --
+-- the frame mints nothing here.  That is what
 -- puts the path factor on the DELIVERY face's bill and off this one,
 -- and it is why the omission is a property rather than an oversight.
 
@@ -2451,8 +2451,8 @@ postulate
   --   states: the whole-frame forms are the ones the ratio kills.
   -- DEAD ROUTE: and the KEY the ring must carry cannot be the head's
   --   own, which was the first shape to try and the cheapest to kill.
-  --   `Probed.Nest-Multi-Level` measures the emitted key against the
-  --   emitter's down a stack of substituting boundaries: the emitted
+  --   Measured down a stack of substituting boundaries, the emitted
+  --   key against the emitter's: the emitted
   --   column DOUBLES per level while the head's, reading a spine that
   --   grows by one boundary and one map, rises by a constant -- so the
   --   identity form survives two levels and is false from the third,
@@ -2467,88 +2467,10 @@ postulate
   --   -- so the emitted exponent is bounded BY the key instead of
   --   running away from it, and the exponential column is the one the
   --   repaired statement can carry.
-  -- PROBED: `Probed.Subscribe-Nest-Wrap` instantiates the conclusion
-  --   this leaf now carries the risk of, at `W = 0` -- the smallest
-  --   grant the statement can be read at, so a green row is stronger
-  --   than the head asks for -- with the cap at the value's own sync
-  --   size, `B` at `nestDᵉ` exactly and the store `st-init`, with
-  --   `nestCapsOK?` -- the premise this statement names, not the caps
-  --   face's -- pinned by `refl` rather than assumed, so the rows are
-  --   not evidence about a region where the head grants nothing.
-  --   Covered: the BURST conjunct, at two nested layers per head, each
-  --   descent handing back two values; and the MERGE head's store half
-  --   at a queue that survives the frame, reading 1 and 2 rather than
-  --   zero, with the conclusion holding there.  Reaching it needs the
-  --   merge's FIRST inner not to finish inside the frame, which no
-  --   synchronous inner manages -- a `deferᵉ` inner does, its body
-  --   being unrun at subscribe, so the limit is still spent when the
-  --   descent returns and the second inner is genuinely parked.  NOT
-  --   covered: the switch and exhaust store halves, which are `0 ≤ _`
-  --   for a reason no program can defeat -- `nodeNest` is zero by
-  --   definition on `switch-st` and `exhaust-st`.  And the depth axis
-  --   cannot refute: delivered nesting is exactly the layer count while
-  --   the grant's base alone is 106 at one layer and grows four times
-  --   faster, so the rows are DEGENERATE on the exponent.  What every
-  --   row here says about THIS leaf: the parent conclusion is now
-  --   DERIVED from it by checked chaining, and the value conjunct is
-  --   the join of the per-step reads -- so at these programs a false
-  --   fit could hide only in an INTERMEDIATE state's store reading,
-  --   never in the values.
-  -- PROBED: `Probed.Wrap-Nest-Frame` reads the axis the receipt above
-  --   leaves open: `G` mentions `κ` nowhere, and every row there is at
-  --   the root from an empty table.  Covered: all three heads under a
-  --   `thru-outer` frame from a table already holding a merge node
-  --   whose queue is three deep, with `nestCapsOK?` pinned there too --
-  --   so the store conjuncts read 3 against 3 rather than `0 ≤ _`.
-  --   Those are carried by the incoming summand alone, which is why the
-  --   module does not stop at them: a merge whose FIRST inner is a
-  --   `deferᵉ` parks its second past the frame, and then the subscribe
-  --   installs SIX against an incoming three, so all three conjuncts
-  --   are taken where the grant is what pays.  The `from-inner` frame
-  --   -- the constructor the drain exits under, and the one this head's
-  --   risk actually names -- is taken the same way, at the root TYPE
-  --   rather than one `obs` up: six installed against an incoming three,
-  --   all three conjuncts inside the grant.  The two zero-by-definition
-  --   heads were pushed at the same outer and did not move off the
-  --   incoming table, which is what unreachable reads like from outside
-  --   and is why no row can arm them.  A `map-f` frame is reached too,
-  --   for the κ-blindness of the grant rather than for a fit: its
-  --   readings are pinned INVARIANT in the depth of the mapped body,
-  --   not merely inside a bound, since the bound is astronomical there
-  --   and a `≤ᵇ` row could not have failed.  The region that CAN
-  --   refute is the one where the grant is blind: `nestDᵉ` and
-  --   `syncSizeᵉ` both stop at a `deferᵉ`, so a body hidden behind one
-  --   is worth nothing to `G`.  A subscribed inner turns out to leave
-  --   nothing behind at all -- what these conjuncts read is the QUEUE
-  --   the spent limit refused -- and the queue reading is blind at a
-  --   `deferᵉ` exactly where `G` is, pinned invariant from two deep to
-  --   eight while the same body undeferred reads its own depth.  That
-  --   alignment is why the blind region is not the refutation it looks
-  --   like.  The sighted direction, the one that can outrun a bound,
-  --   is taken to fourteen: installed exactly fourteen, inside the
-  --   grant.  NOT covered: a `share-sink` frame; any row where the
-  --   burst side is nonzero -- the drain that arms the store is what
-  --   keeps the burst empty here; and a MULTI-LEVEL descent, every row
-  --   being one subscribe rather than the recursion the grant shrinks
-  --   along.
-  -- PROBED: `Probed.Nest-Multi-Level` reaches the region both
-  --   receipts above name unreached: the MULTI-LEVEL descent, three
-  --   boundaries deep under the head, with substitution between the
-  --   levels -- a step function naming its payload at the measure's
-  --   one additive slot, so the delivered figure DOUBLES per level,
-  --   one then two then four then eight, where every earlier row
-  --   moved linearly.  All six rows hold inside the head's own grant
-  --   at `W = 0`, both premises pinned true, every burst non-empty.
-  --   Covered: the merge head at every level, switch and exhaust at
-  --   the outermost.  Not covered: a duplication rate above two per
-  --   level -- though no spendable rate crosses, the grant's exponent
-  --   growing with the very spine the duplicator enlarges -- and a
-  --   LIMITED merge under the stack, whose queue is the
-  --   `Probed.Wrap-Nest-Frame` region.  And not the arrival index this
-  --   leaf is read at, which `Probed.PushVals-Body-Key` takes.
-  -- PROBED: `Probed.PushVals-Body-Key` takes the index every receipt
-  --   above is one step short of.  Those rows measure the ASSEMBLED
-  --   head and key the grant at its `syncSizeᵉ`; what this leaf
+  -- PROBED: `Probed.PushVals-Body-Key` takes the index the earlier
+  --   rounds of rows were one step short of.  Those measured the
+  --   ASSEMBLED head and keyed the grant at its `syncSizeᵉ`; what this
+  --   leaf
   --   asserts is one level below, at the BODY's, and `nestB` is
   --   strictly increasing there -- so the earlier greens were against
   --   a strictly larger grant and did not transfer.  The shrink is a
@@ -2572,7 +2494,23 @@ postulate
   --   verdict meant anything.  NOT covered: a rate above two per
   --   level, which no substitution this term language admits reaches,
   --   and a LIMITED merge under the descent, whose queue is the
-  --   `Probed.Wrap-Nest-Frame` region.
+  --   region an ARMED table reaches, which the same module now takes:
+  --   the descent leaves from a node whose queue is already three deep,
+  --   at an id the frame does not claim, and the rows read 3 against a
+  --   grant that pays -- DEGENERATE at the shallow levels, where the
+  --   incoming summand alone carries the reading, and load-bearing at
+  --   the doubling family's deepest.
+  -- RECOVERY: `git show ce6597b` is the last tree holding
+  --   `Probed.Nest-Multi-Level`, a multi-level substituting tower,
+  --   `Probed.Subscribe-Nest-Wrap`, a two-layer wrap harness, and
+  --   `Probed.Wrap-Nest-Frame`, an armed node table under a frame.
+  --   Neither is a coverage claim about this statement: both key the
+  --   grant at the ASSEMBLED head's `syncSizeᵉ` where this leaf is read
+  --   at the BODY's, which is a strictly smaller grant -- the shrink
+  --   `Probed.PushVals-Body-Key` was built to re-take.  The third does
+  --   not even subscribe what the statement subscribes: it runs the
+  --   WRAP under a frame where the leaf runs the wrap's BODY.  What is
+  --   worth recovering is the harness, not the verdicts.
   pushVals-merge-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -2601,9 +2539,10 @@ postulate
             (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
     in pushValsCapsOK c sl g switchᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The switch wrap's measure, at its own initial state.
-  -- PROBED: `Probed.Subscribe-Nest-Wrap`, whose coverage and its
-  --   boundary are stated at `pushVals-merge-nest` above.
+  -- The switch wrap's measure, at its own initial state.  Its STORE
+  -- conjuncts are `0 ≤ _` at every program: `nodeNest` is zero by
+  -- definition on `switch-st`, so no instantiation can arm them and
+  -- only the burst half is ever evidence about this statement.
   pushVals-switch-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (b : Closed Γ (obs u))
@@ -2632,9 +2571,9 @@ postulate
             (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
     in pushValsCapsOK c sl g exhaustᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The exhaust wrap's measure, at its own initial state.
-  -- PROBED: `Probed.Subscribe-Nest-Wrap`, whose coverage and its
-  --   boundary are stated at `pushVals-merge-nest` above.
+  -- The exhaust wrap's measure, at its own initial state.  As at the
+  -- switch head above, `nodeNest` is zero by definition on
+  -- `exhaust-st`, so the store conjuncts cannot be armed.
   pushVals-exhaust-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (b : Closed Γ (obs u))
