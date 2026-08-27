@@ -26,9 +26,10 @@
 -- once per level against a `syncSizeᵛ` that grows by a constant per
 -- level.  The rows below do not reach it.
 --
--- TARGET: thruStep-merge-inner
--- TARGET: thruStep-switch-inner
--- TARGET: thruStep-exhaust-inner
+-- TARGET: subscribeInner-nest-arr
+-- TARGET: thruStep-merge-inner-caps
+-- TARGET: thruStep-switch-inner-caps
+-- TARGET: thruStep-exhaust-inner-caps
 -- REFUTED: Refuted.Thru-Step-Caps
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Thru-Step-Indexed where

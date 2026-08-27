@@ -178,11 +178,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`thruStep-merge-inner`, `thruStep-switch-inner`, `thruStep-exhaust-inner`**
-  (Nest-Walk) — DIFFICULTY, `PROBED×2`: the arm that descends, now that the
-  step around it is a checked case split. Both routes through the proven
-  subscribe bound are dead; the residue they name is a delivery bound tight in
-  the arrival.
+- **`subscribeInner-nest-arr`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE×2, PROBED`: one subscription charged a DOUBLING per
+  boundary of its arrival rather than a whole grant per level. This is the
+  residue both dead routes name, and it is what the three consume steps now
+  spend.
+- **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
+  `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
+  bundle and the slots equation across the arm that subscribes, the measures
+  around them now being checked bodies. The switch's covers its kill too.
 - **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED×6`: the outer's burst carries admissible values inside
   the grant, emit by emit, with room at the node for each. The body key and the

@@ -25,7 +25,7 @@ open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
    +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
-   +-identityʳ; n≤1+n)
+   +-identityʳ; n≤1+n; m≤n+m)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
@@ -103,6 +103,49 @@ abstract
     ≤-trans (≤-reflexive (cong (2 ^ k +_) (sym (+-identityʳ (2 ^ k)))))
             (pow-mono-exp 2 (s≤s z≤n) hk)
 
+  -- THE PROGRAM'S UNIT IS UNDER EVERY GRANT, one copy per level and at
+  -- least one level always present.
+  nestB-unit : ∀ (S W U B m : ℕ) → U ≤ nestB S W U B m
+  nestB-unit S W U B m =
+    ≤-trans (m≤m+n U (m * U))
+    (≤-trans (m≤n+m (suc m * U) B)
+    (≤-trans (≤-reflexive (sym (*-identityˡ (B + suc m * U))))
+             (*-monoˡ-≤ (B + suc m * U)
+                (1≤pow≤ ((2 ^ S) ^ suc W) m
+                   (1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n)))))))
+
+  -- ONE LEVEL OF THE KEY BUYS A DOUBLING, which is the form a descent
+  -- read against its ARRIVAL wants rather than against the depth the
+  -- grant was opened at.  A substituting frame may name its payload
+  -- twice, so what it delivers is two copies of what it received; a
+  -- level of the key is a full copy of the per-frame factor, and `2 ^ S`
+  -- covers the doubling with the frame's own factor still to spare.
+  nestB-frame-dbl : ∀ (S W U B m k m′ : ℕ) → suc k ≤ S → suc m ≤ m′ →
+    2 ^ k * (nestB S W U B m + nestB S W U B m) ≤ nestB S W U B m′
+  nestB-frame-dbl S W U B m k m′ hk hm =
+    ≤-trans step1 (≤-trans step2 (≤-trans step3 (≤-trans step4 step5)))
+    where
+    N : ℕ
+    N = nestB S W U B m
+    step1 : 2 ^ k * (N + N) ≤ (2 ^ k + 2 ^ k) * N
+    step1 = ≤-reflexive (trans (*-distribˡ-+ (2 ^ k) N N)
+                               (sym (*-distribʳ-+ N (2 ^ k) (2 ^ k))))
+    step2 : (2 ^ k + 2 ^ k) * N ≤ 2 ^ S * N
+    step2 = *-monoˡ-≤ N (pow2-dbl S k hk)
+    step3 : 2 ^ S * N ≤ ((2 ^ S) ^ suc W) * N
+    step3 = *-monoˡ-≤ N
+              (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
+                       (*-monoʳ-≤ (2 ^ S)
+                          (1≤pow≤ (2 ^ S) W (1≤pow≤ 2 S (s≤s z≤n)))))
+    step4 : ((2 ^ S) ^ suc W) * N
+              ≤ ((2 ^ S) ^ suc W) ^ suc m * (B + suc m * U)
+    step4 = ≤-reflexive (sym (*-assoc ((2 ^ S) ^ suc W)
+                                      (((2 ^ S) ^ suc W) ^ m) (B + suc m * U)))
+    step5 : ((2 ^ S) ^ suc W) ^ suc m * (B + suc m * U) ≤ nestB S W U B m′
+    step5 = *-mono-≤ (pow-mono-exp ((2 ^ S) ^ suc W)
+                        (1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n))) hm)
+                     (+-monoʳ-≤ B (*-monoˡ-≤ U (≤-trans hm (n≤1+n m′))))
+
   -- ONE LEVEL OF THE KEY BUYS ONE FRAME, which is the whole reason the
   -- grant is keyed on the term's size: a substituting frame charges two
   -- to its own size, the head that installs it is at least one node
@@ -112,18 +155,6 @@ abstract
   nestB-frame : ∀ (S W U B m k m′ : ℕ) → suc k ≤ S → suc m ≤ m′ →
     2 ^ k * (B + nestB S W U B m) ≤ nestB S W U B m′
   nestB-frame S W U B m k m′ hk hm =
-    ≤-trans (*-monoʳ-≤ (2 ^ k) (+-monoˡ-≤ (nestB S W U B m) (nestB-base S W U B m)))
-    (≤-trans (≤-reflexive
-               (trans (*-distribˡ-+ (2 ^ k) (nestB S W U B m) (nestB S W U B m))
-                      (sym (*-distribʳ-+ (nestB S W U B m) (2 ^ k) (2 ^ k)))))
-    (≤-trans (*-monoˡ-≤ (nestB S W U B m) (pow2-dbl S k hk))
-    (≤-trans (*-monoˡ-≤ (nestB S W U B m)
-               (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
-                        (*-monoʳ-≤ (2 ^ S) (1≤pow≤ (2 ^ S) W (1≤pow≤ 2 S (s≤s z≤n))))))
-    (≤-trans (≤-reflexive
-               (sym (*-assoc ((2 ^ S) ^ suc W) (((2 ^ S) ^ suc W) ^ m)
-                             (B + suc m * U))))
-             (*-mono-≤ (pow-mono-exp ((2 ^ S) ^ suc W)
-                          (1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n))) hm)
-                       (+-monoʳ-≤ B
-                         (*-monoˡ-≤ U (≤-trans hm (n≤1+n m′)))))))))
+    ≤-trans (*-monoʳ-≤ (2 ^ k)
+               (+-monoˡ-≤ (nestB S W U B m) (nestB-base S W U B m)))
+            (nestB-frame-dbl S W U B m k m′ hk hm)
