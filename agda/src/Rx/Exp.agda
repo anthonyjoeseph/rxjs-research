@@ -588,13 +588,9 @@ syncSizeᵛ (obs t)  e        = syncSizeᵉ e
 -- (strmᵗ) a boundary, and Tm material weightless.  subΘ rewrites
 -- only Tm material (Θ var positions), so substitution preserves
 -- every shell size EXACTLY — runtime instantiation neither
--- inflates nor deflates a shell.  shellsᵉ is the multiset of shell
--- sizes of e and of every sync-reachable embedded observable,
--- transitively.  The Dershowitz–Manna multiset order
--- (counts B ∘ shellsᵉ) was the original subscription measure;
--- it was retired in favour of the closed-form dBound measure in
--- Verify-Budget-Sufficient.  shellsᵉ/shellsᵛ currently have no
--- consumer.
+-- inflates nor deflates a shell.  `shellSizeᵉ` is what survives of
+-- that idea and it has one consumer, `innerᵗ`, which lists a
+-- carrier's own shell size ahead of its inner ones.
 ------------------------------------------------------------------
 
 shellSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ

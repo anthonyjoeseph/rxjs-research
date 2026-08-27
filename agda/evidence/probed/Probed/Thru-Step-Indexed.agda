@@ -34,8 +34,13 @@
 -- the tight rows at the bottom pin as arithmetic rather than as a
 -- failed attempt: the cap bounds the arrival and the key's factor is
 -- two to that cap, so a step delivering twice its arrival fits at
--- every program.  The region that could refute is the merge drain,
--- where delivery is the node's parked queue and not the value in hand.
+-- every program.  AND IT IS NOT THE DRAIN EITHER, which is the reading
+-- this file used to carry: every arm of `thruConsume` subscribes the
+-- arrival or parks it, and no arm reads a queue back, so the parked
+-- figure is never a delivery.  The region left is the arrival's own
+-- term, where nesting a duplicating substitution to depth `d` doubles
+-- once per level against a `syncSizeᵛ` that grows by a constant per
+-- level.  The rows below do not reach it.
 --
 -- TARGET: thruStep-merge
 -- TARGET: thruStep-switch

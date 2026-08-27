@@ -1201,9 +1201,15 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 --   both sides and the bound side stays ahead; at the shallowest
 --   arrival the harness has, `S` still reads twenty-one, because
 --   `syncSizeᵛ` measures the TERM and a duplicating step needs one.
---   So the region that could refute is a step whose delivery is NOT
---   linear in its arrival -- the merge DRAIN, bounded by the node's
---   parked queue -- and nothing here reaches it.
+--   AND THE DRAIN IS NOT THAT REGION, though it reads like the obvious
+--   candidate: every arm of `thruConsume` either SUBSCRIBES the arrival
+--   or PARKS it, and no arm reads the queue back, so a step that never
+--   drains cannot be broken by what a queue holds.  What is left is the
+--   arrival's own term, where the delivery is whatever the substitution
+--   emits -- and a substitution NESTED to depth `d` doubles once per
+--   level while `syncSizeᵛ` grows by a constant per level, which is the
+--   one axis on which the two sides move at comparable rates.  Nothing
+--   here reaches it.
 --   NOT COVERED: the store halves at the arm that SUBSCRIBES, which is
 --   a boundary rather than a gap -- a merge's `nodeNest` folds its
 --   QUEUE and the admit arm has room, so it queues nothing, and
