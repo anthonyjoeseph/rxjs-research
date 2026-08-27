@@ -8,41 +8,44 @@
 -- `Probed.Main`.
 --
 -- WHY THIS AXIS AND NOT THE OTHER ONE.  `Probed.Scan-Arr-Clos-Key`
--- lengthens a cold script under a step naming its accumulator TWICE:
--- the delivery then doubles per value while the key gains two, so the
--- grant gains two bits per value against a demand of one and the
--- margin widens.  That reading is about the pairing of those two
--- rates, and neither is forced.  Here the source is an `ofᵉ` of bare
--- naturals, whose key gains ONE per value, and the step names its
--- accumulator FOUR times, so the demand gains two bits per value
--- against a grant of one.
+-- lengthens a cold script under a step naming its accumulator TWICE.
+-- That reading is about the pairing of two rates and neither is
+-- forced.  Here the source is an `ofᵉ` of bare naturals, whose key
+-- gains ONE per value, and the step names its accumulator FOUR times,
+-- so the demand gains two bits per value against a written size of
+-- one — the worst pairing the family offers.
 --
--- WHAT THE ROWS THEREFORE MEASURE.  Not a crossing: the grant starts
--- ahead by the step function's own written size, which the key charges
--- once, so the rows are green throughout.  What they measure is the
--- SIGN of the margin's derivative, which is the whole question — the
--- fit holds for all programs only if the demand's per-value rate is
--- dominated by the key's, and these rows are LOAD-BEARING because they
--- show it is not.  A row fails as soon as the head start is spent.
+-- WHAT THE ROWS THEREFORE MEASURE: the SIGN of the margin's
+-- derivative, which is the whole question.  The grant is read over
+-- `suc W` copies of the arrival's closure size, so its exponent is a
+-- PRODUCT of the width and the size and grows quadratically in the
+-- value count, while the demand gains a fixed two bits each.  Nineteen
+-- bits of grant against zero of demand, a hundred and fifteen against
+-- eight, two hundred and forty-three against sixteen.  LOAD-BEARING:
+-- were the key read at the arrival alone the exponent would be flat in
+-- the width and every one of these rows would fail past the head start.
 --
--- WHAT IS NOT COVERED.  The crossing itself, and this is a boundary
--- rather than a gap: the delivered depth is the size of an actual
--- substituted term, so a row at the crossing is a term of some 2^40
--- nodes on the cheapest member of the family — raising the duplication
--- raises the head start faster than it raises the rate.  Nor is a
--- source whose key gains nothing per value: every synchronous value is
--- written down somewhere the closure measure reads.
+-- THE WIDTH IS A LOWER BOUND AND NOT THE MEASURE.  `descW` is sealed,
+-- so it cannot be evaluated here; the burst it joins over is exactly
+-- the length pinned below, and the grant is monotone in the width, so
+-- a fit at this width is a fit at the real one.
+--
+-- WHAT IS NOT COVERED, and it is a boundary rather than a gap: any
+-- source whose key gains nothing per value — every synchronous value
+-- is written down somewhere the closure measure reads — and the
+-- interaction with a SHARED slot, whose key is read through the
+-- telescope rather than off the term.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: subscribeE-nest-arr-scan @b3dbe3
+-- TARGET: subscribeE-nest-arr-scan @10d2d8
 module Probed.Scan-Arr-Margin where
 
 open import Data.Bool using (true)
 open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _*_; _≤ᵇ_)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gasPad; cold)
@@ -91,40 +94,72 @@ prog k = scanᵉ deepen4 (strmᵗ emptyᵉ) (ofᵉ (lits k))
 gas : Gas
 gas = gasPad 400 g0
 
-row : ℕ → ℕ × ℕ
-row k =
+-- the width the grant is read at, and it is a LOWER bound rather than
+-- the measure itself: `descW` is sealed and cannot be evaluated here,
+-- while the burst it joins over is exactly this length, so a fit at
+-- this width is a fit at the real one.
+wid : ℕ → ℕ
+wid k =
+  let p = prog k
+      r = subscribeE gas p root 0 0 (sched-init p slots) (st-init p)
+  in length (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ r)))
+
+delivered : ℕ → ℕ
+delivered k =
   let p = prog k
       r = subscribeE gas p root 0 0 (sched-init p slots) (st-init p)
   in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ r)))
-   , arrD (nestUnit p slots) (nestDᵉ p) (closSizeᵉ (slotClos slots) p)
 
--- THE TWO COLUMNS, AT ZERO THROUGH EIGHT DELIVERED VALUES.  The left
--- is the delivered nesting, the right the grant `NestArrAt` allows.
-figures : (ℕ × ℕ) × (ℕ × ℕ) × (ℕ × ℕ) × (ℕ × ℕ) × (ℕ × ℕ)
-figures = row 0 , row 1 , row 2 , row 3 , row 4
+-- the key the grant is actually read at: `suc W` copies of the
+-- arrival's closure size
+keyW : ℕ → ℕ
+keyW k = suc (wid k) * closSizeᵉ (slotClos slots) (prog k)
 
-figures≡ : figures ≡ ((0 , 1310720) , (2 , 2621440) , (10 , 5242880) , (42 , 10485760) , (170 , 20971520))
-figures≡ = refl
+grant : ℕ → ℕ
+grant k = arrD (nestUnit (prog k) slots) (nestDᵉ (prog k)) (keyW k)
 
-figuresHi : (ℕ × ℕ) × (ℕ × ℕ) × (ℕ × ℕ) × (ℕ × ℕ)
-figuresHi = row 5 , row 6 , row 7 , row 8
+-- THE DELIVERED DEPTHS, AT ZERO THROUGH EIGHT VALUES.  Four
+-- accumulator copies over an `ofᵉ` of bare naturals: `4d + 2` per
+-- value, so the demand's exponent grows by two bits per value.
+lo : ℕ × ℕ × ℕ × ℕ × ℕ
+lo = delivered 0 , delivered 1 , delivered 2 , delivered 3 , delivered 4
 
-figuresHi≡ : figuresHi ≡ ((682 , 41943040) , (2730 , 83886080) , (10922 , 167772160) , (43690 , 335544320))
-figuresHi≡ = refl
+hi : ℕ × ℕ × ℕ × ℕ
+hi = delivered 5 , delivered 6 , delivered 7 , delivered 8
 
--- THE RATES, WHICH ARE THE FINDING.  The delivered depth is `4d + 2`
--- per value and the grant exactly doubles, so the margin loses a
--- factor of two per value: four hundred thousand times over at zero
--- values, seven thousand at eight.  Nothing here is upward-closed --
--- a row fails as soon as the head start the step function's own
--- written size buys is spent.
-key : ℕ × ℕ × ℕ
-key = closSizeᵉ (slotClos slots) (prog 0)
-    , closSizeᵉ (slotClos slots) (prog 4)
-    , closSizeᵉ (slotClos slots) (prog 8)
+delivered≡ : lo ≡ (0 , 2 , 10 , 42 , 170)
+delivered≡ = refl
 
-key≡ : key ≡ (19 , 23 , 27)
-key≡ = refl
+deliveredHi≡ : hi ≡ (682 , 2730 , 10922 , 43690)
+deliveredHi≡ = refl
+
+-- AND THE KEY, WHICH IS THE FINDING.  Reading the grant over the
+-- width makes the exponent the PRODUCT of the width and the arrival's
+-- closure size, so it grows quadratically in the value count where
+-- the demand grows by a fixed two bits each -- 19, 115, 243 against
+-- demands of 0, 8 and 16 bits.  The margin's derivative has the sign
+-- the statement needs, which is what the unscaled key did not.
+keys : ℕ × ℕ × ℕ
+keys = keyW 0 , keyW 4 , keyW 8
+
+keys≡ : keys ≡ (19 , 115 , 243)
+keys≡ = refl
+
+widths : ℕ × ℕ × ℕ
+widths = wid 0 , wid 4 , wid 8
+
+widths≡ : widths ≡ (0 , 4 , 8)
+widths≡ = refl
+
+-- the unscaled sizes the product is built from, so the two factors
+-- are separable in the reading above
+sizes : ℕ × ℕ × ℕ
+sizes = closSizeᵉ (slotClos slots) (prog 0)
+      , closSizeᵉ (slotClos slots) (prog 4)
+      , closSizeᵉ (slotClos slots) (prog 8)
+
+sizes≡ : sizes ≡ (19 , 23 , 27)
+sizes≡ = refl
 
 -- THE PREMISES, PINNED RATHER THAN ASSUMED, at the widest row.  The
 -- size cap is the arrival's own closure size, the smallest the
@@ -138,18 +173,11 @@ premises : (nestValOK? cap (obs (obs natᵗ)) (prog 8) ≡ true)
          × (nestCapsOK? cap (sched-init (prog 8) slots) (st-init (prog 8)) ≡ true)
 premises = refl , refl , refl
 
--- and the burst really is eight values wide, in ONE subscribe frame,
--- so the fold count is the axis these rows move
-burst≡8 : length (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)}
-            (proj₁ (subscribeE gas (prog 8) root 0 0
-                      (sched-init (prog 8) slots) (st-init (prog 8)))))) ≡ 8
-burst≡8 = refl
-
-fit0 : (proj₁ (row 0) ≤ᵇ proj₂ (row 0)) ≡ true
+fit0 : (delivered 0 ≤ᵇ grant 0) ≡ true
 fit0 = refl
 
-fit4 : (proj₁ (row 4) ≤ᵇ proj₂ (row 4)) ≡ true
+fit4 : (delivered 4 ≤ᵇ grant 4) ≡ true
 fit4 = refl
 
-fit8 : (proj₁ (row 8) ≤ᵇ proj₂ (row 8)) ≡ true
+fit8 : (delivered 8 ≤ᵇ grant 8) ≡ true
 fit8 = refl

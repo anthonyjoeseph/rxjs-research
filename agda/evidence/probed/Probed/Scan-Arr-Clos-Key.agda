@@ -16,6 +16,12 @@
 -- row fails exactly when the key fails to keep up, and nothing here is
 -- upward-closed.
 --
+-- AND THE GRANT IS READ OVER THE WIDTH, which is what the statement
+-- now does: the key is `suc W` copies of the arrival's closure size,
+-- with `W` pinned as the burst's own length.  That is a LOWER bound on
+-- the sealed measure the premise names, and the grant is monotone in
+-- it, so a fit here is a fit at the real one.
+--
 -- WHAT IS NOT COVERED.  One scripted slot, and a script of literal
 -- naturals — a script of OBSERVABLE values would charge more on the key
 -- side and deliver more on the left, and which side wins there is not
@@ -23,14 +29,14 @@
 -- telescope below is scripted throughout, so the staged environment is
 -- constant and does no work in these rows.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: subscribeE-nest-arr-scan @b3dbe3
+-- TARGET: subscribeE-nest-arr-scan @10d2d8
 module Probed.Scan-Arr-Clos-Key where
 
 open import Data.Bool using (true)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _*_; _≤ᵇ_)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -75,12 +81,23 @@ gas = gasPad 400 g0
 cap : Caps
 cap = caps (syncSizeᵉ prog) 4000 4000
 
+-- the width the grant is read at, and it is a LOWER bound rather than
+-- the measure itself: `descW` is sealed and cannot be evaluated here,
+-- while the burst it joins over is exactly this length, so a fit at
+-- this width is a fit at the real one.
+wid : ℕ → ℕ
+wid k =
+  let sl = slots k
+      r  = subscribeE gas prog root 0 0 (sched-init prog sl) (st-init prog)
+  in length (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ r)))
+
 row : ℕ → ℕ × ℕ
 row k =
   let sl = slots k
       r  = subscribeE gas prog root 0 0 (sched-init prog sl) (st-init prog)
   in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ r)))
-   , arrD (nestUnit prog sl) (nestDᵉ prog) (closSizeᵉ (slotClos sl) prog)
+   , arrD (nestUnit prog sl) (nestDᵉ prog)
+       (suc (wid k) * closSizeᵉ (slotClos sl) prog)
 
 -- THE HEAD'S OWN PREMISES, pinned rather than assumed, so the rows are
 -- not evidence about a region the statement grants nothing at.  `B` is
@@ -100,6 +117,14 @@ keys = closSizeᵉ (slotClos (slots 0)) prog
 
 keys≡ : keys ≡ (12 , 26 , 38 , 40)
 keys≡ = refl
+
+-- and the widths the key is now multiplied by, which is what makes
+-- the grant's exponent a product rather than a sum
+widths : ℕ × ℕ × ℕ × ℕ
+widths = wid 0 , wid 7 , wid 13 , wid 14
+
+widths≡ : widths ≡ (0 , 7 , 13 , 14)
+widths≡ = refl
 
 fit0 : (proj₁ (row 0) ≤ᵇ proj₂ (row 0)) ≡ true
 fit0 = refl

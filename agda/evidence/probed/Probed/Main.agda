@@ -67,7 +67,8 @@ open import Probed.Thru-Step-Indexed
          residueFigures≡; resN1; resN2; resN3)
 
 open import Probed.Scan-Arr-Clos-Key
-  using (premises; keys≡; fit0; fit7; fit13; fit14)
+  using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14)
 
 open import Probed.Scan-Arr-Margin
-  using (figures≡; figuresHi≡; key≡; premises; burst≡8; fit0; fit4; fit8)
+  using (delivered≡; deliveredHi≡; keys≡; widths≡; sizes≡; premises;
+         fit0; fit4; fit8)

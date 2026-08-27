@@ -26,9 +26,9 @@
 -- once per level against a `syncSizeᵛ` that grows by a constant per
 -- level.  The rows below do not reach it.
 --
--- TARGET: subscribeE-nest-arr-merge @ea9c61
--- TARGET: subscribeE-nest-arr-switch @52c64b
--- TARGET: subscribeE-nest-arr-exhaust @185435
+-- TARGET: subscribeE-nest-arr-merge @00c3bf
+-- TARGET: subscribeE-nest-arr-switch @21d56b
+-- TARGET: subscribeE-nest-arr-exhaust @8383f1
 -- TARGET: thruStep-merge-inner-caps @cafb22
 -- TARGET: thruStep-switch-inner-caps @3402c0
 -- TARGET: thruStep-exhaust-inner-caps @d49656
@@ -103,7 +103,9 @@ cap = caps (syncSizeᵛ (obs (obs natᵗ)) (arr 6))
            (pWᵛ 2 slots (obs (obs natᵗ)) (arr 6)) 0
 
 -- the grant, written out because `nestB` is sealed, at `W = 0` -- the
--- smallest the statement can be read at
+-- smallest the statement can be read at, and below the arr-keyed
+-- grant these rows also bear on, whose key the width premise
+-- multiplies by `suc W`
 G : ℕ → ℕ → ℕ
 G B m = (2 ^ Caps.cSize cap) ^ m * (B + suc m * nestUnit prog slots)
 

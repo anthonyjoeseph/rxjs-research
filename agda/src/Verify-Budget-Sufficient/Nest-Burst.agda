@@ -40,20 +40,24 @@ module Verify-Budget-Sufficient.Nest-Burst where
 
 open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; nothing)
-open import Data.Bool using (false)
+open import Data.Bool using (false; T)
 open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
-open import Data.Nat.Properties using (≤-refl; m≤m⊔n; m≤n⊔m)
+open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; m≤m⊔n; m≤n⊔m)
+open import Data.Fin using (Fin; toℕ)
+open import Data.Vec using (lookup)
 open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
   (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ)
+  exhaustAllᵉ; μᵉ; input; inputsBelowᵉ)
+open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
    AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
-   mintNode; installNode; subscribeE; subscribeInner; splitBurst)
+   mintNode; installNode; subscribeE; subscribeInner; splitBurst;
+   share-sink; register)
 
 abstract
   -- THE BURST ONE SUBSCRIBE HANDS BACK, named so the recursion below
@@ -64,8 +68,34 @@ abstract
     length (proj₁ (splitBurst {A = Val Γ t}
               (proj₁ (subscribeE g o κ id now sched st))))
 
+  connW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    → Gas → (i : Fin n) → Closed Γ (lookup Γ i) → Path Γ (lookup Γ i) t
+    → Id → Tick → Sched Γ → EvalSt e → ℕ
+
+  -- THE SPLIT IS A NAMED FUNCTION OF THE SLOT, not a `with` and not a
+  -- where-helper, because the projection below is a `cong` OVER IT: a
+  -- consumer holds the slots equation and needs the two readings to be
+  -- the same term applied to the two sides of it.
+  slotW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    → Gas → (i : Fin n) → Path Γ (lookup Γ i) t
+    → Id → Tick → Sched Γ → EvalSt e → Slot Γ (toℕ i) (lookup Γ i) → ℕ
+
   descW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     → Gas → Closed Γ u → Path Γ u t → Id → Tick → Sched Γ → EvalSt e → ℕ
+  -- THE SLOT HEAD, WHICH USED TO BE A LEAF AND STOPPED BEING ONE WHEN
+  -- ITS STATEMENT DID.  A shared slot's connect re-enters the walk on
+  -- the DEFINITION, so the widest burst under this subscribe is not
+  -- the one the slot hands back; a statement about the slot that calls
+  -- an inductive hypothesis needs its child's width, and there is no
+  -- projection to give it while this clause reads a leaf.  The split
+  -- is by helper rather than by `with` for the reason the count is,
+  -- one clause down.  It OVER-APPROXIMATES the two early exits of the
+  -- join -- a spent share and a live one descend nowhere -- which is
+  -- sound in a premise's direction and is why the helper does not
+  -- read the state those exits branch on.
+  descW g (input i) κ id now sched st =
+    burstW g (input i) κ id now sched st
+      ⊔ slotW g i κ id now sched st (Sched.slots sched i)
   descW g (mapᵉ f b) κ id now sched st =
     burstW g (mapᵉ f b) κ id now sched st
       ⊔ descW g b (map-f f ↠ κ) id now sched st
@@ -110,6 +140,21 @@ abstract
       ⊔ descW fuel (unfoldμ body) κ id now sched st
   descW g o κ id now sched st = burstW g o κ id now sched st
 
+  slotW g i κ id now sched st (scripted _) = 0
+  slotW g i κ id now sched st (shared d)   = connW g i d κ id now sched st
+
+  connW g0 i d κ id now sched st = 0
+  connW (gs fuel) i d κ id now sched st =
+    descW fuel d (share-sink i) id now sched
+      (register (toℕ i) κ
+        (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+
+  -- THE CONNECT'S OWN DESCENT, named for the reason `innerW` is: the
+  -- fuel the definition is walked at is the PEELED one, so an inlined
+  -- term would name a subscribe the out-of-gas arm never makes.  The
+  -- state it descends from is the one the connect registers into,
+  -- because a measure that read the caller's state would be about a
+  -- different run.
   -- AND THE SAME QUESTION ONE LEVEL UP, at the inner subscription a
   -- drain performs.  It is a definition rather than the descent term
   -- written out because the fuel the descent runs at is the PEELED one,
@@ -202,6 +247,36 @@ abstract
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
       ≤ descW g (exhaustAllᵉ b) κ id now sched st
   descW-exhaust g b κ id now sched st = m≤n⊔m _ _
+
+  -- AND THE CONNECT'S HALF AT THE SLOT HEAD, which is the projection the
+  -- slot clause was split for.  A consumer holds the slots equation and
+  -- needs the two readings of the join's right side to be the same term
+  -- applied to the two sides of it -- which is available exactly because
+  -- the split is a named function of the slot rather than a `with`.
+  -- AND THE PEELED FUEL'S HALF UNDER THE CONNECT, which is the same
+  -- shape `innerW-gs` has and is exported for the same reason: the
+  -- family is sealed, so a consumer cannot see that the recursive call
+  -- it needs a width for is the one this measure already names.
+  connW-gs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    descW fuel d (share-sink i) id now sched
+      (register (toℕ i) κ
+        (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+      ≤ connW (gs fuel) i d κ id now sched st
+  connW-gs fuel i d κ id now sched st = ≤-refl
+
+  descW-conn : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    {ok : T (inputsBelowᵉ (toℕ i) d)}
+    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched i ≡ shared d {ok = ok} →
+    connW g i d κ id now sched st ≤ descW g (input i) κ id now sched st
+  descW-conn g i d κ id now sched st eqs =
+    ≤-trans (≤-reflexive (sym (cong (slotW g i κ id now sched st) eqs)))
+            (m≤n⊔m _ _)
 
   -- AND THE WHOLE DRAIN'S WORTH, one `⊔` per queued inner at the state
   -- that inner is actually subscribed at.  It is a SEPARATE measure

@@ -25,7 +25,8 @@ open import Data.Nat using (ℕ; suc; pred; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
    +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
-   +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤)
+   +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤;
+   *-suc; *-comm; ^-*-assoc)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
@@ -228,3 +229,86 @@ abstract
                (sym (trans (*-assoc 2 (2 ^ k) (U + B))
                            (cong (λ z → 2 ^ k * (U + B) + z)
                                  (+-identityʳ (2 ^ k * (U + B))))))
+
+  -- AND THE SAME FOUR AT A KEY READ OVER THE BURST'S WIDTH, which is
+  -- the shape the arr-keyed walk takes once its statement reads the
+  -- width at all.  A fold multiplies the delivered depth once per
+  -- value while the key gains only what the value costs to write, so
+  -- a grant read at the arrival alone loses a factor per value; read
+  -- at `suc W` copies of the key it does not, because the key already
+  -- contains the step's own duplication count and a doubling per copy
+  -- outruns a duplication per value.
+  --
+  -- THEY ARE WRAPPERS AND NOT A SECOND FAMILY: each is its unscaled
+  -- sibling followed by one `arrD-mono`, and the scaling factor is
+  -- what pays for that step.  Keeping them here rather than at the
+  -- call sites is what leaves the walk's clauses reading as they did.
+  arrDW-mono : ∀ (U B W m m′ : ℕ) → m ≤ m′ →
+    arrD U B (suc W * m) ≤ arrD U B (suc W * m′)
+  arrDW-mono U B W m m′ hm =
+    arrD-mono U B (suc W * m) (suc W * m′) (*-monoʳ-≤ (suc W) hm)
+
+  1≤suc : ∀ (W : ℕ) → 1 ≤ suc W
+  1≤suc W = s≤s z≤n
+
+  arrDW-pos : ∀ (W m : ℕ) → 1 ≤ m → 1 ≤ suc W * m
+  arrDW-pos W m hm = *-mono-≤ {1} {suc W} {1} {m} (1≤suc W) hm
+
+  arrDW-key : ∀ (W m : ℕ) → m ≤ suc W * m
+  arrDW-key W m = m≤m+n m (W * m)
+
+  arrDW-bump : ∀ (W m : ℕ) → suc (suc W * m) ≤ suc W * suc m
+  arrDW-bump W m =
+    ≤-trans (+-monoˡ-≤ (suc W * m) (1≤suc W))
+            (≤-reflexive (sym (*-suc (suc W) m)))
+
+  arrDW-flat : ∀ (U B W k j : ℕ) → k ≤ suc W * j →
+    2 ^ k * B ≤ arrD U B (suc W * suc j)
+  arrDW-flat U B W k j hk =
+    ≤-trans (arrD-flat U B k)
+            (arrD-mono U B (suc k) (suc W * suc j)
+              (≤-trans (s≤s hk) (arrDW-bump W j)))
+
+  arrDW-slot : ∀ (U B W m : ℕ) → 1 ≤ m →
+    arrD U U (suc W * m) ≤ arrD U B (suc W * suc m)
+  arrDW-slot U B W m hm =
+    ≤-trans (arrD-slot U B (suc W * m) (arrDW-pos W m hm))
+            (arrD-mono U B (suc (suc W * m)) (suc W * suc m) (arrDW-bump W m))
+
+  arrDW-frame : ∀ (U B W m k j : ℕ) → 1 ≤ m → B ≤ U + B → k ≤ suc W * j →
+    2 ^ k * (B + arrD U B (suc W * m)) ≤ arrD U B (suc W * suc (j + m))
+  arrDW-frame U B W m k j hm hB hk =
+    ≤-trans (arrD-frame U B (suc W * m) k (arrDW-pos W m hm) hB)
+            (arrD-mono U B (suc (k + suc W * m)) (suc W * suc (j + m)) step)
+    where
+    dist : suc W * suc (j + m) ≡ suc W + (suc W * j + suc W * m)
+    dist = trans (*-suc (suc W) (j + m))
+                 (cong (suc W +_) (*-distribˡ-+ (suc W) j m))
+    step : suc (k + suc W * m) ≤ suc W * suc (j + m)
+    step = ≤-trans (s≤s (+-monoˡ-≤ (suc W * m) hk))
+                   (≤-trans (+-monoˡ-≤ (suc W * j + suc W * m) (1≤suc W))
+                            (≤-reflexive (sym dist)))
+
+  -- THE PER-LEVEL FACTOR IS ALREADY A WIDTH'S WORTH, which is what
+  -- lets a frame charge read against a WIDENED key still fit.  The
+  -- cap-keyed grant iterates `2 ^ S` once per unit of width before it
+  -- iterates it once per level, so the two exponents commute and a
+  -- grant at cap `S` and width `W` IS a grant at cap `suc W * S` and
+  -- width zero.  Everything below is that observation spent.
+  nestB-swap : ∀ (S W U B m : ℕ) → nestB S W U B m ≡ nestB (suc W * S) 0 U B m
+  nestB-swap S W U B m = cong (λ z → z ^ m * (B + suc m * U)) eq
+    where
+    eq : (2 ^ S) ^ suc W ≡ (2 ^ (suc W * S)) ^ suc 0
+    eq = trans (^-*-assoc 2 S (suc W))
+               (trans (cong (2 ^_) (*-comm S (suc W)))
+                      (sym (*-identityʳ (2 ^ (suc W * S)))))
+
+  -- AND THE FRAME LAW AT THAT WIDER LEDGER.  A descent whose key is
+  -- read over the burst's width spends an exponent up to `suc W * S`
+  -- rather than `S`, and the sibling below is the same statement with
+  -- the width folded into the cap.
+  nestB-frame-dblW : ∀ (S W U B m k m′ : ℕ) → suc k ≤ suc W * S → suc m ≤ m′ →
+    2 ^ k * (nestB S W U B m + nestB S W U B m) ≤ nestB S W U B m′
+  nestB-frame-dblW S W U B m k m′ hk hm
+    rewrite nestB-swap S W U B m | nestB-swap S W U B m′ =
+    nestB-frame-dbl (suc W * S) 0 U B m k m′ hk hm

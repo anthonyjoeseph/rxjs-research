@@ -6,13 +6,19 @@
 -- claim, and the two were being read as one because they were conjuncts
 -- of a single predicate.
 --
+-- WHAT IS NOT COVERED, and it is a gap rather than a boundary: the
+-- WIDTH conjunct the bundle now also carries -- a bound on the measure
+-- under each arrival's own subscribe.  These rows read the caps side
+-- only, and the measure is sealed, so instantiating it would need a
+-- lower bound of the kind the arr-keyed scan probes pin.
+--
 -- EVIDENCE, not a claim: `src` cannot import this file (the library
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-merge-caps @695f6a
--- TARGET: pushVals-switch-caps @351898
--- TARGET: pushVals-exhaust-caps @bcd844
+-- TARGET: pushVals-merge-caps @7dd49b
+-- TARGET: pushVals-switch-caps @7c5e90
+-- TARGET: pushVals-exhaust-caps @937aa4
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
@@ -27,7 +33,7 @@ open import Data.Nat.Properties using (_≤?_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary.Decidable using (True; toWitness)
 
-open import Rx.Prim using (Gas; g0; gs)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; nat̂; strmᵗ; deferᵉ;
   syncSizeᵛ; mapᵉ; input; Fn; varᵗ)
@@ -35,10 +41,12 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (subscribeE; root; sched-init; st-init; mintNode; installNode; thru-outer; _↠_; mergeAllᵒ;
-  switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream)
+  switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
+  AllOp; NodeId; Path)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK)
+open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -106,40 +114,55 @@ burstLens≡ = refl
 
 -- THE CONCLUSION, at the state the descent LEAVES, which is what
 -- distinguishes these rows from every earlier probe of this family.
-capsM : (lim k : ℕ) → Set
-capsM lim k =
-  pushValsCapsOK (tight {obs (obs natᵗ)} (rM lim k)) slots gasBig mergeAllᵒ
+capsM : (lim k W : ℕ) → Set
+capsM lim k W =
+  pushValsCapsOK (tight {obs (obs natᵗ)} (rM lim k)) slots W gasBig mergeAllᵒ
     (proj₁ (mintNode (sched-init (rM lim k) slots))) root 0 0
     (proj₁ (resM lim k)) (proj₁ (proj₂ (resM lim k))) (proj₂ (proj₂ (resM lim k)))
 
 le : ∀ {x y} → True (x ≤? y) → x ≤ y
 le = toWitness
 
-capsM-1 : capsM 1 1
-capsM-1 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od refl → le tt }) , (le tt , λ { lim act q od refl → le tt }) , tt)
+-- THE WIDTH HALF, TAKEN AS A HYPOTHESIS AND NOT AS A ROW.  The measure
+-- is sealed, so no numeral discharges it and no `refl` reaches it; what
+-- these rows read is the CAPS half, which computes.  Stating the width
+-- half as one universally quantified premise is what keeps the row
+-- honest about that: it says the caps conjuncts hold at these programs
+-- GIVEN the widths, and it claims nothing about the widths themselves.
+Widths : ℕ → Set
+Widths W = ∀ {s t} {e : Closed Γ₂ t} (fuel : Gas) (op : AllOp) (nid : NodeId)
+             (κ : Path Γ₂ s t) (id : Id) (now : Tick) (o : Closed Γ₂ s)
+             (sched : Sched Γ₂) (st : EvalSt e) →
+             innerW fuel op nid κ id now o sched st ≤ W
+
+capsM-1 : ∀ {W} → Widths W → capsM 1 1 W
+capsM-1 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , tt
 
-capsS : (k : ℕ) → Set
-capsS k =
-  pushValsCapsOK (tight {obs (obs natᵗ)} (qS k)) slots gasBig switchᵒ
+capsS : (k W : ℕ) → Set
+capsS k W =
+  pushValsCapsOK (tight {obs (obs natᵗ)} (qS k)) slots W gasBig switchᵒ
     (proj₁ (mintNode (sched-init (qS k) slots))) root 0 0
     (proj₁ (resS k)) (proj₁ (proj₂ (resS k))) (proj₂ (proj₂ (resS k)))
 
-capsS-1 : capsS 1
-capsS-1 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
+capsS-1 : ∀ {W} → Widths W → capsS 1 W
+capsS-1 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
         , tt
 
-capsX : (k : ℕ) → Set
-capsX k =
-  pushValsCapsOK (tight {obs (obs natᵗ)} (qX k)) slots gasBig exhaustᵒ
+capsX : (k W : ℕ) → Set
+capsX k W =
+  pushValsCapsOK (tight {obs (obs natᵗ)} (qX k)) slots W gasBig exhaustᵒ
     (proj₁ (mintNode (sched-init (qX k) slots))) root 0 0
     (proj₁ (resX k)) (proj₁ (proj₂ (resX k))) (proj₂ (proj₂ (resX k)))
 
-capsX-1 : capsX 1
-capsX-1 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
+capsX-1 : ∀ {W} → Widths W → capsX 1 W
+capsX-1 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , tt
 
 -- THE HEAD'S OWN PREMISES, pinned rather than assumed, so the rows
@@ -174,24 +197,28 @@ headsClos≡ = refl
 
 -- and a second nesting level, and a limit the arrivals do not fit
 -- under, since the queue-room conjunct is the one a limit moves
-capsM-2 : capsM 1 2
-capsM-2 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od refl → le tt }) , (le tt , λ { lim act q od refl → le tt }) , tt)
+capsM-2 : ∀ {W} → Widths W → capsM 1 2 W
+capsM-2 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , tt
 
-capsM-0 : capsM 0 1
-capsM-0 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od refl → le tt }) , (le tt , λ { lim act q od refl → le tt }) , tt)
+capsM-0 : ∀ {W} → Widths W → capsM 0 1 W
+capsM-0 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , tt
 
-capsS-2 : capsS 2
-capsS-2 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
+capsS-2 : ∀ {W} → Widths W → capsS 2 W
+capsS-2 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
         , tt
 
-capsX-2 : capsX 2
-capsX-2 = refl , refl , refl , refl
-        , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
+capsX-2 : ∀ {W} → Widths W → capsX 2 W
+capsX-2 hw = refl , refl , refl , refl
+        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , tt
 
 -- WHICH CONJUNCTS COULD HAVE FAILED, and the answer is not all of

@@ -2,9 +2,9 @@
 -- ONE SUBSCRIPTION'S STORE HALVES, WHICH ARE THE REGION THE DOUBLING
 -- PROBE LEFT OPEN AND SAID SO.
 --
--- TARGET: subscribeE-nest-arr-merge @ea9c61
--- TARGET: subscribeE-nest-arr-switch @52c64b
--- TARGET: subscribeE-nest-arr-exhaust @185435
+-- TARGET: subscribeE-nest-arr-merge @00c3bf
+-- TARGET: subscribeE-nest-arr-switch @21d56b
+-- TARGET: subscribeE-nest-arr-exhaust @8383f1
 --
 -- WHY THIS AXIS.  The bound this statement carries is read on three
 -- things: the values the subscription hands back, the whole node
@@ -103,7 +103,11 @@ r o = subscribeInner gasBig mergeAllᵒ 7 κF 0 0 o (sched-init prog slots) st�
 stOf : Closed Γ₂ natᵗ → EvalSt prog
 stOf o = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (r o)))))
 
--- the bound, with `B` at the arrival's own depth exactly
+-- the bound, with `B` at the arrival's own depth exactly.  It is read
+-- STRICTLY BELOW the statement's grant twice over -- at the written
+-- size rather than the closure size, and at one copy of the key rather
+-- than the `suc W` copies the width premise buys -- so a row that fits
+-- here fits the grant the head is actually given.
 D : Closed Γ₂ natᵗ → ℕ
 D o = 2 ^ pred (syncSizeᵉ o) * (nestUnit prog slots + nestDᵉ o)
 
