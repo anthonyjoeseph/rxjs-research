@@ -70,3 +70,6 @@ open import Probed.Thru-Step-Indexed
 
 open import Probed.Scan-Arr-Clos-Key
   using (premises; keys≡; fit0; fit7; fit13; fit14)
+
+open import Probed.Shared-Slot-Telescope
+  using (keysLow≡; keysUp≡; fit00; fit20; fit02; fit22)

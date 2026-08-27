@@ -18,8 +18,9 @@
 -- COVERED, LOAD-BEARING: the value conjunct of the arm at the
 -- substituting family, layers zero to three, and at the CONTAINED
 -- family over the same layers.  NOT covered: the two store conjuncts,
--- which this shape leaves at `0 ≤ _`, and any slot whose definition
--- itself references a lower slot -- the telescope here has one entry.
+-- which this shape leaves at `0 ≤ _`.  The telescope here has ONE
+-- entry, so the staged environment is never consulted; the two-slot
+-- reading is `Probed.Shared-Slot-Telescope`.
 -- ══════════════════════════════════════════════════════════════════
 -- TARGET: subscribeSharedSlot-nest-arr @891d01
 module Probed.Shared-Slot-Clos-Key where

@@ -1487,10 +1487,16 @@ postulate
   --   restatement was chosen for -- and every layer of both families
   --   fits, the contained one included.  Covered LOAD-BEARING: the
   --   value conjunct over those layers.  NOT covered: the two store
-  --   conjuncts, which this shape leaves at `0 ≤ _`, and a slot whose
-  --   definition references a LOWER slot, the telescope there having
-  --   one entry -- which is the one place the staged environment does
-  --   any work, so it is the gap worth naming.
+  --   conjuncts, which this shape leaves at `0 ≤ _`.
+  -- PROBED: `Probed.Shared-Slot-Telescope` takes the region that one
+  --   left open -- a telescope of TWO, the upper definition naming the
+  --   lower, which is the only place the staged environment does any
+  --   work.  The key SEES THROUGH the reference and charges a lower
+  --   layer exactly what it charges an upper one, fifteen units per
+  --   doubling on both axes, and the fit holds at every corner of the
+  --   two-by-two.  Not covered: a telescope of three, and a lower slot
+  --   that is SCRIPTED, where the key reads a script rather than a
+  --   definition.
   subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
     (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
