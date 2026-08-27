@@ -14,22 +14,6 @@
 -- pinning exactly once, because it is the finding: the axis the
 -- one-index form died on cannot reach the indexed one at all.
 --
--- WHAT CAN FAIL is everything else, and one of them did.  The STORE
--- halves are taken at the arm that PARKS -- a merge whose limit is
--- already spent writes the arrival into its own queue, which is the one
--- place a step's store reading is the arrival's depth rather than the
--- table's, and the node goes from three to six against an incoming
--- three.  The two conjuncts that are not inequalities at all are taken
--- there too: the caps invariant the next step runs under and the slots
--- equation the walk re-enters at.
---
--- AND THE CAPS ONE HAD TO BE PAID FOR, which is why the field here is
--- two and not the arrival's own one: the node conjunct COUNTS the queue
--- as well as measuring it, so the parking arm overflows a field the
--- arrival fits in exactly.  Two is the smallest field the statement's
--- room premise admits at this node, so the rows are not bought by
--- widening.
---
 -- AND THE VALUE CONJUNCT IS NOT REACHABLE BY THIS AXIS AT ALL, which
 -- the tight rows at the bottom pin as arithmetic rather than as a
 -- failed attempt: the cap bounds the arrival and the key's factor is
@@ -42,7 +26,6 @@
 -- once per level against a `syncSizeᵛ` that grows by a constant per
 -- level.  The rows below do not reach it.
 --
--- TARGET: thruStep-merge-park
 -- TARGET: thruStep-merge-inner
 -- TARGET: thruStep-switch-inner
 -- TARGET: thruStep-exhaust-inner
@@ -52,11 +35,10 @@ module Probed.Thru-Step-Indexed where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Bool using (Bool; true; false)
-open import Data.Bool.ListAction using (all)
 open import Data.List using ([]; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (nothing; just)
-open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤ᵇ_; _^_; _*_; _+_)
+open import Data.Maybe using (nothing)
+open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _^_; _*_; _+_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -74,7 +56,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; nestCapsOK?; nodesMax; nodeNestAt; nestStB?; nodeWidᴺ?)
+  using (nestDᵛˢ; nestCapsOK?; nodesMax; nodeNestAt)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -223,60 +205,6 @@ storeM = nodesMax (proj₂ (proj₂ (proj₂ rM)))
 storeM≡ : storeM ≡ 0
 storeM≡ = refl
 
--- ── the store halves, at the arm that PARKS ──────────────────────
-
--- a merge whose limit is already spent takes the arm that writes the
--- arrival into the node's own queue -- the one place a step's store
--- reading is the arrival's depth rather than the table's, and the only
--- arm where the conjunct is not `0 ≤ _` at these programs
-stFull : EvalSt prog
-stFull = installNode 7 (mergeAll-st {t = obs natᵗ} (just 1) 1 (arr 3 ∷ []) false)
-                    (st-init prog)
-
--- the width field is TWO here, not the arrival's own one: the node
--- conjunct counts the queue as well as measuring it, and at a field of
--- one the parking arm overflows -- which is `Refuted.Thru-Step-Caps`
--- and is why the statement carries a room premise.  Two is the
--- smallest field the premise admits at this node, so nothing is given
--- away by widening it
-capF : Caps
-capF = caps (syncSizeᵛ (obs (obs natᵗ)) (arr 6)) 2 0
-
-premF : (nestValOK? capF (obs (obs natᵗ)) (arr 6) ≡ true)
-      × (nestCapsOK? capF sched₀ stFull ≡ true)
-premF = refl , refl
-
-rF : _
-rF = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr 6) sched₀ stFull
-
-armed : ℕ
-armed = nodeNestAt 7 stFull
-
-storeF : ℕ
-storeF = armed
-       + 100 * nodeNestAt 7 (proj₂ (proj₂ (proj₂ rF)))
-       + 10000 * nodesMax (proj₂ (proj₂ (proj₂ rF)))
-
-storeF≡ : storeF ≡ 60603
-storeF≡ = refl
-
--- the conjuncts themselves at that arm, where what the node ends up
--- holding is the arrival and the grant is what has to cover it
-fitsF : ((nodeNestAt 7 (proj₂ (proj₂ (proj₂ rF))) ≤ᵇ armed ⊔ G Bmin 1) ≡ true)
-      × ((nodesMax (proj₂ (proj₂ (proj₂ rF))) ≤ᵇ nodesMax stFull ⊔ G Bmin 1) ≡ true)
-      × (nestCapsOK? capF (proj₁ (proj₂ (proj₂ rF))) (proj₂ (proj₂ (proj₂ rF))) ≡ true)
-fitsF = refl , refl , refl
-
--- both halves of the node conjunct, at the arm that writes the queue
-parts : Bool × Bool
-parts =
-  nestStB? (Caps.cSize capF) (proj₁ (proj₂ (proj₂ rF))) (proj₂ (proj₂ (proj₂ rF)))
-  , all (λ kv → nodeWidᴺ? (Caps.cWid capF) (Sched.slots (proj₁ (proj₂ (proj₂ rF)))) (proj₂ kv))
-        (EvalSt.nodes (proj₂ (proj₂ (proj₂ rF))))
-
-parts≡ : parts ≡ (true , true)
-parts≡ = refl
-
 -- ── the value conjunct where the two sides are COMPARABLE ─────────
 
 -- the rows above are degenerate for a reason that is about the CAP and
@@ -327,10 +255,9 @@ valTight = refl
 -- than the measure side by construction.
 --
 -- WHERE THE RISK ACTUALLY LIVES is a step whose delivery is NOT linear
--- in its arrival -- the merge DRAIN, which hands over a queue parked by
--- earlier arrivals and so is bounded by the node's width rather than by
--- the value in hand.  That is the region an instantiation would have to
--- reach, and these rows do not reach it.
+-- in its arrival, and the rows below reach that: nesting the
+-- duplicating step compounds the delivery per level while the arrival
+-- grows by one.
 
 -- ── THE NESTED DUPLICATOR, which is the axis the receipt names ────
 

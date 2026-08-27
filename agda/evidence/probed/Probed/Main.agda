@@ -63,5 +63,5 @@ open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed
   using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡; prems≡;
-         capsAfter≡; storeM≡; premF; storeF≡; parts≡; fitsF;
+         capsAfter≡; storeM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3)

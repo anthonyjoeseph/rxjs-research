@@ -7,7 +7,7 @@ open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
 open import Rx.Frame-Width using (pWᵉ)
-open import Data.List.Properties using (++-identityʳ)
+open import Data.List.Properties using (++-identityʳ; length-++)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using
@@ -40,8 +40,9 @@ open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?; nestValOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
+open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
-open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; boundedNode; all-impl; ∧-true; syncSize-unfoldμ)
+open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*)
@@ -489,35 +490,27 @@ abstract
             (≤-reflexive (sym (⊔-assoc (nestDᵛ u x) (nestDᵛˢ xs) (nestDᵛˢ ys))))
 
 -- THE CAPS PREMISE THIS FACE CARRIES, AND IT IS DELIBERATELY WEAKER
--- THAN THE CAPS FACE'S.  A scan installs the EVALUATED seed, and
--- `boundedNode` reads a scan node at the stored value's SIZE while the
--- premise available at that head bounds the seed's TERM size.
--- Evaluation grows size, so no head can re-establish `capsOK?` for its
--- child at the cap it was entered at, and stepping the cap the way the
--- caps face does is not available here -- the grant is keyed on
--- `cSize`, so a stepped cap is a larger grant and the parent owes the
--- smaller one.
+-- THAN THE CAPS FACE'S: it bounds the LIVE subscriptions' sizes and
+-- the stored nodes' WIDTHS, and says nothing about a stored node's
+-- SIZE.
 --
--- Exempting the scan node is the repair, and it costs nothing HERE:
--- this face measures DEPTH, and the one place a stored accumulator is
--- read -- the frame-level scan bound -- reads it through
--- `lookupNode-nodes` at its depth, never at its size or its width.
--- What the exemption leaves standing is the flatten queue, which is
--- the conjunct the *All heads actually spend.
+-- Dropping the store's size conjunct is one fact and not two -- no
+-- head of this face can re-establish it, and no head of this face
+-- reads it.  It cannot be re-established because the only premise a
+-- head holds about an arrival bounds the arrival's SYNC size, while
+-- the store predicate reads its TERM size, and evaluation relates the
+-- two in the wrong direction.  It is not read because this face
+-- measures DEPTH: the one place a stored value is consulted -- the
+-- frame-level scan bound -- goes through `lookupNode-nodes` at its
+-- depth, and what the *All heads actually spend is the flatten
+-- queue's WIDTH.
 --
 -- Weakening a HYPOTHESIS strengthens every statement it appears in, so
 -- the boundary runs one way only: a caller holding the caps face's own
 -- predicate hands it in through `capsOK?⇒nest`, and nothing converts
 -- back.
--- REFUTED: `Refuted.Scan-Seed-Caps` is the crossing, at the smallest
---   cap the head's premise admits.
-nodeSzᴺ? : ∀ {n} {Γ : Ctx n} → ℕ → NodeState Γ → Bool
-nodeSzᴺ? B (scan-st _)                = true
-nodeSzᴺ? B (take-st _)                = true
-nodeSzᴺ? B (mergeAll-st lim act q od) = boundedNode B (mergeAll-st lim act q od)
-nodeSzᴺ? B (switch-st _ _)            = true
-nodeSzᴺ? B (exhaust-st _ _)           = true
-
+-- REFUTED: `Refuted.Scan-Seed-Caps` is the size crossing, at the
+--   smallest cap the storing head's premise admits.
 nodeWidᴺ? : ∀ {n} {Γ : Ctx n} → ℕ → Slots Γ → NodeState Γ → Bool
 nodeWidᴺ? W sl (scan-st _)                = true
 nodeWidᴺ? W sl (take-st _)                = true
@@ -526,9 +519,7 @@ nodeWidᴺ? W sl (switch-st _ _)            = true
 nodeWidᴺ? W sl (exhaust-st _ _)           = true
 
 nestStB? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → Sched Γ → EvalSt e → Bool
-nestStB? B sched st =
-  all (boundedLive B) (Sched.live sched)
-  ∧ all (λ kv → nodeSzᴺ? B (proj₂ kv)) (EvalSt.nodes st)
+nestStB? B sched st = all (boundedLive B) (Sched.live sched)
 
 nestCapsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → Caps → Sched Γ → EvalSt e → Bool
@@ -557,14 +548,6 @@ nestCapsOK?-parts c sched st h with ∧-true _ _ h
 ... | h2 , r3 with ∧-true _ _ r3
 ... | h3 , h4 = h0 , h1 , h2 , h3 , h4
 
-nodeSzᴺ?-weaken : ∀ {n} {Γ : Ctx n} (B : ℕ) (ns : NodeState Γ) →
-  boundedNode B ns ≡ true → nodeSzᴺ? B ns ≡ true
-nodeSzᴺ?-weaken B (scan-st _)          h = refl
-nodeSzᴺ?-weaken B (take-st _)          h = refl
-nodeSzᴺ?-weaken B (mergeAll-st _ _ _ _) h = h
-nodeSzᴺ?-weaken B (switch-st _ _)      h = refl
-nodeSzᴺ?-weaken B (exhaust-st _ _)     h = refl
-
 nodeWidᴺ?-weaken : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) (ns : NodeState Γ) →
   widNode W sl ns ≡ true → nodeWidᴺ? W sl ns ≡ true
 nodeWidᴺ?-weaken W sl (scan-st _)          h = refl
@@ -577,10 +560,7 @@ capsOK?⇒nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true → nestCapsOK? c sched st ≡ true
 capsOK?⇒nest c sched st h =
-    ∧-intro (∧-intro (proj₁ hL)
-                     (all-impl _ _
-                        (λ kv → nodeSzᴺ?-weaken (Caps.cSize c) (proj₂ kv))
-                        (EvalSt.nodes st) (proj₂ hL)))
+    ∧-intro hLive
     (∧-intro h1
     (∧-intro h2
     (∧-intro (all-impl _ _
@@ -592,6 +572,10 @@ capsOK?⇒nest c sched st h =
   P  = capsOK?-parts c sched st h
   h0 = proj₁ P
   hL = ∧-true _ _ h0
+
+  hLive : all (boundedLive (Caps.cSize c)) (Sched.live sched) ≡ true
+  hLive = proj₁ hL
+
   h1 = proj₁ (proj₂ P)
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
@@ -604,16 +588,6 @@ nestCapsOK?-nextNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestCapsOK? c sched st ≡ true →
   nestCapsOK? c (record sched { nextNode = k }) st ≡ true
 nestCapsOK?-nextNode c k sched st h = h
-
-setNode-nodeSzᴺ? : ∀ {n} {Γ : Ctx n} (B : ℕ)
-  (nid : NodeId) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
-  nodeSzᴺ? B ns ≡ true →
-  all (λ kv → nodeSzᴺ? B (proj₂ kv)) nodes ≡ true →
-  all (λ kv → nodeSzᴺ? B (proj₂ kv)) (setNode nid ns nodes) ≡ true
-setNode-nodeSzᴺ? B nid ns []             bn h = ∧-intro bn refl
-setNode-nodeSzᴺ? B nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
-... | true  = ∧-intro bn (∧-trueʳ h)
-... | false = ∧-intro (∧-trueˡ h) (setNode-nodeSzᴺ? B nid ns r bn (∧-trueʳ h))
 
 setNode-nodeWidᴺ? : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ)
   (nid : NodeId) (ns : NodeState Γ) (nodes : List (NodeId × NodeState Γ)) →
@@ -628,14 +602,11 @@ setNode-nodeWidᴺ? W sl nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
 
 nestCapsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
-  nodeSzᴺ? (Caps.cSize c) ns ≡ true →
   nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns ≡ true →
   nestCapsOK? c sched st ≡ true →
   nestCapsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
-nestCapsOK?-setNode c nid ns sched st bn wn inv =
-    ∧-intro (∧-intro (proj₁ hL)
-                     (setNode-nodeSzᴺ? (Caps.cSize c) nid ns (EvalSt.nodes st) bn
-                        (proj₂ hL)))
+nestCapsOK?-setNode c nid ns sched st wn inv =
+    ∧-intro h0
     (∧-intro h1
     (∧-intro h2
     (∧-intro (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
@@ -644,7 +615,6 @@ nestCapsOK?-setNode c nid ns sched st bn wn inv =
   where
   P  = nestCapsOK?-parts c sched st inv
   h0 = proj₁ P
-  hL = ∧-true _ _ h0
   h1 = proj₁ (proj₂ P)
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
@@ -1127,6 +1097,126 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
   where rc = thruConsume fuel op nid κ id now o sched st
 
+-- THE TWO ARMS A MERGE'S STEP HAS, and they are the whole of it: the
+-- limit has room and the arrival is SUBSCRIBED, or it is spent and the
+-- arrival is PARKED.  Every other way into `thruConsume` -- no node at
+-- the id, a node of another shape, a node carrying another element
+-- type -- returns its inputs untouched, so all five conjuncts are the
+-- hypotheses back and the body below discharges them rather than
+-- asserting them.
+--
+-- THE PARK ARM CARRIES THREE, not five: the burst is empty there and
+-- the schedule is the one that came in, so the two conjuncts about
+-- them are `z≤n` and a hypothesis.  Stating a leaf over what it
+-- actually owes is what keeps the fit CHECKED when it lands.
+--
+-- AND THE ROOM PREMISE IS WHY THE QUEUE LENGTH IS IN THE TELESCOPE.
+-- The caller's room record quantifies over the node it finds at the
+-- id, so once the step has matched that node the record is spent and
+-- what is left is the one number it yielded.  Passing the number
+-- rather than the record is not a weakening: it is the same fact with
+-- the match already made, and it is what lets this leaf be stated
+-- without naming `thruConsume` at all.
+-- REFUTED: `Refuted.Thru-Step-Caps` is why that premise is there at
+--   all -- the node conjunct COUNTS the queue as well as measuring it,
+--   so the parking arm overflows a field the arrival fits in exactly.
+thruStep-merge-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (nid : NodeId)
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} lim act q od) →
+  Sched.slots sched ≡ sl →
+  suc m ≤ m′ →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+  suc (length q) ≤ Caps.cWid c →
+  nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+  let st′ = record st
+              { nodes = setNode nid (mergeAll-st {t = u} lim act (q ++ o ∷ []) od)
+                          (EvalSt.nodes st) }
+      G′  = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+  (nodesMax st′ ≤ nodesMax st ⊔ G′)
+  × ((j : NodeId) → nodeNestAt j st′ ≤ nodeNestAt j st ⊔ G′)
+  × (nestCapsOK? c sched st′ ≡ true)
+thruStep-merge-park {n = n} {Γ = Γ} {e = e} {u = u}
+  c sl B W m m′ nid lim act q od o sched st eq hsl hm hc hv hw hq hn =
+  c1 , c2 , nestCapsOK?-setNode c nid ns sched st wn hc
+  where
+  ns₀ = mergeAll-st {t = u} lim act q od
+  ns  = mergeAll-st {t = u} lim act (q ++ o ∷ []) od
+  G′  = nestB (Caps.cSize c) W (nestUnit e sl) B m′
+
+  -- the arrival is inside the grant the STEP promises, which is the
+  -- one the caller reads at `m′`; the queue it joins was inside the
+  -- table's own maximum already
+  oG : nestDᵛ (obs u) o ≤ G′
+  oG = ≤-trans hn (nestB-mono (Caps.cSize c) W (nestUnit e sl) B
+                     (≤-trans (n≤1+n m) hm))
+
+  qapp : nodeNest ns ≤ nodeNest ns₀ ⊔ G′
+  qapp = ≤-trans (nestDᵛˢ-++ q (o ∷ []))
+                 (⊔-mono-≤ ≤-refl (⊔-lub oG z≤n))
+
+  c1 : nodesMax (record st { nodes = setNode nid ns (EvalSt.nodes st) })
+         ≤ nodesMax st ⊔ G′
+  c1 = ≤-trans (setNode-nodes nid ns (EvalSt.nodes st))
+         (⊔-lub (≤-trans qapp
+                   (⊔-mono-≤ (lookupNode-nodes nid ns₀ (EvalSt.nodes st) eq) ≤-refl))
+                (m≤m⊔n _ _))
+
+  atSelf : (j : NodeId) → nid ≡ j →
+    maybe nodeNest 0 (lookupNode j (setNode nid ns (EvalSt.nodes st)))
+      ≤ maybe nodeNest 0 (lookupNode j (EvalSt.nodes st)) ⊔ G′
+  atSelf j refl =
+    ≤-trans (≤-reflexive (cong (maybe nodeNest 0)
+               (lookupNode-setNode nid ns (EvalSt.nodes st))))
+            (≤-trans qapp
+               (⊔-mono-≤ (≤-reflexive (sym (cong (maybe nodeNest 0) eq))) ≤-refl))
+
+  -- A WRITE IS INVISIBLE AT EVERY OTHER KEY, and the pointwise
+  -- conjunct needs that rather than `lookupNode-set-at`: that bound
+  -- charges every reading the written node's own nesting, which at a
+  -- key the write did not touch would demand the arrival's cap fit
+  -- inside the grant, and nothing supplies that.
+  c2 : (j : NodeId) →
+    nodeNestAt j (record st { nodes = setNode nid ns (EvalSt.nodes st) })
+      ≤ nodeNestAt j st ⊔ G′
+  c2 j with nid ≡ᵇ j in ej
+  ... | true  = atSelf j (≡ᵇ→≡ nid j ej)
+  ... | false = ≤-trans (≤-reflexive (cong (maybe nodeNest 0)
+                           (lookupNode-setNode-other j nid ns (EvalSt.nodes st) ej)))
+                        (m≤m⊔n _ _)
+
+  -- the width half is the only one the store keeps, and both of its
+  -- conjuncts come straight through: the arrival's own frame width is
+  -- a premise, and the queue's new length is the number the caller's
+  -- room record yielded
+  lookupWid : (nodes : List (NodeId × NodeState Γ)) →
+    all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv)) nodes ≡ true →
+    lookupNode nid nodes ≡ just ns₀ →
+    nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns₀ ≡ true
+  lookupWid [] h ()
+  lookupWid ((k , s′) ∷ r) h e with k ≡ᵇ nid | e
+  ... | true  | refl = ∧-trueˡ h
+  ... | false | e′   = lookupWid r (∧-trueʳ h) e′
+
+  wn₀ : nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns₀ ≡ true
+  wn₀ = lookupWid (EvalSt.nodes st)
+          (proj₁ (proj₂ (proj₂ (proj₂ (nestCapsOK?-parts c sched st hc))))) eq
+
+  hlen : length (q ++ o ∷ []) ≤ Caps.cWid c
+  hlen = ≤-trans (≤-reflexive (trans (length-++ q {o ∷ []})
+                                     (+-comm (length q) 1))) hq
+
+  wn : nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns ≡ true
+  wn = ∧-intro
+         (all-++-intro (λ x → pWᵉ n (Sched.slots sched) x ≤ᵇ Caps.cWid c)
+            q (o ∷ [])
+            (∧-trueˡ wn₀)
+            (∧-intro (≤ᵇ-true _ _ hw) refl))
+         (≤ᵇ-true _ _ hlen)
+
 -- ONE CONSUME STEP, AT TWO GRANT INDICES AND NOT ONE.  Each head reads
 -- its own node, and every arm either leaves the state alone or runs
 -- the ONE `subscribeInner` all three share and writes one node -- so
@@ -1184,10 +1274,7 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 -- PROBED: `Probed.Thru-Step-Indexed` instantiates all four conjuncts
 --   at the very arrival that killed the flat form, at `W = 0` and with
 --   both other premises pinned by `refl`.  Covered LOAD-BEARING: the
---   caps conjunct at BOTH arms, which is where the room premise was
---   found owed; the slots equation; and the store halves at the arm
---   that PARKS, the node reading three going in and six coming out, so
---   the grant is what carries them and not the incoming summand.
+--   caps conjunct at the arm that subscribes, and the slots equation.
 --   DEGENERATE, and pinned as such rather than reported as coverage:
 --   every row on the VALUE conjunct, the delivery reading twelve
 --   against a grant of twenty-two trillion -- one step of the key buys
@@ -1215,77 +1302,16 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 --   the one above -- the exponent is a power of the very term the
 --   duplicator enlarges, so each level buys the bound a squaring and
 --   the delivery a doubling.
---   NOT COVERED: the store halves at the arm that SUBSCRIBES, which is
---   a boundary rather than a gap -- a merge's `nodeNest` folds its
---   QUEUE and the admit arm has room, so it queues nothing, and
---   deferring the inner does not change that.  A LIMITED merge under
---   the frame is what arms a subscribe's store, and that region is
---   `Probed.Wrap-Nest-Frame`.
+--   NOT COVERED: the store halves here, which is a boundary rather
+--   than a gap -- a merge's `nodeNest` folds its QUEUE and this arm
+--   has room, so it queues nothing, and deferring the inner does not
+--   change that.  A LIMITED merge under the frame is what arms a
+--   subscribe's store, and that region is `Probed.Wrap-Nest-Frame`.
 
--- THE TWO ARMS A MERGE'S STEP HAS, and they are the whole of it: the
--- limit has room and the arrival is SUBSCRIBED, or it is spent and the
--- arrival is PARKED.  Every other way into `thruConsume` -- no node at
--- the id, a node of another shape, a node carrying another element
--- type -- returns its inputs untouched, so all five conjuncts are the
--- hypotheses back and the body below discharges them rather than
--- asserting them.
---
--- THE PARK ARM CARRIES THREE, not five: the burst is empty there and
--- the schedule is the one that came in, so the two conjuncts about
--- them are `z≤n` and a hypothesis.  Stating a leaf over what it
--- actually owes is what keeps the fit CHECKED when it lands.
---
--- AND THE ROOM PREMISE IS WHY THE QUEUE LENGTH IS IN THE TELESCOPE.
--- The caller's room record quantifies over the node it finds at the
--- id, so once the step has matched that node the record is spent and
--- what is left is the one number it yielded.  Passing the number
--- rather than the record is not a weakening: it is the same fact with
--- the match already made, and it is what lets this leaf be stated
--- without naming `thruConsume` at all.
--- PROBED: `Probed.Thru-Step-Indexed` is evidence about THIS arm --
---   its store rows are taken at the merge whose limit is spent, the
---   node reading three going in and six coming out, so the grant is
---   what carries them rather than the incoming summand.  The caps
---   conjunct is taken at the same arm, and it is where the room
---   premise was found owed in the first place.
-postulate
-  thruStep-merge-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (nid : NodeId)
-    (lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool)
-    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} lim act q od) →
-    Sched.slots sched ≡ sl →
-    suc m ≤ m′ →
-    nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) o ≡ true →
-    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
-    suc (length q) ≤ Caps.cWid c →
-    nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
-    let st′ = record st
-                { nodes = setNode nid (mergeAll-st {t = u} lim act (q ++ o ∷ []) od)
-                            (EvalSt.nodes st) }
-        G′  = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
-    (nodesMax st′ ≤ nodesMax st ⊔ G′)
-    × ((j : NodeId) → nodeNestAt j st′ ≤ nodeNestAt j st ⊔ G′)
-    × (nestCapsOK? c sched st′ ≡ true)
-
--- AND THE ARM THAT SUBSCRIBES, which is where the induction lives and
--- where the two dead routes above land: the flattened subscribe bound
--- spends a factor per level up to the cap, and the tight one composes
--- to `suc (m + syncSizeᵉ o)` against a caller reading `m′` at
--- `suc m`.  Both are recorded at the statement this leaf came out of,
--- and the leaf inherits them -- what it owes is the residue they name,
--- a delivery bound tight in the arrival rather than a bigger grant.
---
--- WHAT THE ASSEMBLY ADDS is that the gap is now the LEAF's and not the
--- step's: the arms that return their inputs untouched are discharged,
--- so nothing else in the step is waiting on this.
--- PROBED: `Probed.Thru-Step-Indexed` covers this arm's VALUE conjunct
---   and pins it DEGENERATE -- one step of the key buys a factor no
---   arrival can consume, and the nested duplicator that doubles per
---   level stays inside the grant.  NOT covered: the store halves
---   here, which is a boundary rather than a gap, a merge's `nodeNest`
---   folding its QUEUE and this arm having room to queue nothing.
+-- AND THE ARM THAT SUBSCRIBES IS THE ONE STILL OPEN, which is where
+-- the induction lives: every other way into `thruConsume` either
+-- returns its inputs untouched or parks the arrival, and both are
+-- discharged above, so nothing else in the step is waiting on this.
 postulate
   thruStep-merge-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -2105,7 +2131,7 @@ subscribeE-nest {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st hsl hc hv 
   res    = subscribeE g b (take-f nid ↠ κ) id now sched₀ st₀
 
   inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
-  inv₀ = nestCapsOK?-setNode c nid (take-st (suc k)) sched₀ st refl refl
+  inv₀ = nestCapsOK?-setNode c nid (take-st (suc k)) sched₀ st refl
            (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
 
   push = pushBurst-nest-take g id now nid κ
@@ -2146,7 +2172,7 @@ subscribeE-nest {e = e} {u = u} c sl B W g (mergeAllᵉ lim b) κ id now sched s
   res    = subscribeE g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₀ st₀
 
   inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
-  inv₀ = nestCapsOK?-setNode c nid (mergeAll-st {t = u} lim 0 [] false) sched₀ st refl refl
+  inv₀ = nestCapsOK?-setNode c nid (mergeAll-st {t = u} lim 0 [] false) sched₀ st refl
            (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
 
   IH = subscribeE-nest c sl B W g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₀ st₀
@@ -2188,7 +2214,7 @@ subscribeE-nest {e = e} {u = u} c sl B W g (switchAllᵉ b) κ id now sched st
   res    = subscribeE g b (thru-outer switchᵒ nid ↠ κ) id now sched₀ st₀
 
   inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
-  inv₀ = nestCapsOK?-setNode c nid (switch-st nothing false) sched₀ st refl refl
+  inv₀ = nestCapsOK?-setNode c nid (switch-st nothing false) sched₀ st refl
            (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
 
   IH = subscribeE-nest c sl B W g b (thru-outer switchᵒ nid ↠ κ) id now sched₀ st₀
@@ -2227,7 +2253,7 @@ subscribeE-nest {e = e} {u = u} c sl B W g (exhaustAllᵉ b) κ id now sched st
   res    = subscribeE g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₀ st₀
 
   inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
-  inv₀ = nestCapsOK?-setNode c nid (exhaust-st false false) sched₀ st refl refl
+  inv₀ = nestCapsOK?-setNode c nid (exhaust-st false false) sched₀ st refl
            (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
 
   IH = subscribeE-nest c sl B W g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₀ st₀

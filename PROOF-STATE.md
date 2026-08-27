@@ -178,14 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`thruStep-merge-inner`, `thruStep-switch-inner`,
-  `thruStep-exhaust-inner`** (Nest-Walk) — DIFFICULTY, `PROBED×3`: the arm that
-  descends, now that the step around it is a checked case split. Both routes
-  through the proven subscribe bound are dead; the residue they name is a
-  delivery bound tight in the arrival.
-- **`thruStep-merge-park`** (Nest-Walk) — DIFFICULTY, `PROBED`: the arm that
-  writes the arrival into a spent merge's queue. Three conjuncts, the helpers
-  for all three are proven, and the probe's store rows are taken here.
+- **`thruStep-merge-inner`, `thruStep-switch-inner`, `thruStep-exhaust-inner`**
+  (Nest-Walk) — DIFFICULTY, `PROBED×2`: the arm that descends, now that the
+  step around it is a checked case split. Both routes through the proven
+  subscribe bound are dead; the residue they name is a delivery bound tight in
+  the arrival.
 - **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED×6`: the outer's burst carries admissible values inside
   the grant, emit by emit, with room at the node for each. The body key and the
