@@ -2,7 +2,7 @@
 -- foldPath-nodes … frameNestD
 module Verify-Budget-Sufficient.Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; not)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
@@ -33,7 +33,7 @@ open import Rx.Evaluator using
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals; mergeAll-st;
   switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
-  mergeAllDrain; subscribeInner; hasRoom; subscribeE; splitBurst; Stream; mintNode;
+  mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE; splitBurst; Stream; mintNode;
   installNode; pushBurst; oneShotBurst; splitEvents; thruConsume; thruWalk; thruWrap;
   retagEvents)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
@@ -1221,66 +1221,286 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 --   deferring the inner does not change that.  A LIMITED merge under
 --   the frame is what arms a subscribe's store, and that region is
 --   `Probed.Wrap-Nest-Frame`.
+
+-- THE TWO ARMS A MERGE'S STEP HAS, and they are the whole of it: the
+-- limit has room and the arrival is SUBSCRIBED, or it is spent and the
+-- arrival is PARKED.  Every other way into `thruConsume` -- no node at
+-- the id, a node of another shape, a node carrying another element
+-- type -- returns its inputs untouched, so all five conjuncts are the
+-- hypotheses back and the body below discharges them rather than
+-- asserting them.
+--
+-- THE PARK ARM CARRIES THREE, not five: the burst is empty there and
+-- the schedule is the one that came in, so the two conjuncts about
+-- them are `z≤n` and a hypothesis.  Stating a leaf over what it
+-- actually owes is what keeps the fit CHECKED when it lands.
+--
+-- AND THE ROOM PREMISE IS WHY THE QUEUE LENGTH IS IN THE TELESCOPE.
+-- The caller's room record quantifies over the node it finds at the
+-- id, so once the step has matched that node the record is spent and
+-- what is left is the one number it yielded.  Passing the number
+-- rather than the record is not a weakening: it is the same fact with
+-- the match already made, and it is what lets this leaf be stated
+-- without naming `thruConsume` at all.
+-- PROBED: `Probed.Thru-Step-Indexed` is evidence about THIS arm --
+--   its store rows are taken at the merge whose limit is spent, the
+--   node reading three going in and six coming out, so the grant is
+--   what carries them rather than the incoming summand.  The caps
+--   conjunct is taken at the same arm, and it is where the room
+--   premise was found owed in the first place.
 postulate
-  thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
+  thruStep-merge-park : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (nid : NodeId)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool)
+    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} lim act q od) →
     Sched.slots sched ≡ sl →
     suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
-    thruRoom c nid o sched st →
+    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+    suc (length q) ≤ Caps.cWid c →
     nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
-    let rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
-        G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
-    (nestDᵛˢ (proj₁ rc) ≤ G′)
-    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
-    × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
-    × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
-                     (proj₂ (proj₂ (proj₂ rc))) ≡ true)
-    × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
+    let st′ = record st
+                { nodes = setNode nid (mergeAll-st {t = u} lim act (q ++ o ∷ []) od)
+                            (EvalSt.nodes st) }
+        G′  = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nodesMax st′ ≤ nodesMax st ⊔ G′)
+    × ((j : NodeId) → nodeNestAt j st′ ≤ nodeNestAt j st ⊔ G′)
+    × (nestCapsOK? c sched st′ ≡ true)
 
-  thruStep-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+-- AND THE ARM THAT SUBSCRIBES, which is where the induction lives and
+-- where the two dead routes above land: the flattened subscribe bound
+-- spends a factor per level up to the cap, and the tight one composes
+-- to `suc (m + syncSizeᵉ o)` against a caller reading `m′` at
+-- `suc m`.  Both are recorded at the statement this leaf came out of,
+-- and the leaf inherits them -- what it owes is the residue they name,
+-- a delivery bound tight in the arrival rather than a bigger grant.
+--
+-- WHAT THE ASSEMBLY ADDS is that the gap is now the LEAF's and not the
+-- step's: the arms that return their inputs untouched are discharged,
+-- so nothing else in the step is waiting on this.
+-- PROBED: `Probed.Thru-Step-Indexed` covers this arm's VALUE conjunct
+--   and pins it DEGENERATE -- one step of the key buys a factor no
+--   arrival can consume, and the nested duplicator that doubles per
+--   level stays inside the grant.  NOT covered: the store halves
+--   here, which is a boundary rather than a gap, a merge's `nodeNest`
+--   folding its QUEUE and this arm having room to queue nothing.
+postulate
+  thruStep-merge-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool)
+    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} lim act q od) →
     Sched.slots sched ≡ sl →
     suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
-    thruRoom c nid o sched st →
+    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+    suc (length q) ≤ Caps.cWid c →
     nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
-    let rc = thruConsume fuel switchᵒ nid κ id now o sched st
-        G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
-    (nestDᵛˢ (proj₁ rc) ≤ G′)
-    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
-    × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
-    × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
-                     (proj₂ (proj₂ (proj₂ rc))) ≡ true)
-    × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
+    let R      = subscribeInner fuel mergeAllᵒ nid κ id now o sched st
+        vs     = proj₁ (proj₂ R)
+        done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+        sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st′    = record st₁ { nodes = mergeAllBump nid done (EvalSt.nodes st₁) }
+        G′     = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nestDᵛˢ vs ≤ G′)
+    × (nodesMax st′ ≤ nodesMax st ⊔ G′)
+    × ((j : NodeId) → nodeNestAt j st′ ≤ nodeNestAt j st ⊔ G′)
+    × (nestCapsOK? c sched₁ st′ ≡ true)
+    × (Sched.slots sched₁ ≡ sl)
 
-  thruStep-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+-- THE SWITCH HAS ONE ARM THAT DOES ANYTHING: there is no limit to
+-- spend, so an arrival always kills the current inner and subscribes.
+-- What the leaf owes over the merge's is the KILL -- `switchKill`
+-- emits closes and edits the table before the descent runs, so the
+-- state the subscribe starts from is not the one the caller handed in.
+-- PROBED: `Probed.Thru-Step-Indexed`, whose coverage and its
+--   boundary are stated at `thruStep-merge-inner` above.
+postulate
+  thruStep-switch-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
-    (sched : Sched Γ) (st : EvalSt e) →
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (cur : Maybe Id) (od : Bool)
+    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (switch-st cur od) →
     Sched.slots sched ≡ sl →
     suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
-    thruRoom c nid o sched st →
+    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
     nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
-    let rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
-        G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
-    (nestDᵛˢ (proj₁ rc) ≤ G′)
-    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
-    × ((j : NodeId) →
-         nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
-    × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
-                     (proj₂ (proj₂ (proj₂ rc))) ≡ true)
-    × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
+    let K      = switchKill cur sched st
+        sched₁ = proj₁ (proj₂ K)
+        st₁    = proj₂ (proj₂ K)
+        R      = subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
+        vs     = proj₁ (proj₂ R)
+        inst   = proj₁ R
+        done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+        sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st′    = record st₂
+                   { nodes = setNode nid
+                       (switch-st (if done then nothing else just inst) od)
+                       (EvalSt.nodes st₂) }
+        G′     = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nestDᵛˢ vs ≤ G′)
+    × (nodesMax st′ ≤ nodesMax st ⊔ G′)
+    × ((j : NodeId) → nodeNestAt j st′ ≤ nodeNestAt j st ⊔ G′)
+    × (nestCapsOK? c sched₂ st′ ≡ true)
+    × (Sched.slots sched₂ ≡ sl)
+
+-- AND THE EXHAUST HAS ONE TOO, the busy arm dropping the arrival
+-- outright -- so the only work is the idle one, and it is the merge's
+-- admit arm without a queue to write back.
+-- PROBED: `Probed.Thru-Step-Indexed`, whose coverage and its
+--   boundary are stated at `thruStep-merge-inner` above.
+postulate
+  thruStep-exhaust-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (od : Bool)
+    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+    lookupNode nid (EvalSt.nodes st) ≡ just (exhaust-st false od) →
+    Sched.slots sched ≡ sl →
+    suc m ≤ m′ →
+    nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) o ≡ true →
+    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+    nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+    let R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
+        vs     = proj₁ (proj₂ R)
+        done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+        sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st′    = record st₁
+                   { nodes = setNode nid (exhaust-st (not done) od)
+                               (EvalSt.nodes st₁) }
+        G′     = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+    (nestDᵛˢ vs ≤ G′)
+    × (nodesMax st′ ≤ nodesMax st ⊔ G′)
+    × ((j : NodeId) → nodeNestAt j st′ ≤ nodeNestAt j st ⊔ G′)
+    × (nestCapsOK? c sched₁ st′ ≡ true)
+    × (Sched.slots sched₁ ≡ sl)
+
+-- THE STEP, ASSEMBLED: the case split is `thruConsume`'s own, so the
+-- arms that return their inputs untouched are discharged here and only
+-- the two that do work are owed.
+thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  suc m ≤ m′ →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  thruRoom c nid o sched st →
+  nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+  let rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
+      G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+  (nestDᵛˢ (proj₁ rc) ≤ G′)
+  × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
+  × ((j : NodeId) →
+       nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
+  × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
+                   (proj₂ (proj₂ (proj₂ rc))) ≡ true)
+  × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
+thruStep-merge {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
+...   | no _ = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+...   | yes refl with hasRoom lim act
+...     | true =
+          let I = thruStep-merge-inner c sl B W m m′ fuel nid κ id now
+                    lim act q od o sched st eq hsl hm hc hv
+                    (proj₁ hr) (proj₂ hr lim act q od refl) hn
+          in proj₁ I , proj₁ (proj₂ I) , proj₁ (proj₂ (proj₂ I))
+           , proj₁ (proj₂ (proj₂ (proj₂ I)))
+           , proj₂ (proj₂ (proj₂ (proj₂ I)))
+...     | false =
+          let P = thruStep-merge-park c sl B W m m′ nid
+                    lim act q od o sched st eq hsl hm hc hv
+                    (proj₁ hr) (proj₂ hr lim act q od refl) hn
+          in z≤n , proj₁ P , proj₁ (proj₂ P) , proj₂ (proj₂ P) , hsl
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+    | nothing               = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+    | just (scan-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+    | just (take-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+    | just (switch-st _ _)  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+    | just (exhaust-st _ _) = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+
+thruStep-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  suc m ≤ m′ →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  thruRoom c nid o sched st →
+  nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+  let rc = thruConsume fuel switchᵒ nid κ id now o sched st
+      G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+  (nestDᵛˢ (proj₁ rc) ≤ G′)
+  × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
+  × ((j : NodeId) →
+       nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
+  × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
+                   (proj₂ (proj₂ (proj₂ rc))) ≡ true)
+  × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
+thruStep-switch {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | just (switch-st cur od) =
+      let I = thruStep-switch-inner c sl B W m m′ fuel nid κ id now cur od
+                o sched st eq hsl hm hc hv (proj₁ hr) hn
+      in proj₁ I , proj₁ (proj₂ I) , proj₁ (proj₂ (proj₂ I))
+           , proj₁ (proj₂ (proj₂ (proj₂ I)))
+           , proj₂ (proj₂ (proj₂ (proj₂ I)))
+... | nothing               = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (mergeAll-st _ _ _ _) = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (scan-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (take-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (exhaust-st _ _) = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+
+thruStep-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  suc m ≤ m′ →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  thruRoom c nid o sched st →
+  nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+  let rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
+      G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
+  (nestDᵛˢ (proj₁ rc) ≤ G′)
+  × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G′)
+  × ((j : NodeId) →
+       nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G′)
+  × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
+                   (proj₂ (proj₂ (proj₂ rc))) ≡ true)
+  × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
+thruStep-exhaust {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | just (exhaust-st false od) =
+      let I = thruStep-exhaust-inner c sl B W m m′ fuel nid κ id now od
+                o sched st eq hsl hm hc hv (proj₁ hr) hn
+      in proj₁ I , proj₁ (proj₂ I) , proj₁ (proj₂ (proj₂ I))
+           , proj₁ (proj₂ (proj₂ (proj₂ I)))
+           , proj₂ (proj₂ (proj₂ (proj₂ I)))
+... | just (exhaust-st true od)  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | nothing               = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (mergeAll-st _ _ _ _) = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (scan-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (take-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
+... | just (switch-st _ _)  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
 
 -- The fit over one emit's values is now CHECKED: each arrival spends
 -- its step, the invariant the step returns is what the next arrival
