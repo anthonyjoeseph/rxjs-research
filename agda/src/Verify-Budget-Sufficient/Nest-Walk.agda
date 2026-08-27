@@ -49,7 +49,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; w
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
-open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
+open import Verify-Budget-Sufficient.Measures using (pathLen; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
    nest-inflate; pow-grow¹; pow-distrib-*; slotNest; slotsNestSum;
@@ -584,29 +584,31 @@ nodeWidᴺ? W sl (mergeAll-st lim act q od) = widNode W sl (mergeAll-st lim act 
 nodeWidᴺ? W sl (switch-st _ _)            = true
 nodeWidᴺ? W sl (exhaust-st _ _)           = true
 
-nestStB? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → ℕ → Sched Γ → EvalSt e → Bool
-nestStB? B sched st = all (boundedLive B) (Sched.live sched)
-
+-- ONLY THE TWO WIDTH CONJUNCTS, deliberately.  A size conjunct over
+-- the pending payloads was carried here and spent by nothing on this
+-- face, and it is not preservable from sync-denominated premises: a
+-- defer parks its body at FULL syntax size while every premise of the
+-- walk reads the defer as 1.  The size story belongs to the caps face,
+-- which pays it from a full-size budget at a stepped cap.
+-- REFUTED: `Refuted.Defer-Park-Size` kills the caps-walk family over
+--   the predicate that carried the size conjunct, a defer at its own
+--   descent bound against the evaluator's initial state.
 nestCapsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → Caps → Sched Γ → EvalSt e → Bool
 nestCapsOK? c sched st =
-  nestStB? (Caps.cSize c) sched st
-  ∧ all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
+  all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
   ∧ all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
         (EvalSt.nodes st)
 
--- the three conjuncts back out, with their result types pinned so the
+-- the two conjuncts back out, with their result types pinned so the
 -- booleans `∧-true` splits on are determined
 nestCapsOK?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   nestCapsOK? c sched st ≡ true →
-    (nestStB? (Caps.cSize c) sched st ≡ true)
-  × (all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched) ≡ true)
+    (all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched) ≡ true)
   × (all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
          (EvalSt.nodes st) ≡ true)
-nestCapsOK?-parts c sched st h with ∧-true _ _ h
-... | h0 , r1 with ∧-true _ _ r1
-... | h2 , h3 = h0 , h2 , h3
+nestCapsOK?-parts c sched st h = ∧-true _ _ h
 
 nodeWidᴺ?-weaken : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) (ns : NodeState Γ) →
   widNode W sl ns ≡ true → nodeWidᴺ? W sl ns ≡ true
@@ -620,20 +622,13 @@ capsOK?⇒nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true → nestCapsOK? c sched st ≡ true
 capsOK?⇒nest c sched st h =
-    ∧-intro hLive
-    (∧-intro h2
-             (all-impl _ _
-                (λ kv → nodeWidᴺ?-weaken (Caps.cWid c) (Sched.slots sched)
-                          (proj₂ kv))
-                (EvalSt.nodes st) h3))
+    ∧-intro h2
+    (all-impl _ _
+       (λ kv → nodeWidᴺ?-weaken (Caps.cWid c) (Sched.slots sched)
+                 (proj₂ kv))
+       (EvalSt.nodes st) h3)
   where
   P  = capsOK?-parts c sched st h
-  h0 = proj₁ P
-  hL = ∧-true _ _ h0
-
-  hLive : all (boundedLive (Caps.cSize c)) (Sched.live sched) ≡ true
-  hLive = proj₁ hL
-
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
 
@@ -662,15 +657,11 @@ nestCapsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestCapsOK? c sched st ≡ true →
   nestCapsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 nestCapsOK?-setNode c nid ns sched st wn inv =
-    ∧-intro h0
-    (∧-intro h2
-             (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
-                (EvalSt.nodes st) wn h3))
+    ∧-intro (proj₁ P)
+    (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
+       (EvalSt.nodes st) wn (proj₂ P))
   where
   P  = nestCapsOK?-parts c sched st inv
-  h0 = proj₁ P
-  h2 = proj₁ (proj₂ P)
-  h3 = proj₂ (proj₂ P)
 
 -- and the read the write law needs beside it: a node the table holds
 -- already passed the width check the invariant folds over the table
@@ -680,7 +671,7 @@ nestCapsOK?-lookupWid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestCapsOK? c sched st ≡ true →
   nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns ≡ true
 nestCapsOK?-lookupWid {Γ = Γ} c nid ns sched st eq hc =
-  go (EvalSt.nodes st) (proj₂ (proj₂ (nestCapsOK?-parts c sched st hc))) eq
+  go (EvalSt.nodes st) (proj₂ (nestCapsOK?-parts c sched st hc)) eq
   where
   go : (nodes : List (NodeId × NodeState Γ)) →
     all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv)) nodes ≡ true →
@@ -3305,7 +3296,12 @@ postulate
   -- way the arr-keyed trio is; the share legs are minted with the
   -- body, per the leaf-only law, and the per-instant machinery every
   -- clause will spend at its boundary -- `stepThru-caps` and the
-  -- proofs under it -- is already checked above.
+  -- proofs under it -- is already checked above.  The invariant is the
+  -- two width conjuncts and no size conjunct, which is what makes the
+  -- defer clause survivable at a fixed cap.
+  -- REFUTED: `Refuted.Defer-Park-Size` kills this statement over the
+  --   predicate that carried the size conjunct: a defer parks its body
+  --   at full syntax size, and every premise here reads a defer as 1.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-room` below.
   subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
