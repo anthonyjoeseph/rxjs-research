@@ -6,6 +6,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
+open import Rx.Frame-Width using (pWᵉ)
 open import Data.List.Properties using (++-identityʳ)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
@@ -1093,6 +1094,39 @@ pushBurst-nest-thru {Γ = Γ} {t = t} {u = u} G fuel op nid κ id now (em ∷ em
   N₂ j = ≤-trans (proj₂ (proj₂ WR) j) (proj₂ (proj₂ WK) j)
 
 
+-- THE ROOM THE WIDTH FIELD MUST STILL HAVE AT THE NODE THIS STEP
+-- WRITES.  The invariant's node conjunct bounds a merge queue two ways
+-- against ONE field -- every queued value's frame width, and the
+-- queue's LENGTH -- while the premise on the arriving value bounds its
+-- SIZE and nothing else.  The no-room arm appends, so a step handed a
+-- value that premise admits can still push the length past the field,
+-- and no fact about the value reaches a count of how many the node
+-- already holds.  Hence a premise about the NODE, quantified over what
+-- the table actually has there the way the drain's bundle already is.
+--
+-- REFUTED: Refuted.Thru-Step-Caps
+thruRoom : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (nid : NodeId) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+thruRoom {n = n} {Γ = Γ} {u = u} c nid o sched st =
+  (pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c)
+  × ((lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool) →
+       lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+       suc (length q) ≤ Caps.cWid c)
+
+-- and the same over a walk's arrivals, each at the state the previous
+-- one left -- the shape `thruFitOK` already has, for the same reason
+thruRoomOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (fuel : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+thruRoomOK c fuel op nid κ id now [] sched st = ⊤
+thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
+  thruRoom c nid o sched st
+  × thruRoomOK c fuel op nid κ id now os
+      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
+  where rc = thruConsume fuel op nid κ id now o sched st
+
 -- ONE CONSUME STEP, AT TWO GRANT INDICES AND NOT ONE.  Each head reads
 -- its own node, and every arm either leaves the state alone or runs
 -- the ONE `subscribeInner` all three share and writes one node -- so
@@ -1129,6 +1163,7 @@ postulate
     suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
+    thruRoom c nid o sched st →
     nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
     let rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
         G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
@@ -1148,6 +1183,7 @@ postulate
     suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
+    thruRoom c nid o sched st →
     nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
     let rc = thruConsume fuel switchᵒ nid κ id now o sched st
         G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
@@ -1167,6 +1203,7 @@ postulate
     suc m ≤ m′ →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
+    thruRoom c nid o sched st →
     nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
     let rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
         G′ = nestB (Caps.cSize c) W (nestUnit e sl) B m′ in
@@ -1190,45 +1227,46 @@ thruFit-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   all (nestValOK? c (obs u)) os ≡ true →
+  thruRoomOK c fuel op nid κ id now os sched st →
   nestDᵛˢ os ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   thruFitOK (nestB (Caps.cSize c) W (nestUnit e sl) B m′)
     fuel op nid κ id now os sched st
-thruFit-vals c sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hn = tt
-thruFit-vals {u = u} c sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hn =
+thruFit-vals c sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hr hn = tt
+thruFit-vals {u = u} c sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hr hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
   , thruFit-vals c sl B W m m′ fuel mergeAllᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
-      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv)) (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
   S = thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
-        (proj₁ (∧-true _ _ hv))
+        (proj₁ (∧-true _ _ hv)) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hn =
+thruFit-vals {u = u} c sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hr hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
   , thruFit-vals c sl B W m m′ fuel switchᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
-      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv)) (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel switchᵒ nid κ id now o sched st
   S = thruStep-switch c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
-        (proj₁ (∧-true _ _ hv))
+        (proj₁ (∧-true _ _ hv)) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hn =
+thruFit-vals {u = u} c sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hr hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
   , thruFit-vals c sl B W m m′ fuel exhaustᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
-      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv)) (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
   S = thruStep-exhaust c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
-        (proj₁ (∧-true _ _ hv))
+        (proj₁ (∧-true _ _ hv)) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
 
 -- What the outer's burst has to satisfy, emit by emit and at the state
@@ -1245,6 +1283,7 @@ pushValsOK {Γ = Γ} {e = e} {u = u} c sl B W m fuel op nid κ id now (em ∷ em
   (Sched.slots sched ≡ sl)
   × (nestCapsOK? c sched st ≡ true)
   × (all (nestValOK? c (obs u)) (proj₁ sp) ≡ true)
+  × thruRoomOK c fuel op nid κ id now (proj₁ sp) sched st
   × (nestDᵛˢ (proj₁ sp) ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m)
   × pushValsOK c sl B W m fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
@@ -1265,8 +1304,8 @@ pushFit-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     fuel op nid κ id now str sched st
 pushFit-ems c sl B W m m′ fuel op nid κ id now [] sched st hm vals = tt
 pushFit-ems {Γ = Γ} {u = u} c sl B W m m′ fuel op nid κ id now (em ∷ ems) sched st hm
-            (hsl , hc , hv , hn , rest) =
-  thruFit-vals c sl B W m m′ fuel op nid κ id now (proj₁ sp) sched st hsl hm hc hv hn
+            (hsl , hc , hv , hr , hn , rest) =
+  thruFit-vals c sl B W m m′ fuel op nid κ id now (proj₁ sp) sched st hsl hm hc hv hr hn
   , pushFit-ems c sl B W m m′ fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) hm rest
   where

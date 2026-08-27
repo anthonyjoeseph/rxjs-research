@@ -59,3 +59,6 @@ open import Probed.Wrap-Nest-Frame
   using (premM; premS; premX; figures≡; premP; parked≡; fitsP; premF; frameFigs≡; fitsF; mapFigs≡; mapInvariant; hidNodes≡; hidQueue≡; hidAligned; deepFit; deepGrown)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
+open import Probed.Thru-Step-Indexed
+  using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡; prems≡;
+         capsAfter≡; premF; storeF≡; parts≡; fitsF)

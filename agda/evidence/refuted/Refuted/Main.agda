@@ -75,3 +75,5 @@ open import Refuted.Thru-Step-Nest
          deliveredM≡12; deliveredS≡12; deliveredX≡12;
          thru-step-merge-absurd; thru-step-switch-absurd;
          thru-step-exhaust-absurd)
+open import Refuted.Thru-Step-Caps
+  using (capsPrems≡; slots≡; after≡false; thru-step-caps-absurd; widths≡)
