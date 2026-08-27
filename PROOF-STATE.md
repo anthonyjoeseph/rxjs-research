@@ -178,6 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
+- **`pushVals-merge-caps`, `pushVals-switch-caps`, `pushVals-exhaust-caps`**
+  (Nest-Walk) — FALSITY, `NO EVIDENCE`: the bundle the burst carries beside the
+  measure — slots, invariant, admissibility, room at the node — at every frame
+  the descent leaves. Nothing has instantiated it: every probe here pins
+  `nestCapsOK?` at the INITIAL state, which is the premise and not this.
 - **`subscribeInner-nest-arr`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×2, PROBED`: one subscription charged a DOUBLING per
   boundary of its arrival rather than a whole grant per level. This is the
@@ -187,10 +192,11 @@ does not fit is a finding about the shared statement, not about the head.
   `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
   bundle and the slots equation across the arm that subscribes, the measures
   around them now being checked bodies. The switch's covers its kill too.
-- **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
-  `DEAD ROUTE×2, PROBED×6`: the outer's burst carries admissible values inside
-  the grant, emit by emit, with room at the node for each. The body key and the
-  rate that survives the frame are both taken.
+- **`pushVals-merge-nest`, `pushVals-switch-nest`, `pushVals-exhaust-nest`**
+  (Nest-Walk) — DIFFICULTY, `DEAD ROUTE×2, PROBED×6`: the outer's burst is
+  inside the grant, emit by emit, at the BODY's key. This is where the burst
+  statement's risk is; the body key and the rate that survives the frame are
+  both taken.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and

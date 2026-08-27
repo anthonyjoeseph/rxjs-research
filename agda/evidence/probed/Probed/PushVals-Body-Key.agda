@@ -38,9 +38,9 @@
 -- factor is a power -- and a duplication rate that DOES survive a
 -- frame is the region still open.
 --
--- TARGET: pushVals-merge
--- TARGET: pushVals-switch
--- TARGET: pushVals-exhaust
+-- TARGET: pushVals-merge-nest
+-- TARGET: pushVals-switch-nest
+-- TARGET: pushVals-exhaust-nest
 -- ══════════════════════════════════════════════════════════════════
 module Probed.PushVals-Body-Key where
 

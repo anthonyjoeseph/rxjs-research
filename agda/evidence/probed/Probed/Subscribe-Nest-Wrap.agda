@@ -5,9 +5,9 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-merge
--- TARGET: pushVals-switch
--- TARGET: pushVals-exhaust
+-- TARGET: pushVals-merge-nest
+-- TARGET: pushVals-switch-nest
+-- TARGET: pushVals-exhaust-nest
 --
 -- WHAT IS BEING TESTED, and at the STRONGEST reading of the statement:
 -- every row fixes `W` at ZERO, the smallest burst width the grant can

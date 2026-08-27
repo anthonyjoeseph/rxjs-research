@@ -11,9 +11,9 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-merge
--- TARGET: pushVals-switch
--- TARGET: pushVals-exhaust
+-- TARGET: pushVals-merge-nest
+-- TARGET: pushVals-switch-nest
+-- TARGET: pushVals-exhaust-nest
 --
 -- THE FAMILY.  `dup` names its observable payload twice at the one
 -- additive slot the measure has, so one application doubles the

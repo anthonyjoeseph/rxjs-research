@@ -1862,6 +1862,69 @@ pushValsOK {Γ = Γ} {e = e} {u = u} c sl B W m fuel op nid κ id now (em ∷ em
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
          (proj₂ (proj₂ sp)) sched st
 
+-- AND IT SPLITS IN TWO, along the line the risk actually runs on.  Four
+-- of the five conjuncts are the caps bundle a burst carries -- the
+-- slots, the invariant, admissibility, room at the node -- and the
+-- fifth is the MEASURE.  A head owes both, but it owes them for
+-- different reasons: the bundle mirrors what the caps face already
+-- carries along a burst, while the measure is where a substituting
+-- frame can outrun its grant.  Stating them apart is what lets the
+-- second be probed and ranked without the first riding along.
+--
+-- Both halves recurse over the SAME stream at the SAME states, since
+-- the frame each emit leaves is a function of the emit and the state
+-- and of neither half's own content -- which is why the join below is
+-- a plain induction and not a re-derivation.
+pushValsCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+pushValsCapsOK c sl fuel op nid κ id now [] sched st = ⊤
+pushValsCapsOK {Γ = Γ} {u = u} c sl fuel op nid κ id now (em ∷ ems) sched st =
+  (Sched.slots sched ≡ sl)
+  × (nestCapsOK? c sched st ≡ true)
+  × (all (nestValOK? c (obs u)) (proj₁ sp) ≡ true)
+  × thruRoomOK c fuel op nid κ id now (proj₁ sp) sched st
+  × pushValsCapsOK c sl fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
+pushValsNestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+pushValsNestOK c sl B W m fuel op nid κ id now [] sched st = ⊤
+pushValsNestOK {Γ = Γ} {e = e} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sched st =
+  (nestDᵛˢ (proj₁ sp) ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m)
+  × pushValsNestOK c sl B W m fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
+pushVals-both : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  pushValsCapsOK c sl fuel op nid κ id now str sched st →
+  pushValsNestOK c sl B W m fuel op nid κ id now str sched st →
+  pushValsOK c sl B W m fuel op nid κ id now str sched st
+pushVals-both c sl B W m fuel op nid κ id now [] sched st hcap hnest = tt
+pushVals-both {Γ = Γ} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sched st
+              (hsl , hc , hv , hr , restC) (hn , restN) =
+  hsl , hc , hv , hr , hn
+  , pushVals-both c sl B W m fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+      restC restN
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
 -- and the lift, CHECKED: one emit's fit is its values' fit, and the
 -- rest runs at the frame the emit left
 pushFit-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -2029,14 +2092,35 @@ postulate
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (scanᵉ f z b) κ id now sched st
-  -- THE THREE `*All` BURST LEAVES.  The heads themselves are REAL
-  -- BODIES now: mint, the outer's own descent as the IH, and the burst
-  -- pushed back through the `thru-outer` frame by the checked walk
-  -- above; and the FIT is no longer asserted either, being read off
-  -- these by `pushFit-ems`.  What is left is a claim about the burst
-  -- alone -- at every frame the descent leaves, the invariant still
-  -- holds, the values that arrive are admissible, and their joined
-  -- nesting is already inside the head's grant.  It is stated over
+  -- THE THREE `*All` BURST LEAVES, CAPS HALF.  The heads themselves are
+  -- REAL BODIES now: mint, the outer's own descent as the IH, and the
+  -- burst pushed back through the `thru-outer` frame by the checked
+  -- walk above; and the FIT is no longer asserted either, being read
+  -- off these by `pushFit-ems`.  What each of these carries is the
+  -- bundle a burst travels with -- at every frame the descent leaves,
+  -- the slots are the ones the caller named, the invariant still holds,
+  -- the values that arrive are admissible, and the node has room for
+  -- them.  It mirrors what the caps face already carries along a burst,
+  -- which is why it is stated apart from the measure: nothing here can
+  -- be outrun by a substituting frame.
+  pushVals-merge-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
+    descW g (mergeAllᵉ lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
+    in pushValsCapsOK c sl g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  -- THE THREE `*All` BURST LEAVES, MEASURE HALF -- and this is where
+  -- the risk of the burst statement is, the bundle beside it being
+  -- routine.  What each carries is one inequality per emit: the joined
+  -- nesting of the values the descent hands back is already inside the
+  -- head's grant, read at the BODY's key rather than the assembled
+  -- head's.  It is stated over
   -- `subscribeE`'s own output rather than any bound of it because an
   -- admitted inner's cost has to come back bounded through the KEY,
   -- which is the strengthened conclusion the ring's members carry.
@@ -2186,7 +2270,7 @@ postulate
   --   level, which no substitution this term language admits reaches,
   --   and a LIMITED merge under the descent, whose queue is the
   --   `Probed.Wrap-Nest-Frame` region.
-  pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-merge-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -2195,44 +2279,140 @@ postulate
     nestDᵉ (mergeAllᵉ lim b) ≤ B →
     descW g (mergeAllᵉ lim b) κ id now sched st ≤ W →
     let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
-                id now (proj₂ (mintNode sched))
-                (installNode (proj₁ (mintNode sched))
-                             (mergeAll-st {t = u} lim 0 [] false) st)
-    in pushValsOK c sl B W (syncSizeᵉ b)
-         g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
+    in pushValsNestOK c sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The switch wrap's fit, at its own initial state.
+  -- The switch wrap's bundle, at its own initial state.
+  pushVals-switch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
+    descW g (switchAllᵉ b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+    in pushValsCapsOK c sl g switchᵒ (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  -- The switch wrap's measure, at its own initial state.
   -- PROBED: `Probed.Subscribe-Nest-Wrap`, whose coverage and its
-  --   boundary are stated at `pushVals-merge` above.
-  pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
+  --   boundary are stated at `pushVals-merge-nest` above.
+  pushVals-switch-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
     nestDᵉ (switchAllᵉ b) ≤ B →
     descW g (switchAllᵉ b) κ id now sched st ≤ W →
     let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
-                id now (proj₂ (mintNode sched))
-                (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
-    in pushValsOK c sl B W (syncSizeᵉ b)
-         g switchᵒ (proj₁ (mintNode sched)) κ id now
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+    in pushValsNestOK c sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The exhaust wrap's fit, at its own initial state.
+  -- The exhaust wrap's bundle, at its own initial state.
+  pushVals-exhaust-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
+    descW g (exhaustAllᵉ b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
+    in pushValsCapsOK c sl g exhaustᵒ (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  -- The exhaust wrap's measure, at its own initial state.
   -- PROBED: `Probed.Subscribe-Nest-Wrap`, whose coverage and its
-  --   boundary are stated at `pushVals-merge` above.
-  pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
+  --   boundary are stated at `pushVals-merge-nest` above.
+  pushVals-exhaust-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
     nestDᵉ (exhaustAllᵉ b) ≤ B →
     descW g (exhaustAllᵉ b) κ id now sched st ≤ W →
     let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
-                id now (proj₂ (mintNode sched))
-                (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
-    in pushValsOK c sl B W (syncSizeᵉ b)
-         g exhaustᵒ (proj₁ (mintNode sched)) κ id now
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
+    in pushValsNestOK c sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+  (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
+  nestDᵉ (mergeAllᵉ lim b) ≤ B →
+  descW g (mergeAllᵉ lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
+  in pushValsOK c sl B W (syncSizeᵉ b)
+       g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+       (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+pushVals-merge {u = u} c sl B W g lim b κ id now sched st hsl hc hv hn hw =
+  pushVals-both c sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (pushVals-merge-caps c sl W g lim b κ id now sched st hsl hc hv hw)
+    (pushVals-merge-nest c sl B W g lim b κ id now sched st hsl hc hv hn hw)
+  where
+  res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
+
+pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+  (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
+  nestDᵉ (switchAllᵉ b) ≤ B →
+  descW g (switchAllᵉ b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+  in pushValsOK c sl B W (syncSizeᵉ b)
+       g switchᵒ (proj₁ (mintNode sched)) κ id now
+       (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+pushVals-switch c sl B W g b κ id now sched st hsl hc hv hn hw =
+  pushVals-both c sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (pushVals-switch-caps c sl W g b κ id now sched st hsl hc hv hw)
+    (pushVals-switch-nest c sl B W g b κ id now sched st hsl hc hv hn hw)
+  where
+  res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+
+pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+  (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
+  nestDᵉ (exhaustAllᵉ b) ≤ B →
+  descW g (exhaustAllᵉ b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
+  in pushValsOK c sl B W (syncSizeᵉ b)
+       g exhaustᵒ (proj₁ (mintNode sched)) κ id now
+       (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+pushVals-exhaust c sl B W g b κ id now sched st hsl hc hv hn hw =
+  pushVals-both c sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (pushVals-exhaust-caps c sl W g b κ id now sched st hsl hc hv hw)
+    (pushVals-exhaust-nest c sl B W g b κ id now sched st hsl hc hv hn hw)
+  where
+  res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
 
 
 -- THE THREE FITS, now READ OFF the burst statement rather than
