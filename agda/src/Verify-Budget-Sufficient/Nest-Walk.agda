@@ -4815,12 +4815,25 @@ abstract
 --   prices, a `map-f` frame carrying a constant the program never
 --   mentions stores a value no program-denominated charge covers, and
 --   the gap grows a layer per layer of the constant.  The `chainsNestD`
---   premise is that refutation's one sufficient repair — the sink
---   discharges it through `shareAdmit-nest` from the registry conjunct
---   `capsWalkOK` now carries at its sink arm, and re-establishing that
---   conjunct at every state a real walk passes through is
---   `arr-chains-caps`' obligation, where the walk invariants already
---   live.
+--   premise repaired the TOP list only — see the next two entries for
+--   why that is not enough — and the sink discharges it through
+--   `shareAdmit-nest` from the registry conjunct `capsWalkOK` carries
+--   at its sink arm, whose re-establishment at every state a real walk
+--   passes through is `arr-chains-caps`' obligation.
+-- REFUTED: `Refuted.Share-Go-Registry` kills the statement AS WRITTEN,
+--   four against two, on the sibling witness's own figures: a top list
+--   of one bare `share-sink` hop is priced at zero, and the sink then
+--   admits from the STATE's registry, which no hypothesis prices — so
+--   the fold walks the same four-deep registration one level down and
+--   the premise is shown to price the wrong list.
+-- REFUTED: `Refuted.Share-Go-Stack` kills the candidate repair (add
+--   `regsNestMax st ≤ nestUnit`), three against two: a branch that
+--   descends through TWO shares spends each hop's whole unit in
+--   SEQUENCE, so per-path independent pricing — any max — stacks
+--   whatever it licensed once per level.  A surviving restatement must
+--   charge the branch structure: levels bounded by the dispatch gas,
+--   or a premise summing a descent's wraps inside the unit, which is
+--   what a registry built by a real run satisfies.
 postulate
   shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)

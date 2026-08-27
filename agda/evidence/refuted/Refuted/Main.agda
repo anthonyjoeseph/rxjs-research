@@ -86,6 +86,10 @@ open import Refuted.Thru-Step-Caps
   using (capsPrems≡; slots≡; after≡false; thru-step-caps-absurd; widths≡)
 open import Refuted.Share-Go-Path
   using (grown≡; charge≡; share-go-path-absurd)
+open import Refuted.Share-Go-Registry
+  using (priced; slots-fixed; grown≡; charge≡; share-go-registry-absurd)
+open import Refuted.Share-Go-Stack
+  using (priced; reg-priced; slots-fixed; grown≡; charge≡; share-go-stack-absurd)
 open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width

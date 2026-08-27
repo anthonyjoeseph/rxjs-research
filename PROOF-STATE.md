@@ -178,10 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, DEAD ROUTE`: the
-  fan-out under a priced registration list — the premise the refutations
-  forced, discharged at the sink from the walk invariant's new registry
-  conjunct, whose re-establishment `arr-chains-caps` now owes.
+- **`shareGo-nodes`** (Nest-Walk) — SHAPE, `REFUTED×4, DEAD ROUTE`: the stated
+  form is refuted through the registry the premise never priced, and so is the
+  max-premised repair — a branch spends its hops in sequence, so the
+  restatement must charge the branch structure, gas-indexed or summed.
 - **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
   all the three boundary heads still owe — the recursion and the push around it
