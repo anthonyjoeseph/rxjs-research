@@ -179,10 +179,9 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`sharedConnect-nest-arr`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED×3`:
-  all the slot head still owes, its completed and already-connected arms now
-  proven; keyed to EXPAND the slot, the additive reading having been refuted,
-  and the refuting family, a two-slot telescope and a fold over a script below
-  the slot all fit.
+  all the slot head still owes, restated at the DESCENT's own key over the
+  unit — the caller's additive term is about a term the walk is leaving. Its
+  three families fit; what the arm cannot re-establish is the registry.
 - **`subscribeE-nest-arr-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`:
   the scan head, where the key that charges a script nothing was refuted and
   the one that charges it its script now fits the same doubling family with a

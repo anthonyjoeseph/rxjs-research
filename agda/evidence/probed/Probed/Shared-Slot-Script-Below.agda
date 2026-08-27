@@ -27,7 +27,7 @@
 -- NOT COVERED: the two store conjuncts, which this shape leaves at
 -- `0 ≤ _`, and a script of OBSERVABLE values.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: sharedConnect-nest-arr @7b8935
+-- TARGET: sharedConnect-nest-arr @094c83
 module Probed.Shared-Slot-Script-Below where
 
 open import Data.Bool using (T; true)
@@ -95,8 +95,8 @@ burstOf j ok =
               (sched-init prog (sl j ok)) (st-init prog)))))
 
 GOf : (j : ℕ) (ok : T (inputsBelowᵉ 1 defn)) → ℕ
-GOf j ok = arrD (nestUnit prog (sl j ok)) 0
-             (suc (closSizeᵉ (slotClos (sl j ok)) defn))
+GOf j ok = arrD (nestUnit prog (sl j ok)) (nestUnit prog (sl j ok))
+             (closSizeᵉ (slotClos (sl j ok)) defn)
 
 -- THE KEY REACHES THROUGH THE REFERENCE AND READS THE SCRIPT AT THE FAR
 -- END OF IT, which is the one thing these rows exist to see: the

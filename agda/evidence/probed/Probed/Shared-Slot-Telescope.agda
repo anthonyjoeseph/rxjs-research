@@ -28,7 +28,7 @@
 -- `0 ≤ _`; a telescope of three; and a lower slot that is SCRIPTED
 -- rather than shared, where the key reads the script instead.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: sharedConnect-nest-arr @7b8935
+-- TARGET: sharedConnect-nest-arr @094c83
 module Probed.Shared-Slot-Telescope where
 
 open import Data.Bool using (T; true)
@@ -101,8 +101,9 @@ burstOf j k oj ok =
 
 GOf : (j k : ℕ) (oj : T (inputsBelowᵉ 0 (low j)))
       (ok : T (inputsBelowᵉ 1 (up k))) → ℕ
-GOf j k oj ok = arrD (nestUnit prog (sl j k oj ok)) 0
-                  (suc (closSizeᵉ (slotClos (sl j k oj ok)) (up k)))
+GOf j k oj ok = arrD (nestUnit prog (sl j k oj ok))
+                  (nestUnit prog (sl j k oj ok))
+                  (closSizeᵉ (slotClos (sl j k oj ok)) (up k))
 
 -- THE KEY SEES THROUGH THE REFERENCE, which is the reading the one-slot
 -- rows could not take: holding the upper definition fixed and growing

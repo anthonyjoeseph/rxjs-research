@@ -210,3 +210,21 @@ abstract
   -- own size.
   arrD-flat : ∀ (U B k : ℕ) → 2 ^ k * B ≤ arrD U B (suc k)
   arrD-flat U B k = *-monoʳ-≤ (2 ^ k) (m≤n+m B U)
+
+  -- WHAT A SLOT HEAD SPENDS TO HAND OFF TO ITS DEFINITION.  The
+  -- descent on the definition is granted the whole UNIT as its
+  -- additive term -- the telescope's nesting is a summand of the unit,
+  -- so the definition's own depth is inside it however the caller's
+  -- `B` is shaped -- and the one step of key the slot's closure buys
+  -- over the definition's is worth exactly the factor of two that
+  -- doubling the additive term costs.
+  arrD-slot : ∀ (U B m : ℕ) → 1 ≤ m → arrD U U m ≤ arrD U B (suc m)
+  arrD-slot U B (suc k) _ =
+    ≤-trans (*-monoʳ-≤ (2 ^ k) (+-mono-≤ (m≤m+n U B) (m≤m+n U B)))
+            (≤-reflexive eq)
+    where
+    eq : 2 ^ k * ((U + B) + (U + B)) ≡ 2 ^ suc k * (U + B)
+    eq = trans (*-distribˡ-+ (2 ^ k) (U + B) (U + B))
+               (sym (trans (*-assoc 2 (2 ^ k) (U + B))
+                           (cong (λ z → 2 ^ k * (U + B) + z)
+                                 (+-identityʳ (2 ^ k * (U + B))))))

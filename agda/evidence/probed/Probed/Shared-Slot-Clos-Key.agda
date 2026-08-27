@@ -22,7 +22,7 @@
 -- entry, so the staged environment is never consulted; the two-slot
 -- reading is `Probed.Shared-Slot-Telescope`.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: sharedConnect-nest-arr @7b8935
+-- TARGET: sharedConnect-nest-arr @094c83
 module Probed.Shared-Slot-Clos-Key where
 
 open import Data.Bool using (T; true)
@@ -91,8 +91,8 @@ burstOf d ok =
 -- the RESTATED grant: keyed on the definition's closure, at the `B`
 -- the head hands down, which is zero
 GOf : (d : Closed Γₛ (obs natᵗ)) (ok : T (inputsBelowᵉ 0 d)) → ℕ
-GOf d ok = arrD (nestUnit prog (sl d ok)) 0
-             (suc (closSizeᵉ (slotClos (sl d ok)) d))
+GOf d ok = arrD (nestUnit prog (sl d ok)) (nestUnit prog (sl d ok))
+             (closSizeᵉ (slotClos (sl d ok)) d)
 
 -- THE KEY ITSELF, packed base 100: the four substituting layers cost
 -- 11 26 41 56, one more than the closure at each, so the exponent
