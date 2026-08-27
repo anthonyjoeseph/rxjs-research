@@ -30,8 +30,10 @@ module Rx.Clos-Size where
 
 open import Data.Fin  using (Fin)
 open import Data.List using (List; []; _∷_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat  using (ℕ; suc; _+_; _≤_; s≤s)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 open import Data.Nat.Properties using (+-mono-≤; ≤-refl)
 
 open import Rx.Exp using (Ctx; Exp; Tm;
@@ -40,7 +42,8 @@ open import Rx.Exp using (Ctx; Exp; Tm;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
                           inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
-                          syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; unfoldμ)
+                          syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; unfoldμ;
+                          elimGExp; elimGTm; elimGTms)
 
 mutual
   closSizeᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (σ : Fin n → ℕ) →
@@ -136,16 +139,69 @@ mutual
   syncSize≤closᵗˢ σ h (y ∷ ys) =
     +-mono-≤ (syncSize≤closᵗ σ h y) (syncSize≤closᵗˢ σ h ys)
 
-postulate
-  -- AN UNFOLD LEAVES THE CLOSURE WHERE IT WAS, for the reason the bare
-  -- size is left where it was: `unfoldμ` substitutes the whole `μᵉ`
-  -- only at DEFER-GATED variable positions, and a defer is a leaf in
-  -- both measures -- so the substituted copies sit under a cut and
-  -- nothing about them is counted.  The environment is untouched
-  -- throughout, the substitution introducing no new `input`.
-  -- TWIN: `Verify-Budget-Sufficient.Measures.syncSize-elimG`, proven,
-  --   whose clauses this mirrors one for one; the only clause that is
-  --   not a copy is `input`, where both sides read the same `σ i`.
-  closSize-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (σ : Fin n → ℕ)
-    (body : Exp Γ (t ∷ []) [] [] t) →
-    closSizeᵉ σ (unfoldμ body) ≡ closSizeᵉ σ body
+-- AN UNFOLD LEAVES THE CLOSURE WHERE IT WAS, for the reason the bare
+-- size is left where it was: `unfoldμ` substitutes the whole `μᵉ`
+-- only at DEFER-GATED variable positions, and a defer is a leaf in
+-- both measures -- so the substituted copies sit under a cut and
+-- nothing about them is counted.  The environment is untouched
+-- throughout, the substitution introducing no new `input`.
+-- TWIN: `Verify-Budget-Sufficient.Measures.syncSize-elimG`, proven,
+--   whose clauses this mirrors one for one; the only clause that is
+--   not a copy is `input`, where both sides read the same `σ i`.
+mutual
+  closSize-elimG : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (σ : Fin n → ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (e : Exp Γ Δᵍ Δ Θ u) →
+    closSizeᵉ σ (elimGExp x cl e) ≡ closSizeᵉ σ e
+  closSize-elimG σ x cl (input i)       = refl
+  closSize-elimG σ x cl (ofᵉ ts)        = cong suc (closSize-elimGᵗˢ σ x cl ts)
+  closSize-elimG σ x cl emptyᵉ          = refl
+  closSize-elimG σ x cl (mapᵉ f e)      =
+    cong suc (cong₂ _+_ (closSize-elimGᵗ σ x cl f) (closSize-elimG σ x cl e))
+  closSize-elimG σ x cl (takeᵉ c e)     =
+    cong suc (cong₂ _+_ (closSize-elimGᵗ σ x cl c) (closSize-elimG σ x cl e))
+  closSize-elimG σ x cl (scanᵉ f z e)   =
+    cong suc (cong₂ _+_ (cong₂ _+_ (closSize-elimGᵗ σ x cl f)
+                                   (closSize-elimGᵗ σ x cl z))
+                        (closSize-elimG σ x cl e))
+  closSize-elimG σ x cl (mergeAllᵉ lim e) = cong suc (closSize-elimG σ x cl e)
+  closSize-elimG σ x cl (switchAllᵉ e)  = cong suc (closSize-elimG σ x cl e)
+  closSize-elimG σ x cl (exhaustAllᵉ e) = cong suc (closSize-elimG σ x cl e)
+  closSize-elimG σ x cl (μᵉ e)          = cong suc (closSize-elimG σ (there x) cl e)
+  closSize-elimG σ x cl (varᵉ y)        = refl
+  closSize-elimG σ x cl (deferᵉ e)      = refl
+
+  closSize-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (σ : Fin n → ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    closSizeᵗ σ (elimGTm x cl f) ≡ closSizeᵗ σ f
+  closSize-elimGᵗ σ x cl (varᵗ y)      = refl
+  closSize-elimGᵗ σ x cl unit̂          = refl
+  closSize-elimGᵗ σ x cl (bool̂ _)      = refl
+  closSize-elimGᵗ σ x cl (nat̂ _)       = refl
+  closSize-elimGᵗ σ x cl (pairᵗ a b)   =
+    cong suc (cong₂ _+_ (closSize-elimGᵗ σ x cl a) (closSize-elimGᵗ σ x cl b))
+  closSize-elimGᵗ σ x cl (fstᵗ p)      = cong suc (closSize-elimGᵗ σ x cl p)
+  closSize-elimGᵗ σ x cl (sndᵗ p)      = cong suc (closSize-elimGᵗ σ x cl p)
+  closSize-elimGᵗ σ x cl (inlᵗ a)      = cong suc (closSize-elimGᵗ σ x cl a)
+  closSize-elimGᵗ σ x cl (inrᵗ a)      = cong suc (closSize-elimGᵗ σ x cl a)
+  closSize-elimGᵗ σ x cl (caseᵗ s l r) =
+    cong suc (cong₂ _+_ (cong₂ _+_ (closSize-elimGᵗ σ x cl s)
+                                   (closSize-elimGᵗ σ x cl l))
+                        (closSize-elimGᵗ σ x cl r))
+  closSize-elimGᵗ σ x cl (ifᵗ c a b)   =
+    cong suc (cong₂ _+_ (cong₂ _+_ (closSize-elimGᵗ σ x cl c)
+                                   (closSize-elimGᵗ σ x cl a))
+                        (closSize-elimGᵗ σ x cl b))
+  closSize-elimGᵗ σ x cl (primᵗ _ a)   = cong suc (closSize-elimGᵗ σ x cl a)
+  closSize-elimGᵗ σ x cl (strmᵗ e)     = cong suc (closSize-elimG σ x cl e)
+
+  closSize-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (σ : Fin n → ℕ) (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    closSizeᵗˢ σ (elimGTms x cl ts) ≡ closSizeᵗˢ σ ts
+  closSize-elimGᵗˢ σ x cl []       = refl
+  closSize-elimGᵗˢ σ x cl (y ∷ ys) =
+    cong₂ _+_ (closSize-elimGᵗ σ x cl y) (closSize-elimGᵗˢ σ x cl ys)
+
+closSize-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (σ : Fin n → ℕ)
+  (body : Exp Γ (t ∷ []) [] [] t) →
+  closSizeᵉ σ (unfoldμ body) ≡ closSizeᵉ σ body
+closSize-unfoldμ σ body = closSize-elimG σ (here refl) (μᵉ body) body

@@ -43,7 +43,7 @@
 -- million nodes; fourteen is already a quarter of a million and four
 -- seconds, so the geometry puts it out of reach and the second
 -- crossing is unmeasured.  Nothing here varies the store, the path or
--- the cap -- `Probed.Subscribe-Nest` is where those axes are moved.
+-- the cap.
 module Probed.Scan-Burst-Nest where
 
 open import Data.Bool using (true; false)

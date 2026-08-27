@@ -32,8 +32,8 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (Maybe; nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤m*n; *-monoʳ-≤;
-  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n; *-monoʳ-≤;
+  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; foldr)
@@ -102,7 +102,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store;
   nestOK?-intro; nestCapAt-suc; nest-sum-3; nestFacAt; nestIncAt; storeNest-latch;
   storeNest-finish; nestOK?-latch; nestUnit; nestOK?-from-floor; storeNestMax-lub;
-  liveNest; nodeNest; regsNestMax)
+  liveNest; nodeNest; regsNestMax; storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
@@ -1983,19 +1983,64 @@ burst-caps e ins =
 -- TWIN: `pop-caps` and `pop-head-valCaps`, both proven directly above,
 --   are these two clause for clause — same pop equation, same transport,
 --   the size predicate swapped for the nesting one.
-postulate
-  pop-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : ℕ) (sched : Sched Γ) (st : EvalSt e) {a : Arrival Γ} {sched′ : Sched Γ} →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    nestOK? e (Sched.slots sched) id sched st ≡ true →
-    nestOK? e (Sched.slots sched) id sched′ st ≡ true
+liveFoldN : ∀ {n} {Γ : Ctx n} → List (LiveSource Γ) → ℕ
+liveFoldN = foldr (λ l acc → liveNest l ⊔ acc) 0
 
-  pop-head-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : ℕ) (sched : Sched Γ) (st : EvalSt e) {a : Arrival Γ} {sched′ : Sched Γ} →
-    sched-next sched ≡ inj₂ (a , sched′) →
-    nestOK? e (Sched.slots sched) id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a)
-      ≤ nestCapAt e (Sched.slots sched) id
+schedHeadOf-liveNest : ∀ {n} {Γ : Ctx n} (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  (liveNest l′ ≤ liveNest l) × (nestDᵛ (arrTy a) (arrVal a) ≤ liveNest l)
+schedHeadOf-liveNest l eq with LiveSource.pending l | eq
+... | (t , v) ∷ ps | refl = m≤n⊔m _ _ , m≤m⊔n _ _
+
+schedGo-liveNest : ∀ {n} {Γ : Ctx n} (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  schedGo ls ≡ inj₂ (a , ls′) →
+  (liveFoldN ls′ ≤ liveFoldN ls) × (nestDᵛ (arrTy a) (arrVal a) ≤ liveFoldN ls)
+schedGo-liveNest (l ∷ ls) eq with schedHeadOf l in eqH | schedGo ls in eqR
+schedGo-liveNest (l ∷ ls) refl | inj₁ _ | inj₂ (a′ , ls″) =
+  ⊔-monoʳ-≤ (liveNest l) (proj₁ (schedGo-liveNest ls eqR)) ,
+  ≤-trans (proj₂ (schedGo-liveNest ls eqR)) (m≤n⊔m (liveNest l) (liveFoldN ls))
+schedGo-liveNest (l ∷ ls) refl | inj₂ (a″ , l′) | inj₁ _ =
+  ⊔-monoˡ-≤ (liveFoldN ls) (proj₁ (schedHeadOf-liveNest l eqH)) ,
+  ≤-trans (proj₂ (schedHeadOf-liveNest l eqH)) (m≤m⊔n (liveNest l) (liveFoldN ls))
+schedGo-liveNest (l ∷ ls) eq | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with schedEarlier a″ a′ | eq
+... | true  | refl =
+  ⊔-monoˡ-≤ (liveFoldN ls) (proj₁ (schedHeadOf-liveNest l eqH)) ,
+  ≤-trans (proj₂ (schedHeadOf-liveNest l eqH)) (m≤m⊔n (liveNest l) (liveFoldN ls))
+... | false | refl =
+  ⊔-monoʳ-≤ (liveNest l) (proj₁ (schedGo-liveNest ls eqR)) ,
+  ≤-trans (proj₂ (schedGo-liveNest ls eqR)) (m≤n⊔m (liveNest l) (liveFoldN ls))
+
+pop-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : ℕ) (sched : Sched Γ) (st : EvalSt e) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  nestOK? e (Sched.slots sched) id sched st ≡ true →
+  nestOK? e (Sched.slots sched) id sched′ st ≡ true
+pop-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+  nestOK?-intro e (Sched.slots sched) id _ st
+    (≤-trans
+      (storeNestMax-lub (record sched { live = ls }) st (storeNestMax sched st)
+        (storeNest-slots≤ sched st)
+        (≤-trans (proj₁ (schedGo-liveNest (Sched.live sched) eqL))
+                 (storeNest-live≤ sched st))
+        (storeNest-nodes≤ sched st)
+        (storeNest-regs≤ sched st))
+      (nestOK?-store e (Sched.slots sched) id sched st h))
+
+pop-head-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (id : ℕ) (sched : Sched Γ) (st : EvalSt e) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  nestOK? e (Sched.slots sched) id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a)
+    ≤ nestCapAt e (Sched.slots sched) id
+pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+  ≤-trans (≤-trans (proj₂ (schedGo-liveNest (Sched.live sched) eqL))
+                   (storeNest-live≤ sched st))
+          (nestOK?-store e (Sched.slots sched) id sched st h)
 
 -- AND THIS IS WHERE THE CURRENCY IS ACTUALLY BET.  The increment it
 -- spends is the one at instant zero, the only one that is not the wrap

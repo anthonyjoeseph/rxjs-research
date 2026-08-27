@@ -29,15 +29,6 @@ open import Probed.Cascade-Chain-Count
          Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits)
 open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
-open import Probed.Subscribe-Nest
-  using (premises₁; premises₂; premises₃;
-         fits₁; fits₂; fits₃;
-         sizes≡; bases≡; bursts≡; emits≡;
-         spend₁; spend₂; spend₃;
-         premThru; burstThru≡; fitsThru; thruFigs≡; spendThru;
-         premInner; readInner≡; spendInner;
-         premDeep; readDeep≡; spendDeep;
-         premDeeper; readDeeper≡; spendDeeper)
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
 open import Probed.Chain-Caps-Flat
@@ -58,8 +49,7 @@ open import Probed.PushVals-Caps
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed
-  using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡; prems≡;
-         capsAfter≡; storeM≡;
+  using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;
          residueFigures≡; resN1; resN2; resN3)
 

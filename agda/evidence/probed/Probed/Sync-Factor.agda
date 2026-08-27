@@ -5,11 +5,13 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushBurst-nest-map @349bc6
+-- TARGET: evalWith-nest-sync @07243b
 --
--- WHAT IS BEING TESTED.  The per-emit substitution charge is a factor
+-- WHAT IS BEING TESTED.  The substitution walk's charge is a factor
 -- `2 ^ sizeᵗ fn`, and the whole question is which SIZE CLASS the
--- exponent should be read in.  Full size grows under a μ-unfolding --
+-- exponent should be read in.  Each row is the target's conclusion at
+-- a one-entry environment -- `applyFn` IS `evalWith` at that
+-- environment, and the `EnvNest` premise is the payload's own depth.  Full size grows under a μ-unfolding --
 -- substitution rewrites frames that embed deferred observables -- while
 -- the nest currency the factor pays for reads zero at every `deferᵉ`,
 -- exactly where `syncSizeᵗ` stops counting.  If the factor holds at
@@ -30,10 +32,10 @@
 -- equality and not an inequality; row D mixes one visible and one
 -- hidden copy and must price exactly the visible one.
 --
--- WHAT IS NOT COVERED.  `evalTm` at a closed seed (the scan head's
--- other spend) runs the same `evalWith` walk at an empty environment,
--- but no row here reads it; and no row stacks substitutions, which
--- `Probed.Subscribe-Nest` covers in the full-size denomination.
+-- WHAT IS NOT COVERED.  Every row runs the walk at a ONE-entry
+-- environment whose depth premise is the payload's own reading, so the
+-- empty environment (`evalTm` at a closed seed) and any wider one are
+-- untouched, and no row stacks substitutions.
 module Probed.Sync-Factor where
 
 open import Data.List using ([]; _∷_)

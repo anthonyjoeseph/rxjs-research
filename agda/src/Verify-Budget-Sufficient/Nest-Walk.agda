@@ -53,10 +53,10 @@ open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; ∧
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
-open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; cSize≤delSq; fanLen-zero; fanSq-zero)
+open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; cSize≤delSq; fanLen-zero; fanSq-zero; fanLen-suc; fanSq-suc)
 open import Verify-Budget-Sufficient.Deliver-Measure using
   (deliverLen; deliverNestF; deliverNestD; admSz?; shareAdmit-len; shareAdmit-sz)
-open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest-sync; nestD-unfoldμ)
+open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; applyFn-nest-sync; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
   (nestB; nestB-mono; nestB-base; nestB-frame; nestB-unit; nestFac; 1≤nestFac; nestU;
@@ -142,6 +142,20 @@ abstract
                       (+-monoʳ-≤ (nestDᵗ fn) (m≤m⊔n (nestDᵛ _ v) (nestDᵛˢ vs)))))
           (≤-trans (mapVals-nest fn vs)
                    (*-monoʳ-≤ (2 ^ sizeᵗ fn)
+                      (+-monoʳ-≤ (nestDᵗ fn) (m≤n⊔m (nestDᵛ _ v) (nestDᵛˢ vs)))))
+
+  -- the same fold with the exponent read on the sync spine, which is
+  -- the denomination the frame's own bound is stated in
+  mapVals-nest-sync : ∀ {n} {Γ : Ctx n} {s u}
+    (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+    nestDᵛˢ (map (applyFn fn) vals) ≤ 2 ^ syncSizeᵗ fn * (nestDᵗ fn + nestDᵛˢ vals)
+  mapVals-nest-sync fn []           = z≤n
+  mapVals-nest-sync {u = u} fn (v ∷ vs) =
+    ⊔-lub (≤-trans (applyFn-nest-sync fn v)
+                   (*-monoʳ-≤ (2 ^ syncSizeᵗ fn)
+                      (+-monoʳ-≤ (nestDᵗ fn) (m≤m⊔n (nestDᵛ _ v) (nestDᵛˢ vs)))))
+          (≤-trans (mapVals-nest-sync fn vs)
+                   (*-monoʳ-≤ (2 ^ syncSizeᵗ fn)
                       (+-monoʳ-≤ (nestDᵗ fn) (m≤n⊔m (nestDᵛ _ v) (nestDᵛˢ vs)))))
 
 -- AND OVER A ONE-SHOT'S PAYLOADS, where nothing is substituted IN and
@@ -465,70 +479,6 @@ abstract
                      (*-monoˡ-≤ X (1≤nestFac S W)))
             (addN S W X U)
 
--- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
--- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
--- frame the `suc` a `*All` layer adds -- exactly right for the LAYER,
--- and silent about what the layer DOES.  `thruWalk` subscribes each
--- observable it is handed, so the values leaving the frame are an
--- inner's emissions, and a subscription SUBSTITUTES: the emitted depth
--- is the argument's depth times the number of times the step function
--- names its payload.  Multiplicative, so no summand is the shape.
---
--- AND THE FACTOR COMES FROM THE CAP BECAUSE THE FRAME CANNOT CARRY IT.
--- A frame holds an op and node ids and no syntax, so no function of it
--- can see what the subscription will substitute; the occurrence count is
--- bounded by two to the substituted function's SIZE.  But `capsOK?`
--- bounds the STATE and the arriving values are not in it, so the cap has
--- to be imposed on them separately -- which is what the `valCaps?`
--- premise does, and why the caps hypothesis alone is not enough.
---
--- AND THE INNER ARM IS THE SAME STATEMENT AT THE OTHER `*All` FRAME.
--- Both re-enter the subscribe machinery and both were charged as though
--- they forwarded, so one repair covers two arms.
---
--- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
---   eighty against forty-one, at a payload forty layers deep; the gap
---   is that depth, so no constant per value closes it.  The same
---   witness kills the ASSEMBLY at this frame, whose charge at the
---   smallest admissible width IS this bound.
--- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the caps-scaled form at
---   the same eighty against forty-one, because `capsOK? (caps 0 0 0)`
---   holds at the state it is asked about -- one ordinary installed node
---   and nothing else -- so the factor is one and the caps premise buys
---   the statement nothing at all.  The same file pins `valCaps?` FALSE
---   at the arriving value, which is the premise that does buy it.
--- REFUTED: `Refuted.Thru-Scan-Burst-Nest` kills the FLAT factor, at a
---   cold scripted slot whose sync list is charged to neither side: the
---   frame's own burst doubles the delivered depth per value while the
---   cap and the incoming state stay fixed, so the crossing arrives at
---   sixteen thousand three hundred and eighty-three against eight
---   thousand one hundred and ninety-two -- one value earlier, the two
---   sides are eight thousand one hundred and ninety-one against the same
---   eight thousand one hundred and ninety-two.  That is why the factor
---   is a power in the OUTPUT burst and the length premise is stated.
--- PROBED: `Probed.Subscribe-Nest` clears the burst-powered form at the
---   same witness and the same tight cap, at the width this statement's
---   own hypotheses pin -- `1 ≤ W`, one value in, one value back.  The
---   crossing is the row that could have failed: eighty delivered
---   against forty-one at a factor of one, which is the first refutation
---   above, and against eighty-two at a factor of two, while the cap the
---   value's size grants is a hundred and seventy-three.  Not covered:
---   the BURST axis -- the frame hands back a single value there, so the
---   second copy of the base is slack, and the refutation directly above
---   is what covers that axis instead.
-postulate
-  stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (W : ℕ) (sl : Slots Γ)
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (p : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
-    all (valCaps? c sl (obs u)) vals ≡ true →
-    let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
-    length (proj₁ r) ≤ W →
-    (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-      ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
 
 -- A QUEUE'S NESTING, THE SAME `⊔`-FOLD `nodeNest` READS OFF A PARKED
 -- `mergeAll-st`, named so a statement about the drain can say what it
@@ -546,6 +496,20 @@ abstract
   nestDᵛˢ-++ {u = u} (x ∷ xs) ys =
     ≤-trans (⊔-mono-≤ (≤-refl {nestDᵛ u x}) (nestDᵛˢ-++ xs ys))
             (≤-reflexive (sym (⊔-assoc (nestDᵛ u x) (nestDᵛˢ xs) (nestDᵛˢ ys))))
+
+  -- and the two injections, which is what a fold over the SPLIT list
+  -- spends when its bound is read against the joined one
+  nestDᵛˢ-++ˡ : ∀ {n} {Γ : Ctx n} {u} (xs ys : List (Val Γ u)) →
+    nestDᵛˢ xs ≤ nestDᵛˢ (xs ++ ys)
+  nestDᵛˢ-++ˡ []       ys = z≤n
+  nestDᵛˢ-++ˡ {u = u} (x ∷ xs) ys =
+    ⊔-mono-≤ (≤-refl {nestDᵛ u x}) (nestDᵛˢ-++ˡ xs ys)
+
+  nestDᵛˢ-++ʳ : ∀ {n} {Γ : Ctx n} {u} (xs ys : List (Val Γ u)) →
+    nestDᵛˢ ys ≤ nestDᵛˢ (xs ++ ys)
+  nestDᵛˢ-++ʳ []       ys = ≤-refl
+  nestDᵛˢ-++ʳ {u = u} (x ∷ xs) ys =
+    ≤-trans (nestDᵛˢ-++ʳ xs ys) (m≤n⊔m (nestDᵛ u x) (nestDᵛˢ (xs ++ ys)))
 
 -- THE CAPS PREMISE THIS FACE CARRIES, AND IT IS DELIBERATELY WEAKER
 -- THAN THE CAPS FACE'S: it bounds the LIVE subscriptions' sizes and
@@ -816,97 +780,6 @@ abstract
     ≤ᵇ-true (syncSizeᵛ (obs (obs u)) b) (Caps.cSize c)
       (≤-trans (n≤1+n (syncSizeᵉ b)) (≤ᵇ⇒≤ _ _ (T-to h)))
 
--- AND THE FILTER FRAME'S PUSH, WHICH MUST BE FREE.  A `take-f` writes a
--- decremented counter and forwards or drops, so it neither substitutes
--- into a value nor stores one -- the node's own nesting is zero and no
--- value leaves deeper than it arrived.  Stated as two
--- separate facts because that is what the head above spends: the values
--- are a prefix of what arrived and the table is the table that arrived,
--- and neither half is bounded by the other.
---
--- TWIN: `pushBurst-caps` is this induction walked -- the same fold over
---   the same emit list, threading the same evolving state and spending
---   a per-emit frame lemma at each step -- on the caps face, where it
---   is proven and carries an index the nest face does not need.
--- TWIN: `stepFrame-nodes-take` is the per-emit half, proven, and it
---   already says exactly what one filter frame costs: nothing.
-postulate
-  pushBurst-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (g : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
-    (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    let r = pushBurst g id now (take-f nid) κ str sched st in
-    (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
-       ≤ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
-    × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
-    × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st)
-
--- AND THE SUBSTITUTING FRAME'S PUSH, WHICH IS WHERE THE FACTOR COMES
--- FROM.  A `map-f` applies its function to every value going past and
--- writes nothing, so the table is untouched and the values grow by
--- exactly one substitution -- the per-emit cost `mapVals-nest` already
--- charges, lifted across the fold.  The two halves are separate facts
--- for the same reason the filter frame's are: neither bounds the other.
---
--- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
---   against forty, at a queued `mapᵉ` whose step function names its
---   payload on both sides of the sum: `nestDᵉ` is additive there and
---   the substitution is not, so the emitted value is deeper than the
---   whole queue is charged.
--- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
---   invites -- charging the arm the `nestUnit e sl` its own parent
---   already carries -- at a hundred and twenty against eighty-two,
---   with the queued observable AS the program so the unit is as large
---   as the currency admits.  A third occurrence of the payload in the
---   step function moves the emit and leaves the unit where it was, so
---   what is owed is a FACTOR in the substituted function's SIZE and
---   no summand in a depth currency is one.
--- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent
---   from the STORE's cap instead, sixteen delivered against a charge
---   of six at `st-init`, where the node table is empty and so
---   `capsOK? (caps 0 0 0)` holds outright and the factor collapses to
---   one.  Each stacked `mapᵉ` naming its payload twice doubles the
---   delivered depth and leaves the charge where it was -- eight, then
---   sixteen -- so the gap is unbounded rather than one crossing.  That
---   is what fixes the exponent here to the FUNCTION's own size.
--- TWIN: `mapVals-nest` is the per-emit half at the full measure,
---   proven, with the fold the same walk `pushBurst-caps` already makes
---   over the same list; the factor's SYNC denomination is the probed
---   re-run of that per-emit induction, not a new shape.
--- PROBED: `Probed.Subscribe-Nest` reaches this leaf through the head
---   above rather than directly -- the head is a real body now, so the
---   only map-specific thing its rows can still be measuring is this
---   factor -- on exactly the family that refuted every earlier form:
---   a stack of `mapᵉ` frames each naming its payload on both sides of
---   a sum, so the delivered depth doubles per layer, read at the
---   SMALLEST cap the `nestValOK?` premise admits.  What it measures
---   rather than asserts is the exponent SPENT: two of the three
---   programs cross, needing one bit and two against the twenty-one to
---   thirty-five the cap grants, and the demand rises by ONE per
---   stacked frame while the size it is read off rises by SEVEN -- so
---   the doubling is outrun with six of every seven bits unspent.  Not
---   covered: the FOLD, since every row hands back exactly one value,
---   pinned rather than assumed; and any cap above the value's own.
--- PROBED: `Probed.Sync-Factor` measures the factor's DENOMINATION --
---   whether the exponent can be read in `syncSizeᵗ` rather than
---   `sizeᵗ` -- at the duplicating family of `Refuted.Apply-Fn-Nest`
---   plus the rows that split the two currencies: the same duplication
---   under a `deferᵉ` gate contributes ZERO to the output's nesting,
---   pinned as an equality, and a mixed function prices exactly its
---   visible copy.  So substitution does not relocate content across a
---   defer gate on any row, and the sync-denominated bound holds where
---   the currencies disagree.  Not covered: `evalTm` at a closed seed,
---   and stacked substitutions, which the receipt above reaches only in
---   the full-size denomination.
-postulate
-  pushBurst-nest-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
-    (κ : Path Γ u t) (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
-    let r = pushBurst g id now (map-f fn) κ str sched st in
-    (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
-       ≤ 2 ^ syncSizeᵗ fn
-         * (nestDᵗ fn + nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str))))
-    × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
-    × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st)
 
 
 -- THE THRU FRAME'S PUSH, TAKEN APART.  A `thru-outer` frame is the one
@@ -966,6 +839,18 @@ abstract
       (trans (splitEvents-retag-id evs _)
         (trans (splitEvents-vals vals [])
                (++-identityʳ vals)))
+
+  -- the retag type is a phantom on the VALUE component, so the two
+  -- readings a statement and its reduction pick are the same list
+  splitEvents-vals-A : ∀ {n} {Γ : Ctx n} {u} {A B : Set}
+    (es : List (InstEvent (Val Γ u))) →
+    proj₁ (splitEvents {A = A} es) ≡ proj₁ (splitEvents {A = B} es)
+  splitEvents-vals-A []               = refl
+  splitEvents-vals-A (value v   ∷ es) = cong (v ∷_) (splitEvents-vals-A es)
+  splitEvents-vals-A (init s    ∷ es) = splitEvents-vals-A es
+  splitEvents-vals-A (close s r ∷ es) = splitEvents-vals-A es
+  splitEvents-vals-A (handoff s ∷ es) = splitEvents-vals-A es
+  splitEvents-vals-A (complete  ∷ es) = splitEvents-vals-A es
 
 -- A write that does not deepen its node moves NO reading of the table:
 -- `lookupNode-set-at` at the point where the written state is bounded
@@ -1090,6 +975,92 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
   IH = thruWalk-nest G fuel op nid κ id now os
          (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc))) rest
 
+-- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
+-- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
+-- frame the `suc` a `*All` layer adds -- exactly right for the LAYER,
+-- and silent about what the layer DOES.  `thruWalk` subscribes each
+-- observable it is handed, so the values leaving the frame are an
+-- inner's emissions, and a subscription SUBSTITUTES: the emitted depth
+-- is the argument's depth times the number of times the step function
+-- names its payload.  Multiplicative, so no summand is the shape.
+--
+-- AND THE FACTOR COMES FROM THE CAP BECAUSE THE FRAME CANNOT CARRY IT.
+-- A frame holds an op and node ids and no syntax, so no function of it
+-- can see what the subscription will substitute; the occurrence count is
+-- bounded by two to the substituted function's SIZE.  But `capsOK?`
+-- bounds the STATE and the arriving values are not in it, so the cap has
+-- to be imposed on them separately -- which is what the `valCaps?`
+-- premise does, and why the caps hypothesis alone is not enough.
+--
+-- AND THE INNER ARM IS THE SAME STATEMENT AT THE OTHER `*All` FRAME.
+-- Both re-enter the subscribe machinery and both were charged as though
+-- they forwarded, so one repair covers two arms.
+--
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
+--   eighty against forty-one, at a payload forty layers deep; the gap
+--   is that depth, so no constant per value closes it.  The same
+--   witness kills the ASSEMBLY at this frame, whose charge at the
+--   smallest admissible width IS this bound.
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the caps-scaled form at
+--   the same eighty against forty-one, because `capsOK? (caps 0 0 0)`
+--   holds at the state it is asked about -- one ordinary installed node
+--   and nothing else -- so the factor is one and the caps premise buys
+--   the statement nothing at all.  The same file pins `valCaps?` FALSE
+--   at the arriving value, which is the premise that does buy it.
+-- REFUTED: `Refuted.Thru-Scan-Burst-Nest` kills the FLAT factor, at a
+--   cold scripted slot whose sync list is charged to neither side: the
+--   frame's own burst doubles the delivered depth per value while the
+--   cap and the incoming state stay fixed, so the crossing arrives at
+--   sixteen thousand three hundred and eighty-three against eight
+--   thousand one hundred and ninety-two -- one value earlier, the two
+--   sides are eight thousand one hundred and ninety-one against the same
+--   eight thousand one hundred and ninety-two.  That is why the factor
+--   is a power in the OUTPUT burst and the length premise is stated.
+postulate
+  thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (W : ℕ) (sl : Slots Γ)
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (p : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+    all (valCaps? c sl (obs u)) vals ≡ true →
+    thruFitOK (nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W))
+      sf op nid p id now vals sched st
+
+-- The head itself is now the walk and the wrap composed at that
+-- grant, with the base term absorbed by positivity of the factor.
+stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (W : ℕ) (sl : Slots Γ)
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+  all (valCaps? c sl (obs u)) vals ≡ true →
+  let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
+  length (proj₁ r) ≤ W →
+  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+    ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
+stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
+  hsl h1w hlv hcap hval hlr =
+  ⊔-lub
+    (≤-trans (proj₁ (proj₂ WRAP))
+      (≤-trans (proj₁ (proj₂ WALK))
+        (⊔-lub (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
+                        (raiseN (Caps.cSize c) W
+                          (nodesMax st ⊔ nestDᵛˢ vals) W))
+               ≤-refl)))
+    (≤-trans (≤-reflexive (cong nestDᵛˢ (proj₁ WRAP))) (proj₁ WALK))
+  where
+  G = nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
+  w = thruWalk sf op nid p id now vals sched st
+  WALK = thruWalk-nest G sf op nid p id now vals sched st
+           (thruFit-frame c W sl sf id now op nid p vals sched st
+              hsl h1w hlv hcap hval)
+  WRAP = thruWrap-nest op nid fin (proj₁ w) (proj₁ (proj₂ w))
+           (proj₁ (proj₂ (proj₂ w))) (proj₂ (proj₂ (proj₂ w)))
+
 -- The same relation lifted over the burst the descent hands back, one
 -- fit per emit, each at the state the previous frame left.
 pushFitOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1157,6 +1128,184 @@ pushBurst-nest-thru {Γ = Γ} {t = t} {u = u} G fuel op nid κ id now (em ∷ em
   N₁ = ≤-trans (proj₁ (proj₂ WR)) (proj₁ (proj₂ WK))
   N₂ : (j : NodeId) → nodeNestAt j st₁ ≤ nodeNestAt j st ⊔ G
   N₂ j = ≤-trans (proj₂ (proj₂ WR) j) (proj₂ (proj₂ WK) j)
+
+-- AND THE FILTER FRAME'S PUSH, WHICH MUST BE FREE.  A `take-f` writes a
+-- decremented counter and forwards or drops, so it neither substitutes
+-- into a value nor stores one -- the node's own nesting is zero and no
+-- value leaves deeper than it arrived.  Stated as two
+-- separate facts because that is what the head above spends: the values
+-- are a prefix of what arrived and the table is the table that arrived,
+-- and neither half is bounded by the other.
+--
+-- TWIN: `pushBurst-caps` is this induction walked -- the same fold over
+--   the same emit list, threading the same evolving state and spending
+--   a per-emit frame lemma at each step -- on the caps face, where it
+--   is proven and carries an index the nest face does not need.
+-- TWIN: `stepFrame-nodes-take` is the per-emit half, proven, and it
+--   already says exactly what one filter frame costs: nothing.
+abstract
+  stepFrame-take-split : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (g : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame g id now (take-f nid) κ vals fin sched st in
+    (nestDᵛˢ (proj₁ r) ≤ nestDᵛˢ vals)
+    × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≤ nodesMax st)
+    × (∀ (j : NodeId) →
+         nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≤ nodeNestAt j st)
+  stepFrame-take-split g id now nid κ vals fin sched st
+    with lookupNode nid (EvalSt.nodes st) in eq
+  ... | nothing                    = z≤n , ≤-refl , (λ j → ≤-refl)
+  ... | just (scan-st _)           = z≤n , ≤-refl , (λ j → ≤-refl)
+  ... | just (mergeAll-st _ _ _ _) = z≤n , ≤-refl , (λ j → ≤-refl)
+  ... | just (switch-st _ _)       = z≤n , ≤-refl , (λ j → ≤-refl)
+  ... | just (exhaust-st _ _)      = z≤n , ≤-refl , (λ j → ≤-refl)
+  ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+  ...   | true  =
+        takeVals-nest k vals
+        , ≤-trans (setNode-nodes nid (take-st zero) (EvalSt.nodes st))
+                  (⊔-lub z≤n ≤-refl)
+        , (λ j → lookupNode-set-same j nid (take-st zero) (take-st k)
+                   (EvalSt.nodes st) eq ≤-refl)
+  ...   | false =
+        takeVals-nest k vals
+        , ≤-trans (setNode-nodes nid
+                     (take-st (proj₁ (proj₂ (takeVals k vals))))
+                     (EvalSt.nodes st))
+                  (⊔-lub z≤n ≤-refl)
+        , (λ j → lookupNode-set-same j nid
+                   (take-st (proj₁ (proj₂ (takeVals k vals)))) (take-st k)
+                   (EvalSt.nodes st) eq ≤-refl)
+
+pushBurst-nest-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (g : Gas) (id : Id) (now : Tick) (nid : NodeId) (κ : Path Γ s t)
+  (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  let r = pushBurst g id now (take-f nid) κ str sched st in
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
+     ≤ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str)))
+  × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st)
+pushBurst-nest-take g id now nid κ [] sched st =
+  z≤n , ≤-refl , (λ j → ≤-refl)
+pushBurst-nest-take {Γ = Γ} {t = t} {s = s} g id now nid κ (em ∷ ems) sched st =
+  ≤-trans (nestDᵛˢ-++
+             (proj₁ (splitEvents {A = Val Γ t}
+               (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ sf))
+                ++ map value (proj₁ sf)
+                ++ (if proj₁ (proj₂ (proj₂ sf)) then complete ∷ [] else []))))
+             (proj₁ (splitBurst {A = Val Γ t}
+               (proj₁ (pushBurst g id now (take-f nid) κ ems sched₁ st₁)))))
+    (⊔-lub (≤-trans (≤-reflexive (cong (nestDᵛˢ {u = s}) PEV))
+                    (≤-trans (proj₁ STEP)
+                      (≤-trans (≤-reflexive (cong (nestDᵛˢ {u = s})
+                                 (splitEvents-vals-A {A = Val Γ s} {B = Val Γ t}
+                                   (InstEmit.events em))))
+                        (nestDᵛˢ-++ˡ
+                          (proj₁ (splitEvents {A = Val Γ t} (InstEmit.events em)))
+                          (proj₁ (splitBurst {A = Val Γ t} ems))))))
+           (≤-trans (proj₁ IH)
+                    (nestDᵛˢ-++ʳ
+                      (proj₁ (splitEvents {A = Val Γ t} (InstEmit.events em)))
+                      (proj₁ (splitBurst {A = Val Γ t} ems)))))
+  , ≤-trans (proj₁ (proj₂ IH)) (proj₁ (proj₂ STEP))
+  , (λ j → ≤-trans (proj₂ (proj₂ IH) j) (proj₂ (proj₂ STEP) j))
+  where
+  sp = splitEvents {A = Val Γ s} (InstEmit.events em)
+  sf = stepFrame g id now (take-f nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ sf)))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ sf)))
+  STEP = stepFrame-take-split g id now nid κ (proj₁ sp)
+           (proj₂ (proj₂ sp)) sched st
+  IH = pushBurst-nest-take g id now nid κ ems sched₁ st₁
+  PEV : proj₁ (splitEvents {A = Val Γ t}
+          (proj₁ (proj₂ sp) ++ retagEvents (proj₁ (proj₂ sf))
+           ++ map value (proj₁ sf)
+           ++ (if proj₁ (proj₂ (proj₂ sf)) then complete ∷ [] else [])))
+          ≡ proj₁ sf
+  PEV = pushEmit-vals (InstEmit.events em) (proj₁ (proj₂ sf)) (proj₁ sf)
+          (proj₁ (proj₂ (proj₂ sf)))
+
+-- AND THE SUBSTITUTING FRAME'S PUSH, WHICH IS WHERE THE FACTOR COMES
+-- FROM.  A `map-f` applies its function to every value going past and
+-- writes nothing, so the table is untouched and the values grow by
+-- exactly one substitution -- the per-emit cost `mapVals-nest` already
+-- charges, lifted across the fold.  The two halves are separate facts
+-- for the same reason the filter frame's are: neither bounds the other.
+--
+-- REFUTED: `Refuted.Inner-Drain-Nest` kills the free form, eighty
+--   against forty, at a queued `mapᵉ` whose step function names its
+--   payload on both sides of the sum: `nestDᵉ` is additive there and
+--   the substitution is not, so the emitted value is deeper than the
+--   whole queue is charged.
+-- REFUTED: `Refuted.Inner-Drain-Nest` also kills the repair this most
+--   invites -- charging the arm the `nestUnit e sl` its own parent
+--   already carries -- at a hundred and twenty against eighty-two,
+--   with the queued observable AS the program so the unit is as large
+--   as the currency admits.  A third occurrence of the payload in the
+--   step function moves the emit and leaves the unit where it was, so
+--   what is owed is a FACTOR in the substituted function's SIZE and
+--   no summand in a depth currency is one.
+-- REFUTED: `Refuted.Subscribe-Caps-Nest` kills taking the exponent
+--   from the STORE's cap instead, sixteen delivered against a charge
+--   of six at `st-init`, where the node table is empty and so
+--   `capsOK? (caps 0 0 0)` holds outright and the factor collapses to
+--   one.  Each stacked `mapᵉ` naming its payload twice doubles the
+--   delivered depth and leaves the charge where it was -- eight, then
+--   sixteen -- so the gap is unbounded rather than one crossing.  That
+--   is what fixes the exponent here to the FUNCTION's own size.
+-- TWIN: `mapVals-nest` is the per-emit half at the full measure,
+--   proven, with the fold the same walk `pushBurst-caps` already makes
+--   over the same list; the factor's SYNC denomination is the probed
+--   re-run of that per-emit induction, not a new shape.
+pushBurst-nest-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] s u)
+  (κ : Path Γ u t) (str : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  let r = pushBurst g id now (map-f fn) κ str sched st in
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r)))
+     ≤ 2 ^ syncSizeᵗ fn
+       * (nestDᵗ fn + nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} str))))
+  × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st)
+pushBurst-nest-map g id now fn κ [] sched st =
+  z≤n , ≤-refl , (λ j → ≤-refl)
+pushBurst-nest-map {Γ = Γ} {t = t} {s = s} {u = u} g id now fn κ (em ∷ ems) sched st =
+  ≤-trans (nestDᵛˢ-++
+             (proj₁ (splitEvents {A = Val Γ t}
+               (proj₁ (proj₂ sp) ++ retagEvents {A = Val Γ t} []
+                ++ map value (map (applyFn fn) (proj₁ sp))
+                ++ (if proj₂ (proj₂ sp) then complete ∷ [] else []))))
+             (proj₁ (splitBurst {A = Val Γ t}
+               (proj₁ (pushBurst g id now (map-f fn) κ ems sched st)))))
+    (⊔-lub (≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u}) PEV))
+                    (≤-trans (mapVals-nest-sync fn (proj₁ sp))
+                             (*-monoʳ-≤ (2 ^ syncSizeᵗ fn)
+                               (+-monoʳ-≤ (nestDᵗ fn)
+                                 (≤-trans (≤-reflexive (cong (nestDᵛˢ {u = s})
+                                            (splitEvents-vals-A
+                                              {A = Val Γ u} {B = Val Γ t}
+                                              (InstEmit.events em))))
+                                   (nestDᵛˢ-++ˡ
+                                     (proj₁ (splitEvents {A = Val Γ t}
+                                              (InstEmit.events em)))
+                                     (proj₁ (splitBurst {A = Val Γ t} ems))))))))
+           (≤-trans (proj₁ IH)
+                    (*-monoʳ-≤ (2 ^ syncSizeᵗ fn)
+                      (+-monoʳ-≤ (nestDᵗ fn)
+                        (nestDᵛˢ-++ʳ
+                          (proj₁ (splitEvents {A = Val Γ t} (InstEmit.events em)))
+                          (proj₁ (splitBurst {A = Val Γ t} ems)))))))
+  , proj₁ (proj₂ IH)
+  , proj₂ (proj₂ IH)
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  IH = pushBurst-nest-map g id now fn κ ems sched st
+  PEV : proj₁ (splitEvents {A = Val Γ t}
+          (proj₁ (proj₂ sp) ++ retagEvents {A = Val Γ t} []
+           ++ map value (map (applyFn fn) (proj₁ sp))
+           ++ (if proj₂ (proj₂ sp) then complete ∷ [] else [])))
+          ≡ map (applyFn fn) (proj₁ sp)
+  PEV = pushEmit-vals {B = Val Γ t} (InstEmit.events em) []
+          (map (applyFn fn) (proj₁ sp)) (proj₂ (proj₂ sp))
 
 
 -- THE ROOM THE WIDTH FIELD MUST STILL HAVE AT THE NODE THIS STEP
@@ -2186,24 +2335,74 @@ subscribeInner-nest-arr c sl B W (gs fuel) op allNid κ id now o sched st
 -- the induction lives: every other way into `thruConsume` either
 -- returns its inputs untouched or parks the arrival, and both are
 -- discharged above, so nothing else in the step is waiting on this.
+-- THE ONE SUBSCRIPTION ALL THREE ARMS SHARE, which is where the caps
+-- bundle is really bet: every node the descent installs must pass the
+-- width fold and the slot telescope must come back unmoved.  The
+-- writes AROUND it are checked beside it -- a bump rewrites one node
+-- to a state the width predicate reads identically, a kill touches no
+-- node and no slot, and each arm's own write-back is a state the
+-- predicate reads as true outright.
 postulate
-  thruStep-merge-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (fuel : Gas) (nid : NodeId)
+  subscribeInner-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (fuel : Gas) (op : AllOp) (nid : NodeId)
     (κ : Path Γ u t) (id : Id) (now : Tick)
-    (lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool)
     (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} lim act q od) →
     Sched.slots sched ≡ sl →
     nestCapsOK? c sched st ≡ true →
     nestValOK? c (obs u) o ≡ true →
     pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
-    suc (length q) ≤ Caps.cWid c →
-    let R      = subscribeInner fuel mergeAllᵒ nid κ id now o sched st
-        done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+    let R      = subscribeInner fuel op nid κ id now o sched st
         sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-        st′    = record st₁ { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } in
-    (nestCapsOK? c sched₁ st′ ≡ true) × (Sched.slots sched₁ ≡ sl)
+        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))) in
+    (nestCapsOK? c sched₁ st₁ ≡ true) × (Sched.slots sched₁ ≡ sl)
+
+-- A bump rewrites one node to a state the width predicate cannot tell
+-- from the old one: the merge clause of `widNode` reads only the
+-- queue, and the bump moves only the activity counter.
+mergeAllBump-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (nid : NodeId) (done : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  nestCapsOK? c sched st ≡ true →
+  nestCapsOK? c sched
+    (record st { nodes = mergeAllBump nid done (EvalSt.nodes st) }) ≡ true
+mergeAllBump-nestCaps c nid done sched st h
+  with lookupNode nid (EvalSt.nodes st) in eq
+... | just (mergeAll-st lim act q od) =
+      nestCapsOK?-setNode c nid
+        (mergeAll-st lim (if done then act else suc act) q od) sched st
+        (nestCapsOK?-lookupWid c nid (mergeAll-st lim act q od) sched st eq h) h
+... | just (scan-st v)        = h
+... | just (take-st k)        = h
+... | just (switch-st cu od)  = h
+... | just (exhaust-st ac od) = h
+... | nothing                 = h
+
+thruStep-merge-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Val Γ (obs u))) (od : Bool)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (mergeAll-st {t = u} lim act q od) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+  suc (length q) ≤ Caps.cWid c →
+  let R      = subscribeInner fuel mergeAllᵒ nid κ id now o sched st
+      done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+      sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+      st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+      st′    = record st₁ { nodes = mergeAllBump nid done (EvalSt.nodes st₁) } in
+  (nestCapsOK? c sched₁ st′ ≡ true) × (Sched.slots sched₁ ≡ sl)
+thruStep-merge-inner-caps c sl fuel nid κ id now lim act q od o sched st
+  hl hsl hc hv hw hq =
+  mergeAllBump-nestCaps c nid done sched₁ st₁ (proj₁ SUB) , proj₂ SUB
+  where
+  R      = subscribeInner fuel mergeAllᵒ nid κ id now o sched st
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  SUB = subscribeInner-nestCaps c sl fuel mergeAllᵒ nid κ id now o sched st
+          hsl hc hv hw
 
 thruStep-merge-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -2298,32 +2497,64 @@ abstract
   switchKill-nodes nothing  sched st = refl
   switchKill-nodes (just v) sched st = refl
 
-postulate
-  thruStep-switch-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (fuel : Gas) (nid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (cur : Maybe Id) (od : Bool)
-    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (switch-st cur od) →
-    Sched.slots sched ≡ sl →
-    nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) o ≡ true →
-    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
-    let K      = switchKill cur sched st
-        sched₁ = proj₁ (proj₂ K)
-        st₁    = proj₂ (proj₂ K)
-        R      = subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
-        inst   = proj₁ R
-        done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
-        sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-        st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-        st′    = record st₂
-                   { nodes = setNode nid
-                       (switch-st (if done then nothing else just inst) od)
-                       (EvalSt.nodes st₂) } in
-    (nestCapsOK? c sched₁ st₁ ≡ true)
-    × (Sched.slots sched₁ ≡ sl)
-    × (nestCapsOK? c sched₂ st′ ≡ true)
-    × (Sched.slots sched₂ ≡ sl)
+thruStep-switch-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (cur : Maybe Id) (od : Bool)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (switch-st cur od) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+  let K      = switchKill cur sched st
+      sched₁ = proj₁ (proj₂ K)
+      st₁    = proj₂ (proj₂ K)
+      R      = subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
+      inst   = proj₁ R
+      done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+      sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+      st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+      st′    = record st₂
+                 { nodes = setNode nid
+                     (switch-st (if done then nothing else just inst) od)
+                     (EvalSt.nodes st₂) } in
+  (nestCapsOK? c sched₁ st₁ ≡ true)
+  × (Sched.slots sched₁ ≡ sl)
+  × (nestCapsOK? c sched₂ st′ ≡ true)
+  × (Sched.slots sched₂ ≡ sl)
+thruStep-switch-inner-caps c sl fuel nid κ id now nothing od o sched st
+  hl hsl hc hv hw =
+  hc , hsl
+  , nestCapsOK?-setNode c nid
+      (switch-st (if done then nothing else just inst) od) sched₂ st₂
+      refl (proj₁ SUB)
+  , proj₂ SUB
+  where
+  R      = subscribeInner fuel switchᵒ nid κ id now o sched st
+  inst   = proj₁ R
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  SUB = subscribeInner-nestCaps c sl fuel switchᵒ nid κ id now o sched st
+          hsl hc hv hw
+thruStep-switch-inner-caps c sl fuel nid κ id now (just v) od o sched st
+  hl hsl hc hv hw =
+  hc , hsl
+  , nestCapsOK?-setNode c nid
+      (switch-st (if done then nothing else just inst) od) sched₂ st₂
+      refl (proj₁ SUB)
+  , proj₂ SUB
+  where
+  K      = switchKill (just v) sched st
+  sched₁ = proj₁ (proj₂ K)
+  st₁    = proj₂ (proj₂ K)
+  R      = subscribeInner fuel switchᵒ nid κ id now o sched₁ st₁
+  inst   = proj₁ R
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  sched₂ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₂    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  SUB = subscribeInner-nestCaps c sl fuel switchᵒ nid κ id now o sched₁ st₁
+          hsl hc hv hw
 
 thruStep-switch-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -2420,26 +2651,35 @@ thruStep-switch-inner {e = e} c sl B W m m′ fuel nid κ id now cur od o sched 
 -- AND THE EXHAUST HAS ONE TOO, the busy arm dropping the arrival
 -- outright -- so the only work is the idle one, and it is the merge's
 -- admit arm without a queue to write back.
--- PROBED: `Probed.Thru-Step-Indexed` reaches the caps conjunct at the
---   arm that subscribes, and the slots equation, both LOAD-BEARING.
-postulate
-  thruStep-exhaust-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (fuel : Gas) (nid : NodeId)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (od : Bool)
-    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-    lookupNode nid (EvalSt.nodes st) ≡ just (exhaust-st false od) →
-    Sched.slots sched ≡ sl →
-    nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) o ≡ true →
-    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
-    let R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
-        done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
-        sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-        st′    = record st₁
-                   { nodes = setNode nid (exhaust-st (not done) od)
-                               (EvalSt.nodes st₁) } in
-    (nestCapsOK? c sched₁ st′ ≡ true) × (Sched.slots sched₁ ≡ sl)
+thruStep-exhaust-inner-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (od : Bool)
+  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+  lookupNode nid (EvalSt.nodes st) ≡ just (exhaust-st false od) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+  let R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
+      done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+      sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+      st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+      st′    = record st₁
+                 { nodes = setNode nid (exhaust-st (not done) od)
+                             (EvalSt.nodes st₁) } in
+  (nestCapsOK? c sched₁ st′ ≡ true) × (Sched.slots sched₁ ≡ sl)
+thruStep-exhaust-inner-caps c sl fuel nid κ id now od o sched st
+  hl hsl hc hv hw =
+  nestCapsOK?-setNode c nid (exhaust-st (not done) od) sched₁ st₁
+    refl (proj₁ SUB)
+  , proj₂ SUB
+  where
+  R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
+  done   = proj₁ (proj₂ (proj₂ (proj₂ R)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+  SUB = subscribeInner-nestCaps c sl fuel exhaustᵒ nid κ id now o sched st
+          hsl hc hv hw
 
 thruStep-exhaust-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
@@ -4978,23 +5218,56 @@ mutual
 --   fan recurrences are the branch-structured charge that refutation
 --   demands: each level's allowance contains the next level's whole.
 postulate
-  shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
     (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (ps : List (RegId × Path Γ (lookup Γ i) t)) (k : ℕ)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
     admSz? (Caps.cSize c) ps ≡ true →
-    length ps ≤ Caps.cReg c →
+    length ps ≤ k → k ≤ Caps.cReg c →
     shareBurstsOK W sf gas id now i vals fin ps sched st →
     shareCapsOK c sl sf gas id now i vals fin ps sched st →
     nodesMax (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
-      ≤ nestFac (Caps.cSize c) W ^ fanLen (suc gas) c
-        * ((2 ^ fanSq (suc gas) c) ^ W
+      ≤ nestFac (Caps.cSize c) W ^ (k * suc (Caps.cSize c + fanLen gas c))
+        * ((2 ^ (k * (Caps.cSize c * Caps.cSize c + fanSq gas c))) ^ W
            * ((nodesMax st ⊔ nestDᵛˢ vals)
-              + W * (fanSq (suc gas) c
-                     + suc (fanLen (suc gas) c) * nestU (delSq (suc gas) c) (nestUnit e sl))))
+              + W * (k * (Caps.cSize c * Caps.cSize c + fanSq gas c)
+                     + suc (fanLen (suc gas) c)
+                       * nestU (delSq (suc gas) c) (nestUnit e sl))))
+
+-- The whole-list statement is the budgeted fold spent at the registry
+-- cap: the allowances' own step equations convert the spent budget
+-- into the sealed recurrences, and nothing else moves.
+shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
+  (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (ps : List (RegId × Path Γ (lookup Γ i) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
+  admSz? (Caps.cSize c) ps ≡ true →
+  length ps ≤ Caps.cReg c →
+  shareBurstsOK W sf gas id now i vals fin ps sched st →
+  shareCapsOK c sl sf gas id now i vals fin ps sched st →
+  nodesMax (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
+    ≤ nestFac (Caps.cSize c) W ^ fanLen (suc gas) c
+      * ((2 ^ fanSq (suc gas) c) ^ W
+         * ((nodesMax st ⊔ nestDᵛˢ vals)
+            + W * (fanSq (suc gas) c
+                   + suc (fanLen (suc gas) c) * nestU (delSq (suc gas) c) (nestUnit e sl))))
+shareGo-nodes {e = e} c W sl sf gas id now i vals fin ps sched st
+  hsl 1≤W 1≤S hadm hlen hb hc =
+  ≤-trans (shareGoFold-nodes c W sl sf gas id now i vals fin ps (Caps.cReg c)
+             sched st hsl 1≤W 1≤S hadm hlen ≤-refl hb hc)
+          (≤-reflexive (cong₂ (λ a b →
+              nestFac (Caps.cSize c) W ^ a
+                * ((2 ^ b) ^ W
+                   * ((nodesMax st ⊔ nestDᵛˢ vals)
+                      + W * (b + suc (fanLen (suc gas) c)
+                               * nestU (delSq (suc gas) c) (nestUnit e sl)))))
+            (sym (fanLen-suc gas c)) (sym (fanSq-suc gas c))))
 
 -- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which
 -- touches the nodes map: out of dispatch gas the state is returned

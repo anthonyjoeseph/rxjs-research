@@ -29,9 +29,6 @@
 -- TARGET: thruFit-arr-merge @7e2ef1
 -- TARGET: thruFit-arr-switch @a5405f
 -- TARGET: thruFit-arr-exhaust @a1c296
--- TARGET: thruStep-merge-inner-caps @cafb22
--- TARGET: thruStep-switch-inner-caps @3402c0
--- TARGET: thruStep-exhaust-inner-caps @d49656
 -- REFUTED: Refuted.Thru-Step-Caps
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Thru-Step-Indexed where
@@ -42,12 +39,12 @@ open import Data.List using ([]; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; pred; _≤ᵇ_; _^_; _*_; _+_)
-open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; syncSizeᵛ; deferᵉ)
+  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; syncSizeᵛ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵛ)
@@ -59,7 +56,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; nestCapsOK?; nodesMax; nodeNestAt)
+  using (nestDᵛˢ; nestCapsOK?)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -155,60 +152,6 @@ marginM = G Bmin 1
 
 marginM≡ : marginM ≡ 21990232555520
 marginM≡ = refl
-
--- ── the conjuncts that can fail ───────────────────────────────────
-
--- the caps invariant the NEXT step runs under, and the slots equation
--- the walk re-enters at: neither is an inequality, so neither has an
--- exponent to hide behind
-after : ∀ (o : Val Γ₂ (obs (obs natᵗ))) → Bool
-after o = nestCapsOK? cap
-            (proj₁ (proj₂ (proj₂ (thruConsume gasBig mergeAllᵒ 7 κ 0 0 o sched₀ stM))))
-            (proj₂ (proj₂ (proj₂ (thruConsume gasBig mergeAllᵒ 7 κ 0 0 o sched₀ stM))))
-
-prems : Bool × Bool
-prems = nestValOK? cap (obs (obs natᵗ)) (arr 6)
-      , nestCapsOK? cap sched₀ stM
-
-prems≡ : prems ≡ (true , true)
-prems≡ = refl
-
-capsAfter≡ : after (arr 6) ≡ true
-capsAfter≡ = refl
-
--- ── the store halves at the arm that SUBSCRIBES ───────────────────
-
--- the parking rows below reach the arm that writes a queue; this is
--- the other one, where the limit has room and the step runs the
--- `subscribeInner` all three heads share -- so what the store reads is
--- what the descent INSTALLED rather than what the caller handed in
-rM : _
-rM = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr 6) sched₀ stM
-
--- AND THE STORE CANNOT BE ARMED HERE AT ALL, which is a boundary and
--- not a gap to fill.  A merge node's `nodeNest` is a fold over its
--- QUEUE, and the admit arm is the one with room, so it queues nothing;
--- every other node kind the descent installs reads zero by definition.
--- Deferring the inner does not move it either -- its body being unrun
--- leaves the node in the table, but an unlimited merge still parks
--- nothing -- so both readings are zero at both, pinned below rather
--- than dressed up as a fit.  The region where a subscribe DOES arm the
--- store is a LIMITED merge under the frame, which no row here
--- reaches.
-arrD : ℕ → Val Γ₂ (obs (obs natᵗ))
-arrD k = mapᵉ dup (ofᵉ (strmᵗ (deferᵉ (E k)) ∷ []))
-
-rD : _
-rD = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arrD 6) sched₀ stM
-
-storeM : ℕ
-storeM = nodesMax (proj₂ (proj₂ (proj₂ rM)))
-       + 100 * nodeNestAt 7 (proj₂ (proj₂ (proj₂ rM)))
-       + 10000 * nodesMax (proj₂ (proj₂ (proj₂ rD)))
-       + 1000000 * nodeNestAt 7 (proj₂ (proj₂ (proj₂ rD)))
-
-storeM≡ : storeM ≡ 0
-storeM≡ = refl
 
 -- ── the value conjunct where the two sides are COMPARABLE ─────────
 

@@ -107,6 +107,14 @@ abstract
   fanLen-zero : (c : Caps) → fanLen zero c ≡ 0
   fanLen-zero c = refl
 
+  fanLen-suc : (g : ℕ) (c : Caps) →
+    fanLen (suc g) c ≡ Caps.cReg c * suc (Caps.cSize c + fanLen g c)
+  fanLen-suc g c = refl
+
+  fanSq-suc : (g : ℕ) (c : Caps) →
+    fanSq (suc g) c ≡ Caps.cReg c * (Caps.cSize c * Caps.cSize c + fanSq g c)
+  fanSq-suc g c = refl
+
   fanSq-zero : (c : Caps) → fanSq zero c ≡ 0
   fanSq-zero c = refl
 

@@ -178,11 +178,21 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`shareGo-nodes`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, TWIN`: the
-  restatement charges the branch structure the stacking refutation demands, as
-  a gas-indexed fan allowance priced in the delivery caps, and nothing has
-  instantiated that charge — the crossing that killed both predecessors is
-  untested against it.
+- **`shareGoFold-nodes`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, TWIN`:
+  the share walk's fold at a spendable branch budget — the k-budgeted
+  strengthening the fixed-gas fold could not induct on. The crossing that
+  killed both predecessors is untested against the per-branch charge.
+- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3`: the emit-by-emit fit
+  the outer wrap's push spends, at the frame's own store-joined grant. Restated
+  from the whole-push bound, so no earlier row reaches it.
+- **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: the caps
+  bundle and the slots equation through the shared inner subscribe, now the one
+  leaf under all three consume arms; the arms' own receipts predate the
+  restatement.
+- **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
+  substitution walk's sync-denominated charge at an arbitrary environment; the
+  one-entry instances are probed where the currencies split, the wider
+  environments and the closed seed are not.
 - **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
   all the three boundary heads still owe — the recursion and the push around it
@@ -196,10 +206,6 @@ does not fit is a finding about the shared statement, not about the head.
   `PROBED×2`: the caps walk family's two stream leaves — the family itself is a
   proven body over every clause, so what remains is admissibility per instant,
   with no state in its type, and the room walk at the wrap's node.
-- **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
-  `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
-  bundle and the slots equation across the arm that subscribes, the measures
-  around them now being checked bodies. The switch's covers its kill too.
 - **`pushVals-nest`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
   burst inside the grant, emit by emit, at the BODY's key. This is where the
@@ -224,10 +230,6 @@ does not fit is a finding about the shared statement, not about the head.
   slot heads under one leaf. A shared slot's charge is a multiple of nothing
   unless the unit is a summand, which is what the refutation pins — and the
   unit is now a summand under a grant the slot's own size does not shrink.
-- **`stepFrame-nodes-thru`** (Nest-Walk) — DIFFICULTY, `REFUTED×3, PROBED`: the
-  same descent arriving through the outer wrap. The flat factor died to the
-  same cold-slot burst that killed the root form; restated as a power in the
-  burst the frame hands back, with the length premise stated.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   the selection's paths and the arrival's payload land inside one unit — the
   fact that ties the walk's charge back to the program. Free-list form refuted;
@@ -266,29 +268,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
-- **`closSize-unfoldμ`** (Clos-Size) — GRINDABLE, `TWIN`: the closure measure
-  is stable under an unfold, for the reason the bare size is; the proven size
-  version's clauses transfer one for one.
-- **`evalTm-nest-sync`** (Nest-Subst) — GRINDABLE, `TWIN`: the closed-term
-  substitution charge with its exponent read on the sync spine. `evalWith-nest`
-  is the same induction at the full measure, clause for clause, and the probe
-  of the shared factor covers the rows where the two currencies disagree.
-- **`pushBurst-nest-take`** (Nest-Walk) — GRINDABLE, `TWIN×2`: the filter
-  frame's push, all that is left of the take head. `pushBurst-caps` is the same
-  fold over the same emits walked on the caps face, and `stepFrame-nodes-take`
-  is the per-emit half — a take frame costs nothing.
-- **`pushBurst-nest-map`** (Nest-Walk) — GRINDABLE,
-  `REFUTED×3, TWIN, PROBED×2`: the substituting frame's push. Same fold as the
-  row above; `mapVals-nest` is the per-emit half at the full measure, the sync
-  denomination of the factor is probed where the currencies split, and the
-  refutations pin why it is a factor and not a summand.
-- **`storeNest-finish`** (Nest-Store) — GRINDABLE, `TWIN`: the far end of a
-  cascade only shortens lists, and every summand of the store measure is a
-  `⊔`-fold over one. Its header names the proven twin at the same two branches.
-- **`pop-nest`, `pop-head-nest`** (Caps-Bridge) — GRINDABLE, `TWIN×2`: the pop
-  mirrors, clause for clause against the proven `pop-caps` and
-  `pop-head-valCaps`.
-
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open

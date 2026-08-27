@@ -46,12 +46,13 @@
 -- once — what its folds pile onto the accumulator is in the store.
 module Verify-Budget-Sufficient.Nest-Store where
 
-open import Data.Bool using (Bool; true; false; T)
+open import Data.Bool using (Bool; true; false; T; _∨_)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
+open import Data.Bool.ListAction using (any)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ;
-  *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
+  *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m; m≤m⊔n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
   *-identityʳ; *-distribˡ-+; m^n>0)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -61,7 +62,8 @@ open import Rx.Exp using (Ctx; Closed; sizeᵗ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId; NodeState;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
-  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH; shareAdmit; sameSource)
+  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH; shareAdmit; sameSource;
+  dropSource; sweepLive; arrSource)
 open import Rx.Prim using (Source; towerℕ)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
@@ -298,6 +300,39 @@ storeNestMax-lub : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 storeNestMax-lub sched st F hs hl hn hr =
   ⊔-lub (⊔-lub (⊔-lub hs hl) hn) hr
 
+-- and the four converses: each place is under the ⊔ it is a summand of
+storeNest-slots≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  slotsNestSum (Sched.slots sched) ≤ storeNestMax sched st
+storeNest-slots≤ sched st =
+  ≤-trans (≤-trans (m≤m⊔n _ (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)))
+                   (m≤m⊔n _ (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))))
+          (m≤m⊔n _ (regsNestMax (EvalSt.registry st)))
+
+storeNest-live≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ≤ storeNestMax sched st
+storeNest-live≤ sched st =
+  ≤-trans (≤-trans (m≤n⊔m (slotsNestSum (Sched.slots sched)) _)
+                   (m≤m⊔n _ (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))))
+          (m≤m⊔n _ (regsNestMax (EvalSt.registry st)))
+
+storeNest-nodes≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ storeNestMax sched st
+storeNest-nodes≤ sched st =
+  ≤-trans (m≤n⊔m (slotsNestSum (Sched.slots sched)
+                  ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)) _)
+          (m≤m⊔n _ (regsNestMax (EvalSt.registry st)))
+
+storeNest-regs≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  regsNestMax (EvalSt.registry st) ≤ storeNestMax sched st
+storeNest-regs≤ sched st =
+  m≤n⊔m (slotsNestSum (Sched.slots sched)
+         ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+         ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)) _
+
 -- THE LATCH MOVES NO OBSERVABLE.  `cascadeLatch` resets the per-cascade
 -- bookkeeping and may add a completed source; it never touches `nodes`,
 -- and the `Sched` is not its argument — so the store's nesting is
@@ -321,11 +356,46 @@ storeNest-latch a sched st with Arrival.isLast a
 -- TWIN: `cascadeFinish-caps` — the same preservation across the same
 --   two branches on the size face, proven, and its `true` arm is a
 --   single lemma about exactly the two list operations this one needs.
-postulate
-  storeNest-finish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    let r = cascadeFinish a sched st
-    in storeNestMax (proj₁ r) (proj₂ r) ≤ storeNestMax sched st
+
+dropSource-nest : ∀ {n} {Γ : Ctx n} {t}
+  (src : Source) (rs : List (RegId × Source × Chain Γ t)) →
+  regsNestMax (dropSource src rs) ≤ regsNestMax rs
+dropSource-nest src [] = z≤n
+dropSource-nest src ((rid , s , c) ∷ r) with sameSource src s
+... | true  = ≤-trans (dropSource-nest src r)
+                      (m≤n⊔m (pathNestD (proj₂ c)) (regsNestMax r))
+... | false = ⊔-monoʳ-≤ (pathNestD (proj₂ c)) (dropSource-nest src r)
+
+sweepLive-nest : ∀ {n} {Γ : Ctx n} {t}
+  (reg : List (RegId × Source × Chain Γ t)) (ls : List (LiveSource Γ)) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 (sweepLive reg ls)
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 ls
+sweepLive-nest {n = n} reg [] = z≤n
+sweepLive-nest {n = n} reg (l ∷ ls)
+  with (LiveSource.source l <ᵇ n)
+       ∨ any (λ p → sameSource (LiveSource.source l) (proj₁ (proj₂ p))) reg
+... | true  = ⊔-monoʳ-≤ (liveNest l) (sweepLive-nest reg ls)
+... | false = ≤-trans (sweepLive-nest reg ls)
+                      (m≤n⊔m (liveNest l) _)
+
+storeNest-finish : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  let r = cascadeFinish a sched st
+  in storeNestMax (proj₁ r) (proj₂ r) ≤ storeNestMax sched st
+storeNest-finish a sched st with Arrival.isLast a
+... | false = ≤-refl
+... | true  =
+  storeNestMax-lub (record sched { live = sweepLive kept (Sched.live sched) })
+    st′ (storeNestMax sched st)
+    (storeNest-slots≤ sched st)
+    (≤-trans (sweepLive-nest kept (Sched.live sched)) (storeNest-live≤ sched st))
+    (storeNest-nodes≤ sched st)
+    (≤-trans (dropSource-nest (arrSource a) (EvalSt.registry st))
+             (storeNest-regs≤ sched st))
+  where
+  kept = dropSource (arrSource a) (EvalSt.registry st)
+  st′ : EvalSt _
+  st′ = record st { registry = kept }
 
 -- THE SYNTACTIC FACTOR: the most any single fold can wrap an
 -- accumulator by, read off the program and its shared defs — a step

@@ -29,7 +29,7 @@ open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-trans; ≤-reflexive; ≤-refl; <⇒≤; +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-assoc; +-comm; *-mono-≤;
   *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-distribˡ-+; *-distribʳ-+; *-assoc; *-comm;
-  ^-distribˡ-+-*; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m; n≤1+n; ^-monoʳ-≤; m^n>0)
+  ^-distribˡ-+-*; +-identityʳ; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m; n≤1+n; ^-monoʳ-≤; m^n>0)
 open import Data.Product using (_×_; _,_)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
@@ -405,17 +405,38 @@ applyFn-nest {s = s} fn v =
 -- monotonicity, where the sync spine has the identical `suc` structure,
 -- and occurrence counting, where every nest-visible occurrence is
 -- sync-visible -- so the tightening is a re-run of that induction at
--- the smaller measure rather than a new idea.  The denomination itself
--- is machine-tested at the sibling walk `applyFn` by
--- `Probed.Sync-Factor`, whose rows never reach a closed-term
--- evaluation -- which is why this leaf carries no receipt of its own.
+-- the smaller measure rather than a new idea.
 -- TWIN: `evalWith-nest` is the same induction at the full measure,
 --   proven above, clause for clause; the two places its exponent is
 --   actually spent -- constructor monotonicity and occurrence
 --   counting -- are the two places the sync spine gives no less.
+-- PROBED: `Probed.Sync-Factor` instantiates the conclusion at one-entry
+--   environments, the depth premise read off the payload itself, at the
+--   duplicating family that refuted the additive form -- including the
+--   rows where the two currencies split, a hidden copy pricing at zero
+--   as an equality.  Not covered: the empty environment, any wider one,
+--   and stacked substitutions.
 postulate
-  evalTm-nest-sync : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
-    nestDᵛ t (evalTm tm) ≤ 2 ^ syncSizeᵗ tm * nestDᵗ tm
+  evalWith-nest-sync : ∀ {n} {Γ : Ctx n} {Θ t} (N : ℕ)
+    (tm : Tm Γ [] [] Θ t) (env : All (Val Γ) Θ) → EnvNest N env →
+    nestDᵛ t (evalWith tm env) ≤ 2 ^ syncSizeᵗ tm * (nestDᵗ tm + N)
+
+-- The closed reading is the general one at the empty environment: the
+-- grant goes to zero and the additive slack is absorbed by
+-- `+-identityʳ`, so the whole closed statement is one instantiation.
+evalTm-nest-sync : ∀ {n} {Γ : Ctx n} {t} (tm : Tm Γ [] [] [] t) →
+  nestDᵛ t (evalTm tm) ≤ 2 ^ syncSizeᵗ tm * nestDᵗ tm
+evalTm-nest-sync {t = t} tm =
+  ≤-trans (evalWith-nest-sync 0 tm []ᵃ tt)
+          (≤-reflexive (cong (2 ^ syncSizeᵗ tm *_) (+-identityʳ (nestDᵗ tm))))
+
+-- And the walk's per-payload spend in the same denomination, the
+-- instantiation `applyFn-nest` already is of the full-measure leaf.
+applyFn-nest-sync : ∀ {n} {Γ : Ctx n} {s u}
+  (fn : Fn Γ [] [] [] s u) (v : Val Γ s) →
+  nestDᵛ u (applyFn fn v) ≤ 2 ^ syncSizeᵗ fn * (nestDᵗ fn + nestDᵛ s v)
+applyFn-nest-sync {s = s} fn v =
+  evalWith-nest-sync (nestDᵛ s v) fn (v ∷ᵃ []ᵃ) (≤-refl , tt)
 
 -- THE DEPTH READING IS UNMOVED BY A μ-UNFOLDING, and that is the fact
 -- the nest walk's own recursion turns on.  `elimG` substitutes only
