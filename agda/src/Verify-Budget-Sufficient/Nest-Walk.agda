@@ -1452,10 +1452,17 @@ postulate
   -- is the transport and not the shape.
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST LENGTH IS REALLY BET.  A
   -- scan's step is written once and applied once per value of the burst
-  -- it is fed, so a step that doubles its accumulator doubles the
-  -- delivered depth PER VALUE.  Nothing in the arrival's SYNTAX moves
-  -- when a cold script grows, so the key is carried entirely by the
-  -- closure measure charging a scripted slot its script.
+  -- it is fed, so the delivered depth is MULTIPLIED once per value,
+  -- while the key gains only what that value costs to write down.  Both
+  -- rates are properties of the program and neither bounds the other: a
+  -- step naming its accumulator four times, over a source of bare
+  -- naturals, puts two bits per value on the demand against one on the
+  -- grant, so the margin loses a factor of two per value and the fit
+  -- survives on nothing but the head start the step function's own
+  -- written size buys.  THE STATEMENT IS THEREFORE WRONG AS WRITTEN, and
+  -- the restatement is the width premise the cap-keyed sibling family
+  -- already carries: a grant that never reads the burst it folds over
+  -- cannot be keyed on the arrival alone.
   --
   -- REFUTED: `Refuted.Scan-Arr-Nest` kills the reading that charges a
   --   script nothing -- 16383 delivered against 6144, at a fourteen-value
@@ -1472,6 +1479,20 @@ postulate
   --   OBSERVABLE values, which charges both sides and is not read here,
   --   and the interaction with a substituting slot, the telescope there
   --   being scripted throughout.
+  -- PROBED: `Probed.Scan-Arr-Margin` takes the axis that receipt holds
+  --   still -- how fast the STEP duplicates rather than how long the
+  --   script is -- at four accumulator copies over an `ofᵉ` source of
+  --   bare naturals, whose key gains one per value: delivered 0, 2, 10,
+  --   42, 170 and on to 43690 against a grant that exactly doubles, so
+  --   the ratio falls from four hundred thousand to seven thousand
+  --   across nine values, with the three premises and the burst width
+  --   pinned by `refl`.  Covered LOAD-BEARING: the value conjunct at
+  --   that family, every row failing as soon as the head start is
+  --   spent.  NOT covered, and it is a boundary rather than a gap: the
+  --   crossing itself, since the delivered depth is the size of a real
+  --   substituted term and raising the duplication raises the head
+  --   start faster than the rate -- the cheapest member of the family
+  --   reaches its crossing at some 2^40 nodes.
   subscribeE-nest-arr-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)

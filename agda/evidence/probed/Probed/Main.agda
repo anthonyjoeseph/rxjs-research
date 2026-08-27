@@ -68,3 +68,6 @@ open import Probed.Thru-Step-Indexed
 
 open import Probed.Scan-Arr-Clos-Key
   using (premises; keys≡; fit0; fit7; fit13; fit14)
+
+open import Probed.Scan-Arr-Margin
+  using (figures≡; figuresHi≡; key≡; premises; burst≡8; fit0; fit4; fit8)

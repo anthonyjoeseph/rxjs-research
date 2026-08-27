@@ -178,10 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-arr-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`:
-  the scan head, where the key that charges a script nothing was refuted and
-  the one that charges it its script now fits the same doubling family with a
-  widening margin; a script of OBSERVABLE values is uninstantiated.
+- **`subscribeE-nest-arr-scan`** (Nest-Walk) — SHAPE, `REFUTED, PROBED×2`: the
+  depth is multiplied per value, the key gains only what that value costs to
+  write; neither rate bounds the other, and the margin is measured losing a
+  factor of two per value. Owed the width premise its sibling carries.
 - **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
   `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
   boundary heads, where the doubling per boundary is charged and where the
