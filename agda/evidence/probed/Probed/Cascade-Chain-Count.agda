@@ -4,9 +4,11 @@
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 --
 -- NOTHING IS BLOCKED HERE, which is unusual in this neighbourhood and
--- is why the rows are worth taking: the target is premise-free and both
--- sides compute off the evaluator, so a row that reads false is a
--- refutation outright rather than a candidate modulo a cap record.
+-- is why the rows are worth taking: both sides compute off the
+-- evaluator, and the one premise a target carries — the sink target's
+-- registration fold at or under the unit — is read by its own rows
+-- beside the conclusion's, so a row that reads false is a refutation
+-- outright rather than a candidate modulo a cap record.
 --
 -- EVERY ROW IS LOAD-BEARING, AND THE AXIS IS THE ONE THAT KILLED THE
 -- PREDECESSOR.  `progF w` registers `suc w` copies of one input, so an
@@ -22,7 +24,7 @@
 -- reading below hands the step exactly that, and the path-denominated
 -- charge covers it where a program-denominated one does not.
 --
--- TARGET: shareGo-nodes @2a6eb5
+-- TARGET: shareGo-nodes @6eda26
 -- TARGET: arr-chains-nest-syn @f18ea2
 module Probed.Cascade-Chain-Count where
 
@@ -42,7 +44,7 @@ open import Rx.Evaluator
          _↠_; scan-f; map-f)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nodeNest; pathNestD; chainsNestD; nestUnit)
+  using (nodeNest; pathNestD; chainsNestD; nestUnit; regsNestMax)
 
 open import Verify-Budget-Sufficient.Demand-Programs
   using (Γ₂; progU; progC; progF; progW; foldD; insF; insS; sucGS; sucGU; sucGC; sucGF; sucGW)
@@ -330,3 +332,20 @@ Sh3-fits = refl
 
 ShCh3-fits : proj₂ (proj₂ (shChRow 2 3 1)) ≡ true
 ShCh3-fits = refl
+
+-- AND THE SINK TARGET'S PREMISE, READ AT THE SAME STATES: what the
+-- fan-out walks is a selection from the registry, so the registry's
+-- own ⊔-fold at or under the unit is what puts the rows above INSIDE
+-- the conditional statement rather than beside it.  LOAD-BEARING on
+-- the same axis: `progF w` is the family whose registrations multiply.
+shPrem : ℕ → ℕ → ℕ → ℕ × ℕ × Bool
+shPrem j w k = let e₀  = entry (progF w k) (insS j) (sucGS j w k)
+                   lhs = regsNestMax (EvalSt.registry (proj₂ e₀))
+                   rhs = nestUnit (progF w k) (insS j)
+               in lhs , rhs , (lhs ≤ᵇ rhs)
+
+ShP1-holds : proj₂ (proj₂ (shPrem 2 1 1)) ≡ true
+ShP1-holds = refl
+
+ShP3-holds : proj₂ (proj₂ (shPrem 2 3 1)) ≡ true
+ShP3-holds = refl

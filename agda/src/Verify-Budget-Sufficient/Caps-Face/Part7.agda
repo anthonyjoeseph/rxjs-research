@@ -2241,9 +2241,10 @@ postulate
 --   width and the registry come back at or below where they started on
 --   every row, so two of the three conjuncts are preservation outright
 --   and the slack claim is about one component.  Not covered: the cap's
---   own value, and therefore the verdict itself; and the `valCaps?`
+--   own value, and therefore the verdict itself; the `valCaps?`
 --   conjunct past the first frame, since a mid-walk value list is not
---   addressable from outside the fold.
+--   addressable from outside the fold; and the sink arm's
+--   registry-versus-unit conjunct, which no row addresses.
 postulate
   arr-chains-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

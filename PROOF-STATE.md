@@ -178,11 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`shareGo-nodes`** (Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE`: the
-  fan-out's registration list is a bound variable no premise prices, so a
-  foreign `map-f` frame stores past any program-denominated charge. The repair
-  is a registry conjunct on the invariant record; `foldPath-nodes`' sink arm is
-  proven from this leaf and inherits the defect.
+- **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, DEAD ROUTE`: the
+  fan-out under a priced registration list — the premise the refutations
+  forced, discharged at the sink from the walk invariant's new registry
+  conjunct, whose re-establishment `arr-chains-caps` now owes.
 - **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
   all the three boundary heads still owe — the recursion and the push around it
@@ -260,9 +259,9 @@ does not fit is a finding about the shared statement, not about the head.
   obs-freeness only reduces at a concrete type, so an `isData` inversion is
   owed first.
 - **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the caps the
-  selection's walk spends, held at every state it passes through. Only the SIZE
-  component moves across a cascade — width and registry are preservation
-  outright — so the flat reading is a slack claim about one component.
+  selection's walk spends, held at every state it passes through — now with the
+  sink's registry-versus-unit conjunct, which no row reads. Only the SIZE
+  component moves across a cascade, so the flat reading is a slack claim.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

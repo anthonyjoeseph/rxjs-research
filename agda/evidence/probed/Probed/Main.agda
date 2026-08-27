@@ -27,7 +27,7 @@ open import Probed.Cascade-Chain-Count
          S22-fits; S1-fits; SU-fits; SC-fits;
          SW-fits; ChW-fits; ChW2-fits; Adv-fits;
          Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits;
-         Sh1-fits; Sh3-fits; ShCh3-fits)
+         Sh1-fits; Sh3-fits; ShCh3-fits; ShP1-holds; ShP3-holds)
 open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
 open import Probed.Subscribe-Nest

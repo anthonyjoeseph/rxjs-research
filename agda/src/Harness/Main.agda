@@ -530,11 +530,13 @@ satRow fam ds ks j w k =
 -- share sits at index zero has one nothing can arrive into; `insS`
 -- puts the share above the async slot, and these rows read what the
 -- entry leaves standing there against the unit that is supposed to
--- cover a delivery through it.  Coverage only: the growth side is
--- read by `Probed.Cascade-Chain-Count`, at the typechecker, where a
--- row can be pinned.
+-- cover a delivery through it.  The store measure's fourth place is
+-- the registry fold the target's premise prices, so a row at or under
+-- the unit reads the premise side too.  Coverage only: the growth
+-- side is read by `Probed.Cascade-Chain-Count`, at the typechecker,
+-- where a row can be pinned.
 --
--- TARGET: shareGo-nodes @2a6eb5
+-- TARGET: shareGo-nodes @6eda26
 shareNestRow : ℕ → ℕ → ℕ → String
 shareNestRow j w k =
   let p = progF w k

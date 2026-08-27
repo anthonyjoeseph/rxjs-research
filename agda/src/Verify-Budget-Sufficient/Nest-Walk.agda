@@ -52,7 +52,8 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; 
 open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
-   nest-inflate; pow-grow¹; pow-distrib-*; slotNest; slotsNestSum)
+   nest-inflate; pow-grow¹; pow-distrib-*; slotNest; slotsNestSum;
+   chainsNestD; regsNestMax; shareAdmit-nest)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
@@ -4081,18 +4082,17 @@ abstract
 -- REFUTED: `Refuted.Share-Sink-Nodes` kills the unit-free form of the
 --   statement below, three against one, and against two when the whole
 --   store measure is charged in place of the nodes map.
--- REFUTED: `Refuted.Share-Go-Path` kills THIS form too, four against
---   two: the registration list is a bound variable with no premise
---   tying its paths to the program, so a `map-f` frame carrying a
---   constant the program never mentions stores a value no charge here
---   prices, and the gap grows a layer per layer of the constant.  The
---   strict-descent argument above is a REACHABILITY fact about real
---   registries, and no hypothesis carries it; nor does `nestCapsOK?`,
---   which has no registry conjunct.  The repair is the invariant
---   record: a registry conjunct bounding `regsNestMax` in the
---   program's currency, which every register site must re-establish.
---   `foldPath-nodes`' share-sink arm is proven FROM this leaf, so its
---   own conclusion at an adversarial registry inherits the defect.
+-- REFUTED: `Refuted.Share-Go-Path` kills the premise-free form, four
+--   against two: with the registration list a bound variable no premise
+--   prices, a `map-f` frame carrying a constant the program never
+--   mentions stores a value no program-denominated charge covers, and
+--   the gap grows a layer per layer of the constant.  The `chainsNestD`
+--   premise is that refutation's one sufficient repair — the sink
+--   discharges it through `shareAdmit-nest` from the registry conjunct
+--   `capsWalkOK` now carries at its sink arm, and re-establishing that
+--   conjunct at every state a real walk passes through is
+--   `arr-chains-caps`' obligation, where the walk invariants already
+--   live.
 postulate
   shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
@@ -4100,6 +4100,7 @@ postulate
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
+    chainsNestD ps ≤ nestUnit e sl →
     nodesMax (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
       ≤ (nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl
 
@@ -4113,16 +4114,19 @@ dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
+  regsNestMax (EvalSt.registry st) ≤ nestUnit e sl →
   nodesMax (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
     ≤ (nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl
-dispatchShare-nodes sl sf zero id now i vals fin sched st hsl =
+dispatchShare-nodes sl sf zero id now i vals fin sched st hsl _ =
   ≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)
-dispatchShare-nodes sl sf (suc gas) id now i vals false sched st hsl =
+dispatchShare-nodes sl sf (suc gas) id now i vals false sched st hsl hreg =
   shareGo-nodes sl sf gas id now i vals false
     (shareAdmit i (EvalSt.registry st)) sched st hsl
-dispatchShare-nodes sl sf (suc gas) id now i vals true sched st hsl =
+    (≤-trans (shareAdmit-nest i (EvalSt.registry st)) hreg)
+dispatchShare-nodes sl sf (suc gas) id now i vals true sched st hsl hreg =
   shareGo-nodes sl sf gas id now i vals true
     (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) hsl
+    (≤-trans (shareAdmit-nest i (EvalSt.registry st)) hreg)
 
 -- THE WALK ITSELF, WHICH IS A TELESCOPE.  Each frame spends its own term
 -- of `pathNestD` and hands the rest of the path a state and a value list
@@ -4187,7 +4191,8 @@ capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
 capsWalkOK c sl sf id now root           vals fin sched st = capsOK? c sched st ≡ true
-capsWalkOK c sl sf id now (share-sink _) vals fin sched st = capsOK? c sched st ≡ true
+capsWalkOK {e = e} c sl sf id now (share-sink _) vals fin sched st =
+  (capsOK? c sched st ≡ true) × (regsNestMax (EvalSt.registry st) ≤ nestUnit e sl)
 capsWalkOK {u = u} c sl sf id now (f ↠ p) vals fin sched st =
   (capsOK? c sched st ≡ true)
   × (all (valCaps? c sl u) vals ≡ true)
@@ -4217,7 +4222,7 @@ foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W 
                    (one-pow W _))
           (≤-reflexive (sym (*-identityˡ _)))
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb hc =
-  ≤-trans (≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl)
+  ≤-trans (≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl (proj₂ hc))
                    (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
                               (≤-trans (nestU-base (Caps.cSize c) (nestUnit e sl))
                                (≤-trans (nest-inflate W (nestU (Caps.cSize c) (nestUnit e sl)) 1≤W)

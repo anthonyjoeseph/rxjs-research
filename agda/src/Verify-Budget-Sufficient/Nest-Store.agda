@@ -50,18 +50,21 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m;
   n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
-open import Rx.Exp using (Ctx; Closed; sizeᵗ)
+open import Rx.Exp using (Ctx; Closed; sizeᵗ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId; NodeState;
   scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
-  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH)
+  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH; shareAdmit; sameSource)
 open import Rx.Prim using (Source; towerℕ)
+open import Data.Fin using (Fin; toℕ)
+open import Data.Vec using (lookup)
+open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤; 1≤capsAt-reg)
@@ -268,6 +271,21 @@ regsNestMax : ∀ {n} {Γ : Ctx n} {t} →
   List (RegId × Source × Chain Γ t) → ℕ
 regsNestMax =
   foldr (λ r acc → pathNestD (proj₂ (proj₂ (proj₂ r))) ⊔ acc) 0
+
+-- A SHARE'S ADMITTED REGISTRATIONS ARE A SELECTION FROM THE REGISTRY,
+-- so the ⊔-fold over what the sink walks is under the registry's own
+-- place in the store measure -- the same one-line skip-or-keep
+-- induction a cascade's chain selection spends, at the sink's own
+-- filter.
+shareAdmit-nest : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  chainsNestD (shareAdmit i rs) ≤ regsNestMax rs
+shareAdmit-nest i [] = z≤n
+shareAdmit-nest {Γ = Γ} i ((rid , s , (u , p)) ∷ r)
+  with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
+... | false | _        = ≤-trans (shareAdmit-nest i r) (m≤n⊔m (pathNestD p) (regsNestMax r))
+... | true  | no  _    = ≤-trans (shareAdmit-nest i r) (m≤n⊔m (pathNestD p) (regsNestMax r))
+... | true  | yes refl = ⊔-mono-≤ ≤-refl (shareAdmit-nest i r)
 
 storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   Sched Γ → EvalSt e → ℕ
