@@ -2,7 +2,7 @@
 -- foldPath-nodes … frameNestD
 module Verify-Budget-Sufficient.Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; _∧_; not)
+open import Data.Bool using (Bool; true; false; if_then_else_; not)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
@@ -45,7 +45,7 @@ open import Rx.Evaluator using
   sharedConnect; sharedPlumb; burstCompleted; register; dropSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; nestValOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widNode; nestValOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
@@ -584,31 +584,26 @@ nodeWidᴺ? W sl (mergeAll-st lim act q od) = widNode W sl (mergeAll-st lim act 
 nodeWidᴺ? W sl (switch-st _ _)            = true
 nodeWidᴺ? W sl (exhaust-st _ _)           = true
 
--- ONLY THE TWO WIDTH CONJUNCTS, deliberately.  A size conjunct over
--- the pending payloads was carried here and spent by nothing on this
--- face, and it is not preservable from sync-denominated premises: a
--- defer parks its body at FULL syntax size while every premise of the
--- walk reads the defer as 1.  The size story belongs to the caps face,
--- which pays it from a full-size budget at a stepped cap.
--- REFUTED: `Refuted.Defer-Park-Size` kills the caps-walk family over
---   the predicate that carried the size conjunct, a defer at its own
---   descent bound against the evaluator's initial state.
+-- ONLY THE NODES CONJUNCT, deliberately.  This predicate once carried
+-- a full-size bound and a pending-width bound over the live list, and
+-- BOTH were spent by nothing on this face: the one read anything here
+-- performs is `nestCapsOK?-lookupWid`, on the node table.  Neither
+-- dead conjunct was preservable from the walk's sync-denominated
+-- premises -- a defer parks its own body as a pending payload at FULL
+-- syntax size and FULL delivered width, while `nestValOK?`,
+-- `nestClosOK?` and `descW` all read the defer as 1 -- and the proven
+-- caps face pays those entries from a full-size budget and a
+-- parked-width premise this face deliberately does not carry.
+-- REFUTED: `Refuted.Defer-Park-Size` kills the family over the
+--   size-carrying predicate, a defer at its own descent bound against
+--   the evaluator's initial state.
+-- REFUTED: `Refuted.Defer-Park-Width` kills it again over the
+--   pending-width conjunct, the same program at unit width.
 nestCapsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → Caps → Sched Γ → EvalSt e → Bool
 nestCapsOK? c sched st =
-  all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
-  ∧ all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
-        (EvalSt.nodes st)
-
--- the two conjuncts back out, with their result types pinned so the
--- booleans `∧-true` splits on are determined
-nestCapsOK?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
-  nestCapsOK? c sched st ≡ true →
-    (all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched) ≡ true)
-  × (all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
-         (EvalSt.nodes st) ≡ true)
-nestCapsOK?-parts c sched st h = ∧-true _ _ h
+  all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
+      (EvalSt.nodes st)
 
 nodeWidᴺ?-weaken : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) (ns : NodeState Γ) →
   widNode W sl ns ≡ true → nodeWidᴺ? W sl ns ≡ true
@@ -622,15 +617,11 @@ capsOK?⇒nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true → nestCapsOK? c sched st ≡ true
 capsOK?⇒nest c sched st h =
-    ∧-intro h2
-    (all-impl _ _
+    all-impl _ _
        (λ kv → nodeWidᴺ?-weaken (Caps.cWid c) (Sched.slots sched)
                  (proj₂ kv))
-       (EvalSt.nodes st) h3)
-  where
-  P  = capsOK?-parts c sched st h
-  h2 = proj₁ (proj₂ (proj₂ P))
-  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
+       (EvalSt.nodes st)
+       (proj₁ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st h)))))
 
 -- minting an instance id touches the node counter and nothing this
 -- predicate reads
@@ -657,11 +648,8 @@ nestCapsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestCapsOK? c sched st ≡ true →
   nestCapsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 nestCapsOK?-setNode c nid ns sched st wn inv =
-    ∧-intro (proj₁ P)
-    (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
-       (EvalSt.nodes st) wn (proj₂ P))
-  where
-  P  = nestCapsOK?-parts c sched st inv
+  setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
+    (EvalSt.nodes st) wn inv
 
 -- and the read the write law needs beside it: a node the table holds
 -- already passed the width check the invariant folds over the table
@@ -671,7 +659,7 @@ nestCapsOK?-lookupWid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestCapsOK? c sched st ≡ true →
   nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns ≡ true
 nestCapsOK?-lookupWid {Γ = Γ} c nid ns sched st eq hc =
-  go (EvalSt.nodes st) (proj₂ (nestCapsOK?-parts c sched st hc)) eq
+  go (EvalSt.nodes st) hc eq
   where
   go : (nodes : List (NodeId × NodeState Γ)) →
     all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv)) nodes ≡ true →
@@ -3297,11 +3285,14 @@ postulate
   -- body, per the leaf-only law, and the per-instant machinery every
   -- clause will spend at its boundary -- `stepThru-caps` and the
   -- proofs under it -- is already checked above.  The invariant is the
-  -- two width conjuncts and no size conjunct, which is what makes the
-  -- defer clause survivable at a fixed cap.
+  -- node-table conjunct alone, which is what makes the defer and
+  -- cold-input clauses survivable at a fixed cap: their only node
+  -- write is a fresh node.
   -- REFUTED: `Refuted.Defer-Park-Size` kills this statement over the
-  --   predicate that carried the size conjunct: a defer parks its body
+  --   predicate that carried a size conjunct: a defer parks its body
   --   at full syntax size, and every premise here reads a defer as 1.
+  -- REFUTED: `Refuted.Defer-Park-Width` kills it over the
+  --   pending-width conjunct too, the same program at unit width.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-room` below.
   subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

@@ -88,3 +88,5 @@ open import Refuted.Share-Go-Path
   using (grown≡; charge≡; share-go-path-absurd)
 open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
+open import Refuted.Defer-Park-Width
+  using (StmtW; progW; defer-park-width-absurd)

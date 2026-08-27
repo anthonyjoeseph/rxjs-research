@@ -192,10 +192,10 @@ does not fit is a finding about the shared statement, not about the head.
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
 - **`subscribeE-caps-exit`, `pushVals-caps-adm`, `pushVals-caps-room`**
-  (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED×3`: the caps walk family over any
-  subscription, restated width-only — the size-conjunct form is machine-dead at
-  the defer clause — plus stream admissibility with no state in its type, and
-  the room walk, where the remaining risk sits.
+  (Nest-Walk) — DIFFICULTY, `REFUTED×2, PROBED×3`: the caps walk family over
+  any subscription, its invariant now the node-table conjunct alone — both
+  dead conjuncts are machine-dead at the defer clause — plus stream
+  admissibility with no state in its type, and the room walk.
 - **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
   `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
   bundle and the slots equation across the arm that subscribes, the measures
