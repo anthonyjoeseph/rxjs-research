@@ -10,9 +10,9 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-merge-caps @41ce21
--- TARGET: pushVals-switch-caps @794562
--- TARGET: pushVals-exhaust-caps @c4cd9e
+-- TARGET: pushVals-merge-caps @695f6a
+-- TARGET: pushVals-switch-caps @351898
+-- TARGET: pushVals-exhaust-caps @bcd844
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
@@ -38,7 +38,7 @@ open import Rx.Evaluator
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; pushValsCapsOK)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -160,6 +160,18 @@ entry = nestCapsOK? (tight {obs (obs natᵗ)} (rM 1 1)) (sched-init (rM 1 1) slo
 entry≡ : entry ≡ (true , true , true)
 entry≡ = refl
 
+-- AND THE CLOSURE PREMISE THE HEADS NOW CARRY, pinned at the same three
+-- arrivals.  These programs reference the telescope, so the reading is
+-- not the written size by default; what it turns on is whether a slot
+-- the arrival names is SCRIPTED, since a scripted slot's closure is one.
+headsClos : Bool × Bool × Bool
+headsClos = nestClosOK? (tight {obs (obs natᵗ)} (rM 1 1)) slots (rM 1 1)
+          , nestClosOK? (tight {obs (obs natᵗ)} (qS 1)) slots (qS 1)
+          , nestClosOK? (tight {obs (obs natᵗ)} (qX 1)) slots (qX 1)
+
+headsClos≡ : headsClos ≡ (true , true , true)
+headsClos≡ = refl
+
 -- and a second nesting level, and a limit the arrivals do not fit
 -- under, since the queue-room conjunct is the one a limit moves
 capsM-2 : capsM 1 2
@@ -186,7 +198,7 @@ capsX-2 = refl , refl , refl , refl
 -- them.  Read at a cap granting nothing, the invariant at the very
 -- state the descent LEAVES still reads true at all three heads -- so
 -- that conjunct is REACHED here and cannot fail here, and a row above
--- is evidence for the other four.  The census below says why: the
+-- is evidence for the other five.  The census below says why: the
 -- left state carries one node and an empty registry and live set, so
 -- four of the invariant's five conjuncts are quantified over nothing
 -- and the fifth is a width reading on an empty queue.

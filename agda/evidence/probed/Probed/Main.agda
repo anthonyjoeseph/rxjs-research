@@ -58,7 +58,7 @@ open import Probed.Shared-Slot-Clos-Key
   using (keys≡; fitDup0; fitDup1; fitDup2; fitDup3; fitDeep3)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
-         capsX-1; capsX-2; heads≡; entry≡; left-starved≡; census≡;
+         capsX-1; capsX-2; heads≡; entry≡; headsClos≡; left-starved≡; census≡;
          burstOne≡)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
