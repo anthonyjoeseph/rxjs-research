@@ -182,9 +182,10 @@ does not fit is a finding about the shared statement, not about the head.
   the share walk's fold at a spendable branch budget — the k-budgeted
   strengthening the fixed-gas fold could not induct on. The crossing that
   killed both predecessors is untested against the per-branch charge.
-- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3`: the emit-by-emit fit
-  the outer wrap's push spends, at the frame's own store-joined grant. Restated
-  from the whole-push bound, so no earlier row reaches it.
+- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE`: the
+  emit-by-emit fit the outer wrap's push spends. The arrival-depth axis cannot
+  refute it — the factor is a tower in the cap the arrival's own size sets —
+  so nothing has reached the region that could.
 - **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `PROBED`: the caps
   bundle and the slots equation through the shared inner subscribe, now the one
   leaf under all three consume arms. Both conjuncts instantiated; the ARMED

@@ -1016,6 +1016,18 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 --   sides are eight thousand one hundred and ninety-one against the same
 --   eight thousand one hundred and ninety-two.  That is why the factor
 --   is a power in the OUTPUT burst and the length premise is stated.
+-- DEAD ROUTE: sweeping the ARRIVAL's depth cannot refute this, and the
+--   reason is arithmetic rather than a failed attempt.  The grant's
+--   factor is `nestFac`, a tower in the cap -- the cap is read off the
+--   arrival's own size through the `valCaps?` premise, and a step that
+--   duplicates needs a term big enough to write the duplication down.
+--   So depth buys the bound side a tower per unit of size and the
+--   measure side a doubling per level, and every deeper witness widens
+--   the margin.  The refutations above all killed FLAT factors, which
+--   is the axis that was open before the exponent moved into the burst.
+--   What could still refute is a delivery that compounds per UNIT of
+--   cap rather than per nesting level, and no head in this term
+--   language delivers that.
 postulate
   thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (W : ℕ) (sl : Slots Γ)
