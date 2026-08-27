@@ -225,3 +225,24 @@ headGrant≡5 = refl
 nest-arr-at-slot-absurd : headBurst ≤ headGrant → ⊥
 nest-arr-at-slot-absurd h =
   ≤⇒≤ᵇ (subst (λ z → headBurst ≤ z) headGrant≡5 h)
+
+----------------------------------------------------------------------
+-- WHAT THE REPAIR HAS TO BEAT.  The delivered column doubles; the
+-- question is whether the definition's own SYNCHRONOUS SIZE grows at
+-- least as fast, since a layer that duplicates also enlarges the term
+-- it duplicates in.  If it does, a factor `2 ^ syncSizeᵉ d` is bought
+-- rather than free and the repair is a factor rather than a redesign.
+----------------------------------------------------------------------
+
+sizes : ℕ
+sizes = syncSizeᵉ (dDup 0) + 100 * syncSizeᵉ (dDup 1)
+      + 10000 * syncSizeᵉ (dDup 2) + 1000000 * syncSizeᵉ (dDup 3)
+      + 100000000 * (nestDᵉ (dDup 0) + 100 * nestDᵉ (dDup 1)
+                   + 10000 * nestDᵉ (dDup 2) + 1000000 * nestDᵉ (dDup 3))
+
+-- synchronous size `10 25 40 55`, subterm depth `1 2 3 4`: the size
+-- rises by FIFTEEN per layer where the delivery doubles, so
+-- `2 ^ syncSizeᵉ d` outruns the delivery from the first row and the
+-- repair is a factor rather than a redesign
+sizes≡ : sizes ≡ 403020155402510
+sizes≡ = refl

@@ -1421,15 +1421,28 @@ postulate
   -- `o = input i`, which is zero, so `B = 0` is what the head hands
   -- down and the grant is the unit alone.
   --
-  -- WHAT THE REPAIR HAS TO CARRY.  A factor keyed on the DEFINITION's
-  -- synchronous size, since the arrival's is one at a slot and the
-  -- doubling is bought rather than free -- a layer that duplicates also
-  -- enlarges the definition it duplicates in.  The charge cannot simply
-  -- BE the walk's own grant at the definition, because that grant reads
-  -- the unit and the unit reads the slot: the recursion is real, and it
-  -- is well-founded only because a definition may reference slots
-  -- strictly BELOW its own index.  That restriction was put there for
-  -- a different reason and is what makes this repairable.
+  -- WHAT THE REPAIR HAS TO CARRY, and the shape is forced.  The
+  -- doubling is BOUGHT rather than free -- a layer that duplicates also
+  -- enlarges the definition it duplicates in, measured at fifteen units
+  -- of synchronous size per doubling -- so a factor keyed on the
+  -- DEFINITION's size outruns the delivery from the first row.  The
+  -- question is only where that key comes from.
+  --
+  -- A CONSTANT SHIFT OF THE KEY CANNOT BE IT, which is worth writing
+  -- down because it is the first thing to try and it is decidably
+  -- wrong.  The arm re-enters the walk on the definition, so whatever
+  -- key the head spends at `input i` must DOMINATE the key the walk
+  -- spends at `d`.  Shift every key by the same term and the two sides
+  -- shift together: `1 + c` against `syncSizeᵉ d + c`, and the arrival's
+  -- own size at a slot reference is one.
+  --
+  -- So the key has to EXPAND the slot: the closure size of the arrival
+  -- under substitution of definitions, which is `syncSizeᵉ` everywhere
+  -- except at `input i`, where it is one plus the closure size of `d`.
+  -- That recursion terminates for a reason already in the language --
+  -- a definition may reference slots strictly BELOW its own index --
+  -- and it changes nothing for a slot-free program, where the closure
+  -- and the size coincide.
   -- REFUTED: `Refuted.Shared-Slot-Nest-Arr`, at a four-layer
   --   substituting definition: delivered `1 2 4 8` against a grant of
   --   `2 3 4 5`, crossing at the third layer.  The same module takes
