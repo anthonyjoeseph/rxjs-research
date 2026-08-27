@@ -2766,6 +2766,73 @@ pushVals-both {Γ = Γ} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sc
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
          (proj₂ (proj₂ sp)) sched st
 
+-- AND THE CAPS HALF SPLITS AGAIN, three ways and along its own
+-- conjuncts, because its five obligations are not one kind of fact.
+-- Two ride the STATE CHAIN -- the slots equation and the invariant,
+-- re-read at the frame each instant leaves; two are properties of the
+-- STREAM ALONE -- admissibility written and admissibility under the
+-- telescope, read off the split values with no state anywhere in
+-- their type; and one is the ROOM WALK, the per-value march through
+-- `thruConsume` at the wrap's own node.  Splitting by conjunct is
+-- what isolates the risk: the admissibility half can be walked with
+-- no caps state threaded through it at all, the state half reduces
+-- per value to the `thruStep` facts and per instant to the wrap's
+-- `setNode`, and what remains hard is exactly the room walk and
+-- nothing else.  All three recurse at the SAME states, so the join
+-- below is a plain zip.
+pushValsStOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+pushValsStOK c sl fuel op nid κ id now [] sched st = ⊤
+pushValsStOK {Γ = Γ} {u = u} c sl fuel op nid κ id now (em ∷ ems) sched st =
+  (Sched.slots sched ≡ sl)
+  × (nestCapsOK? c sched st ≡ true)
+  × pushValsStOK c sl fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
+pushValsAdmOK : ∀ {n} {Γ : Ctx n} {u}
+  (c : Caps) (sl : Slots Γ) (str : Stream Γ (obs u)) → Set
+pushValsAdmOK c sl [] = ⊤
+pushValsAdmOK {Γ = Γ} {u = u} c sl (em ∷ ems) =
+  (all (nestValOK? c (obs u)) (proj₁ sp) ≡ true)
+  × (all (nestClosOK? c sl) (proj₁ sp) ≡ true)
+  × pushValsAdmOK c sl ems
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+
+pushValsRoomOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+pushValsRoomOK c sl W fuel op nid κ id now [] sched st = ⊤
+pushValsRoomOK {Γ = Γ} {u = u} c sl W fuel op nid κ id now (em ∷ ems) sched st =
+  thruRoomOK c W fuel op nid κ id now (proj₁ sp) sched st
+  × pushValsRoomOK c sl W fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
+pushVals-caps-join : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  pushValsStOK c sl fuel op nid κ id now str sched st →
+  pushValsAdmOK c sl str →
+  pushValsRoomOK c sl W fuel op nid κ id now str sched st →
+  pushValsCapsOK c sl W fuel op nid κ id now str sched st
+pushVals-caps-join c sl W fuel op nid κ id now [] sched st hst hadm hroom = tt
+pushVals-caps-join c sl W fuel op nid κ id now (em ∷ ems) sched st
+    (hsl , hc , restSt) (hv , hcl , restAdm) (hr , restRoom) =
+  hsl , hc , hv , hcl , hr
+  , pushVals-caps-join c sl W fuel op nid κ id now ems _ _ restSt restAdm restRoom
+
 -- and the lift, CHECKED: one emit's fit is its values' fit, and the
 -- rest runs at the frame the emit left
 pushFit-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -2961,19 +3028,49 @@ postulate
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (scanᵉ f z b) κ id now sched st
-  -- THE `*All` BURST LEAF, CAPS HALF -- one statement over the op,
-  -- each head's old form being its instance by `allWrap`'s reduction.
-  -- The heads themselves are REAL BODIES: mint, the outer's own
-  -- descent as the IH, and the burst pushed back through the
-  -- `thru-outer` frame by the checked walk above; and the FIT is not
-  -- asserted either, being read off these by `pushFit-ems`.  What the
-  -- leaf carries is the bundle a burst travels with -- at every frame
-  -- the descent leaves, the slots are the ones the caller named, the
-  -- invariant still holds, the values that arrive are admissible, and
-  -- the node has room for them.  It mirrors what the caps face
-  -- already carries along a burst, which is why it is stated apart
-  -- from the measure: nothing here can be outrun by a substituting
-  -- frame.
+  -- THE `*All` BURST LEAVES, CAPS HALF, SPLIT BY CONJUNCT.  The
+  -- master below the block is a REAL BODY over these three, so what
+  -- each owes is one kind of fact about the outer's burst and nothing
+  -- else.  The STATE leaf carries the slots equation and the
+  -- invariant at the frame every instant leaves: per value that is
+  -- the `thruStep` facts, per instant the wrap's own `setNode`.  The
+  -- ADMISSIBILITY leaf is a property of the stream alone -- no state
+  -- in its conclusion's type -- so its walk needs no caps threading
+  -- at all.  The ROOM leaf is the per-value march through
+  -- `thruConsume` at the wrap's node, and it is where the remaining
+  -- risk of the caps half sits.
+  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
+  --   are stated at `pushVals-caps-room` below.
+  pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestClosOK? c sl (allWrap op lim b) ≡ true →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in pushValsStOK c sl g op (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  -- The stream's own half: every instant's values admissible, written
+  -- and under the telescope.
+  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
+  --   are stated at `pushVals-caps-room` below.
+  pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestClosOK? c sl (allWrap op lim b) ≡ true →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in pushValsAdmOK c sl (proj₁ res)
+  -- The room walk, per value at the wrap's node.
   -- PROBED: `Probed.PushVals-Caps` builds the conclusion itself -- it
   --   is `Set`-valued, so the row is an INHABITANT and not a pinned
   --   boolean -- at all three heads, at the cap the value's own sync
@@ -2993,7 +3090,7 @@ postulate
   --   leaves: the invariant conjunct's discrimination, since the state
   --   the descent leaves carries one node and an empty registry and
   --   live set, so it reads true even at a cap granting nothing.
-  pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-caps-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -3004,7 +3101,7 @@ postulate
     let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in pushValsCapsOK c sl W g op (proj₁ (mintNode sched)) κ id now
+    in pushValsRoomOK c sl W g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- THE `*All` BURST LEAF, MEASURE HALF -- and this is where the risk
   -- of the burst statement is, the bundle beside it being routine.
@@ -3114,6 +3211,33 @@ postulate
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
     in pushValsNestOK c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+-- THE CAPS MASTER IS AN ASSEMBLY.  The walk owes three kinds of fact
+-- and the leaves above state them apart; the composition into the
+-- full bundle is checked here rather than asserted.
+pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in pushValsCapsOK c sl W g op (proj₁ (mintNode sched)) κ id now
+       (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+pushVals-caps {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  pushVals-caps-join c sl W g op (proj₁ (mintNode sched)) κ id now
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (pushVals-caps-st c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-adm c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-room c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+  where
+  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+
 pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
   (lim : Maybe ℕ) (b : Closed Γ (obs u))
