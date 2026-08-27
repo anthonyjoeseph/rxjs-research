@@ -179,10 +179,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`subscribeSharedSlot-nest-arr`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, PROBED×2`: restated at a key that EXPANDS the slot, the additive
-  one having been refuted; the refuting family fits with margin and so does a
-  two-slot telescope, where the key charges a layer it reaches through the same
-  fifteen.
+  `REFUTED, PROBED×3`: restated at a key that EXPANDS the slot, the additive
+  one having been refuted; the refuting family, a two-slot telescope and a fold
+  over a script below the slot all fit, the last two being where the staging
+  works.
 - **`subscribeE-nest-arr-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED`:
   the scan head, where the key that charges a script nothing was refuted and
   the one that charges it its script now fits the same doubling family with a

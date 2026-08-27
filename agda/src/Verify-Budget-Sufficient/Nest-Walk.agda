@@ -1494,9 +1494,16 @@ postulate
   --   work.  The key SEES THROUGH the reference and charges a lower
   --   layer exactly what it charges an upper one, fifteen units per
   --   doubling on both axes, and the fit holds at every corner of the
-  --   two-by-two.  Not covered: a telescope of three, and a lower slot
-  --   that is SCRIPTED, where the key reads a script rather than a
-  --   definition.
+  --   two-by-two.  Not covered: a telescope of three.
+  -- PROBED: `Probed.Shared-Slot-Script-Below` takes the composition of
+  --   the two shapes that have each broken a key on this face -- a
+  --   shared slot whose definition FOLDS over a scripted one below it,
+  --   using the very step that refutes a script-blind key.  The
+  --   definition is the same term at every row, so the key moving at
+  --   all is the staged environment carrying the script inward: two
+  --   units per scripted value against a delivery that doubles, so the
+  --   grant gains a factor of four where the demand gains two.  Not
+  --   covered: a script of OBSERVABLE values.
   subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
     (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)

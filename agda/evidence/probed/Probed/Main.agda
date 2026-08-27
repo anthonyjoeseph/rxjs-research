@@ -73,3 +73,6 @@ open import Probed.Scan-Arr-Clos-Key
 
 open import Probed.Shared-Slot-Telescope
   using (keysLow≡; keysUp≡; fit00; fit20; fit02; fit22)
+
+open import Probed.Shared-Slot-Script-Below
+  using (keys≡; fit0; fit4; fit8)
