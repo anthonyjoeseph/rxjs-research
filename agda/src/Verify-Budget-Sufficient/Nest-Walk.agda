@@ -4081,6 +4081,18 @@ abstract
 -- REFUTED: `Refuted.Share-Sink-Nodes` kills the unit-free form of the
 --   statement below, three against one, and against two when the whole
 --   store measure is charged in place of the nodes map.
+-- REFUTED: `Refuted.Share-Go-Path` kills THIS form too, four against
+--   two: the registration list is a bound variable with no premise
+--   tying its paths to the program, so a `map-f` frame carrying a
+--   constant the program never mentions stores a value no charge here
+--   prices, and the gap grows a layer per layer of the constant.  The
+--   strict-descent argument above is a REACHABILITY fact about real
+--   registries, and no hypothesis carries it; nor does `nestCapsOK?`,
+--   which has no registry conjunct.  The repair is the invariant
+--   record: a registry conjunct bounding `regsNestMax` in the
+--   program's currency, which every register site must re-establish.
+--   `foldPath-nodes`' share-sink arm is proven FROM this leaf, so its
+--   own conclusion at an adversarial registry inherits the defect.
 postulate
   shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)

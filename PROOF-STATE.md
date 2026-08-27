@@ -178,6 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
+- **`shareGo-nodes`** (Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE`: the
+  fan-out's registration list is a bound variable no premise prices, so a
+  foreign `map-f` frame stores past any program-denominated charge. The repair
+  is a registry conjunct on the invariant record; `foldPath-nodes`' sink arm is
+  proven from this leaf and inherits the defect.
 - **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
   all the three boundary heads still owe — the recursion and the push around it
@@ -223,10 +228,6 @@ does not fit is a finding about the shared statement, not about the head.
   same descent arriving through the outer wrap. The flat factor died to the
   same cold-slot burst that killed the root form; restated as a power in the
   burst the frame hands back, with the length premise stated.
-- **`shareGo-nodes`** (Nest-Walk) — DIFFICULTY, `REFUTED, DEAD ROUTE`: the
-  share sink's fan-out over the admitted registrations, under one unit. They
-  touch disjoint nodes, so the map moves by the deepest and not the sum — which
-  the fold cannot see.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   the selection's paths and the arrival's payload land inside one unit — the
   fact that ties the walk's charge back to the program. Free-list form refuted;

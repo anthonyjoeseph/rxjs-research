@@ -84,3 +84,5 @@ open import Refuted.Thru-Step-Nest
          thru-step-exhaust-absurd)
 open import Refuted.Thru-Step-Caps
   using (capsPrems≡; slots≡; after≡false; thru-step-caps-absurd; widths≡)
+open import Refuted.Share-Go-Path
+  using (grown≡; charge≡; share-go-path-absurd)
