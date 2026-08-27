@@ -1154,6 +1154,33 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 -- step is read at is a different one, and the chain does not compose.
 --
 -- REFUTED: Refuted.Thru-Step-Nest
+-- DEAD ROUTE: spending the proven subscribe bound is STRUCTURALLY
+--   DEAD, and it is the route the indexed shape most invites, so it is
+--   worth killing here rather than at the third attempt.  That bound
+--   FLATTENS the descent at the cap -- deliberately, because the drain
+--   it serves walks a queue and wants ONE exponent rather than one per
+--   element -- so what it delivers over an arrival bounded by the
+--   grant at `m` is the grant at the CAP over that base.  One step of
+--   the key affords one factor; the flattened bound spends a factor
+--   per level up to the cap, and the two differ by every level between
+--   `suc m` and the cap.  No choice of base closes it, the base being
+--   what both sides are read over.  What the step needs is a subscribe
+--   bound keyed on the ARRIVAL's own sync size, which is the shape the
+--   recursive head already has and the drain's deliberately does not.
+-- DEAD ROUTE: and the TIGHT bound does not close it either, which is
+--   the more useful half because it says what the residue is.  Spending
+--   it puts the arrival's own bound in as the base, so the delivery is
+--   the grant at the arrival's sync size OVER the grant at `m` -- two
+--   grants stacked.  Composing them adds the keys and costs a `suc`, so
+--   what comes out sits at `suc (m + syncSizeᵉ o)` and the statement is
+--   read at `m′`.  At the caller `m′` is `suc m`, so the route closes
+--   only when the emitted arrival carries NO boundary of its own, which
+--   is not the general case.  What this does NOT show is that the
+--   caller's grant is too small: the composition is the worst case of a
+--   bound that flattens, and the measured delivery doubles per level
+--   where the composition charges a full factor.  The gap is the
+--   subscribe bound's slack, so the residue is a delivery bound tight
+--   in the arrival rather than a bigger grant.
 -- PROBED: `Probed.Thru-Step-Indexed` instantiates all four conjuncts
 --   at the very arrival that killed the flat form, at `W = 0` and with
 --   both other premises pinned by `refl`.  Covered LOAD-BEARING: the
@@ -1992,13 +2019,43 @@ subscribeE-nest c sl B W g (deferᵉ body) κ id now sched st hsl hc hv hn hw =
   , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
   , (λ j → ≤-trans (nodeNestAt-set j _ _ st) (⊔-lub z≤n (m≤m⊔n _ _)))
 
--- ONE SUBSCRIPTION, AND THE BOUND IS ABSOLUTE.  What the subscription
--- installs is read off `o`, whose depth the drain bounds by `B`, and off
--- the slots, which the unit covers -- so re-establishing the same bound
--- rather than one relative to the store handed in is exactly what stops
--- the factor compounding once per queued inner.  A relative form would
--- read `2 ^ cSize` times the PREVIOUS store and raise the drain's cost to
--- a tower in the queue's length, which is not what a queue of independent
+-- ONE SUBSCRIPTION, AT THE ARRIVAL'S OWN KEY.  A subscribe IS the
+-- recursive descent under a `from-inner` frame, so the bound the
+-- descent already proves transfers verbatim -- keyed on the arrival's
+-- sync size, which is what a caller wanting to spend ONE level of key
+-- needs and what flattening at the cap throws away.
+subscribeInner-nest-tight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
+  (κ : Path Γ s t)
+  (id : Id) (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs s) o ≡ true →
+  nestDᵉ o ≤ B →
+  innerW sf op allNid κ id now o sched st ≤ W →
+  let r = subscribeInner sf op allNid κ id now o sched st
+      G = nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ o) in
+  (nestDᵛˢ (proj₁ (proj₂ r)) ≤ G)
+  × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
+  × (∀ (j : NodeId) →
+       nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt j st ⊔ G)
+subscribeInner-nest-tight c sl B W g0 op allNid κ id now o sched st hsl hc hv hn hw =
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeInner-nest-tight {e = e} c sl B W (gs fuel) op allNid κ id now o sched st
+                          hsl hc hv hn hw =
+  subscribeE-nest c sl B W fuel o
+    (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+    (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
+    (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
+    (≤-trans (innerW-gs fuel op allNid κ id now o sched st) hw)
+
+-- AND FLATTENED AT THE CAP, which is what the DRAIN wants and only the
+-- drain: an inner the caps premise admits is no larger than the cap, so
+-- a queue can be walked at ONE exponent instead of one per element.  The
+-- bound is then ABSOLUTE -- re-established rather than read relative to
+-- the store handed in, which is exactly what stops the factor
+-- compounding once per queued inner.  A relative form would read
+-- `2 ^ cSize` times the PREVIOUS store and raise the drain's cost to a
+-- tower in the queue's length, which is not what a queue of independent
 -- inners costs.
 subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
@@ -2014,22 +2071,14 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
   × (∀ (j : NodeId) →
        nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt j st ⊔ G)
-subscribeInner-nest c sl B W g0 op allNid κ id now o sched st hsl hc hv hn hw =
-  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
-subscribeInner-nest {e = e} c sl B W (gs fuel) op allNid κ id now o sched st hsl hc hv hn hw =
-  ≤-trans (proj₁ IH) grow
-  , ≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow)
-  , (λ j → ≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ ≤-refl grow))
+subscribeInner-nest {e = e} c sl B W sf op allNid κ id now o sched st hsl hc hv hn hw =
+  ≤-trans (proj₁ T) grow
+  , ≤-trans (proj₁ (proj₂ T)) (⊔-mono-≤ ≤-refl grow)
+  , (λ j → ≤-trans (proj₂ (proj₂ T) j) (⊔-mono-≤ ≤-refl grow))
   where
-  IH = subscribeE-nest c sl B W fuel o
-         (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
-         (record sched { nextNode = suc (Sched.nextNode sched) }) st hsl
-         (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc) hv hn
-         (≤-trans (innerW-gs fuel op allNid κ id now o sched st) hw)
+  T = subscribeInner-nest-tight c sl B W sf op allNid κ id now o sched st
+        hsl hc hv hn hw
 
-  -- the cap is what flattens the descent's own index here: an inner the
-  -- caps premise admits is no larger than the cap, so the queue below
-  -- can be walked at ONE exponent instead of one per element
   grow : nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ o)
            ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c)
   grow = nestB-mono (Caps.cSize c) W (nestUnit e sl) B (nestValOK?-size c o hv)

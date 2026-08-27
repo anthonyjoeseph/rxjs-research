@@ -179,10 +179,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 - **`thruStep-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
-  `REFUTED×3, PROBED×3`: one `thruConsume`, arrival at key `m` and delivery at
-  `m′`. The flat grant is refuted by a duplicating step and the caps conjunct
-  by a full queue; both repairs are in, and the store halves are probed at the
-  arm that parks.
+  `REFUTED×3, DEAD ROUTE×6, PROBED×3`: one `thruConsume`, arrival at key `m`
+  and delivery at `m′`. The flat grant is refuted by a duplicating step and the
+  caps conjunct by a full queue; both repairs are in, and the store halves are
+  probed at the arm that parks.
 - **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
   `DEAD ROUTE×2, PROBED×5`: the outer's burst carries admissible values inside
   the grant, emit by emit, with room at the node for each. The fit reads off it
