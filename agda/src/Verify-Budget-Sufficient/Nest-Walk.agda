@@ -1193,6 +1193,17 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 --   against a grant of twenty-two trillion -- one step of the key buys
 --   `(2 ^ S) ^ suc W`, so the doubling that killed the flat form
 --   cannot reach this form at all and no row on that axis could fail.
+--   AND NO ARRIVAL CAN MAKE IT FAIL, which the same probe's tight rows
+--   settle as arithmetic rather than as a run of misses: `S` is the
+--   arrival's own `syncSizeᵛ` and the `nestValOK?` premise bounds the
+--   arrival BY it, so a step delivering twice its arrival is asking
+--   `2 * k ≤ 2 ^ k`, true at every `k`.  Shrinking the arrival shrinks
+--   both sides and the bound side stays ahead; at the shallowest
+--   arrival the harness has, `S` still reads twenty-one, because
+--   `syncSizeᵛ` measures the TERM and a duplicating step needs one.
+--   So the region that could refute is a step whose delivery is NOT
+--   linear in its arrival -- the merge DRAIN, bounded by the node's
+--   parked queue -- and nothing here reaches it.
 --   NOT COVERED: the store halves at the arm that SUBSCRIBES, which is
 --   a boundary rather than a gap -- a merge's `nodeNest` folds its
 --   QUEUE and the admit arm has room, so it queues nothing, and

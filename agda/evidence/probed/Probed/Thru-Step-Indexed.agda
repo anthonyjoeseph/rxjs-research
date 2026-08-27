@@ -30,6 +30,13 @@
 -- room premise admits at this node, so the rows are not bought by
 -- widening.
 --
+-- AND THE VALUE CONJUNCT IS NOT REACHABLE BY THIS AXIS AT ALL, which
+-- the tight rows at the bottom pin as arithmetic rather than as a
+-- failed attempt: the cap bounds the arrival and the key's factor is
+-- two to that cap, so a step delivering twice its arrival fits at
+-- every program.  The region that could refute is the merge drain,
+-- where delivery is the node's parked queue and not the value in hand.
+--
 -- TARGET: thruStep-merge
 -- TARGET: thruStep-switch
 -- TARGET: thruStep-exhaust
@@ -263,3 +270,58 @@ parts =
 
 parts≡ : parts ≡ (true , true)
 parts≡ = refl
+
+-- ── the value conjunct where the two sides are COMPARABLE ─────────
+
+-- the rows above are degenerate for a reason that is about the CAP and
+-- not about the program's depth: the key's factor is a power of
+-- `cSize`, `cSize` is read off the arrival's own size, and the step
+-- only doubles.  So the way to bring the two sides together is a
+-- SHALLOWER arrival, not a deeper program -- which is the cheap
+-- direction, since the harness cost is geometric in depth
+capT : Caps
+capT = caps (syncSizeᵛ (obs (obs natᵗ)) (arr 1))
+            (pWᵛ 2 slots (obs (obs natᵗ)) (arr 1)) 0
+
+GT : ℕ → ℕ → ℕ
+GT B m = (2 ^ Caps.cSize capT) ^ m * (B + suc m * nestUnit prog slots)
+
+arrivalT deliveredT : ℕ
+arrivalT = nestDᵛ (obs (obs natᵗ)) (arr 1)
+deliveredT =
+  nestDᵛˢ (proj₁ (thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr 1) sched₀ stM))
+
+tightFigures : ℕ
+tightFigures = arrivalT + 100 * deliveredT + 10000 * Caps.cSize capT
+             + 1000000 * nestUnit prog slots
+
+tightFigures≡ : tightFigures ≡ 2210201
+tightFigures≡ = refl
+
+-- the conjunct itself at those caps, DEGENERATE like every other row
+-- on this axis and kept because it makes the gap a number: two against
+-- ten million, at the shallowest arrival there is
+valTight : (deliveredT ≤ᵇ GT arrivalT 1) ≡ true
+valTight = refl
+
+-- AND THE AXIS CANNOT REFUTE, WHICH IS THE FINDING RATHER THAN THE
+-- FAILED ATTEMPT.  The reading above is arrival 1, delivered 2, unit 2
+-- and `cSize` TWENTY-ONE -- at the shallowest arrival the harness has.
+-- `cSize` is the arrival's `syncSizeᵛ`, which measures the TERM, and a
+-- step that duplicates needs a term big enough to do it, so shrinking
+-- the arrival's depth does not shrink the cap.
+--
+-- Worse for the sweep, and this is what closes it: the same `cSize`
+-- bounds the arrival, through the very `nestValOK?` premise the
+-- statement carries.  So for any step delivering at most twice its
+-- arrival, the conjunct at one key reads `2 * arrival ≤ (2 ^ cSize) * _`
+-- with `arrival ≤ cSize` -- and `2 * k ≤ 2 ^ k` at every `k`, with
+-- equality only at one and two.  No program refutes that, so no sweep
+-- over arrivals is worth running: the axis moves the bound side faster
+-- than the measure side by construction.
+--
+-- WHERE THE RISK ACTUALLY LIVES is a step whose delivery is NOT linear
+-- in its arrival -- the merge DRAIN, which hands over a queue parked by
+-- earlier arrivals and so is bounded by the node's width rather than by
+-- the value in hand.  That is the region an instantiation would have to
+-- reach, and these rows do not reach it.
