@@ -38,7 +38,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.List using ([]; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _^_; _*_; _+_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤ᵇ_; _^_; _*_; _+_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -301,3 +301,42 @@ fitN2 = refl
 
 fitN3 : (delN 3 ≤ᵇ GN 3 (arrN 3) 1) ≡ true
 fitN3 = refl
+
+-- ── THE RESIDUE THE SUBSCRIBING ARM OWES, MEASURED ────────────────
+
+-- what one step of the key actually affords is `2 ^ k` for a `k`
+-- STRICTLY under the cap -- that is `nestB-frame`, and it is the only
+-- shape a caller reading `m′` at `suc m` can absorb.  So the question
+-- the leaf turns on is whether the delivery fits a base-TWO frame
+-- charge at the largest such `k`, rather than the grant's own
+-- per-level factor.  These rows read it at the nested duplicator,
+-- which is the fastest-growing delivery this harness has.
+--
+-- AND THEY ARE DEGENERATE, WHICH IS THE MEASUREMENT AND NOT AN
+-- APOLOGY: the caps read twenty-five, forty and fifty-five over the
+-- three levels while the delivery reads two, four and eight, so the
+-- bound side gains fifteen doublings per level and the measure side
+-- one.  What that says about the candidate is the useful part -- a
+-- duplicating step spends fifteen units of sync size to buy one
+-- doubling, so the frame charge is nowhere near tight and the
+-- statement has room to be true.  What would refute it is a term
+-- whose delivery doubles per UNIT of sync size rather than per
+-- nesting level, and no head in this language does that
+frameFit : ℕ → ℕ
+frameFit k = 2 ^ pred (Caps.cSize (capN k)) * (arrN k + nestUnit prog slots)
+
+residueFigures : ℕ
+residueFigures = Caps.cSize (capN 1) + 100 * Caps.cSize (capN 2)
+               + 10000 * Caps.cSize (capN 3)
+
+residueFigures≡ : residueFigures ≡ 554025
+residueFigures≡ = refl
+
+resN1 : (delN 1 ≤ᵇ frameFit 1) ≡ true
+resN1 = refl
+
+resN2 : (delN 2 ≤ᵇ frameFit 2) ≡ true
+resN2 = refl
+
+resN3 : (delN 3 ≤ᵇ frameFit 3) ≡ true
+resN3 = refl
