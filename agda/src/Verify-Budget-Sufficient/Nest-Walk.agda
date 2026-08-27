@@ -38,9 +38,9 @@ open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals;
-  mergeAll-st; switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish;
+  mergeAll-st; switch-st; exhaust-st; lookupNode; setNode; scanVals; takeDispatch; innerFinish;
   aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
-  splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
+  splitBurst; Stream; mintNode; installNode; pushBurst; subscribeAll; oneShotBurst; splitEvents; thruConsume;
   thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource;
   sharedConnect; sharedPlumb; burstCompleted; register; dropSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
@@ -61,7 +61,7 @@ open import Verify-Budget-Sufficient.Nest-Cap using
   nestU-base; nestB-at; arrD; arrDW-mono; arrDW-pos; arrDW-key; arrDW-flat; arrDW-slot;
   arrDW-frame; nestB-frame-dblW)
 open import Verify-Budget-Sufficient.Nest-Burst using
-  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-mu;
+  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-scan; descW-mu;
    descW-merge; descW-switch; descW-exhaust; connW; connW-gs; descW-conn)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
@@ -775,6 +775,16 @@ abstract
   nestValOK?-take {u = u} c cnt b h =
     ≤ᵇ-true (syncSizeᵛ (obs u) b) (Caps.cSize c)
       (≤-trans (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ cnt)) (n≤1+n _))
+               (≤ᵇ⇒≤ _ _ (T-to h)))
+
+  nestValOK?-scan : ∀ {n} {Γ : Ctx n} {s u} (c : Caps)
+    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s) →
+    nestValOK? c (obs u) (scanᵉ f z b) ≡ true →
+    nestValOK? c (obs s) b ≡ true
+  nestValOK?-scan {s = s} c f z b h =
+    ≤ᵇ-true (syncSizeᵛ (obs s) b) (Caps.cSize c)
+      (≤-trans (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f + syncSizeᵗ z))
+                        (n≤1+n _))
                (≤ᵇ⇒≤ _ _ (T-to h)))
 
   nestValOK?-merge : ∀ {n} {Γ : Ctx n} {u} (c : Caps)
@@ -3276,36 +3286,6 @@ postulate
   -- at all.  The ROOM leaf is the per-value march through
   -- `thruConsume` at the wrap's node, and it is where the remaining
   -- risk of the caps half sits.
-  -- THE CAPS-PRESERVATION WALK, stated as the one family its clauses
-  -- will discharge: at ANY subscription, at ANY path, the slots
-  -- equation and the invariant come back from `subscribeE` on the
-  -- premises the caps half already carries.  Its body is the walk
-  -- over `subscribeE`'s clauses, mutual through the share connect the
-  -- way the arr-keyed trio is; the share legs are minted with the
-  -- body, per the leaf-only law, and the per-instant machinery every
-  -- clause will spend at its boundary -- `stepThru-caps` and the
-  -- proofs under it -- is already checked above.  The invariant is the
-  -- node-table conjunct alone, which is what makes the defer and
-  -- cold-input clauses survivable at a fixed cap: their only node
-  -- write is a fresh node.
-  -- REFUTED: `Refuted.Defer-Park-Size` kills this statement over the
-  --   predicate that carried a size conjunct: a defer parks its body
-  --   at full syntax size, and every premise here reads a defer as 1.
-  -- REFUTED: `Refuted.Defer-Park-Width` kills it over the
-  --   pending-width conjunct too, the same program at unit width.
-  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
-  --   are stated at `pushVals-caps-room` below.
-  subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) o ≡ true →
-    nestClosOK? c sl o ≡ true →
-    descW g o κ id now sched st ≤ W →
-    let r = subscribeE g o κ id now sched st in
-    (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
-    × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
   -- The stream's own half: every instant's values admissible, written
   -- and under the telescope.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
@@ -3463,6 +3443,365 @@ postulate
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
     in pushValsNestOK c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+-- THE PAIR RIDES AN `if` THE WAY THE NEST BOUND DOES, and for the same
+-- reason: the connect's two exits differ only in bookkeeping the
+-- invariant never reads, so one proof serves both branches once the
+-- scrutinee is a variable.
+capsExit-if : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (bc : Bool)
+  (X Y : Stream Γ u × Sched Γ × EvalSt e) →
+  ((Sched.slots (proj₁ (proj₂ X)) ≡ sl)
+   × (nestCapsOK? c (proj₁ (proj₂ X)) (proj₂ (proj₂ X)) ≡ true)) →
+  ((Sched.slots (proj₁ (proj₂ Y)) ≡ sl)
+   × (nestCapsOK? c (proj₁ (proj₂ Y)) (proj₂ (proj₂ Y)) ≡ true)) →
+  (Sched.slots (proj₁ (proj₂ (if bc then X else Y))) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ (if bc then X else Y)))
+                   (proj₂ (proj₂ (if bc then X else Y))) ≡ true)
+capsExit-if c sl true  X Y hx hy = hx
+capsExit-if c sl false X Y hx hy = hy
+
+-- ONE INSTANT AT THE FOLD'S FRAME PRESERVES THE PAIR UNCONDITIONALLY:
+-- the only write is the accumulator's node, which the invariant reads
+-- as true at every width.
+stepScan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (id : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  let sf = stepFrame fuel id now (scan-f fn nid) κ vals fin sched st in
+  (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂ sf)))) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ (proj₂ (proj₂ sf))))
+                   (proj₂ (proj₂ (proj₂ (proj₂ sf)))) ≡ true)
+stepScan-caps {s = s} {u = u} c sl fuel id now fn nid κ vals fin sched st hsl hc
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = hsl , hc
+... | just (take-st _)           = hsl , hc
+... | just (mergeAll-st _ _ _ _) = hsl , hc
+... | just (switch-st _ _)       = hsl , hc
+... | just (exhaust-st _ _)      = hsl , hc
+... | just (scan-st {w} ac) with w ≟ᵗ u
+...   | no _     = hsl , hc
+...   | yes refl =
+        hsl , setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid
+                (scan-st (proj₂ (scanVals fn ac vals))) (EvalSt.nodes st)
+                refl hc
+
+-- AND THE FILTER'S DISPATCH DOES TOO: a cut sweeps the live list and
+-- drops registrations, neither of which the invariant reads, and both
+-- node writes are counters it reads as true.
+takeDispatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (nid : NodeId)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (mns : Maybe (NodeState Γ)) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  let r = takeDispatch {t = t} {e = e} nid vals fin sched st mns in
+  (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂ r)))) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ (proj₂ (proj₂ r))))
+                   (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≡ true)
+takeDispatch-caps c sl nid vals fin sched st (just (take-st k)) hsl hc
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = hsl , setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid
+                      (take-st zero) (EvalSt.nodes st) refl hc
+... | false = hsl , setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid
+                      (take-st (proj₁ (proj₂ (takeVals k vals))))
+                      (EvalSt.nodes st) refl hc
+takeDispatch-caps c sl nid vals fin sched st nothing                    hsl hc = hsl , hc
+takeDispatch-caps c sl nid vals fin sched st (just (scan-st _))         hsl hc = hsl , hc
+takeDispatch-caps c sl nid vals fin sched st (just (mergeAll-st _ _ _ _)) hsl hc = hsl , hc
+takeDispatch-caps c sl nid vals fin sched st (just (switch-st _ _))     hsl hc = hsl , hc
+takeDispatch-caps c sl nid vals fin sched st (just (exhaust-st _ _))    hsl hc = hsl , hc
+
+-- A BURST THROUGH A FRAME WHOSE EVERY STEP PRESERVES THE PAIR
+-- PRESERVES THE PAIR, one induction serving the three frames whose
+-- step needs no premises about the values at all.
+pushBurst-caps-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (c : Caps) (sl : Slots Γ) (fuel : Gas) (id : Id) (now : Tick)
+  (f : Frame Γ s u) (κ : Path Γ u t) (str : Stream Γ s)
+  (sched : Sched Γ) (st : EvalSt e) →
+  (∀ (vals : List (Val Γ s)) (fin : Bool) (sched′ : Sched Γ) (st′ : EvalSt e) →
+     Sched.slots sched′ ≡ sl → nestCapsOK? c sched′ st′ ≡ true →
+     let sf = stepFrame fuel id now f κ vals fin sched′ st′ in
+     (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂ sf)))) ≡ sl)
+     × (nestCapsOK? c (proj₁ (proj₂ (proj₂ (proj₂ sf))))
+                      (proj₂ (proj₂ (proj₂ (proj₂ sf)))) ≡ true)) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  let r = pushBurst fuel id now f κ str sched st in
+  (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+pushBurst-caps-frame c sl fuel id now f κ [] sched st step hsl hc = hsl , hc
+pushBurst-caps-frame {Γ = Γ} {u = u} c sl fuel id now f κ (em ∷ ems) sched st
+    step hsl hc =
+  pushBurst-caps-frame c sl fuel id now f κ ems
+    (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+    step (proj₁ S) (proj₂ S)
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+  S  = step (proj₁ sp) (proj₂ (proj₂ sp)) sched st hsl hc
+
+-- AND THE WRAP'S OWN BURST NEEDS ITS PREMISES: the state chain's exit,
+-- read off the same induction `pushValsSt-walk` threads, with
+-- admissibility and room supplying what each instant's step consumes.
+pushValsSt-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  pushValsAdmOK c sl str →
+  pushValsRoomOK c sl W fuel op nid κ id now str sched st →
+  let r = pushBurst fuel id now (thru-outer op nid) κ str sched st in
+  (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+pushValsSt-exit c sl W fuel op nid κ id now [] sched st hsl hc hadm hroom =
+  hsl , hc
+pushValsSt-exit {Γ = Γ} {u = u} c sl W fuel op nid κ id now (em ∷ ems) sched st
+    hsl hc (hv , hcl , restAdm) (hr , restRoom) =
+  pushValsSt-exit c sl W fuel op nid κ id now ems
+    (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+    (proj₁ S) (proj₂ S) restAdm restRoom
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+  S = stepThru-caps c sl W fuel op nid κ id now (proj₁ sp)
+        (proj₂ (proj₂ sp)) sched st hsl hc hv hr
+
+-- THE CONNECT LEG OF THE CAPS WALK: the registration and the latch are
+-- bookkeeping the invariant never reads, so the whole of what this leg
+-- owes is the re-entry on the definition, keyed by the closure premise
+-- the slot head holds.
+sharedConnect-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (i : Fin n)
+  (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)}
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → sl i ≡ shared d {ok = ok} →
+  nestCapsOK? c sched st ≡ true →
+  suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
+  connW g i d κ id now sched st ≤ W →
+  let r = sharedConnect g i d κ id now sched st in
+  (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
+-- THE SLOT LEG: a spent share and a live one leave the table alone, so
+-- only the connect arm owes anything.
+subscribeSharedSlot-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (i : Fin n)
+  (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)}
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → sl i ≡ shared d {ok = ok} →
+  nestCapsOK? c sched st ≡ true →
+  suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
+  connW g i d κ id now sched st ≤ W →
+  let r = subscribeSharedSlot g i d κ id now sched st in
+  (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+subscribeSharedSlot-caps-exit c sl W g i d κ id now sched st hsl hsi hc hk hw
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  = hsl , hc
+... | false
+  with memberSource (toℕ i) (EvalSt.connectedShares st)
+... | true  = hsl , hc
+... | false = sharedConnect-caps-exit c sl W g i d κ id now sched st
+                hsl hsi hc hk hw
+
+-- THE `*All` LEG, one member for the three ops: the inner exit pair is
+-- the walk's own re-entry through the wrap vocabulary's bridges, and
+-- the wrap's burst is the state chain's exit over the two stream
+-- leaves.
+subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let r = subscribeAll g op (allFresh u op lim) b κ id now sched st in
+  (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+
+-- THE CAPS-PRESERVATION WALK, now a body: at ANY subscription, at ANY
+-- path, the slots equation and the invariant come back from
+-- `subscribeE` on the premises the caps half already carries.  The
+-- invariant is the node-table conjunct alone, which is what makes the
+-- defer and cold-input clauses close outright: their only node write
+-- is a fresh node.
+-- REFUTED: `Refuted.Defer-Park-Size` kills this statement over the
+--   predicate that carried a size conjunct: a defer parks its body
+--   at full syntax size, and every premise here reads a defer as 1.
+-- REFUTED: `Refuted.Defer-Park-Width` kills it over the
+--   pending-width conjunct too, the same program at unit width.
+subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) o ≡ true →
+  nestClosOK? c sl o ≡ true →
+  descW g o κ id now sched st ≤ W →
+  let r = subscribeE g o κ id now sched st in
+  (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+  × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
+subscribeE-caps-exit c sl W g (input i) κ id now sched st hsl hc hv hcl hw
+  with Sched.slots sched i in eqs
+... | shared d
+  rewrite slotClos-fix sl i (trans (sym (cong (λ f → f i) hsl)) eqs) =
+  subscribeSharedSlot-caps-exit c sl W g i d κ id now sched st hsl
+    (trans (sym (cong (λ f → f i) hsl)) eqs) hc (≤ᵇ⇒≤ _ _ (T-to hcl))
+    (≤-trans (descW-conn g i d κ id now sched st eqs) hw)
+... | scripted (hot _)
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  = hsl , hc
+... | false = hsl , hc
+subscribeE-caps-exit c sl W g (input i) κ id now sched st hsl hc hv hcl hw
+    | scripted (cold sync []) = hsl , hc
+subscribeE-caps-exit c sl W g (input i) κ id now sched st hsl hc hv hcl hw
+    | scripted (cold sync (dl ∷ ds)) = hsl , hc
+subscribeE-caps-exit c sl W g (ofᵉ ts) κ id now sched st hsl hc hv hcl hw =
+  hsl , hc
+subscribeE-caps-exit c sl W g emptyᵉ κ id now sched st hsl hc hv hcl hw =
+  hsl , hc
+subscribeE-caps-exit c sl W g (mapᵉ f b) κ id now sched st hsl hc hv hcl hw =
+  pushBurst-caps-frame c sl g id now (map-f f) κ (proj₁ res)
+    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (λ vals fin sched′ st′ h₁ h₂ → h₁ , h₂)
+    (proj₁ IH) (proj₂ IH)
+  where
+  res = subscribeE g b (map-f f ↠ κ) id now sched st
+  IH = subscribeE-caps-exit c sl W g b (map-f f ↠ κ) id now sched st
+         hsl hc (nestValOK?-map c f b hv)
+         (nestClosOK?-mono c sl b (mapᵉ f b)
+            (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
+                            (closSizeᵗ (slotClos sl) f))
+                     (n≤1+n _))
+            hcl)
+         (≤-trans (descW-map g f b κ id now sched st) hw)
+subscribeE-caps-exit c sl W g (takeᵉ cnt b) κ id now sched st hsl hc hv hcl hw
+  with evalTm cnt in eqc
+... | zero  = hsl , hc
+... | suc k =
+  pushBurst-caps-frame c sl g id now (take-f nid) κ (proj₁ res)
+    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (λ vals fin sched′ st′ h₁ h₂ →
+       takeDispatch-caps c sl nid vals fin sched′ st′
+         (lookupNode nid (EvalSt.nodes st′)) h₁ h₂)
+    (proj₁ IH) (proj₂ IH)
+  where
+  nid = proj₁ (mintNode sched)
+  res = subscribeE g b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
+          (installNode nid (take-st (suc k)) st)
+  IH = subscribeE-caps-exit c sl W g b (take-f nid ↠ κ) id now
+         (proj₂ (mintNode sched)) (installNode nid (take-st (suc k)) st)
+         hsl
+         (nestCapsOK?-setNode c nid (take-st (suc k))
+            (proj₂ (mintNode sched)) st refl hc)
+         (nestValOK?-take c cnt b hv)
+         (nestClosOK?-mono c sl b (takeᵉ cnt b)
+            (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
+                            (closSizeᵗ (slotClos sl) cnt))
+                     (n≤1+n _))
+            hcl)
+         (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw)
+subscribeE-caps-exit c sl W g (scanᵉ f z b) κ id now sched st hsl hc hv hcl hw =
+  pushBurst-caps-frame c sl g id now (scan-f f nid) κ (proj₁ res)
+    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (λ vals fin sched′ st′ h₁ h₂ →
+       stepScan-caps c sl g id now f nid κ vals fin sched′ st′ h₁ h₂)
+    (proj₁ IH) (proj₂ IH)
+  where
+  nid = proj₁ (mintNode sched)
+  res = subscribeE g b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
+          (installNode nid (scan-st (evalTm z)) st)
+  IH = subscribeE-caps-exit c sl W g b (scan-f f nid ↠ κ) id now
+         (proj₂ (mintNode sched)) (installNode nid (scan-st (evalTm z)) st)
+         hsl
+         (nestCapsOK?-setNode c nid (scan-st (evalTm z))
+            (proj₂ (mintNode sched)) st refl hc)
+         (nestValOK?-scan c f z b hv)
+         (nestClosOK?-mono c sl b (scanᵉ f z b)
+            (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
+                            (closSizeᵗ (slotClos sl) f
+                               + closSizeᵗ (slotClos sl) z))
+                     (n≤1+n _))
+            hcl)
+         (≤-trans (descW-scan g f z b κ id now sched st) hw)
+subscribeE-caps-exit c sl W g (mergeAllᵉ lim b) κ id now sched st hsl hc hv hcl hw =
+  subscribeAll-caps-exit c sl W g mergeAllᵒ lim b κ id now sched st
+    hsl hc hv hcl hw
+subscribeE-caps-exit c sl W g (switchAllᵉ b) κ id now sched st hsl hc hv hcl hw =
+  subscribeAll-caps-exit c sl W g switchᵒ nothing b κ id now sched st
+    hsl hc hv hcl hw
+subscribeE-caps-exit c sl W g (exhaustAllᵉ b) κ id now sched st hsl hc hv hcl hw =
+  subscribeAll-caps-exit c sl W g exhaustᵒ nothing b κ id now sched st
+    hsl hc hv hcl hw
+subscribeE-caps-exit c sl W g0 (μᵉ b) κ id now sched st hsl hc hv hcl hw =
+  hsl , hc
+subscribeE-caps-exit c sl W (gs fuel) (μᵉ b) κ id now sched st hsl hc hv hcl hw =
+  subscribeE-caps-exit c sl W fuel (unfoldμ b) κ id now sched st hsl hc
+    (≤ᵇ-true (syncSizeᵉ (unfoldμ b)) (Caps.cSize c)
+      (≤-trans (≤-reflexive (syncSize-unfoldμ b))
+        (≤-trans (n≤1+n (syncSizeᵉ b))
+                 (nestValOK?-size c (μᵉ b) hv))))
+    (nestClosOK?-mono c sl (unfoldμ b) (μᵉ b)
+       (≤-trans (≤-reflexive (closSize-unfoldμ (slotClos sl) b))
+                (n≤1+n _))
+       hcl)
+    (≤-trans (descW-mu fuel b κ id now sched st) hw)
+subscribeE-caps-exit c sl W g (varᵉ ()) κ id now sched st hsl hc hv hcl hw
+subscribeE-caps-exit {u = u} c sl W g (deferᵉ b) κ id now sched st hsl hc hv hcl hw =
+  hsl , setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched)
+          (Sched.nextNode sched) (mergeAll-st {t = u} nothing 0 [] false)
+          (EvalSt.nodes st) refl hc
+
+subscribeAll-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  pushValsSt-exit c sl W g op nid κ id now (proj₁ res)
+    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (proj₁ EX) (proj₂ EX)
+    (pushVals-caps-adm c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-room c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+  where
+  nid = proj₁ (mintNode sched)
+  res = subscribeE g b (thru-outer op nid ↠ κ) id now (proj₂ (mintNode sched))
+          (installNode nid (allFresh u op lim) st)
+  EX : (Sched.slots (proj₁ (proj₂ res)) ≡ sl)
+       × (nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+  EX = subscribeE-caps-exit c sl W g b (thru-outer op nid ↠ κ) id now
+         (proj₂ (mintNode sched)) (installNode nid (allFresh u op lim) st)
+         hsl
+         (nestCapsOK?-setNode c nid (allFresh u op lim)
+            (proj₂ (mintNode sched)) st
+            (allFresh-wid (Caps.cWid c)
+               (Sched.slots (proj₂ (mintNode sched))) u op lim)
+            hc)
+         (allWrap-valOK c op lim b hv)
+         (allWrap-closOK c sl op lim b hcl)
+         (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)
+
+sharedConnect-caps-exit c sl W g0 i d κ id now sched st hsl hsi hc hk hw =
+  hsl , hc
+sharedConnect-caps-exit {Γ = Γ} c sl W (gs fuel′) i d κ id now sched st
+                        hsl hsi hc hk hw =
+  capsExit-if c sl (burstCompleted (proj₁ res)) _ _
+    (proj₁ IH , proj₂ IH) (proj₁ IH , proj₂ IH)
+  where
+  st₁ = register (toℕ i) κ
+          (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+  res = subscribeE fuel′ d (share-sink i) id now sched st₁
+  IH : (Sched.slots (proj₁ (proj₂ res)) ≡ sl)
+       × (nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+  IH = subscribeE-caps-exit c sl W fuel′ d (share-sink i) id now sched st₁
+         hsl hc
+         (≤ᵇ-true (syncSizeᵛ (obs (lookup Γ i)) d) (Caps.cSize c)
+            (≤-trans (≤-trans (syncSize≤closᵉ (slotClos sl) (slotClos-pos sl) d)
+                              (n≤1+n _))
+                     hk))
+         (≤ᵇ-true (closSizeᵉ (slotClos sl) d) (Caps.cSize c)
+            (≤-trans (n≤1+n _) hk))
+         (≤-trans (connW-gs fuel′ i d κ id now sched st) hw)
+
 -- the exit pair is one instance of the walk, entered at the installed
 -- state through the wrap vocabulary's own bridges
 pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

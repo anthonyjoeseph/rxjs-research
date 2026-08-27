@@ -16,7 +16,6 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-caps-exit @15a7dd
 -- TARGET: pushVals-caps-adm @66072f
 -- TARGET: pushVals-caps-room @8c59dd
 module Probed.PushVals-Caps where
