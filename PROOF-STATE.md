@@ -178,10 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-arr-slot`, `subscribeE-nest-arr-scan`** (Nest-Walk) —
-  FALSITY, `NO EVIDENCE`: the two heads the cap-keyed descent also postulates,
-  now at the arrival's own key. Nothing has instantiated `NestArrAt` at either;
-  the slot's charged side reads the telescope the syntax cannot see.
+- **`subscribeSharedSlot-nest-arr`, `subscribeE-nest-arr-scan`** (Nest-Walk) —
+  FALSITY, `NO EVIDENCE`: what is left of the two heads the cap-keyed descent
+  also postulates. The slot head is a body now, so only its SHARED arm is open:
+  a share re-enters the walk on a definition whose depth the unit charges.
 - **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
   `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
   boundary heads, where the doubling per boundary is charged and where the

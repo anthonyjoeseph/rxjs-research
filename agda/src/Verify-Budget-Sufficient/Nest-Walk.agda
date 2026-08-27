@@ -16,26 +16,29 @@ open import Data.Nat.Properties using
   ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
 open import Data.Unit using (⊤; tt)
 open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
 open import Relation.Nullary using (yes; no)
+open import Data.Bool using (T)
+open import Data.Fin using (toℕ)
 
-open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; InstEmit; value;
-  init; close; handoff; complete)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; _×ᵗ_; natᵗ; obs; sizeᵗ; applyFn; _≟ᵗ_; evalTm; syncSizeᵉ;
+open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; InstEmit; value; hot; cold; _at_from_as_;
+  subscribe; init; close; handoff; complete)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; natᵗ; obs; isData; sizeᵗ; applyFn; _≟ᵗ_; evalTm; syncSizeᵉ;
   syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵗˢ; nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; foldPath; dispatchShare; stepFrame; shareGo; shareAdmit; shareLatch; RegId;
-  NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals; mergeAll-st;
-  switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish; aliveThroughᶠ;
-  mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE; splitBurst; Stream; mintNode;
-  installNode; pushBurst; oneShotBurst; splitEvents; thruConsume; thruWalk; thruWrap;
-  retagEvents)
+  NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals;
+  mergeAll-st; switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish;
+  aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
+  splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
+  thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?; nestValOK?)
@@ -65,7 +68,39 @@ nodesMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} → EvalSt e → ℕ
 nodesMax st = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
 
 nestDᵛˢ : ∀ {n} {Γ : Ctx n} {u} → List (Val Γ u) → ℕ
-nestDᵛˢ {u = u} = foldr (λ v acc → nestDᵛ u v ⊔ acc) 0
+nestDᵛˢ {u = u} vs = foldr (λ v acc → nestDᵛ u v ⊔ acc) 0 vs
+
+-- A SCRIPTED SLOT CANNOT DELIVER DEPTH, and the proof is its own
+-- constructor: `isData` excludes `obs` outright, so `nestDᵛ` bottoms
+-- out at every leaf of such a type and the two projections below are
+-- the only reasoning the product and sum cases need.
+ifData-l : ∀ (a b : Bool) → T (if a then b else false) → T a
+ifData-l true  b ok = tt
+ifData-l false b ()
+
+ifData-r : ∀ (a b : Bool) → T (if a then b else false) → T b
+ifData-r true  b ok = ok
+ifData-r false b ()
+
+nestDᵛ-data : ∀ {n} {Γ : Ctx n} (t : Ty) → T (isData t) → (v : Val Γ t) →
+  nestDᵛ t v ≡ 0
+nestDᵛ-data unitᵗ    ok v        = refl
+nestDᵛ-data boolᵗ    ok v        = refl
+nestDᵛ-data natᵗ     ok v        = refl
+nestDᵛ-data (s ×ᵗ t) ok (a , b)  =
+  cong₂ _⊔_ (nestDᵛ-data s (ifData-l (isData s) (isData t) ok) a)
+            (nestDᵛ-data t (ifData-r (isData s) (isData t) ok) b)
+nestDᵛ-data (s +ᵗ t) ok (inj₁ a) =
+  nestDᵛ-data s (ifData-l (isData s) (isData t) ok) a
+nestDᵛ-data (s +ᵗ t) ok (inj₂ b) =
+  nestDᵛ-data t (ifData-r (isData s) (isData t) ok) b
+nestDᵛ-data (obs t)  () v
+
+nestDᵛˢ-data : ∀ {n} {Γ : Ctx n} {u} → T (isData u) →
+  (vs : List (Val Γ u)) → nestDᵛˢ {Γ = Γ} vs ≡ 0
+nestDᵛˢ-data ok []       = refl
+nestDᵛˢ-data {u = u} ok (v ∷ vs) =
+  cong₂ _⊔_ (nestDᵛ-data u ok v) (nestDᵛˢ-data ok vs)
 
 -- ONE FRAME'S SHARE OF THE PATH MEASURE, split out so the frame clause
 -- can spend it.  It is `pathNestD`'s own step and nothing else, which
@@ -130,6 +165,17 @@ abstract
       ≡ vals ++ proj₁ (splitEvents {A = A} es)
   splitEvents-vals []         es = refl
   splitEvents-vals (v ∷ vals) es = cong (v ∷_) (splitEvents-vals vals es)
+
+  initHead-vals : ∀ {n} {Γ : Ctx n} {u} {A : Set}
+    (vals : List (Val Γ u)) (i : Id) (s : Source) →
+    proj₁ (splitBurst {A = A}
+             (((init s ∷ map value vals) at i from s as subscribe) ∷ []))
+      ≡ vals
+  initHead-vals vals i s =
+    trans (cong (_++ []) (trans (cong (λ z → proj₁ (splitEvents z))
+                                      (sym (++-identityʳ (map value vals))))
+                                (splitEvents-vals vals [])))
+          (trans (cong (_++ []) (++-identityʳ vals)) (++-identityʳ vals))
 
   oneShot-vals : ∀ {n} {Γ : Ctx n} {u} {A : Set}
     (vals : List (Val Γ u)) (id : Id) (sched : Sched Γ) →
@@ -1359,11 +1405,22 @@ postulate
   -- THE HEADS THIS DESCENT STILL OWES.  Each is the arr-keyed twin of
   -- a clause the cap-keyed descent already discharges, so what is open
   -- is the transport and not the shape.
-  subscribeE-nest-arr-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  -- THE SHARED ARM, and it is the whole of what the slot head owes.  A
+  -- share re-enters the walk on its definition, so what it delivers is
+  -- the definition's own depth -- which `slotNest` charges to the unit
+  -- and the additive half of the grant therefore covers.  The scripted
+  -- arms need nothing: `isData` excludes `obs`, so a script has no
+  -- depth to deliver at all.
+  subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
-    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B g (input i) κ id now sched st
+    (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    let r = subscribeSharedSlot g i d κ id now sched st
+        D = arrD (nestUnit e sl) B 1 in
+    (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
+    × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
+    × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
 
   subscribeE-nest-arr-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
@@ -1420,8 +1477,35 @@ subscribeE-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   NestArrAt c sl B g o κ id now sched st
-subscribeE-nest-arr c sl B g (input i) κ id now sched st =
-  subscribeE-nest-arr-slot c sl B g i κ id now sched st
+-- A SLOT SUBSCRIPTION READS THE TELESCOPE RATHER THAN DESCENDING, so
+-- there is no key to spend and the additive half of the grant is what
+-- has to cover it.  That is exactly the difference from the cap-keyed
+-- form, which multiplies by an arrival whose `nestDᵉ` is zero here and
+-- so charges nothing at all.
+subscribeE-nest-arr c sl B g (input i) κ id now sched st hsl hc hv hn
+  with Sched.slots sched i
+... | shared d =
+  subscribeSharedSlot-nest-arr c sl B g i d κ id now sched st hsl hc
+... | scripted {ok = ok} (hot _)
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+... | false = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeE-nest-arr {Γ = Γ} c sl B g (input i) κ id now sched st hsl hc hv hn
+    | scripted {ok = ok} (cold sync []) =
+  ≤-trans (≤-reflexive
+            (trans (cong (nestDᵛˢ {u = lookup Γ i}) (oneShot-vals sync id sched))
+                   (nestDᵛˢ-data ok sync))) z≤n
+  , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeE-nest-arr {Γ = Γ} {t = t} c sl B g (input i) κ id now sched st
+                    hsl hc hv hn
+    | scripted {ok = ok} (cold sync (dl ∷ ds)) =
+  ≤-trans (≤-reflexive
+            (trans (cong (nestDᵛˢ {u = lookup Γ i})
+                     (initHead-vals {A = Val Γ t} sync id
+                        (proj₁ (mintSource sched))))
+                   (nestDᵛˢ-data ok sync))) z≤n
+  , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+
 subscribeE-nest-arr {Γ = Γ} {t = t} {e = e} {u = u} c sl B g (ofᵉ ts) κ id now sched st
   hsl hc hv hn =
   ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
@@ -3023,12 +3107,12 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (∀ (j : NodeId) →
        nodeNestAt j (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt j st ⊔ G)
 subscribeInner-nest {e = e} c sl B W sf op allNid κ id now o sched st hsl hc hv hn hw =
-  ≤-trans (proj₁ T) grow
-  , ≤-trans (proj₁ (proj₂ T)) (⊔-mono-≤ ≤-refl grow)
-  , (λ j → ≤-trans (proj₂ (proj₂ T) j) (⊔-mono-≤ ≤-refl grow))
+  ≤-trans (proj₁ tight) grow
+  , ≤-trans (proj₁ (proj₂ tight)) (⊔-mono-≤ ≤-refl grow)
+  , (λ j → ≤-trans (proj₂ (proj₂ tight) j) (⊔-mono-≤ ≤-refl grow))
   where
-  T = subscribeInner-nest-tight c sl B W sf op allNid κ id now o sched st
-        hsl hc hv hn hw
+  tight = subscribeInner-nest-tight c sl B W sf op allNid κ id now o sched st
+            hsl hc hv hn hw
 
   grow : nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ o)
            ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (Caps.cSize c)
