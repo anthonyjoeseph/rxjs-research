@@ -62,6 +62,7 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [bg.md](bg.md) | `make bg` / `bg-check` / `bg-wait` — detaching a build that outlives a tool call |
 | [find.md](find.md) | `make find` and `make dup-check` — search by the shape of the STATEMENT |
 | [find-prose.md](find-prose.md) | `make find-prose` — search FINDINGS: dead routes, coverage boundaries, rulings, traps |
+| [stub-proofs.md](stub-proofs.md) | `scripts/stub-proofs.py` — a `src` mirror with the proofs postulated; measured, and why it is not on the gate path |
 | [imports-check.md](imports-check.md) | `make imports-check` / `imports-fix` — dead imports, blanket imports, the claim root, the orphan guard, and why an edge costs |
 | [harness.md](harness.md) | `make harness` — the compiled calculator, and why its numbers prove nothing |
 | [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |

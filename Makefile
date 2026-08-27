@@ -236,6 +236,12 @@ stripped:
 strip-selftest:
 	@scripts/strip-comments.py --selftest
 
+# OFF THE GATE PATH, deliberately -- docs/stub-proofs.md carries the numbers
+# that decided that.  The selftest runs anyway, because an instrument nobody
+# exercises is an instrument nobody can trust when it is finally wanted.
+stub-selftest:
+	@scripts/stub-proofs.py --src . --dest . --selftest
+
 # Run agda against the mirror and map its positions back onto agda/src, WITHOUT
 # letting the pipe swallow agda's exit status — `$$?` is stashed before the pipe,
 # exactly as the `agda` recipe does.
