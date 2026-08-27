@@ -178,10 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
-  `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
-  boundary heads, where the doubling per boundary is charged and where the
-  recursion the old cycle-breaker hid actually lives.
+- **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
+  (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
+  all the three boundary heads still owe — the recursion and the push around it
+  are checked. The cap-keyed route to a fit does not transport to a key that is
+  not a `nestB`.
 - **`subscribeE-nest-arr-scan`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED×2`:
   the fold multiplies the depth per value while the key gains only the value's
   written size, so the grant is read over `suc W` copies of the key; measured,

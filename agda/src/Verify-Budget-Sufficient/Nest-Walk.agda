@@ -1523,53 +1523,79 @@ postulate
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestArrAt c sl B W g (scanᵉ f z b) κ id now sched st
 
+  -- THE WALL THE THREE BOUNDARY HEADS CROSS, and it is now the whole
+  -- of what they owe: the clause below each of these is a checked body
+  -- that recurses on the definition and pushes the burst, so what is
+  -- asserted here is the emit-by-emit FIT at the arr key and nothing
+  -- else.  The cap-keyed face reads its own fit off `pushVals-*`
+  -- through `pushFit-ems`; the arr key is not a `nestB`, so that route
+  -- does not transport and the fit is stated directly.
+  --
   -- PROBED: `Probed.Thru-Step-Indexed` takes the one axis on which the
   --   two sides move at comparable rates -- the arrival's own term, where
   --   the delivery is whatever the substitution emits.  Nesting a
   --   duplicating step delivers two, four and eight against arrivals of
   --   two, three and four, every fit inside the grant and both premises
-  --   pinned by `refl`, which is the DOUBLING PER BOUNDARY this statement
-  --   charges for.  Covered LOAD-BEARING: the value conjunct at that
+  --   pinned by `refl`, which is the DOUBLING PER BOUNDARY these leaves
+  --   charge for.  Covered LOAD-BEARING: the value conjunct at that
   --   family, read at a grant BELOW this one -- the rows take the key
   --   at one copy where the width premise buys `suc W` of them, so a
   --   fit there is a fit here.
-  -- PROBED: `Probed.Subscribe-Nest-Arr-Store` takes the store halves,
-  --   which the doubling rows leave at `0 ≤ _`: the subscription is
-  --   taken under a `from-inner` frame from a table already holding a
-  --   merge node three deep, and the arrival is a LIMITED merge whose
-  --   first inner is deferred, so its limit is still spent on return and
-  --   the second inner is genuinely parked and INSTALLS.  Covered: both
-  --   store conjuncts at the shallowest and deepest arrivals the harness
-  --   reaches, premises pinned by `refl`.  DEGENERATE, and this is the
-  --   finding rather than a gap in the sweep: over that column the
-  --   installed depth rises by one per level while the bound rises as
-  --   two to the arrival's own sync size, so the two ends read 3 and 6
-  --   against bounds of 768 and about 3.9e10.  The store halves cannot
-  --   be refuted on this axis, and a subscription installing depth
-  --   faster than its own key is what would be needed.  That column too
-  --   is read below this grant, at the WRITTEN size and at one copy of
-  --   the key rather than the `suc W` the width premise buys.
-  subscribeE-nest-arr-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  thruFit-arr-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
-    (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (lim : Maybe ℕ)
+    (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B W g (mergeAllᵉ lim b) κ id now sched st
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
+    nestClosOK? c sl (mergeAllᵉ lim b) ≡ true →
+    nestDᵉ (mergeAllᵉ lim b) ≤ B →
+    descW g (mergeAllᵉ lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+                id now (proj₂ (mintNode sched))
+                (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
+    in pushFitOK (arrD (nestUnit e sl) B
+                    (suc W * closSizeᵉ (slotClos sl) (mergeAllᵉ lim b)))
+         g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
-  -- PROBED: `Probed.Thru-Step-Indexed` and
-  --   `Probed.Subscribe-Nest-Arr-Store`, whose coverage is stated at
-  --   `subscribeE-nest-arr-merge` above.
-  subscribeE-nest-arr-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
+  -- PROBED: `Probed.Thru-Step-Indexed`, whose coverage is stated at
+  --   `thruFit-arr-merge` above.
+  thruFit-arr-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B W g (switchAllᵉ b) κ id now sched st
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
+    nestClosOK? c sl (switchAllᵉ b) ≡ true →
+    nestDᵉ (switchAllᵉ b) ≤ B →
+    descW g (switchAllᵉ b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
+                id now (proj₂ (mintNode sched))
+                (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+    in pushFitOK (arrD (nestUnit e sl) B
+                    (suc W * closSizeᵉ (slotClos sl) (switchAllᵉ b)))
+         g switchᵒ (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
-  -- PROBED: `Probed.Thru-Step-Indexed` and
-  --   `Probed.Subscribe-Nest-Arr-Store`, whose coverage is stated at
-  --   `subscribeE-nest-arr-merge` above.
-  subscribeE-nest-arr-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
+  -- PROBED: `Probed.Thru-Step-Indexed`, whose coverage is stated at
+  --   `thruFit-arr-merge` above.
+  thruFit-arr-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+    (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B W g (exhaustAllᵉ b) κ id now sched st
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
+    nestClosOK? c sl (exhaustAllᵉ b) ≡ true →
+    nestDᵉ (exhaustAllᵉ b) ≤ B →
+    descW g (exhaustAllᵉ b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
+                id now (proj₂ (mintNode sched))
+                (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
+    in pushFitOK (arrD (nestUnit e sl) B
+                    (suc W * closSizeᵉ (slotClos sl) (exhaustAllᵉ b)))
+         g exhaustᵒ (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 
 
 -- A PLUMBING RETAG REWRITES `kind`, WHICH THE SPLIT NEVER READS, so a
@@ -1858,12 +1884,132 @@ subscribeE-nest-arr {e = e} c sl B W g (takeᵉ cnt b) κ id now sched st
                     (n≤1+n _))
 subscribeE-nest-arr c sl B W g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-arr-scan c sl B W g f z b κ id now sched st
-subscribeE-nest-arr c sl B W g (mergeAllᵉ lim b) κ id now sched st =
-  subscribeE-nest-arr-merge c sl B W g lim b κ id now sched st
-subscribeE-nest-arr c sl B W g (switchAllᵉ b) κ id now sched st =
-  subscribeE-nest-arr-switch c sl B W g b κ id now sched st
-subscribeE-nest-arr c sl B W g (exhaustAllᵉ b) κ id now sched st =
-  subscribeE-nest-arr-exhaust c sl B W g b κ id now sched st
+subscribeE-nest-arr {e = e} {u = u} c sl B W g (mergeAllᵉ lim b) κ id now sched st
+                    hsl hc hv hcl hn hw =
+  proj₁ PUSH
+  , ⊔-chain (proj₁ (proj₂ PUSH)) (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ st₀≤ grow))
+  , (λ j → ⊔-chain (proj₂ (proj₂ PUSH) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ (st₀at j) grow)))
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₀ = proj₂ (mintNode sched)
+  st₀    = installNode nid (mergeAll-st {t = u} lim 0 [] false) st
+  res    = subscribeE g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₀ st₀
+
+  inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
+  inv₀ = nestCapsOK?-setNode c nid (mergeAll-st {t = u} lim 0 [] false) sched₀ st refl
+           (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
+
+  IH = subscribeE-nest-arr c sl B W g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₀ st₀
+         hsl inv₀ (nestValOK?-merge c lim b hv)
+         (nestClosOK?-mono c sl b (mergeAllᵉ lim b) (n≤1+n _) hcl)
+         (≤-trans (n≤1+n (nestDᵉ b)) hn)
+         (≤-trans (descW-merge g lim b κ id now sched st) hw)
+
+  FIT = thruFit-arr-merge c sl B W g lim b κ id now sched st hsl hc hv hcl hn hw
+
+  PUSH = pushBurst-nest-thru
+           (arrD (nestUnit e sl) B
+              (suc W * closSizeᵉ (slotClos sl) (mergeAllᵉ lim b)))
+           g mergeAllᵒ nid κ id now (proj₁ res)
+           (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) FIT
+
+  st₀≤ : nodesMax st₀ ≤ nodesMax st
+  st₀≤ = ≤-trans (setNode-nodes nid (mergeAll-st {t = u} lim 0 [] false) (EvalSt.nodes st))
+                 (⊔-lub z≤n ≤-refl)
+
+  st₀at : ∀ (j : NodeId) → nodeNestAt j st₀ ≤ nodeNestAt j st
+  st₀at j = ≤-trans (nodeNestAt-set j nid (mergeAll-st {t = u} lim 0 [] false) st)
+                    (⊔-lub z≤n ≤-refl)
+
+  grow : arrD (nestUnit e sl) B (suc W * closSizeᵉ (slotClos sl) b)
+           ≤ arrD (nestUnit e sl) B (suc W * closSizeᵉ (slotClos sl) (mergeAllᵉ lim b))
+  grow = arrDW-mono (nestUnit e sl) B W (closSizeᵉ (slotClos sl) b)
+           (closSizeᵉ (slotClos sl) (mergeAllᵉ lim b)) (n≤1+n _)
+subscribeE-nest-arr {e = e} {u = u} c sl B W g (switchAllᵉ b) κ id now sched st
+                    hsl hc hv hcl hn hw =
+  proj₁ PUSH
+  , ⊔-chain (proj₁ (proj₂ PUSH)) (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ st₀≤ grow))
+  , (λ j → ⊔-chain (proj₂ (proj₂ PUSH) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ (st₀at j) grow)))
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₀ = proj₂ (mintNode sched)
+  st₀    = installNode nid (switch-st nothing false) st
+  res    = subscribeE g b (thru-outer switchᵒ nid ↠ κ) id now sched₀ st₀
+
+  inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
+  inv₀ = nestCapsOK?-setNode c nid (switch-st nothing false) sched₀ st refl
+           (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
+
+  IH = subscribeE-nest-arr c sl B W g b (thru-outer switchᵒ nid ↠ κ) id now sched₀ st₀
+         hsl inv₀ (nestValOK?-switch c b hv)
+         (nestClosOK?-mono c sl b (switchAllᵉ b) (n≤1+n _) hcl)
+         (≤-trans (n≤1+n (nestDᵉ b)) hn)
+         (≤-trans (descW-switch g b κ id now sched st) hw)
+
+  FIT = thruFit-arr-switch c sl B W g b κ id now sched st hsl hc hv hcl hn hw
+
+  PUSH = pushBurst-nest-thru
+           (arrD (nestUnit e sl) B
+              (suc W * closSizeᵉ (slotClos sl) (switchAllᵉ b)))
+           g switchᵒ nid κ id now (proj₁ res)
+           (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) FIT
+
+  st₀≤ : nodesMax st₀ ≤ nodesMax st
+  st₀≤ = ≤-trans (setNode-nodes nid (switch-st nothing false) (EvalSt.nodes st))
+                 (⊔-lub z≤n ≤-refl)
+
+  st₀at : ∀ (j : NodeId) → nodeNestAt j st₀ ≤ nodeNestAt j st
+  st₀at j = ≤-trans (nodeNestAt-set j nid (switch-st nothing false) st)
+                    (⊔-lub z≤n ≤-refl)
+
+  grow : arrD (nestUnit e sl) B (suc W * closSizeᵉ (slotClos sl) b)
+           ≤ arrD (nestUnit e sl) B (suc W * closSizeᵉ (slotClos sl) (switchAllᵉ b))
+  grow = arrDW-mono (nestUnit e sl) B W (closSizeᵉ (slotClos sl) b)
+           (closSizeᵉ (slotClos sl) (switchAllᵉ b)) (n≤1+n _)
+subscribeE-nest-arr {e = e} {u = u} c sl B W g (exhaustAllᵉ b) κ id now sched st
+                    hsl hc hv hcl hn hw =
+  proj₁ PUSH
+  , ⊔-chain (proj₁ (proj₂ PUSH)) (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ st₀≤ grow))
+  , (λ j → ⊔-chain (proj₂ (proj₂ PUSH) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ (st₀at j) grow)))
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₀ = proj₂ (mintNode sched)
+  st₀    = installNode nid (exhaust-st false false) st
+  res    = subscribeE g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₀ st₀
+
+  inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
+  inv₀ = nestCapsOK?-setNode c nid (exhaust-st false false) sched₀ st refl
+           (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
+
+  IH = subscribeE-nest-arr c sl B W g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₀ st₀
+         hsl inv₀ (nestValOK?-exhaust c b hv)
+         (nestClosOK?-mono c sl b (exhaustAllᵉ b) (n≤1+n _) hcl)
+         (≤-trans (n≤1+n (nestDᵉ b)) hn)
+         (≤-trans (descW-exhaust g b κ id now sched st) hw)
+
+  FIT = thruFit-arr-exhaust c sl B W g b κ id now sched st hsl hc hv hcl hn hw
+
+  PUSH = pushBurst-nest-thru
+           (arrD (nestUnit e sl) B
+              (suc W * closSizeᵉ (slotClos sl) (exhaustAllᵉ b)))
+           g exhaustᵒ nid κ id now (proj₁ res)
+           (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) FIT
+
+  st₀≤ : nodesMax st₀ ≤ nodesMax st
+  st₀≤ = ≤-trans (setNode-nodes nid (exhaust-st false false) (EvalSt.nodes st))
+                 (⊔-lub z≤n ≤-refl)
+
+  st₀at : ∀ (j : NodeId) → nodeNestAt j st₀ ≤ nodeNestAt j st
+  st₀at j = ≤-trans (nodeNestAt-set j nid (exhaust-st false false) st)
+                    (⊔-lub z≤n ≤-refl)
+
+  grow : arrD (nestUnit e sl) B (suc W * closSizeᵉ (slotClos sl) b)
+           ≤ arrD (nestUnit e sl) B (suc W * closSizeᵉ (slotClos sl) (exhaustAllᵉ b))
+  grow = arrDW-mono (nestUnit e sl) B W (closSizeᵉ (slotClos sl) b)
+           (closSizeᵉ (slotClos sl) (exhaustAllᵉ b)) (n≤1+n _)
 subscribeE-nest-arr c sl B W g0 (μᵉ b) κ id now sched st hsl hc hv hcl hn hw =
   z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest-arr {e = e} c sl B W (gs fuel) (μᵉ b) κ id now sched st

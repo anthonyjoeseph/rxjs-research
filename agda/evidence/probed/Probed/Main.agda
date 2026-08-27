@@ -52,8 +52,6 @@ open import Probed.Sync-Factor
          mixOut≡3; mixD-holds)
 open import Probed.PushVals-Body-Key
   using (premTow; premDup; lensBK≡; deliveredTow≡; deliveredDup≡; fitTow0; fitTow1; fitTow2; fitDup1; fitDup2; fitDup3; fitS; fitX; deliveredD₂≡; premD₂; lenD₂≡; fitD₂1; fitD₂2; fitD₂3; armed≡; premA; lenA≡; deliveredA≡; fitA1; fitA3; fitAD₂3)
-open import Probed.Subscribe-Nest-Arr-Store
-  using (premF-6; installed≡; fits-0; fits-6)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
          capsX-1; capsX-2; heads≡; entry≡; headsClos≡; left-starved≡; census≡;
