@@ -26,14 +26,14 @@
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Subscribe-Nest-Arr-Store where
 
-open import Data.Bool using (true)
-open import Data.List using ([]; _∷_)
+open import Data.Bool using (Bool; true; false)
+open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (just)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Prim using (Gas; g0; gs)
+open import Rx.Prim using (Gas; g0; gs; InstEvent)
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ;
          nat̂; strmᵗ; deferᵉ; syncSizeᵛ; syncSizeᵉ)
@@ -41,7 +41,7 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
-  using (subscribeInner; root; sched-init; st-init; EvalSt;
+  using (subscribeInner; root; sched-init; st-init; EvalSt; Sched; NodeId;
          Path; _↠_; from-inner; mergeAllᵒ; installNode; mergeAll-st)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
@@ -75,9 +75,11 @@ tight {u} v = caps (syncSizeᵛ u v) (pWᵛ 2 slots u v) 0
 
 -- the arrival: a limited merge whose first inner is deferred, so the
 -- second is parked rather than subscribed
+gated : Val Γ₂ (obs natᵗ)
+gated = deferᵉ (ofᵉ (nat̂ 0 ∷ []))
+
 parkedFlat : ℕ → Val Γ₂ (obs (obs natᵗ))
-parkedFlat k =
-  ofᵉ (strmᵗ (deferᵉ (ofᵉ (nat̂ 0 ∷ []))) ∷ strmᵗ (deepV k) ∷ [])
+parkedFlat k = ofᵉ (strmᵗ gated ∷ strmᵗ (deepV k) ∷ [])
 
 oF : ℕ → Closed Γ₂ natᵗ
 oF k = mergeAllᵉ (just 1) (parkedFlat k)
@@ -91,7 +93,9 @@ premF k =
 premF-6 : premF 6
 premF-6 = refl , refl
 
-r : (o : Closed Γ₂ natᵗ) → _
+r : (o : Closed Γ₂ natᵗ) →
+    NodeId × List (Val Γ₂ natᵗ) × List (InstEvent (Val Γ₂ natᵗ))
+      × Bool × Sched Γ₂ × EvalSt prog
 r o = subscribeInner gasBig mergeAllᵒ 7 κF 0 0 o (sched-init prog slots) st₀
 
 stOf : Closed Γ₂ natᵗ → EvalSt prog
@@ -104,10 +108,38 @@ D o = 2 ^ pred (syncSizeᵉ o) * (nestUnit prog slots + nestDᵉ o)
 armed : ℕ
 armed = nodeNestAt 7 st₀
 
-figures : ℕ
-figures = armed + 10 * nestDᵛˢ (proj₁ (proj₂ (r (oF 6))))
-        + 100 * nodesMax (stOf (oF 6)) + 10000 * nodeNestAt 7 (stOf (oF 6))
-        + 1000000 * D (oF 6)
+-- THE SWEEP: the three readings against the bound, at the shallow end
+-- where they are closest.  `D` is `2 ^ pred (syncSizeᵉ o)`, so a deep
+-- arrival buys headroom faster than it installs depth -- which is the
+-- finding, and it is why the row that matters is `k = 0`.
+-- THE SWEEP: the three readings against the bound, at the shallow end
+-- where they are closest.
+dlv : ℕ → ℕ
+dlv k = nestDᵛˢ {Γ = Γ₂} {u = natᵗ} (proj₁ (proj₂ (r (oF k))))
 
-figures≡ : figures ≡ 0
-figures≡ = refl
+nmax : ℕ → ℕ
+nmax k = nodesMax (stOf (oF k))
+
+nat7 : ℕ → ℕ
+nat7 k = nodeNestAt 7 (stOf (oF k))
+
+-- the installed column, which is what the store conjuncts read
+installed : ℕ
+installed = nmax 0 + 10 * nmax 1 + 100 * nmax 2 + 1000 * nmax 3
+          + 10000 * nmax 4 + 100000 * nmax 5 + 1000000 * nmax 6
+
+installed≡ : installed ≡ 6543333
+installed≡ = refl
+
+-- THE CONJUNCTS THEMSELVES, at the deepest arrival this harness
+-- reaches and at the shallowest, so both ends of the column are rows.
+fits : (k : ℕ) → Set
+fits k = ((dlv k ≤ᵇ D (oF k)) ≡ true)
+       × ((nmax k ≤ᵇ nodesMax st₀ ⊔ D (oF k)) ≡ true)
+       × ((nat7 k ≤ᵇ nodeNestAt 7 st₀ ⊔ D (oF k)) ≡ true)
+
+fits-0 : fits 0
+fits-0 = refl , refl , refl
+
+fits-6 : fits 6
+fits-6 = refl , refl , refl

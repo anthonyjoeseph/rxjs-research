@@ -1334,10 +1334,21 @@ abstract
 --   two, three and four, every fit inside the grant and both premises
 --   pinned by `refl`, which is the DOUBLING PER BOUNDARY this statement
 --   charges for.  Covered LOAD-BEARING: the value conjunct at that
---   family.  NOT COVERED: the store halves, which is a boundary rather
---   than a gap -- the arms probed have room, so they queue nothing, and
---   a LIMITED merge under the frame is what arms a subscribe's store;
---   that region is `Probed.Wrap-Nest-Frame`.
+--   family.
+-- PROBED: `Probed.Subscribe-Nest-Arr-Store` takes the store halves,
+--   which the doubling rows leave at `0 ≤ _`: the subscription is
+--   taken under a `from-inner` frame from a table already holding a
+--   merge node three deep, and the arrival is a LIMITED merge whose
+--   first inner is deferred, so its limit is still spent on return and
+--   the second inner is genuinely parked and INSTALLS.  Covered: both
+--   store conjuncts at the shallowest and deepest arrivals the harness
+--   reaches, premises pinned by `refl`.  DEGENERATE, and this is the
+--   finding rather than a gap in the sweep: over that column the
+--   installed depth rises by one per level while the bound rises as
+--   two to the arrival's own sync size, so the two ends read 3 and 6
+--   against bounds of 768 and about 3.9e10.  The store halves cannot
+--   be refuted on this axis, and a subscription installing depth
+--   faster than its own key is what would be needed.
 postulate
   subscribeInner-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)

@@ -183,7 +183,7 @@ does not fit is a finding about the shared statement, not about the head.
   measure — slots, invariant, admissibility, room at the node — at every frame
   the descent leaves. Inhabited at the frame it leaves; the walk is untested.
 - **`subscribeInner-nest-arr`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×2, PROBED`: one subscription charged a DOUBLING per
+  `REFUTED, DEAD ROUTE×2, PROBED×2`: one subscription charged a DOUBLING per
   boundary of its arrival rather than a whole grant per level. This is the
   residue both dead routes name, and it is what the three consume steps now
   spend.
