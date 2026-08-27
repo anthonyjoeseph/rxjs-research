@@ -54,8 +54,6 @@ open import Probed.PushVals-Body-Key
   using (premTow; premDup; lensBK≡; deliveredTow≡; deliveredDup≡; fitTow0; fitTow1; fitTow2; fitDup1; fitDup2; fitDup3; fitS; fitX; deliveredD₂≡; premD₂; lenD₂≡; fitD₂1; fitD₂2; fitD₂3; armed≡; premA; lenA≡; deliveredA≡; fitA1; fitA3; fitAD₂3)
 open import Probed.Subscribe-Nest-Arr-Store
   using (premF-6; installed≡; fits-0; fits-6)
-open import Probed.Shared-Slot-Clos-Key
-  using (keys≡; fitDup0; fitDup1; fitDup2; fitDup3; fitDeep3)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
          capsX-1; capsX-2; heads≡; entry≡; headsClos≡; left-starved≡; census≡;
@@ -70,9 +68,3 @@ open import Probed.Thru-Step-Indexed
 
 open import Probed.Scan-Arr-Clos-Key
   using (premises; keys≡; fit0; fit7; fit13; fit14)
-
-open import Probed.Shared-Slot-Telescope
-  using (keysLow≡; keysUp≡; fit00; fit20; fit02; fit22)
-
-open import Probed.Shared-Slot-Script-Below
-  using (keys≡; fit0; fit4; fit8)

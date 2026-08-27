@@ -25,10 +25,10 @@ open import Data.Bool using (T)
 open import Data.Fin using (toℕ)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; InstEmit; value; hot; cold; _at_from_as_;
-  subscribe; init; close; handoff; complete)
+  subscribe; init; close; handoff; complete; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; natᵗ; obs; isData; sizeᵗ; applyFn; _≟ᵗ_; evalTm; syncSizeᵉ;
   syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Clos-Size using (closSizeᵉ; closSizeᵗ; closSizeᵗˢ;
   syncSize≤closᵉ; syncSize≤closᵗ; syncSize≤closᵗˢ; closSize-unfoldμ)
@@ -42,17 +42,17 @@ open import Rx.Evaluator using
   aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
   splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
   thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource;
-  sharedConnect)
+  sharedConnect; sharedPlumb; burstCompleted; register; dropSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; nestValOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
-open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ)
+open import Verify-Budget-Sufficient.Measures using (pathLen; boundedLive; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
-   nest-inflate; pow-grow¹; pow-distrib-*)
+   nest-inflate; pow-grow¹; pow-distrib-*; slotNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
@@ -1450,101 +1450,6 @@ postulate
   -- THE HEADS THIS DESCENT STILL OWES.  Each is the arr-keyed twin of
   -- a clause the cap-keyed descent already discharges, so what is open
   -- is the transport and not the shape.
-  -- THE SHARED ARM, and it is the whole of what the slot head owes --
-  -- the scripted arms need nothing, since `isData` excludes `obs` and
-  -- a script therefore has no depth to deliver at all.
-  --
-  -- THE KEY EXPANDS THE SLOT, and that is the whole content of the
-  -- restatement.  A share re-enters the walk on its definition, so
-  -- whatever key the head spends at `input i` must DOMINATE the key
-  -- the walk spends at `d` -- and the arrival's own written size
-  -- there is ONE, however large the definition behind it.  The
-  -- additive reading of that gap does not survive: a definition that
-  -- SUBSTITUTES builds what it emits, one occurrence in the step
-  -- function and one in the source it maps over, so a subscribe
-  -- doubles per layer while `nestDᵉ`, a subterm measure, rises by one.
-  -- Nor was there room in `B`, the head's own premise being
-  -- `nestDᵉ o ≤ B` at `o = input i`, which is zero.
-  --
-  -- WHAT PAYS FOR IT is that the doubling is BOUGHT rather than free:
-  -- a layer that duplicates also enlarges the definition it duplicates
-  -- in, measured at fifteen units of synchronous size per doubling, so
-  -- a key keyed on the DEFINITION's size outruns the delivery from the
-  -- first row.  `Rx.Slot-Clos.slotClos` is that key, and its fixpoint
-  -- hands this arm exactly one step of it over the descent it calls --
-  -- `slotClos sl i` is one MORE than the definition's closure size.
-  --
-  -- AND THE CALLER'S `B` IS GONE FROM THE GRANT, which is the content
-  -- of the restatement rather than a tidy-up.  A slot handoff does not
-  -- descend into the arrival, it LEAVES it: the caller's additive term
-  -- bounds the depth of a term the walk is about to stop looking at,
-  -- and what the descent on the definition needs is a term bounding
-  -- the DEFINITION's depth.  The unit is that term -- the telescope's
-  -- nesting is one of its summands -- and the one step of key the
-  -- slot's closure holds over the definition's pays for the swap
-  -- exactly, which is what `arrD-slot` is.
-  --
-  -- AND WHAT KEEPS IT A LEAF IS THE REGISTRATION, not the descent.
-  -- The connect arm appends one entry to the registry before it walks
-  -- the definition, and two conjuncts of the invariant read that list:
-  -- the per-path size bound and the count against the registry cap.
-  -- Neither survives an append, and no premise here carries room for
-  -- one more entry -- so the recursion cannot be handed the invariant
-  -- at the state it actually runs in.  Neither conjunct is READ
-  -- anywhere on this face, which is the position the store's size
-  -- conjunct was in when it was dropped from the same predicate; that
-  -- is a reason to test the drop, not to make it, since weakening a
-  -- hypothesis strengthens every open statement under it.
-  --
-  -- A CONSTANT SHIFT OF THE KEY COULD NOT HAVE BEEN IT, which is worth
-  -- keeping because it is the first thing to try and it is decidably
-  -- wrong: shift every key by the same term and the two sides shift
-  -- together, `1 + c` against `syncSizeᵉ d + c`.
-  -- REFUTED: `Refuted.Shared-Slot-Nest-Arr`, which is what killed the
-  --   additive form -- at a four-layer substituting definition it
-  --   delivers `1 2 4 8` against a grant of `2 3 4 5`, crossing at the
-  --   third layer, and it reaches the head's own conclusion as well as
-  --   this arm's.  The same module takes the CONTAINED family at the
-  --   same four programs, `0 1 2 3` against the same grant, so the
-  --   additive form was right about containment and wrong about
-  --   substitution.  Neither reading survives a key of one, which is
-  --   the quantity that moved.
-  -- PROBED: `Probed.Shared-Slot-Clos-Key` re-runs that family against
-  --   the key that replaced it.  The four substituting layers key at
-  --   `11 26 41 56` -- fifteen per doubling, which is the margin the
-  --   restatement was chosen for -- and every layer of both families
-  --   fits, the contained one included.  Covered LOAD-BEARING: the
-  --   value conjunct over those layers.  NOT covered: the two store
-  --   conjuncts, which this shape leaves at `0 ≤ _`.
-  -- PROBED: `Probed.Shared-Slot-Telescope` takes the region that one
-  --   left open -- a telescope of TWO, the upper definition naming the
-  --   lower, which is the only place the staged environment does any
-  --   work.  The key SEES THROUGH the reference and charges a lower
-  --   layer exactly what it charges an upper one, fifteen units per
-  --   doubling on both axes, and the fit holds at every corner of the
-  --   two-by-two.  Not covered: a telescope of three.
-  -- PROBED: `Probed.Shared-Slot-Script-Below` takes the composition of
-  --   the two shapes that have each broken a key on this face -- a
-  --   shared slot whose definition FOLDS over a scripted one below it,
-  --   using the very step that refutes a script-blind key.  The
-  --   definition is the same term at every row, so the key moving at
-  --   all is the staged environment carrying the script inward: two
-  --   units per scripted value against a delivery that doubles, so the
-  --   grant gains a factor of four where the demand gains two.  Not
-  --   covered: a script of OBSERVABLE values.
-  sharedConnect-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (g : Gas) (i : Fin n)
-    (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
-    let r = sharedConnect g i d κ id now sched st
-        D = arrD (nestUnit e sl) (nestUnit e sl)
-              (closSizeᵉ (slotClos sl) d) in
-    (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
-    × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
-    × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
-
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST LENGTH IS REALLY BET.  A
   -- scan's step is written once and applied once per value of the burst
   -- it is fed, so a step that doubles its accumulator doubles the
@@ -1618,6 +1523,112 @@ postulate
     NestArrAt c sl B g (exhaustAllᵉ b) κ id now sched st
 
 
+-- A PLUMBING RETAG REWRITES `kind`, WHICH THE SPLIT NEVER READS, so a
+-- connect's adopted burst delivers exactly the values the definition's
+-- own subscribe did.
+splitBurst-plumb : ∀ {n} {Γ : Ctx n} {u} {A : Set} (str : Stream Γ u) →
+  proj₁ (splitBurst {A = A} (sharedPlumb str))
+  ≡ proj₁ (splitBurst {A = A} str)
+splitBurst-plumb []         = refl
+splitBurst-plumb (em ∷ ems) =
+  cong (proj₁ (splitEvents (InstEmit.events em)) ++_) (splitBurst-plumb ems)
+
+-- WHAT A SUBSCRIBE OWES, AS ONE NAME OVER ITS WHOLE RESULT.  The walk's
+-- three conjuncts are read off one triple, and an arm that EXITS two
+-- ways has to state them twice; naming them once is what lets the two
+-- exits be discharged as the same obligation at two triples.
+NestOut : ∀ {n} {Γ : Ctx n} {t} {u} {e : Closed Γ t} →
+  ℕ → EvalSt e → Stream Γ u × Sched Γ × EvalSt e → Set
+NestOut {Γ = Γ} {t = t} D st R =
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ R))) ≤ D)
+  × (nodesMax (proj₂ (proj₂ R)) ≤ nodesMax st ⊔ D)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ R)) ≤ nodeNestAt j st ⊔ D)
+
+-- and a branch owes it at whichever triple it took
+nestOut-if : ∀ {n} {Γ : Ctx n} {t} {u} {e : Closed Γ t}
+  (D : ℕ) (st : EvalSt e) (bc : Bool)
+  (X Y : Stream Γ u × Sched Γ × EvalSt e) →
+  NestOut {t = t} D st X → NestOut {t = t} D st Y →
+  NestOut {t = t} D st (if bc then X else Y)
+nestOut-if D st true  X Y hx hy = hx
+nestOut-if D st false X Y hx hy = hy
+
+-- THE SHARED ARM, and it is the whole of what the slot head owes --
+-- the scripted arms need nothing, since `isData` excludes `obs` and
+-- a script therefore has no depth to deliver at all.
+--
+-- THE KEY EXPANDS THE SLOT, and that is the whole content of the
+-- restatement.  A share re-enters the walk on its definition, so
+-- whatever key the head spends at `input i` must DOMINATE the key
+-- the walk spends at `d` -- and the arrival's own written size
+-- there is ONE, however large the definition behind it.  The
+-- additive reading of that gap does not survive: a definition that
+-- SUBSTITUTES builds what it emits, one occurrence in the step
+-- function and one in the source it maps over, so a subscribe
+-- doubles per layer while `nestDᵉ`, a subterm measure, rises by one.
+-- Nor was there room in `B`, the head's own premise being
+-- `nestDᵉ o ≤ B` at `o = input i`, which is zero.
+--
+-- WHAT PAYS FOR IT is that the doubling is BOUGHT rather than free:
+-- a layer that duplicates also enlarges the definition it duplicates
+-- in, measured at fifteen units of synchronous size per doubling, so
+-- a key keyed on the DEFINITION's size outruns the delivery from the
+-- first row.  `Rx.Slot-Clos.slotClos` is that key, and its fixpoint
+-- hands this arm exactly one step of it over the descent it calls --
+-- `slotClos sl i` is one MORE than the definition's closure size.
+--
+-- AND THE CALLER'S `B` IS GONE FROM THE GRANT, which is the content
+-- of the restatement rather than a tidy-up.  A slot handoff does not
+-- descend into the arrival, it LEAVES it: the caller's additive term
+-- bounds the depth of a term the walk is about to stop looking at,
+-- and what the descent on the definition needs is a term bounding
+-- the DEFINITION's depth.  The unit is that term -- the telescope's
+-- nesting is one of its summands -- and the one step of key the
+-- slot's closure holds over the definition's pays for the swap
+-- exactly, which is what `arrD-slot` is.
+--
+-- AND THE SLOT PREMISE IS NOT CALL-SITE CONVENIENCE.  The grant is
+-- read over the UNIT, whose telescope summand pays for exactly the
+-- definitions the telescope holds, so a connect on a definition the
+-- slots do NOT hold is granted nothing by that term at all.  Without
+-- the premise the statement is false rather than merely unprovable,
+-- which is the one justification a hypothesis has.
+--
+-- A CONSTANT SHIFT OF THE KEY COULD NOT HAVE BEEN IT, which is worth
+-- keeping because it is the first thing to try and it is decidably
+-- wrong: shift every key by the same term and the two sides shift
+-- together, `1 + c` against `syncSizeᵉ d + c`.
+-- REFUTED: `Refuted.Shared-Slot-Nest-Arr`, which is what killed the
+--   additive form -- at a four-layer substituting definition it
+--   delivers `1 2 4 8` against a grant of `2 3 4 5`, crossing at the
+--   third layer, and it reaches the head's own conclusion as well as
+--   this arm's.  The same module takes the CONTAINED family at the
+--   same four programs, `0 1 2 3` against the same grant, so the
+--   additive form was right about containment and wrong about
+--   substitution.  Neither reading survives a key of one, which is
+--   the quantity that moved.
+-- RECOVERY: git show 98665c7 restores the three probe families this
+--   arm was carried on -- `Probed.Shared-Slot-Clos-Key` (the
+--   substituting and contained layer families), `.Telescope` (a
+--   two-slot environment, the only shape where the staged key does
+--   work) and `.Script-Below` (a fold over a scripted slot beneath a
+--   shared one).  Their coverage is superseded by the body below;
+--   the harness is what a later arr-keyed statement would want back.
+sharedConnect-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (g : Gas) (i : Fin n)
+  (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)}
+  (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → sl i ≡ shared d {ok = ok} →
+  nestCapsOK? c sched st ≡ true →
+  suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
+  let r = sharedConnect g i d κ id now sched st
+      D = arrD (nestUnit e sl) (nestUnit e sl)
+            (closSizeᵉ (slotClos sl) d) in
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
+  × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
+
 -- THE SLOT HEAD SPLITS THREE WAYS, AND TWO OF THEM OWE NOTHING.  A
 -- share that has already completed replays a close in one instant, and
 -- a share that is already connected joins mid-flight: neither carries a
@@ -1628,16 +1639,18 @@ postulate
 -- walk on the definition, and that is what the leaf is.
 subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
-  (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
+  (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)}
+  (κ : Path Γ (lookup Γ i) t)
   (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl → sl i ≡ shared d {ok = ok} →
+  nestCapsOK? c sched st ≡ true →
   suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
   let r = subscribeSharedSlot g i d κ id now sched st
       D = arrD (nestUnit e sl) B (suc (closSizeᵉ (slotClos sl) d)) in
   (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
   × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
   × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
-subscribeSharedSlot-nest-arr {e = e} c sl B g i d κ id now sched st hsl hc hk
+subscribeSharedSlot-nest-arr {e = e} c sl B g i d κ id now sched st hsl hsi hc hk
   with memberSource (toℕ i) (EvalSt.completedSources st)
 ... | true  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 ... | false
@@ -1648,7 +1661,7 @@ subscribeSharedSlot-nest-arr {e = e} c sl B g i d κ id now sched st hsl hc hk
   , ≤-trans (proj₁ (proj₂ L)) (⊔-mono-≤ ≤-refl step)
   , (λ j → ≤-trans (proj₂ (proj₂ L) j) (⊔-mono-≤ ≤-refl step))
   where
-  L = sharedConnect-nest-arr c sl g i d κ id now sched st hsl hc hk
+  L = sharedConnect-nest-arr c sl g i d κ id now sched st hsl hsi hc hk
 
   step : arrD (nestUnit e sl) (nestUnit e sl) (closSizeᵉ (slotClos sl) d)
        ≤ arrD (nestUnit e sl) B (suc (closSizeᵉ (slotClos sl) d))
@@ -1670,8 +1683,8 @@ subscribeE-nest-arr c sl B g (input i) κ id now sched st hsl hc hv hcl hn
   with Sched.slots sched i in eqs
 ... | shared d
   rewrite slotClos-fix sl i (trans (sym (cong (λ f → f i) hsl)) eqs) =
-  subscribeSharedSlot-nest-arr c sl B g i d κ id now sched st hsl hc
-    (≤ᵇ⇒≤ _ _ (T-to hcl))
+  subscribeSharedSlot-nest-arr c sl B g i d κ id now sched st hsl
+    (trans (sym (cong (λ f → f i) hsl)) eqs) hc (≤ᵇ⇒≤ _ _ (T-to hcl))
 ... | scripted {ok = ok} (hot _)
   with memberSource (toℕ i) (EvalSt.completedSources st)
 ... | true  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
@@ -1833,6 +1846,64 @@ subscribeE-nest-arr c sl B g (deferᵉ b) κ id now sched st hsl hc hv hcl hn =
   z≤n
   , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
   , (λ j → ≤-trans (nodeNestAt-set j _ _ st) (⊔-lub z≤n (m≤m⊔n _ _)))
+
+
+-- NO FUEL IS NO CONNECT: the arm returns a dry close and leaves the
+-- state alone, so every conjunct is at its floor.
+sharedConnect-nest-arr c sl g0 i d κ id now sched st hsl hsi hc hk =
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+sharedConnect-nest-arr {Γ = Γ} {t = t} {e = e} c sl (gs fuel) i d κ id now sched st
+                       hsl hsi hc hk =
+  nestOut-if {t = t} D st (burstCompleted (proj₁ res)) _ _ died lived
+  where
+  D = arrD (nestUnit e sl) (nestUnit e sl) (closSizeᵉ (slotClos sl) d)
+
+  st₁ : EvalSt e
+  st₁ = register (toℕ i) κ
+          (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
+
+  res = subscribeE fuel d (share-sink i) id now sched st₁
+
+  -- the registration writes the registry and the counter beside it, so
+  -- every conjunct of the invariant reads the list it read before
+  IH = subscribeE-nest-arr c sl (nestUnit e sl) fuel d (share-sink i) id now
+         sched st₁ hsl hc
+         (≤ᵇ-true (syncSizeᵛ (obs (lookup Γ i)) d) (Caps.cSize c)
+            (≤-trans (≤-trans (syncSize≤closᵉ (slotClos sl) (slotClos-pos sl) d)
+                              (n≤1+n _))
+                     hk))
+         (≤ᵇ-true (closSizeᵉ (slotClos sl) d) (Caps.cSize c)
+            (≤-trans (n≤1+n _) hk))
+         -- the definition is a SUMMAND of the telescope's nesting, which
+         -- is what the premise buys and what the unit is made of
+         (≤-trans (≤-trans (≤-reflexive (sym (cong slotNest hsi)))
+                           (fᵢ≤sum-tab (λ j → slotNest (sl j)) i))
+                  (≤-trans (m≤n+m (slotsNestSum sl) (nestDᵉ e)) (n≤1+n _)))
+
+  -- the definition died inside its own connect burst: a close is
+  -- latched and the registration drops, neither of which is a value
+  -- and neither of which touches the node table
+  died : NestOut {t = t} D st
+           ((((init (toℕ i) ∷ close (toℕ i) exhausted ∷ [])
+                at id from toℕ i as subscribe) ∷ sharedPlumb (proj₁ res))
+            , proj₁ (proj₂ res)
+            , record (proj₂ (proj₂ res))
+                { registry = dropSource (toℕ i) (EvalSt.registry (proj₂ (proj₂ res)))
+                ; completedSources =
+                    toℕ i ∷ EvalSt.completedSources (proj₂ (proj₂ res)) })
+  died = ≤-trans (≤-reflexive
+                   (cong (nestDᵛˢ {u = lookup Γ i}) (splitBurst-plumb (proj₁ res))))
+                 (proj₁ IH)
+       , proj₁ (proj₂ IH) , proj₂ (proj₂ IH)
+
+  lived : NestOut {t = t} D st
+            ((((init (toℕ i) ∷ []) at id from toℕ i as subscribe)
+                ∷ sharedPlumb (proj₁ res))
+             , proj₁ (proj₂ res) , proj₂ (proj₂ res))
+  lived = ≤-trans (≤-reflexive
+                    (cong (nestDᵛˢ {u = lookup Γ i}) (splitBurst-plumb (proj₁ res))))
+                  (proj₁ IH)
+        , proj₁ (proj₂ IH) , proj₂ (proj₂ IH)
 
 subscribeInner-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
