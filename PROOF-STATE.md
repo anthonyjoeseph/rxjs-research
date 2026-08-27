@@ -178,11 +178,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-arr-slot`, `subscribeE-nest-arr-take`,
-  `subscribeE-nest-arr-scan`, `subscribeE-nest-arr-mu`,
-  `subscribeE-nest-arr-defer`** (Nest-Walk) — FALSITY, `PROBED×2`: the arr
-  descent's non-boundary heads. Nothing has instantiated `NestArrAt` at any of
-  them; the boundary heads below carry the only rows this grant has.
+- **`subscribeE-nest-arr-slot`, `subscribeE-nest-arr-scan`** (Nest-Walk) —
+  FALSITY, `NO EVIDENCE`: the two heads the cap-keyed descent also postulates,
+  now at the arrival's own key. Nothing has instantiated `NestArrAt` at either;
+  the slot's charged side reads the telescope the syntax cannot see.
 - **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
   `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
   boundary heads, where the doubling per boundary is charged and where the

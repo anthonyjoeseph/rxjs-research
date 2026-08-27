@@ -1365,12 +1365,6 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     NestArrAt c sl B g (input i) κ id now sched st
 
-  subscribeE-nest-arr-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
-    (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B g (takeᵉ cnt b) κ id now sched st
-
   subscribeE-nest-arr-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
@@ -1421,15 +1415,6 @@ postulate
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestArrAt c sl B g (exhaustAllᵉ b) κ id now sched st
 
-  subscribeE-nest-arr-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Exp Γ (u ∷ []) [] [] u)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B g (μᵉ b) κ id now sched st
-
-  subscribeE-nest-arr-defer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Exp Γ [] [] [] u)
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    NestArrAt c sl B g (deferᵉ b) κ id now sched st
 
 subscribeE-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
@@ -1472,8 +1457,44 @@ subscribeE-nest-arr {e = e} c sl B g (mapᵉ f b) κ id now sched st hsl hc hv h
            ≤ arrD (nestUnit e sl) B (syncSizeᵉ (mapᵉ f b))
   grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵉ (mapᵉ f b))
            (≤-trans (n≤1+n (syncSizeᵉ b)) (s≤s (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))))
-subscribeE-nest-arr c sl B g (takeᵉ cnt b) κ id now sched st =
-  subscribeE-nest-arr-take c sl B g cnt b κ id now sched st
+subscribeE-nest-arr {e = e} c sl B g (takeᵉ cnt b) κ id now sched st
+                    hsl hc hv hn
+  with evalTm cnt
+... | zero  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+... | suc k =
+  ≤-trans (proj₁ push) (≤-trans (proj₁ IH) grow)
+  , ≤-trans (proj₁ (proj₂ push))
+      (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ st₀≤ grow))
+  , (λ j → ≤-trans (proj₂ (proj₂ push) j)
+             (≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ (st₀at j) grow)))
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₀ = proj₂ (mintNode sched)
+  st₀    = installNode nid (take-st (suc k)) st
+  res    = subscribeE g b (take-f nid ↠ κ) id now sched₀ st₀
+
+  inv₀ : nestCapsOK? c sched₀ st₀ ≡ true
+  inv₀ = nestCapsOK?-setNode c nid (take-st (suc k)) sched₀ st refl
+           (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
+
+  push = pushBurst-nest-take g id now nid κ
+           (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+
+  IH = subscribeE-nest-arr c sl B g b (take-f nid ↠ κ) id now sched₀ st₀
+         hsl inv₀ (nestValOK?-take c cnt b hv) hn
+
+  st₀≤ : nodesMax st₀ ≤ nodesMax st
+  st₀≤ = ≤-trans (setNode-nodes nid (take-st (suc k)) (EvalSt.nodes st))
+                 (⊔-lub z≤n ≤-refl)
+
+  st₀at : ∀ (j : NodeId) → nodeNestAt j st₀ ≤ nodeNestAt j st
+  st₀at j = ≤-trans (nodeNestAt-set j nid (take-st (suc k)) st)
+                    (⊔-lub z≤n ≤-refl)
+
+  grow : arrD (nestUnit e sl) B (syncSizeᵉ b)
+           ≤ arrD (nestUnit e sl) B (syncSizeᵉ (takeᵉ cnt b))
+  grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵉ (takeᵉ cnt b))
+           (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ cnt)) (n≤1+n _))
 subscribeE-nest-arr c sl B g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-arr-scan c sl B g f z b κ id now sched st
 subscribeE-nest-arr c sl B g (mergeAllᵉ lim b) κ id now sched st =
@@ -1482,10 +1503,36 @@ subscribeE-nest-arr c sl B g (switchAllᵉ b) κ id now sched st =
   subscribeE-nest-arr-switch c sl B g b κ id now sched st
 subscribeE-nest-arr c sl B g (exhaustAllᵉ b) κ id now sched st =
   subscribeE-nest-arr-exhaust c sl B g b κ id now sched st
-subscribeE-nest-arr c sl B g (μᵉ b) κ id now sched st =
-  subscribeE-nest-arr-mu c sl B g b κ id now sched st
-subscribeE-nest-arr c sl B g (deferᵉ b) κ id now sched st =
-  subscribeE-nest-arr-defer c sl B g b κ id now sched st
+subscribeE-nest-arr c sl B g0 (μᵉ b) κ id now sched st hsl hc hv hn =
+  z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+subscribeE-nest-arr {e = e} c sl B (gs fuel) (μᵉ b) κ id now sched st
+                    hsl hc hv hn =
+  ≤-trans (proj₁ IH) grow
+  , ≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow)
+  , (λ j → ≤-trans (proj₂ (proj₂ IH) j) (⊔-mono-≤ ≤-refl grow))
+  where
+  IH = subscribeE-nest-arr c sl B fuel (unfoldμ b) κ id now sched st hsl hc
+         (≤ᵇ-true (syncSizeᵉ (unfoldμ b)) (Caps.cSize c)
+           (≤-trans (≤-reflexive (syncSize-unfoldμ b))
+             (≤-trans (n≤1+n (syncSizeᵉ b))
+                      (nestValOK?-size c (μᵉ b) hv))))
+         (≤-trans (≤-reflexive (nestD-unfoldμ b)) hn)
+
+  -- the unfolding leaves the sync spine where it was, the recursive
+  -- occurrences being defer-gated, so the μ node is the only thing
+  -- this head spends and one step of the key covers it
+  grow : arrD (nestUnit e sl) B (syncSizeᵉ (unfoldμ b))
+           ≤ arrD (nestUnit e sl) B (syncSizeᵉ (μᵉ b))
+  grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ (unfoldμ b))
+           (syncSizeᵉ (μᵉ b))
+           (≤-trans (≤-reflexive (syncSize-unfoldμ b)) (n≤1+n _))
+-- a defer PARKS its body rather than subscribing it, so the burst is
+-- bookkeeping and the node installed reads zero: nothing about the
+-- body reaches either measure, which is why the head needs no key
+subscribeE-nest-arr c sl B g (deferᵉ b) κ id now sched st hsl hc hv hn =
+  z≤n
+  , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
+  , (λ j → ≤-trans (nodeNestAt-set j _ _ st) (⊔-lub z≤n (m≤m⊔n _ _)))
 
 subscribeInner-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (B : ℕ) (sf : Gas) (op : AllOp) (allNid : NodeId)
