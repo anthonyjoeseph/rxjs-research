@@ -49,7 +49,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; syncSizeᵛ)
+  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; syncSizeᵛ; deferᵉ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵛ)
@@ -175,6 +175,40 @@ prems≡ = refl
 
 capsAfter≡ : after (arr 6) ≡ true
 capsAfter≡ = refl
+
+-- ── the store halves at the arm that SUBSCRIBES ───────────────────
+
+-- the parking rows below reach the arm that writes a queue; this is
+-- the other one, where the limit has room and the step runs the
+-- `subscribeInner` all three heads share -- so what the store reads is
+-- what the descent INSTALLED rather than what the caller handed in
+rM : _
+rM = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr 6) sched₀ stM
+
+-- AND THE STORE CANNOT BE ARMED HERE AT ALL, which is a boundary and
+-- not a gap to fill.  A merge node's `nodeNest` is a fold over its
+-- QUEUE, and the admit arm is the one with room, so it queues nothing;
+-- every other node kind the descent installs reads zero by definition.
+-- Deferring the inner does not move it either -- its body being unrun
+-- leaves the node in the table, but an unlimited merge still parks
+-- nothing -- so both readings are zero at both, pinned below rather
+-- than dressed up as a fit.  The region where a subscribe DOES arm the
+-- store is a LIMITED merge under the frame, and `Probed.Wrap-Nest-Frame`
+-- is where it is taken.
+arrD : ℕ → Val Γ₂ (obs (obs natᵗ))
+arrD k = mapᵉ dup (ofᵉ (strmᵗ (deferᵉ (E k)) ∷ []))
+
+rD : _
+rD = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arrD 6) sched₀ stM
+
+storeM : ℕ
+storeM = nodesMax (proj₂ (proj₂ (proj₂ rM)))
+       + 100 * nodeNestAt 7 (proj₂ (proj₂ (proj₂ rM)))
+       + 10000 * nodesMax (proj₂ (proj₂ (proj₂ rD)))
+       + 1000000 * nodeNestAt 7 (proj₂ (proj₂ (proj₂ rD)))
+
+storeM≡ : storeM ≡ 0
+storeM≡ = refl
 
 -- ── the store halves, at the arm that PARKS ──────────────────────
 

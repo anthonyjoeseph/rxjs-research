@@ -1154,6 +1154,24 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 -- step is read at is a different one, and the chain does not compose.
 --
 -- REFUTED: Refuted.Thru-Step-Nest
+-- PROBED: `Probed.Thru-Step-Indexed` instantiates all four conjuncts
+--   at the very arrival that killed the flat form, at `W = 0` and with
+--   both other premises pinned by `refl`.  Covered LOAD-BEARING: the
+--   caps conjunct at BOTH arms, which is where the room premise was
+--   found owed; the slots equation; and the store halves at the arm
+--   that PARKS, the node reading three going in and six coming out, so
+--   the grant is what carries them and not the incoming summand.
+--   DEGENERATE, and pinned as such rather than reported as coverage:
+--   every row on the VALUE conjunct, the delivery reading twelve
+--   against a grant of twenty-two trillion -- one step of the key buys
+--   `(2 ^ S) ^ suc W`, so the doubling that killed the flat form
+--   cannot reach this form at all and no row on that axis could fail.
+--   NOT COVERED: the store halves at the arm that SUBSCRIBES, which is
+--   a boundary rather than a gap -- a merge's `nodeNest` folds its
+--   QUEUE and the admit arm has room, so it queues nothing, and
+--   deferring the inner does not change that.  A LIMITED merge under
+--   the frame is what arms a subscribe's store, and that region is
+--   `Probed.Wrap-Nest-Frame`.
 postulate
   thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W m m′ : ℕ) (fuel : Gas) (nid : NodeId)
