@@ -47,8 +47,8 @@ make refuted              typecheck the refutations   (Refuted/Main.agda)
 make probed               typecheck the probes        (Probed/Main.agda)
 make wiring-refuted       reachability, rooted at Refuted/Main
 make wiring-probed        reachability, rooted at Probed/Main
-make evidence-check       E1 + E2
-make evidence-selftest    proves E1 and E2 still fire
+make evidence-check       E1 + E2 + E3 + E4 + E5
+make evidence-selftest    proves every one of them still fires
 ```
 
 `evidence-check` and `evidence-selftest` are in `GATE_CHEAP` — both are pure
@@ -62,9 +62,10 @@ cache.
    `Probed.<Name>` — the tree name and the module namespace are separate
    directory levels, and the `.agda-lib` includes `probed`, not its parent.
    Import from `src` freely — that direction is the point.
-2. Give it a `-- TARGET: <postulate>` line naming what it is evidence for, one
-   name per line, bare (no module prefix). E2 checks each against
-   `make postulates`.
+2. Give it a `-- TARGET: <postulate> @<stamp>` line naming what it is evidence
+   for, one name per line, bare (no module prefix). E2 checks each name against
+   `make postulates`; E5 checks the stamp. Write the target bare the first time
+   and run `make evidence-check` — it prints the line to paste.
 3. Name it in `Probed/Main.agda`'s `using (…)`, or `wiring-probed` will call
    it unreachable.
 4. Put the RECEIPT — which shapes were covered — in the target postulate's own
@@ -124,3 +125,43 @@ cache.
   proven both in `src` and in a refutation is not reported. That is deliberate
   — a refutation restating a `src` definition's type in order to contradict it
   is normal — but it means the SEARCH FIRST rule is on you out here.
+
+## E5 — the stamp, and the failure it exists for
+
+E2 expires a probe when its target is **discharged** or **deleted**. There is a
+third way a probe stops being evidence and E2 is blind to all of it: the target
+**restated under the same name**. The name still resolves, `make postulates`
+still lists it, the check reports clean — and the rows are measuring text that
+is gone. That is strictly worse than an expired probe, because an expired one
+goes red and this one goes on printing a coverage claim.
+
+So a target carries a fingerprint:
+
+```
+-- TARGET: pushVals-merge-nest @c12ae2
+```
+
+Six hex of the SHA-256 of the alpha-normalised statement, taken from
+`check-duplicates.py`'s own normaliser — loaded by path, since its module name
+is not an identifier — so the two checks cannot drift into disagreeing about
+what "the same statement" means. Binder spelling and type synonyms do not move
+the stamp; anything else does.
+
+Three states, and the report says which:
+
+- **unstamped** — the target names a live postulate and says nothing about which
+  text the rows were taken against. The report prints the line to paste.
+- **stale** — the stamp resolves and the statement under the name has changed.
+  The report names BOTH fingerprints, because finding the rows' own statement in
+  the history is the only way to know what was covered.
+- **unknown name** — E2's finding, reported here too rather than skipped.
+
+**Never restamp alone.** A stamp is a claim that these rows were run against
+that text; moving it without re-running converts a false coverage claim into a
+certified one, which is the one outcome worse than no check. Re-run and restamp,
+or delete the probe.
+
+`scripts/stamp-targets.py` is the adoption pass that put the first stamps in.
+It is deliberately **not** a make target: it writes the current fingerprint onto
+every unstamped target, which is exactly the move the paragraph above forbids
+doing by reflex.
