@@ -116,7 +116,7 @@ le : ∀ {x y} → True (x ≤? y) → x ≤ y
 le = toWitness
 
 capsM-1 : capsM 1 1
-capsM-1 = refl , refl , refl
+capsM-1 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od refl → le tt }) , (le tt , λ { lim act q od refl → le tt }) , tt)
         , tt
 
@@ -127,7 +127,7 @@ capsS k =
     (proj₁ (resS k)) (proj₁ (proj₂ (resS k))) (proj₂ (proj₂ (resS k)))
 
 capsS-1 : capsS 1
-capsS-1 = refl , refl , refl
+capsS-1 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
         , tt
 
@@ -138,7 +138,7 @@ capsX k =
     (proj₁ (resX k)) (proj₁ (proj₂ (resX k))) (proj₂ (proj₂ (resX k)))
 
 capsX-1 : capsX 1
-capsX-1 = refl , refl , refl
+capsX-1 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
         , tt
 
@@ -163,22 +163,22 @@ entry≡ = refl
 -- and a second nesting level, and a limit the arrivals do not fit
 -- under, since the queue-room conjunct is the one a limit moves
 capsM-2 : capsM 1 2
-capsM-2 = refl , refl , refl
+capsM-2 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od refl → le tt }) , (le tt , λ { lim act q od refl → le tt }) , tt)
         , tt
 
 capsM-0 : capsM 0 1
-capsM-0 = refl , refl , refl
+capsM-0 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od refl → le tt }) , (le tt , λ { lim act q od refl → le tt }) , tt)
         , tt
 
 capsS-2 : capsS 2
-capsS-2 = refl , refl , refl
+capsS-2 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
         , tt
 
 capsX-2 : capsX 2
-capsX-2 = refl , refl , refl
+capsX-2 = refl , refl , refl , refl
         , ((le tt , λ { lim act q od () }) , (le tt , λ { lim act q od () }) , tt)
         , tt
 

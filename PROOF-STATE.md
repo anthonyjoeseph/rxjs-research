@@ -178,13 +178,13 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeE-nest-arr-scan`** (Nest-Walk) — FALSITY, `REFUTED`: the scan
-  head, where a fold compounds one factor per value and the arr key carries no
-  term in the burst's length.
-- **`subscribeSharedSlot-nest-arr`** (Nest-Walk) — SHAPE, `REFUTED`: refuted as
-  stated, and so is the head above it. A substituting definition BUILDS what it
-  emits, so a subscribe doubles per layer while the subterm measure charging it
-  rises by one. The repair needs a factor keyed on the DEFINITION's size.
+- **`subscribeE-nest-arr-scan`** (Nest-Walk) — FALSITY, `REFUTED, PROBED`: the
+  scan head, where a fold compounds one factor per value and the arr key
+  carries no term in the burst's length.
+- **`subscribeSharedSlot-nest-arr`** (Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+  restated at a key that EXPANDS the slot, the additive one having been
+  refuted; the refuting family now fits with margin, but a telescope of more
+  than one slot — where the staged key does its work — is uninstantiated.
 - **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
   `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
   boundary heads, where the doubling per boundary is charged and where the
@@ -267,6 +267,9 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+- **`closSize-unfoldμ`** (Clos-Size) — GRINDABLE, `TWIN`: the closure measure
+  is stable under an unfold, for the reason the bare size is; the proven size
+  version's clauses transfer one for one.
 - **`evalTm-nest-sync`** (Nest-Subst) — GRINDABLE, `TWIN`: the closed-term
   substitution charge with its exponent read on the sync spine. `evalWith-nest`
   is the same induction at the full measure, clause for clause, and the probe

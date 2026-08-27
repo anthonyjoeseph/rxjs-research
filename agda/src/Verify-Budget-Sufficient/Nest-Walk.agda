@@ -30,6 +30,9 @@ open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; un
   syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ)
 open import Rx.Slots using (Slots; scripted; shared)
+open import Rx.Clos-Size using (closSizeᵉ; closSizeᵗ; closSizeᵗˢ;
+  syncSize≤closᵉ; syncSize≤closᵗ; syncSize≤closᵗˢ; closSize-unfoldμ)
+open import Rx.Slot-Clos using (slotClos; slotClos-pos; slotClos-fix)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵗˢ; nestDᵛ; nestDᵉ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner;
@@ -721,6 +724,20 @@ capsDrainOK {s = s} c sl sf allNid κ id now lim act (o ∷ q) sched st =
 -- Either wrapper is one node bigger than its source, so the cap survives
 -- being narrowed to the source -- and the descent below needs it there,
 -- since that is what it subscribes.
+-- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
+-- arr-keyed descent needs and the one `nestValOK?` deliberately does
+-- not have: that predicate is a fact about a VALUE alone, while the
+-- key a subscription is charged at sees through the telescope the
+-- value may reference.  The two coincide on a slot-free arrival.
+nestClosOK? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Val Γ (obs u) → Bool
+nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
+
+abstract
+  nestClosOK?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+    (o : Val Γ (obs u)) →
+    nestClosOK? c sl o ≡ true → closSizeᵉ (slotClos sl) o ≤ Caps.cSize c
+  nestClosOK?-size c sl o h = ≤ᵇ⇒≤ _ _ (T-to h)
+
 abstract
   nestValOK?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps)
     (o : Closed Γ u) →
@@ -1390,7 +1407,7 @@ NestArrAt {Γ = Γ} {t = t} {e = e} c sl B g o κ id now sched st =
   nestValOK? c (obs _) o ≡ true →
   nestDᵉ o ≤ B →
   let r = subscribeE g o κ id now sched st
-      D = arrD (nestUnit e sl) B (syncSizeᵉ o) in
+      D = arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) o) in
   (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
   × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
   × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
@@ -1401,6 +1418,12 @@ syncSizeᵉ-pos : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (x : Exp Γ Δᵍ Δ Θ t
   1 ≤ syncSizeᵉ x
 syncSizeᵉ-pos x = ≤-trans (s≤s z≤n) (≤-reflexive (syncSizeᵉ-suc-pred x))
 
+-- and the same step read as an inequality, which is what a key whose
+-- positivity comes from a DOMINATION rather than from its own clauses
+-- can supply
+suc-pred-≤ : ∀ {x : ℕ} → 1 ≤ x → suc (pred x) ≤ x
+suc-pred-≤ {suc _} _ = ≤-refl
+
 postulate
   -- THE HEADS THIS DESCENT STILL OWES.  Each is the arr-keyed twin of
   -- a clause the cap-keyed descent already discharges, so what is open
@@ -1409,54 +1432,56 @@ postulate
   -- the scripted arms need nothing, since `isData` excludes `obs` and
   -- a script therefore has no depth to deliver at all.
   --
-  -- AS STATED IT IS FALSE, AND SO IS THE HEAD ABOVE IT.  The reading
-  -- that put it here: a share re-enters the walk on its definition, so
-  -- what it delivers is the definition's own depth, which `slotNest`
-  -- charges to the unit and the additive grant therefore covers.  That
-  -- holds only where the layers are CONTAINED.  A substituting step
-  -- BUILDS what it emits -- one occurrence in the step function and one
-  -- in the source it maps over -- so a subscribe doubles per layer
-  -- while `nestDᵉ`, a subterm measure, rises by one.  And there is no
-  -- room in `B`: the head's own premise is `nestDᵉ o ≤ B` at
-  -- `o = input i`, which is zero, so `B = 0` is what the head hands
-  -- down and the grant is the unit alone.
+  -- THE KEY EXPANDS THE SLOT, and that is the whole content of the
+  -- restatement.  A share re-enters the walk on its definition, so
+  -- whatever key the head spends at `input i` must DOMINATE the key
+  -- the walk spends at `d` -- and the arrival's own written size
+  -- there is ONE, however large the definition behind it.  The
+  -- additive reading of that gap does not survive: a definition that
+  -- SUBSTITUTES builds what it emits, one occurrence in the step
+  -- function and one in the source it maps over, so a subscribe
+  -- doubles per layer while `nestDᵉ`, a subterm measure, rises by one.
+  -- Nor was there room in `B`, the head's own premise being
+  -- `nestDᵉ o ≤ B` at `o = input i`, which is zero.
   --
-  -- WHAT THE REPAIR HAS TO CARRY, and the shape is forced.  The
-  -- doubling is BOUGHT rather than free -- a layer that duplicates also
-  -- enlarges the definition it duplicates in, measured at fifteen units
-  -- of synchronous size per doubling -- so a factor keyed on the
-  -- DEFINITION's size outruns the delivery from the first row.  The
-  -- question is only where that key comes from.
+  -- WHAT PAYS FOR IT is that the doubling is BOUGHT rather than free:
+  -- a layer that duplicates also enlarges the definition it duplicates
+  -- in, measured at fifteen units of synchronous size per doubling, so
+  -- a key keyed on the DEFINITION's size outruns the delivery from the
+  -- first row.  `Rx.Slot-Clos.slotClos` is that key, and its fixpoint
+  -- hands this arm exactly one step of it over the descent it calls --
+  -- `slotClos sl i` is one MORE than the definition's closure size.
   --
-  -- A CONSTANT SHIFT OF THE KEY CANNOT BE IT, which is worth writing
-  -- down because it is the first thing to try and it is decidably
-  -- wrong.  The arm re-enters the walk on the definition, so whatever
-  -- key the head spends at `input i` must DOMINATE the key the walk
-  -- spends at `d`.  Shift every key by the same term and the two sides
-  -- shift together: `1 + c` against `syncSizeᵉ d + c`, and the arrival's
-  -- own size at a slot reference is one.
-  --
-  -- So the key has to EXPAND the slot: the closure size of the arrival
-  -- under substitution of definitions, which is `syncSizeᵉ` everywhere
-  -- except at `input i`, where it is one plus the closure size of `d`.
-  -- That recursion terminates for a reason already in the language --
-  -- a definition may reference slots strictly BELOW its own index --
-  -- and it changes nothing for a slot-free program, where the closure
-  -- and the size coincide.
-  -- REFUTED: `Refuted.Shared-Slot-Nest-Arr`, at a four-layer
-  --   substituting definition: delivered `1 2 4 8` against a grant of
-  --   `2 3 4 5`, crossing at the third layer.  The same module takes
-  --   the CONTAINED family at the same four programs -- `0 1 2 3`
-  --   against the same `2 3 4 5` -- so the additive form is right
-  --   about containment and wrong about substitution, and it reaches
-  --   the head's own conclusion as well as this arm's.
+  -- A CONSTANT SHIFT OF THE KEY COULD NOT HAVE BEEN IT, which is worth
+  -- keeping because it is the first thing to try and it is decidably
+  -- wrong: shift every key by the same term and the two sides shift
+  -- together, `1 + c` against `syncSizeᵉ d + c`.
+  -- REFUTED: `Refuted.Shared-Slot-Nest-Arr`, which is what killed the
+  --   additive form -- at a four-layer substituting definition it
+  --   delivers `1 2 4 8` against a grant of `2 3 4 5`, crossing at the
+  --   third layer, and it reaches the head's own conclusion as well as
+  --   this arm's.  The same module takes the CONTAINED family at the
+  --   same four programs, `0 1 2 3` against the same grant, so the
+  --   additive form was right about containment and wrong about
+  --   substitution.  Neither reading survives a key of one, which is
+  --   the quantity that moved.
+  -- PROBED: `Probed.Shared-Slot-Clos-Key` re-runs that family against
+  --   the key that replaced it.  The four substituting layers key at
+  --   `11 26 41 56` -- fifteen per doubling, which is the margin the
+  --   restatement was chosen for -- and every layer of both families
+  --   fits, the contained one included.  Covered LOAD-BEARING: the
+  --   value conjunct over those layers.  NOT covered: the two store
+  --   conjuncts, which this shape leaves at `0 ≤ _`, and a slot whose
+  --   definition references a LOWER slot, the telescope there having
+  --   one entry -- which is the one place the staged environment does
+  --   any work, so it is the gap worth naming.
   subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
     (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
     let r = subscribeSharedSlot g i d κ id now sched st
-        D = arrD (nestUnit e sl) B 1 in
+        D = arrD (nestUnit e sl) B (suc (closSizeᵉ (slotClos sl) d)) in
     (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
     × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
     × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
@@ -1522,8 +1547,9 @@ subscribeE-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- form, which multiplies by an arrival whose `nestDᵉ` is zero here and
 -- so charges nothing at all.
 subscribeE-nest-arr c sl B g (input i) κ id now sched st hsl hc hv hn
-  with Sched.slots sched i
-... | shared d =
+  with Sched.slots sched i in eqs
+... | shared d
+  rewrite slotClos-fix sl i (trans (sym (cong (λ f → f i) hsl)) eqs) =
   subscribeSharedSlot-nest-arr c sl B g i d κ id now sched st hsl hc
 ... | scripted {ok = ok} (hot _)
   with memberSource (toℕ i) (EvalSt.completedSources st)
@@ -1550,15 +1576,26 @@ subscribeE-nest-arr {Γ = Γ} {t = t} {e = e} {u = u} c sl B g (ofᵉ ts) κ id 
   ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
              (oneShot-vals {A = Val Γ t} (map (λ tm → evalTm tm) ts) id sched)))
     (≤-trans (≤-trans (ofVals-nest-sync ts) (*-monoʳ-≤ (2 ^ syncSizeᵗˢ ts) hn))
-             (arrD-flat (nestUnit e sl) B (syncSizeᵗˢ ts)))
+             (≤-trans (arrD-flat (nestUnit e sl) B (syncSizeᵗˢ ts))
+                      (arrD-mono (nestUnit e sl) B (suc (syncSizeᵗˢ ts))
+                        (suc (closSizeᵗˢ (slotClos sl) ts))
+                        (s≤s (syncSize≤closᵗˢ (slotClos sl)
+                                (slotClos-pos sl) ts)))))
   , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest-arr c sl B g emptyᵉ κ id now sched st hsl hc hv hn =
   z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest-arr {e = e} c sl B g (mapᵉ f b) κ id now sched st hsl hc hv hn =
   ≤-trans (proj₁ push)
     (≤-trans (*-monoʳ-≤ (2 ^ syncSizeᵗ f) (+-mono-≤ hfB (proj₁ IH)))
-             (arrD-frame (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵗ f)
-                (syncSizeᵉ-pos b) (m≤n+m B (nestUnit e sl))))
+             (≤-trans
+               (arrD-frame (nestUnit e sl) B (closSizeᵉ (slotClos sl) b)
+                 (syncSizeᵗ f) (≤-trans (syncSizeᵉ-pos b) (clos-b))
+                 (m≤n+m B (nestUnit e sl)))
+               (arrD-mono (nestUnit e sl) B
+                 (suc (syncSizeᵗ f + closSizeᵉ (slotClos sl) b))
+                 (suc (closSizeᵗ (slotClos sl) f + closSizeᵉ (slotClos sl) b))
+                 (s≤s (+-monoˡ-≤ (closSizeᵉ (slotClos sl) b)
+                        (syncSize≤closᵗ (slotClos sl) (slotClos-pos sl) f))))))
   , ≤-trans (proj₁ (proj₂ push))
       (≤-trans (proj₁ (proj₂ IH)) (⊔-mono-≤ ≤-refl grow))
   , (λ j → ≤-trans (proj₂ (proj₂ push) j)
@@ -1576,10 +1613,16 @@ subscribeE-nest-arr {e = e} c sl B g (mapᵉ f b) κ id now sched st hsl hc hv h
   hfB : nestDᵗ f ≤ B
   hfB = ≤-trans (m≤m+n (nestDᵗ f) (nestDᵉ b)) hn
 
-  grow : arrD (nestUnit e sl) B (syncSizeᵉ b)
-           ≤ arrD (nestUnit e sl) B (syncSizeᵉ (mapᵉ f b))
-  grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵉ (mapᵉ f b))
-           (≤-trans (n≤1+n (syncSizeᵉ b)) (s≤s (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))))
+  clos-b : syncSizeᵉ b ≤ closSizeᵉ (slotClos sl) b
+  clos-b = syncSize≤closᵉ (slotClos sl) (slotClos-pos sl) b
+
+  grow : arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) b)
+           ≤ arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) (mapᵉ f b))
+  grow = arrD-mono (nestUnit e sl) B (closSizeᵉ (slotClos sl) b)
+           (closSizeᵉ (slotClos sl) (mapᵉ f b))
+           (≤-trans (n≤1+n _)
+                    (s≤s (m≤n+m (closSizeᵉ (slotClos sl) b)
+                                (closSizeᵗ (slotClos sl) f))))
 subscribeE-nest-arr {e = e} c sl B g (takeᵉ cnt b) κ id now sched st
                     hsl hc hv hn
   with evalTm cnt
@@ -1614,10 +1657,13 @@ subscribeE-nest-arr {e = e} c sl B g (takeᵉ cnt b) κ id now sched st
   st₀at j = ≤-trans (nodeNestAt-set j nid (take-st (suc k)) st)
                     (⊔-lub z≤n ≤-refl)
 
-  grow : arrD (nestUnit e sl) B (syncSizeᵉ b)
-           ≤ arrD (nestUnit e sl) B (syncSizeᵉ (takeᵉ cnt b))
-  grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ b) (syncSizeᵉ (takeᵉ cnt b))
-           (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ cnt)) (n≤1+n _))
+  grow : arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) b)
+           ≤ arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) (takeᵉ cnt b))
+  grow = arrD-mono (nestUnit e sl) B (closSizeᵉ (slotClos sl) b)
+           (closSizeᵉ (slotClos sl) (takeᵉ cnt b))
+           (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
+                           (closSizeᵗ (slotClos sl) cnt))
+                    (n≤1+n _))
 subscribeE-nest-arr c sl B g (scanᵉ f z b) κ id now sched st =
   subscribeE-nest-arr-scan c sl B g f z b κ id now sched st
 subscribeE-nest-arr c sl B g (mergeAllᵉ lim b) κ id now sched st =
@@ -1644,11 +1690,12 @@ subscribeE-nest-arr {e = e} c sl B (gs fuel) (μᵉ b) κ id now sched st
   -- the unfolding leaves the sync spine where it was, the recursive
   -- occurrences being defer-gated, so the μ node is the only thing
   -- this head spends and one step of the key covers it
-  grow : arrD (nestUnit e sl) B (syncSizeᵉ (unfoldμ b))
-           ≤ arrD (nestUnit e sl) B (syncSizeᵉ (μᵉ b))
-  grow = arrD-mono (nestUnit e sl) B (syncSizeᵉ (unfoldμ b))
-           (syncSizeᵉ (μᵉ b))
-           (≤-trans (≤-reflexive (syncSize-unfoldμ b)) (n≤1+n _))
+  grow : arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) (unfoldμ b))
+           ≤ arrD (nestUnit e sl) B (closSizeᵉ (slotClos sl) (μᵉ b))
+  grow = arrD-mono (nestUnit e sl) B (closSizeᵉ (slotClos sl) (unfoldμ b))
+           (closSizeᵉ (slotClos sl) (μᵉ b))
+           (≤-trans (≤-reflexive (closSize-unfoldμ (slotClos sl) b))
+                    (n≤1+n _))
 -- a defer PARKS its body rather than subscribing it, so the burst is
 -- bookkeeping and the node installed reads zero: nothing about the
 -- body reaches either measure, which is why the head needs no key
@@ -1666,7 +1713,7 @@ subscribeInner-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   nestValOK? c (obs s) o ≡ true →
   nestDᵉ o ≤ B →
   let r = subscribeInner sf op allNid κ id now o sched st
-      D = 2 ^ pred (syncSizeᵉ o) * (nestUnit e sl + B) in
+      D = 2 ^ pred (closSizeᵉ (slotClos sl) o) * (nestUnit e sl + B) in
   (nestDᵛˢ (proj₁ (proj₂ r)) ≤ D)
   × (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ D)
   × ((j : NodeId) →
@@ -1740,6 +1787,13 @@ thruStep-merge-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) o ≡ true →
+  -- THE CAP DOMINATES THE ARRIVAL'S CLOSURE, not merely its written
+  -- size.  The unconditional reading was REFUTED at a substituting
+  -- slot definition, where the two differ by a whole telescope, so
+  -- this is the true statement replacing a false one rather than a
+  -- weakening -- and the descent below spends it as the frame charge's
+  -- exponent, which is the same quantity the key is read at.
+  closSizeᵉ (slotClos sl) o ≤ Caps.cSize c →
   pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
   suc (length q) ≤ Caps.cWid c →
   nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
@@ -1756,7 +1810,7 @@ thruStep-merge-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (nestCapsOK? c sched₁ st′ ≡ true)
   × (Sched.slots sched₁ ≡ sl)
 thruStep-merge-inner {e = e} c sl B W m m′ fuel nid κ id now lim act q od o sched st
-                     eq hsl hm hc hv hw hlen hn =
+                     eq hsl hm hc hv hcl hw hlen hn =
     ≤-trans (proj₁ ARR) frame
   , ≤-trans (bump-fold nid done (EvalSt.nodes st₁))
             (≤-trans (proj₁ (proj₂ ARR)) (⊔-mono-≤ ≤-refl frame))
@@ -1780,15 +1834,18 @@ thruStep-merge-inner {e = e} c sl B W m m′ fuel nid κ id now lim act q od o s
   CAPS = thruStep-merge-inner-caps c sl fuel nid κ id now lim act q od o sched st
            eq hsl hc hv hw hlen
 
-  hk : suc (pred (syncSizeᵉ o)) ≤ Caps.cSize c
-  hk = ≤-trans (≤-reflexive (syncSizeᵉ-suc-pred o)) (nestValOK?-size c o hv)
+  hk : suc (pred (closSizeᵉ (slotClos sl) o)) ≤ Caps.cSize c
+  hk = ≤-trans (suc-pred-≤ (≤-trans (syncSizeᵉ-pos o)
+                             (syncSize≤closᵉ (slotClos sl)
+                                (slotClos-pos sl) o)))
+               hcl
 
-  frame : 2 ^ pred (syncSizeᵉ o) * (nestUnit e sl + N)
+  frame : 2 ^ pred (closSizeᵉ (slotClos sl) o) * (nestUnit e sl + N)
             ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m′
-  frame = ≤-trans (*-monoʳ-≤ (2 ^ pred (syncSizeᵉ o))
+  frame = ≤-trans (*-monoʳ-≤ (2 ^ pred (closSizeᵉ (slotClos sl) o))
                      (+-monoˡ-≤ N (nestB-unit (Caps.cSize c) W (nestUnit e sl) B m)))
                   (nestB-frame-dbl (Caps.cSize c) W (nestUnit e sl) B m
-                     (pred (syncSizeᵉ o)) m′ hk hm)
+                     (pred (closSizeᵉ (slotClos sl) o)) m′ hk hm)
 
 -- THE SWITCH HAS ONE ARM THAT DOES ANYTHING: there is no limit to
 -- spend, so an arrival always kills the current inner and subscribes.
@@ -1843,6 +1900,13 @@ thruStep-switch-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) o ≡ true →
+  -- THE CAP DOMINATES THE ARRIVAL'S CLOSURE, not merely its written
+  -- size.  The unconditional reading was REFUTED at a substituting
+  -- slot definition, where the two differ by a whole telescope, so
+  -- this is the true statement replacing a false one rather than a
+  -- weakening -- and the descent below spends it as the frame charge's
+  -- exponent, which is the same quantity the key is read at.
+  closSizeᵉ (slotClos sl) o ≤ Caps.cSize c →
   pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
   nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   let K      = switchKill cur sched st
@@ -1865,7 +1929,7 @@ thruStep-switch-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (nestCapsOK? c sched₂ st′ ≡ true)
   × (Sched.slots sched₂ ≡ sl)
 thruStep-switch-inner {e = e} c sl B W m m′ fuel nid κ id now cur od o sched st
-                      eq hsl hm hc hv hw hn =
+                      eq hsl hm hc hv hcl hw hn =
     ≤-trans (proj₁ ARR) frame
   , ≤-trans (setNode-nodes nid _ (EvalSt.nodes st₂))
             (⊔-lub z≤n (≤-trans (proj₁ (proj₂ ARR))
@@ -1899,15 +1963,18 @@ thruStep-switch-inner {e = e} c sl B W m m′ fuel nid κ id now cur od o sched 
                (cong (λ z → maybe nodeNest 0 (lookupNode j z))
                      (switchKill-nodes cur sched st))
 
-  hk : suc (pred (syncSizeᵉ o)) ≤ Caps.cSize c
-  hk = ≤-trans (≤-reflexive (syncSizeᵉ-suc-pred o)) (nestValOK?-size c o hv)
+  hk : suc (pred (closSizeᵉ (slotClos sl) o)) ≤ Caps.cSize c
+  hk = ≤-trans (suc-pred-≤ (≤-trans (syncSizeᵉ-pos o)
+                             (syncSize≤closᵉ (slotClos sl)
+                                (slotClos-pos sl) o)))
+               hcl
 
-  frame : 2 ^ pred (syncSizeᵉ o) * (nestUnit e sl + N)
+  frame : 2 ^ pred (closSizeᵉ (slotClos sl) o) * (nestUnit e sl + N)
             ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m′
-  frame = ≤-trans (*-monoʳ-≤ (2 ^ pred (syncSizeᵉ o))
+  frame = ≤-trans (*-monoʳ-≤ (2 ^ pred (closSizeᵉ (slotClos sl) o))
                      (+-monoˡ-≤ N (nestB-unit (Caps.cSize c) W (nestUnit e sl) B m)))
                   (nestB-frame-dbl (Caps.cSize c) W (nestUnit e sl) B m
-                     (pred (syncSizeᵉ o)) m′ hk hm)
+                     (pred (closSizeᵉ (slotClos sl) o)) m′ hk hm)
 
 -- AND THE EXHAUST HAS ONE TOO, the busy arm dropping the arrival
 -- outright -- so the only work is the idle one, and it is the merge's
@@ -1942,6 +2009,13 @@ thruStep-exhaust-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) o ≡ true →
+  -- THE CAP DOMINATES THE ARRIVAL'S CLOSURE, not merely its written
+  -- size.  The unconditional reading was REFUTED at a substituting
+  -- slot definition, where the two differ by a whole telescope, so
+  -- this is the true statement replacing a false one rather than a
+  -- weakening -- and the descent below spends it as the frame charge's
+  -- exponent, which is the same quantity the key is read at.
+  closSizeᵉ (slotClos sl) o ≤ Caps.cSize c →
   pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
   nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   let R      = subscribeInner fuel exhaustᵒ nid κ id now o sched st
@@ -1959,7 +2033,7 @@ thruStep-exhaust-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (nestCapsOK? c sched₁ st′ ≡ true)
   × (Sched.slots sched₁ ≡ sl)
 thruStep-exhaust-inner {e = e} c sl B W m m′ fuel nid κ id now od o sched st
-                       eq hsl hm hc hv hw hn =
+                       eq hsl hm hc hv hcl hw hn =
     ≤-trans (proj₁ ARR) frame
   , ≤-trans (setNode-nodes nid (exhaust-st (not done) od) (EvalSt.nodes st₁))
             (⊔-lub z≤n (≤-trans (proj₁ (proj₂ ARR)) (⊔-mono-≤ ≤-refl frame)))
@@ -1984,15 +2058,18 @@ thruStep-exhaust-inner {e = e} c sl B W m m′ fuel nid κ id now od o sched st
   CAPS = thruStep-exhaust-inner-caps c sl fuel nid κ id now od o sched st
            eq hsl hc hv hw
 
-  hk : suc (pred (syncSizeᵉ o)) ≤ Caps.cSize c
-  hk = ≤-trans (≤-reflexive (syncSizeᵉ-suc-pred o)) (nestValOK?-size c o hv)
+  hk : suc (pred (closSizeᵉ (slotClos sl) o)) ≤ Caps.cSize c
+  hk = ≤-trans (suc-pred-≤ (≤-trans (syncSizeᵉ-pos o)
+                             (syncSize≤closᵉ (slotClos sl)
+                                (slotClos-pos sl) o)))
+               hcl
 
-  frame : 2 ^ pred (syncSizeᵉ o) * (nestUnit e sl + N)
+  frame : 2 ^ pred (closSizeᵉ (slotClos sl) o) * (nestUnit e sl + N)
             ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m′
-  frame = ≤-trans (*-monoʳ-≤ (2 ^ pred (syncSizeᵉ o))
+  frame = ≤-trans (*-monoʳ-≤ (2 ^ pred (closSizeᵉ (slotClos sl) o))
                      (+-monoˡ-≤ N (nestB-unit (Caps.cSize c) W (nestUnit e sl) B m)))
                   (nestB-frame-dbl (Caps.cSize c) W (nestUnit e sl) B m
-                     (pred (syncSizeᵉ o)) m′ hk hm)
+                     (pred (closSizeᵉ (slotClos sl) o)) m′ hk hm)
 
 -- THE STEP, ASSEMBLED: the case split is `thruConsume`'s own, so the
 -- arms that return their inputs untouched are discharged here and only
@@ -2005,6 +2082,7 @@ thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) o ≡ true →
+  closSizeᵉ (slotClos sl) o ≤ Caps.cSize c →
   thruRoom c nid o sched st →
   nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   let rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
@@ -2016,14 +2094,14 @@ thruStep-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
                    (proj₂ (proj₂ (proj₂ rc))) ≡ true)
   × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
-thruStep-merge {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-merge {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ u
 ...   | no _ = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
 ...   | yes refl with hasRoom lim act
 ...     | true =
           let I = thruStep-merge-inner c sl B W m m′ fuel nid κ id now
-                    lim act q od o sched st eq hsl hm hc hv
+                    lim act q od o sched st eq hsl hm hc hv hcl
                     (proj₁ hr) (proj₂ hr lim act q od refl) hn
           in proj₁ I , proj₁ (proj₂ I) , proj₁ (proj₂ (proj₂ I))
            , proj₁ (proj₂ (proj₂ (proj₂ I)))
@@ -2033,15 +2111,15 @@ thruStep-merge {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc h
                     lim act q od o sched st eq hsl hm hc hv
                     (proj₁ hr) (proj₂ hr lim act q od refl) hn
           in z≤n , proj₁ P , proj₁ (proj₂ P) , proj₂ (proj₂ P) , hsl
-thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
     | nothing               = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
-thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
     | just (scan-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
-thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
     | just (take-st _)      = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
-thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
     | just (switch-st _ _)  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
-thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
     | just (exhaust-st _ _) = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _) , hc , hsl
 
 thruStep-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -2052,6 +2130,7 @@ thruStep-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) o ≡ true →
+  closSizeᵉ (slotClos sl) o ≤ Caps.cSize c →
   thruRoom c nid o sched st →
   nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   let rc = thruConsume fuel switchᵒ nid κ id now o sched st
@@ -2063,11 +2142,11 @@ thruStep-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
                    (proj₂ (proj₂ (proj₂ rc))) ≡ true)
   × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
-thruStep-switch {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-switch {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | just (switch-st cur od) =
       let I = thruStep-switch-inner c sl B W m m′ fuel nid κ id now cur od
-                o sched st eq hsl hm hc hv (proj₁ hr) hn
+                o sched st eq hsl hm hc hv hcl (proj₁ hr) hn
       in proj₁ I , proj₁ (proj₂ I) , proj₁ (proj₂ (proj₂ I))
            , proj₁ (proj₂ (proj₂ (proj₂ I)))
            , proj₂ (proj₂ (proj₂ (proj₂ I)))
@@ -2085,6 +2164,7 @@ thruStep-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) o ≡ true →
+  closSizeᵉ (slotClos sl) o ≤ Caps.cSize c →
   thruRoom c nid o sched st →
   nestDᵛ (obs u) o ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   let rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
@@ -2096,11 +2176,11 @@ thruStep-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   × (nestCapsOK? c (proj₁ (proj₂ (proj₂ rc)))
                    (proj₂ (proj₂ (proj₂ rc))) ≡ true)
   × (Sched.slots (proj₁ (proj₂ (proj₂ rc))) ≡ sl)
-thruStep-exhaust {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hr hn
+thruStep-exhaust {u = u} c sl B W m m′ fuel nid κ id now o sched st hsl hm hc hv hcl hr hn
   with lookupNode nid (EvalSt.nodes st) in eq
 ... | just (exhaust-st false od) =
       let I = thruStep-exhaust-inner c sl B W m m′ fuel nid κ id now od
-                o sched st eq hsl hm hc hv (proj₁ hr) hn
+                o sched st eq hsl hm hc hv hcl (proj₁ hr) hn
       in proj₁ I , proj₁ (proj₂ I) , proj₁ (proj₂ (proj₂ I))
            , proj₁ (proj₂ (proj₂ (proj₂ I)))
            , proj₂ (proj₂ (proj₂ (proj₂ I)))
@@ -2123,46 +2203,53 @@ thruFit-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   suc m ≤ m′ →
   nestCapsOK? c sched st ≡ true →
   all (nestValOK? c (obs u)) os ≡ true →
+  all (nestClosOK? c sl) os ≡ true →
   thruRoomOK c fuel op nid κ id now os sched st →
   nestDᵛˢ os ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
   thruFitOK (nestB (Caps.cSize c) W (nestUnit e sl) B m′)
     fuel op nid κ id now os sched st
-thruFit-vals c sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hr hn = tt
-thruFit-vals {u = u} c sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hr hn =
+thruFit-vals c sl B W m m′ fuel op nid κ id now [] sched st hsl hm hc hv hcl hr hn = tt
+thruFit-vals {u = u} c sl B W m m′ fuel mergeAllᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hr hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
   , thruFit-vals c sl B W m m′ fuel mergeAllᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
-      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv)) (proj₂ hr)
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
+      (proj₂ (∧-true _ _ hcl)) (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel mergeAllᵒ nid κ id now o sched st
   S = thruStep-merge c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
-        (proj₁ (∧-true _ _ hv)) (proj₁ hr)
+        (proj₁ (∧-true _ _ hv))
+        (nestClosOK?-size c sl o (proj₁ (∧-true _ _ hcl))) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hr hn =
+thruFit-vals {u = u} c sl B W m m′ fuel switchᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hr hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
   , thruFit-vals c sl B W m m′ fuel switchᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
-      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv)) (proj₂ hr)
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
+      (proj₂ (∧-true _ _ hcl)) (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel switchᵒ nid κ id now o sched st
   S = thruStep-switch c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
-        (proj₁ (∧-true _ _ hv)) (proj₁ hr)
+        (proj₁ (∧-true _ _ hv))
+        (nestClosOK?-size c sl o (proj₁ (∧-true _ _ hcl))) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
-thruFit-vals {u = u} c sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hr hn =
+thruFit-vals {u = u} c sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sched st hsl hm hc hv hcl hr hn =
   proj₁ S , proj₁ (proj₂ S) , proj₁ (proj₂ (proj₂ S))
   , thruFit-vals c sl B W m m′ fuel exhaustᵒ nid κ id now os
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
       (proj₂ (proj₂ (proj₂ (proj₂ S)))) hm
-      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv)) (proj₂ hr)
+      (proj₁ (proj₂ (proj₂ (proj₂ S)))) (proj₂ (∧-true _ _ hv))
+      (proj₂ (∧-true _ _ hcl)) (proj₂ hr)
       (≤-trans (m≤n⊔m (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
   where
   rc = thruConsume fuel exhaustᵒ nid κ id now o sched st
   S = thruStep-exhaust c sl B W m m′ fuel nid κ id now o sched st hsl hm hc
-        (proj₁ (∧-true _ _ hv)) (proj₁ hr)
+        (proj₁ (∧-true _ _ hv))
+        (nestClosOK?-size c sl o (proj₁ (∧-true _ _ hcl))) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
 
 -- What the outer's burst has to satisfy, emit by emit and at the state
@@ -2179,6 +2266,7 @@ pushValsOK {Γ = Γ} {e = e} {u = u} c sl B W m fuel op nid κ id now (em ∷ em
   (Sched.slots sched ≡ sl)
   × (nestCapsOK? c sched st ≡ true)
   × (all (nestValOK? c (obs u)) (proj₁ sp) ≡ true)
+  × (all (nestClosOK? c sl) (proj₁ sp) ≡ true)
   × thruRoomOK c fuel op nid κ id now (proj₁ sp) sched st
   × (nestDᵛˢ (proj₁ sp) ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m)
   × pushValsOK c sl B W m fuel op nid κ id now ems
@@ -2210,6 +2298,7 @@ pushValsCapsOK {Γ = Γ} {u = u} c sl fuel op nid κ id now (em ∷ ems) sched s
   (Sched.slots sched ≡ sl)
   × (nestCapsOK? c sched st ≡ true)
   × (all (nestValOK? c (obs u)) (proj₁ sp) ≡ true)
+  × (all (nestClosOK? c sl) (proj₁ sp) ≡ true)
   × thruRoomOK c fuel op nid κ id now (proj₁ sp) sched st
   × pushValsCapsOK c sl fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
@@ -2241,8 +2330,8 @@ pushVals-both : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pushValsOK c sl B W m fuel op nid κ id now str sched st
 pushVals-both c sl B W m fuel op nid κ id now [] sched st hcap hnest = tt
 pushVals-both {Γ = Γ} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sched st
-              (hsl , hc , hv , hr , restC) (hn , restN) =
-  hsl , hc , hv , hr , hn
+              (hsl , hc , hv , hcl , hr , restC) (hn , restN) =
+  hsl , hc , hv , hcl , hr , hn
   , pushVals-both c sl B W m fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
       restC restN
@@ -2263,8 +2352,9 @@ pushFit-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     fuel op nid κ id now str sched st
 pushFit-ems c sl B W m m′ fuel op nid κ id now [] sched st hm vals = tt
 pushFit-ems {Γ = Γ} {u = u} c sl B W m m′ fuel op nid κ id now (em ∷ ems) sched st hm
-            (hsl , hc , hv , hr , hn , rest) =
-  thruFit-vals c sl B W m m′ fuel op nid κ id now (proj₁ sp) sched st hsl hm hc hv hr hn
+            (hsl , hc , hv , hcl , hr , hn , rest) =
+  thruFit-vals c sl B W m m′ fuel op nid κ id now (proj₁ sp) sched st
+    hsl hm hc hv hcl hr hn
   , pushFit-ems c sl B W m m′ fuel op nid κ id now ems
       (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) hm rest
   where
