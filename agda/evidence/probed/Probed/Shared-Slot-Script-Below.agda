@@ -27,7 +27,7 @@
 -- NOT COVERED: the two store conjuncts, which this shape leaves at
 -- `0 ≤ _`, and a script of OBSERVABLE values.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: subscribeSharedSlot-nest-arr @891d01
+-- TARGET: sharedConnect-nest-arr @7b8935
 module Probed.Shared-Slot-Script-Below where
 
 open import Data.Bool using (T; true)
@@ -49,7 +49,7 @@ open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Slot-Clos using (slotClos)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator
-  using (subscribeSharedSlot; splitBurst; root; sched-init; st-init; Path; _↠_;
+  using (sharedConnect; splitBurst; root; sched-init; st-init; Path; _↠_;
   thru-outer; mergeAllᵒ)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
@@ -91,7 +91,7 @@ sl j ok (fsuc fzero) = shared defn {ok = ok}
 burstOf : (j : ℕ) (ok : T (inputsBelowᵉ 1 defn)) → ℕ
 burstOf j ok =
   nestDᵛˢ (proj₁ (splitBurst {A = Val Γₘ natᵗ}
-    (proj₁ (subscribeSharedSlot gas (fsuc fzero) defn κ 0 0
+    (proj₁ (sharedConnect gas (fsuc fzero) defn κ 0 0
               (sched-init prog (sl j ok)) (st-init prog)))))
 
 GOf : (j : ℕ) (ok : T (inputsBelowᵉ 1 defn)) → ℕ

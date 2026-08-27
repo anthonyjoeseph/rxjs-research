@@ -28,7 +28,7 @@
 -- `0 ≤ _`; a telescope of three; and a lower slot that is SCRIPTED
 -- rather than shared, where the key reads the script instead.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: subscribeSharedSlot-nest-arr @891d01
+-- TARGET: sharedConnect-nest-arr @7b8935
 module Probed.Shared-Slot-Telescope where
 
 open import Data.Bool using (T; true)
@@ -50,7 +50,7 @@ open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Slot-Clos using (slotClos)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
-  using (subscribeSharedSlot; splitBurst; root; sched-init; st-init; Path; _↠_;
+  using (sharedConnect; splitBurst; root; sched-init; st-init; Path; _↠_;
   thru-outer; mergeAllᵒ)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
@@ -96,7 +96,7 @@ burstOf : (j k : ℕ) (oj : T (inputsBelowᵉ 0 (low j)))
           (ok : T (inputsBelowᵉ 1 (up k))) → ℕ
 burstOf j k oj ok =
   nestDᵛˢ (proj₁ (splitBurst {A = Val Γₜ natᵗ}
-    (proj₁ (subscribeSharedSlot gasBig (fsuc fzero) (up k) κ 0 0
+    (proj₁ (sharedConnect gasBig (fsuc fzero) (up k) κ 0 0
               (sched-init prog (sl j k oj ok)) (st-init prog)))))
 
 GOf : (j k : ℕ) (oj : T (inputsBelowᵉ 0 (low j)))

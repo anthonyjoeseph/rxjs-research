@@ -22,7 +22,7 @@
 -- entry, so the staged environment is never consulted; the two-slot
 -- reading is `Probed.Shared-Slot-Telescope`.
 -- ══════════════════════════════════════════════════════════════════
--- TARGET: subscribeSharedSlot-nest-arr @891d01
+-- TARGET: sharedConnect-nest-arr @7b8935
 module Probed.Shared-Slot-Clos-Key where
 
 open import Data.Bool using (T; true)
@@ -44,7 +44,7 @@ open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Slot-Clos using (slotClos)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
-  using (subscribeSharedSlot; splitBurst; root; sched-init; st-init; Path; _↠_;
+  using (sharedConnect; splitBurst; root; sched-init; st-init; Path; _↠_;
   thru-outer; mergeAllᵒ)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
@@ -85,7 +85,7 @@ sl d ok fzero = shared d {ok = ok}
 burstOf : (d : Closed Γₛ (obs natᵗ)) (ok : T (inputsBelowᵉ 0 d)) → ℕ
 burstOf d ok =
   nestDᵛˢ (proj₁ (splitBurst {A = Val Γₛ natᵗ}
-    (proj₁ (subscribeSharedSlot gasBig fzero d κ 0 0
+    (proj₁ (sharedConnect gasBig fzero d κ 0 0
               (sched-init prog (sl d ok)) (st-init prog)))))
 
 -- the RESTATED grant: keyed on the definition's closure, at the `B`

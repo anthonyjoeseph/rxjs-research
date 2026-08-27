@@ -41,7 +41,8 @@ open import Rx.Evaluator using
   mergeAll-st; switch-st; exhaust-st; lookupNode; setNode; scanVals; innerFinish;
   aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
   splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
-  thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource)
+  thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource;
+  sharedConnect)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?; nestValOK?)
@@ -1504,12 +1505,12 @@ postulate
   --   units per scripted value against a delivery that doubles, so the
   --   grant gains a factor of four where the demand gains two.  Not
   --   covered: a script of OBSERVABLE values.
-  subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  sharedConnect-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
     (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    let r = subscribeSharedSlot g i d κ id now sched st
+    let r = sharedConnect g i d κ id now sched st
         D = arrD (nestUnit e sl) B (suc (closSizeᵉ (slotClos sl) d)) in
     (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
     × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
@@ -1586,6 +1587,33 @@ postulate
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestArrAt c sl B g (exhaustAllᵉ b) κ id now sched st
+
+
+-- THE SLOT HEAD SPLITS THREE WAYS, AND TWO OF THEM OWE NOTHING.  A
+-- share that has already completed replays a close in one instant, and
+-- a share that is already connected joins mid-flight: neither carries a
+-- value, so the delivered depth is zero, and neither touches the node
+-- table -- `register` writes the registry and the counter beside it, so
+-- `nodesMax` and `nodeNestAt` read the same list they read before.  The
+-- whole of what this head owes is the CONNECT arm, which re-enters the
+-- walk on the definition, and that is what the leaf is.
+subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
+  (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  let r = subscribeSharedSlot g i d κ id now sched st
+      D = arrD (nestUnit e sl) B (suc (closSizeᵉ (slotClos sl) d)) in
+  (nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ r))) ≤ D)
+  × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
+  × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
+subscribeSharedSlot-nest-arr c sl B g i d κ id now sched st hsl hc
+  with memberSource (toℕ i) (EvalSt.completedSources st)
+... | true  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+... | false
+  with memberSource (toℕ i) (EvalSt.connectedShares st)
+... | true  = z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+... | false = sharedConnect-nest-arr c sl B g i d κ id now sched st hsl hc
 
 
 subscribeE-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
