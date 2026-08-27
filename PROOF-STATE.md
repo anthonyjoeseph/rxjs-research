@@ -191,20 +191,19 @@ does not fit is a finding about the shared statement, not about the head.
   the fold multiplies the depth per value while the key gains only the value's
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
-- **`pushVals-merge-caps`, `pushVals-switch-caps`, `pushVals-exhaust-caps`**
-  (Nest-Walk) — DIFFICULTY, `PROBED×3`: the bundle the burst carries beside the
-  measure — slots, invariant, admissibility, room at the node — at every frame
-  the descent leaves. Inhabited at one- and two-instant bursts, the second
-  through the one route there is: a share connect.
+- **`pushVals-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the bundle the burst
+  carries beside the measure, at every frame the descent leaves. Inhabited at
+  every op and at one- and two-instant bursts, the second through the one
+  route there is: a share connect.
 - **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
   `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
   bundle and the slots equation across the arm that subscribes, the measures
   around them now being checked bodies. The switch's covers its kill too.
-- **`pushVals-merge-nest`, `pushVals-switch-nest`, `pushVals-exhaust-nest`**
-  (Nest-Walk) — DIFFICULTY, `DEAD ROUTE×2, PROBED, RECOVERY`: the outer's burst
-  is inside the grant, emit by emit, at the BODY's key. This is where the burst
-  statement's risk is; the body key and the rate that survives the frame are
-  both taken.
+- **`pushVals-nest`** (Nest-Walk) — DIFFICULTY,
+  `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
+  burst inside the grant, emit by emit, at the BODY's key. This is where the
+  burst statement's risk is; the body key and the rate that survives the frame
+  are both taken.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and

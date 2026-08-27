@@ -2876,6 +2876,24 @@ NestAt {Γ = Γ} {t = t} {e = e} c sl B W g o κ id now sched st =
   × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ G)
   × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ G)
 
+-- THE `*All` WRAP VOCABULARY.  One op-indexed spelling of what the
+-- evaluator writes three ways: the wrap expression a head's premises
+-- are read over, and the fresh state installed under it.  Both reduce
+-- definitionally at each constructor, so a premise stated over
+-- `allWrap op lim b` IS the merge premise at `mergeAllᵒ`, letter for
+-- letter -- which is what lets one burst statement stand where three
+-- stood.  The limit rides only the merge arm; the other two ops
+-- discard it by matching the op first.
+allWrap : ∀ {n} {Γ : Ctx n} {u} → AllOp → Maybe ℕ → Closed Γ (obs u) → Closed Γ u
+allWrap mergeAllᵒ lim b = mergeAllᵉ lim b
+allWrap switchᵒ   _   b = switchAllᵉ b
+allWrap exhaustᵒ  _   b = exhaustAllᵉ b
+
+allFresh : ∀ {n} {Γ : Ctx n} (u : Ty) → AllOp → Maybe ℕ → NodeState Γ
+allFresh u mergeAllᵒ lim = mergeAll-st {t = u} lim 0 [] false
+allFresh _ switchᵒ   _   = switch-st nothing false
+allFresh _ exhaustᵒ  _   = exhaust-st false false
+
 postulate
   -- THE SLOT HEADS, where a subscription reads the telescope rather
   -- than descending.  A hot slot emits bookkeeping and no values; a
@@ -2943,22 +2961,25 @@ postulate
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (scanᵉ f z b) κ id now sched st
-  -- THE THREE `*All` BURST LEAVES, CAPS HALF.  The heads themselves are
-  -- REAL BODIES now: mint, the outer's own descent as the IH, and the
-  -- burst pushed back through the `thru-outer` frame by the checked
-  -- walk above; and the FIT is no longer asserted either, being read
-  -- off these by `pushFit-ems`.  What each of these carries is the
-  -- bundle a burst travels with -- at every frame the descent leaves,
-  -- the slots are the ones the caller named, the invariant still holds,
-  -- the values that arrive are admissible, and the node has room for
-  -- them.  It mirrors what the caps face already carries along a burst,
-  -- which is why it is stated apart from the measure: nothing here can
-  -- be outrun by a substituting frame.
+  -- THE `*All` BURST LEAF, CAPS HALF -- one statement over the op,
+  -- each head's old form being its instance by `allWrap`'s reduction.
+  -- The heads themselves are REAL BODIES: mint, the outer's own
+  -- descent as the IH, and the burst pushed back through the
+  -- `thru-outer` frame by the checked walk above; and the FIT is not
+  -- asserted either, being read off these by `pushFit-ems`.  What the
+  -- leaf carries is the bundle a burst travels with -- at every frame
+  -- the descent leaves, the slots are the ones the caller named, the
+  -- invariant still holds, the values that arrive are admissible, and
+  -- the node has room for them.  It mirrors what the caps face
+  -- already carries along a burst, which is why it is stated apart
+  -- from the measure: nothing here can be outrun by a substituting
+  -- frame.
   -- PROBED: `Probed.PushVals-Caps` builds the conclusion itself -- it
   --   is `Set`-valued, so the row is an INHABITANT and not a pinned
   --   boolean -- at all three heads, at the cap the value's own sync
   --   size gives, with the head's premises pinned by `refl` rather
-  --   than assumed.  Covered: all six conjuncts, at two nesting
+  --   than assumed, at every constructor of the op axis, which the
+  --   rows therefore cover in FULL.  Covered: all six conjuncts, at two nesting
   --   depths and at limits 0 and 1, with the queue-room arm resolved
   --   through a real node lookup at the merge and through an absurd
   --   one at the other two, and with the head's CLOSURE premise pinned
@@ -2972,29 +2993,31 @@ postulate
   --   leaves: the invariant conjunct's discrimination, since the state
   --   the descent leaves carries one node and an empty registry and
   --   live set, so it reads true even at a cap granting nothing.
-  pushVals-merge-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-    (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
-    nestClosOK? c sl (mergeAllᵉ lim b) ≡ true →
-    descW g (mergeAllᵉ lim b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestClosOK? c sl (allWrap op lim b) ≡ true →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
-    in pushValsCapsOK c sl W g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in pushValsCapsOK c sl W g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- THE THREE `*All` BURST LEAVES, MEASURE HALF -- and this is where
-  -- the risk of the burst statement is, the bundle beside it being
-  -- routine.  What each carries is one inequality per emit: the joined
-  -- nesting of the values the descent hands back is already inside the
-  -- head's grant, read at the BODY's key rather than the assembled
-  -- head's.  It is stated over
-  -- `subscribeE`'s own output rather than any bound of it because an
-  -- admitted inner's cost has to come back bounded through the KEY,
-  -- which is the strengthened conclusion the ring's members carry.
-  --
+  -- THE `*All` BURST LEAF, MEASURE HALF -- and this is where the risk
+  -- of the burst statement is, the bundle beside it being routine.
+  -- What it carries is one inequality per emit: the joined nesting of
+  -- the values the descent hands back is already inside the head's
+  -- grant, read at the BODY's key rather than the assembled head's.
+  -- It is stated over `subscribeE`'s own output rather than any bound
+  -- of it because an admitted inner's cost has to come back bounded
+  -- through the KEY, which is the strengthened conclusion the ring's
+  -- members carry.  At the switch and exhaust ops the STORE conjuncts
+  -- are `0 ≤ _` at every program -- `nodeNest` is zero by definition
+  -- on both fresh states -- so at those arms only the burst half is
+  -- ever evidence about this statement.
   -- DEAD ROUTE: closing the fit with a `pushBurst` LEAF over the whole
   --   frame -- the takeᵉ-shaped body -- is STRUCTURALLY DEAD at every
   --   choice of leaf, because the grant's per-key-unit ratio cannot pay
@@ -3078,85 +3101,19 @@ postulate
   --   not even subscribe what the statement subscribes: it runs the
   --   WRAP under a frame where the leaf runs the wrap's BODY.  What is
   --   worth recovering is the harness, not the verdicts.
-  pushVals-merge-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
-    (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
-    nestDᵉ (mergeAllᵉ lim b) ≤ B →
-    descW g (mergeAllᵉ lim b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestDᵉ (allWrap op lim b) ≤ B →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (mergeAll-st {t = u} lim 0 [] false) st)
-    in pushValsNestOK c sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in pushValsNestOK c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The switch wrap's bundle, at its own initial state.
-  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its two
-  --   boundaries are stated at `pushVals-merge-caps` above.
-  pushVals-switch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-    (b : Closed Γ (obs u))
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
-    nestClosOK? c sl (switchAllᵉ b) ≡ true →
-    descW g (switchAllᵉ b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
-    in pushValsCapsOK c sl W g switchᵒ (proj₁ (mintNode sched)) κ id now
-         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The switch wrap's measure, at its own initial state.  Its STORE
-  -- conjuncts are `0 ≤ _` at every program: `nodeNest` is zero by
-  -- definition on `switch-st`, so no instantiation can arm them and
-  -- only the burst half is ever evidence about this statement.
-  pushVals-switch-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
-    (b : Closed Γ (obs u))
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
-    nestDᵉ (switchAllᵉ b) ≤ B →
-    descW g (switchAllᵉ b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
-    in pushValsNestOK c sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
-         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The exhaust wrap's bundle, at its own initial state.
-  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its two
-  --   boundaries are stated at `pushVals-merge-caps` above.
-  pushVals-exhaust-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-    (b : Closed Γ (obs u))
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
-    nestClosOK? c sl (exhaustAllᵉ b) ≡ true →
-    descW g (exhaustAllᵉ b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
-    in pushValsCapsOK c sl W g exhaustᵒ (proj₁ (mintNode sched)) κ id now
-         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-  -- The exhaust wrap's measure, at its own initial state.  As at the
-  -- switch head above, `nodeNest` is zero by definition on
-  -- `exhaust-st`, so the store conjuncts cannot be armed.
-  pushVals-exhaust-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
-    (b : Closed Γ (obs u))
-    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
-    nestDᵉ (exhaustAllᵉ b) ≤ B →
-    descW g (exhaustAllᵉ b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
-    in pushValsNestOK c sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
-         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-
 pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
   (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -3175,8 +3132,8 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 pushVals-merge {u = u} c sl B W g lim b κ id now sched st hsl hc hv hcl hn hw =
   pushVals-both c sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-merge-caps c sl W g lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-merge-nest c sl B W g lim b κ id now sched st hsl hc hv hn hw)
+    (pushVals-caps c sl W g mergeAllᵒ lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-nest c sl B W g mergeAllᵒ lim b κ id now sched st hsl hc hv hn hw)
   where
   res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -3200,8 +3157,8 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 pushVals-switch c sl B W g b κ id now sched st hsl hc hv hcl hn hw =
   pushVals-both c sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-switch-caps c sl W g b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-switch-nest c sl B W g b κ id now sched st hsl hc hv hn hw)
+    (pushVals-caps c sl W g switchᵒ nothing b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-nest c sl B W g switchᵒ nothing b κ id now sched st hsl hc hv hn hw)
   where
   res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -3225,8 +3182,8 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 pushVals-exhaust c sl B W g b κ id now sched st hsl hc hv hcl hn hw =
   pushVals-both c sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-exhaust-caps c sl W g b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-exhaust-nest c sl B W g b κ id now sched st hsl hc hv hn hw)
+    (pushVals-caps c sl W g exhaustᵒ nothing b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-nest c sl B W g exhaustᵒ nothing b κ id now sched st hsl hc hv hn hw)
   where
   res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
