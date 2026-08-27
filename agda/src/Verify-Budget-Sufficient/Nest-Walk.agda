@@ -1207,9 +1207,14 @@ thruRoomOK c fuel op nid κ id now (o ∷ os) sched st =
 --   drains cannot be broken by what a queue holds.  What is left is the
 --   arrival's own term, where the delivery is whatever the substitution
 --   emits -- and a substitution NESTED to depth `d` doubles once per
---   level while `syncSizeᵛ` grows by a constant per level, which is the
---   one axis on which the two sides move at comparable rates.  Nothing
---   here reaches it.
+--   level while the arrival grows by one, which is the one axis on
+--   which the two sides move at comparable rates.  That axis is taken:
+--   nesting the same duplicating step delivers two, four and eight
+--   against arrivals of two, three and four, every fit inside the
+--   grant, both premises pinned.  It cannot cross, and the reason is
+--   the one above -- the exponent is a power of the very term the
+--   duplicator enlarges, so each level buys the bound a squaring and
+--   the delivery a doubling.
 --   NOT COVERED: the store halves at the arm that SUBSCRIBES, which is
 --   a boundary rather than a gap -- a merge's `nodeNest` folds its
 --   QUEUE and the admit arm has room, so it queues nothing, and
@@ -1664,14 +1669,20 @@ postulate
   --   by `refl`, every burst pinned non-empty; the merge head over
   --   two families to three and four levels, and the switch and
   --   exhaust heads at the deepest level of the tower.  Twelve rows,
-  --   all inside the grant.  NOT covered, and it is the region this
-  --   receipt turns up rather than inherits: a duplication rate that
-  --   survives the frame.  The substituting family that doubles per
-  --   level at the root reads LINEAR here, because the frame
-  --   SUBSCRIBES what the body emits rather than handing it on, so
-  --   the layer the doubling rode in is consumed on the way out --
-  --   which is why no row from here can outrun a grant whose factor
-  --   is a power, and why the rate is the axis left.
+  --   all inside the grant.  AND THE RATE IS TAKEN TOO, which is what
+  --   makes these rows evidence about the region rather than around
+  --   it.  A substituting family whose step is typed one level UP
+  --   emits the doubled term itself instead of a term containing one,
+  --   so the measure reads it before the frame subscribes it: the
+  --   delivered figure runs one, two, four, eight across the levels
+  --   while the key rises by one per level, and every fit holds.
+  --   The same family typed at the payload's own level reads LINEAR
+  --   here -- the frame consumes the layer the doubling rode in --
+  --   which is the distinction the rows had to separate before either
+  --   verdict meant anything.  NOT covered: a rate above two per
+  --   level, which no substitution this term language admits reaches,
+  --   and a LIMITED merge under the descent, whose queue is the
+  --   `Probed.Wrap-Nest-Frame` region.
   pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))

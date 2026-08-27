@@ -219,3 +219,45 @@ fitS = refl
 
 fitX : (lhsX (bTow 2) ≤ᵇ G (exhaustAllᵉ (bTow 2)) (bTow 2)) ≡ true
 fitX = refl
+
+-- ── THE RATE THAT SURVIVES THE FRAME ──────────────────────────────
+
+-- the same substituting step one type up, so what the body EMITS is
+-- the doubled term rather than a term that merely contains one: the
+-- frame subscribes an emitted `obs natᵗ`, and the measure reads the
+-- value before it does
+dup₂ : Fn Γ₂ [] [] [] (obs (obs natᵗ)) (obs (obs natᵗ))
+dup₂ = strmᵗ (mapᵉ
+         (caseᵗ (inlᵗ (varᵗ (there (here refl))))
+                (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+                (varᵗ (here refl)))
+         (ofᵉ (varᵗ (here refl) ∷ [])))
+
+D₂ : ℕ → Closed Γ₂ (obs (obs natᵗ))
+D₂ zero    = ofᵉ (strmᵗ (mergeAllᵉ nothing
+               (ofᵉ (strmᵗ (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ [])) ∷ []))) ∷ [])
+D₂ (suc k) = mapᵉ dup₂ (mergeAllᵉ nothing (ofᵉ (strmᵗ (D₂ k) ∷ [])))
+
+deliveredD₂ : ℕ × ℕ × ℕ × ℕ
+deliveredD₂ = lhsM (D₂ 0) , lhsM (D₂ 1) , lhsM (D₂ 2) , lhsM (D₂ 3)
+
+deliveredD₂≡ : deliveredD₂ ≡ (1 , 2 , 4 , 8)
+deliveredD₂≡ = refl
+
+premD₂ : prem (mergeAllᵉ nothing (D₂ 3)) ≡ (true , true)
+premD₂ = refl
+
+lenD₂ : ℕ
+lenD₂ = lenM (D₂ 3)
+
+lenD₂≡ : lenD₂ ≡ 1
+lenD₂≡ = refl
+
+fitD₂1 : (lhsM (D₂ 1) ≤ᵇ G (mergeAllᵉ nothing (D₂ 1)) (D₂ 1)) ≡ true
+fitD₂1 = refl
+
+fitD₂2 : (lhsM (D₂ 2) ≤ᵇ G (mergeAllᵉ nothing (D₂ 2)) (D₂ 2)) ≡ true
+fitD₂2 = refl
+
+fitD₂3 : (lhsM (D₂ 3) ≤ᵇ G (mergeAllᵉ nothing (D₂ 3)) (D₂ 3)) ≡ true
+fitD₂3 = refl

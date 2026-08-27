@@ -178,15 +178,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`thruStep-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
+- **`thruStep-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `REFUTED×3, DEAD ROUTE×6, PROBED×3`: one `thruConsume`, arrival at key `m`
-  and delivery at `m′`. The flat grant is refuted by a duplicating step and the
-  caps conjunct by a full queue; both repairs are in, and the store halves are
-  probed at the arm that parks.
-- **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
+  and delivery at `m′`. Every conjunct is instantiated, the compounding axis
+  included — a nested duplicator doubles against a linear arrival and stays in.
+- **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED×6`: the outer's burst carries admissible values inside
-  the grant, emit by emit, with room at the node for each. The body key is now
-  taken; what is open is a duplication rate that survives the wrap's frame.
+  the grant, emit by emit, with room at the node for each. The body key and the
+  rate that survives the frame are both taken.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and

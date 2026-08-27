@@ -330,3 +330,46 @@ valTight = refl
 -- earlier arrivals and so is bounded by the node's width rather than by
 -- the value in hand.  That is the region an instantiation would have to
 -- reach, and these rows do not reach it.
+
+-- ── THE NESTED DUPLICATOR, which is the axis the receipt names ────
+
+-- `arr` applies the substituting step ONCE; this nests it, so the
+-- arrival's delivery compounds per level instead of doubling once
+Dn : ℕ → Val Γ₂ (obs (obs natᵗ))
+Dn zero    = ofᵉ (strmᵗ (mergeAllᵉ nothing
+               (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))) ∷ [])
+Dn (suc k) = mapᵉ dup (mergeAllᵉ nothing (ofᵉ (strmᵗ (Dn k) ∷ [])))
+
+capN : ℕ → Caps
+capN k = caps (syncSizeᵛ (obs (obs natᵗ)) (Dn k))
+              (pWᵛ 2 slots (obs (obs natᵗ)) (Dn k)) 0
+
+GN : ℕ → ℕ → ℕ → ℕ
+GN k B m = (2 ^ Caps.cSize (capN k)) ^ m * (B + suc m * nestUnit prog slots)
+
+arrN delN : ℕ → ℕ
+arrN k = nestDᵛ (obs (obs natᵗ)) (Dn k)
+delN k = nestDᵛˢ (proj₁ (thruConsume gasBig mergeAllᵒ 7 κ 0 0 (Dn k) sched₀ stM))
+
+nestedFigures : ℕ
+nestedFigures = arrN 1 + 10 * delN 1 + 100 * arrN 2 + 1000 * delN 2
+              + 10000 * arrN 3 + 100000 * delN 3
+
+nestedFigures≡ : nestedFigures ≡ 844322
+nestedFigures≡ = refl
+
+premN : Bool × Bool
+premN = nestValOK? (capN 3) (obs (obs natᵗ)) (Dn 3)
+      , nestCapsOK? (capN 3) sched₀ stM
+
+premN≡ : premN ≡ (true , true)
+premN≡ = refl
+
+fitN1 : (delN 1 ≤ᵇ GN 1 (arrN 1) 1) ≡ true
+fitN1 = refl
+
+fitN2 : (delN 2 ≤ᵇ GN 2 (arrN 2) 1) ≡ true
+fitN2 = refl
+
+fitN3 : (delN 3 ≤ᵇ GN 3 (arrN 3) 1) ≡ true
+fitN3 = refl

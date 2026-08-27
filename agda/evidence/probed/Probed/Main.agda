@@ -56,7 +56,7 @@ open import Probed.Sync-Factor
 open import Probed.Nest-Multi-Level
   using (lens≡; nestPrems≡; valPrems≡; delivered≡; fitsM0; fitsM1; fitsM2; fitsM3; fitsS2; fitsX2; emitted≡; heads≡; keyM0; keyM1; keyM2; keyM3; keyS2; keyX2; keyM3-2; deep4≡)
 open import Probed.PushVals-Body-Key
-  using (premTow; premDup; lensBK≡; deliveredTow≡; deliveredDup≡; fitTow0; fitTow1; fitTow2; fitDup1; fitDup2; fitDup3; fitS; fitX)
+  using (premTow; premDup; lensBK≡; deliveredTow≡; deliveredDup≡; fitTow0; fitTow1; fitTow2; fitDup1; fitDup2; fitDup3; fitS; fitX; deliveredD₂≡; premD₂; lenD₂≡; fitD₂1; fitD₂2; fitD₂3)
 open import Probed.Wrap-Nest-Frame
   using (premM; premS; premX; figures≡; premP; parked≡; fitsP; premF; frameFigs≡; fitsF; mapFigs≡; mapInvariant; hidNodes≡; hidQueue≡; hidAligned; deepFit; deepGrown)
 open import Probed.Chain-Step-Live-Nest
@@ -64,4 +64,4 @@ open import Probed.Chain-Step-Live-Nest
 open import Probed.Thru-Step-Indexed
   using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡; prems≡;
          capsAfter≡; storeM≡; premF; storeF≡; parts≡; fitsF;
-         tightFigures≡; valTight)
+         tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3)
