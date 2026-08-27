@@ -45,7 +45,7 @@ open import Rx.Evaluator using
   sharedConnect)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; regsSz?; nestValOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widLive; widNode; nestValOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
@@ -557,6 +557,19 @@ abstract
 -- depth, and what the *All heads actually spend is the flatten
 -- queue's WIDTH.
 --
+-- AND THE REGISTRY GOES FOR THE SAME REASON, one step further out.
+-- The per-path size bound and the count against the registry cap are
+-- both SIZE facts, so this face does not read them; and the connect
+-- arm APPENDS to the registry, so no head that joins a share can
+-- re-establish either.  The caps face pays for that append by moving
+-- its cap -- `register-caps` concludes at `frameStep (suc j) c` where
+-- it began at `frameStep j c` -- and this predicate is stated at a
+-- flat `c` with no frame index to spend.  Carrying a conjunct nothing
+-- reads and no head can restore is what made the slot handoff look
+-- impossible; without them `register` preserves this predicate
+-- outright, since it writes the registry and its counter and nothing
+-- else.
+--
 -- Weakening a HYPOTHESIS strengthens every statement it appears in, so
 -- the boundary runs one way only: a caller holding the caps face's own
 -- predicate hands it in through `capsOK?⇒nest`, and nothing converts
@@ -577,28 +590,22 @@ nestCapsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             → Caps → Sched Γ → EvalSt e → Bool
 nestCapsOK? c sched st =
   nestStB? (Caps.cSize c) sched st
-  ∧ regsSz? (Caps.cSize c) (EvalSt.registry st)
   ∧ all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched)
   ∧ all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
         (EvalSt.nodes st)
-  ∧ (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
 
--- the five conjuncts back out, with their result types pinned so the
+-- the three conjuncts back out, with their result types pinned so the
 -- booleans `∧-true` splits on are determined
 nestCapsOK?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   nestCapsOK? c sched st ≡ true →
     (nestStB? (Caps.cSize c) sched st ≡ true)
-  × (regsSz? (Caps.cSize c) (EvalSt.registry st) ≡ true)
   × (all (widLive (Caps.cWid c) (Sched.slots sched)) (Sched.live sched) ≡ true)
   × (all (λ kv → nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
          (EvalSt.nodes st) ≡ true)
-  × ((length (EvalSt.registry st) ≤ᵇ Caps.cReg c) ≡ true)
 nestCapsOK?-parts c sched st h with ∧-true _ _ h
 ... | h0 , r1 with ∧-true _ _ r1
-... | h1 , r2 with ∧-true _ _ r2
-... | h2 , r3 with ∧-true _ _ r3
-... | h3 , h4 = h0 , h1 , h2 , h3 , h4
+... | h2 , h3 = h0 , h2 , h3
 
 nodeWidᴺ?-weaken : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) (ns : NodeState Γ) →
   widNode W sl ns ≡ true → nodeWidᴺ? W sl ns ≡ true
@@ -613,13 +620,11 @@ capsOK?⇒nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched st ≡ true → nestCapsOK? c sched st ≡ true
 capsOK?⇒nest c sched st h =
     ∧-intro hLive
-    (∧-intro h1
     (∧-intro h2
-    (∧-intro (all-impl _ _
+             (all-impl _ _
                 (λ kv → nodeWidᴺ?-weaken (Caps.cWid c) (Sched.slots sched)
                           (proj₂ kv))
-                (EvalSt.nodes st) h3)
-             h4)))
+                (EvalSt.nodes st) h3))
   where
   P  = capsOK?-parts c sched st h
   h0 = proj₁ P
@@ -628,10 +633,8 @@ capsOK?⇒nest c sched st h =
   hLive : all (boundedLive (Caps.cSize c)) (Sched.live sched) ≡ true
   hLive = proj₁ hL
 
-  h1 = proj₁ (proj₂ P)
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
-  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
 
 -- minting an instance id touches the node counter and nothing this
 -- predicate reads
@@ -659,18 +662,14 @@ nestCapsOK?-setNode : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestCapsOK? c sched (record st { nodes = setNode nid ns (EvalSt.nodes st) }) ≡ true
 nestCapsOK?-setNode c nid ns sched st wn inv =
     ∧-intro h0
-    (∧-intro h1
     (∧-intro h2
-    (∧-intro (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
-                (EvalSt.nodes st) wn h3)
-             h4)))
+             (setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
+                (EvalSt.nodes st) wn h3))
   where
   P  = nestCapsOK?-parts c sched st inv
   h0 = proj₁ P
-  h1 = proj₁ (proj₂ P)
-  h2 = proj₁ (proj₂ (proj₂ P))
-  h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
-  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+  h2 = proj₁ (proj₂ P)
+  h3 = proj₂ (proj₂ P)
 
 
 -- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
@@ -1285,7 +1284,7 @@ thruStep-merge-park {n = n} {Γ = Γ} {e = e} {u = u}
 
   wn₀ : nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) ns₀ ≡ true
   wn₀ = lookupWid (EvalSt.nodes st)
-          (proj₁ (proj₂ (proj₂ (proj₂ (nestCapsOK?-parts c sched st hc))))) eq
+          (proj₂ (proj₂ (nestCapsOK?-parts c sched st hc))) eq
 
   hlen : length (q ++ o ∷ []) ≤ Caps.cWid c
   hlen = ≤-trans (≤-reflexive (trans (length-++ q {o ∷ []})
