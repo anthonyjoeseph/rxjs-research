@@ -178,10 +178,13 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`subscribeSharedSlot-nest-arr`, `subscribeE-nest-arr-scan`** (Nest-Walk) —
-  FALSITY, `NO EVIDENCE`: what is left of the two heads the cap-keyed descent
-  also postulates. The slot head is a body now, so only its SHARED arm is open:
-  a share re-enters the walk on a definition whose depth the unit charges.
+- **`subscribeE-nest-arr-scan`** (Nest-Walk) — FALSITY, `REFUTED`: the scan
+  head, where a fold compounds one factor per value and the arr key carries no
+  term in the burst's length.
+- **`subscribeSharedSlot-nest-arr`** (Nest-Walk) — SHAPE, `REFUTED`: refuted as
+  stated, and so is the head above it. A substituting definition BUILDS what it
+  emits, so a subscribe doubles per layer while the subterm measure charging it
+  rises by one. The repair needs a factor keyed on the DEFINITION's size.
 - **`subscribeE-nest-arr-merge`, `subscribeE-nest-arr-switch`,
   `subscribeE-nest-arr-exhaust`** (Nest-Walk) — DIFFICULTY, `PROBED×4`: the
   boundary heads, where the doubling per boundary is charged and where the

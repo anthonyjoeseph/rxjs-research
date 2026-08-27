@@ -60,6 +60,10 @@ open import Refuted.Subscribe-Caps-Nest
   using (capsZero; capsZero₂; delivered≡16; charged≡6;
          delivered₂≡8; charged₂≡6;
          subscribeE-nest-absurd; subscribeE-nest-two-absurd; valCapsFails₃; valCapsFails₂)
+open import Refuted.Shared-Slot-Nest-Arr
+  using (arrival≡0; capsPin; contained≡; substituted≡; delivered≡8;
+         granted≡5; sharedSlot-nest-arr-absurd; headValPin; packHead≡;
+         headGrant≡5; nest-arr-at-slot-absurd)
 open import Refuted.Inner-Drain-Share-Nest
   using (delivered≡40; charged≡0; capsPin;
          stepFrame-nodes-inner-share-absurd; unit≡41)

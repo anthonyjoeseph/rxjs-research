@@ -1405,12 +1405,38 @@ postulate
   -- THE HEADS THIS DESCENT STILL OWES.  Each is the arr-keyed twin of
   -- a clause the cap-keyed descent already discharges, so what is open
   -- is the transport and not the shape.
-  -- THE SHARED ARM, and it is the whole of what the slot head owes.  A
-  -- share re-enters the walk on its definition, so what it delivers is
-  -- the definition's own depth -- which `slotNest` charges to the unit
-  -- and the additive half of the grant therefore covers.  The scripted
-  -- arms need nothing: `isData` excludes `obs`, so a script has no
-  -- depth to deliver at all.
+  -- THE SHARED ARM, and it is the whole of what the slot head owes --
+  -- the scripted arms need nothing, since `isData` excludes `obs` and
+  -- a script therefore has no depth to deliver at all.
+  --
+  -- AS STATED IT IS FALSE, AND SO IS THE HEAD ABOVE IT.  The reading
+  -- that put it here: a share re-enters the walk on its definition, so
+  -- what it delivers is the definition's own depth, which `slotNest`
+  -- charges to the unit and the additive grant therefore covers.  That
+  -- holds only where the layers are CONTAINED.  A substituting step
+  -- BUILDS what it emits -- one occurrence in the step function and one
+  -- in the source it maps over -- so a subscribe doubles per layer
+  -- while `nestDᵉ`, a subterm measure, rises by one.  And there is no
+  -- room in `B`: the head's own premise is `nestDᵉ o ≤ B` at
+  -- `o = input i`, which is zero, so `B = 0` is what the head hands
+  -- down and the grant is the unit alone.
+  --
+  -- WHAT THE REPAIR HAS TO CARRY.  A factor keyed on the DEFINITION's
+  -- synchronous size, since the arrival's is one at a slot and the
+  -- doubling is bought rather than free -- a layer that duplicates also
+  -- enlarges the definition it duplicates in.  The charge cannot simply
+  -- BE the walk's own grant at the definition, because that grant reads
+  -- the unit and the unit reads the slot: the recursion is real, and it
+  -- is well-founded only because a definition may reference slots
+  -- strictly BELOW its own index.  That restriction was put there for
+  -- a different reason and is what makes this repairable.
+  -- REFUTED: `Refuted.Shared-Slot-Nest-Arr`, at a four-layer
+  --   substituting definition: delivered `1 2 4 8` against a grant of
+  --   `2 3 4 5`, crossing at the third layer.  The same module takes
+  --   the CONTAINED family at the same four programs -- `0 1 2 3`
+  --   against the same `2 3 4 5` -- so the additive form is right
+  --   about containment and wrong about substitution, and it reaches
+  --   the head's own conclusion as well as this arm's.
   subscribeSharedSlot-nest-arr : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas) (i : Fin n)
     (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
