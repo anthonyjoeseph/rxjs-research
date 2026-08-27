@@ -63,7 +63,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using (nest)
 open import Verify-Budget-Sufficient.Measures using (∧-true)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using (cSize≤frameStep)
 open import Verify-Budget-Sufficient.Wet.Part6 using (sizeCapAt; 2≤sizeCapAt)
-open import Verify-Budget-Sufficient.Burst-Walk using (OKB)
+open import Verify-Budget-Sufficient.Burst-Walk.Predicates using (OKB)
 open import Decide using (T-to)
 
 ----------------------------------------------------------------------

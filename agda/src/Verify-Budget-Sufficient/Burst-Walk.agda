@@ -98,7 +98,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim using (Gas; gs; g0; Id; Tick; Source; InstEvent; value; close; handoff; complete; cut; cutPending;
   gasPad; gasTower; towerℕ; InstEmit; _at_from_as_; EmitKind; delivery)
-open import Rx.Exp  using (Ty; Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; syncSizeᵉ)
+open import Rx.Exp  using (Ctx; Closed; Val; obs; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; syncSizeᵉ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Arrival; RegId; Chain; Path; Frame; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; Stream; stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; hasDry;
@@ -162,11 +162,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; pathSz?; pathSz?-widen; regsSz?; slotsCaps?;
   valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
-   capsOK?-parts; capsOK?-regs; frameBud; lookupNode-caps; mList?; mList?-head;
-   mList?-keeps; mList?-tail; NodeCaps; pathSz?-len; pathSz?-tail;
-   shareLatch-caps; switchKill-caps; valsCaps?; valsCaps?-lvl;
-   valsCaps→mList-strict; walkOK; walkOK-finish)
+  (capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts;
+  capsOK?-regs; frameBud; lookupNode-caps; mList?; mList?-head; mList?-keeps; mList?-tail;
+  NodeCaps; pathSz?-len; pathSz?-tail; shareLatch-caps; switchKill-caps; valsCaps?;
+  valsCaps?-lvl; valsCaps→mList-strict; walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (burstCaps?-widen; eventsCaps?-widen; frameStep-chain-suc; pathSz?-⊑;
    valCaps?-size)
@@ -181,6 +180,8 @@ open import Verify-Budget-Sufficient.Wet.Part6 using
   (sizeCapAt)
 open import Verify-Budget-Sufficient.Wet.Part1 using
   (INV?-widen; scanVals-fnCap; setNode-fnCap; sweepLive-fnCap)
+open import Verify-Budget-Sufficient.Burst-Walk.Predicates using
+  (BbB; EbB; OKB; PbB; VbB)
 open import Verify-Budget-Sufficient.Walk-Level
   using (subscribeE-walk-level; capsOK⇒regsLen; regsLen?-mono)
 open import Verify-Budget-Sufficient.Walk-Level.Statement using
@@ -213,26 +214,6 @@ open import Decide using (T-to; T⇒≡true; not-in; not-out; ∧-intro; ≤ᵇ-
 -- mention J), so every widen law passes it through untouched; it rides
 -- the same J only because the ledger is one Bool.
 ------------------------------------------------------------------
-
--- VbB sits OUTSIDE the t-anonymous-module: it never mentions t, and an
--- unmentioned module implicit is an unsolvable meta at every use site
-VbB : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → ℕ → ℕ → ∀ {s} → List (Val Γ s) → Bool
-VbB c sl Ψ J vs = valsCaps? (frameStep J c) sl vs ∧ valsΨ? Ψ vs
-
-module _ {n} {Γ : Ctx n} {t : Ty} where
-
-  PbB : Caps → ℕ → ℕ → ∀ {u} → Path Γ u t → Bool
-  PbB c Ψ J p = pathSz? (Caps.cSize (frameStep J c)) p ∧ pathBΨ? Ψ p
-
-  EbB : Caps → Slots Γ → ℕ → ℕ → List (InstEvent (Val Γ t)) → Bool
-  EbB c sl Ψ J es =
-    all (eventCaps? (frameStep J c) sl) es ∧ eventsΨ? Ψ es
-      ∧ not (any dryEvent es)
-
-  BbB : Caps → Slots Γ → ℕ → ℕ → Stream Γ t → Bool
-  BbB c sl Ψ J str =
-    burstCaps? (frameStep J c) sl str ∧ burstΨ? Ψ str
-      ∧ not (hasDry str)
 
 -- any-dry-++ MOVED DOWN to .Walk-Level, with the whole
 -- dry trio: the ground subscribeInner-walk consumes it there, and this
@@ -437,11 +418,6 @@ cutThrough-nodry nid dl wm dy ((rid , src , c) ∷ r)
                closes
                (close-severs-nodry src (any (_≡ᵇ rid) dl ∨ (wm ≤ᵇ rid)))
                ih
-
-OKB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    → Caps → Slots Γ → ℕ → ℕ → Sched Γ → EvalSt e → Set
-OKB c sl Ψ J sched st =
-  walkOK c sl J sched st × (fnCapBounded? Ψ sched st ≡ true)
 
 ------------------------------------------------------------------
 -- ONE FRAME PRESERVES BOTH FLAVOURS — no longer one postulate.

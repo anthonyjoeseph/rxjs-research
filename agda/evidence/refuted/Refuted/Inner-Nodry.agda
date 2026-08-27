@@ -59,7 +59,7 @@ open import Rx.Frame-Width using (pWᵉ)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Measures using (fnCapᵉ; slotsFnCap; INV?)
 open import Verify-Budget-Sufficient.Delivery-Walk using (regP?)
-open import Verify-Budget-Sufficient.Burst-Walk using (OKB; PbB)
+open import Verify-Budget-Sufficient.Burst-Walk.Predicates using (OKB; PbB)
 
 false≢true : false ≡ true → ⊥
 false≢true ()
