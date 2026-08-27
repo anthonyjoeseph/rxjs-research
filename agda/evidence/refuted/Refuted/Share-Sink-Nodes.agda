@@ -49,22 +49,49 @@ module Refuted.Share-Sink-Nodes where
 
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; foldr)
-open import Data.Nat using (ℕ; _+_; _≤_; _⊔_)
+open import Data.Nat using (ℕ; suc; _+_; _≤_; _⊔_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Closed; natᵗ)
+open import Rx.Exp using (Closed; natᵗ; ofᵉ; mergeAllᵉ; strmᵗ; input; syncSizeᵉ)
 open import Rx.Nest-Depth using (nestDᵛ)
-open import Rx.Prim using (gasPad; g0)
+open import Rx.Prim using (gasPad; g0; hot)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
          cascadeLatch; chainsOf; chainStep; arrTy; arrVal; Arrival; Path; RegId)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared; scripted)
 open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; pathNestD)
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progF; insS; sucGS)
+  using (Γ₂; progF; asyncNats)
+open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Slot-Hop using (slotHop)
+open import Data.Maybe using (nothing)
+open import Data.Unit using (tt)
+open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
+
+-- THE SHARE-SINK VOCABULARY, and the arrangement is the content.  A
+-- shared slot's def may only reference inputs BELOW its own index, so
+-- the shared slot every other family here installs -- at index zero --
+-- can reference nothing, and no arrival ever flows INTO it.  Its share
+-- therefore fans out only during the connect burst, at subscribe time,
+-- and a DELIVERY never reaches a `share-sink`.  Putting the shared slot
+-- above the async one instead is what lets an arrival travel through
+-- the def and fan out to every registration on the share, which is the
+-- one arm of the walk no other vocabulary reaches.
+shareDef : Closed Γ₂ natᵗ
+shareDef = mergeAllᵉ nothing (ofᵉ (strmᵗ (input fzero) ∷ []))
+
+insS : ℕ → Slots Γ₂
+insS j fzero        = scripted (hot (asyncNats j))
+insS j (fsuc fzero) = shared shareDef {ok = tt}
+
+sucGS : ℕ → ℕ → ℕ → ℕ
+sucGS j w k =
+  suc (syncSizeᵉ (progF w k)
+       + hopDᵉ 0 (slotHop 0 (insS j)) (progF w k))
+
 
 prog : Closed Γ₂ natᵗ
 prog = progF 1 1

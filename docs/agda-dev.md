@@ -39,6 +39,28 @@ which is exactly where `make gate-heavy` earns its keep.
 **`make gate-heavy` is still the merge gate:** never report a result as verified on a dev
 run, never commit on one alone, never call dev-green "typechecks".
 
+## A module's own number never predicts what its CONSUMER's first check costs
+
+The loop stubs mutual blocks in the TARGET only, and checks every dependency for
+real. So a per-module number is measured with that module's own blocks stubbed,
+while the first check of any CONSUMER after an edit pays the UNSTUBBED cost of
+every module in between — a quantity no row in the numbers file is about, since
+no dev run ever measures it.
+
+The asymmetry bites hardest in the middle of the tower, where a module with a
+heavy block reads as seconds on its own and costs far more than that number
+suggests when something downstream forces the real build. Measured once: an edit
+to a mid-tower module invalidated two such modules, and four successive checks of
+a consumer were killed by the budget while paying for them — each one reading as
+a blowup in the consumer, which was never slow at all.
+
+**The attribution, and it is two cheap runs.** Truncate the consumer to its
+import list and check that: if the truncation is slow too, nothing in the module
+is slow and the cost is entirely below it. Then check each import alone in a
+throwaway module — a cached dependency answers in seconds and the culprit does
+not. Both runs are decisive, and both are cheaper than one more killed check of
+the consumer.
+
 ## There is no whole-project sweep, and do not rebuild one
 
 It existed, was measured against `make gate`, and lost on both cost and fidelity —

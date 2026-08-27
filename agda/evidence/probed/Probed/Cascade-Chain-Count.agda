@@ -5,10 +5,8 @@
 --
 -- NOTHING IS BLOCKED HERE, which is unusual in this neighbourhood and
 -- is why the rows are worth taking: both sides compute off the
--- evaluator, and the one premise a target carries — the sink target's
--- registration fold at or under the unit — is read by its own rows
--- beside the conclusion's, so a row that reads false is a refutation
--- outright rather than a candidate modulo a cap record.
+-- evaluator, so a row that reads false is a refutation outright rather
+-- than a candidate modulo a cap record.
 --
 -- EVERY ROW IS LOAD-BEARING, AND THE AXIS IS THE ONE THAT KILLED THE
 -- PREDECESSOR.  `progF w` registers `suc w` copies of one input, so an
@@ -24,7 +22,6 @@
 -- reading below hands the step exactly that, and the path-denominated
 -- charge covers it where a program-denominated one does not.
 --
--- TARGET: shareGo-nodes @6eda26
 -- TARGET: arr-chains-nest-syn @f18ea2
 module Probed.Cascade-Chain-Count where
 
@@ -44,10 +41,10 @@ open import Rx.Evaluator
          _↠_; scan-f; map-f)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (nodeNest; pathNestD; chainsNestD; nestUnit; regsNestMax)
+  using (nodeNest; pathNestD; chainsNestD; nestUnit)
 
 open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progU; progC; progF; progW; foldD; insF; insS; sucGS; sucGU; sucGC; sucGF; sucGW)
+  using (Γ₂; progU; progC; progF; progW; foldD; insF; sucGU; sucGC; sucGF; sucGW)
 
 ----------------------------------------------------------------------
 -- The walk, taken at the arrival the root subscribe leaves behind,
@@ -301,51 +298,3 @@ TieW-fits = refl
 -- together rather than one that is merely slack.
 TieC4-fits : proj₂ (proj₂ (tieRow (progC 4 2 2) sl₅ (sucGC 1 2 6 4 2 2) 3)) ≡ true
 TieC4-fits = refl
-
-----------------------------------------------------------------------
--- READING FIVE — THE SHARE SINK, which no other row here reaches.  A
--- shared slot may only reference inputs below its own index, so the
--- vocabulary every family above uses -- shared at index zero -- has a
--- share nothing can arrive into, and its fan-out happens once, at
--- subscribe time.  `insS` puts the share ABOVE the async slot instead,
--- so an arrival travels through the def and `dispatchShare` fans it to
--- every registration on the share INSIDE a delivery.  `progF w` puts
--- `suc w` registrations there, which is the axis the fan-out arm is
--- about.
-----------------------------------------------------------------------
-
-shRow : ℕ → ℕ → ℕ → ℕ × ℕ × Bool
-shRow j w k = let e₀ = entry (progF w k) (insS j) (sucGS j w k)
-              in readS (progF w k) (insS j) (proj₁ e₀) (proj₂ e₀)
-
-shChRow : ℕ → ℕ → ℕ → ℕ × ℕ × Bool
-shChRow j w k = let e₀ = entry (progF w k) (insS j) (sucGS j w k)
-                in readCh (progF w k) (insS j) (proj₁ e₀) (proj₂ e₀)
-
--- the crossing the one-unit charge fails at, `Refuted.Share-Sink-Nodes`,
--- read here against the charge that carries the unit: three against six
-Sh1-fits : shRow 2 1 1 ≡ (3 , 6 , true)
-Sh1-fits = refl
-
-Sh3-fits : proj₂ (proj₂ (shRow 2 3 1)) ≡ true
-Sh3-fits = refl
-
-ShCh3-fits : proj₂ (proj₂ (shChRow 2 3 1)) ≡ true
-ShCh3-fits = refl
-
--- AND THE SINK TARGET'S PREMISE, READ AT THE SAME STATES: what the
--- fan-out walks is a selection from the registry, so the registry's
--- own ⊔-fold at or under the unit is what puts the rows above INSIDE
--- the conditional statement rather than beside it.  LOAD-BEARING on
--- the same axis: `progF w` is the family whose registrations multiply.
-shPrem : ℕ → ℕ → ℕ → ℕ × ℕ × Bool
-shPrem j w k = let e₀  = entry (progF w k) (insS j) (sucGS j w k)
-                   lhs = regsNestMax (EvalSt.registry (proj₂ e₀))
-                   rhs = nestUnit (progF w k) (insS j)
-               in lhs , rhs , (lhs ≤ᵇ rhs)
-
-ShP1-holds : proj₂ (proj₂ (shPrem 2 1 1)) ≡ true
-ShP1-holds = refl
-
-ShP3-holds : proj₂ (proj₂ (shPrem 2 3 1)) ≡ true
-ShP3-holds = refl

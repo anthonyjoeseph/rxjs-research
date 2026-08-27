@@ -178,10 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`shareGo-nodes`** (Nest-Walk) — SHAPE, `REFUTED×4, DEAD ROUTE`: the stated
-  form is refuted through the registry the premise never priced, and so is the
-  max-premised repair — a branch spends its hops in sequence, so the
-  restatement must charge the branch structure, gas-indexed or summed.
+- **`shareGo-nodes`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, TWIN`: the
+  restatement charges the branch structure the stacking refutation demands, as
+  a gas-indexed fan allowance priced in the delivery caps, and nothing has
+  instantiated that charge — the crossing that killed both predecessors is
+  untested against it.
 - **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
   (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
   all the three boundary heads still owe — the recursion and the push around it

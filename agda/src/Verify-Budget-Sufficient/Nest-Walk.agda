@@ -49,16 +49,18 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; w
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
-open import Verify-Budget-Sufficient.Measures using (pathLen; all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
+open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (nodeNest; pathNestD; pathNestF; frameNestF; 1≤frameNestF; nest-telescope; nestUnit;
-   nest-inflate; pow-grow¹; pow-distrib-*; slotNest; slotsNestSum;
-   chainsNestD; regsNestMax; shareAdmit-nest)
+  (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
+  pow-distrib-*; slotNest; slotsNestSum)
+open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; cSize≤delSq; fanLen-zero; fanSq-zero)
+open import Verify-Budget-Sufficient.Deliver-Measure using
+  (deliverLen; deliverNestF; deliverNestD; admSz?; shareAdmit-len; shareAdmit-sz)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
   (nestB; nestB-mono; nestB-base; nestB-frame; nestB-unit; nestFac; 1≤nestFac; nestU;
-  nestU-base; nestB-at; arrD; arrDW-mono; arrDW-pos; arrDW-key; arrDW-flat; arrDW-slot;
+  nestU-mono; nestB-at; arrD; arrDW-mono; arrDW-pos; arrDW-key; arrDW-flat; arrDW-slot;
   arrDW-frame; nestB-frame-dblW)
 open import Verify-Budget-Sufficient.Nest-Burst using
   (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-scan; descW-mu;
@@ -117,13 +119,16 @@ frameNestD (take-f _)         = 0
 frameNestD (from-inner _ _ _) = 0
 frameNestD (thru-outer _ _)   = 1
 
-pathNestD-cons : ∀ {n} {Γ : Ctx n} {s u t} (f : Frame Γ s u) (p : Path Γ u t) →
-  pathNestD (f ↠ p) ≡ frameNestD f + pathNestD p
-pathNestD-cons (map-f _)          p = refl
-pathNestD-cons (scan-f _ _)       p = refl
-pathNestD-cons (take-f _)         p = refl
-pathNestD-cons (from-inner _ _ _) p = refl
-pathNestD-cons (thru-outer _ _)   p = refl
+-- and the deliver measure's own step, which is the same equation at
+-- every frame — only the sink clause separates the two measures
+deliverNestD-cons : ∀ {n} {Γ : Ctx n} {s u t} (g : ℕ) (c : Caps)
+  (f : Frame Γ s u) (p : Path Γ u t) →
+  deliverNestD g c (f ↠ p) ≡ frameNestD f + deliverNestD g c p
+deliverNestD-cons g c (map-f _)          p = refl
+deliverNestD-cons g c (scan-f _ _)       p = refl
+deliverNestD-cons g c (take-f _)         p = refl
+deliverNestD-cons g c (from-inner _ _ _) p = refl
+deliverNestD-cons g c (thru-outer _ _)   p = refl
 
 -- and the same over a burst, which is the map frame's actual argument
 abstract
@@ -4769,106 +4774,6 @@ abstract
                                 (trans (cong (_* (A + Z)) (*-comm Y F))
                                        (*-assoc F Y (A + Z)))))))
 
--- THE SHARE SINK, WHICH IS WHERE THE PATH MEASURE HAS NOTHING LEFT TO
--- SPEND, and the whole reason the walk is charged a UNIT on top of its
--- path.  The sink fans the arriving values into every registration on
--- the share, and each of those walks a path that lives in the REGISTRY
--- rather than in the chain being charged -- so the wraps it spends are
--- invisible to `pathNestD`, which charges a sink zero.
---
--- WHAT THE UNIT BUYS, and it is not a constant chosen to fit.  A shared
--- def may only reference inputs strictly below its own index, so the
--- shares a fan-out can reach form a strict descent through the slot
--- vector; the wraps it can spend are therefore the DEFS' wraps, summed,
--- which is `slotsNestSum` and so sits inside one unit however deeply
--- the shares nest.
---
--- AND WHAT IS ACTUALLY HARD is not the ceiling but the fan-out's shape:
--- the registrations touch DISJOINT nodes, so the nodes map moves by the
--- deepest of them and not by their sum.  An induction over the admitted
--- list cannot see that -- its hypothesis is stated against the running
--- state, so one sibling's growth lands in the next one's base -- which
--- is what keeps this a leaf rather than a fold like the walk above it.
---
--- AND THE FOLD IS WHERE IT IS HARD, WHICH IS WHY THIS IS THE LEAF.  Each
--- admitted registration walks its own path and stores at its own node,
--- so the map moves by the DEEPEST of them; but a fold's hypothesis is
--- stated against the running state, so one sibling's growth lands in the
--- next one's base and an n-registration share is charged n paths.  The
--- measurement says it does not stack -- three against six where the
--- naive fold would predict a multiple.
---
--- DEAD ROUTE: strengthening the fold to a PRESERVATION -- carry a
---   ceiling `K`, show each step re-establishes it, which is how the caps
---   face avoids exactly this stacking with a pointwise predicate over
---   the nodes map instead of a MAX.  It does not close here: a step also
---   REGISTERS the inners it subscribes, so the premise bounding the
---   registry's own wraps has to be re-established at the grown registry,
---   and that quantity provably grows -- it is what the parent charges a
---   whole width factor for.  A preservation over the nodes map alone is
---   not enough, and one over the store is false.
--- REFUTED: `Refuted.Share-Sink-Nodes` kills the unit-free form of the
---   statement below, three against one, and against two when the whole
---   store measure is charged in place of the nodes map.
--- REFUTED: `Refuted.Share-Go-Path` kills the premise-free form, four
---   against two: with the registration list a bound variable no premise
---   prices, a `map-f` frame carrying a constant the program never
---   mentions stores a value no program-denominated charge covers, and
---   the gap grows a layer per layer of the constant.  The `chainsNestD`
---   premise repaired the TOP list only — see the next two entries for
---   why that is not enough — and the sink discharges it through
---   `shareAdmit-nest` from the registry conjunct `capsWalkOK` carries
---   at its sink arm, whose re-establishment at every state a real walk
---   passes through is `arr-chains-caps`' obligation.
--- REFUTED: `Refuted.Share-Go-Registry` kills the statement AS WRITTEN,
---   four against two, on the sibling witness's own figures: a top list
---   of one bare `share-sink` hop is priced at zero, and the sink then
---   admits from the STATE's registry, which no hypothesis prices — so
---   the fold walks the same four-deep registration one level down and
---   the premise is shown to price the wrong list.
--- REFUTED: `Refuted.Share-Go-Stack` kills the candidate repair (add
---   `regsNestMax st ≤ nestUnit`), three against two: a branch that
---   descends through TWO shares spends each hop's whole unit in
---   SEQUENCE, so per-path independent pricing — any max — stacks
---   whatever it licensed once per level.  A surviving restatement must
---   charge the branch structure: levels bounded by the dispatch gas,
---   or a premise summing a descent's wraps inside the unit, which is
---   what a registry built by a real run satisfies.
-postulate
-  shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (ps : List (RegId × Path Γ (lookup Γ i) t))
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    chainsNestD ps ≤ nestUnit e sl →
-    nodesMax (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
-      ≤ (nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl
-
--- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which
--- touches the nodes map: out of dispatch gas the state is returned
--- untouched, and the finishing arm latches the share's source into the
--- dying and completed ledgers, which are not the map.  So the whole of
--- the sink's growth is the fold's, and the leaf is the fold.
-dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  regsNestMax (EvalSt.registry st) ≤ nestUnit e sl →
-  nodesMax (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
-    ≤ (nodesMax st ⊔ nestDᵛˢ vals) + nestUnit e sl
-dispatchShare-nodes sl sf zero id now i vals fin sched st hsl _ =
-  ≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)
-dispatchShare-nodes sl sf (suc gas) id now i vals false sched st hsl hreg =
-  shareGo-nodes sl sf gas id now i vals false
-    (shareAdmit i (EvalSt.registry st)) sched st hsl
-    (≤-trans (shareAdmit-nest i (EvalSt.registry st)) hreg)
-dispatchShare-nodes sl sf (suc gas) id now i vals true sched st hsl hreg =
-  shareGo-nodes sl sf gas id now i vals true
-    (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) hsl
-    (≤-trans (shareAdmit-nest i (EvalSt.registry st)) hreg)
-
 -- THE WALK ITSELF, WHICH IS A TELESCOPE.  Each frame spends its own term
 -- of `pathNestD` and hands the rest of the path a state and a value list
 -- already charged for; the root spends nothing because it only emits,
@@ -4883,19 +4788,57 @@ dispatchShare-nodes sl sf (suc gas) id now i vals true sched st hsl hreg =
 -- list under `W`, the next stage's list read off the frame that just
 -- ran -- and the consumer discharges it where the width face is, which
 -- is where a burst is capped at all.
-burstsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
-  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
-burstsOK W sf id now root           vals fin sched st = length vals ≤ W
-burstsOK W sf id now (share-sink _) vals fin sched st = length vals ≤ W
-burstsOK W sf id now (f ↠ p)        vals fin sched st =
-  (length vals ≤ W)
-  × frameDrainW W sf id now f p sched st
-  × burstsOK W sf id now p (proj₁ step)
-      (proj₁ (proj₂ (proj₂ step)))
-      (proj₁ (proj₂ (proj₂ (proj₂ step))))
-      (proj₂ (proj₂ (proj₂ (proj₂ step))))
-  where step = stepFrame sf id now f p vals fin sched st
+-- AND, AT A SINK, THE SAME OBLIGATIONS FOR EVERY WALK THE FAN-OUT
+-- RUNS: the dispatch admits a registration list and folds a walk per
+-- entry, so the hypothesis mirrors that fold — an entry the state has
+-- cancelled owes nothing, and a delivered one owes its own walk's bound
+-- and then the rest of the fold at the state its walk left.  The gas
+-- index is what ties the recursion off: a walk's sink dispatches at the
+-- walk's own gas, and the fold underneath runs one level down.
+mutual
+  burstsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
+    (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+  burstsOK W sf gas id now root           vals fin sched st = length vals ≤ W
+  burstsOK W sf gas id now (share-sink i) vals fin sched st =
+    (length vals ≤ W)
+    × dispatchBurstsOK W sf gas id now i vals fin sched st
+  burstsOK W sf gas id now (f ↠ p)        vals fin sched st =
+    (length vals ≤ W)
+    × frameDrainW W sf id now f p sched st
+    × burstsOK W sf gas id now p (proj₁ step)
+        (proj₁ (proj₂ (proj₂ step)))
+        (proj₁ (proj₂ (proj₂ (proj₂ step))))
+        (proj₂ (proj₂ (proj₂ (proj₂ step))))
+    where step = stepFrame sf id now f p vals fin sched st
+
+  dispatchBurstsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  dispatchBurstsOK W sf zero      id now i vals fin sched st = ⊤
+  dispatchBurstsOK W sf (suc gas) id now i vals fin sched st =
+    shareBurstsOK W sf gas id now i vals fin
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
+
+  shareBurstsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  shareBurstsOK W sf gas id now i vals fin [] sched st = ⊤
+  shareBurstsOK W sf gas id now i vals fin ((rid , p) ∷ ps) sched st =
+    if any (_≡ᵇ rid) (EvalSt.cancelled st)
+    then shareBurstsOK W sf gas id now i vals fin ps sched st
+    else (burstsOK W sf gas id now p vals fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st })
+          × shareBurstsOK W sf gas id now i vals fin ps
+              (proj₁ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+                       (if fin then close (toℕ i) exhausted ∷ [] else [])
+                       fin sched (record st { delivered = rid ∷ EvalSt.delivered st }))))
+              (proj₂ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+                       (if fin then close (toℕ i) exhausted ∷ [] else [])
+                       fin sched (record st { delivered = rid ∷ EvalSt.delivered st })))))
 
 -- THE HEAD OF A WALK'S BURST BOUND, WHICH EVERY SHAPE OF PATH CARRIES.
 -- Each clause bounds the list it is handed before it says anything about
@@ -4903,22 +4846,22 @@ burstsOK W sf id now (f ↠ p)        vals fin sched st =
 -- EMITS is already in hand one step down -- the walk's own recursion is
 -- what supplies it, and no second hypothesis is owed.
 burstsHead : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
+  (W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  burstsOK W sf id now p vals fin sched st → length vals ≤ W
-burstsHead W sf id now root           vals fin sched st h = h
-burstsHead W sf id now (share-sink _) vals fin sched st h = h
-burstsHead W sf id now (_ ↠ _)        vals fin sched st h = proj₁ h
+  burstsOK W sf gas id now p vals fin sched st → length vals ≤ W
+burstsHead W sf gas id now root           vals fin sched st h = h
+burstsHead W sf gas id now (share-sink _) vals fin sched st h = proj₁ h
+burstsHead W sf gas id now (_ ↠ _)        vals fin sched st h = proj₁ h
 
 -- AND THE DRAIN OBLIGATION AT THE SAME HEAD, projected out so the frame
 -- lemma's premise comes off the walk's own recursion rather than being
 -- owed a second time.
 burstsDrain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
-  (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
+  (W : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (f : Frame Γ s u) (p : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  burstsOK W sf id now (f ↠ p) vals fin sched st →
+  burstsOK W sf gas id now (f ↠ p) vals fin sched st →
   frameDrainW W sf id now f p sched st
-burstsDrain W sf id now f p vals fin sched st h = proj₁ (proj₂ h)
+burstsDrain W sf gas id now f p vals fin sched st h = proj₁ (proj₂ h)
 
 -- AND THE CAPS THE TWO `*All` FRAMES SPEND, carried the same way and for
 -- the same reason.  A frame that re-enters the subscribe machinery is
@@ -4928,21 +4871,177 @@ burstsDrain W sf id now f p vals fin sched st h = proj₁ (proj₂ h)
 -- starts from.  Stating it by recursion on the path is what lets the
 -- induction take its own hypothesis apart instead of re-deriving the
 -- caps face's frame counter in a second currency.
-capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick) (p : Path Γ u t)
-  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
-capsWalkOK c sl sf id now root           vals fin sched st = capsOK? c sched st ≡ true
-capsWalkOK {e = e} c sl sf id now (share-sink _) vals fin sched st =
-  (capsOK? c sched st ≡ true) × (regsNestMax (EvalSt.registry st) ≤ nestUnit e sl)
-capsWalkOK {u = u} c sl sf id now (f ↠ p) vals fin sched st =
-  (capsOK? c sched st ≡ true)
-  × (all (valCaps? c sl u) vals ≡ true)
-  × frameDrainOK c sl sf id now f p sched st
-  × capsWalkOK c sl sf id now p (proj₁ step)
-      (proj₁ (proj₂ (proj₂ step)))
-      (proj₁ (proj₂ (proj₂ (proj₂ step))))
-      (proj₂ (proj₂ (proj₂ (proj₂ step))))
-  where step = stepFrame sf id now f p vals fin sched st
+mutual
+  capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
+    (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+  capsWalkOK c sl sf gas id now root           vals fin sched st = capsOK? c sched st ≡ true
+  capsWalkOK c sl sf gas id now (share-sink i) vals fin sched st =
+    (capsOK? c sched st ≡ true)
+    × dispatchCapsOK c sl sf gas id now i vals fin sched st
+  capsWalkOK {u = u} c sl sf gas id now (f ↠ p) vals fin sched st =
+    (capsOK? c sched st ≡ true)
+    × (all (valCaps? c sl u) vals ≡ true)
+    × frameDrainOK c sl sf id now f p sched st
+    × capsWalkOK c sl sf gas id now p (proj₁ step)
+        (proj₁ (proj₂ (proj₂ step)))
+        (proj₁ (proj₂ (proj₂ (proj₂ step))))
+        (proj₂ (proj₂ (proj₂ (proj₂ step))))
+    where step = stepFrame sf id now f p vals fin sched st
+
+  dispatchCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  dispatchCapsOK c sl sf zero      id now i vals fin sched st = ⊤
+  dispatchCapsOK c sl sf (suc gas) id now i vals fin sched st =
+    shareCapsOK c sl sf gas id now i vals fin
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
+
+  shareCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (sl : Slots Γ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  shareCapsOK c sl sf gas id now i vals fin [] sched st = ⊤
+  shareCapsOK c sl sf gas id now i vals fin ((rid , p) ∷ ps) sched st =
+    if any (_≡ᵇ rid) (EvalSt.cancelled st)
+    then shareCapsOK c sl sf gas id now i vals fin ps sched st
+    else (capsWalkOK c sl sf gas id now p vals fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st })
+          × shareCapsOK c sl sf gas id now i vals fin ps
+              (proj₁ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+                       (if fin then close (toℕ i) exhausted ∷ [] else [])
+                       fin sched (record st { delivered = rid ∷ EvalSt.delivered st }))))
+              (proj₂ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+                       (if fin then close (toℕ i) exhausted ∷ [] else [])
+                       fin sched (record st { delivered = rid ∷ EvalSt.delivered st })))))
+
+-- THE SHARE SINK, WHICH IS WHERE THE PATH MEASURES HAVE NOTHING LEFT
+-- TO SPEND, and where the deliver measures pay instead.  The sink fans
+-- the arriving values into every registration the state admits, and
+-- each of those walks a path that lives in the REGISTRY rather than in
+-- the chain being charged — so the sink's budget must price the
+-- registry, and the caps are the one thing that does: `capsOK?` bounds
+-- every registered path's frames and length by `cSize` and the
+-- registry's count by `cReg`, so one dispatch level spends at most
+-- `cReg` walks of caps-priced charge plus whatever the NEXT level's
+-- sinks spend — the `fanLen`/`fanSq` recurrences, indexed by the
+-- dispatch gas that ties the descent off.  The fold obligations mirror
+-- the cascade fold's: each admitted entry owes its own walk's burst and
+-- caps hypotheses at the state the fold reaches it in.
+--
+-- AND THE CHARGE HAS NO INSTANTIATION ROUTE AT ALL, which is worth
+-- knowing before anyone budgets a sweep for it.  The typechecker is
+-- shut because `fanLen`, `fanSq` and `delSq` are sealed, so neither
+-- side of a row reduces to a numeral under `refl`.  The compiled
+-- harness looks like the way round that — the backend runs the real
+-- bodies — and it is not: the allowances are priced in caps, and a cap
+-- does not evaluate either, for the reason recorded at `capsAt`.  So
+-- no row reaches this statement at any program size, and nothing below
+-- should be budgeted as though one might.
+--
+-- TWIN: `cascadeGo-nodes-chains` — the proven fold over a cascade's
+--   chain list, whose skip/deliver arms and telescope arithmetic are
+--   the route for this fold, with the fan allowances standing where its
+--   per-list sums stand.
+-- DEAD ROUTE: strengthening the fold to a PRESERVATION -- carry a
+--   ceiling `K`, show each step re-establishes it, which is how the caps
+--   face avoids exactly this stacking with a pointwise predicate over
+--   the nodes map instead of a MAX.  It does not close here: a step also
+--   REGISTERS the inners it subscribes, so the premise bounding the
+--   registry's own wraps has to be re-established at the grown registry,
+--   and that quantity provably grows -- it is what the parent charges a
+--   whole width factor for.  A preservation over the nodes map alone is
+--   not enough, and one over the store is false.
+-- REFUTED: `Refuted.Share-Sink-Nodes` kills the unit-free flat form,
+--   three against one, and against two when the whole store measure is
+--   charged in place of the nodes map.
+-- REFUTED: `Refuted.Share-Go-Path` kills the premise-free form, four
+--   against two: with the registration list a bound variable no premise
+--   prices, a `map-f` frame carrying a constant the program never
+--   mentions stores a value no program-denominated charge covers, and
+--   the gap grows a layer per layer of the constant.  Under the current
+--   form that constant's size is priced by `admSz?`, which is why the
+--   cap squared appears in the fan allowances.
+-- REFUTED: `Refuted.Share-Go-Registry` kills the predecessor statement
+--   (premise `chainsNestD ps ≤ nestUnit`, flat unit conclusion), four
+--   against two: a top list of one bare `share-sink` hop is priced at
+--   zero, and the sink then admits from the STATE's registry, which
+--   that premise never priced.  The current premises price the state's
+--   registry through `capsOK?`, which is this refutation's repair.
+-- REFUTED: `Refuted.Share-Go-Stack` kills the max-premised repair of
+--   the predecessor (add `regsNestMax st ≤ nestUnit`), three against
+--   two: a branch that descends through TWO shares spends each hop's
+--   whole allowance in SEQUENCE, so per-path independent pricing — any
+--   max — stacks whatever it licensed once per level.  The gas-indexed
+--   fan recurrences are the branch-structured charge that refutation
+--   demands: each level's allowance contains the next level's whole.
+postulate
+  shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
+    (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
+    admSz? (Caps.cSize c) ps ≡ true →
+    length ps ≤ Caps.cReg c →
+    shareBurstsOK W sf gas id now i vals fin ps sched st →
+    shareCapsOK c sl sf gas id now i vals fin ps sched st →
+    nodesMax (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))
+      ≤ nestFac (Caps.cSize c) W ^ fanLen (suc gas) c
+        * ((2 ^ fanSq (suc gas) c) ^ W
+           * ((nodesMax st ⊔ nestDᵛˢ vals)
+              + W * (fanSq (suc gas) c
+                     + suc (fanLen (suc gas) c) * nestU (delSq (suc gas) c) (nestUnit e sl))))
+
+-- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which
+-- touches the nodes map: out of dispatch gas the state is returned
+-- untouched, and the finishing arm latches the share's source into the
+-- dying and completed ledgers, which are not the map.  So the whole of
+-- the sink's growth is the fold's, and the leaf is the fold.  The
+-- admitted list's own pricing is read off `capsOK?` here — the admitted
+-- registrations are a sublist of the registry, so they inherit its
+-- `regsSz?` receipt and its count bound.
+dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
+  (id : Id) (now : Tick) (i : Fin n)
+  (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
+  capsOK? c sched st ≡ true →
+  dispatchBurstsOK W sf gas id now i vals fin sched st →
+  dispatchCapsOK c sl sf gas id now i vals fin sched st →
+  nodesMax (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))
+    ≤ nestFac (Caps.cSize c) W ^ fanLen gas c
+      * ((2 ^ fanSq gas c) ^ W
+         * ((nodesMax st ⊔ nestDᵛˢ vals)
+            + W * (fanSq gas c
+                   + suc (fanLen gas c) * nestU (delSq gas c) (nestUnit e sl))))
+dispatchShare-nodes c W sl sf zero id now i vals fin sched st hsl 1≤W 1≤S hcaps hdb hdc
+  rewrite fanLen-zero c | fanSq-zero c =
+  ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
+                   (one-pow W _))
+          (≤-reflexive (sym (*-identityˡ _)))
+dispatchShare-nodes c W sl sf (suc gas) id now i vals false sched st hsl 1≤W 1≤S hcaps hdb hdc =
+  shareGo-nodes c W sl sf gas id now i vals false
+    (shareAdmit i (EvalSt.registry st)) sched st hsl 1≤W 1≤S
+    (shareAdmit-sz i (Caps.cSize c) (EvalSt.registry st)
+      (proj₁ (proj₂ (capsOK?-parts c sched st hcaps))))
+    (≤-trans (shareAdmit-len i (EvalSt.registry st))
+             (≤ᵇ⇒≤ (length (EvalSt.registry st)) (Caps.cReg c)
+               (T-to (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st hcaps))))))))
+    hdb hdc
+dispatchShare-nodes c W sl sf (suc gas) id now i vals true sched st hsl 1≤W 1≤S hcaps hdb hdc =
+  shareGo-nodes c W sl sf gas id now i vals true
+    (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) hsl 1≤W 1≤S
+    (shareAdmit-sz i (Caps.cSize c) (EvalSt.registry st)
+      (proj₁ (proj₂ (capsOK?-parts c sched st hcaps))))
+    (≤-trans (shareAdmit-len i (EvalSt.registry st))
+             (≤ᵇ⇒≤ (length (EvalSt.registry st)) (Caps.cReg c)
+               (T-to (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st hcaps))))))))
+    hdb hdc
 
 foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (W : ℕ) (sl : Slots Γ)
@@ -4950,69 +5049,72 @@ foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (path : Path Γ u t) (vals : List (Val Γ u))
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → 1 ≤ W →
-  burstsOK W sf id now path vals fin sched st →
-  capsWalkOK c sl sf id now path vals fin sched st →
+  Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
+  burstsOK W sf gas id now path vals fin sched st →
+  capsWalkOK c sl sf gas id now path vals fin sched st →
   nodesMax (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))
-    ≤ (nestFac (Caps.cSize c) W) ^ pathLen path
-      * (pathNestF path ^ W
+    ≤ (nestFac (Caps.cSize c) W) ^ deliverLen gas c path
+      * (deliverNestF gas c path ^ W
          * ((nodesMax st ⊔ nestDᵛˢ vals)
-            + W * (pathNestD path + suc (pathLen path) * nestU (Caps.cSize c) (nestUnit e sl))))
-foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W hb hc =
+            + W * (deliverNestD gas c path
+                   + suc (deliverLen gas c path) * nestU (delSq gas c) (nestUnit e sl))))
+foldPath-nodes c W sl sf gas id now envSrc root vals evs fin sched st hsl 1≤W 1≤S hb hc =
   ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
                    (one-pow W _))
           (≤-reflexive (sym (*-identityˡ _)))
-foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W hb hc =
-  ≤-trans (≤-trans (dispatchShare-nodes sl sf gas id now i vals fin sched st hsl (proj₂ hc))
-                   (≤-trans (+-monoʳ-≤ (nodesMax st ⊔ nestDᵛˢ vals)
-                              (≤-trans (nestU-base (Caps.cSize c) (nestUnit e sl))
-                               (≤-trans (nest-inflate W (nestU (Caps.cSize c) (nestUnit e sl)) 1≤W)
-                                       (*-monoʳ-≤ W (≤-reflexive
-                                         (sym (*-identityˡ (nestU (Caps.cSize c) (nestUnit e sl)))))))))
-                            (one-pow W _)))
-          (≤-reflexive (sym (*-identityˡ _)))
-foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W hb hc =
+foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W 1≤S hb hc =
+  dispatchShare-nodes c W sl sf gas id now i vals fin sched st hsl 1≤W 1≤S
+    (proj₁ hc) (proj₂ hb) (proj₂ hc)
+foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W 1≤S hb hc =
   ≤-trans (foldPath-nodes c W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
              (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-             1≤W (proj₂ (proj₂ hb)) (proj₂ (proj₂ (proj₂ hc))))
-    (≤-trans (*-monoʳ-≤ (Q ^ pathLen p)
-                (*-monoʳ-≤ (pathNestF p ^ W)
-                  (+-monoˡ-≤ (W * (pathNestD p + L * U))
-                             (stepFrame-nodes c W sl sf id now f p vals fin sched st
-                                hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc)) (proj₁ (proj₂ (proj₂ hc)))
-                                (burstsDrain W sf id now f p vals fin sched st hb)
-                                (burstsHead W sf id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb)))))))
-    (≤-trans (*-monoʳ-≤ (Q ^ pathLen p)
-                (fac-hoist Q (pathNestF p ^ W) (A + U) (W * (pathNestD p + L * U))
+             1≤W 1≤S (proj₂ (proj₂ hb)) (proj₂ (proj₂ (proj₂ hc))))
+    (≤-trans (*-monoʳ-≤ (Q ^ deliverLen gas c p)
+                (*-monoʳ-≤ (deliverNestF gas c p ^ W)
+                  (+-monoˡ-≤ (W * (deliverNestD gas c p + L * U))
+                             (≤-trans
+                               (stepFrame-nodes c W sl sf id now f p vals fin sched st
+                                  hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc)) (proj₁ (proj₂ (proj₂ hc)))
+                                  (burstsDrain W sf gas id now f p vals fin sched st hb)
+                                  (burstsHead W sf gas id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb))))
+                               (*-monoʳ-≤ Q (+-monoʳ-≤ A unit≤))))))
+    (≤-trans (*-monoʳ-≤ (Q ^ deliverLen gas c p)
+                (fac-hoist Q (deliverNestF gas c p ^ W) (A + U) (W * (deliverNestD gas c p + L * U))
                            1≤Q))
-    (≤-trans (≤-reflexive (sym (*-assoc (Q ^ pathLen p) Q Inner)))
-    (≤-trans (≤-reflexive (cong (_* Inner) (*-comm (Q ^ pathLen p) Q)))
-             (*-monoʳ-≤ (Q ^ suc (pathLen p))
-    (≤-trans (*-monoʳ-≤ (pathNestF p ^ W)
-               (≤-trans (≤-reflexive (+-assoc A U (W * (pathNestD p + L * U))))
+    (≤-trans (≤-reflexive (sym (*-assoc (Q ^ deliverLen gas c p) Q Inner)))
+    (≤-trans (≤-reflexive (cong (_* Inner) (*-comm (Q ^ deliverLen gas c p) Q)))
+             (*-monoʳ-≤ (Q ^ suc (deliverLen gas c p))
+    (≤-trans (*-monoʳ-≤ (deliverNestF gas c p ^ W)
+               (≤-trans (≤-reflexive (+-assoc A U (W * (deliverNestD gas c p + L * U))))
                         (+-monoʳ-≤ A widen)))
-    (≤-trans (nest-telescope (frameNestF f ^ W) (pathNestF p ^ W) B
-                             (W * frameNestD f) (W * (pathNestD p + L * U) + W * U)
+    (≤-trans (nest-telescope (frameNestF f ^ W) (deliverNestF gas c p ^ W) B
+                             (W * frameNestD f) (W * (deliverNestD gas c p + L * U) + W * U)
                              (1≤pow≤ (frameNestF f) W (1≤frameNestF f)))
              (≤-reflexive
-               (cong₂ _*_ (sym (pow-distrib-* W (frameNestF f) (pathNestF p)))
+               (cong₂ _*_ (sym (pow-distrib-* W (frameNestF f) (deliverNestF gas c p)))
                           (cong (B +_) charge))))))))))
   where
   S      = Caps.cSize c
   Q      = nestFac S W
   1≤Q    = 1≤nestFac S W
   A      = frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
-  Inner  = pathNestF p ^ W * ((A + nestU (Caps.cSize c) (nestUnit e sl))
-                              + W * (pathNestD p + suc (pathLen p) * nestU (Caps.cSize c) (nestUnit e sl)))
+  Inner  = deliverNestF gas c p ^ W * ((A + nestU (delSq gas c) (nestUnit e sl))
+                              + W * (deliverNestD gas c p + suc (deliverLen gas c p) * nestU (delSq gas c) (nestUnit e sl)))
   B      = nodesMax st ⊔ nestDᵛˢ vals
-  U      = nestU (Caps.cSize c) (nestUnit e sl)
-  L      = suc (pathLen p)
+  U      = nestU (delSq gas c) (nestUnit e sl)
+  L      = suc (deliverLen gas c p)
+
+  -- the frame face prices its unit at the bare size cap; the walk
+  -- prices it at the delivery square, which is the wider of the two
+  unit≤ : nestU (Caps.cSize c) (nestUnit e sl) ≤ U
+  unit≤ = nestU-mono (Caps.cSize c) (delSq gas c) (nestUnit e sl)
+                     (cSize≤delSq gas c 1≤S)
 
   -- the frame's own summand is paid out of the extra `W * U` the path's
   -- coefficient gains at this level, and `1 ≤ W` is what makes it fit
-  widen : U + W * (pathNestD p + L * U) ≤ W * (pathNestD p + L * U) + W * U
-  widen = ≤-trans (≤-reflexive (+-comm U (W * (pathNestD p + L * U))))
-                  (+-monoʳ-≤ (W * (pathNestD p + L * U))
+  widen : U + W * (deliverNestD gas c p + L * U) ≤ W * (deliverNestD gas c p + L * U) + W * U
+  widen = ≤-trans (≤-reflexive (+-comm U (W * (deliverNestD gas c p + L * U))))
+                  (+-monoʳ-≤ (W * (deliverNestD gas c p + L * U))
                     (≤-trans (≤-reflexive (sym (*-identityˡ U)))
                              (*-monoˡ-≤ U 1≤W)))
   step   = stepFrame sf id now f p vals fin sched st
@@ -5022,19 +5124,19 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ step)))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ step)))
 
-  charge : W * frameNestD f + (W * (pathNestD p + L * U) + W * U)
-             ≡ W * (pathNestD (f ↠ p) + suc L * U)
+  charge : W * frameNestD f + (W * (deliverNestD gas c p + L * U) + W * U)
+             ≡ W * (deliverNestD gas c (f ↠ p) + suc L * U)
   charge =
     trans (cong (W * frameNestD f +_)
-            (sym (*-distribˡ-+ W (pathNestD p + L * U) U)))
-    (trans (sym (*-distribˡ-+ W (frameNestD f) ((pathNestD p + L * U) + U)))
+            (sym (*-distribˡ-+ W (deliverNestD gas c p + L * U) U)))
+    (trans (sym (*-distribˡ-+ W (frameNestD f) ((deliverNestD gas c p + L * U) + U)))
            (cong (W *_) inner))
     where
-    inner : frameNestD f + ((pathNestD p + L * U) + U)
-              ≡ pathNestD (f ↠ p) + (U + L * U)
+    inner : frameNestD f + ((deliverNestD gas c p + L * U) + U)
+              ≡ deliverNestD gas c (f ↠ p) + (U + L * U)
     inner =
       trans (cong (frameNestD f +_)
-              (trans (+-assoc (pathNestD p) (L * U) U)
-                     (cong (pathNestD p +_) (+-comm (L * U) U))))
-      (trans (sym (+-assoc (frameNestD f) (pathNestD p) (U + L * U)))
-             (cong (_+ (U + L * U)) (sym (pathNestD-cons f p))))
+              (trans (+-assoc (deliverNestD gas c p) (L * U) U)
+                     (cong (deliverNestD gas c p +_) (+-comm (L * U) U))))
+      (trans (sym (+-assoc (frameNestD f) (deliverNestD gas c p) (U + L * U)))
+             (cong (_+ (U + L * U)) (sym (deliverNestD-cons gas c f p))))

@@ -44,10 +44,10 @@ open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Ctx; Closed; Exp; Fn; Ty; natᵗ; obs; ofᵉ; mergeAllᵉ;
-                          emptyᵉ; nat̂; strmᵗ; varᵗ; input; Tm)
+open import Rx.Exp using (Ctx; Closed; Exp; Fn; natᵗ; obs; ofᵉ; mergeAllᵉ;
+                          emptyᵉ; nat̂; strmᵗ; varᵗ; input)
 open import Rx.Prim using (g0; Source; cold)
-open import Rx.Slots using (Slots; Slot; scripted; shared)
+open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Evaluator
   using (EvalSt; sched-init; st-init; root; _↠_; map-f; thru-outer; mergeAllᵒ;
          mergeAll-st; shareGo; share-sink; Path; RegId; Chain; Sched)

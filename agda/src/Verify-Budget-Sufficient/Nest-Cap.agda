@@ -95,6 +95,22 @@ abstract
   nestU-base : ∀ (S U : ℕ) → U ≤ nestU S U
   nestU-base S U = m≤m+n U (S * U)
 
+  -- and the unit grows with the size it is priced at, which a consumer
+  -- pricing one face at the bare cap and another at a wider one has to
+  -- spend to put the two side by side
+  nestU-mono : ∀ (S S′ U : ℕ) → S ≤ S′ → nestU S U ≤ nestU S′ U
+  nestU-mono S S′ U h = *-monoˡ-≤ U (s≤s h)
+
+  -- AND THE UNIT HAS ROOM FOR ONE WHOLE SIZE ON TOP OF ITS BASE, which
+  -- is what a consumer holding a bound in one currency and owing it in
+  -- a wider one spends: the price is a MULTIPLE of the base, so any
+  -- rider within the size fits beside a base that is itself at least
+  -- one.
+  nestU-room : ∀ (S U x : ℕ) → 1 ≤ U → x ≤ S → U + x ≤ nestU S U
+  nestU-room S U x 1≤U h =
+    +-monoʳ-≤ U (≤-trans h (≤-trans (≤-reflexive (sym (*-identityʳ S)))
+                                    (*-monoʳ-≤ S 1≤U)))
+
   -- THE LEAF HEADS' WHOLE OBLIGATION: a subscribe that installs
   -- nothing and emits nothing is under its own grant at every size.
   nestB-base : ∀ (S W U B m : ℕ) → B ≤ nestB S W U B m

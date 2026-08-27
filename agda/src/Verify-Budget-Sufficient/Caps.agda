@@ -444,6 +444,25 @@ frameStep-reg-suc (caps s w r) j =
 capsH : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
 capsH e sl id = capsHgo (capsBase e sl) id
 
+-- A CAP DOES NOT EVALUATE, SO NOTHING PRICED IN ONE CAN BE PUT TO A
+-- ROW.  `frameBlowup c d` is `frameStep` at the count `sizeCount c d`,
+-- and that count is `lvls` iterating `dLvl` as many times as `cDel c d`
+-- says -- so `exp≤dLvl` makes one iteration at least an exponential and
+-- the count at least a tower of twos of that height.  The sealing
+-- already shut the typechecker; what this shuts is the COMPILED route,
+-- which is otherwise the standing answer to a sealed family, since the
+-- backend ignores `abstract` and runs the real body.  It does not help
+-- here, and shrinking the program does not either: `2 ≤ cSize` holds of
+-- every cap a program can reach, which is all `exp≤dLvl` asks for.
+--
+-- DEAD ROUTE: pricing any caps-denominated bound by a harness row.
+--   The base fields and `capsBase` print at once at a corpus program,
+--   and `cDel` at that same base does not return -- so the wall stands
+--   BELOW the recurrence, at the count feeding it, and no smaller
+--   program moves it.  Assembling a small cap by hand instead is the
+--   hand-built-state trap: it is not one `capsAt` reaches, so a row
+--   over it is evidence about nothing.
+
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
   frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)

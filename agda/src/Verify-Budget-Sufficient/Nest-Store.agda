@@ -50,11 +50,12 @@ open import Data.Bool using (Bool; true; false; T)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ; *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m;
-  n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ; *-identityʳ; *-distribˡ-+; m^n>0; ^-distribˡ-+-*)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ;
+  *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
+  *-identityʳ; *-distribˡ-+; m^n>0)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Exp using (Ctx; Closed; sizeᵗ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
@@ -69,6 +70,7 @@ open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤; 1≤capsAt-reg)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
+open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -191,14 +193,6 @@ frameNestF≡ (take-f _)         = refl
 frameNestF≡ (from-inner _ _ _) = refl
 frameNestF≡ (thru-outer _ _)   = refl
 
-pathNestF≡ : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) →
-  pathNestF p ≡ 2 ^ pathSzSum p
-pathNestF≡ root           = refl
-pathNestF≡ (share-sink _) = refl
-pathNestF≡ (f ↠ p)        =
-  trans (cong₂ _*_ (frameNestF≡ f) (pathNestF≡ p))
-        (sym (^-distribˡ-+-* 2 (frameSzD f) (pathSzSum p)))
-
 nest-inflate : ∀ (F X : ℕ) → 1 ≤ F → X ≤ F * X
 nest-inflate F X 1≤F =
   ≤-trans (≤-reflexive (sym (*-identityˡ X))) (*-monoˡ-≤ X 1≤F)
@@ -233,13 +227,6 @@ chainsSzSum = foldr (λ rc acc → pathSzSum (proj₂ rc) + acc) 0
   1 ≤ chainsNestF cs
 1≤chainsNestF []             = s≤s z≤n
 1≤chainsNestF ((_ , p) ∷ cs) = *-mono-≤ (1≤pathNestF p) (1≤chainsNestF cs)
-
-chainsNestF≡ : ∀ {n} {Γ : Ctx n} {s t} (cs : List (RegId × Path Γ s t)) →
-  chainsNestF cs ≡ 2 ^ chainsSzSum cs
-chainsNestF≡ []             = refl
-chainsNestF≡ ((_ , p) ∷ cs) =
-  trans (cong₂ _*_ (pathNestF≡ p) (chainsNestF≡ cs))
-        (sym (^-distribˡ-+-* 2 (pathSzSum p) (chainsSzSum cs)))
 
 -- A SCRIPTED SLOT IS OBS-FREE BY CONSTRUCTION (`isData`), so no
 -- observable enters a run from outside the program and the clause is 0
@@ -506,22 +493,21 @@ abstract
   --   not move with it at all.
   nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
-  nestFacAt e sl id =
+  nestFacAt {n = n} e sl id =
     2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-         * (suc (Caps.cSize (capsAt e sl id))
-            * (realWidAt e sl id
-               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))))
+         * (suc (delSize n (capsAt e sl id))
+            * (realWidAt e sl id * delSq n (capsAt e sl id))))
 
   -- ONE INSTANT'S FRESH GROWTH, NAMED, because it is what the
   -- recurrence adds and what every preservation step has to match
   -- against -- and because it now has three factors rather than two.
   nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
-  nestIncAt e sl id =
+  nestIncAt {n = n} e sl id =
     realWidAt e sl id
       * (nestBurstAt e sl id
-         * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
-            * nestU (Caps.cSize (capsAt e sl id)) (nestUnit e sl)))
+         * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
+            * nestU (delSq n (capsAt e sl id)) (nestUnit e sl)))
 
   -- THE SIZE CAP SITS UNDER ONE INSTANT'S GROWTH, which is what lets a
   -- walk charge an arrival's own size to the increment rather than to
@@ -531,37 +517,41 @@ abstract
   -- least one.
   size≤nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → Caps.cSize (capsAt e sl id) ≤ nestIncAt e sl id
-  size≤nestIncAt e sl id =
+  size≤nestIncAt {n = n} e sl id =
     ≤-trans S≤mid (≤-trans (≤-trans mid≤u u≤b) b≤r)
     where
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
 
+    D : ℕ
+    D = delSize n (capsAt e sl id)
+
     R : ℕ
     R = realWidAt e sl id
 
     U : ℕ
-    U = nestU S (nestUnit e sl)
+    U = nestU (delSq n (capsAt e sl id)) (nestUnit e sl)
 
     1≤U : 1 ≤ U
-    1≤U = ≤-trans (s≤s z≤n) (nestU-base S (nestUnit e sl))
+    1≤U = ≤-trans (s≤s z≤n) (nestU-base (delSq n (capsAt e sl id)) (nestUnit e sl))
 
-    S≤mid : S ≤ suc (suc (R * S))
+    S≤mid : S ≤ suc (suc (R * D))
     S≤mid =
-      ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ S)))
-                       (*-monoˡ-≤ S (1≤capsAt-reg e sl id)))
-              (≤-trans (n≤1+n (R * S)) (n≤1+n (suc (R * S))))
+      ≤-trans (delSize-cap n (capsAt e sl id))
+        (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ D)))
+                          (*-monoˡ-≤ D (1≤capsAt-reg e sl id)))
+                 (≤-trans (n≤1+n (R * D)) (n≤1+n (suc (R * D)))))
 
-    mid≤u : suc (suc (R * S)) ≤ suc (suc (R * S)) * U
-    mid≤u = ≤-trans (≤-reflexive (sym (*-identityʳ (suc (suc (R * S))))))
-                    (*-monoʳ-≤ (suc (suc (R * S))) 1≤U)
+    mid≤u : suc (suc (R * D)) ≤ suc (suc (R * D)) * U
+    mid≤u = ≤-trans (≤-reflexive (sym (*-identityʳ (suc (suc (R * D))))))
+                    (*-monoʳ-≤ (suc (suc (R * D))) 1≤U)
 
-    u≤b : suc (suc (R * S)) * U ≤ nestBurstAt e sl id * (suc (suc (R * S)) * U)
-    u≤b = ≤-trans (≤-reflexive (sym (*-identityˡ (suc (suc (R * S)) * U))))
-                  (*-monoˡ-≤ (suc (suc (R * S)) * U) (1≤nestBurstAt e sl id))
+    u≤b : suc (suc (R * D)) * U ≤ nestBurstAt e sl id * (suc (suc (R * D)) * U)
+    u≤b = ≤-trans (≤-reflexive (sym (*-identityˡ (suc (suc (R * D)) * U))))
+                  (*-monoˡ-≤ (suc (suc (R * D)) * U) (1≤nestBurstAt e sl id))
 
-    b≤r : nestBurstAt e sl id * (suc (suc (R * S)) * U)
-            ≤ R * (nestBurstAt e sl id * (suc (suc (R * S)) * U))
+    b≤r : nestBurstAt e sl id * (suc (suc (R * D)) * U)
+            ≤ R * (nestBurstAt e sl id * (suc (suc (R * D)) * U))
     b≤r = ≤-trans (≤-reflexive (sym (*-identityˡ _)))
                   (*-monoˡ-≤ _ (1≤capsAt-reg e sl id))
 
@@ -581,9 +571,8 @@ abstract
     (id : ℕ) →
     nestFacAt e sl id
       ≡ 2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-             * (suc (Caps.cSize (capsAt e sl id))
-                * (realWidAt e sl id
-                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))))
+             * (suc (delSize n (capsAt e sl id))
+                * (realWidAt e sl id * delSq n (capsAt e sl id))))
   nestFacAt-def e sl id = refl
 
   nestIncAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -591,8 +580,8 @@ abstract
     nestIncAt e sl id
       ≡ realWidAt e sl id
         * (nestBurstAt e sl id
-           * (suc (suc (realWidAt e sl id * Caps.cSize (capsAt e sl id)))
-              * nestU (Caps.cSize (capsAt e sl id)) (nestUnit e sl)))
+           * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
+              * nestU (delSq n (capsAt e sl id)) (nestUnit e sl)))
   nestIncAt-def e sl id = refl
 
   nestCapAt e sl zero    = nestUnit e sl
@@ -601,11 +590,10 @@ abstract
 
   1≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → 1 ≤ nestFacAt e sl id
-  1≤nestFacAt e sl id =
+  1≤nestFacAt {n = n} e sl id =
     m^n>0 2 (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-             * (suc (Caps.cSize (capsAt e sl id))
-                * (realWidAt e sl id
-                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))))
+             * (suc (delSize n (capsAt e sl id))
+                * (realWidAt e sl id * delSq n (capsAt e sl id))))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool

@@ -32,19 +32,26 @@ open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; size�
   applyFn)
 open import Rx.Frame-Width using (pWᵛ; dWᵉ; dWᵗ; dWᵗˢ)
 open import Rx.Nest-Depth using (nestDᵛ)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; 1≤nestFac; nestU; nestU-base)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; 1≤nestFac; nestU; nestU-room)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; fac-hoist; one-pow)
+open import Verify-Budget-Sufficient.Deliver-Measure using
+  (pathSzSum-cap; deliverLen; deliverNestD; deliverNestF; 1≤deliverNestF; chainsLenSum;
+  chainsDelLen; chainsDelNestD; chainsDelNestF; 1≤chainsDelNestF; chainsDelSzSum;
+  chainsDelNestF≡; chainsDelLen-chains; chainsDelNestD-chains; chainsDelSzSum-chains;
+  chainsNestF≤)
+open import Verify-Budget-Sufficient.Fan-Caps using
+  (fanLen; fanSq; delSize; delSq; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (chainsNestD; chainsNestF; chainsNestF≡; chainsSzSum; pathSzSum; frameSzD; pathNestD;
-  pathNestF; 1≤pathNestF; 1≤chainsNestF; nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt;
-  nestOK?; nestOK?-latch; nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt;
-  nest-inflate; storeNest-latch; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
-  size≤nestIncAt; m≤m^burst;
-  nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest; nodeNest; regsNestMax)
+  (chainsNestD; chainsNestF; chainsSzSum; pathNestD; pathNestF; 1≤pathNestF; 1≤chainsNestF;
+  nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestOK?-latch;
+  nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt; nest-inflate;
+  storeNest-latch; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def; size≤nestIncAt;
+  m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest; nodeNest;
+  regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
-  from-inner; thru-outer; root; share-sink; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
+  from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
   iterSize; fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
@@ -1417,7 +1424,7 @@ chainBurstOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (W : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) → Set
 chainBurstOK {n = n} {e = e} W id a path sched st =
-  burstsOK W (budgetAt e (Sched.slots sched) id) id (arrTick a) path
+  burstsOK W (budgetAt e (Sched.slots sched) id) n id (arrTick a) path
            (arrVal a ∷ []) (Arrival.isLast a) sched st
 
 -- AND THE SAME PACKAGING FOR THE CAPS THE `*All` FRAMES SPEND, so a
@@ -1426,18 +1433,8 @@ chainCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) → Set
 chainCapsOK {n = n} {e = e} c sl id a path sched st =
-  capsWalkOK c sl (budgetAt e (Sched.slots sched) id) id (arrTick a) path
+  capsWalkOK c sl (budgetAt e (Sched.slots sched) id) n id (arrTick a) path
              (arrVal a ∷ []) (Arrival.isLast a) sched st
-
--- THE EXPONENT THE CAPS RIDER TELESCOPES TO OVER A CHAIN LIST.  One
--- factor is spent per FRAME, so the fold's exponent is the total frame
--- count and not the chain count -- the same reason `chainsNestF` is a
--- product where `chainsNestD` is a max.  It is stated here rather than
--- beside those two because the frame count is `pathLen`, and the module
--- that holds them would have to import the measures tower to say it.
-chainsLenSum : ∀ {n} {Γ : Ctx n} {s t} →
-  List (RegId × Path Γ s t) → ℕ
-chainsLenSum = foldr (λ rc acc → pathLen (proj₂ rc) + acc) 0
 
 -- THE STORE'S ONE ACCUMULATING CORNER, AND WHAT PAYS FOR IT IS THE
 -- SELECTION.  Within the node arm the store deepens at two sites, not
@@ -1492,37 +1489,38 @@ chainsLenSum = foldr (λ rc acc → pathLen (proj₂ rc) + acc) 0
 chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (W : ℕ) (sl : Slots Γ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → 1 ≤ W → chainBurstOK W id a path sched st →
+  Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
+  chainBurstOK W id a path sched st →
   chainCapsOK c sl id a path sched st →
   let r = chainStep id a path sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-    ≤ nestFac (Caps.cSize c) W ^ pathLen path
-      * (pathNestF path ^ W
+    ≤ nestFac (Caps.cSize c) W ^ deliverLen n c path
+      * (deliverNestF n c path ^ W
          * (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-            + W * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path
-                   + suc (pathLen path) * nestU (Caps.cSize c) (nestUnit e sl))))
-chainStep-nodes {n = n} {e = e} c W sl id a path sched st hsl 1≤W hb hc =
+            + W * (nestDᵛ (arrTy a) (arrVal a) + deliverNestD n c path
+                   + suc (deliverLen n c path) * nestU (delSq n c) (nestUnit e sl))))
+chainStep-nodes {n = n} {e = e} c W sl id a path sched st hsl 1≤W 1≤S hb hc =
   ≤-trans (foldPath-nodes c W sl (budgetAt e (Sched.slots sched) id) n id
              (arrTick a) (arrSource a) path (arrVal a ∷ [])
              (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-             (Arrival.isLast a) sched st hsl 1≤W hb hc)
-    (*-monoʳ-≤ (nestFac (Caps.cSize c) W ^ pathLen path)
-    (*-monoʳ-≤ (pathNestF path ^ W)
-      (≤-trans (+-monoˡ-≤ (W * (pathNestD path + U))
+             (Arrival.isLast a) sched st hsl 1≤W 1≤S hb hc)
+    (*-monoʳ-≤ (nestFac (Caps.cSize c) W ^ deliverLen n c path)
+    (*-monoʳ-≤ (deliverNestF n c path ^ W)
+      (≤-trans (+-monoˡ-≤ (W * (deliverNestD n c path + U))
                           (≤-trans (⊔-mono-≤ (≤-refl {nodesMax st})
                                              (≤-reflexive (⊔-identityʳ V)))
                                    (m⊔n≤m+n (nodesMax st) V)))
-      (≤-trans (≤-reflexive (+-assoc (nodesMax st) V (W * (pathNestD path + U))))
+      (≤-trans (≤-reflexive (+-assoc (nodesMax st) V (W * (deliverNestD n c path + U))))
                (+-monoʳ-≤ (nodesMax st) spread)))))
   where
   V = nestDᵛ (arrTy a) (arrVal a)
-  U = suc (pathLen path) * nestU (Caps.cSize c) (nestUnit e sl)
+  U = suc (deliverLen n c path) * nestU (delSq n c) (nestUnit e sl)
 
-  spread : V + W * (pathNestD path + U) ≤ W * (V + pathNestD path + U)
+  spread : V + W * (deliverNestD n c path + U) ≤ W * (V + deliverNestD n c path + U)
   spread =
-    ≤-trans (+-monoˡ-≤ (W * (pathNestD path + U)) (nest-inflate W V 1≤W))
-      (≤-trans (≤-reflexive (sym (*-distribˡ-+ W V (pathNestD path + U))))
-               (≤-reflexive (cong (W *_) (sym (+-assoc V (pathNestD path) U)))))
+    ≤-trans (+-monoˡ-≤ (W * (deliverNestD n c path + U)) (nest-inflate W V 1≤W))
+      (≤-trans (≤-reflexive (sym (*-distribˡ-+ W V (deliverNestD n c path + U))))
+               (≤-reflexive (cong (W *_) (sym (+-assoc V (deliverNestD n c path) U)))))
 
 -- AND OVER A CASCADE'S CHAIN LIST, mirroring `cascadeGo`: a cancelled
 -- registration walks nothing and owes nothing, and a delivered one owes
@@ -1566,101 +1564,102 @@ cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (cp : Caps) (W : ℕ) (sl : Slots Γ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → 1 ≤ W → chainsBurstOK W a nextId chains sched st →
+  Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize cp →
+  chainsBurstOK W a nextId chains sched st →
   chainsCapsOK cp sl a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st in
   foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
-    ≤ nestFac (Caps.cSize cp) W ^ chainsLenSum chains
-      * (chainsNestF chains ^ W
+    ≤ nestFac (Caps.cSize cp) W ^ chainsDelLen n cp chains
+      * (chainsDelNestF n cp chains ^ W
          * (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
             + length chains
-                * (W * (nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains
-                        + suc (chainsLenSum chains) * nestU (Caps.cSize cp) (nestUnit e sl)))))
-cascadeGo-nodes-chains cp W sl a nextId [] sched st hsl 1≤W hb hc =
+                * (W * (nestDᵛ (arrTy a) (arrVal a) + chainsDelNestD n cp chains
+                        + suc (chainsDelLen n cp chains) * nestU (delSq n cp) (nestUnit e sl)))))
+cascadeGo-nodes-chains cp W sl a nextId [] sched st hsl 1≤W 1≤S hb hc =
   ≤-trans (≤-trans (m≤m+n _ 0) (one-pow W _)) (≤-reflexive (sym (*-identityˡ _)))
-cascadeGo-nodes-chains {e = e} cp W sl a nextId ((rid , c) ∷ chains) sched st hsl 1≤W hb hc
+cascadeGo-nodes-chains {n = n} {e = e} cp W sl a nextId ((rid , c) ∷ chains) sched st hsl 1≤W 1≤S hb hc
   with any (_≡ᵇ rid) (EvalSt.cancelled st) | hb | hc
 ... | true | hb′ | hc′ =
-  ≤-trans (cascadeGo-nodes-chains cp W sl a nextId chains sched st hsl 1≤W hb′ hc′)
+  ≤-trans (cascadeGo-nodes-chains cp W sl a nextId chains sched st hsl 1≤W 1≤S hb′ hc′)
     (≤-trans (*-monoʳ-≤ (R ^ K)
       (≤-trans (*-monoʳ-≤ (G ^ W) (+-monoʳ-≤ M grow))
-               (≤-trans (nest-scale (pathNestF c ^ W) (G ^ W)
+               (≤-trans (nest-scale (deliverNestF n cp c ^ W) (G ^ W)
                            (M + suc (length chains) * (W * (V + C′ + U)))
-                           (1≤pow≤ (pathNestF c) W (1≤pathNestF c)))
+                           (1≤pow≤ (deliverNestF n cp c) W (1≤deliverNestF n cp c)))
                         (≤-reflexive
                           (cong (_* (M + suc (length chains) * (W * (V + C′ + U))))
-                                (sym (pow-distrib-* W (pathNestF c) G)))))))
-    (≤-trans (nest-scale (R ^ pathLen c) (R ^ K) Xc (1≤pow≤ R (pathLen c) 1≤R))
-             (≤-reflexive (cong (_* Xc) (sym (^-distribˡ-+-* R (pathLen c) K))))))
+                                (sym (pow-distrib-* W (deliverNestF n cp c) G)))))))
+    (≤-trans (nest-scale (R ^ deliverLen n cp c) (R ^ K) Xc (1≤pow≤ R (deliverLen n cp c) 1≤R))
+             (≤-reflexive (cong (_* Xc) (sym (^-distribˡ-+-* R (deliverLen n cp c) K))))))
   where
   R  = nestFac (Caps.cSize cp) W
   1≤R : 1 ≤ R
   1≤R = 1≤nestFac (Caps.cSize cp) W
-  K  = chainsLenSum chains
+  K  = chainsDelLen n cp chains
   M  = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
   V  = nestDᵛ (arrTy a) (arrVal a)
-  C  = chainsNestD chains
-  C′ = pathNestD c ⊔ C
-  Uz = nestU (Caps.cSize cp) (nestUnit e sl)
-  U  = suc (pathLen c + K) * Uz
+  C  = chainsDelNestD n cp chains
+  C′ = deliverNestD n cp c ⊔ C
+  Uz = nestU (delSq n cp) (nestUnit e sl)
+  U  = suc (deliverLen n cp c + K) * Uz
   Uₜ = suc K * Uz
   Uₜ≤U : Uₜ ≤ U
-  Uₜ≤U = *-monoˡ-≤ Uz (s≤s (m≤n+m K (pathLen c)))
-  G  = chainsNestF chains
-  Xc = (pathNestF c * G) ^ W * (M + suc (length chains) * (W * (V + C′ + U)))
+  Uₜ≤U = *-monoˡ-≤ Uz (s≤s (m≤n+m K (deliverLen n cp c)))
+  G  = chainsDelNestF n cp chains
+  Xc = (deliverNestF n cp c * G) ^ W * (M + suc (length chains) * (W * (V + C′ + U)))
   grow : length chains * (W * (V + C + Uₜ)) ≤ suc (length chains) * (W * (V + C′ + U))
   grow = *-mono-≤ (n≤1+n (length chains))
                   (*-monoʳ-≤ W
-                    (+-mono-≤ (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C)) Uₜ≤U))
+                    (+-mono-≤ (+-monoʳ-≤ V (m≤n⊔m (deliverNestD n cp c) C)) Uₜ≤U))
 ... | false | hb′ | hc′ =
   ≤-trans (cascadeGo-nodes-chains cp W sl a nextId chains sd₁ st₁
-             (trans (chainStep-slots nextId a c sched st′) hsl) 1≤W (proj₂ hb′) (proj₂ hc′))
+             (trans (chainStep-slots nextId a c sched st′) hsl) 1≤W 1≤S (proj₂ hb′) (proj₂ hc′))
           (≤-trans (*-monoʳ-≤ (R ^ K)
                       (*-monoʳ-≤ (G ^ W)
                         (+-monoˡ-≤ (length chains * (W * (V + C + Uₜ)))
                                    (chainStep-nodes cp W sl nextId a c sched st′ hsl
-                                      1≤W (proj₁ hb′) (proj₁ hc′)))))
+                                      1≤W 1≤S (proj₁ hb′) (proj₁ hc′)))))
           (≤-trans (*-monoʳ-≤ (R ^ K)
-                      (fac-hoist (R ^ pathLen c) (G ^ W) A Z (1≤pow≤ R (pathLen c) 1≤R)))
-          (≤-trans (≤-reflexive (sym (*-assoc (R ^ K) (R ^ pathLen c) Y)))
+                      (fac-hoist (R ^ deliverLen n cp c) (G ^ W) A Z (1≤pow≤ R (deliverLen n cp c) 1≤R)))
+          (≤-trans (≤-reflexive (sym (*-assoc (R ^ K) (R ^ deliverLen n cp c) Y)))
           (≤-trans (≤-reflexive
-                      (cong (_* Y) (trans (*-comm (R ^ K) (R ^ pathLen c))
-                                          (sym (^-distribˡ-+-* R (pathLen c) K)))))
-                   (*-monoʳ-≤ (R ^ (pathLen c + K))
-          (≤-trans (nest-telescope (pathNestF c ^ W) (G ^ W) M
-                                   (W * (V + pathNestD c + Uc))
+                      (cong (_* Y) (trans (*-comm (R ^ K) (R ^ deliverLen n cp c))
+                                          (sym (^-distribˡ-+-* R (deliverLen n cp c) K)))))
+                   (*-monoʳ-≤ (R ^ (deliverLen n cp c + K))
+          (≤-trans (nest-telescope (deliverNestF n cp c ^ W) (G ^ W) M
+                                   (W * (V + deliverNestD n cp c + Uc))
                                    (length chains * (W * (V + C + Uₜ)))
-                                   (1≤pow≤ (pathNestF c) W (1≤pathNestF c)))
+                                   (1≤pow≤ (deliverNestF n cp c) W (1≤deliverNestF n cp c)))
                    (≤-trans (≤-reflexive
-                               (cong (_* (M + (W * (V + pathNestD c + Uc)
+                               (cong (_* (M + (W * (V + deliverNestD n cp c + Uc)
                                                + length chains * (W * (V + C + Uₜ)))))
-                                     (sym (pow-distrib-* W (pathNestF c) G))))
-                     (*-monoʳ-≤ ((pathNestF c * G) ^ W)
+                                     (sym (pow-distrib-* W (deliverNestF n cp c) G))))
+                     (*-monoʳ-≤ ((deliverNestF n cp c * G) ^ W)
                        (+-monoʳ-≤ M
                          (+-mono-≤ (*-monoʳ-≤ W
-                                     (+-mono-≤ (+-monoʳ-≤ V (m≤m⊔n (pathNestD c) C)) Uc≤U))
+                                     (+-mono-≤ (+-monoʳ-≤ V (m≤m⊔n (deliverNestD n cp c) C)) Uc≤U))
                                    (*-monoʳ-≤ (length chains)
                                      (*-monoʳ-≤ W
-                                       (+-mono-≤ (+-monoʳ-≤ V (m≤n⊔m (pathNestD c) C))
+                                       (+-mono-≤ (+-monoʳ-≤ V (m≤n⊔m (deliverNestD n cp c) C))
                                                  Uₜ≤U)))))))))))))
   where
   M   = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
   V   = nestDᵛ (arrTy a) (arrVal a)
-  C   = chainsNestD chains
-  Uz  = nestU (Caps.cSize cp) (nestUnit e sl)
-  G   = chainsNestF chains
+  C   = chainsDelNestD n cp chains
+  Uz  = nestU (delSq n cp) (nestUnit e sl)
+  G   = chainsDelNestF n cp chains
   R   = nestFac (Caps.cSize cp) W
   1≤R : 1 ≤ R
   1≤R = 1≤nestFac (Caps.cSize cp) W
-  K   = chainsLenSum chains
-  U   = suc (pathLen c + K) * Uz
+  K   = chainsDelLen n cp chains
+  U   = suc (deliverLen n cp c + K) * Uz
   Uₜ  = suc K * Uz
-  Uc  = suc (pathLen c) * Uz
+  Uc  = suc (deliverLen n cp c) * Uz
   Uₜ≤U : Uₜ ≤ U
-  Uₜ≤U = *-monoˡ-≤ Uz (s≤s (m≤n+m K (pathLen c)))
+  Uₜ≤U = *-monoˡ-≤ Uz (s≤s (m≤n+m K (deliverLen n cp c)))
   Uc≤U : Uc ≤ U
-  Uc≤U = *-monoˡ-≤ Uz (s≤s (m≤m+n (pathLen c) K))
-  A   = pathNestF c ^ W * (M + W * (V + pathNestD c + Uc))
+  Uc≤U = *-monoˡ-≤ Uz (s≤s (m≤m+n (deliverLen n cp c) K))
+  A   = deliverNestF n cp c ^ W * (M + W * (V + deliverNestD n cp c + Uc))
   Z   = length chains * (W * (V + C + Uₜ))
   Y   = G ^ W * (A + Z)
   st′ = record st { delivered = rid ∷ EvalSt.delivered st }
@@ -1707,36 +1706,60 @@ cascadeGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   length chains ≤ realWidAt e sl id →
   nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains ≤ nestUnit e sl →
-  chainsLenSum chains ≤ realWidAt e sl id * Caps.cSize (capsAt e sl id) →
+  chainsDelLen n (capsAt e sl id) chains
+    ≤ realWidAt e sl id * delSize n (capsAt e sl id) →
   nestFac (Caps.cSize (capsAt e sl id)) (nestBurstAt e sl id)
-      ^ chainsLenSum chains
-    * chainsNestF chains ^ nestBurstAt e sl id ≤ nestFacAt e sl id →
+      ^ chainsDelLen n (capsAt e sl id) chains
+    * chainsDelNestF n (capsAt e sl id) chains ^ nestBurstAt e sl id
+      ≤ nestFacAt e sl id →
   chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
   chainsCapsOK (capsAt e sl id) sl a nextId chains sched st →
   let r = cascadeGo a nextId chains sched st
   in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
        ≤ nestFacAt e sl id
          * (storeNestMax sched st + nestIncAt e sl id)
-cascadeGo-nest-nodes {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hls hfac hburst hcw =
+cascadeGo-nest-nodes {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hls hfac hburst hcw =
   ≤-trans (≤-trans (cascadeGo-nodes-chains (capsAt e sl id) (nestBurstAt e sl id) sl a nextId
-                      chains sched st hsl (1≤nestBurstAt e sl id) hburst hcw)
+                      chains sched st hsl (1≤nestBurstAt e sl id)
+                      (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)) hburst hcw)
                    (≤-reflexive
                      (sym (*-assoc (nestFac (Caps.cSize (capsAt e sl id))
                                             (nestBurstAt e sl id)
-                                     ^ chainsLenSum chains)
-                                   (chainsNestF chains ^ nestBurstAt e sl id) _))))
+                                     ^ chainsDelLen n (capsAt e sl id) chains)
+                                   (chainsDelNestF n (capsAt e sl id) chains
+                                     ^ nestBurstAt e sl id) _))))
     (*-mono-≤ hfac
       (+-mono-≤ nodes≤store
         (≤-trans (*-mono-≤ hcnt
                     (*-monoʳ-≤ (nestBurstAt e sl id)
-                      (≤-trans (+-monoˡ-≤ (suc (chainsLenSum chains) * UU)
-                                          (≤-trans hchg (nestU-base SS (nestUnit e sl))))
+                      (≤-trans (+-monoˡ-≤ (suc (chainsDelLen n (capsAt e sl id) chains) * UU)
+                                          depth≤)
                                (*-monoˡ-≤ UU (s≤s (s≤s hls))))))
                  (≤-reflexive (sym (nestIncAt-def e sl id))))))
   where
 
-  SS = Caps.cSize (capsAt e sl id)
+  SS = delSq n (capsAt e sl id)
   UU = nestU SS (nestUnit e sl)
+
+  -- the walk charges its depth in the delivery currency and the
+  -- selection bound is a path fact, so the fan allowance is what sits
+  -- between them -- and the unit is priced at the delivery square
+  -- precisely so it has room for one
+  depth≤ : nestDᵛ (arrTy a) (arrVal a) + chainsDelNestD n (capsAt e sl id) chains ≤ UU
+  depth≤ =
+    ≤-trans (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a))
+                       (chainsDelNestD-chains n (capsAt e sl id) chains))
+      (≤-trans (≤-reflexive (sym (+-assoc (nestDᵛ (arrTy a) (arrVal a))
+                                          (chainsNestD chains)
+                                          (fanSq n (capsAt e sl id)))))
+        (≤-trans (+-monoˡ-≤ (fanSq n (capsAt e sl id)) hchg)
+                 (nestU-room SS (nestUnit e sl) (fanSq n (capsAt e sl id))
+                             (≤-trans (s≤s z≤n) ≤-refl)
+                             (≤-trans (m≤n+m (fanSq n (capsAt e sl id))
+                                             (Caps.cSize (capsAt e sl id)
+                                                * Caps.cSize (capsAt e sl id)))
+                                      (delSq-cap n (capsAt e sl id)
+                                                 (1≤capsAt-reg e sl id))))))
 
   nodes≤store : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ storeNestMax sched st
   nodes≤store = ≤-trans (m≤n⊔m (NA ⊔ NB) NC) (m≤m⊔n ((NA ⊔ NB) ⊔ NC) ND)
@@ -1812,10 +1835,12 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   length chains ≤ realWidAt e sl id →
   nestDᵛ (arrTy a) (arrVal a) + chainsNestD chains ≤ nestUnit e sl →
-  chainsLenSum chains ≤ realWidAt e sl id * Caps.cSize (capsAt e sl id) →
+  chainsDelLen n (capsAt e sl id) chains
+    ≤ realWidAt e sl id * delSize n (capsAt e sl id) →
   nestFac (Caps.cSize (capsAt e sl id)) (nestBurstAt e sl id)
-      ^ chainsLenSum chains
-    * chainsNestF chains ^ nestBurstAt e sl id ≤ nestFacAt e sl id →
+      ^ chainsDelLen n (capsAt e sl id) chains
+    * chainsDelNestF n (capsAt e sl id) chains ^ nestBurstAt e sl id
+      ≤ nestFacAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
   chainsCapsOK (capsAt e sl id) sl a nextId chains sched st →
@@ -1823,7 +1848,7 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
          * (storeNestMax sched st + nestIncAt e sl id)
-cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hls hfac hsz hburst hcw =
+cascadeGo-nest {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hls hfac hsz hburst hcw =
   ⊔-lub (⊔-lub (⊔-lub SL LV) ND) RG
   where
   r   = cascadeGo a nextId chains sched st
@@ -1849,13 +1874,15 @@ cascadeGo-nest {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt 
   -- comes out of it.
   chF≤fac : chainsNestF chains ≤ nestFacAt e sl id
   chF≤fac =
-    ≤-trans (m≤m^burst e sl id (chainsNestF chains) (1≤chainsNestF chains))
-            (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ _)))
-                              (*-monoˡ-≤ _ (1≤pow≤ (nestFac (Caps.cSize (capsAt e sl id))
-                                                            (nestBurstAt e sl id))
-                                                   (chainsLenSum chains)
-                                                   (1≤nestFac _ _))))
-                     hfac)
+    ≤-trans (chainsNestF≤ n (capsAt e sl id) chains)
+      (≤-trans (m≤m^burst e sl id (chainsDelNestF n (capsAt e sl id) chains)
+                          (1≤chainsDelNestF n (capsAt e sl id) chains))
+               (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ _)))
+                                 (*-monoˡ-≤ _ (1≤pow≤ (nestFac (Caps.cSize (capsAt e sl id))
+                                                               (nestBurstAt e sl id))
+                                                      (chainsDelLen n (capsAt e sl id) chains)
+                                                      (1≤nestFac _ _))))
+                        hfac))
 
   LV : foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sd′) ≤ nestFacAt e sl id * RHS
   LV = cascadeGo-nest-live sl id a nextId chains sched st hsl hcaps hnest hval hsz chF≤fac
@@ -2011,29 +2038,6 @@ postulate
 -- IT IS STATED IN THE SIZE CURRENCY AND NOT THE FANOUT ONE, which is
 -- what keeps it provable: the exponential is peeled off by
 -- `chainsNestF≡` above the leaf, so nothing under here ever multiplies.
--- a path charges at most one cap per frame
-frameSzD≤ : ∀ {n} {Γ : Ctx n} {s u} (B : ℕ) (f : Frame Γ s u) →
-  frameSz? B f ≡ true → frameSzD f ≤ B
-frameSzD≤ B (map-f fn)          h = ≤ᵇ⇒≤ (sizeᵗ fn) B (T-to h)
-frameSzD≤ B (scan-f fn _)       h = ≤ᵇ⇒≤ (sizeᵗ fn) B (T-to h)
-frameSzD≤ B (take-f _)          h = z≤n
-frameSzD≤ B (from-inner _ _ _)  h = z≤n
-frameSzD≤ B (thru-outer _ _)    h = z≤n
-
-pathSzSum-len : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathSz? B p ≡ true → pathSzSum p ≤ pathLen p * B
-pathSzSum-len B root           h = z≤n
-pathSzSum-len B (share-sink i) h = z≤n
-pathSzSum-len B (f ↠ p)        h
-  with ∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
-... | hf , hr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hr
-... | _ , hp = +-mono-≤ (frameSzD≤ B f hf) (pathSzSum-len B p hp)
-
-pathSzSum-cap : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathSz? B p ≡ true → pathSzSum p ≤ B * B
-pathSzSum-cap B p h =
-  ≤-trans (pathSzSum-len B p h) (*-monoˡ-≤ B (pathSz?-len B p h))
-
 -- the selection inherits the registry's own size predicate, filter and
 -- retag alike
 chainsGo-sz : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (a : Arrival Γ)
@@ -2073,30 +2077,43 @@ arr-chains-len-sum : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
-  chainsLenSum (chainsOf a st) ≤ realWidAt e sl id * Caps.cSize (capsAt e sl id)
-arr-chains-len-sum {e = e} sl id a sched st hsl hcaps =
-  ≤-trans (chainsLenSum-bound B (chainsOf a st)
-             (chainsGo-sz B a (EvalSt.registry st) regsz))
-          (*-monoˡ-≤ B (chains-count-width sl id a sched st hcaps))
+  chainsDelLen n (capsAt e sl id) (chainsOf a st)
+    ≤ realWidAt e sl id * delSize n (capsAt e sl id)
+arr-chains-len-sum {n = n} {e = e} sl id a sched st hsl hcaps =
+  ≤-trans (chainsDelLen-chains n C (chainsOf a st))
+    (≤-trans (+-mono-≤ (≤-trans (chainsLenSum-bound B (chainsOf a st)
+                                   (chainsGo-sz B a (EvalSt.registry st) regsz))
+                                (*-monoˡ-≤ B wid))
+                       (*-monoˡ-≤ (fanLen n C) wid))
+             (≤-reflexive (trans (sym (*-distribˡ-+ (realWidAt e sl id) B (fanLen n C)))
+                                 (cong (realWidAt e sl id *_) (sym (delSize-def n C))))))
   where
-  B = Caps.cSize (capsAt e sl id)
+  C = capsAt e sl id
+  B = Caps.cSize C
+  wid = chains-count-width sl id a sched st hcaps
   regsz : regsSz? B (EvalSt.registry st) ≡ true
-  regsz = capsOK?-regs (capsAt e sl id) sched st hcaps
+  regsz = capsOK?-regs C sched st hcaps
 
 arr-chains-sz-sum : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
-  chainsSzSum (chainsOf a st)
-    ≤ realWidAt e sl id
-      * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-arr-chains-sz-sum {e = e} sl id a sched st hsl hcaps =
-  ≤-trans (chainsSzSum-bound B (chainsOf a st) (chainsGo-sz B a (EvalSt.registry st) regsz))
-          (*-monoˡ-≤ (B * B) (chains-count-width sl id a sched st hcaps))
+  chainsDelSzSum n (capsAt e sl id) (chainsOf a st)
+    ≤ realWidAt e sl id * delSq n (capsAt e sl id)
+arr-chains-sz-sum {n = n} {e = e} sl id a sched st hsl hcaps =
+  ≤-trans (chainsDelSzSum-chains n C (chainsOf a st))
+    (≤-trans (+-mono-≤ (≤-trans (chainsSzSum-bound B (chainsOf a st)
+                                   (chainsGo-sz B a (EvalSt.registry st) regsz))
+                                (*-monoˡ-≤ (B * B) wid))
+                       (*-monoˡ-≤ (fanSq n C) wid))
+    (≤-trans (≤-reflexive (sym (*-distribˡ-+ (realWidAt e sl id) (B * B) (fanSq n C))))
+             (*-monoʳ-≤ (realWidAt e sl id) (delSq-cap n C (1≤capsAt-reg e sl id)))))
   where
-  B = Caps.cSize (capsAt e sl id)
+  C = capsAt e sl id
+  B = Caps.cSize C
+  wid = chains-count-width sl id a sched st hcaps
   regsz : regsSz? B (EvalSt.registry st) ≡ true
-  regsz = capsOK?-regs (capsAt e sl id) sched st hcaps
+  regsz = capsOK?-regs C sched st hcaps
 
 -- AND THE SAME SELECTION AGAINST THE FANOUT CEILING, which is the half
 -- the additive reading got wrong.  A frame does not ADD its function's
@@ -2119,40 +2136,45 @@ arr-chains-nest-fac : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
   nestFac (Caps.cSize (capsAt e sl id)) (nestBurstAt e sl id)
-      ^ chainsLenSum (chainsOf a st)
-    * chainsNestF (chainsOf a st) ^ nestBurstAt e sl id ≤ nestFacAt e sl id
-arr-chains-nest-fac {e = e} sl id a sched st hsl hcaps hnest =
+      ^ chainsDelLen n (capsAt e sl id) (chainsOf a st)
+    * chainsDelNestF n (capsAt e sl id) (chainsOf a st) ^ nestBurstAt e sl id
+      ≤ nestFacAt e sl id
+arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
   ≤-trans (≤-reflexive
              (cong₂ _*_ (trans (cong (_^ L)
                                  (trans (nestFac-def B K)
                                    (trans (cong (_^ B) (^-*-assoc 2 B (suc K)))
                                           (^-*-assoc 2 (B * suc K) B))))
                                (^-*-assoc 2 (B * suc K * B) L))
-                        (trans (cong (_^ K) (chainsNestF≡ (chainsOf a st)))
+                        (trans (cong (_^ K) (chainsDelNestF≡ n C (chainsOf a st)))
                                (^-*-assoc 2 S K))))
     (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 (B * suc K * B * L) (S * K))))
       (≤-trans (^-monoʳ-≤ 2 expo)
                (≤-reflexive (sym (nestFacAt-def e sl id)))))
   where
-  B = Caps.cSize (capsAt e sl id)
+  C = capsAt e sl id
+  B = Caps.cSize C
   K = nestBurstAt e sl id
-  L = chainsLenSum (chainsOf a st)
-  S = chainsSzSum (chainsOf a st)
-  X = realWidAt e sl id * (B * B)
-  Xʹ = suc B * X
+  L = chainsDelLen n C (chainsOf a st)
+  S = chainsDelSzSum n C (chainsOf a st)
+  D = delSize n C
+  X = realWidAt e sl id * delSq n C
+  Xʹ = suc D * X
 
   X≤Xʹ : X ≤ Xʹ
-  X≤Xʹ = m≤m+n X (B * X)
+  X≤Xʹ = m≤m+n X (D * X)
 
   -- the length half lands on the fresh `suc`, the size half on the
   -- burst term the factor already had
   lenX : B * L ≤ X
   lenX =
-    ≤-trans (*-monoʳ-≤ B (arr-chains-len-sum sl id a sched st hsl hcaps))
+    ≤-trans (*-mono-≤ (delSize-cap n C)
+                      (arr-chains-len-sum sl id a sched st hsl hcaps))
             (≤-reflexive
-              (trans (sym (*-assoc B (realWidAt e sl id) B))
-                     (trans (cong (_* B) (*-comm B (realWidAt e sl id)))
-                            (*-assoc (realWidAt e sl id) B B))))
+              (trans (sym (*-assoc D (realWidAt e sl id) D))
+                     (trans (cong (_* D) (*-comm D (realWidAt e sl id)))
+                            (trans (*-assoc (realWidAt e sl id) D D)
+                                   (cong (realWidAt e sl id *_) (sym (delSq-def n C)))))))
 
   szX : S * K ≤ K * Xʹ
   szX = ≤-trans (≤-reflexive (*-comm S K))
@@ -2171,7 +2193,8 @@ arr-chains-nest-fac {e = e} sl id a sched st hsl hcaps hnest =
                      (trans (cong (_* (B * L)) (*-comm B (suc K)))
                             (*-assoc (suc K) B (B * L)))))
             (*-monoʳ-≤ (suc K)
-              (≤-trans (*-monoʳ-≤ B lenX) (*-monoˡ-≤ X (n≤1+n B))))
+              (≤-trans (*-monoʳ-≤ B lenX)
+                       (*-monoˡ-≤ X (≤-trans (delSize-cap n C) (n≤1+n D)))))
 
   sq : suc K + K ≤ suc K * suc K
   sq = +-monoʳ-≤ (suc K) (m≤m*n K (suc K))
