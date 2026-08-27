@@ -1649,12 +1649,29 @@ postulate
   --   level -- though no spendable rate crosses, the grant's exponent
   --   growing with the very spine the duplicator enlarges -- and a
   --   LIMITED merge under the stack, whose queue is the
-  --   `Probed.Wrap-Nest-Frame` region.  AND NOT COVERED BY ANY ROW
-  --   ABOVE: the arrival index this statement is now read at.  Every
-  --   row measures the assembled head, whose key is the wrap's own
-  --   `syncSizeᵉ`; what this leaf asserts is one level BELOW that, at
-  --   the body's, so the grant the rows were green against is strictly
-  --   the larger of the two and their verdict does not transfer.
+  --   `Probed.Wrap-Nest-Frame` region.  And not the arrival index this
+  --   leaf is read at, which `Probed.PushVals-Body-Key` takes.
+  -- PROBED: `Probed.PushVals-Body-Key` takes the index every receipt
+  --   above is one step short of.  Those rows measure the ASSEMBLED
+  --   head and key the grant at its `syncSizeᵉ`; what this leaf
+  --   asserts is one level below, at the BODY's, and `nestB` is
+  --   strictly increasing there -- so the earlier greens were against
+  --   a strictly larger grant and did not transfer.  The shrink is a
+  --   whole factor of `(2 ^ S) ^ suc W` and one `nestUnit` off the
+  --   base, at an `S` in the twenties.  Covered: the descent in the
+  --   leaf's own shape -- into the body, under the wrap's frame, from
+  --   the node the wrap installs -- at `W = 0`, both premises pinned
+  --   by `refl`, every burst pinned non-empty; the merge head over
+  --   two families to three and four levels, and the switch and
+  --   exhaust heads at the deepest level of the tower.  Twelve rows,
+  --   all inside the grant.  NOT covered, and it is the region this
+  --   receipt turns up rather than inherits: a duplication rate that
+  --   survives the frame.  The substituting family that doubles per
+  --   level at the root reads LINEAR here, because the frame
+  --   SUBSCRIBES what the body emits rather than handing it on, so
+  --   the layer the doubling rode in is consumed on the way out --
+  --   which is why no row from here can outrun a grant whose factor
+  --   is a power, and why the rate is the axis left.
   pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ) (b : Closed Γ (obs u))

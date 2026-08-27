@@ -184,9 +184,9 @@ does not fit is a finding about the shared statement, not about the head.
   caps conjunct by a full queue; both repairs are in, and the store halves are
   probed at the arm that parks.
 - **`pushVals-merge`, `-switch`, `-exhaust`** (Nest-Walk) — FALSITY,
-  `DEAD ROUTE×2, PROBED×5`: the outer's burst carries admissible values inside
-  the grant, emit by emit, with room at the node for each. The fit reads off it
-  again now the step is indexed; no row has reached the new arrival key.
+  `DEAD ROUTE×2, PROBED×6`: the outer's burst carries admissible values inside
+  the grant, emit by emit, with room at the node for each. The body key is now
+  taken; what is open is a duplication rate that survives the wrap's frame.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
