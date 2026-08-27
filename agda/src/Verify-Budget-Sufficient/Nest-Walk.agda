@@ -3161,6 +3161,63 @@ allFresh u mergeAllᵒ lim = mergeAll-st {t = u} lim 0 [] false
 allFresh _ switchᵒ   _   = switch-st nothing false
 allFresh _ exhaustᵒ  _   = exhaust-st false false
 
+-- and the four facts the wrap vocabulary carries across its ops: a
+-- fresh node passes the width check, the wrap's admissibility and
+-- closure premises narrow to the body's -- each wrap costs one `suc`
+-- in both measures -- and the body's descent under the installed frame
+-- is inside the wrap's
+allFresh-wid : ∀ {n} {Γ : Ctx n} (Wd : ℕ) (sl : Slots Γ)
+  (u : Ty) (op : AllOp) (lim : Maybe ℕ) →
+  nodeWidᴺ? Wd sl (allFresh u op lim) ≡ true
+allFresh-wid Wd sl u mergeAllᵒ lim = refl
+allFresh-wid Wd sl u switchᵒ   _   = refl
+allFresh-wid Wd sl u exhaustᵒ  _   = refl
+
+allWrap-valOK : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (op : AllOp) (lim : Maybe ℕ)
+  (b : Closed Γ (obs u)) →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestValOK? c (obs (obs u)) b ≡ true
+allWrap-valOK c mergeAllᵒ lim b hv =
+  ≤ᵇ-true (syncSizeᵉ b) (Caps.cSize c)
+    (≤-trans (n≤1+n (syncSizeᵉ b))
+             (≤ᵇ⇒≤ (suc (syncSizeᵉ b)) (Caps.cSize c) (T-to hv)))
+allWrap-valOK c switchᵒ   _   b hv =
+  ≤ᵇ-true (syncSizeᵉ b) (Caps.cSize c)
+    (≤-trans (n≤1+n (syncSizeᵉ b))
+             (≤ᵇ⇒≤ (suc (syncSizeᵉ b)) (Caps.cSize c) (T-to hv)))
+allWrap-valOK c exhaustᵒ  _   b hv =
+  ≤ᵇ-true (syncSizeᵉ b) (Caps.cSize c)
+    (≤-trans (n≤1+n (syncSizeᵉ b))
+             (≤ᵇ⇒≤ (suc (syncSizeᵉ b)) (Caps.cSize c) (T-to hv)))
+
+allWrap-closOK : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u)) →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  nestClosOK? c sl b ≡ true
+allWrap-closOK c sl mergeAllᵒ lim b hcl =
+  ≤ᵇ-true (closSizeᵉ (slotClos sl) b) (Caps.cSize c)
+    (≤-trans (n≤1+n (closSizeᵉ (slotClos sl) b))
+             (≤ᵇ⇒≤ (suc (closSizeᵉ (slotClos sl) b)) (Caps.cSize c) (T-to hcl)))
+allWrap-closOK c sl switchᵒ   _   b hcl =
+  ≤ᵇ-true (closSizeᵉ (slotClos sl) b) (Caps.cSize c)
+    (≤-trans (n≤1+n (closSizeᵉ (slotClos sl) b))
+             (≤ᵇ⇒≤ (suc (closSizeᵉ (slotClos sl) b)) (Caps.cSize c) (T-to hcl)))
+allWrap-closOK c sl exhaustᵒ  _   b hcl =
+  ≤ᵇ-true (closSizeᵉ (slotClos sl) b) (Caps.cSize c)
+    (≤-trans (n≤1+n (closSizeᵉ (slotClos sl) b))
+             (≤ᵇ⇒≤ (suc (closSizeᵉ (slotClos sl) b)) (Caps.cSize c) (T-to hcl)))
+
+allWrap-descW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  descW g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ) id now
+    (proj₂ (mintNode sched))
+    (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  ≤ descW g (allWrap op lim b) κ id now sched st
+allWrap-descW g mergeAllᵒ lim b κ id now sched st = descW-merge g lim b κ id now sched st
+allWrap-descW g switchᵒ   lim b κ id now sched st = descW-switch g b κ id now sched st
+allWrap-descW g exhaustᵒ  lim b κ id now sched st = descW-exhaust g b κ id now sched st
+
 postulate
   -- THE SLOT HEADS, where a subscription reads the telescope rather
   -- than descending.  A hot slot emits bookkeeping and no values; a
@@ -3240,21 +3297,28 @@ postulate
   -- at all.  The ROOM leaf is the per-value march through
   -- `thruConsume` at the wrap's node, and it is where the remaining
   -- risk of the caps half sits.
+  -- THE CAPS-PRESERVATION WALK, stated as the one family its clauses
+  -- will discharge: at ANY subscription, at ANY path, the slots
+  -- equation and the invariant come back from `subscribeE` on the
+  -- premises the caps half already carries.  Its body is the walk
+  -- over `subscribeE`'s clauses, mutual through the share connect the
+  -- way the arr-keyed trio is; the share legs are minted with the
+  -- body, per the leaf-only law, and the per-instant machinery every
+  -- clause will spend at its boundary -- `stepThru-caps` and the
+  -- proofs under it -- is already checked above.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-room` below.
-  pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
-    nestClosOK? c sl (allWrap op lim b) ≡ true →
-    descW g (allWrap op lim b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in (Sched.slots (proj₁ (proj₂ res)) ≡ sl)
-       × (nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+    Sched.slots sched ≡ sl →
+    nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) o ≡ true →
+    nestClosOK? c sl o ≡ true →
+    descW g o κ id now sched st ≤ W →
+    let r = subscribeE g o κ id now sched st in
+    (Sched.slots (proj₁ (proj₂ r)) ≡ sl)
+    × (nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
   -- The stream's own half: every instant's values admissible, written
   -- and under the telescope.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
@@ -3412,6 +3476,35 @@ postulate
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
     in pushValsNestOK c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+-- the exit pair is one instance of the walk, entered at the installed
+-- state through the wrap vocabulary's own bridges
+pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in (Sched.slots (proj₁ (proj₂ res)) ≡ sl)
+     × (nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+pushVals-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  subscribeE-caps-exit c sl W g b
+    (thru-outer op (proj₁ (mintNode sched)) ↠ κ) id now
+    (proj₂ (mintNode sched))
+    (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    hsl
+    (nestCapsOK?-setNode c (proj₁ (mintNode sched)) (allFresh u op lim)
+       (proj₂ (mintNode sched)) st
+       (allFresh-wid (Caps.cWid c) (Sched.slots (proj₂ (mintNode sched))) u op lim)
+       hc)
+    (allWrap-valOK c op lim b hv)
+    (allWrap-closOK c sl op lim b hcl)
+    (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)
+
 -- the state half assembled: exit pair in, checked chain out
 pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)

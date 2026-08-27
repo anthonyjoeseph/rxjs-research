@@ -191,11 +191,11 @@ does not fit is a finding about the shared statement, not about the head.
   the fold multiplies the depth per value while the key gains only the value's
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
-- **`pushVals-caps-exit`, `pushVals-caps-adm`, `pushVals-caps-room`**
-  (Nest-Walk) — DIFFICULTY, `PROBED×3`: the caps bundle split by conjunct — one
-  exit-state pair (the chain from it is a checked walk over the proven
-  per-instant step), stream admissibility with no state in its type, and the
-  room walk, where the remaining risk sits.
+- **`subscribeE-caps-exit`, `pushVals-caps-adm`, `pushVals-caps-room`**
+  (Nest-Walk) — DIFFICULTY, `PROBED×3`: the caps walk family, now stated over
+  any subscription — the old exit pair is one checked instance of it — plus
+  stream admissibility with no state in its type, and the room walk, where the
+  remaining risk sits.
 - **`thruStep-merge-inner-caps`, `thruStep-switch-inner-caps`,
   `thruStep-exhaust-inner-caps`** (Nest-Walk) — DIFFICULTY, `PROBED`: the caps
   bundle and the slots equation across the arm that subscribes, the measures
