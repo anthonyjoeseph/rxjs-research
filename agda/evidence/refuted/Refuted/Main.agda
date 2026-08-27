@@ -49,8 +49,8 @@ open import Refuted.Scan-Burst-Nest
   using (premises; burst≡14; delivered≡16383; charged≡12288;
          delivered₁₃≡8191; charged₁₃≡12288; subscribeE-nest-burst-absurd)
 open import Refuted.Scan-Arr-Nest
-  using (premises; burst≡14; keys≡; delivered≡; charged≡;
-         delivered₁₃≡; charged₁₃≡; subscribeE-nest-arr-scan-absurd)
+  using (premises; burst≡14; delivered≡; charged≡;
+         delivered₁₃≡; charged₁₃≡; closKeys≡; subscribeE-nest-arr-scan-absurd)
 open import Refuted.Thru-Scan-Burst-Nest
   using (charged≡8192; charged₁₃≡8192; stepFrame-nodes-thru-burst-absurd)
   renaming (premises to thruBurstPremises;

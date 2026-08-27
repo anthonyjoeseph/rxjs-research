@@ -67,3 +67,6 @@ open import Probed.Thru-Step-Indexed
          capsAfter≡; storeM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;
          residueFigures≡; resN1; resN2; resN3)
+
+open import Probed.Scan-Arr-Clos-Key
+  using (premises; keys≡; fit0; fit7; fit13; fit14)

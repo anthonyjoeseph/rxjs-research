@@ -1502,23 +1502,28 @@ postulate
     × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ D)
     × (∀ (j : NodeId) → nodeNestAt j (proj₂ (proj₂ r)) ≤ nodeNestAt j st ⊔ D)
 
-  -- THE SCAN HEAD, WHICH THE CLOSURE KEY DOES NOT CARRY.  A scan's step
-  -- is written once and applied once per value of the burst it is fed,
-  -- so a step that doubles its accumulator doubles the delivered depth
-  -- PER VALUE while the arrival's syntax stands still.  The closure key
-  -- expands a SUBSTITUTING slot and nothing else, and a cold script is
-  -- not an expression, so the arrival reads the same size at every
-  -- script length -- which is why the key that carried the shared-slot
-  -- head is silent here.
+  -- THE SCAN HEAD, WHICH IS WHERE THE BURST LENGTH IS REALLY BET.  A
+  -- scan's step is written once and applied once per value of the burst
+  -- it is fed, so a step that doubles its accumulator doubles the
+  -- delivered depth PER VALUE.  Nothing in the arrival's SYNTAX moves
+  -- when a cold script grows, so the key is carried entirely by the
+  -- closure measure charging a scripted slot its script.
   --
-  -- REFUTED: `Refuted.Scan-Arr-Nest`, 16383 delivered against a charge
-  --   of 6144, at a fourteen-value cold script; the row one value
-  --   shorter still holds, so it is a crossing and not a scale error,
-  --   and the same file pins the key IDENTICAL at zero values and at
-  --   fourteen.  What that leaves is the shape of the repair rather
-  --   than a doubt about it: the quantity that sees a script is the
-  --   slot measure the budget face already reads a script off, so the
-  --   key has to read a scripted slot at its script and not at one.
+  -- REFUTED: `Refuted.Scan-Arr-Nest` kills the reading that charges a
+  --   script nothing -- 16383 delivered against 6144, at a fourteen-value
+  --   cold script, the row one value shorter holding against the SAME
+  --   charge, so it is a crossing and not a scale error.  What the same
+  --   file pins beside it is the quantity that replaces it: twelve at no
+  --   values and forty at fourteen, a term in the delivered length
+  --   exactly where the demand has one.
+  -- PROBED: `Probed.Scan-Arr-Clos-Key` reads THIS form at that witness,
+  --   the fit holding at zero, seven, thirteen and fourteen values with
+  --   the key rising two per value against a delivery that doubles -- so
+  --   the grant doubles twice per value and the margin widens along the
+  --   axis that produced the refutation.  Not covered: a script of
+  --   OBSERVABLE values, which charges both sides and is not read here,
+  --   and the interaction with a substituting slot, the telescope there
+  --   being scripted throughout.
   subscribeE-nest-arr-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
     (c : Caps) (sl : Slots Γ) (B : ℕ) (g : Gas)
     (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s)

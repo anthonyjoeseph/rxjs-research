@@ -29,16 +29,27 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; cong; sym; trans; subst)
 
 open import Rx.Exp   using (Ctx; Closed; inputsBelowᵉ)
-open import Rx.Slots using (Slot; Slots; scripted; shared)
+open import Rx.Prim  using (hot; cold)
+open import Rx.Slots using (Slot; Slots; scripted; shared; inputSize)
 open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Clos-Eta-Cong using (clos-σ-congᵉ)
 
 
 -- ONE SLOT'S CONTRIBUTION, given an environment for the inputs its
--- definition may read.  A scripted slot delivers stored data and is
--- never descended into, so it costs the one symbol it already costs.
+-- definition may read.  A shared slot is descended into, so it costs
+-- its definition's closure; a scripted one is not, and costs its
+-- SCRIPT -- the same reading the budget face's slot measure takes.
+--
+-- AND THE SCRIPT ARM IS THE LOAD-BEARING ONE.  A step applied once per
+-- delivered value doubles the depth per value, so an arrival whose
+-- source is a cold script races a key built from syntax alone: the
+-- script is not an expression, so nothing in the arrival moves when it
+-- grows.  Charging the script is what puts a term in the delivered
+-- length on the key side, and it only ENLARGES the key, so it cannot
+-- cost any fit that already held.
+-- REFUTED: `Refuted.Scan-Arr-Nest`
 slotClosD : ∀ {n} {Γ : Ctx n} {k t} (σ : Fin n → ℕ) → Slot Γ k t → ℕ
-slotClosD σ (scripted _) = 1
+slotClosD σ (scripted i) = inputSize i
 slotClosD σ (shared d)   = suc (closSizeᵉ σ d)
 
 -- the stage-k environment: the true closure sizes below k, the bare
@@ -83,5 +94,6 @@ slotClos-fix sl i {d} {ok} eq =
 slotClos-pos : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n) →
   1 ≤ slotClos sl i
 slotClos-pos sl i with sl i
-... | scripted _ = s≤s z≤n
-... | shared d   = s≤s z≤n
+... | scripted (hot _)    = s≤s z≤n
+... | scripted (cold _ _) = s≤s z≤n
+... | shared d            = s≤s z≤n

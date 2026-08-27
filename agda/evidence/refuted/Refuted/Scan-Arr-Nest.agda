@@ -19,12 +19,13 @@
 -- script doubles the delivered depth per value.  The script is charged
 -- to neither the exponent nor the base.
 --
--- WHAT DIES AND WHAT DOES NOT.  A longer key does not repair it and
--- neither does a larger `B`: both sides are read at the SAME program,
--- and only the script grows.  What the rows leave open is the shape of
--- the repair, which has to be a term in a width the SLOTS bound --
--- the same conclusion the burst face reached at this witness, arriving
--- now at the face that was supposed to be immune to it.
+-- WHAT DIES AND WHAT DOES NOT.  A larger `B` does not repair it and
+-- neither does a wider cap: both sides are read at the SAME program,
+-- and only the script grows.  What repairs it is the key READING the
+-- script, which is the last two rows here: the written size is the
+-- same number at zero values and at fourteen, and the measure that
+-- charges a scripted slot its script is not.  So this file pins a form
+-- as dead and the quantity that replaces it as live, at one witness.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Scan-Arr-Nest where
 
@@ -84,12 +85,14 @@ gas = gasPad 400 g0
 cap : Caps
 cap = caps (syncSizeᵉ prog) 4000 4000
 
+-- THE KEY IS WRITTEN OUT rather than read off the measure, because
+-- what is refuted is the READING and the measure has since moved.
 row : ℕ → ℕ × ℕ
 row k =
   let sl = slots k
       r  = subscribeE gas prog root 0 0 (sched-init prog sl) (st-init prog)
   in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ r)))
-   , arrD (nestUnit prog sl) (nestDᵉ prog) (closSizeᵉ (slotClos sl) prog)
+   , arrD (nestUnit prog sl) (nestDᵉ prog) (syncSizeᵉ prog)
 
 -- THE PREMISES, PINNED RATHER THAN ASSUMED.  `B` is `nestDᵉ prog`
 -- exactly, so the depth premise holds by construction; the two that
@@ -104,13 +107,6 @@ burst≡14 : length (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)}
                        (sched-init prog (slots 14)) (st-init prog))))) ≡ 14
 burst≡14 = refl
 
--- AND THE KEY DOES NOT MOVE WITH IT, which is the whole finding: the
--- closure of a scripted slot is one, so the arrival reads the same
--- size at every script length.
-keys≡ : closSizeᵉ (slotClos (slots 0)) prog
-      ≡ closSizeᵉ (slotClos (slots 14)) prog
-keys≡ = refl
-
 delivered≡ : proj₁ (row 14) ≡ 16383
 delivered≡ = refl
 
@@ -119,8 +115,9 @@ charged≡ = refl
 
 -- AND THE ROW BELOW IT STILL HOLDS, which is what makes this a crossing
 -- and not a scale error: at thirteen values the descent delivers 8191
--- against the same charge.  The budget is the SAME number in both rows,
--- because the script is charged to neither side of it.
+-- against the same charge.  That the charge is the SAME NUMBER in both
+-- rows is the finding itself -- the written key cannot see a script, so
+-- the whole right-hand side stands still while the left doubles.
 delivered₁₃≡ : proj₁ (row 13) ≡ 8191
 delivered₁₃≡ = refl
 
@@ -129,3 +126,14 @@ charged₁₃≡ = refl
 
 subscribeE-nest-arr-scan-absurd : proj₁ (row 14) ≤ proj₂ (row 14) → ⊥
 subscribeE-nest-arr-scan-absurd h = ≤⇒≤ᵇ h
+
+-- AND THE MEASURE THAT CHARGES THE SCRIPT DOES MOVE, which is why the
+-- repair is that measure and not a constant: twelve at no values and
+-- forty at fourteen, so the grant gains a term in the delivered length
+-- exactly where the demand does.
+closKeys : ℕ × ℕ
+closKeys = closSizeᵉ (slotClos (slots 0)) prog
+         , closSizeᵉ (slotClos (slots 14)) prog
+
+closKeys≡ : closKeys ≡ (12 , 40)
+closKeys≡ = refl
