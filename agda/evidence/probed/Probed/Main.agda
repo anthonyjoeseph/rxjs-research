@@ -66,4 +66,5 @@ open import Probed.Thru-Fit-Frame
          figB≡; fitB1; fitB2; fitB3;
          figC≡; fitC1; fitC2; fitC3;
          figD≡; fitD1; fitD2; fitD3;
-         figE≡; fitE1; fitE2; fitE3; premC1; premC3; premK1; premK3)
+         figE≡; fitE1; fitE2; fitE3; premC1; premC3; premK1; premK3;
+         premK2-3; figF≡; fitF1; fitF2; fitF3; figG≡; fitG1; fitG2; fitG3)

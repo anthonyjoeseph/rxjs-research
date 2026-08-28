@@ -1073,6 +1073,12 @@ real, a leg falls back on the risk classes and may name a single row; that is a 
 `make roadmap-check` holds each tier to exactly three legs, and each leg to a prose budget
 several times a row's, since a group has no header to send its reasoning to.
 
+**AND THE THREE DO NOT COVER THE TIER (Anthony).** They are the NEXT three legs, not a
+partition of what is left — covering the ledger is the ROWS' job and they already do it.
+What comes after the third leg is left unnamed deliberately: it will be re-grouped by
+whatever the first three turn up, so naming it now writes a schedule that ages before
+anyone reads it. A leg enumerating every remaining row has stopped being a plan.
+
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs saying
 because every instinct — and every subagent's default — runs the other way. Anthony, in
 the session that set this rule: *"the relentless mindset of reducing those numbers is very

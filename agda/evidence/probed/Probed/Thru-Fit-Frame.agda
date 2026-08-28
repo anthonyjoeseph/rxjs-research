@@ -6,10 +6,12 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: thruFit-frame @76ff10
+-- TARGET: thruConsume-fit @779fee
 --
--- WHAT IS BEING TESTED.  The grant in `thruFit-frame` is
---   nestFac (cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
+-- WHAT IS BEING TESTED.  The grant in `thruConsume-fit` is
+--   nestFac (cSize c) W * (M + W)
+-- and the frame spends it at M = nodesMax st ⊔ nestDᵛˢ vals, which is
+-- the M every row here takes,
 -- while the `nestB-at` bound the machinery elsewhere spends carries
 -- `+ nestU S U` instead, where `nestU S U = (suc S) * U` and
 -- `U = nestUnit e sl`.  For small W and large cSize S, the gap
@@ -328,3 +330,80 @@ fitE2 = refl
 fitE3 : (nodeNestAt 9 (proj₂ (proj₂ (proj₂ (rcX 1))))
           ≤ᵇ nodeNestAt 9 stX ⊔ G (Caps.cSize (capF 1)) 1 (BM 1)) ≡ true
 fitE3 = refl
+
+-- ── the ITERATED region: a list, not a singleton ─────────────────
+
+-- Every row above consumes ONE value, and the grant is computed from
+-- the state that value arrives at.  `thruFitOK` walks a LIST and
+-- re-uses the SAME `G` at every step, so the second consume is read
+-- at the state the first LEFT while the grant is still frozen at the
+-- first's.  That is the one axis here that moves the measure side
+-- without moving the bound side, and it is what these rows take.
+
+-- the chained states: consume, then consume again at the exit
+ch1M : ℕ → _
+ch1M k = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr k)
+           (proj₁ (proj₂ (proj₂ (rcM k)))) (proj₂ (proj₂ (proj₂ (rcM k))))
+
+ch2M : ℕ → _
+ch2M k = thruConsume gasBig mergeAllᵒ 7 κ 0 0 (arr k)
+           (proj₁ (proj₂ (proj₂ (ch1M k)))) (proj₂ (proj₂ (proj₂ (ch1M k))))
+
+-- the grant's base term at the list, NOT at the last value
+BM2 : ℕ → ℕ
+BM2 k = nodesMax stM ⊔ nestDᵛˢ (arr k ∷ arr k ∷ [])
+
+BM4 : ℕ → ℕ
+BM4 k = nodesMax stM ⊔ nestDᵛˢ (arr k ∷ arr k ∷ arr k ∷ arr k ∷ [])
+
+premK2-3 : all (nestClosOK? (capF 3) slots) (arr 3 ∷ arr 3 ∷ []) ≡ true
+premK2-3 = refl
+
+-- ROW F: W = 2, two copies of arr 3, mergeAll.  LOAD-BEARING on the
+-- second step's conjunct (1): `figF` reads the SECOND consume's
+-- delivery, taken at the state the first left, against a grant whose
+-- base term `BM2 3` was read before either ran.  It fails if a
+-- consume delivers more when the state under it has already been
+-- raised -- which is the shape the single-value rows cannot see.
+figF : ℕ × ℕ × ℕ
+figF = nestDᵛˢ (proj₁ (ch1M 3))
+     , nodesMax (proj₂ (proj₂ (proj₂ (ch1M 3))))
+     , nodeNestAt 7 (proj₂ (proj₂ (proj₂ (ch1M 3))))
+
+fitF1 : (nestDᵛˢ (proj₁ (ch1M 3))
+          ≤ᵇ G (Caps.cSize (capF 3)) 2 (BM2 3)) ≡ true
+fitF1 = refl
+
+fitF2 : (nodesMax (proj₂ (proj₂ (proj₂ (ch1M 3))))
+          ≤ᵇ nodesMax stM ⊔ G (Caps.cSize (capF 3)) 2 (BM2 3)) ≡ true
+fitF2 = refl
+
+fitF3 : (nodeNestAt 7 (proj₂ (proj₂ (proj₂ (ch1M 3))))
+          ≤ᵇ nodeNestAt 7 stM ⊔ G (Caps.cSize (capF 3)) 2 (BM2 3)) ≡ true
+fitF3 = refl
+
+-- ROW G: the third consume in the same chain, W = 4.  Same axis one
+-- step further out, so a drift that only shows after two raisings is
+-- reached too.
+figG : ℕ × ℕ × ℕ
+figG = nestDᵛˢ (proj₁ (ch2M 3))
+     , nodesMax (proj₂ (proj₂ (proj₂ (ch2M 3))))
+     , nodeNestAt 7 (proj₂ (proj₂ (proj₂ (ch2M 3))))
+
+fitG1 : (nestDᵛˢ (proj₁ (ch2M 3))
+          ≤ᵇ G (Caps.cSize (capF 3)) 4 (BM4 3)) ≡ true
+fitG1 = refl
+
+fitG2 : (nodesMax (proj₂ (proj₂ (proj₂ (ch2M 3))))
+          ≤ᵇ nodesMax stM ⊔ G (Caps.cSize (capF 3)) 4 (BM4 3)) ≡ true
+fitG2 = refl
+
+fitG3 : (nodeNestAt 7 (proj₂ (proj₂ (proj₂ (ch2M 3))))
+          ≤ᵇ nodeNestAt 7 stM ⊔ G (Caps.cSize (capF 3)) 4 (BM4 3)) ≡ true
+fitG3 = refl
+
+figF≡ : figF ≡ (6 , 0 , 0)
+figF≡ = refl
+
+figG≡ : figG ≡ (6 , 0 , 0)
+figG≡ = refl

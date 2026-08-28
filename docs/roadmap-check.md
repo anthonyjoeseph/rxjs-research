@@ -50,6 +50,10 @@ consume it, one shelf of mechanical obligations — and legs are ranked riskiest
 without being bound to the class order as tightly as rows are. Where a grouping is not
 real, a leg falls back on the classes and may name one row.
 
+The legs do NOT partition the tier. They are the next three units of work; coverage of
+the ledger is the rows' job, and check 2 already enforces it. What lies past the third
+leg is left unnamed on purpose — it gets re-grouped by whatever the first three find.
+
 The count is fixed rather than bounded because both failures are real. Fewer than three
 is a tier planning one leg ahead, which is what reading down the ledger already does.
 More than three is a backlog, and the rows already are the backlog — a roadmap that

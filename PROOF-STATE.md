@@ -55,6 +55,11 @@ LEDGER of one-line hooks; everything else lives in the code.
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
   where it is not; a leg naming a single row is still a leg.
+  **THE THREE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT
+  three, not a partition of the remaining work — the coverage rule is the
+  LEDGER's job, and the rows already discharge it. Work beyond the third leg is
+  left unnamed on purpose: it will be re-grouped by what the first three find,
+  so naming it now writes a plan that ages before it is read.
   **Pick up the top LEG, not the top row.** Reading straight down the ledger
   works exactly one postulate at a time, and the expensive part of this
   campaign is never the clause — it is discovering, after the clause is ground,
@@ -198,7 +203,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the `thru` frame's fit, and the burst underneath it** — `thruFit-frame`,
+- **the `thru` frame's fit, and the burst underneath it** — `thruConsume-fit`,
   `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-room`,
   `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit
   because they are one currency argument seen from four places: the wrap's
@@ -212,20 +217,20 @@ does not fit is a finding about the shared statement, not about the head.
   shared grant shrinks with the term and its store half is a join, so a head
   that does not fit is a finding about the statement — which makes them cheap
   together and misleading apart.
-- **the caps face's width and store shelf** — `arr-chains-nest-syn`,
-  `arr-chains-bursts`, `arr-chains-caps`, `cascadeGo-nest-regs`,
-  `cascade-nest-store`, `chainStep-nest-live`, `burst-nest-live`,
-  `burst-nest-nodes`, `burst-nest-regs`, `depth-nest-compositional`,
-  `nest-height`, `init-nestOK?`, `subscribeE-Ψ`. Mechanical in bulk once the
-  two legs above pin the currency: one loaded context, many similar
-  obligations, which is the repetition shape delegation is for.
+- **the selection's width shelf** — `arr-chains-nest-syn`, `arr-chains-caps`,
+  `arr-chains-bursts`, `cascadeGo-nest-regs`, `cascade-nest-store`. One walk
+  under one width cap, read at five places: the paths, the caps they spend, the
+  bursts, the registry, and the descent that is a corollary of the others. Once
+  the two legs above pin the currency this is one loaded context and many
+  similar obligations, which is the repetition shape delegation is for. What
+  comes after it is deliberately not named here.
 
 ### The ledger
 
-- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, PROBED`:
-  the outer wrap's fit, now under the caps face's own standing premise — the
-  unconditional form is refuted at a shared slot, by a cap the top never
-  instantiates. Nothing has instantiated the conditioned form's risky region.
+- **`thruConsume-fit`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, PROBED`:
+  ONE consume's fit under the caps face's own standing premise; the walk over
+  it is a checked body. Refuted unconditionally at a shared slot, by a cap the
+  top never instantiates, and the conditioned form's region is unreached.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

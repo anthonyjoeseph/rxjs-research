@@ -1110,20 +1110,95 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 --   grant -- raising it moves the program and not the bound.  What
 --   would refute is a step delivering more nesting than its arrival
 --   carried by more than the `+ W`, which this family never does.
+--   The same module now also takes the ITERATED axis, which is the
+--   one the walk above creates and no single-arrival row can see: the
+--   grant is read off the ENTRY state while each consume runs at the
+--   state the previous one left, so a delivery that compounded across
+--   the chain would break a frozen grant.  Three consumes deep, the
+--   delivery reads six at every step and the nodes side stays at zero
+--   -- so the chain does not compound here and the axis is closed for
+--   this family.  Conjuncts two and three stay DEGENERATE on those
+--   rows for that same reason; conjunct one is load-bearing and flat.
 
 postulate
-  thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  thruConsume-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (W : ℕ) (sl : Slots Γ)
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (p : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+    (p : Path Γ u t) (M : ℕ)
+    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
-    all (valCaps? c sl (obs u)) vals ≡ true →
+    1 ≤ W → capsOK? c sched st ≡ true →
+    valCaps? c sl (obs u) o ≡ true →
     slotsSize sl ≤ Caps.cSize c →
-    all (nestClosOK? c sl) vals ≡ true →
-    thruFitOK (nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W))
-      sf op nid p id now vals sched st
+    nestClosOK? c sl o ≡ true →
+    nodesMax st ≤ M →
+    let rc = thruConsume sf op nid p id now o sched st
+        sched′ = proj₁ (proj₂ (proj₂ rc))
+        st′ = proj₂ (proj₂ (proj₂ rc))
+    in (nestDᵛˢ (proj₁ rc) ≤ nestFac (Caps.cSize c) W * (M + W))
+     × (nodesMax st′ ≤ M)
+     × ((j : NodeId) → nodeNestAt j st′
+          ≤ nodeNestAt j st ⊔ (nestFac (Caps.cSize c) W * (M + W)))
+     × (Sched.slots sched′ ≡ sl)
+     × (capsOK? c sched′ st′ ≡ true)
+
+-- The walk is that leaf chained, and the STATE BOUND is what makes
+-- the chain close: `thruFitOK` re-uses ONE grant at every step while
+-- each consume runs at the state the previous one left, so a grant
+-- read off the entry state cannot be re-derived at the tail.  Taking
+-- `M` as a parameter the leaf PRESERVES -- rather than raising to the
+-- grant, which is all the fit itself asks -- is what lets the same
+-- grant serve the whole list.
+thruFit-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (W : ℕ) (sl : Slots Γ)
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t) (M : ℕ)
+  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  1 ≤ W → capsOK? c sched st ≡ true →
+  all (valCaps? c sl (obs u)) vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  all (nestClosOK? c sl) vals ≡ true →
+  nodesMax st ≤ M →
+  thruFitOK (nestFac (Caps.cSize c) W * (M + W)) sf op nid p id now vals sched st
+thruFit-walk c W sl sf id now op nid p M [] sched st
+  hsl h1w hcap hval hss hclos hM = tt
+thruFit-walk {u = u} c W sl sf id now op nid p M (o ∷ os) sched st
+  hsl h1w hcap hval hss hclos hM =
+  proj₁ L
+  , ≤-trans (proj₁ (proj₂ L)) (≤-trans (raiseN (Caps.cSize c) W M W)
+                                       (m≤n⊔m _ _))
+  , proj₁ (proj₂ (proj₂ L))
+  , thruFit-walk c W sl sf id now op nid p M os
+      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
+      (proj₁ (proj₂ (proj₂ (proj₂ L))))
+      h1w (proj₂ (proj₂ (proj₂ (proj₂ L))))
+      (proj₂ (∧-true _ _ hval)) hss (proj₂ (∧-true _ _ hclos))
+      (proj₁ (proj₂ L))
+  where
+  rc = thruConsume sf op nid p id now o sched st
+  L = thruConsume-fit c W sl sf id now op nid p M o sched st
+        hsl h1w hcap (proj₁ (∧-true _ _ hval)) hss
+        (proj₁ (∧-true _ _ hclos)) hM
+
+-- and the frame's own grant is that walk at the entry state's bound
+thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (W : ℕ) (sl : Slots Γ)
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+  all (valCaps? c sl (obs u)) vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  all (nestClosOK? c sl) vals ≡ true →
+  thruFitOK (nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W))
+    sf op nid p id now vals sched st
+thruFit-frame c W sl sf id now op nid p vals sched st
+  hsl h1w hlv hcap hval hss hclos =
+  thruFit-walk c W sl sf id now op nid p
+    (nodesMax st ⊔ nestDᵛˢ vals) vals sched st
+    hsl h1w hcap hval hss hclos (m≤m⊔n _ _)
 
 -- The head itself is now the walk and the wrap composed at that
 -- grant, with the base term absorbed by positivity of the factor.
