@@ -6,7 +6,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: thruFit-frame @010e63
+-- TARGET: thruFit-frame @76ff10
 --
 -- WHAT IS BEING TESTED.  The grant in `thruFit-frame` is
 --   nestFac (cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
@@ -49,6 +49,7 @@ module Probed.Thru-Fit-Frame where
 
 open import Data.Bool using (true; false)
 open import Data.List using ([]; _∷_)
+open import Data.Bool.ListAction using (all)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_)
@@ -71,7 +72,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; nodesMax; nodeNestAt)
+  using (nestDᵛˢ; nodesMax; nodeNestAt; nestClosOK?)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 -- ── harness setup (shared with Probed.Thru-Step-Indexed) ─────────
@@ -192,8 +193,14 @@ premX1 = refl
 premC1 : slotsSize slots ≤ Caps.cSize (capF 1)
 premC1 = ≤ᵇ⇒≤ _ _ tt
 
+premK1 : all (nestClosOK? (capF 1) slots) (arr 1 ∷ []) ≡ true
+premK1 = refl
+
 premC3 : slotsSize slots ≤ Caps.cSize (capF 3)
 premC3 = ≤ᵇ⇒≤ _ _ tt
+
+premK3 : all (nestClosOK? (capF 3) slots) (arr 3 ∷ []) ≡ true
+premK3 = refl
 
 -- ── combined figure pins (delivery LHS for all three conjuncts) ──
 

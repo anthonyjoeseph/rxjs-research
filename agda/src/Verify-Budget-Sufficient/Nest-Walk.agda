@@ -1028,15 +1028,19 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 -- Both re-enter the subscribe machinery and both were charged as though
 -- they forwarded, so one repair covers two arms.
 --
--- AND THE PREMISE THAT CLOSES IT TIES THE CAP TO THE TELESCOPE RATHER
--- THAN TO THE ARRIVAL, which is the one the caps face has carried all
--- along.  A telescope of depth `d` costs `d` units of written size, so
--- the cap dominates `d` and the grant's tower dominates the `2 ^ d` a
--- doubling definition can deliver.  Keying on the arrival's resolved
--- closure would also close it, and is what the arr-keyed twin does;
--- this is the weaker premise, it is uniform over the frames rather
--- than one predicate per frame, and at the top it is a proven
--- consequence of `capsAt`'s own size.
+-- AND IT TAKES TWO PREMISES, WHICH ARE INDEPENDENT AND EACH
+-- LOAD-BEARING FOR A DIFFERENT READER.  Tying the cap to the
+-- TELESCOPE is what makes the arithmetic work: a telescope of depth
+-- `d` costs `d` units of written size, so the cap dominates `d` and
+-- the grant's tower dominates the `2 ^ d` a doubling definition can
+-- deliver; and at the top it is a proven consequence of `capsAt`'s own
+-- size, which is what lets a consumer discharge it.  Keying on the
+-- ARRIVAL's resolved closure is what the route to a proof needs: this
+-- module's proven statement about consuming one subscribed value takes
+-- that key, as do the arr-keyed twin and the drain, and the size
+-- premise cannot supply it -- the resolved closure is multiplicative
+-- in the telescope's depth where the written sum is flat, so neither
+-- premise implies the other.
 --
 -- AND THE DOUBLING SLOT FAMILY CANNOT BE SWEPT AGAINST THE CONDITIONED
 -- FORM AT ALL, which is a coverage boundary and not evidence for the
@@ -1117,6 +1121,7 @@ postulate
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     all (valCaps? c sl (obs u)) vals ≡ true →
     slotsSize sl ≤ Caps.cSize c →
+    all (nestClosOK? c sl) vals ≡ true →
     thruFitOK (nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W))
       sf op nid p id now vals sched st
 
@@ -1131,12 +1136,13 @@ stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
   all (valCaps? c sl (obs u)) vals ≡ true →
   slotsSize sl ≤ Caps.cSize c →
+  all (nestClosOK? c sl) vals ≡ true →
   let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
   length (proj₁ r) ≤ W →
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
     ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
 stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
-  hsl h1w hlv hcap hval hclos hlr =
+  hsl h1w hlv hcap hval hss hclos hlr =
   ⊔-lub
     (≤-trans (proj₁ (proj₂ WRAP))
       (≤-trans (proj₁ (proj₂ WALK))
@@ -1150,7 +1156,7 @@ stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
   w = thruWalk sf op nid p id now vals sched st
   WALK = thruWalk-nest G sf op nid p id now vals sched st
            (thruFit-frame c W sl sf id now op nid p vals sched st
-              hsl h1w hlv hcap hval hclos)
+              hsl h1w hlv hcap hval hss hclos)
   WRAP = thruWrap-nest op nid fin (proj₁ w) (proj₁ (proj₂ w))
            (proj₁ (proj₂ (proj₂ w))) (proj₂ (proj₂ (proj₂ w)))
 
@@ -3701,6 +3707,19 @@ postulate
   -- are `0 ≤ _` at every program -- `nodeNest` is zero by definition
   -- on both fresh states -- so at those arms only the burst half is
   -- ever evidence about this statement.
+  -- AND IT IS THE ONE ARBITRARY-CAP STATEMENT OF THIS TIER STILL
+  -- KEYED ON WRITTEN SIZE.  A census of the tier's open rows puts
+  -- every other one out of reach of that defect: most instantiate the
+  -- concrete cap, so nothing is quantified that a witness could set
+  -- small; several name no cap at all; and the remaining arrival-side
+  -- statements are instances of the shared arr-keyed relation, which
+  -- takes the resolved-closure key already.  This head does not, and
+  -- its conclusion keys the grant at the source's `syncSizeᵉ` -- the
+  -- WRITTEN size, which a slot reference pins at one however large the
+  -- definition behind it.  That is the same mechanism the outer wrap's
+  -- fit was refuted by, so the witness family transfers unchanged and
+  -- this is the row to point it at next.
+  --
   -- DEAD ROUTE: closing the fit with a `pushBurst` LEAF over the whole
   --   frame -- the takeᵉ-shaped body -- is STRUCTURALLY DEAD at every
   --   choice of leaf, because the grant's per-key-unit ratio cannot pay
@@ -5015,6 +5034,29 @@ frameDrainOK {Γ = Γ} {u = u} c sl sf id now (from-inner op allNid inst) p sche
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     capsDrainOK c sl sf allNid p id now lim (pred act) q sched st
 
+-- WHAT A SUBSCRIBING FRAME HAS TO BE HANDED, AND IT IS NOT WHAT THE
+-- ARRIVAL'S SYNTAX SAYS.  A `thru-outer` subscribes each value it takes,
+-- so what it delivers is a run of that value's DEFINITION, and an
+-- arrival may name its definition instead of carrying it.  The size
+-- premise beside this one bounds the telescope and cannot bound this:
+-- a definition naming a slot twice pays for it twice, so the resolved
+-- closure is multiplicative in the telescope's depth where the written
+-- sum is flat.  The two are independent, and this is the one the
+-- module's own proven consumer of a subscription takes.
+--
+-- IT IS A PER-FRAME PREDICATE BECAUSE THE OBLIGATION IS.  Four of the
+-- five frames forward what they are given and owe nothing here, and
+-- their arms discharge it by `tt`; only the one that re-enters the
+-- subscribe machinery with an arrival in hand can be surprised by what
+-- the arrival names.
+frameClosOK : ∀ {n} {Γ : Ctx n} {s u}
+  (c : Caps) (sl : Slots Γ) (f : Frame Γ s u) (vals : List (Val Γ s)) → Set
+frameClosOK c sl (map-f _)          vals = ⊤
+frameClosOK c sl (scan-f _ _)       vals = ⊤
+frameClosOK c sl (take-f _)         vals = ⊤
+frameClosOK c sl (from-inner _ _ _) vals = ⊤
+frameClosOK c sl (thru-outer _ _)   vals = all (nestClosOK? c sl) vals ≡ true
+
 -- AND THE DRAIN'S WIDTH, CARRIED THE SAME WAY AND AT THE SAME ONE
 -- FRAME.  It is a second predicate rather than a conjunct of the one
 -- above because the two say different things about the same queue --
@@ -5095,6 +5137,7 @@ abstract
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     all (valCaps? c sl s) vals ≡ true →
     slotsSize sl ≤ Caps.cSize c →
+    frameClosOK c sl f vals →
     frameDrainOK c sl sf id now f p sched st →
     frameDrainW W sf id now f p sched st →
     let r = stepFrame sf id now f p vals fin sched st in
@@ -5103,7 +5146,7 @@ abstract
       ≤ nestFac (Caps.cSize c) W
         * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
            + nestU (Caps.cSize c) (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
@@ -5117,21 +5160,21 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
     ≤-trans (stepFrame-nodes-inner c sl W sf id now op allNid inst p vals fin sched st
                hsl (capsOK?⇒nest c sched st hc) hfd hfw)
             (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
               (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl)) (zero-charge W _)))
-  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
     ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
-               hsl 1≤W hlen hc hv hfc hw)
+               hsl 1≤W hlen hc hv hss hfc hw)
             (≤-trans (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
               (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
                        (one-pow W (_ + W * 1))))
@@ -5263,6 +5306,7 @@ mutual
     (capsOK? c sched st ≡ true)
     × (all (valCaps? c sl u) vals ≡ true)
     × (slotsSize sl ≤ Caps.cSize c)
+    × frameClosOK c sl f vals
     × frameDrainOK c sl sf id now f p sched st
     × capsWalkOK c sl sf gas id now p (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
@@ -5621,7 +5665,7 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (share-sink i) vals evs fin s
 foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W 1≤S hb hc =
   ≤-trans (foldPath-nodes c W sl sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
              (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-             1≤W 1≤S (proj₂ (proj₂ hb)) (proj₂ (proj₂ (proj₂ (proj₂ hc)))))
+             1≤W 1≤S (proj₂ (proj₂ hb)) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc))))))
     (≤-trans (*-monoʳ-≤ (Q ^ deliverLen gas c p)
                 (*-monoʳ-≤ (deliverNestF gas c p ^ W)
                   (+-monoˡ-≤ (W * (deliverNestD gas c p + L * U))
@@ -5629,6 +5673,7 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
                                (stepFrame-nodes c W sl sf id now f p vals fin sched st
                                   hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc))
                                   (proj₁ (proj₂ (proj₂ hc))) (proj₁ (proj₂ (proj₂ (proj₂ hc))))
+                                  (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))
                                   (burstsDrain W sf gas id now f p vals fin sched st hb)
                                   (burstsHead W sf gas id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb))))
                                (*-monoʳ-≤ Q (+-monoʳ-≤ A unit≤))))))

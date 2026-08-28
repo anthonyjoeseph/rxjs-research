@@ -2,8 +2,8 @@
 
 **What this file is.** The ordered worklist for the one goal: discharging
 `agda/src/Verify-Batch-Simultaneous/The-Proof.agda` — no postulates, everything
-typechecks. This file holds the ORDER and a one-line hook per item; everything
-else lives in the code.
+typechecks. This file holds the SCHEDULE — each tier's next three legs — over a
+LEDGER of one-line hooks; everything else lives in the code.
 
 **Hygiene — the rules this file lives by:**
 
@@ -47,6 +47,24 @@ else lives in the code.
   timing figures (those live in typecheck-performance-numbers.md alone).
   A position silently re-aims when the thing it indexes is edited; a name
   greps or it errors.
+- **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
+  IT IS DRAWN FROM (Anthony).** Every tier opens with a
+  `### Big picture tier roadmap` naming EXACTLY THREE legs — the next three
+  units of work, ranked riskiest-first — and then a `### The ledger` carrying
+  the rows. A leg is a GROUP: several postulates sharing a currency, a
+  statement together with the sites that consume it, one shelf of mechanical
+  rows. Group where the grouping is real and fall back on the risk classes
+  where it is not; a leg naming a single row is still a leg.
+  **Pick up the top LEG, not the top row.** Reading straight down the ledger
+  works exactly one postulate at a time, and the expensive part of this
+  campaign is never the clause — it is discovering, after the clause is ground,
+  that the statement's neighbours had to move with it.
+  **`make roadmap-check` ENFORCES THE COUNT AND A PROSE BUDGET PER LEG.** Three,
+  unless the tier has fewer than three live postulates to plan over — fewer is a
+  tier planning one leg ahead, more is a backlog, and the rows already are the
+  backlog. The budget is several times a row's, because a leg carries its own
+  reasoning and a group has no header to send research to; past it, the leg has
+  stopped saying why this group is next and started proving it.
 - **EVERY TIER IS SORTED RISKIEST-FIRST, AND THE SORT IS AN INVARIANT —
   NOT A ONE-TIME TIDY.** Within a tier, rows appear
   in risk-class order: FALSITY, then SHAPE, then VACUITY, then DIFFICULTY,
@@ -54,9 +72,9 @@ else lives in the code.
   row** — a class raised or lowered, a postulate added, discharged, split, or
   renamed. A split is the easy one to miss: it can put a SHAPE child in a
   parent's GRINDABLE slot.
-  **Why it is an invariant and not cosmetics:** this file's order is the only
-  thing that says what to work on, so a stale sort silently re-aims the next
-  session — and it re-aims it toward the SAFE end, because grinding is what
+  **Why it is an invariant and not cosmetics:** the ledger's order is what the
+  roadmap above it is drawn FROM, so a stale sort silently re-aims the next leg
+  — and it re-aims it toward the SAFE end, because grinding is what
   looks like progress. A riskiest row buried below four safer ones goes
   untouched for exactly one reason: the list said it was ninth.
   **`make roadmap-check` ENFORCES THIS — it is part of `make gate`.** It fails
@@ -120,7 +138,7 @@ else lives in the code.
 lowest-numbered tier below finishes first, strictly, and an emptied tier is
 DELETED rather than renumbered, so the numbers are names and not positions;
 classes worst-first are FALSITY, SHAPE, VACUITY, DIFFICULTY, GRINDABLE. This
-file only ASSIGNS them. Read that section
+file only ASSIGNS them, and schedules them into legs. Read that section
 before re-classifying anything: what counts as evidence for lowering a class, the
 convergence test for whether a spawned FALSITY is progress, and why GRINDABLE is
 the delegation boundary, all live there. A GRINDABLE row must name its worked
@@ -177,6 +195,32 @@ half is a join; why it is shaped that way is in its own header. A head that
 does not fit is a finding about the shared statement, not about the head.
 
 
+
+### Big picture tier roadmap
+
+- **the `thru` frame's fit, and the burst underneath it** — `thruFit-frame`,
+  `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-room`,
+  `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit
+  because they are one currency argument seen from four places: the wrap's
+  grant, the burst inside it, the admissibility per instant, and the arr key
+  that the cap-keyed route does not transport to. The tier's only FALSITY is
+  here, and its neighbours all key on written size, so a restatement of the fit
+  moves every one of them. Grinding any of the others first bets on the key.
+- **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
+  `subscribeE-nest-slot`, `evalWith-nest-sync`. The preamble already says these
+  are one statement and not one per head; the leg is that fact scheduled. The
+  shared grant shrinks with the term and its store half is a join, so a head
+  that does not fit is a finding about the statement — which makes them cheap
+  together and misleading apart.
+- **the caps face's width and store shelf** — `arr-chains-nest-syn`,
+  `arr-chains-bursts`, `arr-chains-caps`, `cascadeGo-nest-regs`,
+  `cascade-nest-store`, `chainStep-nest-live`, `burst-nest-live`,
+  `burst-nest-nodes`, `burst-nest-regs`, `depth-nest-compositional`,
+  `nest-height`, `init-nestOK?`, `subscribeE-Ψ`. Mechanical in bulk once the
+  two legs above pin the currency: one loaded context, many similar
+  obligations, which is the repetition shape delegation is for.
+
+### The ledger
 
 - **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, PROBED`:
   the outer wrap's fit, now under the caps face's own standing premise — the
@@ -275,6 +319,29 @@ statement owes, and why it would inherit no evidence from the probe that is the
 predicate's only consumer, is recorded on `Part4.root-mergeAllCache`.
 
 In rough order for when the tier opens — statement repairs first, then grinds:
+
+### Big picture tier roadmap
+
+- **the FoldOut readoff** — `mid-readoff`, `foldPath-frame-out`,
+  `foldPath-share-out`, `mid-fold-certs`, `dispatchShare-wf`,
+  `root-entry-sunk`. FoldOut is a six-field record validated at exactly one
+  clause, and every row here is a readoff from it, so the risk is the record
+  and not the arms. Instantiate it before any arm is ground: if the record is
+  wrong, all six are.
+- **the push family** — `map-nodry-push`, `scan-nodry-push`, `take-nodry-push`,
+  `mergeAll-nodry-push`, `mergeAll-valsLast-push`, `map-valsLast-push`,
+  `scan-valsLast-push`. The whole family stands on nothing at any operator,
+  which is why it is one leg. Start at the map row: every ingredient is already
+  PROVEN and the route is complete, so it is an ASSEMBLY, and assembling it
+  tests the shape the other six will be written to.
+- **the `subscribeE` arms, and the invariants they may not disturb** —
+  `subscribeSharedSlot-wf`, `subscribeE-defer-wf`, `input-hot-spent-wf`,
+  `input-cold-async-wf`, `subscribeE-dying`, the `HotLive` preservation leaves,
+  `sched-next-hot-live`. Grouped because they share one mutual block and one
+  question — what a subscribe touches — and the blocked slot arm cannot close
+  outside it anyway.
+
+### The ledger
 
 - **`root-entry-sunk`** (Part4) — FALSITY, `NO EVIDENCE`: the per-entry residue
   of `root-done-plumbed`. Its load-bearing region was NOT reached by probe, so
@@ -383,6 +450,25 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 
 The second ledger: claims Main asserts beside the main theorem, off its
 critical path.
+
+### Big picture tier roadmap
+
+- **the twelve top-line claims** — `id-inheritance`, `batch-online`, the
+  `readme-*` family. Nothing has ever instantiated them and they are stated
+  over defined machinery, so they are probeable today. A refutation of a
+  `readme-*` claim is SPEC-level: surface it, do not patch it.
+- **the abstractions, and the claims that quantify over them** — `locality`,
+  `non-interference`, `timing-invariance`, `causality`, `μ-guarded`,
+  `defer-shift`, over `Node`, `NodeSt`, `Inbox`, `inboxOf`, `stAt`, `cascade`,
+  `δ`, `Retiming`, `retime`, `truncateIn`, `emittedBefore`. One leg because
+  de-risking any claim means DEFINING the abstraction under it, which is claim
+  authoring and needs Anthony. Nothing here is grindable and no precedent can
+  make it so.
+- **the evaluator laws** — `μ-unfold`, `fuel-coherent`. The only rows in this
+  tier carrying a receipt; last because a spent battery already instantiated
+  both at every canonical program without refuting either.
+
+### The ledger
 
 - **`id-inheritance`, `batch-online`, `readme-*`** — FALSITY, `NO EVIDENCE`:
   the twelve top-line claims nothing has ever instantiated. A refutation of a

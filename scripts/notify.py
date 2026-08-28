@@ -78,7 +78,7 @@ def census(live):
     tiers = cr.parse(ROOT / "PROOF-STATE.md")
     cen = cr.census(ROOT, live)
     out = []
-    for name, rows, _pre in tiers:
+    for name, rows, _pre, _legs in tiers:
         counts = {}
         evid = {}
         for label, cls, _ln, _cost in rows:

@@ -1,12 +1,12 @@
-# fixture — a GRINDABLE row whose postulate names no proven twin: must FAIL
+# fixture — a sorted roadmap whose leg COUNT is right and whose first leg has
+# stopped saying why the group is next and started proving it.
 
 ## Tier 0 — anchor
 
 ### Big picture tier roadmap
 
-- **the anchor group** — the worst-class row and the two statements that share
-  its currency; one unit of work because a restatement of any of them moves the
-  other two.
+- **the anchor group** — the worst-class row and the two statements that
+  share its currency. The unconditional form is refuted at a shared slot by a cap the top never instantiates, so the conditioned form is the one stated, and the premise it takes is the caps face's own rather than a fresh one minted for this site. The flat slot measure is not the closure key: a four-slot doubling telescope reads twenty-seven against ninety-eight, because closure is multiplicative through a slot chain while the flat sum is a sum, so neither premise subsumes the other and both are carried. The grant absorbs the doubling under the size premise, since a telescope of depth d costs d units of written size and the factor is exponential in the cap. What could still break it is a delivery that grows without the telescope's written size growing with it, and no sweep over the doubling family can produce one, because both sides move and at different orders. 
 - **the mechanical shelf** — every row whose shape is already known, ground in
   one pass off a single loaded context.
 - **the parked remainder** — what is left once the two legs above land, kept
@@ -39,11 +39,10 @@
   naming both.
 - **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY, `PROBED`: a leading-dash
   suffix after a sibling in the same row counts as naming `suf-nodry-nestRec`.
-- **`f-grindable`** — GRINDABLE, `NO EVIDENCE`: mechanical because the PROVEN
-  twin `a-proven-citation` did the same thing at the same indices. A name CITED
-  in a hook is not a name the row claims, so the staleness check must NOT fire
-  on it — earning GRINDABLE requires naming a precedent, and a precedent is
-  proven.
+- **`f-grindable`** — GRINDABLE, `TWIN`: mechanical because the PROVEN twin
+  `a-proven-citation` did the same thing at the same indices. A name CITED in a
+  hook is not a name the row claims, so the staleness check must NOT fire on it
+  — earning GRINDABLE requires naming a precedent, and a precedent is proven.
 - **the `glob-*` family** — GRINDABLE, `TWIN×2`: a glob covers the family it
   names.
 - **`g-unclassified`** — carried, not counted.

@@ -581,6 +581,30 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: a within-budget row was reported over budget"; fail=1; }; \
 	  echo "$$out" | grep -q "OVER BUDGET" \
 	    && { echo "SELFTEST FAIL: the length check fired on the sort fixture"; fail=1; }; \
+	  lgc=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-count.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-count.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a tier planning TWO legs where it has rows for three PASSED — the leg count is dead"; fail=1; \
+	  fi; \
+	  echo "$$lgc" | grep -q "^  Tier 0  legs-count.md  names 2 leg(s), wants 3" \
+	    || { echo "SELFTEST FAIL: the short-count tier was not NAMED with its found and wanted counts"; fail=1; }; \
+	  echo "$$lgc" | grep -q "^  Tier 1  legs-count.md  names" \
+	    && { echo "SELFTEST FAIL: a correctly-planned tier was reported — the count is not being read per tier"; fail=1; }; \
+	  echo "$$lgc" | grep -q "OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: a budget check fired on legs-count.md, so it does not isolate the COUNT"; fail=1; }; \
+	  lgf=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-fat.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/legs-fat.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a leg carrying its own proof PASSED — the leg budget is dead"; fail=1; \
+	  fi; \
+	  echo "$$lgf" | grep -q "ROADMAP LEGS OVER BUDGET" \
+	    || { echo "SELFTEST FAIL: the over-budget leg was not reported"; fail=1; }; \
+	  echo "$$lgf" | grep -q "ROWS OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: the ROW budget fired on legs-fat.md, so it does not prove a leg is charged on its own budget"; fail=1; }; \
+	  echo "$$lgf" | grep -q "BIG PICTURE TIER ROADMAP" \
+	    && { echo "SELFTEST FAIL: the leg COUNT fired on legs-fat.md, so it does not isolate the budget"; fail=1; }; \
+	  echo "$$out" | grep -q "BIG PICTURE TIER ROADMAP" \
+	    && { echo "SELFTEST FAIL: the leg count fired on the sort fixture"; fail=1; }; \
+	  echo "$$out" | grep -q "ROADMAP LEGS OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: the leg budget fired on the sort fixture"; fail=1; }; \
 	  pre=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/fatpre.md 2>&1); \
 	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/fatpre.md > /dev/null 2>&1; then \
 	    echo "SELFTEST FAIL: a tier whose PREAMBLE holds a leaked header PASSED — the preamble budget is dead"; fail=1; \

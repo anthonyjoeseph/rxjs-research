@@ -125,7 +125,7 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `imports-selftest` | the import checker still fires, in both directions | [docs/imports-check.md](docs/imports-check.md) |
 | `imports-check` | **NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE (Anthony: "no unused imports, either")** — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. AND no `using` clause may ask a module of this tree for a name that module does not have — a definition MOVES, one consumer's clause is repaired and its sibling's is not, and Agda reports that only as a scope warning `-W error` promotes MANY MINUTES down the tower, one instance per build, naming the importer and not the name's new home. What makes the cheap check sound is the `public` ban directly above: with no re-exports, a module can only export what its own text mentions. AND every file DECLARES its own module name, matching its path: a missing header is not a syntax error, so Agda checks such a file as a target and then crashes every IMPORTER with an internal error naming neither end — and a dev check cannot see it, because it checks a generated copy carrying its own header. Every part of this buys LEGIBILITY, not time: `using` filters scope rather than the build, a re-export removes no edge since a ladder's name-level dependencies are genuine, and a clause with one live name holds its edge open however many dead names sit beside it — which is why the name-level half was once argued to be optional, and is the wrong measure. A list naming thirty things the file never touches is not a record of what the file depends on | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
-| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of exactly three legs, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-selftest` | every comment check still fires, and four precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
 | `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date, a historical marker or a LINE NUMBER — in any of `Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`; a block's evidence sits LAST and in order; no marker is DOUBLED into the comment text (`-- -- RECOVERY:`), which is a marker every checker here reads as prose while a human reads it as a marker; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; no explanation names the subject of a section the same block already carries, which is redundancy that DRIFTS rather than merely repeats; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
 | the tower (inline in `gate-heavy`, no target of its own) | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
@@ -214,8 +214,9 @@ these is a stop. A finding gets written down and the work continues past it; a l
 finishes gets merged and the next one starts. **A STOP IS A FINDING, NOT A REST**, which
 is the same law the postulate-assembly section states about bodies, arriving at the
 session's own scheduling. Work the tier order from its lowest open tier upward, end to
-end, and when a row is genuinely blocked take the next one rather than stopping on it —
-a blocked row is a row to report and route around, not a stop condition.
+end, taking that tier's BIG PICTURE ROADMAP leg by leg, and when a leg is genuinely
+blocked take the next one rather than stopping on it — a blocked leg is a leg to report
+and route around, not a stop condition.
 
 **AND THE ORDER INSIDE A TURN IS ACT FIRST, REPORT SECOND (Anthony).** The stop
 conditions are the three above, and none of them is "a good report is ready". But a
@@ -817,14 +818,13 @@ updated per commit) and then spent two full context windows on ONE DIFFICULTY ro
 producing a complete proof plan and no code. Same session, same rules, same repo — the
 class of the row predicted the outcome.
 
-**RISK-REDUCTION PRIORITY OUTRANKS PARALLELISM: WHILE A TIER HAS ANY OPEN ROW OF A WORSE
-CLASS, DO NOT FAN WORKERS OUT ACROSS ITS GRINDABLE ROWS — WORK THE WORST-CLASS ROW
-(Anthony, twice — the second time intercepting the spawn mid-turn: "Don't! Do the hard
-stuff first").** This is the ordering law of de-risk mode applied to *scheduling*, so it
-is stated over the class ORDER and not over any one class: whatever sits highest in the
-worst-first ordering is the row that gets worked, and the design session takes it itself.
-The rule above says *who* a row goes to once picked up; this says *which row is picked up
-at all*.
+**RISK-REDUCTION PRIORITY OUTRANKS PARALLELISM: WHILE A TIER'S ROADMAP HAS AN OPEN LEG
+ABOVE THE GRINDABLE ONES, DO NOT FAN WORKERS OUT ACROSS ITS MECHANICAL ROWS — WORK THE
+TOP LEG (Anthony, twice — the second time intercepting the spawn mid-turn: "Don't! Do the
+hard stuff first").** This is the ordering law of de-risk mode applied to *scheduling*, so
+it is stated over the ORDER and not over any one class: whatever sits highest in the
+tier's roadmap is what gets worked, and the design session takes it itself. The rule above
+says *who* work goes to once picked up; this says *what is picked up at all*.
 
 The fan-out looks like leverage and buys proof-progress optics while the row that could
 still move the ground stays open — and the per-worker context cost is paid again if a
@@ -1060,6 +1060,18 @@ postulates those are, and why each is ranked where it is, lives in PROOF-STATE.m
 file never names them.** The tier structure exists because priority that lives only in
 prose gets spent on whatever is nearest — measured once at five days of discharges that
 all went to non-anchor rows while the anchor sat untouched.
+
+**AND WITHIN THE TIER, THE BIG PICTURE ROADMAP IS THE THING FOLLOWED — NOT THE NEXT ROW
+DOWN (Anthony).** Every tier there opens with its next three LEGS, ranked riskiest-first,
+each a GROUP of postulates aggregated across the whole ledger: statements sharing a
+currency, a claim and the sites that consume it, one shelf of mechanical work. Take the
+top leg and work it end to end. The rows are the ledger the legs are drawn from, and
+reading straight down them proves one postulate at a time — which is the wrong unit,
+because the expensive discovery in this campaign is never the clause but the neighbours a
+restatement drags with it, and a row cannot show you those. Where the grouping is not
+real, a leg falls back on the risk classes and may name a single row; that is a leg too.
+`make roadmap-check` holds each tier to exactly three legs, and each leg to a prose budget
+several times a row's, since a group has no header to send its reasoning to.
 
 **A RISING POSTULATE COUNT IS THE MECHANISM WORKING, NOT A REGRESSION.** This needs saying
 because every instinct — and every subagent's default — runs the other way. Anthony, in

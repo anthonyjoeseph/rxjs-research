@@ -1,4 +1,6 @@
-# fixture — a GRINDABLE row whose postulate names no proven twin: must FAIL
+# fixture — a sorted roadmap whose rows are fine and whose SCHEDULE is not:
+# the first tier plans two legs where it has the rows to plan three, which is
+# a tier planning one leg ahead and calling it a roadmap.
 
 ## Tier 0 — anchor
 
@@ -9,8 +11,6 @@
   other two.
 - **the mechanical shelf** — every row whose shape is already known, ground in
   one pass off a single loaded context.
-- **the parked remainder** — what is left once the two legs above land, kept
-  here so the tier's plan is complete rather than open-ended.
 
 ### The ledger
 
@@ -39,11 +39,10 @@
   naming both.
 - **`suf-nodry-loop` / `-nestRec`** — DIFFICULTY, `PROBED`: a leading-dash
   suffix after a sibling in the same row counts as naming `suf-nodry-nestRec`.
-- **`f-grindable`** — GRINDABLE, `NO EVIDENCE`: mechanical because the PROVEN
-  twin `a-proven-citation` did the same thing at the same indices. A name CITED
-  in a hook is not a name the row claims, so the staleness check must NOT fire
-  on it — earning GRINDABLE requires naming a precedent, and a precedent is
-  proven.
+- **`f-grindable`** — GRINDABLE, `TWIN`: mechanical because the PROVEN twin
+  `a-proven-citation` did the same thing at the same indices. A name CITED in a
+  hook is not a name the row claims, so the staleness check must NOT fire on it
+  — earning GRINDABLE requires naming a precedent, and a precedent is proven.
 - **the `glob-*` family** — GRINDABLE, `TWIN×2`: a glob covers the family it
   names.
 - **`g-unclassified`** — carried, not counted.

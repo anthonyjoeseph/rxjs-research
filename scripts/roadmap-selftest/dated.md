@@ -7,6 +7,18 @@ row-scoped check.  This line is the negative control for that: `2026` and
 
 ## Tier 0
 
+### Big picture tier roadmap
+
+- **the anchor group** — the worst-class row and the two statements that share
+  its currency; one unit of work because a restatement of any of them moves the
+  other two.
+- **the mechanical shelf** — every row whose shape is already known, ground in
+  one pass off a single loaded context.
+- **the parked remainder** — what is left once the two legs above land, kept
+  here so the tier's plan is complete rather than open-ended.
+
+### The ledger
+
 - **`plain-row`** — GRINDABLE: names no date, so it must not be reported.
 - **`attributed-row`** — GRINDABLE: carries a ruling's attribution
   (Anthony, 2026-08-20), which is the shape the check exists to catch.

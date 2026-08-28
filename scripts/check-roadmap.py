@@ -214,6 +214,31 @@ ROW_BUDGET = 280
 # the GAP is what makes a budget safe, not the margin.
 TIER_BUDGET = 900
 
+# THE TIER'S BIG-PICTURE ROADMAP — the section that says what to work on.
+# Rows are the LEDGER, sorted by class so nothing hides; the roadmap is the
+# SCHEDULE, and the two answer different questions.  A ledger sorted
+# riskiest-first names the next row but not the next PIECE OF WORK: risk is a
+# property of one statement, while the work is usually a GROUP of them that
+# stand or fall together, and taking the top row over and over walks the group
+# in an order nobody chose.  So a tier carries exactly three legs, ranked
+# riskiest-first, each free to cut across the classes where a group is the
+# better unit and to fall back on the classes where it is not.
+#
+# EXACTLY THREE, and the bound is what makes it a plan rather than a wish
+# list: three is short enough that writing a fourth forces a judgement about
+# which of the three it displaces.  The one exemption is arithmetic — a tier
+# with fewer than three live postulates cannot name three legs, so it names
+# one per postulate.
+ROADMAP_RE = re.compile(r"^###\s+Big picture tier roadmap\s*$")
+SUBHEAD_RE = re.compile(r"^###\s+\S")
+LEGS_WANTED = 3
+
+# Prose per LEG, names free.  Deliberately far above ROW_BUDGET: a row says
+# WHERE the risk lives and defers the story to a header, while a leg has to
+# carry its own reasoning -- which postulates it groups and why they are one
+# piece of work -- and there is no header for a group.
+LEG_BUDGET = 700
+
 BACKTICK_SPAN_RE = re.compile(r"`[^`]*`")
 
 # Any ISO-ish or spelled date.  The roadmap has no legitimate use for one.
@@ -253,7 +278,11 @@ def prose_cost(chunks):
 
 
 def parse(path):
-    """-> [(tier_name, [(row_label, class_or_None, line_no, prose_cost)], pre)]
+    """-> [(tier_name, [(row_label, class_or_None, line_no, prose_cost)], pre, legs)]
+
+    `legs` is [(label, line_no, prose_cost)] for the tier's BIG PICTURE
+    ROADMAP -- the bullets under that heading, which are legs and not rows and
+    so are held to their own budget and their own count.
 
     `pre` is (first_lineno, prose_cost) for the tier's PREAMBLE — every line in
     the section that is not row text.  It is collected HERE, rather than by a
@@ -267,6 +296,8 @@ def parse(path):
     rows = None
     pre = None  # [lineno_or_None, [text chunks]]
     row = None  # (lineno, [text chunks])
+    legs = None      # [(lineno, [text chunks])] for the roadmap subsection
+    in_roadmap = False
 
     def flush_pre():
         if pre is not None and pre[1]:
@@ -279,6 +310,9 @@ def parse(path):
             text = " ".join(chunks)
             ml = LABEL_RE.search(text)
             label = ml.group(1) if ml else text.strip()[:60]
+            if in_roadmap:
+                legs.append((label, lineno, prose_cost(chunks)))
+                return
             m = CLASS_RE.search(text)
             rows.append((label, m.group(1) if m else None, lineno,
                          prose_cost(chunks)))
@@ -288,14 +322,26 @@ def parse(path):
         if mt:
             flush_row()
             if cur is not None:
-                tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre())
+                tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs)
             row = None
+            in_roadmap = False
             cur = mt.group(1)
             rows = []
+            legs = []
             pre = [None, []]
-            tiers.append((cur, rows, (None, 0)))
+            tiers.append((cur, rows, (None, 0), legs))
             continue
         if cur is None:
+            continue
+        if SUBHEAD_RE.match(line):
+            # a subheading OPENS a subsection and is not preamble.  Bullets
+            # under the roadmap heading are LEGS; bullets under any other
+            # subheading -- and under none -- are ROWS, so the ledger closes the
+            # roadmap by starting, and the roadmap may sit at the top of the
+            # tier where a schedule belongs.
+            flush_row()
+            row = None
+            in_roadmap = bool(ROADMAP_RE.match(line))
             continue
         if ROW_START_RE.match(line):
             flush_row()
@@ -318,7 +364,7 @@ def parse(path):
             pre[1].append(line)
     flush_row()
     if cur is not None:
-        tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre())
+        tiers[-1] = (tiers[-1][0], tiers[-1][1], flush_pre(), legs)
     return tiers
 
 
@@ -463,7 +509,7 @@ def check_stale(tiers, live, srcnames):
     not owed).  `gone_parents` is the descriptive-head case.
     """
     discharged, vanished, gone_parents = [], [], []
-    for tier, rows, _pre in tiers:
+    for tier, rows, _pre, _legs in tiers:
         for label, _cls, lineno, _cost in rows:
             if not BACKTICK_RE.search(label):
                 continue
@@ -680,7 +726,7 @@ def check_evidence(path, tiers, cen):
     """-> ([(tier,label,lineno,have,want)], [(tier,label,lineno)]) — mismatched, missing."""
     lines = path.read_text().splitlines()
     bad, missing = [], []
-    for tier, rows, _pre in tiers:
+    for tier, rows, _pre, _legs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls is None:
                 continue
@@ -708,7 +754,7 @@ def unearned_grindable(path, tiers, cen):
     walked route rather than a believed one.
     """
     out = []
-    for tier, rows, _pre in tiers:
+    for tier, rows, _pre, _legs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls == "GRINDABLE" and "TWIN" not in row_evidence(label, cen):
                 out.append((tier, label, lineno))
@@ -726,7 +772,7 @@ def unevidenced_difficulty(path, tiers, cen):
     stays legal on the three classes that claim nothing.
     """
     out = []
-    for tier, rows, _pre in tiers:
+    for tier, rows, _pre, _legs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls == "DIFFICULTY" and not row_evidence(label, cen):
                 out.append((tier, label, lineno))
@@ -740,7 +786,7 @@ def fix_evidence(path, tiers, cen):
     # BOTTOM-UP, because a rewrap changes how many lines a row occupies and
     # every row below it would shift under a top-down pass.
     spans = []
-    for _tier, rows, _pre in tiers:
+    for _tier, rows, _pre, _legs in tiers:
         for label, cls, lineno, _cost in rows:
             if cls is not None:
                 spans.append((lineno, label))
@@ -806,9 +852,19 @@ def main():
     unclassified = []
     overlong = []
     fat_tiers = []
-    for tier, rows, (pre_line, pre_cost) in tiers:
+    bad_legs = []      # (tier, found, wanted) — the count is wrong
+    fat_legs = []      # (tier, label, lineno, cost) — one leg over budget
+    for tier, rows, (pre_line, pre_cost), legs in tiers:
         if pre_cost > TIER_BUDGET:
             fat_tiers.append((tier, pre_line, pre_cost))
+        # THE COUNT.  Three, unless the tier has fewer postulates than that to
+        # plan over -- in which case naming three would mean inventing work.
+        want = min(LEGS_WANTED, len(rows))
+        if len(legs) != want:
+            bad_legs.append((tier, len(legs), want))
+        for leg_label, leg_line, leg_cost in legs:
+            if leg_cost > LEG_BUDGET:
+                fat_legs.append((tier, leg_label, leg_line, leg_cost))
         worst = -1  # highest class index seen so far
         worst_label = None
         for label, cls, lineno, cost in rows:
@@ -823,7 +879,7 @@ def main():
             else:
                 worst, worst_label = idx, label
 
-    for tier, rows, _pre in tiers:
+    for tier, rows, _pre, _legs in tiers:
         shown = [f"{c or '-'}" for _, c, _, _ in rows]
         print(f"  Tier {tier}: {' → '.join(shown) if shown else '(no rows)'}")
 
@@ -959,6 +1015,36 @@ def main():
         print("the line here. Git history is the archive.")
         failures.append(None)
 
+    if bad_legs:
+        print(f"\nBIG PICTURE TIER ROADMAP — {len(bad_legs)} tier(s) do not name "
+              f"the right number of legs:")
+        for tier, found, want in bad_legs:
+            print(f"  Tier {tier}  {path.name}  names {found} leg(s), wants {want}")
+        print("\nThe roadmap is the SCHEDULE and the rows are the LEDGER. A tier's")
+        print("next three legs are what the session actually works, grouped across")
+        print("the whole ledger rather than read off the top of it — so the count is")
+        print("fixed at three, and drops below three only when the tier has fewer")
+        print("live postulates than that to plan over. Fewer than three is a tier")
+        print("planning one leg ahead; more is a backlog, and a backlog is what the")
+        print("rows already are. Write each leg as  - **<name>** — <reasoning>  under")
+        print("a  ### Big picture tier roadmap  heading, riskiest leg first.")
+        failures.append(None)
+
+    if fat_legs:
+        print(f"\nROADMAP LEGS OVER BUDGET — {len(fat_legs)} leg(s) spend more "
+              f"than {LEG_BUDGET} prose characters:")
+        for tier, label, lineno, cost in fat_legs:
+            print(f"  Tier {tier}  {path.name}:{lineno}  {cost} chars "
+                  f"(+{cost - LEG_BUDGET})  {label}")
+        print("\nA leg carries its own reasoning, which is why its budget is several")
+        print("times a row's: there is no postulate header to send the research to,")
+        print("because the subject is a GROUP. But the budget still ends somewhere,")
+        print("and past it the leg has stopped saying why this group is next and")
+        print("started proving it. Move the argument into the header of the")
+        print("postulate it is about, and leave the leg naming the group, the risk")
+        print("it retires, and what makes it one unit of work.")
+        failures.append(None)
+
     if fat_tiers:
         print(f"\nTIER PREAMBLES OVER BUDGET — {len(fat_tiers)} preamble(s) spend "
               f"more than {TIER_BUDGET} prose characters:")
@@ -1007,7 +1093,9 @@ def main():
 
     print(f"\ncheck-roadmap: every tier sorted riskiest-class-first; every row "
           f"within its {ROW_BUDGET}-char hook budget; every tier preamble "
-          f"within its {TIER_BUDGET}-char budget; no dated narrative in "
+          f"within its {TIER_BUDGET}-char budget; every tier's big picture "
+          f"roadmap naming its next legs, each within {LEG_BUDGET} chars; "
+          f"no dated narrative in "
           # named individually up to a handful, then counted -- a report line
           # that grows with docs/ stops being read
           + (" or ".join(f.name for f in date_targets) if len(date_targets) <= 4

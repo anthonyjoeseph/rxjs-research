@@ -4,6 +4,16 @@
 
 ## Tier 0 — anchor
 
+### Big picture tier roadmap
+
+- **the anchor group** — the worst-class row and the two statements that share
+  its currency; one unit of work because a restatement of any of them moves the
+  other two.
+- **the mechanical shelf** — every row whose shape is already known, ground in
+  one pass off a single loaded context.
+
+### The ledger
+
 **THE TIER IS ONE STATEMENT.** This sentence is structural and belongs here.
 
 **AND THE COUNT WENT DOWN BY DELETION.** Parts four and five were the width
@@ -32,6 +42,18 @@ measures, read rather than bracketed.
 - **`short-row`** — GRINDABLE: one line.
 
 ## Tier 1 — a preamble within budget, under rows that would break it if the
+
+### Big picture tier roadmap
+
+- **the anchor group** — the worst-class row and the two statements that share
+  its currency; one unit of work because a restatement of any of them moves the
+  other two.
+- **the mechanical shelf** — every row whose shape is already known, ground in
+  one pass off a single loaded context.
+- **the parked remainder** — what is left once the two legs above land, kept
+  here so the tier's plan is complete rather than open-ended.
+
+### The ledger
 ##          check charged their continuation lines to the section
 
 Parked behind tier 0, and this preamble says only that. Nothing more.

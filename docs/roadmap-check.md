@@ -5,7 +5,7 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Eight checks
+## Eleven checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
@@ -33,6 +33,38 @@ can see into build failures.
 9. **A DIFFICULTY row standing on nothing** — a DIFFICULTY row whose postulates carry no
    marker at all fails. The class claims the statement is true and correctly stated, and
    that is a claim about evidence; absent one the row is SHAPE or FALSITY.
+
+10. **The leg count** — each tier opens with a `### Big picture tier roadmap` naming
+    exactly three legs, dropping below three only when the tier has fewer live
+    postulates than that to plan over.
+11. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
+    `ROW_BUDGET`.
+
+## The roadmap is the schedule; the rows are the ledger
+
+Checks 10 and 11 are the newest and they change what the file IS. A tier now has two
+subsections: the roadmap, naming the next three units of work, and the ledger under
+`### The ledger`, carrying one row per postulate. A leg is a GROUP aggregated across the
+whole ledger — statements sharing a currency, a claim together with the sites that
+consume it, one shelf of mechanical obligations — and legs are ranked riskiest-first
+without being bound to the class order as tightly as rows are. Where a grouping is not
+real, a leg falls back on the classes and may name one row.
+
+The count is fixed rather than bounded because both failures are real. Fewer than three
+is a tier planning one leg ahead, which is what reading down the ledger already does.
+More than three is a backlog, and the rows already are the backlog — a roadmap that
+grows without limit stops being a decision and becomes a second copy of the ledger,
+which is what "there is no second roadmap" rules out.
+
+The budget is several times a row's for a reason the row budget does not have: a row
+sends its research to the postulate's own header, and a GROUP has no header. So a leg is
+allowed to carry its own reasoning — why these postulates are one unit, what risk the leg
+retires, why it is above the next. Past the budget it has stopped saying that and started
+proving something, and the proof has a home.
+
+Parsing: any `###` heading opens a subsection, and only the roadmap heading makes the
+bullets under it legs. That is why the ledger heading closes the roadmap by starting,
+and why the roadmap can sit at the top of the tier, where a schedule belongs.
 
 ## What the preamble check charges, and the one bug it was written after
 
@@ -100,7 +132,11 @@ a row with no field at all, and a row whose field disagrees with the census — 
 `--census` fixture standing in for a scan of `agda/src`. A third pins the unearned
 GRINDABLE, against a second census in which the fixture's twin is absent, and a fourth
 the unevidenced DIFFICULTY, against a third census with the marker removed — that one
-also pins the must-NOT direction, since the blank stays legal on a SHAPE row.
+also pins the must-NOT direction, since the blank stays legal on a SHAPE row. Two more
+pin the legs, and each is built to isolate ONE of them: `legs-count.md` plans two legs in
+a tier with the rows for three while every leg is inside budget, and `legs-fat.md` names
+three legs of which one carries an argument instead of a reason, with the ROW budget
+silent — so neither can pass by tripping the other's check.
 
 ## The evidence field, and why a derived field may be mandatory
 
