@@ -1038,6 +1038,19 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 -- than one predicate per frame, and at the top it is a proven
 -- consequence of `capsAt`'s own size.
 --
+-- AND THE DOUBLING SLOT FAMILY CANNOT BE SWEPT AGAINST THE CONDITIONED
+-- FORM AT ALL, which is a coverage boundary and not evidence for the
+-- statement.  Tying the cap to the telescope makes both sides move with
+-- the layer count, at different orders: the slot's written size climbs
+-- about fifteen per layer -- twenty-five at one layer, fifty-five at
+-- three -- so the grant is a tower in a number growing linearly, while
+-- the delivery only doubles, reading eight at three layers against a
+-- grant past two to the six-thousandth.  Every deeper witness widens
+-- the margin, so no member of the family can fail and a sweep over it
+-- is unfalsifiable by construction.  What could still break the
+-- statement has to break the link the premise creates: a delivery that
+-- grows without the telescope's written size growing with it.
+--
 -- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
 --   eighty against forty-one, at a payload forty layers deep; the gap
 --   is that depth, so no constant per value closes it.  The same
