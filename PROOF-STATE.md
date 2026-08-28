@@ -221,9 +221,11 @@ does not fit is a finding about the shared statement, not about the head.
   proves that head, so the residue was one arithmetic bridge. The same question
   — which key does this head's grant read — is what the three left turn on.
 - **the selection's width shelf** — `arr-chains-nest-syn`, `arr-chains-caps`,
-  `arr-chains-bursts`, `cascadeGo-nest-regs`, `cascade-nest-store`. One walk
-  under one width cap, read at five places: the paths, the caps they spend, the
-  bursts, the registry, and the descent that is a corollary of the others. Once
+  `arr-chains-bursts`, `cascadeGo-nest-regs`, `cascade-nest-compositional`. One
+  walk under one width cap, read at five places: the paths, the caps they
+  spend, the bursts, the registry, and the descent, which no longer follows
+  from the others -- reading it off the store they bound is the cycle its
+  header records, so it is a leaf of this leg rather than its corollary. Once
   the two legs above pin the currency this is one loaded context and many
   similar obligations, which is the repetition shape delegation is for. What
   comes after it is deliberately not named here.
