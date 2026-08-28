@@ -216,23 +216,21 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the other two conversion sites** — `thruFit-vals` and `thruRoom-frame`.
-  The check that decided the last leg is ANSWERED: every entry into the
-  node-table currency holds the FULL face already, so the walk's weaker
-  premise is a choice made at the door rather than a limit of what the
-  caller has. Pushing that door down one chain retired the third site
-  outright — the inner-finish arm never read the weakened invariant at all,
-  and its premise was dead the whole way. This leg does the same to the two
-  that remain, and the product is the honest measure of how much of the walk
-  the nest currency is actually load-bearing for.
-- **the exit walk retired** — `subscribeE-caps-exit` and the cone under it.
-  With the order turned around it is a superseded predecessor: the proven face
-  carries the same invariant across the same operation at full strength, and
-  the weakening down to the node-table conjunct is already proven. What made
-  restating the walk unaffordable is what makes deleting it right — the
-  residue it would have to report is the level RECURRENCE, so it needs the
-  budget and operator currencies the proven face already carries and this
-  module does not.
+- **the face's premises threaded to the doors** — `thruFit-frame`,
+  `stepFrame-nodes` and `foldPath-nodes`. The frontier does not need
+  restating, because it already exists proven: the walk duplicates a
+  full-face clique one module up HEAD FOR HEAD, same names, weaker
+  currency — invisible to the duplicate check because the statements
+  differ and the two are never in scope together. So what is owed is not
+  a statement but the premises that clique reads: the slot caps, the two
+  positivity keys, the path key, and the budget, operator and depth
+  currencies. This leg carries them from the doors out to the cone's own
+  consumers, where the full caps world already holds them.
+- **the duplicate generation deleted** — the walk's copies go and the
+  proven clique is imported in their place, with the weakening applied at
+  the two doors that genuinely read it. Nothing here is a proof: the
+  superseded predecessor drags its whole support cone with it, and only
+  reachability can see that, since a mutual cluster consumes itself.
 - **the two burst leaves at the arrivals' cap** — `subscribeE-burst-caps`,
   `subscribeE-burst-nest`. Both are refuted at a width of zero because the
   face carries size keys only. Their conclusions name the arrivals' cap

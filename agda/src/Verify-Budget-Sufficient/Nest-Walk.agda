@@ -2864,6 +2864,32 @@ thruStep-exhaust-inner {e = e} c sl B W m m′ fuel nid κ id now od o sched st
 -- arms are the postulated inner-caps leaves; the parking arm and every
 -- untouched-node arm are discharged here, so what this body asserts is
 -- exactly the leaves and nothing beside them.
+
+-- AND THIS IS WHERE THE WEAKENED INVARIANT IS PRODUCED, which is what
+-- fixes the shape of retiring it.  Every entry into that currency holds
+-- the FULL face already, so two of the three downgrades are a choice
+-- made at the door and one was not read at all -- but the two that
+-- remain cannot have the door pushed any further down, because the
+-- premise their own recursion consumes is this head's CONCLUSION.  The
+-- currency is not threaded through the walk; it is minted by it.
+--
+-- So the cone comes out in ONE piece or not at all -- and it comes out
+-- against something that already exists.  This head, the three step
+-- heads beside it, the arrival walk, the frame step, the burst push and
+-- both subscribe heads are all duplicated one module up, HEAD FOR HEAD
+-- against the same evaluator heads, at the FULL face and proven -- two
+-- of them under the very same name.  The duplicate check cannot see it:
+-- the statements differ in their currency, and the modules are never in
+-- scope together.
+--
+-- So nothing here needs restating.  What is owed is the premises that
+-- clique reads and this one does not -- the slot caps, the two
+-- positivity keys, the path key, and the budget, operator and depth
+-- currencies -- carried from the two doors out to the consumers, which
+-- hold them already.  Stated at the full face WITHOUT them it would be
+-- the statement the width refutation kills, one layer up and no truer
+-- for the move; that is why the threading is the work and the deletion
+-- is not.
 thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
