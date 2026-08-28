@@ -183,10 +183,10 @@ does not fit is a finding about the shared statement, not about the head.
   branch budget — the k-budgeted strengthening the fixed-gas fold could not
   induct on. The crossing that killed both predecessors is untested against the
   per-branch charge.
-- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE`: the
-  emit-by-emit fit the outer wrap's push spends. The arrival-depth axis cannot
-  refute it — the factor is a tower in the cap the arrival's own size sets — so
-  nothing has reached the region that could.
+- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE, PROBED`:
+  the emit-by-emit fit the outer wrap's push spends. Neither the arrival-depth
+  axis nor the `nestU` gap can refute it, so nothing has reached the region
+  that could.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

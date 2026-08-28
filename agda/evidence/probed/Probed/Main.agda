@@ -61,3 +61,11 @@ open import Probed.Scan-Arr-Clos-Key
 open import Probed.Scan-Arr-Margin
   using (delivered≡; deliveredHi≡; keys≡; widths≡; sizes≡; premises;
          fit0; fit4; fit8)
+
+open import Probed.Thru-Fit-Frame
+  using (unitPin; gapFig≡; premM1; premV1; premM3; premV3; premS1; premX1;
+         figA≡; fitA1; fitA2; fitA3;
+         figB≡; fitB1; fitB2; fitB3;
+         figC≡; fitC1; fitC2; fitC3;
+         figD≡; fitD1; fitD2; fitD3;
+         figE≡; fitE1; fitE2; fitE3)

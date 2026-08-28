@@ -1028,6 +1028,15 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 --   What could still refute is a delivery that compounds per UNIT of
 --   cap rather than per nesting level, and no head in this term
 --   language delivers that.
+-- PROBED: `Probed.Thru-Fit-Frame` takes the W = 1 / large-S axis
+--   (minimal grant addend against the widest `nestU` gap) and the
+--   W-large contrast, across mergeAll, switch and exhaust.  It does
+--   NOT reach the risky region, and the file pins why: the nodes-side
+--   conjuncts are zero on every row, so only the emitted-depth
+--   conjunct carries a number, and `nestU` does not occur in the
+--   grant -- raising it moves the program and not the bound.  What
+--   would refute is a step delivering more nesting than its arrival
+--   carried by more than the `+ W`, which this family never does.
 postulate
   thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (W : ℕ) (sl : Slots Γ)
