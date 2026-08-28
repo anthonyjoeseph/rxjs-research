@@ -3810,6 +3810,38 @@ allWrap-descW g switchᵒ   lim b κ id now sched st = descW-switch g b κ id no
 allWrap-descW g exhaustᵒ  lim b κ id now sched st = descW-exhaust g b κ id now sched st
 
 postulate
+  -- AND THE PREMISE THIS HEAD CANNOT MEET IS THE SIZE ONE.  A slot
+  -- reference is replaced by its definition, so what gets subscribed is
+  -- the head's syntax with the payload IN it, and a step function
+  -- naming its payload twice hands back about twice the payload while
+  -- contributing a constant to the head.  The cap the walk reads every
+  -- arrival at is written against the head, so it does not survive the
+  -- substitution and this is where that shows: nothing in the premises
+  -- bounds `slotDef`.  The repair is a ceiling the cap is closed under,
+  -- and the whole question is WHICH RECURRENCE prices one substitution.
+  --
+  -- DEAD ROUTE: a ceiling of the walk's own, keyed on the hop budget and
+  --   stepping by the caps face's `iterSize`, is STRUCTURALLY DEAD at
+  --   the face it has to hand its grant to.  Threading it is mechanical
+  --   -- the grant's size argument, the local size annotations, and one
+  --   widening at each re-entry that spends a hop -- and it goes green
+  --   right up to `thruFit-frame`, where the flattened grant meets the
+  --   delivery currency.  That currency is a SQUARE of the cap per
+  --   level, closed under the FAN recurrence and nothing wider, while
+  --   one `iterSize` step iterates a multiply once per unit of cap.  No
+  --   arithmetic reconciles them: a square cannot dominate a tower, so
+  --   either the delivery currency itself becomes one -- which moves the
+  --   whole ladder -- or the walk's step is priced at ONE substitution,
+  --   which is a square and is what the delivery currency already is.
+  --   The second is the live route and it is why the currency is a
+  --   square in the first place.
+  -- RECOVERY: git show 09d8bf7 restores the ceiling algebra -- the
+  --   gas-keyed tower, its two monotonicities, the drop a non-
+  --   substituting re-entry needs, and `subCaps`, which is the part
+  --   that transfers unchanged: an arrival-side cap must move its size
+  --   field alone, since widening the width would weaken the room
+  --   record's queue conjunct.
+
   -- THE SLOT HEADS, where a subscription reads the telescope rather
   -- than descending.  A hot slot emits bookkeeping and no values; a
   -- cold one emits its script, which is charged to the unit and not to
