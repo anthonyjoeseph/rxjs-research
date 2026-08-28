@@ -215,11 +215,11 @@ does not fit is a finding about the shared statement, not about the head.
   keys on the same written size, so the restatement moves all of them, and
   grinding any of them first bets on the key.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
-  `subscribeE-nest-slot`, `evalWith-nest-sync`. The preamble already says these
-  are one statement and not one per head; the leg is that fact scheduled. The
-  shared grant shrinks with the term and its store half is a join, so a head
-  that does not fit is a finding about the statement — which makes them cheap
-  together and misleading apart.
+  `evalWith-nest-sync`. The preamble already says these are one statement and
+  not one per head; the leg is that fact scheduled. The slot head fell to it
+  outright: the arr-keyed face reads its key THROUGH the telescope and already
+  proves that head, so the residue was one arithmetic bridge. The same question
+  — which key does this head's grant read — is what the three left turn on.
 - **the selection's width shelf** — `arr-chains-nest-syn`, `arr-chains-caps`,
   `arr-chains-bursts`, `cascadeGo-nest-regs`, `cascade-nest-store`. One walk
   under one width cap, read at five places: the paths, the caps they spend, the
@@ -271,10 +271,6 @@ does not fit is a finding about the shared statement, not about the head.
   conjunct this head's accumulator read demanded, so the shape is settled; what
   remains is the fold arithmetic at the sync-keyed grant and the seed's
   `evalTm-nest-sync` spend.
-- **`subscribeE-nest-slot`** (Nest-Walk) — DIFFICULTY, `REFUTED`: the three
-  slot heads under one leaf. A shared slot's charge is a multiple of nothing
-  unless the unit is a summand, which is what the refutation pins — and the
-  unit is now a summand under a grant the slot's own size does not shrink.
 - **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   the selection's paths and the arrival's payload land inside one unit — the
   fact that ties the walk's charge back to the program. Free-list form refuted;

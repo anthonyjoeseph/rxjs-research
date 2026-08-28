@@ -26,7 +26,7 @@ open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
    +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
    +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤;
-   *-suc; *-comm; ^-*-assoc)
+   *-suc; *-comm; ^-*-assoc; ^-monoʳ-≤; +-comm; pred[n]≤n)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
@@ -70,6 +70,28 @@ abstract
   -- SPENDS IT WITHOUT THE REST.  Once the descent has been flattened at
   -- the cap, everything above it carries one factor and one widened
   -- unit, and both are functions of the caps alone.
+  -- THE ARR FACE'S GRANT SITS INSIDE THE CAP-KEYED ONE AT ONE LAYER,
+  -- which is what lets a head proven against the telescope-read key
+  -- answer the cap-keyed statement.  The arr grant doubles once per
+  -- unit of the key and the cap-keyed grant doubles the CAP that many
+  -- times per layer, so a key the cap dominates is dominated exponent
+  -- and all; the unit side is the arr grant's `U + B` against a layer's
+  -- `B + 2U`, which is the same two summands with one to spare.
+  arrD≤nestB : ∀ (S W U B k : ℕ) → k ≤ S → arrD U B (suc W * k) ≤ nestB S W U B 1
+  arrD≤nestB S W U B k hk = *-mono-≤ pow unit
+    where
+    pow : 2 ^ pred (suc W * k) ≤ ((2 ^ S) ^ suc W) ^ 1
+    pow = ≤-trans (^-monoʳ-≤ 2
+                    (≤-trans (pred[n]≤n {suc W * k})
+                             (≤-trans (*-monoʳ-≤ (suc W) hk)
+                                      (≤-reflexive (*-comm (suc W) S)))))
+                  (≤-reflexive
+                    (sym (trans (*-identityʳ ((2 ^ S) ^ suc W))
+                                (^-*-assoc 2 S (suc W)))))
+
+    unit : U + B ≤ B + suc 1 * U
+    unit = ≤-trans (≤-reflexive (+-comm U B)) (+-monoʳ-≤ B (m≤m+n U (U + 0)))
+
   nestFac : (S W : ℕ) → ℕ
   nestFac S W = ((2 ^ S) ^ suc W) ^ S
 

@@ -64,7 +64,7 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; applyFn-nest-sync; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
-  (nestB; nestB-mono; nestB-base; nestB-frame; nestB-unit; nestFac; 1≤nestFac; nestU;
+  (nestB; nestB-mono; arrD≤nestB; nestB-base; nestB-frame; nestB-unit; nestFac; 1≤nestFac; nestU;
   nestU-mono; pow-mono-exp; nestB-at; arrD; arrDW-mono; arrDW-pos; arrDW-key; arrDW-flat; arrDW-slot;
   arrDW-frame; nestB-frame-dblW)
 open import Verify-Budget-Sufficient.Nest-Burst using
@@ -3810,56 +3810,6 @@ allWrap-descW g switchᵒ   lim b κ id now sched st = descW-switch g b κ id no
 allWrap-descW g exhaustᵒ  lim b κ id now sched st = descW-exhaust g b κ id now sched st
 
 postulate
-  -- AND THE PREMISE THIS HEAD CANNOT MEET IS THE SIZE ONE.  A slot
-  -- reference is replaced by its definition, so what gets subscribed is
-  -- the head's syntax with the payload IN it, and a step function
-  -- naming its payload twice hands back about twice the payload while
-  -- contributing a constant to the head.  The cap the walk reads every
-  -- arrival at is written against the head, so it does not survive the
-  -- substitution and this is where that shows: nothing in the premises
-  -- bounds `slotDef`.  The repair is a ceiling the cap is closed under,
-  -- and the whole question is WHICH RECURRENCE prices one substitution.
-  --
-  -- DEAD ROUTE: a ceiling of the walk's own, keyed on the hop budget and
-  --   stepping by the caps face's `iterSize`, is STRUCTURALLY DEAD at
-  --   the face it has to hand its grant to.  Threading it is mechanical
-  --   -- the grant's size argument, the local size annotations, and one
-  --   widening at each re-entry that spends a hop -- and it goes green
-  --   right up to `thruFit-frame`, where the flattened grant meets the
-  --   delivery currency.  That currency is a SQUARE of the cap per
-  --   level, closed under the FAN recurrence and nothing wider, while
-  --   one `iterSize` step iterates a multiply once per unit of cap.  No
-  --   arithmetic reconciles them: a square cannot dominate a tower, so
-  --   either the delivery currency itself becomes one -- which moves the
-  --   whole ladder -- or the walk's step is priced at ONE substitution,
-  --   which is a square and is what the delivery currency already is.
-  --   The second is the live route and it is why the currency is a
-  --   square in the first place.
-  -- RECOVERY: git show 09d8bf7 restores the ceiling algebra -- the
-  --   gas-keyed tower, its two monotonicities, the drop a non-
-  --   substituting re-entry needs, and `subCaps`, which is the part
-  --   that transfers unchanged: an arrival-side cap must move its size
-  --   field alone, since widening the width would weaken the room
-  --   record's queue conjunct.
-
-  -- THE SLOT HEADS, where a subscription reads the telescope rather
-  -- than descending.  A hot slot emits bookkeeping and no values; a
-  -- cold one emits its script, which is charged to the unit and not to
-  -- the expression; a shared one connects and re-enters the walk.
-  --
-  -- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled
-  --   form, forty delivered against a charge of ZERO, at a queue
-  --   holding nothing but a reference to an observable-typed share.
-  --   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
-  --   reference says nothing about the slot -- and the node table does
-  --   not read the slots either, so the charged side is empty and every
-  --   factor is a multiple of nothing.  What that pins is the shape:
-  --   the factor AND a slots summand, each of which is dead on its own.
-  subscribeE-nest-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (i : Fin n)
-    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    NestAt c sl B W g (input i) κ id now sched st
   -- THE SCAN HEAD, WHICH IS WHERE THE BURST INDEX IS REALLY BET.  A
   -- scan's step function is written once and applied once per value of
   -- whatever burst arrives, so this is the head whose demand is a
@@ -4838,6 +4788,70 @@ thruFit-exhaust {e = e} c sl B W g b κ id now sched st hsl hc hv hcl hn hw =
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
 
+
+-- THE GRANT ONLY EVER GROWS, so a clause proving the shared statement
+-- against one bound proves it against any larger one.  The three
+-- conjuncts widen together because they are one tuple.
+nestTriple-widen : ∀ {D N n0 G G′ : ℕ} {A Bf : NodeId → ℕ} → G ≤ G′ →
+  (D ≤ G) × (N ≤ n0 ⊔ G) × (∀ (j : NodeId) → A j ≤ Bf j ⊔ G) →
+  (D ≤ G′) × (N ≤ n0 ⊔ G′) × (∀ (j : NodeId) → A j ≤ Bf j ⊔ G′)
+nestTriple-widen hG (p , q , r) =
+  ≤-trans p hG
+  , ≤-trans q (⊔-mono-≤ ≤-refl hG)
+  , (λ j → ≤-trans (r j) (⊔-mono-≤ ≤-refl hG))
+
+-- THE SLOT HEADS, where a subscription reads the telescope rather
+-- than descending.  A hot slot emits bookkeeping and no values; a cold
+-- one emits its script, which is charged to the unit and not to the
+-- expression; a shared one connects and re-enters the walk.
+--
+-- AND THE PREMISE THAT LOOKS ABSENT HERE IS ONLY THE WRITTEN ONE.  A
+-- slot reference is replaced by its definition, so what gets subscribed
+-- is the head's syntax with the payload IN it, and the value premise is
+-- keyed on the written size, which at `input i` is one.  The closure
+-- premise beside it reads the size with the telescope SUBSTITUTED IN,
+-- which is what it was put there for -- so the arr-keyed face, whose
+-- whole grant is read on that key, already proves this head, and what
+-- is left is arithmetic: the arr grant doubles once per unit of the
+-- key and a layer of the cap-keyed grant doubles the cap that many
+-- times, so a key the cap dominates is dominated exponent and all.
+--
+-- REFUTED: `Refuted.Inner-Drain-Share-Nest` kills the caps-scaled
+--   form, forty delivered against a charge of ZERO, at a queue holding
+--   nothing but a reference to an observable-typed share.
+--   `nestDᵉ (input i)` is zero and rightly so -- the syntax of a slot
+--   reference says nothing about the slot -- and the node table does
+--   not read the slots either, so the charged side is empty and every
+--   factor is a multiple of nothing.  What that pins is the shape: the
+--   factor AND a slots summand, each of which is dead on its own.
+-- DEAD ROUTE: a ceiling of the walk's own -- keyed on the hop budget,
+--   stepping by the caps face's `iterSize`, with every arrival read at
+--   it -- is STRUCTURALLY DEAD at the face it hands its grant to.
+--   Threading it is mechanical and goes green right up to the
+--   flattening site, where the grant meets the delivery currency.  That
+--   currency is a SQUARE of the cap per level, closed under the fan
+--   recurrence and nothing wider, while one `iterSize` step iterates a
+--   multiply once per unit of cap; no arithmetic reconciles them.
+--   Minting a second currency here is the part that is dead, and it
+--   stays dead however the step is priced.
+-- RECOVERY: git show 09d8bf7 restores that ceiling's algebra -- the
+--   gas-keyed tower, its two monotonicities, the drop a non-
+--   substituting re-entry needs, and `subCaps`, which is the piece
+--   worth having back if an arrival-side cap is ever wanted: it moves
+--   the size field alone, since widening the width would weaken the
+--   room record's queue conjunct.
+subscribeE-nest-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (i : Fin n)
+  (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) →
+  NestAt c sl B W g (input i) κ id now sched st
+subscribeE-nest-slot {e = e} c sl B W g i κ id now sched st hsl hc hv hcl hn hw =
+  nestTriple-widen
+    (arrD≤nestB (Caps.cSize c) W (nestUnit e sl) B
+       (slotClos sl i)
+       (nestClosOK?-size c sl (input i) hcl))
+    (subscribeE-nest-arr c sl B W g (input i) κ id now sched st
+       hsl hc hv hcl hn hw)
 
 subscribeE-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
