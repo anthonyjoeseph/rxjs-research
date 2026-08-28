@@ -154,7 +154,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
    frameStep-⊑-+; frameSz?-widen; mapValue-caps; obsListCaps?-widen;
    pathsSz?-⊑; pathSz?-⊑; valCaps?-size; valCaps?-wid; valCaps?-widen;
    valsCaps?-widen; ⊑ᶜ-trans)
-open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps; unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (concat-fits; dbl-suc; double≤foldStep; frameStep-+suc; lenWiden;

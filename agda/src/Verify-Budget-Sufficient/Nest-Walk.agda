@@ -4608,15 +4608,31 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   a walk that re-enters itself, so the level has to be CARRIED, not
 --   nested: in at one level, out at that level plus a residue, over
 --   ONE base cap.
+-- DEAD ROUTE: and CARRYING the level does not work here either, which
+--   is the sharper finding and the one that decides the module.  The
+--   residue such a walk reports is not a parameter it can be generic
+--   in: levels ADD along a sequential composition, and the walk
+--   re-enters itself once per pushed value, so the total is the level
+--   RECURRENCE and nothing weaker bounds it.  The proven face bounds
+--   its own residue with that recurrence, which reads the budget and
+--   the operator count -- two currencies this module does not carry
+--   and cannot acquire without restating the face here.  So the walk
+--   is not repairable in place at any level; what is left is to stop
+--   stating it and consume the face instead.
 -- TWIN: `subscribeE-caps` already carries the caps invariant across
---   this very operation in exactly that shape -- premise at a level,
---   conclusion at the level plus a residue, with the residue bounded
---   so the existential is not upward-closed in its witness.  It is a
---   proven body, so the shape is walked and not merely proposed.
+--   this very operation, at full strength and over the same cap
+--   family -- the node-table conjunct is a definitional weakening of
+--   its own, and the weakening is proven.  It is a proven body, so
+--   what this walk owes is reachable rather than merely proposed, and
+--   the only thing between them is which module reads which.
 -- RECOVERY: git show 0e96e46 restores the one-step attempt, whose
 --   width lemmas the level-indexed form needs UNCHANGED: the node
 --   widening step, its lift to the nest predicate, and the two
 --   `2 ≤ cSize` extractors for a wrap and for a parked closure.
+-- RECOVERY: git show 66a493a restores the level-carried attempt, which
+--   adds the arrivals' own widening over the level order and the step
+--   that spends it, and leaves the module red at the one arm that read
+--   the frozen width in both directions.
 subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

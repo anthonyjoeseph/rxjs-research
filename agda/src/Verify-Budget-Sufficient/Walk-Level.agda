@@ -172,7 +172,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face
          pushBurst-len; retagEvents-caps;
          burstCount?-widen; burstCount?-tail;
          splitBurst-len; mul-fits)
-open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+open import Verify-Budget-Sufficient.Caps-Term using
   (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (concat-fits; frameStep-+suc; lenWiden; thruWrap-vals; valsIn; valsLen;

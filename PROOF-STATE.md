@@ -216,32 +216,30 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the cap's width and the walk's level, in ONE commit** —
-  `subscribeE-burst-caps`, `subscribeE-burst-nest`. The face carries size keys
-  only, so its width field may be zero and both rows are refuted there. The
-  two halves cannot be separate commits, and that was measured rather than
-  assumed: the frozen width is what made the node invariant the SAME boolean
-  at the arrivals' cap as at the entry cap, and the `*All` arm spends that
-  identity in BOTH directions — it hands its exit pair up to a stepped cap and
-  reports back down at the flat one. Unfreeze the width and the arm has no
-  statement, so the walk's level moves in the same commit or the module is red.
-- **the two burst leaves, restated at the level the walk reports** — the same
-  two rows, the commit after. Their conclusions name the arrivals' cap
-  directly, so the commit above moves them whether or not anything is ground;
-  this is that restatement plus re-running `Probed.PushVals-Caps` against the
-  statement as it then reads. Re-running is not optional and restamping alone
-  is forbidden: a green taken against the frozen-width cap is evidence about
-  text that is gone, and a stamp without rows converts a false coverage claim
-  into a certified one.
-- **the queue and the burst width, at the stepped cap** —
-  `pushVals-caps-queue`, `pushVals-caps-burstW`. Both are refuted
-  unconditionally today: at the empty queue the wrap installs, the queue row
-  already reads `1 ≤ cWid`, and every premise beside it reads the size field
-  or the slots. Once the two commits above put the width in the cap the
-  arrivals are read at, the repair is the sibling key rather than a positivity
-  premise cascading through the face. One commit for the pair, re-probed
-  against the statement as it then reads.
-
+- **the node cone above the subscribe face** — the reorder, now that the edge
+  holding it below is gone: the three term lemmas the subscribe face wanted
+  from the node cone's module are out in their own, so nothing above the walk
+  depends on the walk any more. The leg is to turn the remaining edge around —
+  the node cone importing the proven subscribe face rather than being read by
+  it. Its first act is the check that decides the leg: whether the walk's
+  consumers can supply the full face's premise, which is strictly stronger
+  than the node-table conjunct they supply today. If they cannot, the leg ends
+  in that finding and the fallback is the level currency below.
+- **the exit walk retired** — `subscribeE-caps-exit` and the cone under it.
+  With the order turned around it is a superseded predecessor: the proven face
+  carries the same invariant across the same operation at full strength, and
+  the weakening down to the node-table conjunct is already proven. What made
+  restating the walk unaffordable is what makes deleting it right — the
+  residue it would have to report is the level RECURRENCE, so it needs the
+  budget and operator currencies the proven face already carries and this
+  module does not.
+- **the two burst leaves at the arrivals' cap** — `subscribeE-burst-caps`,
+  `subscribeE-burst-nest`. Both are refuted at a width of zero because the
+  face carries size keys only. Their conclusions name the arrivals' cap
+  directly, so this is the restatement onto a cap whose width axis steps, plus
+  re-running `Probed.PushVals-Caps` against the statement as it then reads.
+  Re-running is not optional and restamping alone is forbidden: a green taken
+  against the frozen-width cap is evidence about text that is gone.
 ### The ledger
 
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: the

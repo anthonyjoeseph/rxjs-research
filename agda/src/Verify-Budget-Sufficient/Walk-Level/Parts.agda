@@ -67,7 +67,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
 open import Verify-Budget-Sufficient.Wet.Part2 using
   (finList-B)
 -- the caps face: only the five predicates the statement reads there
-open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; frameSz?; pathSz?; valCaps?; widNode)
