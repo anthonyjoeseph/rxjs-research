@@ -180,9 +180,9 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **`shareGoFold-nodes`** (Nest-Walk) — FALSITY,
   `REFUTED×4, DEAD ROUTE, TWIN, PROBED`: the share walk's fold at a spendable
-  branch budget — the k-budgeted strengthening the fixed-gas fold could not
-  induct on. The crossing that killed both predecessors is untested against the
-  per-branch charge.
+  branch budget, unit term now k-indexed so each step's charge is exact. The
+  crossing that killed both predecessors is untested against the per-branch
+  charge.
 - **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE, PROBED`:
   the emit-by-emit fit the outer wrap's push spends. Neither the arrival-depth
   axis nor the `nestU` gap can refute it, so nothing has reached the region

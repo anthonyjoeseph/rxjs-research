@@ -5227,15 +5227,20 @@ mutual
 -- the cascade fold's: each admitted entry owes its own walk's burst and
 -- caps hypotheses at the state the fold reaches it in.
 --
--- AND THE CHARGE HAS NO INSTANTIATION ROUTE AT ALL, which is worth
--- knowing before anyone budgets a sweep for it.  The typechecker is
--- shut because `fanLen`, `fanSq` and `delSq` are sealed, so neither
--- side of a row reduces to a numeral under `refl`.  The compiled
--- harness looks like the way round that — the backend runs the real
--- bodies — and it is not: the allowances are priced in caps, and a cap
--- does not evaluate either, for the reason recorded at `capsAt`.  So
--- no row reaches this statement at any program size, and nothing below
--- should be budgeted as though one might.
+-- AND THE UNIT TERM IS K-INDEXED BECAUSE THE FOLD'S OWN CHARGE IS.
+-- Each admitted registration pays `suc (deliverLen …) * U` additively,
+-- which the size premise caps at one `suc (cSize + fanLen gas)` per
+-- entry -- so a budget naming the whole level's allowance ONCE cannot
+-- close the induction: the step's payment would have to fit inside a
+-- term it does not grow.  Spent at `suc (k * suc (cSize + fanLen
+-- gas))` each step's payment is EXACT, and at the registry cap it is
+-- the level allowance again, since that is what the length recurrence
+-- multiplies out to.  The two budgets are one budget, read at one k.
+--
+-- AND THE SEALED ALLOWANCES DO NOT SHUT INSTANTIATION, only the direct
+-- route: `fanLen`, `fanSq` and `delSq` do not reduce, so no row reads
+-- THROUGH them -- but writing the recurrences out from their own
+-- equations reaches the conclusion at concrete programs.
 --
 -- TWIN: `cascadeGo-nodes-chains` — the proven fold over a cascade's
 --   chain list, whose skip/deliver arms and telescope arithmetic are
@@ -5300,7 +5305,7 @@ postulate
         * ((2 ^ (k * (Caps.cSize c * Caps.cSize c + fanSq gas c))) ^ W
            * ((nodesMax st ⊔ nestDᵛˢ vals)
               + W * (k * (Caps.cSize c * Caps.cSize c + fanSq gas c)
-                     + suc (fanLen (suc gas) c)
+                     + suc (k * suc (Caps.cSize c + fanLen gas c))
                        * nestU (delSq (suc gas) c) (nestUnit e sl))))
 
 -- The whole-list statement is the budgeted fold spent at the registry
@@ -5331,8 +5336,7 @@ shareGo-nodes {e = e} c W sl sf gas id now i vals fin ps sched st
               nestFac (Caps.cSize c) W ^ a
                 * ((2 ^ b) ^ W
                    * ((nodesMax st ⊔ nestDᵛˢ vals)
-                      + W * (b + suc (fanLen (suc gas) c)
-                               * nestU (delSq (suc gas) c) (nestUnit e sl)))))
+                      + W * (b + suc a * nestU (delSq (suc gas) c) (nestUnit e sl)))))
             (sym (fanLen-suc gas c)) (sym (fanSq-suc gas c))))
 
 -- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which

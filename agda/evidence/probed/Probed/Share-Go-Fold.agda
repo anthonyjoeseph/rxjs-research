@@ -5,7 +5,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: shareGoFold-nodes @23f8d5
+-- TARGET: shareGoFold-nodes @c17f49
 --
 -- WHAT IS BEING TESTED, and it is the axis the predecessors died on.
 -- The fold walks one registration after another, and each one's
@@ -123,7 +123,7 @@ grant k =
     * ((2 ^ (k * (Caps.cSize cap * Caps.cSize cap + fanSqᶜ gas))) ^ W
        * ((nodesMax st₀ ⊔ nestDᵛˢ {Γ = Γ₂} {u = natᵗ} (0 ∷ []))
           + W * (k * (Caps.cSize cap * Caps.cSize cap + fanSqᶜ gas)
-                 + suc (fanLenᶜ (suc gas))
+                 + suc (k * suc (Caps.cSize cap + fanLenᶜ gas))
                    * (suc (delSqᶜ (suc gas)) * nestUnit prog slots))))
 
 -- THE DECIDABLE PREMISE, pinned rather than assumed
