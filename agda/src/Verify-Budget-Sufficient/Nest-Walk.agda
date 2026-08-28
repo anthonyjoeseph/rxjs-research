@@ -3884,13 +3884,22 @@ postulate
   -- hands it to the walk's own re-entry -- so what fails is the walk's
   -- PREMISE surviving this arm, and the only device that preserves it
   -- is a premise that SURVIVES A SUBSTITUTION, which this one does not.
-  -- Two devices do: the caps face's LEVEL, arrivals read at the entry
-  -- cap stepped, which costs an index the nest walk does not carry; or
-  -- an intrinsic measure on the syntax dominating what it can emit,
-  -- which costs no index and moves every head's premise.  The state
-  -- invariant is untouched either way -- it reads the WIDTH field over
-  -- the node table and no size at all -- so what is owed is the arm's
-  -- premise and not its state chain.
+  -- One device does, and it is the caps face's LEVEL: arrivals read at
+  -- the entry cap STEPPED.  The state invariant is untouched by it --
+  -- it reads the WIDTH field over the node table and no size at all --
+  -- so what is owed is the arm's premise and not its state chain.
+  --
+  -- AND WHAT THE LEVEL COSTS IS A SECOND CAP HERE, NOT AN INDEX.  This
+  -- face is GRANT-FREE end to end: the caps, room, width, queue and
+  -- state folds all conclude the exit pair and name no grant, so the
+  -- objection recorded one block up -- that a stepped cap is a larger
+  -- key, hence a larger grant, and the parent owes the smaller one --
+  -- reaches the grant-carrying `*All` rows and not these.  What reaches
+  -- these is the join that fuses the caps half with the nest half: it
+  -- names the caps premises and the grant's key as ONE cap, so a level
+  -- on the caps side moves a key nothing on that side reads.  Splitting
+  -- that one cap in two -- premises at the stepped one, grant at the
+  -- entry one -- is the restatement, and it is confined to this family.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- DEAD ROUTE: flattening at a cap CLOSED UNDER a descent's worth of
   --   substitutions is structurally dead, and not for want of
@@ -3900,10 +3909,21 @@ postulate
   --   of the caps face's size function iterates a multiply once per
   --   unit of cap -- so no closure of the cap under substitution fits
   --   inside it.  Minting a currency here is the part that is dead; the
-  --   two devices above are untouched, and of them the LEVEL is the one
-  --   the delivery currency already prices, since its ladder is per
-  --   level.  `subscribeE-nest-slot` carries the worked threading and a
-  --   pointer to the algebra.
+  --   LEVEL is untouched, and is the one the delivery currency already
+  --   prices, since its ladder is per level.  `subscribeE-nest-slot`
+  --   carries the worked threading and a pointer to the algebra.
+  -- DEAD ROUTE: an INTRINSIC measure on the syntax dominating what that
+  --   syntax can emit -- the device that would cost no cap at all -- is
+  --   dead by unsatisfiability rather than by difficulty, and the tree
+  --   already proves why.  The bound on a value with a payload
+  --   substituted in is `applyFn-iterSize`, whose right side is the
+  --   caps face's own size iteration based AT THE CAP; so a premise
+  --   asking that an emission read inside the cap asks, at one single
+  --   iteration and a payload of any size, for `S * suc (2 * V) ≤ S`.
+  --   No sharper measure repairs it, because the sharpening would have
+  --   to beat a bound the caps face spends everywhere.  A key that
+  --   dominates an emission is therefore not a key at this cap, and the
+  --   cap has to move -- which is the LEVEL and nothing else.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

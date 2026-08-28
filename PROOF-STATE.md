@@ -206,15 +206,12 @@ does not fit is a finding about the shared statement, not about the head.
 - **the `*All` arm's premise does not survive a substitution** —
   `pushVals-caps-adm`, `pushVals-caps-wid`, then `pushVals-nest`,
   `pushVals-caps-burstW`, `pushVals-caps-queue`, `thruFit-arr-merge`,
-  `thruFit-arr-switch`, `thruFit-arr-exhaust`. The two stream leaves are
-  REFUTED: an arrival is the head's syntax with the payload substituted in, so
-  a step function naming its payload twice outgrows the flat cap every premise
-  reads. The arm SUBSCRIBES such an arrival through the walk's own re-entry, so
-  what fails is the premise surviving the arm. A ceiling of the walk's own is
-  now DEAD — the delivery currency prices a level at a square and no closure of
-  the cap under substitution fits inside one — which leaves the caps face's
-  LEVEL, the device that currency already prices. Every row beside them keys on
-  the same written size, so the restatement moves all of them.
+  `thruFit-arr-switch`, `thruFit-arr-exhaust`. One refuted premise read at one
+  flat cap, and every row keys on it, so the restatement moves all of them at
+  once. Two of the three candidate devices are dead in the leaves' headers and
+  the third is the caps face's LEVEL; the two caps rows can take it now, since
+  their cone concludes the exit pair and carries no grant. What the leg buys is
+  the shape of that restatement, which the grant-carrying rows then inherit.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
@@ -232,9 +229,9 @@ does not fit is a finding about the shared statement, not about the head.
 ### The ledger
 
 - **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — SHAPE,
-  `REFUTED×2, DEAD ROUTE, PROBED×2`: the arrivals read at the flat cap, refuted
-  at a map naming its payload twice; the restatement owed is the arm's missing
-  level, not a premise on either leaf.
+  `REFUTED×2, DEAD ROUTE×2, PROBED×2`: the arrivals read at the flat cap,
+  refuted at a map naming its payload twice; the restatement owed is the arm's
+  missing level, not a premise on either leaf.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
