@@ -3909,6 +3909,20 @@ postulate
   -- invariant is untouched either way -- it reads the WIDTH field over
   -- the node table and no size at all -- so what is owed is the arm's
   -- premise and not its state chain.
+  --
+  -- AND WHERE THE PREMISE IS SPENT NAMES A THIRD DEVICE, CHEAPER THAN
+  -- EITHER.  It is spent FLATTENING THE DESCENT AT THE CAP: the grant
+  -- is exponential in the descent's own size, and the frame layer above
+  -- it carries one factor that is a function of the CAPS ALONE, which
+  -- is what lets the walk state itself over an opaque summand instead
+  -- of re-deriving a count per arm.  Flattening at the cap is what a
+  -- substituting arrival breaks.  But an arrival's size is bounded by a
+  -- function of the cap and nothing else -- one substitution is the
+  -- caps face's own size step, and a descent composes at most the
+  -- head's size of them -- so flattening at the cap CLOSED UNDER A
+  -- DESCENT'S WORTH OF SUBSTITUTIONS keeps the frame layer's property
+  -- and costs only a bigger constant, in arithmetic the caps face has
+  -- already proven.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
