@@ -203,17 +203,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the `*All` arm's premise does not survive a substitution** —
-  `pushVals-caps-burstW`, `pushVals-caps-queue`, `subscribeE-burst-nest`,
-  `subscribeE-burst-caps`, `thruFit-arr-merge`, `thruFit-arr-switch`,
-  `thruFit-arr-exhaust`. The measure half is DONE: the arrivals read at a caps
-  LEVEL the arm passes in, and at that level the child's own reported burst
-  bound IS the head's, so the nest half is a body. The level moves the SIZE
-  axis alone, which is why threading it cost nothing. The admission and width
-  halves are bodies too, each over ONE boolean over the whole subscription in
-  the caps face's own arrival currency — and both are stated over ANY
-  subscription at ANY path, since nothing in the conclusion is state. The twin
-  is this face's exit walk, which carries the state half at those premises.
+- **the face has no width key, and the walk is false without one** —
+  `subscribeE-burst-caps`, `pushVals-caps-queue`, `pushVals-caps-burstW`,
+  `subscribeE-burst-nest`, `thruFit-arr-merge`, `thruFit-arr-switch`,
+  `thruFit-arr-exhaust`. Every key this face carries is a size bound and its
+  invariant is one boolean over node widths an unwritten table satisfies, so
+  the width field may be zero — and at zero the arrivals' bound is refuted,
+  the exit pair with it at a parked pair under a limit of one, and the
+  proven walk already inhabits the type that kills. The level cannot repair
+  it: it freezes the width ON PURPOSE, since the invariant reads that field
+  and nothing else. So the leg is the key and the stepped width axis; the
+  admission half, which reads size alone, is untouched and stays a body.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it

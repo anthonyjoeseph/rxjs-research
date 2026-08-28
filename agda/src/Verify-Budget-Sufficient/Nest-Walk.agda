@@ -4578,11 +4578,25 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- invariant is the node-table conjunct alone, which is what makes the
 -- defer and cold-input clauses close outright: their only node write
 -- is a fresh node.
+--
+-- AND AS STATED IT IS FALSE, which the body does not show because the
+-- body stands on a leaf that is false with it.  Nothing here bounds
+-- the width field: the two keys are size bounds and the invariant is
+-- one boolean over node widths that an unwritten table satisfies at
+-- every width.  Hand the arm a source whose inners cross a tick and
+-- the limit holds the second inner in the node the arm installed, so
+-- the invariant this walk reports is absurd at a width of zero.  What
+-- is owed is a width key on the face, and the arrivals' own bound
+-- moving to a cap whose width axis steps -- which the invariant admits
+-- in the widening direction and refuses in the other.
 -- REFUTED: `Refuted.Defer-Park-Size` kills this statement over the
 --   predicate that carried a size conjunct: a defer parks its body
 --   at full syntax size, and every premise here reads a defer as 1.
 -- REFUTED: `Refuted.Defer-Park-Width` kills it over the
 --   pending-width conjunct too, the same program at unit width.
+-- REFUTED: `Refuted.Subscribe-Burst-Width` kills the statement as it
+--   now stands, at a parked pair under a limit of one -- and spells
+--   out that this very definition inhabits the type it kills.
 subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

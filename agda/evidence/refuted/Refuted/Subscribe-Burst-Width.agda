@@ -22,9 +22,11 @@
 -- half of the same burst, which reads the size axis alone and which
 -- the arrival level therefore does move; it says nothing about what a
 -- positive width owes, which is the content the statement still
--- carries once a width key is threaded; and the row at the foot pins
--- that the walk stated over the node table SURVIVES this witness, so
--- the crossing is the arrival bound's alone.
+-- carries once a width key is threaded.  What it DOES show, past the
+-- leaf, is that the crossing has already reached a proven body: the
+-- exit pair over the same descent is refuted at a source whose inners
+-- cross a tick, and the walk's own definition inhabits the type this
+-- file kills.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Subscribe-Burst-Width where
 
@@ -39,7 +41,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; natᵗ; obs; ofᵉ; switchAllᵉ; mergeAllᵉ; nat̂; strmᵗ;
+  using (Closed; Val; natᵗ; obs; ofᵉ; switchAllᵉ; mergeAllᵉ; nat̂; strmᵗ; deferᵉ;
          syncSizeᵛ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
@@ -51,7 +53,7 @@ open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (nestValOK?; burstCaps?)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestCapsOK?; nestClosOK?)
+  using (nestCapsOK?; nestClosOK?; subscribeE-caps-exit)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -129,11 +131,11 @@ figs = Caps.cWid (arrCapAt (Caps.cSize cap) cap)
 figs≡ : figs ≡ (0 , 1)
 figs≡ = refl
 
--- AND THE WALK ABOVE IT DOES NOT INHERIT THE CROSSING, which is a
--- boundary worth pinning rather than an omission: the arm's node
--- reading survives this width because the merge node's queue is empty
--- where the descent leaves it, so what the width-zero cap kills is the
--- ARRIVAL bound alone and not the invariant stated over the table.
+-- AND THE WALK ABOVE IT SURVIVES THIS PARTICULAR SOURCE, which is a
+-- boundary worth pinning rather than an omission: the inners here
+-- finish inside the subscribe, so the merge drains and the node
+-- reading never sees a queue.  A source that parks its inners is the
+-- one that carries the crossing into the table, and it is below.
 Rw : Stream Γ₂ (obs natᵗ) × Sched Γ₂ × EvalSt head
 Rw = subscribeE gasBig head root 0 0 sched₀ (st-init head)
 
@@ -142,3 +144,59 @@ walkRead = nestCapsOK? cap (proj₁ (proj₂ Rw)) (proj₂ (proj₂ Rw))
 
 walkRead≡ : walkRead ≡ true
 walkRead≡ = refl
+
+-- AND A PARKED PAIR PUTS THE CROSSING IN THE TABLE TOO.  The row above
+-- is at a source whose inners finish inside the subscribe, so the
+-- merge drains and the node reading never sees a queue.  Hand it two
+-- inners that cross a tick and the limit holds the second: the node
+-- the arm installed carries it out of the descent, and the walk's own
+-- conjunct is then absurd at the same width.
+parked : Val Γ₂ (obs (obs (obs natᵗ)))
+parked = ofᵉ (strmᵗ (deferᵉ (ofᵉ (strmᵗ (deepV 1) ∷ []))) ∷
+              strmᵗ (deferᵉ (ofᵉ (strmᵗ (deepV 1) ∷ []))) ∷ [])
+
+headP : Closed Γ₂ (obs natᵗ)
+headP = mergeAllᵉ (just 1) parked
+
+capP : Caps
+capP = caps (syncSizeᵛ (obs (obs natᵗ)) headP) 0 0
+
+schedP : Sched Γ₂
+schedP = sched-init headP slots
+
+RP : Stream Γ₂ (obs natᵗ) × Sched Γ₂ × EvalSt headP
+RP = subscribeE gasBig headP root 0 0 schedP (st-init headP)
+
+WP : ℕ
+WP = descW gasBig headP root 0 0 schedP (st-init headP)
+
+premsP : Bool × Bool × Bool
+premsP = nestCapsOK? capP schedP (st-init headP)
+       , nestValOK? capP (obs (obs natᵗ)) headP
+       , nestClosOK? capP slots headP
+
+premsP≡ : premsP ≡ (true , true , true)
+premsP≡ = refl
+
+StmtWalk : Set
+StmtWalk =
+  Sched.slots schedP ≡ slots →
+  nestCapsOK? capP schedP (st-init headP) ≡ true →
+  nestValOK? capP (obs (obs natᵗ)) headP ≡ true →
+  nestClosOK? capP slots headP ≡ true →
+  descW gasBig headP root 0 0 schedP (st-init headP) ≤ WP →
+  (Sched.slots (proj₁ (proj₂ RP)) ≡ slots)
+  × (nestCapsOK? capP (proj₁ (proj₂ RP)) (proj₂ (proj₂ RP)) ≡ true)
+
+walk-absurd : StmtWalk → ⊥
+walk-absurd h with h refl refl refl refl ≤-refl
+... | (_ , ())
+
+-- AND THE PROVEN WALK ALREADY INHABITS THAT TYPE, which is what makes
+-- the restatement unavoidable rather than tidy: the exit pair is a
+-- real body over the leaf refuted above, so `src` today proves the
+-- statement this witness kills.  The inhabitant is spelled out because
+-- a reader is entitled to check the claim rather than take it.
+walkStands : StmtWalk
+walkStands = subscribeE-caps-exit capP slots WP gasBig headP root 0 0
+               schedP (st-init headP)
