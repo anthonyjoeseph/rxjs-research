@@ -5238,6 +5238,16 @@ mutual
 --   max — stacks whatever it licensed once per level.  The gas-indexed
 --   fan recurrences are the branch-structured charge that refutation
 --   demands: each level's allowance contains the next level's whole.
+-- PROBED: `Probed.Share-Go-Fold` instantiates the conclusion at one,
+--   two and three registrations over the family that refuted the
+--   premise-free form, with the decidable `admSz?` premise pinned and
+--   the budget spent at the list's own length.  Not covered, and the
+--   file pins why: the delivered store is FLAT in the length here, so
+--   every row is degenerate on the stacking axis the budget `k` is
+--   spent for -- parallel registrations each install their own node
+--   and `nodesMax` is a join, so identical branches cannot compound.
+--   The two walk premises are Set-valued and cannot be discharged at
+--   numerals at all, so the hypothesis side is unreached entirely.
 postulate
   shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
