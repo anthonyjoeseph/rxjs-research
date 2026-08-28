@@ -649,6 +649,18 @@ nestCapsOK?-lookupWid {Γ = Γ} c nid ns sched st eq hc =
 -- not have: that predicate is a fact about a VALUE alone, while the
 -- key a subscription is charged at sees through the telescope the
 -- value may reference.  The two coincide on a slot-free arrival.
+-- AND THE FLAT SLOT MEASURE CANNOT STAND IN FOR IT, which is worth
+-- saying because that measure is the one the caps face already carries
+-- as a standing premise and the obvious candidate for generalising this
+-- key away.  `closSizeᵉ` reads `input i` as `slotClos i`, so a
+-- definition naming a slot TWICE pays for it twice, and a telescope in
+-- which each definition doubles its predecessor is closed under
+-- `inputsBelowᵉ`: the closure measure is multiplicative in the
+-- telescope's depth where `slotsSize` is a flat sum of written sizes.
+-- Four such slots already read 27 against 98.  So `slotsSize sl ≤
+-- Caps.cSize c` does not imply this predicate, and the two premises are
+-- independent rather than one subsuming the other.
+
 nestClosOK? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Val Γ (obs u) → Bool
 nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
 
