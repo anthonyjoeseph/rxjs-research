@@ -983,6 +983,26 @@ thruFitOK G fuel op nid κ id now (o ∷ os) sched st =
       (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
   where rc = thruConsume fuel op nid κ id now o sched st
 
+-- A WIDER GRANT IS STILL A GRANT.  Every conjunct is upward-closed in
+-- `G` -- two of them under a `⊔` -- so a fit taken in one currency
+-- transports to any bound above it, which is what lets the frame spend
+-- a walk proven at the machinery's own grant.
+thruFitOK-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (G G′ : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  G ≤ G′ →
+  thruFitOK G fuel op nid κ id now os sched st →
+  thruFitOK G′ fuel op nid κ id now os sched st
+thruFitOK-mono G G′ fuel op nid κ id now [] sched st le fit = tt
+thruFitOK-mono G G′ fuel op nid κ id now (o ∷ os) sched st le (h1 , h2 , h3 , rest) =
+  ≤-trans h1 le
+  , ≤-trans h2 (⊔-mono-≤ ≤-refl le)
+  , (λ j → ≤-trans (h3 j) (⊔-mono-≤ ≤-refl le))
+  , thruFitOK-mono G G′ fuel op nid κ id now os
+      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc))) le rest
+  where rc = thruConsume fuel op nid κ id now o sched st
+
 -- The walk is the fit chained: values join step by step, the store
 -- bounds compose because the grant is the SAME `G` at every step.
 thruWalk-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1006,234 +1026,6 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
          (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
   IH = thruWalk-nest G fuel op nid κ id now os
          (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc))) rest
-
--- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
--- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
--- frame the `suc` a `*All` layer adds -- exactly right for the LAYER,
--- and silent about what the layer DOES.  `thruWalk` subscribes each
--- observable it is handed, so the values leaving the frame are an
--- inner's emissions, and a subscription SUBSTITUTES: the emitted depth
--- is the argument's depth times the number of times the step function
--- names its payload.  Multiplicative, so no summand is the shape.
---
--- AND THE FACTOR COMES FROM THE CAP BECAUSE THE FRAME CANNOT CARRY IT.
--- A frame holds an op and node ids and no syntax, so no function of it
--- can see what the subscription will substitute; the occurrence count is
--- bounded by two to the substituted function's SIZE.  But `capsOK?`
--- bounds the STATE and the arriving values are not in it, so the cap has
--- to be imposed on them separately -- which is what the `valCaps?`
--- premise does, and why the caps hypothesis alone is not enough.
---
--- AND THE INNER ARM IS THE SAME STATEMENT AT THE OTHER `*All` FRAME.
--- Both re-enter the subscribe machinery and both were charged as though
--- they forwarded, so one repair covers two arms.
---
--- AND IT TAKES TWO PREMISES, WHICH ARE INDEPENDENT AND EACH
--- LOAD-BEARING FOR A DIFFERENT READER.  Tying the cap to the
--- TELESCOPE is what makes the arithmetic work: a telescope of depth
--- `d` costs `d` units of written size, so the cap dominates `d` and
--- the grant's tower dominates the `2 ^ d` a doubling definition can
--- deliver; and at the top it is a proven consequence of `capsAt`'s own
--- size, which is what lets a consumer discharge it.  Keying on the
--- ARRIVAL's resolved closure is what the route to a proof needs: this
--- module's proven statement about consuming one subscribed value takes
--- that key, as do the arr-keyed twin and the drain, and the size
--- premise cannot supply it -- the resolved closure is multiplicative
--- in the telescope's depth where the written sum is flat, so neither
--- premise implies the other.
---
--- AND THE DOUBLING SLOT FAMILY CANNOT BE SWEPT AGAINST THE CONDITIONED
--- FORM AT ALL, which is a coverage boundary and not evidence for the
--- statement.  Tying the cap to the telescope makes both sides move with
--- the layer count, at different orders: the slot's written size climbs
--- about fifteen per layer -- twenty-five at one layer, fifty-five at
--- three -- so the grant is a tower in a number growing linearly, while
--- the delivery only doubles, reading eight at three layers against a
--- grant past two to the six-thousandth.  Every deeper witness widens
--- the margin, so no member of the family can fail and a sweep over it
--- is unfalsifiable by construction.  What could still break the
--- statement has to break the link the premise creates: a delivery that
--- grows without the telescope's written size growing with it.
---
--- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
---   eighty against forty-one, at a payload forty layers deep; the gap
---   is that depth, so no constant per value closes it.  The same
---   witness kills the ASSEMBLY at this frame, whose charge at the
---   smallest admissible width IS this bound.
--- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the caps-scaled form at
---   the same eighty against forty-one, because `capsOK? (caps 0 0 0)`
---   holds at the state it is asked about -- one ordinary installed node
---   and nothing else -- so the factor is one and the caps premise buys
---   the statement nothing at all.  The same file pins `valCaps?` FALSE
---   at the arriving value, which is the premise that does buy it.
--- REFUTED: `Refuted.Thru-Scan-Burst-Nest` kills the FLAT factor, at a
---   cold scripted slot whose sync list is charged to neither side: the
---   frame's own burst doubles the delivered depth per value while the
---   cap and the incoming state stay fixed, so the crossing arrives at
---   sixteen thousand three hundred and eighty-three against eight
---   thousand one hundred and ninety-two -- one value earlier, the two
---   sides are eight thousand one hundred and ninety-one against the same
---   eight thousand one hundred and ninety-two.  That is why the factor
---   is a power in the OUTPUT burst and the length premise is stated.
--- REFUTED: `Refuted.Thru-Fit-Frame-Slot` kills the form WITHOUT the
---   resolved-size premise, at a shared slot, eight against four.  A
---   slot reference has size one and depth zero, both by definition
---   and both correct, so the arrival pinned EVERY term of the grant
---   at its floor -- the cap `valCaps?` admits is one and the store
---   term is zero -- while the definition behind the slot doubles per
---   layer when it is subscribed.  No cap absorbed it: `capsOK?` has
---   no clause for slot defs, deliberately, they being fixed syntax,
---   and the width cap that does read the telescope is not a term of
---   the grant.  The same file carries the crossing at the PARENT,
---   whose own telescope term is linear where the delivery doubles --
---   which is why the premise is added HERE and spent there rather
---   than the unit being widened.
--- DEAD ROUTE: sweeping the ARRIVAL's depth cannot refute this, and the
---   reason is arithmetic rather than a failed attempt.  The grant's
---   factor is `nestFac`, a tower in the cap -- the cap is read off the
---   arrival's own size through the `valCaps?` premise, and a step that
---   duplicates needs a term big enough to write the duplication down.
---   So depth buys the bound side a tower per unit of size and the
---   measure side a doubling per level, and every deeper witness widens
---   the margin.  The refutations above all killed FLAT factors, which
---   is the axis that was open before the exponent moved into the burst.
---   What this does NOT cover is an arrival that NAMES its content
---   instead of carrying it, where the cap is read off the reference
---   and the delivery comes from somewhere the reference does not
---   measure -- the refutation below.
--- PROBED: `Probed.Thru-Fit-Frame` takes the W = 1 / large-S axis
---   (minimal grant addend against the widest `nestU` gap) and the
---   W-large contrast, across mergeAll, switch and exhaust.  It does
---   NOT reach the risky region, and the file pins why: the nodes-side
---   conjuncts are zero on every row, so only the emitted-depth
---   conjunct carries a number, and `nestU` does not occur in the
---   grant -- raising it moves the program and not the bound.  What
---   would refute is a step delivering more nesting than its arrival
---   carried by more than the `+ W`, which this family never does.
---   The same module now also takes the ITERATED axis, which is the
---   one the walk above creates and no single-arrival row can see: the
---   grant is read off the ENTRY state while each consume runs at the
---   state the previous one left, so a delivery that compounded across
---   the chain would break a frozen grant.  Three consumes deep, the
---   delivery reads six at every step and the nodes side stays at zero
---   -- so the chain does not compound here and the axis is closed for
---   this family.  Conjuncts two and three stay DEGENERATE on those
---   rows for that same reason; conjunct one is load-bearing and flat.
-
-postulate
-  thruConsume-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (W : ℕ) (sl : Slots Γ)
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (p : Path Γ u t) (M : ℕ)
-    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    1 ≤ W → capsOK? c sched st ≡ true →
-    valCaps? c sl (obs u) o ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    nestClosOK? c sl o ≡ true →
-    nodesMax st ≤ M →
-    let rc = thruConsume sf op nid p id now o sched st
-        sched′ = proj₁ (proj₂ (proj₂ rc))
-        st′ = proj₂ (proj₂ (proj₂ rc))
-    in (nestDᵛˢ (proj₁ rc) ≤ nestFac (Caps.cSize c) W * (M + W))
-     × (nodesMax st′ ≤ M)
-     × ((j : NodeId) → nodeNestAt j st′
-          ≤ nodeNestAt j st ⊔ (nestFac (Caps.cSize c) W * (M + W)))
-     × (Sched.slots sched′ ≡ sl)
-     × (capsOK? c sched′ st′ ≡ true)
-
--- The walk is that leaf chained, and the STATE BOUND is what makes
--- the chain close: `thruFitOK` re-uses ONE grant at every step while
--- each consume runs at the state the previous one left, so a grant
--- read off the entry state cannot be re-derived at the tail.  Taking
--- `M` as a parameter the leaf PRESERVES -- rather than raising to the
--- grant, which is all the fit itself asks -- is what lets the same
--- grant serve the whole list.
-thruFit-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (W : ℕ) (sl : Slots Γ)
-  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-  (p : Path Γ u t) (M : ℕ)
-  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  1 ≤ W → capsOK? c sched st ≡ true →
-  all (valCaps? c sl (obs u)) vals ≡ true →
-  slotsSize sl ≤ Caps.cSize c →
-  all (nestClosOK? c sl) vals ≡ true →
-  nodesMax st ≤ M →
-  thruFitOK (nestFac (Caps.cSize c) W * (M + W)) sf op nid p id now vals sched st
-thruFit-walk c W sl sf id now op nid p M [] sched st
-  hsl h1w hcap hval hss hclos hM = tt
-thruFit-walk {u = u} c W sl sf id now op nid p M (o ∷ os) sched st
-  hsl h1w hcap hval hss hclos hM =
-  proj₁ L
-  , ≤-trans (proj₁ (proj₂ L)) (≤-trans (raiseN (Caps.cSize c) W M W)
-                                       (m≤n⊔m _ _))
-  , proj₁ (proj₂ (proj₂ L))
-  , thruFit-walk c W sl sf id now op nid p M os
-      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
-      (proj₁ (proj₂ (proj₂ (proj₂ L))))
-      h1w (proj₂ (proj₂ (proj₂ (proj₂ L))))
-      (proj₂ (∧-true _ _ hval)) hss (proj₂ (∧-true _ _ hclos))
-      (proj₁ (proj₂ L))
-  where
-  rc = thruConsume sf op nid p id now o sched st
-  L = thruConsume-fit c W sl sf id now op nid p M o sched st
-        hsl h1w hcap (proj₁ (∧-true _ _ hval)) hss
-        (proj₁ (∧-true _ _ hclos)) hM
-
--- and the frame's own grant is that walk at the entry state's bound
-thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (W : ℕ) (sl : Slots Γ)
-  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-  (p : Path Γ u t)
-  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
-  all (valCaps? c sl (obs u)) vals ≡ true →
-  slotsSize sl ≤ Caps.cSize c →
-  all (nestClosOK? c sl) vals ≡ true →
-  thruFitOK (nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W))
-    sf op nid p id now vals sched st
-thruFit-frame c W sl sf id now op nid p vals sched st
-  hsl h1w hlv hcap hval hss hclos =
-  thruFit-walk c W sl sf id now op nid p
-    (nodesMax st ⊔ nestDᵛˢ vals) vals sched st
-    hsl h1w hcap hval hss hclos (m≤m⊔n _ _)
-
--- The head itself is now the walk and the wrap composed at that
--- grant, with the base term absorbed by positivity of the factor.
-stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (W : ℕ) (sl : Slots Γ)
-  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-  (p : Path Γ u t)
-  (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
-  all (valCaps? c sl (obs u)) vals ≡ true →
-  slotsSize sl ≤ Caps.cSize c →
-  all (nestClosOK? c sl) vals ≡ true →
-  let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
-  length (proj₁ r) ≤ W →
-  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
-    ≤ nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
-stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
-  hsl h1w hlv hcap hval hss hclos hlr =
-  ⊔-lub
-    (≤-trans (proj₁ (proj₂ WRAP))
-      (≤-trans (proj₁ (proj₂ WALK))
-        (⊔-lub (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
-                        (raiseN (Caps.cSize c) W
-                          (nodesMax st ⊔ nestDᵛˢ vals) W))
-               ≤-refl)))
-    (≤-trans (≤-reflexive (cong nestDᵛˢ (proj₁ WRAP))) (proj₁ WALK))
-  where
-  G = nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
-  w = thruWalk sf op nid p id now vals sched st
-  WALK = thruWalk-nest G sf op nid p id now vals sched st
-           (thruFit-frame c W sl sf id now op nid p vals sched st
-              hsl h1w hlv hcap hval hss hclos)
-  WRAP = thruWrap-nest op nid fin (proj₁ w) (proj₁ (proj₂ w))
-           (proj₁ (proj₂ (proj₂ w))) (proj₂ (proj₂ (proj₂ w)))
 
 -- The same relation lifted over the burst the descent hands back, one
 -- fit per emit, each at the state the previous frame left.
@@ -3275,6 +3067,214 @@ thruFit-vals {u = u} c sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) sc
         (nestClosOK?-size c sl o (proj₁ (∧-true _ _ hcl))) (proj₁ hr)
         (≤-trans (m≤m⊔n (nestDᵛ (obs u) o) (nestDᵛˢ os)) hn)
 
+-- WHAT SURVIVES THE FIT IS ROOM, WHICH IS A CLAIM ABOUT THE STATE
+-- AND NOT ABOUT THE DELIVERY.  The walk spends this once per value:
+-- each consume must have somewhere to install what it subscribes,
+-- and the caps face is what says so.  The delivery side is no longer
+-- assumed -- the grant is the machinery's own and the frame's fit is
+-- proven at it -- so this is the single leaf that fit still rests on,
+-- and it is the same currency the burst's admission statements are
+-- stated in.
+postulate
+  thruRoom-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (W : ℕ) (sl : Slots Γ)
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (p : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+    all (valCaps? c sl (obs u)) vals ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    all (nestClosOK? c sl) vals ≡ true →
+    thruRoomOK c W sf op nid p id now vals sched st
+
+-- THE ARRIVAL'S SYNC READING IS UNDER ITS RESOLVED CLOSURE, so the
+-- key premise pays for the size premise the walk asks about each
+-- value and no second hypothesis is owed.  The telescope is positive
+-- at every slot, which is the side condition that makes the closure a
+-- widening rather than a re-reading.
+nestClosOK?⇒val : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  (o : Val Γ (obs u)) →
+  nestClosOK? c sl o ≡ true → nestValOK? c (obs u) o ≡ true
+nestClosOK?⇒val c sl o h =
+  ≤ᵇ-true _ _ (≤-trans (syncSize≤closᵉ (slotClos sl) (slotClos-pos sl) o)
+                       (nestClosOK?-size c sl o h))
+
+-- THE OUTER WRAP TAKES OBSERVABLES AND SUBSCRIBES THEM, which is why
+-- this arm is charged a FACTOR and not a unit.  `pathNestD` charges the
+-- frame the `suc` a `*All` layer adds -- exactly right for the LAYER,
+-- and silent about what the layer DOES.  `thruWalk` subscribes each
+-- observable it is handed, so the values leaving the frame are an
+-- inner's emissions, and a subscription SUBSTITUTES: the emitted depth
+-- is the argument's depth times the number of times the step function
+-- names its payload.  Multiplicative, so no summand is the shape.
+--
+-- AND THE FACTOR COMES FROM THE CAP BECAUSE THE FRAME CANNOT CARRY IT.
+-- A frame holds an op and node ids and no syntax, so no function of it
+-- can see what the subscription will substitute; the occurrence count is
+-- bounded by two to the substituted function's SIZE.  But `capsOK?`
+-- bounds the STATE and the arriving values are not in it, so the cap has
+-- to be imposed on them separately -- which is what the `valCaps?`
+-- premise does, and why the caps hypothesis alone is not enough.
+--
+-- AND THE INNER ARM IS THE SAME STATEMENT AT THE OTHER `*All` FRAME.
+-- Both re-enter the subscribe machinery and both were charged as though
+-- they forwarded, so one repair covers two arms.
+--
+-- AND IT TAKES TWO PREMISES, WHICH ARE INDEPENDENT AND EACH
+-- LOAD-BEARING FOR A DIFFERENT READER.  Tying the cap to the
+-- TELESCOPE is what makes the arithmetic work: a telescope of depth
+-- `d` costs `d` units of written size, so the cap dominates `d` and
+-- the grant's tower dominates the `2 ^ d` a doubling definition can
+-- deliver; and at the top it is a proven consequence of `capsAt`'s own
+-- size, which is what lets a consumer discharge it.  Keying on the
+-- ARRIVAL's resolved closure is what the route to a proof needs: this
+-- module's proven statement about consuming one subscribed value takes
+-- that key, as do the arr-keyed twin and the drain, and the size
+-- premise cannot supply it -- the resolved closure is multiplicative
+-- in the telescope's depth where the written sum is flat, so neither
+-- premise implies the other.
+--
+-- AND THE DOUBLING SLOT FAMILY CANNOT BE SWEPT AGAINST THE CONDITIONED
+-- FORM AT ALL, which is a coverage boundary and not evidence for the
+-- statement.  Tying the cap to the telescope makes both sides move with
+-- the layer count, at different orders: the slot's written size climbs
+-- about fifteen per layer -- twenty-five at one layer, fifty-five at
+-- three -- so the grant is a tower in a number growing linearly, while
+-- the delivery only doubles, reading eight at three layers against a
+-- grant past two to the six-thousandth.  Every deeper witness widens
+-- the margin, so no member of the family can fail and a sweep over it
+-- is unfalsifiable by construction.  What could still break the
+-- statement has to break the link the premise creates: a delivery that
+-- grows without the telescope's written size growing with it.
+--
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
+--   eighty against forty-one, at a payload forty layers deep; the gap
+--   is that depth, so no constant per value closes it.  The same
+--   witness kills the ASSEMBLY at this frame, whose charge at the
+--   smallest admissible width IS this bound.
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the caps-scaled form at
+--   the same eighty against forty-one, because `capsOK? (caps 0 0 0)`
+--   holds at the state it is asked about -- one ordinary installed node
+--   and nothing else -- so the factor is one and the caps premise buys
+--   the statement nothing at all.  The same file pins `valCaps?` FALSE
+--   at the arriving value, which is the premise that does buy it.
+-- REFUTED: `Refuted.Thru-Scan-Burst-Nest` kills the FLAT factor, at a
+--   cold scripted slot whose sync list is charged to neither side: the
+--   frame's own burst doubles the delivered depth per value while the
+--   cap and the incoming state stay fixed, so the crossing arrives at
+--   sixteen thousand three hundred and eighty-three against eight
+--   thousand one hundred and ninety-two -- one value earlier, the two
+--   sides are eight thousand one hundred and ninety-one against the same
+--   eight thousand one hundred and ninety-two.  That is why the factor
+--   is a power in the OUTPUT burst and the length premise is stated.
+-- REFUTED: `Refuted.Thru-Fit-Frame-Slot` kills the form WITHOUT the
+--   resolved-size premise, at a shared slot, eight against four.  A
+--   slot reference has size one and depth zero, both by definition
+--   and both correct, so the arrival pinned EVERY term of the grant
+--   at its floor -- the cap `valCaps?` admits is one and the store
+--   term is zero -- while the definition behind the slot doubles per
+--   layer when it is subscribed.  No cap absorbed it: `capsOK?` has
+--   no clause for slot defs, deliberately, they being fixed syntax,
+--   and the width cap that does read the telescope is not a term of
+--   the grant.  The same file carries the crossing at the PARENT,
+--   whose own telescope term is linear where the delivery doubles --
+--   which is why the premise is added HERE and spent there rather
+--   than the unit being widened.
+-- DEAD ROUTE: sweeping the ARRIVAL's depth cannot refute this, and the
+--   reason is arithmetic rather than a failed attempt.  The grant's
+--   factor is `nestFac`, a tower in the cap -- the cap is read off the
+--   arrival's own size through the `valCaps?` premise, and a step that
+--   duplicates needs a term big enough to write the duplication down.
+--   So depth buys the bound side a tower per unit of size and the
+--   measure side a doubling per level, and every deeper witness widens
+--   the margin.  The refutations above all killed FLAT factors, which
+--   is the axis that was open before the exponent moved into the burst.
+--   What this does NOT cover is an arrival that NAMES its content
+--   instead of carrying it, where the cap is read off the reference
+--   and the delivery comes from somewhere the reference does not
+--   measure -- the refutation below.
+
+-- THE FRAME'S FIT IS THE MACHINERY'S WALK, WIDENED.  `thruFit-vals`
+-- already proves the fit at the grant the rest of the tower spends,
+-- and the descent is opened at the cap itself, where that grant IS
+-- the frame layer's shape.  What the frame adds is only that the
+-- arrival's own joined nesting sits under the base term, which is
+-- where the walk starts, and that the whole thing survives a wider
+-- bound -- both arithmetic.
+thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (W : ℕ) (sl : Slots Γ)
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  1 ≤ W → length vals ≤ W → 1 ≤ Caps.cSize c → capsOK? c sched st ≡ true →
+  all (valCaps? c sl (obs u)) vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  all (nestClosOK? c sl) vals ≡ true →
+  thruFitOK (nestFac (Caps.cSize c) W
+              * ((nodesMax st ⊔ nestDᵛˢ vals)
+                 + nestU (Caps.cSize c) (nestUnit e sl)))
+    sf op nid p id now vals sched st
+thruFit-frame {e = e} c W sl sf id now op nid p vals sched st
+  hsl h1w hlv h1S hcap hval hss hclos =
+  thruFitOK-mono
+    (nestB (Caps.cSize c) W (nestUnit e sl) (nestDᵛˢ vals) (Caps.cSize c))
+    (nestFac (Caps.cSize c) W
+      * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl)))
+    sf op nid p id now vals sched st
+    (≤-trans (nestB-at (Caps.cSize c) W (nestUnit e sl) (nestDᵛˢ vals))
+             (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
+                (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl))
+                   (m≤n⊔m (nodesMax st) (nestDᵛˢ vals)))))
+    (thruFit-vals c sl (nestDᵛˢ vals) W 0 (Caps.cSize c) sf op nid p id now
+       vals sched st hsl h1S (capsOK?⇒nest c sched st hcap)
+       (all-impl (nestClosOK? c sl) (nestValOK? c (obs _))
+          (λ o → nestClosOK?⇒val c sl o) vals hclos)
+       hclos
+       (thruRoom-frame c W sl sf id now op nid p vals sched st
+          hsl h1w hlv hcap hval hss hclos)
+       (nestB-base (Caps.cSize c) W (nestUnit e sl) (nestDᵛˢ vals) 0))
+
+-- The head itself is now the walk and the wrap composed at that
+-- grant, with the base term absorbed by positivity of the factor.
+stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (W : ℕ) (sl : Slots Γ)
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
+  all (valCaps? c sl (obs u)) vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
+  all (nestClosOK? c sl) vals ≡ true →
+  1 ≤ Caps.cSize c →
+  let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
+  length (proj₁ r) ≤ W →
+  (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
+    ≤ nestFac (Caps.cSize c) W
+      * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
+stepFrame-nodes-thru {e = e} c W sl sf id now op nid p vals fin sched st
+  hsl h1w hlv hcap hval hss hclos h1S hlr =
+  ⊔-lub
+    (≤-trans (proj₁ (proj₂ WRAP))
+      (≤-trans (proj₁ (proj₂ WALK))
+        (⊔-lub (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
+                        (raiseN (Caps.cSize c) W
+                          (nodesMax st ⊔ nestDᵛˢ vals)
+                          (nestU (Caps.cSize c) (nestUnit e sl))))
+               ≤-refl)))
+    (≤-trans (≤-reflexive (cong nestDᵛˢ (proj₁ WRAP))) (proj₁ WALK))
+  where
+  G = nestFac (Caps.cSize c) W
+        * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU (Caps.cSize c) (nestUnit e sl))
+  w = thruWalk sf op nid p id now vals sched st
+  WALK = thruWalk-nest G sf op nid p id now vals sched st
+           (thruFit-frame c W sl sf id now op nid p vals sched st
+              hsl h1w hlv h1S hcap hval hss hclos)
+  WRAP = thruWrap-nest op nid fin (proj₁ w) (proj₁ (proj₂ w))
+           (proj₁ (proj₂ (proj₂ w))) (proj₂ (proj₂ (proj₂ w)))
+
 -- What the outer's burst has to satisfy, emit by emit and at the state
 -- each frame leaves: the invariant holds there, the values it carries
 -- are admissible, and their joined nesting is already inside the grant.
@@ -5215,13 +5215,14 @@ abstract
     frameClosOK c sl f vals →
     frameDrainOK c sl sf id now f p sched st →
     frameDrainW W sf id now f p sched st →
+    1 ≤ Caps.cSize c →
     let r = stepFrame sf id now f p vals fin sched st in
     length (proj₁ r) ≤ W →
     (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
       ≤ nestFac (Caps.cSize c) W
         * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
            + nestU (Caps.cSize c) (nestUnit e sl))
-  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hw =
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
                    (*-mono-≤ (pow-grow¹ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn)) 1≤W)
@@ -5235,25 +5236,25 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hw =
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hw =
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hw =
     ≤-trans (stepFrame-nodes-inner c sl W sf id now op allNid inst p vals fin sched st
                hsl (capsOK?⇒nest c sched st hc) hfd hfw)
             (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
               (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl)) (zero-charge W _)))
-  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw hw =
+  stepFrame-nodes {e = e} c W sl sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hw =
     ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
-               hsl 1≤W hlen hc hv hss hfc hw)
-            (≤-trans (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
-              (≤-trans (≤-reflexive (cong (_ +_) (sym (*-identityʳ W))))
-                       (one-pow W (_ + W * 1))))
-              (addN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl))))
+               hsl 1≤W hlen hc hv hss hfc h1S hw)
+            (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
+              (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl))
+                (≤-trans (m≤m+n (nodesMax st ⊔ nestDᵛˢ vals) (W * 1))
+                         (one-pow W ((nodesMax st ⊔ nestDᵛˢ vals) + W * 1)))))
 
 -- HOISTING THE SUBSTITUTION FACTOR PAST ONE FRAME'S CHARGE, which is
 -- the only arithmetic the caps rider adds to the telescope.  The factor
@@ -5750,6 +5751,7 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
                                   (proj₁ (proj₂ (proj₂ hc))) (proj₁ (proj₂ (proj₂ (proj₂ hc))))
                                   (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))
                                   (burstsDrain W sf gas id now f p vals fin sched st hb)
+                                  1≤S
                                   (burstsHead W sf gas id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb))))
                                (*-monoʳ-≤ Q (+-monoʳ-≤ A unit≤))))))
     (≤-trans (*-monoʳ-≤ (Q ^ deliverLen gas c p)

@@ -203,7 +203,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the `thru` frame's fit, and the burst underneath it** — `thruConsume-fit`,
+- **the `thru` frame's fit, and the burst underneath it** — `thruRoom-frame`,
   `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-room`,
   `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit
   because they are one currency argument seen from four places: the wrap's
@@ -227,10 +227,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`thruConsume-fit`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, PROBED`:
-  ONE consume's fit under the caps face's own standing premise; the walk over
-  it is a checked body. Refuted unconditionally at a shared slot, by a cap the
-  top never instantiates, and the conditioned form's region is unreached.
+- **`thruRoom-frame`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: the frame's room
+  for one burst, the single leaf the fit still rests on. Nothing has
+  instantiated it; the fit above it is now a checked body at the machinery's
+  own grant.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
