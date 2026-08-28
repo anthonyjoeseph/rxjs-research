@@ -243,10 +243,10 @@ does not fit is a finding about the shared statement, not about the head.
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
 - **`pushVals-caps-adm`, `pushVals-caps-wid`, `pushVals-caps-burstW`,
-  `pushVals-caps-queue`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED×4`: the burst's
-  stream leaves — the walk over them is a proven body, so what remains is per
-  instant: the values admissible, their width key, the frame widths, and the
-  queue reading the invariant cannot supply.
+  `pushVals-caps-queue`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, PROBED×4`: the
+  burst's stream leaves — the walk over them is a proven body, so what remains
+  is per instant: the values admissible, their width key, the frame widths, and
+  the queue reading the invariant cannot supply.
 - **`pushVals-nest`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
   burst inside the grant, emit by emit, at the BODY's key. This is where the

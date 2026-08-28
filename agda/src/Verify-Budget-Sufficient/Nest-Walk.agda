@@ -3948,7 +3948,17 @@ postulate
   -- cannot supply it -- they admit a queue as long as the field, and
   -- the record asks the field for one more -- which is why it is a
   -- leaf of the burst rather than a consequence of the invariant.
+  --
+  -- AND IT TAKES THE WIDTH KEY BESIDE IT, because unconditionally it
+  -- is FALSE.  At the EMPTY queue the wrap installs, the conclusion
+  -- already reads `1 ≤ cWid`, so it asserts the width field is
+  -- positive -- and every other premise reads the SIZE field or the
+  -- slots, so nothing forbids a width of zero.  The repair is not a
+  -- positivity premise cascading through the face: the arrivals' own
+  -- key rules the witness out, since at width zero no arrival fits and
+  -- the sibling leaf's conclusion is false at the very same program.
   -- REFUTED: `Refuted.Thru-Room-Frame`
+  -- REFUTED: `Refuted.PushVals-Queue-Width`
   -- PROBED: `Probed.PushVals-Caps` inhabits all three of these leaves,
   --   and the admissibility beside them, at every constructor of the op
   --   axis -- which the rows therefore cover in FULL -- at the cap each
@@ -3981,7 +3991,8 @@ postulate
     let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in pushValsQOK c g op (proj₁ (mintNode sched)) κ id now
+    in pushValsWidOK c sl (proj₁ res) →
+       pushValsQOK c g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- THE `*All` BURST LEAF, MEASURE HALF -- and this is where the risk
   -- of the burst statement is, the bundle beside it being routine.
@@ -4469,7 +4480,8 @@ pushVals-caps-room {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw
     (pushVals-caps-adm c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
     (pushVals-caps-wid c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
     (pushVals-caps-burstW c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-caps-queue c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-queue c sl W g op lim b κ id now sched st hsl hc hv hcl hw
+       (pushVals-caps-wid c sl W g op lim b κ id now sched st hsl hc hv hcl hw))
   where
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))

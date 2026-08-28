@@ -19,7 +19,7 @@
 -- TARGET: pushVals-caps-adm @66072f
 -- TARGET: pushVals-caps-wid @962e07
 -- TARGET: pushVals-caps-burstW @f0db0b
--- TARGET: pushVals-caps-queue @a37576
+-- TARGET: pushVals-caps-queue @f51f3d
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
