@@ -104,6 +104,8 @@ open import Refuted.Thru-Room-Frame
   using (Stmt; prems≡; room-absurd; figs≡)
 open import Refuted.PushVals-Queue-Width
   using (Stmt; prems≡; queue-absurd; figs≡; widRead≡)
+open import Refuted.Subscribe-Burst-Width
+  using (Stmt; prems≡; burst-width-absurd; figs≡; walkRead≡)
 open import Refuted.PushVals-Adm-Map
   using (AdmStmt; WidStmt; prems-map≡; adm-absurd; wid-absurd; figs-map≡;
   AdmStmtZ; WidStmtZ; prems-z≡; adm-absurd-z; wid-absurd-z; regs≡)

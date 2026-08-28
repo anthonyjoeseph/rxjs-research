@@ -236,10 +236,14 @@ does not fit is a finding about the shared statement, not about the head.
   cascade descent against the instant's own grant. Nothing instantiates it —
   both sealed families sit on the right — and the store-mediated route it
   replaced is circular; the header carries the cycle.
-- **`subscribeE-burst-nest`, `subscribeE-burst-caps`** (Nest-Walk) —
-  DIFFICULTY, `REFUTED×2, DEAD ROUTE×3, PROBED×2, RECOVERY`: one arrival
-  boolean each over any subscription's whole burst, read one caps level up —
-  the level the refuting map crosses by, and the one the width field ignores.
+- **`subscribeE-burst-caps`** (Nest-Walk) — FALSITY, `REFUTED×2, PROBED`: the
+  arrivals' width key over any subscription's burst. Refuted at a width of
+  zero, which no key here forbids; the width axis has to step with the level,
+  and a key on the source does not repair it. The header carries the route.
+- **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
+  subscription's whole burst, read one caps level up — the level the refuting
+  map crosses by, and the axis that level does move.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

@@ -4120,7 +4120,34 @@ postulate
   -- this `subscribeE`, at exactly this shape of level -- what stands
   -- between the two is the module order, since the caps face is built
   -- ON this one and cannot be read from here.
+  --
+  -- AND IT IS FALSE AS STATED, on the WIDTH half and at every level.
+  -- The level moves the size axis and leaves the width field exactly
+  -- where it was, deliberately: the invariant reads `cWid` and nothing
+  -- else, which is what makes it the SAME boolean at the stepped cap
+  -- and lets the arm hand its exit pair straight through.  So nothing
+  -- here forbids a width of zero -- the two keys are size bounds and
+  -- the invariant is satisfied by a table the descent has not written
+  -- -- and a source that hands back an observable payload is absurd at
+  -- the first instant.
+  --
+  -- AND A WIDTH KEY ON THE SOURCE DOES NOT REPAIR IT, which is the
+  -- part worth knowing before the next attempt: an `ofᵉ`'s own reading
+  -- joins its payload COUNT with its parked half, and the emitted
+  -- inner's delivered width appears in neither.  The quantity that
+  -- covers it is the inner width, and the proven bound delivering all
+  -- three at once is `wid-iterFold` -- whose right side is the width
+  -- axis ITERATED, at the syntax size and over a slot-width key this
+  -- face does not carry.  So what is owed is the width axis stepping
+  -- with the level, and the walk's exit conjunct moving to the stepped
+  -- cap with it; that direction is a widening, which is the one thing
+  -- the node reading does admit.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
+  -- REFUTED: `Refuted.Subscribe-Burst-Width` sets the width field to
+  --   zero, pins the three keys true there, and crosses at the first
+  --   emitted inner -- and its last row pins that the walk stated over
+  --   the node table SURVIVES that witness, so the crossing is this
+  --   statement's alone and not the exit pair's.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   subscribeE-burst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
