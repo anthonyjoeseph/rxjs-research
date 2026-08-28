@@ -12,6 +12,15 @@
 -- only, and the measure is sealed, so instantiating it would need a
 -- lower bound of the kind the arr-keyed scan probes pin.
 --
+-- AND THE TWO ARRIVAL BOOLEANS ARE READ AT THE *All-HEADED PATH ONLY,
+-- which is a coverage boundary and named as one.  Those two targets
+-- are stated over ANY subscription at ANY path; every row here enters
+-- through a `thru-outer` continuation, because that is the shape the
+-- consumers of those statements stand at.  The clauses no row reaches
+-- are therefore the ones a bare path takes -- and the risky two of
+-- those, the defer and the scripted slot, ARE reached, since the gate
+-- and async bodies below put both under a `*All` head.
+--
 -- AND THE LEVEL IS A BOUNDARY, not a gap: the three leaves now take the
 -- caps level as a parameter, and these rows are taken at the level the
 -- head's own written size fixes -- the SMALLEST any arm passes, since an
@@ -25,8 +34,8 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-caps-admB @98710d
--- TARGET: pushVals-caps-widB @369c46
+-- TARGET: subscribeE-burst-nest @7c48f9
+-- TARGET: subscribeE-burst-caps @b43021
 -- TARGET: pushVals-caps-burstW @f0db0b
 -- TARGET: pushVals-caps-queue @861d80
 module Probed.PushVals-Caps where
@@ -664,3 +673,32 @@ burstsShS≡ = refl
 
 burstsShX≡ : burstsShX ≡ (true , true)
 burstsShX≡ = refl
+
+-- AND THE TWO BOOLEANS AT THE DEFER AND THE SCRIPTED SLOT, which is
+-- where the two refutations of this face's state predicate live: a
+-- defer parks its body at FULL syntax size and FULL delivered width
+-- while every premise here reads the defer as 1, and a scripted slot
+-- delivers on a later tick.  The arrival cap steps the SIZE axis only,
+-- so if the parked body ever arrives its WIDTH is priced at the entry
+-- field and the width half has nowhere to move.  LOAD-BEARING on both
+-- axes, and the whole reason for the rows: every other program here
+-- reaches the leaf through a synchronous source.
+tightG : (lim : ℕ) → Caps
+tightG lim = tight {obs (obs natᵗ)} (rG lim)
+
+tightA : (lim : ℕ) → Caps
+tightA lim = tight {obs (obs natᵗ)} (rA lim)
+
+burstsG : Bool × Bool
+burstsG = burstCaps? (arrCapAt (Caps.cSize (tightG 1)) (tightG 1)) slots (proj₁ (resG 1))
+        , burstNest? (arrCapAt (Caps.cSize (tightG 1)) (tightG 1)) slots (proj₁ (resG 1))
+
+burstsG≡ : burstsG ≡ (true , true)
+burstsG≡ = refl
+
+burstsA : Bool × Bool
+burstsA = burstCaps? (arrCapAt (Caps.cSize (tightA 1)) (tightA 1)) (slotsA 1) (proj₁ (resA 1 1))
+        , burstNest? (arrCapAt (Caps.cSize (tightA 1)) (tightA 1)) (slotsA 1) (proj₁ (resA 1 1))
+
+burstsA≡ : burstsA ≡ (true , true)
+burstsA≡ = refl

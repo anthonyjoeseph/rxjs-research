@@ -2,7 +2,7 @@
 -- foldPath-nodes … frameNestD
 module Verify-Budget-Sufficient.Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; if_then_else_; not)
+open import Data.Bool using (Bool; true; false; if_then_else_; not; _∧_)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map; foldr; length)
@@ -47,13 +47,13 @@ open import Rx.Evaluator using
   sharedConnect; sharedPlumb; burstCompleted; register; dropSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using
-  (1≤pow≤; arrCapAt; Caps; frameStep; frameStep-reg-mono; iterSize-infl; iterSize-mono-count)
+  (_⊑ᶜ_; 1≤pow≤; arrCapAt; arrCapAt-⊑; Caps; frameStep; frameStep-reg-mono; iterSize-infl; iterSize-mono-count)
 open import Verify-Budget-Sufficient.Caps using (sizeCount)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDisp; depthDrain; depthFin; depthFold; depthFrame; depthInner; depthE; depthReact;
   depthShareGo; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; nestValOK?; pathSz?)
-open import Verify-Budget-Sufficient.Caps-Face.Part3 using (valCaps?-wid)
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots; pathSz?-len;
   splitEvents-vals-caps)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
@@ -693,15 +693,55 @@ nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
 -- arrival predicate in.  Only a `value` carries an arrival, so every
 -- other event reads as true outright -- the fold is a filter with the
 -- closure reading attached, not a second traversal.
-eventNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ (obs u)) → Bool
-eventNest? c sl (value v)   = nestClosOK? c sl v
+nestClosOK?ᵛ : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
+nestClosOK?ᵛ c sl unitᵗ    _        = true
+nestClosOK?ᵛ c sl boolᵗ    _        = true
+nestClosOK?ᵛ c sl natᵗ     _        = true
+nestClosOK?ᵛ c sl (s ×ᵗ t) (a , b)  = nestClosOK?ᵛ c sl s a ∧ nestClosOK?ᵛ c sl t b
+nestClosOK?ᵛ c sl (s +ᵗ t) (inj₁ a) = nestClosOK?ᵛ c sl s a
+nestClosOK?ᵛ c sl (s +ᵗ t) (inj₂ b) = nestClosOK?ᵛ c sl t b
+nestClosOK?ᵛ c sl (obs t)  o        = nestClosOK? c sl o
+
+eventNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ u) → Bool
+eventNest? {u = u} c sl (value v) = nestClosOK?ᵛ c sl u v
 eventNest? c sl (init _)    = true
 eventNest? c sl (close _ _) = true
 eventNest? c sl (handoff _) = true
 eventNest? c sl complete    = true
 
-burstNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Stream Γ (obs u) → Bool
+burstNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Stream Γ u → Bool
 burstNest? c sl = all (λ em → all (eventNest? c sl) (InstEmit.events em))
+
+-- AND BOTH ARRIVAL BOOLEANS WIDEN WITH THE CAP, which is what lets a
+-- caller read a bound at the level the walk reports and spend it at
+-- the join its own arm needs.  The size field is the only one the
+-- arrival cap moves, and every reading here is against it.
+nestClosOK?ᵛ-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
+  c ⊑ᶜ c′ → nestClosOK?ᵛ c sl u v ≡ true → nestClosOK?ᵛ c′ sl u v ≡ true
+nestClosOK?ᵛ-widen sl unitᵗ    v        le h = refl
+nestClosOK?ᵛ-widen sl boolᵗ    v        le h = refl
+nestClosOK?ᵛ-widen sl natᵗ     v        le h = refl
+nestClosOK?ᵛ-widen sl (s ×ᵗ t) (a , b)  le h =
+  ∧-intro (nestClosOK?ᵛ-widen sl s a le (proj₁ (∧-true _ _ h)))
+          (nestClosOK?ᵛ-widen sl t b le (proj₂ (∧-true _ _ h)))
+nestClosOK?ᵛ-widen sl (s +ᵗ t) (inj₁ a) le h = nestClosOK?ᵛ-widen sl s a le h
+nestClosOK?ᵛ-widen sl (s +ᵗ t) (inj₂ b) le h = nestClosOK?ᵛ-widen sl t b le h
+nestClosOK?ᵛ-widen {c = c} sl (obs t) o le h =
+  ≤ᵇ-true _ _ (≤-trans (≤ᵇ⇒≤ (closSizeᵉ (slotClos sl) o) (Caps.cSize c) (T-to h)) (proj₁ le))
+
+burstNest?-widen : ∀ {n} {Γ : Ctx n} {u} {c c′ : Caps} (sl : Slots Γ) (str : Stream Γ u) →
+  c ⊑ᶜ c′ → burstNest? c sl str ≡ true → burstNest? c′ sl str ≡ true
+burstNest?-widen sl [] le h = refl
+burstNest?-widen {u = u} sl (em ∷ ems) le h =
+  ∧-intro (all-impl _ _ EV (InstEmit.events em) (proj₁ (∧-true _ _ h)))
+          (burstNest?-widen sl ems le (proj₂ (∧-true _ _ h)))
+  where
+  EV : ∀ (ev : InstEvent (Val _ u)) → _ ≡ true → _ ≡ true
+  EV (value v)   hv = nestClosOK?ᵛ-widen sl u v le hv
+  EV (init _)    hv = refl
+  EV (close _ _) hv = refl
+  EV (handoff _) hv = refl
+  EV complete    hv = refl
 
 abstract
   nestClosOK?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
@@ -3946,7 +3986,15 @@ postulate
   -- the arrivals' width key, the frame widths, and the queue reading.
 
   -- The stream's own half: every instant's values admissible, written
-  -- and under the telescope.
+  -- and under the telescope.  It is stated over ANY subscription at
+  -- ANY path rather than over the `*All` arm that consumes it: the
+  -- arm's premises reduce to these by the same bundle its own exit
+  -- leaf already spends, and generality costs nothing here because
+  -- there is no state in the conclusion for a head to have to
+  -- re-establish.  The proven twin to grind it against is the exit
+  -- walk over the same `subscribeE`, which carries this face's whole
+  -- state half at exactly these premises and says nothing about the
+  -- burst it returns.
   --
   -- AND IT IS FALSE AT THE FLAT CAP THIS FACE CARRIES.  Every premise
   -- reads the head's SYNTAX, which counts a bound variable as one; an
@@ -4043,18 +4091,15 @@ postulate
   --   re-deriving its bound at the lifted cap and started reading the
   --   child's; a caps leaf whose proof needs an arrival premise carried
   --   UP a level is what would want it back.
-  pushVals-caps-admB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
-    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  subscribeE-burst-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
-    nestClosOK? c sl (allWrap op lim b) ≡ true →
-    descW g (allWrap op lim b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in burstNest? (arrCapAt j c) sl (proj₁ res) ≡ true
+    nestValOK? c (obs u) o ≡ true →
+    nestClosOK? c sl o ≡ true →
+    descW g o κ id now sched st ≤ W →
+    burstNest? (arrCapAt (Caps.cSize c) c) sl
+      (proj₁ (subscribeE g o κ id now sched st)) ≡ true
   -- The arrivals' width key: every value the descent hands back reads
   -- inside the cap at the telescope the frame is standing in.  It is
   -- the one half of the room the frame's own record cannot recover,
@@ -4078,18 +4123,15 @@ postulate
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
-  pushVals-caps-widB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
-    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  subscribeE-burst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
-    nestClosOK? c sl (allWrap op lim b) ≡ true →
-    descW g (allWrap op lim b) κ id now sched st ≤ W →
-    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
-            id now (proj₂ (mintNode sched))
-            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in burstCaps? (arrCapAt j c) sl (proj₁ res) ≡ true
+    nestValOK? c (obs u) o ≡ true →
+    nestClosOK? c sl o ≡ true →
+    descW g o κ id now sched st ≤ W →
+    burstCaps? (arrCapAt (Caps.cSize c) c) sl
+      (proj₁ (subscribeE g o κ id now sched st)) ≡ true
   -- The frame widths the burst's arrivals drive, per arrival and at
   -- the state its predecessor left.  This is the measure half of the
   -- room and the only one of the three that reads `W`, so it is where
@@ -4255,6 +4297,7 @@ pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
   (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (allWrap op lim b) ≡ true →
   nestClosOK? c sl (allWrap op lim b) ≡ true →
@@ -4263,18 +4306,34 @@ pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in pushValsAdmOK (arrCapAt j c) sl (proj₁ res)
-pushVals-caps-adm {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+pushVals-caps-adm {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw =
   pushVals-adm-ems (arrCapAt j c) sl (proj₁ res)
-    (pushVals-caps-admB c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (burstNest?-widen sl (proj₁ res)
+       (arrCapAt-⊑ c (≤-trans (syncSizeᵉ-pos (allWrap op lim b))
+                              (nestValOK?-size c (allWrap op lim b) hv)) hj)
+       (subscribeE-burst-nest c sl W g b
+          (thru-outer op nid ↠ κ) id now (proj₂ (mintNode sched))
+          (installNode nid (allFresh u op lim) st)
+          hsl
+          (nestCapsOK?-setNode c nid (allFresh u op lim)
+             (proj₂ (mintNode sched)) st
+             (allFresh-wid (Caps.cWid c)
+                (Sched.slots (proj₂ (mintNode sched))) u op lim)
+             hc)
+          (allWrap-valOK c op lim b hv)
+          (allWrap-closOK c sl op lim b hcl)
+          (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)))
   where
-  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+  nid = proj₁ (mintNode sched)
+  res = subscribeE g b (thru-outer op nid ↠ κ)
           id now (proj₂ (mintNode sched))
-          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+          (installNode nid (allFresh u op lim) st)
 
 pushVals-caps-wid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
   (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (allWrap op lim b) ≡ true →
   nestClosOK? c sl (allWrap op lim b) ≡ true →
@@ -4283,13 +4342,28 @@ pushVals-caps-wid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in pushValsWidOK (arrCapAt j c) sl (proj₁ res)
-pushVals-caps-wid {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+pushVals-caps-wid {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw =
   pushVals-wid-ems (arrCapAt j c) sl (proj₁ res)
-    (pushVals-caps-widB c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (burstCaps?-widen sl (proj₁ res)
+       (arrCapAt-⊑ c (≤-trans (syncSizeᵉ-pos (allWrap op lim b))
+                              (nestValOK?-size c (allWrap op lim b) hv)) hj)
+       (subscribeE-burst-caps c sl W g b
+          (thru-outer op nid ↠ κ) id now (proj₂ (mintNode sched))
+          (installNode nid (allFresh u op lim) st)
+          hsl
+          (nestCapsOK?-setNode c nid (allFresh u op lim)
+             (proj₂ (mintNode sched)) st
+             (allFresh-wid (Caps.cWid c)
+                (Sched.slots (proj₂ (mintNode sched))) u op lim)
+             hc)
+          (allWrap-valOK c op lim b hv)
+          (allWrap-closOK c sl op lim b hcl)
+          (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)))
   where
-  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+  nid = proj₁ (mintNode sched)
+  res = subscribeE g b (thru-outer op nid ↠ κ)
           id now (proj₂ (mintNode sched))
-          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+          (installNode nid (allFresh u op lim) st)
 
 -- THE PAIR RIDES AN `if` THE WAY THE NEST BOUND DOES, and for the same
 -- reason: the connect's two exits differ only in bookkeeping the
@@ -4640,6 +4714,7 @@ pushVals-caps-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
   (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (allWrap op lim b) ≡ true →
   nestClosOK? c sl (allWrap op lim b) ≡ true →
@@ -4649,15 +4724,15 @@ pushVals-caps-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in pushValsRoomOK (arrCapAt j c) sl W g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps-room {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+pushVals-caps-room {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw =
   pushVals-room-join (arrCapAt j c) sl W g op (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
     (proj₁ EX) (proj₂ EX)
-    (pushVals-caps-adm c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-caps-wid c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-adm c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
+    (pushVals-caps-wid c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
     (pushVals-caps-burstW c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
     (pushVals-caps-queue c j sl W g op lim b κ id now sched st hsl hc hv hcl hw
-       (pushVals-caps-wid c j sl W g op lim b κ id now sched st hsl hc hv hcl hw))
+       (pushVals-caps-wid c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw))
   where
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -4668,8 +4743,8 @@ subscribeAll-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hc
   pushValsSt-exit (arrCapAt (Caps.cSize c) c) sl W g op nid κ id now (proj₁ res)
     (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
     (proj₁ EX) (proj₂ EX)
-    (pushVals-caps-adm c (Caps.cSize c) sl W g op lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-caps-room c (Caps.cSize c) sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-adm c (Caps.cSize c) sl W g op lim b κ id now sched st ≤-refl hsl hc hv hcl hw)
+    (pushVals-caps-room c (Caps.cSize c) sl W g op lim b κ id now sched st ≤-refl hsl hc hv hcl hw)
   where
   nid = proj₁ (mintNode sched)
   res = subscribeE g b (thru-outer op nid ↠ κ) id now (proj₂ (mintNode sched))
@@ -4734,6 +4809,7 @@ pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
   (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (allWrap op lim b) ≡ true →
   nestClosOK? c sl (allWrap op lim b) ≡ true →
@@ -4743,12 +4819,12 @@ pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in pushValsStOK (arrCapAt j c) sl g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps-st {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+pushVals-caps-st {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw =
   pushValsSt-walk (arrCapAt j c) sl W g op (proj₁ (mintNode sched)) κ id now (proj₁ res)
     (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
     (proj₁ EX) (proj₂ EX)
-    (pushVals-caps-adm c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-caps-room c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-adm c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
+    (pushVals-caps-room c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
   where
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -4762,6 +4838,7 @@ pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
   (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (allWrap op lim b) ≡ true →
   nestClosOK? c sl (allWrap op lim b) ≡ true →
@@ -4771,12 +4848,12 @@ pushVals-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   in pushValsCapsOK (arrCapAt j c) sl W g op (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-pushVals-caps {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+pushVals-caps {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw =
   pushVals-caps-join (arrCapAt j c) sl W g op (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-caps-st c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-caps-adm c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
-    (pushVals-caps-room c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-st c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
+    (pushVals-caps-adm c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
+    (pushVals-caps-room c j sl W g op lim b κ id now sched st hj hsl hc hv hcl hw)
   where
   res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -4786,6 +4863,7 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (B W : ℕ) (g : Gas)
   (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
   nestClosOK? c sl (mergeAllᵉ lim b) ≡ true →
@@ -4803,10 +4881,10 @@ pushVals-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-merge {Γ = Γ} {t = t} {e = e} {u = u} c j sl B W g lim b κ id now sched st
-               hsl hc hv hcl hn hw hbu =
+               hj hsl hc hv hcl hn hw hbu =
   pushVals-both (arrCapAt j c) sl B W (syncSizeᵉ b) g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-caps c j sl W g mergeAllᵒ lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps c j sl W g mergeAllᵒ lim b κ id now sched st hj hsl hc hv hcl hw)
     (pushVals-nest-ems (arrCapAt j c) sl B W (syncSizeᵉ b) g mergeAllᵒ
        (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -4821,6 +4899,7 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (B W : ℕ) (g : Gas)
   (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
   nestClosOK? c sl (switchAllᵉ b) ≡ true →
@@ -4838,10 +4917,10 @@ pushVals-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-switch {Γ = Γ} {t = t} {e = e} {u = u} c j sl B W g b κ id now sched st
-               hsl hc hv hcl hn hw hbu =
+               hj hsl hc hv hcl hn hw hbu =
   pushVals-both (arrCapAt j c) sl B W (syncSizeᵉ b) g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-caps c j sl W g switchᵒ nothing b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps c j sl W g switchᵒ nothing b κ id now sched st hj hsl hc hv hcl hw)
     (pushVals-nest-ems (arrCapAt j c) sl B W (syncSizeᵉ b) g switchᵒ
        (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -4856,6 +4935,7 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (B W : ℕ) (g : Gas)
   (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
   nestClosOK? c sl (exhaustAllᵉ b) ≡ true →
@@ -4873,10 +4953,10 @@ pushVals-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
 pushVals-exhaust {Γ = Γ} {t = t} {e = e} {u = u} c j sl B W g b κ id now sched st
-               hsl hc hv hcl hn hw hbu =
+               hj hsl hc hv hcl hn hw hbu =
   pushVals-both (arrCapAt j c) sl B W (syncSizeᵉ b) g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (pushVals-caps c j sl W g exhaustᵒ nothing b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps c j sl W g exhaustᵒ nothing b κ id now sched st hj hsl hc hv hcl hw)
     (pushVals-nest-ems (arrCapAt j c) sl B W (syncSizeᵉ b) g exhaustᵒ
        (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -4896,6 +4976,7 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (B W : ℕ) (g : Gas)
   (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (mergeAllᵉ lim b) ≡ true →
   nestClosOK? c sl (mergeAllᵉ lim b) ≡ true →
@@ -4914,11 +4995,11 @@ thruFit-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (mergeAllᵉ lim b)))
        g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-merge {e = e} {u = u} c j sl B W g lim b κ id now sched st hsl hc hv hcl hn hw hbu =
+thruFit-merge {e = e} {u = u} c j sl B W g lim b κ id now sched st hj hsl hc hv hcl hn hw hbu =
   pushFit-ems (arrCapAt j c) sl B W (syncSizeᵉ b) (syncSizeᵉ (mergeAllᵉ lim b))
     g mergeAllᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
-    (pushVals-merge c j sl B W g lim b κ id now sched st hsl hc hv hcl hn hw hbu)
+    (pushVals-merge c j sl B W g lim b κ id now sched st hj hsl hc hv hcl hn hw hbu)
   where
   res = subscribeE g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -4928,6 +5009,7 @@ thruFit-merge {e = e} {u = u} c j sl B W g lim b κ id now sched st hsl hc hv hc
 thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (switchAllᵉ b) ≡ true →
   nestClosOK? c sl (switchAllᵉ b) ≡ true →
@@ -4945,11 +5027,11 @@ thruFit-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (switchAllᵉ b)))
        g switchᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-switch {e = e} c j sl B W g b κ id now sched st hsl hc hv hcl hn hw hbu =
+thruFit-switch {e = e} c j sl B W g b κ id now sched st hj hsl hc hv hcl hn hw hbu =
   pushFit-ems (arrCapAt j c) sl B W (syncSizeᵉ b) (syncSizeᵉ (switchAllᵉ b))
     g switchᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
-    (pushVals-switch c j sl B W g b κ id now sched st hsl hc hv hcl hn hw hbu)
+    (pushVals-switch c j sl B W g b κ id now sched st hj hsl hc hv hcl hn hw hbu)
   where
   res = subscribeE g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -4958,6 +5040,7 @@ thruFit-switch {e = e} c j sl B W g b κ id now sched st hsl hc hv hcl hn hw hbu
 thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (sl : Slots Γ) (B W : ℕ) (g : Gas) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Caps.cSize c ≤ j →
   Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
   nestValOK? c (obs u) (exhaustAllᵉ b) ≡ true →
   nestClosOK? c sl (exhaustAllᵉ b) ≡ true →
@@ -4975,11 +5058,11 @@ thruFit-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   (syncSizeᵉ (exhaustAllᵉ b)))
        g exhaustᵒ (proj₁ (mintNode sched)) κ id now
        (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-thruFit-exhaust {e = e} c j sl B W g b κ id now sched st hsl hc hv hcl hn hw hbu =
+thruFit-exhaust {e = e} c j sl B W g b κ id now sched st hj hsl hc hv hcl hn hw hbu =
   pushFit-ems (arrCapAt j c) sl B W (syncSizeᵉ b) (syncSizeᵉ (exhaustAllᵉ b))
     g exhaustᵒ (proj₁ (mintNode sched)) κ id now
     (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≤-refl
-    (pushVals-exhaust c j sl B W g b κ id now sched st hsl hc hv hcl hn hw hbu)
+    (pushVals-exhaust c j sl B W g b κ id now sched st hj hsl hc hv hcl hn hw hbu)
   where
   res = subscribeE g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ)
           id now (proj₂ (mintNode sched))
@@ -5241,7 +5324,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W g (mergeAllᵉ lim b) κ id now sched
           (proj₂ (proj₂ IH₀))
 
   -- the wall crosses here, and it is the ONE assertion of the clause
-  FIT = thruFit-merge c J sl B W g lim b κ id now sched st hsl hc hv hcl hn hw (proj₁ IH)
+  FIT = thruFit-merge c J sl B W g lim b κ id now sched st (m≤n⊔m jIH (Caps.cSize c)) hsl hc hv hcl hn hw (proj₁ IH)
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (mergeAllᵉ lim b)))
@@ -5309,7 +5392,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W g (switchAllᵉ b) κ id now sched st
              W (nestUnit e sl) B (syncSizeᵉ b))
           (proj₂ (proj₂ IH₀))
 
-  FIT = thruFit-switch c J sl B W g b κ id now sched st hsl hc hv hcl hn hw (proj₁ IH)
+  FIT = thruFit-switch c J sl B W g b κ id now sched st (m≤n⊔m jIH (Caps.cSize c)) hsl hc hv hcl hn hw (proj₁ IH)
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (switchAllᵉ b)))
@@ -5375,7 +5458,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W g (exhaustAllᵉ b) κ id now sched s
              W (nestUnit e sl) B (syncSizeᵉ b))
           (proj₂ (proj₂ IH₀))
 
-  FIT = thruFit-exhaust c J sl B W g b κ id now sched st hsl hc hv hcl hn hw (proj₁ IH)
+  FIT = thruFit-exhaust c J sl B W g b κ id now sched st (m≤n⊔m jIH (Caps.cSize c)) hsl hc hv hcl hn hw (proj₁ IH)
 
   PUSH = pushBurst-nest-thru
            (nestB S′ W (nestUnit e sl) B (syncSizeᵉ (exhaustAllᵉ b)))

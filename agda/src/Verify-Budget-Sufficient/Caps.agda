@@ -541,6 +541,17 @@ iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j �
 iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s
 iterSize-mono-count S s hS           (s≤s le)  = iterSize-mono-count S (sizeStep S s) hS le
 
+-- AND RAISING THE LEVEL IS A WIDENING, which is what lets a caller
+-- take a bound at the level a callee reports and spend it at the join
+-- it actually needs.  Only the size field moves, so the other two
+-- halves of the ordering are reflexivity -- and the side condition is
+-- a positive cap, which every head's own written-size premise already
+-- supplies.
+arrCapAt-⊑ : ∀ (c : Caps) → 1 ≤ Caps.cSize c → ∀ {j j′ : ℕ} → j ≤ j′ →
+  arrCapAt j c ⊑ᶜ arrCapAt j′ c
+arrCapAt-⊑ c hS le =
+  iterSize-mono-count (Caps.cSize c) (Caps.cSize c) hS le , ≤-refl , ≤-refl
+
 
 -- WIDTH: foldStep is inflationary for S ≥ 2 (w < 2^w ≤ 2^(1+w) ≤ S^(1+w))
 foldStep-infl : ∀ (S w : ℕ) → 2 ≤ S → w ≤ foldStep S w
