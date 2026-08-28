@@ -48,8 +48,6 @@ open import Probed.PushVals-Caps
          burstOne≡; lenSh≡; capsSh-2; lenShS≡; capsShS-2; lenShX≡; capsShX-2)
 open import Probed.Share-Go-Fold
   using (admits; flat; fitsA; fitsB; fitsC)
-open import Probed.Subscribe-Inner-Caps
-  using (premA; concA; premB; concB; premC; concC; notArmed; premD; concD)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed

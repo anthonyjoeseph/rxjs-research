@@ -187,10 +187,6 @@ does not fit is a finding about the shared statement, not about the head.
   emit-by-emit fit the outer wrap's push spends. The arrival-depth axis cannot
   refute it — the factor is a tower in the cap the arrival's own size sets — so
   nothing has reached the region that could.
-- **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `PROBED`: the caps
-  bundle and the slots equation through the shared inner subscribe, now the one
-  leaf under all three consume arms. Both conjuncts instantiated; the ARMED
-  store is where the width fold could move and no witness reaches it.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

@@ -114,6 +114,22 @@ report, not an exemption.** `NOT_DEV_CHECKABLE` exists for that, is currently EM
 and empty is the target; its last entry was retired by splitting the file, not by
 tolerating the exclusion.
 
+## Every stub sits at its own source position, and that is a scope rule
+
+A stubbed member's `postulate` is emitted where that member's own signature already
+sits, never gathered with its block-siblings at the block's head. **Source order is
+the scope argument**: the file compiles, so its own order is valid by construction,
+and a stub that moves can only move ABOVE something its signature reads. That failure
+does not surface where the move happened — it surfaces as a `NotInScope` naming the
+definition that got jumped, which reads as a missing name rather than a reordering.
+
+The case that forces per-member placement rather than one delayed block is a mutual
+block whose members STRADDLE a Set-valued definition used in a later member's type —
+common once a forward declaration joins two regions of a file into one block. Gathering
+the stubs anywhere puts that later signature on the wrong side of the definition it
+reads. Keeping each where it already was needs no regex enumerating what a signature
+may mention, which is the only other way to get it right.
+
 ## A block member in NO cycle is never stubbed, and that is what blows the budget
 
 The loop's whole trick is that a focused check keeps ONE body real and replaces its

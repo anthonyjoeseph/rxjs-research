@@ -468,12 +468,16 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                 sig_at[it.name] = i
             if it.kind == "clauses" and it.name not in cls_at:
                 cls_at[it.name] = i
-    for bi in heavy:
-        if stubs_of[bi]:
-            B = min(i for i, it in enumerate(p.items)
-                    if it.name in stubs_of[bi])
-        else:
-            B = min(i for i, it in enumerate(p.items) if it.block == bi)
+    # AND EACH STUB IS EMITTED AT ITS OWN POSITION, not all of them at the
+    # block's first.  One shared point is only scope-valid when every
+    # definition the stub signatures mention precedes it, and a block whose
+    # members straddle a Set-valued definition used in a LATER member's type
+    # breaks that: the later signature is hoisted above the definition it
+    # reads and the run dies NotInScope, naming the definition rather than
+    # the reordering.  Source order is scope-valid by construction -- the
+    # file compiles -- so keeping each stub where it already sits needs no
+    # regex enumerating what a signature may mention.
+    def back_up(B: int) -> int:
         while True:
             moved = False
             for m, si in sig_at.items():
@@ -488,8 +492,19 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                 B -= 1
                 moved = True
             if not moved:
-                break
-        ins_at[bi] = B
+                return B
+
+    stub_at: dict[int, list[tuple[int, str]]] = {}
+    for bi in heavy:
+        for m in stubs_of[bi]:
+            B = back_up(sig_at.get(m, cls_at.get(m, 0)))
+            stub_at.setdefault(B, []).append((bi, m))
+        if stubs_of[bi]:
+            ins_at[bi] = min(B for B, ms in stub_at.items()
+                             if any(b == bi for b, _ in ms))
+        else:
+            ins_at[bi] = back_up(min(i for i, it in enumerate(p.items)
+                                     if it.block == bi))
 
     out: list[str] = []
     emitted: set[int] = set()
@@ -520,22 +535,17 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             # spurious warnings in this tool's output are precisely what it
             # exists to prevent -- a loop nobody reads the output of is not
             # a loop.
-            hdr = len(out)
-            out += ["", f"-- agda-dev: mutual block of {len(b.members)} members,",
-                    "-- POSTULATED at their exact existing signatures.", "postulate"]
-            body_at = len(out)
-            for m in b.members:
-                if m not in stubs_of[bi]:
-                    continue
-                first = len(out) + 1
-                for ln in sig_text(p, m) or []:
-                    out.append(("  " + ln) if ln.strip() else "")
-                if stub_lines is not None:
-                    stub_lines[m] = (first, len(out))
-            if len(out) == body_at:
-                del out[hdr:]
-            else:
-                out.append("")
+        for bi, m in stub_at.get(idx, []):
+            if bi not in emitted:
+                continue
+            out += ["", f"-- agda-dev: mutual-block member {m},",
+                    "-- POSTULATED at its exact existing signature.", "postulate"]
+            first = len(out) + 1
+            for ln in sig_text(p, m) or []:
+                out.append(("  " + ln) if ln.strip() else "")
+            if stub_lines is not None:
+                stub_lines[m] = (first, len(out))
+            out.append("")
         if it.kind == "pass" and it.start == p.module_line:
             out.append(f"module {mod} where")
             continue
