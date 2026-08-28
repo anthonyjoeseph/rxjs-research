@@ -15,7 +15,7 @@
 -- this, which is what lets the telescope survive with no length factor.
 module Verify-Budget-Sufficient.Fan-Caps where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-trans; ≤-reflexive; n≤1+n; m≤m+n; m≤n+m;
    +-mono-≤; +-monoʳ-≤; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
@@ -124,3 +124,18 @@ abstract
   delSize-def : (g : ℕ) (c : Caps) → delSize g c ≡ Caps.cSize c + fanLen g c
   delSize-def g c = refl
 
+  -- THE DELIVERY CAPS GROW WITH THE GAS, which is what lets a bound
+  -- proven at one dispatch level be spent at the level above it.  The
+  -- length recurrence multiplies a successor, so a level's own summand
+  -- cannot shrink; where the registry admits nothing both sides are
+  -- zero, which is an equality rather than a vacuity.
+  fanLen-mono : (g : ℕ) (c : Caps) → fanLen g c ≤ fanLen (suc g) c
+  fanLen-mono zero    c = z≤n
+  fanLen-mono (suc g) c =
+    *-monoʳ-≤ (Caps.cReg c) (s≤s (+-monoʳ-≤ (Caps.cSize c) (fanLen-mono g c)))
+
+  delSize-mono : (g : ℕ) (c : Caps) → delSize g c ≤ delSize (suc g) c
+  delSize-mono g c = +-monoʳ-≤ (Caps.cSize c) (fanLen-mono g c)
+
+  delSq-mono : (g : ℕ) (c : Caps) → delSq g c ≤ delSq (suc g) c
+  delSq-mono g c = *-mono-≤ (delSize-mono g c) (delSize-mono g c)

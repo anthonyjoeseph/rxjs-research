@@ -178,14 +178,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`shareFold-unit`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: one admitted
-  registration's own grant widened into a single unit of the branch budget,
-  with its path measures capped by the fold's size premise. Nothing has
-  instantiated it.
-- **`shareFold-tele`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: the fold's
-  telescope — a store inside one unit, carried through k of them, lands inside
-  k+1. The additive charges meet exactly, so a slack reading would not show up
-  as slack.
 - **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE, PROBED`:
   the emit-by-emit fit the outer wrap's push spends. Neither the arrival-depth
   axis nor the `nestU` gap can refute it, so nothing has reached the region

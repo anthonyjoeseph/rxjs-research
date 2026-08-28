@@ -13,7 +13,9 @@ open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
   *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤; *-distribˡ-+;
-  ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤)
+  ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤; ^-distribˡ-+-*; ^-monoˡ-≤)
+open import Data.Nat.Solver using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -46,21 +48,23 @@ open import Rx.Evaluator using
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widNode; nestValOK?; pathSz?)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots; pathSz?-len)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
-open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; cSize≤delSq; fanLen-zero; fanSq-zero; fanLen-suc; fanSq-suc)
+open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; delSq-mono; cSize≤delSq; fanLen-zero; fanSq-zero; fanLen-suc; fanSq-suc)
 open import Verify-Budget-Sufficient.Deliver-Measure using
-  (deliverLen; deliverNestF; deliverNestD; admSz?; shareAdmit-len; shareAdmit-sz)
+  (deliverLen; deliverNestF; deliverNestD; admSz?; shareAdmit-len; shareAdmit-sz;
+   deliverLen-path; deliverSzSum-path; deliverNestD-path; deliverNestF≡;
+   pathSzSum-cap; pathNestD-len)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; applyFn-nest-sync; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
   (nestB; nestB-mono; nestB-base; nestB-frame; nestB-unit; nestFac; 1≤nestFac; nestU;
-  nestU-mono; nestB-at; arrD; arrDW-mono; arrDW-pos; arrDW-key; arrDW-flat; arrDW-slot;
+  nestU-mono; pow-mono-exp; nestB-at; arrD; arrDW-mono; arrDW-pos; arrDW-key; arrDW-flat; arrDW-slot;
   arrDW-frame; nestB-frame-dblW)
 open import Verify-Budget-Sufficient.Nest-Burst using
   (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-scan; descW-mu;
@@ -5300,34 +5304,119 @@ mutual
 -- of two and its depth the square, which is what makes a unit a unit.
 -- The unit it prices sits one gas level below the level the fold's
 -- conclusion prices, and the delivery caps grow with the gas.
-postulate
-  shareFold-unit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (c : Caps) (W : ℕ) (sl : Slots Γ) (gas : ℕ)
-    (p : Path Γ u t) (X : ℕ) →
-    1 ≤ Caps.cSize c → pathSz? (Caps.cSize c) p ≡ true →
-    nestFac (Caps.cSize c) W ^ deliverLen gas c p
-      * (deliverNestF gas c p ^ W
-         * (X + W * (deliverNestD gas c p
-                     + suc (deliverLen gas c p)
-                       * nestU (delSq gas c) (nestUnit e sl))))
-      ≤ nestFac (Caps.cSize c) W ^ suc (Caps.cSize c + fanLen gas c)
-        * ((2 ^ (Caps.cSize c * Caps.cSize c + fanSq gas c)) ^ W
-           * (X + W * ((Caps.cSize c * Caps.cSize c + fanSq gas c)
-                       + suc (Caps.cSize c + fanLen gas c)
-                         * nestU (delSq (suc gas) c) (nestUnit e sl))))
+shareFold-unit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (W : ℕ) (sl : Slots Γ) (gas : ℕ)
+  (p : Path Γ u t) (X : ℕ) →
+  1 ≤ Caps.cSize c → pathSz? (Caps.cSize c) p ≡ true →
+  nestFac (Caps.cSize c) W ^ deliverLen gas c p
+    * (deliverNestF gas c p ^ W
+       * (X + W * (deliverNestD gas c p
+                   + suc (deliverLen gas c p)
+                     * nestU (delSq gas c) (nestUnit e sl))))
+    ≤ nestFac (Caps.cSize c) W ^ suc (Caps.cSize c + fanLen gas c)
+      * ((2 ^ (Caps.cSize c * Caps.cSize c + fanSq gas c)) ^ W
+         * (X + W * ((Caps.cSize c * Caps.cSize c + fanSq gas c)
+                     + suc (Caps.cSize c + fanLen gas c)
+                       * nestU (delSq (suc gas) c) (nestUnit e sl))))
+shareFold-unit {e = e} c W sl gas p X 1≤S hsz =
+  ≤-trans (*-monoʳ-≤ (Q ^ dL)
+            (*-mono-≤ facLE
+              (+-monoʳ-≤ X (*-monoʳ-≤ W (+-mono-≤ depLE (*-mono-≤ (s≤s lenLE) unitLE))))))
+          (*-monoˡ-≤ ((2 ^ Sq) ^ W * (X + W * (Sq + Lu * U)))
+            (pow-mono-exp Q (1≤nestFac S W)
+              (≤-trans lenLE (n≤1+n (S + fanLen gas c)))))
+  where
+  S  = Caps.cSize c
+  Q  = nestFac S W
+  Sq = S * S + fanSq gas c
+  Lu = suc (S + fanLen gas c)
+  U  = nestU (delSq (suc gas) c) (nestUnit e sl)
+  dL = deliverLen gas c p
+
+  lenLE : dL ≤ S + fanLen gas c
+  lenLE = ≤-trans (deliverLen-path gas c p)
+                  (+-monoˡ-≤ (fanLen gas c) (pathSz?-len S p hsz))
+
+  facLE : deliverNestF gas c p ^ W ≤ (2 ^ Sq) ^ W
+  facLE = ^-monoˡ-≤ W
+    (≤-trans (≤-reflexive (deliverNestF≡ gas c p))
+             (pow-mono-exp 2 (s≤s z≤n)
+               (≤-trans (deliverSzSum-path gas c p)
+                        (+-monoˡ-≤ (fanSq gas c) (pathSzSum-cap S p hsz)))))
+
+  depLE : deliverNestD gas c p ≤ Sq
+  depLE = ≤-trans (deliverNestD-path gas c p)
+    (+-monoˡ-≤ (fanSq gas c)
+      (≤-trans (pathNestD-len S p 1≤S hsz)
+               (*-monoˡ-≤ S (pathSz?-len S p hsz))))
+
+  unitLE : nestU (delSq gas c) (nestUnit e sl) ≤ U
+  unitLE = nestU-mono (delSq gas c) (delSq (suc gas) c) (nestUnit e sl)
+                      (delSq-mono gas c)
 
 -- AND THE TELESCOPE THE FOLD COMPOSES WITH, which is where the unit
 -- term's `k` earns itself: a store already inside ONE unit, carried
 -- through `k` of them, lands inside `k + 1`.  The two additive charges
 -- meet exactly -- a unit's `Lu * U` IS the difference between
--- successive unit terms -- so this is an identity at the boundary and
--- not a bound with room in it.
-  shareFold-tele : (Q W Lu Sq U k X H : ℕ) → 1 ≤ Q →
-    H ≤ Q ^ Lu * ((2 ^ Sq) ^ W * (X + W * (Sq + Lu * U))) →
-    Q ^ (k * Lu) * ((2 ^ (k * Sq)) ^ W * (H + W * (k * Sq + suc (k * Lu) * U)))
-      ≤ Q ^ (suc k * Lu)
-        * ((2 ^ (suc k * Sq)) ^ W
-           * (X + W * (suc k * Sq + suc (suc k * Lu) * U)))
+-- successive unit terms -- so the arithmetic below is an identity at
+-- the boundary and not a bound with room in it.
+shareFold-tele : (Q W Lu Sq U k X H : ℕ) → 1 ≤ Q →
+  H ≤ Q ^ Lu * ((2 ^ Sq) ^ W * (X + W * (Sq + Lu * U))) →
+  Q ^ (k * Lu) * ((2 ^ (k * Sq)) ^ W * (H + W * (k * Sq + suc (k * Lu) * U)))
+    ≤ Q ^ (suc k * Lu)
+      * ((2 ^ (suc k * Sq)) ^ W
+         * (X + W * (suc k * Sq + suc (suc k * Lu) * U)))
+shareFold-tele Q W Lu Sq U k X H 1≤Q hH =
+  ≤-trans (*-monoʳ-≤ Fk (*-monoʳ-≤ Pk (+-monoˡ-≤ Y intoUnit)))
+  (≤-trans (*-monoʳ-≤ Fk (nest-telescope (F * P) Pk X A Y 1≤FP))
+           (≤-reflexive shuffle))
+  where
+  F  = Q ^ Lu
+  P  = (2 ^ Sq) ^ W
+  Fk = Q ^ (k * Lu)
+  Pk = (2 ^ (k * Sq)) ^ W
+  A  = W * (Sq + Lu * U)
+  Y  = W * (k * Sq + suc (k * Lu) * U)
+
+  1≤FP : 1 ≤ F * P
+  1≤FP = *-mono-≤ (1≤pow≤ Q Lu 1≤Q) (1≤pow≤ (2 ^ Sq) W (m^n>0 2 Sq))
+
+  intoUnit : H ≤ F * P * (X + A)
+  intoUnit = ≤-trans hH (≤-reflexive (sym (*-assoc F P (X + A))))
+
+  -- the two factors rejoin their own exponent, and the two additive
+  -- charges rejoin as one step of the unit term
+  facQ : Fk * F ≡ Q ^ (suc k * Lu)
+  facQ = trans (sym (^-distribˡ-+-* Q (k * Lu) Lu))
+               (cong (Q ^_) (+-comm (k * Lu) Lu))
+
+  facP : Pk * P ≡ (2 ^ (suc k * Sq)) ^ W
+  facP = trans (sym (pow-distrib-* W (2 ^ (k * Sq)) (2 ^ Sq)))
+               (cong (_^ W) (trans (sym (^-distribˡ-+-* 2 (k * Sq) Sq))
+                                   (cong (2 ^_) (+-comm (k * Sq) Sq))))
+
+  charge : A + Y ≡ W * (suc k * Sq + suc (suc k * Lu) * U)
+  charge = trans (sym (*-distribˡ-+ W (Sq + Lu * U) (k * Sq + suc (k * Lu) * U)))
+                 (cong (W *_) inner)
+    where
+    inner : (Sq + Lu * U) + (k * Sq + suc (k * Lu) * U)
+              ≡ suc k * Sq + suc (suc k * Lu) * U
+    inner = solve 4 (λ sq lu u kk →
+              (sq :+ lu :* u) :+ (kk :* sq :+ (con 1 :+ kk :* lu) :* u)
+                := (sq :+ kk :* sq) :+ (con 1 :+ (lu :+ kk :* lu)) :* u)
+              refl Sq Lu U k
+
+  shuffle : Fk * (F * P * Pk * (X + (A + Y)))
+              ≡ Q ^ (suc k * Lu)
+                * ((2 ^ (suc k * Sq)) ^ W
+                   * (X + W * (suc k * Sq + suc (suc k * Lu) * U)))
+  shuffle =
+    trans (solve 5 (λ fk f p pk z → fk :* (f :* p :* pk :* z)
+                                      := (fk :* f) :* ((pk :* p) :* z))
+             refl Fk F P Pk (X + (A + Y)))
+    (trans (cong₂ (λ a b → a * (b * (X + (A + Y)))) facQ facP)
+           (cong (λ z → Q ^ (suc k * Lu) * ((2 ^ (suc k * Sq)) ^ W * (X + z)))
+                 charge))
 
 shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
