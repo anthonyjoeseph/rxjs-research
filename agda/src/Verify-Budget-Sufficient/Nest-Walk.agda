@@ -3889,17 +3889,29 @@ postulate
   -- it reads the WIDTH field over the node table and no size at all --
   -- so what is owed is the arm's premise and not its state chain.
   --
-  -- AND WHAT THE LEVEL COSTS IS A SECOND CAP HERE, NOT AN INDEX.  This
-  -- face is GRANT-FREE end to end: the caps, room, width, queue and
-  -- state folds all conclude the exit pair and name no grant, so the
-  -- objection recorded one block up -- that a stepped cap is a larger
-  -- key, hence a larger grant, and the parent owes the smaller one --
-  -- reaches the grant-carrying `*All` rows and not these.  What reaches
-  -- these is the join that fuses the caps half with the nest half: it
-  -- names the caps premises and the grant's key as ONE cap, so a level
-  -- on the caps side moves a key nothing on that side reads.  Splitting
-  -- that one cap in two -- premises at the stepped one, grant at the
-  -- entry one -- is the restatement, and it is confined to this family.
+  -- AND THE LEVEL HAS TO BE THE INSTANT'S, WHICH IS THE MECHANISM
+  -- MOVING RATHER THAN THIS LEAF.  This face is grant-free end to end
+  -- -- caps, room, width, queue and state folds all conclude the exit
+  -- pair -- so the larger-grant objection recorded one block up reaches
+  -- the grant-carrying `*All` rows and not these; but the join that
+  -- fuses the two halves names the caps premises and the grant's key as
+  -- ONE cap, and that cap is not free to be split, because the merge
+  -- step spends the ARRIVAL'S closure size as the frame charge's own
+  -- exponent.  The grant's exponent IS the bound on the arriving
+  -- value's size, so any device that grows that bound grows the grant,
+  -- and this arm's arrivals are emissions no entry cap dominates.
+  --
+  -- SO THE TWO CAPS ARE CONSECUTIVE INSTANT CAPS, AND NOTHING SMALLER
+  -- WORKS.  A run's values are assembled from the program's own
+  -- templates, and the caps recurrence already separates one instant
+  -- from the next by a single blowup that the caps face proves absorbs
+  -- one instant's whole growth.  Stating the walk over that PAIR --
+  -- premises at the instant's cap, conclusion at its successor's --
+  -- puts the emission inside a bound that exists, and the top owes the
+  -- successor on both sides, so no parent is left owing the smaller
+  -- one.  The cost is that the pair threads every walk predicate, which
+  -- is what it was abandoned for once, before the cheaper devices below
+  -- were closed.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- DEAD ROUTE: flattening at a cap CLOSED UNDER a descent's worth of
   --   substitutions is structurally dead, and not for want of
@@ -3924,6 +3936,13 @@ postulate
   --   to beat a bound the caps face spends everywhere.  A key that
   --   dominates an emission is therefore not a key at this cap, and the
   --   cap has to move -- which is the LEVEL and nothing else.
+  -- DEAD ROUTE: reading the caps premises at a stepped cap while the
+  --   grant stays at the entry one -- the cheap form of the level,
+  --   confined to this family and needing no instant index.  The merge
+  --   step spends the arrival's closure size AS the grant's exponent,
+  --   so the two occurrences of the cap are one quantity and the split
+  --   is not a split.  This is the third closed subdivision of the same
+  --   region, which is what puts the finding on the mechanism.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

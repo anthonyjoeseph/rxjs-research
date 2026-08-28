@@ -208,10 +208,12 @@ does not fit is a finding about the shared statement, not about the head.
   `pushVals-caps-burstW`, `pushVals-caps-queue`, `thruFit-arr-merge`,
   `thruFit-arr-switch`, `thruFit-arr-exhaust`. One refuted premise read at one
   flat cap, and every row keys on it, so the restatement moves all of them at
-  once. Two of the three candidate devices are dead in the leaves' headers and
-  the third is the caps face's LEVEL; the two caps rows can take it now, since
-  their cone concludes the exit pair and carries no grant. What the leg buys is
-  the shape of that restatement, which the grant-carrying rows then inherit.
+  once. THREE devices are now closed in the leaves' headers, all at one place:
+  the merge step spends the arrival's closure size AS the grant's exponent, so
+  the bound and the grant are one quantity. That is the mechanism, and the leg
+  is now to state the walk over CONSECUTIVE INSTANT CAPS — premises at the
+  instant's, conclusion at its successor's — which threads every walk predicate
+  and is what the cheaper devices were being tried instead of.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
@@ -229,7 +231,7 @@ does not fit is a finding about the shared statement, not about the head.
 ### The ledger
 
 - **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — SHAPE,
-  `REFUTED×2, DEAD ROUTE×2, PROBED×2`: the arrivals read at the flat cap,
+  `REFUTED×2, DEAD ROUTE×3, PROBED×2`: the arrivals read at the flat cap,
   refuted at a map naming its payload twice; the restatement owed is the arm's
   missing level, not a premise on either leaf.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
