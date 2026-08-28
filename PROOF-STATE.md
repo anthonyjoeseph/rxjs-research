@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the face's premises threaded to the doors** — `thruFit-frame`,
-  `stepFrame-nodes` and `foldPath-nodes`. The frontier does not need
-  restating, because it already exists proven: the walk duplicates a
-  full-face clique one module up HEAD FOR HEAD, same names, weaker
-  currency — invisible to the duplicate check because the statements
-  differ and the two are never in scope together. So what is owed is not
-  a statement but the premises that clique reads: the slot caps, the two
-  positivity keys, the path key, and the budget, operator and depth
-  currencies. This leg carries them from the doors out to the cone's own
-  consumers, where the full caps world already holds them.
+- **the arr fits at a substituting slot** — `thruFit-arr-merge`,
+  `thruFit-arr-switch`, `thruFit-arr-exhaust`. The whole frame charge
+  reaches exactly these three and nothing else, and the spine above them
+  is now known to be sound: the slot refutation kills the form without
+  the resolved-size premise, not the head that carries it. So these
+  three carry all of the region's remaining risk, and their own receipts
+  name the substituting slot as the one thing NOT covered — the region
+  where the key is read through the telescope rather than off the term.
+  The telescope harness for it now exists in the refutation that cleared
+  the spine; this leg runs the three fits against it.
 - **the duplicate generation deleted** — the walk's copies go and the
   proven clique is imported in their place, with the weakening applied at
   the two doors that genuinely read it. Nothing here is a proof: the

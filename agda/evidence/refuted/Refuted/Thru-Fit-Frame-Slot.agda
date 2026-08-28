@@ -45,6 +45,16 @@
 -- fail: a definition the arrival cannot see is unpaid whether or not
 -- its depth doubles, and doubling is only what makes the gap
 -- unbounded rather than merely positive.
+--
+-- AND IT DOES NOT KILL THE HEADS AS THEY STAND, which is worth saying
+-- here rather than leaving to whoever reads the rows next.  Both the
+-- fit head and the frame head above it carry a premise bounding the
+-- RESOLVED size of the slot telescope by the size cap, and the cap
+-- every row below is read at does not meet it -- `parent-premise-absurd`
+-- is that, machine-checked.  So what these rows kill is the form
+-- WITHOUT that premise, which is the reason it is stated; at the
+-- smallest cap admitting this telescope the factor is a tower in
+-- fifty-five and the eight delivered here is nowhere near it.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Thru-Fit-Frame-Slot where
 
@@ -67,7 +77,7 @@ open import Rx.Exp
   using (Ctx; Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂;
          strmᵗ; varᵗ; caseᵗ; inlᵗ; input; inputsBelowᵉ)
 open import Rx.Nest-Depth using (nestDᵉ)
-open import Rx.Slots using (Slots; shared)
+open import Rx.Slots using (Slots; shared; slotsSize)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; Frame; root; _↠_; thru-outer; mergeAllᵒ;
          mergeAll-st; thruConsume; stepFrame; installNode; sched-init; st-init)
@@ -209,13 +219,16 @@ stepFrame-nodes-thru-slot-absurd h =
   ≤⇒≤ᵇ (subst (λ z → grownOf (dDup 3) tt ≤ z) G≡4 h)
 
 ----------------------------------------------------------------------
--- AND THE UNIT ITS PARENT ADDS DOES NOT SAVE IT, one layer further on.
--- `parentGrant` is `stepFrame-nodes`'s own right-hand side at this
--- frame, with the two sealed families written out from their
--- definitions -- `nestFac S W ≡ ((2 ^ S) ^ suc W) ^ S`, which the
--- module exports, and `nestU S U ≡ suc S * U`, which it does not.  The
--- telescope term is the real `nestUnit`, so the reading is of the
--- charge and not of a model of it.
+-- THE UNIT ITS PARENT ADDS DOES NOT SAVE THE PREMISE-FREE FORM either,
+-- one layer further on.  `parentGrant` is the frame head's right-hand
+-- side at this frame READ AT THIS CAP, with the two sealed families
+-- written out from their definitions -- `nestFac S W ≡
+-- ((2 ^ S) ^ suc W) ^ S`, which the module exports, and `nestU S U ≡
+-- suc S * U`, which it does not.  The telescope term is the real
+-- `nestUnit`, so the reading is of the charge and not of a model of
+-- it -- but the cap it is read at is one, and the head demands a cap
+-- that the telescope resolves under, so this is the unit-only form
+-- and not the head.
 ----------------------------------------------------------------------
 
 parentGrant : ℕ
@@ -250,3 +263,25 @@ parentGrant₆≡68 = refl
 stepFrame-nodes-slot-absurd : grownOf (dDup 7) tt ≤ parentGrant → ⊥
 stepFrame-nodes-slot-absurd h =
   ≤⇒≤ᵇ (subst (λ z → grownOf (dDup 7) tt ≤ z) parentGrant≡76 h)
+
+----------------------------------------------------------------------
+-- AND THE HEAD ITSELF ESCAPES, which is the reading that keeps the
+-- rows above honest: the size cap they are all taken at is one, and
+-- both heads bound the RESOLVED telescope by that cap.  Fifty-five at
+-- three layers, one hundred and fifteen at seven, against a cap of
+-- one -- so no row here is a reading of either head's own grant.
+----------------------------------------------------------------------
+
+telescope₇≡115 : slotsSize (sl (dDup 7) tt) ≡ 115
+telescope₇≡115 = refl
+
+telescope₃≡55 : slotsSize (sl (dDup 3) tt) ≡ 55
+telescope₃≡55 = refl
+
+parent-premise-absurd : slotsSize (sl (dDup 7) tt) ≤ Caps.cSize cap → ⊥
+parent-premise-absurd h =
+  ≤⇒≤ᵇ (subst (λ z → z ≤ Caps.cSize cap) telescope₇≡115 h)
+
+fit-premise-absurd : slotsSize (sl (dDup 3) tt) ≤ Caps.cSize cap → ⊥
+fit-premise-absurd h =
+  ≤⇒≤ᵇ (subst (λ z → z ≤ Caps.cSize cap) telescope₃≡55 h)

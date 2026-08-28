@@ -6103,17 +6103,19 @@ frameDrainW {Γ = Γ} {u = u} W sf id now (from-inner op allNid inst) p vals sch
 --   on a wrap and the values are an inner's emissions -- and kills the
 --   caps-scaled repair at the same figures, the cap being satisfied by
 --   a state the arriving values are no part of.
--- REFUTED: `Refuted.Thru-Fit-Frame-Slot` kills THIS STATEMENT, unit
---   and all, at a shared slot: one hundred and twenty-eight against
---   seventy-six, sixty-four against sixty-eight one layer shorter, so
---   it is a crossing and not a scale error.  The telescope IS priced
---   here, which is why the reading is a finding about this charge and
---   not about the arm it delegates to -- but it is priced by a
---   `nestU`, linear in the unit, against a subscribe that doubles per
---   layer of the definition.  So the body below is a real proof of a
---   false statement, resting on the thru arm's own refuted leaf, and
---   the repair is to key the factor on a size that resolves through
---   the telescope, which is what the arr-keyed twin already does.
+-- REFUTED: `Refuted.Thru-Fit-Frame-Slot` kills the unit-only form at
+--   a shared slot -- one hundred and twenty-eight against seventy-six,
+--   sixty-four against sixty-eight one layer shorter, so a crossing
+--   and not a scale error, the telescope being priced by a `nestU`
+--   linear in the unit against a subscribe that doubles per layer.
+--   It does NOT kill the statement below, and the same file says so
+--   mechanically: those rows are read at a size cap of one, while the
+--   head bounds the RESOLVED telescope by that cap, and the telescope
+--   at the refuting witness measures one hundred and fifteen.  At the
+--   smallest cap the premise admits, the factor is a tower in that
+--   number and the delivery is eight.  So the resolved-size premise is
+--   what the slot axis buys, here as at the fit head it delegates to,
+--   and the axis is spent rather than open.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (c : Caps) (d : ℕ) (W : ℕ) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick)
