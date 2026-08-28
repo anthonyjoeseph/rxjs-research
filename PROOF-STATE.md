@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the node cone above the subscribe face** — the reorder, now that the edge
-  holding it below is gone: the three term lemmas the subscribe face wanted
-  from the node cone's module are out in their own, so nothing above the walk
-  depends on the walk any more. The leg is to turn the remaining edge around —
-  the node cone importing the proven subscribe face rather than being read by
-  it. Its first act is the check that decides the leg: whether the walk's
-  consumers can supply the full face's premise, which is strictly stronger
-  than the node-table conjunct they supply today. If they cannot, the leg ends
-  in that finding and the fallback is the level currency below.
+- **the other two conversion sites** — `thruFit-vals` and `thruRoom-frame`.
+  The check that decided the last leg is ANSWERED: every entry into the
+  node-table currency holds the FULL face already, so the walk's weaker
+  premise is a choice made at the door rather than a limit of what the
+  caller has. Pushing that door down one chain retired the third site
+  outright — the inner-finish arm never read the weakened invariant at all,
+  and its premise was dead the whole way. This leg does the same to the two
+  that remain, and the product is the honest measure of how much of the walk
+  the nest currency is actually load-bearing for.
 - **the exit walk retired** — `subscribeE-caps-exit` and the cone under it.
   With the order turned around it is a superseded predecessor: the proven face
   carries the same invariant across the same operation at full strength, and

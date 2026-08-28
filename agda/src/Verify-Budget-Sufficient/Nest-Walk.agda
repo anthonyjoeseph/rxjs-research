@@ -5782,7 +5782,7 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
   (id : Id) (now : Tick)
   (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl →
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
@@ -5799,7 +5799,7 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
        ≤ nestFac S′ W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
 
-innerFinish-nest {e = e} c d sl W sf switchᵒ allNid inst p id now vals sched st hsl hc hdr hw hdp
+innerFinish-nest {e = e} c d sl W sf switchᵒ allNid inst p id now vals sched st hsl hdr hw hdp
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                    = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (scan-st _)           = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
@@ -5815,7 +5815,7 @@ innerFinish-nest {e = e} c d sl W sf switchᵒ allNid inst p id now vals sched s
                     (≤-refl {nestDᵛˢ vals}))
           (raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)))
 
-innerFinish-nest {e = e} c d sl W sf exhaustᵒ allNid inst p id now vals sched st hsl hc hdr hw hdp
+innerFinish-nest {e = e} c d sl W sf exhaustᵒ allNid inst p id now vals sched st hsl hdr hw hdp
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                    = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (scan-st _)           = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
@@ -5828,7 +5828,7 @@ innerFinish-nest {e = e} c d sl W sf exhaustᵒ allNid inst p id now vals sched 
                     (≤-refl {nestDᵛˢ vals}))
           (raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)))
 
-innerFinish-nest {e = e} {s = s} c d sl W sf mergeAllᵒ allNid inst p id now vals sched st hsl hc hdr hw hdp
+innerFinish-nest {e = e} {s = s} c d sl W sf mergeAllᵒ allNid inst p id now vals sched st hsl hdr hw hdp
   with lookupNode allNid (EvalSt.nodes st) in eq
 ... | nothing                = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (scan-st _)       = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
@@ -5936,7 +5936,7 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (d : ℕ) (sl : Slots Γ) (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (op : AllOp)
   (allNid : NodeId) (inst : NodeId) (p : Path Γ s t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  Sched.slots sched ≡ sl →
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      capsDrainOK c sl sf allNid p id now lim (pred act) q sched st) →
@@ -5950,12 +5950,12 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (j ≤ sizeCount c d ⊔ Caps.cSize c)
   × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
        ≤ nestFac S′ W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
-stepFrame-nodes-inner {e = e} c d sl W sf id now op allNid inst p vals false sched st hsl hc hdr hw hdp =
+stepFrame-nodes-inner {e = e} c d sl W sf id now op allNid inst p vals false sched st hsl hdr hw hdp =
   0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
-stepFrame-nodes-inner {e = e} c d sl W sf id now op allNid inst p vals true sched st hsl hc hdr hw hdp
+stepFrame-nodes-inner {e = e} c d sl W sf id now op allNid inst p vals true sched st hsl hdr hw hdp
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
-... | false = innerFinish-nest c d sl W sf op allNid inst p id now vals sched st hsl hc hdr hw hdp
+... | false = innerFinish-nest c d sl W sf op allNid inst p id now vals sched st hsl hdr hw hdp
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -6137,7 +6137,7 @@ abstract
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
   stepFrame-nodes {e = e} c d W sl sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hw =
     let INNER = stepFrame-nodes-inner c d sl W sf id now op allNid inst p vals fin sched st
-                  hsl (capsOK?⇒nest c sched st hc) hfd hfw hdp
+                  hsl hfd hfw hdp
         S′ = Caps.cSize (frameStep (proj₁ INNER) c) in
     proj₁ INNER
     , proj₁ (proj₂ INNER)
