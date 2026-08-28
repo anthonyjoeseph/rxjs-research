@@ -505,8 +505,7 @@ iterSize-infl S hS (suc k) s =
 -- THE SIZE AXIS STEPPED ALONE, AND THE WIDTH LEFT EXACTLY WHERE IT
 -- WAS -- the cap a descent's ARRIVALS are read at.  An arrival is the
 -- head's syntax with payloads substituted in, so it crosses the size
--- field; the level it crosses by is bounded by the head's own written
--- size, which is what pins the count here rather than an existential.
+-- field, and the level is the parameter.
 --
 -- The width field does NOT move, and that is measured rather than
 -- assumed: a step function naming its payload twice mentions ONE
@@ -526,20 +525,22 @@ iterSize-infl S hS (suc k) s =
 -- rule is really about -- a body reaching the caps recurrence -- is
 -- paid by `frameStep`, which is transparent already and appears in
 -- these types either way; this adds one application of it.
-arrCap : Caps → Caps
-arrCap c =
-  caps (Caps.cSize (frameStep (Caps.cSize c) c)) (Caps.cWid c) (Caps.cReg c)
+--
+-- AND THE LEVEL IS A PARAMETER RATHER THAN THE HEAD'S OWN SIZE, which
+-- is what lets the two halves of a `*All` arm be spent together.  The
+-- arm reads its arrivals at the level its own written size fixes, and
+-- it also holds a CHILD's burst bound reported at whatever level the
+-- child stepped to; fixing either level in the cap forces a transport
+-- of the other.  Taking the level as an argument lets the arm read
+-- both at their join, where neither moves.
+arrCapAt : ℕ → Caps → Caps
+arrCapAt j c = caps (Caps.cSize (frameStep j c)) (Caps.cWid c) (Caps.cReg c)
 
 iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
   iterSize S j s ≤ iterSize S j′ s
 iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s
 iterSize-mono-count S s hS           (s≤s le)  = iterSize-mono-count S (sizeStep S s) hS le
 
--- and the one fact its consumers spend: the entry cap's size fits
--- inside it, so every size-keyed premise transports up unchanged
-arrCap-size : ∀ (c : Caps) → 1 ≤ Caps.cSize c →
-  Caps.cSize c ≤ Caps.cSize (arrCap c)
-arrCap-size c hS = iterSize-infl (Caps.cSize c) hS (Caps.cSize c) (Caps.cSize c)
 
 -- WIDTH: foldStep is inflationary for S ≥ 2 (w < 2^w ≤ 2^(1+w) ≤ S^(1+w))
 foldStep-infl : ∀ (S w : ℕ) → 2 ≤ S → w ≤ foldStep S w

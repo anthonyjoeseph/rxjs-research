@@ -12,14 +12,23 @@
 -- only, and the measure is sealed, so instantiating it would need a
 -- lower bound of the kind the arr-keyed scan probes pin.
 --
+-- AND THE LEVEL IS A BOUNDARY, not a gap: the three leaves now take the
+-- caps level as a parameter, and these rows are taken at the level the
+-- head's own written size fixes -- the SMALLEST any arm passes, since an
+-- arm hands in that size joined with its child's.  A larger level is a
+-- larger cap and a weaker conjunct, so a row green here is green at
+-- every level an arm actually uses.  What is NOT reached is the other
+-- direction: level zero, where the step is the identity and the leaf
+-- collapses to the flat statement `Refuted.PushVals-Adm-Map` kills.
+--
 -- EVIDENCE, not a claim: `src` cannot import this file (the library
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-caps-adm @4936ee
--- TARGET: pushVals-caps-wid @b57840
+-- TARGET: pushVals-caps-adm @297913
+-- TARGET: pushVals-caps-wid @634f86
 -- TARGET: pushVals-caps-burstW @f0db0b
--- TARGET: pushVals-caps-queue @254228
+-- TARGET: pushVals-caps-queue @861d80
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
@@ -45,7 +54,7 @@ open import Rx.Evaluator
   splitEvents;
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
   AllOp; NodeId; Path)
-open import Verify-Budget-Sufficient.Caps using (arrCap; Caps; caps)
+open import Verify-Budget-Sufficient.Caps using (arrCapAt; Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
           pushValsWOK; pushValsQOK)
@@ -126,7 +135,7 @@ burstLens≡ = refl
 -- single cap satisfying both.
 capsM : (lim k W : ℕ) → Set
 capsM lim k W =
-  pushValsCapsOK (arrCap (tight {obs (obs natᵗ)} (rM lim k))) slots W gasBig mergeAllᵒ
+  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (rM lim k))) (tight {obs (obs natᵗ)} (rM lim k))) slots W gasBig mergeAllᵒ
     (proj₁ (mintNode (sched-init (rM lim k) slots))) root 0 0
     (proj₁ (resM lim k)) (proj₁ (proj₂ (resM lim k))) (proj₂ (proj₂ (resM lim k)))
 
@@ -153,7 +162,7 @@ capsM-1 hw = refl , refl , refl , refl
 
 capsS : (k W : ℕ) → Set
 capsS k W =
-  pushValsCapsOK (arrCap (tight {obs (obs natᵗ)} (qS k))) slots W gasBig switchᵒ
+  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (qS k))) (tight {obs (obs natᵗ)} (qS k))) slots W gasBig switchᵒ
     (proj₁ (mintNode (sched-init (qS k) slots))) root 0 0
     (proj₁ (resS k)) (proj₁ (proj₂ (resS k))) (proj₂ (proj₂ (resS k)))
 
@@ -165,7 +174,7 @@ capsS-1 hw = refl , refl , refl , refl
 
 capsX : (k W : ℕ) → Set
 capsX k W =
-  pushValsCapsOK (arrCap (tight {obs (obs natᵗ)} (qX k))) slots W gasBig exhaustᵒ
+  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (qX k))) (tight {obs (obs natᵗ)} (qX k))) slots W gasBig exhaustᵒ
     (proj₁ (mintNode (sched-init (qX k) slots))) root 0 0
     (proj₁ (resX k)) (proj₁ (proj₂ (resX k))) (proj₂ (proj₂ (resX k)))
 

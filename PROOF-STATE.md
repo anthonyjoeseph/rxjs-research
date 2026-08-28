@@ -204,16 +204,16 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **the `*All` arm's premise does not survive a substitution** —
-  `pushVals-nest-burst`, `pushVals-caps-burstW`, `pushVals-caps-queue`,
-  `pushVals-caps-adm`, `pushVals-caps-wid`, `thruFit-arr-merge`,
-  `thruFit-arr-switch`, `thruFit-arr-exhaust`. The restatement is landed: the
-  arrivals are read one caps level up, the level the refuting map crosses by,
-  and the arm reports it joined with the child's. It cost almost nothing
-  because the crossing is measured to be confined to the SIZE axis — a step
-  function naming its payload twice mentions ONE observable twice, and the
-  frame measure counts observables — so the state invariant, which reads the
-  width field alone, is the same proposition at both caps and no transport
-  exists anywhere. What is left is the leaves themselves, at the new cap.
+  `pushVals-caps-burstW`, `pushVals-caps-queue`, `pushVals-caps-adm`,
+  `pushVals-caps-wid`, `thruFit-arr-merge`, `thruFit-arr-switch`,
+  `thruFit-arr-exhaust`. The measure half is DONE: the arrivals read at a
+  caps LEVEL the arm passes in, the arm picking its child's joined with its
+  own written size, and at that level the child's own reported burst bound IS
+  the head's — so the whole nest half is now a body and nothing is postulated
+  about the burst. What made it free is that the level moves the SIZE axis
+  alone, leaving the width field literally equal, so the state invariant is
+  the same proposition at every level. What is left is the CAPS half at the
+  same level: four leaves reading widths, queues and admission.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
@@ -237,9 +237,9 @@ does not fit is a finding about the shared statement, not about the head.
   both sealed families sit on the right — and the store-mediated route it
   replaced is circular; the header carries the cycle.
 - **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE×3, PROBED×2`: the arrivals now read one caps level up,
-  the level the refuting map crosses by; the width field does not move, so the
-  state invariant is the same proposition at both caps.
+  `REFUTED×2, DEAD ROUTE×3, PROBED×2, RECOVERY`: the arrivals now read one caps
+  level up, the level the refuting map crosses by; the width field does not
+  move, so the state invariant is the same proposition at both caps.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
@@ -257,10 +257,6 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED×2, PROBED×2`: the other two stream leaves — the walk over them is a
   proven body, so what remains per instant is the frame widths and the queue
   reading the invariant cannot supply.
-- **`pushVals-nest-burst`** (Nest-Walk) — DIFFICULTY,
-  `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
-  whole burst inside the grant, at the BODY's key — the emit-by-emit walk off
-  it is a proven body. This is where the burst statement's risk is.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
