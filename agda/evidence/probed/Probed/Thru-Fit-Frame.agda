@@ -6,7 +6,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: thruFit-frame @e2748f
+-- TARGET: thruFit-frame @010e63
 --
 -- WHAT IS BEING TESTED.  The grant in `thruFit-frame` is
 --   nestFac (cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
@@ -51,7 +51,9 @@ open import Data.Bool using (true; false)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -60,7 +62,7 @@ open import Rx.Exp
   using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ;
          varᵗ; caseᵗ; inlᵗ; syncSizeᵛ)
 open import Rx.Frame-Width using (pWᵛ)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (root; sched-init; st-init; EvalSt; Sched; Path; _↠_; thru-outer;
          mergeAllᵒ; switchᵒ; exhaustᵒ; installNode; mergeAll-st; switch-st;
@@ -69,7 +71,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; nodesMax; nodeNestAt; nestClosOK?)
+  using (nestDᵛˢ; nodesMax; nodeNestAt)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 -- ── harness setup (shared with Probed.Thru-Step-Indexed) ─────────
@@ -187,11 +189,11 @@ premX1 = refl
 -- the resolved-size premise, which the arrivals here meet at the same
 -- cap: no `arr` names a slot, so the size read through the telescope
 -- is the size read off the term
-premC1 : nestClosOK? (capF 1) slots (arr 1) ≡ true
-premC1 = refl
+premC1 : slotsSize slots ≤ Caps.cSize (capF 1)
+premC1 = ≤ᵇ⇒≤ _ _ tt
 
-premC3 : nestClosOK? (capF 3) slots (arr 3) ≡ true
-premC3 = refl
+premC3 : slotsSize slots ≤ Caps.cSize (capF 3)
+premC3 = ≤ᵇ⇒≤ _ _ tt
 
 -- ── combined figure pins (delivery LHS for all three conjuncts) ──
 

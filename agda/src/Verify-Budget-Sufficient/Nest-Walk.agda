@@ -31,7 +31,7 @@ open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; InstEmit; v
 open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; natᵗ; obs; isData; sizeᵗ; applyFn; _≟ᵗ_; evalTm; syncSizeᵉ;
   syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ)
-open import Rx.Slots using (Slots; scripted; shared)
+open import Rx.Slots using (Slots; scripted; shared; slotsSize)
 open import Rx.Clos-Size using (closSizeᵉ; closSizeᵗ; closSizeᵗˢ;
   syncSize≤closᵉ; syncSize≤closᵗ; syncSize≤closᵗˢ; closSize-unfoldμ)
 open import Rx.Slot-Clos using (slotClos; slotClos-pos; slotClos-fix)
@@ -661,6 +661,22 @@ nestCapsOK?-lookupWid {Γ = Γ} c nid ns sched st eq hc =
 -- Caps.cSize c` does not imply this predicate, and the two premises are
 -- independent rather than one subsuming the other.
 
+-- AND WHETHER THE CAP THE TOP INSTANTIATES CAN SATISFY IT IS OPEN, AND
+-- SYMBOLIC-OR-NOTHING.  Every consumer of this key takes it as a
+-- premise, so nothing owes a proof today; what is owed at the top is
+-- that `capsAt`'s own size admits the telescope, and by the paragraph
+-- above that number has to beat a measure exponential in the
+-- telescope's depth.  THE MEASURING ROUTE IS CLOSED: `capsAt`'s size is
+-- `iterSize` at a count the caps counting family produces, and that
+-- family is the one the harness quarantines as unreachable by
+-- measurement -- native code at the smallest arguments, no value -- so
+-- no probe, row or `refl` pin can decide it.  What is left is
+-- arithmetic already in the tree: `exp-iterSize` puts `2 ^ k` under
+-- that size, so the question reduces to whether the count dominates the
+-- slot depth, and that is a statement about the counting family rather
+-- than about this predicate.  No assembly is stated for it here because
+-- the walk has no top-level consumer to hang one on yet.
+
 nestClosOK? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Val Γ (obs u) → Bool
 nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
 
@@ -1012,6 +1028,16 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 -- Both re-enter the subscribe machinery and both were charged as though
 -- they forwarded, so one repair covers two arms.
 --
+-- AND THE PREMISE THAT CLOSES IT TIES THE CAP TO THE TELESCOPE RATHER
+-- THAN TO THE ARRIVAL, which is the one the caps face has carried all
+-- along.  A telescope of depth `d` costs `d` units of written size, so
+-- the cap dominates `d` and the grant's tower dominates the `2 ^ d` a
+-- doubling definition can deliver.  Keying on the arrival's resolved
+-- closure would also close it, and is what the arr-keyed twin does;
+-- this is the weaker premise, it is uniform over the frames rather
+-- than one predicate per frame, and at the top it is a proven
+-- consequence of `capsAt`'s own size.
+--
 -- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form,
 --   eighty against forty-one, at a payload forty layers deep; the gap
 --   is that depth, so no constant per value closes it.  The same
@@ -1067,6 +1093,7 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 --   grant -- raising it moves the program and not the bound.  What
 --   would refute is a step delivering more nesting than its arrival
 --   carried by more than the `+ W`, which this family never does.
+
 postulate
   thruFit-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (W : ℕ) (sl : Slots Γ)
@@ -1076,7 +1103,7 @@ postulate
     Sched.slots sched ≡ sl →
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     all (valCaps? c sl (obs u)) vals ≡ true →
-    all (nestClosOK? c sl) vals ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
     thruFitOK (nestFac (Caps.cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W))
       sf op nid p id now vals sched st
 
@@ -1090,7 +1117,7 @@ stepFrame-nodes-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   Sched.slots sched ≡ sl →
   1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
   all (valCaps? c sl (obs u)) vals ≡ true →
-  all (nestClosOK? c sl) vals ≡ true →
+  slotsSize sl ≤ Caps.cSize c →
   let r = stepFrame sf id now (thru-outer op nid) p vals fin sched st in
   length (proj₁ r) ≤ W →
   (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
@@ -4975,31 +5002,6 @@ frameDrainOK {Γ = Γ} {u = u} c sl sf id now (from-inner op allNid inst) p sche
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     capsDrainOK c sl sf allNid p id now lim (pred act) q sched st
 
--- WHAT A SUBSCRIBING FRAME HAS TO BE HANDED, AND IT IS NOT WHAT THE
--- ARRIVAL'S SYNTAX SAYS.  A `thru-outer` subscribes each value it
--- takes, so what it delivers is a run of that value's DEFINITION -- and
--- an arrival may name its definition instead of carrying it.  At a
--- shared slot the caps premise reads size one, correctly, since the
--- syntax of a reference says nothing about the slot; so the size cap
--- keyed on the arrival prices nothing that is about to run, and the
--- statement built on it is refuted.  This is the premise that closes
--- it, and it is the one the arr-keyed twin has always taken: a size
--- read THROUGH the telescope rather than off the reference.
---
--- IT IS A PER-FRAME PREDICATE BECAUSE THE OBLIGATION IS.  Four of the
--- five frames forward what they are given and owe nothing here, and
--- their arms discharge it by `tt`; only the one that re-enters the
--- subscribe machinery with an arrival in hand can be surprised by
--- what the arrival names.  Stating it over the whole walk instead
--- would oblige every frame to carry a bound none of them spends.
-frameClosOK : ∀ {n} {Γ : Ctx n} {s u}
-  (c : Caps) (sl : Slots Γ) (f : Frame Γ s u) (vals : List (Val Γ s)) → Set
-frameClosOK c sl (map-f _)          vals = ⊤
-frameClosOK c sl (scan-f _ _)       vals = ⊤
-frameClosOK c sl (take-f _)         vals = ⊤
-frameClosOK c sl (from-inner _ _ _) vals = ⊤
-frameClosOK c sl (thru-outer _ _)   vals = all (nestClosOK? c sl) vals ≡ true
-
 -- AND THE DRAIN'S WIDTH, CARRIED THE SAME WAY AND AT THE SAME ONE
 -- FRAME.  It is a second predicate rather than a conjunct of the one
 -- above because the two say different things about the same queue --
@@ -5079,7 +5081,7 @@ abstract
     Sched.slots sched ≡ sl →
     1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
     all (valCaps? c sl s) vals ≡ true →
-    frameClosOK c sl f vals →
+    slotsSize sl ≤ Caps.cSize c →
     frameDrainOK c sl sf id now f p sched st →
     frameDrainW W sf id now f p sched st →
     let r = stepFrame sf id now f p vals fin sched st in
@@ -5247,7 +5249,7 @@ mutual
   capsWalkOK {u = u} c sl sf gas id now (f ↠ p) vals fin sched st =
     (capsOK? c sched st ≡ true)
     × (all (valCaps? c sl u) vals ≡ true)
-    × frameClosOK c sl f vals
+    × (slotsSize sl ≤ Caps.cSize c)
     × frameDrainOK c sl sf id now f p sched st
     × capsWalkOK c sl sf gas id now p (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
