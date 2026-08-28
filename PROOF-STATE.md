@@ -203,16 +203,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the `thru` frame's fit, and the burst underneath it** —
-  `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-wid`,
+- **the `*All` arm's premise does not survive a substitution** —
+  `pushVals-caps-adm`, `pushVals-caps-wid`, then `pushVals-nest`,
   `pushVals-caps-burstW`, `pushVals-caps-queue`, `thruFit-arr-merge`,
-  `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit because they are one
-  currency argument seen from four places: the wrap's grant, the burst inside
-  it, the admissibility per instant, and the arr key that the cap-keyed route
-  does not transport to. The frame's fit, its room and the burst's room walk
-  are now checked bodies, so what is left is the burst's own inputs — and they
-  all key on written size, so a restatement of one moves every one of the
-  others. Grinding any of them first bets on the key.
+  `thruFit-arr-switch`, `thruFit-arr-exhaust`. The two stream leaves are
+  REFUTED: an arrival is the head's syntax with the payload substituted in, so
+  a step function naming its payload twice outgrows the flat cap every premise
+  reads. The arm SUBSCRIBES such an arrival through the walk's own re-entry, so
+  what fails is the premise surviving the arm; the caps face's level and an
+  intrinsic emit measure are the two devices that would. Every row beside them
+  keys on the same written size, so the restatement moves all of them, and
+  grinding any of them first bets on the key.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `subscribeE-nest-slot`, `evalWith-nest-sync`. The preamble already says these
   are one statement and not one per head; the leg is that fact scheduled. The
@@ -229,6 +230,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
+- **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — SHAPE,
+  `REFUTED×2, PROBED×2`: the arrivals read at the flat cap, refuted at a map
+  naming its payload twice; the restatement owed is the arm's missing level,
+  not a premise on either leaf.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
@@ -242,11 +247,10 @@ does not fit is a finding about the shared statement, not about the head.
   the fold multiplies the depth per value while the key gains only the value's
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
-- **`pushVals-caps-adm`, `pushVals-caps-wid`, `pushVals-caps-burstW`,
-  `pushVals-caps-queue`** (Nest-Walk) — DIFFICULTY, `REFUTED×2, PROBED×4`: the
-  burst's stream leaves — the walk over them is a proven body, so what remains
-  is per instant: the values admissible, their width key, the frame widths, and
-  the queue reading the invariant cannot supply.
+- **`pushVals-caps-burstW`, `pushVals-caps-queue`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED×2, PROBED×2`: the other two stream leaves — the walk over them is a
+  proven body, so what remains per instant is the frame widths and the queue
+  reading the invariant cannot supply.
 - **`pushVals-nest`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
   burst inside the grant, emit by emit, at the BODY's key. This is where the

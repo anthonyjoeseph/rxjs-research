@@ -3888,8 +3888,28 @@ postulate
   -- at all.  The room is no longer a leaf: it is a checked fold of
   -- the frame's own record, standing on the three that follow it --
   -- the arrivals' width key, the frame widths, and the queue reading.
+
   -- The stream's own half: every instant's values admissible, written
   -- and under the telescope.
+  --
+  -- AND IT IS FALSE AT THE FLAT CAP THIS FACE CARRIES.  Every premise
+  -- reads the head's SYNTAX, which counts a bound variable as one; an
+  -- emitted value is that syntax with the payload SUBSTITUTED IN, so a
+  -- step function naming its payload twice hands back about twice the
+  -- payload while contributing a constant to the head.  The gap grows
+  -- with the payload and no premise can see it.  The repair is not a
+  -- premise on this leaf: the arrival is SUBSCRIBED -- the merge arm
+  -- hands it to the walk's own re-entry -- so what fails is the walk's
+  -- PREMISE surviving this arm, and the only device that preserves it
+  -- is a premise that SURVIVES A SUBSTITUTION, which this one does not.
+  -- Two devices do: the caps face's LEVEL, arrivals read at the entry
+  -- cap stepped, which costs an index the nest walk does not carry; or
+  -- an intrinsic measure on the syntax dominating what it can emit,
+  -- which costs no index and moves every head's premise.  The state
+  -- invariant is untouched either way -- it reads the WIDTH field over
+  -- the node table and no size at all -- so what is owed is the arm's
+  -- premise and not its state chain.
+  -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -3909,6 +3929,14 @@ postulate
   -- the one half of the room the frame's own record cannot recover,
   -- since it is a fact about the VALUE and the caps at the frame's
   -- state say nothing about a value that has not arrived.
+  --
+  -- AND IT DIES TO THE SAME SUBSTITUTION ITS SIBLING DOES, at the same
+  -- witness and for the same reason: the key is a size bound, and an
+  -- arrival is the head's syntax with the payload substituted in.  The
+  -- WIDTH half of the key is not what fails -- the witness sets that
+  -- field wide so the reading is unambiguous -- which is why what is
+  -- owed here is the arm's level and not a width premise.
+  -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   pushVals-caps-wid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
