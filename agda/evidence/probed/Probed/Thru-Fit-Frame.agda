@@ -6,7 +6,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: thruFit-frame @ac684e
+-- TARGET: thruFit-frame @e2748f
 --
 -- WHAT IS BEING TESTED.  The grant in `thruFit-frame` is
 --   nestFac (cSize c) W * ((nodesMax st ⊔ nestDᵛˢ vals) + W)
@@ -69,7 +69,7 @@ open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; nodesMax; nodeNestAt)
+  using (nestDᵛˢ; nodesMax; nodeNestAt; nestClosOK?)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 -- ── harness setup (shared with Probed.Thru-Step-Indexed) ─────────
@@ -183,6 +183,15 @@ premS1 = refl
 
 premX1 : capsOK? (capF 1) sched₀ stX ≡ true
 premX1 = refl
+
+-- the resolved-size premise, which the arrivals here meet at the same
+-- cap: no `arr` names a slot, so the size read through the telescope
+-- is the size read off the term
+premC1 : nestClosOK? (capF 1) slots (arr 1) ≡ true
+premC1 = refl
+
+premC3 : nestClosOK? (capF 3) slots (arr 3) ≡ true
+premC3 = refl
 
 -- ── combined figure pins (delivery LHS for all three conjuncts) ──
 

@@ -178,10 +178,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`thruFit-frame`** (Nest-Walk) — SHAPE, `REFUTED×4, DEAD ROUTE, PROBED`:
-  the outer wrap's fit, keyed on the arrival — which at a shared slot names
-  its content, so the key is one and the delivery is the definition's. The
-  parent `stepFrame-nodes` crosses too. Restate on a slot-resolved key.
+- **`thruFit-frame`** (Nest-Walk) — FALSITY, `REFUTED×4, DEAD ROUTE, PROBED`:
+  the outer wrap's fit, now keyed through the slot telescope — the
+  arrival-keyed form is refuted at a shared slot, where the key reads one and
+  the delivery is the definition's. Nothing has instantiated the new key in
+  that region.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
