@@ -3507,6 +3507,49 @@ pushValsRoomOK {Γ = Γ} {u = u} c sl W fuel op nid κ id now (em ∷ ems) sched
   sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
          (proj₂ (proj₂ sp)) sched st
 
+-- AND THE ROOM RECORD'S THREE HALVES, EACH FOLDED OVER THE BURST THE
+-- SAME WAY THE ROOM ITSELF IS.  The room walk is a checked fold of the
+-- frame's own record, so what the burst leaves owe is no longer the
+-- record but its inputs: the arrivals' written admissibility against
+-- the telescope, the arrival widths the frame reads, and the queue
+-- reading at each state the walk passes through.
+pushValsWidOK : ∀ {n} {Γ : Ctx n} {u}
+  (c : Caps) (sl : Slots Γ) (str : Stream Γ (obs u)) → Set
+pushValsWidOK c sl [] = ⊤
+pushValsWidOK {Γ = Γ} {u = u} c sl (em ∷ ems) =
+  (all (valCaps? c sl (obs u)) (proj₁ sp) ≡ true)
+  × pushValsWidOK c sl ems
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+
+pushValsWOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+pushValsWOK W fuel op nid κ id now [] sched st = ⊤
+pushValsWOK {Γ = Γ} {u = u} W fuel op nid κ id now (em ∷ ems) sched st =
+  thruRoomWOK W fuel op nid κ id now (proj₁ sp) sched st
+  × pushValsWOK W fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
+pushValsQOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+pushValsQOK c fuel op nid κ id now [] sched st = ⊤
+pushValsQOK {Γ = Γ} {u = u} c fuel op nid κ id now (em ∷ ems) sched st =
+  thruRoomQOK c fuel op nid κ id now (proj₁ sp) sched st
+  × pushValsQOK c fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+
 pushVals-caps-join : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
@@ -3547,6 +3590,39 @@ pushValsSt-walk {Γ = Γ} {u = u} c sl W fuel op nid κ id now (em ∷ ems) sche
          (proj₂ (proj₂ sp)) sched st
   S = stepThru-caps c sl W fuel op nid κ id now (proj₁ sp)
         (proj₂ (proj₂ sp)) sched st hsl hc hv hcl hr
+
+-- AND THE ROOM WALK IS A CHECKED FOLD.  Each instant's arrivals are
+-- handed to the frame's own record, and the state pair the next
+-- instant is read at comes from the same per-instant step the state
+-- walk beside this one advances by -- so the two walks agree on where
+-- they are by construction rather than by a shared assumption.
+pushVals-room-join : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  nestCapsOK? c sched st ≡ true →
+  pushValsAdmOK c sl str →
+  pushValsWidOK c sl str →
+  pushValsWOK W fuel op nid κ id now str sched st →
+  pushValsQOK c fuel op nid κ id now str sched st →
+  pushValsRoomOK c sl W fuel op nid κ id now str sched st
+pushVals-room-join c sl W fuel op nid κ id now [] sched st
+  hsl hc hadm hwid hw hq = tt
+pushVals-room-join {Γ = Γ} {u = u} c sl W fuel op nid κ id now (em ∷ ems) sched st
+    hsl hc (hv , hcl , restAdm) (hd , restWid) (hw , restW) (hq , restQ) =
+  R
+  , pushVals-room-join c sl W fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+      (proj₁ S) (proj₂ S) restAdm restWid restW restQ
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
+  R = thruRoom-frame c W sl fuel id now op nid κ (proj₁ sp) sched st
+        hsl hc hv hd hcl hw hq
+  S = stepThru-caps c sl W fuel op nid κ id now (proj₁ sp)
+        (proj₂ (proj₂ sp)) sched st hsl hc hv hcl R
 
 -- and the lift, CHECKED: one emit's fit is its values' fit, and the
 -- rest runs at the frame the emit left
@@ -3801,21 +3877,21 @@ postulate
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     NestAt c sl B W g (scanᵉ f z b) κ id now sched st
   -- THE `*All` BURST LEAVES, CAPS HALF, SPLIT BY CONJUNCT.  The
-  -- master below the block is a REAL BODY over these three, so what
-  -- each owes is one kind of fact about the outer's burst and nothing
+  -- masters below the block are REAL BODIES over these, so what each
+  -- owes is one kind of fact about the outer's burst and nothing
   -- else.  The EXIT leaf carries the slots equation and the
   -- invariant at the one state the subscribe leaves; the chain from
   -- there is a checked walk over the per-instant step, so the whole
   -- state half stands on this single fact.  The
   -- ADMISSIBILITY leaf is a property of the stream alone -- no state
   -- in its conclusion's type -- so its walk needs no caps threading
-  -- at all.  The ROOM leaf is the per-value march through
-  -- `thruConsume` at the wrap's node, and it is where the remaining
-  -- risk of the caps half sits.
+  -- at all.  The room is no longer a leaf: it is a checked fold of
+  -- the frame's own record, standing on the three that follow it --
+  -- the arrivals' width key, the frame widths, and the queue reading.
   -- The stream's own half: every instant's values admissible, written
   -- and under the telescope.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
-  --   are stated at `pushVals-caps-room` below.
+  --   are stated at `pushVals-caps-queue` below.
   pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -3828,27 +3904,14 @@ postulate
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
     in pushValsAdmOK c sl (proj₁ res)
-  -- The room walk, per value at the wrap's node.
-  -- PROBED: `Probed.PushVals-Caps` builds the conclusion itself -- it
-  --   is `Set`-valued, so the row is an INHABITANT and not a pinned
-  --   boolean -- at all three heads, at the cap the value's own sync
-  --   size gives, with the head's premises pinned by `refl` rather
-  --   than assumed, at every constructor of the op axis, which the
-  --   rows therefore cover in FULL.  Covered: all six conjuncts, at two nesting
-  --   depths and at limits 0 and 1, with the queue-room arm resolved
-  --   through a real node lookup at the merge and through an absurd
-  --   one at the other two, and with the head's CLOSURE premise pinned
-  --   beside its written one.  The RECURSION is covered too, at all
-  --   three heads: the one route to a subscribe-frame burst longer
-  --   than one instant is a share CONNECT, whose head instant rides in
-  --   front of the def's plumbed burst, and the probe's share-headed
-  --   rows pin that burst at length TWO and inhabit the second
-  --   instant's bundle at the state the first instant's step leaves.
-  --   NOT covered, a reading the probe makes rather than a gap it
-  --   leaves: the invariant conjunct's discrimination, since the state
-  --   the descent leaves carries one node and an empty registry and
-  --   live set, so it reads true even at a cap granting nothing.
-  pushVals-caps-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  -- The arrivals' width key: every value the descent hands back reads
+  -- inside the cap at the telescope the frame is standing in.  It is
+  -- the one half of the room the frame's own record cannot recover,
+  -- since it is a fact about the VALUE and the caps at the frame's
+  -- state say nothing about a value that has not arrived.
+  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
+  --   are stated at `pushVals-caps-queue` below.
+  pushVals-caps-wid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -3859,7 +3922,66 @@ postulate
     let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in pushValsRoomOK c sl W g op (proj₁ (mintNode sched)) κ id now
+    in pushValsWidOK c sl (proj₁ res)
+  -- The frame widths the burst's arrivals drive, per arrival and at
+  -- the state its predecessor left.  This is the measure half of the
+  -- room and the only one of the three that reads `W`, so it is where
+  -- a grant that is too small shows up.
+  -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
+  --   are stated at `pushVals-caps-queue` below.
+  pushVals-caps-burstW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestClosOK? c sl (allWrap op lim b) ≡ true →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in pushValsWOK W g op (proj₁ (mintNode sched)) κ id now
+         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+  -- The queue reading at each state the burst passes through: a merge
+  -- node parked at the wrap holds strictly fewer than the width field
+  -- grants, so one more arrival still fits.  The caps at that state
+  -- cannot supply it -- they admit a queue as long as the field, and
+  -- the record asks the field for one more -- which is why it is a
+  -- leaf of the burst rather than a consequence of the invariant.
+  -- REFUTED: `Refuted.Thru-Room-Frame`
+  -- PROBED: `Probed.PushVals-Caps` inhabits all three of these leaves,
+  --   and the admissibility beside them, at every constructor of the op
+  --   axis -- which the rows therefore cover in FULL -- at the cap each
+  --   value's own sync size gives, at two nesting depths and at limits
+  --   0 and 1, with each head's written and CLOSURE premises pinned by
+  --   `refl` rather than assumed.  The queue arm is resolved through a
+  --   real node lookup at the merge and through an absurd one at the
+  --   other two.  The RECURSION is covered at all three heads: the one
+  --   route to a subscribe-frame burst longer than one instant is a
+  --   share CONNECT, whose head instant rides in front of the def's
+  --   plumbed burst, and the share-headed rows pin that burst at length
+  --   TWO and inhabit the second instant at the state the first
+  --   instant's step leaves.  Of the three, only the WIDTH KEY could
+  --   have failed on its own -- it is a `refl` on a boolean, where the
+  --   frame widths are taken as a quantified premise because the
+  --   measure is sealed, and the queue arm's merge lookup is the one
+  --   place a numeral is read.  NOT covered, a reading the rows make
+  --   rather than a gap they leave: the invariant conjunct's
+  --   discrimination, since the state the descent leaves carries one
+  --   node and an empty registry and live set, so it reads true even at
+  --   a cap granting nothing.
+  pushVals-caps-queue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestClosOK? c sl (allWrap op lim b) ≡ true →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in pushValsQOK c g op (proj₁ (mintNode sched)) κ id now
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- THE `*All` BURST LEAF, MEASURE HALF -- and this is where the risk
   -- of the burst statement is, the bundle beside it being routine.
@@ -4295,6 +4417,65 @@ subscribeE-caps-exit {u = u} c sl W g (deferᵉ b) κ id now sched st hsl hc hv 
           (Sched.nextNode sched) (mergeAll-st {t = u} nothing 0 [] false)
           (EvalSt.nodes st) refl hc
 
+-- the exit pair is one instance of the walk, entered at the installed
+-- state through the wrap vocabulary's own bridges
+pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in (Sched.slots (proj₁ (proj₂ res)) ≡ sl)
+     × (nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
+pushVals-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  subscribeE-caps-exit c sl W g b
+    (thru-outer op (proj₁ (mintNode sched)) ↠ κ) id now
+    (proj₂ (mintNode sched))
+    (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    hsl
+    (nestCapsOK?-setNode c (proj₁ (mintNode sched)) (allFresh u op lim)
+       (proj₂ (mintNode sched)) st
+       (allFresh-wid (Caps.cWid c) (Sched.slots (proj₂ (mintNode sched))) u op lim)
+       hc)
+    (allWrap-valOK c op lim b hv)
+    (allWrap-closOK c sl op lim b hcl)
+    (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)
+
+-- THE ROOM WALK ASSEMBLED, over the three leaves the block above
+-- states apart.  The exit pair is the descent's, so the fold starts at
+-- the one state the subscribe leaves and marches from there.
+pushVals-caps-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in pushValsRoomOK c sl W g op (proj₁ (mintNode sched)) κ id now
+       (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+pushVals-caps-room {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  pushVals-room-join c sl W g op (proj₁ (mintNode sched)) κ id now
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (proj₁ EX) (proj₂ EX)
+    (pushVals-caps-adm c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-wid c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-burstW c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+    (pushVals-caps-queue c sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+  where
+  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  EX = pushVals-caps-exit c sl W g op lim b κ id now sched st hsl hc hv hcl hw
+
 subscribeAll-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
   pushValsSt-exit c sl W g op nid κ id now (proj₁ res)
     (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
@@ -4359,35 +4540,6 @@ subscribeInner-nestCaps c sl (gs fuel) op nid κ id now o sched st
         fuel o κ′ id now sc′ st hsl
         (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
         hv hcl ≤-refl
-
--- the exit pair is one instance of the walk, entered at the installed
--- state through the wrap vocabulary's own bridges
-pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
-  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
-  nestClosOK? c sl (allWrap op lim b) ≡ true →
-  descW g (allWrap op lim b) κ id now sched st ≤ W →
-  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
-          id now (proj₂ (mintNode sched))
-          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-  in (Sched.slots (proj₁ (proj₂ res)) ≡ sl)
-     × (nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true)
-pushVals-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
-  subscribeE-caps-exit c sl W g b
-    (thru-outer op (proj₁ (mintNode sched)) ↠ κ) id now
-    (proj₂ (mintNode sched))
-    (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    hsl
-    (nestCapsOK?-setNode c (proj₁ (mintNode sched)) (allFresh u op lim)
-       (proj₂ (mintNode sched)) st
-       (allFresh-wid (Caps.cWid c) (Sched.slots (proj₂ (mintNode sched))) u op lim)
-       hc)
-    (allWrap-valOK c op lim b hv)
-    (allWrap-closOK c sl op lim b hcl)
-    (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)
 
 -- the state half assembled: exit pair in, checked chain out
 pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

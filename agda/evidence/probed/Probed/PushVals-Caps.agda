@@ -17,7 +17,9 @@
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
 -- TARGET: pushVals-caps-adm @66072f
--- TARGET: pushVals-caps-room @8c59dd
+-- TARGET: pushVals-caps-wid @962e07
+-- TARGET: pushVals-caps-burstW @f0db0b
+-- TARGET: pushVals-caps-queue @a37576
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
@@ -44,7 +46,8 @@ open import Rx.Evaluator
   AllOp; NodeId; Path)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
+          pushValsWOK; pushValsQOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
@@ -412,3 +415,113 @@ burstOne = length (proj₁ (resG 1))
 
 burstOne≡ : burstOne ≡ (1 , 1 , 1 , 1)
 burstOne≡ = refl
+
+-- AND THE SAME PROGRAMS AT THE THREE LEAVES THE ROOM WALK NOW STANDS
+-- ON.  The bundle rows above build the room record whole; these build
+-- its inputs apart, in the shapes the burst leaves state -- the
+-- arrivals' width key, the frame widths, and the queue reading -- so
+-- the rows are evidence about those statements and not only about the
+-- record they compose into.  The width key is the one of the three
+-- that is NEW here rather than a re-cut of a conjunct the bundle rows
+-- already carried: it is a `refl` on a boolean, so unlike its two
+-- siblings it could have failed on its own.
+Leaves : ∀ {t u} {e : Closed Γ₂ t} (c : Caps) (sl : Slots Γ₂) (W : ℕ)
+  (op : AllOp) (nid : NodeId) (κ : Path Γ₂ u t)
+  (r : Stream Γ₂ (obs u) × Sched Γ₂ × EvalSt e) → Set
+Leaves c sl W op nid κ r =
+  pushValsWidOK c sl (proj₁ r)
+  × pushValsWOK W gasBig op nid κ 0 0 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+  × pushValsQOK c gasBig op nid κ 0 0 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+leavesM-1 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (rM 1 1)) slots W mergeAllᵒ
+    (proj₁ (mintNode (sched-init (rM 1 1) slots))) root (resM 1 1)
+leavesM-1 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (((λ { lim′ act q od refl → le tt })
+     , (λ { lim′ act q od refl → le tt }) , tt) , tt)
+
+leavesM-2 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (rM 1 2)) slots W mergeAllᵒ
+    (proj₁ (mintNode (sched-init (rM 1 2) slots))) root (resM 1 2)
+leavesM-2 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (((λ { lim′ act q od refl → le tt })
+     , (λ { lim′ act q od refl → le tt }) , tt) , tt)
+
+leavesM-0 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (rM 0 1)) slots W mergeAllᵒ
+    (proj₁ (mintNode (sched-init (rM 0 1) slots))) root (resM 0 1)
+leavesM-0 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (((λ { lim′ act q od refl → le tt })
+     , (λ { lim′ act q od refl → le tt }) , tt) , tt)
+
+leavesS-1 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (qS 1)) slots W switchᵒ
+    (proj₁ (mintNode (sched-init (qS 1) slots))) root (resS 1)
+leavesS-1 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt)
+  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
+
+leavesS-2 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (qS 2)) slots W switchᵒ
+    (proj₁ (mintNode (sched-init (qS 2) slots))) root (resS 2)
+leavesS-2 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt)
+  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
+
+leavesX-1 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (qX 1)) slots W exhaustᵒ
+    (proj₁ (mintNode (sched-init (qX 1) slots))) root (resX 1)
+leavesX-1 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
+
+leavesX-2 : ∀ {W} → Widths W →
+  Leaves (tight {obs (obs natᵗ)} (qX 2)) slots W exhaustᵒ
+    (proj₁ (mintNode (sched-init (qX 2) slots))) root (resX 2)
+leavesX-2 hw =
+  (refl , tt)
+  , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+     , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
+
+-- and the two-instant walk, where the leaves are read at the state the
+-- head instant's step leaves exactly as the bundle rows read theirs
+leavesSh : ∀ {W} → Widths W →
+  Leaves tightSh insSh W mergeAllᵒ
+    (proj₁ (mintNode (sched-init rSh insSh))) root resSh
+leavesSh hw =
+  (refl , refl , tt)
+  , (tt , ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (tt , ((λ { lim′ act q od refl → le tt }) , tt) , tt)
+
+leavesShS : ∀ {W} → Widths W →
+  Leaves tightShS insSh W switchᵒ
+    (proj₁ (mintNode (sched-init qSh insSh))) root resShS
+leavesShS hw =
+  (refl , refl , tt)
+  , (tt , ((hw _ _ _ _ _ _ _ _ _
+           , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt)
+  , (tt , ((λ { lim′ act q od () }) , tt) , tt)
+
+leavesShX : ∀ {W} → Widths W →
+  Leaves tightShX insSh W exhaustᵒ
+    (proj₁ (mintNode (sched-init xSh insSh))) root resShX
+leavesShX hw =
+  (refl , refl , tt)
+  , (tt , ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
+  , (tt , ((λ { lim′ act q od () }) , tt) , tt)

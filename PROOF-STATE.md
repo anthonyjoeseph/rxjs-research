@@ -204,13 +204,14 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **the `thru` frame's fit, and the burst underneath it** —
-  `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-room`,
-  `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit
-  because they are one currency argument seen from four places: the wrap's
-  grant, the burst inside it, the admissibility per instant, and the arr key
-  that the cap-keyed route does not transport to. The frame's own fit and its
-  room are now checked bodies, so what is left is the burst under them — and
-  they all key on written size, so a restatement of one moves every one of the
+  `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-wid`,
+  `pushVals-caps-burstW`, `pushVals-caps-queue`, `thruFit-arr-merge`,
+  `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit because they are one
+  currency argument seen from four places: the wrap's grant, the burst inside
+  it, the admissibility per instant, and the arr key that the cap-keyed route
+  does not transport to. The frame's fit, its room and the burst's room walk
+  are now checked bodies, so what is left is the burst's own inputs — and they
+  all key on written size, so a restatement of one moves every one of the
   others. Grinding any of them first bets on the key.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `subscribeE-nest-slot`, `evalWith-nest-sync`. The preamble already says these
@@ -241,10 +242,11 @@ does not fit is a finding about the shared statement, not about the head.
   the fold multiplies the depth per value while the key gains only the value's
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
-- **`pushVals-caps-adm`, `pushVals-caps-room`** (Nest-Walk) — DIFFICULTY,
-  `PROBED×2`: the caps walk family's two stream leaves — the family itself is a
-  proven body over every clause, so what remains is admissibility per instant,
-  with no state in its type, and the room walk at the wrap's node.
+- **`pushVals-caps-adm`, `pushVals-caps-wid`, `pushVals-caps-burstW`,
+  `pushVals-caps-queue`** (Nest-Walk) — DIFFICULTY, `REFUTED, PROBED×4`: the burst's
+  stream leaves — the walk over them is a proven body, so what remains is per
+  instant: the values admissible, their width key, the frame widths, and the
+  queue reading the invariant cannot supply.
 - **`pushVals-nest`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
   burst inside the grant, emit by emit, at the BODY's key. This is where the

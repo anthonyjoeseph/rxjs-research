@@ -617,12 +617,18 @@ def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
     for it in p.items:
         if it.kind == "pass" and p.lines[it.start].startswith(("import ", "open import ")):
             out.extend(p.lines[it.start : it.end])
-    shown = list(dict.fromkeys(keep + foci))
+    # ONLY THE FOCI ARE HIDDEN.  A kept-real sibling is already real in the
+    # context -- `keep` is passed there as an extra focus, so it is never
+    # stubbed -- and hiding it here would mint a SECOND copy: the focus body
+    # would then read the local one while every stub signature in the context
+    # still reads the context's, and the two are not the same term.  The error
+    # names the definition twice, once bare and once context-qualified.
+    shown = list(dict.fromkeys(foci))
     out.append(f"open import {ctx} hiding ({'; '.join(shown)})")
     out.append("")
     if keep:
-        out.append("-- agda-dev: kept REAL because the focus reduces them and a")
-        out.append("-- postulate would not: " + ", ".join(keep))
+        out.append("-- agda-dev: kept REAL in the CONTEXT because the focus")
+        out.append("-- reduces them and a postulate would not: " + ", ".join(keep))
     out.append("-- agda-dev: THE FOCUS BODIES, verbatim from the real module.")
     out.append("-- Signatures first so a call between them resolves: that makes")
     out.append("-- the batch one mutual block, which is checked for real.")
