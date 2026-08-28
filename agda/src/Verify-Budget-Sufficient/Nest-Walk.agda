@@ -52,9 +52,10 @@ open import Verify-Budget-Sufficient.Caps using (sizeCount)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDisp; depthDrain; depthFin; depthFold; depthFrame; depthInner; depthE; depthReact;
   depthShareGo; lub3-m; lub3-r)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widNode; nestValOK?; pathSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; nestValOK?; pathSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (valCaps?-wid)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots; pathSz?-len)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots; pathSz?-len;
+  splitEvents-vals-caps)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
@@ -686,6 +687,21 @@ nestCapsOK?-lookupWid {Γ = Γ} c nid ns sched st eq hc =
 
 nestClosOK? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Val Γ (obs u) → Bool
 nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
+
+-- AND THE SAME READING FOLDED OVER A WHOLE SUBSCRIPTION, event by
+-- event, which is the shape the caps face already states its own
+-- arrival predicate in.  Only a `value` carries an arrival, so every
+-- other event reads as true outright -- the fold is a filter with the
+-- closure reading attached, not a second traversal.
+eventNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ (obs u)) → Bool
+eventNest? c sl (value v)   = nestClosOK? c sl v
+eventNest? c sl (init _)    = true
+eventNest? c sl (close _ _) = true
+eventNest? c sl (handoff _) = true
+eventNest? c sl complete    = true
+
+burstNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Stream Γ (obs u) → Bool
+burstNest? c sl = all (λ em → all (eventNest? c sl) (InstEmit.events em))
 
 abstract
   nestClosOK?-size : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
@@ -3981,6 +3997,13 @@ postulate
   -- the entry cap on both sides of every walk predicate that carries
   -- it, and what takes the stepped cap is the arrival's size key and
   -- the closure key beside it.
+  --
+  -- AND WHAT IS LEFT IS ONE BOOLEAN OVER THE WHOLE SUBSCRIPTION, not a
+  -- per-emit record: the walk down to the emits is proven, and so is
+  -- the collapse of the record's two conjuncts into one, since an
+  -- arrival's sync reading sits under its resolved closure.  So the
+  -- leaf reads closures alone, emit by emit, in the shape the caps
+  -- face already states its own arrival predicate in.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- DEAD ROUTE: flattening at a cap CLOSED UNDER a descent's worth of
   --   substitutions is structurally dead, and not for want of
@@ -4020,7 +4043,7 @@ postulate
   --   re-deriving its bound at the lifted cap and started reading the
   --   child's; a caps leaf whose proof needs an arrival premise carried
   --   UP a level is what would want it back.
-  pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-caps-admB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -4031,7 +4054,7 @@ postulate
     let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in pushValsAdmOK (arrCapAt j c) sl (proj₁ res)
+    in burstNest? (arrCapAt j c) sl (proj₁ res) ≡ true
   -- The arrivals' width key: every value the descent hands back reads
   -- inside the cap at the telescope the frame is standing in.  It is
   -- the one half of the room the frame's own record cannot recover,
@@ -4044,10 +4067,18 @@ postulate
   -- WIDTH half of the key is not what fails -- the witness sets that
   -- field wide so the reading is unambiguous -- which is why what is
   -- owed here is the arm's level and not a width premise.
+  --
+  -- AND WHAT IS LEFT IS THE CAPS FACE'S OWN PREDICATE OVER THE WHOLE
+  -- SUBSCRIPTION, not a per-emit record: the walk down to the emits is
+  -- proven, so the leaf is `burstCaps?` of the descent's burst.  That
+  -- is the conclusion `subscribeE-caps` already reports for exactly
+  -- this `subscribeE`, at exactly this shape of level -- what stands
+  -- between the two is the module order, since the caps face is built
+  -- ON this one and cannot be read from here.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
-  pushVals-caps-wid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-caps-widB : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
     (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -4058,7 +4089,7 @@ postulate
     let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in pushValsWidOK (arrCapAt j c) sl (proj₁ res)
+    in burstCaps? (arrCapAt j c) sl (proj₁ res) ≡ true
   -- The frame widths the burst's arrivals drive, per arrival and at
   -- the state its predecessor left.  This is the measure half of the
   -- room and the only one of the three that reads `W`, so it is where
@@ -4169,6 +4200,96 @@ pushVals-nest-ems {Γ = Γ} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems
       (≤-trans (nestDᵛˢ-++ʳ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
                             (proj₁ (splitBurst {A = Val Γ u} ems)))
                hb)
+
+-- AND THE WIDTH HALF WALKS THE SAME WAY, off the caps face's own burst
+-- predicate rather than a bound: each emit owes the arrivals' widths at
+-- the telescope, `burstCaps?` is that fact per emit already, and the
+-- split's value column is a sublist of the emit's events.  So the leaf
+-- underneath is one boolean over the whole subscription, in the caps
+-- face's currency rather than this one -- which is the currency the
+-- statement that would discharge it is written in.
+pushVals-wid-ems : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  (str : Stream Γ (obs u)) →
+  burstCaps? c sl str ≡ true → pushValsWidOK c sl str
+pushVals-wid-ems c sl []         h = tt
+pushVals-wid-ems {u = u} c sl (em ∷ ems) h =
+    splitEvents-vals-caps {u = u} c sl (InstEmit.events em) (proj₁ (∧-true _ _ h))
+  , pushVals-wid-ems c sl ems (proj₂ (∧-true _ _ h))
+
+-- AND THE ADMISSION HALF WALKS THE SAME WAY, off the burst predicate
+-- rather than a per-emit record.  Its two conjuncts are not two facts:
+-- the arrival's sync reading is under its resolved closure, so the
+-- closure conjunct pays for the size conjunct pointwise and the walk
+-- states one boolean, not two.
+splitEvents-vals-nest : ∀ {n} {Γ : Ctx n} {u} {A : Set} (c : Caps) (sl : Slots Γ)
+  (es : List (InstEvent (Val Γ (obs u)))) →
+  all (eventNest? c sl) es ≡ true →
+  all (nestClosOK? c sl) (proj₁ (splitEvents {A = A} es)) ≡ true
+splitEvents-vals-nest c sl []               h = refl
+splitEvents-vals-nest c sl (value v   ∷ es) h =
+  ∧-intro (proj₁ (∧-true _ _ h)) (splitEvents-vals-nest c sl es (proj₂ (∧-true _ _ h)))
+splitEvents-vals-nest c sl (init _    ∷ es) h =
+  splitEvents-vals-nest c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-nest c sl (close _ _ ∷ es) h =
+  splitEvents-vals-nest c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-nest c sl (handoff _ ∷ es) h =
+  splitEvents-vals-nest c sl es (proj₂ (∧-true _ _ h))
+splitEvents-vals-nest c sl (complete  ∷ es) h =
+  splitEvents-vals-nest c sl es (proj₂ (∧-true _ _ h))
+
+pushVals-adm-ems : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
+  (str : Stream Γ (obs u)) →
+  burstNest? c sl str ≡ true → pushValsAdmOK c sl str
+pushVals-adm-ems c sl []         h = tt
+pushVals-adm-ems {Γ = Γ} {u = u} c sl (em ∷ ems) h =
+    all-impl (nestClosOK? c sl) (nestValOK? c (obs u))
+      (λ o → nestClosOK?⇒val c sl o)
+      (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em))) CL
+  , CL
+  , pushVals-adm-ems c sl ems (proj₂ (∧-true _ _ h))
+  where
+  CL = splitEvents-vals-nest {A = Val Γ u} c sl (InstEmit.events em)
+         (proj₁ (∧-true _ _ h))
+
+pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in pushValsAdmOK (arrCapAt j c) sl (proj₁ res)
+pushVals-caps-adm {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  pushVals-adm-ems (arrCapAt j c) sl (proj₁ res)
+    (pushVals-caps-admB c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+  where
+  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+
+pushVals-caps-wid : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (j : ℕ) (sl : Slots Γ) (W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestClosOK? c sl (allWrap op lim b) ≡ true →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in pushValsWidOK (arrCapAt j c) sl (proj₁ res)
+pushVals-caps-wid {u = u} c j sl W g op lim b κ id now sched st hsl hc hv hcl hw =
+  pushVals-wid-ems (arrCapAt j c) sl (proj₁ res)
+    (pushVals-caps-widB c j sl W g op lim b κ id now sched st hsl hc hv hcl hw)
+  where
+  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
 
 -- THE PAIR RIDES AN `if` THE WAY THE NEST BOUND DOES, and for the same
 -- reason: the connect's two exits differ only in bookkeeping the

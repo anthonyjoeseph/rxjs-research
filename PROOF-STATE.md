@@ -204,16 +204,15 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **the `*All` arm's premise does not survive a substitution** —
-  `pushVals-caps-burstW`, `pushVals-caps-queue`, `pushVals-caps-adm`,
-  `pushVals-caps-wid`, `thruFit-arr-merge`, `thruFit-arr-switch`,
-  `thruFit-arr-exhaust`. The measure half is DONE: the arrivals read at a
-  caps LEVEL the arm passes in, the arm picking its child's joined with its
-  own written size, and at that level the child's own reported burst bound IS
-  the head's — so the whole nest half is now a body and nothing is postulated
-  about the burst. What made it free is that the level moves the SIZE axis
-  alone, leaving the width field literally equal, so the state invariant is
-  the same proposition at every level. What is left is the CAPS half at the
-  same level: four leaves reading widths, queues and admission.
+  `pushVals-caps-burstW`, `pushVals-caps-queue`, `pushVals-caps-admB`,
+  `pushVals-caps-widB`, `thruFit-arr-merge`, `thruFit-arr-switch`,
+  `thruFit-arr-exhaust`. The measure half is DONE: the arrivals read at a caps
+  LEVEL the arm passes in, and at that level the child's own reported burst
+  bound IS the head's, so the nest half is a body. The level moves the SIZE
+  axis alone, which is why threading it cost nothing. The admission and width
+  halves are bodies too, each over ONE boolean over the whole subscription in
+  the caps face's own arrival currency. What is left is those two booleans and
+  the room's two state-threaded leaves.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
@@ -236,10 +235,10 @@ does not fit is a finding about the shared statement, not about the head.
   cascade descent against the instant's own grant. Nothing instantiates it —
   both sealed families sit on the right — and the store-mediated route it
   replaced is circular; the header carries the cycle.
-- **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE×3, PROBED×2, RECOVERY`: the arrivals now read one caps
-  level up, the level the refuting map crosses by; the width field does not
-  move, so the state invariant is the same proposition at both caps.
+- **`pushVals-caps-admB`, `pushVals-caps-widB`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED×2, DEAD ROUTE×3, PROBED×2, RECOVERY`: one arrival boolean each over
+  the descent's whole burst, read one caps level up — the level the refuting
+  map crosses by, and the level the width field does not move at.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

@@ -25,8 +25,8 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-caps-adm @297913
--- TARGET: pushVals-caps-wid @634f86
+-- TARGET: pushVals-caps-admB @98710d
+-- TARGET: pushVals-caps-widB @369c46
 -- TARGET: pushVals-caps-burstW @f0db0b
 -- TARGET: pushVals-caps-queue @861d80
 module Probed.PushVals-Caps where
@@ -55,8 +55,8 @@ open import Rx.Evaluator
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
   AllOp; NodeId; Path)
 open import Verify-Budget-Sufficient.Caps using (arrCapAt; Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; nestValOK?)
+open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
           pushValsWOK; pushValsQOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
@@ -616,3 +616,51 @@ axesFlat≡ = refl
 
 axesNest≡ : axesNest ≡ ((22 , 2) , 27 ∷ [] , 2 ∷ [])
 axesNest≡ = refl
+
+-- THE TWO BURST PREDICATES THE ADMISSION AND WIDTH LEAVES NOW STATE,
+-- read at the same three heads and at the same arrival cap the bundle
+-- rows use.  These are the rows that carry those two targets: the
+-- per-emit records above are now DERIVED from these booleans, so a row
+-- on a record is a consequence and not evidence about the leaf.  Both
+-- are LOAD-BEARING and could have failed independently -- the width
+-- boolean reads the arrival's frame width against the cap, and the
+-- admission boolean reads its resolved CLOSURE, which the head's own
+-- `nestClosOK?` says nothing about once a payload has been substituted.
+capAt : ∀ {u} → Val Γ₂ u → Caps
+capAt {u} v = arrCapAt (Caps.cSize (tight {u} v)) (tight {u} v)
+
+burstsM burstsS burstsX : Bool × Bool
+burstsM = burstCaps? (capAt {obs (obs natᵗ)} (rM 1 1)) slots (proj₁ (resM 1 1))
+        , burstNest? (capAt {obs (obs natᵗ)} (rM 1 1)) slots (proj₁ (resM 1 1))
+burstsS = burstCaps? (capAt {obs (obs natᵗ)} (qS 1)) slots (proj₁ (resS 1))
+        , burstNest? (capAt {obs (obs natᵗ)} (qS 1)) slots (proj₁ (resS 1))
+burstsX = burstCaps? (capAt {obs (obs natᵗ)} (qX 1)) slots (proj₁ (resX 1))
+        , burstNest? (capAt {obs (obs natᵗ)} (qX 1)) slots (proj₁ (resX 1))
+
+burstsM≡ : burstsM ≡ (true , true)
+burstsM≡ = refl
+
+burstsS≡ : burstsS ≡ (true , true)
+burstsS≡ = refl
+
+burstsX≡ : burstsX ≡ (true , true)
+burstsX≡ = refl
+
+-- and the two-instant walk, where the second instant's arrivals are
+-- the ones no single-instant row reaches
+burstsSh burstsShS burstsShX : Bool × Bool
+burstsSh  = burstCaps? (arrCapAt (Caps.cSize tightSh) tightSh) insSh (proj₁ resSh)
+          , burstNest? (arrCapAt (Caps.cSize tightSh) tightSh) insSh (proj₁ resSh)
+burstsShS = burstCaps? (arrCapAt (Caps.cSize tightShS) tightShS) insSh (proj₁ resShS)
+          , burstNest? (arrCapAt (Caps.cSize tightShS) tightShS) insSh (proj₁ resShS)
+burstsShX = burstCaps? (arrCapAt (Caps.cSize tightShX) tightShX) insSh (proj₁ resShX)
+          , burstNest? (arrCapAt (Caps.cSize tightShX) tightShX) insSh (proj₁ resShX)
+
+burstsSh≡ : burstsSh ≡ (true , true)
+burstsSh≡ = refl
+
+burstsShS≡ : burstsShS ≡ (true , true)
+burstsShS≡ = refl
+
+burstsShX≡ : burstsShX ≡ (true , true)
+burstsShX≡ = refl

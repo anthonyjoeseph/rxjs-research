@@ -42,7 +42,8 @@ open import Probed.PushVals-Caps
          burstOne≡; lenSh≡; capsSh-2; lenShS≡; capsShS-2; lenShX≡; capsShX-2;
          leavesM-1; leavesM-2; leavesM-0; leavesS-1; leavesS-2;
          leavesX-1; leavesX-2; leavesSh; leavesShS; leavesShX;
-         axesFlat≡; axesNest≡)
+         axesFlat≡; axesNest≡;
+         burstsM≡; burstsS≡; burstsX≡; burstsSh≡; burstsShS≡; burstsShX≡)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed
