@@ -230,6 +230,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: the
+  cascade descent against the instant's own grant. Nothing instantiates it —
+  both sealed families sit on the right — and the store-mediated route it
+  replaced is circular; the header carries the cycle.
 - **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — SHAPE,
   `REFUTED×2, DEAD ROUTE×3, PROBED×2`: the arrivals read at the flat cap,
   refuted at a map naming its payload twice; the restatement owed is the arm's
@@ -280,11 +284,6 @@ does not fit is a finding about the shared statement, not about the head.
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`cascade-nest-store`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
-  descent under its base terms plus the store the walk LEAVES, premise-free. It
-  is what makes the cascade descent a corollary of the row above rather than a
-  second width argument; probed over five families, the drain and the skip
-  branch.
 - **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`:
   the subscribe-side depth induction, width-denominated. Its one-`nestSyn` form
   is machine-refuted at a fold depth of five; this form clears the same family

@@ -17,10 +17,6 @@
 module Probed.Main where
 
 open import Probed.Root using ()
-open import Probed.Cascade-Nest-Store
-  using (U-chains; U-descent; U-holds;
-         C-chains; C-descent; C-holds;
-         F-chains; F-descent; F-holds)
 open import Probed.Cascade-Chain-Count
   using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
          Dup1-fits; Dup4-fits;

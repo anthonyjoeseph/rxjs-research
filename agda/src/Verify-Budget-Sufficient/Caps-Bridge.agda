@@ -42,7 +42,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Empty   using (⊥)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst; subst₂)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Gas; Tick; Id; Fuel)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
@@ -110,7 +110,7 @@ open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; frameBlowup;
   iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize; 1≤capsAt-reg; _⊑ᶜ_; Caps;
-  caps; capsAt; capsAt-suc-full; capsH; frameStep; frameStep-0; frameStep-full;
+  caps; capsAt; capsAt-suc-full; capsAt-⊑-suc; capsH; frameStep; frameStep-0;
   frameStep-mono-j; sizeCount)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
@@ -820,6 +820,7 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
       (arr-chains-len-sum sl id a sched st hsl hcaps)
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
       hsz
+      (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz)
       (arr-chains-bursts sl id a nextId sched st hsl hcaps)
       (arr-chains-caps sl id a nextId sched st hsl hcaps)
 
@@ -1195,37 +1196,7 @@ init-capsOK?-0 {n = n} e ins =
     )
     (init-capsOK?-base e ins)
 
--- The recurrence climbs in ⊑ᶜ: level id sits at frameStep 0 of itself
--- (frameStep-0), level suc id at the FULL frameStep endpoint
--- (frameStep-full composed with capsAt's own suc clause, which is
--- definitional), and frameStep-mono-j spans the two at 0 ≤ sizeCount.
--- This is what retired the `init-capsOK?-suc` postulate:
--- its recorded blocker — `capsAt e ins id` never reduces to a numeral
--- because `sizeCount` is abstract — killed only the COMPUTATIONAL
--- route.  The monotonicity route never needs a numeral: `capsOK?` is
--- monotone in the caps (capsOK?-mono) and the caps only ever widen.
--- Built PRIVATE, exported through an ABSTRACT alias — the caps axis's
--- standing normalization contract (see sizeCount's header): these are
--- PROOFS, no consumer ever unfolds them, and an unfoldable body here
--- hands VWF's conversion the whole capsOK?-mono/frameStep-mono-j proof
--- tower — measured as an OOM, twice, and VWF is green with the
--- postulate in this spot, i.e. with exactly this opacity.  The alias pattern rather than a plain
--- abstract block because the bodies lean on untyped where-bindings,
--- which abstract refuses to infer.
 private
-  capsAt-⊑-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-    (id : ℕ) → capsAt e ins id ⊑ᶜ capsAt e ins (suc id)
-  capsAt-⊑-suc e ins id =
-    subst₂ _⊑ᶜ_ (frameStep-0 c) (frameStep-full c (capsH e ins id)) span
-    where
-    c = capsAt e ins id
-    -- the count is pinned by hand: iterSize/iterFold match on it, so
-    -- unification cannot invert `frameStep _ c` to recover it from the
-    -- ⊑ᶜ endpoints
-    span : frameStep 0 c ⊑ᶜ frameStep (sizeCount c (capsH e ins id)) c
-    span = frameStep-mono-j c (2≤capsAt-size e ins id)
-             (z≤n {n = sizeCount c (capsH e ins id)})
-
   -- PROVEN AT EVERY id (was: proven at 0, postulated at suc) — the
   -- id = 0 base is init-capsOK?-0 (lifting init-capsOK?-base via
   -- capsOK?-mono), and the suc case is capsOK?-mono along capsAt-⊑-suc

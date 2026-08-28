@@ -139,3 +139,29 @@ abstract
 
   delSq-mono : (g : ℕ) (c : Caps) → delSq g c ≤ delSq (suc g) c
   delSq-mono g c = *-mono-≤ (delSize-mono g c) (delSize-mono g c)
+
+  -- AND THEY GROW WITH THE CAP TOO, which is the half the LEVEL needs.
+  -- A clause reporting its charge at one instant's cap answers a parent
+  -- reading the same charge at a later one, and the caps face's own
+  -- ordering is exactly the componentwise one these recurrences are
+  -- built out of: every occurrence of a field is in a `+` or a `*`
+  -- position, so no clause can invert.  The zero level is an equality
+  -- on both, since a fan that admits nothing is priced at nothing
+  -- whatever the cap says.
+  fanLen-monoᶜ : (g : ℕ) (c c′ : Caps) →
+    Caps.cSize c ≤ Caps.cSize c′ → Caps.cReg c ≤ Caps.cReg c′ →
+    fanLen g c ≤ fanLen g c′
+  fanLen-monoᶜ zero    c c′ hS hR = z≤n
+  fanLen-monoᶜ (suc g) c c′ hS hR =
+    *-mono-≤ hR (s≤s (+-mono-≤ hS (fanLen-monoᶜ g c c′ hS hR)))
+
+  delSize-monoᶜ : (g : ℕ) (c c′ : Caps) →
+    Caps.cSize c ≤ Caps.cSize c′ → Caps.cReg c ≤ Caps.cReg c′ →
+    delSize g c ≤ delSize g c′
+  delSize-monoᶜ g c c′ hS hR = +-mono-≤ hS (fanLen-monoᶜ g c c′ hS hR)
+
+  delSq-monoᶜ : (g : ℕ) (c c′ : Caps) →
+    Caps.cSize c ≤ Caps.cSize c′ → Caps.cReg c ≤ Caps.cReg c′ →
+    delSq g c ≤ delSq g c′
+  delSq-monoᶜ g c c′ hS hR =
+    *-mono-≤ (delSize-monoᶜ g c c′ hS hR) (delSize-monoᶜ g c c′ hS hR)

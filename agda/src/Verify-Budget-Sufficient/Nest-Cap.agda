@@ -26,7 +26,7 @@ open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
    +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
    +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤;
-   *-suc; *-comm; ^-*-assoc; ^-monoʳ-≤; +-comm; pred[n]≤n)
+   *-suc; *-comm; ^-*-assoc; ^-monoʳ-≤; ^-monoˡ-≤; +-comm; pred[n]≤n)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
@@ -66,6 +66,17 @@ abstract
     1≤F : 1 ≤ ((2 ^ S) ^ suc W)
     1≤F = 1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n))
 
+  -- AND THE CAP ONLY EVER GROWS TOO, which is the half the LEVEL
+  -- needs: a clause reporting its grant at one instant's cap answers a
+  -- parent reading the same grant at a later one.  Every occurrence of
+  -- the base sits under a `2 ^`, so the whole tower is monotone in it
+  -- and the unit side does not mention it at all.
+  nestB-monoS : ∀ {S S′ : ℕ} → S ≤ S′ → ∀ (W U B m : ℕ) →
+    nestB S W U B m ≤ nestB S′ W U B m
+  nestB-monoS hS W U B m =
+    *-monoˡ-≤ (B + suc m * U)
+      (^-monoˡ-≤ m (^-monoˡ-≤ (suc W) (pow-mono-exp 2 (s≤s z≤n) hS)))
+
   -- THE GRANT'S FACTOR, NAMED SEPARATELY BECAUSE THE FRAME LAYER
   -- SPENDS IT WITHOUT THE REST.  Once the descent has been flattened at
   -- the cap, everything above it carries one factor and one widened
@@ -101,6 +112,17 @@ abstract
   1≤nestFac : ∀ (S W : ℕ) → 1 ≤ nestFac S W
   1≤nestFac S W =
     1≤pow≤ ((2 ^ S) ^ suc W) S (1≤pow≤ (2 ^ S) (suc W) (1≤pow≤ 2 S (s≤s z≤n)))
+
+  -- AND THE FACTOR GROWS WITH THE CAP, which is what a clause reporting
+  -- its charge at one LEVEL owes a parent reading the same charge at a
+  -- later one.  The cap occurs twice -- inside the base's own power and
+  -- as the outer exponent -- and both occurrences are increasing, so
+  -- the two widenings compose rather than fight.
+  nestFac-monoS : ∀ {S S′ : ℕ} → S ≤ S′ → ∀ (W : ℕ) → nestFac S W ≤ nestFac S′ W
+  nestFac-monoS {S} {S′} hS W =
+    ≤-trans (^-monoˡ-≤ S (^-monoˡ-≤ (suc W) (pow-mono-exp 2 (s≤s z≤n) hS)))
+            (pow-mono-exp ((2 ^ S′) ^ suc W)
+              (1≤pow≤ (2 ^ S′) (suc W) (1≤pow≤ 2 S′ (s≤s z≤n))) hS)
 
   -- THE UNIT THE FRAME LAYER CARRIES, which is the program's own unit
   -- once per level the descent may have spent it at.  Named so that the

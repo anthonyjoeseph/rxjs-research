@@ -565,19 +565,31 @@ abstract
     (id : ℕ) → ℕ
   nestFacAt {n = n} e sl id =
     2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-         * (suc (delSize n (capsAt e sl id))
-            * (realWidAt e sl id * delSq n (capsAt e sl id))))
+         * (suc (delSize n (capsAt e sl (suc id)))
+            * (realWidAt e sl id * delSq n (capsAt e sl (suc id)))))
 
   -- ONE INSTANT'S FRESH GROWTH, NAMED, because it is what the
   -- recurrence adds and what every preservation step has to match
   -- against -- and because it now has three factors rather than two.
+  --
+  -- THE UNIT IS PRICED AT THE INSTANT'S EXIT CAP, AND THAT IS FORCED
+  -- rather than chosen.  A walk inside instant `id` widens the caps as
+  -- it descends, and the caps recurrence says by exactly how much: its
+  -- own step is `frameStep (sizeCount (capsAt id) (capsH id))`, whose
+  -- endpoint IS `capsAt (suc id)`.  So the deepest store the walk can
+  -- leave is priced in the delivery square at that endpoint, and an
+  -- increment reading the ENTRY cap is charging a walk for a cap it
+  -- has already climbed past.  The STORE COUNT beside it stays at the
+  -- entry cap deliberately -- how many stores a walk touches is a
+  -- width fact the entry cap already fixes, and only the per-store
+  -- DEPTH moves with the descent.
   nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestIncAt {n = n} e sl id =
     realWidAt e sl id
       * (nestBurstAt e sl id
          * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
-            * nestU (delSq n (capsAt e sl id)) (nestUnit e sl)))
+            * nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)))
 
   -- THE SIZE CAP SITS UNDER ONE INSTANT'S GROWTH, which is what lets a
   -- walk charge an arrival's own size to the increment rather than to
@@ -600,10 +612,10 @@ abstract
     R = realWidAt e sl id
 
     U : ℕ
-    U = nestU (delSq n (capsAt e sl id)) (nestUnit e sl)
+    U = nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)
 
     1≤U : 1 ≤ U
-    1≤U = ≤-trans (s≤s z≤n) (nestU-base (delSq n (capsAt e sl id)) (nestUnit e sl))
+    1≤U = ≤-trans (s≤s z≤n) (nestU-base (delSq n (capsAt e sl (suc id))) (nestUnit e sl))
 
     S≤mid : S ≤ suc (suc (R * D))
     S≤mid =
@@ -641,8 +653,8 @@ abstract
     (id : ℕ) →
     nestFacAt e sl id
       ≡ 2 ^ (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-             * (suc (delSize n (capsAt e sl id))
-                * (realWidAt e sl id * delSq n (capsAt e sl id))))
+             * (suc (delSize n (capsAt e sl (suc id)))
+                * (realWidAt e sl id * delSq n (capsAt e sl (suc id)))))
   nestFacAt-def e sl id = refl
 
   nestIncAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -651,7 +663,7 @@ abstract
       ≡ realWidAt e sl id
         * (nestBurstAt e sl id
            * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
-              * nestU (delSq n (capsAt e sl id)) (nestUnit e sl)))
+              * nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)))
   nestIncAt-def e sl id = refl
 
   nestCapAt e sl zero    = nestUnit e sl
@@ -662,8 +674,8 @@ abstract
     (id : ℕ) → 1 ≤ nestFacAt e sl id
   1≤nestFacAt {n = n} e sl id =
     m^n>0 2 (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
-             * (suc (delSize n (capsAt e sl id))
-                * (realWidAt e sl id * delSq n (capsAt e sl id))))
+             * (suc (delSize n (capsAt e sl (suc id)))
+                * (realWidAt e sl id * delSq n (capsAt e sl (suc id)))))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool

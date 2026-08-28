@@ -240,7 +240,15 @@ depthRunWalkRowU steps ds ks j d k =
 -- distinguish the two readings, so `c` is printed and a row with `c`
 -- at one is evidence about nothing here.
 --
--- TARGET: cascade-nest-store @5903c7
+-- AND ONLY THE LEFT SIDE AND THE BASE TERMS ARE REACHABLE.  The
+-- target's right-hand side reads two sealed families, so no row here
+-- can print a verdict on the inequality itself; what the rows reach is
+-- the descent, the base terms it is measured against, and the store
+-- sequence the factor has to cover.  A saturating sequence says the
+-- factor is carrying nothing and the shape is wrong; a climbing one
+-- says what it has to carry.
+--
+-- TARGET: cascade-nest-compositional @524772
 pfxL : ∀ {A : Set} → ℕ → List A → List A
 pfxL 0       xs       = []
 pfxL (suc i) []       = []

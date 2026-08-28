@@ -896,13 +896,6 @@ frameStep-mono-j c hS le =
   , iterFold-mono-count (Caps.cSize c) (Caps.cWid c) hS le
   , frameStep-reg-mono c le
 
--- the tick endpoint, by definition rather than by arithmetic: this is
--- what makes caps-tick the j = full case of (a) rather than a
--- separate claim
-frameStep-full : ∀ (c : Caps) (d : ℕ) →
-  frameStep (sizeCount c d) c ≡ frameBlowup c d
-frameStep-full c d = refl
-
 -- and the recurrence's own step, so capsAt (suc id) IS the full endpoint
 capsAt-suc-full : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsAt e sl (suc id)
@@ -931,6 +924,24 @@ capsAt-suc-full e sl id = refl
     (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
 2≤capsAt-size e sl (suc id) =
   2≤frameBlowup-size (capsAt e sl id) (capsH e sl id) (2≤capsAt-size e sl id)
+
+-- THE RECURRENCE ONLY EVER WIDENS, which is the one fact every face
+-- needs to read a quantity taken at one instant against the next
+-- instant's cap.  It is the j = 0 end of `frameStep-mono-j` transported
+-- along the two definitional equations that pin the endpoints, and the
+-- count is pinned by hand because `iterSize`/`iterFold` match on it, so
+-- unification cannot invert `frameStep _ c` to recover it from the ⊑ᶜ
+-- endpoints.  Sealed for the reason the whole caps axis is: no consumer
+-- ever unfolds a ⊑ᶜ proof, and an unfoldable body hands the conversion
+-- checker the entire mono tower underneath it.
+abstract
+  capsAt-⊑-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → capsAt e sl id ⊑ᶜ capsAt e sl (suc id)
+  capsAt-⊑-suc e sl id =
+    subst₂ _⊑ᶜ_ (frameStep-0 (capsAt e sl id))
+                (sym (capsAt-suc-full e sl id))
+                (frameStep-mono-j (capsAt e sl id) (2≤capsAt-size e sl id)
+                   (z≤n {n = sizeCount (capsAt e sl id) (capsH e sl id)}))
 
 -- 1 ≤ cReg AT EVERY LEVEL, the registering companions' side condition,
 -- and the recurrence proves it the same way: the base's cReg is a `suc`,

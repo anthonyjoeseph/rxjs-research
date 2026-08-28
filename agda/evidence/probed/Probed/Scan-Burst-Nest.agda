@@ -5,7 +5,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-nest-scan @191f4a
+-- TARGET: subscribeE-nest-scan @db3c9a
 --
 -- WHAT IS BEING TESTED, AND IT IS THE AXIS AND NOT THE PROGRAM.  The
 -- statement's factor is now a power in the BURST the descent hands
@@ -43,7 +43,11 @@
 -- million nodes; fourteen is already a quarter of a million and four
 -- seconds, so the geometry puts it out of reach and the second
 -- crossing is unmeasured.  Nothing here varies the store, the path or
--- the cap.
+-- the cap.  Nor the LEVEL: the statement reports a level and bounds it
+-- by the caps count at the descent's depth, and every row here reads
+-- the grant at level zero, where the stepped cap is the entry cap
+-- outright.  So the bound conjunct is untouched, and what these rows
+-- cover is the three that sit beside it.
 module Probed.Scan-Burst-Nest where
 
 open import Data.Bool using (true; false)
