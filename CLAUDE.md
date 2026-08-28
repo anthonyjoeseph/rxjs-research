@@ -1385,13 +1385,21 @@ the group is SIZED BY THE COMMIT: it is the chunk of work this session intends
 to land next, not a theme or a region that happens to be coherent. So the
 roadmap changes with every commit, and the check fails when it does not.
 
-**The two outcomes, and one of them always applies.** The leg LANDED: retire it,
-promote the other two, and write a new third — so the file moves. Or the session
-could NOT finish what it planned: then **rewrite the first leg as the work that
-remains**, which is the more valuable of the two writes, because it is the only
-record of what the leg turned out to cost. Neither outcome leaves the roadmap
-untouched, so an unchanged file means a leg was finished without being retired
-or abandoned without being restated.
+**THE THREE OUTCOMES, AND ONE OF THEM ALWAYS APPLIES (Anthony: "we also want to
+discard routes that are no longer applicable").** The leg LANDED: retire it,
+promote the other two, and write a new third — so the file moves. The leg was NOT
+FINISHED: **rewrite the first leg as the work that remains**, which is worth more
+than the retirement, because it is the only record of what the leg turned out to
+cost. Or the leg's ROUTE DIED — the plan it described rested on something now
+known not to work — and then it is **DISCARDED**, not rewritten. The third needs
+saying because the second HIDES it: "the work that remains" is a rewrite that
+keeps the old framing and shrinks it, and a refuted framing shrunk is still a
+refuted framing steering the next session. Nothing of that shape remains to be
+done. The finding goes where a dead route goes — the header of the statement it
+constrains — and the leg replacing it is written from the risk as it NOW stands,
+not from what is left of the old plan. None of the three leaves the roadmap
+untouched, so an unchanged file means a leg was finished without being retired,
+abandoned without being restated, or refuted without being dropped.
 
 **Legs two and three may aim at the SAME postulates as the first.** The three
 are not three subjects — they are the next three commits, and a single group of

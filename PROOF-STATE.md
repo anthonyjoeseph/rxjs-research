@@ -62,10 +62,12 @@ LEDGER of one-line hooks; everything else lives in the code.
   reducing the most risk, cut at commit boundaries. Pick the risk order first,
   then cut — never pick three topics and hope each is commit-sized.
   **SO THE FILE MOVES WITH EVERY COMMIT, and `make roadmap-moved` fails when it
-  does not.** The leg landed: retire it, promote the other two, write a new
-  third. Or the session could not finish it: **rewrite the first leg as the work
-  that remains** — the more valuable of the two writes, since it is the only
-  record of what the leg turned out to cost.
+  does not.** Three outcomes. The leg landed: retire it, promote the other two,
+  write a new third. It did not finish: **rewrite the first leg as the work that
+  remains**, the only record of what it turned out to cost. Or its ROUTE DIED:
+  **discard it** — a refuted framing rewritten smaller is still steering, so the
+  finding goes to the header of the statement it constrains and the leg that
+  replaces it is written from the risk as it now stands.
   **THE THREE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT
   three, not a partition of the remaining work — the coverage rule is the
   LEDGER's job, and the rows already discharge it. Work beyond the third leg is
@@ -214,32 +216,31 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **carry the width level, do not step it** — `subscribeE-burst-caps`,
-  `pushVals-caps-queue`, `pushVals-caps-burstW`, `subscribeE-burst-nest`,
-  `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. The face
-  carries size keys only, so its width field may be zero and the walk is
-  refuted there; that much is settled. What is NOT settled is the repair, and
-  the one notch this leg spent itself on is now a dead route in the exit
-  walk's own header: a cap whose width steps once closes every arm and dies
-  on composition, since the value push re-enters the walk and a notch does
-  not nest. The remaining work is the shape the caps face already walks and
-  this one does not — level in, level plus a bounded residue out, over one
-  base cap — restated across these heads before any of them is ground.
-- **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
-  `evalWith-nest-sync`. The preamble already says these are one statement and
-  not one per head; the leg is that fact scheduled. The slot head fell to it
-  outright: the arr-keyed face reads its key THROUGH the telescope and already
-  proves that head, so the residue was one arithmetic bridge. The same question
-  — which key does this head's grant read — is what the three left turn on.
-- **the selection's width shelf** — `arr-chains-nest-syn`, `arr-chains-caps`,
-  `arr-chains-bursts`, `cascadeGo-nest-regs`, `cascade-nest-compositional`. One
-  walk under one width cap, read at five places: the paths, the caps they
-  spend, the bursts, the registry, and the descent, which no longer follows
-  from the others -- reading it off the store they bound is the cycle its
-  header records, so it is a leaf of this leg rather than its corollary. Once
-  the two legs above pin the currency this is one loaded context and many
-  similar obligations, which is the repetition shape delegation is for. What
-  comes after it is deliberately not named here.
+- **the cap's width and the walk's level, in ONE commit** —
+  `subscribeE-burst-caps`, `subscribeE-burst-nest`. The face carries size keys
+  only, so its width field may be zero and both rows are refuted there. The
+  two halves cannot be separate commits, and that was measured rather than
+  assumed: the frozen width is what made the node invariant the SAME boolean
+  at the arrivals' cap as at the entry cap, and the `*All` arm spends that
+  identity in BOTH directions — it hands its exit pair up to a stepped cap and
+  reports back down at the flat one. Unfreeze the width and the arm has no
+  statement, so the walk's level moves in the same commit or the module is red.
+- **the two burst leaves, restated at the level the walk reports** — the same
+  two rows, the commit after. Their conclusions name the arrivals' cap
+  directly, so the commit above moves them whether or not anything is ground;
+  this is that restatement plus re-running `Probed.PushVals-Caps` against the
+  statement as it then reads. Re-running is not optional and restamping alone
+  is forbidden: a green taken against the frozen-width cap is evidence about
+  text that is gone, and a stamp without rows converts a false coverage claim
+  into a certified one.
+- **the queue and the burst width, at the stepped cap** —
+  `pushVals-caps-queue`, `pushVals-caps-burstW`. Both are refuted
+  unconditionally today: at the empty queue the wrap installs, the queue row
+  already reads `1 ≤ cWid`, and every premise beside it reads the size field
+  or the slots. Once the two commits above put the width in the cap the
+  arrivals are read at, the repair is the sibling key rather than a positivity
+  premise cascading through the face. One commit for the pair, re-probed
+  against the statement as it then reads.
 
 ### The ledger
 
@@ -337,24 +338,23 @@ In rough order for when the tier opens — statement repairs first, then grinds:
 
 ### Big picture tier roadmap
 
-- **the FoldOut readoff** — `mid-readoff`, `foldPath-frame-out`,
-  `foldPath-share-out`, `mid-fold-certs`, `dispatchShare-wf`,
-  `root-entry-sunk`. FoldOut is a six-field record validated at exactly one
-  clause, and every row here is a readoff from it, so the risk is the record
-  and not the arms. Instantiate it before any arm is ground: if the record is
-  wrong, all six are.
-- **the push family** — `map-nodry-push`, `scan-nodry-push`, `take-nodry-push`,
-  `mergeAll-nodry-push`, `mergeAll-valsLast-push`, `map-valsLast-push`,
-  `scan-valsLast-push`. The whole family stands on nothing at any operator,
-  which is why it is one leg. Start at the map row: every ingredient is already
-  PROVEN and the route is complete, so it is an ASSEMBLY, and assembling it
-  tests the shape the other six will be written to.
-- **the `subscribeE` arms, and the invariants they may not disturb** —
-  `subscribeSharedSlot-wf`, `subscribeE-defer-wf`, `input-hot-spent-wf`,
-  `input-cold-async-wf`, `subscribeE-dying`, the `HotLive` preservation leaves,
-  `sched-next-hot-live`. Grouped because they share one mutual block and one
-  question — what a subscribe touches — and the blocked slot arm cannot close
-  outside it anyway.
+- **instantiate FoldOut before any arm is ground** — `mid-readoff`. FoldOut is
+  a six-field record validated at exactly one clause and five further rows are
+  readoffs from it, so the risk is the record and not the arms: if it is
+  wrong, all six are. This commit is the probe alone — the record at canonical
+  programs, saying which fields the rows reach and which they do not — and
+  whatever the probe forces on the record's own statement.
+- **the map push, as an ASSEMBLY** — `map-nodry-push`. Every ingredient is
+  already PROVEN and the route is complete, so this is a body over leaves
+  rather than a grind, and it is one commit. It is taken before its six
+  siblings because assembling it tests the shape they will all be written to,
+  and a shape found wrong here costs one row instead of seven.
+- **the two frame readoffs the record's probe unblocks** —
+  `foldPath-frame-out`, `foldPath-share-out`. They share the record, the
+  clause it is validated at and the fold they are read off, so once the first
+  commit says what the record actually carries they are one shelf of
+  mechanical work. Held behind that commit deliberately: a readoff ground
+  against a record that then moves is ground twice.
 
 ### The ledger
 
@@ -468,20 +468,21 @@ critical path.
 
 ### Big picture tier roadmap
 
-- **the twelve top-line claims** — `id-inheritance`, `batch-online`, the
-  `readme-*` family. Nothing has ever instantiated them and they are stated
-  over defined machinery, so they are probeable today. A refutation of a
-  `readme-*` claim is SPEC-level: surface it, do not patch it.
-- **the abstractions, and the claims that quantify over them** — `locality`,
-  `non-interference`, `timing-invariance`, `causality`, `μ-guarded`,
-  `defer-shift`, over `Node`, `NodeSt`, `Inbox`, `inboxOf`, `stAt`, `cascade`,
-  `δ`, `Retiming`, `retime`, `truncateIn`, `emittedBefore`. One leg because
-  de-risking any claim means DEFINING the abstraction under it, which is claim
-  authoring and needs Anthony. Nothing here is grindable and no precedent can
-  make it so.
-- **the evaluator laws** — `μ-unfold`, `fuel-coherent`. The only rows in this
-  tier carrying a receipt; last because a spent battery already instantiated
-  both at every canonical program without refuting either.
+- **probe the `readme-*` family** — the `readme-*` rows. Nothing has ever
+  instantiated them and they are stated over defined machinery, so they are
+  probeable today and the whole family shares one harness: one context, many
+  similar obligations. One commit for the sweep and its receipts. A refutation
+  here is SPEC-level — surface it, do not patch it.
+- **probe the two inheritance claims** — `id-inheritance`, `batch-online`.
+  Separated from the family above because they are stated over the batching
+  pipeline rather than the readme's programs, so they need their own harness;
+  same shape of commit, and unprobed is unprobed whatever the statement reads.
+- **draft the abstractions and ASK** — `locality`, `non-interference`,
+  `timing-invariance`, `causality`, `μ-guarded`, `defer-shift`, over `Node`,
+  `NodeSt`, `Inbox`, `inboxOf`, `stAt`, `cascade`, `δ`, `Retiming`, `retime`,
+  `truncateIn`, `emittedBefore`. De-risking any of these means DEFINING the
+  abstraction under it, which is claim authoring and Anthony's call. The
+  commit is the drafted definition set and the question, not a discharge.
 
 ### The ledger
 
