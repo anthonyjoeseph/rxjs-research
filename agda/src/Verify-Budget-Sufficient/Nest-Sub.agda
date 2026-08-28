@@ -1,92 +1,85 @@
 ------------------------------------------------------------------
--- THE CEILING AN ARRIVAL CANNOT LEAVE, AND WHY THE NEST FACE NEEDS
--- ONE SEPARATE FROM ITS CAP.
+-- THE CEILING AN ARRIVAL CANNOT LEAVE, AND WHY IT LIVES INSIDE THE
+-- GRANT RATHER THAN BESIDE THE CAP.
 --
 -- The nest walk reads every arrival at the head's own written cap,
 -- and that reading is false: an arrival is the head's syntax with the
 -- payload SUBSTITUTED IN, so a step function naming its payload twice
 -- hands back about twice the payload while contributing a constant to
 -- the head.  One substitution is the caps face's own size step, and a
--- descent performs at most the head's size of them, so a ceiling that
--- steps the cap that many times dominates everything the run can
--- reach -- including an arrival's own arrivals, because the hops are
--- counted against the head and not against the ceiling.
+-- descent performs at most the head's size of them, so a cap stepped
+-- that many times dominates everything one hop can reach.
 --
--- THAT IS WHAT MAKES IT FLAT.  The alternative device is a LEVEL, an
--- index stepped at each substituting frame, which is what the caps
--- face carries and what costs an existential in every conclusion.
--- Here the count is bounded once, at the head, so the walk threads a
--- plain number that never moves: the cap keeps bounding the head and
--- the ceiling bounds everything the head can produce.
+-- WHAT MAKES IT COST NOTHING IS THE GAS.  A substituting re-entry is
+-- exactly where the evaluator spends a unit of gas -- that is why the
+-- subscription terminates -- so the hop budget is already threaded
+-- through every statement on this face.  Indexing the tower by it
+-- makes the re-entry read off definitionally: the child runs at the
+-- stepped cap with one less gas, and `tow` of that is `tow` of the
+-- parent's, the same numeral rather than a bound to re-establish.
+-- The alternative devices both cost an index -- a second cap tied by
+-- a premise every predicate in the walk would have to carry, or the
+-- caps face's existential level in every conclusion.
 --
--- AND IT IS SEALED, because it lands in premises the walk carries
--- through every recursive call.  The two lemmas below are the whole
--- interface: the ceiling is above the cap, and it is above one
--- descent's worth of steps from the cap.
+-- AND IT IS SEALED, because it lands in the grant, which is what the
+-- walk's conclusions are stated against.  The interface is the two
+-- monotonicities plus the step equation.
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Nest-Sub where
 
-open import Data.Bool using (Bool; true; _∧_)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤ᵇ⇒≤)
+open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤-refl; ≤-trans)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Decide using (∧-trueˡ; ∧-trueʳ; T-to)
 
+open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Evaluator using (iterSize)
-open import Verify-Budget-Sufficient.Caps using (Caps; caps; iterSize-infl)
+open import Verify-Budget-Sufficient.Caps using
+  (Caps; caps; iterSize-infl; iterSize-mono-count; iterSize-mono-base)
 
 -- THE ARRIVAL-SIDE CAP, which is the walk's own cap with its size
--- field replaced.  The width and the registration count are the
--- state's business and an arrival changes neither, so only the size
--- moves -- and a widened width would weaken the queue conjunct the
--- room record owes upward.
+-- field replaced.  The width and the registration count are left
+-- alone deliberately: a widened width would weaken the room record's
+-- queue conjunct, and only the size premise is the one a substitution
+-- breaks.
 subCaps : ℕ → Caps → Caps
 subCaps Ŝ c = caps Ŝ (Caps.cWid c) (Caps.cReg c)
 
 abstract
-  -- one substituting frame's worth of growth, at the size it is
-  -- growing from: the frame's own syntax is inside that size, so the
-  -- count and the base are the same quantity
   towStep : ℕ → ℕ
   towStep s = iterSize s s s
 
-  -- and the ceiling after `j` more of them, which is the shape the
-  -- walk threads: one hop is spent at every substituting frame, and
-  -- what the premise says is that the hops still to come fit under
-  -- the ceiling the entry chose.
-  tow : ℕ → ℕ → ℕ
-  tow zero    s = s
-  tow (suc k) s = tow k (towStep s)
+  tow : Gas → ℕ → ℕ
+  tow g0     s = s
+  tow (gs g) s = tow g (towStep s)
 
-  tow-step : ∀ (j s : ℕ) → tow (suc j) s ≡ tow j (towStep s)
-  tow-step j s = refl
+  tow-step : ∀ (g : Gas) (s : ℕ) → tow (gs g) s ≡ tow g (towStep s)
+  tow-step g s = refl
 
-  1≤towStep : ∀ (s : ℕ) → 1 ≤ s → 1 ≤ towStep s
-  1≤towStep s h = ≤-trans h (iterSize-infl s h s s)
+  towStep-infl : ∀ (s : ℕ) → s ≤ towStep s
+  towStep-infl zero    = z≤n
+  towStep-infl (suc s) = iterSize-infl (suc s) (s≤s z≤n) (suc s) (suc s)
 
-  s≤towStep : ∀ (s : ℕ) → 1 ≤ s → s ≤ towStep s
-  s≤towStep s h = iterSize-infl s h s s
+  towStep-mono : ∀ {s s′ : ℕ} → s ≤ s′ → towStep s ≤ towStep s′
+  towStep-mono {zero}          le = z≤n
+  towStep-mono {suc s} {suc s′} le =
+    ≤-trans (iterSize-mono-base (suc s) le le)
+            (iterSize-mono-count (suc s′) (suc s′) (s≤s z≤n) le)
 
-  tow-infl : ∀ (j s : ℕ) → 1 ≤ s → s ≤ tow j s
-  tow-infl zero    s h = ≤-refl
-  tow-infl (suc j) s h =
-    ≤-trans (s≤towStep s h) (tow-infl j (towStep s) (1≤towStep s h))
+  tow-infl : ∀ (g : Gas) (s : ℕ) → s ≤ tow g s
+  tow-infl g0     s = ≤-refl
+  tow-infl (gs g) s = ≤-trans (towStep-infl s) (tow-infl g (towStep s))
 
--- THE WALK'S OWN CLOSURE PREMISE: the cap the head is read at, and the
--- ceiling everything the head can reach is read at.  Both conjuncts
--- are spent -- the first widens a frame's key from the head's cap to
--- the ceiling, the second is what makes the arrival statements true --
--- and the first is kept rather than derived because deriving it wants
--- the cap to be positive, which is a premise the walk does not carry.
-nestSubOK? : ℕ → Caps → Caps → Bool
-nestSubOK? j c₀ c =
-  (Caps.cSize c₀ ≤ᵇ Caps.cSize c) ∧ (tow j (Caps.cSize c₀) ≤ᵇ Caps.cSize c)
+  tow-mono-s : ∀ (g : Gas) {s s′ : ℕ} → s ≤ s′ → tow g s ≤ tow g s′
+  tow-mono-s g0     le = le
+  tow-mono-s (gs g) le = tow-mono-s g (towStep-mono le)
 
-abstract
-  nestSubOK?-cap : ∀ (j : ℕ) (c₀ c : Caps) → nestSubOK? j c₀ c ≡ true →
-    Caps.cSize c₀ ≤ Caps.cSize c
-  nestSubOK?-cap j c₀ c h = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
+  -- THE GAS DROP, which is what a re-entry that does NOT substitute
+  -- needs: one less hop can only reach a smaller ceiling.
+  tow-drop : ∀ (g : Gas) (s : ℕ) → tow g s ≤ tow (gs g) s
+  tow-drop g s = tow-mono-s g (towStep-infl s)
 
-  nestSubOK?-tow : ∀ (j : ℕ) (c₀ c : Caps) → nestSubOK? j c₀ c ≡ true →
-    tow j (Caps.cSize c₀) ≤ Caps.cSize c
-  nestSubOK?-tow j c₀ c h = ≤ᵇ⇒≤ _ _ (T-to (∧-trueʳ h))
+  -- THE SAME INFLATION WITH ITS GAS LEFT TO INFERENCE, which is what
+  -- the walk's clauses spend: the hop budget there is a pattern rather
+  -- than a name, and every clause would otherwise repeat it.
+  tow-infl′ : ∀ {g : Gas} {s : ℕ} → s ≤ tow g s
+  tow-infl′ {g} {s} = tow-infl g s
