@@ -1793,6 +1793,17 @@ postulate
   --   family, read at a grant BELOW this one -- the rows take the key
   --   at one copy where the width premise buys `suc W` of them, so a
   --   fit there is a fit here.
+  -- PROBED: `Probed.Thru-Arr-Slot` takes the region that receipt names
+  --   as open -- a SUBSTITUTING SLOT, where the key is read through the
+  --   telescope rather than off the term -- at the very witness that
+  --   killed the cap-keyed sibling.  Covered LOAD-BEARING: the value
+  --   conjunct at four layers and all three operators, the key rising
+  --   about fifteen per layer against a delivery that doubles, so the
+  --   margin widens along the axis that produced that refutation: four
+  --   against eight there, one hundred and eighty quadrillion against
+  --   eight here.  NOT covered: a telescope deepening without
+  --   lengthening, which no head in this language writes, and the two
+  --   STORE conjuncts, weaker than the value one at the same grant.
   thruFit-arr-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ)
@@ -1813,6 +1824,7 @@ postulate
 
   -- PROBED: `Probed.Thru-Step-Indexed`, whose coverage is stated at
   --   `thruFit-arr-merge` above.
+  -- PROBED: `Probed.Thru-Arr-Slot`, likewise stated there.
   thruFit-arr-switch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (b : Closed Γ (obs u))
@@ -1832,6 +1844,7 @@ postulate
 
   -- PROBED: `Probed.Thru-Step-Indexed`, whose coverage is stated at
   --   `thruFit-arr-merge` above.
+  -- PROBED: `Probed.Thru-Arr-Slot`, likewise stated there.
   thruFit-arr-exhaust : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (b : Closed Γ (obs u))

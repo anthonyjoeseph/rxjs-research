@@ -59,3 +59,6 @@ open import Probed.Scan-Arr-Margin
   using (delivered≡; deliveredHi≡; keys≡; widths≡; sizes≡; premises;
          fit0; fit4; fit8)
 
+
+open import Probed.Thru-Arr-Slot
+  using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡)

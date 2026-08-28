@@ -216,28 +216,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the arr fits at a substituting slot** — `thruFit-arr-merge`,
-  `thruFit-arr-switch`, `thruFit-arr-exhaust`. The whole frame charge
-  reaches exactly these three and nothing else, and the spine above them
-  is now known to be sound: the slot refutation kills the form without
-  the resolved-size premise, not the head that carries it. So these
-  three carry all of the region's remaining risk, and their own receipts
-  name the substituting slot as the one thing NOT covered — the region
-  where the key is read through the telescope rather than off the term.
-  The telescope harness for it now exists in the refutation that cleared
-  the spine; this leg runs the three fits against it.
+- **the two burst leaves at the arrivals' cap** — `subscribeE-burst-caps`,
+  `subscribeE-burst-nest`. Both are refuted at a width of zero because the
+  face carries size keys only. Their conclusions name the arrivals' cap
+  directly, so this is the restatement onto a cap whose width axis steps,
+  plus re-running `Probed.PushVals-Caps` against the statement as it then
+  reads. Re-running is not optional and restamping alone is forbidden: a
+  green taken against the frozen-width cap is evidence about text that is
+  gone.
+- **the cascade descent against the instant's own grant** —
+  `cascade-nest-compositional`. Nothing has ever instantiated it: both
+  sealed families sit on the right, so the conclusion side does not
+  compute, and the store-mediated route it replaced is circular. The leg
+  is to find the side that DOES compute — the hypotheses are the half a
+  witness can be built against — and either instantiate it or record which
+  side is blocked, since an uninstantiated FALSITY row is the cheapest
+  unmanaged risk the tier holds.
 - **the duplicate generation deleted** — the walk's copies go and the
   proven clique is imported in their place, with the weakening applied at
   the two doors that genuinely read it. Nothing here is a proof: the
   superseded predecessor drags its whole support cone with it, and only
   reachability can see that, since a mutual cluster consumes itself.
-- **the two burst leaves at the arrivals' cap** — `subscribeE-burst-caps`,
-  `subscribeE-burst-nest`. Both are refuted at a width of zero because the
-  face carries size keys only. Their conclusions name the arrivals' cap
-  directly, so this is the restatement onto a cap whose width axis steps, plus
-  re-running `Probed.PushVals-Caps` against the statement as it then reads.
-  Re-running is not optional and restamping alone is forbidden: a green taken
-  against the frozen-width cap is evidence about text that is gone.
+
 ### The ledger
 
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: the
@@ -257,7 +257,7 @@ does not fit is a finding about the shared statement, not about the head.
   one-entry instances are probed where the currencies split, the wider
   environments and the closed seed are not.
 - **`thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`**
-  (Nest-Walk) — DIFFICULTY, `PROBED×3`: the emit-by-emit fit at the arr key,
+  (Nest-Walk) — DIFFICULTY, `PROBED×6`: the emit-by-emit fit at the arr key,
   all the three boundary heads still owe — the recursion and the push around it
   are checked. The cap-keyed route to a fit does not transport to a key that is
   not a `nestB`.
