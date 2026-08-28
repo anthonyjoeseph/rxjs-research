@@ -227,10 +227,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`thruRoom-frame`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: the frame's room
-  for one burst, the single leaf the fit still rests on. Nothing has
-  instantiated it; the fit above it is now a checked body at the machinery's
-  own grant.
+- **`thruRoom-frame`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: the frame's room,
+  caps half only — the width half now comes off the burst record. Nothing has
+  instantiated it, and one cap is asked to serve a walk whose own preservation
+  lands at a stepped one.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
