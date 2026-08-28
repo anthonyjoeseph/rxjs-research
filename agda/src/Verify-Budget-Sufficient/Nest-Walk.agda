@@ -1020,6 +1020,17 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 --   sides are eight thousand one hundred and ninety-one against the same
 --   eight thousand one hundred and ninety-two.  That is why the factor
 --   is a power in the OUTPUT burst and the length premise is stated.
+-- REFUTED: `Refuted.Thru-Fit-Frame-Slot` kills it at a SHARED SLOT,
+--   eight against four.  A slot reference has size one and depth
+--   zero, both by definition and both correct, so the arrival pins
+--   EVERY term of the grant at its floor -- the cap `valCaps?` admits
+--   is one and the store term is zero -- while the definition behind
+--   the slot doubles per layer when it is subscribed.  No cap absorbs
+--   it: `capsOK?` has no clause for slot defs, deliberately, they
+--   being fixed syntax, and the width cap that does read the
+--   telescope is not a term of the grant.  The same file carries the
+--   crossing at the PARENT, whose own telescope term is linear where
+--   the delivery doubles.
 -- DEAD ROUTE: sweeping the ARRIVAL's depth cannot refute this, and the
 --   reason is arithmetic rather than a failed attempt.  The grant's
 --   factor is `nestFac`, a tower in the cap -- the cap is read off the
@@ -1029,9 +1040,10 @@ thruWalk-nest G fuel op nid κ id now (o ∷ os) sched st (h1 , h2 , h3 , rest) 
 --   measure side a doubling per level, and every deeper witness widens
 --   the margin.  The refutations above all killed FLAT factors, which
 --   is the axis that was open before the exponent moved into the burst.
---   What could still refute is a delivery that compounds per UNIT of
---   cap rather than per nesting level, and no head in this term
---   language delivers that.
+--   What this does NOT cover is an arrival that NAMES its content
+--   instead of carrying it, where the cap is read off the reference
+--   and the delivery comes from somewhere the reference does not
+--   measure -- the refutation below.
 -- PROBED: `Probed.Thru-Fit-Frame` takes the W = 1 / large-S axis
 --   (minimal grant addend against the widest `nestU` gap) and the
 --   W-large contrast, across mergeAll, switch and exhaust.  It does
@@ -5007,6 +5019,17 @@ frameDrainW {Γ = Γ} {u = u} W sf id now (from-inner op allNid inst) p sched st
 --   on a wrap and the values are an inner's emissions -- and kills the
 --   caps-scaled repair at the same figures, the cap being satisfied by
 --   a state the arriving values are no part of.
+-- REFUTED: `Refuted.Thru-Fit-Frame-Slot` kills THIS STATEMENT, unit
+--   and all, at a shared slot: one hundred and twenty-eight against
+--   seventy-six, sixty-four against sixty-eight one layer shorter, so
+--   it is a crossing and not a scale error.  The telescope IS priced
+--   here, which is why the reading is a finding about this charge and
+--   not about the arm it delegates to -- but it is priced by a
+--   `nestU`, linear in the unit, against a subscribe that doubles per
+--   layer of the definition.  So the body below is a real proof of a
+--   false statement, resting on the thru arm's own refuted leaf, and
+--   the repair is to key the factor on a size that resolves through
+--   the telescope, which is what the arr-keyed twin already does.
 abstract
   stepFrame-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (id : Id) (now : Tick)

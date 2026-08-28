@@ -63,6 +63,12 @@ open import Refuted.Subscribe-Caps-Nest
   using (capsZero; capsZero₂; delivered≡16; charged≡6;
          delivered₂≡8; charged₂≡6;
          subscribeE-nest-absurd; subscribeE-nest-two-absurd; valCapsFails₃; valCapsFails₂)
+open import Refuted.Thru-Fit-Frame-Slot
+  using (arrival-nest≡0; store≡0; G≡4; premises; delivered≡;
+         delivered₃≡8; thruFit-frame-slot-absurd; len₃≡1; grown₃≡8;
+         stepFrame-nodes-thru-slot-absurd; unit₇≡9; parentGrant≡76;
+         len₇≡1; grown₇≡128; grown₆≡64; parentGrant₆≡68;
+         stepFrame-nodes-slot-absurd)
 open import Refuted.Shared-Slot-Nest-Arr
   using (arrival≡0; capsPin; contained≡; substituted≡; delivered≡8;
          granted≡5; sharedSlot-nest-arr-absurd; headValPin; packHead≡;
