@@ -1,4 +1,4 @@
-.PHONY: find-prose gate roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -538,6 +538,35 @@ roadmap-check:
 roadmap-evidence:
 	@scripts/check-roadmap.py --fix-evidence
 
+# THE ROADMAP MUST MOVE IN EVERY COMMIT, BECAUSE A LEG IS ONE COMMIT.  Either the
+# leg landed -- retire it, promote the other two, write a new third -- or the
+# session could not finish it, in which case the FIRST leg is rewritten as the
+# work that remains.  Neither leaves the file untouched.  The check is
+# deliberately dumb (did it change against HEAD) because what it defends cannot
+# be resolved by a machine: `roadmap-check` verifies that a row's NAME exists,
+# and nothing can verify that the plan a leg describes is still the plan.
+# See docs/roadmap-check.md.
+roadmap-moved:
+	@scripts/check-roadmap-moved.py
+
+# PROVES roadmap-moved IS LOAD-BEARING, in BOTH directions -- and the third
+# fixture is the one that matters: a trailing-whitespace edit is the cheapest
+# way to satisfy a did-it-change check, so it must NOT satisfy this one.
+roadmap-moved-selftest:
+	@fail=0; \
+	  scripts/check-roadmap-moved.py --file scripts/roadmap-selftest/moved-diff.md \
+	      --baseline-file scripts/roadmap-selftest/moved-same.md > /dev/null \
+	    || { echo "SELFTEST FAIL: a genuinely changed roadmap was rejected"; fail=1; }; \
+	  if scripts/check-roadmap-moved.py --file scripts/roadmap-selftest/moved-same.md \
+	       --baseline-file scripts/roadmap-selftest/moved-same.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: an UNCHANGED roadmap PASSED — the check is dead"; fail=1; \
+	  fi; \
+	  if scripts/check-roadmap-moved.py --file scripts/roadmap-selftest/moved-space.md \
+	       --baseline-file scripts/roadmap-selftest/moved-same.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a trailing-whitespace edit PASSED as movement — the check can be satisfied by saying nothing"; fail=1; \
+	  fi; \
+	  if [ $$fail -eq 0 ]; then echo "roadmap-moved-selftest: OK"; else exit 1; fi
+
 # PROVES roadmap-check IS LOAD-BEARING, against fixtures outside PROOF-STATE.md.
 # Same reason dup-selftest exists: the real file is (and should stay) SORTED, so
 # the failing path never runs on it and would rot untested.  The MUST-NOT row is
@@ -833,6 +862,7 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              imports-selftest imports-check \
              evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
+             roadmap-moved-selftest roadmap-moved \
              comments-selftest comments-check dev-changed-selftest
 
 gate-cheap:

@@ -126,6 +126,8 @@ reason to spend those minutes only to fail on something a textual pass already k
 | `imports-check` | **NO UNUSED IMPORT, AND NO UNUSED NAME IN A SURVIVING CLAUSE (Anthony: "no unused imports, either")** — an import is a module-graph EDGE, fixing what must be built BEFORE this file and what an edit to the imported module INVALIDATES, and Agda has no warning for a dead one so `-W error` cannot see it. `make imports-fix` deletes them, but never a **claim root**'s imports (one file per tree — they ARE the claim, so unused is the design) nor a **sole-route** edge, which is a wiring finding rather than dead weight. AND no import may put names in a file's SCOPE without naming them: a missing `using` list is a finding in every file, claim roots included (`using ()` and a qualified `import M as Q` are fine). AND **no `public` re-exports** — a name is imported from where it is DEFINED, so that `grep` and `make find` point at its real home. AND no `using` clause may ask a module of this tree for a name that module does not have — a definition MOVES, one consumer's clause is repaired and its sibling's is not, and Agda reports that only as a scope warning `-W error` promotes MANY MINUTES down the tower, one instance per build, naming the importer and not the name's new home. What makes the cheap check sound is the `public` ban directly above: with no re-exports, a module can only export what its own text mentions. AND every file DECLARES its own module name, matching its path: a missing header is not a syntax error, so Agda checks such a file as a target and then crashes every IMPORTER with an internal error naming neither end — and a dev check cannot see it, because it checks a generated copy carrying its own header. Every part of this buys LEGIBILITY, not time: `using` filters scope rather than the build, a re-export removes no edge since a ladder's name-level dependencies are genuine, and a clause with one live name holds its edge open however many dead names sit beside it — which is why the name-level half was once argued to be optional, and is the wrong measure. A list naming thirty things the file never touches is not a record of what the file depends on | [docs/imports-check.md](docs/imports-check.md) |
 | `roadmap-selftest` | the roadmap checker still fires | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `roadmap-check` | PROOF-STATE is sorted riskiest-first, names every live postulate AND NOTHING ELSE in a row head, keeps rows AND TIER PREAMBLES within a character budget — the second because holding every row to a line and writing the finding into the section text above them satisfies the first exactly — carries no date, and neither does this file or `docs/`; opens every tier with a BIG PICTURE ROADMAP of exactly three legs, each within a prose budget several times a row's, because the legs are the schedule and the rows are only the ledger it is drawn from; and every classed row carries the DERIVED evidence field its postulates' headers dictate, which is why a field may be mandatory where the `TWIN:` section it summarises is not — a derived field cannot be filled with filler, so the blank is the product. `make roadmap-evidence` writes it; and no DIFFICULTY row stands on nothing, which is the same law the GRINDABLE half already carried | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-moved-selftest` | the movement checker still fires, in both directions — and that a trailing-whitespace edit does NOT count as movement | [docs/roadmap-check.md](docs/roadmap-check.md) |
+| `roadmap-moved` | PROOF-STATE has CHANGED against HEAD. A LEG IS ONE COMMIT, so a commit that leaves the roadmap byte-identical has either finished a leg without retiring it or abandoned one without saying so. The check is deliberately dumb — did the file change — because what it defends is not resolvable by a machine: the checker above verifies a row's NAME, and nothing can verify that the plan a leg describes is still the plan | [docs/roadmap-check.md](docs/roadmap-check.md) |
 | `comments-selftest` | every comment check still fires, and four precision properties still don't | [docs/comments-check.md](docs/comments-check.md) |
 | `comments-check` | no comment in `agda/src` or `agda/evidence` carries a date, a historical marker or a LINE NUMBER — in any of `Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`; a block's evidence sits LAST and in order; no marker is DOUBLED into the comment text (`-- -- RECOVERY:`), which is a marker every checker here reads as prose while a human reads it as a marker; every `TWIN`/`REFUTED`/`PROBED`/`RECOVERY` reference RESOLVES — a twin to a definition that is proven and not still a postulate, a spent probe to the sha holding it — while `DEAD ROUTE` is unvalidated because it names nothing; no explanation names the subject of a section the same block already carries, which is redundancy that DRIFTS rather than merely repeats; and the EXPLANATION — the prose before the first evidence marker, sha pointers free — is within a character budget. Charging explaining and not evidence is the whole design: this header is where the roadmap's own budget SENDS research, so a flat per-block ceiling would budget the destination and a finding with nowhere to go gets deleted rather than moved | [docs/comments-check.md](docs/comments-check.md) |
 | the tower (inline in `gate-heavy`, no target of its own) | the tower typechecks. **A WARNING IS A FAILURE** (`-W error`, exit 42) | [docs/agda-build.md](docs/agda-build.md) |
@@ -1375,6 +1377,29 @@ changes the ledger, in that same commit** — a postulate discharged, added, ren
 reclassified, or reordered. The roadmap is the file every session reads FIRST, so a stale
 row misdirects the next session's whole leg; one already did, naming two postulates that had
 become real definitions.
+
+**A LEG IS ONE COMMIT OF WORK, AND `make roadmap-moved` ENFORCES IT (Anthony:
+"let's mechanically enforce that the roadmap cannot stay the same across
+commits").** A leg is still a GROUP — that is how PROOF-STATE states it — but
+the group is SIZED BY THE COMMIT: it is the chunk of work this session intends
+to land next, not a theme or a region that happens to be coherent. So the
+roadmap changes with every commit, and the check fails when it does not.
+
+**The two outcomes, and one of them always applies.** The leg LANDED: retire it,
+promote the other two, and write a new third — so the file moves. Or the session
+could NOT finish what it planned: then **rewrite the first leg as the work that
+remains**, which is the more valuable of the two writes, because it is the only
+record of what the leg turned out to cost. Neither outcome leaves the roadmap
+untouched, so an unchanged file means a leg was finished without being retired
+or abandoned without being restated.
+
+**Legs two and three may aim at the SAME postulates as the first.** The three
+are not three subjects — they are the next three commits, and a single group of
+statements routinely takes three. What the trio owes is a coherent vision for
+reducing the most risk, cut into pieces each of which is a reasonable single
+commit. Parcel the work that way: pick the risk order first, then cut it at
+commit boundaries, rather than picking three topics and hoping each is
+commit-sized.
 
 And update it **to the hygiene rules in its own header, which are also part of the gate**:
 one line per item (name + risk class + hook), NO numbering of any kind, research in source

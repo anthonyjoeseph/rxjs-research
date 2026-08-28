@@ -4597,6 +4597,26 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 -- REFUTED: `Refuted.Subscribe-Burst-Width` kills the statement as it
 --   now stands, at a parked pair under a limit of one -- and spells
 --   out that this very definition inhabits the type it kills.
+-- DEAD ROUTE: repairing this by STEPPING the cap one notch -- a
+--   `arrCapAt` whose width axis advances with the size axis, so the
+--   conclusion reports at the stepped cap -- closes every arm of this
+--   walk and then dies on COMPOSITION.  The value push runs the inner
+--   subscription at the already-stepped cap, so the inner reports at a
+--   cap stepped twice; and the step does not nest, because the inner
+--   cap's base size is strictly larger and no monotonicity brings a
+--   two-step cap under a one-step one.  A single notch cannot express
+--   a walk that re-enters itself, so the level has to be CARRIED, not
+--   nested: in at one level, out at that level plus a residue, over
+--   ONE base cap.
+-- TWIN: `subscribeE-caps` already carries the caps invariant across
+--   this very operation in exactly that shape -- premise at a level,
+--   conclusion at the level plus a residue, with the residue bounded
+--   so the existential is not upward-closed in its witness.  It is a
+--   proven body, so the shape is walked and not merely proposed.
+-- RECOVERY: git show 0e96e46 restores the one-step attempt, whose
+--   width lemmas the level-indexed form needs UNCHANGED: the node
+--   widening step, its lift to the nest predicate, and the two
+--   `2 ≤ cSize` extractors for a wrap and for a parked closure.
 subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
   (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →

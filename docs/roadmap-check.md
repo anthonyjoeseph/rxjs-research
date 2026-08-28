@@ -214,3 +214,29 @@ is correct where the row really is one statement and wrong where it is a bag. Wh
 census answers a family row with a single marker, the question to ask is whether the row
 should be SPLIT, and the answer is usually yes.
 
+## `make roadmap-moved` — the roadmap cannot stay the same across commits
+
+`scripts/check-roadmap-moved.py` compares the working tree's `PROOF-STATE.md`
+against `git show HEAD:PROOF-STATE.md` and fails when they are the same. That is
+the whole algorithm. Three details:
+
+- **Normalisation.** Trailing whitespace on each line, and trailing blank lines,
+  are stripped before comparing — so the cheapest way to satisfy the check is to
+  say something rather than to add a space. `roadmap-moved-selftest` pins that
+  arm specifically, since it is the one an author reaches for under pressure.
+- **`--baseline-file F`** replaces the git lookup with a plain file, which is how
+  the selftest drives both directions without touching the repo's history.
+  `--ref R` compares against another commit; `--file F` picks another roadmap.
+- **No `PROOF-STATE.md` at the ref** (a first commit, an orphan branch) passes,
+  because there is nothing to have moved away from.
+
+**Why a dumb check is the right one here.** A **leg is one commit of work** —
+that is what the unit means — so every commit either retires a leg (promote the
+other two, write a new third) or fails to finish one (rewrite the first leg as
+the remainder). Both write to the file. What a machine cannot check is the part
+that matters: `check-roadmap.py` resolves a row's NAME against the ledger, and
+nothing resolves whether the plan a leg describes is still the plan. Forcing the
+file to change is the only hold available, and it works by making the author
+read the three legs before each commit — which is when the question "is this
+still what we are doing?" actually gets asked.
+

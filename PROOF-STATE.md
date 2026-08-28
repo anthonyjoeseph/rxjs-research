@@ -55,6 +55,17 @@ LEDGER of one-line hooks; everything else lives in the code.
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
   where it is not; a leg naming a single row is still a leg.
+  **AND A LEG IS ONE COMMIT OF WORK (Anthony).** That is the unit — not a theme
+  and not a region, but the chunk this session intends to land next. So the
+  three are the next three COMMITS, and legs two and three may aim at the very
+  same postulates as the first; what the trio owes is a coherent vision for
+  reducing the most risk, cut at commit boundaries. Pick the risk order first,
+  then cut — never pick three topics and hope each is commit-sized.
+  **SO THE FILE MOVES WITH EVERY COMMIT, and `make roadmap-moved` fails when it
+  does not.** The leg landed: retire it, promote the other two, write a new
+  third. Or the session could not finish it: **rewrite the first leg as the work
+  that remains** — the more valuable of the two writes, since it is the only
+  record of what the leg turned out to cost.
   **THE THREE LEGS DO NOT HAVE TO COVER THE TIER (Anthony).** They are the NEXT
   three, not a partition of the remaining work — the coverage rule is the
   LEDGER's job, and the rows already discharge it. Work beyond the third leg is
@@ -203,17 +214,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the face has no width key, and the walk is false without one** —
-  `subscribeE-burst-caps`, `pushVals-caps-queue`, `pushVals-caps-burstW`,
-  `subscribeE-burst-nest`, `thruFit-arr-merge`, `thruFit-arr-switch`,
-  `thruFit-arr-exhaust`. Every key this face carries is a size bound and its
-  invariant is one boolean over node widths an unwritten table satisfies, so
-  the width field may be zero — and at zero the arrivals' bound is refuted,
-  the exit pair with it at a parked pair under a limit of one, and the
-  proven walk already inhabits the type that kills. The level cannot repair
-  it: it freezes the width ON PURPOSE, since the invariant reads that field
-  and nothing else. So the leg is the key and the stepped width axis; the
-  admission half, which reads size alone, is untouched and stays a body.
+- **carry the width level, do not step it** — `subscribeE-burst-caps`,
+  `pushVals-caps-queue`, `pushVals-caps-burstW`, `subscribeE-burst-nest`,
+  `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. The face
+  carries size keys only, so its width field may be zero and the walk is
+  refuted there; that much is settled. What is NOT settled is the repair, and
+  the one notch this leg spent itself on is now a dead route in the exit
+  walk's own header: a cap whose width steps once closes every arm and dies
+  on composition, since the value push re-enters the walk and a notch does
+  not nest. The remaining work is the shape the caps face already walks and
+  this one does not — level in, level plus a bounded residue out, over one
+  base cap — restated across these heads before any of them is ground.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
