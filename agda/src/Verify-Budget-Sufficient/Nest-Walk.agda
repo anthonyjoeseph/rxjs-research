@@ -45,8 +45,8 @@ open import Rx.Evaluator using
   sharedConnect; sharedPlumb; burstCompleted; register; dropSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤; Caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widNode; nestValOK?)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?; widNode; nestValOK?; pathSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots)
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab)
@@ -5242,6 +5242,17 @@ mutual
 -- THROUGH them -- but writing the recurrences out from their own
 -- equations reaches the conclusion at concrete programs.
 --
+-- AND A WITNESS FOR THE STACKING AXIS CANNOT BE BUILT FROM PARALLEL
+-- BRANCHES, which is worth carrying before anyone instantiates the
+-- leaves below.  Registrations each install their OWN node and
+-- `nodesMax` is a join, so identical branches cannot compound however
+-- many are folded -- a family of them delivers the same store at three
+-- registrations as at one.  Compounding needs a registration whose
+-- subscription deepens a node a LATER registration is then read at, and
+-- a branch parked at a spent merge never carries depth forward.  The
+-- Set-valued walk premises are unreachable at numerals besides, so only
+-- the conclusion and the decidable size premise are ever pinnable.
+--
 -- TWIN: `cascadeGo-nodes-chains` — the proven fold over a cascade's
 --   chain list, whose skip/deliver arms and telescope arithmetic are
 --   the route for this fold, with the fan allowances standing where its
@@ -5278,18 +5289,47 @@ mutual
 --   max — stacks whatever it licensed once per level.  The gas-indexed
 --   fan recurrences are the branch-structured charge that refutation
 --   demands: each level's allowance contains the next level's whole.
--- PROBED: `Probed.Share-Go-Fold` instantiates the conclusion at one,
---   two and three registrations over the family that refuted the
---   premise-free form, with the decidable `admSz?` premise pinned and
---   the budget spent at the list's own length.  Not covered, and the
---   file pins why: the delivered store is FLAT in the length here, so
---   every row is degenerate on the stacking axis the budget `k` is
---   spent for -- parallel registrations each install their own node
---   and `nodesMax` is a join, so identical branches cannot compound.
---   The two walk premises are Set-valued and cannot be discharged at
---   numerals at all, so the hypothesis side is unreached entirely.
+-- RECOVERY: git show 7b5936b:agda/evidence/probed/Probed/Share-Go-Fold.agda
+--   restores the harness -- the four-deep constant registration, the
+--   written-out recurrences and the `admSz?` pins.
+
+-- ONE ADMITTED REGISTRATION'S OWN GRANT, WIDENED INTO ONE UNIT OF THE
+-- BRANCH BUDGET.  The entry's path measures are capped by the size
+-- premise the fold carries for the whole admitted list: its length
+-- fits one `suc (cSize + fanLen gas)`, its factor the square's power
+-- of two and its depth the square, which is what makes a unit a unit.
+-- The unit it prices sits one gas level below the level the fold's
+-- conclusion prices, and the delivery caps grow with the gas.
 postulate
-  shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  shareFold-unit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (W : ℕ) (sl : Slots Γ) (gas : ℕ)
+    (p : Path Γ u t) (X : ℕ) →
+    1 ≤ Caps.cSize c → pathSz? (Caps.cSize c) p ≡ true →
+    nestFac (Caps.cSize c) W ^ deliverLen gas c p
+      * (deliverNestF gas c p ^ W
+         * (X + W * (deliverNestD gas c p
+                     + suc (deliverLen gas c p)
+                       * nestU (delSq gas c) (nestUnit e sl))))
+      ≤ nestFac (Caps.cSize c) W ^ suc (Caps.cSize c + fanLen gas c)
+        * ((2 ^ (Caps.cSize c * Caps.cSize c + fanSq gas c)) ^ W
+           * (X + W * ((Caps.cSize c * Caps.cSize c + fanSq gas c)
+                       + suc (Caps.cSize c + fanLen gas c)
+                         * nestU (delSq (suc gas) c) (nestUnit e sl))))
+
+-- AND THE TELESCOPE THE FOLD COMPOSES WITH, which is where the unit
+-- term's `k` earns itself: a store already inside ONE unit, carried
+-- through `k` of them, lands inside `k + 1`.  The two additive charges
+-- meet exactly -- a unit's `Lu * U` IS the difference between
+-- successive unit terms -- so this is an identity at the boundary and
+-- not a bound with room in it.
+  shareFold-tele : (Q W Lu Sq U k X H : ℕ) → 1 ≤ Q →
+    H ≤ Q ^ Lu * ((2 ^ Sq) ^ W * (X + W * (Sq + Lu * U))) →
+    Q ^ (k * Lu) * ((2 ^ (k * Sq)) ^ W * (H + W * (k * Sq + suc (k * Lu) * U)))
+      ≤ Q ^ (suc k * Lu)
+        * ((2 ^ (suc k * Sq)) ^ W
+           * (X + W * (suc k * Sq + suc (suc k * Lu) * U)))
+
+shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (W : ℕ) (sl : Slots Γ) (sf : Gas) (gas : ℕ)
     (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
@@ -5483,3 +5523,71 @@ foldPath-nodes {e = e} c W sl sf gas id now envSrc (f ↠ p) vals evs fin sched 
                      (cong (deliverNestD gas c p +_) (+-comm (L * U) U))))
       (trans (sym (+-assoc (frameNestD f) (deliverNestD gas c p) (U + L * U)))
              (cong (_+ (U + L * U)) (sym (deliverNestD-cons gas c f p))))
+
+-- The fold's own three arms, which are `shareGo`'s: an empty list
+-- returns the state it was handed, a cancelled registration is skipped
+-- without spending any of the budget, and a delivered one spends
+-- exactly one unit of it.  Only the last arm is an induction, and its
+-- two halves are the walk that runs the entry and the fold that runs
+-- the rest -- so the budget decrements where the list does.
+shareGoFold-nodes {e = e} c W sl sf gas id now i vals fin [] k sched st
+                  hsl 1≤W 1≤S hadm hlen hk hb hc =
+  ≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
+  (≤-trans (m≤m+n _ _)
+  (≤-trans (grow ((2 ^ (k * (Caps.cSize c * Caps.cSize c + fanSq gas c))) ^ W) _
+             (1≤pow≤ (2 ^ (k * (Caps.cSize c * Caps.cSize c + fanSq gas c))) W
+               (m^n>0 2 (k * (Caps.cSize c * Caps.cSize c + fanSq gas c)))))
+           (grow (nestFac (Caps.cSize c) W ^ (k * suc (Caps.cSize c + fanLen gas c))) _
+             (1≤pow≤ (nestFac (Caps.cSize c) W)
+               (k * suc (Caps.cSize c + fanLen gas c))
+               (1≤nestFac (Caps.cSize c) W)))))
+  where
+  grow : ∀ (F Y : ℕ) → 1 ≤ F → Y ≤ F * Y
+  grow F Y 1≤F = ≤-trans (≤-reflexive (sym (*-identityˡ Y))) (*-monoˡ-≤ Y 1≤F)
+shareGoFold-nodes {e = e} c W sl sf gas id now i vals fin ((rid , p) ∷ ps) (suc k)
+                  sched st hsl 1≤W 1≤S hadm (s≤s hlen) hk hb hc
+  with any (_≡ᵇ rid) (EvalSt.cancelled st) | hb | hc
+... | true  | hb′ | hc′ =
+  shareGoFold-nodes c W sl sf gas id now i vals fin ps (suc k) sched st hsl 1≤W 1≤S
+    (proj₂ (∧-true _ _ hadm)) (≤-trans hlen (n≤1+n k)) hk hb′ hc′
+... | false | hb′ | hc′ =
+  ≤-trans (shareGoFold-nodes c W sl sf gas id now i vals fin ps k sched₁ st₁
+             (trans (foldPath-slots sf gas id now (toℕ i) p vals evs fin sched st′) hsl)
+             1≤W 1≤S (proj₂ (∧-true _ _ hadm)) hlen (≤-trans (n≤1+n k) hk)
+             (proj₂ hb′) (proj₂ hc′))
+          (shareFold-tele Q W Lu Sq U k X (nodesMax st₁ ⊔ nestDᵛˢ vals)
+             (1≤nestFac (Caps.cSize c) W) fit)
+  where
+  Q  = nestFac (Caps.cSize c) W
+  Lu = suc (Caps.cSize c + fanLen gas c)
+  Sq = Caps.cSize c * Caps.cSize c + fanSq gas c
+  U  = nestU (delSq (suc gas) c) (nestUnit e sl)
+  X  = nodesMax st ⊔ nestDᵛˢ vals
+  st′  = record st { delivered = rid ∷ EvalSt.delivered st }
+  evs  = if fin then close (toℕ i) exhausted ∷ [] else []
+  r    = foldPath sf gas id now (toℕ i) p vals evs fin sched st′
+  sched₁ = proj₁ (proj₂ r)
+  st₁    = proj₂ (proj₂ r)
+
+  grow : ∀ (F Y : ℕ) → 1 ≤ F → Y ≤ F * Y
+  grow F Y 1≤F = ≤-trans (≤-reflexive (sym (*-identityˡ Y))) (*-monoˡ-≤ Y 1≤F)
+
+  unit : ℕ
+  unit = Q ^ Lu * ((2 ^ Sq) ^ W * (X + W * (Sq + Lu * U)))
+
+  Inner : ℕ
+  Inner = X + W * (Sq + Lu * U)
+
+  X≤unit : X ≤ unit
+  X≤unit =
+    ≤-trans (m≤m+n X (W * (Sq + Lu * U)))
+    (≤-trans (grow ((2 ^ Sq) ^ W) Inner (1≤pow≤ (2 ^ Sq) W (m^n>0 2 Sq)))
+             (grow (Q ^ Lu) ((2 ^ Sq) ^ W * Inner)
+                   (1≤pow≤ Q Lu (1≤nestFac (Caps.cSize c) W))))
+
+  fit : (nodesMax st₁ ⊔ nestDᵛˢ vals) ≤ unit
+  fit = ⊔-lub
+    (≤-trans (foldPath-nodes c W sl sf gas id now (toℕ i) p vals evs fin sched st′
+                hsl 1≤W 1≤S (proj₁ hb′) (proj₁ hc′))
+             (shareFold-unit {e = e} c W sl gas p X 1≤S (proj₁ (∧-true _ _ hadm))))
+    (≤-trans (m≤n⊔m (nodesMax st) (nestDᵛˢ vals)) X≤unit)
