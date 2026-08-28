@@ -208,12 +208,12 @@ does not fit is a finding about the shared statement, not about the head.
   `pushVals-caps-burstW`, `pushVals-caps-queue`, `thruFit-arr-merge`,
   `thruFit-arr-switch`, `thruFit-arr-exhaust`. One refuted premise read at one
   flat cap, and every row keys on it, so the restatement moves all of them at
-  once. THREE devices are now closed in the leaves' headers, all at one place:
-  the merge step spends the arrival's closure size AS the grant's exponent, so
-  the bound and the grant are one quantity. That is the mechanism, and the leg
-  is now to state the walk over CONSECUTIVE INSTANT CAPS — premises at the
-  instant's, conclusion at its successor's — which threads every walk predicate
-  and is what the cheaper devices were being tried instead of.
+  once. Three cap-free devices are closed in the leaves' headers, all at one
+  place: the merge step spends the arrival's closure size AS the grant's
+  exponent. What survives is the caps face's own shape — a LEVEL, existential
+  in the conclusion, so a parent picks the level its child reports instead of
+  owing a fixed one. The leg is that restatement of the shared statement; the
+  twin is the caps face's frame lemmas, which are proven and do exactly it.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it

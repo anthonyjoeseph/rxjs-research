@@ -3838,10 +3838,16 @@ postulate
   --   `pWᵛ` of one and an `entryCeil` of eight, which is why no wider
   --   reading of the ENTRY cap repairs it either.
   -- DEAD ROUTE: stepping the cap the way the caps face does -- a scan
-  --   there reports `frameStep (j + j′)` and charges `j′` -- is dead
-  --   HERE and not merely unproven, because the grant is keyed on
-  --   `cSize`: a stepped cap is a LARGER key, hence a larger grant, and
-  --   the parent owes the smaller one.
+  --   there reports `frameStep (j + j′)` and charges `j′` -- while the
+  --   shared statement's conclusion names ONE cap.  The grant is keyed
+  --   on `cSize`, so a stepped cap is a larger key and a larger grant,
+  --   and a parent whose own obligation is fixed owes the smaller one.
+  --   What the route needs is the caps face's OTHER half, which this
+  --   statement does not have: there the parent's obligation is
+  --   existential in the level too, so it picks the level its child
+  --   reports and the mismatch never arises.  Dead against the shared
+  --   statement as written; a restatement of that statement, not a
+  --   proof, is what reopens it.
   -- PROBED: `Probed.Scan-Burst-Nest` reads that witness against THIS
   --   form, at the same cold script and the same tight size cap --
   --   fourteen values, 16383 delivered, green here and pinned `false`
