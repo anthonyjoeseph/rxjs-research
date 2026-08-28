@@ -158,3 +158,61 @@ figs-map = Caps.cSize cap , sizes (proj₁ res)
 
 figs-map≡ : figs-map ≡ (21 , 25 ∷ [])
 figs-map≡ = refl
+
+-- AND IT IS STILL FALSE AT AN EMPTY REGISTRY FIELD, which is what
+-- decides where the arrival cap's LEVEL may come from.  The repair the
+-- crossing above forces is to read the arrivals one caps level up, and
+-- the tempting source for that level is the descent's own delivery
+-- count, which the walk statements already bound their level by.  It
+-- cannot be: the count is only known to be positive where the cap
+-- grants a registration, so at an empty registry field a level bounded
+-- by the count alone is level ZERO -- and `frameStep 0` is the
+-- identity, so the stepped statement is the flat one, which this
+-- witness reaches unchanged.  Same program, same premises, registry
+-- emptied.  So the level a `*All` arm reports carries the head's own
+-- written size as a SEPARATE summand rather than folded into the
+-- count, and the positivity is paid at the one consumer that finally
+-- collapses the existential.
+capZ : Caps
+capZ = caps (syncSizeᵛ (obs natᵗ) head) 99 0
+
+prems-z : Bool × Bool × Bool
+prems-z = nestCapsOK? capZ sched₀ st₀
+    , nestValOK? capZ (obs natᵗ) head
+    , nestClosOK? capZ slots head
+
+prems-z≡ : prems-z ≡ (true , true , true)
+prems-z≡ = refl
+
+AdmStmtZ : Set
+AdmStmtZ =
+  Sched.slots sched₀ ≡ slots →
+  nestCapsOK? capZ sched₀ st₀ ≡ true →
+  nestValOK? capZ (obs natᵗ) head ≡ true →
+  nestClosOK? capZ slots head ≡ true →
+  descW gasBig head root 0 0 sched₀ st₀ ≤ W →
+  pushValsAdmOK capZ slots (proj₁ res)
+
+WidStmtZ : Set
+WidStmtZ =
+  Sched.slots sched₀ ≡ slots →
+  nestCapsOK? capZ sched₀ st₀ ≡ true →
+  nestValOK? capZ (obs natᵗ) head ≡ true →
+  nestClosOK? capZ slots head ≡ true →
+  descW gasBig head root 0 0 sched₀ st₀ ≤ W →
+  pushValsWidOK capZ slots (proj₁ res)
+
+adm-absurd-z : AdmStmtZ → ⊥
+adm-absurd-z h with h refl refl refl refl ≤-refl
+... | () , _
+
+wid-absurd-z : WidStmtZ → ⊥
+wid-absurd-z h with h refl refl refl refl ≤-refl
+... | () , _
+
+-- the registry field the two caps differ in, read rather than assumed
+regs : ℕ × ℕ
+regs = Caps.cReg cap , Caps.cReg capZ
+
+regs≡ : regs ≡ (99 , 0)
+regs≡ = refl

@@ -16,15 +16,15 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: pushVals-caps-adm @66072f
--- TARGET: pushVals-caps-wid @962e07
+-- TARGET: pushVals-caps-adm @4936ee
+-- TARGET: pushVals-caps-wid @b57840
 -- TARGET: pushVals-caps-burstW @f0db0b
--- TARGET: pushVals-caps-queue @f51f3d
+-- TARGET: pushVals-caps-queue @254228
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Unit using (tt)
-open import Data.List using ([]; _∷_; length)
+open import Data.List using (List; []; _∷_; length; map; _++_)
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (just; nothing)
@@ -34,7 +34,7 @@ open import Data.Nat.Properties using (_≤?_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary.Decidable using (True; toWitness)
 
-open import Rx.Prim using (Gas; g0; gs; Id; Tick; hot)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; hot; InstEmit)
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; nat̂; strmᵗ; deferᵉ;
   syncSizeᵛ; mapᵉ; input; Fn; varᵗ)
@@ -42,9 +42,10 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Evaluator
   using (subscribeE; root; sched-init; st-init; mintNode; installNode; thru-outer; _↠_; mergeAllᵒ;
+  splitEvents;
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
   AllOp; NodeId; Path)
-open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+open import Verify-Budget-Sufficient.Caps using (arrCap; Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
           pushValsWOK; pushValsQOK)
@@ -115,10 +116,17 @@ burstLens≡ : burstLens ≡ (1 , 1 , 1)
 burstLens≡ = refl
 
 -- THE CONCLUSION, at the state the descent LEAVES, which is what
--- distinguishes these rows from every earlier probe of this family.
+-- distinguishes these rows from every earlier probe of this family --
+-- and read at the ARRIVAL CAP, one caps level above the one the head's
+-- premises are pinned at.  That is where the statements put it: an
+-- arrival is the head's syntax with payloads substituted in, so it
+-- crosses the size key, and the level it crosses by is the head's own
+-- written size.  The premises below stay at the entry cap, so a row
+-- here is a reading about the gap between the two and not about a
+-- single cap satisfying both.
 capsM : (lim k W : ℕ) → Set
 capsM lim k W =
-  pushValsCapsOK (tight {obs (obs natᵗ)} (rM lim k)) slots W gasBig mergeAllᵒ
+  pushValsCapsOK (arrCap (tight {obs (obs natᵗ)} (rM lim k))) slots W gasBig mergeAllᵒ
     (proj₁ (mintNode (sched-init (rM lim k) slots))) root 0 0
     (proj₁ (resM lim k)) (proj₁ (proj₂ (resM lim k))) (proj₂ (proj₂ (resM lim k)))
 
@@ -145,7 +153,7 @@ capsM-1 hw = refl , refl , refl , refl
 
 capsS : (k W : ℕ) → Set
 capsS k W =
-  pushValsCapsOK (tight {obs (obs natᵗ)} (qS k)) slots W gasBig switchᵒ
+  pushValsCapsOK (arrCap (tight {obs (obs natᵗ)} (qS k))) slots W gasBig switchᵒ
     (proj₁ (mintNode (sched-init (qS k) slots))) root 0 0
     (proj₁ (resS k)) (proj₁ (proj₂ (resS k))) (proj₂ (proj₂ (resS k)))
 
@@ -157,7 +165,7 @@ capsS-1 hw = refl , refl , refl , refl
 
 capsX : (k W : ℕ) → Set
 capsX k W =
-  pushValsCapsOK (tight {obs (obs natᵗ)} (qX k)) slots W gasBig exhaustᵒ
+  pushValsCapsOK (arrCap (tight {obs (obs natᵗ)} (qX k))) slots W gasBig exhaustᵒ
     (proj₁ (mintNode (sched-init (qX k) slots))) root 0 0
     (proj₁ (resX k)) (proj₁ (proj₂ (resX k))) (proj₂ (proj₂ (resX k)))
 
@@ -525,3 +533,77 @@ leavesShX hw =
   (refl , refl , tt)
   , (tt , ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
   , (tt , ((λ { lim′ act q od () }) , tt) , tt)
+
+-- THE SUBSTITUTION'S TWO AXES READ APART, at the very program that
+-- refutes the pair.  `Refuted.PushVals-Adm-Map` sets the width and
+-- registry fields WIDE on purpose, so that nothing but the size half
+-- can be doing the work -- which leaves open the question a split
+-- design turns on: does the arrival's PENDING WIDTH stay inside the
+-- head's own width, while only its SIZE crosses?  These rows put the
+-- same dup-map program under a cap tight on BOTH fields and report
+-- the two readings side by side.  LOAD-BEARING on the width axis, and
+-- it is the axis that could have gone either way: the size crossing
+-- is already known.
+--
+-- IT DOES NOT MOVE.  Over a flat payload the head reads (21, 16) and
+-- the arrival (25, 16); over a payload that is itself pending, (22, 2)
+-- against (27, 2).  The step function names its payload twice in both,
+-- so the doubling is there in the size and simply absent from the
+-- width -- a duplicated reference is a second mention of the SAME
+-- pending observable, and the frame measure counts observables and not
+-- mentions.  So the crossing is confined to the one axis a stepped cap
+-- prices, and the invariant that reads the node table's widths has no
+-- reason to leave the entry cap.
+dupFn : Fn Γ₂ [] [] [] (obs natᵗ) (obs natᵗ)
+dupFn = strmᵗ (mergeAllᵉ nothing
+                 (ofᵉ (varᵗ (here refl) ∷ varᵗ (here refl) ∷ [])))
+
+flatV : Val Γ₂ (obs natᵗ)
+flatV = ofᵉ (nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷
+             nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ nat̂ 0 ∷ [])
+
+-- and the same shape over a payload that is itself PENDING, so the
+-- width axis has something to double
+nestV : Val Γ₂ (obs natᵗ)
+nestV = deepV 2
+
+dupBody : Val Γ₂ (obs natᵗ) → Closed Γ₂ (obs natᵗ)
+dupBody v = mapᵉ dupFn (ofᵉ (strmᵗ v ∷ []))
+
+dupHead : Val Γ₂ (obs natᵗ) → Closed Γ₂ natᵗ
+dupHead v = mergeAllᵉ nothing (dupBody v)
+
+resD : (v : Val Γ₂ (obs natᵗ)) →
+  Stream Γ₂ (obs natᵗ) × Sched Γ₂ × EvalSt (dupHead v)
+resD v =
+  subscribeE gasBig (dupBody v)
+    (thru-outer mergeAllᵒ (proj₁ (mintNode (sched-init (dupHead v) slots))) ↠ root) 0 0
+    (proj₂ (mintNode (sched-init (dupHead v) slots)))
+    (installNode (proj₁ (mintNode (sched-init (dupHead v) slots)))
+       (mergeAll-st {t = natᵗ} nothing 0 [] false)
+       (st-init (dupHead v)))
+
+vals : Stream Γ₂ (obs natᵗ) → List (Val Γ₂ (obs natᵗ))
+vals [] = []
+vals (em ∷ ems) =
+  proj₁ (splitEvents {A = Val Γ₂ natᵗ} (InstEmit.events em)) ++ vals ems
+
+-- the head's own two readings, then the arrivals' -- LOAD-BEARING on
+-- the width axis, which is the one that could have gone either way
+axesFlat : (ℕ × ℕ) × List ℕ × List ℕ
+axesFlat =
+  (syncSizeᵛ (obs natᵗ) (dupHead flatV) , pWᵛ 2 slots (obs natᵗ) (dupHead flatV))
+  , map (syncSizeᵛ (obs natᵗ)) (vals (proj₁ (resD flatV)))
+  , map (pWᵛ 2 slots (obs natᵗ)) (vals (proj₁ (resD flatV)))
+
+axesNest : (ℕ × ℕ) × List ℕ × List ℕ
+axesNest =
+  (syncSizeᵛ (obs natᵗ) (dupHead nestV) , pWᵛ 2 slots (obs natᵗ) (dupHead nestV))
+  , map (syncSizeᵛ (obs natᵗ)) (vals (proj₁ (resD nestV)))
+  , map (pWᵛ 2 slots (obs natᵗ)) (vals (proj₁ (resD nestV)))
+
+axesFlat≡ : axesFlat ≡ ((21 , 16) , 25 ∷ [] , 16 ∷ [])
+axesFlat≡ = refl
+
+axesNest≡ : axesNest ≡ ((22 , 2) , 27 ∷ [] , 2 ∷ [])
+axesNest≡ = refl

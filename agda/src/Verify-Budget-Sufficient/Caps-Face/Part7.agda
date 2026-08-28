@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Caps using
    capsAt-⊑-suc; capsH; cDel; _⊑ᶜ_;
    cDel-body; dWalkᶜ-mono; frameStep; frameStep-0; frameStep-mono-j; frameStep-reg-mono;
    iterFold-infl; iterFold-mono-count; iterSize-mono-count; lvls-mono;
-   sizeCount; sizeCount-body)
+   size≤sizeCount; sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
   (n<2^n; pathLen; reach-reset; ∧-true)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -1499,7 +1499,7 @@ chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   let r = chainStep id a path sched st in
   Σ ℕ λ j →
   let c′ = frameStep j c in
-  (j ≤ sizeCount c d)
+  (j ≤ sizeCount c d ⊔ Caps.cSize c)
   × (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
     ≤ nestFac (Caps.cSize c′) W ^ deliverLen n c path
       * (deliverNestF n c path ^ W
@@ -1582,7 +1582,7 @@ cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   let r = cascadeGo a nextId chains sched st in
   Σ ℕ λ j →
   let cp′ = frameStep j cp in
-  (j ≤ sizeCount cp d)
+  (j ≤ sizeCount cp d ⊔ Caps.cSize cp)
   × (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes (proj₂ (proj₂ r)))
     ≤ nestFac (Caps.cSize cp′) W ^ chainsDelLen n cp chains
       * (chainsDelNestF n cp chains ^ W
@@ -1846,7 +1846,10 @@ cascadeGo-nest-nodes {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hn
   lift-⊑ = subst (λ x → frameStep (proj₁ CH) (capsAt e sl id) ⊑ᶜ x)
                  (sym (capsAt-suc-full e sl id))
                  (frameStep-mono-j (capsAt e sl id) (2≤capsAt-size e sl id)
-                                   (proj₁ (proj₂ CH)))
+                                   (≤-trans (proj₁ (proj₂ CH))
+                                      (⊔-lub ≤-refl
+                                         (size≤sizeCount (capsAt e sl id) (capsH e sl id)
+                                            (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)))))
 
   lift = *-mono-≤ (^-monoˡ-≤ (chainsDelLen n (capsAt e sl id) chains)
                      (nestFac-monoS (proj₁ lift-⊑) (nestBurstAt e sl id)))

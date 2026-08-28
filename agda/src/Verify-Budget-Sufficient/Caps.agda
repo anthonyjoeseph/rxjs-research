@@ -502,10 +502,44 @@ iterSize-infl S hS zero    s = ≤-refl
 iterSize-infl S hS (suc k) s =
   ≤-trans (sizeStep-infl S s hS) (iterSize-infl S hS k (sizeStep S s))
 
+-- THE SIZE AXIS STEPPED ALONE, AND THE WIDTH LEFT EXACTLY WHERE IT
+-- WAS -- the cap a descent's ARRIVALS are read at.  An arrival is the
+-- head's syntax with payloads substituted in, so it crosses the size
+-- field; the level it crosses by is bounded by the head's own written
+-- size, which is what pins the count here rather than an existential.
+--
+-- The width field does NOT move, and that is measured rather than
+-- assumed: a step function naming its payload twice mentions ONE
+-- pending observable twice, and the frame measure counts observables.
+-- Leaving it alone is what keeps the blast radius at nothing.  The
+-- state invariant this face preserves reads the width field and no
+-- size at all, so at this cap it REDUCES to the same proposition it
+-- was at the entry cap -- the whole burst walk can therefore run one
+-- cap up while its conclusion is still the one the parent asked for,
+-- with no transport anywhere.
+--
+-- AND IT IS DELIBERATELY NOT SEALED, against the standing rule that a
+-- cap named in a premise is worse than a body.  That reduction is the
+-- whole design: it holds because the projection meets a `caps`
+-- constructor, so sealing this would turn an identity the checker sees
+-- for free into a transport at every site of the burst walk.  What the
+-- rule is really about -- a body reaching the caps recurrence -- is
+-- paid by `frameStep`, which is transparent already and appears in
+-- these types either way; this adds one application of it.
+arrCap : Caps → Caps
+arrCap c =
+  caps (Caps.cSize (frameStep (Caps.cSize c) c)) (Caps.cWid c) (Caps.cReg c)
+
 iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
   iterSize S j s ≤ iterSize S j′ s
 iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s
 iterSize-mono-count S s hS           (s≤s le)  = iterSize-mono-count S (sizeStep S s) hS le
+
+-- and the one fact its consumers spend: the entry cap's size fits
+-- inside it, so every size-keyed premise transports up unchanged
+arrCap-size : ∀ (c : Caps) → 1 ≤ Caps.cSize c →
+  Caps.cSize c ≤ Caps.cSize (arrCap c)
+arrCap-size c hS = iterSize-infl (Caps.cSize c) hS (Caps.cSize c) (Caps.cSize c)
 
 -- WIDTH: foldStep is inflationary for S ≥ 2 (w < 2^w ≤ 2^(1+w) ≤ S^(1+w))
 foldStep-infl : ∀ (S w : ℕ) → 2 ≤ S → w ≤ foldStep S w
@@ -1528,6 +1562,25 @@ exp≤dLvl S W d J 2≤S =
   ≤-trans (exp≤sizeAt S J 2≤S)
   (≤-trans (≤-trans (n≤1+n (sizeAt S J)) (m≤n+m (suc (sizeAt S J)) J))
            (J+n≤iterL S W d (suc (sizeAt S J)) J))
+
+-- AND THE COUNT DOMINATES THE SIZE FIELD ITSELF, which is what lets a
+-- descent's own written size be spent as a LEVEL.  One delivery's
+-- ladder starts at `sizeAt S 0`, and that IS `S`; `iterL` never goes
+-- down, and one registration is enough to reach the first delivery --
+-- so the entry cap's size is already inside the count, at every depth.
+size≤sizeCount : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cSize c ≤ sizeCount c d
+size≤sizeCount c d 2≤S 1≤R =
+  ≤-trans (≤-trans (≤-trans (n≤1+n (Caps.cSize c))
+                            (J+n≤iterL (Caps.cSize c) (Caps.cWid c) d
+                               (suc (sizeAt (Caps.cSize c) 0)) 0))
+                   (lvls-mono 1 (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl 1≤D))
+          (≤-reflexive (sym (sizeCount-body c d)))
+  where
+  1≤D : 1 ≤ cDel c d
+  1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
+                         (Caps.cSize c) 0 1≤R)
+                (≤-reflexive (sym (cDel-body c d)))
 
 -- THE COUNT BUYS A TOWER, one story per level step -- the level ladder
 -- read as growth rather than as a linear advance.

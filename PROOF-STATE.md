@@ -204,16 +204,16 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **the `*All` arm's premise does not survive a substitution** —
-  `pushVals-caps-adm`, `pushVals-caps-wid`, then `pushVals-nest`,
-  `pushVals-caps-burstW`, `pushVals-caps-queue`, `thruFit-arr-merge`,
-  `thruFit-arr-switch`, `thruFit-arr-exhaust`. One refuted premise read at one
-  flat cap, and every row keys on it, so the restatement moves all of them at
-  once. Three cap-free devices are closed in the leaves' headers, all at one
-  place: the merge step spends the arrival's closure size AS the grant's
-  exponent. What survives is the caps face's own shape — a LEVEL, existential
-  in the conclusion, so a parent picks the level its child reports instead of
-  owing a fixed one. The leg is that restatement of the shared statement; the
-  twin is the caps face's frame lemmas, which are proven and do exactly it.
+  `pushVals-nest`, `pushVals-caps-burstW`, `pushVals-caps-queue`,
+  `pushVals-caps-adm`, `pushVals-caps-wid`, `thruFit-arr-merge`,
+  `thruFit-arr-switch`, `thruFit-arr-exhaust`. The restatement is landed: the
+  arrivals are read one caps level up, the level the refuting map crosses by,
+  and the arm reports it joined with the child's. It cost almost nothing
+  because the crossing is measured to be confined to the SIZE axis — a step
+  function naming its payload twice mentions ONE observable twice, and the
+  frame measure counts observables — so the state invariant, which reads the
+  width field alone, is the same proposition at both caps and no transport
+  exists anywhere. What is left is the leaves themselves, at the new cap.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
@@ -236,10 +236,10 @@ does not fit is a finding about the shared statement, not about the head.
   cascade descent against the instant's own grant. Nothing instantiates it —
   both sealed families sit on the right — and the store-mediated route it
   replaced is circular; the header carries the cycle.
-- **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — SHAPE,
-  `REFUTED×2, DEAD ROUTE×3, PROBED×2`: the arrivals read at the flat cap,
-  refuted at a map naming its payload twice; the restatement owed is the arm's
-  missing level, not a premise on either leaf.
+- **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED×2, DEAD ROUTE×3, PROBED×2`: the arrivals now read one caps level up,
+  the level the refuting map crosses by; the width field does not move, so the
+  state invariant is the same proposition at both caps.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
