@@ -210,10 +210,11 @@ does not fit is a finding about the shared statement, not about the head.
   REFUTED: an arrival is the head's syntax with the payload substituted in, so
   a step function naming its payload twice outgrows the flat cap every premise
   reads. The arm SUBSCRIBES such an arrival through the walk's own re-entry, so
-  what fails is the premise surviving the arm; the caps face's level and an
-  intrinsic emit measure are the two devices that would. Every row beside them
-  keys on the same written size, so the restatement moves all of them, and
-  grinding any of them first bets on the key.
+  what fails is the premise surviving the arm. A ceiling of the walk's own is
+  now DEAD — the delivery currency prices a level at a square and no closure of
+  the cap under substitution fits inside one — which leaves the caps face's
+  LEVEL, the device that currency already prices. Every row beside them keys on
+  the same written size, so the restatement moves all of them.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `evalWith-nest-sync`. The preamble already says these are one statement and
   not one per head; the leg is that fact scheduled. The slot head fell to it
@@ -231,9 +232,9 @@ does not fit is a finding about the shared statement, not about the head.
 ### The ledger
 
 - **`pushVals-caps-adm`, `pushVals-caps-wid`** (Nest-Walk) — SHAPE,
-  `REFUTED×2, PROBED×2`: the arrivals read at the flat cap, refuted at a map
-  naming its payload twice; the restatement owed is the arm's missing level,
-  not a premise on either leaf.
+  `REFUTED×2, DEAD ROUTE, PROBED×2`: the arrivals read at the flat cap, refuted
+  at a map naming its payload twice; the restatement owed is the arm's missing
+  level, not a premise on either leaf.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

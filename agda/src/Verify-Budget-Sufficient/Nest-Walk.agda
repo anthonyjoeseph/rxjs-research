@@ -3891,21 +3891,19 @@ postulate
   -- invariant is untouched either way -- it reads the WIDTH field over
   -- the node table and no size at all -- so what is owed is the arm's
   -- premise and not its state chain.
-  --
-  -- AND WHERE THE PREMISE IS SPENT NAMES A THIRD DEVICE, CHEAPER THAN
-  -- EITHER.  It is spent FLATTENING THE DESCENT AT THE CAP: the grant
-  -- is exponential in the descent's own size, and the frame layer above
-  -- it carries one factor that is a function of the CAPS ALONE, which
-  -- is what lets the walk state itself over an opaque summand instead
-  -- of re-deriving a count per arm.  Flattening at the cap is what a
-  -- substituting arrival breaks.  But an arrival's size is bounded by a
-  -- function of the cap and nothing else -- one substitution is the
-  -- caps face's own size step, and a descent composes at most the
-  -- head's size of them -- so flattening at the cap CLOSED UNDER A
-  -- DESCENT'S WORTH OF SUBSTITUTIONS keeps the frame layer's property
-  -- and costs only a bigger constant, in arithmetic the caps face has
-  -- already proven.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
+  -- DEAD ROUTE: flattening at a cap CLOSED UNDER a descent's worth of
+  --   substitutions is structurally dead, and not for want of
+  --   arithmetic.  The walk's flattened grant is handed to the delivery
+  --   currency, which prices a level at a SQUARE of the cap and is
+  --   closed under the fan recurrence and nothing wider, while one step
+  --   of the caps face's size function iterates a multiply once per
+  --   unit of cap -- so no closure of the cap under substitution fits
+  --   inside it.  Minting a currency here is the part that is dead; the
+  --   two devices above are untouched, and of them the LEVEL is the one
+  --   the delivery currency already prices, since its ladder is per
+  --   level.  `subscribeE-nest-slot` carries the worked threading and a
+  --   pointer to the algebra.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   pushVals-caps-adm : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
