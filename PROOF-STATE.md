@@ -204,7 +204,7 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **the `*All` arm's premise does not survive a substitution** —
-  `pushVals-nest`, `pushVals-caps-burstW`, `pushVals-caps-queue`,
+  `pushVals-nest-burst`, `pushVals-caps-burstW`, `pushVals-caps-queue`,
   `pushVals-caps-adm`, `pushVals-caps-wid`, `thruFit-arr-merge`,
   `thruFit-arr-switch`, `thruFit-arr-exhaust`. The restatement is landed: the
   arrivals are read one caps level up, the level the refuting map crosses by,
@@ -257,11 +257,10 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED×2, PROBED×2`: the other two stream leaves — the walk over them is a
   proven body, so what remains per instant is the frame widths and the queue
   reading the invariant cannot supply.
-- **`pushVals-nest`** (Nest-Walk) — DIFFICULTY,
+- **`pushVals-nest-burst`** (Nest-Walk) — DIFFICULTY,
   `DEAD ROUTE×2, PROBED, RECOVERY`: one statement over the op for the outer's
-  burst inside the grant, emit by emit, at the BODY's key. This is where the
-  burst statement's risk is; the body key and the rate that survives the frame
-  are both taken.
+  whole burst inside the grant, at the BODY's key — the emit-by-emit walk off
+  it is a proven body. This is where the burst statement's risk is.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and

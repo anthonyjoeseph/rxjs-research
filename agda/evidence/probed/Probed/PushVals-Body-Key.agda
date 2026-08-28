@@ -38,7 +38,13 @@
 -- factor is a power -- and a duplication rate that DOES survive a
 -- frame is the region still open.
 --
--- TARGET: pushVals-nest @c45c4e
+-- AND THE ROWS READ A LARGER LEFT SIDE THAN THE TARGET'S, deliberately:
+-- the target bounds the burst column alone, while `lhsM` joins it with
+-- the store's node maximum.  Every fit below is therefore a fit the
+-- target has slack under, so nothing here is green on the target's
+-- account and red on its own.
+--
+-- TARGET: pushVals-nest-burst @c90867
 -- ══════════════════════════════════════════════════════════════════
 module Probed.PushVals-Body-Key where
 

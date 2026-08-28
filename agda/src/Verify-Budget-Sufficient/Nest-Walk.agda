@@ -1810,6 +1810,15 @@ splitBurst-plumb []         = refl
 splitBurst-plumb (em ∷ ems) =
   cong (proj₁ (splitEvents (InstEmit.events em)) ++_) (splitBurst-plumb ems)
 
+-- AND A WHOLE BURST INHERITS THAT, one emit's value column at a time
+-- -- which is what lets a bound taken by one face be read by another
+-- that picked a different bookkeeping type for the same subscription.
+splitBurst-vals-A : ∀ {n} {Γ : Ctx n} {u} {A B : Set} (str : Stream Γ u) →
+  proj₁ (splitBurst {A = A} str) ≡ proj₁ (splitBurst {A = B} str)
+splitBurst-vals-A []         = refl
+splitBurst-vals-A (em ∷ ems) =
+  cong₂ _++_ (splitEvents-vals-A (InstEmit.events em)) (splitBurst-vals-A ems)
+
 -- WHAT A SUBSCRIBE OWES, AS ONE NAME OVER ITS WHOLE RESULT.  The walk's
 -- three conjuncts are read off one triple, and an arm that EXITS two
 -- ways has to state them twice; naming them once is what lets the two
@@ -4142,9 +4151,14 @@ postulate
          (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
   -- THE `*All` BURST LEAF, MEASURE HALF -- and this is where the risk
   -- of the burst statement is, the bundle beside it being routine.
-  -- What it carries is one inequality per emit: the joined nesting of
-  -- the values the descent hands back is already inside the head's
-  -- grant, read at the BODY's key rather than the assembled head's.
+  -- What it carries is ONE inequality over the whole subscription: the
+  -- joined nesting of every value the descent hands back is already
+  -- inside the head's grant, read at the BODY's key rather than the
+  -- assembled head's.  The emit-by-emit obligation the heads actually
+  -- consume follows from it by a proven walk -- each conjunct reads
+  -- one emit's value column and nothing threaded, while the whole
+  -- column is that emit's concatenated with the rest -- so what is
+  -- left here is the substitution question and none of the plumbing.
   -- It is stated over `subscribeE`'s own output rather than any bound
   -- of it because an admitted inner's cost has to come back bounded
   -- through the KEY, which is the strengthened conclusion the ring's
@@ -4248,7 +4262,7 @@ postulate
   --   not even subscribe what the statement subscribes: it runs the
   --   WRAP under a frame where the leaf runs the wrap's BODY.  What is
   --   worth recovering is the harness, not the verdicts.
-  pushVals-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  pushVals-nest-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -4259,8 +4273,56 @@ postulate
     let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
             id now (proj₂ (mintNode sched))
             (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    in pushValsNestOK c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
-         (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    in nestDᵛˢ (proj₁ (splitBurst {A = Val Γ t} (proj₁ res)))
+         ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ b)
+
+-- ONE BOUND ON THE WHOLE COLUMN DISCHARGES EVERY EMIT'S CONJUNCT.  The
+-- obligation's threaded state is carried and never read: each conjunct
+-- names its own emit's values and the grant, both independent of where
+-- the walk has got to, so the induction spends only the two injections
+-- of a fold of maxima into a concatenation.
+pushVals-nest-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W m : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  nestDᵛˢ (proj₁ (splitBurst {A = Val Γ u} str))
+    ≤ nestB (Caps.cSize c) W (nestUnit e sl) B m →
+  pushValsNestOK c sl B W m fuel op nid κ id now str sched st
+pushVals-nest-ems c sl B W m fuel op nid κ id now []         sched st hb = tt
+pushVals-nest-ems {Γ = Γ} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sched st hb =
+    ≤-trans (nestDᵛˢ-++ˡ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+                         (proj₁ (splitBurst {A = Val Γ u} ems)))
+            hb
+  , pushVals-nest-ems c sl B W m fuel op nid κ id now ems _ _
+      (≤-trans (nestDᵛˢ-++ʳ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+                            (proj₁ (splitBurst {A = Val Γ u} ems)))
+               hb)
+
+pushVals-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
+  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+  nestDᵉ (allWrap op lim b) ≤ B →
+  descW g (allWrap op lim b) κ id now sched st ≤ W →
+  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+  in pushValsNestOK c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
+       (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+pushVals-nest {Γ = Γ} {t = t} {e = e} {u = u} c sl B W g op lim b κ id now sched st hsl hc hv hb hw =
+  pushVals-nest-ems c sl B W (syncSizeᵉ b) g op (proj₁ (mintNode sched)) κ id now
+    (proj₁ res) (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
+    (subst (λ z → nestDᵛˢ z ≤ nestB (Caps.cSize c) W (nestUnit e sl) B (syncSizeᵉ b))
+           (splitBurst-vals-A {A = Val Γ t} {B = Val Γ u} (proj₁ res))
+           (pushVals-nest-burst c sl B W g op lim b κ id now sched st hsl hc hv hb hw))
+  where
+  res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+          id now (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+
+
 -- THE PAIR RIDES AN `if` THE WAY THE NEST BOUND DOES, and for the same
 -- reason: the connect's two exits differ only in bookkeeping the
 -- invariant never reads, so one proof serves both branches once the
