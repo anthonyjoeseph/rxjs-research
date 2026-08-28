@@ -100,3 +100,5 @@ open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width
   using (StmtW; progW; defer-park-width-absurd)
+open import Refuted.Thru-Room-Frame
+  using (Stmt; prems≡; room-absurd; figs≡)

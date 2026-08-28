@@ -203,14 +203,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the `thru` frame's fit, and the burst underneath it** — `thruRoom-frame`,
+- **the `thru` frame's fit, and the burst underneath it** —
   `pushVals-nest`, `pushVals-caps-adm`, `pushVals-caps-room`,
   `thruFit-arr-merge`, `thruFit-arr-switch`, `thruFit-arr-exhaust`. One unit
   because they are one currency argument seen from four places: the wrap's
   grant, the burst inside it, the admissibility per instant, and the arr key
-  that the cap-keyed route does not transport to. The tier's only FALSITY is
-  here, and its neighbours all key on written size, so a restatement of the fit
-  moves every one of them. Grinding any of the others first bets on the key.
+  that the cap-keyed route does not transport to. The frame's own fit and its
+  room are now checked bodies, so what is left is the burst under them — and
+  they all key on written size, so a restatement of one moves every one of the
+  others. Grinding any of them first bets on the key.
 - **the `NestAt` heads** — `subscribeE-nest-arr-scan`, `subscribeE-nest-scan`,
   `subscribeE-nest-slot`, `evalWith-nest-sync`. The preamble already says these
   are one statement and not one per head; the leg is that fact scheduled. The
@@ -227,10 +228,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`thruRoom-frame`** (Nest-Walk) — FALSITY, `NO EVIDENCE`: the frame's room,
-  caps half only — the width half now comes off the burst record. Nothing has
-  instantiated it, and one cap is asked to serve a walk whose own preservation
-  lands at a stepped one.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider
