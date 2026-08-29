@@ -16,38 +16,33 @@
 
 module Verify-Budget-Sufficient.Deliver-Measure where
 
-open import Data.Bool using (Bool; true; false; _∧_)
+open import Data.Bool using (Bool; true; _∧_)
 open import Data.Bool.ListAction using (all)
-open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; length; foldr)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤m+n; m≤n+m; m≤n⇒m≤1+n; +-assoc; +-comm;
-  +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; m^n>0; ⊔-lub; m≤m⊔n; m≤n⊔m;
+  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⇒m≤1+n; +-assoc; +-comm; +-mono-≤;
+  +-monoʳ-≤; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; m^n>0; ⊔-lub; m≤m⊔n; m≤n⊔m;
   ^-distribˡ-+-*)
 open import Data.Product using (_×_; _,_; proj₂)
-open import Data.Vec using (lookup)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; cong₂)
-open import Relation.Nullary using (yes; no)
 
 open import Rx.Exp using
-  (Ctx; Exp; Tm; sizeᵉ; sizeᵗ; sizeᵗˢ; _≟ᵗ_;
-   input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
-   varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
+  (Ctx; Exp; Tm; sizeᵉ; sizeᵗ; sizeᵗˢ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ;
+  inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵗˢ)
-open import Rx.Prim using (Source)
 open import Rx.Evaluator using
-  (Frame; map-f; scan-f; take-f; from-inner; thru-outer;
-   Path; root; share-sink; _↠_; RegId; Chain; shareAdmit; sameSource)
+  (Frame; map-f; scan-f; take-f; from-inner; thru-outer; Path; root; share-sink; _↠_; RegId)
 open import Verify-Budget-Sufficient.Caps using (Caps)
 open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?; regsSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; frameSzD; pathSzSum; pathNestF; frameNestF; 1≤frameNestF; frameNestF≡;
    chainsNestD; chainsNestF; chainsSzSum)
-open import Decide using (T-to; ∧-intro)
+open import Decide using (T-to)
 
 -- EVERY NEST DEPTH IS UNDER A SIZE, over the whole term language at
 -- once.  The mutuality is the language's: a term may carry a stream and
@@ -226,32 +221,14 @@ deliverNestD-path g c (take-f _ ↠ p)         = deliverNestD-path g c p
 deliverNestD-path g c (from-inner _ _ _ ↠ p) = deliverNestD-path g c p
 deliverNestD-path g c (thru-outer _ _ ↠ p)   = s≤s (deliverNestD-path g c p)
 
--- what a share hands each admitted chain: the admitted list is a
--- sublist of the registry, so it inherits the registry's caps facts —
--- its length bound and every path's `pathSz?` receipt
+-- what a share hands each admitted chain.  The admitted list is a
+-- sublist of the registry, so the two facts the sink's nodes bound
+-- needs of it -- a length under the registry cap and a `pathSz?`
+-- receipt per path -- are inherited rather than proven here: they are
+-- conjuncts of the walk predicate, because the state the sink is
+-- reached at is not the state the cap was read at.
 admSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → List (RegId × Path Γ s t) → Bool
 admSz? B = all (λ en → pathSz? B (proj₂ en))
-
-shareAdmit-len : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
-  (rs : List (RegId × Source × Chain Γ t)) →
-  length (shareAdmit i rs) ≤ length rs
-shareAdmit-len i [] = z≤n
-shareAdmit-len {Γ = Γ} i ((rid , s , (u , p)) ∷ r)
-  with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
-... | false | _        = ≤-trans (shareAdmit-len i r) (n≤1+n (length r))
-... | true  | no _     = ≤-trans (shareAdmit-len i r) (n≤1+n (length r))
-... | true  | yes refl = s≤s (shareAdmit-len i r)
-
-shareAdmit-sz : ∀ {n} {Γ : Ctx n} {t} (i : Fin n) (B : ℕ)
-  (rs : List (RegId × Source × Chain Γ t)) →
-  regsSz? B rs ≡ true → admSz? B (shareAdmit i rs) ≡ true
-shareAdmit-sz i B [] h = refl
-shareAdmit-sz {Γ = Γ} i B ((rid , s , (u , p)) ∷ r) h
-  with sameSource (toℕ i) s | u ≟ᵗ lookup Γ i
-     | ∧-true (pathSz? B p) (regsSz? B r) h
-... | false | _        | _ , hr  = shareAdmit-sz i B r hr
-... | true  | no _     | _ , hr  = shareAdmit-sz i B r hr
-... | true  | yes refl | hp , hr = ∧-intro hp (shareAdmit-sz i B r hr)
 
 -- and the same measures aggregated over a cascade's chain list,
 -- mirroring the path aggregates its fold spends: lengths and depths

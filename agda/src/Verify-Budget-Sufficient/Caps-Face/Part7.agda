@@ -1362,7 +1362,7 @@ chainStep-nodes {n = n} {e = e} c d W sl id a path sched st hsl 1≤W 1≤S hb h
          (arrTick a) (arrSource a) path (arrVal a ∷ [])
          (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
          (Arrival.isLast a) sched st hsl 1≤W 1≤S hb hc hdp
-         (pathSz?-lvl c 0 path (FaceOK.fSize faceHere) hpz)
+         (pathSz?-lvl c 0 path (FaceOK.fSize faceHere) hpz) z≤n
   c′ = frameStep (proj₁ FP) c
   V = nestDᵛ (arrTy a) (arrVal a)
   U = suc (deliverLen n c path) * nestU (delSq n c′) (nestUnit e sl)

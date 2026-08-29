@@ -74,9 +74,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   pow-distrib-*; slotNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; delSq-mono; delSq-monoᶜ; cSize≤delSq; fanLen-zero; fanSq-zero; fanLen-suc; fanSq-suc)
 open import Verify-Budget-Sufficient.Deliver-Measure using
-  (deliverLen; deliverNestF; deliverNestD; admSz?; shareAdmit-len; shareAdmit-sz;
-   deliverLen-path; deliverSzSum-path; deliverNestD-path; deliverNestF≡;
-   pathSzSum-cap; pathNestD-len)
+  (deliverLen; deliverNestF; deliverNestD; admSz?; deliverLen-path; deliverSzSum-path;
+  deliverNestD-path; deliverNestF≡; pathSzSum-cap; pathNestD-len)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest; applyFn-nest-sync; evalTm-nest-sync; nestD-unfoldμ)
   renaming (pow-grow to pow-grow-both)
 open import Verify-Budget-Sufficient.Nest-Cap using
@@ -6661,16 +6660,17 @@ abstract
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
     ⦃ _ : FaceOK c sl ⦄ →
     Sched.slots sched ≡ sl →
-    1 ≤ W → length vals ≤ W → capsOK? c sched st ≡ true →
-    all (valCaps? c sl s) vals ≡ true →
-    slotsSize sl ≤ Caps.cSize c →
-    frameClosOK c sl f vals →
+    1 ≤ W → length vals ≤ W → capsOK? (frameStep Lv c) sched st ≡ true →
+    all (valCaps? (frameStep Lv c) sl s) vals ≡ true →
+    slotsSize sl ≤ Caps.cSize (frameStep Lv c) →
+    frameClosOK (frameStep Lv c) sl f vals →
     frameDrainOK c sl d Lv sf id now f p vals sched st →
     frameDrainW W sf id now f p vals sched st →
     1 ≤ Caps.cSize c →
     depthFrame sf id now f p vals fin sched st ≤ d →
-    pathSz? (Caps.cSize c) p ≡ true →
-    suc (pathLen p) ≤ Caps.cSize c →
+    pathSz? (Caps.cSize (frameStep Lv c)) p ≡ true →
+    suc (pathLen p) ≤ Caps.cSize (frameStep Lv c) →
+    Lv ≤ sizeCount c d ⊔ Caps.cSize c →
     let r = stepFrame sf id now f p vals fin sched st in
     length (proj₁ r) ≤ W →
     Σ ℕ λ j →
@@ -6680,7 +6680,7 @@ abstract
          ≤ nestFac S′ W
            * (frameNestF f ^ W * ((nodesMax st ⊔ nestDᵛˢ vals) + W * frameNestD f)
               + nestU S′ (nestUnit e sl)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (map-f fn) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hlv hw =
     0 , z≤n ,
     ≤-trans (⊔-lub (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _)) up)
           (≤-trans (mapVals-nest fn vals)
@@ -6695,32 +6695,32 @@ abstract
     up : X ≤ (2 ^ sizeᵗ fn) ^ W * X
     up = ≤-trans (≤-reflexive (sym (*-identityˡ X)))
                  (*-monoˡ-≤ X (1≤pow≤ (2 ^ sizeᵗ fn) W (1≤frameNestF (map-f fn))))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (scan-f fn nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hlv hw =
     0 , z≤n ,
     ≤-trans (stepFrame-nodes-scan W sf id now fn nid p vals fin sched st hlen)
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (take-f nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hlv hw =
     0 , z≤n ,
     ≤-trans (≤-trans (stepFrame-nodes-take sf id now nid p vals fin sched st)
                      (zero-charge W _))
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hw =
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hlv hw =
     let INNER = stepFrame-nodes-inner c d sl W Lv sf id now op allNid inst p vals fin sched st
-                  hsl hfd hfw hdp
-                  (pathSz?-lvl c Lv p (FaceOK.fSize faceHere) hpk)
-                  (≤-trans hpl (proj₁ (c⊑step c Lv (FaceOK.fSize faceHere))))
+                  hsl hfd hfw hdp hpk hpl
         S′ = Caps.cSize (frameStep (proj₁ INNER) c) in
     proj₁ INNER
     , proj₁ (proj₂ INNER)
     , ≤-trans (proj₂ (proj₂ INNER))
             (*-monoʳ-≤ (nestFac S′ W)
               (+-monoˡ-≤ (nestU S′ (nestUnit e sl)) (zero-charge W _)))
-  stepFrame-nodes {e = e} c d W sl Lv sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hw =
-    0 , z≤n ,
-    ≤-trans (stepFrame-nodes-thru c W sl sf id now op nid p vals fin sched st
-               hsl 1≤W hlen hc hv hss hfc h1S hpk hpl hfw hw)
-            (*-monoʳ-≤ (nestFac (Caps.cSize c) W)
-              (+-monoˡ-≤ (nestU (Caps.cSize c) (nestUnit e sl))
+  stepFrame-nodes {e = e} c d W sl Lv sf id now (thru-outer op nid) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hlv hw =
+    Lv , hlv ,
+    ≤-trans (stepFrame-nodes-thru (frameStep Lv c) W sl sf id now op nid p vals fin sched st
+               ⦃ face⊑ c (frameStep Lv c) sl (c⊑step c Lv (FaceOK.fSize faceHere)) faceHere ⦄
+               hsl 1≤W hlen hc hv hss hfc
+               (≤-trans h1S (proj₁ (c⊑step c Lv (FaceOK.fSize faceHere)))) hpk hpl hfw hw)
+            (*-monoʳ-≤ (nestFac (Caps.cSize (frameStep Lv c)) W)
+              (+-monoˡ-≤ (nestU (Caps.cSize (frameStep Lv c)) (nestUnit e sl))
                 (≤-trans (m≤m+n (nodesMax st ⊔ nestDᵛˢ vals) (W * 1))
                          (one-pow W ((nodesMax st ⊔ nestDᵛˢ vals) + W * 1)))))
 
@@ -6842,20 +6842,23 @@ mutual
   capsWalkOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
     (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
-  capsWalkOK c sl d Lv sf gas id now root           vals fin sched st = capsOK? c sched st ≡ true
+  capsWalkOK c sl d Lv sf gas id now root           vals fin sched st =
+    capsOK? (frameStep Lv c) sched st ≡ true
   capsWalkOK c sl d Lv sf gas id now (share-sink i) vals fin sched st =
-    (capsOK? c sched st ≡ true)
+    (capsOK? (frameStep Lv c) sched st ≡ true)
     × dispatchCapsOK c sl d Lv sf gas id now i vals fin sched st
   capsWalkOK {u = u} c sl d Lv sf gas id now (f ↠ p) vals fin sched st =
-    (capsOK? c sched st ≡ true)
-    × (all (valCaps? c sl u) vals ≡ true)
+    (capsOK? (frameStep Lv c) sched st ≡ true)
+    × (all (valCaps? (frameStep Lv c) sl u) vals ≡ true)
     × (slotsSize sl ≤ Caps.cSize c)
-    × frameClosOK c sl f vals
+    × frameClosOK (frameStep Lv c) sl f vals
     × frameDrainOK c sl d Lv sf id now f p vals sched st
-    × capsWalkOK c sl d Lv sf gas id now p (proj₁ step)
-        (proj₁ (proj₂ (proj₂ step)))
-        (proj₁ (proj₂ (proj₂ (proj₂ step))))
-        (proj₂ (proj₂ (proj₂ (proj₂ step))))
+    × (Σ ℕ λ L′ →
+        (Lv + L′ ≤ sizeCount c d ⊔ Caps.cSize c)
+        × capsWalkOK c sl d (Lv + L′) sf gas id now p (proj₁ step)
+            (proj₁ (proj₂ (proj₂ step)))
+            (proj₁ (proj₂ (proj₂ (proj₂ step))))
+            (proj₂ (proj₂ (proj₂ (proj₂ step)))))
     where step = stepFrame sf id now f p vals fin sched st
 
   dispatchCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -6864,8 +6867,10 @@ mutual
     (sched : Sched Γ) (st : EvalSt e) → Set
   dispatchCapsOK c sl d Lv sf zero      id now i vals fin sched st = ⊤
   dispatchCapsOK c sl d Lv sf (suc gas) id now i vals fin sched st =
-    shareCapsOK c sl d Lv sf gas id now i vals fin
-      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
+    (admSz? (Caps.cSize c) (shareAdmit i (EvalSt.registry st)) ≡ true)
+    × (length (shareAdmit i (EvalSt.registry st)) ≤ Caps.cReg c)
+    × shareCapsOK c sl d Lv sf gas id now i vals fin
+        (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
 
   shareCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
@@ -6878,7 +6883,9 @@ mutual
     then shareCapsOK c sl d Lv sf gas id now i vals fin ps sched st
     else (capsWalkOK c sl d Lv sf gas id now p vals fin sched
             (record st { delivered = rid ∷ EvalSt.delivered st })
-          × shareCapsOK c sl d Lv sf gas id now i vals fin ps
+          × Σ ℕ λ L′ →
+            (Lv + L′ ≤ sizeCount c d ⊔ Caps.cSize c)
+          × shareCapsOK c sl d (Lv + L′) sf gas id now i vals fin ps
               (proj₁ (proj₂ (foldPath sf gas id now (toℕ i) p vals
                        (if fin then close (toℕ i) exhausted ∷ [] else [])
                        fin sched (record st { delivered = rid ∷ EvalSt.delivered st }))))
@@ -7107,6 +7114,7 @@ shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     shareBurstsOK W sf gas id now i vals fin ps sched st →
     shareCapsOK c sl d Lv sf gas id now i vals fin ps sched st →
     depthShareGo sf gas id now i vals fin ps sched st ≤ d →
+    Lv ≤ sizeCount c d ⊔ Caps.cSize c →
   ⦃ _ : FaceOK c sl ⦄ →
     Σ ℕ λ j →
     let c′ = frameStep j c in
@@ -7134,6 +7142,7 @@ shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   shareBurstsOK W sf gas id now i vals fin ps sched st →
   shareCapsOK c sl d Lv sf gas id now i vals fin ps sched st →
   depthShareGo sf gas id now i vals fin ps sched st ≤ d →
+  Lv ≤ sizeCount c d ⊔ Caps.cSize c →
   ⦃ _ : FaceOK c sl ⦄ →
   Σ ℕ λ j →
   let c′ = frameStep j c in
@@ -7145,7 +7154,7 @@ shareGo-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
             + W * (fanSq (suc gas) c
                    + suc (fanLen (suc gas) c) * nestU (delSq (suc gas) c′) (nestUnit e sl)))))
 shareGo-nodes {e = e} c d W sl Lv sf gas id now i vals fin ps sched st
-  hsl 1≤W 1≤S hadm hlen hb hc hdp =
+  hsl 1≤W 1≤S hadm hlen hb hc hdp hlv =
   proj₁ FOLD ,
   proj₁ (proj₂ FOLD) ,
   ≤-trans (proj₂ (proj₂ FOLD))
@@ -7159,7 +7168,7 @@ shareGo-nodes {e = e} c d W sl Lv sf gas id now i vals fin ps sched st
             (sym (fanLen-suc gas c)) (sym (fanSq-suc gas c))))
   where
   FOLD = shareGoFold-nodes c d W sl Lv sf gas id now i vals fin ps (Caps.cReg c)
-           sched st hsl 1≤W 1≤S hadm hlen ≤-refl hb hc hdp
+           sched st hsl 1≤W 1≤S hadm hlen ≤-refl hb hc hdp hlv
 
 -- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which
 -- touches the nodes map: out of dispatch gas the state is returned
@@ -7175,10 +7184,10 @@ dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
-  capsOK? c sched st ≡ true →
   dispatchBurstsOK W sf gas id now i vals fin sched st →
   dispatchCapsOK c sl d Lv sf gas id now i vals fin sched st →
   depthDisp sf gas id now i vals fin sched st ≤ d →
+  Lv ≤ sizeCount c d ⊔ Caps.cSize c →
   ⦃ _ : FaceOK c sl ⦄ →
   Σ ℕ λ j →
   let c′ = frameStep j c in
@@ -7189,30 +7198,22 @@ dispatchShare-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
          * ((nodesMax st ⊔ nestDᵛˢ vals)
             + W * (fanSq gas c
                    + suc (fanLen gas c) * nestU (delSq gas c′) (nestUnit e sl)))))
-dispatchShare-nodes c d W sl Lv sf zero id now i vals fin sched st hsl 1≤W 1≤S hcaps hdb hdc hdp
+dispatchShare-nodes c d W sl Lv sf zero id now i vals fin sched st hsl 1≤W 1≤S hdb hdc hdp hlv
   rewrite fanLen-zero c | fanSq-zero c =
   0 , z≤n ,
   ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
                    (one-pow W _))
           (≤-reflexive (sym (*-identityˡ _)))
-dispatchShare-nodes c d W sl Lv sf (suc gas) id now i vals false sched st hsl 1≤W 1≤S hcaps hdb hdc hdp =
+dispatchShare-nodes c d W sl Lv sf (suc gas) id now i vals false sched st hsl 1≤W 1≤S hdb hdc hdp hlv =
   shareGo-nodes c d W sl Lv sf gas id now i vals false
     (shareAdmit i (EvalSt.registry st)) sched st hsl 1≤W 1≤S
-    (shareAdmit-sz i (Caps.cSize c) (EvalSt.registry st)
-      (proj₁ (proj₂ (capsOK?-parts c sched st hcaps))))
-    (≤-trans (shareAdmit-len i (EvalSt.registry st))
-             (≤ᵇ⇒≤ (length (EvalSt.registry st)) (Caps.cReg c)
-               (T-to (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st hcaps)))))))))
-    hdb hdc hdp
-dispatchShare-nodes c d W sl Lv sf (suc gas) id now i vals true sched st hsl 1≤W 1≤S hcaps hdb hdc hdp =
+    (proj₁ hdc) (proj₁ (proj₂ hdc))
+    hdb (proj₂ (proj₂ hdc)) hdp hlv
+dispatchShare-nodes c d W sl Lv sf (suc gas) id now i vals true sched st hsl 1≤W 1≤S hdb hdc hdp hlv =
   shareGo-nodes c d W sl Lv sf gas id now i vals true
     (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) hsl 1≤W 1≤S
-    (shareAdmit-sz i (Caps.cSize c) (EvalSt.registry st)
-      (proj₁ (proj₂ (capsOK?-parts c sched st hcaps))))
-    (≤-trans (shareAdmit-len i (EvalSt.registry st))
-             (≤ᵇ⇒≤ (length (EvalSt.registry st)) (Caps.cReg c)
-               (T-to (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st hcaps)))))))))
-    hdb hdc hdp
+    (proj₁ hdc) (proj₁ (proj₂ hdc))
+    hdb (proj₂ (proj₂ hdc)) hdp hlv
 
 foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (d : ℕ) (W : ℕ) (sl : Slots Γ) (Lv : ℕ)
@@ -7226,6 +7227,7 @@ foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   capsWalkOK c sl d Lv sf gas id now path vals fin sched st →
   depthFold sf gas id now envSrc path vals evs fin sched st ≤ d →
   pathSz? (Caps.cSize c) path ≡ true →
+  Lv ≤ sizeCount c d ⊔ Caps.cSize c →
   Σ ℕ λ j →
   let c′ = frameStep j c in
   (j ≤ sizeCount c d ⊔ Caps.cSize c)
@@ -7235,18 +7237,18 @@ foldPath-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
          * ((nodesMax st ⊔ nestDᵛˢ vals)
             + W * (deliverNestD gas c path
                    + suc (deliverLen gas c path) * nestU (delSq gas c′) (nestUnit e sl)))))
-foldPath-nodes c d W sl Lv sf gas id now envSrc root vals evs fin sched st hsl 1≤W 1≤S hb hc hdp hpk =
+foldPath-nodes c d W sl Lv sf gas id now envSrc root vals evs fin sched st hsl 1≤W 1≤S hb hc hdp hpk hlv =
   0 , z≤n ,
   ≤-trans (≤-trans (≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) (m≤m+n _ _))
                    (one-pow W _))
           (≤-reflexive (sym (*-identityˡ _)))
-foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W 1≤S hb hc hdp hpk =
+foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (share-sink i) vals evs fin sched st hsl 1≤W 1≤S hb hc hdp hpk hlv =
   -- the sink arm IS the dispatch, level and all: every deliver measure
   -- at a `share-sink` reduces to the fan allowance the dispatch is
   -- already stated over, so the two conclusions are the same statement
   dispatchShare-nodes c d W sl Lv sf gas id now i vals fin sched st hsl 1≤W 1≤S
-    (proj₁ hc) (proj₂ hb) (proj₂ hc) hdp
-foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W 1≤S hb hc hdp hpk =
+    (proj₂ hb) (proj₂ hc) hdp hlv
+foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fin sched st hsl 1≤W 1≤S hb hc hdp hpk hlv =
   jt ,
   ⊔-lub (proj₁ (proj₂ IHr)) (proj₁ (proj₂ SFr)) ,
   ≤-trans IHw
@@ -7284,17 +7286,29 @@ foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fin s
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ step)))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ step)))
 
-  IHr = foldPath-nodes c d W sl Lv sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
+  -- THE WALK HANDS ITS OWN NEXT LEVEL, and the two are independent:
+  -- the level the tail is asserted at comes from the predicate, the
+  -- level the bound is read at comes from the frame receipt, and the
+  -- join below is what puts them back together.
+  tail  = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc))))
+  L′    = proj₁ tail
+  hL′   = proj₁ (proj₂ tail)
+  hstep = c⊑step c Lv (FaceOK.fSize faceHere)
+
+  IHr = foldPath-nodes c d W sl (Lv + L′) sf gas id now envSrc p vals′ (evs ++ evs′) fin′ sched₁ st₁
           (trans (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st)) hsl)
-          1≤W 1≤S (proj₂ (proj₂ hb)) (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))
-          (≤-trans (m≤n⊔m _ _) hdp) hpkp
+          1≤W 1≤S (proj₂ (proj₂ hb)) (proj₂ (proj₂ tail))
+          (≤-trans (m≤n⊔m _ _) hdp) hpkp hL′
   SFr = stepFrame-nodes c d W sl Lv sf id now f p vals fin sched st
           hsl 1≤W (proj₁ hb) (proj₁ hc) (proj₁ (proj₂ hc))
-          (proj₁ (proj₂ (proj₂ hc))) (proj₁ (proj₂ (proj₂ (proj₂ hc))))
+          (≤-trans (proj₁ (proj₂ (proj₂ hc))) (proj₁ hstep))
+          (proj₁ (proj₂ (proj₂ (proj₂ hc))))
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hc)))))
           (burstsDrain W sf gas id now f p vals fin sched st hb)
           1≤S
-          (≤-trans (m≤m⊔n _ _) hdp) hpkp hplp
+          (≤-trans (m≤m⊔n _ _) hdp)
+          (pathSz?-lvl c Lv p (FaceOK.fSize faceHere) hpkp)
+          (≤-trans hplp (proj₁ hstep)) hlv
           (burstsHead W sf gas id now p vals′ fin′ sched₁ st₁ (proj₂ (proj₂ hb)))
   jᵢ = proj₁ IHr
   jₛ = proj₁ SFr
@@ -7383,7 +7397,7 @@ foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fin s
 -- two halves are the walk that runs the entry and the fold that runs
 -- the rest -- so the budget decrements where the list does.
 shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin [] k sched st
-                  hsl 1≤W 1≤S hadm hlen hk hb hc hdp =
+                  hsl 1≤W 1≤S hadm hlen hk hb hc hdp hlv =
   0 , z≤n ,
   ≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
   (≤-trans (m≤m+n _ _)
@@ -7398,12 +7412,12 @@ shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin [] k sched st
   grow : ∀ (F Y : ℕ) → 1 ≤ F → Y ≤ F * Y
   grow F Y 1≤F = ≤-trans (≤-reflexive (sym (*-identityˡ Y))) (*-monoˡ-≤ Y 1≤F)
 shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin ((rid , p) ∷ ps) (suc k)
-                  sched st hsl 1≤W 1≤S hadm (s≤s hlen) hk hb hc hdp
+                  sched st hsl 1≤W 1≤S hadm (s≤s hlen) hk hb hc hdp hlv
   with any (_≡ᵇ rid) (EvalSt.cancelled st) | hb | hc
 ... | true  | hb′ | hc′ =
   shareGoFold-nodes c d W sl Lv sf gas id now i vals fin ps (suc k) sched st hsl 1≤W 1≤S
     (proj₂ (∧-true _ _ hadm)) (≤-trans hlen (n≤1+n k)) hk hb′ hc′
-    (≤-trans (m≤m⊔n _ _) hdp)
+    (≤-trans (m≤m⊔n _ _) hdp) hlv
 ... | false | hb′ | hc′ =
   jt ,
   ⊔-lub (proj₁ (proj₂ TAILr)) (proj₁ (proj₂ HEADr)) ,
@@ -7427,14 +7441,15 @@ shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin ((rid , p) ∷ ps
             (lub3-m (depthShareGo sf gas id now i vals fin ps sched st)
                     (depthFold sf gas id now (toℕ i) p vals evs fin sched st′)
                     (depthShareGo sf gas id now i vals fin ps sched₁ st₁) hdp)
-            (proj₁ (∧-true _ _ hadm))
-  TAILr = shareGoFold-nodes c d W sl Lv sf gas id now i vals fin ps k sched₁ st₁
+            (proj₁ (∧-true _ _ hadm)) hlv
+  TAILr = shareGoFold-nodes c d W sl (Lv + proj₁ (proj₂ hc′)) sf gas id now i vals fin ps k sched₁ st₁
             (trans (foldPath-slots sf gas id now (toℕ i) p vals evs fin sched st′) hsl)
             1≤W 1≤S (proj₂ (∧-true _ _ hadm)) hlen (≤-trans (n≤1+n k) hk)
-            (proj₂ hb′) (proj₂ hc′)
+            (proj₂ hb′) (proj₂ (proj₂ (proj₂ hc′)))
             (lub3-r (depthShareGo sf gas id now i vals fin ps sched st)
                     (depthFold sf gas id now (toℕ i) p vals evs fin sched st′)
                     (depthShareGo sf gas id now i vals fin ps sched₁ st₁) hdp)
+            (proj₁ (proj₂ (proj₂ hc′)))
   jt = proj₁ TAILr ⊔ proj₁ HEADr
   c′ = frameStep jt c
 
