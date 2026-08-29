@@ -12,7 +12,7 @@ open import Data.Nat.Properties using
   *-mono-≤; m≤m⊔n)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
-open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dCapᶜ; dWalkᶜ; regAt)
+open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; opIterD-mono; sizeCount; sizeCount-body; cDel-body;
   lvls-add; lvls-mono; dWalkᶜ-mono; dCapᶜ-mono)
@@ -187,13 +187,23 @@ room-descend c d g J i 2≤S hi room =
 -- relation rather than as a number.  Carrying the gas is the point: it
 -- is what a level bound cannot say and what makes the room derivable
 -- instead of assumed.
+-- THE LEVEL THE `i`-TH CHAIN OF A ROUND IS ENTERED AT.  The walk's
+-- ledger `dWalkᶜ … i` is what the round has spent before this chain,
+-- and one restart past that is where the chain begins.
+Ent : Caps → ℕ → ℕ → ℕ → ℕ → ℕ
+Ent c d J g i =
+  lvls (Caps.cSize c) (Caps.cWid c) d J
+    (dWalkᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g J i)
+
+Pos : Caps → ℕ → ℕ → ℕ → ℕ → ℕ
+Pos c d J g i = dLvl (Caps.cSize c) (Caps.cWid c) d (Ent c d J g i)
+
 data Reached (c : Caps) (d : ℕ) : ℕ → ℕ → Set where
   base : Reached c d 0 (suc (Caps.cSize c))
   walk : ∀ (J g i : ℕ) →
     suc i ≤ regAt (Caps.cSize c) (Caps.cReg c) J →
     Reached c d J (suc g) →
-    Reached c d (lvls (Caps.cSize c) (Caps.cWid c) d J
-                  (suc (dWalkᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g J i))) g
+    Reached c d (Pos c d J g i) g
 
 -- AND A REACHED LEVEL HAS ITS ROOM, which is what the relation was for:
 -- the bottom by the two bodies, every other level by the walk step.
@@ -221,6 +231,28 @@ room-gas c d Lv g g′ 2≤S hg room =
   S = Caps.cSize c
   W = Caps.cWid c
   R = Caps.cReg c
+
+-- ONE CHAIN OF A ROUND ADVANCES THE POSITION BY ITS OWN BUDGET, and
+-- the fold's actual climb is under it exactly when the chain's
+-- deliveries are.  `dWalkᶜ` at a `suc` is the ledger plus one restart
+-- plus the cap read AT the chain's own level, which is the same
+-- `lvls-add` split the cascade fold already makes per chain -- so the
+-- two ladders differ only in the count, and the residue is one
+-- comparison of a delivery total against the budget at that level.
+ent-step : ∀ (c : Caps) (d J g i D : ℕ) → 2 ≤ Caps.cSize c →
+  D ≤ dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g (Pos c d J g i) →
+  lvls (Caps.cSize c) (Caps.cWid c) d (Ent c d J g i) (suc D)
+    ≤ Ent c d J g (suc i)
+ent-step c d J g i D 2≤S hD =
+  ≤-trans (lvls-mono (suc D) (suc C) 2≤S ≤-refl ≤-refl ≤-refl (s≤s hD))
+          (≤-reflexive (sym (lvls-add S W d J w (suc C))))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  R = Caps.cReg c
+  w = dWalkᶜ S W R d g J i
+  C = dCapᶜ S W R d g (Pos c d J g i)
+
 
 -- THE WALK'S LEVEL IS BOUNDED BY A DELIVERY POSITION, NOT EQUAL TO ONE.
 -- A chain advances its level by one `fLvlD` charge per frame, while the

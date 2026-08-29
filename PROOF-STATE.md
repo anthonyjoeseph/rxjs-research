@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **carry a delivery position ABOVE the walk's level along the
-  chain, which is what the drain now owes** — the frame increments
-  are not positions: a chain climbs one charge per frame while the
-  cascade climbs whole restarts, so the levels a chain visits sit
-  between two positions. Room survives that gap upward, so the
-  conjunct asks for a position above and not for equality. What is
-  left is producing one and holding it across the chain's own Σ,
-  whose tail moves the level and would otherwise have to re-derive
-  it. The path length is the lever: a chain shorter than one restart
-  cannot climb past the position it started under.
+- **one chain's deliveries against the budget read at its own
+  position, which is the whole claim one round down** — the fold now
+  carries the position and the leaf is what it hands the ceiling, so
+  every other part of the room is proven and this is the residue.
+  It is the recursion rather than a step of it: the entry bound is
+  the same statement at the entry level, and this asks for it where
+  the round's ledger has climbed to. So the question is whether the
+  cascade's own delivery theorem can be stated at a level at all, or
+  only at zero — and if only at zero, the position is the wrong
+  vehicle and the ledger has to move instead of the level.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
@@ -251,10 +251,13 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
+- **`chain-deliv-cap`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one chain's
+  deliveries under the budget read at its own position in the round. The whole
+  claim one round down, so it is the recursion rather than a step of it.
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
-  `mergeAll`'s parked queue, now owing that the walk's level is REACHED by the
-  delivery walk with gas left. The room follows from that, so what is left is
-  the reaching — uninstantiable, since the ladder outruns computation.
+  `mergeAll`'s parked queue, now owing a delivery position above the walk's
+  level with gas left. The fold supplies the position; what the leaf still owes
+  is the frame-local half.
 - **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction
@@ -324,6 +327,9 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+- **`capsAt-gas-size`** (Caps-Face/Part7) — GRINDABLE, `TWIN`: the entry cap
+  clears the walk's gas, because the blowup at least doubles the base.
+  Arithmetic on `iterSize`, no design left in it.
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
