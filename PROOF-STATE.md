@@ -216,24 +216,23 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **instantiate the three leaves the path induction left, before any of
-  them is ground** — they are new statements and nothing has reached
-  them, which is the cheapest unmanaged risk there is. The instrument
-  already exists: the walk probe's re-walk reads a boolean conjunct at
-  every state a fold passes through, and two of the three leaves ARE
-  booleans at a state — a `thru-outer`'s closures, a bounded
-  `mergeAll`'s parked queue. Recover it, point it at those two, and
-  read the sink's admitted list at the same states. A refutation here
-  costs a restatement; found after the fold is ground it costs the fold.
+- **hand the drain its ceiling instead of rebuilding it from the
+  bottom** — the level premise the walk cannot pay is now refuted at a
+  witness, and the finding is narrow: the drain's headroom conjunct is
+  the level on top of a positive quantity under the BASE size cap,
+  while the walk's own Σ is denominated in the count. The two are the
+  same currency one `opIterD` apart, so the repair is to carry the
+  relative ceiling through the walk rather than a bound the recursion
+  cannot reproduce. This restates a definition the proven drain face
+  consumes, so it moves that face's premise with it.
 
-- **spend the parked term's headroom at the chain walk, which now has a
-  source** — the charge exists as a conjunct of the caps record and
-  every face re-establishes it, so the two size bounds the chain walk
-  asserts about a parked inner stop being unsourced: the walk reads the
-  conjunct where it reads the rest of the record, and the arithmetic
-  paying it is the same three-level supply the parking clause already
-  spends. That is a leg of reading, not of design, and it is what the
-  headroom was carried for.
+- **instantiate the two surviving leaves before either is ground** —
+  the closures one and the sink one are still statements nothing has
+  reached, and the drain's refutation is the argument for doing it:
+  the same bundle, the same hand-built entry state, and the instrument
+  now exists in the refuted tree rather than needing recovery. A
+  refutation costs a restatement; found after the fold is ground it
+  costs the fold.
 
 - **the flat-versus-moving bound on every chain's stages, which the
   mirror already carries** — the width cap over each stage of each
@@ -251,14 +250,14 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
+- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `REFUTED`: a bounded
+  `mergeAll`'s parked queue, charged against the BASE size cap while the walk's
+  ladder is denominated in the count. False in its level and nothing else; the
+  restatement owed is the ceiling in relative form.
 - **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction
   hands off rather than closes.
-- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
-  bounded `mergeAll`'s parked queue, at the level the frame is read at. `⊤` at
-  four of the five frame heads, so the whole statement is the drain's two size
-  bounds.
 - **`walk-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
   `thru-outer`'s closures under the frame's cap. `⊤` at the other four heads;
   the weakest of the three, since one frame's values are what the walk already

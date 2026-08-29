@@ -2385,12 +2385,11 @@ WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
            (pathLen p) L
        ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id))
 
--- THE THREE LEAVES THE PATH INDUCTION CANNOT REACH, each of them a
--- statement about ONE frame or ONE sink rather than about a walk.  The
--- two frame-local ones are `⊤` at four of the five frame heads, so what
--- they really assert is a bound on a `thru-outer`'s closures and on a
--- bounded `mergeAll`'s parked queue; the sink one is the share fold,
--- which is a second recursion and not this one.
+-- THE LEAVES THE PATH INDUCTION CANNOT REACH, each of them a statement
+-- about ONE frame or ONE sink rather than about a walk.  The frame-local
+-- one is `⊤` at four of the five frame heads, so what it really asserts
+-- is a bound on a `thru-outer`'s closures; the sink one is the share
+-- fold, which is a second recursion and not this one.
 postulate
   walk-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
@@ -2400,6 +2399,37 @@ postulate
     WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
     frameClosOK (frameStep L (capsAt e sl id)) sl f vals
 
+  walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (i : Fin n) (vals : List (Val Γ (lookup Γ i)))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps {t = t} sl id L sf gas nid now src (share-sink i) vals evs fin sched st →
+    dispatchCapsOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now i vals fin sched st
+
+-- AND THE DRAIN ONE IS FALSE AS WRITTEN, IN ITS LEVEL AND IN NOTHING
+-- ELSE.  The drain's headroom conjunct charges the level against the
+-- BASE size cap, because its own proven consumer climbs the relative
+-- ceiling one operator per level from the bottom and that climb is paid
+-- for only while the level fits under that cap.  The walk's ladder is
+-- denominated in the COUNT instead: the Σ it hands its tail permits a
+-- level anywhere up to `sizeCount c d ⊔ Caps.cSize c`, and the arrival
+-- face confirms levels genuinely reach the count.  At level zero the
+-- conjunct is `capsOK?` at the base read through `parkRoom`, so the
+-- level is the whole of what it asks for and the whole of what the
+-- bundle cannot give.
+--
+-- THE REPAIR IS NOT A HYPOTHESIS ON THIS LEAF.  A level bound tight
+-- enough to feed the base-cap arithmetic cannot be reproduced across the
+-- recursion, since one frame's growth is bounded only by `fLvlD`.  What
+-- transfers is the ledger's own relative form: the walk's Σ and `CeilD`
+-- are the same currency, so the drain wants the ceiling handed to it
+-- rather than rebuilt from the bottom.
+--
+-- REFUTED: `Refuted.Walk-Frame-Drain-Level` — `walk-frame-drain` at the
+--   empty context with the level taken to be the base size cap, every
+--   other premise met by the entry bounds and the proven node installer.
+postulate
   walk-frame-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
     (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
@@ -2408,13 +2438,6 @@ postulate
     WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
     frameDrainOK (capsAt e sl id) sl (capsH e sl id) L sf nid now f p vals sched st
 
-  walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (src : Source) (i : Fin n) (vals : List (Val Γ (lookup Γ i)))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    WalkHyps {t = t} sl id L sf gas nid now src (share-sink i) vals evs fin sched st →
-    dispatchCapsOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now i vals fin sched st
 
 -- THE WALK ITSELF, WHICH IS THE FRAME LAW ITERATED AND NOTHING ELSE.
 -- Each frame spends the proven step receipt, which reports its own

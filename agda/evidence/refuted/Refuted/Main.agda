@@ -36,6 +36,8 @@ open import Refuted.Cascade-Nest-PerDeliv
 open import Refuted.Chain-Level-Unbounded
   using (prog; slots; cp; ceil; lvl; arr; pth; widen; fits;
          chain-level-unbounded-absurd)
+open import Refuted.Walk-Frame-Drain-Level
+  using (walk-frame-drain-absurd)
 open import Refuted.Chain-Step-Live-Nest
   using (grown≡3; charge≡1; grown₅≡5; chainStep-nest-live-absurd)
 open import Refuted.Chain-Step-Nodes
