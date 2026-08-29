@@ -34,9 +34,9 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-burst-nest @7c48f9
--- TARGET: subscribeE-burst-caps @b43021
--- TARGET: pushVals-caps-burstW @f0db0b
+-- TARGET: subscribeE-burst-nest @d2c32b
+-- TARGET: subscribeE-burst-caps @583b8e
+-- TARGET: pushVals-caps-burstW @338e1f
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
@@ -63,7 +63,7 @@ open import Rx.Evaluator
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
   AllOp; NodeId; Path)
 open import Verify-Budget-Sufficient.Caps using (arrCapAt; Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; nestValOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; nestValOK?; slotsCaps?)
 open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
           pushValsWOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
@@ -202,13 +202,26 @@ heads = nestValOK? (tight {obs (obs natᵗ)} (rM 1 1)) (obs (obs natᵗ)) (rM 1 
 heads≡ : heads ≡ (true , true , true)
 heads≡ = refl
 
+-- read at the FULL invariant, which is what the leaves now ask for at
+-- entry, and at the slot-table bundle beside it -- the two keys the
+-- restatement added, pinned here rather than assumed so these rows stay
+-- evidence about the statement as it now reads
 entry : Bool × Bool × Bool
-entry = nestCapsOK? (tight {obs (obs natᵗ)} (rM 1 1)) (sched-init (rM 1 1) slots) (st-init (rM 1 1))
-      , nestCapsOK? (tight {obs (obs natᵗ)} (qS 1)) (sched-init (qS 1) slots) (st-init (qS 1))
-      , nestCapsOK? (tight {obs (obs natᵗ)} (qX 1)) (sched-init (qX 1) slots) (st-init (qX 1))
+entry = capsOK? (tight {obs (obs natᵗ)} (rM 1 1)) (sched-init (rM 1 1) slots) (st-init (rM 1 1))
+      , capsOK? (tight {obs (obs natᵗ)} (qS 1)) (sched-init (qS 1) slots) (st-init (qS 1))
+      , capsOK? (tight {obs (obs natᵗ)} (qX 1)) (sched-init (qX 1) slots) (st-init (qX 1))
 
 entry≡ : entry ≡ (true , true , true)
 entry≡ = refl
+
+entryFace : Bool × Bool × Bool
+entryFace =
+    slotsCaps? (Caps.cSize (tight {obs (obs natᵗ)} (rM 1 1))) (Caps.cWid (tight {obs (obs natᵗ)} (rM 1 1))) slots
+  , slotsCaps? (Caps.cSize (tight {obs (obs natᵗ)} (qS 1))) (Caps.cWid (tight {obs (obs natᵗ)} (qS 1))) slots
+  , slotsCaps? (Caps.cSize (tight {obs (obs natᵗ)} (qX 1))) (Caps.cWid (tight {obs (obs natᵗ)} (qX 1))) slots
+
+entryFace≡ : entryFace ≡ (true , true , true)
+entryFace≡ = refl
 
 -- AND THE CLOSURE PREMISE THE HEADS NOW CARRY, pinned at the same three
 -- arrivals.  These programs reference the telescope, so the reading is

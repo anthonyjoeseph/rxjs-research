@@ -38,7 +38,7 @@ open import Probed.Sync-Factor
          mixOut≡3; mixD-holds)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
-         capsX-1; capsX-2; heads≡; entry≡; headsClos≡; left-starved≡; census≡;
+         capsX-1; capsX-2; heads≡; entry≡; entryFace≡; headsClos≡; left-starved≡; census≡;
          burstOne≡; lenSh≡; capsSh-2; lenShS≡; capsShS-2; lenShX≡; capsShX-2;
          leavesM-1; leavesM-2; leavesM-0; leavesS-1; leavesS-2;
          leavesX-1; leavesX-2; leavesSh; leavesShS; leavesShX;
