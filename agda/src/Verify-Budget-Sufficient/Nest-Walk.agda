@@ -6861,6 +6861,22 @@ mutual
             (proj₂ (proj₂ (proj₂ (proj₂ step)))))
     where step = stepFrame sf id now f p vals fin sched st
 
+  -- THE SINK IS WHERE THE LEVEL AND THE MEASURES MEET, AND THE TWO
+  -- FACTS IT NEEDS ARE ITS OWN.  Every other clause of the deliver
+  -- measures adds a constant, so the cap they are read at never moves
+  -- along a path; the `share-sink` leaf is the single clause that reads
+  -- one, and what it wants of the admitted list -- a length under the
+  -- registry cap and a `pathSz?` receipt per path -- used to be taken
+  -- off a FLAT `capsOK?` at whatever state the walk had reached.  That
+  -- is the claim the step leaf was refuted at, so the two are conjuncts
+  -- here instead: the state the sink is reached at is not the state the
+  -- cap was read at, and this predicate is what knows the difference.
+  --
+  -- RECOVERY: git show f0b8b7c restores `shareAdmit-len` and
+  --   `shareAdmit-sz`, which derived exactly these two from a
+  --   `capsOK?` at one cap -- the admitted list is a sublist of the
+  --   registry, so both were inherited rather than proven.  Whoever
+  --   discharges these conjuncts at a levelled cap wants them back.
   dispatchCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)

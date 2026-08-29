@@ -28,7 +28,7 @@ open import Probed.Scan-Burst-Nest
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
 open import Probed.Chain-Caps-Flat
-  using (U-row; C-row; F-row)
+  using (U-row; C-row; F-row; capU; eU; stepRow; step-pre; step-flat; step-lvl1)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
 open import Probed.Cascade-Nest-Flat

@@ -216,6 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
+- **pin the increment the step leaf now reports, which is the only
+  thing left between it and a body** — the statement asks for a level
+  under the instant's own count and a row already meets it at one, so
+  what is missing is the arithmetic: the growth one chain's step causes
+  is a `frameBlowup` of the cap it entered at, and the count the ceiling
+  names is the same recurrence read at the instant. Both sides are the
+  caps recurrence, so this is a comparison inside one family rather than
+  a claim about the evaluator, and it is what turns a probed row into a
+  proof. The walk leaf beside it is unprobed and stays where it is.
+
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
   every face re-establishes it, so the two size bounds the chain walk
@@ -234,17 +244,6 @@ does not fit is a finding about the shared statement, not about the head.
   that moves per stage, which is the shape a mirror cannot hand over
   and the only part this row still owes.
 
-- **carry the level across the CHAIN list, the one fold the threading
-  did not reach** — the path fold and the share ring now hand their own
-  next level, but the chains fold still asserts every chain at the flat
-  cap the instant opened at while recursing on the state the previous
-  chain's step produced, which is the exact shape the step leaf was
-  refuted at. So the chain predicate takes a level, its live arm
-  recurses under a Σ at the sum, and the nodes fold above it joins the
-  two halves the way the path fold now does. The two leaves then say
-  what they always meant: a chain is entered one level above the last,
-  not at the opening cap.
-
 ### The ledger
 
 - **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
@@ -252,14 +251,14 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`arr-chain-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED, DEAD ROUTE, TWIN`:
-  ONE chain's walk, now asserted at a level its frame receipt can pay. What
-  stays flat is the level the chain is ENTERED at, which the chains fold above
-  it still fixes at the instant's opening cap.
-- **`chainStep-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED, DEAD ROUTE, TWIN`:
-  one chain's step preserves the caps. FALSE at an arbitrary flat cap — a drain
-  subscribes what it releases and the step retires none of it — so the level
-  the next chain is entered at has to come from this one.
+- **`arr-chain-caps`** (Caps-Face/Part7) — FALSITY,
+  `REFUTED, DEAD ROUTE, TWIN`: ONE chain's walk, asserted at a level its frame
+  receipt can pay. Restated and never instantiated — a mid-walk value list is
+  not addressable from outside the fold, so no row reaches it.
+- **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE, TWIN`: one chain's step reports the increment that
+  carries its post-state. An increment of ONE meets it at the family that
+  refuted the flat form; what is unproven is that it stays under the count.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of

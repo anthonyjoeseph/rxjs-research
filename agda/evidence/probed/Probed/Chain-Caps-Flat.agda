@@ -3,38 +3,36 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: chainStep-caps @38f180
+-- TARGET: chainStep-caps @c85c2f
 --
--- WHAT IS BEING TESTED.  The target asserts `chainsCapsOK` at ONE cap --
--- the one read at the instant the cascade starts -- and that predicate
--- restates `capsOK?` at EVERY state its fold passes through.  The
--- hypothesis speaks only about the state the fold BEGINS at, so the
--- whole content is that a walk which starts inside the cap stays inside
--- it, and the risk is that the cap is read one instant too early: the
--- frame-wise receipt this would be assembled from concludes at a GROWN
--- cap, and composing a walk's growth is what the caps recurrence
--- identifies with the cap at the NEXT instant.
+-- WHAT IS BEING TESTED.  The target hands one chain's step a state
+-- inside `frameStep Lv` of the instant's cap and asks for an INCREMENT
+-- carrying the post-state, under the instant's own count.  So there are
+-- two questions and the rows answer both at the family that refuted the
+-- flat form: does an increment exist at all, and is it small.
 --
--- AND THE ANSWER IS THAT ONLY THE SIZE MOVES, WHICH IS THE FINDING.
--- Over three families the width and the registry components do not grow
--- across a cascade at all -- both come back at or below where they
--- started, because a delivery CONSUMES a queued value and RETIRES the
--- registration it walked.  The size grows in every one of them, by
--- under a factor of three at the widest and by a bit over a third at
--- the narrowest, so the flat reading is a slack claim about a SINGLE
--- component and the other two are preservation outright.
+-- AND THE ANSWER IS ONE LEVEL, WHICH IS THE FINDING.  At a cap the
+-- pre-state fits, the post-state of ONE chain's step does not -- and it
+-- fits that cap's FIRST step outright.  The increment is therefore one
+-- against a ceiling that is at least the cap's own size, so the count
+-- conjunct is met with four orders of magnitude to spare rather than a
+-- margin.  The three cascade rows beneath say where the growth is: over
+-- three families the width and registry components come back at or
+-- below where they started -- a delivery CONSUMES a queued value and
+-- RETIRES the registration it walked -- and only the size moves.
 --
 -- WHAT THESE ROWS DO NOT REACH, and it is why they are evidence for
--- the STEP leaf and not for the walk one beside it.  A fit read before
--- and after a cascade says the caps survive the fold; it says nothing
--- about what the fold's own walk asserts at the states in between --
--- the parked drain's two size bounds, the sink arm's
--- registry-versus-unit conjunct -- and those are the walk leaf's
--- content.  The three figures below are the caps components alone.
+-- the STEP leaf and not for the walk one beside it.  A fit read either
+-- side of a step says the caps are recoverable at a level; it says
+-- nothing about what the walk asserts at the states in between -- the
+-- parked drain's two size bounds, the sink arm's registry-versus-unit
+-- conjunct -- and those are the walk leaf's content.  Nor is the
+-- ceiling itself reached: `sizeCount` is sealed, so what the rows meet
+-- is the `⊔` branch the cap's own size supplies.
 module Probed.Chain-Caps-Flat where
 
-open import Data.Bool using (Bool; if_then_else_)
-open import Data.List using (length)
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.List using (length; []; _∷_)
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -44,12 +42,12 @@ open import Rx.Exp using (Closed; natᵗ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascade; cascadeLatch; chainsOf)
+         cascade; cascadeLatch; chainsOf; chainStep)
 open import Rx.Slots using (Slots)
 
 open import Verify-Budget-Sufficient.Demand-Programs
   using (Γ₂; progU; progC; progF; insF; sucGU; sucGC; sucGF)
-open import Verify-Budget-Sufficient.Caps using (caps)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
 
 entry : ∀ {t} (e : Closed Γ₂ t) → Slots Γ₂ → ℕ → Sched Γ₂ × EvalSt e
@@ -137,3 +135,41 @@ C-row = refl
 
 F-row : rowF ≡ (2 , (38 , 1 , 2) , (52 , 1 , 0))
 F-row = refl
+
+-- AND ONE LEVEL OF THE RECURRENCE COVERS THE STEP, which is the row the
+-- statement now asks for.  Read either side of ONE chain's step rather
+-- than a whole cascade: the post-state does NOT fit the cap the
+-- pre-state was read at, and it DOES fit that cap's first step.  So the
+-- claim the statement makes -- an increment exists, under the instant's
+-- own count -- is satisfied here at an increment of one, and the gap
+-- between the two is four orders of magnitude rather than a margin.
+capU : Caps
+capU = caps 26 4 4
+
+eU : Sched Γ₂ × EvalSt pU
+eU = let e₀ = entry pU sl₁ (sucGU 1 2 2 2 2)
+     in step1 (proj₁ e₀) (proj₂ e₀)
+
+stepRow : Bool × Bool × Bool
+stepRow with sched-next (proj₁ eU)
+... | inj₁ _ = false , false , false
+... | inj₂ (a , sd) with chainsOf a (proj₂ eU)
+...   | []            = false , false , false
+...   | (rid , p) ∷ _ =
+  let st₀ = cascadeLatch a (proj₂ eU)
+      st₁ = record st₀ { delivered = rid ∷ EvalSt.delivered st₀ }
+      r   = chainStep 1 a p sd st₁
+      sd′ = proj₁ (proj₂ r)
+      st′ = proj₂ (proj₂ r)
+  in capsOK? capU sd st₁
+   , capsOK? capU sd′ st′
+   , capsOK? (frameStep 1 capU) sd′ st′
+
+step-pre : proj₁ stepRow ≡ true
+step-pre = refl
+
+step-flat : proj₁ (proj₂ stepRow) ≡ false
+step-flat = refl
+
+step-lvl1 : proj₂ (proj₂ stepRow) ≡ true
+step-lvl1 = refl
