@@ -121,3 +121,5 @@ open import Refuted.Nest-Cap-Height
          NestHeight; nest-height-absurd)
 open import Refuted.Chain-Step-Flat
   using (cap; row; latched≡true; pre≡true; post≡false; chain-step-flat-absurd)
+open import Refuted.Frame-Step-Compose
+  using (c₀; FrameStepCompose; frameStep-compose-absurd)

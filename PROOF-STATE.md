@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **level the walk predicate's own cap, which is a two-file change and
-  the level is already there** — the predicate carries `Lv` and already
-  spends it on the drain's bounds; only its `capsOK?` and value
-  conjuncts are read at the bare cap, and its frame clause recurses at
-  the same `Lv` instead of a grown one. Both predicates live in exactly
-  two modules. Moving the cap to `frameStep Lv` and putting a Σ on the
-  frame recursion returns the two leaves to the instant's own cap
-  without the refuted flatness, and hands the nodes fold the level it
-  already reports.
+- **thread the level through the nodes frame receipt, the one route
+  the arithmetic leaves** — absorbing it into the cap is now refuted:
+  the step's width iterates an exponential whose base is its own size,
+  so re-entering at a stepped cap costs a tower storey per level. So
+  the walk predicate's conjuncts move to `frameStep Lv`, its frame
+  clause recurses under a Σ at the sum, and the nodes frame receipt
+  takes its invariant at the stepped cap and restates at the sum —
+  which is what the caps frame receipt beside it already does, arm for
+  arm. Two modules, and the twin is proven.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -251,14 +251,15 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`arr-chain-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED`: ONE chain's walk.
-  Its `root` clause IS the step leaf's conclusion, so on a sink-free path it
-  implies the refuted statement; the flat walk predicate is where the frame
-  receipt's level is discarded, and threading it is the repair.
-- **`chainStep-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED`: one chain's step
-  preserves the caps. FALSE at an arbitrary cap the input satisfies — a drain
-  subscribes what it releases and the step retires none of it — so only the
-  instant's own blowup can pay, or the predicate needs a level.
+- **`arr-chain-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED, DEAD ROUTE, TWIN`:
+  ONE chain's walk. Its `root` clause IS the step leaf's conclusion, so on a
+  sink-free path it implies the refuted statement; the flat walk predicate is
+  where the frame receipt's level is discarded, and threading it is the repair.
+- **`chainStep-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED, DEAD ROUTE, TWIN`:
+  one chain's step preserves the caps. FALSE at an arbitrary cap the input
+  satisfies — a drain subscribes what it releases and the step retires none of
+  it — so only the instant's own blowup can pay, or the predicate needs a
+  level.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of

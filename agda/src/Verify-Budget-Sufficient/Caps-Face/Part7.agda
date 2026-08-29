@@ -2311,6 +2311,21 @@ postulate
 --
 -- REFUTED: `Refuted.Chain-Step-Flat` -- one step of one chain, at a
 --   concrete cap the pre-state satisfies and the post-state does not.
+--   `Refuted.Frame-Step-Compose` -- the step does not compose, so the
+--   level cannot be absorbed into the cap the machinery re-enters at.
+--
+-- DEAD ROUTE: re-entering the frame receipt with its cap parameter
+--   instantiated at the STEPPED cap, so that the level needs no
+--   threading.  The step's width component iterates an exponential
+--   whose base is its size component, and stepping raises the size, so
+--   the second step runs at the raised base -- a tower storey per
+--   level against a flat count that runs every iteration at the
+--   original.  One level either side already overshoots by five orders
+--   of magnitude.
+--
+-- TWIN: `stepFrame-caps` -- the same frame, proven, with exactly the
+--   discipline owed here: invariant taken at the stepped cap, own
+--   increment reported, conclusion restated at the sum.
 postulate
   arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
