@@ -190,26 +190,25 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the duplicate chain retired: the thru caps walk is already proven
-  at the stepping cap, one face over** — `subscribeInner-caps`,
-  `thruConsume-caps` and `thruWalk-caps` all exist in the subscribe
-  face, reporting the strong reading, the value and event keys and a
-  strict level bound. This cone re-proves them weaker, at the fixed cap
-  the witness kills. The duplicate checker cannot see it: different
-  predicate, different cap, so they read as different facts. What holds
-  the copy in place is the NESTING chain beside it, which takes its
-  state facts from these arms. This leg moves that chain onto the
-  proven ones, arm by arm.
+- **the room's queue conjunct derived instead of assumed** — the
+  crossing is ONE UNIT wide: the room asks `suc (length q) ≤ cWid c`
+  while the invariant carries `length q ≤ cWid c`, and one level of the
+  frame step buys exactly that unit — `iterFold-lift` at both indices
+  zero, against a step whose width field IS that iterate. So read one
+  level up the conjunct is derivable from the node reading `capsOK?`
+  already carries, and the parked pair that kills this shape stops
+  being expressible. This leg threads the strong reading down to the
+  room and drops the conjunct from the record.
 
-- **the fold's level accumulates, and its bound is proven already** —
-  with the arms on the proven face each arrival reports at its own
-  step, and the burst fold SUMS them: `thruWalk-caps` charges one rung
-  per cons and holds the total under `sIterD` in the payload count. So
-  nothing new is owed on the level itself. What the nesting chain owes
-  is to widen its own conjuncts along `frameStep` monotonicity as the
-  level climbs, which is the same transport that fold already spends on
-  the value and event keys. This leg does that widening, and it is what
-  retires the two FALSITY rows by proof rather than restatement.
+- **the duplicate arms retired onto the proven face** — with the strong
+  reading in place, `subscribeInner-caps`, `thruConsume-caps` and
+  `thruWalk-caps` replace this cone's own copies, which re-prove them
+  weaker at the fixed cap. The duplicate checker cannot see the copy:
+  different predicate, different cap, so the two read as different
+  facts while being the same operation. What holds it in place is the
+  NESTING chain beside it, which takes its state facts from these arms;
+  this leg moves that chain over, arm by arm, and the level each arm
+  reports is what it carries.
 
 - **the burst leaves discharged and their probe re-run** — under a
   discharged ceiling the arrivals' width key is the face's own second

@@ -1389,6 +1389,24 @@ pushBurst-nest-map {Γ = Γ} {t = t} {s = s} {u = u} g id now fn κ (em ∷ ems)
           (map (applyFn fn) (proj₁ sp)) (proj₂ (proj₂ sp))
 
 
+-- THE QUEUE CONJUNCT IS THE CROSSING, AND IT IS ONE UNIT WIDE.  What
+-- the room asks for is `suc (length q) ≤ cWid c` -- ROOM for the
+-- arrival about to park -- while the caps invariant carries
+-- `length q ≤ cWid c`.  That single unit is the whole gap, and it is
+-- why this record is false at a FIXED cap and true at a stepping one:
+-- the invariant at a cap gives the room at any STRICTLY wider one, and
+-- one level of the frame step is exactly what buys a unit of width --
+-- `iterFold-lift` says so, at `K` and `q` both zero, and the step's
+-- width field IS that iterate.
+--
+-- SO THE CONJUNCT SHOULD NOT BE A PREMISE AT ALL.  Read at the level
+-- above the one the caps boolean is held at, it is DERIVED -- from the
+-- node reading `capsOK?` already carries, through the lookup -- and
+-- the parked pair that kills this shape stops being expressible, since
+-- what it crosses is a width the statement no longer names.  Threading the
+-- strong reading down to here is what makes that derivation available,
+-- and it is the same threading the arms beside this need to spend the
+-- proven face.
 -- THE ROOM THE WIDTH FIELD MUST STILL HAVE AT THE NODE THIS STEP
 -- WRITES.  The invariant's node conjunct bounds a merge queue two ways
 -- against ONE field -- every queued value's frame width, and the
