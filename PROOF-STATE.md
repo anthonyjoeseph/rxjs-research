@@ -190,24 +190,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the thru door stops weakening: this cone carries the STRONG caps
-  reading, not the node-table conjunct alone** — the exit family is
-  refuted at one cap, and the proven face cannot replace it for a
-  reason that is about the PREDICATE rather than the cap: the face
-  reads the strong boolean, this cone the weak one, and the conversion
-  runs one way only. A ceiling form typechecked and was still
-  unreachable: no door here can assemble what the face asks for. The door holding the strong reading is the
-  thru entry, which discards it at once. This leg carries it through
-  instead, down to the two exits now postulated at full strength —
-  which is what makes the face reachable at all.
+- **the duplicate chain retired: the thru caps walk is already proven
+  at the stepping cap, one face over** — `subscribeInner-caps`,
+  `thruConsume-caps` and `thruWalk-caps` all exist in the subscribe
+  face, reporting the strong reading, the value and event keys and a
+  strict level bound. This cone re-proves them weaker, at the fixed cap
+  the witness kills. The duplicate checker cannot see it: different
+  predicate, different cap, so they read as different facts. What holds
+  the copy in place is the NESTING chain beside it, which takes its
+  state facts from these arms. This leg moves that chain onto the
+  proven ones, arm by arm.
 
-- **the ceiling discharged at the instant's own cap** — a ceiling
-  premise is worth exactly the cap that discharges it, and no level of
-  the frame cap can: `frameStep J c` cannot ceiling a walk that climbs
-  past `J`, which `Burst-Walk`'s nodry face already records and answers
-  by anchoring at the reset caps `sizeCapAt e sl (suc id)` instead.
-  This leg takes that anchor on the WIDTH axis and retires `arrCapAt`,
-  whose frozen width is the figure the refutation crosses.
+- **the fold's level accumulates, and its bound is proven already** —
+  with the arms on the proven face each arrival reports at its own
+  step, and the burst fold SUMS them: `thruWalk-caps` charges one rung
+  per cons and holds the total under `sIterD` in the payload count. So
+  nothing new is owed on the level itself. What the nesting chain owes
+  is to widen its own conjuncts along `frameStep` monotonicity as the
+  level climbs, which is the same transport that fold already spends on
+  the value and event keys. This leg does that widening, and it is what
+  retires the two FALSITY rows by proof rather than restatement.
 
 - **the burst leaves discharged and their probe re-run** — under a
   discharged ceiling the arrivals' width key is the face's own second

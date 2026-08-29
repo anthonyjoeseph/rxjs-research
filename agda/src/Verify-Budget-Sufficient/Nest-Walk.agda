@@ -2522,6 +2522,26 @@ subscribeInner-nest-arr c sl B W (gs fuel) op allNid κ id now o sched st
 -- pins the arrival's DELIVERED width, which that witness exceeds, so
 -- what sits below is adjacent rather than decisive and nothing has yet
 -- instantiated this shape.
+--
+-- AND THE DESCENT IT NEEDS IS PROVEN, ONE FACE OVER AND STRICTLY
+-- STRONGER: `subscribeInner-caps` reports the caps boolean over the
+-- descended state, the value key over the payload, the event key over
+-- the burst and a STRICT level bound, at a cap that STEPS -- which is
+-- what a walk through a substituting head can honestly claim, and why
+-- it is not refutable where this shape is.  So this row is not owed a
+-- proof; it is owed a CONVERSION, and the premises that face asks for
+-- are the walk premise's own, dropped at this cone's door in favour of
+-- the weaker reading.
+--
+-- AND THE WHOLE CHAIN ABOVE IT IS PROVEN THERE TOO -- the per-arrival
+-- step and the fold over a burst both -- so what stands here is a
+-- weaker DUPLICATE of proven code.  The duplicate checker cannot see
+-- it: the two are stated at different predicates and different caps,
+-- so they read as different facts while being the same operation.
+-- What holds the copy in place is the NESTING chain beside it, which
+-- takes its state facts from these arms; moving it onto the proven
+-- ones is the conversion, and the level those report is what the fold
+-- has to join rather than accumulate.
 -- REFUTED: `Refuted.Subscribe-Burst-Width` kills the unkeyed walk this
 --   body descended through, at a parked pair whose queue crosses the
 --   width the premises were read at.
@@ -4638,6 +4658,11 @@ takeDispatch-caps c sl nid vals fin sched st (just (exhaust-st _ _))    hsl hc =
 -- reading to feed it.  The entry that COULD is the thru door, which
 -- holds the strong boolean and weakens it immediately; the repair is
 -- to stop weakening there, not to re-cap anything here.
+--
+-- AND ITS DESCENT IS PROVEN ONE FACE OVER, at the stepping cap and the
+-- strong reading, exactly as the inner walk's is; the wrap adds a
+-- frame and a minted node and neither is a fact that face lacks.  So
+-- this row is owed the same conversion, and the two travel together.
 -- REFUTED: `Refuted.Subscribe-Burst-Width` kills the walk this was a
 --   one-line application of, and pins the two figures it crosses --
 --   an arrival cap's width against the reading of the first payload
