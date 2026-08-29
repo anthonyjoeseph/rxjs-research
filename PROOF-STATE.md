@@ -190,23 +190,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **thread the walk's path keys at a level, which is now forced** —
-  the entry keys are REFUTED as something the walk can produce: the
-  ceiling they must sit under is fixed by the cap and the descent
-  depth, a source reaching no subscribe reports depth zero at every
-  path, and the path length is free — so one number is asked to
-  exceed every path in a family at once. The proven burst face carries
-  the same two keys as premises at a level instead, and this leg puts
-  that device on the nest walk's own invariant, which is where the
-  refutation says it belongs.
-
 - **the two remaining descent rows, which fail on the same key** — the
   inner descent's invariant and the wrap's exit are separate
   statements with one blocker: each is stated at a cap whose width is
   the ENTRY field, and each witness crosses at a width the source's
-  own inners deliver. The device the leg above installs is what both
-  are missing, so they are one shelf and not two, and this leg
-  re-reads both through it.
+  own inners deliver. The nest walk now carries its keys at a level and
+  its ceiling RELATIVELY, as a remaining-budget implication rather than
+  a number; that device is what both are missing, so they are one shelf
+  and not two, and this leg re-reads both through it.
 
 - **the cascade descent, whose risk is now priced rather than
   probeable** — no row can print a verdict on it: the bound side reads
@@ -216,16 +207,21 @@ does not fit is a finding about the shared statement, not about the head.
   the delivery side spends it through a single composition, so this
   leg narrows that consumer's demand to the part the rows do reach.
 
+- **discharge the carried ceiling at the entry, where it is proven** —
+  the walk now carries its ceiling as an implication rather than a
+  number, and one postulate produces that implication for every chain
+  of a cascade. At the entry the level is zero, which is exactly where
+  the domination inequality is proven, so the conjunct is a lemma and
+  not an assertion. This leg moves it out of the postulate, shrinking
+  what the selection's walk is trusted for to the components a row
+  actually reads.
+
 ### The ledger
 
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE,
   RECOVERY`: the cascade descent against the instant's own grant. The one
   form under it that proven inequalities reach is refuted at the evaluator,
   so nothing instantiates it from below; the store route it replaced cycles.
-- **`nest-caps-keys`** (Nest-Walk) — FALSITY, `REFUTED, TWIN`: the caps
-  face's entry keys at a level of the entry cap, plus the sum's bound.
-  REFUTED outright — the ceiling is one number and the path length is
-  free — so the keys are threaded as premises, as the burst face does.
 - **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   the inner descent's caps invariant, in at one cap and out at the same one.
   Its entry-width key stops the neighbouring witness reaching it, so nothing

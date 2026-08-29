@@ -811,6 +811,8 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
       (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz)
       (arr-chains-bursts sl id a nextId sched st hsl hcaps)
       (arr-chains-caps sl id a nextId sched st hsl hcaps)
+      (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
+        (capsOK?-regs (capsAt e sl id) sched st hcaps))
 
 nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

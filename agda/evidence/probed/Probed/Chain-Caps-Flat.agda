@@ -3,7 +3,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: arr-chains-caps @884c2e
+-- TARGET: arr-chains-caps @77ddb4
 --
 -- WHAT IS BEING TESTED.  The target asserts `chainsCapsOK` at ONE cap --
 -- the one read at the instant the cascade starts -- and that predicate
@@ -23,6 +23,13 @@
 -- factor of five at the widest and by half at the narrowest, so the
 -- flat reading is a slack claim about a SINGLE component and the other
 -- two are preservation outright.
+--
+-- WHAT THESE ROWS DO NOT REACH.  The predicate the target asserts now
+-- also carries the walk's CEILING as an implication -- that whatever
+-- level a descent reaches sits under the instant's count -- and a
+-- component fit says nothing about it.  Nor about the sink arm's
+-- registry-versus-unit conjunct.  The three figures below are the caps
+-- components alone.
 module Probed.Chain-Caps-Flat where
 
 open import Data.Bool using (Bool; if_then_else_)

@@ -5,7 +5,7 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-nest-scan @db3c9a
+-- TARGET: subscribeE-nest-scan @b2e74d
 --
 -- WHAT IS BEING TESTED, AND IT IS THE AXIS AND NOT THE PROGRAM.  The
 -- statement's factor is now a power in the BURST the descent hands
@@ -47,7 +47,9 @@
 -- by the caps count at the descent's depth, and every row here reads
 -- the grant at level zero, where the stepped cap is the entry cap
 -- outright.  So the bound conjunct is untouched, and what these rows
--- cover is the three that sit beside it.
+-- cover is the three that sit beside it.  Nor the CEILING the statement
+-- now takes as a premise, which is an implication about every level the
+-- descent could reach and is discharged by nothing a row computes.
 module Probed.Scan-Burst-Nest where
 
 open import Data.Bool using (true; false)
