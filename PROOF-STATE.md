@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the subscribe side's increment, by the move the cascade side just
-  made** — its bound carries one sealed term and no factor at all, and
-  the sweep reading it against a computable stand-in has been printing
-  verdicts for as long as the sealed reading has been unprobeable. The
-  seal's body is a product whose smallest factor is the syntactic unit,
-  so if that unit sits under it by a proven inequality the statement
-  splits the same way this one did: a computable leaf a probe pins, and
-  a body carrying it back to the term the proof spends.
-
 - **price the parked drain from the cap's own slack** — what replaced
   the ceiling is two plain size bounds on a queued inner: what it
   nests, and what a level of the walk still has to spend. Both compare
@@ -242,6 +233,17 @@ does not fit is a finding about the shared statement, not about the head.
   computation. It is the lowest fact in the tier and the one a falsity
   in would void the rest, and the work is an inversion and a transport
   rather than a walk.
+
+- **the arithmetic shelf both depth faces spend, now that neither can
+  be split** — the cascade side and the subscribe side each read their
+  charge against a tower height, and the attempt to trade the subscribe
+  bound for one a probe can pin has now been refuted twice, so the
+  height is where the remaining uncertainty actually sits. It carries
+  no evaluator at all: one tower for the currency's sum, one story
+  below the caps height, with the conversion and the recurrence's base
+  already proven around it. That makes it the one row in the tier whose
+  obstacle is arithmetic, and whose risk is therefore reducible without
+  reaching a state.
 
 ### The ledger
 
@@ -295,11 +297,10 @@ does not fit is a finding about the shared statement, not about the head.
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`:
-  the subscribe-side depth induction, width-denominated. Its one-`nestSyn` form
-  is machine-refuted at a fold depth of five; this form clears the same family
-  by three orders of magnitude. Nineteen mutual members, every level paid by a
-  path term but one.
+- **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY,
+  `REFUTED×2, PROBED`: the subscribe-side depth induction, width-denominated.
+  Both computable readings are refuted — one charge, and the live registry
+  count — so the bound must name the sealed increment, which no probe reaches.
 - **`nest-height`** (Nest-Store, inside the seal) — DIFFICULTY, `RECOVERY`: the
   arithmetic both depth rows spend, and no evaluator in it. One tower height
   for the currency's sum, one story below the caps height; the `blowH`
@@ -308,7 +309,7 @@ does not fit is a finding about the shared statement, not about the head.
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.
-- **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the entry
+- **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY, `REFUTED×2, PROBED`: the entry
   state's nesting receipt. `init-capsOK?` is its route, but a scripted slot's
   obs-freeness only reduces at a concrete type, so an `isData` inversion is
   owed first.

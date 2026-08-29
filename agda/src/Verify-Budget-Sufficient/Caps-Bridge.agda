@@ -1490,6 +1490,21 @@ abstract
 --   reads 4, 5, 9, 13, 17, 21 while the bound reads 9, 11, 13, 15, 17,
 --   19 -- about four per layer against a flat two, tying at depth 4.
 --
+-- REFUTED: `Refuted.Nest-Depth-Live-Reg` -- the same bound with the
+--   increment replaced by the LIVE registry count times one charge,
+--   which is the shape a leaf every term of which computes would have
+--   to take.  A proven inequality does put that reading under the
+--   increment, since the count sits under the cap by the caps
+--   predicate's own count conjunct, so the trade reads as the harmless
+--   direction; but the widening then runs from the candidate leaf UP,
+--   which makes the leaf the STRONGER statement and obliges it to be
+--   true alone.  It is not: a cap is a ceiling and the registry at the
+--   state a root subscribe is entered from is empty, so the whole width
+--   term vanishes.  At the witness above, descent 81 against 24, where
+--   the single charge managed 74 -- worse than carrying no width factor
+--   at all.  So this bound has to name the increment, and the increment
+--   is what does not reduce.
+--
 -- PROBED: `Harness.Main`'s SERIES T reads this bound on the same
 --   crossing family and clears it everywhere the narrow form fails --
 --   descent 481 against 74249 at a fold depth of 120.  SERIES S adds the

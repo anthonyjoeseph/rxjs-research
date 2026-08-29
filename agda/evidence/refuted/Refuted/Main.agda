@@ -27,6 +27,8 @@ open import Refuted.Inner-Nodry
   using (inner-nodry-inv-regLen-absurd)
 open import Refuted.Nest-Depth-One
   using (descent≡81; oneSyn≡74; nest-one-syn-absurd)
+open import Refuted.Nest-Depth-Live-Reg
+  using (liveDescent≡81; liveReg≡24; nest-live-reg-absurd)
 open import Refuted.Cascade-Deliv-Depth
   using (descent≡49; perDeliv≡44; val-hyp; cascade-deliv-depth-absurd)
 open import Refuted.Cascade-Nest-PerDeliv
