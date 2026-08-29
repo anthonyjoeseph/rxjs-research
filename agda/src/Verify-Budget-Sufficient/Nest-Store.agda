@@ -854,15 +854,19 @@ abstract
 -- closes it on its own: no factor, no witness and no widening repairs
 -- a cap that reads a caps field and is measured against a caps HEIGHT.
 --
--- NOR DOES CHANGING THE BUDGET, AND THAT IS THE PART THAT COSTS.  The
+-- NOR DOES RAISING THE FUEL, AND THAT IS THE PART THAT COSTS.  The
 -- obstruction is parametric in the depth fuel, not a miscalibration of
 -- `capsH`: for ANY fuel `F`, `F ≤ cSize (frameBlowup c F)`, because one
 -- unit of depth buys at least one level and one level adds at least one
--- to the size.  So raising the budget raises the exit size it is
--- compared against, and the cap is EXPONENTIAL in that size while the
--- budget is linear in itself.  No fuel satisfies `F ≥ 2 ^ poly (blowup
--- by F)`, so no index shift, no larger height sequence and no tower
--- denomination of the budget can close it.
+-- to the size.  So raising the fuel raises the exit size it is compared
+-- against, and the cap is EXPONENTIAL in that size while the fuel is
+-- linear in itself.  No fuel satisfies `F ≥ 2 ^ poly (blowup by F)`.
+--
+-- WHAT THIS DOES NOT TOUCH IS THE INSTANT THE HEIGHT IS READ AT, and
+-- that is the surviving repair.  What fails above is a quantity being
+-- its own driver; a height read one or more instants LATER is not fuel
+-- for the cap it is asked to dominate, and the fuel-to-size inequality
+-- says nothing about it.
 --
 -- WHAT IS LEFT IS TO STOP READING THE EXIT CAP -- IN EVERY SUMMAND,
 -- NOT ONLY IN THE FACTOR.  The obligation is unsatisfiable while ANY
@@ -879,42 +883,47 @@ abstract
 --   the increment alone -- and the same file refutes the `nest-height`
 --   Σ this body is assembled from.
 
--- WHERE THE EXIT CAP ENTERS, WHICH IS WHERE THE REPAIR HAS TO BE MADE,
--- and it is one widening rather than a design commitment.  A cascade's
--- walk reports its own level `j`, and the tight cap its states satisfy
--- is `frameStep j (capsAt e sl id)` -- the entry cap stepped by the
--- level actually reached.  The delivery face then widens that to
--- `capsAt e sl (suc id)` so the fanout bound can be stated as a
--- function of `e`, `sl` and `id` alone, since `j` is existential in the
--- run; and `capsAt e sl (suc id)` IS that widening, being the entry cap
--- stepped by the maximum level the fuel admits.  That widening is what
--- puts the exit cap into the currency, in both summands.
+-- THE KEY IS CLOSED AS A SUBJECT, and this is the finding that closes
+-- it.  The exit cap enters through ONE widening: a cascade's walk
+-- reports its own level, the tight cap its states satisfy is the entry
+-- cap stepped by that level, and the delivery face widens the level to
+-- the recurrence's maximum so the bound can be a function of the
+-- instant rather than of a level existential in the run.  Keeping the
+-- walk's own level instead fails at EVERY level at or above the depth
+-- fuel -- one frame of the size recurrence adds at least its entry
+-- size, so the size field at level `j` is at least `j`, and the height
+-- is priced in that same fuel.  The only level left is one a walk halts
+-- strictly below the fuel at, and the walk face refuses that in its
+-- reset-anchor pins: a level cap cannot ceiling a walk which climbs
+-- past the level it is keyed at.
 --
--- AND THE ENTRY CAP IS NOT CAUGHT BY EITHER REPLAY, WHICH IS WHAT
--- NARROWS THE REPAIR TO ONE STEP.  Both crossings need the SUCCESSOR
--- instant's cap: the increment's unit term is keyed there, and the
--- factor's exponent reads its delivery square.  Every other reading
--- this currency makes is at the entry cap, and the entry cap is under
--- the previous instant's height rather than this one's, which the
--- height's own growth per instant covers with stories to spare.
+-- AND THE DESCENT'S OWN FLATTENING IS NOT THE PROBLEM.  Its grant is
+-- flattened at a level count the PATH bounds -- the caps face carries
+-- `suc (pathLen p) ≤ Caps.cSize c` as a conjunct, at the ENTRY cap --
+-- so the per-level charge is priced against a quantity that does not
+-- move with the instant.  What moves is the base the factor is keyed
+-- on, and that is the widening above.
+
+-- SO WHAT IS INDICTED IS THE INSTANT, NOT THE KEY -- AND THE OFFSET
+-- IS TWO.  The height is read at the instant whose fuel drives the cap
+-- it must dominate, which no key survives; read it two instants up and
+-- the arithmetic closes with tools already proven.  The exit cap sits
+-- under a tower of the NEXT height, the currency is an exponential of
+-- a polynomial in that cap, so it sits under a tower of that height
+-- plus a constant -- and the tower-to-story lemma turns any such tower
+-- into the story ABOVE, which is the height two instants up.
 --
--- AND THE DESCENT'S OWN FLATTENING IS ALREADY ENTRY-SHAPED.  The grant
--- is flattened at a level count the PATH bounds -- the caps face
--- carries `suc (pathLen p) ≤ Caps.cSize c` as a conjunct, at the entry
--- cap -- so the per-level charge is priced against a quantity that does
--- not move with the instant.  What is NOT entry-shaped is the base the
--- factor is keyed on: a walk reports its bound at the cap its own
--- descent reached, and the caps face widens that to the successor
--- instant's cap so the statement can be a function of `e`, `sl` and
--- `id` alone rather than of a level existential in the run.
+-- AND THE COST IS ONE STORY AT THE MINT, WHICH IS WHERE THE DESIGN
+-- QUESTION NOW SITS.  The gas an instant is evaluated with is minted
+-- one story above the fuel that instant's blowup runs at, so the
+-- budget affords a depth bound one instant up and the arithmetic wants
+-- two.  The deficit is a property of the mint rather than of this
+-- statement: gas only ever removes dryness, so raising it cannot make
+-- the claim it supports false, and nothing in the spec names it.
 --
--- SO THE WHOLE OF THE REPAIR IS THAT ONE WIDENING.  The walk's tight
--- key is the entry cap stepped by the level actually reached; the
--- widening replaces that level by the recurrence's maximum, and the
--- recurrence's maximum is what the second replay is about.  A key that
--- stays at the walk's own level, or a bound on that level in terms of
--- the path rather than of the recurrence, leaves nothing here reading
--- the successor cap.
+-- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), which
+--   carries the level-keyed obligation as its own statement and kills
+--   it at every level the fuel reaches.
 nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
   2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id

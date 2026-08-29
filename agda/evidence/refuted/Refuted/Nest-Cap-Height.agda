@@ -56,7 +56,7 @@ module Refuted.Nest-Cap-Height where
 open import Data.Empty using (⊥)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; +-suc; +-monoˡ-≤; +-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
+  (≤-refl; ≤-trans; ≤-reflexive; +-comm; +-suc; +-monoˡ-≤; +-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
    1+n≰n; *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-identityʳ; ^-monoʳ-≤)
 open import Data.Product using (Σ; _×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (sym; subst)
@@ -69,7 +69,7 @@ open import Rx.Evaluator using
   sIterD-suc; sLvlD-suc; opIterD-suc; fIterD-suc; dLvl; lvls)
 open import Verify-Budget-Sufficient.Measures using (n<2^n)
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; capsAt; capsH; frameBlowup; sizeCount; sizeCount-body; cDel; cDel-body;
+  (Caps; capsAt; capsH; frameStep; frameBlowup; sizeCount; sizeCount-body; cDel; cDel-body;
    1≤dCapᶜ; 2≤capsAt-size; 1≤capsAt-reg; tower-le-blowH;
    sIterD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; iterL-infl)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; cSize≤delSq)
@@ -325,6 +325,38 @@ inc≤cap e sl id =
           (≤-reflexive (sym (nestCapAt-suc e sl id)))
 
 ----------------------------------------------------------------------
+-- SIX.  AND THE LEVEL KEY IS IN THE DEAD ZONE TOO, at every level at
+-- or above the fuel -- which is what closes the repair that keys the
+-- currency at the level a walk REACHED rather than at the
+-- recurrence's maximum.  One frame of the size recurrence adds at
+-- least its own entry size, so the size field at level `j` is at
+-- least `j`, and the fuel is the thing the height is priced in.  Part
+-- THREE puts the recurrence's own count at or above the fuel, so the
+-- exit cap is one instance of this and not a separate fact.
+--
+-- WHAT THIS DOES NOT CLOSE, and it is the whole of what survives: a
+-- walk that halts STRICTLY BELOW the fuel.  That escape is refused on
+-- the walk face rather than here, by a reset-anchor pin recording
+-- that a level cap cannot ceiling a walk which climbs past the level
+-- it is keyed at -- prose, and so outside this file's guarantee.
+----------------------------------------------------------------------
+
+level-step : ∀ (c : Caps) (j : ℕ) → 1 ≤ Caps.cSize c →
+  j + Caps.cSize c ≤ Caps.cSize (frameStep j c)
+level-step c j 1≤S = add≤iterSize (Caps.cSize c) 1≤S j (Caps.cSize c)
+
+level-crosses : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id j : ℕ) → capsH e sl id ≤ j →
+  suc (capsH e sl id) ≤ Caps.cSize (frameStep j (capsAt e sl id))
+level-crosses e sl id j hj =
+  ≤-trans (s≤s hj)
+  (≤-trans (≤-trans (≤-reflexive (+-comm 1 j)) (+-monoʳ-≤ j 1≤S))
+           (level-step (capsAt e sl id) j 1≤S))
+  where
+  1≤S : 1 ≤ Caps.cSize (capsAt e sl id)
+  1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+
+----------------------------------------------------------------------
 -- THE STATEMENT, AND ITS REFUTATION.  `NestCapCapsH` is the arithmetic
 -- obligation the nesting cap rests on, verbatim.
 ----------------------------------------------------------------------
@@ -360,6 +392,27 @@ nestCap-3≤capsH-absurd-inc pr =
         (≤-trans (inc≤cap e sl 0)
         (≤-trans (m≤n+m (nestCapAt e sl 1) (2 * nestCapAt e sl 0))
                  (pr e sl 0))))
+  where
+  e : Closed Γ₀ natᵗ
+  e = progD 0 0
+  sl : Slots Γ₀
+  sl = ins₀
+
+-- AND THE LEVEL-KEYED FORM DIES WITH THEM.  `NestLevelKeyed` is the
+-- repair stated as its own obligation: price the currency at the cap
+-- a walk's own level reaches, and ask that cap to stay under the fuel
+-- the height is denominated in.  It fails at every level the fuel
+-- itself reaches, so the surviving form of the repair is not "key it
+-- lower" but "stop denominating the height in this fuel".
+NestLevelKeyed : Set
+NestLevelKeyed = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id j : ℕ) → capsH e sl id ≤ j →
+  Caps.cSize (frameStep j (capsAt e sl id)) ≤ capsH e sl id
+
+nestCap-level-absurd : NestLevelKeyed → ⊥
+nestCap-level-absurd pr =
+  1+n≰n (≤-trans (level-crosses e sl 0 (capsH e sl 0) ≤-refl)
+                 (pr e sl 0 (capsH e sl 0) ≤-refl))
   where
   e : Closed Γ₀ natᵗ
   e = progD 0 0

@@ -216,16 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **keep the walk's factor at the level it actually reached, which is
-  the one widening that reads the successor cap** — both replays need
-  that cap, and every other reading this currency makes is at the entry
-  cap, which the height's own growth per instant covers. The descent's
-  flattening is already entry-shaped: its level count is bounded by the
-  path length, a conjunct of the caps face. What is not is the base the
-  factor is keyed on — a walk reports at the cap its descent reached
-  and the delivery face widens that to the recurrence's maximum, so the
-  bound can be a function of the instant. The leg bounds that level by
-  the path instead, and carries the tight key to the two sums.
+- **read the nesting height two instants up, and find the story to pay
+  for it** — the key is closed as a subject: every level at or above
+  the depth fuel is refuted, and the walk face refuses the only level
+  below it. What survives is the INSTANT. The exit cap sits under a
+  tower of the next height, the currency is an exponential of a
+  polynomial in that cap, and the tower-to-story lemma lifts any such
+  tower to the story above — so the obligation is true two instants up
+  with tools already proven. The mint affords one. The leg states the
+  shifted form, proves the arithmetic, and prices the deficit.
 
 - **the step half of the selection's caps, which is the half already
   measured** — one chain's step preserving the caps is now its own
