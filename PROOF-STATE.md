@@ -190,15 +190,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **give the nest cone a source SIZE key, or establish it cannot have
-  one** — the two descent rows were to be discharged from the proven
-  caps face; that route is now refuted, and not at the cap. The face
-  sizes the subscribed source syntactically while this cone reads only
-  the sync spine and the slot closure, both leaves at a defer gate the
-  syntactic size recurses through, so no level closes it. The thru door
-  holds the strong reading and weakens it at its own threshold, so this
-  leg asks the suppliers for the size and threads it — or records it
-  unpayable, which puts both rows onto a nest-currency descent instead.
+- **move the thru fold onto the proven inner face** — the wrap's exit
+  is now a real body over the proven subscribe face, so the strong caps
+  boolean is in hand where the fold starts and is thrown away one line
+  later. The fold and every step under it are keyed on the weak node
+  reading, which the proven inner descent does not take and cannot be
+  recovered from, so the remaining row is a weaker duplicate of proven
+  code held in place by its own currency. This leg re-keys the fold to
+  the boolean the entry already has.
 
 - **the cascade descent, whose risk is now priced rather than
   probeable** — no row can print a verdict on it: the bound side reads
@@ -229,11 +228,6 @@ does not fit is a finding about the shared statement, not about the head.
   one cap and out at the same one. Its entry-width key stops the neighbouring
   witness reaching it, so nothing has instantiated this shape; the descent
   installs the iterate.
-- **`pushVals-caps-exit`** (Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE, RECOVERY`: the wrap's exit, which is the unkeyed walk
-  one hop down under a `thru-outer` frame. Its premises are the WRAP's keys and
-  say nothing about the width the source's own inners deliver, which is the
-  crossing the witness makes.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting
