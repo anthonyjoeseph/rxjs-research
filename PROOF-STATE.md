@@ -216,17 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **flatten the descent at the program's own layer count instead of at
-  the size cap** — the level count a walk may reach is already past the
-  height it is measured against, so any charge of one unit per level is
-  fatal however keyed — which closes re-keying the factor, shifting the
-  index and raising the budget alike. But nesting only
-  grows where a walk crosses an `*All` boundary, and the flattening
-  charges it once per unit of SIZE, which is where the caps entered the
-  currency at all. The delivery face already carries the path-shaped
-  form, and one lemma converts all three of its readings to cap-shaped
-  ones in a single step; the leg stops converting there and carries the
-  path-shaped form up to the two sums.
+- **keep the walk's factor at the level it actually reached, which is
+  the one widening that reads the successor cap** — both replays need
+  that cap, and every other reading this currency makes is at the entry
+  cap, which the height's own growth per instant covers. The descent's
+  flattening is already entry-shaped: its level count is bounded by the
+  path length, a conjunct of the caps face. What is not is the base the
+  factor is keyed on — a walk reports at the cap its descent reached
+  and the delivery face widens that to the recurrence's maximum, so the
+  bound can be a function of the instant. The leg bounds that level by
+  the path instead, and carries the tight key to the two sums.
 
 - **the step half of the selection's caps, which is the half already
   measured** — one chain's step preserving the caps is now its own

@@ -181,17 +181,20 @@ fuel≤blowup c F 1≤R 1≤S =
   S = Caps.cSize c
   J = sizeCount c F
 
--- AND THE LEVEL COUNT IS ALREADY PAST THE FUEL, BEFORE ANY CAP IS
--- READ -- which is the widest form of the finding and the one that
--- aims a repair.  The count a walk may descend to at instant `id` is
+-- AND THE RECURRENCE'S OWN LEVEL COUNT IS ALREADY PAST THE FUEL, which
+-- is what closes the widening the caps face performs on a walk's
+-- report.  The count the recurrence steps by at instant `id` is
 -- `sizeCount` of the entry cap at fuel `capsH e sl id`, and part ONE
--- puts the fuel under it.  So a currency charging ONE unit per level
--- descended already exceeds the height it is measured against,
--- whatever the per-level charge is a function of and whichever cap it
--- reads.  Only a currency that charges NOTHING per level -- one whose
--- nesting is PRESERVED down a descent rather than increased -- escapes,
--- and that is a question about the nesting measure's clauses rather
--- than about the caps.
+-- puts the fuel under it, so a quantity charging one unit per level of
+-- THAT count exceeds the height whatever it is keyed on.
+--
+-- AND THE SCOPE IS EXACTLY THAT COUNT, NOT EVERY PER-LEVEL CHARGE.  A
+-- descent's own flattening is keyed on the PATH, whose length the entry
+-- cap bounds by an invariant conjunct, and that is a much smaller
+-- quantity than the recurrence's worst case -- so a currency flattened
+-- at the entry cap's size is not caught here.  What is caught is the
+-- step that replaces a walk's reported level by the recurrence's
+-- maximum in order to state the bound as a function of the instant.
 capsH≤levels : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsH e sl id ≤ sizeCount (capsAt e sl id) (capsH e sl id)
 capsH≤levels e sl id =

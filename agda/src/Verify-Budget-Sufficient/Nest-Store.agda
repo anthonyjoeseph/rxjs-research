@@ -890,34 +890,31 @@ abstract
 -- stepped by the maximum level the fuel admits.  That widening is what
 -- puts the exit cap into the currency, in both summands.
 --
--- AND RE-KEYING THE FACTOR IS DEAD TOO, WHICH MOVES THE QUESTION TO THE
--- FLATTENING.  The count a walk may descend to at this instant is
--- `sizeCount` of the entry cap at fuel `capsH e sl id`, and one unit of
--- depth buys at least one level, so the LEVEL COUNT is already past the
--- height before any cap is read.  A charge of one unit per level
--- therefore exceeds the height whatever it is a function of and
--- whichever cap it reads -- entry, exit, nesting or program-shaped
--- alike.
+-- AND THE ENTRY CAP IS NOT CAUGHT BY EITHER REPLAY, WHICH IS WHAT
+-- NARROWS THE REPAIR TO ONE STEP.  Both crossings need the SUCCESSOR
+-- instant's cap: the increment's unit term is keyed there, and the
+-- factor's exponent reads its delivery square.  Every other reading
+-- this currency makes is at the entry cap, and the entry cap is under
+-- the previous instant's height rather than this one's, which the
+-- height's own growth per instant covers with stories to spare.
 --
--- WHAT IS ACTUALLY BEING CHARGED IS SIZE, AND NESTING DOES NOT GROW
--- THERE.  The descent's grant is flattened at the cap's SIZE field, so
--- it pays one nesting unit and one factor for every unit of term size a
--- walk may cross; but the measure only moves where a walk crosses an
--- `*All` boundary, and every other clause either carries its argument
--- or takes a maximum.  The flattening key is where the caps entered
--- this currency at all.
+-- AND THE DESCENT'S OWN FLATTENING IS ALREADY ENTRY-SHAPED.  The grant
+-- is flattened at a level count the PATH bounds -- the caps face
+-- carries `suc (pathLen p) ≤ Caps.cSize c` as a conjunct, at the entry
+-- cap -- so the per-level charge is priced against a quantity that does
+-- not move with the instant.  What is NOT entry-shaped is the base the
+-- factor is keyed on: a walk reports its bound at the cap its own
+-- descent reached, and the caps face widens that to the successor
+-- instant's cap so the statement can be a function of `e`, `sl` and
+-- `id` alone rather than of a level existential in the run.
 --
--- AND THE PATH-SHAPED FORM ALREADY EXISTS, WHICH IS WHY THIS IS A LEG
--- AND NOT A DESIGN QUESTION.  The delivery face carries a per-frame
--- nesting factor multiplied along the path, and a path-shaped nesting
--- depth beside it; what turns them into the cap-shaped key is one
--- conversion lemma bounding the path depth by the path LENGTH times
--- the size cap, spent in `shareFold-unit` (.Nest-Walk) -- which is the
--- single site where the caps enter this currency, converting all three
--- path-shaped readings to cap-shaped ones in one step.  Everything
--- downstream of it is paying for that step.  The work is to carry the
--- path-shaped form up to these two sums rather than to invent a
--- currency.
+-- SO THE WHOLE OF THE REPAIR IS THAT ONE WIDENING.  The walk's tight
+-- key is the entry cap stepped by the level actually reached; the
+-- widening replaces that level by the recurrence's maximum, and the
+-- recurrence's maximum is what the second replay is about.  A key that
+-- stays at the walk's own level, or a bound on that level in terms of
+-- the path rather than of the recurrence, leaves nothing here reading
+-- the successor cap.
 nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
   2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id
