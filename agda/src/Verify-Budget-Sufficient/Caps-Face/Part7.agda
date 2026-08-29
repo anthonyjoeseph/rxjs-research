@@ -1110,6 +1110,13 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- untouched.  The statement the caller wants follows because both are
 -- summands of the same `⊔`.
 --
+-- THE SHAPE THAT COULD WORK IS THE μ STEP'S, NOT THE FRAME'S.  A μ
+-- already jumps the level by a quadratic without paying an operator per
+-- level, because its measure is RE-MINTED at the stepped level's size
+-- cap rather than decremented.  A frame's sibling of that step is what
+-- this leaf is waiting on, and it leaves the drain's conjunct
+-- arithmetic — which is what kept the ceiling out of the types.
+--
 -- REFUTED: `Refuted.Chain-Step-Live-Nest`, three against one at a body
 --   three layers deep and five against one at five, so the gap is
 --   unbounded in the body's depth and no constant repairs it.
@@ -2429,6 +2436,17 @@ postulate
 -- REFUTED: `Refuted.Walk-Frame-Drain-Level` — `walk-frame-drain` at the
 --   empty context with the level taken to be the base size cap, every
 --   other premise met by the entry bounds and the proven node installer.
+--
+-- DEAD ROUTE: replacing the drain's arithmetic conjunct by `CeilD`
+--   itself, so that the walk hands the ceiling over instead of the
+--   consumer rebuilding it from level zero.  The ceiling's descent lemma
+--   spends ONE unit of the operator measure per level, so a ceiling
+--   carried at fixed measures cannot cross a frame whose growth is
+--   bounded by `fLvlD` — the obstruction MOVES rather than clearing, and
+--   the walk is left owing the same quantity in a different currency.
+--   It also puts a computing measure into a type that many signatures
+--   mention, which pushed the module's shared-context check past the dev
+--   budget, and it orphans the whole base-cap climb.
 postulate
   walk-frame-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)

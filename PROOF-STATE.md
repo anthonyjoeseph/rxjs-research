@@ -216,15 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **hand the drain its ceiling instead of rebuilding it from the
-  bottom** — the level premise the walk cannot pay is now refuted at a
-  witness, and the finding is narrow: the drain's headroom conjunct is
-  the level on top of a positive quantity under the BASE size cap,
-  while the walk's own Σ is denominated in the count. The two are the
-  same currency one `opIterD` apart, so the repair is to carry the
-  relative ceiling through the walk rather than a bound the recursion
-  cannot reproduce. This restates a definition the proven drain face
-  consumes, so it moves that face's premise with it.
+- **give the level jump a frame-shaped step that re-mints its
+  measure** — carrying the relative ceiling through the drain is dead:
+  its descent lemma spends one unit of the operator measure per level,
+  so a ceiling held at fixed measures cannot cross a frame at all, and
+  the obstruction merely changes currency. The one step in the ceiling
+  family that crosses levels without paying per level is the μ one,
+  because it RE-MINTS the measure at the stepped level's own size cap
+  instead of decrementing it. A frame's sibling of that step is what
+  the refuted leaf is waiting on, and it leaves the drain's conjunct as
+  arithmetic — which is what kept the ceiling out of the types.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
@@ -250,10 +251,10 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `REFUTED`: a bounded
-  `mergeAll`'s parked queue, charged against the BASE size cap while the walk's
-  ladder is denominated in the count. False in its level and nothing else; the
-  restatement owed is the ceiling in relative form.
+- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `REFUTED, DEAD ROUTE`: a
+  bounded `mergeAll`'s parked queue, charged against the BASE size cap while
+  the walk's ladder is denominated in the count. False in its level and nothing
+  else; the restatement owed is the ceiling in relative form.
 - **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction
