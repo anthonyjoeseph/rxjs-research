@@ -4465,6 +4465,17 @@ postulate
   --   blocks every version is one conjunct -- the room record's
   --   arrival width, read against the entry field -- so a repair that
   --   does not move that conjunct has not moved anything.
+  -- TWIN: `inner-dWO` answers the index question this leaf keeps
+  --   failing on.  The burst face carries the arrival width key as a
+  --   LEVELLED predicate over the arrival list, and reads `dWᵉ` out at
+  --   `frameStep J c` -- never at the entry field.  So the fact this
+  --   leaf needs is already proven one face over, at the one cap the
+  --   refutation leaves available.  What that moves is the CONCLUSION
+  --   and not a premise: a key at a wider field cannot establish a
+  --   bound at a narrower one, so the repair is to state this leaf at
+  --   the stepped cap and carry the room record's arrival conjunct
+  --   with it -- which is the conjunct the dead route above names as
+  --   the one every reparameterisation failed to move.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-burstW` below.
   subscribeE-burst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

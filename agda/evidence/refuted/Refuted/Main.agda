@@ -102,7 +102,7 @@ open import Refuted.Defer-Park-Size
 open import Refuted.Defer-Park-Width
   using (StmtW; progW; defer-park-width-absurd)
 open import Refuted.Subscribe-Burst-Width
-  using (Stmt; prems≡; burst-width-absurd; figs≡;
+  using (Stmt; prems≡; burst-width-absurd; figs≡; keyFig≡;
          StmtWalk; premsP≡; walk-absurd)
 open import Refuted.PushVals-Adm-Map
   using (AdmStmt; WidStmt; prems-map≡; adm-absurd; wid-absurd; figs-map≡;

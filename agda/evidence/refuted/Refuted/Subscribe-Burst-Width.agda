@@ -54,7 +54,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; switchAllᵉ; mergeAllᵉ; nat̂; strmᵗ; deferᵉ)
-open import Rx.Frame-Width using (pWᵛ)
+open import Rx.Frame-Width using (pWᵛ; dWᵉ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (root; sched-init; st-init; subscribeE; mintNode; EvalSt; Sched;
@@ -186,3 +186,15 @@ StmtWalk =
 walk-absurd : StmtWalk → ⊥
 walk-absurd h with h face refl refl refl refl ≤-refl
 ... | ()
+
+-- THE KEY THAT SEPARATES IT.  The crossing payload is a PARKED body,
+-- so its `outWᵛ` is zero and every unit of its width sits on the dW
+-- side.  The source therefore reads THREE on the parked measure at the
+-- table it is subscribed under, against a cap granting two -- so a
+-- `dWᵉ … ≤ cWid` premise excludes this witness exactly, which is what
+-- licenses conditioning the leaf on it rather than weakening it.
+keyFig : ℕ
+keyFig = dWᵉ 2 slots parked
+
+keyFig≡ : keyFig ≡ 3
+keyFig≡ = refl

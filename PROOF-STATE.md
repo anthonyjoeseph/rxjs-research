@@ -190,22 +190,24 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the arrival's own width key, at the one clause that prices it** —
-  the leaves now hold the state invariant in full and the slot-table
-  bundle, and the refutation was re-run against exactly that and
-  SURVIVES: a parked head hands back a payload wider than the table,
-  and neither key reads a payload. So the key must be on the ARRIVAL,
-  and it cannot be flat — the `μᵉ` clause recurses on an unfolding the
-  `μᵉ`'s own reading does not bound, which is a dead route at the leaf.
-  This leg states the μ step's width obligation ALONE, and asks whether
-  the level it needs collapses at the cap the arms already report at —
-  before any j-indexed shape is adopted across the descent.
+- **the burst leaf's CONCLUSION moved to the stepped cap** — the
+  previous leg asked for the μ step's width obligation at a flat cap.
+  There is none: the only μ width statement in the tree is stepped,
+  and a flat key is refuted at the leaf and unsupplyable at the walk's
+  own `μᵉ` clause. What answers it is one face over — the burst side
+  carries this key as a levelled predicate on the arrivals and reads
+  the width out at the stepped cap. A wider key cannot establish a
+  narrower bound, so the premise is not where the repair goes. This
+  leg restates the leaf at that cap and takes the level from the walk.
 
-- **the burst probe re-run against what replaces it** — the probe over
-  these leaves was taken at the frozen-width cap, so its rows become
-  evidence about text that is gone. Its harness is the expensive half
-  and transfers; the verdict does not. Re-running is not optional and
-  restamping the fingerprint alone is forbidden.
+- **the room record's arrival conjunct, which is what blocks it** —
+  every reparameterisation of the arrival cap died on one conjunct:
+  the record reads the arrival width against the ENTRY field, so the
+  leaf's consumer owes a frozen-cap fact whatever the leaf proves.
+  The asymmetry is already visible in the room's own fold: its state
+  half advances a level per instant while its width half stays at the
+  entry field. This leg advances the width half with it, and prices
+  what the exit walk then owes.
 
 - **the cascade descent given something that instantiates it** — the
   tier's other FALSITY, and the one row nothing has ever reached: both
@@ -223,10 +225,9 @@ does not fit is a finding about the shared statement, not about the head.
   both sealed families sit on the right — and the store-mediated route it
   replaced is circular; the header carries the cycle.
 - **`subscribeE-burst-caps`** (Nest-Walk) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2, PROBED`: the arrivals' width key over any
-  subscription's burst. Now holds the state invariant in full AND the
-  slot-table bundle, and is refuted against exactly that — a parked payload
-  wider than the table, which no key over the cap and the table reads.
+  `REFUTED×2, DEAD ROUTE×2, TWIN, PROBED`: the arrivals' width key over any
+  subscription's burst, refuted against the full invariant and the slot
+  bundle both. The index it is owed at is the burst face's stepped cap.
 - **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   the inner descent's caps invariant, in at one cap and out at the same one.
   Its entry-width key stops the neighbouring witness reaching it, so nothing
