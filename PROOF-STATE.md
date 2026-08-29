@@ -1,30 +1,56 @@
-- **the exit family restated in the face's own shape: the level
-  existentially quantified AND bounded** — the constant died at the
-  thru chain and a carried level names the wrong thing, but the chain
-  composes if each arrival contributes its own step to a running total
-  held under one bound. That is what the proven face already reports —
-  a Σ over the level with `j + j′` under an iteration bound — and what
-  the instant's own cap family is built to absorb, its successor being
-  the entry stepped by a computed count. This commit is the
-  restatement of the conclusion alone; the arms stay postulated
-  beneath it.
-- **the arms consume `subscribeE-caps` rather than re-proving it** —
-  with the conclusion in the face's shape, no arm has to re-establish
-  a premise: the arm spends the face and inherits its level and its
-  bound, weakening `capsOK?` through `capsOK?⇒nest`. The premises are
-  not threaded, which is the point — threading them arm by arm is the
-  route the header already records as dead, and the face is where they
-  already sit. The bridge's charge one module over is the worked
-  instance.
-- **the walk's entry stops weakening, and the probe is re-run** — the
-  thru door holds `capsOK?` and discards it immediately; the face
-  wants exactly that, so the weakening moves from the door down to
-  each arm's conclusion. `Probed.PushVals-Caps` was taken against the
-  frozen-width cap, so its green is evidence about text that will be
-  gone; the rows re-run at the restated shape or the probe goes, and
-  restamping the fingerprint alone is forbidden.
+# PROOF-STATE — the roadmap
 
-### The ledger` carrying
+**What this file is.** The ordered worklist for the one goal: discharging
+`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` — no postulates, everything
+typechecks. This file holds the SCHEDULE — each tier's next three legs — over a
+LEDGER of one-line hooks; everything else lives in the code.
+
+**Hygiene — the rules this file lives by:**
+
+- **Stay current.** This file describes the repo's present state and the work
+  ahead — never its history. No dated narrative, no "was X, now Y", no
+  superseded plans, no references to code that no longer exists. Git history
+  is the archive.
+  **`make roadmap-check` ENFORCES THE DATE HALF** — this file names no calendar
+  date, anywhere, and one is a build failure. The same scan holds CLAUDE.md to
+  the rule, for the neighbouring reason: this file must be CURRENT, that one
+  must be TIMELESS. It is the half a machine can see
+  with no judgement, and it catches most of the rest by proxy: history arrives
+  here WITH a timestamp attached, because the writer knows the reader will want
+  to know when. Dates are wanted in a postulate's header, where their age is
+  the point, and in CLAUDE.md, where a ruling's attribution belongs. A "was X,
+  now Y" that carries no date still has to be caught by eye — which is a reason
+  to read the file, not a reason to catch none of it.
+- **Completed items are DELETED, not marked complete.** No ~~strikethrough~~,
+  no "✅ DONE" rows, no discharged-count bookkeeping in tier headings. The
+  deletion happens in the same commit as the discharge, and the commit
+  message carries what was proven. A completed row left in place is the seed
+  of dated-narrative rot.
+- **Research lives in source comments**, in the header of the postulate or
+  definition it is about — probe receipts (`-- PROBED`), failed routes
+  (`-- DEAD ROUTE`), proof sketches, coverage residue, recovery pointers.
+  If a note here outgrows its one line, it belongs in a header instead.
+  **`make roadmap-check` ENFORCES A CHARACTER BUDGET, on a row's hook AND on
+  a tier's PREAMBLE.** The second is not redundant: holding every bullet to a
+  line while writing the finding into the section text above them satisfies
+  the row budget exactly, and one tier's preamble reached 4387 characters
+  that way — a deleted face's refutation history, a superseded predecessor's
+  deletion story, and the research for a currency swap that was already in
+  the source header it belongs in. A preamble says what the tier IS: the one
+  statement it exports, the doors in and out, and what orders the rows.
+- **No numbering.** Items are referred to BY NAME (postulates are unique,
+  greppable names — the wiring law guarantees it). Order within a tier is
+  the schedule: top item first. Reorder freely, in the same commit as the
+  finding that reorders it. This covers EVERY positional scheme, not just
+  list indices: conjunct positions ("conjunct (8)" — say `the hasDry
+  conjunct`), source section numbers ("§ 5a" — say the postulate's name),
+  timing figures (those live in typecheck-performance-numbers.md alone).
+  A position silently re-aims when the thing it indexes is edited; a name
+  greps or it errors.
+- **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
+  IT IS DRAWN FROM (Anthony).** Every tier opens with a
+  `### Big picture tier roadmap` naming EXACTLY THREE legs — the next three
+  units of work, ranked riskiest-first — and then a `### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
@@ -190,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **move the thru fold onto the proven inner face** — the wrap's exit
-  is now a real body over the proven subscribe face, so the strong caps
-  boolean is in hand where the fold starts and is thrown away one line
-  later. The fold and every step under it are keyed on the weak node
-  reading, which the proven inner descent does not take and cannot be
-  recovered from, so the remaining row is a weaker duplicate of proven
-  code held in place by its own currency. This leg re-keys the fold to
-  the boolean the entry already has.
-
 - **the cascade descent, whose risk is now priced rather than
   probeable** — no row can print a verdict on it: the bound side reads
   two sealed families, and the one form underneath it that proven
@@ -216,6 +233,14 @@ does not fit is a finding about the shared statement, not about the head.
   what the selection's walk is trusted for to the components a row
   actually reads.
 
+- **the burst's admissibility, at the level the walk now reads it** —
+  the fold below it stopped needing the nesting boolean, so the one
+  remaining consumer of the burst's nest-keyed reading is this row, and
+  its refuting map crosses exactly the level the walk now carries as a
+  bound rather than a constant. Whether the row survives the re-key or
+  is refuted at the new reading is a question one probe answers, and
+  the harness for it is the one the fold's caps boolean already uses.
+
 ### The ledger
 
 - **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY,
@@ -223,11 +248,6 @@ does not fit is a finding about the shared statement, not about the head.
   The one form under it that proven inequalities reach is refuted at the
   evaluator, so nothing instantiates it from below; the store route it replaced
   cycles.
-- **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY,
-  `REFUTED, DEAD ROUTE, RECOVERY`: the inner descent's caps invariant, in at
-  one cap and out at the same one. Its entry-width key stops the neighbouring
-  witness reaching it, so nothing has instantiated this shape; the descent
-  installs the iterate.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting

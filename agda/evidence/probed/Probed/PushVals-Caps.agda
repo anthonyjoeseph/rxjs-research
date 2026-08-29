@@ -163,6 +163,7 @@ Widths W = ∀ {s t} {e : Closed Γ₂ t} (fuel : Gas) (op : AllOp) (nid : NodeI
 
 capsM-1 : ∀ {W} → Widths W → capsM 1 1 W
 capsM-1 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , 0 , tt
@@ -175,6 +176,7 @@ capsS k W =
 
 capsS-1 : ∀ {W} → Widths W → capsS 1 W
 capsS-1 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
         , 0 , tt
@@ -187,6 +189,7 @@ capsX k W =
 
 capsX-1 : ∀ {W} → Widths W → capsX 1 W
 capsX-1 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , 0 , tt
@@ -239,24 +242,28 @@ headsClos≡ = refl
 -- at one that admits
 capsM-2 : ∀ {W} → Widths W → capsM 1 2 W
 capsM-2 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , 0 , tt
 
 capsM-0 : ∀ {W} → Widths W → capsM 0 1 W
 capsM-0 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , 0 , tt
 
 capsS-2 : ∀ {W} → Widths W → capsS 2 W
 capsS-2 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
         , 0 , tt
 
 capsX-2 : ∀ {W} → Widths W → capsX 2 W
 capsX-2 hw = refl , refl , refl , refl
+        , refl
         , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
           , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
         , 0 , tt
@@ -342,8 +349,8 @@ capsSh W =
     (proj₁ resSh) (proj₁ (proj₂ resSh)) (proj₂ (proj₂ resSh))
 
 capsSh-2 : ∀ {W} → Widths W → capsSh W
-capsSh-2 hw = refl , refl , refl , refl , tt
-        , 0 , (refl , refl , refl , refl
+capsSh-2 hw = refl , refl , refl , refl , refl , tt
+        , 0 , (refl , refl , refl , refl , refl
           , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
           , 0 , tt)
 
@@ -392,8 +399,8 @@ capsShS W =
     (proj₁ resShS) (proj₁ (proj₂ resShS)) (proj₂ (proj₂ resShS))
 
 capsShS-2 : ∀ {W} → Widths W → capsShS W
-capsShS-2 hw = refl , refl , refl , refl , tt
-        , 0 , (refl , refl , refl , refl
+capsShS-2 hw = refl , refl , refl , refl , refl , tt
+        , 0 , (refl , refl , refl , refl , refl
           , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
           , 0 , tt)
 
@@ -404,8 +411,8 @@ capsShX W =
     (proj₁ resShX) (proj₁ (proj₂ resShX)) (proj₂ (proj₂ resShX))
 
 capsShX-2 : ∀ {W} → Widths W → capsShX W
-capsShX-2 hw = refl , refl , refl , refl , tt
-        , 0 , (refl , refl , refl , refl
+capsShX-2 hw = refl , refl , refl , refl , refl , tt
+        , 0 , (refl , refl , refl , refl , refl
           , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
           , 0 , tt)
 
