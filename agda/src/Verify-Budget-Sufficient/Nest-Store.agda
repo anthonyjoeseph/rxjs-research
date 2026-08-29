@@ -864,16 +864,60 @@ abstract
 -- by F)`, so no index shift, no larger height sequence and no tower
 -- denomination of the budget can close it.
 --
--- WHAT IS LEFT IS TO STOP READING THE EXIT CAP.  The obligation is
--- unsatisfiable exactly while the factor reads `capsAt` at the instant's
--- OWN EXIT, which is the index the depth budget defines; a factor that
--- reads only the ENTRY caps and program-shaped quantities is not caught
--- by this argument, and pricing the walk's descent then has to be paid
--- for some other way than by naming the endpoint it climbs to.
+-- WHAT IS LEFT IS TO STOP READING THE EXIT CAP -- IN EVERY SUMMAND,
+-- NOT ONLY IN THE FACTOR.  The obligation is unsatisfiable while ANY
+-- part of the currency reads `capsAt` at the instant's own exit, which
+-- is the index the depth budget defines.  The increment alone already
+-- crosses, by a chain that never reaches an exponent: its unit term is
+-- `nestU` keyed on the exit cap's delivery square, `nestU` is a `suc`
+-- of its key times a successor, and the fuel is under that key.  So a
+-- re-denomination of the factor that leaves the increment's key where
+-- it is repairs nothing.
 --
 -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), at a
---   closed program, and the same file refutes the `nest-height` Σ this
---   body is assembled from.
+--   closed program, twice -- once through the factor and once through
+--   the increment alone -- and the same file refutes the `nest-height`
+--   Σ this body is assembled from.
+
+-- WHERE THE EXIT CAP ENTERS, WHICH IS WHERE THE REPAIR HAS TO BE MADE,
+-- and it is one widening rather than a design commitment.  A cascade's
+-- walk reports its own level `j`, and the tight cap its states satisfy
+-- is `frameStep j (capsAt e sl id)` -- the entry cap stepped by the
+-- level actually reached.  The delivery face then widens that to
+-- `capsAt e sl (suc id)` so the fanout bound can be stated as a
+-- function of `e`, `sl` and `id` alone, since `j` is existential in the
+-- run; and `capsAt e sl (suc id)` IS that widening, being the entry cap
+-- stepped by the maximum level the fuel admits.  That widening is what
+-- puts the exit cap into the currency, in both summands.
+--
+-- AND RE-KEYING THE FACTOR IS DEAD TOO, WHICH MOVES THE QUESTION TO THE
+-- FLATTENING.  The count a walk may descend to at this instant is
+-- `sizeCount` of the entry cap at fuel `capsH e sl id`, and one unit of
+-- depth buys at least one level, so the LEVEL COUNT is already past the
+-- height before any cap is read.  A charge of one unit per level
+-- therefore exceeds the height whatever it is a function of and
+-- whichever cap it reads -- entry, exit, nesting or program-shaped
+-- alike.
+--
+-- WHAT IS ACTUALLY BEING CHARGED IS SIZE, AND NESTING DOES NOT GROW
+-- THERE.  The descent's grant is flattened at the cap's SIZE field, so
+-- it pays one nesting unit and one factor for every unit of term size a
+-- walk may cross; but the measure only moves where a walk crosses an
+-- `*All` boundary, and every other clause either carries its argument
+-- or takes a maximum.  The flattening key is where the caps entered
+-- this currency at all.
+--
+-- AND THE PATH-SHAPED FORM ALREADY EXISTS, WHICH IS WHY THIS IS A LEG
+-- AND NOT A DESIGN QUESTION.  The delivery face carries a per-frame
+-- nesting factor multiplied along the path, and a path-shaped nesting
+-- depth beside it; what turns them into the cap-shaped key is one
+-- conversion lemma bounding the path depth by the path LENGTH times
+-- the size cap, spent in `shareFold-unit` (.Nest-Walk) -- which is the
+-- single site where the caps enter this currency, converting all three
+-- path-shaped readings to cap-shaped ones in one step.  Everything
+-- downstream of it is paying for that step.  The work is to carry the
+-- path-shaped form up to these two sums rather than to invent a
+-- currency.
 nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
   2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id

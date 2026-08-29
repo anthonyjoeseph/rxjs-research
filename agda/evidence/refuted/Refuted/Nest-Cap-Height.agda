@@ -30,13 +30,20 @@
 --
 -- WHAT THIS DOES NOT SHOW.  It says nothing against the nesting
 -- invariant itself, and nothing against the caps recurrence.  It kills
--- the CALIBRATION: a cap that reads a caps field cannot be bounded by a
--- caps HEIGHT, whatever the factor, because `n < 2 ^ n` alone closes the
--- gap.  A repair has to break the read -- either the factor stops
--- reading `capsAt` (back to program-shaped, which is what the header
--- still describes) or the obligation is restated against a TOWER of the
--- height rather than the height, which is the currency `capsAt` itself
--- is bounded in.
+-- the CALIBRATION: a cap that reads the SUCCESSOR instant's caps field
+-- cannot be bounded by the height that instant's own step was fuelled
+-- by, because part THREE puts the fuel under that field for every
+-- fuel.
+--
+-- AND THE TOWER ESCAPE IS CLOSED TOO, which is why part THREE is
+-- stated over an arbitrary fuel rather than over `capsH`.  Restating
+-- the obligation against a bigger height does not help: whatever the
+-- height is, the exit cap's size field is at least it, so the currency
+-- is at least it, and the two grow together rather than apart.  The
+-- repair has to break the READ, and part FIVE says how completely --
+-- not one summand of the currency may read `capsAt` at the successor
+-- instant, the increment's unit term included, so re-denominating the
+-- factor alone leaves the obligation refuted.
 --
 -- AND THE ARITHMETIC BELOW IS NOT ABOUT THE PROGRAM.  No conjunct reads
 -- the witness beyond needing one closed program to exist, because the
@@ -49,7 +56,7 @@ module Refuted.Nest-Cap-Height where
 open import Data.Empty using (⊥)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; +-suc; +-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
+  (≤-refl; ≤-trans; ≤-reflexive; +-suc; +-monoˡ-≤; +-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
    1+n≰n; *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-identityʳ; ^-monoʳ-≤)
 open import Data.Product using (Σ; _×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (sym; subst)
@@ -66,10 +73,11 @@ open import Verify-Budget-Sufficient.Caps using
    1≤dCapᶜ; 2≤capsAt-size; 1≤capsAt-reg; tower-le-blowH;
    sIterD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; iterL-infl)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; cSize≤delSq)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-room)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (nestCapAt; nestCapAt-suc; nestFacAt; nestFacAt-def; nestIncAt;
-   size≤nestIncAt; realWidAt; realWidAt-def; nestBurstAt;
-   capsHpred; capsH-blow; 1≤capsHpred)
+  (nestCapAt; nestCapAt-suc; nestFacAt; nestFacAt-def; 1≤nestFacAt; nestIncAt;
+   nestIncAt-def; nestUnit; size≤nestIncAt; realWidAt; realWidAt-def;
+   nestBurstAt; 1≤nestBurstAt; capsHpred; capsH-blow; 1≤capsHpred)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₀; ins₀; progD)
 
 ----------------------------------------------------------------------
@@ -173,6 +181,22 @@ fuel≤blowup c F 1≤R 1≤S =
   S = Caps.cSize c
   J = sizeCount c F
 
+-- AND THE LEVEL COUNT IS ALREADY PAST THE FUEL, BEFORE ANY CAP IS
+-- READ -- which is the widest form of the finding and the one that
+-- aims a repair.  The count a walk may descend to at instant `id` is
+-- `sizeCount` of the entry cap at fuel `capsH e sl id`, and part ONE
+-- puts the fuel under it.  So a currency charging ONE unit per level
+-- descended already exceeds the height it is measured against,
+-- whatever the per-level charge is a function of and whichever cap it
+-- reads.  Only a currency that charges NOTHING per level -- one whose
+-- nesting is PRESERVED down a descent rather than increased -- escapes,
+-- and that is a question about the nesting measure's clauses rather
+-- than about the caps.
+capsH≤levels : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  capsH e sl id ≤ sizeCount (capsAt e sl id) (capsH e sl id)
+capsH≤levels e sl id =
+  d≤sizeCount (capsAt e sl id) (capsH e sl id) (1≤capsAt-reg e sl id)
+
 capsH≤size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   capsH e sl id ≤ Caps.cSize (capsAt e sl (suc id))
 capsH≤size e sl id =
@@ -230,6 +254,74 @@ fac≤cap e sl id =
                    (m≤n+m (nestIncAt e sl id) (nestCapAt e sl id))
 
 ----------------------------------------------------------------------
+-- FIVE.  THE INCREMENT ALONE ALREADY CROSSES, WITHOUT THE FACTOR --
+-- which is what narrows the repair from "re-denominate the factor" to
+-- "no summand of the currency may read the cap at the instant AFTER
+-- the one it prices".  The increment's unit term is `nestU` at the
+-- delivery square of the exit cap, and `nestU` is `suc` of its key
+-- times a unit that is a successor by construction, so the exit cap's
+-- own size field sits STRICTLY under one summand of the increment
+-- before any exponent is reached.  Part THREE puts the fuel under that
+-- size field, so the increment exceeds the fuel it is priced against.
+----------------------------------------------------------------------
+
+capsH<inc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (capsH e sl id) ≤ nestIncAt e sl id
+capsH<inc {n = n} e sl id =
+  ≤-trans (s≤s (≤-trans (capsH≤size e sl id)
+                        (cSize≤delSq n (capsAt e sl (suc id)) 1≤S′)))
+  (≤-trans sQ≤nu (≤-trans nu≤mid (≤-trans mid≤b b≤r)))
+  where
+  Q = delSq n (capsAt e sl (suc id))
+  U = nestUnit e sl
+  R = realWidAt e sl id
+  b = nestBurstAt e sl id
+  D = delSize n (capsAt e sl id)
+
+  1≤S′ : 1 ≤ Caps.cSize (capsAt e sl (suc id))
+  1≤S′ = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl (suc id))
+
+  1≤U : 1 ≤ U
+  1≤U = s≤s z≤n
+
+  1≤R : 1 ≤ R
+  1≤R = subst (1 ≤_) (sym (realWidAt-def e sl id)) (1≤capsAt-reg e sl id)
+
+  sQ≤nu : suc Q ≤ nestU Q U
+  sQ≤nu = ≤-trans (+-monoˡ-≤ Q 1≤U) (nestU-room Q U Q 1≤U ≤-refl)
+
+  1≤mid : 1 ≤ suc (suc (R * D))
+  1≤mid = s≤s z≤n
+
+  nu≤mid : nestU Q U ≤ suc (suc (R * D)) * nestU Q U
+  nu≤mid = ≤-trans (≤-reflexive (sym (*-identityˡ (nestU Q U))))
+                   (*-monoˡ-≤ (nestU Q U) 1≤mid)
+
+  mid≤b : suc (suc (R * D)) * nestU Q U
+            ≤ b * (suc (suc (R * D)) * nestU Q U)
+  mid≤b = ≤-trans (≤-reflexive (sym (*-identityˡ (suc (suc (R * D)) * nestU Q U))))
+                  (*-monoˡ-≤ (suc (suc (R * D)) * nestU Q U)
+                             (1≤nestBurstAt e sl id))
+
+  b≤r : b * (suc (suc (R * D)) * nestU Q U) ≤ nestIncAt e sl id
+  b≤r =
+    ≤-trans (≤-trans (≤-reflexive
+                       (sym (*-identityˡ (b * (suc (suc (R * D)) * nestU Q U)))))
+                     (*-monoˡ-≤ (b * (suc (suc (R * D)) * nestU Q U)) 1≤R))
+            (≤-reflexive (sym (nestIncAt-def e sl id)))
+
+inc≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestIncAt e sl id ≤ nestCapAt e sl (suc id)
+inc≤cap e sl id =
+  ≤-trans (≤-trans (m≤n+m (nestIncAt e sl id) (nestCapAt e sl id))
+                   (≤-trans (≤-reflexive
+                              (sym (*-identityˡ (nestCapAt e sl id
+                                                   + nestIncAt e sl id))))
+                            (*-monoˡ-≤ (nestCapAt e sl id + nestIncAt e sl id)
+                                       (1≤nestFacAt e sl id))))
+          (≤-reflexive (sym (nestCapAt-suc e sl id)))
+
+----------------------------------------------------------------------
 -- THE STATEMENT, AND ITS REFUTATION.  `NestCapCapsH` is the arithmetic
 -- obligation the nesting cap rests on, verbatim.
 ----------------------------------------------------------------------
@@ -245,6 +337,26 @@ nestCap-3≤capsH-absurd pr =
         (≤-trans (fac≤cap e sl 0)
         (≤-trans (m≤n+m (nestCapAt e sl 1) (2 * nestCapAt e sl 0))
                  (pr e sl 0)))))
+  where
+  e : Closed Γ₀ natᵗ
+  e = progD 0 0
+  sl : Slots Γ₀
+  sl = ins₀
+
+-- AND THE SAME OBLIGATION DIES A SECOND, SHORTER DEATH, one that no
+-- change to the FACTOR can repair.  This replay never reaches
+-- `nestFacAt`'s exponent: it walks the fuel into the exit cap's size
+-- field, the size field into the increment's unit summand, and the
+-- increment into the cap.  So a repair that re-denominates only the
+-- factor leaves the obligation refuted, and the constraint the repair
+-- has to satisfy is that NO summand of the currency reads `capsAt` at
+-- the successor instant.
+nestCap-3≤capsH-absurd-inc : NestCapCapsH → ⊥
+nestCap-3≤capsH-absurd-inc pr =
+  1+n≰n (≤-trans (capsH<inc e sl 0)
+        (≤-trans (inc≤cap e sl 0)
+        (≤-trans (m≤n+m (nestCapAt e sl 1) (2 * nestCapAt e sl 0))
+                 (pr e sl 0))))
   where
   e : Closed Γ₀ natᵗ
   e = progD 0 0

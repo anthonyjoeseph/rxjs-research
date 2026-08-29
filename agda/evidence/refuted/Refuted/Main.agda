@@ -115,6 +115,6 @@ open import Refuted.PushVals-Adm-Map
   AdmStmtZ; WidStmtZ; prems-z≡; adm-absurd-z; wid-absurd-z; regs≡)
 open import Refuted.Nest-Cap-Height
   using (fLvlD-depth; d≤dLvl; d≤lvls; d≤sizeCount; suc≤sizeStep; add≤iterSize;
-         fuel≤blowup; capsH≤size; size<fac; fac≤cap;
-         NestCapCapsH; nestCap-3≤capsH-absurd;
+         fuel≤blowup; capsH≤levels; capsH≤size; size<fac; fac≤cap; capsH<inc; inc≤cap;
+         NestCapCapsH; nestCap-3≤capsH-absurd; nestCap-3≤capsH-absurd-inc;
          NestHeight; nest-height-absurd)

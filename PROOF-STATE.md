@@ -216,17 +216,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **re-denominate the nesting currency, which is now known to be
-  measured against a budget it cannot fit in** — the height comparison
-  both depth faces spend is REFUTED at a closed program: the factor
-  reads a caps field inside an exponent while the budget is a caps
-  HEIGHT, and the depth fuel is itself inside the size it is compared
-  against, so `n < 2 ^ n` closes it alone. No index shift is available —
-  the caps recurrence is defined by that exact fuel — so the leg moves
-  the currency: take the cap's reads of `capsAt` back to program-shaped
-  quantities, or restate the obligation in the tower denomination the
-  caps are themselves bounded in, and re-derive the two sums and their
-  two consumers against whichever survives.
+- **flatten the descent at the program's own layer count instead of at
+  the size cap** — the level count a walk may reach is already past the
+  height it is measured against, so any charge of one unit per level is
+  fatal however keyed — which closes re-keying the factor, shifting the
+  index and raising the budget alike. But nesting only
+  grows where a walk crosses an `*All` boundary, and the flattening
+  charges it once per unit of SIZE, which is where the caps entered the
+  currency at all. The delivery face already carries the path-shaped
+  form, and one lemma converts all three of its readings to cap-shaped
+  ones in a single step; the leg stops converting there and carries the
+  path-shaped form up to the two sums.
 
 - **the step half of the selection's caps, which is the half already
   measured** — one chain's step preserving the caps is now its own
