@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **thread the level through the walk predicate, which is the one
-  place it is being discarded** — the two open caps rows are one
-  obligation, not two: the walk's `root` clause IS the step's
-  conclusion, so the refuted crossing indicts both. The frame receipt
-  already returns a level and restates the invariant at
-  `frameStep (j + j')`, and the walk predicate throws it away to assert
-  one flat cap at every frame. The leg is to index that predicate by a
-  level and rebuild the two leaves as receipts in the same currency the
-  cascade result is already stated in.
+- **level the walk predicate's own cap, which is a two-file change and
+  the level is already there** — the predicate carries `Lv` and already
+  spends it on the drain's bounds; only its `capsOK?` and value
+  conjuncts are read at the bare cap, and its frame clause recurses at
+  the same `Lv` instead of a grown one. Both predicates live in exactly
+  two modules. Moving the cap to `frameStep Lv` and putting a Σ on the
+  frame recursion returns the two leaves to the instant's own cap
+  without the refuted flatness, and hands the nodes fold the level it
+  already reports.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
