@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **show the walk's level is one the cascade actually reaches, which
-  is what the drain now owes** — the room stopped being an assumption:
-  a level reached by a delivery-walk position inherits its room from
-  the level it came from, one gas down, and the bottom is the entry.
-  Both are proven, so what the queue asks for is the REACHING — a
-  level, and the gas still standing there. Instantiating it is not
-  available: both sides of the room are levels in the ladder, and the
-  ladder outruns computation at its smallest instance. So this is a
-  proof about the walk's recursion, and the question is whether its
-  frame increments ARE delivery-walk positions.
+- **carry a delivery position ABOVE the walk's level along the
+  chain, which is what the drain now owes** — the frame increments
+  are not positions: a chain climbs one charge per frame while the
+  cascade climbs whole restarts, so the levels a chain visits sit
+  between two positions. Room survives that gap upward, so the
+  conjunct asks for a position above and not for equality. What is
+  left is producing one and holding it across the chain's own Σ,
+  whose tail moves the level and would otherwise have to re-derive
+  it. The path length is the lever: a chain shorter than one restart
+  cannot climb past the position it started under.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has

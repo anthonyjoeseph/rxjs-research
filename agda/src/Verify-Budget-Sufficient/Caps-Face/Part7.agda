@@ -2444,6 +2444,16 @@ postulate
 -- exists.  A level bound cannot say which of the two it has; the
 -- reaching relation can, because it is built by spending it.
 --
+-- AND THE REACHING IS A `≤`, WHICH IS THE ONLY SHAPE THAT COULD BE
+-- SUPPLIED.  A chain advances its level by one frame charge at a time
+-- while the cascade advances by whole restarts, so the levels a chain
+-- visits sit BETWEEN two positions the walk lands on and are almost
+-- never positions themselves.  Room survives that gap in the useful
+-- direction: the ladder from a level and the budget read at it both
+-- grow with the level, so the receipt at the position ABOVE covers
+-- every level under it, and what the queue asks for is a position
+-- above the walk's level rather than the walk's level itself.
+--
 -- RECOVERY: git show b927a16 restores `Refuted.Walk-Frame-Drain-Level`,
 --   which refuted the levelled conjunct at the empty context with the
 --   level taken to be the base size cap, every other premise met by the

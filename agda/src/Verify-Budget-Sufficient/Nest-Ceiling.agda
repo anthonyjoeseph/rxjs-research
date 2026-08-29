@@ -221,3 +221,23 @@ room-gas c d Lv g g′ 2≤S hg room =
   S = Caps.cSize c
   W = Caps.cWid c
   R = Caps.cReg c
+
+-- THE WALK'S LEVEL IS BOUNDED BY A DELIVERY POSITION, NOT EQUAL TO ONE.
+-- A chain advances its level by one `fLvlD` charge per frame, while the
+-- cascade's walk advances by whole `dLvl` restarts, so the levels a
+-- chain visits sit BETWEEN two positions the walk lands on.  Room is
+-- monotone the useful way: both the ladder from a level and the budget
+-- read at it grow with the level, so a receipt at the position ABOVE
+-- covers every level under it, and the reaching obligation is a `≤`.
+room-le : ∀ (c : Caps) (d Lv Lv′ g : ℕ) → 2 ≤ Caps.cSize c → Lv ≤ Lv′ →
+  RoomG c d Lv′ g → RoomG c d Lv g
+room-le c d Lv Lv′ g 2≤S hLv room =
+  ≤-trans (lvls-mono (dCapᶜ S W R d g Lv) (dCapᶜ S W R d g Lv′)
+             2≤S ≤-refl ≤-refl hLv
+             (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {Lv} {Lv′} {d}
+                g g 2≤S ≤-refl ≤-refl ≤-refl ≤-refl hLv))
+          room
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  R = Caps.cReg c
