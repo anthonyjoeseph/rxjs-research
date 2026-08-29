@@ -11,9 +11,10 @@ open import Data.List.Properties using (++-identityʳ)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_; _≤ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤; *-assoc; *-comm; m^n>0;
-  *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤; +-mono-≤; *-distribˡ-+;
-  ^-zeroˡ; +-identityʳ; +-suc; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤; ^-distribˡ-+-*; ^-monoˡ-≤)
+  (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; n≤1+n; m≤n+m; +-assoc; +-comm; +-monoˡ-≤; +-monoʳ-≤;
+  *-assoc; *-comm; m^n>0; *-identityˡ; *-identityʳ; *-zeroʳ; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
+  +-mono-≤; *-distribˡ-+; ^-zeroˡ; +-identityʳ; m≤m+n; m≤m⊔n; m≤n⊔m; ⊔-lub; ⊔-assoc; ⊔-mono-≤;
+  ^-distribˡ-+-*; ^-monoˡ-≤)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Maybe using (Maybe; just; nothing; maybe)
@@ -44,7 +45,7 @@ open import Rx.Evaluator using
   aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
   splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
   thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource;
-  sharedConnect; sharedPlumb; burstCompleted; register; dropSource; opIterD; sLvlD-suc)
+  sharedConnect; sharedPlumb; burstCompleted; register; dropSource; opIterD)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; subscribeE-keeps; subscribeInner-keeps; stepFrame-keeps; thruConsume-keeps)
 open import Verify-Budget-Sufficient.Caps using
@@ -52,10 +53,9 @@ open import Verify-Budget-Sufficient.Caps using
   iterFold-infl; iterSize-infl; iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size;
   opIterD-mono;
   1≤capsAt-reg)
-open import Verify-Budget-Sufficient.Caps using (sizeCount; sizeCount-body)
-open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
+open import Verify-Budget-Sufficient.Caps using (sizeCount)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeE-caps; subscribeInner-caps)
-open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-mu; leaf-lvl)
+open import Verify-Budget-Sufficient.Caps-Chain using (leaf-lvl)
 open import Verify-Budget-Sufficient.Caps-Term using (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDisp; depthDrain; depthFin; depthFold; depthFrame; depthInner; depthE; depthReact;
@@ -69,6 +69,7 @@ open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; looku
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-supply)
+open import Verify-Budget-Sufficient.Nest-Ceiling using (CeilD; ceil-step; ceil-le; ceil-mu; ceil-lift)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -850,104 +851,6 @@ abstract
   nestClosOK?-mono c sl x y le h =
     ≤ᵇ-true (closSizeᵉ (slotClos sl) x) (Caps.cSize c)
       (≤-trans le (nestClosOK?-size c sl y h))
-
--- THE CEILING, CARRIED RELATIVELY -- what the walk owes and cannot
--- produce.  A level is only meaningful under a ceiling, and the
--- proven domination of the descent ledger is stated at level ZERO: it
--- says the whole instant's descent from the root fits in the caps
--- count.  Read at a level already reached, the same claim is false --
--- a walk standing at the ceiling still has a descent in front of it --
--- so the honest invariant is the REMAINING budget rather than the
--- level.  That is one implication per node, and it composes: a child
--- one frame down spends one operator of the parent's ledger.
-CeilD : (c : Caps) (d Lv k m : ℕ) → Set
-CeilD c d Lv k m =
-  ∀ (L′ : ℕ) →
-    Lv + L′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) d k m Lv →
-    Lv + L′ ≤ sizeCount c d ⊔ Caps.cSize c
-
--- AND IT DESCENDS BY ONE OPERATOR, which is the whole reason the
--- relative form is the one carried.  A child sits one frame down with
--- a smaller closure budget and one operator fewer; `op-desc` is the
--- ledger equation saying a sweep at the successor level with the
--- operator unspent sits under the sweep with it spent, and the two
--- monotonicities put the child's own measures under the parent's.
-ceil-step : ∀ (c : Caps) (d Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
-  k′ ≤ k → suc m′ ≤ m → CeilD c d Lv k m → CeilD c d (suc Lv) k′ m′
-ceil-step c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
-  subst (λ x → x ≤ sizeCount c d ⊔ Caps.cSize c) (+-suc Lv L′)
-    (H (suc L′)
-       (subst (λ x → x ≤ opIterD (Caps.cSize c) (Caps.cWid c) d k m Lv)
-              (sym (+-suc Lv L′))
-              (≤-trans hL
-                 (≤-trans (opIterD-mono m′ m′ d d k′ k 2≤S ≤-refl ≤-refl ≤-refl
-                             ≤-refl hk ≤-refl)
-                    (≤-trans (op-desc (Caps.cSize c) (Caps.cWid c) d k m′ Lv 2≤S)
-                             (opIterD-mono (suc m′) m d d k k 2≤S ≤-refl ≤-refl
-                                ≤-refl ≤-refl ≤-refl hm))))))
-
--- AND IT WEAKENS IN BOTH MEASURES, which is the direction that looks
--- backwards and is not: a bigger closure budget or a longer operator
--- chain makes the LEDGER bigger, so the implication's hypothesis gets
--- weaker and the statement gets stronger.  Every arm therefore reads
--- its child's ceiling off a coarser one.
-ceil-le : ∀ (c : Caps) (d Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
-  k′ ≤ k → m′ ≤ m → CeilD c d Lv k m → CeilD c d Lv k′ m′
-ceil-le c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
-  H L′ (≤-trans hL (opIterD-mono m′ m d d k′ k 2≤S ≤-refl ≤-refl ≤-refl
-                      ≤-refl hk hm))
-
--- AND A μ IS NOT A FRAME: it subscribes a LARGER term, so the ledger
--- charges it as a fresh entry rather than a chain edge -- the level
--- jumps by the quadratic the unfolding costs and the operator index is
--- MINTED at the new level's size cap instead of descending.  That is
--- `op-step-mu`, and this is the ceiling read through it.
-ceil-mu : ∀ (c : Caps) (d Lv k m m₀ : ℕ) → 2 ≤ Caps.cSize c →
-  m₀ ≤ Caps.cSize (frameStep Lv c) →
-  CeilD c d Lv (suc k) (suc m) →
-  CeilD c d (Lv + (m₀ + suc (m₀ * m₀))) k
-    (suc (Caps.cSize (frameStep (Lv + (m₀ + suc (m₀ * m₀))) c)))
-ceil-mu c d Lv k m m₀ 2≤S hm₀ H L′ hL =
-  subst (λ x → x ≤ sizeCount c d ⊔ Caps.cSize c)
-        (sym (+-assoc Lv (m₀ + suc (m₀ * m₀)) L′))
-    (H ((m₀ + suc (m₀ * m₀)) + L′)
-       (op-step-mu (Caps.cSize c) (Caps.cWid c) d (suc k) m Lv m₀ L′ 2≤S hm₀
-          (≤-trans hL
-             (≤-reflexive (sym (sLvlD-suc (Caps.cSize c) (Caps.cWid c) d k
-                                  (Lv + (m₀ + suc (m₀ * m₀)))))))))
-
--- AND AT LEVEL ZERO THE CEILING IS A THEOREM, WHICH IS WHAT THE WHOLE
--- RELATIVE FORM WAS FOR.  The descent ledger read from the bottom is
--- dominated by the caps count -- that is the proven inequality this
--- development already spends at the entry -- and the ceiling is that
--- inequality with the implication wrapped round it.  So a consumer
--- carrying the ceiling as an assumption is carrying something it could
--- have derived from two size bounds and the two entry facts every face
--- of this walk already has in its ambient bundle.
-ceil-entry : ∀ (c : Caps) (d k m : ℕ) → 2 ≤ Caps.cSize c →
-  3 + k ≤ Caps.cSize c → m ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  CeilD c d 0 k m
-ceil-entry c d k m 2≤S hk hm 1≤R L′ hL =
-  ≤-trans hL
-    (≤-trans (≤-trans (opIterD-dominated (Caps.cSize c) (Caps.cWid c) d k m
-                         (Caps.cReg c) 2≤S hk hm 1≤R)
-                      (≤-reflexive (sym (sizeCount-body c d))))
-             (m≤m⊔n (sizeCount c d) (Caps.cSize c)))
-
--- AND IT CLIMBS TO ANY LEVEL THE SIZE CAP PAYS FOR, so no consumer has
--- to be at the bottom to use it.  One level costs one unit of the
--- operator index, which is exactly the descent `ceil-step` states, so a
--- ceiling wanted at a level is the entry ceiling asked for that many
--- more operators -- and the premise is the sum, which is the honest
--- statement of what a level costs.
-ceil-lift : ∀ (c : Caps) (d Lv k m : ℕ) → 2 ≤ Caps.cSize c →
-  3 + k ≤ Caps.cSize c → Lv + m ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  CeilD c d Lv k m
-ceil-lift c d zero    k m 2≤S hk hm 1≤R = ceil-entry c d k m 2≤S hk hm 1≤R
-ceil-lift c d (suc Lv) k m 2≤S hk hm 1≤R =
-  ceil-step c d Lv k k (suc m) m 2≤S ≤-refl ≤-refl
-    (ceil-lift c d Lv k (suc m) 2≤S hk
-      (≤-trans (≤-reflexive (+-suc Lv m)) hm) 1≤R)
 
 
 -- ONE FRAME COSTS ONE LEVEL, and this is where it is paid.  The two

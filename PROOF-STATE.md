@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **give the level jump a frame-shaped step that re-mints its
-  measure** — carrying the relative ceiling through the drain is dead:
-  its descent lemma spends one unit of the operator measure per level,
-  so a ceiling held at fixed measures cannot cross a frame at all, and
-  the obstruction merely changes currency. The one step in the ceiling
-  family that crosses levels without paying per level is the μ one,
-  because it RE-MINTS the measure at the stepped level's own size cap
-  instead of decrementing it. A frame's sibling of that step is what
-  the refuted leaf is waiting on, and it leaves the drain's conjunct as
-  arithmetic — which is what kept the ceiling out of the types.
+- **spend the re-minting step at the drain, which means threading
+  the walk's ceiling to the step face** — the step exists: any edge
+  entering a fresh subscribe advances the level by its own receipt and
+  MINTS the operator index at the arrival level's size cap, and at a
+  receipt of zero that is a re-mint at the SAME level for one unit of
+  the operator budget. That is exactly what the refuted leaf needs, so
+  its conjunct becomes the stepped-cap arithmetic with no level term at
+  all. What is missing is the input: the step face carries a level and a
+  path key but no ceiling, while the subscribe face beside it carries
+  one and descends it. Threading it is the commit.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
