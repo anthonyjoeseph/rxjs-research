@@ -190,27 +190,8 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the room record's arrival conjunct, which is what blocks it** —
-  every reparameterisation of the arrival cap died on one conjunct:
-  the record reads the arrival width against the ENTRY field, so the
-  leaf's consumer owes a frozen-cap fact whatever the leaf proves.
-  The column above it now reads at the stepped cap throughout, so the
-  asymmetry is down to this one record: its state half advances a
-  level per instant while its width half stays at the entry field.
-  This leg advances the width half with it, and prices what the exit
-  walk then owes.
-
-- **the cascade descent given something that instantiates it** — the
-  tier's other FALSITY, and the one row nothing has ever reached: both
-  families it is stated over are sealed, so neither side computes and
-  no probe can be built against it as written. The route it replaced
-  was circular through the store, which is why the header carries the
-  cycle rather than a plan. This leg asks the smaller question first —
-  which SIDE is blocked — and unseals or restates whichever one a
-  harness could then reach, before any clause is ground.
-
-- **the walk's entry keys, which are now the whole residue** — the
-  burst leaf is discharged into the proven caps face, and what stands
+- **the walk's entry keys, which are the whole residue** — the burst
+  leaf is discharged into the proven caps face, and what stands
   between them is four quantities the nest walk has no premise about:
   the source's written size and parked width, and both path keys. The
   path key is the one with structure — a descent adds a frame per
@@ -219,12 +200,28 @@ does not fit is a finding about the shared statement, not about the head.
   settles the arithmetic putting the face's op-iteration ceiling under
   the walk's own count.
 
+- **the two remaining descent rows, which fail on the same key** — the
+  inner descent's invariant and the wrap's exit are separate
+  statements with one blocker: each is stated at a cap whose width is
+  the ENTRY field, and each witness crosses at a width the source's
+  own inners deliver. Whatever device carries the keys down the walk
+  serves both, so they are one shelf and not two. This leg states that
+  device once and re-reads both rows through it.
+
+- **the cascade descent, whose risk is now priced rather than
+  probeable** — no row can print a verdict on it: the bound side reads
+  two sealed families, and the one form underneath it that proven
+  inequalities reach is refuted at the evaluator, so instantiation is
+  exhausted from below. What is left is to shrink what rests on it —
+  the delivery side spends it through a single composition, so this
+  leg narrows that consumer's demand to the part the rows do reach.
+
 ### The ledger
 
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: the
-  cascade descent against the instant's own grant. Nothing instantiates it —
-  both sealed families sit on the right — and the store-mediated route it
-  replaced is circular; the header carries the cycle.
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE,
+  RECOVERY`: the cascade descent against the instant's own grant. The one
+  form under it that proven inequalities reach is refuted at the evaluator,
+  so nothing instantiates it from below; the store route it replaced cycles.
 - **`nest-caps-keys`** (Nest-Walk) — FALSITY, `REFUTED, TWIN`: the caps
   face's entry keys — written size, parked width, both path keys — at a
   level of the entry cap, plus the sum's bound. Nothing yet carries them

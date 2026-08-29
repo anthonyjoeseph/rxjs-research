@@ -56,7 +56,7 @@ open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
 open import Data.Product using (proj₁; proj₂; _,_; _×_)
 open import Data.Sum using (inj₁; inj₂)
-open import Rx.Exp using (Ctx; Closed; sizeᵉ)
+open import Rx.Exp using (Ctx; Closed; sizeᵉ; sizeᵛ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Frame-Width using (entryCeil)
 open import Rx.Prim using (towerℕ; gasPad; g0; Id)
@@ -224,29 +224,38 @@ depthRunWalkRowU steps ds ks j d k =
      ++ " d=" ++ show d ++ " k=" ++ show k
      ++ depthRunWalk p sl steps 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
--- SERIES Y (12000000): DOES THE WALK'S STORE GROWTH SATURATE OR
--- ACCUMULATE?  This is the one question that decides the shape of the
--- store row's induction, and it is decidable by instantiation because
--- `storeNestMax` is a MAX -- a `⊔` of four `⊔`-folds -- so a walk that
--- stores repeatedly need not grow repeatedly.  A row runs `cascadeGo`
--- on every PREFIX of the arrival's chain list and prints the store
--- after each, so the sequence itself is the answer: flat after the
--- first step means the max absorbs every later one and the induction
--- needs no budget, while a sequence that climbs per step means the
--- growth has to be threaded and the width factor is what pays.
+-- SERIES Y (12000000): HOW BIG MUST THE TARGET'S FACTOR BE?  The
+-- target bounds a cascade's descent by the arrival's nesting, the
+-- chains' nesting, and a SEALED factor times the store before the
+-- cascade -- and the factor is the only part of it nothing has ever
+-- measured.  A row prints the descent, both base terms, the store,
+-- the arrival's own size, and `Fmin`: the least factor for which the
+-- inequality holds when the increment is read as that size, which is
+-- the largest computable quantity a proven inequality puts under the
+-- sealed one.  A bounded `Fmin` says a computable stand-in exists and
+-- the target can be reached from below; one that climbs with the walk
+-- says the tower is doing real work and the right-hand side stays
+-- symbolic.
 --
--- LOAD-BEARING only where the chain list has more than one entry; a
--- one-chain family reports a two-element sequence that cannot
--- distinguish the two readings, so `c` is printed and a row with `c`
--- at one is evidence about nothing here.
+-- A ROW CANNOT CONFIRM THE TARGET, BUT IT CAN REFUTE A FORM UNDER IT.
+-- The right-hand side reads two sealed families, so no row prints a
+-- verdict on the inequality as stated.  What a row settles is whether
+-- a form whose factor and increment are both bounded by PROVEN
+-- inequalities survives -- green there would have carried the target,
+-- and red kills that form outright.
 --
--- AND ONLY THE LEFT SIDE AND THE BASE TERMS ARE REACHABLE.  The
--- target's right-hand side reads two sealed families, so no row here
--- can print a verdict on the inequality itself; what the rows reach is
--- the descent, the base terms it is measured against, and the store
--- sequence the factor has to cover.  A saturating sequence says the
--- factor is carrying nothing and the shape is wrong; a climbing one
--- says what it has to carry.
+-- The store sequence is printed per chain PREFIX, and it is the
+-- residue of the question this series used to ask: it climbs by one
+-- per prefix in every family swept, so the growth accumulates and the
+-- factor is what has to pay for it.  That half is LOAD-BEARING only
+-- where `c` exceeds one, since a one-chain family reports a
+-- two-element sequence that cannot distinguish the two readings.
+--
+-- AND A ROW IS EVIDENCE ONLY WHERE IT PRINTS `NEST0-holds`.  The
+-- target takes `nestOK?` as a premise, so a row that fails it
+-- instantiates nothing -- and the families swept contain one such
+-- row, which is also the only unbounded row reporting a factor of
+-- one.
 --
 -- TARGET: cascade-nest-compositional @524772
 pfxL : ∀ {A : Set} → ℕ → List A → List A
@@ -309,6 +318,12 @@ satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
                    ++ (if mm ≤ᵇ ec then " EC-ok" else " EC-OVER")))
      ++ (if dep ≤ᵇ suc aft then " ok" else " AFT-OVER")
      ++ (if dep ≤ᵇ nv + cn + aft then "" else " BASE-OVER")
+     ++ (let iv = sizeᵛ (arrTy a) (arrVal a)
+             bs = suc (storeNestMax sd stL + iv ∸ 1)
+             nd = dep ∸ (nv + cn)
+         in " I=" ++ show iv
+            ++ " Fmin=" ++ show ((nd + bs ∸ 1) / bs)
+            ++ (if dep ≤ᵇ nv + cn + bs then " F1-ok" else " F1-OVER"))
      ++ " |" ++ satGo a nextId ch sd stL (length ch)
      ++ satWalk e sl m (suc nextId)
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))

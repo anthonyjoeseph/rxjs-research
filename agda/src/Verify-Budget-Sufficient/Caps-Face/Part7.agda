@@ -2258,6 +2258,25 @@ postulate
 -- `cascade-depth-capsH` still assembles FROM this, so the tie back to
 -- the syntactic ceiling is unchanged.
 --
+-- DEAD ROUTE: the factor cannot be replaced by a computable stand-in
+--   from below.  Exactly one weakening of the right-hand side is
+--   backed by proven inequalities on both sealed parts -- factor at
+--   one by `1≤nestFacAt`, increment at the arrival's own `sizeᵛ` by
+--   `size≤nestIncAt` -- so it is the one form whose GREEN would have
+--   carried this statement rather than merely failing to refute it.
+--   `Harness.Main`'s series Y prints the least factor that flat form
+--   needs, and it exceeds one on most rows it reaches: two across the
+--   fan and width families at every depth and width swept, three on
+--   the unbounded ones, one only where the store already dominates
+--   the descent.  So the flat form is false at the evaluator and
+--   stating it would replace a live statement with a refuted one.
+--   What the same rows do NOT do is threaten this statement: the
+--   factor they call for stays at two or three while `nestFacAt` is a
+--   tower, so every row is slack by an enormous margin, and the
+--   descent lands one above the store the cascade PRODUCES on every
+--   row without exception -- which is the relation the store-mediated
+--   route below rested on, and it is exact rather than merely true.
+--
 -- RECOVERY: git show ae75251:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda
 --   restores the store-mediated assembly and the produced-store
 --   statement it spent, for whichever side of the cycle is broken
@@ -2268,7 +2287,8 @@ postulate
 --   `git show ae75251:agda/src/Harness/Main.agda` the prefix sweep
 --   that asked whether the store growth saturates.  Neither transfers
 --   as it stands: this statement's right-hand side reads two sealed
---   families, so nothing here computes to a verdict.
+--   families, so no row prints a verdict on it, only on the forms
+--   underneath it.
 postulate
   cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
