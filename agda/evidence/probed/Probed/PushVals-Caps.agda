@@ -35,7 +35,6 @@
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
 -- TARGET: subscribeE-burst-nest @d2c32b
--- TARGET: subscribeE-burst-caps @583b8e
 -- TARGET: pushVals-caps-burstW @338e1f
 module Probed.PushVals-Caps where
 
