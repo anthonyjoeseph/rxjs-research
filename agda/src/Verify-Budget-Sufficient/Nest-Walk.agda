@@ -4814,6 +4814,18 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   at a fixed cap, however many currencies ride beside it, and the
 --   currencies stop being a repair of their own: they are the face's
 --   premise list, which is where they already are.
+-- DEAD ROUTE: and the walk cannot report at a STEPPED cap either, in
+--   any form that names the step.  Deleting the frozen width forces
+--   it: the `*All` arm's exit pair is owed at the arrivals' cap, so
+--   the walk must report one step above its entry.  Freezing that
+--   report at entry-plus-one closes the arm the level-carried form
+--   died at -- the whole `*All` leg and both `pushVals` halves go
+--   green -- and dies one level further out, where the thru chain
+--   calls the inner subscribe ONCE PER ARRIVAL at a cap it threads
+--   unchanged across the fold.  A walk that steps the cap steps it
+--   again at every arrival, so the residue is a per-arrival
+--   recurrence: no constant names it, and a carried level names the
+--   wrong thing.  Two parameterisations, one wall.
 -- TWIN: `subscribeE-caps` already carries the caps invariant across
 --   this very operation, at full strength and over the same cap
 --   family -- the node-table conjunct is a definitional weakening of
@@ -4824,6 +4836,10 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   width lemmas the level-indexed form needs UNCHANGED: the node
 --   widening step, its lift to the nest predicate, and the two
 --   `2 ≤ cSize` extractors for a wrap and for a parked closure.
+-- RECOVERY: git show bfbf2b4 restores the constant-step attempt, and
+--   with it the `arrCapAt` deletion across all fifty-four sites, the
+--   node-width widening step, its lift to the nest predicate, and the
+--   one-step conversion built over them.
 -- RECOVERY: git show 66a493a restores the level-carried attempt, which
 --   adds the arrivals' own widening over the level order and the step
 --   that spends it, and leaves the module red at the one arm that read

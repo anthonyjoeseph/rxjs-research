@@ -1,3 +1,28 @@
+- **the face's premise list stated on `subscribeE-caps-exit`'s own
+  door** — the local repair is now dead twice over: the walk cannot
+  report at a fixed cap (the frozen width is refuted) and it cannot
+  report at a named step either (the thru chain steps once per
+  arrival). So the premises the face reads — the term's size and
+  parked width, the path's size and length, the nesting budget, the
+  operator count, the descent depth — go onto that signature, and the
+  structural arms re-establish them exactly as they already
+  re-establish the value and closure keys. Nothing is consumed yet;
+  this commit is the door.
+- **the `*All` arm stops walking and spends the face** — with the
+  premises at the door, the arm that forces the step drops its own
+  recursion and spends `subscribeE-caps`, weakening the `capsOK?`
+  conclusion through `capsOK?⇒nest` and absorbing the level the Σ
+  returns together with its bound. The bridge's charge one module over
+  is the worked instance at this exact premise list. It is where the
+  refuted burst statements leave the tree.
+- **the thru chain's inner subscribe follows, and the probe is
+  re-run** — the chain is what refuted the constant, so it is the last
+  arm and the one that decides whether the bounded Σ composes across a
+  fold. `Probed.PushVals-Caps` was taken against the frozen-width cap;
+  its green is then evidence about text that is gone, and restamping
+  the fingerprint alone is forbidden. Rows re-run at the restated
+  shape, or the probe goes.
+
 # PROOF-STATE — the roadmap
 
 **What this file is.** The ordered worklist for the one goal: discharging
