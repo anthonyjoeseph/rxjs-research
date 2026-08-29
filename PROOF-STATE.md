@@ -226,15 +226,6 @@ does not fit is a finding about the shared statement, not about the head.
   there is no smaller number to spend the constant difference against.
   The leg is to put the headroom where the bound is stated.
 
-- **the entry state's own nesting receipt, which everything above it
-  assumes** — the caps receipt at the same state is proven and is the
-  route, and what stands between them is one inversion: a scripted
-  slot's obs-freeness only reduces at a concrete type, so the fact has
-  to be got at by cases on the data judgement rather than by
-  computation. It is the lowest fact in the tier and the one a falsity
-  in would void the rest, and the work is an inversion and a transport
-  rather than a walk.
-
 - **the arithmetic shelf both depth faces spend, now that neither can
   be split** — the cascade side and the subscribe side each read their
   charge against a tower height, and the attempt to trade the subscribe
@@ -245,6 +236,16 @@ does not fit is a finding about the shared statement, not about the head.
   already proven around it. That makes it the one row in the tier whose
   obstacle is arithmetic, and whose risk is therefore reducible without
   reaching a state.
+
+- **the step half of the selection's caps, which is the half already
+  measured** — one chain's step preserving the caps is now its own
+  leaf, and it is the one the flat-cap rows actually read: two of the
+  three components come back at or below where they started, and the
+  slots half is a proven equation rather than an obligation. So this is
+  the leaf in the pair whose evidence is real and whose remaining work
+  is a walk over the step's own arms, not a design question — which
+  makes it the right commit to take while the walk leaf beside it waits
+  on the store bound moving.
 
 ### The ledger
 
@@ -310,10 +311,6 @@ does not fit is a finding about the shared statement, not about the head.
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.
-- **`init-nestOK?`** (Caps-Bridge) — DIFFICULTY, `REFUTED×2, PROBED`: the entry
-  state's nesting receipt. `init-capsOK?` is its route, but a scripted slot's
-  obs-freeness only reduces at a concrete type, so an `isData` inversion is
-  owed first.
 - **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   ONE chain's walk, the fold over the selection being a body now. What is left
   asserted is the sink's registry-versus-unit conjunct and two size bounds on a

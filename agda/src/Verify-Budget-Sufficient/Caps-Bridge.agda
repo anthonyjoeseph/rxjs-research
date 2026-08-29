@@ -106,6 +106,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
+open import Verify-Budget-Sufficient.Init-Nest using (init-nestOK?)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; dWᵉ≤capsAt-wid; sizeCount-body; frameBlowup;
@@ -1524,10 +1525,6 @@ postulate
       ≤ nestDᵉ b + pathNestD κ
         + storeNestMax sched st
         + nestIncAt e sl id
-
-postulate
-  init-nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
-    (id : ℕ) → nestOK? e ins id (sched-init e ins) (st-init e) ≡ true
 
 subscribe-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
