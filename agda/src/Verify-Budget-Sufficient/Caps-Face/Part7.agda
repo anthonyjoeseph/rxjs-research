@@ -2414,39 +2414,31 @@ postulate
     WalkHyps {t = t} sl id L sf gas nid now src (share-sink i) vals evs fin sched st →
     dispatchCapsOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now i vals fin sched st
 
--- AND THE DRAIN ONE IS FALSE AS WRITTEN, IN ITS LEVEL AND IN NOTHING
--- ELSE.  The drain's headroom conjunct charges the level against the
--- BASE size cap, because its own proven consumer climbs the relative
+-- AND THE DRAIN ONE IS NOW A FRAME-LOCAL STATEMENT, which is what it
+-- had to become.  Its conjunct used to charge the walk's LEVEL against
+-- the BASE size cap, because the proven consumer climbed the relative
 -- ceiling one operator per level from the bottom and that climb is paid
 -- for only while the level fits under that cap.  The walk's ladder is
--- denominated in the COUNT instead: the Σ it hands its tail permits a
+-- denominated in the COUNT instead -- the Σ it hands its tail permits a
 -- level anywhere up to `sizeCount c d ⊔ Caps.cSize c`, and the arrival
--- face confirms levels genuinely reach the count.  At level zero the
--- conjunct is `capsOK?` at the base read through `parkRoom`, so the
--- level is the whole of what it asks for and the whole of what the
--- bundle cannot give.
+-- face confirms levels genuinely reach the count -- so at level zero the
+-- conjunct was `capsOK?` read through `parkRoom` and the level was the
+-- whole of what it asked for and the whole of what the bundle could not
+-- give.
 --
--- THE REPAIR IS NOT A HYPOTHESIS ON THIS LEAF.  A level bound tight
--- enough to feed the base-cap arithmetic cannot be reproduced across the
--- recursion, since one frame's growth is bounded only by `fLvlD`.  What
--- transfers is the ledger's own relative form: the walk's Σ and `CeilD`
--- are the same currency, so the drain wants the ceiling handed to it
--- rather than rebuilt from the bottom.
+-- WHAT THE CONJUNCT SAYS NOW IS THE PARKED TERM UNDER THE CAP AT THE
+-- WALK'S OWN LEVEL, with no level term in it, which is the same shape
+-- its two neighbours already had.  The ceiling the head's subscribe
+-- needs is minted from the level's own package instead -- see
+-- `ceilAt-suc`, which is where the level went and where the risk now
+-- sits.  So this leaf is a claim about ONE frame and one queue, and
+-- nothing has instantiated it.
 --
--- REFUTED: `Refuted.Walk-Frame-Drain-Level` — `walk-frame-drain` at the
---   empty context with the level taken to be the base size cap, every
---   other premise met by the entry bounds and the proven node installer.
---
--- DEAD ROUTE: replacing the drain's arithmetic conjunct by `CeilD`
---   itself, so that the walk hands the ceiling over instead of the
---   consumer rebuilding it from level zero.  The ceiling's descent lemma
---   spends ONE unit of the operator measure per level, so a ceiling
---   carried at fixed measures cannot cross a frame whose growth is
---   bounded by `fLvlD` — the obstruction MOVES rather than clearing, and
---   the walk is left owing the same quantity in a different currency.
---   It also puts a computing measure into a type that many signatures
---   mention, which pushed the module's shared-context check past the dev
---   budget, and it orphans the whole base-cap climb.
+-- RECOVERY: git show b927a16 restores `Refuted.Walk-Frame-Drain-Level`,
+--   which refuted the levelled conjunct at the empty context with the
+--   level taken to be the base size cap, every other premise met by the
+--   entry bounds and the proven node installer.  Whoever puts a level
+--   back into this statement wants that witness back.
 postulate
   walk-frame-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)

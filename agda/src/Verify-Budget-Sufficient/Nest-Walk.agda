@@ -69,7 +69,7 @@ open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; looku
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-supply)
-open import Verify-Budget-Sufficient.Nest-Ceiling using (CeilD; ceil-step; ceil-le; ceil-mu; ceil-lift)
+open import Verify-Budget-Sufficient.Nest-Ceiling using (CeilD; CeilAt; ceilAt-any; ceil-step; ceil-le; ceil-mu)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -921,7 +921,7 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (nestClosOK? c sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
-  × (Lv + (3 + (sizeᵉ o + slotsSize sl)) ≤ Caps.cSize c)
+  × (3 + (sizeᵉ o + slotsSize sl) ≤ Caps.cSize (frameStep Lv c))
   × capsDrainOK c sl d Lv sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
@@ -6141,6 +6141,7 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sched : Sched Γ) (st : EvalSt e) →
   ⦃ _ : FaceOK c sl ⦄ →
   capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st →
+  CeilAt c d Lv →
   queueNest q ≤ B →
   drainW sf allNid κ id now q sched st ≤ W →
   depthDrain sf allNid κ id now q sched st ≤ d →
@@ -6154,9 +6155,9 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (nestDᵛˢ (proj₁ r) ≤ G)
   × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
         ⊔ queueNest (proj₁ (proj₂ (proj₂ (proj₂ r))))) ≤ nodesMax st ⊔ G)
-mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act [] sched st hcd hq hw hd hpk hpl =
+mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act [] sched st hcd hce hq hw hd hpk hpl =
   0 , z≤n , z≤n , ⊔-lub (m≤m⊔n _ _) z≤n
-mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) sched st hcd hq hw hd hpk hpl
+mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) sched st hcd hce hq hw hd hpk hpl
   with hasRoom lim act
 ... | false =
   0
@@ -6192,7 +6193,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
 
   -- the drain's two ceiling premises, off the ONE the queue's own
   -- conjunct now carries
-  headHere = drain-head-supply c Lv o sl (EvalSt.connectedShares st)
+  headHere = drain-head-supply (frameStep Lv c) o sl (EvalSt.connectedShares st)
                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
 
   SUB₀ = subscribeInner-nest c d sl B W Lv sf mergeAllᵒ allNid κ id now o sched st
@@ -6203,14 +6204,13 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
           hpk hpl
-          (ceil-lift c d Lv (nest o sl (EvalSt.connectedShares st))
-             (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
-             (proj₁ headHere) (proj₂ headHere)
-             (FaceOK.fReg faceHere))
+          (CeilAt.mint hce (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o)))
+             (proj₁ headHere) (proj₂ headHere))
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+         hce
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          splitW′
          (≤-trans (m≤n⊔m _ _) hd)
@@ -6251,6 +6251,7 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      drainW sf allNid p id now q sched st ≤ W) →
+  CeilAt c d Lv →
   depthFin sf op allNid inst p id now vals sched st
     (lookupNode allNid (EvalSt.nodes st)) ≤ d →
   pathSz? (Caps.cSize (frameStep Lv c)) p ≡ true →
@@ -6263,7 +6264,7 @@ innerFinish-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
        ≤ nestFac S′ W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
 
-innerFinish-nest {e = e} c d sl W Lv sf switchᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl
+innerFinish-nest {e = e} c d sl W Lv sf switchᵒ allNid inst p id now vals sched st hsl hdr hw hce hdp hpk hpl
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                    = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (scan-st _)           = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
@@ -6279,7 +6280,7 @@ innerFinish-nest {e = e} c d sl W Lv sf switchᵒ allNid inst p id now vals sche
                     (≤-refl {nestDᵛˢ vals}))
           (raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)))
 
-innerFinish-nest {e = e} c d sl W Lv sf exhaustᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl
+innerFinish-nest {e = e} c d sl W Lv sf exhaustᵒ allNid inst p id now vals sched st hsl hdr hw hce hdp hpk hpl
   with lookupNode allNid (EvalSt.nodes st)
 ... | nothing                    = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (scan-st _)           = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
@@ -6292,7 +6293,7 @@ innerFinish-nest {e = e} c d sl W Lv sf exhaustᵒ allNid inst p id now vals sch
                     (≤-refl {nestDᵛˢ vals}))
           (raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl)))
 
-innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl
+innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now vals sched st hsl hdr hw hce hdp hpk hpl
   with lookupNode allNid (EvalSt.nodes st) in eq
 ... | nothing                = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
 ... | just (scan-st _)       = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
@@ -6327,7 +6328,7 @@ innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now
   dw = hw lim act q od refl
 
   DR = mergeAllDrain-nest c d sl (nodesMax st) W Lv sf allNid p id now lim (pred act) q sched st
-         (hdr lim act q od refl) qbnd dw
+         (hdr lim act q od refl) hce qbnd dw
          (≤-trans (n≤1+n _) hdp) hpk hpl
 
   S′ = Caps.cSize (frameStep (proj₁ DR) c)
@@ -6408,6 +6409,7 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
      drainW sf allNid p id now q sched st ≤ W) →
+  CeilAt c d Lv →
   depthReact sf op allNid inst p id now vals sched st fin ≤ d →
   pathSz? (Caps.cSize (frameStep Lv c)) p ≡ true →
   suc (pathLen p) ≤ Caps.cSize (frameStep Lv c) →
@@ -6417,12 +6419,12 @@ stepFrame-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (j ≤ sizeCount c d ⊔ Caps.cSize c)
   × ((nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ⊔ nestDᵛˢ (proj₁ r))
        ≤ nestFac S′ W * ((nodesMax st ⊔ nestDᵛˢ vals) + nestU S′ (nestUnit e sl)))
-stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals false sched st hsl hdr hw hdp hpk hpl =
+stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals false sched st hsl hdr hw hce hdp hpk hpl =
   0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
-stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals true sched st hsl hdr hw hdp hpk hpl
+stepFrame-nodes-inner {e = e} c d sl W Lv sf id now op allNid inst p vals true sched st hsl hdr hw hce hdp hpk hpl
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  = 0 , z≤n , raiseN (Caps.cSize c) W (nodesMax st ⊔ nestDᵛˢ vals) (nestU (Caps.cSize c) (nestUnit e sl))
-... | false = innerFinish-nest c d sl W Lv sf op allNid inst p id now vals sched st hsl hdr hw hdp hpk hpl
+... | false = innerFinish-nest c d sl W Lv sf op allNid inst p id now vals sched st hsl hdr hw hce hdp hpk hpl
 
 -- THE TWO SHAPES A UNIT FACTOR TAKES ONCE THE BURST IS IN THE
 -- EXPONENT, which is all that separates the three frames that charge
@@ -6609,7 +6611,9 @@ abstract
             (raiseN (Caps.cSize c) W _ (nestU (Caps.cSize c) (nestUnit e sl)))
   stepFrame-nodes {e = e} c d W sl Lv sf id now (from-inner op allNid inst) p vals fin sched st hsl 1≤W hlen hc hv hss hfc hfd hfw h1S hdp hpk hpl hlv hw =
     let INNER = stepFrame-nodes-inner c d sl W Lv sf id now op allNid inst p vals fin sched st
-                  hsl hfd hfw hdp hpk hpl
+                  hsl hfd hfw
+                  (ceilAt-any c d Lv (FaceOK.fSize faceHere) (FaceOK.fReg faceHere) hlv)
+                  hdp hpk hpl
         S′ = Caps.cSize (frameStep (proj₁ INNER) c) in
     proj₁ INNER
     , proj₁ (proj₂ INNER)

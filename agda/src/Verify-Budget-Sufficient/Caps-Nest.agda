@@ -152,17 +152,15 @@ nest≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
 -- under the cap at the walk's own level -- supplies both, and whatever
 -- states the store bound has ONE inequality to establish rather than a
 -- measure it has no access to.
-drain-head-supply : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps) (Lv : ℕ)
+drain-head-supply : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps)
   (o : Exp Γ Δᵍ Δ Θ t) (sl : Slots Γ) (cs : List Source) →
-  Lv + (3 + (sizeᵉ o + slotsSize sl)) ≤ Caps.cSize c →
+  3 + (sizeᵉ o + slotsSize sl) ≤ Caps.cSize c →
   (3 + nest o sl cs ≤ Caps.cSize c)
-  × (Lv + suc (suc (sizeᵉ o)) ≤ Caps.cSize c)
-drain-head-supply c Lv o sl cs h =
-  ≤-trans (s≤s (s≤s (s≤s (nest≤ o sl cs))))
-          (≤-trans (m≤n+m (3 + (sizeᵉ o + slotsSize sl)) Lv) h)
-  , ≤-trans (+-monoʳ-≤ Lv
-              (s≤s (s≤s (≤-trans (m≤m+n (sizeᵉ o) (slotsSize sl))
-                                 (n≤1+n (sizeᵉ o + slotsSize sl))))))
+  × (suc (suc (sizeᵉ o)) ≤ Caps.cSize c)
+drain-head-supply c o sl cs h =
+  ≤-trans (s≤s (s≤s (s≤s (nest≤ o sl cs)))) h
+  , ≤-trans (s≤s (s≤s (≤-trans (m≤m+n (sizeᵉ o) (slotsSize sl))
+                               (n≤1+n (sizeᵉ o + slotsSize sl)))))
             h
 
 -- THE SHARE EDGE'S STEP, which is the row the residue exists for.

@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **spend the re-minting step at the drain, which means threading
-  the walk's ceiling to the step face** — the step exists: any edge
-  entering a fresh subscribe advances the level by its own receipt and
-  MINTS the operator index at the arrival level's size cap, and at a
-  receipt of zero that is a re-mint at the SAME level for one unit of
-  the operator budget. That is exactly what the refuted leaf needs, so
-  its conjunct becomes the stepped-cap arithmetic with no level term at
-  all. What is missing is the input: the step face carries a level and a
-  path key but no ceiling, while the subscribe face beside it carries
-  one and descends it. Threading it is the commit.
+- **give the level's ceiling package a remaining-budget premise, so
+  that a positive level can mint at all** — the drain's refutation
+  moved the whole risk into one leaf: a walk standing at a level must
+  mint a ceiling at that level's OWN cap, which grows with the level,
+  after a climb that spent the ladder's rounds getting there. A level
+  bound cannot say the climb left room, so the leaf as stated is
+  probably false. The ledger already prices a sweep from an arbitrary
+  level against a remaining round count, and that receipt is the
+  currency the package should be asking for. Restate it in that
+  currency, then check what the walk's own bundle can already pay.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
@@ -251,10 +251,15 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `REFUTED, DEAD ROUTE`: a
-  bounded `mergeAll`'s parked queue, charged against the BASE size cap while
-  the walk's ladder is denominated in the count. False in its level and nothing
-  else; the restatement owed is the ceiling in relative form.
+- **`ceilAt-suc`** (Nest-Ceiling) — FALSITY, `NO EVIDENCE`: the level's own
+  ceiling package at a positive level, which is what a fresh subscribe there
+  has to mint. It asks for room under the ARRIVAL level's cap after a climb
+  that spent the ladder's rounds; the level bound cannot say the climb left
+  any.
+- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
+  `mergeAll`'s parked queue at the walk's own level. The level term that was
+  refuted is gone — the conjunct is stepped-cap arithmetic now — so what is
+  left is the frame-local statement nothing has yet instantiated.
 - **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction
