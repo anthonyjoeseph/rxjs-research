@@ -203,12 +203,11 @@ StmtWalk =
   nestValOK? capP (obs (obs natᵗ)) headP ≡ true →
   nestClosOK? capP slots headP ≡ true →
   descW gasBig headP root 0 0 schedP (st-init headP) ≤ WP →
-  (Sched.slots (proj₁ (proj₂ RP)) ≡ slots)
-  × (nestCapsOK? capP (proj₁ (proj₂ RP)) (proj₂ (proj₂ RP)) ≡ true)
+  nestCapsOK? capP (proj₁ (proj₂ RP)) (proj₂ (proj₂ RP)) ≡ true
 
 walk-absurd : StmtWalk → ⊥
 walk-absurd h with h refl refl refl refl ≤-refl
-... | (_ , ())
+... | ()
 
 -- AND THE PROVEN WALK ALREADY INHABITS THAT TYPE, which is what makes
 -- the restatement unavoidable rather than tidy: the exit pair is a

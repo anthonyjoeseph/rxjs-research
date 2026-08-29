@@ -216,34 +216,31 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the arrivals' width key made reachable, and its flat form
-  closed** — the key the proven face reads is the one premise about
-  the SOURCE rather than the state, so a door into that face cannot
-  draw it from a slots bundle. It is derivable below the walk, and the
-  proven form sat one module too high to reach; moving the fact down
-  is this leg. The same leg records why the flat form dies: every
-  structural arm preserves such a key definitionally, and the mu arm
-  does not, because the unfold's plug lands exactly where the parked
-  width looks. So the currencies stop being a repair of their own —
-  they are the face's premise list, and the walk has to go there.
-- **the walk stops stating the caps exit and consumes the face** — its
-  own header has now closed every local repair: a one-notch step dies
-  on composition, carrying the level needs a residue only the level
-  recurrence bounds, a parameterised level breaks the up-and-down
-  identity the frozen width supplied, and a flat arrivals key dies at
-  the unfold. What is left is the twin — a proven body carrying the
-  same invariant across the same operation over the same cap family,
-  whose node-table conjunct is a proven weakening of its own. `FaceOK`
-  already rides the cone, so this leg threads the rest of the face's
-  list to the doors and weakens there. It is where the FALSE statement
-  leaves the tree.
-- **the probe re-run against the statements as they then read** —
-  `Probed.PushVals-Caps` was taken against the frozen-width cap, so its
-  green is evidence about text that will be gone. Re-running is not
-  optional and restamping the fingerprint alone is forbidden: that
-  converts a false coverage claim into a certified one. Either the rows
-  come back green at the restated shape, or the probe is deleted and the
-  rows that survive are re-declared against what they actually reached.
+- **the face's subscription-side premises threaded to the exit
+  family's doors** — `FaceOK` carries the slot-side keys already. What
+  the face reads on top of them is the SUBSCRIPTION: the term's size
+  and parked width, the path's size and length, the nesting budget,
+  the operator count, the descent depth. None reaches a door today.
+  Stating them is the justified kind of restatement — the
+  unconditional form is machine-refuted — and `capsWalkOK` is where
+  they belong, being the per-node bundle the walk already threads.
+- **the structural arms consume the face** — with the premises at the
+  door, each leaf arm of the walk stops proving the invariant and
+  spends `subscribeE-caps` instead, weakening its `capsOK?` conclusion
+  with `capsOK?⇒nest` and absorbing the level the Σ returns. The
+  worked instance is one module over: the bridge's own charge already
+  consumes that face at this exact premise list, substituting through
+  the zero step, so the shape is typed rather than proposed. It is
+  where the FALSE statement leaves the tree.
+- **the `*All` and inner arms follow, and the probe is re-run** — the
+  wrap and the inner subscribe are the last two arms and they consume
+  the face's siblings rather than the face. `Probed.PushVals-Caps` was
+  taken against the frozen-width cap, so its green is evidence about
+  text that will then be gone; re-running is not optional and
+  restamping the fingerprint alone is forbidden. Either the rows come
+  back green at the restated shape, or the probe is deleted and the
+  rows that survive are re-declared against what they actually
+  reached.
 
 ### The ledger
 
