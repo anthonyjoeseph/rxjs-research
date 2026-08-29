@@ -216,6 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
+- **the currencies the face's residue is priced in, carried to the
+  doors** — the recurrence bounding that residue reads the budget and
+  the operator count, and the walk holds neither. Both are available
+  above it rather than absent: the strong invariant arrives frame by
+  frame in the premise the fold already takes, and the two counts come
+  down from the cascade that enters the cone. This is the leg that
+  decides whether the consumption is a threading or a restatement of
+  the door, and it is sized as one commit because the doors are few.
 - **the walk stops stating the caps exit and consumes the face** — its
   own header has closed both repairs in place: a one-notch step dies on
   composition, and carrying the level needs a residue only the level
@@ -225,14 +233,6 @@ does not fit is a finding about the shared statement, not about the head.
   is a proven weakening of its own. `FaceOK` already rides the cone, so
   this leg threads the rest of the face's list to the doors and weakens
   there. It is where the FALSE statement leaves the tree.
-- **the currencies the face's residue is priced in, carried to the
-  doors** — the recurrence bounding that residue reads the budget and
-  the operator count, and the walk holds neither. Both are available
-  above it rather than absent: the strong invariant arrives frame by
-  frame in the premise the fold already takes, and the two counts come
-  down from the cascade that enters the cone. This is the leg that
-  decides whether the consumption is a threading or a restatement of
-  the door, and it is sized as one commit because the doors are few.
 - **the probe re-run against the statements as they then read** —
   `Probed.PushVals-Caps` was taken against the frozen-width cap, so its
   green is evidence about text that will be gone. Re-running is not

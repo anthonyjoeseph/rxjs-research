@@ -4783,7 +4783,15 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   the operator count -- two currencies this module does not carry
 --   and cannot acquire without restating the face here.  So the walk
 --   is not repairable in place at any level; what is left is to stop
---   stating it and consume the face instead.
+--   stating it and consume the face instead -- and the CURRENCIES come
+--   first, which is the ordering the two dead routes above fix rather
+--   than a preference.  The face prices its residue in a budget and an
+--   operator count, and every door out of this cone reads a cap whose
+--   width is frozen, so a consumption written before those arrive has
+--   nothing to hand the face and nothing to receive.  They are not a
+--   bundle a sweep can thread either: each reads the SUBSCRIPTION, so a
+--   recursive arm re-establishes its own rather than inheriting one,
+--   and that re-establishment is the content.
 -- TWIN: `subscribeE-caps` already carries the caps invariant across
 --   this very operation, at full strength and over the same cap
 --   family -- the node-table conjunct is a definitional weakening of
