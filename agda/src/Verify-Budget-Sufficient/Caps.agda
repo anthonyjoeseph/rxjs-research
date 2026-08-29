@@ -502,56 +502,11 @@ iterSize-infl S hS zero    s = ≤-refl
 iterSize-infl S hS (suc k) s =
   ≤-trans (sizeStep-infl S s hS) (iterSize-infl S hS k (sizeStep S s))
 
--- THE SIZE AXIS STEPPED ALONE, AND THE WIDTH LEFT EXACTLY WHERE IT
--- WAS -- the cap a descent's ARRIVALS are read at.  An arrival is the
--- head's syntax with payloads substituted in, so it crosses the size
--- field, and the level is the parameter.
---
--- The width field does NOT move, and that is measured rather than
--- assumed: a step function naming its payload twice mentions ONE
--- pending observable twice, and the frame measure counts observables.
--- Leaving it alone is what keeps the blast radius at nothing.  The
--- state invariant this face preserves reads the width field and no
--- size at all, so at this cap it REDUCES to the same proposition it
--- was at the entry cap -- the whole burst walk can therefore run one
--- cap up while its conclusion is still the one the parent asked for,
--- with no transport anywhere.
---
--- AND IT IS DELIBERATELY NOT SEALED, against the standing rule that a
--- cap named in a premise is worse than a body.  That reduction is the
--- whole design: it holds because the projection meets a `caps`
--- constructor, so sealing this would turn an identity the checker sees
--- for free into a transport at every site of the burst walk.  What the
--- rule is really about -- a body reaching the caps recurrence -- is
--- paid by `frameStep`, which is transparent already and appears in
--- these types either way; this adds one application of it.
---
--- AND THE LEVEL IS A PARAMETER RATHER THAN THE HEAD'S OWN SIZE, which
--- is what lets the two halves of a `*All` arm be spent together.  The
--- arm reads its arrivals at the level its own written size fixes, and
--- it also holds a CHILD's burst bound reported at whatever level the
--- child stepped to; fixing either level in the cap forces a transport
--- of the other.  Taking the level as an argument lets the arm read
--- both at their join, where neither moves.
-arrCapAt : ℕ → Caps → Caps
-arrCapAt j c = caps (Caps.cSize (frameStep j c)) (Caps.cWid c) (Caps.cReg c)
 
 iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
   iterSize S j s ≤ iterSize S j′ s
 iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s
 iterSize-mono-count S s hS           (s≤s le)  = iterSize-mono-count S (sizeStep S s) hS le
-
--- AND RAISING THE LEVEL IS A WIDENING, which is what lets a caller
--- take a bound at the level a callee reports and spend it at the join
--- it actually needs.  Only the size field moves, so the other two
--- halves of the ordering are reflexivity -- and the side condition is
--- a positive cap, which every head's own written-size premise already
--- supplies.
-arrCapAt-⊑ : ∀ (c : Caps) → 1 ≤ Caps.cSize c → ∀ {j j′ : ℕ} → j ≤ j′ →
-  arrCapAt j c ⊑ᶜ arrCapAt j′ c
-arrCapAt-⊑ c hS le =
-  iterSize-mono-count (Caps.cSize c) (Caps.cSize c) hS le , ≤-refl , ≤-refl
-
 
 -- WIDTH: foldStep is inflationary for S ≥ 2 (w < 2^w ≤ 2^(1+w) ≤ S^(1+w))
 foldStep-infl : ∀ (S w : ℕ) → 2 ≤ S → w ≤ foldStep S w
