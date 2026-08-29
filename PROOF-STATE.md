@@ -216,14 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **price the parked drain from the cap's own slack** — what replaced
-  the ceiling is two plain size bounds on a queued inner: what it
-  nests, and what a level of the walk still has to spend. Both compare
-  against the entry cap, and that cap is already proven to carry three
-  units above the program's own written size — the slack the
-  domination guard was repaired to want. So the question is whether the
-  queue's own receipts reach a queued term the way the base fact
-  reaches the root, and it is arithmetic rather than a walk.
+- **carry the drain's headroom in the store bound, since nothing
+  downstream of it can** — the selection's caps are now a body over one
+  chain's walk and one chain's step, so the parked drain's two size
+  bounds sit in a leaf small enough to argue about. The argument came
+  out negative: a queue is store content and the caps predicate does
+  price every parked term, but it prices one AT the cap, and the size
+  currency the wet stack measures with is that same projection, so
+  there is no smaller number to spend the constant difference against.
+  The leg is to put the headroom where the bound is stated.
 
 - **the entry state's own nesting receipt, which everything above it
   assumes** — the caps receipt at the same state is proven and is the
@@ -313,10 +314,13 @@ does not fit is a finding about the shared statement, not about the head.
   state's nesting receipt. `init-capsOK?` is its route, but a scripted slot's
   obs-freeness only reduces at a concrete type, so an `isData` inversion is
   owed first.
-- **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the caps the
-  selection's walk spends, held at every state it passes through. The walk's
-  ceiling is derived now, so what is left asserted is the sink's
-  registry-versus-unit conjunct and two size bounds on a parked inner.
+- **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
+  ONE chain's walk, the fold over the selection being a body now. What is left
+  asserted is the sink's registry-versus-unit conjunct and two size bounds on a
+  parked inner, whose headroom has no source downstream of the store bound.
+- **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`: one
+  chain's step preserves the caps — the half the flat-cap rows actually read,
+  where two of the three components come back at or below where they started.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

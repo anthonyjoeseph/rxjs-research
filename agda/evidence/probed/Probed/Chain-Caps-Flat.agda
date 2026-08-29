@@ -3,7 +3,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: arr-chains-caps @77ddb4
+-- TARGET: chainStep-caps @38f180
 --
 -- WHAT IS BEING TESTED.  The target asserts `chainsCapsOK` at ONE cap --
 -- the one read at the instant the cascade starts -- and that predicate
@@ -24,13 +24,13 @@
 -- flat reading is a slack claim about a SINGLE component and the other
 -- two are preservation outright.
 --
--- WHAT THESE ROWS DO NOT REACH.  The predicate the target asserts also
--- prices the parked drain -- what a queued inner nests and how much
--- size a level of the walk still has to spend -- and both of those
--- compare against the cap itself, which is the one quantity these rows
--- report a floor for rather than a value.  Nor is the sink arm's
--- registry-versus-unit conjunct addressed.  The three figures below
--- are the caps components alone.
+-- WHAT THESE ROWS DO NOT REACH, and it is why they are evidence for
+-- the STEP leaf and not for the walk one beside it.  A fit read before
+-- and after a cascade says the caps survive the fold; it says nothing
+-- about what the fold's own walk asserts at the states in between --
+-- the parked drain's two size bounds, the sink arm's
+-- registry-versus-unit conjunct -- and those are the walk leaf's
+-- content.  The three figures below are the caps components alone.
 module Probed.Chain-Caps-Flat where
 
 open import Data.Bool using (Bool; if_then_else_)

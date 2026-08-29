@@ -2223,6 +2223,40 @@ postulate
 -- single `frameBlowup` separating this instant's cap from the last --
 -- an argument about the recurrence, not another induction over frames.
 --
+-- AND THE FOLD OVER THE CHAINS IS A BODY, so what is asserted is ONE
+-- chain's walk and ONE chain's preservation rather than a selection's
+-- worth of both.  The predicate recurses on the list -- a cancelled
+-- registration walks nothing and weakens by a chain, a live one owes
+-- its own walk and hands the rest the state its step produced -- so the
+-- induction is the list's and nothing about it is undecided.  Splitting
+-- here is what makes the two obligations greppable: the walk leaf is
+-- the one the flat-cap rows measure, and the step leaf is the
+-- preservation half those rows report as holding outright on two of the
+-- three components.
+--
+-- AND THE SLOTS HALF IS ALREADY PROVEN, which is why the step leaf
+-- carries only the caps: `chainStep-slots` says a step does not move
+-- the vocabulary, so threading the equation costs nothing.
+--
+-- WHAT THE WALK LEAF STILL OWES, AND IT IS NOT THE WALK.  The drain's
+-- predicate prices a PARKED inner twice over -- what it nests, and what
+-- a level of the walk still has to spend -- and both are stated with
+-- HEADROOM: three units above the nesting, and two above the size plus
+-- one per level.  Those are the shapes the domination guard wants, and
+-- they are the shapes the proven entry mirror takes as hypotheses too,
+-- so the conjuncts are not suspect.  What has no source is the
+-- headroom itself.
+--
+-- DEAD ROUTE: reading the headroom off the caps hypothesis cannot
+--   work.  A mergeAll queue is store content, so the caps predicate
+--   does bound every parked term -- but its store conjunct bounds one
+--   by the cap EXACTLY, and the size currency the wet stack measures
+--   with is that same projection by definition, so there is no second,
+--   smaller number to spend the difference against.  The gap is a
+--   constant two and the arithmetic cannot manufacture it; the
+--   headroom has to be carried by whatever states the store bound, not
+--   recovered downstream of it.
+--
 -- PROBED: `Probed.Chain-Caps-Flat` measures what that asks for.  The
 --   cap itself cannot be instantiated -- it spends `capsH`, which the
 --   harness's own quarantine records as divergent in COMPILED code at
@@ -2237,13 +2271,52 @@ postulate
 --   addressable from outside the fold; and the sink arm's
 --   registry-versus-unit conjunct, which no row addresses.
 postulate
-  arr-chains-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (sched : Sched Γ) (st : EvalSt e) →
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
-    chainsCapsOK (capsAt e sl id) sl (capsH e sl id) a nextId (chainsOf a st) sched
-      (cascadeLatch a st)
+    chainCapsOK (capsAt e sl id) sl (capsH e sl id) nextId a path sched st
+
+  chainStep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    capsOK? (capsAt e sl id)
+      (proj₁ (proj₂ (chainStep nextId a path sched st)))
+      (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true
+
+arr-chains-caps-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  chainsCapsOK (capsAt e sl id) sl (capsH e sl id) a nextId chains sched st
+arr-chains-caps-go sl id a nextId [] sched st sleq cok = tt
+arr-chains-caps-go sl id a nextId ((rid , path) ∷ chains) sched st sleq cok
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true  = arr-chains-caps-go sl id a nextId chains sched st sleq cok
+... | false =
+      arr-chain-caps sl id a nextId path sched st′ sleq cok
+    , arr-chains-caps-go sl id a nextId chains
+        (proj₁ (proj₂ (chainStep nextId a path sched st′)))
+        (proj₂ (proj₂ (chainStep nextId a path sched st′)))
+        (trans (chainStep-slots nextId a path sched st′) sleq)
+        (chainStep-caps sl id a nextId path sched st′ sleq cok)
+  where st′ = record st { delivered = rid ∷ EvalSt.delivered st }
+
+arr-chains-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  chainsCapsOK (capsAt e sl id) sl (capsH e sl id) a nextId (chainsOf a st) sched
+    (cascadeLatch a st)
+arr-chains-caps {e = e} sl id a nextId sched st sleq cok =
+  arr-chains-caps-go sl id a nextId (chainsOf a st) sched (cascadeLatch a st)
+    sleq (cascadeLatch-caps (capsAt e sl id) a sched st cok)
 
 -- ONE CASCADE'S DESCENT AGAINST A COMPUTABLE CEILING, which is what
 -- the statement below is now read off.  Every term here computes --
