@@ -152,8 +152,8 @@ shared-live-INV {u = u} c Ψ j j′ src κ sched st 2≤S hCR cOK′ inv pB
   regCap : (length (EvalSt.registry st
                     ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
              ≤ᵇ Caps.cReg (frameStep (j + j′) c)) ≡ true
-  regCap = proj₂ (proj₂ (proj₂ (proj₂
-    (capsOK?-parts (frameStep (j + j′) c) sched (register src κ st) cOK′))))
+  regCap = proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+    (capsOK?-parts (frameStep (j + j′) c) sched (register src κ st) cOK′)))))
   lenOK = ≤ᵇ-widen (length (EvalSt.registry st
                             ++ (EvalSt.nextReg st , src , u , κ) ∷ []))
             (frameStep-reg≤size c (j + j′) (≤-trans (s≤s z≤n) 2≤S) hCR)
@@ -636,7 +636,7 @@ private
     CP = capsOK?-parts (frameStep (j + j′) c) sched₁ DROP cOK′
     RL = ≤ᵇ-widen (length (EvalSt.registry DROP))
            (frameStep-reg≤size c (j + j′) (≤-trans (s≤s z≤n) 2≤S) hCR)
-           (proj₂ (proj₂ (proj₂ (proj₂ CP))))
+           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ CP)))))
     slEq₁ : Sched.slots sched₁ ≡ sl
     slEq₁ = trans (KeepsC.slotsEq
                      (subscribeE-keeps fuel d (share-sink i) bid now sched st₁)) slEq
@@ -676,7 +676,7 @@ private
     CP = capsOK?-parts (frameStep (j + j′) c) sched₁ st₂ cOK′
     RL = ≤ᵇ-widen (length (EvalSt.registry st₂))
            (frameStep-reg≤size c (j + j′) (≤-trans (s≤s z≤n) 2≤S) hCR)
-           (proj₂ (proj₂ (proj₂ (proj₂ CP))))
+           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ CP)))))
     slEq₁ : Sched.slots sched₁ ≡ sl
     slEq₁ = trans (KeepsC.slotsEq
                      (subscribeE-keeps fuel d (share-sink i) bid now sched st₁)) slEq

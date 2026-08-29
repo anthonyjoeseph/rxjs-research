@@ -1851,7 +1851,7 @@ subscribeE-inner-nodry-inv : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   INV? Ψ (Caps.cSize (frameStep J c)) sched st ≡ true
 subscribeE-inner-nodry-inv c sl Ψ J sched st slSz slFc rgSz ((slEq , cOK) , fcb) rp
   with capsOK?-parts (frameStep J c) sched st cOK
-... | stB , rgSzP , _ , _ , rLen =
+... | stB , rgSzP , _ , _ , rLen , _ =
   INV?-of-parts Ψ (Caps.cSize (frameStep J c)) sched st stB fcb
     (T⇒≡true (length (EvalSt.registry st) ≤ᵇ Caps.cSize (frameStep J c))
       (≤⇒≤ᵇ (≤-trans (≤ᵇ⇒≤ (length (EvalSt.registry st))

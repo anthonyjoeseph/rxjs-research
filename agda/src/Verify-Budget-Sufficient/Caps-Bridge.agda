@@ -61,8 +61,8 @@ open import Rx.Slots using (Slots; slotsSize)
 -- below from the module that defines it
 open import Verify-Budget-Sufficient.Measures using
   (_hasAtLeast_; all-impl; boundedLive; capᴱ; chainsB?-widen; dBound; finish-slots;
-  fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; pathB?;
-  pathLen; pop-bounded; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
+  fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; parkRoom;
+  pathB?; pathLen; pop-bounded; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
   valB?-widen; V≤C; ΨAt; ∧-true; szB)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
@@ -491,7 +491,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       hNodeFn = repQ-all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) (suc W) o hfn
       hLen : (length q ≤ᵇ W) ≡ false
       hLen = trans (cong (_≤ᵇ W) (repQ-len (suc W) o)) (sucW≰W W)
-      -- capsOK?'s five conjuncts, NAMED.  ∧-true's Bool arguments must be
+      -- capsOK?'s six conjuncts, NAMED.  ∧-true's Bool arguments must be
       -- given explicitly: `_` leaves them as metas that Agda will not
       -- solve, because decomposing `?a ∧ ?b = C ∧ REST` needs `_∧_` to be
       -- injective and it is a function.  Same lesson as the ∧-true sites
@@ -499,19 +499,21 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       A3 = all (widLive W sl) (Sched.live sched)
       A4 = all (λ kv → widNode W sl (proj₂ kv)) (EvalSt.nodes st)
       A5 = (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
+      A6 = all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv))
+               (EvalSt.nodes st)
       A2 = regsSz? B (EvalSt.registry st)
       A1 = stBounded? B sched st
       WD = widNode W sl (mergeAll-st nothing 0 q false)
   in ∧-intro (∧-intro hLive   (∧-intro hNodeSz refl))
              (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
                       (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
-   -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount.
+   -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount ∧ park.
    -- Peel to the widNode conjunct, then to its queue-LENGTH half, and
    -- read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
-   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ A5))) hc)
-                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ A5)) t2)
-                t4 = proj₂ (∧-true A3 (A4 ∧ A5) t3)
-                t5 = proj₁ (∧-true A4 A5 t4)
+   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ A6)))) hc)
+                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ A6))) t2)
+                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ A6)) t3)
+                t5 = proj₁ (∧-true A4 (A5 ∧ A6) t4)
                 w  = proj₁ (∧-true WD true t5)
                 ln = widNode-len W sl nothing 0 q false w
             in f≡t-absurd (trans (sym hLen) ln)
@@ -1096,13 +1098,15 @@ pop-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sched-next sched ≡ inj₂ (a , sched′) →
   capsOK? c sched st ≡ true → capsOK? c sched′ st ≡ true
 pop-caps c sched st eq h with capsOK?-parts c sched st h
-... | sb , rg , wl , wn , rl =
+... | sb , rg , wl , wn , rl , pk =
   ∧-intro (pop-bounded (Caps.cSize c) sched st eq sb)
   (∧-intro rg
   (∧-intro (pop-widLive (Caps.cWid c) sched eq wl)
   (∧-intro (subst (λ sl → all (λ kv → widNode (Caps.cWid c) sl (proj₂ kv)) (EvalSt.nodes st) ≡ true)
                   (sym (pop-slots sched eq)) wn)
-           rl)))
+  (∧-intro rl
+           (subst (λ sl → all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv)) (EvalSt.nodes st) ≡ true)
+                  (sym (pop-slots sched eq)) pk)))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`

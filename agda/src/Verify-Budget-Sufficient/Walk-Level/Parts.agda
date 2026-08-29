@@ -1225,7 +1225,7 @@ walk-take-suc {n = n} {u = u} g cnt b k ecEq wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud 
   pB′ : pathB? B′ Ψ (take-f nid ↠ κ) ≡ true
   pB′ = ∧-intro refl (pathB?-widen κ (proj₁ step⊑) pB)
   inv₀ : capsOK? (frameStep (suc j) c) sched₀ st₀ ≡ true
-  inv₀ = capsOK?-setNode (frameStep (suc j) c) nid ns sched₀ st refl refl
+  inv₀ = capsOK?-setNode (frameStep (suc j) c) nid ns sched₀ st refl refl refl
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
               (capsOK?-nextNode (frameStep j c) (suc (Sched.nextNode sched))
                                 sched st inv))
@@ -1714,7 +1714,7 @@ walk-scan-source-tail {n = n} {u = u} g f z b wb c Ψ F Ŝ R̂ G ℓ L̂ dep bud
                          (T⇒≡true _ (≤⇒≤ᵇ capf)))
                 (pathB?-widen κ (proj₁ ⊑both) pB)
   inv₀ : capsOK? (frameStep (suc (j + j₀)) c) sched₀ st₀ ≡ true
-  inv₀ = capsOK?-setNode (frameStep (suc (j + j₀)) c) nid ns sched₀ st bnd
+  inv₀ = capsOK?-setNode (frameStep (suc (j + j₀)) c) nid ns sched₀ st bnd refl
            (subst (λ y → widNode (Caps.cWid (frameStep (suc (j + j₀)) c)) y ns ≡ true)
                   (sym slEq)
                   (valCaps?-wid (frameStep (suc (j + j₀)) c) sl _ (evalTm z) VW))

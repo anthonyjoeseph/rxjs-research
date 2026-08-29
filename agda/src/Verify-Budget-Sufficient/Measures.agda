@@ -64,6 +64,7 @@ open import Data.Vec     using (lookup)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (⊤; tt)
+open import Data.Maybe   using (Maybe; nothing; just)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
@@ -90,7 +91,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; resolve; mkH
   setNode; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; sched-next; schedHeadOf; schedGo; schedEarlier; cascadeFinish; sweepLive; takeVals;
   cutThrough; pathHasNode; dropSource; Path; splitEvents; retagEvents; hasDry; dryEvent;
-  sameSource; capsHgo)
+  sameSource; capsHgo; lookupNode)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ifEq; ifLe1; ifNeq; ∧-intro; ≤ᵇ-widen)
 
@@ -245,6 +246,32 @@ boundedNode B (take-st _)          = true
 boundedNode B (switch-st _ _)      = true
 boundedNode B (exhaust-st _ _)     = true
 
+-- AND THE PARKED TERM'S HEADROOM, which is a SECOND charge on the same
+-- queue and not a tightening of the first.  A drain re-enters the
+-- subscribe machinery at the term it parked, and what the level
+-- ceiling wants there is room above that term for the frame it opens
+-- and for the slots the state has not connected -- three units and the
+-- vocabulary, over and above the size the store already bounds.  It is
+-- The predicate lives here, beside the size charge it sits next to, but
+-- the CONJUNCT that spends it is the caps face's and not the store's.
+-- The store bound is shared with the wet face, whose cap is a fixed
+-- power at the clause that parks -- it reports its exponent unchanged --
+-- so a charge asking for three units and the whole slot vocabulary ABOVE
+-- the parked term is unpayable there.  What pays it is the caps face's
+-- refreshed level, which is a MULTIPLE of the one below it, so the slack
+-- is inside the factor and nothing has to be premised for it.
+--
+-- The slots' size is a plain number rather than the vocabulary itself,
+-- so the node predicate stays a function of the node: the schedule
+-- carries the slots, and the conjunct reads them off it at the one
+-- place the two meet.
+parkRoom : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → NodeState Γ → Bool
+parkRoom B Z (scan-st _)        = true
+parkRoom B Z (mergeAll-st _ _ q _) = all (λ o → 3 + (sizeᵉ o + Z) ≤ᵇ B) q
+parkRoom B Z (take-st _)        = true
+parkRoom B Z (switch-st _ _)    = true
+parkRoom B Z (exhaust-st _ _)   = true
+
 stBounded? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
            → ℕ → Sched Γ → EvalSt e → Bool
 stBounded? B sched st =
@@ -346,6 +373,15 @@ boundedNode-widen le (mergeAll-st _ _ q _) h =
 boundedNode-widen le (take-st _)       h = refl
 boundedNode-widen le (switch-st _ _)   h = refl
 boundedNode-widen le (exhaust-st _ _)  h = refl
+
+parkRoom-widen : ∀ {n} {Γ : Ctx n} {B B′ Z : ℕ} → B ≤ B′ →
+  (ns : NodeState Γ) → parkRoom B Z ns ≡ true → parkRoom B′ Z ns ≡ true
+parkRoom-widen le (scan-st _)          h = refl
+parkRoom-widen {Z = Z} le (mergeAll-st _ _ q _) h =
+  all-impl _ _ (λ o → ≤ᵇ-widen (3 + (sizeᵉ o + Z)) le) q h
+parkRoom-widen le (take-st _)          h = refl
+parkRoom-widen le (switch-st _ _)      h = refl
+parkRoom-widen le (exhaust-st _ _)     h = refl
 
 -- the invariant survives raising the bound — composes cascades:
 -- landing within (suc id)'s budget IS starting within (suc id)'s
@@ -3149,6 +3185,40 @@ setNode-bounded B nid ns ((k , s′) ∷ r) bn h with k ≡ᵇ nid
 ... | true  = ∧-intro bn (proj₂ (∧-true _ _ h))
 ... | false = ∧-intro (proj₁ (∧-true _ _ h))
                       (setNode-bounded B nid ns r bn (proj₂ (∧-true _ _ h)))
+
+-- the same walk over the table for the parked-room charge: generic in
+-- the node predicate would be the tidier statement, and the two are
+-- kept apart because the caller supplies a DIFFERENT fact for each
+setNode-park : ∀ {n} {Γ : Ctx n} (B Z : ℕ) (nid : NodeId) (ns : NodeState Γ)
+  (nodes : List (NodeId × NodeState Γ)) →
+  parkRoom B Z ns ≡ true →
+  all (λ kv → parkRoom B Z (proj₂ kv)) nodes ≡ true →
+  all (λ kv → parkRoom B Z (proj₂ kv)) (setNode nid ns nodes) ≡ true
+setNode-park B Z nid ns []             pk h = ∧-intro pk refl
+setNode-park B Z nid ns ((k , s′) ∷ r) pk h with k ≡ᵇ nid
+... | true  = ∧-intro pk (proj₂ (∧-true _ _ h))
+... | false = ∧-intro (proj₁ (∧-true _ _ h))
+                      (setNode-park B Z nid ns r pk (proj₂ (∧-true _ _ h)))
+
+-- and the same conjunct READ BACK out of a node table, for the clauses
+-- that reinstall a queue they just looked up.  It is a lemma of its own
+-- rather than a third component of either face's node receipt because
+-- both faces read it and only the queue clauses need it
+NodePark : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Maybe (NodeState Γ) → Set
+NodePark B Z nothing   = ⊤
+NodePark B Z (just ns) = parkRoom B Z ns ≡ true
+
+lookupNode-park : ∀ {n} {Γ : Ctx n} (B Z : ℕ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → parkRoom B Z (proj₂ kv)) nodes ≡ true →
+  NodePark B Z (lookupNode nid nodes)
+lookupNode-park B Z nid []            hp = tt
+lookupNode-park B Z nid ((k , s) ∷ r) hp with k ≡ᵇ nid
+... | true  = proj₁ (∧-true (parkRoom B Z s)
+                            (all (λ kv → parkRoom B Z (proj₂ kv)) r) hp)
+... | false = lookupNode-park B Z nid r
+                (proj₂ (∧-true (parkRoom B Z s)
+                               (all (λ kv → parkRoom B Z (proj₂ kv)) r) hp))
 
 install-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
   (sched : Sched Γ) (st : EvalSt e) (nid : NodeId) (ns : NodeState Γ) →

@@ -437,10 +437,19 @@ nestSyn e sl = 2 * nestUnit e sl
 -- most a stored width per layer crossed, so one instant costs at most
 -- one exponential — and `capsH` gains `blowH`'s pooled summand, a
 -- tower, per instant.  The bet this recurrence carries is exactly
--- that: EXPONENTIAL-PER-INSTANT COVERS THE REAL DYNAMICS.  Every
--- definition reads only program-shaped quantities (`nestSyn`,
--- `capsBase`), never the caps recurrence, so nothing can drag
--- `frameBlowup` into a type.
+-- that: EXPONENTIAL-PER-INSTANT COVERS THE REAL DYNAMICS.
+--
+-- ⚠ AND THE RECURRENCE BELOW BREAKS THAT LAW, WHICH IS WHY THE HEIGHT
+-- COMPARISON IT FEEDS IS FALSE.  `realWidAt` reads `Caps.cReg` of the
+-- caps recurrence and the factor reads `delSq` of it one instant on,
+-- inside an exponent -- so the "program-shaped" clause this paragraph
+-- used to end on is not true of the definitions, and every consequence
+-- drawn from it is void.  The exponential is exponential in a CAP, and
+-- a cap already towers past the height, so the per-instant comparison
+-- loses before `blowH` is reached.  A repair moves these reads back to
+-- program-shaped quantities or re-denominates the obligation; it
+-- cannot be a bigger factor.  Machine-checked in
+-- `Refuted.Nest-Cap-Height`.
 --
 -- THE BLOCK IS SEALED BECAUSE A CAP OR A MEASURE ON THIS SPINE MUST
 -- BE, and this is both.  The standing tell is met exactly: the body
@@ -795,9 +804,16 @@ abstract
   -- outside would oblige a future proof to export two more, widening
   -- the seal for no reason other than where a postulate was typed.
   --
-  -- AND THE Σ HAS CONTENT: the first conjunct is upward-closed in `h`
-  -- and the second downward-closed, so no witness satisfies both by
-  -- being large enough.
+  -- AND IT IS FALSE, WHICH IS WHAT THE TWO-SIDED Σ WAS SUPPOSED TO
+  -- MAKE VISIBLE AND DID NOT.  The two conjuncts do pin `h` from both
+  -- sides, so no witness satisfies them by being large enough -- but
+  -- pinning is not satisfiability, and here the interval is empty: the
+  -- currency's own factor already exceeds every tower the second
+  -- conjunct admits.
+  --
+  -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted) -- the
+  --   Σ is uninhabited at a closed program, by replaying it through
+  --   `tower-le-blowH` into the untowered form and refuting that.
   --
   -- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
   --   holds height arithmetic written for exactly this shape and
@@ -822,18 +838,42 @@ abstract
 -- store is read at the instant's ENTRY while the walk subscribes
 -- accumulators the instant's own folds have deepened since.
 --
--- WHY THE HEADROOM IS THERE.  `nestCapAt` and `realWidAt` iterate one
--- exponential per instant from program-shaped bases, while `capsH`
--- iterates `blowH`, whose pooled summand `2 * poolCount (towerℕ m) m`
--- sits above `towerℕ k` for every reachable k — a tower per instant
--- against an exponential per instant, so the sum is dominated with
--- stories to spare rather than by a constant-factor squeeze.
+-- ⚠ AND IT IS FALSE AS STATED, WITH NO REPAIR AVAILABLE AT THIS INDEX.
+-- The headroom argument this block used to carry -- an exponential per
+-- instant off program-shaped bases, against a tower per instant from
+-- `blowH` -- rests on a premise the currency stopped satisfying when
+-- the width was re-denominated to the registry cap.  `realWidAt` reads
+-- `Caps.cReg (capsAt e sl id)` and `nestFacAt` reads
+-- `delSq n (capsAt e sl (suc id))` inside an exponent, so ONE instant's
+-- factor already exceeds `2 ^ cSize (capsAt e sl (suc id))`, while the
+-- budget is the depth height `capsH e sl id` -- and the depth fuel is
+-- itself INSIDE that size, since `capsAt e sl (suc id)` steps `capsAt e
+-- sl id` exactly `sizeCount c (capsH e sl id)` times and one size step
+-- adds at least one.  So `capsH e sl id ≤ cSize (capsAt e sl (suc id))
+-- < nestFacAt e sl id ≤ nestCapAt e sl (suc id)`, and `n < 2 ^ n`
+-- closes it on its own: no factor, no witness and no widening repairs
+-- a cap that reads a caps field and is measured against a caps HEIGHT.
 --
--- AND THE WHOLE OF IT IS NOW A HEIGHT QUESTION.  `capsH` is `blowH` of
--- the previous height at every index, and `tower-le-blowH` turns a
--- tower one story below that height into `blowH` of it, so the sum's
--- own tower height is the only thing left to establish -- which is
--- `nest-height`, inside the seal, where the two axes unfold.
+-- NOR DOES CHANGING THE BUDGET, AND THAT IS THE PART THAT COSTS.  The
+-- obstruction is parametric in the depth fuel, not a miscalibration of
+-- `capsH`: for ANY fuel `F`, `F ≤ cSize (frameBlowup c F)`, because one
+-- unit of depth buys at least one level and one level adds at least one
+-- to the size.  So raising the budget raises the exit size it is
+-- compared against, and the cap is EXPONENTIAL in that size while the
+-- budget is linear in itself.  No fuel satisfies `F ≥ 2 ^ poly (blowup
+-- by F)`, so no index shift, no larger height sequence and no tower
+-- denomination of the budget can close it.
+--
+-- WHAT IS LEFT IS TO STOP READING THE EXIT CAP.  The obligation is
+-- unsatisfiable exactly while the factor reads `capsAt` at the instant's
+-- OWN EXIT, which is the index the depth budget defines; a factor that
+-- reads only the ENTRY caps and program-shaped quantities is not caught
+-- by this argument, and pricing the walk's descent then has to be paid
+-- for some other way than by naming the endpoint it climbs to.
+--
+-- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), at a
+--   closed program, and the same file refutes the `nest-height` Σ this
+--   body is assembled from.
 nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
   2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id

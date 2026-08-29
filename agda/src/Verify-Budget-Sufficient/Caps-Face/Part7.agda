@@ -256,7 +256,7 @@ innerFinish-face _ c d j g switchᵒ allNid inst κ id now vals sl sched st
   innerFinish-face-keep c d j sl vals od sched
     (record st { nodes = setNode allNid (switch-st nothing od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (switch-st nothing od)
-       sched st refl refl inv)
+       sched st refl refl refl inv)
     vC
 
 -- EXHAUST: clear the busy flag
@@ -272,7 +272,7 @@ innerFinish-face _ c d j g exhaustᵒ allNid inst κ id now vals sl sched st
   innerFinish-face-keep c d j sl vals od sched
     (record st { nodes = setNode allNid (exhaust-st false od) (EvalSt.nodes st) })
     (capsOK?-setNode (frameStep j c) allNid (exhaust-st false od)
-       sched st refl refl inv)
+       sched st refl refl refl inv)
     vC
 
 -- and the from-inner FRAME: a fin that nothing absorbs finishes the
@@ -370,6 +370,7 @@ stepFrame-face-scan {s = s} {u = u} c d j g id now fn nid κ vals fin sl sched s
      , capsOK?-setNode (frameStep (j + j′) c) nid
          (scan-st (proj₂ run)) sched st
          (valCaps?-size (frameStep (j + j′) c) sl _ (proj₂ run) (proj₂ (proj₂ SC)))
+         refl
          (subst (λ x → widNode (Caps.cWid (frameStep (j + j′) c)) x
                          (scan-st (proj₂ run)) ≡ true)
                 (sym slEq)

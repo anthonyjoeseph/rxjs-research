@@ -19,10 +19,10 @@
 -- Over three families the width and the registry components do not grow
 -- across a cascade at all -- both come back at or below where they
 -- started, because a delivery CONSUMES a queued value and RETIRES the
--- registration it walked.  The size grows in every one of them, by a
--- factor of five at the widest and by half at the narrowest, so the
--- flat reading is a slack claim about a SINGLE component and the other
--- two are preservation outright.
+-- registration it walked.  The size grows in every one of them, by
+-- under a factor of three at the widest and by a bit over a third at
+-- the narrowest, so the flat reading is a slack claim about a SINGLE
+-- component and the other two are preservation outright.
 --
 -- WHAT THESE ROWS DO NOT REACH, and it is why they are evidence for
 -- the STEP leaf and not for the walk one beside it.  A fit read before
@@ -129,7 +129,7 @@ rowF = let e₀ = entry pF sl₁ (sucGF 1 2 2 1 1)
            e₁ = step1 (proj₁ e₀) (proj₂ e₀)
        in read1 (proj₁ e₁) (proj₂ e₁)
 
-U-row : rowU ≡ (1 , (14 , 4 , 1) , (69 , 1 , 0))
+U-row : rowU ≡ (1 , (26 , 4 , 1) , (69 , 1 , 0))
 U-row = refl
 
 C-row : rowC ≡ (3 , (17 , 1 , 3) , (24 , 1 , 0))

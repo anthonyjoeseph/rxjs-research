@@ -37,6 +37,7 @@ module Rx.MergeAll-Laws where
 
 open import Data.Bool  using (Bool; true; false; if_then_else_)
 open import Data.List  using (List; []; _∷_; length)
+open import Data.Bool.ListAction using (all)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Nat   using (ℕ; suc; _≤_; _≤ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; n≤1+n)
@@ -44,6 +45,7 @@ open import Data.Product using (_,_; proj₁; proj₂)
 open import Data.Sum   using (_⊎_; inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
+open import Decide using (∧-trueʳ)
 open import Rx.Prim using (Gas; Id; Tick)
 open import Rx.Exp  using (Ctx; Closed)
 open import Rx.Evaluator using (EvalSt; NodeId; Path; Sched; mergeAllDrain; mergeAllᵒ; hasRoom; subscribeInner)
@@ -141,3 +143,30 @@ drain-queue-shrinks g allNid κ id now lim act (o ∷ q) sched st
       ≤-trans (drain-queue-shrinks g allNid κ id now lim
                  (if done then act else suc act) q sched₁ st₁)
               (n≤1+n (length q))
+
+-- AND THE RESIDUE IS A SUFFIX, which is the stronger reading the same
+-- recursion supports: every branch returns `[]`, the queue it was
+-- handed, or the residue of the tail, so ANY pointwise predicate over
+-- the queue survives the drain.  Stated over an abstract `P` rather
+-- than over the one bound that wanted it, because the length version
+-- above is the same induction and a second copy per conjunct is how a
+-- face acquires three of these
+drain-queue-all :
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (P : Closed Γ s → Bool)
+    (g : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+    (sched : Sched Γ) (st : EvalSt e) →
+  all P q ≡ true →
+  let r  = mergeAllDrain g allNid κ id now lim act q sched st
+      q′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  in all P q′ ≡ true
+drain-queue-all P g allNid κ id now lim act []      sched st h = h
+drain-queue-all P g allNid κ id now lim act (o ∷ q) sched st h
+  with hasRoom lim act
+... | false = h
+... | true  with subscribeInner g mergeAllᵒ allNid κ id now o sched st
+...   | _ , vs , bs , done , sched₁ , st₁ =
+      drain-queue-all P g allNid κ id now lim
+        (if done then act else suc act) q sched₁ st₁
+        (∧-trueʳ {P o} {all P q} h)

@@ -49,7 +49,7 @@
 module Refuted.Thru-Loop where
 
 open import Data.Bool using (true; false)
-open import Data.Nat  using (ℕ; suc)
+open import Data.Nat  using (ℕ; suc; _+_)
 open import Data.List using (List; []; _∷_; replicate)
 open import Data.Maybe using (just)
 open import Data.Empty using (⊥)
@@ -83,8 +83,9 @@ false≢true ()
 -- every lane of its limit spent, holding a queue exactly as long as the
 -- width cap.
 --
--- The caps are read off `eₚ` rather than chosen: `cSize` is the value's
--- own size and `cWid` is one past its own width, so every per-element
+-- The caps are read off `eₚ` rather than chosen: `cSize` is one park
+-- frame above the value's own size and `cWid` is one past its own width,
+-- so every per-element
 -- conjunct holds with a margin and the ONLY tight one is the queue's
 -- LENGTH — which is the one the park breaks.  `cReg` is 0 because the
 -- registry is empty and stays empty; this clause never registers.
@@ -103,15 +104,18 @@ Wₚ : ℕ
 Wₚ = suc (pWᵉ 0 slₚ eₚ)
 
 cₚ : Caps
-cₚ = caps (sizeᵉ eₚ) Wₚ 0
+cₚ = caps (3 + sizeᵉ eₚ) Wₚ 0
 
 -- pinned, because "the cap is 0" would make this a degenerate-zero
 -- refutation and not a real one: the width cap is 2, and the queue holds
--- exactly 2, and the size cap (3) has room to spare
+-- exactly 2, and the size cap (6) has room to spare.  The size cap is one
+-- park-frame above the element's own size rather than equal to it,
+-- because `capsOK?`'s park conjunct demands exactly that headroom of
+-- every queued element; the tight conjunct is still the queue's LENGTH.
 _ : Caps.cWid cₚ ≡ 2
 _ = refl
 
-_ : Caps.cSize cₚ ≡ 3
+_ : Caps.cSize cₚ ≡ 6
 _ = refl
 
 qₚ : List (Closed Γₚ natᵗ)

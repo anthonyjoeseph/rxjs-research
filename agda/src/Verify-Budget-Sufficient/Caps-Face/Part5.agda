@@ -53,8 +53,7 @@ open import Rx.Slots using (Slots)
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Measures using
-  (all-impl; boundedLive; boundedNode;
-                                                      fnCapᵛ; ∧-true)
+  (all-impl; boundedLive; boundedNode; fnCapᵛ; ∧-true)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; iterFold-infl; iterFold-mono-count; iterSize-infl;
    iterSize-mono-count)
@@ -289,7 +288,7 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl inv =
     ∧-intro (∧-intro (∧-intro bl (proj₁ hL)) (proj₂ hL))
     (∧-intro h1
     (∧-intro (∧-intro wl h2)
-    (∧-intro h3 h4)))
+    (∧-intro h3 (∧-intro h4 h5))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -299,7 +298,8 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl inv =
   h1 = proj₁ (proj₂ P)
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
-  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  h5 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
 
 -- AND THE SAME STEP BACKWARDS, which costs no hypothesis at all: every
 -- capsOK? conjunct that reads `live` reads it through an `all`, so the head
@@ -319,13 +319,12 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
     ∧-intro (∧-intro (proj₂ hL) (proj₂ hB))
     (∧-intro h1
     (∧-intro (proj₂ hW)
-    (∧-intro h3 h4)))
+    (∧-intro h3 (∧-intro h4 h5))))
   where
   sched′ = record sched { live = l ∷ Sched.live sched }
   P  = capsOK?-parts c sched′ st ok
   hB = ∧-true (all (boundedLive {Γ = Γ} (Caps.cSize c)) (l ∷ Sched.live sched))
-              (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv))
-                   (EvalSt.nodes st))
+              (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) (EvalSt.nodes st))
               (proj₁ P)
   hL = ∧-true (boundedLive (Caps.cSize c) l)
               (all (boundedLive {Γ = Γ} (Caps.cSize c)) (Sched.live sched))
@@ -336,7 +335,8 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
               (proj₁ (proj₂ (proj₂ P)))
   h1 = proj₁ (proj₂ P)
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
-  h4 = proj₂ (proj₂ (proj₂ (proj₂ P)))
+  h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  h5 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
 
 -- and the head of the same conjunct, which the drop throws away and a fresh
 -- cold subscribe then needs: the entry it just prepended is bounded, and the
@@ -351,8 +351,7 @@ capsOK?-liveHead {Γ = Γ} c l sched st ok =
                 (proj₁ (∧-true
                   (all (boundedLive {Γ = Γ} (Caps.cSize c))
                        (l ∷ Sched.live sched))
-                  (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv))
-                       (EvalSt.nodes st))
+                  (all (λ kv → boundedNode (Caps.cSize c) (proj₂ kv)) (EvalSt.nodes st))
                   (proj₁ (capsOK?-parts c
                     (record sched { live = l ∷ Sched.live sched }) st ok)))))
 
@@ -739,6 +738,7 @@ stepFrame-scan-caps {s = s} {u = u} c j g id now fn nid κ vals fin sl sched st
   j′ , capsOK?-setNode (frameStep (j + j′) c) nid
          (scan-st (proj₂ run)) sched st
          (valCaps?-size (frameStep (j + j′) c) sl _ (proj₂ run) (proj₂ (proj₂ SC)))
+         refl
          (subst (λ x → widNode (Caps.cWid (frameStep (j + j′) c)) x
                          (scan-st (proj₂ run)) ≡ true)
                 (sym slEq)

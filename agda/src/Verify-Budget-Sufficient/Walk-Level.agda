@@ -106,7 +106,7 @@ open import Rx.Slots using (Slots; slotsSize)
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
 open import Verify-Budget-Sufficient.Measures using
-  (_hasAtLeast_; all-++-intro; all-impl;
+  (_hasAtLeast_; all-++-intro; all-impl; lookupNode-park; parkRoom;
                                                       applyFn-size; boundedLive; boundedNode;
                                                       budget-covers; burstB?; burstB?-widen;
                                                       burstHopD?; connect-anchor; dBound;
@@ -140,7 +140,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   valCountᵉ; widNode; widNode-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-mergeAllBump; capsOK?-nextNode; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-regs;
-  capsOK?-setNode; frameBud; lookupNode-caps; mList?; mList?-head; mList?-keeps; mList?-tail;
+  capsOK?-nodePark; capsOK?-setNode; frameBud; lookupNode-caps; mList?; mList?-head;
+  mList?-keeps; mList?-tail; parkList-push;
   pathSz?-len; slotsCaps?-capsAt; splitBurst-bk-caps; splitBurst-vals-caps;
   splitEvents-bk-caps; splitEvents-valsCaps; switchKill-caps; switchKill-closes-caps;
   thruWrap-caps; valsCaps?; valsCaps→mList-strict)
@@ -1056,6 +1057,7 @@ subscribeAll-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   slotsSize sl ≤ Caps.cSize c →
   capsOK? (frameStep j c) sched st ≡ true →
   boundedNode (Caps.cSize (frameStep (suc j) c)) ns ≡ true →
+  parkRoom (Caps.cSize (frameStep (suc j) c)) (slotsSize sl) ns ≡ true →
   widNode (Caps.cWid (frameStep (suc j) c)) sl ns ≡ true →
   sizeᵉ b ≤ Caps.cSize (frameStep j c) →
   dWᵉ n sl b ≤ Caps.cWid (frameStep j c) →
@@ -1110,7 +1112,7 @@ walk-mergeAll {u = u} lim b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now s
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g mergeAllᵒ
     (mergeAll-st {t = u} lim 0 [] false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (mergeAll-step lim _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -1121,7 +1123,7 @@ walk-switchAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g switchᵒ
     (switch-st nothing false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (switch-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -1132,7 +1134,7 @@ walk-exhaustAll b c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g κ bid now sl sched st
   2≤S 1≤R hCR slEq slC slSz inv szb wdb pC lC nst hidx dpt invW fnC pB s2 fS rS ceil lb dmd gas lℓ rgs =
   subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j g exhaustᵒ
     (exhaust-st false false) b κ bid now sl sched st
-    2≤S 1≤R hCR slEq slC slSz inv refl refl
+    2≤S 1≤R hCR slEq slC slSz inv refl refl refl
     (≤-trans (n≤1+n (sizeᵉ b)) szb) wdb pC lC
     (exhaust-step _ sl _ bud nst) hidx dpt
     invW fnC refl pB s2 fS rS ceil lb dmd gas lℓ rgs
@@ -1398,9 +1400,9 @@ walk-mu {n = n} body c Ψ F Ŝ R̂ G ℓ L̂ dep (suc bud′) (suc ops′) j (gs
 -- zero the index hypothesis `suc (suc (sizeᵉ b)) ≤ zero` is uninhabited,
 -- and the successor clause spends op-step's one operator.
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud zero j g op ns b κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv bn wn szb wdb pC lC nst ()
+  2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst ()
 subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bid now sl sched st
-  2≤S 1≤R hCR slEq slC slSz inv bn wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs =
+  2≤S 1≤R hCR slEq slC slSz inv bn pk wn szb wdb pC lC nst hidx dpt invW fnC fnN pB s2 fS rS ceil lb dmd gas lℓ rgs =
   suc (j₁ + j₂)
     , subst (λ x → capsOK? (frameStep x c)
                      (proj₁ (proj₂ PB)) (proj₂ (proj₂ PB)) ≡ true) EQ W1
@@ -1444,6 +1446,9 @@ subscribeAll-walk c Ψ F Ŝ R̂ G ℓ L̂ dep bud (suc ops′) j g op ns b κ bi
                    (pathSz?-⊑ κ step⊑ pC))
   inv₀ : capsOK? (frameStep (suc j) c) sched₀ st₀ ≡ true
   inv₀ = capsOK?-setNode (frameStep (suc j) c) nid ns sched₀ st bn
+           (subst (λ y → parkRoom (Caps.cSize (frameStep (suc j) c))
+                           (slotsSize y) ns ≡ true)
+                  (sym slEq) pk)
            (subst (λ y → widNode (Caps.cWid (frameStep (suc j) c)) y ns ≡ true)
                   (sym slEq) wn)
            (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched₀ st step⊑
@@ -1714,7 +1719,10 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
                         (all (λ kv → fnCapNode Ψ (proj₂ kv)) (EvalSt.nodes st))
                         (proj₁ (proj₂ (INV-parts Ψ (Caps.cSize (frameStep j c))
                                          sched st invW)))))
-... | nothing                | _ | _ =
+     | lookupNode-park (Caps.cSize (frameStep j c))
+         (slotsSize (Sched.slots sched)) nid (EvalSt.nodes st)
+         (capsOK?-nodePark (frameStep j c) sched st inv)
+... | nothing                | _ | _ | _ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -1722,7 +1730,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (scan-st _)       | _ | _ =
+... | just (scan-st _)       | _ | _ | _ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -1730,7 +1738,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (take-st _)       | _ | _ =
+... | just (take-st _)       | _ | _ | _ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -1738,7 +1746,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (switch-st _ _)   | _ | _ =
+... | just (switch-st _ _)   | _ | _ | _ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -1746,7 +1754,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (exhaust-st _ _)  | _ | _ =
+... | just (exhaust-st _ _)  | _ | _ | _ =
   0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     , ZW , refl , refl , refl , rgs
   where
@@ -1754,7 +1762,7 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
              (sym (+-identityʳ j)) inv
   ZW = subst (λ x → INV? Ψ (Caps.cSize (frameStep x c)) sched st ≡ true)
              (sym (+-identityʳ j)) invW
-... | just (mergeAll-st {w} lim act q od) | (bn , wn) | (bnW , fnW) with w ≟ᵗ u
+... | just (mergeAll-st {w} lim act q od) | (bn , wn) | (bnW , fnW) | pk with w ≟ᵗ u
 ...   | no _ =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
             (sym (+-identityʳ j)) inv
@@ -1812,9 +1820,19 @@ thruConsume-walk {n = n} {u = u} c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g me
   WN = widNode-push c j (Sched.slots sched) lim q o act od 2≤S wn
          (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                 (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
+  PK = subst (λ y → all (λ x → 3 + (sizeᵉ x + slotsSize y)
+                                 ≤ᵇ Caps.cSize (frameStep (suc j) c))
+                        (q ++ o ∷ []) ≡ true)
+             (sym slEq)
+             (parkList-push c j sl q o 2≤S slSz
+                (≤ᵇ⇒≤ (sizeᵉ o) (Caps.cSize (frameStep j c))
+                      (T-to (valCaps?-size (frameStep j c) sl (obs u) o vC)))
+                (subst (λ y → all (λ x → 3 + (sizeᵉ x + slotsSize y)
+                                           ≤ᵇ Caps.cSize (frameStep j c)) q ≡ true)
+                       slEq pk))
   capsPark = capsOK?-setNode (frameStep (suc j) c)
                nid (mergeAll-st lim act (q ++ o ∷ []) od)
-               sched st BN WN
+               sched st BN PK WN
                (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                   (frameStep-mono-j c 2≤S (n≤1+n j)) inv)
   FN : fnCapNode Ψ (mergeAll-st lim act (q ++ o ∷ []) od) ≡ true
@@ -1880,7 +1898,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g switchᵒ nid κ b
                      else just (proj₁ R)) od)
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-         refl refl (proj₁ (proj₂ SI))
+         refl refl refl (proj₁ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ SI))
      , all-++-intro (eventCaps? (frameStep (j + j′) c) sl)
          (proj₁ KILL) _
@@ -1984,7 +2002,7 @@ thruConsume-walk c Ψ F Ŝ R̂ G ℓ L̂ U r̂ ŝ dep bud j g exhaustᵒ nid κ 
          (exhaust-st (not (proj₁ (proj₂ (proj₂ (proj₂ R))))) od)
          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
          (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-         refl refl (proj₁ (proj₂ SI))
+         refl refl refl (proj₁ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ SI))
      , proj₁ (proj₂ (proj₂ (proj₂ SI)))
      , proj₁ (proj₂ (proj₂ (proj₂ (proj₂ SI))))

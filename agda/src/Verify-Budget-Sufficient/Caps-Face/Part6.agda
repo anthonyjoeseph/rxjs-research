@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part6 where
 
 open import Data.Bool    using (Bool; true; false; not; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; ≤-pred; +-suc; +-identityʳ; +-comm; +-assoc; *-monoʳ-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; ≤-pred; +-suc; +-identityʳ; +-comm; +-assoc; *-monoʳ-≤;
   n≤1+n; +-mono-≤; ^-monoˡ-≤; m≤m⊔n; m≤n⊔m)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -52,7 +52,7 @@ open import Rx.Slots using (Slots; slotsSize)
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Measures using
-  (all-++-intro; all-impl; hopR; n<2^n;
+  (all-++-intro; all-impl; hopR; lookupNode-park; n<2^n;
                                                       pathLen; ∧-true; szB)
 open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; Caps; frameStep; frameStep-mono-j; frameStep-wid-suc)
@@ -90,11 +90,12 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-mergeAllBump; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-setNode;
    face-lift; frameBud; FrameFace; lookupNode-caps; mList?; mList?-head;
    mList?-keeps; mList?-tail; switchKill-caps; switchKill-closes-caps;
-   thruWrap-caps; valsCaps?; valsCaps→mList-strict)
+   thruWrap-caps; valsCaps?; valsCaps→mList-strict;
+   capsOK?-nodePark; parkList-push)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; obsCaps?; pathSz?;
    slotsCaps?; valCaps?; widNode-push)
-open import Decide using (T⇒≡true; ∧-intro; ≤ᵇ-widen)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 -- innerFinish's clauses that hand the payload straight back — switch's
 -- cleared slot, exhaust's cleared flag, the absorb path, and every
@@ -442,17 +443,20 @@ private
        | lookupNode-caps (frameStep j c) (Sched.slots sched) nid (EvalSt.nodes st)
            (capsOK?-nodeSz (frameStep j c) sched st inv)
            (capsOK?-nodeWid (frameStep j c) sched st inv)
-  ... | nothing                | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+       | lookupNode-park (Caps.cSize (frameStep j c))
+           (slotsSize (Sched.slots sched)) nid (EvalSt.nodes st)
+           (capsOK?-nodePark (frameStep j c) sched st inv)
+  ... | nothing                | _ | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (scan-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+  ... | just (scan-st _)       | _ | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (take-st _)       | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+  ... | just (take-st _)       | _ | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (switch-st _ _)   | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+  ... | just (switch-st _ _)   | _ | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (exhaust-st _ _)  | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
+  ... | just (exhaust-st _ _)  | _ | _ = 0 , ZI , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
     where ZI = subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
-  ... | just (mergeAll-st {w} lim act q od) | (bn , wn) with w ≟ᵗ u
+  ... | just (mergeAll-st {w} lim act q od) | (bn , wn) | pk with w ≟ᵗ u
   ...   | no _ = 0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
                             (sym (+-identityʳ j)) inv
                 , refl , refl , inner-nil (Caps.cSize c) (Caps.cWid c) dep (suc bud) j
@@ -482,7 +486,7 @@ private
               (sym lvl)
               (capsOK?-setNode (frameStep (suc j) c)
                  nid (mergeAll-st lim act (q ++ o ∷ []) od)
-                 sched st BN WN
+                 sched st BN PK WN
                  (capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
                     (frameStep-mono-j c 2≤S (n≤1+n j)) inv))
       , refl , refl
@@ -499,6 +503,16 @@ private
     WN = widNode-push c j (Sched.slots sched) lim q o act od 2≤S wn
            (subst (λ y → (pWᵉ n y o ≤ᵇ Caps.cWid (frameStep j c)) ≡ true)
                   (sym slEq) (valCaps?-wid (frameStep j c) sl (obs u) o vC))
+    PK = subst (λ y → all (λ x → 3 + (sizeᵉ x + slotsSize y)
+                                   ≤ᵇ Caps.cSize (frameStep (suc j) c))
+                          (q ++ o ∷ []) ≡ true)
+               (sym slEq)
+               (parkList-push c j sl q o 2≤S slSz
+                  (≤ᵇ⇒≤ (sizeᵉ o) (Caps.cSize (frameStep j c))
+                        (T-to (valCaps?-size (frameStep j c) sl (obs u) o vC)))
+                  (subst (λ y → all (λ x → 3 + (sizeᵉ x + slotsSize y)
+                                             ≤ᵇ Caps.cSize (frameStep j c)) q ≡ true)
+                         slEq pk))
   thruConsume-caps-go siC c dep bud j g switchᵒ nid κ id now o sl sched st
                       2≤S 1≤R slEq slC slSz inv vC pC lC nst dpt
     with lookupNode nid (EvalSt.nodes st) | dpt
@@ -518,7 +532,7 @@ private
                        else just (proj₁ R)) od)
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-           refl refl (proj₁ (proj₂ SI))
+           refl refl refl (proj₁ (proj₂ SI))
        , proj₁ (proj₂ (proj₂ SI))
        , all-++-intro (eventCaps? (frameStep (j + j′) c) sl)
            (proj₁ KILL) _
@@ -557,7 +571,7 @@ private
            (exhaust-st (not (proj₁ (proj₂ (proj₂ (proj₂ R))))) od)
            (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
            (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))))
-           refl refl (proj₁ (proj₂ SI))
+           refl refl refl (proj₁ (proj₂ SI))
        , proj₁ (proj₂ (proj₂ SI))
        , proj₁ (proj₂ (proj₂ (proj₂ SI)))
        , proj₂ (proj₂ (proj₂ (proj₂ SI)))

@@ -153,6 +153,7 @@ open import Verify-Budget-Sufficient.Measures using
                                                       EnvSize; envSize-lookup; envSize-widen;
                                                       fᵢ≤sum-tab; n<2^n; n≤slotsSize;
                                                       pathLen; size-subΘᵉ; sizeᵗ-pos;
+                                                      parkRoom; parkRoom-widen;
                                                       stBounded-widen; stBounded?; ∧-true)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -289,6 +290,9 @@ capsOK? c sched st =
   ∧ all (λ kv → widNode (Caps.cWid c) (Sched.slots sched) (proj₂ kv))
         (EvalSt.nodes st)
   ∧ (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
+  ∧ all (λ kv → parkRoom (Caps.cSize c) (slotsSize (Sched.slots sched))
+                         (proj₂ kv))
+        (EvalSt.nodes st)
 
 ------------------------------------------------------------------
 -- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
@@ -355,14 +359,17 @@ capsOK?-mono c c′ sched st (sz≤ , wd≤ , rg≤) h
 ... | hSt , hRest with ∧-true _ _ hRest
 ... | hRg , hRest2 with ∧-true _ _ hRest2
 ... | hWL , hRest3 with ∧-true _ _ hRest3
-... | hWN , hLen =
+... | hWN , hRest4 with ∧-true _ _ hRest4
+... | hLen , hPk =
   ∧-intro (stBounded-widen sz≤ sched st hSt)
   (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
   (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
                      (Sched.live sched) hWL)
   (∧-intro (all-impl _ _ (λ kv → widNode-widen (Sched.slots sched) (proj₂ kv) wd≤)
                      (EvalSt.nodes st) hWN)
-           (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen))))
+  (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen)
+           (all-impl _ _ (λ kv → parkRoom-widen sz≤ (proj₂ kv))
+                     (EvalSt.nodes st) hPk)))))
 
 ------------------------------------------------------------------
 -- THE SYNTAX-LINEAR EVAL RECEIPT — ONE iterSize FOLD PER SYNTAX NODE.

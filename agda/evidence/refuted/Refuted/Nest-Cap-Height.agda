@@ -1,0 +1,276 @@
+-- ══════════════════════════════════════════════════════════════════
+-- THE NESTING CURRENCY CANNOT SIT UNDER THE CAPS HEIGHT, so the one
+-- arithmetic obligation the whole nesting cap rests on is FALSE, and
+-- the postulate holding it up is false with it.
+--
+-- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
+-- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE`
+-- notes.
+--
+-- WHAT THE ROUTE SAID.  The nesting cap was designed to grow by ONE
+-- EXPONENTIAL per instant off program-shaped bases, while the caps
+-- height gains `blowH`'s pooled summand -- a tower -- per instant, so
+-- the sum of three nesting caps would sit under the height with stories
+-- to spare.  That reading is recorded in the currency's own header and
+-- it was true of the currency it was written for.
+--
+-- WHERE IT BREAKS, AND IT IS THE RE-DENOMINATION AND NOT THE
+-- ARITHMETIC.  The width stopped being an invention of the nesting
+-- module and became the REGISTRY CAP, which is a field of the caps
+-- recurrence; the per-instant factor now reads `delSq` of the caps at
+-- the instant AFTER the one being bounded.  So the cap no longer reads
+-- program-shaped quantities: it exponentiates a caps field, and the
+-- caps field at that instant is built by iterating the size step
+-- `sizeCount c d` times AT THE DEPTH FUEL `d = capsH`.  That count is
+-- inflationary IN ITS DEPTH -- `fLvlD` at depth `suc d` runs a whole
+-- nested iteration whose innermost call is `fLvlD` at depth `d` -- so
+-- the height is inside the count, the count is inside the size, and the
+-- size is inside an exponent.  One instant's cap therefore exceeds
+-- `2 ^ capsH`, and it was asked to be at most `capsH`.
+--
+-- WHAT THIS DOES NOT SHOW.  It says nothing against the nesting
+-- invariant itself, and nothing against the caps recurrence.  It kills
+-- the CALIBRATION: a cap that reads a caps field cannot be bounded by a
+-- caps HEIGHT, whatever the factor, because `n < 2 ^ n` alone closes the
+-- gap.  A repair has to break the read -- either the factor stops
+-- reading `capsAt` (back to program-shaped, which is what the header
+-- still describes) or the obligation is restated against a TOWER of the
+-- height rather than the height, which is the currency `capsAt` itself
+-- is bounded in.
+--
+-- AND THE ARITHMETIC BELOW IS NOT ABOUT THE PROGRAM.  No conjunct reads
+-- the witness beyond needing one closed program to exist, because the
+-- gap is between two definitions and not at any instantiation; the
+-- concrete program is there so the statement is not vacuously
+-- quantified over an empty type.
+-- ══════════════════════════════════════════════════════════════════
+module Refuted.Nest-Cap-Height where
+
+open import Data.Empty using (⊥)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
+open import Data.Nat.Properties using
+  (≤-refl; ≤-trans; ≤-reflexive; +-suc; +-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
+   1+n≰n; *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-identityʳ; ^-monoʳ-≤)
+open import Data.Product using (Σ; _×_; proj₁; proj₂)
+open import Relation.Binary.PropositionalEquality using (sym; subst)
+
+open import Rx.Exp using (Ctx; Closed; natᵗ)
+open import Rx.Prim using (towerℕ)
+open import Rx.Slots using (Slots)
+open import Rx.Evaluator using
+  (fLvl; fCharge; widAt; sizeAt; iterSize; sizeStep; fLvlD; sLvlD; opIterD; fLvlD-0; fLvlD-suc;
+  sIterD-suc; sLvlD-suc; opIterD-suc; fIterD-suc; dLvl; lvls)
+open import Verify-Budget-Sufficient.Measures using (n<2^n)
+open import Verify-Budget-Sufficient.Caps using
+  (Caps; capsAt; capsH; frameBlowup; sizeCount; sizeCount-body; cDel; cDel-body;
+   1≤dCapᶜ; 2≤capsAt-size; 1≤capsAt-reg; tower-le-blowH;
+   sIterD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; iterL-infl)
+open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; cSize≤delSq)
+open import Verify-Budget-Sufficient.Nest-Store using
+  (nestCapAt; nestCapAt-suc; nestFacAt; nestFacAt-def; nestIncAt;
+   size≤nestIncAt; realWidAt; realWidAt-def; nestBurstAt;
+   capsHpred; capsH-blow; 1≤capsHpred)
+open import Verify-Budget-Sufficient.Demand-Programs using (Γ₀; ins₀; progD)
+
+----------------------------------------------------------------------
+-- ONE.  THE DEPTH FUEL IS INSIDE THE LEVEL.  `fLvlD` at depth `suc d`
+-- opens a chain that reaches `fLvlD` at depth `d` on an argument
+-- strictly above the one it started at, so each unit of depth buys at
+-- least one unit of level.  Every step is an exported clause equation
+-- or an exported inflation, because the whole family is sealed.
+----------------------------------------------------------------------
+
+fLvlD-depth : ∀ (S W d J : ℕ) → d + J ≤ fLvlD S W d J
+fLvlD-depth S W zero J =
+  ≤-trans (≤-trans (m≤m+n J (fCharge S W J))
+                   (m≤m+n (fLvl S W J) (suc (widAt S W J))))
+          (≤-reflexive (sym (fLvlD-0 S W J)))
+fLvlD-depth S W (suc d) J =
+  ≤-trans step
+  (≤-trans (fLvlD-depth S W d J₂)
+  (≤-trans (fIterD-infl S W d k₀ w₂ (fLvlD S W d J₂))
+  (≤-trans (≤-reflexive (sym (fIterD-suc S W d k₀ w₂ J₂)))
+  (≤-trans (≤-reflexive (sym (opIterD-suc S W d k₀ m′ Y)))
+  (≤-trans (≤-reflexive (sym (sLvlD-suc S W d k₀ Y)))
+  (≤-trans (sIterD-infl S W d K m₀ (sLvlD S W d K Y))
+  (≤-trans (≤-reflexive (sym (sIterD-suc S W d K m₀ X)))
+           (≤-reflexive (sym (fLvlD-suc S W d J))))))))))
+  where
+  X  = fLvl S W J
+  k₀ = sizeAt S (suc J)
+  K  = suc k₀
+  m₀ = widAt S W J
+  Y  = suc X
+  m′ = sizeAt S Y
+  J₀ = suc (Y + suc m′ * suc m′)
+  J₂ = opIterD S W d k₀ m′ (sLvlD S W d k₀ J₀)
+  w₂ = widAt S W J₂
+
+  sucJ≤J₂ : suc J ≤ J₂
+  sucJ≤J₂ =
+    ≤-trans (s≤s (m≤m+n J (fCharge S W J)))
+    (≤-trans (≤-trans (m≤m+n Y (suc m′ * suc m′)) (n≤1+n (Y + suc m′ * suc m′)))
+             (≤-trans (sLvlD-infl S W d k₀ J₀)
+                      (opIterD-infl S W d k₀ m′ (sLvlD S W d k₀ J₀))))
+
+  step : suc d + J ≤ d + J₂
+  step = ≤-trans (≤-reflexive (sym (+-suc d J))) (+-monoʳ-≤ d sucJ≤J₂)
+
+d≤dLvl : ∀ (S W d J : ℕ) → d ≤ dLvl S W d J
+d≤dLvl S W d J =
+  ≤-trans (≤-trans (m≤m+n d J) (fLvlD-depth S W d J))
+          (iterL-infl S W d (sizeAt S J) (fLvlD S W d J))
+
+d≤lvls : ∀ (S W d J n : ℕ) → 1 ≤ n → d ≤ lvls S W d J n
+d≤lvls S W d J zero    ()
+d≤lvls S W d J (suc n) _  = d≤dLvl S W d (lvls S W d J n)
+
+d≤sizeCount : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c → d ≤ sizeCount c d
+d≤sizeCount c d 1≤R =
+  ≤-trans (d≤lvls (Caps.cSize c) (Caps.cWid c) d 0 (cDel c d) 1≤D)
+          (≤-reflexive (sym (sizeCount-body c d)))
+  where
+  1≤D : 1 ≤ cDel c d
+  1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
+                         (Caps.cSize c) 0 1≤R)
+                (≤-reflexive (sym (cDel-body c d)))
+
+----------------------------------------------------------------------
+-- TWO.  THE COUNT IS INSIDE THE SIZE.  One size step adds at least one,
+-- so iterating it `k` times from `s` lands at least at `k + s`.
+----------------------------------------------------------------------
+
+suc≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → suc s ≤ sizeStep S s
+suc≤sizeStep S s 1≤S =
+  ≤-trans (s≤s (m≤m+n s (1 * s)))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                   (*-monoˡ-≤ (suc (2 * s)) 1≤S))
+
+add≤iterSize : ∀ (S : ℕ) → 1 ≤ S → ∀ (k s : ℕ) → k + s ≤ iterSize S k s
+add≤iterSize S 1≤S zero    s = ≤-refl
+add≤iterSize S 1≤S (suc k) s =
+  ≤-trans (≤-trans (≤-reflexive (sym (+-suc k s)))
+                   (+-monoʳ-≤ k (suc≤sizeStep S s 1≤S)))
+          (add≤iterSize S 1≤S k (sizeStep S s))
+
+----------------------------------------------------------------------
+-- THREE.  THE FUEL IS INSIDE ITS OWN BLOWUP, FOR EVERY FUEL -- and
+-- stating it in the fuel rather than in `capsH` is the point.  It says
+-- the gap below is not a miscalibration of the height sequence that a
+-- different one would close: whatever depth budget the caps recurrence
+-- is driven by, the size it produces already dominates that budget, so
+-- a cap read off that size can never be paid for out of it.  The
+-- instant's own reading is the specialisation directly beneath.
+----------------------------------------------------------------------
+
+fuel≤blowup : ∀ (c : Caps) (F : ℕ) →
+  1 ≤ Caps.cReg c → 1 ≤ Caps.cSize c →
+  F ≤ Caps.cSize (frameBlowup c F)
+fuel≤blowup c F 1≤R 1≤S =
+  ≤-trans (≤-trans (d≤sizeCount c F 1≤R) (m≤m+n J S))
+          (add≤iterSize S 1≤S J S)
+  where
+  S = Caps.cSize c
+  J = sizeCount c F
+
+capsH≤size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  capsH e sl id ≤ Caps.cSize (capsAt e sl (suc id))
+capsH≤size e sl id =
+  fuel≤blowup (capsAt e sl id) (capsH e sl id)
+    (1≤capsAt-reg e sl id)
+    (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+
+----------------------------------------------------------------------
+-- FOUR.  THE SIZE FIELD IS INSIDE THE NESTING FACTOR'S EXPONENT, and
+-- `n < 2 ^ n` is the whole of the crossing.
+----------------------------------------------------------------------
+
+size<fac : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (Caps.cSize (capsAt e sl (suc id))) ≤ nestFacAt e sl id
+size<fac {n = n} e sl id =
+  ≤-trans (s≤s (cSize≤delSq n (capsAt e sl (suc id)) 1≤S′))
+  (≤-trans (n<2^n Q)
+  (≤-trans (^-monoʳ-≤ 2 Q≤E)
+           (≤-reflexive (sym (nestFacAt-def e sl id)))))
+  where
+  b  = nestBurstAt e sl id
+  D  = delSize n (capsAt e sl (suc id))
+  R  = realWidAt e sl id
+  Q  = delSq n (capsAt e sl (suc id))
+  1≤S′ : 1 ≤ Caps.cSize (capsAt e sl (suc id))
+  1≤S′ = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl (suc id))
+  1≤R : 1 ≤ R
+  1≤R = subst (1 ≤_) (sym (realWidAt-def e sl id)) (1≤capsAt-reg e sl id)
+  1≤sD : 1 ≤ suc D
+  1≤sD = s≤s z≤n
+  1≤bb : 1 ≤ suc b * suc b
+  1≤bb = s≤s z≤n
+  s1 : Q ≤ R * Q
+  s1 = ≤-trans (≤-reflexive (sym (*-identityˡ Q))) (*-monoˡ-≤ Q 1≤R)
+  s2 : R * Q ≤ suc D * (R * Q)
+  s2 = ≤-trans (≤-reflexive (sym (*-identityˡ (R * Q))))
+               (*-monoˡ-≤ (R * Q) 1≤sD)
+  s3 : suc D * (R * Q) ≤ suc b * suc b * (suc D * (R * Q))
+  s3 = ≤-trans (≤-reflexive (sym (*-identityˡ (suc D * (R * Q)))))
+               (*-monoˡ-≤ (suc D * (R * Q)) 1≤bb)
+  Q≤E : Q ≤ suc b * suc b * (suc D * (R * Q))
+  Q≤E = ≤-trans s1 (≤-trans s2 s3)
+
+fac≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestFacAt e sl id ≤ nestCapAt e sl (suc id)
+fac≤cap e sl id =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (nestFacAt e sl id))))
+                   (*-monoʳ-≤ (nestFacAt e sl id) 1≤rest))
+          (≤-reflexive (sym (nestCapAt-suc e sl id)))
+  where
+  1≤rest : 1 ≤ nestCapAt e sl id + nestIncAt e sl id
+  1≤rest = ≤-trans (≤-trans (s≤s z≤n)
+                            (≤-trans (2≤capsAt-size e sl id)
+                                     (size≤nestIncAt e sl id)))
+                   (m≤n+m (nestIncAt e sl id) (nestCapAt e sl id))
+
+----------------------------------------------------------------------
+-- THE STATEMENT, AND ITS REFUTATION.  `NestCapCapsH` is the arithmetic
+-- obligation the nesting cap rests on, verbatim.
+----------------------------------------------------------------------
+
+NestCapCapsH : Set
+NestCapCapsH = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id
+
+nestCap-3≤capsH-absurd : NestCapCapsH → ⊥
+nestCap-3≤capsH-absurd pr =
+  1+n≰n (≤-trans (s≤s (capsH≤size e sl 0))
+        (≤-trans (size<fac e sl 0)
+        (≤-trans (fac≤cap e sl 0)
+        (≤-trans (m≤n+m (nestCapAt e sl 1) (2 * nestCapAt e sl 0))
+                 (pr e sl 0)))))
+  where
+  e : Closed Γ₀ natᵗ
+  e = progD 0 0
+  sl : Slots Γ₀
+  sl = ins₀
+
+----------------------------------------------------------------------
+-- AND THE POSTULATE ITSELF.  `nest-height` is the sole support of the
+-- obligation above -- the composition is `tower-le-blowH` at the height
+-- the Σ hands back -- so refuting the obligation refutes the postulate,
+-- and the replay below says so in code rather than in prose.
+----------------------------------------------------------------------
+
+NestHeight : Set
+NestHeight = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  Σ ℕ λ h →
+    (2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ towerℕ h)
+    × (suc h ≤ towerℕ (capsHpred e sl id))
+
+nest-height-absurd : NestHeight → ⊥
+nest-height-absurd nh = nestCap-3≤capsH-absurd replay
+  where
+  replay : NestCapCapsH
+  replay e sl id =
+    ≤-trans (proj₁ (proj₂ (nh e sl id)))
+            (subst (towerℕ (proj₁ (nh e sl id)) ≤_) (sym (capsH-blow e sl id))
+               (tower-le-blowH (proj₁ (nh e sl id)) (capsHpred e sl id)
+                               (1≤capsHpred e sl id)
+                               (proj₂ (proj₂ (nh e sl id)))))

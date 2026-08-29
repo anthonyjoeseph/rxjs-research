@@ -40,7 +40,7 @@ open import Data.Nat  using (ℕ; suc; _+_; _*_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-trans; ≤-refl; ≤-reflexive; +-mono-≤; +-monoʳ-≤; *-mono-≤;
          *-identityˡ; *-identityʳ; +-identityʳ; +-assoc; *-distribˡ-+;
-         +-comm; m≤m+n; m≤n+m; +-monoˡ-≤; n≤1+n; ≡⇒≡ᵇ)
+         +-comm; m≤m+n; m≤n+m; +-monoˡ-≤; *-monoʳ-≤; n≤1+n; ≡⇒≡ᵇ)
 open import Data.Fin  using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.List using (List; []; _∷_; tabulate)
@@ -59,6 +59,7 @@ open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; iterSize-suc)
+open import Verify-Budget-Sufficient.Caps-Chain using (2≤sizeAt)
 open import Verify-Budget-Sufficient.Measures using
   (sum-tab-mono; syncSize-unfoldμ;
                                                       syncSize≤sizeᵉ)
@@ -349,6 +350,49 @@ one-level-supply-strict : ∀ (S j x y : ℕ) →
 one-level-supply-strict S j x y 1≤S hx hy =
   ≤-trans (≤-trans (+-mono-≤ hx hy) (core S (sizeAt S j) 1≤S))
           (≤-reflexive (sym (sizeAt-suc S j)))
+
+-- AND THE ROW WITH THE PARKED TERM'S HEADROOM IN IT.  A drain's
+-- ceiling wants three units above the pair a queued inner is charged
+-- for, and the level below has room for them without being asked: the
+-- refreshed budget is a MULTIPLE of the one it refreshes, so the slack
+-- is a factor rather than a constant and three is bought by the size
+-- cap being at least two.  That is what lets a store predicate carry
+-- the drain's demand at the level it parks at.
+core3 : ∀ (S X : ℕ) → 2 ≤ S → 2 ≤ X → 3 + (X + S) ≤ S * suc (2 * X)
+core3 S X 2≤S 2≤X =
+  ≤-trans (≤-reflexive (sym (+-assoc 3 X S)))
+          (≤-trans (+-monoˡ-≤ S 3+X≤2SX)
+                   (≤-trans (≤-reflexive (+-comm (S * (2 * X)) S))
+                            (≤-reflexive step)))
+  where
+  3≤2X : 3 ≤ 2 * X
+  3≤2X = ≤-trans (s≤s (s≤s (s≤s z≤n))) (*-monoʳ-≤ 2 2≤X)
+
+  X≤2X : X ≤ 2 * X
+  X≤2X = m≤m+n X (X + 0)
+
+  3+X≤twice : 3 + X ≤ 2 * X + 2 * X
+  3+X≤twice = +-mono-≤ 3≤2X X≤2X
+
+  twice≤2SX : 2 * X + 2 * X ≤ S * (2 * X)
+  twice≤2SX =
+    ≤-trans (≤-reflexive (cong (2 * X +_) (sym (+-identityʳ (2 * X)))))
+            (*-mono-≤ 2≤S (≤-refl {2 * X}))
+
+  3+X≤2SX : 3 + X ≤ S * (2 * X)
+  3+X≤2SX = ≤-trans 3+X≤twice twice≤2SX
+
+  step : S + S * (2 * X) ≡ S * suc (2 * X)
+  step = trans (cong (_+ S * (2 * X)) (sym (*-identityʳ S)))
+               (sym (*-distribˡ-+ S 1 (2 * X)))
+
+three-level-supply : ∀ (S j x y : ℕ) →
+  2 ≤ S → x ≤ sizeAt S j → y ≤ S → 3 + (x + y) ≤ sizeAt S (suc j)
+three-level-supply S j x y 2≤S hx hy =
+  ≤-trans (s≤s (s≤s (s≤s (+-mono-≤ hx hy))))
+          (≤-trans (core3 S (sizeAt S j) 2≤S
+                     (2≤sizeAt S j 2≤S))
+                   (≤-reflexive (sym (sizeAt-suc S j))))
 
 one-level-supply : ∀ (S j x y : ℕ) →
   1 ≤ S → x ≤ sizeAt S j → y ≤ S → x + y ≤ suc (sizeAt S (suc j))

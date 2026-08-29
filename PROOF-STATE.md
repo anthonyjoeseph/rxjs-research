@@ -216,26 +216,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **strengthen the store's charge on a parked term, which is now ONE
-  inequality** — the drain's two headroom demands turned out to be one
-  currency: nesting is a size plus the slots a state has not connected,
-  and a proven row already says so, so the queue's conjunct is the
-  parked term's size and the slots and three, under the cap at the
-  walk's level. That is a statement a store predicate can carry, which
-  the nesting one was not. The leg is to charge it in the bound itself
-  and re-establish it where the tick states the store's — the invariant
-  record, not a signature, since every producer owes it.
-
-- **the arithmetic shelf both depth faces spend, now that neither can
-  be split** — the cascade side and the subscribe side each read their
-  charge against a tower height, and the attempt to trade the subscribe
-  bound for one a probe can pin has now been refuted twice, so the
-  height is where the remaining uncertainty actually sits. It carries
-  no evaluator at all: one tower for the currency's sum, one story
-  below the caps height, with the conversion and the recurrence's base
-  already proven around it. That makes it the one row in the tier whose
-  obstacle is arithmetic, and whose risk is therefore reducible without
-  reaching a state.
+- **re-denominate the nesting currency, which is now known to be
+  measured against a budget it cannot fit in** — the height comparison
+  both depth faces spend is REFUTED at a closed program: the factor
+  reads a caps field inside an exponent while the budget is a caps
+  HEIGHT, and the depth fuel is itself inside the size it is compared
+  against, so `n < 2 ^ n` closes it alone. No index shift is available —
+  the caps recurrence is defined by that exact fuel — so the leg moves
+  the currency: take the cap's reads of `capsAt` back to program-shaped
+  quantities, or restate the obligation in the tower denomination the
+  caps are themselves bounded in, and re-derive the two sums and their
+  two consumers against whichever survives.
 
 - **the step half of the selection's caps, which is the half already
   measured** — one chain's step preserving the caps is now its own
@@ -243,12 +234,23 @@ does not fit is a finding about the shared statement, not about the head.
   three components come back at or below where they started, and the
   slots half is a proven equation rather than an obligation. So this is
   the leaf in the pair whose evidence is real and whose remaining work
-  is a walk over the step's own arms, not a design question — which
-  makes it the right commit to take while the walk leaf beside it waits
-  on the store bound moving.
+  is a walk over the step's own arms, not a design question.
+
+- **spend the parked term's headroom at the chain walk, which now has a
+  source** — the charge exists as a conjunct of the caps record and
+  every face re-establishes it, so the two size bounds the chain walk
+  asserts about a parked inner stop being unsourced: the walk reads the
+  conjunct where it reads the rest of the record, and the arithmetic
+  paying it is the same three-level supply the parking clause already
+  spends. That is a leg of reading, not of design, and it is what the
+  headroom was carried for.
 
 ### The ledger
 
+- **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
+  `REFUTED, RECOVERY`: the arithmetic both depth rows spend, and the Σ is
+  UNINHABITED. The currency's own factor exceeds every tower the height
+  conjunct admits, so the repair is a restatement of the cap, not a witness.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of
@@ -303,10 +305,6 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED×2, PROBED`: the subscribe-side depth induction, width-denominated.
   Both computable readings are refuted — one charge, and the live registry
   count — so the bound must name the sealed increment, which no probe reaches.
-- **`nest-height`** (Nest-Store, inside the seal) — DIFFICULTY, `RECOVERY`: the
-  arithmetic both depth rows spend, and no evaluator in it. One tower height
-  for the currency's sum, one story below the caps height; the `blowH`
-  conversion and the recurrence's own base are now proven around it.
 - **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `TWIN`: every stage
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
@@ -314,10 +312,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   ONE chain's walk, the fold over the selection being a body now. What is left
   asserted is the sink's registry-versus-unit conjunct and two size bounds on a
-  parked inner, whose headroom has no source downstream of the store bound.
-- **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`: one
-  chain's step preserves the caps — the half the flat-cap rows actually read,
-  where two of the three components come back at or below where they started.
+  parked inner, whose headroom is now a conjunct of the caps record.
+- **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
+  one chain's step preserves the caps — the half the flat-cap rows actually
+  read, where two of the three components come back at or below where they
+  started.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
