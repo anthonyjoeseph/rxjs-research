@@ -216,29 +216,29 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two burst leaves at the arrivals' cap** — `subscribeE-burst-caps`,
-  `subscribeE-burst-nest`. Both are refuted at a width of zero because the
-  face carries size keys only. Their conclusions name the arrivals' cap
-  directly, and that cap freezes its width field at the entry one while the
-  frame step beside it folds the width along with the size — so the
-  restatement is onto the stepped field, and the fold escapes zero at the
-  first level. Then re-run `Probed.PushVals-Caps` against the statement as
-  it then reads: re-running is not optional and restamping alone is
-  forbidden, a green taken against the frozen-width cap being evidence
-  about text that is gone.
-- **the cascade descent against the instant's own grant** —
-  `cascade-nest-compositional`. Nothing has ever instantiated it: both
-  sealed families sit on the right, so the conclusion side does not
-  compute, and the store-mediated route it replaced is circular. The leg
-  is to find the side that DOES compute — the hypotheses are the half a
-  witness can be built against — and either instantiate it or record which
-  side is blocked, since an uninstantiated FALSITY row is the cheapest
-  unmanaged risk the tier holds.
-- **the duplicate generation deleted** — the walk's copies go and the
-  proven clique is imported in their place, with the weakening applied at
-  the two doors that genuinely read it. Nothing here is a proof: the
-  superseded predecessor drags its whole support cone with it, and only
-  reachability can see that, since a mutual cluster consumes itself.
+- **the face's premises reach the consume cone** — the whole weakened
+  invariant in `Nest-Walk` is a head-for-head duplicate of a proven clique
+  in `Subscribe-Face` and `Caps-Face.Part4`, two heads under the very same
+  name, and the obstacle is not the module order: neither module reaches
+  the other, so the import is available for the asking. What is missing is
+  the face's premise list — the slot caps, the two positivity keys, the
+  path key and the budget, operator and depth currencies. This leg carries
+  them from the two doors that already hold them down to `thruConsume-caps`
+  and `thruWalk-caps`, changing no conclusion.
+- **the duplicated heads retired** — with the premises in place the copies
+  go: the consume step, the arrival walk and the wrap are deleted from the
+  walk and the proven ones imported, with `capsOK?⇒nest` applied at the two
+  doors that genuinely read the weak form. This is where the FALSE
+  generation actually leaves the tree, and only reachability can see it —
+  a mutual cluster consumes itself, so every local check reads the
+  predecessor's cone as wired.
+- **the two burst leaves discharged from the face** — `subscribeE-burst-caps`
+  and `subscribeE-burst-nest` become bodies over `subscribeE-caps`, which
+  reports exactly their conclusion for exactly their `subscribeE` at the
+  level-carried shape. Then re-run `Probed.PushVals-Caps` against the
+  statements as they then read: re-running is not optional and restamping
+  alone is forbidden, a green taken against the frozen-width cap being
+  evidence about text that is gone.
 
 ### The ledger
 
@@ -248,8 +248,9 @@ does not fit is a finding about the shared statement, not about the head.
   replaced is circular; the header carries the cycle.
 - **`subscribeE-burst-caps`** (Nest-Walk) — FALSITY, `REFUTED×2, PROBED`: the
   arrivals' width key over any subscription's burst. Refuted at a width of
-  zero, which no key here forbids; the width axis has to step with the level,
-  and a key on the source does not repair it. The header carries the route.
+  zero, which no key here forbids. The route is `subscribeE-caps`, which
+  reports this conclusion and is importable — the module order was read as
+  forbidding it and does not.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting

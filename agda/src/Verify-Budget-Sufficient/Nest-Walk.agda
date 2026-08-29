@@ -4156,9 +4156,19 @@ postulate
   -- SUBSCRIPTION, not a per-emit record: the walk down to the emits is
   -- proven, so the leaf is `burstCaps?` of the descent's burst.  That
   -- is the conclusion `subscribeE-caps` already reports for exactly
-  -- this `subscribeE`, at exactly this shape of level -- what stands
-  -- between the two is the module order, since the caps face is built
-  -- ON this one and cannot be read from here.
+  -- this `subscribeE`, at exactly this shape of level.
+  --
+  -- AND THE MODULE ORDER IS NOT WHAT STANDS BETWEEN THEM, which is
+  -- worth knowing because it was read the other way and it decided
+  -- the route.  The caps face is not built on this module and this
+  -- module is not built on it: neither reaches the other through the
+  -- import graph, so the face is importable here for the asking, and
+  -- the ban is on a CYCLE rather than on a direction.  What stands
+  -- between them is the face's PREMISE LIST -- the slot caps, the two
+  -- positivity keys, the path key and the budget, operator and depth
+  -- currencies -- which is the same list `thruConsume-caps` below
+  -- names, and the same threading.  That is a job with a route rather
+  -- than an obstruction, and it is where this leaf is discharged.
   --
   -- AND IT IS FALSE AS STATED, on the WIDTH half and at every level.
   -- The level moves the size axis and leaves the width field exactly
