@@ -222,9 +222,11 @@ does not fit is a finding about the shared statement, not about the head.
   threads the invariant across the emit list one arrival at a time. So a
   stepped conclusion there is a SUM over arrivals rather than an offset
   a caller absorbs, and the budget and operator count are what bound
-  that sum. They are not a bundle a sweep threads either: each reads the
-  subscription, so an arm re-establishes its own. That re-establishment
-  is this leg, and the accumulator is where it has to land first.
+  that sum. Nothing local substitutes: the discarded level attempt is
+  now known to cover a PARAMETERISED level too, since what the frozen
+  width bought was an up-and-down identity no level supplies. The
+  re-establishment per arm is this leg, and the accumulator is where it
+  lands first.
 - **the walk stops stating the caps exit and consumes the face** — its
   own header has closed both repairs in place: a one-notch step dies on
   composition, and carrying the level needs a residue only the level

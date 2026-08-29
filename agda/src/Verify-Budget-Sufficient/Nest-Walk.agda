@@ -4796,8 +4796,14 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   its own residue with that recurrence, which reads the budget and
 --   the operator count -- two currencies this module does not carry
 --   and cannot acquire without restating the face here.  So the walk
---   is not repairable in place at any level; what is left is to stop
---   stating it and consume the face instead -- and the CURRENCIES come
+--   is not repairable in place at any level -- and "any level" covers a
+--   level taken as a PARAMETER, which is the form the arrivals' own cap
+--   already uses and so the one a reader reaches for next.  The arm
+--   hands its exit pair UP to the arrivals' cap and reports back DOWN
+--   at the flat one, and only the FROZEN width ever made those the same
+--   boolean; a width that steps breaks the identity in the direction
+--   the arm reports, whatever supplies the level.  So what is left is
+--   to stop stating it and consume the face instead -- and the CURRENCIES come
 --   first, which is the ordering the two dead routes above fix rather
 --   than a preference.  The face prices its residue in a budget and an
 --   operator count, and every door out of this cone reads a cap whose
