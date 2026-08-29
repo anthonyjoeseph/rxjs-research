@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **instantiate the room receipt, which is now the whole of the
-  drain's risk and is newly probeable** — the ceiling package stopped
-  being a postulate: a term's operator descent is dominated by the
-  cascade's delivery walk read FROM its level, at gas four plus the
-  term's own operator count, and that is proven at every level. What
-  the drain now carries is that walk fitting under the count. Both
-  sides COMPUTE, and the gas is syntactic rather than the cascade's,
-  which is what makes rows possible at all — at the cascade's gas the
-  receipt is false above the bottom and needs no witness. So run it at
-  reachable levels before anything is ground on it.
+- **show the walk's level is one the cascade actually reaches, which
+  is what the drain now owes** — the room stopped being an assumption:
+  a level reached by a delivery-walk position inherits its room from
+  the level it came from, one gas down, and the bottom is the entry.
+  Both are proven, so what the queue asks for is the REACHING — a
+  level, and the gas still standing there. Instantiating it is not
+  available: both sides of the room are levels in the ladder, and the
+  ladder outruns computation at its smallest instance. So this is a
+  proof about the walk's recursion, and the question is whether its
+  frame increments ARE delivery-walk positions.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
@@ -252,10 +252,9 @@ does not fit is a finding about the shared statement, not about the head.
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
-  `mergeAll`'s parked queue, now carrying the head's ROOM — the delivery walk
-  from the level, at gas four plus the head's operator count. The refuted
-  level term is gone and the gas is syntactic, so the unspent-budget claim
-  sits here, uninstantiated.
+  `mergeAll`'s parked queue, now owing that the walk's level is REACHED by the
+  delivery walk with gas left. The room follows from that, so what is left is
+  the reaching — uninstantiable, since the ladder outruns computation.
 - **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction

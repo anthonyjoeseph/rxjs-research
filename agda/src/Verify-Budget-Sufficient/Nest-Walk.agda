@@ -70,7 +70,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; 
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-supply)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
-  (CeilD; RoomG; ceil-room; ceil-step; ceil-le; ceil-mu)
+  (CeilD; Reached; reached-room; room-gas; ceil-room; ceil-step; ceil-le; ceil-mu)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -923,7 +923,7 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
   × (3 + (sizeᵉ o + slotsSize sl) ≤ Caps.cSize c)
-  × RoomG c d Lv (4 + nest o sl (EvalSt.connectedShares st))
+  × (Σ ℕ λ g → (4 + nest o sl (EvalSt.connectedShares st) ≤ g) × Reached c d Lv g)
   × capsDrainOK c sl d Lv sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
@@ -6194,6 +6194,8 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
 
   -- the drain's two ceiling premises, off the ONE the queue's own
   -- conjunct now carries
+  roomHere = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+
   headHere = drain-head-supply c o sl (EvalSt.connectedShares st)
                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
 
@@ -6208,7 +6210,11 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           (ceil-room c d Lv (nest o sl (EvalSt.connectedShares st))
              (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
              (proj₁ headHere) (proj₂ headHere) (FaceOK.fReg faceHere)
-             (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))))
+             (room-gas c d Lv (proj₁ roomHere)
+                (4 + nest o sl (EvalSt.connectedShares st))
+                (FaceOK.fSize faceHere) (proj₁ (proj₂ roomHere))
+                (reached-room c d Lv (proj₁ roomHere) (FaceOK.fSize faceHere)
+                   (proj₂ (proj₂ roomHere)))))
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁

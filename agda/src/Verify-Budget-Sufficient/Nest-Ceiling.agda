@@ -8,12 +8,14 @@ module Verify-Budget-Sufficient.Nest-Ceiling where
 
 open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; s≤s)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; +-mono-≤; +-monoʳ-≤; *-mono-≤)
-open import Relation.Binary.PropositionalEquality using (sym; subst)
+  (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; +-mono-≤; +-monoʳ-≤;
+  *-mono-≤; m≤m⊔n)
+open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
-open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dCapᶜ)
+open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; frameStep; opIterD-mono; sizeCount)
+  (Caps; frameStep; opIterD-mono; sizeCount; sizeCount-body; cDel-body;
+  lvls-add; lvls-mono; dWalkᶜ-mono; dCapᶜ-mono)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated-at)
 open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
 
@@ -135,3 +137,87 @@ ceil-room c d Lv k m 2≤S hk hm 1≤R room L′ hL =
     (≤-trans (opIterD-dominated-at (Caps.cSize c) (Caps.cWid c) d k m
                 (Caps.cReg c) Lv 2≤S hk hm 1≤R)
              room)
+
+-- AND THE RECEIPT DESCENDS THE WALK EXACTLY, WHICH IS WHY IT IS ASKED
+-- FOR AND NOT PROBED.  Neither side of the room can be instantiated:
+-- both are levels in the delivery ladder, and the ladder outruns
+-- computation at its own smallest legal instance -- the right-hand side
+-- alone, at the two-slot cap with one registration and no depth, does
+-- not finish.  So no probe and no harness row can reach this statement,
+-- which is a coverage boundary rather than a gap in the sweeping.
+--
+-- WHAT REPLACES A ROW IS THAT THE WALK'S OWN RECURRENCE CARRIES IT.  A
+-- position of the delivery walk spends `w + suc (dCapᶜ … at the level
+-- w restarts reach)`, and `w + suc C` is `suc w + C`, so splitting the
+-- count at `suc w` turns the budget read from that level into the walk
+-- read from the base -- an EQUALITY, not a bound.  A level the walk
+-- reaches therefore inherits its room from the base's, one gas up, and
+-- the bottom is the entry.
+room-step : ∀ (S W R d g J i : ℕ) →
+  lvls S W d (lvls S W d J (suc (dWalkᶜ S W R d g J i)))
+      (dCapᶜ S W R d g (lvls S W d J (suc (dWalkᶜ S W R d g J i))))
+    ≡ lvls S W d J (dWalkᶜ S W R d g J (suc i))
+room-step S W R d g J i =
+  sym (trans (cong (lvls S W d J) (+-suc w C)) (lvls-add S W d J (suc w) C))
+  where
+  w = dWalkᶜ S W R d g J i
+  C = dCapᶜ S W R d g (lvls S W d J (suc w))
+
+room-descend : ∀ (c : Caps) (d g J i : ℕ) → 2 ≤ Caps.cSize c →
+  suc i ≤ regAt (Caps.cSize c) (Caps.cReg c) J →
+  RoomG c d J (suc g) →
+  RoomG c d (lvls (Caps.cSize c) (Caps.cWid c) d J
+              (suc (dWalkᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g J i))) g
+room-descend c d g J i 2≤S hi room =
+  ≤-trans (≤-reflexive (room-step S W R d g J i))
+  (≤-trans (lvls-mono (dWalkᶜ S W R d g J (suc i)) (dWalkᶜ S W R d g J (regAt S R J))
+              2≤S ≤-refl ≤-refl ≤-refl
+              (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {J} {J} {d}
+                 g g (suc i) (regAt S R J) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hi))
+           room)
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  R = Caps.cReg c
+
+-- A LEVEL THE CASCADE ACTUALLY REACHES, TOGETHER WITH WHAT IT HAS LEFT.
+-- The bottom is reached with the whole dispatch gas; a position of the
+-- delivery walk from a reached level reaches the level that position
+-- lands on, with one gas less -- which is the walk recurrence read as a
+-- relation rather than as a number.  Carrying the gas is the point: it
+-- is what a level bound cannot say and what makes the room derivable
+-- instead of assumed.
+data Reached (c : Caps) (d : ℕ) : ℕ → ℕ → Set where
+  base : Reached c d 0 (suc (Caps.cSize c))
+  walk : ∀ (J g i : ℕ) →
+    suc i ≤ regAt (Caps.cSize c) (Caps.cReg c) J →
+    Reached c d J (suc g) →
+    Reached c d (lvls (Caps.cSize c) (Caps.cWid c) d J
+                  (suc (dWalkᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g J i))) g
+
+-- AND A REACHED LEVEL HAS ITS ROOM, which is what the relation was for:
+-- the bottom by the two bodies, every other level by the walk step.
+reached-room : ∀ (c : Caps) (d Lv g : ℕ) → 2 ≤ Caps.cSize c →
+  Reached c d Lv g → RoomG c d Lv g
+reached-room c d .0 .(suc (Caps.cSize c)) 2≤S base =
+  ≤-trans (≤-reflexive (sym (trans (sizeCount-body c d)
+                                   (cong (lvls (Caps.cSize c) (Caps.cWid c) d 0)
+                                         (cDel-body c d)))))
+          (m≤m⊔n (sizeCount c d) (Caps.cSize c))
+reached-room c d _ g 2≤S (walk J g′ i hi r) =
+  room-descend c d g′ J i 2≤S hi (reached-room c d J (suc g′) 2≤S r)
+
+-- AND LESS GAS IS LESS ROOM, so a term asks for what it costs rather
+-- than for what the level happens to hold.
+room-gas : ∀ (c : Caps) (d Lv g g′ : ℕ) → 2 ≤ Caps.cSize c → g′ ≤ g →
+  RoomG c d Lv g → RoomG c d Lv g′
+room-gas c d Lv g g′ 2≤S hg room =
+  ≤-trans (lvls-mono (dCapᶜ S W R d g′ Lv) (dCapᶜ S W R d g Lv)
+             2≤S ≤-refl ≤-refl ≤-refl
+             (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {Lv} {Lv} {d}
+                g′ g 2≤S ≤-refl ≤-refl ≤-refl hg ≤-refl))
+          room
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  R = Caps.cReg c

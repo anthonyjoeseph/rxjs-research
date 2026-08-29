@@ -2428,19 +2428,21 @@ postulate
 --
 -- WHAT THE CONJUNCT SAYS NOW IS THE PARKED TERM UNDER THE BASE CAP,
 -- with no level term in it, which is the refuted statement minus the
--- refuted part, TOGETHER WITH THE HEAD'S ROOM.  The room is the honest
--- form of what the climb was pretending to have: the cascade's own
--- delivery walk read FROM this level, at gas four plus the head's
--- operator count, fitting under the count.  Its GAS is what makes it a
--- statement worth making -- at the whole cascade's gas the receipt is
--- false everywhere above the bottom, since the budget read higher is
--- the larger one and the ladder from there is longer, so both sides
--- move the wrong way at once.  Four plus an operator count is
--- syntactic, fixed before any level exists, and small where the
--- cascade's own gas is the size cap.
+-- refuted part, TOGETHER WITH THE LEVEL BEING REACHED.  A level the
+-- cascade's delivery walk actually lands on carries the gas it still
+-- has there, and from that its room is derived rather than assumed:
+-- the walk recurrence splits so that the budget read from a reached
+-- level IS the walk read from the level before it, one gas down, and
+-- the bottom is the two bodies.  So the queue asks for the reaching
+-- and the arithmetic follows.
 --
--- SO THIS LEAF IS A CLAIM ABOUT ONE FRAME AND ONE QUEUE, and the room
--- half of it computes on both sides, which the levelled form did not.
+-- AND THE GAS IS WHY THE RELATION CARRIES ONE.  At the whole cascade's
+-- gas a room receipt is false everywhere above the bottom -- the
+-- budget read higher is the larger one and the ladder from there is
+-- longer, so both sides move the wrong way at once -- while four plus
+-- a term's operator count is syntactic and fixed before any level
+-- exists.  A level bound cannot say which of the two it has; the
+-- reaching relation can, because it is built by spending it.
 --
 -- RECOVERY: git show b927a16 restores `Refuted.Walk-Frame-Drain-Level`,
 --   which refuted the levelled conjunct at the empty context with the
