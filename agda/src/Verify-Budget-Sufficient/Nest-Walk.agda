@@ -4301,6 +4301,17 @@ postulate
   --   emitted inner -- and its last row pins that the walk stated over
   --   the node table SURVIVES that witness, so the crossing is this
   --   statement's alone and not the exit pair's.
+  -- DEAD ROUTE: a delivered-width key on the SOURCE, carried at the
+  --   entry field, does not survive the walk it would have to be
+  --   threaded through.  It kills the refuting witness -- that source
+  --   parks a body wider than the field -- so the leaf itself looks
+  --   repairable, and the arm that breaks it is one hop away: a
+  --   substituting head hands back its own syntax with the payload
+  --   substituted in, and the proven bound for that is `wid-subΘ`,
+  --   whose right side is the width axis ITERATED at the syntax size.
+  --   A premise stated at the entry field cannot be re-established at
+  --   the next arm, so the key would have to be re-acquired at every
+  --   substituting head and there is nothing to acquire it from.
   -- DEAD ROUTE: stepping the arrival cap's WIDTH is dead in all three
   --   parameterisations tried -- a level carried on the statement, a
   --   constant one step above entry, and the frozen field simply
