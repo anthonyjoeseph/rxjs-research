@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **pin the increment the step leaf now reports, which is the only
-  thing left between it and a body** — the statement asks for a level
-  under the instant's own count and a row already meets it at one, so
-  what is missing is the arithmetic: the growth one chain's step causes
-  is a `frameBlowup` of the cap it entered at, and the count the ceiling
-  names is the same recurrence read at the instant. Both sides are the
-  caps recurrence, so this is a comparison inside one family rather than
-  a claim about the evaluator, and it is what turns a probed row into a
-  proof. The walk leaf beside it is unprobed and stays where it is.
+- **pin the increment BOTH leaves report, which is the only thing left
+  between them and a body** — each asks for a level under the instant's
+  own count, and rows now meet both at ONE: the step's post-state fits
+  its cap's first step, and a re-walked path's whole `capsOK?` spine
+  holds one level up where flat it fails part way. So what is missing is
+  arithmetic and not a claim about the evaluator — the growth is a
+  `frameBlowup` of the cap entered at, the ceiling names the same
+  recurrence read at the instant, and both sides live in one family.
+  That is what turns two probed rows into proofs.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -251,13 +251,13 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`arr-chain-caps`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE, TWIN`: ONE chain's walk, asserted at a level its frame
-  receipt can pay. Restated and never instantiated — a mid-walk value list is
-  not addressable from outside the fold, so no row reaches it.
+- **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE, TWIN, PROBED×2`: ONE chain's walk, asserted at a level
+  its frame receipt can pay. Its `capsOK?` spine is now read at every state a
+  re-walked path passes through; the `Set`-valued conjuncts are not.
 - **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE, TWIN`: one chain's step reports the increment that
-  carries its post-state. An increment of ONE meets it at the family that
+  `REFUTED, DEAD ROUTE, TWIN, PROBED×2`: one chain's step reports the increment
+  that carries its post-state. An increment of ONE meets it at the family that
   refuted the flat form; what is unproven is that it stays under the count.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The

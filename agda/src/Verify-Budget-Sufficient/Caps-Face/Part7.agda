@@ -2260,22 +2260,6 @@ postulate
 --   constant two and the arithmetic cannot manufacture it; the
 --   headroom has to be carried by whatever states the store bound, not
 --   recovered downstream of it.
---
--- PROBED: `Probed.Chain-Caps-Flat` instantiates the step leaf at the
---   family that refuted its flat form.  At a concrete cap the
---   pre-state fits, the post-state of ONE chain's step does not and
---   the FIRST step of that cap does -- so an increment of one carries
---   it, against a ceiling that is at least the cap's own size.  Three
---   further rows read the smallest fitting cap either side of a whole
---   cascade over three families, one component at a time: only the
---   size ever moves, the width and registry coming back at or below
---   where they started.  Not covered: the ceiling's `sizeCount`
---   branch, which is sealed, so what the rows meet is the `⊔` branch
---   the cap's size supplies; the cap `capsAt` itself names, which
---   spends `capsH` and does not reduce; the `valCaps?` conjunct past
---   the first frame, since a mid-walk value list is not addressable
---   from outside the fold; and the sink arm's registry-versus-unit
---   conjunct, which no row addresses.
 
 -- AND THE STEP LEAF IS NOT PRESERVATION IN GENERAL, WHICH NARROWS WHAT
 -- ITS PROOF MAY REST ON.  Read either side of ONE step rather than a
@@ -2336,6 +2320,37 @@ postulate
 -- TWIN: `stepFrame-caps` -- the same frame, proven, with exactly the
 --   discipline owed here: invariant taken at the stepped cap, own
 --   increment reported, conclusion restated at the sum.
+--
+-- PROBED: `Probed.Chain-Walk-Level` instantiates the WALK leaf's
+--   `capsOK?` spine, which is the conjunct the fit rows cannot see: it
+--   re-walks one chain's path with the evaluator's own `stepFrame` and
+--   reads the conjunct at every state the fold passes through.  Three
+--   frames, four states.  Read FLAT the first two hold and the last two
+--   do not, so the walk leaves the cap PART WAY rather than at its end;
+--   read one level up all four hold.  The level is held CONSTANT, which
+--   satisfies the predicate with every increment after the first taken
+--   as zero, and is the only reachable reading -- the level enters the
+--   width as an iterated exponential based on the size, so three levels
+--   of a small cap is past anything that normalises.  Not covered: the
+--   predicate's other conjuncts, which are `Set`-valued or quantified
+--   over a queue rather than booleans a row can pin; and one family,
+--   one chain, one instant.
+--
+-- PROBED: `Probed.Chain-Caps-Flat` instantiates the step leaf at the
+--   family that refuted its flat form.  At a concrete cap the
+--   pre-state fits, the post-state of ONE chain's step does not and
+--   the FIRST step of that cap does -- so an increment of one carries
+--   it, against a ceiling that is at least the cap's own size.  Three
+--   further rows read the smallest fitting cap either side of a whole
+--   cascade over three families, one component at a time: only the
+--   size ever moves, the width and registry coming back at or below
+--   where they started.  Not covered: the ceiling's `sizeCount`
+--   branch, which is sealed, so what the rows meet is the `⊔` branch
+--   the cap's size supplies; the cap `capsAt` itself names, which
+--   spends `capsH` and does not reduce; the `valCaps?` conjunct past
+--   the first frame, since a mid-walk value list is not addressable
+--   from outside the fold; and the sink arm's registry-versus-unit
+--   conjunct, which no row addresses.
 postulate
   arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (a : Arrival Γ) (nextId : Id)
