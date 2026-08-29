@@ -216,16 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **read the nesting height two instants up, and find the story to pay
-  for it** — the key is closed as a subject: every level at or above
-  the depth fuel is refuted, and the walk face refuses the only level
-  below it. What survives is the INSTANT. The exit cap sits under a
-  tower of the next height, the currency is an exponential of a
-  polynomial in that cap, and the tower-to-story lemma lifts any such
-  tower to the story above — so the obligation is true two instants up
-  with tools already proven. The mint affords one. The leg states the
-  shifted form, proves the arithmetic, and prices the deficit.
-
 - **the step half of the selection's caps, which is the half already
   measured** — one chain's step preserving the caps is now its own
   leaf, and it is the one the flat-cap rows actually read: two of the
@@ -243,12 +233,22 @@ does not fit is a finding about the shared statement, not about the head.
   spends. That is a leg of reading, not of design, and it is what the
   headroom was carried for.
 
+- **the flat-versus-moving bound on every chain's stages, which the
+  mirror already carries** — the width cap over each stage of each
+  chain's walk is the row here whose twin is proven and whose twin
+  crosses the hop that was feared: the same conjunct survives the
+  `thru` boundary on the discharged side, so nothing about the walk is
+  undecided. What is left is arithmetic between a flat cap and one
+  that moves per stage, which is the shape a mirror cannot hand over
+  and the only part this row still owes.
+
 ### The ledger
 
 - **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
-  `REFUTED, RECOVERY`: the arithmetic both depth rows spend, and the Σ is
-  UNINHABITED. The currency's own factor exceeds every tower the height
-  conjunct admits, so the repair is a restatement of the cap, not a witness.
+  `REFUTED, DEAD ROUTE, RECOVERY`: the arithmetic both depth rows spend; the
+  Σ is UNINHABITED at every key and every story. BLOCKED on a ruling — the
+  cap outgrows the depth it caps, so the repair is a different vehicle,
+  not an index.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of

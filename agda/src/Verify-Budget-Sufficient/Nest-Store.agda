@@ -814,6 +814,12 @@ abstract
   -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted) -- the
   --   Σ is uninhabited at a closed program, by replaying it through
   --   `tower-le-blowH` into the untowered form and refuting that.
+  -- DEAD ROUTE: restate the second conjunct one story up, so the
+  --   obligation lands at the height two instants later.  The
+  --   arithmetic goes through -- the exit cap is under a tower of the
+  --   next height and the tower-to-story lemma lifts it -- and the
+  --   module checks; the caps step then rejects the depth, being
+  --   instantiated at the fuel the shifted height has left behind.
   --
   -- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
   --   holds height arithmetic written for exactly this shape and
@@ -904,23 +910,33 @@ abstract
 -- move with the instant.  What moves is the base the factor is keyed
 -- on, and that is the widening above.
 
--- SO WHAT IS INDICTED IS THE INSTANT, NOT THE KEY -- AND THE OFFSET
--- IS TWO.  The height is read at the instant whose fuel drives the cap
--- it must dominate, which no key survives; read it two instants up and
--- the arithmetic closes with tools already proven.  The exit cap sits
--- under a tower of the NEXT height, the currency is an exponential of
--- a polynomial in that cap, so it sits under a tower of that height
--- plus a constant -- and the tower-to-story lemma turns any such tower
--- into the story ABOVE, which is the height two instants up.
+-- THE INSTANT IS NOT THE REPAIR EITHER, AND THE ATTEMPT IS WHAT SAYS
+-- SO.  Shifting the story is arithmetically available: the exit cap
+-- sits under a tower of the next height, the currency is an
+-- exponential of a polynomial in that cap, and the tower-to-story
+-- lemma lifts any such tower to the story above -- so the obligation
+-- reads true two instants up, and the Σ above needs only its second
+-- conjunct restated to deliver it.  The shifted module checks.
 --
--- AND THE COST IS ONE STORY AT THE MINT, WHICH IS WHERE THE DESIGN
--- QUESTION NOW SITS.  The gas an instant is evaluated with is minted
--- one story above the fuel that instant's blowup runs at, so the
--- budget affords a depth bound one instant up and the arithmetic wants
--- two.  The deficit is a property of the mint rather than of this
--- statement: gas only ever removes dryness, so raising it cannot make
--- the claim it supports false, and nothing in the spec names it.
+-- WHAT REFUSES IT IS THE FUEL, AND THE REFUSAL IS STRUCTURAL.  The
+-- caps step at an instant is the entry cap blown by THAT INSTANT'S
+-- HEIGHT, and the cascade walk's level bound is a count monotone in
+-- the depth it is given -- so the walk stays inside the stepped cap
+-- only while the depth is under that same height.  A depth proven at
+-- a later story therefore has to move the step's fuel to match, and
+-- the fuel-to-size inequality is parametric in the fuel: whatever
+-- story is chosen, the cap it produces has a size at least that
+-- story, and the currency is an exponential of it.  So every story is
+-- one the same argument kills, stated at itself.
 --
+-- WHICH MAKES THE VEHICLE THE SUBJECT, NOT THE INDEX.  What the caps
+-- step needs is a bound on the depth the instant ACTUALLY reaches;
+-- what this cap offers is a product of per-instant factors that
+-- over-approximates it exponentially.  The two cannot be reconciled
+-- by moving an index, because the gap is not an offset -- it is the
+-- cap growing faster than the quantity it is a cap on.  A repair has
+-- to bound the cascade's depth by something that is not this
+-- currency.
 -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), which
 --   carries the level-keyed obligation as its own statement and kills
 --   it at every level the fuel reaches.
