@@ -10,7 +10,7 @@ open import Data.Nat.Properties using (m+[n∸m]≡n; *-assoc; *-identityˡ; ^-d
   *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; length; map; foldr)
+open import Data.List    using (List; []; _∷_; _++_; length; map; foldr)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin)
 import Data.Fin as Fin
@@ -34,9 +34,10 @@ open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; size�
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
-open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps)
+open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; fac-hoist; one-pow; FaceOK; faceAt)
+  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
+  fac-hoist; one-pow; FaceOK; faceAt)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade; depthChain; depthFold; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -59,6 +60,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
+  share-sink; root;
   fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
 
@@ -86,7 +88,7 @@ open import Verify-Budget-Sufficient.Deliveries using
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
   capsAt-⊑-suc; capsH; cDel; _⊑ᶜ_; cDel-body; dWalkᶜ-mono; frameStep; frameStep-0;
-  frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; lvls-add;
+  frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; J+n≤iterL; lvls-add;
   lvls-mono; size≤sizeCount; sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; reach-reset; ∧-true)
@@ -2356,40 +2358,131 @@ postulate
 --   discipline owed here: invariant taken at the stepped cap, own
 --   increment reported, conclusion restated at the sum.
 --
--- PROBED: `Probed.Chain-Walk-Level` instantiates the WALK leaf's
---   `capsOK?` spine, which is the conjunct the fit rows cannot see: it
---   re-walks one chain's path with the evaluator's own `stepFrame` and
---   reads the conjunct at every state the fold passes through.  Three
---   frames, four states.  Read FLAT the first two hold and the last two
---   do not, so the walk leaves the cap PART WAY rather than at its end;
---   read one level up all four hold.  The level is held CONSTANT, which
---   satisfies the predicate with every increment after the first taken
---   as zero, and is the only reachable reading -- the level enters the
---   width as an iterated exponential based on the size, so three levels
---   of a small cap is past anything that normalises.  Not covered: the
---   predicate's other conjuncts, which are `Set`-valued or quantified
---   over a queue rather than booleans a row can pin; and one family,
---   one chain, one instant.
+-- RECOVERY: git show 1281567 restores `Probed.Chain-Walk-Level`, whose
+--   `walkSpine` re-walks a path with the evaluator's own `stepFrame`
+--   and reads a boolean conjunct at EVERY state the fold passes
+--   through, rather than at the two ends a fit row can see.  That is
+--   the instrument the three leaves below want: they are exactly the
+--   conjuncts it could not pin, and the harness generalises to any of
+--   them that is a boolean.
 --
 -- RECOVERY: git show c415649 restores `Probed.Chain-Caps-Flat`, whose
 --   harness reads the SMALLEST FITTING CAP either side of a whole
 --   cascade over three families, one component at a time -- the way to
 --   find where a cascade's growth actually lands.
+WalkHyps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) → Set
+WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
+  (Sched.slots sched ≡ sl)
+  × (capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true)
+  × (valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true)
+  × (pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) p ≡ true)
+  × (depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id)
+  × (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
+           (pathLen p) L
+       ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id))
+
+-- THE THREE LEAVES THE PATH INDUCTION CANNOT REACH, each of them a
+-- statement about ONE frame or ONE sink rather than about a walk.  The
+-- two frame-local ones are `⊤` at four of the five frame heads, so what
+-- they really assert is a bound on a `thru-outer`'s closures and on a
+-- bounded `mergeAll`'s parked queue; the sink one is the share fold,
+-- which is a second recursion and not this one.
 postulate
-  chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  walk-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+    (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) p ≡ true →
-    depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id →
-    iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
-          (pathLen p) L
-      ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id) →
-    capsWalkOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now p vals fin sched st
+    WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+    frameClosOK (frameStep L (capsAt e sl id)) sl f vals
+
+  walk-frame-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+    frameDrainOK (capsAt e sl id) sl (capsH e sl id) L sf nid now f p vals sched st
+
+  walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (i : Fin n) (vals : List (Val Γ (lookup Γ i)))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps {t = t} sl id L sf gas nid now src (share-sink i) vals evs fin sched st →
+    dispatchCapsOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now i vals fin sched st
+
+-- THE WALK ITSELF, WHICH IS THE FRAME LAW ITERATED AND NOTHING ELSE.
+-- Each frame spends the proven step receipt, which reports its own
+-- increment and hands back the caps and the values one level up; the
+-- ladder premise pays the ceiling at that frame and reproduces itself
+-- for the tail, since `iterL` at a `suc` IS `iterL` at the stepped
+-- level.  The path receipt splits the same way -- this frame's, the
+-- tail's length, the tail's -- so nothing has to be re-established
+-- from outside, which is what made the frame law's data the right
+-- thing to state the walk over.
+chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
+  capsWalkOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now p vals fin sched st
+chain-walk-caps sl id L sf gas nid now src root vals evs fin sched st H =
+  proj₁ (proj₂ H)
+chain-walk-caps sl id L sf gas nid now src (share-sink i) vals evs fin sched st H =
+  proj₁ (proj₂ H)
+  , walk-sink-caps sl id L sf gas nid now src i vals evs fin sched st H
+chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched st
+  H@(sleq , cok , hvc , hpz , hdp , hlv) =
+    cok
+  , proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc)
+  , slSz
+  , walk-frame-clos sl id L sf gas nid now src f p vals evs fin sched st H
+  , walk-frame-drain sl id L sf gas nid now src f p vals evs fin sched st H
+  , proj₁ ST
+  , ≤-trans (m≤m+n (L + proj₁ ST) (pathLen p))
+            (≤-trans (J+n≤iterL S W d (pathLen p) (L + proj₁ ST)) TAIL)
+  , chain-walk-caps sl id (L + proj₁ ST) sf gas nid now src p
+      (proj₁ r) (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r)))
+      (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      ( trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
+      , proj₁ (proj₂ ST)
+      , proj₁ (proj₂ (proj₂ ST))
+      , pathSz?-widen p (proj₁ (frameStep-⊑-+ c 2≤S L (proj₁ ST))) pz2
+      , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
+      , TAIL )
+  where
+  c   = capsAt e sl id
+  S   = Caps.cSize c
+  W   = Caps.cWid c
+  d   = capsH e sl id
+  2≤S = 2≤capsAt-size e sl id
+  slSz : slotsSize sl ≤ Caps.cSize c
+  slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
+  B   = Caps.cSize (frameStep L c)
+  pz1 : frameSz? B f ≡ true
+  pz1 = proj₁ (∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
+  pzr : ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) ≡ true
+  pzr = proj₂ (∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
+  pzl : (suc (pathLen p) ≤ᵇ B) ≡ true
+  pzl = proj₁ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) pzr)
+  pz2 : pathSz? B p ≡ true
+  pz2 = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) pzr)
+  r   = stepFrame sf nid now f p vals fin sched st
+  ST  = stepFrame-caps c d (frameBud c L) L sf nid now f p vals fin sl sched st
+          2≤S (1≤capsAt-reg e sl id) sleq (slotsCaps?-capsAt e sl id) slSz cok
+          pz1 pz2 (≤ᵇ⇒≤ (suc (pathLen p)) B (T-to pzl))
+          hvc ≤-refl
+          (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdp)
+  TAIL : iterL S W d (pathLen p) (L + proj₁ ST) ≤ sizeCount c d ⊔ S
+  TAIL = ≤-trans (iterL-mono (pathLen p) (pathLen p) 2≤S ≤-refl ≤-refl
+                    (proj₂ (proj₂ (proj₂ (proj₂ ST)))) ≤-refl)
+                 hlv
 
 -- AND THE CHAIN'S OWN LEAF IS NOW THAT WALK AT ITS ENTRY, with the one
 -- step of arithmetic between them real: the premise arrives as a
@@ -2428,7 +2521,7 @@ arr-chain-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hpz 
   chain-walk-caps sl id Lv (budgetAt e (Sched.slots sched) nextId) n nextId
     (arrTick a) (arrSource a) path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
-    (Arrival.isLast a) sched st sleq cok hvc hpz hdp ENTRY
+    (Arrival.isLast a) sched st (sleq , cok , hvc , hpz , hdp , ENTRY)
   where
   c   = capsAt e sl id
   d   = capsH e sl id

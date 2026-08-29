@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **walk the path: fold the proven frame receipt into the predicate** —
-  the leaf is now stated in the frame law's own currency and over the
-  frame law's own data, and every hypothesis it carries propagates down
-  a path unaided, so what remains is the induction itself. Each frame
-  spends the twin, which reports its own increment and re-establishes
-  the caps and the values one level up; the ladder premise is what pays
-  the Σ's ceiling at every frame, since a chain is one rung wide. The
-  sink arm and the frame-local predicates fall out as leaves, and are
-  where the two legs below then stand.
+- **instantiate the three leaves the path induction left, before any of
+  them is ground** — they are new statements and nothing has reached
+  them, which is the cheapest unmanaged risk there is. The instrument
+  already exists: the walk probe's re-walk reads a boolean conjunct at
+  every state a fold passes through, and two of the three leaves ARE
+  booleans at a state — a `thru-outer`'s closures, a bounded
+  `mergeAll`'s parked queue. Recover it, point it at those two, and
+  read the sink's admitted list at the same states. A refutation here
+  costs a restatement; found after the fold is ground it costs the fold.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -251,10 +251,18 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`chain-walk-caps`** (Caps-Face/Part7) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: ONE path's walk, at a level
-  charged in FRAMES. The chain leaf above it is a real body now, so the
-  delivery-to-frame conversion is checked and this is the induction alone.
+- **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
+  fold at a sink, which is the walk's SECOND recursion — over admitted
+  registrations rather than over a path — and the one arm the path induction
+  hands off rather than closes.
+- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
+  bounded `mergeAll`'s parked queue, at the level the frame is read at. `⊤` at
+  four of the five frame heads, so the whole statement is the drain's two size
+  bounds.
+- **`walk-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
+  `thru-outer`'s closures under the frame's cap. `⊤` at the other four heads;
+  the weakest of the three, since one frame's values are what the walk already
+  carries.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of
