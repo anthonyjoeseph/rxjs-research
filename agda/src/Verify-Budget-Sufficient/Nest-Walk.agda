@@ -52,7 +52,8 @@ open import Verify-Budget-Sufficient.Caps using
   iterFold-infl; iterSize-infl; iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size;
   opIterD-mono;
   1≤capsAt-reg)
-open import Verify-Budget-Sufficient.Caps using (sizeCount)
+open import Verify-Budget-Sufficient.Caps using (sizeCount; sizeCount-body)
+open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-mu; leaf-lvl)
 open import Verify-Budget-Sufficient.Caps-Term using (unfoldμ-caps)
@@ -916,6 +917,40 @@ ceil-mu c d Lv k m m₀ 2≤S hm₀ H L′ hL =
              (≤-reflexive (sym (sLvlD-suc (Caps.cSize c) (Caps.cWid c) d k
                                   (Lv + (m₀ + suc (m₀ * m₀)))))))))
 
+-- AND AT LEVEL ZERO THE CEILING IS A THEOREM, WHICH IS WHAT THE WHOLE
+-- RELATIVE FORM WAS FOR.  The descent ledger read from the bottom is
+-- dominated by the caps count -- that is the proven inequality this
+-- development already spends at the entry -- and the ceiling is that
+-- inequality with the implication wrapped round it.  So a consumer
+-- carrying the ceiling as an assumption is carrying something it could
+-- have derived from two size bounds and the two entry facts every face
+-- of this walk already has in its ambient bundle.
+ceil-entry : ∀ (c : Caps) (d k m : ℕ) → 2 ≤ Caps.cSize c →
+  3 + k ≤ Caps.cSize c → m ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  CeilD c d 0 k m
+ceil-entry c d k m 2≤S hk hm 1≤R L′ hL =
+  ≤-trans hL
+    (≤-trans (≤-trans (opIterD-dominated (Caps.cSize c) (Caps.cWid c) d k m
+                         (Caps.cReg c) 2≤S hk hm 1≤R)
+                      (≤-reflexive (sym (sizeCount-body c d))))
+             (m≤m⊔n (sizeCount c d) (Caps.cSize c)))
+
+-- AND IT CLIMBS TO ANY LEVEL THE SIZE CAP PAYS FOR, so no consumer has
+-- to be at the bottom to use it.  One level costs one unit of the
+-- operator index, which is exactly the descent `ceil-step` states, so a
+-- ceiling wanted at a level is the entry ceiling asked for that many
+-- more operators -- and the premise is the sum, which is the honest
+-- statement of what a level costs.
+ceil-lift : ∀ (c : Caps) (d Lv k m : ℕ) → 2 ≤ Caps.cSize c →
+  3 + k ≤ Caps.cSize c → Lv + m ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  CeilD c d Lv k m
+ceil-lift c d zero    k m 2≤S hk hm 1≤R = ceil-entry c d k m 2≤S hk hm 1≤R
+ceil-lift c d (suc Lv) k m 2≤S hk hm 1≤R =
+  ceil-step c d Lv k k (suc m) m 2≤S ≤-refl ≤-refl
+    (ceil-lift c d Lv k (suc m) 2≤S hk
+      (≤-trans (≤-reflexive (+-suc Lv m)) hm) 1≤R)
+
+
 -- ONE FRAME COSTS ONE LEVEL, and this is where it is paid.  The two
 -- path keys are the pair the proven subscribe face re-establishes at
 -- every frame it descends through: the extended path passes the size
@@ -976,7 +1011,8 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (nestClosOK? c sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
-  × CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o)))
+  × (3 + nest o sl (EvalSt.connectedShares st) ≤ Caps.cSize c)
+  × (Lv + suc (suc (sizeᵉ o)) ≤ Caps.cSize c)
   × capsDrainOK c sl d Lv sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
@@ -6211,11 +6247,15 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
           hpk hpl
-          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+          (ceil-lift c d Lv (nest o sl (EvalSt.connectedShares st))
+             (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
+             (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+             (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))))
+             (FaceOK.fReg faceHere))
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
-         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          splitW′
          (≤-trans (m≤n⊔m _ _) hd)

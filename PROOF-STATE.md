@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **discharge the carried ceiling at the entry, where it is proven** —
-  the walk now carries its ceiling as an implication rather than a
-  number, and one postulate produces that implication for every chain
-  of a cascade. At the entry the level is zero, which is exactly where
-  the domination inequality is proven, so the conjunct is a lemma and
-  not an assertion. This leg moves it out of the postulate, shrinking
-  what the selection's walk is trusted for to the components a row
-  actually reads.
-
 - **the burst's admissibility, at the level the walk now reads it** —
   the fold below it stopped needing the nesting boolean, so the one
   remaining consumer of the burst's nest-keyed reading is this row, and
@@ -241,6 +232,15 @@ does not fit is a finding about the shared statement, not about the head.
   so if that unit sits under it by a proven inequality the statement
   splits the same way this one did: a computable leaf a probe pins, and
   a body carrying it back to the term the proof spends.
+
+- **price the parked drain from the cap's own slack** — what replaced
+  the ceiling is two plain size bounds on a queued inner: what it
+  nests, and what a level of the walk still has to spend. Both compare
+  against the entry cap, and that cap is already proven to carry three
+  units above the program's own written size — the slack the
+  domination guard was repaired to want. So the question is whether the
+  queue's own receipts reach a queued term the way the base fact
+  reaches the root, and it is arithmetic rather than a walk.
 
 ### The ledger
 
@@ -311,9 +311,9 @@ does not fit is a finding about the shared statement, not about the head.
   obs-freeness only reduces at a concrete type, so an `isData` inversion is
   owed first.
 - **`arr-chains-caps`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the caps the
-  selection's walk spends, held at every state it passes through — now with the
-  sink's registry-versus-unit conjunct, which no row reads. Only the SIZE
-  component moves across a cascade, so the flat reading is a slack claim.
+  selection's walk spends, held at every state it passes through. The walk's
+  ceiling is derived now, so what is left asserted is the sink's
+  registry-versus-unit conjunct and two size bounds on a parked inner.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

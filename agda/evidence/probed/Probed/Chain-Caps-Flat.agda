@@ -24,12 +24,13 @@
 -- flat reading is a slack claim about a SINGLE component and the other
 -- two are preservation outright.
 --
--- WHAT THESE ROWS DO NOT REACH.  The predicate the target asserts now
--- also carries the walk's CEILING as an implication -- that whatever
--- level a descent reaches sits under the instant's count -- and a
--- component fit says nothing about it.  Nor about the sink arm's
--- registry-versus-unit conjunct.  The three figures below are the caps
--- components alone.
+-- WHAT THESE ROWS DO NOT REACH.  The predicate the target asserts also
+-- prices the parked drain -- what a queued inner nests and how much
+-- size a level of the walk still has to spend -- and both of those
+-- compare against the cap itself, which is the one quantity these rows
+-- report a floor for rather than a value.  Nor is the sink arm's
+-- registry-versus-unit conjunct addressed.  The three figures below
+-- are the caps components alone.
 module Probed.Chain-Caps-Flat where
 
 open import Data.Bool using (Bool; if_then_else_)
