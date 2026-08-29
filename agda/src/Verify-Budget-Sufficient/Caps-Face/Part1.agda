@@ -906,6 +906,18 @@ slotsCaps?-bound {n = n} B W sl h hw hi =
                     (≤-trans (slotsIW-lb n sl i) hi))
              (slotCaps?-self sl (sl i)))
 
+-- AND THE SAME TELESCOPE UNDER A LARGER PAIR OF NUMBERS, which is what
+-- a walk needs and the bound above does not give: the slots are fixed
+-- for a whole instant while the CAP the walk reports at steps, so a
+-- statement carrying the slot caps has to carry them forward to the
+-- stepped cap rather than re-derive them there.  Both axes widen,
+-- because the frame step moves the size and the fold moves the width.
+slotsCaps?-widen : ∀ {n} {Γ : Ctx n} (B B′ W W′ : ℕ) (sl : Slots Γ) →
+  B ≤ B′ → W ≤ W′ → slotsCaps? B W sl ≡ true → slotsCaps? B′ W′ sl ≡ true
+slotsCaps?-widen {n = n} B B′ W W′ sl le lw h =
+  slotsGo?-bound B′ W′ sl (tabulate {n = n} (λ i → i))
+    (λ i → slotCaps?-widen sl (sl i) le lw (slotsCaps?-lookup B W sl i h))
+
 ------------------------------------------------------------------
 -- THE WIDTH HALF OF THE EVAL CLUSTER — ONE foldStep PER SYNTAX NODE.
 --

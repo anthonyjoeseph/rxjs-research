@@ -216,30 +216,30 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the face's premises reach the consume cone** — the whole weakened
-  invariant in `Nest-Walk` is a head-for-head duplicate of a proven clique
-  in `Subscribe-Face` and `Caps-Face.Part4`, two heads under the very same
-  name, and the obstacle is not the module order: neither module reaches
-  the other. What is missing is the face's premise list — the slot caps,
-  the two positivity keys, the path key and the budget, operator and depth
-  currencies — and with it the face's INDEX, since the proven head reports
-  at a level stepped by an existential of its own, so the cone's
-  conclusions become level-carrying and the level accumulates along the
-  arrival list. This leg carries both to `thruConsume-caps`.
-- **the duplicated heads retired** — with the premises in place the copies
-  go: the consume step, the arrival walk and the wrap are deleted from the
-  walk and the proven ones imported, with `capsOK?⇒nest` applied at the two
-  doors that genuinely read the weak form. This is where the FALSE
-  generation actually leaves the tree, and only reachability can see it —
-  a mutual cluster consumes itself, so every local check reads the
-  predecessor's cone as wired.
-- **the two burst leaves discharged from the face** — `subscribeE-burst-caps`
-  and `subscribeE-burst-nest` become bodies over `subscribeE-caps`, which
-  reports exactly their conclusion for exactly their `subscribeE` at the
-  level-carried shape. Then re-run `Probed.PushVals-Caps` against the
-  statements as they then read: re-running is not optional and restamping
-  alone is forbidden, a green taken against the frozen-width cap being
-  evidence about text that is gone.
+- **the walk stops stating the caps exit and consumes the face** — its
+  own header has closed both repairs in place: a one-notch step dies on
+  composition, and carrying the level needs a residue only the level
+  recurrence bounds, over two currencies this module does not hold. What
+  is left is the twin — a proven body carrying the same invariant across
+  the same operation over the same cap family, whose node-table conjunct
+  is a proven weakening of its own. `FaceOK` already rides the cone, so
+  this leg threads the rest of the face's list to the doors and weakens
+  there. It is where the FALSE statement leaves the tree.
+- **the currencies the face's residue is priced in, carried to the
+  doors** — the recurrence bounding that residue reads the budget and
+  the operator count, and the walk holds neither. Both are available
+  above it rather than absent: the strong invariant arrives frame by
+  frame in the premise the fold already takes, and the two counts come
+  down from the cascade that enters the cone. This is the leg that
+  decides whether the consumption is a threading or a restatement of
+  the door, and it is sized as one commit because the doors are few.
+- **the probe re-run against the statements as they then read** —
+  `Probed.PushVals-Caps` was taken against the frozen-width cap, so its
+  green is evidence about text that will be gone. Re-running is not
+  optional and restamping the fingerprint alone is forbidden: that
+  converts a false coverage claim into a certified one. Either the rows
+  come back green at the restated shape, or the probe is deleted and the
+  rows that survive are re-declared against what they actually reached.
 
 ### The ledger
 

@@ -34,7 +34,7 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; fac-hoist; one-pow)
+  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; fac-hoist; one-pow; FaceOK; faceAt)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade; depthChain; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -1330,6 +1330,7 @@ chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainBurstOK W id a path sched st →
   chainCapsOK c sl id a path sched st →
   depthChain id a path sched st ≤ d →
+  ⦃ _ : FaceOK c sl ⦄ →
   let r = chainStep id a path sched st in
   Σ ℕ λ j →
   let c′ = frameStep j c in
@@ -1413,6 +1414,7 @@ cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsBurstOK W a nextId chains sched st →
   chainsCapsOK cp sl a nextId chains sched st →
   depthCascade a nextId chains sched st ≤ d →
+  ⦃ _ : FaceOK cp sl ⦄ →
   let r = cascadeGo a nextId chains sched st in
   Σ ℕ λ j →
   let cp′ = frameStep j cp in
@@ -1672,6 +1674,7 @@ cascadeGo-nest-nodes {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hn
   CH = cascadeGo-nodes-chains (capsAt e sl id) (capsH e sl id) (nestBurstAt e sl id)
          sl a nextId chains sched st hsl (1≤nestBurstAt e sl id)
          (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)) hburst hcw hdep
+         ⦃ faceAt e sl id ⦄
 
   -- the level's own ceiling, and the whole of the collapse: the count
   -- the cascade reports is under the one the recurrence steps by, so

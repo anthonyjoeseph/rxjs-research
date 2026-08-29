@@ -18,6 +18,16 @@
 -- the FIRST instant -- an `ofᵉ` delivers `length ts`, so the emitted
 -- inner's own reading is at least one.
 --
+-- AND THE WALK HALF NO LONGER NEEDS A ZERO WIDTH, which is what makes
+-- it survive a premise bundle that forbids one.  The walk carries the
+-- slot caps, and those read the width field: at these slots nothing
+-- under two is admitted, so a zero there would make the row unstatable
+-- rather than false.  It is stated at exactly two instead, and the
+-- crossing is moved into the PAYLOAD -- a parked inner carrying three
+-- values reads three, against a width the slots pin at two.  So the
+-- source's own arity is the free parameter, and no bound tying the cap
+-- to the SLOTS can close it: the arrivals are not the slots.
+--
 -- WHAT THIS DOES NOT SHOW.  It says nothing about the ADMISSIBILITY
 -- half of the same burst, which reads the size axis alone and which
 -- the arrival level therefore does move; it says nothing about what a
@@ -34,7 +44,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (just)
-open import Data.Nat using (ℕ; zero; suc; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -53,7 +63,7 @@ open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (nestValOK?; burstCaps?)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestCapsOK?; nestClosOK?; subscribeE-caps-exit)
+  using (nestCapsOK?; nestClosOK?; subscribeE-caps-exit; FaceOK; faceOK)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -151,15 +161,23 @@ walkRead≡ = refl
 -- inners that cross a tick and the limit holds the second: the node
 -- the arm installed carries it out of the descent, and the walk's own
 -- conjunct is then absurd at the same width.
+inner3 : Val Γ₂ (obs (obs natᵗ))
+inner3 = ofᵉ (strmᵗ (deepV 1) ∷ strmᵗ (deepV 1) ∷ strmᵗ (deepV 1) ∷ [])
+
 parked : Val Γ₂ (obs (obs (obs natᵗ)))
-parked = ofᵉ (strmᵗ (deferᵉ (ofᵉ (strmᵗ (deepV 1) ∷ []))) ∷
-              strmᵗ (deferᵉ (ofᵉ (strmᵗ (deepV 1) ∷ []))) ∷ [])
+parked = ofᵉ (strmᵗ (deferᵉ inner3) ∷
+              strmᵗ (deferᵉ inner3) ∷ [])
 
 headP : Closed Γ₂ (obs natᵗ)
 headP = mergeAllᵉ (just 1) parked
 
+-- the registry field is ONE rather than zero, and the width is still
+-- zero: the walk's own premise bundle asks for a positive registry and
+-- says nothing about the width, so a zero there would make this row
+-- unstatable rather than false.  The crossing is on the width axis, so
+-- the registry costs it nothing.
 capP : Caps
-capP = caps (syncSizeᵛ (obs (obs natᵗ)) headP) 0 0
+capP = caps 256 2 1
 
 schedP : Sched Γ₂
 schedP = sched-init headP slots
@@ -197,6 +215,10 @@ walk-absurd h with h refl refl refl refl ≤-refl
 -- real body over the leaf refuted above, so `src` today proves the
 -- statement this witness kills.  The inhabitant is spelled out because
 -- a reader is entitled to check the claim rather than take it.
+faceP : FaceOK capP slots
+faceP = faceOK (s≤s (s≤s z≤n)) (s≤s z≤n) refl
+          (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (z≤n))))))))))))
+
 walkStands : StmtWalk
 walkStands = subscribeE-caps-exit capP slots WP gasBig headP root 0 0
-               schedP (st-init headP)
+               schedP (st-init headP) ⦃ faceP ⦄
