@@ -216,14 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the burst's admissibility, at the level the walk now reads it** —
-  the fold below it stopped needing the nesting boolean, so the one
-  remaining consumer of the burst's nest-keyed reading is this row, and
-  its refuting map crosses exactly the level the walk now carries as a
-  bound rather than a constant. Whether the row survives the re-key or
-  is refuted at the new reading is a question one probe answers, and
-  the harness for it is the one the fold's caps boolean already uses.
-
 - **the subscribe side's increment, by the move the cascade side just
   made** — its bound carries one sealed term and no factor at all, and
   the sweep reading it against a computable stand-in has been printing
@@ -242,6 +234,15 @@ does not fit is a finding about the shared statement, not about the head.
   queue's own receipts reach a queued term the way the base fact
   reaches the root, and it is arithmetic rather than a walk.
 
+- **the entry state's own nesting receipt, which everything above it
+  assumes** — the caps receipt at the same state is proven and is the
+  route, and what stands between them is one inversion: a scripted
+  slot's obs-freeness only reduces at a concrete type, so the fact has
+  to be got at by cases on the data judgement rather than by
+  computation. It is the lowest fact in the tier and the one a falsity
+  in would void the rest, and the work is an inversion and a transport
+  rather than a walk.
+
 ### The ledger
 
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
@@ -249,9 +250,10 @@ does not fit is a finding about the shared statement, not about the head.
   statement the proof spends is now a body over it, carried back by a power of
   two under the sealed factor.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
-  subscription's whole burst, read one caps level up — the level the refuting
-  map crosses by, and the axis that level does move.
+  `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
+  any subscription's whole burst, read one caps level up. At the map that
+  refutes the flat reading the levelled one holds by thirty-odd orders of
+  magnitude, so the crossing is closed and what is left is the induction.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

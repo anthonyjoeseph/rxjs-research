@@ -4603,6 +4603,16 @@ postulate
   --   region, which is what puts the finding on the mechanism.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-burstW` below.
+  -- PROBED: `Probed.Burst-Nest-Level` reaches the region the flat
+  --   reading was refuted in -- the duplicating map, at the payload the
+  --   refutation uses and at twice it -- and pins BOTH verdicts: false
+  --   at the head's own written size, true at the level, by better than
+  --   thirty orders of magnitude on each. So the crossing is closed
+  --   rather than merely untested. NOT covered: the width leaf refuted
+  --   beside this one, which reads a second key; a substitution deeper
+  --   than one frame, which is where the level's own growth rate would
+  --   be tested; and every premise about a cap this face quantifies
+  --   over, since the rows pick a concrete one.
   -- RECOVERY: `git show e55d850` restores the level-lifting machinery
   --   these four used to need -- `arrCapAt-size`, `nestValOK?-cap`,
   --   `allWrap-1≤`.  It went out with the nest half, which stopped

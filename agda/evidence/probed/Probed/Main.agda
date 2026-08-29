@@ -34,6 +34,8 @@ open import Probed.Cascade-Store-Components
 open import Probed.Cascade-Nest-Flat
   using (U-chains; U-descent; U-holds; C-chains; C-descent; C-holds;
          F-chains; F-descent; F-holds)
+open import Probed.Burst-Nest-Level
+  using (row8≡; row16≡)
 open import Probed.Sync-Factor
   using (dupSync≡6; dupOut≡2; dupA-holds;
          dupOut₃≡6; dupB-holds;
