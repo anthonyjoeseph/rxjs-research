@@ -216,26 +216,27 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the currencies carried to the accumulator, which is the one site
-  that needs them** — the census across the exit family says every
-  member but one passes its pair along unchanged, and the exception
-  threads the invariant across the emit list one arrival at a time. So a
-  stepped conclusion there is a SUM over arrivals rather than an offset
-  a caller absorbs, and the budget and operator count are what bound
-  that sum. Nothing local substitutes: the discarded level attempt is
-  now known to cover a PARAMETERISED level too, since what the frozen
-  width bought was an up-and-down identity no level supplies. The
-  re-establishment per arm is this leg, and the accumulator is where it
-  lands first.
+- **the arrivals' width key made reachable, and its flat form
+  closed** — the key the proven face reads is the one premise about
+  the SOURCE rather than the state, so a door into that face cannot
+  draw it from a slots bundle. It is derivable below the walk, and the
+  proven form sat one module too high to reach; moving the fact down
+  is this leg. The same leg records why the flat form dies: every
+  structural arm preserves such a key definitionally, and the mu arm
+  does not, because the unfold's plug lands exactly where the parked
+  width looks. So the currencies stop being a repair of their own —
+  they are the face's premise list, and the walk has to go there.
 - **the walk stops stating the caps exit and consumes the face** — its
-  own header has closed both repairs in place: a one-notch step dies on
-  composition, and carrying the level needs a residue only the level
-  recurrence bounds, over two currencies this module does not hold. What
-  is left is the twin — a proven body carrying the same invariant across
-  the same operation over the same cap family, whose node-table conjunct
-  is a proven weakening of its own. `FaceOK` already rides the cone, so
-  this leg threads the rest of the face's list to the doors and weakens
-  there. It is where the FALSE statement leaves the tree.
+  own header has now closed every local repair: a one-notch step dies
+  on composition, carrying the level needs a residue only the level
+  recurrence bounds, a parameterised level breaks the up-and-down
+  identity the frozen width supplied, and a flat arrivals key dies at
+  the unfold. What is left is the twin — a proven body carrying the
+  same invariant across the same operation over the same cap family,
+  whose node-table conjunct is a proven weakening of its own. `FaceOK`
+  already rides the cone, so this leg threads the rest of the face's
+  list to the doors and weakens there. It is where the FALSE statement
+  leaves the tree.
 - **the probe re-run against the statements as they then read** —
   `Probed.PushVals-Caps` was taken against the frozen-width cap, so its
   green is evidence about text that will be gone. Re-running is not

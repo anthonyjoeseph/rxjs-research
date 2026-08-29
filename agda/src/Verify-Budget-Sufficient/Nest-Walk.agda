@@ -4812,6 +4812,22 @@ subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 --   bundle a sweep can thread either: each reads the SUBSCRIPTION, so a
 --   recursive arm re-establishes its own rather than inheriting one,
 --   and that re-establishment is the content.
+-- DEAD ROUTE: and the arrivals' width key cannot be carried FLAT,
+--   which closes the last local repair rather than merely ranking it.
+--   Every structural arm here preserves such a key definitionally --
+--   the parked width is a join-fold and each arm's subterm is one of
+--   its summands -- so the key reads as threadable right up to the mu
+--   arm, where the walk recurses on the UNFOLD.  There the containment
+--   runs the wrong way: the plug lands at the variable positions,
+--   which is exactly where the parked width is looking, and it exposes
+--   the mu's own delivered width, which the parked one does not bound.
+--   `unfoldμ-caps` is where that is written down -- its width half is
+--   derived from the SIZE hypothesis for this reason, and it delivers
+--   the arrivals' bound only at a cap stepped by the mu's size
+--   squared.  So no premise about a single arrival survives this walk
+--   at a fixed cap, however many currencies ride beside it, and the
+--   currencies stop being a repair of their own: they are the face's
+--   premise list, which is where they already are.
 -- TWIN: `subscribeE-caps` already carries the caps invariant across
 --   this very operation, at full strength and over the same cap
 --   family -- the node-table conjunct is a definitional weakening of

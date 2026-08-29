@@ -46,7 +46,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Gas; Tick; Id; Fuel)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
-open import Rx.Frame-Width using (dWᵉ; ceilᵉ; dW≤ceil; entryCeil; pWᵛ; pWᵉ)
+open import Rx.Frame-Width using (dWᵉ; entryCeil; pWᵛ; pWᵉ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st; Path; root; arrTy; arrVal; cascade;
@@ -108,7 +108,7 @@ open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
-  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; sizeCount-body; frameBlowup;
+  using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; dWᵉ≤capsAt-wid; sizeCount-body; frameBlowup;
   iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize; 1≤capsAt-reg; _⊑ᶜ_; Caps;
   caps; capsAt; capsAt-suc-full; capsAt-⊑-suc; capsH; frameStep; frameStep-0;
   frameStep-mono-j; sizeCount)
@@ -1849,16 +1849,6 @@ abstract
 
 -- helpers for burst-caps corollary
 
--- dWᵉ n ins e ≤ Caps.cWid (capsAt e ins 0)
--- Route: dW≤ceil → m≤m⊔n (ceilᵉ ≤ entryCeil) → n≤1+n → capsAt-base-wid
-dWe≤cWid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  dWᵉ n ins e ≤ Caps.cWid (capsAt e ins 0)
-dWe≤cWid {n = n} e ins =
-  ≤-trans (dW≤ceil n ins e)
-  (≤-trans (m≤m⊔n (ceilᵉ n ins e) _)
-  (≤-trans (n≤1+n _)
-           (capsAt-base-wid e ins 0)))
-
 -- sizeᵉ e ≤ sizeCapAt e ins 0
 -- Route: sizeᵉ e ≤ 2+sizeᵉ+slotsSize ≤ cSize (capsAt-base-size)
 sizeE≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
@@ -1900,7 +1890,7 @@ burst-all {n = n} e ins =
     (m≤m+n (fnCapᵉ e) _)
     (caps-fuel-root e ins)
     (init-capsOK? e ins 0)
-    (dWe≤cWid e ins)
+    (dWᵉ≤capsAt-wid e ins 0)
     nestOK
     opsOK
     (depthE≤capsH-root e ins)

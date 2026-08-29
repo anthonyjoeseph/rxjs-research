@@ -29,7 +29,7 @@ module Verify-Budget-Sufficient.Caps where
 
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; +-assoc; +-comm; *-suc; *-assoc; *-monoˡ-≤; *-monoʳ-≤;
-  *-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ; +-suc; m≤m+n; m≤n+m; n≤1+n; m≤m*n;
+  *-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ; +-suc; m≤m+n; m≤n+m; n≤1+n; m≤m*n; m≤m⊔n;
   ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤; ^-*-assoc; *-comm; *-distribˡ-+; *-identityʳ; *-identityˡ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -38,7 +38,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst; subst₂; module ≡-Reasoning)
 
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
-open import Rx.Frame-Width using (entryCeil)
+open import Rx.Frame-Width using (entryCeil; ceilᵉ; dWᵉ; dW≤ceil)
 open import Rx.Evaluator using (blowH; capsHgo; capsBase;
                                 foldStep; iterFold; sizeStep; iterSize;
                                 sizeAt; widAt; regAt; fCharge; fLvl; iterL;
@@ -1062,6 +1062,22 @@ capsAt-base-wid e sl (suc id) =
   ≤-trans (capsAt-base-wid e sl id)
           (cWid≤frameBlowup (capsAt e sl id) (capsH e sl id)
              (2≤capsAt-size e sl id))
+
+-- AND THE ARRIVALS' OWN WIDTH KEY FALLS OUT OF IT, at every instant
+-- rather than only the first.  This is the one premise of the proven
+-- subscribe face that reads the SOURCE instead of the state, so it is
+-- the one a door into that face cannot get from a slots bundle -- and
+-- it is free here, because the instant's cap is built over a ceiling
+-- that already dominates every width the term can deliver.  It lives at
+-- this level so both faces reach it; the bridge is not the only caller
+-- any more.
+dWᵉ≤capsAt-wid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  dWᵉ n sl e ≤ Caps.cWid (capsAt e sl id)
+dWᵉ≤capsAt-wid {n = n} e sl id =
+  ≤-trans (dW≤ceil n sl e)
+  (≤-trans (m≤m⊔n (ceilᵉ n sl e) _)
+  (≤-trans (n≤1+n _)
+           (capsAt-base-wid e sl id)))
 
 ------------------------------------------------------------------
 -- B2 : THE REGISTRATION COUNT NEVER OUTRUNS THE SIZE CAP.
