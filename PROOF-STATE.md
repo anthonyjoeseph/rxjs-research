@@ -220,11 +220,12 @@ does not fit is a finding about the shared statement, not about the head.
   invariant in `Nest-Walk` is a head-for-head duplicate of a proven clique
   in `Subscribe-Face` and `Caps-Face.Part4`, two heads under the very same
   name, and the obstacle is not the module order: neither module reaches
-  the other, so the import is available for the asking. What is missing is
-  the face's premise list — the slot caps, the two positivity keys, the
-  path key and the budget, operator and depth currencies. This leg carries
-  them from the two doors that already hold them down to `thruConsume-caps`
-  and `thruWalk-caps`, changing no conclusion.
+  the other. What is missing is the face's premise list — the slot caps,
+  the two positivity keys, the path key and the budget, operator and depth
+  currencies — and with it the face's INDEX, since the proven head reports
+  at a level stepped by an existential of its own, so the cone's
+  conclusions become level-carrying and the level accumulates along the
+  arrival list. This leg carries both to `thruConsume-caps`.
 - **the duplicated heads retired** — with the premises in place the copies
   go: the consume step, the arrival walk and the wrap are deleted from the
   walk and the proven ones imported, with `capsOK?⇒nest` applied at the two

@@ -2903,6 +2903,20 @@ thruStep-exhaust-inner {e = e} c sl B W m m′ fuel nid κ id now od o sched st
 -- the statement the width refutation kills, one layer up and no truer
 -- for the move; that is why the threading is the work and the deletion
 -- is not.
+
+-- AND THE PREMISES ARE NECESSARY AND NOT SUFFICIENT, which is the part
+-- the sentence above understates and the part that sizes the job.  The
+-- proven head does not report at the cap it was entered at: it reports
+-- at a level STEPPED by an existential of its own, bounded by the
+-- face's level function.  So an importer inherits that shape -- this
+-- head's conclusion, the arrival walk's above it and the burst push's
+-- above that all become level-carrying, and the level ACCUMULATES
+-- along the arrival list rather than being a constant the caller
+-- picks.  That is the same level the walk's own exit pair was found
+-- unable to carry in place; the difference is that out there it is
+-- already carried, and bounded.  So the threading is not a premise
+-- edit: it is the cone taking the face's INDEX along with the face's
+-- hypotheses, and no smaller change reaches the imported heads.
 thruConsume-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
