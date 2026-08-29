@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **give the count-side leaf its budget, which is the whole of what the
-  discharge left behind** — the step leaf is gone and the conversion back
-  to the cascade's count is one named statement that cannot be proven from
-  what it is handed. The fold knows the answer: the proven cascade bound
-  reads its own count off the same recurrence, and its delivery total is
-  already computed beside it. So this leg carries that total into the
-  chain fold and spends `lvls-add`, which is the one law relating a
-  chain's base to zero.
-
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
   every face re-establishes it, so the two size bounds the chain walk
@@ -243,6 +234,15 @@ does not fit is a finding about the shared statement, not about the head.
   that moves per stage, which is the shape a mirror cannot hand over
   and the only part this row still owes.
 
+- **carry the delivery budget one stratum DOWN, into the walk predicate
+  itself** — the same flat ceiling that was just refuted at the cascade
+  is what the walk predicate asks of every frame and every share chain,
+  and the row that must PRODUCE it will hit the identical wall: a level
+  bound with no account of what is unspent cannot survive a step. The
+  repair is known now, so this leg restates those conjuncts against the
+  fold's own delivery count and re-reads the one proven consumer against
+  the new form, before the shape is ground into a chain-length induction.
+
 ### The ledger
 
 - **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
@@ -250,16 +250,10 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`chain-level-flat`** (Caps-Face/Part7) — SHAPE,
-  `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: the conversion from one
-  chain's own ceiling back to the cascade's count. It needs how much of that
-  count is UNSPENT, which no hypothesis carries; the fold has to hand it the
-  delivery
 - **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: ONE chain's walk, asserted at
   a level its frame receipt can pay. Its `capsOK?` spine is now read at every
   state a re-walked path passes through; the `Set`-valued conjuncts are not.
-  budget the proven cascade bound already computes.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of
