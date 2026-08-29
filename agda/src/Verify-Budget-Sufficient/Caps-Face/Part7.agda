@@ -2291,6 +2291,24 @@ postulate
 -- what the finding below buys.  The alternative is to give the predicate
 -- the level its consumers already speak in, as the nodes face does.
 --
+-- AND THE WALK LEAF IS THE SAME STATEMENT, NOT A SIBLING OF IT.  The
+-- walk predicate's `root` clause IS `capsOK?` at the state the walk
+-- ends on, and a chain's walk ends exactly where its step does -- the
+-- path fold and the walk recurse through the same `stepFrame`, and the
+-- fold returns the scheduler and state untouched at `root`.  So on any
+-- sink-free path the walk leaf IMPLIES the step leaf, the crossing
+-- below is a crossing of both, and the two rows are one obligation
+-- read at two granularities rather than two things to grind.
+--
+-- WHICH PUTS THE LEVEL IN THE WALK PREDICATE, and that is the repair
+-- both rows want.  The frame receipt already hands back a level and
+-- restates the invariant at `frameStep (j + j')`; the walk predicate
+-- throws that away and asserts one FLAT cap at every frame, which is
+-- the single place the level is being discarded.  Threading it is what
+-- makes the walk's own conclusion composable with the fold's, and the
+-- cascade-level result the instant already spends is stated in exactly
+-- that currency.
+--
 -- REFUTED: `Refuted.Chain-Step-Flat` -- one step of one chain, at a
 --   concrete cap the pre-state satisfies and the post-state does not.
 postulate

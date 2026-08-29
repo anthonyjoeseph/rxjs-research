@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **buy the step leaf out of the caps recurrence, since nothing local
-  can pay for it** — one step is now known NOT to preserve an arbitrary
-  cap its input satisfies: a drain subscribes what it releases and the
-  step retires none of it, so the smallest fitting size better than
-  doubles across a single step and the finish, one level up, is what
-  pays. What is left is the instant's own gap: `capsAt` is a
-  `frameBlowup` of its predecessor, so the leg is to show that one
-  blowup swallows one instant's whole growth — or to give the predicate
-  the level its consumers already speak in.
+- **thread the level through the walk predicate, which is the one
+  place it is being discarded** — the two open caps rows are one
+  obligation, not two: the walk's `root` clause IS the step's
+  conclusion, so the refuted crossing indicts both. The frame receipt
+  already returns a level and restates the invariant at
+  `frameStep (j + j')`, and the walk predicate throws it away to assert
+  one flat cap at every frame. The leg is to index that predicate by a
+  level and rebuild the two leaves as receipts in the same currency the
+  cascade result is already stated in.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -251,6 +251,10 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
+- **`arr-chain-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED`: ONE chain's walk.
+  Its `root` clause IS the step leaf's conclusion, so on a sink-free path it
+  implies the refuted statement; the flat walk predicate is where the frame
+  receipt's level is discarded, and threading it is the repair.
 - **`chainStep-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED`: one chain's step
   preserves the caps. FALSE at an arbitrary cap the input satisfies — a drain
   subscribes what it releases and the step retires none of it — so only the
@@ -313,10 +317,6 @@ does not fit is a finding about the shared statement, not about the head.
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.
-- **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED`: ONE chain's
-  walk, the fold over the selection being a body now. What is left asserted is
-  the sink's registry-versus-unit conjunct and two size bounds on a parked
-  inner, whose headroom is now a conjunct of the caps record.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
