@@ -216,14 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the currencies the face's residue is priced in, carried to the
-  doors** — the recurrence bounding that residue reads the budget and
-  the operator count, and the walk holds neither. Both are available
-  above it rather than absent: the strong invariant arrives frame by
-  frame in the premise the fold already takes, and the two counts come
-  down from the cascade that enters the cone. This is the leg that
-  decides whether the consumption is a threading or a restatement of
-  the door, and it is sized as one commit because the doors are few.
+- **the currencies carried to the accumulator, which is the one site
+  that needs them** — the census across the exit family says every
+  member but one passes its pair along unchanged, and the exception
+  threads the invariant across the emit list one arrival at a time. So a
+  stepped conclusion there is a SUM over arrivals rather than an offset
+  a caller absorbs, and the budget and operator count are what bound
+  that sum. They are not a bundle a sweep threads either: each reads the
+  subscription, so an arm re-establishes its own. That re-establishment
+  is this leg, and the accumulator is where it has to land first.
 - **the walk stops stating the caps exit and consumes the face** — its
   own header has closed both repairs in place: a one-notch step dies on
   composition, and carrying the level needs a residue only the level

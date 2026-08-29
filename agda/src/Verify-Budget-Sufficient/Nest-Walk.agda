@@ -4647,6 +4647,20 @@ pushBurst-caps-frame {Γ = Γ} {u = u} c sl fuel id now f κ (em ∷ ems) sched 
 -- AND THE WRAP'S OWN BURST NEEDS ITS PREMISES: the state chain's exit,
 -- read off the same induction `pushValsSt-walk` threads, with
 -- admissibility and room supplying what each instant's step consumes.
+
+-- AND THIS IS WHERE THE EXIT FAMILY'S LEVEL WOULD ACCUMULATE, which is
+-- what makes the family unrepairable by a level and not merely awkward.
+-- Every other member of it passes its pair along unchanged; this one is
+-- an ACCUMULATOR, threading the invariant at a fixed cap across the
+-- emit list one arrival at a time.  So a stepped conclusion here is not
+-- a fixed offset the caller can absorb -- it is a SUM over arrivals,
+-- one step per emit, and the list is as long as the burst is.
+--
+-- That is the whole reason the budget and the operator count are the
+-- currencies the repair needs: they are what bounds that sum, and no
+-- fact about a single arrival can, however tight.  A repair that steps
+-- the cap without carrying them prices one emit correctly and the
+-- burst not at all.
 pushValsSt-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
