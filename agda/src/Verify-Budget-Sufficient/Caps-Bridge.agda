@@ -781,11 +781,12 @@ store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   let r = cascade a nextId sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
          * (storeNestMax sched st + nestIncAt e sl id)
-store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
+store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC =
   ≤-trans (storeNest-finish a schedG stG)
           (subst (λ m → storeNestMax schedG stG
                           ≤ nestFacAt e sl id
@@ -813,7 +814,11 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
       hsz
       (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz)
       (arr-chains-bursts sl id a nextId sched st hsl hcaps)
-      (arr-chains-caps sl id a nextId sched st hsl hcaps)
+      (arr-chains-caps sl id a nextId sched st hsl hcaps
+        (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
+          (capsOK?-regs (capsAt e sl id) sched st hcaps))
+        valC
+        (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz))
       (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
         (capsOK?-regs (capsAt e sl id) sched st hcaps))
 
@@ -825,9 +830,10 @@ nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   let r = cascade a nextId sched st
   in nestOK? e sl (suc id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
+nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC =
   nestOK?-intro e sl (suc id)
     (proj₁ (proj₂ (cascade a nextId sched st)))
     (proj₂ (proj₂ (cascade a nextId sched st)))
@@ -835,7 +841,7 @@ nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
                          (proj₂ (proj₂ (cascade a nextId sched st))) ≤_)
            (sym (nestCapAt-suc e sl id))
            (≤-trans
-             (store-growth sl id a nextId sched st hsl hcaps hnest hval hsz)
+             (store-growth sl id a nextId sched st hsl hcaps hnest hval hsz valC)
              (*-monoʳ-≤ (nestFacAt e sl id)
                (+-monoˡ-≤ (nestIncAt e sl id)
                           (nestOK?-store e sl id sched st hnest)))))
@@ -907,7 +913,8 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC =
     subst (λ s′ → nestOK? e s′ (suc id) sched′ st′ ≡ true) (sym slEq)
           (nest-tick sl id a id sched st refl pre nok harr
             (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
-                  (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC))))
+                  (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC)))
+            valC)
 
   capsParts = capsOK?-parts (capsAt e sl′ (suc id)) sched′ st′ capsOut
 

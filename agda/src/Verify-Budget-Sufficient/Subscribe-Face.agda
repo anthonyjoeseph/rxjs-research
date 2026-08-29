@@ -3361,12 +3361,3 @@ shareGo-caps {Γ = Γ} c dep bud j sf gas id now i vals fin ((rid , p) ∷ ps) s
   j₂  = proj₁ IH
   REST = shareGo sf gas id now i vals fin ps (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
 
--- (DELETED) `chainStep-caps` sat here — one arrival into one
--- chain, a thin wrapper over `foldPath-caps`.  Its only consumer was
--- `dry-tick-core`'s argument list, and that list is wrong about itself: the
--- dry half concludes `hasDry`, so a capsOK?/burstCaps? Σ cannot be an
--- ingredient of it.  The cascade-level
--- induction it looks like the step for — `cascadeGo-caps` (.Caps-Face/Part7)
--- — is ALREADY PROVEN without it, which is the real reason it is redundant
--- rather than merely unwired.
--- RECOVERY: git show fa9692d:agda/src/Verify-Budget-Sufficient/Subscribe-Face.agda

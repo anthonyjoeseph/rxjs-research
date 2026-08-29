@@ -27,8 +27,6 @@ open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
-open import Probed.Chain-Caps-Flat
-  using (U-row; C-row; F-row; capU; eU; stepRow; step-pre; step-flat; step-lvl1)
 open import Probed.Chain-Walk-Level
   using (capU; pU; slU; entry; after1; walkSpine; spineAt; spine0; spine1;
          flat-row; lvl1-row)
