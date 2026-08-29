@@ -4256,21 +4256,12 @@ postulate
   --
   -- AND WHAT IS LEFT IS THE CAPS FACE'S OWN PREDICATE OVER THE WHOLE
   -- SUBSCRIPTION, not a per-emit record: the walk down to the emits is
-  -- proven, so the leaf is `burstCaps?` of the descent's burst.  That
-  -- is the conclusion `subscribeE-caps` already reports for exactly
-  -- this `subscribeE`, at exactly this shape of level.
-  --
-  -- AND THE MODULE ORDER IS NOT WHAT STANDS BETWEEN THEM, which is
-  -- worth knowing because it was read the other way and it decided
-  -- the route.  The caps face is not built on this module and this
-  -- module is not built on it: neither reaches the other through the
-  -- import graph, so the face is importable here for the asking, and
-  -- the ban is on a CYCLE rather than on a direction.  What stands
-  -- between them is the face's PREMISE LIST -- the slot caps, the two
-  -- positivity keys, the path key and the budget, operator and depth
-  -- currencies -- which is the same list `thruConsume-caps` below
-  -- names, and the same threading.  That is a job with a route rather
-  -- than an obstruction, and it is where this leaf is discharged.
+  -- proven, so the leaf is `burstCaps?` of the descent's burst.  The
+  -- face reports exactly that boolean for exactly this `subscribeE`,
+  -- and it is importable here -- neither module reaches the other, so
+  -- the ban is on a CYCLE and not on a direction.  What it reports at
+  -- is a STEPPED cap, and that is the whole of what stands between
+  -- them.
   --
   -- AND IT IS FALSE AS STATED, on the WIDTH half and at every level.
   -- The level moves the size axis and leaves the width field exactly
@@ -4289,16 +4280,37 @@ postulate
   -- covers it is the inner width, and the proven bound delivering all
   -- three at once is `wid-iterFold` -- whose right side is the width
   -- axis ITERATED, at the syntax size and over a slot-width key this
-  -- face does not carry.  So what is owed is the width axis stepping
-  -- with the level, and the walk's exit conjunct moving to the stepped
-  -- cap with it; that direction is a widening, which is the one thing
-  -- the node reading does admit.
+  -- face does not carry.
+  --
+  -- AND THE ITERATE IS NOT REACHABLE BY STEPPING THIS CAP, which is
+  -- what three attempts have now established between them and is the
+  -- thing to read before a fourth.  The frame's own room record reads
+  -- an arrival's `pWᵉ` against the ENTRY width and nothing else, so
+  -- the frozen width is not this walk's convenience -- it is what the
+  -- room demands, and a cap that steps it leaves the room unstatable
+  -- where it stood.  The step then has to move INTO the room, and the
+  -- room is threaded once per arrival across a fold, which is the
+  -- per-arrival recurrence the exit family already died to.  So the
+  -- iterated width has to arrive from somewhere that already holds
+  -- it, and the instant's own cap does: the width field there is the
+  -- iterate by construction, which is why the bundle at that cap is a
+  -- proven fact rather than a hypothesis anyone acquires.
   -- REFUTED: `Refuted.PushVals-Adm-Map`
   -- REFUTED: `Refuted.Subscribe-Burst-Width` sets the width field to
   --   zero, pins the three keys true there, and crosses at the first
   --   emitted inner -- and its last row pins that the walk stated over
   --   the node table SURVIVES that witness, so the crossing is this
   --   statement's alone and not the exit pair's.
+  -- DEAD ROUTE: stepping the arrival cap's WIDTH is dead in all three
+  --   parameterisations tried -- a level carried on the statement, a
+  --   constant one step above entry, and the frozen field simply
+  --   deleted so both axes advance together.  The last of those is the
+  --   cheapest to re-run and the most informative: the `*All` arm's
+  --   exit walk then reports at the stepped cap and its own conclusion
+  --   is owed at the entry cap, and no widening runs that way.  What
+  --   blocks every version is one conjunct -- the room record's
+  --   arrival width, read against the entry field -- so a repair that
+  --   does not move that conjunct has not moved anything.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-queue` below.
   subscribeE-burst-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

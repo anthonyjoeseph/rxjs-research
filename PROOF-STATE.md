@@ -190,31 +190,32 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the face's subscription-side premises threaded to the exit
-  family's doors** — `FaceOK` carries the slot-side keys already. What
-  the face reads on top of them is the SUBSCRIPTION: the term's size
-  and parked width, the path's size and length, the nesting budget,
-  the operator count, the descent depth. None reaches a door today.
-  Stating them is the justified kind of restatement — the
-  unconditional form is machine-refuted — and `capsWalkOK` is where
-  they belong, being the per-node bundle the walk already threads.
-- **the structural arms consume the face** — with the premises at the
-  door, each leaf arm of the walk stops proving the invariant and
-  spends `subscribeE-caps` instead, weakening its `capsOK?` conclusion
-  with `capsOK?⇒nest` and absorbing the level the Σ returns. The
-  worked instance is one module over: the bridge's own charge already
-  consumes that face at this exact premise list, substituting through
-  the zero step, so the shape is typed rather than proposed. It is
-  where the FALSE statement leaves the tree.
-- **the `*All` and inner arms follow, and the probe is re-run** — the
-  wrap and the inner subscribe are the last two arms and they consume
-  the face's siblings rather than the face. `Probed.PushVals-Caps` was
-  taken against the frozen-width cap, so its green is evidence about
-  text that will then be gone; re-running is not optional and
-  restamping the fingerprint alone is forbidden. Either the rows come
-  back green at the restated shape, or the probe is deleted and the
-  rows that survive are re-declared against what they actually
-  reached.
+- **the arrivals' width sourced from the INSTANT's cap, not from a
+  step of the frame's** — three parameterisations have now tried to
+  step the frame cap's width field and all three die at one conjunct:
+  the room record reads an arrival's width against the ENTRY field, so
+  a stepped cap leaves the room unstatable where it stood and pushes
+  the step into a fold that is threaded once per arrival. The iterate
+  has to arrive from a cap that already holds it, and `capsAt` does by
+  construction. This leg establishes the relation between the walk's
+  cap and that one — which is a fact about the family, not a premise
+  anyone acquires.
+
+- **the width key stated over that relation and the leaf discharged**
+  — with the iterate in hand, the arrivals' key is the face's second
+  conjunct read at a cap the room already admits, and the refuted
+  zero-width witness is unstatable rather than false. The restatement
+  is the justified kind: the unconditional form is machine-refuted.
+  The face's own premise list is the same one the bridge's charge
+  spends one module over, so the threading is typed rather than
+  proposed.
+
+- **the probe re-run against what the leaf then says** —
+  `Probed.PushVals-Caps` was taken at the frozen-width cap and its
+  rows are evidence about text that will be gone. Re-running is not
+  optional and restamping the fingerprint alone is forbidden. Either
+  the rows come back green at the restated shape, or the probe is
+  deleted and only what it actually reached is re-declared.
 
 ### The ledger
 
@@ -222,11 +223,11 @@ does not fit is a finding about the shared statement, not about the head.
   cascade descent against the instant's own grant. Nothing instantiates it —
   both sealed families sit on the right — and the store-mediated route it
   replaced is circular; the header carries the cycle.
-- **`subscribeE-burst-caps`** (Nest-Walk) — FALSITY, `REFUTED×2, PROBED`: the
-  arrivals' width key over any subscription's burst. Refuted at a width of
-  zero, which no key here forbids. The route is `subscribeE-caps`, which
-  reports this conclusion and is importable — the module order was read as
-  forbidding it and does not.
+- **`subscribeE-burst-caps`** (Nest-Walk) — FALSITY,
+  `REFUTED×2, DEAD ROUTE, PROBED`: the arrivals' width key over any
+  subscription's burst. Refuted at a width of zero, which no key here forbids.
+  The route is `subscribeE-caps`, which reports this conclusion and is
+  importable — the module order was read as forbidding it and does not.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting
