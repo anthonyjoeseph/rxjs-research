@@ -3,7 +3,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: chainStep-caps @c85c2f
+-- TARGET: chainStep-caps @0f7196
 --
 -- WHAT IS BEING TESTED.  The target hands one chain's step a state
 -- inside `frameStep Lv` of the instant's cap and asks for an INCREMENT
@@ -13,10 +13,9 @@
 --
 -- AND THE ANSWER IS ONE LEVEL, WHICH IS THE FINDING.  At a cap the
 -- pre-state fits, the post-state of ONE chain's step does not -- and it
--- fits that cap's FIRST step outright.  The increment is therefore one
--- against a ceiling that is at least the cap's own size, so the count
--- conjunct is met with four orders of magnitude to spare rather than a
--- margin.  The three cascade rows beneath say where the growth is: over
+-- fits that cap's FIRST step outright.  The increment is therefore one,
+-- which is the EXISTENCE half of the target and the half a row can
+-- settle.  The three cascade rows beneath say where the growth is: over
 -- three families the width and registry components come back at or
 -- below where they started -- a delivery CONSUMES a queued value and
 -- RETIRES the registration it walked -- and only the size moves.
@@ -27,8 +26,12 @@
 -- nothing about what the walk asserts at the states in between -- the
 -- parked drain's two size bounds, the sink arm's registry-versus-unit
 -- conjunct -- and those are the walk leaf's content.  Nor is the
--- ceiling itself reached: `sizeCount` is sealed, so what the rows meet
--- is the `⊔` branch the cap's own size supplies.
+-- CEILING reached, and it is now unreachable in principle rather than
+-- by a seal: the target asks the increment to fit the walk's own
+-- ceiling, an `iterL` over the path's length followed by one charge
+-- per delivery, and one storey of that ladder at a cap this small is
+-- already past anything that normalises.  So the rows say an increment
+-- of one EXISTS and say nothing about what bounds it.
 module Probed.Chain-Caps-Flat where
 
 open import Data.Bool using (Bool; true; false; if_then_else_)

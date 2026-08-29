@@ -57,7 +57,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
-  fLvlD; lvls; sLvlD; chainStep; budgetAt; arrTick)
+  fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -2288,7 +2288,7 @@ postulate
 -- sink-free path the walk leaf IMPLIES the step leaf, the crossing
 -- below is a crossing of both, and the two rows are one obligation
 -- read at two granularities rather than two things to grind.
---
+
 -- AND THE LEVEL IS NOW IN BOTH STATEMENTS, WHICH IS WHAT THE FINDING
 -- BELOW BOUGHT.  Neither leaf asserts preservation any more: the
 -- walk is asserted at `frameStep Lv`, the step is handed a state inside
@@ -2297,11 +2297,23 @@ postulate
 -- chain.  That is the discipline the frame receipt beside them has
 -- always had, and the flat form is gone from the tree.
 --
--- WHAT IS OWED NOW IS THE CEILING, and it is the whole of the risk
--- these two carry.  Every increment they hand back is bounded by the
--- instant's own count, so a proof has to show that one chain's growth
--- fits under that count -- an arithmetic obligation against the caps
--- recurrence, not a claim that the state returns to where it started.
+-- AND THE FLAT CEILING WAS AT THE WRONG GRANULARITY, WHICH IS WHY THE
+-- STEP LEAF NOW REPORTS THE WALK'S OWN.  Asking one chain, from a level
+-- whose only hypothesis is that it sits under the cascade's count, to
+-- land under that same count is a conclusion needing what no hypothesis
+-- carries: how much of the count is UNSPENT.  The level ladder climbs
+-- one delivery-charge per delivery and never returns, so a chain
+-- entered at the count itself must leave above it.  The bound is true
+-- of a cascade and false of a chain read alone -- a cascade-level fact
+-- stated per chain.
+--
+-- SO THE STEP LEAF IS STATED AT THE CEILING THE WALK ACTUALLY DELIVERS:
+-- `iterL` over the path's own length, then one charge per delivery, at
+-- THIS chain's base rather than at zero.  That is the proven cascade
+-- bound's own recurrence, and the two are related by `lvls-add`.  What
+-- the fold still owes is the conversion back, which is now one named
+-- arithmetic leaf beside them rather than a defect spread through every
+-- statement the walk threads.
 --
 -- REFUTED: `Refuted.Chain-Step-Flat` -- one step of one chain, at a
 --   concrete cap the pre-state satisfies and the post-state does not.
@@ -2340,13 +2352,14 @@ postulate
 --   family that refuted its flat form.  At a concrete cap the
 --   pre-state fits, the post-state of ONE chain's step does not and
 --   the FIRST step of that cap does -- so an increment of one carries
---   it, against a ceiling that is at least the cap's own size.  Three
+--   it -- the EXISTENCE half, and the half a row can settle.  Three
 --   further rows read the smallest fitting cap either side of a whole
 --   cascade over three families, one component at a time: only the
 --   size ever moves, the width and registry coming back at or below
---   where they started.  Not covered: the ceiling's `sizeCount`
---   branch, which is sealed, so what the rows meet is the `⊔` branch
---   the cap's size supplies; the cap `capsAt` itself names, which
+--   where they started.  Not covered: the CEILING, which is now out of
+--   reach in principle rather than by a seal -- one storey of the
+--   walk's ladder at a cap this small is past what normalises; the cap
+--   `capsAt` itself names, which
 --   spends `capsH` and does not reduce; the `valCaps?` conjunct past
 --   the first frame, since a mid-walk value list is not addressable
 --   from outside the fold; and the sink arm's registry-versus-unit
@@ -2363,14 +2376,23 @@ postulate
     (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    Lv ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id) →
     capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
     Σ ℕ λ L′ →
-      (Lv + L′ ≤ sizeCount (capsAt e sl id) (capsH e sl id)
-                   ⊔ Caps.cSize (capsAt e sl id))
+      (Lv + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
+                   (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
+                          (capsH e sl id) (pathLen path) Lv)
+                   (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))))
       × (capsOK? (frameStep (Lv + L′) (capsAt e sl id))
            (proj₁ (proj₂ (chainStep nextId a path sched st)))
            (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true)
+
+  chain-level-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lv L D : ℕ) {u} (path : Path Γ u t) →
+    Lv ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id) →
+    L ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
+          (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
+                 (capsH e sl id) (pathLen path) Lv) D →
+    L ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id)
 
 arr-chains-caps-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -2387,14 +2409,17 @@ arr-chains-caps-go sl id Lv a nextId ((rid , path) ∷ chains) sched st sleq hlv
 ... | false =
       arr-chain-caps sl id Lv a nextId path sched st′ sleq cok
     , proj₁ ST
-    , proj₁ (proj₂ ST)
+    , FLAT
     , arr-chains-caps-go sl id (Lv + proj₁ ST) a nextId chains
         (proj₁ (proj₂ (chainStep nextId a path sched st′)))
         (proj₂ (proj₂ (chainStep nextId a path sched st′)))
         (trans (chainStep-slots nextId a path sched st′) sleq)
-        (proj₁ (proj₂ ST)) (proj₂ (proj₂ ST))
+        FLAT (proj₂ (proj₂ ST))
   where st′ = record st { delivered = rid ∷ EvalSt.delivered st }
-        ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq hlv cok
+        ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq cok
+        FLAT = chain-level-flat sl id Lv (Lv + proj₁ ST)
+                 (delivN st′ (proj₂ (proj₂ (chainStep nextId a path sched st′))))
+                 path hlv (proj₁ (proj₂ ST))
 
 arr-chains-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

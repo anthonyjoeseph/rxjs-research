@@ -216,15 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **pin the increment BOTH leaves report, which is the only thing left
-  between them and a body** — each asks for a level under the instant's
-  own count, and rows now meet both at ONE: the step's post-state fits
-  its cap's first step, and a re-walked path's whole `capsOK?` spine
-  holds one level up where flat it fails part way. So what is missing is
-  arithmetic and not a claim about the evaluator — the growth is a
-  `frameBlowup` of the cap entered at, the ceiling names the same
-  recurrence read at the instant, and both sides live in one family.
-  That is what turns two probed rows into proofs.
+- **discharge the step leaf against the walk that already proves it** —
+  one chain's step IS the path fold at the caps instantiation, and that
+  fold is a theorem: it reports the level it lands at, that it only
+  climbed, and the state fact at that level. What separated them was the
+  ceiling, and the leaf now asks for the fold's own. So this leg carries
+  the fold's premises to the leaf's call site — the two size bounds, the
+  slot facts, the depth — and replaces the postulate with the call. The
+  count-side conversion stays where it was put, in one named leaf.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -251,14 +250,19 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
+- **`chain-level-flat`** (Caps-Face/Part7) — SHAPE,
+  `REFUTED, DEAD ROUTE, TWIN, PROBED×2`: the conversion from one chain's own
+  ceiling back to the cascade's count. It needs how much of that count is
+  UNSPENT, which no hypothesis carries; the fold has to hand it the delivery
 - **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, TWIN, PROBED×2`: ONE chain's walk, asserted at a level
   its frame receipt can pay. Its `capsOK?` spine is now read at every state a
   re-walked path passes through; the `Set`-valued conjuncts are not.
+  budget the proven cascade bound already computes.
 - **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, TWIN, PROBED×2`: one chain's step reports the increment
-  that carries its post-state. An increment of ONE meets it at the family that
-  refuted the flat form; what is unproven is that it stays under the count.
+  carrying its post-state, now against the walk's own ceiling. The proven path
+  walk delivers exactly this; what is left is carrying it its premises.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of
