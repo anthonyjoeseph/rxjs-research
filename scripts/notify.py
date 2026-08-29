@@ -17,6 +17,7 @@ convenience and may never fail a gate.
 """
 import json
 import os
+import re
 import pathlib
 import subprocess
 import sys
@@ -91,6 +92,55 @@ def census(live):
     return out
 
 
+def postulate_counts(rows, live):
+    """-> {risk class: how many LIVE POSTULATES the tier's rows name}
+
+    Rows and postulates are not the same census and the difference is not
+    cosmetic: one row routinely heads a family, so a row count reads the tier
+    as smaller than the ledger it stands for.  The class is the row's, since
+    that is where a class is declared, and a name is counted once however many
+    rows reach it.
+    """
+    out = {}
+    for label, cls, _ln, _cost in rows:
+        if not cls:
+            continue
+        seen = out.setdefault(cls, set())
+        for group in cr.head_groups(label):
+            for name in group:
+                if "*" in name:
+                    seen.update(n for n in live if re.fullmatch(
+                        re.escape(name).replace(r"\*", ".*"), n))
+                elif name in live:
+                    seen.add(name)
+    return {k: len(v) for k, v in out.items()}
+
+
+def roadmap(tier):
+    """-> the tier's BIG PICTURE ROADMAP, verbatim.
+
+    Read from the file rather than from the parser's leg labels, because the
+    labels are the leg TITLES and the schedule is the prose under them -- the
+    titles alone say which three groups are next and none of why.
+    """
+    lines = (ROOT / "PROOF-STATE.md").read_text().splitlines()
+    out, state = [], 0
+    for ln in lines:
+        if state == 0:
+            if ln.startswith("## Tier ") and ln[8:].startswith(tier):
+                state = 1
+        elif state == 1:
+            if ln.startswith("### Big picture"):
+                state = 2
+        else:
+            if ln.startswith("### ") or ln.startswith("## "):
+                break
+            out.append(ln)
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
+
 def fmt_counts(counts):
     parts = [f"{counts[c]} {c.lower()}" for c in CLASSES if counts.get(c)]
     return ", ".join(parts) if parts else "clear"
@@ -132,14 +182,14 @@ def main():
     lines = []
     if lowest:
         name, counts, evid = lowest
-        lines.append(f"Tier {name} is the lowest open — {fmt_counts(counts)}")
-        lines.append(f"standing on {fmt_evid(evid)}")
         head_rows = [r for r in cr.parse(ROOT / "PROOF-STATE.md")
                      if r[0] == name][0][1]
-        nxt = next((lab for lab, cls, _l, _c in head_rows if cls), None)
-        if nxt:
-            worst = next(cls for lab, cls, _l, _c in head_rows if cls)
-            lines.append(f"next up: {nxt} ({worst})")
+        pc = postulate_counts(head_rows, set(live_names))
+        lines.append(f"Tier {name} is the lowest open — {fmt_counts(pc)}")
+        lines.append(f"across {fmt_counts(counts)} on the roadmap")
+        lines.append(f"standing on {fmt_evid(evid)}")
+        lines.append("")
+        lines.extend(roadmap(name))
     else:
         lines.append("no tier has a classed row left")
 

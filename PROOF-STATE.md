@@ -219,11 +219,13 @@ does not fit is a finding about the shared statement, not about the head.
 - **the two burst leaves at the arrivals' cap** — `subscribeE-burst-caps`,
   `subscribeE-burst-nest`. Both are refuted at a width of zero because the
   face carries size keys only. Their conclusions name the arrivals' cap
-  directly, so this is the restatement onto a cap whose width axis steps,
-  plus re-running `Probed.PushVals-Caps` against the statement as it then
-  reads. Re-running is not optional and restamping alone is forbidden: a
-  green taken against the frozen-width cap is evidence about text that is
-  gone.
+  directly, and that cap freezes its width field at the entry one while the
+  frame step beside it folds the width along with the size — so the
+  restatement is onto the stepped field, and the fold escapes zero at the
+  first level. Then re-run `Probed.PushVals-Caps` against the statement as
+  it then reads: re-running is not optional and restamping alone is
+  forbidden, a green taken against the frozen-width cap being evidence
+  about text that is gone.
 - **the cascade descent against the instant's own grant** —
   `cascade-nest-compositional`. Nothing has ever instantiated it: both
   sealed families sit on the right, so the conclusion side does not

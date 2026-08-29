@@ -26,9 +26,14 @@ app and add the topic there.
 ```
 Title:  gate GREEN (heavy) - about to commit
 
-Tier 1 is the lowest open — 14 difficulty, 2 grindable
-standing on 10 refutations, 1 dead route, 3 twins, 7 probes, 1 recovery
-next up: `subscribeE-nest` (DIFFICULTY)
+Tier 1 is the lowest open — 2 falsity, 21 difficulty
+across 2 falsity, 16 difficulty on the roadmap
+standing on 11 refutations, 4 dead routes, 3 twins, 21 probes, 3 recoveries
+
+- **the first leg** — … the tier's big picture roadmap, verbatim,
+  all three legs and the prose under each.
+- **the second leg** — …
+- **the third leg** — …
 
   tier 1: 14 difficulty, 2 grindable
     evidence: 10 refutations, 1 dead route, 3 twins, 7 probes, 1 recovery
@@ -43,9 +48,20 @@ evidence standing under them: 11 refutations, 2 dead routes, 3 twins, 8 probes, 
 HEAD <sha> <subject>
 ```
 
-The lowest open tier and its next row are the two figures that decide what gets
-worked next, so they lead; the per-tier breakdown says how far the tier has to
-go.
+The lowest open tier leads, and it leads with the whole of what a session
+would open the roadmap to read: the tier's POSTULATE census by risk class, and
+then its big picture roadmap in full.
+
+**The postulate count and the row count are different censuses, and both are
+printed.** One row routinely heads a family, so counting rows reads the tier as
+smaller than the ledger it stands for; counting postulates says how much is
+actually open. The class is the ROW's, since a class is declared on a row, and
+a name is counted once however many rows reach it.
+
+**The roadmap goes out verbatim rather than as three titles.** The titles say
+which groups are next and none of why, and the why is the part that decides
+whether the plan still fits what the last run found. The per-tier breakdown
+below it says how far each tier has to go.
 
 **The evidence line is the other half of a risk class, and it is why the two
 are printed together.** A tier of fourteen DIFFICULTY rows standing on ten
