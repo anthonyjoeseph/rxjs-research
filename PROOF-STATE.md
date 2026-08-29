@@ -190,16 +190,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the caps arms made level-reporting** — the room premise the parked
-  pair refutes exists only because these arms park a merge arrival at a
-  FIXED cap. `widNode-push` discharges exactly that park with NO room
-  premise, reporting one level up, and the three faces that already
-  report a level spend it at a site apiece; this cone does not, so it
-  assumes what they prove. Stepping the cap instead is dead twice over:
-  one step does not nest, and no constant names a per-arrival
-  recurrence. This leg turns the arms' conclusions into the Σ-level
-  shape and lets the premise go.
-
 - **the levelled arms spent from the proven face** — with the shape
   matched, the same walk proven one face over supplies these arms
   outright: strong reading, stepping cap, level reported. The duplicate
@@ -214,6 +204,15 @@ does not fit is a finding about the shared statement, not about the head.
   evidence about text that is gone. Its harness is the expensive half
   and transfers; the verdict does not. Re-running is not optional and
   restamping the fingerprint alone is forbidden.
+
+- **the cascade descent given something that instantiates it** — the
+  tier's other FALSITY, and the one row nothing has ever reached: both
+  families it is stated over are sealed, so neither side computes and
+  no probe can be built against it as written. The route it replaced
+  was circular through the store, which is why the header carries the
+  cycle rather than a plan. This leg asks the smaller question first —
+  which SIDE is blocked — and unseals or restates whichever one a
+  harness could then reach, before any clause is ground.
 
 ### The ledger
 
@@ -251,10 +250,10 @@ does not fit is a finding about the shared statement, not about the head.
   the fold multiplies the depth per value while the key gains only the value's
   written size, so the grant is read over `suc W` copies of the key; measured,
   that puts the width in the exponent and the margin's sign comes right.
-- **`pushVals-caps-burstW`, `pushVals-caps-queue`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED×2, PROBED×2`: the other two stream leaves — the walk over them is a
-  proven body, so what remains per instant is the frame widths and the queue
-  reading the invariant cannot supply.
+- **`pushVals-caps-burstW`** (Nest-Walk) — DIFFICULTY, `PROBED`: the last
+  stream leaf — the walk over it is a proven body, so what remains per instant
+  is the frame widths, which are sealed and taken as a quantified premise
+  wherever a row reads them.
 - **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
   DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and

@@ -101,10 +101,6 @@ open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width
   using (StmtW; progW; defer-park-width-absurd)
-open import Refuted.Thru-Room-Frame
-  using (Stmt; prems≡; room-absurd; figs≡)
-open import Refuted.PushVals-Queue-Width
-  using (Stmt; prems≡; queue-absurd; figs≡; widRead≡)
 open import Refuted.Subscribe-Burst-Width
   using (Stmt; prems≡; burst-width-absurd; figs≡; walkRead≡;
          StmtWalk; premsP≡; walk-absurd)

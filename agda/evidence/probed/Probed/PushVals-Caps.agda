@@ -37,7 +37,6 @@
 -- TARGET: subscribeE-burst-nest @7c48f9
 -- TARGET: subscribeE-burst-caps @b43021
 -- TARGET: pushVals-caps-burstW @f0db0b
--- TARGET: pushVals-caps-queue @861d80
 module Probed.PushVals-Caps where
 
 open import Data.Bool using (Bool; true; false)
@@ -66,7 +65,7 @@ open import Rx.Evaluator
 open import Verify-Budget-Sufficient.Caps using (arrCapAt; Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
-          pushValsWOK; pushValsQOK)
+          pushValsWOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
@@ -144,7 +143,7 @@ burstLens≡ = refl
 -- single cap satisfying both.
 capsM : (lim k W : ℕ) → Set
 capsM lim k W =
-  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (rM lim k))) (tight {obs (obs natᵗ)} (rM lim k))) slots W gasBig mergeAllᵒ
+  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (rM lim k))) (tight {obs (obs natᵗ)} (rM lim k))) 0 slots W gasBig mergeAllᵒ
     (proj₁ (mintNode (sched-init (rM lim k) slots))) root 0 0
     (proj₁ (resM lim k)) (proj₁ (proj₂ (resM lim k))) (proj₂ (proj₂ (resM lim k)))
 
@@ -165,33 +164,33 @@ Widths W = ∀ {s t} {e : Closed Γ₂ t} (fuel : Gas) (op : AllOp) (nid : NodeI
 
 capsM-1 : ∀ {W} → Widths W → capsM 1 1 W
 capsM-1 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
-          , (le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+        , 0 , tt
 
 capsS : (k W : ℕ) → Set
 capsS k W =
-  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (qS k))) (tight {obs (obs natᵗ)} (qS k))) slots W gasBig switchᵒ
+  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (qS k))) (tight {obs (obs natᵗ)} (qS k))) 0 slots W gasBig switchᵒ
     (proj₁ (mintNode (sched-init (qS k) slots))) root 0 0
     (proj₁ (resS k)) (proj₁ (proj₂ (resS k))) (proj₂ (proj₂ (resS k)))
 
 capsS-1 : ∀ {W} → Widths W → capsS 1 W
 capsS-1 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
-          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
+        , 0 , tt
 
 capsX : (k W : ℕ) → Set
 capsX k W =
-  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (qX k))) (tight {obs (obs natᵗ)} (qX k))) slots W gasBig exhaustᵒ
+  pushValsCapsOK (arrCapAt (Caps.cSize (tight {obs (obs natᵗ)} (qX k))) (tight {obs (obs natᵗ)} (qX k))) 0 slots W gasBig exhaustᵒ
     (proj₁ (mintNode (sched-init (qX k) slots))) root 0 0
     (proj₁ (resX k)) (proj₁ (proj₂ (resX k))) (proj₂ (proj₂ (resX k)))
 
 capsX-1 : ∀ {W} → Widths W → capsX 1 W
 capsX-1 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
-          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+        , 0 , tt
 
 -- THE HEAD'S OWN PREMISES, pinned rather than assumed, so the rows
 -- above are not evidence about a region the head grants nothing at.
@@ -224,30 +223,31 @@ headsClos≡ : headsClos ≡ (true , true , true)
 headsClos≡ = refl
 
 -- and a second nesting level, and a limit the arrivals do not fit
--- under, since the queue-room conjunct is the one a limit moves
+-- under, so the merge head is read at a limit that REFUSES as well as
+-- at one that admits
 capsM-2 : ∀ {W} → Widths W → capsM 1 2 W
 capsM-2 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
-          , (le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+        , 0 , tt
 
 capsM-0 : ∀ {W} → Widths W → capsM 0 1 W
 capsM-0 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
-          , (le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+        , 0 , tt
 
 capsS-2 : ∀ {W} → Widths W → capsS 2 W
 capsS-2 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
-          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
+        , 0 , tt
 
 capsX-2 : ∀ {W} → Widths W → capsX 2 W
 capsX-2 hw = refl , refl , refl , refl
-        , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
-          , (le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-        , tt
+        , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+          , (le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+        , 0 , tt
 
 -- WHICH CONJUNCTS COULD HAVE FAILED, and the answer is not all of
 -- them.  Read at a cap granting nothing, the invariant at the very
@@ -325,15 +325,15 @@ tightSh = caps (syncSizeᵛ (obs natᵗ) rSh) (pWᵛ 2 insSh (obs natᵗ) rSh) 0
 
 capsSh : (W : ℕ) → Set
 capsSh W =
-  pushValsCapsOK tightSh insSh W gasBig mergeAllᵒ
+  pushValsCapsOK tightSh 0 insSh W gasBig mergeAllᵒ
     (proj₁ (mintNode (sched-init rSh insSh))) root 0 0
     (proj₁ resSh) (proj₁ (proj₂ resSh)) (proj₂ (proj₂ resSh))
 
 capsSh-2 : ∀ {W} → Widths W → capsSh W
 capsSh-2 hw = refl , refl , refl , refl , tt
-        , (refl , refl , refl , refl
-          , ((le tt , (λ { lim act q od refl → le tt }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-          , tt)
+        , 0 , (refl , refl , refl , refl
+          , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+          , 0 , tt)
 
 -- the same two-instant walk at the other two heads: the switch
 -- subscribes and records the current inner, the exhaust subscribes
@@ -375,27 +375,27 @@ lenShX≡ = refl
 
 capsShS : (W : ℕ) → Set
 capsShS W =
-  pushValsCapsOK tightShS insSh W gasBig switchᵒ
+  pushValsCapsOK tightShS 0 insSh W gasBig switchᵒ
     (proj₁ (mintNode (sched-init qSh insSh))) root 0 0
     (proj₁ resShS) (proj₁ (proj₂ resShS)) (proj₂ (proj₂ resShS))
 
 capsShS-2 : ∀ {W} → Widths W → capsShS W
 capsShS-2 hw = refl , refl , refl , refl , tt
-        , (refl , refl , refl , refl
-          , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
-          , tt)
+        , 0 , (refl , refl , refl , refl
+          , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt)
+          , 0 , tt)
 
 capsShX : (W : ℕ) → Set
 capsShX W =
-  pushValsCapsOK tightShX insSh W gasBig exhaustᵒ
+  pushValsCapsOK tightShX 0 insSh W gasBig exhaustᵒ
     (proj₁ (mintNode (sched-init xSh insSh))) root 0 0
     (proj₁ resShX) (proj₁ (proj₂ resShX)) (proj₂ (proj₂ resShX))
 
 capsShX-2 : ∀ {W} → Widths W → capsShX W
 capsShX-2 hw = refl , refl , refl , refl , tt
-        , (refl , refl , refl , refl
-          , ((le tt , (λ { lim act q od () }) , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
-          , tt)
+        , 0 , (refl , refl , refl , refl
+          , ((le tt , hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt)
+          , 0 , tt)
 
 slotsA : ℕ → Slots Γ₂
 slotsA j = insT 0 0 j
@@ -442,22 +442,21 @@ burstOne = length (proj₁ (resG 1))
 burstOne≡ : burstOne ≡ (1 , 1 , 1 , 1)
 burstOne≡ = refl
 
--- AND THE SAME PROGRAMS AT THE THREE LEAVES THE ROOM WALK NOW STANDS
+-- AND THE SAME PROGRAMS AT THE TWO LEAVES THE ROOM WALK NOW STANDS
 -- ON.  The bundle rows above build the room record whole; these build
 -- its inputs apart, in the shapes the burst leaves state -- the
--- arrivals' width key, the frame widths, and the queue reading -- so
--- the rows are evidence about those statements and not only about the
--- record they compose into.  The width key is the one of the three
--- that is NEW here rather than a re-cut of a conjunct the bundle rows
--- already carried: it is a `refl` on a boolean, so unlike its two
--- siblings it could have failed on its own.
+-- arrivals' width key and the frame widths -- so the rows are evidence
+-- about those statements and not only about the record they compose
+-- into.  The width key is the one of the two that is NEW here rather
+-- than a re-cut of a conjunct the bundle rows already carried: it is a
+-- `refl` on a boolean, so unlike its sibling it could have failed on
+-- its own.
 Leaves : ∀ {t u} {e : Closed Γ₂ t} (c : Caps) (sl : Slots Γ₂) (W : ℕ)
   (op : AllOp) (nid : NodeId) (κ : Path Γ₂ u t)
   (r : Stream Γ₂ (obs u) × Sched Γ₂ × EvalSt e) → Set
 Leaves c sl W op nid κ r =
   pushValsWidOK c sl (proj₁ r)
   × pushValsWOK W gasBig op nid κ 0 0 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-  × pushValsQOK c gasBig op nid κ 0 0 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 leavesM-1 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (rM 1 1)) slots W mergeAllᵒ
@@ -466,8 +465,6 @@ leavesM-1 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (((λ { lim′ act q od refl → le tt })
-     , (λ { lim′ act q od refl → le tt }) , tt) , tt)
 
 leavesM-2 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (rM 1 2)) slots W mergeAllᵒ
@@ -476,8 +473,6 @@ leavesM-2 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (((λ { lim′ act q od refl → le tt })
-     , (λ { lim′ act q od refl → le tt }) , tt) , tt)
 
 leavesM-0 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (rM 0 1)) slots W mergeAllᵒ
@@ -486,8 +481,6 @@ leavesM-0 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (((λ { lim′ act q od refl → le tt })
-     , (λ { lim′ act q od refl → le tt }) , tt) , tt)
 
 leavesS-1 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (qS 1)) slots W switchᵒ
@@ -496,7 +489,6 @@ leavesS-1 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt)
-  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
 
 leavesS-2 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (qS 2)) slots W switchᵒ
@@ -505,7 +497,6 @@ leavesS-2 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt)
-  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
 
 leavesX-1 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (qX 1)) slots W exhaustᵒ
@@ -514,7 +505,6 @@ leavesX-1 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
 
 leavesX-2 : ∀ {W} → Widths W →
   Leaves (tight {obs (obs natᵗ)} (qX 2)) slots W exhaustᵒ
@@ -523,7 +513,6 @@ leavesX-2 hw =
   (refl , tt)
   , (((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
      , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (((λ { lim′ act q od () }) , (λ { lim′ act q od () }) , tt) , tt)
 
 -- and the two-instant walk, where the leaves are read at the state the
 -- head instant's step leaves exactly as the bundle rows read theirs
@@ -533,7 +522,6 @@ leavesSh : ∀ {W} → Widths W →
 leavesSh hw =
   (refl , refl , tt)
   , (tt , ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (tt , ((λ { lim′ act q od refl → le tt }) , tt) , tt)
 
 leavesShS : ∀ {W} → Widths W →
   Leaves tightShS insSh W switchᵒ
@@ -542,7 +530,6 @@ leavesShS hw =
   (refl , refl , tt)
   , (tt , ((hw _ _ _ _ _ _ _ _ _
            , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt)
-  , (tt , ((λ { lim′ act q od () }) , tt) , tt)
 
 leavesShX : ∀ {W} → Widths W →
   Leaves tightShX insSh W exhaustᵒ
@@ -550,7 +537,6 @@ leavesShX : ∀ {W} → Widths W →
 leavesShX hw =
   (refl , refl , tt)
   , (tt , ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt)
-  , (tt , ((λ { lim′ act q od () }) , tt) , tt)
 
 -- THE SUBSTITUTION'S TWO AXES READ APART, at the very program that
 -- refutes the pair.  `Refuted.PushVals-Adm-Map` sets the width and
