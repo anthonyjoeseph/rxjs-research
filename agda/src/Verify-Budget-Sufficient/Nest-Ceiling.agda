@@ -6,16 +6,15 @@
 -- already the tower's most expensive.
 module Verify-Budget-Sufficient.Nest-Ceiling where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; s≤s)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; s≤s)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; m≤m⊔n;
-  +-mono-≤; +-monoʳ-≤; *-mono-≤)
+  (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; +-mono-≤; +-monoʳ-≤; *-mono-≤)
 open import Relation.Binary.PropositionalEquality using (sym; subst)
 
-open import Rx.Evaluator using (opIterD; sLvlD-suc)
+open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dCapᶜ)
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; frameStep; frameStep-0; opIterD-mono; sizeCount; sizeCount-body)
-open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
+  (Caps; frameStep; opIterD-mono; sizeCount)
+open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated-at)
 open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
 
 -- THE CEILING, CARRIED RELATIVELY -- what the walk owes and cannot
@@ -104,76 +103,35 @@ ceil-mu c d Lv k m m₀ 2≤S hm₀ H =
   where
   B = Caps.cSize (frameStep Lv c)
 
--- AND AT LEVEL ZERO THE CEILING IS A THEOREM, WHICH IS WHAT THE WHOLE
--- RELATIVE FORM WAS FOR.  The descent ledger read from the bottom is
--- dominated by the caps count -- that is the proven inequality this
--- development already spends at the entry -- and the ceiling is that
--- inequality with the implication wrapped round it.  So a consumer
--- carrying the ceiling as an assumption is carrying something it could
--- have derived from two size bounds and the two entry facts every face
--- of this walk already has in its ambient bundle.
-ceil-entry : ∀ (c : Caps) (d k m : ℕ) → 2 ≤ Caps.cSize c →
-  3 + k ≤ Caps.cSize c → m ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  CeilD c d 0 k m
-ceil-entry c d k m 2≤S hk hm 1≤R L′ hL =
-  ≤-trans hL
-    (≤-trans (≤-trans (opIterD-dominated (Caps.cSize c) (Caps.cWid c) d k m
-                         (Caps.cReg c) 2≤S hk hm 1≤R)
-                      (≤-reflexive (sym (sizeCount-body c d))))
-             (m≤m⊔n (sizeCount c d) (Caps.cSize c)))
-
-
--- THE CEILING A LEVEL CARRIES, and it is a PACKAGE rather than a
--- ceiling.  A walk standing at a level has to be able to MINT a ceiling
--- for a term it has just taken off a queue, at that term's own measures
--- and not at the ones its parent happened to be descending -- which is
--- what the relative form one section up cannot do, since every one of
--- its steps consumes a measure the parent chose.  Quantifying the
--- measures over the level's own size cap is what makes minting
--- possible, and it costs nothing at the bottom: the two premises are
--- exactly the entry theorem's, so level zero IS the entry theorem.
-record CeilAt (c : Caps) (d Lv : ℕ) : Set where
-  constructor ceilAt
-  field
-    mint : ∀ (k m : ℕ) →
-      3 + k ≤ Caps.cSize (frameStep Lv c) →
-      m ≤ Caps.cSize (frameStep Lv c) →
-      CeilD c d Lv k m
-
-ceilAt-entry : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  CeilAt c d 0
-ceilAt-entry c d 2≤S 1≤R = ceilAt λ k m hk hm →
-  ceil-entry c d k m 2≤S
-    (subst (λ x → 3 + k ≤ Caps.cSize x) (frameStep-0 c) hk)
-    (subst (λ x → m ≤ Caps.cSize x) (frameStep-0 c) hm) 1≤R
-
--- AND AT A POSITIVE LEVEL IT IS NOT PROVEN, which is the whole of what
--- this leaf owes and the whole of what the refuted drain conjunct was
--- standing in for.  The package has to serve measures under the level's
--- OWN cap, which grows with the level, while the ladder's rounds are
--- consumed by climbing to it -- so it asks for more room after the
--- climb than before, and the level alone is the wrong thing to ask it
--- of.
+-- WHAT A LEVEL HAS LEFT, and it is the receipt the refuted drain
+-- conjunct was standing in for and failing to carry.  A term subscribed
+-- at a level is dominated by the cascade's own delivery walk read FROM
+-- that level -- the budget module's bound at an arbitrary level, which
+-- was always stated there and only ever spent at zero -- so what a
+-- ceiling costs is that walk fitting under the count.  A bare level
+-- bound cannot say it, which is why the flat form was refutable.
 --
--- WHAT THE HONEST FORM PROBABLY CARRIES IS THE REMAINING BUDGET.  The
--- ledger's own proven machinery prices a sweep from an arbitrary level
--- against a receipt saying how much of the ladder that level has already
--- spent, rather than against the level alone; `walk-paid` and
--- `climb-paid` in the budget module are stated exactly that way, and
--- the entry theorem below is their instance at a level that has spent
--- nothing.  A hypothesis bounding the level by the count cannot say
--- that the climb left room, which is where a refutation would come
--- from -- and the level ladder does reach the count.
-postulate
-  ceilAt-suc : ∀ (c : Caps) (d Lv : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-    suc Lv ≤ sizeCount c d ⊔ Caps.cSize c →
-    CeilAt c d (suc Lv)
+-- AND THE GAS IS THE TERM'S OWN, WHICH IS WHAT MAKES THIS SUPPLYABLE.
+-- At the whole cascade's gas the receipt is FALSE above the bottom and
+-- needs no witness: the delivery budget read at a higher level is the
+-- larger one and the ladder from there is longer, so both sides move
+-- the wrong way at once.  What the domination actually consumes is four
+-- plus the term's OPERATOR COUNT -- a syntactic quantity, fixed before
+-- any level exists and small where the cascade's own gas is the size
+-- cap.  So the receipt is asked for per subscribed term rather than per
+-- level, and a queue's head asks it of its own head.
+RoomG : Caps → ℕ → ℕ → ℕ → Set
+RoomG c d Lv g =
+  lvls (Caps.cSize c) (Caps.cWid c) d Lv
+    (dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g Lv)
+    ≤ sizeCount c d ⊔ Caps.cSize c
 
--- AND THE PACKAGE AT ANY LEVEL THE LADDER ADMITS, which is the form
--- every level-indexed face wants: each already carries the level bound,
--- so nothing has to be threaded to reach a mint.
-ceilAt-any : ∀ (c : Caps) (d Lv : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  Lv ≤ sizeCount c d ⊔ Caps.cSize c →
-  CeilAt c d Lv
-ceilAt-any c d zero    2≤S 1≤R hlv = ceilAt-entry c d 2≤S 1≤R
-ceilAt-any c d (suc Lv) 2≤S 1≤R hlv = ceilAt-suc c d Lv 2≤S 1≤R hlv
+ceil-room : ∀ (c : Caps) (d Lv k m : ℕ) → 2 ≤ Caps.cSize c →
+  3 + k ≤ Caps.cSize c → m ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  RoomG c d Lv (4 + k) →
+  CeilD c d Lv k m
+ceil-room c d Lv k m 2≤S hk hm 1≤R room L′ hL =
+  ≤-trans hL
+    (≤-trans (opIterD-dominated-at (Caps.cSize c) (Caps.cWid c) d k m
+                (Caps.cReg c) Lv 2≤S hk hm 1≤R)
+             room)

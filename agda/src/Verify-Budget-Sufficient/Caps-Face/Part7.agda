@@ -2426,13 +2426,21 @@ postulate
 -- whole of what it asked for and the whole of what the bundle could not
 -- give.
 --
--- WHAT THE CONJUNCT SAYS NOW IS THE PARKED TERM UNDER THE CAP AT THE
--- WALK'S OWN LEVEL, with no level term in it, which is the same shape
--- its two neighbours already had.  The ceiling the head's subscribe
--- needs is minted from the level's own package instead -- see
--- `ceilAt-suc`, which is where the level went and where the risk now
--- sits.  So this leaf is a claim about ONE frame and one queue, and
--- nothing has instantiated it.
+-- WHAT THE CONJUNCT SAYS NOW IS THE PARKED TERM UNDER THE BASE CAP,
+-- with no level term in it, which is the refuted statement minus the
+-- refuted part, TOGETHER WITH THE HEAD'S ROOM.  The room is the honest
+-- form of what the climb was pretending to have: the cascade's own
+-- delivery walk read FROM this level, at gas four plus the head's
+-- operator count, fitting under the count.  Its GAS is what makes it a
+-- statement worth making -- at the whole cascade's gas the receipt is
+-- false everywhere above the bottom, since the budget read higher is
+-- the larger one and the ladder from there is longer, so both sides
+-- move the wrong way at once.  Four plus an operator count is
+-- syntactic, fixed before any level exists, and small where the
+-- cascade's own gas is the size cap.
+--
+-- SO THIS LEAF IS A CLAIM ABOUT ONE FRAME AND ONE QUEUE, and the room
+-- half of it computes on both sides, which the levelled form did not.
 --
 -- RECOVERY: git show b927a16 restores `Refuted.Walk-Frame-Drain-Level`,
 --   which refuted the levelled conjunct at the empty context with the

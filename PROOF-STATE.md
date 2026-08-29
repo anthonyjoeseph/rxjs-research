@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **give the level's ceiling package a remaining-budget premise, so
-  that a positive level can mint at all** — the drain's refutation
-  moved the whole risk into one leaf: a walk standing at a level must
-  mint a ceiling at that level's OWN cap, which grows with the level,
-  after a climb that spent the ladder's rounds getting there. A level
-  bound cannot say the climb left room, so the leaf as stated is
-  probably false. The ledger already prices a sweep from an arbitrary
-  level against a remaining round count, and that receipt is the
-  currency the package should be asking for. Restate it in that
-  currency, then check what the walk's own bundle can already pay.
+- **instantiate the room receipt, which is now the whole of the
+  drain's risk and is newly probeable** — the ceiling package stopped
+  being a postulate: a term's operator descent is dominated by the
+  cascade's delivery walk read FROM its level, at gas four plus the
+  term's own operator count, and that is proven at every level. What
+  the drain now carries is that walk fitting under the count. Both
+  sides COMPUTE, and the gas is syntactic rather than the cascade's,
+  which is what makes rows possible at all — at the cascade's gas the
+  receipt is false above the bottom and needs no witness. So run it at
+  reachable levels before anything is ground on it.
 
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
@@ -251,15 +251,11 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`ceilAt-suc`** (Nest-Ceiling) — FALSITY, `NO EVIDENCE`: the level's own
-  ceiling package at a positive level, which is what a fresh subscribe there
-  has to mint. It asks for room under the ARRIVAL level's cap after a climb
-  that spent the ladder's rounds; the level bound cannot say the climb left
-  any.
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
-  `mergeAll`'s parked queue at the walk's own level. The level term that was
-  refuted is gone — the conjunct is stepped-cap arithmetic now — so what is
-  left is the frame-local statement nothing has yet instantiated.
+  `mergeAll`'s parked queue, now carrying the head's ROOM — the delivery walk
+  from the level, at gas four plus the head's operator count. The refuted
+  level term is gone and the gas is syntactic, so the unspent-budget claim
+  sits here, uninstantiated.
 - **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction

@@ -566,83 +566,88 @@ mutual
   6≤F₁ : 6 ≤ F₁
   6≤F₁ = ≤-trans (+-mono-≤ 4≤F₀ 2≤charge) (fLvl≤fLvlD S W d F₀)
 
+-- and the same at any level, since the ladder only climbs: a level is
+-- at least zero, so the descended walk there is at least the descended
+-- walk at the bottom
+5≤dLvl : ∀ S W d J → 2 ≤ S → 5 ≤ dLvl S W d J
+5≤dLvl S W d J 2≤S =
+  ≤-trans (5≤dLvl0 S W d 2≤S)
+          (dLvl-mono {S} {S} {W} {W} {0} {J} {d} 2≤S ≤-refl ≤-refl z≤n)
+
 -- the descended walk has room for the entry's 4 positions and the
 -- m rounds' 5m
-top-positions : ∀ S W R d m → 2 ≤ S → 1 ≤ R → suc m ≤ S →
-  4 + 5 * m ≤ regAt S R (dLvl S W d 0)
-top-positions S W R d m 2≤S 1≤R hm =
+top-positions : ∀ S W R d m J → 2 ≤ S → 1 ≤ R → suc m ≤ S →
+  4 + 5 * m ≤ regAt S R (dLvl S W d J)
+top-positions S W R d m J 2≤S 1≤R hm =
   ≤-trans (n≤1+n (4 + 5 * m))
   (≤-trans (≤-reflexive (sym (*-suc 5 m)))
   (≤-trans (*-monoʳ-≤ 5 hm)
-  (≤-trans (*-monoˡ-≤ S (5≤dLvl0 S W d 2≤S))
-  (≤-trans (n≤1+n (dLvl S W d 0 * S))
-  (≤-trans (≤-reflexive (sym (*-identityˡ (suc (dLvl S W d 0 * S)))))
-           (*-monoˡ-≤ (suc (dLvl S W d 0 * S)) 1≤R))))))
+  (≤-trans (*-monoˡ-≤ S (5≤dLvl S W d J 2≤S))
+  (≤-trans (n≤1+n (dLvl S W d J * S))
+  (≤-trans (≤-reflexive (sym (*-identityˡ (suc (dLvl S W d J * S)))))
+           (*-monoˡ-≤ (suc (dLvl S W d J * S)) 1≤R))))))
 
--- THE TOP UNROLLING, at cDel's own gas.
-climb-paid-at : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
-  G S W d (climb S W d k m) ≤ lvls S W d 0 (dCapᶜ S W R d (suc S) 0)
-climb-paid-at zero      W d k m R ()  hk hm hR
-climb-paid-at (suc S′)  W d k m R 2≤S hk hm hR = ≤-trans step2 step1
+-- THE TOP UNROLLING, at cDel's own gas, and AT ANY LEVEL.  Nothing in
+-- the proof was ever about the bottom: the entry position is spent from
+-- wherever the walk stands, the descended level below it is that level's
+-- own `dLvl`, and the registry there is only longer.  What the level
+-- costs is paid on the OTHER side -- the budget is the cascade's walk
+-- from that level, so a consumer standing high must say what walk it
+-- still has, which is the whole content the flat form was hiding.
+climb-paid-at : ∀ S W d k m R J → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
+  G S W d (climb S W d k m J) ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
+climb-paid-at zero      W d k m R J ()  hk hm hR
+climb-paid-at (suc S′)  W d k m R J 2≤S hk hm hR = ≤-trans step2 step1
   where
   S  = suc S′
-  A₁ = dLvl S W d 0
-  X₁ = sLvlD S W d k (suc (suc (sizeAt S 0) * suc (sizeAt S 0)))
-  Q₁ = lvls S W d A₁ (dCapᶜ S W R d S A₁)
-  P₄ = lvls S W d A₁ (dWalkᶜ S W R d S′ A₁ 4)
+  g  = 3 + k
+  g′ = 2 + k
+  A₁ = dLvl S W d J
+  X₁ = sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J)))
+  Q₁ = lvls S W d A₁ (dCapᶜ S W R d g A₁)
+  P₄ = lvls S W d A₁ (dWalkᶜ S W R d g′ A₁ 4)
 
   -- ONE top position lands exactly on Q₁ (walk-spend at i = 0, then
   -- lvls-add splitting the leading dLvl-step off the restart count)
-  one-pos : lvls S W d 0 (dWalkᶜ S W R d S 0 1) ≡ Q₁
-  one-pos = trans (walk-spend S W R d S 0 0)
-                  (lvls-add S W d 0 1 (dCapᶜ S W R d S A₁))
+  one-pos : lvls S W d J (dWalkᶜ S W R d g J 1) ≡ Q₁
+  one-pos = trans (walk-spend S W R d g J 0)
+                  (lvls-add S W d J 1 (dCapᶜ S W R d g A₁))
 
-  step1 : Q₁ ≤ lvls S W d 0 (dCapᶜ S W R d (suc S) 0)
+  step1 : Q₁ ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
   step1 =
     ≤-trans (≤-reflexive (sym one-pos))
-            (lvls-mono (dWalkᶜ S W R d S 0 1) (dWalkᶜ S W R d S 0 (regAt S R 0))
+            (lvls-mono (dWalkᶜ S W R d g J 1) (dWalkᶜ S W R d g J (regAt S R J))
                2≤S ≤-refl ≤-refl ≤-refl
-               (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {0} {0} {d}
-                  S S 1 (regAt S R 0) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
-                  (1≤regAt S R 0 hR)))
+               (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {J} {J} {d}
+                  g g 1 (regAt S R J) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
+                  (1≤regAt S R J hR)))
 
-  hkg : 2 + k ≤ S′
-  hkg = ≤-pred hk
-
-  -- at the top X ≡ 0, so the entry's hypothesis is `z≤n` — this is the
-  -- one place the bare-X form of round-entry-paid earns its keep
+  -- the entry's hypothesis is the level itself sitting under the
+  -- descended one, which `iterL-infl` gives at every level and `z≤n`
+  -- gave only at the bottom
   entry : G S W d X₁ ≤ P₄
-  entry = round-entry-paid S W R d S′ k 0 A₁ 2≤S hR hkg z≤n
+  entry = round-entry-paid S W R d g′ k J A₁ 2≤S hR ≤-refl
+            (iterL-infl S W d (suc (sizeAt S J)) J)
 
   rounds : G S W d (opIterD S W d k m X₁)
-             ≤ lvls S W d P₄ (dWalkᶜ S W R d S′ P₄ (5 * m))
-  rounds = walk-paid S W R d S′ k m X₁ P₄ 2≤S hR hkg entry
+             ≤ lvls S W d P₄ (dWalkᶜ S W R d g′ P₄ (5 * m))
+  rounds = walk-paid S W R d g′ k m X₁ P₄ 2≤S hR ≤-refl entry
 
   rounds′ : G S W d (opIterD S W d k m X₁)
-              ≤ lvls S W d A₁ (dWalkᶜ S W R d S′ A₁ (4 + 5 * m))
+              ≤ lvls S W d A₁ (dWalkᶜ S W R d g′ A₁ (4 + 5 * m))
   rounds′ = ≤-trans rounds
-              (≤-reflexive (sym (walk-spend-many S W R d S′ A₁ 4 (5 * m))))
+              (≤-reflexive (sym (walk-spend-many S W R d g′ A₁ 4 (5 * m))))
 
-  step2 : G S W d (climb S W d k m) ≤ Q₁
+  step2 : G S W d (climb S W d k m J) ≤ Q₁
   step2 =
     ≤-trans rounds′
-            (lvls-mono (dWalkᶜ S W R d S′ A₁ (4 + 5 * m))
-                       (dWalkᶜ S W R d S′ A₁ (regAt S R A₁))
+            (lvls-mono (dWalkᶜ S W R d g′ A₁ (4 + 5 * m))
+                       (dWalkᶜ S W R d g′ A₁ (regAt S R A₁))
                2≤S ≤-refl ≤-refl ≤-refl
                (dWalkᶜ-mono {S} {S} {W} {W} {R} {R} {A₁} {A₁} {d}
-                  S′ S′ (4 + 5 * m) (regAt S R A₁)
+                  g′ g′ (4 + 5 * m) (regAt S R A₁)
                   2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
-                  (top-positions S W R d m 2≤S hR hm)))
-
-climb-paid : ∀ S W d k m R g → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
-  suc S ≤ g →
-  G S W d (climb S W d k m) ≤ lvls S W d 0 (dCapᶜ S W R d g 0)
-climb-paid S W d k m R g 2≤S hk hm hR hg =
-  ≤-trans (climb-paid-at S W d k m R 2≤S hk hm hR)
-          (lvls-mono (dCapᶜ S W R d (suc S) 0) (dCapᶜ S W R d g 0)
-             2≤S ≤-refl ≤-refl ≤-refl
-             (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {0} {0} {d}
-                (suc S) g 2≤S ≤-refl ≤-refl ≤-refl hg ≤-refl))
+                  (top-positions S W R d m J 2≤S hR hm)))
 
 ------------------------------------------------------------------
 -- § THE ASSEMBLY — route steps (a)+(b), which used to be the
@@ -658,13 +663,11 @@ climb-paid S W d k m R g 2≤S hk hm hR hg =
 -- `2≤dLvl` holds unconditionally, so the claim read `2 ≤ 0`.
 ------------------------------------------------------------------
 
-opIterD-budget : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
-  lvls S W d (climb S W d k m) (suc (widAt S W (climb S W d k m)))
-    ≤ lvls S W d 0 (cDel (caps S W R) d)
-opIterD-budget S W d k m R 2≤S hk hm hR =
-  ≤-trans
-    (climb-paid S W d k m R (suc S) 2≤S hk hm hR ≤-refl)
-    (≤-reflexive (cong (lvls S W d 0) (sym (cDel-body (caps S W R) d))))
+opIterD-budget : ∀ S W d k m R J → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
+  lvls S W d (climb S W d k m J) (suc (widAt S W (climb S W d k m J)))
+    ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
+opIterD-budget S W d k m R J 2≤S hk hm hR =
+  climb-paid-at S W d k m R J 2≤S hk hm hR
 
 -- THE CONSUMER-FACING FORM.  m = 0 is real (opIterD-0 gives 0 on the
 -- left); m = suc _ is the proven fIterD tail (fIterD-lvls) over the
@@ -682,18 +685,29 @@ opIterD-budget S W d k m R 2≤S hk hm hR =
 -- measured as a `Killed: 9` OOM in VWF.  Private impl plus
 -- abstract alias, the caps axis's normalisation contract: no consumer
 -- ever needs more than the type.
-private
-  opIterD-dominated-go : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
-    opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
-  opIterD-dominated-go S W d k zero    R 2≤S hk hm hR =
-    ≤-trans (≤-reflexive (opIterD-0 S W d k 0)) z≤n
-  opIterD-dominated-go S W d k (suc m) R 2≤S hk hm hR =
-    ≤-trans (≤-reflexive (opIterD-suc S W d k m 0))
-      (≤-trans (fIterD-lvls S W d k
-                  (suc (widAt S W (climb S W d k m))) (climb S W d k m) 2≤S)
-               (opIterD-budget S W d k m R 2≤S hk hm hR))
-
 abstract
+  -- AT ANY LEVEL, and at the GAS THE TERM ITSELF COSTS: four plus its
+  -- operator count, never the cascade's own.  The clauses sit inside
+  -- the seal rather than under a private alias because the seal is what
+  -- the contract is about, and a second name for one fact is a
+  -- duplicate whatever its visibility.
+  opIterD-dominated-at : ∀ S W d k m R J → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
+    opIterD S W d k m J ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
+  opIterD-dominated-at S W d k zero    R J 2≤S hk hm hR =
+    ≤-trans (≤-reflexive (opIterD-0 S W d k J))
+            (lvls-infl S W d J (dCapᶜ S W R d (4 + k) J))
+  opIterD-dominated-at S W d k (suc m) R J 2≤S hk hm hR =
+    ≤-trans (≤-reflexive (opIterD-suc S W d k m J))
+      (≤-trans (fIterD-lvls S W d k
+                  (suc (widAt S W (climb S W d k m J))) (climb S W d k m J) 2≤S)
+               (opIterD-budget S W d k m R J 2≤S hk hm hR))
+
   opIterD-dominated : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
     opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
-  opIterD-dominated = opIterD-dominated-go
+  opIterD-dominated S W d k m R 2≤S hk hm hR =
+    ≤-trans (opIterD-dominated-at S W d k m R 0 2≤S hk hm hR)
+    (≤-trans (lvls-mono (dCapᶜ S W R d (4 + k) 0) (dCapᶜ S W R d (suc S) 0)
+                2≤S ≤-refl ≤-refl ≤-refl
+                (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {0} {0} {d}
+                   (4 + k) (suc S) 2≤S ≤-refl ≤-refl ≤-refl (s≤s hk) ≤-refl))
+             (≤-reflexive (cong (lvls S W d 0) (sym (cDel-body (caps S W R) d)))))

@@ -22,7 +22,7 @@
 ------------------------------------------------------------------
 module Verify-Budget-Sufficient.Op-Dominance where
 
-open import Data.Nat using (ℕ; zero; suc; _*_; _≤_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_)
 open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans)
 
@@ -61,11 +61,15 @@ fIterD-lvls S W d k n J 2≤S =
 
 -- The level one opIterD step's recursion reaches before its fIterD
 -- tail fires — spelled out so `opIterD-budget` and the assembly speak
--- about the SAME term (it is opIterD-suc's own J₂ at J = 0).
-climb : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-climb S W d k m =
+-- about the SAME term (it is opIterD-suc's own J₂, at the level the
+-- step is entered at rather than at zero).  The level is a PARAMETER
+-- because the budget the climb is paid out of is the cascade's own
+-- walk from that level, and a step entered at a positive level is what
+-- a walk standing anywhere but the bottom has to price.
+climb : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+climb S W d k m J =
   opIterD S W d k m
-    (sLvlD S W d k (suc (suc (sizeAt S 0) * suc (sizeAt S 0))))
+    (sLvlD S W d k (suc (J + suc (sizeAt S J) * suc (sizeAt S J))))
 
 -- WHAT MOVED OUT: `opIterD-budget` and
 -- `opIterD-dominated` — route steps (a)+(b) — are now PROVEN, in
