@@ -978,6 +978,19 @@ wid-suc-step c L hS =
         (sym (frameStep-wid-suc c L))
         (suc≤foldStep (Caps.cSize c) (Caps.cWid (frameStep L c)) hS)
 
+-- THE QUEUE'S LENGTH, PEELED OFF THE NODE READING.  `widNode`'s merge
+-- arm is the only conjunct anywhere that reads a queue's length, and
+-- this is the half of it that does.  Peeled here rather than at a use
+-- site because the RESULT type pins the second Bool, leaving only the
+-- first to solve -- and because `n` is in scope, so the width side needs
+-- no underscore (one there sends Agda inverting `_≤ᵇ_` to depth 50).
+widNode-len : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) {u}
+              (lim : Maybe ℕ) (a : ℕ) (q : List (Closed Γ u)) (b : Bool) →
+              widNode W sl (mergeAll-st lim a q b) ≡ true →
+              (length q ≤ᵇ W) ≡ true
+widNode-len {n = n} W sl lim a q b h =
+  proj₂ (∧-true (all (λ o′ → pWᵉ n sl o′ ≤ᵇ W) q) (length q ≤ᵇ W) h)
+
 widNode-push : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (L : ℕ) (sl : Slots Γ)
   (lim : Maybe ℕ) (q : List (Closed Γ s)) (o : Closed Γ s) (act : ℕ) (od : Bool) →
   2 ≤ Caps.cSize c →

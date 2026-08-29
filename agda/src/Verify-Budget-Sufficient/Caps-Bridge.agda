@@ -30,7 +30,7 @@
 module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
-open import Data.Maybe   using (Maybe; nothing)
+open import Data.Maybe   using (nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n; *-monoʳ-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
@@ -46,7 +46,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Gas; Tick; Id; Fuel)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ; sizeᵛ)
-open import Rx.Frame-Width using (dWᵉ; entryCeil; pWᵛ; pWᵉ)
+open import Rx.Frame-Width using (dWᵉ; entryCeil; pWᵛ)
 open import Rx.Hop-Depth  using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st; Path; root; arrTy; arrVal; cascade;
@@ -82,7 +82,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
-   regsSz?; slotsCaps?; valCaps?; widLive; widNode)
+   regsSz?; slotsCaps?; valCaps?; widLive; widNode; widNode-len)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
@@ -427,18 +427,6 @@ private
   -- does thirty times in this file — so the refutation runs that way.
   -- (the refutation itself is `f≡t-absurd`, .Measures — strictly stronger,
   -- and imported here directly from .Measures.)
-
-  -- widNode W sl (mergeAll-st _ _ q _) = all (pWᵉ-bound) q ∧ (length q ≤ᵇ W).
-  -- Peeled HERE rather than at the use site because the RESULT type pins
-  -- ∧-true's second Bool, leaving only the first to solve — and because
-  -- `n` is in scope here, so the pWᵉ side needs no underscore (one there
-  -- sends Agda inverting `_≤ᵇ_` to depth 50).
-  widNode-len : ∀ {n} {Γ : Ctx n} (W : ℕ) (sl : Slots Γ) {u}
-                (lim : Maybe ℕ) (a : ℕ) (q : List (Closed Γ u)) (b : Bool) →
-                widNode W sl (mergeAll-st lim a q b) ≡ true →
-                (length q ≤ᵇ W) ≡ true
-  widNode-len {n = n} W sl lim a q b h =
-    proj₂ (∧-true (all (λ o′ → pWᵉ n sl o′ ≤ᵇ W) q) (length q ≤ᵇ W) h)
 
   -- k copies of one queued expression
   repQ : ∀ {n} {Γ : Ctx n} {u} → ℕ → Closed Γ u → List (Closed Γ u)

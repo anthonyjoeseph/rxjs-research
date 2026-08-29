@@ -190,32 +190,30 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the room's queue conjunct derived instead of assumed** — the
-  crossing is ONE UNIT wide: the room asks `suc (length q) ≤ cWid c`
-  while the invariant carries `length q ≤ cWid c`, and one level of the
-  frame step buys exactly that unit — `iterFold-lift` at both indices
-  zero, against a step whose width field IS that iterate. So read one
-  level up the conjunct is derivable from the node reading `capsOK?`
-  already carries, and the parked pair that kills this shape stops
-  being expressible. This leg threads the strong reading down to the
-  room and drops the conjunct from the record.
+- **the caps arms made level-reporting** — the room premise the parked
+  pair refutes exists only because these arms park a merge arrival at a
+  FIXED cap. `widNode-push` discharges exactly that park with NO room
+  premise, reporting one level up, and the three faces that already
+  report a level spend it at a site apiece; this cone does not, so it
+  assumes what they prove. Stepping the cap instead is dead twice over:
+  one step does not nest, and no constant names a per-arrival
+  recurrence. This leg turns the arms' conclusions into the Σ-level
+  shape and lets the premise go.
 
-- **the duplicate arms retired onto the proven face** — with the strong
-  reading in place, `subscribeInner-caps`, `thruConsume-caps` and
-  `thruWalk-caps` replace this cone's own copies, which re-prove them
-  weaker at the fixed cap. The duplicate checker cannot see the copy:
-  different predicate, different cap, so the two read as different
-  facts while being the same operation. What holds it in place is the
-  NESTING chain beside it, which takes its state facts from these arms;
-  this leg moves that chain over, arm by arm, and the level each arm
-  reports is what it carries.
+- **the levelled arms spent from the proven face** — with the shape
+  matched, the same walk proven one face over supplies these arms
+  outright: strong reading, stepping cap, level reported. The duplicate
+  checker cannot see the copy, since predicate and cap both differ, and
+  the import direction is clear — nothing in that face's cone reaches
+  this module — so the refuted postulates here are dischargeable in
+  place rather than by a move. What holds the copy up is the nesting
+  chain beside it, moved arm by arm, each carrying its own level.
 
-- **the burst leaves discharged and their probe re-run** — under a
-  discharged ceiling the arrivals' width key is the face's own second
-  conjunct, so the FALSITY row leaves the ledger by proof rather than
-  by restatement. `Probed.PushVals-Caps` was taken at the frozen-width
-  cap, so its rows are evidence about text that will be gone;
-  re-running is not optional and restamping alone is forbidden.
+- **the burst probe re-run against what replaces it** — the probe over
+  these leaves was taken at the frozen-width cap, so its rows become
+  evidence about text that is gone. Its harness is the expensive half
+  and transfers; the verdict does not. Re-running is not optional and
+  restamping the fingerprint alone is forbidden.
 
 ### The ledger
 

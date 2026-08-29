@@ -533,6 +533,28 @@ iterSize-infl S hS (suc k) s =
 -- child stepped to; fixing either level in the cap forces a transport
 -- of the other.  Taking the level as an argument lets the arm read
 -- both at their join, where neither moves.
+--
+-- AND THE ONE UNIT THE FROZEN WIDTH COSTS CANNOT BE BOUGHT BY STEPPING
+-- IT.  The gap is exactly one: the invariant bounds a parked queue by
+-- the field and an arriving value needs one more than that, so a width
+-- stepped by one level makes the room a projection and every site
+-- swaps.  It dies on COMPOSITION rather than at any one of them --
+-- this cap does not nest, because the inner cap's base size is larger
+-- and no monotonicity brings a step of a step back under one step of
+-- the entry, which is what an inner subscribe inside a burst step
+-- asks for.  Freezing the report at entry-plus-one-step closes that
+-- arm and dies one level further out, for a reason no constant can be
+-- chosen around: the thru chain subscribes ONCE PER ARRIVAL at a cap
+-- it threads unchanged across the fold, so a walk that steps the cap
+-- steps it again at every arrival and the residue is a per-arrival
+-- RECURRENCE.  What the arrivals owe is the level EXISTENTIALLY BOUND,
+-- which is the shape the proven caps face already reports in.
+-- DEAD ROUTE: stepping this width, by one level or by any constant.
+-- RECOVERY: `git show 0e96e46` restores the one-step form with the
+--   node-width widening and its lift to the nest predicate, and
+--   `git show bfbf2b4` the constant-step form with all fifty-four
+--   sites swapped; both are wanted again only if the arrivals are ever
+--   re-read at a cap that is not existentially levelled.
 arrCapAt : ℕ → Caps → Caps
 arrCapAt j c = caps (Caps.cSize (frameStep j c)) (Caps.cWid c) (Caps.cReg c)
 
