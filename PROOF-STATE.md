@@ -216,13 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the step half of the selection's caps, which is the half already
-  measured** — one chain's step preserving the caps is now its own
-  leaf, and it is the one the flat-cap rows actually read: two of the
-  three components come back at or below where they started, and the
-  slots half is a proven equation rather than an obligation. So this is
-  the leaf in the pair whose evidence is real and whose remaining work
-  is a walk over the step's own arms, not a design question.
+- **buy the step leaf out of the caps recurrence, since nothing local
+  can pay for it** — one step is now known NOT to preserve an arbitrary
+  cap its input satisfies: a drain subscribes what it releases and the
+  step retires none of it, so the smallest fitting size better than
+  doubles across a single step and the finish, one level up, is what
+  pays. What is left is the instant's own gap: `capsAt` is a
+  `frameBlowup` of its predecessor, so the leg is to show that one
+  blowup swallows one instant's whole growth — or to give the predicate
+  the level its consumers already speak in.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -245,10 +247,14 @@ does not fit is a finding about the shared statement, not about the head.
 ### The ledger
 
 - **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
-  `REFUTED, DEAD ROUTE, RECOVERY`: the arithmetic both depth rows spend; the
-  Σ is UNINHABITED at every key and every story. BLOCKED on a ruling — the
-  cap outgrows the depth it caps, so the repair is a different vehicle,
-  not an index.
+  `REFUTED, DEAD ROUTE, RECOVERY`: the arithmetic both depth rows spend; the Σ
+  is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
+  outgrows the depth it caps, so the repair is a different vehicle, not an
+  index.
+- **`chainStep-caps`** (Caps-Face/Part7) — SHAPE, `REFUTED`: one chain's step
+  preserves the caps. FALSE at an arbitrary cap the input satisfies — a drain
+  subscribes what it releases and the step retires none of it — so only the
+  instant's own blowup can pay, or the predicate needs a level.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of
@@ -307,14 +313,10 @@ does not fit is a finding about the shared statement, not about the head.
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.
-- **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
-  ONE chain's walk, the fold over the selection being a body now. What is left
-  asserted is the sink's registry-versus-unit conjunct and two size bounds on a
-  parked inner, whose headroom is now a conjunct of the caps record.
-- **`chainStep-caps`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
-  one chain's step preserves the caps — the half the flat-cap rows actually
-  read, where two of the three components come back at or below where they
-  started.
+- **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED`: ONE chain's
+  walk, the fold over the selection being a body now. What is left asserted is
+  the sink's registry-versus-unit conjunct and two size bounds on a parked
+  inner, whose headroom is now a conjunct of the caps record.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

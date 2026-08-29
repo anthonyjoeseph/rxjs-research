@@ -119,3 +119,5 @@ open import Refuted.Nest-Cap-Height
          NestCapCapsH; nestCap-3≤capsH-absurd; nestCap-3≤capsH-absurd-inc;
   NestLevelKeyed; nestCap-level-absurd;
          NestHeight; nest-height-absurd)
+open import Refuted.Chain-Step-Flat
+  using (cap; row; latched≡true; pre≡true; post≡false; chain-step-flat-absurd)

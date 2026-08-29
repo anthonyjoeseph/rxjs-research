@@ -2271,6 +2271,28 @@ postulate
 --   conjunct past the first frame, since a mid-walk value list is not
 --   addressable from outside the fold; and the sink arm's
 --   registry-versus-unit conjunct, which no row addresses.
+
+-- AND THE STEP LEAF IS NOT PRESERVATION IN GENERAL, WHICH NARROWS WHAT
+-- ITS PROOF MAY REST ON.  Read either side of ONE step rather than a
+-- whole cascade, the smallest cap the state fits rises by better than a
+-- factor of two -- a drain SUBSCRIBES the inners it releases and the
+-- step retires nothing, so what pays for the growth is the cascade's
+-- FINISH, one level up and outside this statement.  So a step at an
+-- arbitrary cap the pre-state satisfies does NOT return inside it, and
+-- no arm-by-arm argument can conclude otherwise: the frame-wise receipt
+-- lands at `frameStep (j + j')` and the caps ordering only ever widens.
+--
+-- WHAT IS LEFT IS THE INSTANT'S OWN SLACK, and it is the whole of the
+-- remaining route.  `capsAt` is not an arbitrary cap: it is a
+-- `frameBlowup` of the last instant's, so the statement can still be
+-- true by that gap being wide enough to swallow one instant's whole
+-- growth.  That is an argument about the recurrence -- the same one the
+-- block above names -- and it is now the ONLY one available, which is
+-- what the finding below buys.  The alternative is to give the predicate
+-- the level its consumers already speak in, as the nodes face does.
+--
+-- REFUTED: `Refuted.Chain-Step-Flat` -- one step of one chain, at a
+--   concrete cap the pre-state satisfies and the post-state does not.
 postulate
   arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
