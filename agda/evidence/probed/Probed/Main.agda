@@ -31,6 +31,9 @@ open import Probed.Chain-Caps-Flat
   using (U-row; C-row; F-row)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
+open import Probed.Cascade-Nest-Flat
+  using (U-chains; U-descent; U-holds; C-chains; C-descent; C-holds;
+         F-chains; F-descent; F-holds)
 open import Probed.Sync-Factor
   using (dupSync≡6; dupOut≡2; dupA-holds;
          dupOut₃≡6; dupB-holds;

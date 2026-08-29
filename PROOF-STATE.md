@@ -216,14 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the cascade descent, whose risk is now priced rather than
-  probeable** — no row can print a verdict on it: the bound side reads
-  two sealed families, and the one form underneath it that proven
-  inequalities reach is refuted at the evaluator, so instantiation is
-  exhausted from below. What is left is to shrink what rests on it —
-  the delivery side spends it through a single composition, so this
-  leg narrows that consumer's demand to the part the rows do reach.
-
 - **discharge the carried ceiling at the entry, where it is proven** —
   the walk now carries its ceiling as an implication rather than a
   number, and one postulate produces that implication for every chain
@@ -241,13 +233,21 @@ does not fit is a finding about the shared statement, not about the head.
   is refuted at the new reading is a question one probe answers, and
   the harness for it is the one the fold's caps boolean already uses.
 
+- **the subscribe side's increment, by the move the cascade side just
+  made** — its bound carries one sealed term and no factor at all, and
+  the sweep reading it against a computable stand-in has been printing
+  verdicts for as long as the sealed reading has been unprobeable. The
+  seal's body is a product whose smallest factor is the syntactic unit,
+  so if that unit sits under it by a proven inequality the statement
+  splits the same way this one did: a computable leaf a probe pins, and
+  a body carrying it back to the term the proof spends.
+
 ### The ledger
 
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY,
-  `DEAD ROUTE, RECOVERY`: the cascade descent against the instant's own grant.
-  The one form under it that proven inequalities reach is refuted at the
-  evaluator, so nothing instantiates it from below; the store route it replaced
-  cycles.
+- **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
+  the cascade descent against a ceiling every term of which computes. The
+  statement the proof spends is now a body over it, carried back by a power of
+  two under the sealed factor.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting

@@ -50,6 +50,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestOK?-latch;
   nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt; nest-inflate;
   storeNest-latch; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def; size≤nestIncAt;
+  16≤nestFacAt;
   m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest; nodeNest;
   regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
@@ -2244,6 +2245,54 @@ postulate
     chainsCapsOK (capsAt e sl id) sl (capsH e sl id) a nextId (chainsOf a st) sched
       (cascadeLatch a st)
 
+-- ONE CASCADE'S DESCENT AGAINST A COMPUTABLE CEILING, which is what
+-- the statement below is now read off.  Every term here computes --
+-- the arrival's nesting, the chains' nesting, the store the cascade
+-- arrives at, and the arrival's own size -- so a row can print a
+-- verdict on this one, which is the whole reason it is stated apart
+-- from the statement it carries.
+--
+-- THE SIXTEEN IS HEADROOM, NOT A MEASUREMENT.  A power of two sits
+-- under the sealed factor at any numeral, since that factor's
+-- exponent is a squared burst successor times a product of quantities
+-- already proven positive; sixteen is several times the largest least
+-- factor any sweep has reported, which is where a bound that must not
+-- be re-tuned every time the evaluator moves wants to sit.
+--
+-- DEAD ROUTE: the same form at a factor of ONE is false at the
+--   evaluator.  That is the reading the factor's mere POSITIVITY
+--   licenses, and `Harness.Main`'s series Y prints the least factor it
+--   actually needs: two across the fan and width families at every
+--   depth and width swept, three on the unbounded ones, one only where
+--   the store already dominates the descent.  A consumer reaching for
+--   the positivity rather than for the exponent therefore gets a
+--   refuted statement, and the exponent is what makes any larger
+--   numeral available.
+--
+-- PROBED: `Probed.Cascade-Nest-Flat` pins the conclusion by `refl` at
+--   three families -- the parked drain read one instant in, the skip
+--   branch whose selection outruns its delivery, and a family that
+--   delivers on every chain it selects -- each with its chain count
+--   and its descent pinned beside the verdict, so no row is reading an
+--   empty selection.  NOT covered: any PREMISE, all of which compare
+--   against a sealed cap and therefore do not reduce; and any state a
+--   root subscribe does not reach.
+postulate
+  cascade-nest-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    nestOK? e sl id sched st ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+      ≤ nestDᵛ (arrTy a) (arrVal a)
+        + chainsNestD (chainsOf a st)
+        + 16 * (storeNestMax sched (cascadeLatch a st)
+                + sizeᵛ (arrTy a) (arrVal a))
+
+
 -- ONE CASCADE'S DESCENT AGAINST THE INSTANT'S OWN GRANT, and it is
 -- primitive rather than assembled -- which is a change, and the reason
 -- is a CYCLE the walk's level device made visible.
@@ -2267,24 +2316,14 @@ postulate
 -- `cascade-depth-capsH` still assembles FROM this, so the tie back to
 -- the syntactic ceiling is unchanged.
 --
--- DEAD ROUTE: the factor cannot be replaced by a computable stand-in
---   from below.  Exactly one weakening of the right-hand side is
---   backed by proven inequalities on both sealed parts -- factor at
---   one by `1≤nestFacAt`, increment at the arrival's own `sizeᵛ` by
---   `size≤nestIncAt` -- so it is the one form whose GREEN would have
---   carried this statement rather than merely failing to refute it.
---   `Harness.Main`'s series Y prints the least factor that flat form
---   needs, and it exceeds one on most rows it reaches: two across the
---   fan and width families at every depth and width swept, three on
---   the unbounded ones, one only where the store already dominates
---   the descent.  So the flat form is false at the evaluator and
---   stating it would replace a live statement with a refuted one.
---   What the same rows do NOT do is threaten this statement: the
---   factor they call for stays at two or three while `nestFacAt` is a
---   tower, so every row is slack by an enormous margin, and the
---   descent lands one above the store the cascade PRODUCES on every
---   row without exception -- which is the relation the store-mediated
---   route below rested on, and it is exact rather than merely true.
+-- THE FORM IT IS READ OFF IS COMPUTABLE, AND THAT IS WHERE THE RISK
+-- NOW SITS.  This statement's right-hand side reads two sealed
+-- families, so no row prints a verdict on it directly; the leaf above
+-- replaces both by quantities that compute, and the two proven
+-- inequalities that carry it back -- a power of two under the factor,
+-- the arrival's own size under the increment -- are what this body
+-- spends.  So the instantiable statement and the consumable one are
+-- separated, and only the first has to be probed.
 --
 -- RECOVERY: git show ae75251:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda
 --   restores the store-mediated assembly and the produced-store
@@ -2298,21 +2337,26 @@ postulate
 --   as it stands: this statement's right-hand side reads two sealed
 --   families, so no row prints a verdict on it, only on the forms
 --   underneath it.
-postulate
-  cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-      ≤ nestDᵛ (arrTy a) (arrVal a)
-        + chainsNestD (chainsOf a st)
-        + nestFacAt e sl id
-          * (storeNestMax sched (cascadeLatch a st)
-             + nestIncAt e sl id)
+cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+    ≤ nestDᵛ (arrTy a) (arrVal a)
+      + chainsNestD (chainsOf a st)
+      + nestFacAt e sl id
+        * (storeNestMax sched (cascadeLatch a st)
+           + nestIncAt e sl id)
+cascade-nest-compositional {e = e} sl id a nextId sched st slEq cok nok harr hsz =
+  ≤-trans (cascade-nest-flat sl id a nextId sched st slEq cok nok harr hsz)
+          (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st))
+            (*-mono-≤ (16≤nestFacAt e sl id)
+              (+-monoʳ-≤ (storeNestMax sched (cascadeLatch a st))
+                (≤-trans hsz (size≤nestIncAt e sl id)))))
 
 
 -- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store

@@ -53,7 +53,7 @@ open import Data.Bool.ListAction using (any)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ;
   *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m; m≤m⊔n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
-  *-identityʳ; *-distribˡ-+; m^n>0)
+  *-identityʳ; *-distribˡ-+; m^n>0; ^-monoʳ-≤)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -70,9 +70,9 @@ open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤; 1≤capsAt-reg)
+open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; 2≤capsAt-size)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
-open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap)
+open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; cSize≤delSq)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -676,6 +676,53 @@ abstract
     m^n>0 2 (suc (nestBurstAt e sl id) * suc (nestBurstAt e sl id)
              * (suc (delSize n (capsAt e sl (suc id)))
                 * (realWidAt e sl id * delSq n (capsAt e sl (suc id)))))
+
+  -- AND THE FACTOR IS A POWER OF TWO, SO ITS PROVEN FLOOR IS NOT ONE.
+  -- The positivity beside this one is all a consumer needs when it is
+  -- spending the factor on a single copy, and it is the wrong bound
+  -- entirely for a consumer wanting a COMPUTABLE STAND-IN from below:
+  -- that consumer needs the EXPONENT, and the exponent is a squared
+  -- successor of the burst times a product every factor of which a
+  -- proven inequality already puts at one or above.  So it is four at
+  -- the smallest and the power is sixteen.
+  --
+  -- SIXTEEN IS NOT THE FLOOR, IT IS THE NUMERAL A CONSUMER ASKED FOR.
+  -- The exponent climbs with the width and the delivery square, so any
+  -- numeral is reachable by this same route; a consumer needing more
+  -- copies raises this one rather than finding another argument.
+  16≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → 16 ≤ nestFacAt e sl id
+  16≤nestFacAt {n = n} e sl id = ^-monoʳ-≤ 2 4≤E
+    where
+    b : ℕ
+    b = nestBurstAt e sl id
+
+    D : ℕ
+    D = delSize n (capsAt e sl (suc id))
+
+    RQ : ℕ
+    RQ = realWidAt e sl id * delSq n (capsAt e sl (suc id))
+
+    1≤S : 1 ≤ Caps.cSize (capsAt e sl (suc id))
+    1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl (suc id))
+
+    1≤Q : 1 ≤ delSq n (capsAt e sl (suc id))
+    1≤Q = ≤-trans 1≤S (cSize≤delSq n (capsAt e sl (suc id)) 1≤S)
+
+    1≤RQ : 1 ≤ RQ
+    1≤RQ = ≤-trans (≤-reflexive (sym (*-identityʳ 1)))
+                   (*-mono-≤ (1≤capsAt-reg e sl id) 1≤Q)
+
+    1≤B : 1 ≤ suc D * RQ
+    1≤B = ≤-trans 1≤RQ
+            (≤-trans (≤-reflexive (sym (*-identityˡ RQ)))
+                     (*-monoˡ-≤ RQ (s≤s (z≤n {D}))))
+
+    4≤E : 4 ≤ suc b * suc b * (suc D * RQ)
+    4≤E = ≤-trans (*-mono-≤ (s≤s (1≤nestBurstAt e sl id))
+                            (s≤s (1≤nestBurstAt e sl id)))
+                  (≤-trans (≤-reflexive (sym (*-identityʳ (suc b * suc b))))
+                           (*-monoʳ-≤ (suc b * suc b) 1≤B))
 
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool

@@ -237,12 +237,12 @@ depthRunWalkRowU steps ds ks j d k =
 -- says the tower is doing real work and the right-hand side stays
 -- symbolic.
 --
--- A ROW CANNOT CONFIRM THE TARGET, BUT IT CAN REFUTE A FORM UNDER IT.
--- The right-hand side reads two sealed families, so no row prints a
--- verdict on the inequality as stated.  What a row settles is whether
--- a form whose factor and increment are both bounded by PROVEN
--- inequalities survives -- green there would have carried the target,
--- and red kills that form outright.
+-- A ROW CONFIRMS THE TARGET AT ITS OWN INPUTS, which is new: the
+-- target is the COMPUTABLE form, so both the factor and the increment
+-- are numerals here rather than sealed families.  `F16-ok` is the
+-- target itself at the row, `F1-OVER` the neighbouring form at a
+-- factor of one, and `Fmin` says how much of the gap between them the
+-- row actually uses.
 --
 -- The store sequence is printed per chain PREFIX, and it is the
 -- residue of the question this series used to ask: it climbs by one
@@ -257,7 +257,7 @@ depthRunWalkRowU steps ds ks j d k =
 -- row, which is also the only unbounded row reporting a factor of
 -- one.
 --
--- TARGET: cascade-nest-compositional @524772
+-- TARGET: cascade-nest-flat @6a79ec
 pfxL : ∀ {A : Set} → ℕ → List A → List A
 pfxL 0       xs       = []
 pfxL (suc i) []       = []
@@ -323,7 +323,9 @@ satWalk {n = n} e sl (suc m) nextId sched st with sched-next sched
              nd = dep ∸ (nv + cn)
          in " I=" ++ show iv
             ++ " Fmin=" ++ show ((nd + bs ∸ 1) / bs)
-            ++ (if dep ≤ᵇ nv + cn + bs then " F1-ok" else " F1-OVER"))
+            ++ (if dep ≤ᵇ nv + cn + bs then " F1-ok" else " F1-OVER")
+            ++ (if dep ≤ᵇ nv + cn + 16 * (storeNestMax sd stL + iv)
+                then " F16-ok" else " F16-OVER"))
      ++ " |" ++ satGo a nextId ch sd stL (length ch)
      ++ satWalk e sl m (suc nextId)
                 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
