@@ -50,8 +50,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; _×ᵗ_; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
-  exhaustAllᵉ; μᵉ; input; inputsBelowᵉ)
+  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+  switchAllᵉ; exhaustAllᵉ; μᵉ; input; inputsBelowᵉ)
 open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
@@ -215,19 +215,6 @@ abstract
       ≤ descW g (takeᵉ cnt b) κ id now sched st
   descW-take g cnt b κ id now sched st k h with evalTm cnt | h
   ... | .(suc k) | refl = m≤n⊔m _ _
-
-  -- AND THE CHILD'S HALF AT THE FOLD HEAD, the same projection at the
-  -- freshly minted node and the evaluated seed.  Exported for the
-  -- reason `descW-map` is: the family is SEALED outside this block.
-  descW-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
-    (b : Closed Γ s) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    descW g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
-          (proj₂ (mintNode sched))
-          (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
-      ≤ descW g (scanᵉ f z b) κ id now sched st
-  descW-scan g f z b κ id now sched st = m≤n⊔m _ _
 
   -- AND THE CHILD'S HALF AT THE THREE `*All` HEADS, each the projection
   -- of the head clause's own join at the child's freshly minted node and

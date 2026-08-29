@@ -28,9 +28,9 @@ open import Data.Fin using (toℕ)
 
 open import Rx.Prim using (Tick; Id; Source; Gas; g0; gs; InstEvent; InstEmit; value; hot; cold; _at_from_as_;
   subscribe; init; close; handoff; complete; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; natᵗ; obs; isData; sizeᵗ; applyFn; _≟ᵗ_; evalTm; syncSizeᵉ;
-  syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; Exp; Tm; Ty; _×ᵗ_; _+ᵗ_; unitᵗ; boolᵗ; natᵗ; obs; isData; sizeᵗ;
+  applyFn; _≟ᵗ_; evalTm; syncSizeᵉ; syncSizeᵗ; syncSizeᵗˢ; syncSizeᵛ; input; ofᵉ; emptyᵉ; mapᵉ;
+  takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; inputsBelowᵉ)
 open import Rx.Slots using (Slots; scripted; shared; slotsSize)
 open import Rx.Clos-Size using (closSizeᵉ; closSizeᵗ; closSizeᵗˢ;
   syncSize≤closᵉ; syncSize≤closᵗ; syncSize≤closᵗˢ; closSize-unfoldμ)
@@ -42,20 +42,19 @@ open import Rx.Evaluator using
   NodeId; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; scan-st; take-st; takeVals;
   mergeAll-st; switch-st; exhaust-st; lookupNode; setNode; scanVals; takeDispatch; innerFinish;
   aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
-  splitBurst; Stream; mintNode; installNode; pushBurst; subscribeAll; oneShotBurst; splitEvents; thruConsume;
+  splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
   thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource;
   sharedConnect; sharedPlumb; burstCompleted; register; dropSource)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; subscribeE-keeps; stepFrame-keeps; thruConsume-keeps)
 open import Verify-Budget-Sufficient.Caps using
-  (_⊑ᶜ_; 1≤pow≤; arrCapAt; arrCapAt-⊑; Caps; frameStep; frameStep-reg-mono; iterSize-infl; iterSize-mono-count;
-  capsAt; capsAt-base-size; 2≤capsAt-size; 1≤capsAt-reg)
+  (_⊑ᶜ_; 1≤pow≤; arrCapAt; arrCapAt-⊑; Caps; frameStep; frameStep-reg-mono; iterSize-infl;
+  iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size; 1≤capsAt-reg)
 open import Verify-Budget-Sufficient.Caps using (sizeCount)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDisp; depthDrain; depthFin; depthFold; depthFrame; depthInner; depthE; depthReact;
   depthShareGo; lub3-m; lub3-r)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; nestValOK?; pathSz?;
-  slotsCaps?; slotsCaps?-widen)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; nestValOK?; pathSz?; slotsCaps?; slotsCaps?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-parts; foldPath-slots; pathSz?-len;
   splitEvents-vals-caps; slotsCaps?-capsAt)
@@ -78,8 +77,8 @@ open import Verify-Budget-Sufficient.Nest-Cap using
   nestB-monoS; nestFac-monoS;
   arrDW-frame; nestB-frame-dblW)
 open import Verify-Budget-Sufficient.Nest-Burst using
-  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-scan; descW-mu;
-   descW-merge; descW-switch; descW-exhaust; connW; connW-gs; descW-conn)
+  (descW; innerW; drainW; innerW-gs; drainW-here; drainW-tail; descW-take; descW-map; descW-mu;
+  descW-merge; descW-switch; descW-exhaust; connW; connW-gs; descW-conn)
 
 -- THE TWO MEASURES THE WALK MOVES TOGETHER.  A frame's node stores what
 -- the frame emits -- a `scan`'s accumulator IS its output -- so charging
@@ -597,6 +596,11 @@ nodeWidᴺ?-weaken W sl (mergeAll-st _ _ _ _) h = h
 nodeWidᴺ?-weaken W sl (switch-st _ _)      h = refl
 nodeWidᴺ?-weaken W sl (exhaust-st _ _)     h = refl
 
+-- AND THE SAME READING WIDENS.  The node conjunct is one bound against
+-- `cWid` and nothing else, so a bigger width is a weaker demand at
+-- every arm -- which is what lets a walk that STEPS its cap hand its
+-- table invariant to a reader standing further along.
+
 -- THE PREMISES THE PROVEN CLIQUE READS AND THIS CONE DOES NOT, in one
 -- name because they travel together: they are facts about the CAP and
 -- the SLOTS, and the slots are fixed for a whole instant.  Bundling is
@@ -660,6 +664,7 @@ capsOK?⇒nest c sched st h =
                  (proj₂ kv))
        (EvalSt.nodes st)
        (proj₁ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st h)))))
+
 
 -- minting an instance id touches the node counter and nothing this
 -- predicate reads
@@ -896,16 +901,6 @@ abstract
   nestValOK?-take {u = u} c cnt b h =
     ≤ᵇ-true (syncSizeᵛ (obs u) b) (Caps.cSize c)
       (≤-trans (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ cnt)) (n≤1+n _))
-               (≤ᵇ⇒≤ _ _ (T-to h)))
-
-  nestValOK?-scan : ∀ {n} {Γ : Ctx n} {s u} (c : Caps)
-    (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u) (b : Closed Γ s) →
-    nestValOK? c (obs u) (scanᵉ f z b) ≡ true →
-    nestValOK? c (obs s) b ≡ true
-  nestValOK?-scan {s = s} c f z b h =
-    ≤ᵇ-true (syncSizeᵛ (obs s) b) (Caps.cSize c)
-      (≤-trans (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f + syncSizeᵗ z))
-                        (n≤1+n _))
                (≤ᵇ⇒≤ _ _ (T-to h)))
 
   nestValOK?-merge : ∀ {n} {Γ : Ctx n} {u} (c : Caps)
@@ -2516,20 +2511,39 @@ subscribeInner-nest-arr c sl B W (gs fuel) op allNid κ id now o sched st
 -- premise has ever sized.  The suppliers already carry it -- the burst
 -- admissibility fold states it emit by emit -- so what this threads is
 -- a fact the chain had and dropped.
-subscribeInner-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (fuel : Gas) (op : AllOp) (nid : NodeId)
-  (κ : Path Γ u t) (id : Id) (now : Tick)
-  (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  nestCapsOK? c sched st ≡ true →
-  nestValOK? c (obs u) o ≡ true →
-  nestClosOK? c sl o ≡ true →
-  pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
-  ⦃ _ : FaceOK c sl ⦄ →
-  let R      = subscribeInner fuel op nid κ id now o sched st
-      sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
-      st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))) in
-  (nestCapsOK? c sched₁ st₁ ≡ true) × (Sched.slots sched₁ ≡ sl)
+-- AND THE BODY IT USED TO HAVE RESTED ON A WALK THAT IS NOW KNOWN
+-- FALSE AT ONE CAP, so the statement stands and the proof does not.
+-- What the descent installs is the arrival's syntax SUBSTITUTED, whose
+-- proven width bound is the iterate rather than the entry reading, so
+-- a conclusion at the cap the premises were read at cannot come from
+-- the face -- the face reports at a cap that steps, and the step is
+-- what this statement has nowhere to put.  The entry-width key here is
+-- what stops the neighbouring witness from reaching this form: it
+-- pins the arrival's DELIVERED width, which that witness exceeds, so
+-- what sits below is adjacent rather than decisive and nothing has yet
+-- instantiated this shape.
+-- REFUTED: `Refuted.Subscribe-Burst-Width` kills the unkeyed walk this
+--   body descended through, at a parked pair whose queue crosses the
+--   width the premises were read at.
+-- RECOVERY: git show 5899a5e restores the body, whose re-entry
+--   argument -- that the minted id and the appended frame are writes
+--   the predicate does not read -- the ceiling form still needs.
+postulate
+  subscribeInner-nestCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (fuel : Gas) (op : AllOp) (nid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) o ≡ true →
+    nestClosOK? c sl o ≡ true →
+    pWᵉ n (Sched.slots sched) o ≤ Caps.cWid c →
+    ⦃ _ : FaceOK c sl ⦄ →
+    let R      = subscribeInner fuel op nid κ id now o sched st
+        sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ R))))
+        st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ R)))) in
+    (nestCapsOK? c sched₁ st₁ ≡ true) × (Sched.slots sched₁ ≡ sl)
+
 
 -- A bump rewrites one node to a state the width predicate cannot tell
 -- from the old one: the merge clause of `widNode` reads only the
@@ -4436,13 +4450,14 @@ pushVals-nest-ems : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pushValsNestOK c sl B W m fuel op nid κ id now str sched st
 pushVals-nest-ems c sl B W m fuel op nid κ id now []         sched st hb = tt
 pushVals-nest-ems {Γ = Γ} {u = u} c sl B W m fuel op nid κ id now (em ∷ ems) sched st hb =
-    ≤-trans (nestDᵛˢ-++ˡ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
-                         (proj₁ (splitBurst {A = Val Γ u} ems)))
-            hb
-  , pushVals-nest-ems c sl B W m fuel op nid κ id now ems _ _
-      (≤-trans (nestDᵛˢ-++ʳ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
-                            (proj₁ (splitBurst {A = Val Γ u} ems)))
-               hb)
+    ≤-trans (nestDᵛˢ-++ˡ (proj₁ sp) (proj₁ (splitBurst {A = Val Γ u} ems))) hb
+  , pushVals-nest-ems c sl B W m fuel op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+      (≤-trans (nestDᵛˢ-++ʳ (proj₁ sp) (proj₁ (splitBurst {A = Val Γ u} ems))) hb)
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
+         (proj₂ (proj₂ sp)) sched st
 
 -- AND THE WIDTH HALF WALKS THE SAME WAY, off the caps face's own burst
 -- predicate rather than a bound: each emit owes the arrivals' widths at
@@ -4566,44 +4581,7 @@ pushVals-caps-wid {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv hc
           id now (proj₂ (mintNode sched))
           (installNode nid (allFresh u op lim) st)
 
--- THE PAIR RIDES AN `if` THE WAY THE NEST BOUND DOES, and for the same
--- reason: the connect's two exits differ only in bookkeeping the
--- invariant never reads, so one proof serves both branches once the
--- scrutinee is a variable.
-capsExit-if : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (bc : Bool)
-  (X Y : Stream Γ u × Sched Γ × EvalSt e) →
-  (nestCapsOK? c (proj₁ (proj₂ X)) (proj₂ (proj₂ X)) ≡ true) →
-  (nestCapsOK? c (proj₁ (proj₂ Y)) (proj₂ (proj₂ Y)) ≡ true) →
-  nestCapsOK? c (proj₁ (proj₂ (if bc then X else Y)))
-                (proj₂ (proj₂ (if bc then X else Y))) ≡ true
-capsExit-if c sl true  X Y hx hy = hx
-capsExit-if c sl false X Y hx hy = hy
 
--- ONE INSTANT AT THE FOLD'S FRAME PRESERVES THE PAIR UNCONDITIONALLY:
--- the only write is the accumulator's node, which the invariant reads
--- as true at every width.
-stepScan-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (sl : Slots Γ) (fuel : Gas) (id : Id) (now : Tick)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId) (κ : Path Γ u t)
-  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  let sf = stepFrame fuel id now (scan-f fn nid) κ vals fin sched st in
-  nestCapsOK? c (proj₁ (proj₂ (proj₂ (proj₂ sf))))
-                (proj₂ (proj₂ (proj₂ (proj₂ sf)))) ≡ true
-stepScan-caps {s = s} {u = u} c sl fuel id now fn nid κ vals fin sched st hsl hc
-  with lookupNode nid (EvalSt.nodes st)
-... | nothing                    = hc
-... | just (take-st _)           = hc
-... | just (mergeAll-st _ _ _ _) = hc
-... | just (switch-st _ _)       = hc
-... | just (exhaust-st _ _)      = hc
-... | just (scan-st {w} ac) with w ≟ᵗ u
-...   | no _     = hc
-...   | yes refl =
-        setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid
-          (scan-st (proj₂ (scanVals fn ac vals))) (EvalSt.nodes st)
-          refl hc
 
 -- AND THE FILTER'S DISPATCH DOES TOO: a cut sweeps the live list and
 -- drops registrations, neither of which the invariant reads, and both
@@ -4629,398 +4607,58 @@ takeDispatch-caps c sl nid vals fin sched st (just (mergeAll-st _ _ _ _)) hsl hc
 takeDispatch-caps c sl nid vals fin sched st (just (switch-st _ _))     hsl hc = hc
 takeDispatch-caps c sl nid vals fin sched st (just (exhaust-st _ _))    hsl hc = hc
 
--- A BURST THROUGH A FRAME WHOSE EVERY STEP PRESERVES THE PAIR
--- PRESERVES THE PAIR, one induction serving the three frames whose
--- step needs no premises about the values at all.
-pushBurst-caps-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (c : Caps) (sl : Slots Γ) (fuel : Gas) (id : Id) (now : Tick)
-  (f : Frame Γ s u) (κ : Path Γ u t) (str : Stream Γ s)
-  (sched : Sched Γ) (st : EvalSt e) →
-  (∀ (vals : List (Val Γ s)) (fin : Bool) (sched′ : Sched Γ) (st′ : EvalSt e) →
-     Sched.slots sched′ ≡ sl → nestCapsOK? c sched′ st′ ≡ true →
-     let sf = stepFrame fuel id now f κ vals fin sched′ st′ in
-     nestCapsOK? c (proj₁ (proj₂ (proj₂ (proj₂ sf))))
-                   (proj₂ (proj₂ (proj₂ (proj₂ sf)))) ≡ true) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  let r = pushBurst fuel id now f κ str sched st in
-  nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-pushBurst-caps-frame c sl fuel id now f κ [] sched st step hsl hc = hc
-pushBurst-caps-frame {Γ = Γ} {u = u} c sl fuel id now f κ (em ∷ ems) sched st
-    step hsl hc =
-  pushBurst-caps-frame c sl fuel id now f κ ems
-    (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
-    step
-    (trans (KeepsC.slotsEq (stepFrame-keeps fuel id now f κ (proj₁ sp)
-                              (proj₂ (proj₂ sp)) sched st)) hsl) S
-  where
-  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
-  sf = stepFrame fuel id now f κ (proj₁ sp) (proj₂ (proj₂ sp)) sched st
-  S  = step (proj₁ sp) (proj₂ (proj₂ sp)) sched st hsl hc
 
--- AND THE WRAP'S OWN BURST NEEDS ITS PREMISES: the state chain's exit,
--- read off the same induction `pushValsSt-walk` threads, with
--- admissibility and room supplying what each instant's step consumes.
 
--- AND THIS IS WHERE THE EXIT FAMILY'S LEVEL WOULD ACCUMULATE, which is
--- what makes the family unrepairable by a level and not merely awkward.
--- Every other member of it passes its pair along unchanged; this one is
--- an ACCUMULATOR, threading the invariant at a fixed cap across the
--- emit list one arrival at a time.  So a stepped conclusion here is not
--- a fixed offset the caller can absorb -- it is a SUM over arrivals,
--- one step per emit, and the list is as long as the burst is.
+
+-- THE INNER SUBSCRIBE'S OWN LEG, and it is a re-entry rather than a
+-- step: the wrapper mints a node id and appends an `from-inner` frame,
+-- and neither write is one the invariant reads -- the id bump moves a
+-- counter the width predicate never looks at, and the frame lives on
+-- the path rather than in the table.  So the whole of what this owes
+-- is the walk on the definition it descends into, at the arrival's
+-- own descent width.
+
+-- THE WRAP'S OWN EXIT, AND IT IS THE UNKEYED WALK ONE HOP DOWN.  This
+-- descends into the merge's source under a `thru-outer` frame, with
+-- the WRAP's value and closure keys as its premises -- neither of
+-- which says anything about the width the source's own inners deliver.
+-- So the conclusion is asked at the cap the premises were read at
+-- while the descent installs nodes the face can only bound at a cap
+-- that steps, which is the crossing the witness below makes at the
+-- root path and this shape inherits.
 --
--- That is the whole reason the budget and the operator count are the
--- currencies the repair needs: they are what bounds that sum, and no
--- fact about a single arrival can, however tight.  A repair that steps
--- the cap without carrying them prices one emit correctly and the
--- burst not at all.
-pushValsSt-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
-  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  nestCapsOK? c sched st ≡ true →
-  pushValsAdmOK c sl str →
-  pushValsRoomOK c sl W fuel op nid κ id now str sched st →
-  ⦃ _ : FaceOK c sl ⦄ →
-  let r = pushBurst fuel id now (thru-outer op nid) κ str sched st in
-  nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-pushValsSt-exit c sl W fuel op nid κ id now [] sched st hsl hc hadm hroom = hc
-pushValsSt-exit {Γ = Γ} {u = u} c sl W fuel op nid κ id now (em ∷ ems) sched st
-    hsl hc (hv , hcl , restAdm) (hr , restRoom) =
-  pushValsSt-exit c sl W fuel op nid κ id now ems
-    (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
-    (trans (KeepsC.slotsEq (stepFrame-keeps fuel id now (thru-outer op nid) κ (proj₁ sp)
-                             (proj₂ (proj₂ sp)) sched st)) hsl) S restAdm restRoom
-  where
-  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
-  sf = stepFrame fuel id now (thru-outer op nid) κ (proj₁ sp)
-         (proj₂ (proj₂ sp)) sched st
-  S = stepThru-caps c sl W fuel op nid κ id now (proj₁ sp)
-        (proj₂ (proj₂ sp)) sched st hsl hc hv hcl hr
-
--- THE CONNECT LEG OF THE CAPS WALK: the registration and the latch are
--- bookkeeping the invariant never reads, so the whole of what this leg
--- owes is the re-entry on the definition, keyed by the closure premise
--- the slot head holds.
-sharedConnect-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (i : Fin n)
-  (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)}
-  (κ : Path Γ (lookup Γ i) t)
-  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → sl i ≡ shared d {ok = ok} →
-  nestCapsOK? c sched st ≡ true →
-  suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
-  connW g i d κ id now sched st ≤ W →
-  ⦃ _ : FaceOK c sl ⦄ →
-  let r = sharedConnect g i d κ id now sched st in
-  nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-
--- THE SLOT LEG: a spent share and a live one leave the table alone, so
--- only the connect arm owes anything.
-subscribeSharedSlot-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (i : Fin n)
-  (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)}
-  (κ : Path Γ (lookup Γ i) t)
-  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → sl i ≡ shared d {ok = ok} →
-  nestCapsOK? c sched st ≡ true →
-  suc (closSizeᵉ (slotClos sl) d) ≤ Caps.cSize c →
-  connW g i d κ id now sched st ≤ W →
-  ⦃ _ : FaceOK c sl ⦄ →
-  let r = subscribeSharedSlot g i d κ id now sched st in
-  nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-subscribeSharedSlot-caps-exit c sl W g i d κ id now sched st hsl hsi hc hk hw
-  with memberSource (toℕ i) (EvalSt.completedSources st)
-... | true  = hc
-... | false
-  with memberSource (toℕ i) (EvalSt.connectedShares st)
-... | true  = hc
-... | false = sharedConnect-caps-exit c sl W g i d κ id now sched st
-                hsl hsi hc hk hw
-
--- THE `*All` LEG, one member for the three ops: the inner exit pair is
--- the walk's own re-entry through the wrap vocabulary's bridges, and
--- the wrap's burst is the state chain's exit over the two stream
--- leaves.
-subscribeAll-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
-  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
-  nestClosOK? c sl (allWrap op lim b) ≡ true →
-  descW g (allWrap op lim b) κ id now sched st ≤ W →
-  ⦃ _ : FaceOK c sl ⦄ →
-  let r = subscribeAll g op (allFresh u op lim) b κ id now sched st in
-  nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-
--- THE CAPS-PRESERVATION WALK, now a body: at ANY subscription, at ANY
--- path, the slots equation and the invariant come back from
--- `subscribeE` on the premises the caps half already carries.  The
--- invariant is the node-table conjunct alone, which is what makes the
--- defer and cold-input clauses close outright: their only node write
--- is a fresh node.
---
--- AND AS STATED IT IS FALSE, which the body does not show because the
--- body stands on a leaf that is false with it.  Hand the arm a source
--- whose inners cross a tick and the limit holds the second inner in
--- the node the arm installed, so the invariant this walk reports is
--- absurd at the width its own premises admit.
---
--- AND A SLOT-KEYED WIDTH DOES NOT REPAIR IT, which is worth knowing
--- because it looks like it should: the slot caps DO read the width
--- field, so carrying them rules the degenerate zero out and the
--- crossing simply moves up to whatever width the slots pin.  The
--- quantity that has to be bounded is the PAYLOAD's arity, and the
--- source picks that freely -- the arrivals are not the slots.  What is
--- owed is a width key on the ARRIVALS, and their own bound moving to a
--- cap whose width axis steps, which the invariant admits in the
--- widening direction and refuses in the other.
--- REFUTED: `Refuted.Defer-Park-Size` kills this statement over the
---   predicate that carried a size conjunct: a defer parks its body
---   at full syntax size, and every premise here reads a defer as 1.
--- REFUTED: `Refuted.Defer-Park-Width` kills it over the
---   pending-width conjunct too, the same program at unit width.
--- REFUTED: `Refuted.Subscribe-Burst-Width` kills the statement as it
---   now stands, at a parked pair under a limit of one -- and spells
---   out that this very definition inhabits the type it kills.
--- DEAD ROUTE: repairing this by STEPPING the cap one notch -- a
---   `arrCapAt` whose width axis advances with the size axis, so the
---   conclusion reports at the stepped cap -- closes every arm of this
---   walk and then dies on COMPOSITION.  The value push runs the inner
---   subscription at the already-stepped cap, so the inner reports at a
---   cap stepped twice; and the step does not nest, because the inner
---   cap's base size is strictly larger and no monotonicity brings a
---   two-step cap under a one-step one.  A single notch cannot express
---   a walk that re-enters itself, so the level has to be CARRIED, not
---   nested: in at one level, out at that level plus a residue, over
---   ONE base cap.
--- DEAD ROUTE: and CARRYING the level does not work here either, which
---   is the sharper finding and the one that decides the module.  The
---   residue such a walk reports is not a parameter it can be generic
---   in: levels ADD along a sequential composition, and the walk
---   re-enters itself once per pushed value, so the total is the level
---   RECURRENCE and nothing weaker bounds it.  The proven face bounds
---   its own residue with that recurrence, which reads the budget and
---   the operator count -- two currencies this module does not carry
---   and cannot acquire without restating the face here.  So the walk
---   is not repairable in place at any level -- and "any level" covers a
---   level taken as a PARAMETER, which is the form the arrivals' own cap
---   already uses and so the one a reader reaches for next.  The arm
---   hands its exit pair UP to the arrivals' cap and reports back DOWN
---   at the flat one, and only the FROZEN width ever made those the same
---   boolean; a width that steps breaks the identity in the direction
---   the arm reports, whatever supplies the level.  So what is left is
---   to stop stating it and consume the face instead -- and the CURRENCIES come
---   first, which is the ordering the two dead routes above fix rather
---   than a preference.  The face prices its residue in a budget and an
---   operator count, and every door out of this cone reads a cap whose
---   width is frozen, so a consumption written before those arrive has
---   nothing to hand the face and nothing to receive.  They are not a
---   bundle a sweep can thread either: each reads the SUBSCRIPTION, so a
---   recursive arm re-establishes its own rather than inheriting one,
---   and that re-establishment is the content.
--- DEAD ROUTE: and the arrivals' width key cannot be carried FLAT,
---   which closes the last local repair rather than merely ranking it.
---   Every structural arm here preserves such a key definitionally --
---   the parked width is a join-fold and each arm's subterm is one of
---   its summands -- so the key reads as threadable right up to the mu
---   arm, where the walk recurses on the UNFOLD.  There the containment
---   runs the wrong way: the plug lands at the variable positions,
---   which is exactly where the parked width is looking, and it exposes
---   the mu's own delivered width, which the parked one does not bound.
---   `unfoldμ-caps` is where that is written down -- its width half is
---   derived from the SIZE hypothesis for this reason, and it delivers
---   the arrivals' bound only at a cap stepped by the mu's size
---   squared.  So no premise about a single arrival survives this walk
---   at a fixed cap, however many currencies ride beside it, and the
---   currencies stop being a repair of their own: they are the face's
---   premise list, which is where they already are.
--- DEAD ROUTE: and the walk cannot report at a STEPPED cap either, in
---   any form that names the step.  Deleting the frozen width forces
---   it: the `*All` arm's exit pair is owed at the arrivals' cap, so
---   the walk must report one step above its entry.  Freezing that
---   report at entry-plus-one closes the arm the level-carried form
---   died at -- the whole `*All` leg and both `pushVals` halves go
---   green -- and dies one level further out, where the thru chain
---   calls the inner subscribe ONCE PER ARRIVAL at a cap it threads
---   unchanged across the fold.  A walk that steps the cap steps it
---   again at every arrival, so the residue is a per-arrival
---   recurrence: no constant names it, and a carried level names the
---   wrong thing.  Two parameterisations, one wall.
--- TWIN: `subscribeE-caps` already carries the caps invariant across
---   this very operation, at full strength and over the same cap
---   family -- the node-table conjunct is a definitional weakening of
---   its own, and the weakening is proven.  It is a proven body, so
---   what this walk owes is reachable rather than merely proposed, and
---   the only thing between them is which module reads which.
--- RECOVERY: git show 0e96e46 restores the one-step attempt, whose
---   width lemmas the level-indexed form needs UNCHANGED: the node
---   widening step, its lift to the nest predicate, and the two
---   `2 ≤ cSize` extractors for a wrap and for a parked closure.
--- RECOVERY: git show bfbf2b4 restores the constant-step attempt, and
---   with it the `arrCapAt` deletion across all fifty-four sites, the
---   node-width widening step, its lift to the nest predicate, and the
---   one-step conversion built over them.
--- RECOVERY: git show 66a493a restores the level-carried attempt, which
---   adds the arrivals' own widening over the level order and the step
---   that spends it, and leaves the module red at the one arm that read
---   the frozen width in both directions.
-subscribeE-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas) (o : Closed Γ u)
-  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  ⦃ _ : FaceOK c sl ⦄ →
-  Sched.slots sched ≡ sl →
-  nestCapsOK? c sched st ≡ true →
-  nestValOK? c (obs u) o ≡ true →
-  nestClosOK? c sl o ≡ true →
-  descW g o κ id now sched st ≤ W →
-  let r = subscribeE g o κ id now sched st in
-  nestCapsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-subscribeE-caps-exit c sl W g (input i) κ id now sched st hsl hc hv hcl hw
-  with Sched.slots sched i in eqs
-... | shared d
-  rewrite slotClos-fix sl i (trans (sym (cong (λ f → f i) hsl)) eqs) =
-  subscribeSharedSlot-caps-exit c sl W g i d κ id now sched st hsl
-    (trans (sym (cong (λ f → f i) hsl)) eqs) hc (≤ᵇ⇒≤ _ _ (T-to hcl))
-    (≤-trans (descW-conn g i d κ id now sched st eqs) hw)
-... | scripted (hot _)
-  with memberSource (toℕ i) (EvalSt.completedSources st)
-... | true  = hc
-... | false = hc
-subscribeE-caps-exit c sl W g (input i) κ id now sched st hsl hc hv hcl hw
-    | scripted (cold sync []) = hc
-subscribeE-caps-exit c sl W g (input i) κ id now sched st hsl hc hv hcl hw
-    | scripted (cold sync (dl ∷ ds)) = hc
-subscribeE-caps-exit c sl W g (ofᵉ ts) κ id now sched st hsl hc hv hcl hw = hc
-subscribeE-caps-exit c sl W g emptyᵉ κ id now sched st hsl hc hv hcl hw = hc
-subscribeE-caps-exit c sl W g (mapᵉ f b) κ id now sched st hsl hc hv hcl hw =
-  pushBurst-caps-frame c sl g id now (map-f f) κ (proj₁ res)
-    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (λ vals fin sched′ st′ h₁ h₂ → h₂)
-    (trans (KeepsC.slotsEq
-              (subscribeE-keeps g b (map-f f ↠ κ) id now sched st)) hsl) IH
-  where
-  res = subscribeE g b (map-f f ↠ κ) id now sched st
-  IH = subscribeE-caps-exit c sl W g b (map-f f ↠ κ) id now sched st
-         hsl hc (nestValOK?-map c f b hv)
-         (nestClosOK?-mono c sl b (mapᵉ f b)
-            (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
-                            (closSizeᵗ (slotClos sl) f))
-                     (n≤1+n _))
-            hcl)
-         (≤-trans (descW-map g f b κ id now sched st) hw)
-subscribeE-caps-exit c sl W g (takeᵉ cnt b) κ id now sched st hsl hc hv hcl hw
-  with evalTm cnt in eqc
-... | zero  = hc
-... | suc k =
-  pushBurst-caps-frame c sl g id now (take-f nid) κ (proj₁ res)
-    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (λ vals fin sched′ st′ h₁ h₂ →
-       takeDispatch-caps c sl nid vals fin sched′ st′
-         (lookupNode nid (EvalSt.nodes st′)) h₁ h₂)
-    (trans (KeepsC.slotsEq
-              (subscribeE-keeps g b (take-f nid ↠ κ) id now
-                 (proj₂ (mintNode sched))
-                 (installNode nid (take-st (suc k)) st))) hsl) IH
-  where
-  nid = proj₁ (mintNode sched)
-  res = subscribeE g b (take-f nid ↠ κ) id now (proj₂ (mintNode sched))
-          (installNode nid (take-st (suc k)) st)
-  IH = subscribeE-caps-exit c sl W g b (take-f nid ↠ κ) id now
-         (proj₂ (mintNode sched)) (installNode nid (take-st (suc k)) st)
-         hsl
-         (nestCapsOK?-setNode c nid (take-st (suc k))
-            (proj₂ (mintNode sched)) st refl hc)
-         (nestValOK?-take c cnt b hv)
-         (nestClosOK?-mono c sl b (takeᵉ cnt b)
-            (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
-                            (closSizeᵗ (slotClos sl) cnt))
-                     (n≤1+n _))
-            hcl)
-         (≤-trans (descW-take g cnt b κ id now sched st k eqc) hw)
-subscribeE-caps-exit c sl W g (scanᵉ f z b) κ id now sched st hsl hc hv hcl hw =
-  pushBurst-caps-frame c sl g id now (scan-f f nid) κ (proj₁ res)
-    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (λ vals fin sched′ st′ h₁ h₂ →
-       stepScan-caps c sl g id now f nid κ vals fin sched′ st′ h₁ h₂)
-    (trans (KeepsC.slotsEq
-              (subscribeE-keeps g b (scan-f f nid ↠ κ) id now
-                 (proj₂ (mintNode sched))
-                 (installNode nid (scan-st (evalTm z)) st))) hsl) IH
-  where
-  nid = proj₁ (mintNode sched)
-  res = subscribeE g b (scan-f f nid ↠ κ) id now (proj₂ (mintNode sched))
-          (installNode nid (scan-st (evalTm z)) st)
-  IH = subscribeE-caps-exit c sl W g b (scan-f f nid ↠ κ) id now
-         (proj₂ (mintNode sched)) (installNode nid (scan-st (evalTm z)) st)
-         hsl
-         (nestCapsOK?-setNode c nid (scan-st (evalTm z))
-            (proj₂ (mintNode sched)) st refl hc)
-         (nestValOK?-scan c f z b hv)
-         (nestClosOK?-mono c sl b (scanᵉ f z b)
-            (≤-trans (m≤n+m (closSizeᵉ (slotClos sl) b)
-                            (closSizeᵗ (slotClos sl) f
-                               + closSizeᵗ (slotClos sl) z))
-                     (n≤1+n _))
-            hcl)
-         (≤-trans (descW-scan g f z b κ id now sched st) hw)
-subscribeE-caps-exit c sl W g (mergeAllᵉ lim b) κ id now sched st hsl hc hv hcl hw =
-  subscribeAll-caps-exit c sl W g mergeAllᵒ lim b κ id now sched st
-    hsl hc hv hcl hw
-subscribeE-caps-exit c sl W g (switchAllᵉ b) κ id now sched st hsl hc hv hcl hw =
-  subscribeAll-caps-exit c sl W g switchᵒ nothing b κ id now sched st
-    hsl hc hv hcl hw
-subscribeE-caps-exit c sl W g (exhaustAllᵉ b) κ id now sched st hsl hc hv hcl hw =
-  subscribeAll-caps-exit c sl W g exhaustᵒ nothing b κ id now sched st
-    hsl hc hv hcl hw
-subscribeE-caps-exit c sl W g0 (μᵉ b) κ id now sched st hsl hc hv hcl hw = hc
-subscribeE-caps-exit c sl W (gs fuel) (μᵉ b) κ id now sched st hsl hc hv hcl hw =
-  subscribeE-caps-exit c sl W fuel (unfoldμ b) κ id now sched st hsl hc
-    (≤ᵇ-true (syncSizeᵉ (unfoldμ b)) (Caps.cSize c)
-      (≤-trans (≤-reflexive (syncSize-unfoldμ b))
-        (≤-trans (n≤1+n (syncSizeᵉ b))
-                 (nestValOK?-size c (μᵉ b) hv))))
-    (nestClosOK?-mono c sl (unfoldμ b) (μᵉ b)
-       (≤-trans (≤-reflexive (closSize-unfoldμ (slotClos sl) b))
-                (n≤1+n _))
-       hcl)
-    (≤-trans (descW-mu fuel b κ id now sched st) hw)
-subscribeE-caps-exit c sl W g (varᵉ ()) κ id now sched st hsl hc hv hcl hw
-subscribeE-caps-exit {u = u} c sl W g (deferᵉ b) κ id now sched st hsl hc hv hcl hw =
-  setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched)
-    (Sched.nextNode sched) (mergeAll-st {t = u} nothing 0 [] false)
-    (EvalSt.nodes st) refl hc
-
--- the exit pair is one instance of the walk, entered at the installed
--- state through the wrap vocabulary's own bridges
-pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
-  (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
-  (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
-  nestValOK? c (obs u) (allWrap op lim b) ≡ true →
-  nestClosOK? c sl (allWrap op lim b) ≡ true →
-  descW g (allWrap op lim b) κ id now sched st ≤ W →
-  ⦃ _ : FaceOK c sl ⦄ →
-  let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
-          id now (proj₂ (mintNode sched))
-          (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-  in nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true
-pushVals-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
-  subscribeE-caps-exit c sl W g b
-    (thru-outer op (proj₁ (mintNode sched)) ↠ κ) id now
-    (proj₂ (mintNode sched))
-    (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
-    hsl
-    (nestCapsOK?-setNode c (proj₁ (mintNode sched)) (allFresh u op lim)
-       (proj₂ (mintNode sched)) st
-       (allFresh-wid (Caps.cWid c) (Sched.slots (proj₂ (mintNode sched))) u op lim)
-       hc)
-    (allWrap-valOK c op lim b hv)
-    (allWrap-closOK c sl op lim b hcl)
-    (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)
+-- AND THE PROVEN FACE IS NOT THE REPAIR, WHICH IS A FACT ABOUT THE
+-- PREDICATE AND NOT ABOUT THE CAP.  The face reads the strong caps
+-- boolean and this family reads the node-table conjunct alone; the
+-- conversion between them runs one way, from strong to weak, and there
+-- is no route back.  So a door standing here can never assemble what
+-- the face asks for, however the cap is parameterised -- the walk was
+-- restated at a ceiling, the application typechecked, and it was still
+-- unreachable, because nothing in this cone can produce the strong
+-- reading to feed it.  The entry that COULD is the thru door, which
+-- holds the strong boolean and weakens it immediately; the repair is
+-- to stop weakening there, not to re-cap anything here.
+-- REFUTED: `Refuted.Subscribe-Burst-Width` kills the walk this was a
+--   one-line application of, and pins the two figures it crosses --
+--   an arrival cap's width against the reading of the first payload
+--   the source hands back.
+-- RECOVERY: git show 5899a5e restores the application and the arms
+--   under it, together with the node-reading widening and its lift to
+--   the table predicate, which any ceiling form needs unchanged.
+postulate
+  pushVals-caps-exit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (c : Caps) (sl : Slots Γ) (W : ℕ) (g : Gas)
+    (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl → nestCapsOK? c sched st ≡ true →
+    nestValOK? c (obs u) (allWrap op lim b) ≡ true →
+    nestClosOK? c sl (allWrap op lim b) ≡ true →
+    descW g (allWrap op lim b) κ id now sched st ≤ W →
+    ⦃ _ : FaceOK c sl ⦄ →
+    let res = subscribeE g b (thru-outer op (proj₁ (mintNode sched)) ↠ κ)
+            id now (proj₂ (mintNode sched))
+            (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
+    in nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true
 
 -- THE ROOM WALK ASSEMBLED, over the three leaves the block above
 -- states apart.  The exit pair is the descent's, so the fold starts at
@@ -5059,73 +4697,6 @@ pushVals-caps-room {u = u} c j sl W g op lim b κ id now sched st hj hsl hc hv h
           id now (proj₂ (mintNode sched))
           (installNode (proj₁ (mintNode sched)) (allFresh u op lim) st)
   EX = pushVals-caps-exit c sl W g op lim b κ id now sched st hsl hc hv hcl hw
-
-subscribeAll-caps-exit {u = u} c sl W g op lim b κ id now sched st hsl hc hv hcl hw =
-  pushValsSt-exit (arrCapAt (Caps.cSize c) c) sl W g op nid κ id now (proj₁ res)
-    (proj₁ (proj₂ res)) (proj₂ (proj₂ res))
-    (trans (KeepsC.slotsEq
-              (subscribeE-keeps g b (thru-outer op nid ↠ κ) id now
-                 (proj₂ (mintNode sched))
-                 (installNode nid (allFresh u op lim) st))) hsl) EX
-    (pushVals-caps-adm c (Caps.cSize c) sl W g op lim b κ id now sched st ≤-refl hsl hc hv hcl hw)
-    (pushVals-caps-room c (Caps.cSize c) sl W g op lim b κ id now sched st ≤-refl hsl hc hv hcl hw)
-    ⦃ faceArr c sl (Caps.cSize c) faceHere ⦄
-  where
-  nid = proj₁ (mintNode sched)
-  res = subscribeE g b (thru-outer op nid ↠ κ) id now (proj₂ (mintNode sched))
-          (installNode nid (allFresh u op lim) st)
-  EX : nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true
-  EX = subscribeE-caps-exit c sl W g b (thru-outer op nid ↠ κ) id now
-         (proj₂ (mintNode sched)) (installNode nid (allFresh u op lim) st)
-         hsl
-         (nestCapsOK?-setNode c nid (allFresh u op lim)
-            (proj₂ (mintNode sched)) st
-            (allFresh-wid (Caps.cWid c)
-               (Sched.slots (proj₂ (mintNode sched))) u op lim)
-            hc)
-         (allWrap-valOK c op lim b hv)
-         (allWrap-closOK c sl op lim b hcl)
-         (≤-trans (allWrap-descW g op lim b κ id now sched st) hw)
-
-sharedConnect-caps-exit c sl W g0 i d κ id now sched st hsl hsi hc hk hw = hc
-sharedConnect-caps-exit {Γ = Γ} c sl W (gs fuel′) i d κ id now sched st
-                        hsl hsi hc hk hw =
-  capsExit-if c sl (burstCompleted (proj₁ res)) _ _
-    IH IH
-  where
-  st₁ = register (toℕ i) κ
-          (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
-  res = subscribeE fuel′ d (share-sink i) id now sched st₁
-  IH : nestCapsOK? c (proj₁ (proj₂ res)) (proj₂ (proj₂ res)) ≡ true
-  IH = subscribeE-caps-exit c sl W fuel′ d (share-sink i) id now sched st₁
-         hsl hc
-         (≤ᵇ-true (syncSizeᵛ (obs (lookup Γ i)) d) (Caps.cSize c)
-            (≤-trans (≤-trans (syncSize≤closᵉ (slotClos sl) (slotClos-pos sl) d)
-                              (n≤1+n _))
-                     hk))
-         (≤ᵇ-true (closSizeᵉ (slotClos sl) d) (Caps.cSize c)
-            (≤-trans (n≤1+n _) hk))
-         (≤-trans (connW-gs fuel′ i d κ id now sched st) hw)
-
--- THE INNER SUBSCRIBE'S OWN LEG, and it is a re-entry rather than a
--- step: the wrapper mints a node id and appends an `from-inner` frame,
--- and neither write is one the invariant reads -- the id bump moves a
--- counter the width predicate never looks at, and the frame lives on
--- the path rather than in the table.  So the whole of what this owes
--- is the walk on the definition it descends into, at the arrival's
--- own descent width.
-subscribeInner-nestCaps c sl g0 op nid κ id now o sched st
-                        hsl hc hv hcl hw = hc , hsl
-subscribeInner-nestCaps c sl (gs fuel) op nid κ id now o sched st
-                        hsl hc hv hcl hw =
-  X , trans (KeepsC.slotsEq (subscribeE-keeps fuel o κ′ id now sc′ st)) hsl
-  where
-  κ′  = from-inner op nid (Sched.nextNode sched) ↠ κ
-  sc′ = record sched { nextNode = suc (Sched.nextNode sched) }
-  X = subscribeE-caps-exit c sl (descW fuel o κ′ id now sc′ st)
-        fuel o κ′ id now sc′ st hsl
-        (nestCapsOK?-nextNode c (suc (Sched.nextNode sched)) sched st hc)
-        hv hcl ≤-refl
 
 -- the state half assembled: exit pair in, checked chain out
 pushVals-caps-st : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

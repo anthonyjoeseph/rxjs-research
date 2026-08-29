@@ -190,32 +190,31 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the entry-capped walk retired: `Nest-Walk`'s invariant is refuted
-  at ONE cap and the face already carries it at a stepping one** —
-  `walk-absurd` kills the exit walk's own statement and `walkStands`
-  exhibits this tree's body inhabiting the killed type, so every arm
-  under it is proving something false. The module holds thirty-four
-  refutation references and fifteen dead routes against one shape;
-  that concentration is the finding, not bad luck. `subscribeE-caps`
-  is the same walk over the same subscription, proven, reporting at
-  `frameStep (j + j′) c` with `j′` bounded by the operator sweep. This
-  leg imports it and makes the exit family one application of it.
+- **the thru door stops weakening: this cone carries the STRONG caps
+  reading, not the node-table conjunct alone** — the exit family is
+  refuted at one cap, and the proven face cannot replace it for a
+  reason that is about the PREDICATE rather than the cap: the face
+  reads the strong boolean, this cone the weak one, and the conversion
+  runs one way only. A ceiling form typechecked and was still
+  unreachable: no door here can assemble what the face asks for. The door holding the strong reading is the
+  thru entry, which discards it at once. This leg carries it through
+  instead, down to the two exits now postulated at full strength —
+  which is what makes the face reachable at all.
 
-- **the thru chain re-based on the level the face returns** — the
-  chain is what forced the entry cap: its room record reads an
-  arrival's width against `cWid c`, and an arrival is the head's
-  syntax substituted, whose proven bound is the ITERATE. So the room
-  steps with the walk, once per arrival, and the steps compose — which
-  is why the face quantifies a level rather than naming a constant.
-  This leg moves the room and the node reading onto that level and
-  spends the face's bound to keep it named.
+- **the ceiling discharged at the instant's own cap** — a ceiling
+  premise is worth exactly the cap that discharges it, and no level of
+  the frame cap can: `frameStep J c` cannot ceiling a walk that climbs
+  past `J`, which `Burst-Walk`'s nodry face already records and answers
+  by anchoring at the reset caps `sizeCapAt e sl (suc id)` instead.
+  This leg takes that anchor on the WIDTH axis and retires `arrCapAt`,
+  whose frozen width is the figure the refutation crosses.
 
-- **the burst leaves discharged and their probe re-run** — with the
-  chain at the stepping cap, the arrivals' width key is the face's own
-  second conjunct and the FALSITY row leaves the ledger by proof
-  rather than by restatement. `Probed.PushVals-Caps` was taken at the
-  frozen-width cap, so its rows are evidence about text that will be
-  gone; re-running is not optional and restamping alone is forbidden.
+- **the burst leaves discharged and their probe re-run** — under a
+  discharged ceiling the arrivals' width key is the face's own second
+  conjunct, so the FALSITY row leaves the ledger by proof rather than
+  by restatement. `Probed.PushVals-Caps` was taken at the frozen-width
+  cap, so its rows are evidence about text that will be gone;
+  re-running is not optional and restamping alone is forbidden.
 
 ### The ledger
 
@@ -228,6 +227,14 @@ does not fit is a finding about the shared statement, not about the head.
   subscription's burst. Refuted at a width of zero, which no key here forbids.
   The route is `subscribeE-caps`, which reports this conclusion and is
   importable — the module order was read as forbidding it and does not.
+- **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
+  the inner descent's caps invariant, in at one cap and out at the same one.
+  Its entry-width key stops the neighbouring witness reaching it, so nothing
+  has instantiated this shape; the descent installs the iterate.
+- **`pushVals-caps-exit`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`: the
+  wrap's exit, which is the unkeyed walk one hop down under a `thru-outer`
+  frame. Its premises are the WRAP's keys and say nothing about the width the
+  source's own inners deliver, which is the crossing the witness makes.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting

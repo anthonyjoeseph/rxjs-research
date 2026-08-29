@@ -44,7 +44,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Empty using (⊥)
 open import Data.List using ([]; _∷_)
 open import Data.Maybe using (just)
-open import Data.Nat using (ℕ; zero; suc; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _≤_)
 open import Data.Nat.Properties using (≤-refl)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -63,7 +63,7 @@ open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (nestValOK?; burstCaps?)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestCapsOK?; nestClosOK?; subscribeE-caps-exit; FaceOK; faceOK)
+  using (nestCapsOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -208,16 +208,3 @@ StmtWalk =
 walk-absurd : StmtWalk → ⊥
 walk-absurd h with h refl refl refl refl ≤-refl
 ... | ()
-
--- AND THE PROVEN WALK ALREADY INHABITS THAT TYPE, which is what makes
--- the restatement unavoidable rather than tidy: the exit pair is a
--- real body over the leaf refuted above, so `src` today proves the
--- statement this witness kills.  The inhabitant is spelled out because
--- a reader is entitled to check the claim rather than take it.
-faceP : FaceOK capP slots
-faceP = faceOK (s≤s (s≤s z≤n)) (s≤s z≤n) refl
-          (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (z≤n))))))))))))
-
-walkStands : StmtWalk
-walkStands = subscribeE-caps-exit capP slots WP gasBig headP root 0 0
-               schedP (st-init headP) ⦃ faceP ⦄
