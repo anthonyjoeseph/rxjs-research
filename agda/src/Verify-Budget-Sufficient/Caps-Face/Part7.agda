@@ -2316,20 +2316,31 @@ postulate
 -- two ledger lines split it chain by chain; the conversion back to the
 -- count is `lvls-add` and no longer a leaf.
 --
--- AND THE PREDICATE UNDER THIS ROW STILL ASKS FOR THE FLAT FORM, WHICH
--- IS WHERE THE SAME WALL IS NEXT MET.  The walk predicate's frame
--- clause and its share fold both demand a flat level bound against the
--- cascade's count, one per frame and one per admitted chain, and that is
--- the very statement the block above shows to be a cascade-level fact
--- read per chain.  Whatever proves this row supplies them, so it inherits
--- the defect rather than meeting a new one; the repair is the one just
--- spent one stratum up, and it is a restatement of the predicate, not an
--- induction to be found.
+-- AND THE LEVEL PREMISE ON THE WALK LEAF IS NOT A CONVENIENCE.  Without
+-- it the statement is false at EVERY program and needs no state to kill:
+-- the level is a free parameter, the only hypothesis mentioning it says
+-- the state fits the cap AT that level and so gets WEAKER as it rises,
+-- and the predicate produced asserts at every frame that the level is
+-- under the cascade's count.  A level one above the count satisfies both
+-- hypotheses and contradicts the conclusion.  So the bound is a property
+-- of the CALL, and the delivery-counted form is the one a caller can
+-- actually supply -- this chain's own charge, out of the fold's
+-- invariant.
 --
--- REFUTED: `Refuted.Chain-Step-Flat` -- one step of one chain, at a
---   concrete cap the pre-state satisfies and the post-state does not.
---   `Refuted.Frame-Step-Compose` -- the step does not compose, so the
---   level cannot be absorbed into the cap the machinery re-enters at.
+-- WHICH LEAVES THE PREDICATE'S OWN FLAT CONJUNCTS AS THE GRIND.  Its
+-- frame clause and its share fold each demand a level bound against the
+-- cascade's count, one per frame and one per admitted chain, and the
+-- premise above is what pays for them: a chain is at most one delivery's
+-- charge wide, so every intermediate level sits under the same ceiling.
+--
+-- REFUTED: `Refuted.Chain-Level-Unbounded` -- the level-free form of
+--   THIS statement, at every program at once, by arithmetic rather than
+--   by a row: a level one above the count satisfies both hypotheses and
+--   breaks the conclusion.  `Refuted.Chain-Step-Flat` -- one step of one
+--   chain, at a concrete cap the pre-state satisfies and the post-state
+--   does not.  `Refuted.Frame-Step-Compose` -- the step does not
+--   compose, so the level cannot be absorbed into the cap the machinery
+--   re-enters at.
 --
 -- DEAD ROUTE: re-entering the frame receipt with its cap parameter
 --   instantiated at the STEPPED cap, so that the level needs no
@@ -2369,6 +2380,9 @@ postulate
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
+    lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) Lv
+         (suc (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))))
+      ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id) →
     chainCapsOK (capsAt e sl id) sl (capsH e sl id) Lv nextId a path sched st
 
 
@@ -2477,7 +2491,7 @@ arr-chains-caps-go {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st 
                            (proj₂ (proj₂ (chainStep nextId a path sched
                               (record st { delivered = rid ∷ EvalSt.delivered st }))))) hdp)
 ... | false =
-      arr-chain-caps sl id Lv a nextId path sched st′ sleq cok
+      arr-chain-caps sl id Lv a nextId path sched st′ sleq cok CH≤
     , proj₁ ST
     , FLAT
     , arr-chains-caps-go sl id (Lv + proj₁ ST) a nextId chains
@@ -2530,10 +2544,13 @@ arr-chains-caps-go {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st 
                       (cong suc (delivN-split CS GO))
         hlvC : lvls S W d Lv (suc (D + R)) ≤ TOP
         hlvC = subst (λ x → lvls S W d Lv x ≤ TOP) SPLIT hlv
-        FLAT = ≤-trans (proj₁ (proj₂ ST))
-                 (≤-trans (lvls-mono (suc D) (suc (D + R)) 2≤S ≤-refl ≤-refl ≤-refl
-                             (s≤s (m≤m+n D R)))
-                          hlvC)
+        -- this chain's own charge, which is what both the leaf below
+        -- and the Σ above are bounded by
+        CH≤ : lvls S W d Lv (suc D) ≤ TOP
+        CH≤ = ≤-trans (lvls-mono (suc D) (suc (D + R)) 2≤S ≤-refl ≤-refl ≤-refl
+                         (s≤s (m≤m+n D R)))
+                      hlvC
+        FLAT = ≤-trans (proj₁ (proj₂ ST)) CH≤
         REC  = ≤-trans (lvls-mono R R 2≤S ≤-refl ≤-refl (proj₁ (proj₂ ST)) ≤-refl)
                  (≤-trans (≤-reflexive (sym (lvls-add S W d Lv (suc D) R))) hlvC)
 

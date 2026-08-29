@@ -4,7 +4,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: arr-chain-caps @10e085
+-- TARGET: arr-chain-caps @620ba7
 --
 -- WHAT IS BEING TESTED.  The target hands one chain's walk a level and
 -- asserts `capsOK?` at `frameStep Lv` of the instant's cap at EVERY
@@ -32,6 +32,12 @@
 -- hold.  Both rows are load-bearing in opposite directions: the flat
 -- one could have come back all-true and does not, the levelled one
 -- could have come back with a false and does not.
+--
+-- AND WHAT THE ROWS SAY NOTHING ABOUT IS WHERE THE LEVEL COMES FROM.
+-- They read the predicate's demand at a level handed in, so they
+-- measure how far a walk carries a level and not whether a caller can
+-- pay for one.  The target's level premise is that account, and it is
+-- stated in deliveries rather than levels; no row here instantiates it.
 --
 -- WHAT THESE ROWS DO NOT REACH.  The other conjuncts of the same
 -- predicate -- the values' caps past the first frame, the frame's

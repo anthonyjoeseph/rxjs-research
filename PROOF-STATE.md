@@ -216,6 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
+- **turn the leaf's level premise into the walk's per-frame ledger** —
+  the chain leaf now takes a delivery-counted level bound, which is the
+  quantity its one caller has and the flat form did not; what it does
+  not yet have is a body. The predicate it must produce charges a level
+  to every frame and every admitted share chain, so this leg is the
+  induction over the path that splits the premise the way the cascade
+  fold already splits its own: this frame's step against the ladder,
+  the remainder against the tail. The frame-local conjuncts fall out as
+  leaves, which is where the two legs below then stand.
+
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
   every face re-establishes it, so the two size bounds the chain walk
@@ -234,15 +244,6 @@ does not fit is a finding about the shared statement, not about the head.
   that moves per stage, which is the shape a mirror cannot hand over
   and the only part this row still owes.
 
-- **carry the delivery budget one stratum DOWN, into the walk predicate
-  itself** — the same flat ceiling that was just refuted at the cascade
-  is what the walk predicate asks of every frame and every share chain,
-  and the row that must PRODUCE it will hit the identical wall: a level
-  bound with no account of what is unspent cannot survive a step. The
-  repair is known now, so this leg restates those conjuncts against the
-  fold's own delivery count and re-reads the one proven consumer against
-  the new form, before the shape is ground into a chain-length induction.
-
 ### The ledger
 
 - **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
@@ -251,9 +252,9 @@ does not fit is a finding about the shared statement, not about the head.
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
 - **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: ONE chain's walk, asserted at
-  a level its frame receipt can pay. Its `capsOK?` spine is now read at every
-  state a re-walked path passes through; the `Set`-valued conjuncts are not.
+  `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: ONE chain's walk. Its level is
+  no longer free — a free one killed the statement at every program — but
+  charged against this chain's own deliveries, which is what its caller holds.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of
