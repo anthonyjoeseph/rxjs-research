@@ -3159,6 +3159,29 @@ thruConsume-caps c L sl W fuel exhaustᵒ nid κ id now o sched st hsl hc hv hcl
 
 -- and over a whole arrival list, each at the state the previous one
 -- left -- the fold `thruRoomOK` already has the shape of
+--
+-- THIS IS NOT A WEAKER COPY OF THE PROVEN WALK FACE, and reading it as
+-- one costs the chain.  The face over in the subscribe half is keyed on
+-- the FULL invariant and concludes at it; this one is keyed on the
+-- width reading and concludes at that.  Strong-to-strong does not give
+-- weak-to-weak, so no leaf-level weakening imports the proven bodies,
+-- and these are bodies rather than postulates -- deleting them to reach
+-- for the other face trades proven code for gaps.
+-- DEAD ROUTE: restating this chain, and the burst cone above it, at the
+--   full invariant so the proven face can be spent directly.  The
+--   proven face's PATH premises come with it, and they do not survive
+--   this recursion: the nest descent runs at a FLAT entry cap and
+--   reports its level existentially, so a clause that extends the path
+--   by one frame is asked for `suc (suc (pathLen κ)) ≤ cSize c` from
+--   `suc (pathLen κ) ≤ cSize c`.  The proven twin closes that by
+--   STEPPING the cap per operator and reporting at `j + j′`; adopting
+--   the premises therefore means adopting the j-indexed shape through
+--   every clause of the nest descent and every join in its arithmetic,
+--   which is a restatement of the face and not a spend of the other.
+-- RECOVERY: `git show ba436bd` restores the attempt -- the imports, the
+--   `thruFaceOK`/`thruCapsOK` entry pair and the level-free ∀L fold
+--   over a burst -- wanted again only if the nest face is ever moved to
+--   the j-indexed shape on purpose.
 thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (L : ℕ) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u)))

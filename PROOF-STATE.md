@@ -190,14 +190,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the levelled arms spent from the proven face** — with the shape
-  matched, the same walk proven one face over supplies these arms
-  outright: strong reading, stepping cap, level reported. The duplicate
-  checker cannot see the copy, since predicate and cap both differ, and
-  the import direction is clear — nothing in that face's cone reaches
-  this module — so the refuted postulates here are dischargeable in
-  place rather than by a move. What holds the copy up is the nesting
-  chain beside it, moved arm by arm, each carrying its own level.
+- **the refuted burst leaves given the invariant that kills their
+  witnesses** — every one of them is refuted at a width the weak reading
+  cannot forbid, so what is owed is a RESTATEMENT and the refutation is
+  what licenses it. The full invariant threads through the nest descent
+  unchanged, because that descent leaves the store alone; what does NOT
+  thread is the proven face's path pair, and that is now written down at
+  the walk chain as a dead route. So this leg takes the invariant only,
+  restates the refuted leaves on it, and supplies it from the burst
+  cone's own entry — leaving the walk chain, which is proven code at the
+  width reading, exactly where it stands.
 
 - **the burst probe re-run against what replaces it** — the probe over
   these leaves was taken at the frozen-width cap, so its rows become
