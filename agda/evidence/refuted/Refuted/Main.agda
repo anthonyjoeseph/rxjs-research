@@ -104,6 +104,8 @@ open import Refuted.Defer-Park-Width
 open import Refuted.Subscribe-Burst-Width
   using (Stmt; prems≡; burst-width-absurd; figs≡; keyFig≡;
          StmtWalk; premsP≡; walk-absurd)
+open import Refuted.Nest-Caps-Keys
+  using (Stmt; long-len; nest-caps-keys-absurd)
 open import Refuted.PushVals-Adm-Map
   using (AdmStmt; WidStmt; prems-map≡; adm-absurd; wid-absurd; figs-map≡;
   AdmStmtZ; WidStmtZ; prems-z≡; adm-absurd-z; wid-absurd-z; regs≡)

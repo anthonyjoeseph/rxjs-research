@@ -4441,7 +4441,23 @@ postulate
   -- the walk's own existential is bounded by a count at the depth
   -- fuel, and the face's by an op-iteration at the level, and nothing
   -- yet puts the second under the first.
-  -- REFUTED: `Refuted.Subscribe-Burst-Width.burst-width-absurd`
+  --
+  -- AND THAT BOUNDEDNESS IS WHAT KILLS IT.  The ceiling is fixed by
+  -- the cap and the descent DEPTH, and a source reaching no subscribe
+  -- reports depth zero at every path -- so one number bounds the level
+  -- for a whole family of paths, and the size field it grants is one
+  -- number too, while the path length the statement quantifies over is
+  -- free.  The path key is therefore not derivable here at any level,
+  -- and no widening of the cap helps: the counterexample path is built
+  -- by recursion on whatever bound is offered.  The repair is the one
+  -- the proven burst face already uses -- carry the two path keys down
+  -- the walk as PREMISES at a level, rather than producing them -- and
+  -- it is a restatement of this walk's own invariant, not of this
+  -- leaf alone.
+  -- REFUTED: `Refuted.Nest-Caps-Keys.nest-caps-keys-absurd` refutes
+  --   this statement outright; `Refuted.Subscribe-Burst-Width.burst-width-absurd`
+  --   is why the arrivals' width key is read at a level rather than at
+  --   the entry field.
   -- TWIN: `subscribeE-caps` proves the burst conclusion at exactly the
   --   cap the assembly below reads it at, and `subscribeE-burst-capsL`
   --   is the wrapper spending it.

@@ -190,23 +190,23 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the walk's entry keys, which are the whole residue** — the burst
-  leaf is discharged into the proven caps face, and what stands
-  between them is four quantities the nest walk has no premise about:
-  the source's written size and parked width, and both path keys. The
-  path key is the one with structure — a descent adds a frame per
-  step, so the length key strictly grows and only a stepped size
-  absorbs it. This leg threads the four down the walk at a level, and
-  settles the arithmetic putting the face's op-iteration ceiling under
-  the walk's own count.
+- **thread the walk's path keys at a level, which is now forced** —
+  the entry keys are REFUTED as something the walk can produce: the
+  ceiling they must sit under is fixed by the cap and the descent
+  depth, a source reaching no subscribe reports depth zero at every
+  path, and the path length is free — so one number is asked to
+  exceed every path in a family at once. The proven burst face carries
+  the same two keys as premises at a level instead, and this leg puts
+  that device on the nest walk's own invariant, which is where the
+  refutation says it belongs.
 
 - **the two remaining descent rows, which fail on the same key** — the
   inner descent's invariant and the wrap's exit are separate
   statements with one blocker: each is stated at a cap whose width is
   the ENTRY field, and each witness crosses at a width the source's
-  own inners deliver. Whatever device carries the keys down the walk
-  serves both, so they are one shelf and not two. This leg states that
-  device once and re-reads both rows through it.
+  own inners deliver. The device the leg above installs is what both
+  are missing, so they are one shelf and not two, and this leg
+  re-reads both through it.
 
 - **the cascade descent, whose risk is now priced rather than
   probeable** — no row can print a verdict on it: the bound side reads
@@ -223,9 +223,9 @@ does not fit is a finding about the shared statement, not about the head.
   form under it that proven inequalities reach is refuted at the evaluator,
   so nothing instantiates it from below; the store route it replaced cycles.
 - **`nest-caps-keys`** (Nest-Walk) — FALSITY, `REFUTED, TWIN`: the caps
-  face's entry keys — written size, parked width, both path keys — at a
-  level of the entry cap, plus the sum's bound. Nothing yet carries them
-  down the walk; the burst fact itself is proven one face over.
+  face's entry keys at a level of the entry cap, plus the sum's bound.
+  REFUTED outright — the ceiling is one number and the path length is
+  free — so the keys are threaded as premises, as the burst face does.
 - **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   the inner descent's caps invariant, in at one cap and out at the same one.
   Its entry-width key stops the neighbouring witness reaching it, so nothing
