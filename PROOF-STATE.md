@@ -1,81 +1,30 @@
-- **the face's premise list stated on `subscribeE-caps-exit`'s own
-  door** — the local repair is now dead twice over: the walk cannot
-  report at a fixed cap (the frozen width is refuted) and it cannot
-  report at a named step either (the thru chain steps once per
-  arrival). So the premises the face reads — the term's size and
-  parked width, the path's size and length, the nesting budget, the
-  operator count, the descent depth — go onto that signature, and the
-  structural arms re-establish them exactly as they already
-  re-establish the value and closure keys. Nothing is consumed yet;
-  this commit is the door.
-- **the `*All` arm stops walking and spends the face** — with the
-  premises at the door, the arm that forces the step drops its own
-  recursion and spends `subscribeE-caps`, weakening the `capsOK?`
-  conclusion through `capsOK?⇒nest` and absorbing the level the Σ
-  returns together with its bound. The bridge's charge one module over
-  is the worked instance at this exact premise list. It is where the
-  refuted burst statements leave the tree.
-- **the thru chain's inner subscribe follows, and the probe is
-  re-run** — the chain is what refuted the constant, so it is the last
-  arm and the one that decides whether the bounded Σ composes across a
-  fold. `Probed.PushVals-Caps` was taken against the frozen-width cap;
-  its green is then evidence about text that is gone, and restamping
-  the fingerprint alone is forbidden. Rows re-run at the restated
-  shape, or the probe goes.
+- **the exit family restated in the face's own shape: the level
+  existentially quantified AND bounded** — the constant died at the
+  thru chain and a carried level names the wrong thing, but the chain
+  composes if each arrival contributes its own step to a running total
+  held under one bound. That is what the proven face already reports —
+  a Σ over the level with `j + j′` under an iteration bound — and what
+  the instant's own cap family is built to absorb, its successor being
+  the entry stepped by a computed count. This commit is the
+  restatement of the conclusion alone; the arms stay postulated
+  beneath it.
+- **the arms consume `subscribeE-caps` rather than re-proving it** —
+  with the conclusion in the face's shape, no arm has to re-establish
+  a premise: the arm spends the face and inherits its level and its
+  bound, weakening `capsOK?` through `capsOK?⇒nest`. The premises are
+  not threaded, which is the point — threading them arm by arm is the
+  route the header already records as dead, and the face is where they
+  already sit. The bridge's charge one module over is the worked
+  instance.
+- **the walk's entry stops weakening, and the probe is re-run** — the
+  thru door holds `capsOK?` and discards it immediately; the face
+  wants exactly that, so the weakening moves from the door down to
+  each arm's conclusion. `Probed.PushVals-Caps` was taken against the
+  frozen-width cap, so its green is evidence about text that will be
+  gone; the rows re-run at the restated shape or the probe goes, and
+  restamping the fingerprint alone is forbidden.
 
-# PROOF-STATE — the roadmap
-
-**What this file is.** The ordered worklist for the one goal: discharging
-`agda/src/Verify-Batch-Simultaneous/The-Proof.agda` — no postulates, everything
-typechecks. This file holds the SCHEDULE — each tier's next three legs — over a
-LEDGER of one-line hooks; everything else lives in the code.
-
-**Hygiene — the rules this file lives by:**
-
-- **Stay current.** This file describes the repo's present state and the work
-  ahead — never its history. No dated narrative, no "was X, now Y", no
-  superseded plans, no references to code that no longer exists. Git history
-  is the archive.
-  **`make roadmap-check` ENFORCES THE DATE HALF** — this file names no calendar
-  date, anywhere, and one is a build failure. The same scan holds CLAUDE.md to
-  the rule, for the neighbouring reason: this file must be CURRENT, that one
-  must be TIMELESS. It is the half a machine can see
-  with no judgement, and it catches most of the rest by proxy: history arrives
-  here WITH a timestamp attached, because the writer knows the reader will want
-  to know when. Dates are wanted in a postulate's header, where their age is
-  the point, and in CLAUDE.md, where a ruling's attribution belongs. A "was X,
-  now Y" that carries no date still has to be caught by eye — which is a reason
-  to read the file, not a reason to catch none of it.
-- **Completed items are DELETED, not marked complete.** No ~~strikethrough~~,
-  no "✅ DONE" rows, no discharged-count bookkeeping in tier headings. The
-  deletion happens in the same commit as the discharge, and the commit
-  message carries what was proven. A completed row left in place is the seed
-  of dated-narrative rot.
-- **Research lives in source comments**, in the header of the postulate or
-  definition it is about — probe receipts (`-- PROBED`), failed routes
-  (`-- DEAD ROUTE`), proof sketches, coverage residue, recovery pointers.
-  If a note here outgrows its one line, it belongs in a header instead.
-  **`make roadmap-check` ENFORCES A CHARACTER BUDGET, on a row's hook AND on
-  a tier's PREAMBLE.** The second is not redundant: holding every bullet to a
-  line while writing the finding into the section text above them satisfies
-  the row budget exactly, and one tier's preamble reached 4387 characters
-  that way — a deleted face's refutation history, a superseded predecessor's
-  deletion story, and the research for a currency swap that was already in
-  the source header it belongs in. A preamble says what the tier IS: the one
-  statement it exports, the doors in and out, and what orders the rows.
-- **No numbering.** Items are referred to BY NAME (postulates are unique,
-  greppable names — the wiring law guarantees it). Order within a tier is
-  the schedule: top item first. Reorder freely, in the same commit as the
-  finding that reorders it. This covers EVERY positional scheme, not just
-  list indices: conjunct positions ("conjunct (8)" — say `the hasDry
-  conjunct`), source section numbers ("§ 5a" — say the postulate's name),
-  timing figures (those live in typecheck-performance-numbers.md alone).
-  A position silently re-aims when the thing it indexes is edited; a name
-  greps or it errors.
-- **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
-  IT IS DRAWN FROM (Anthony).** Every tier opens with a
-  `### Big picture tier roadmap` naming EXACTLY THREE legs — the next three
-  units of work, ranked riskiest-first — and then a `### The ledger` carrying
+### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
