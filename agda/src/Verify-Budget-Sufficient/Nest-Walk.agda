@@ -2685,10 +2685,10 @@ subscribeInner-nest-arr c sl B W (gs fuel) op allNid κ id now o sched st
 -- descended state, the value key over the payload, the event key over
 -- the burst and a STRICT level bound, at a cap that STEPS -- which is
 -- what a walk through a substituting head can honestly claim, and why
--- it is not refutable where this shape is.  So this row is not owed a
--- proof; it is owed a CONVERSION, and the premises that face asks for
--- are the walk premise's own, dropped at this cone's door in favour of
--- the weaker reading.
+-- it is not refutable where this shape is.  What that face asks for is
+-- not this cone's premises read at a level, though: it is keyed on the
+-- SYNTACTIC size, and this cone is keyed on the sync spine, so what
+-- separates them is a currency rather than a level.
 --
 -- AND THE WHOLE CHAIN ABOVE IT IS PROVEN THERE TOO -- the per-arrival
 -- step and the fold over a burst both -- so what stands here is a
@@ -2702,6 +2702,16 @@ subscribeInner-nest-arr c sl B W (gs fuel) op allNid κ id now o sched st
 -- REFUTED: `Refuted.Subscribe-Burst-Width` kills the unkeyed walk this
 --   body descended through, at a parked pair whose queue crosses the
 --   width the premises were read at.
+-- DEAD ROUTE: discharging this row FROM the proven caps face.  That
+--   face takes the subscribed source's SYNTACTIC size against the cap,
+--   and the only two premises here that mention the source read it on
+--   the sync spine and through the slot closure -- both leaves at a
+--   defer gate, which the syntactic size recurses through.
+--   `Refuted.Nest-Size-Currency` builds the source from whatever cap is
+--   offered, so the gap is on the SOURCE side and no level, widening or
+--   larger cap reaches it.  The width half is not part of this: once a
+--   size is in hand `expWid-fromSize` gives the width at a level.  What
+--   remains is a state-side descent proven in the nest currency.
 -- RECOVERY: git show 5899a5e restores the body, whose re-entry
 --   argument -- that the minted id and the appended frame are writes
 --   the predicate does not read -- the ceiling form still needs.
@@ -4829,12 +4839,23 @@ takeDispatch-caps c sl nid vals fin sched st (just (exhaust-st _ _))    hsl hc =
 --
 -- AND ITS DESCENT IS PROVEN ONE FACE OVER, at the stepping cap and the
 -- strong reading, exactly as the inner walk's is; the wrap adds a
--- frame and a minted node and neither is a fact that face lacks.  So
--- this row is owed the same conversion, and the two travel together.
+-- frame and a minted node and neither is a fact that face lacks.  What
+-- it does lack is the currency: that face sizes the source
+-- syntactically and this cone does not size it at all, so the two rows
+-- travel together out of the conversion rather than into it.
 -- REFUTED: `Refuted.Subscribe-Burst-Width` kills the walk this was a
 --   one-line application of, and pins the two figures it crosses --
 --   an arrival cap's width against the reading of the first payload
 --   the source hands back.
+-- DEAD ROUTE: discharging this row FROM the proven caps face, which is
+--   dead on the SOURCE side before the predicate question is reached.
+--   That face takes `sizeᵉ` of the subscribed source against the cap;
+--   the wrap's value and closure keys read the sync spine and the slot
+--   closure, and both are leaves at a defer gate the syntactic size
+--   recurses through.  `Refuted.Nest-Size-Currency` grows the source
+--   from whatever cap is offered while holding both keys fixed, so no
+--   level and no larger cap reaches it.  Stated at the merge head,
+--   which is this door's own.
 -- RECOVERY: git show 5899a5e restores the application and the arms
 --   under it, together with the node-reading widening and its lift to
 --   the table predicate, which any ceiling form needs unchanged.

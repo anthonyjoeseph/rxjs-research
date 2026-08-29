@@ -190,14 +190,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two remaining descent rows, which fail on the same key** — the
-  inner descent's invariant and the wrap's exit are separate
-  statements with one blocker: each is stated at a cap whose width is
-  the ENTRY field, and each witness crosses at a width the source's
-  own inners deliver. The nest walk now carries its keys at a level and
-  its ceiling RELATIVELY, as a remaining-budget implication rather than
-  a number; that device is what both are missing, so they are one shelf
-  and not two, and this leg re-reads both through it.
+- **give the nest cone a source SIZE key, or establish it cannot have
+  one** — the two descent rows were to be discharged from the proven
+  caps face; that route is now refuted, and not at the cap. The face
+  sizes the subscribed source syntactically while this cone reads only
+  the sync spine and the slot closure, both leaves at a defer gate the
+  syntactic size recurses through, so no level closes it. The thru door
+  holds the strong reading and weakens it at its own threshold, so this
+  leg asks the suppliers for the size and threads it — or records it
+  unpayable, which puts both rows onto a nest-currency descent instead.
 
 - **the cascade descent, whose risk is now priced rather than
   probeable** — no row can print a verdict on it: the bound side reads
@@ -218,18 +219,21 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE,
-  RECOVERY`: the cascade descent against the instant's own grant. The one
-  form under it that proven inequalities reach is refuted at the evaluator,
-  so nothing instantiates it from below; the store route it replaced cycles.
-- **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
-  the inner descent's caps invariant, in at one cap and out at the same one.
-  Its entry-width key stops the neighbouring witness reaching it, so nothing
-  has instantiated this shape; the descent installs the iterate.
-- **`pushVals-caps-exit`** (Nest-Walk) — FALSITY, `REFUTED, RECOVERY`: the
-  wrap's exit, which is the unkeyed walk one hop down under a `thru-outer`
-  frame. Its premises are the WRAP's keys and say nothing about the width the
-  source's own inners deliver, which is the crossing the witness makes.
+- **`cascade-nest-compositional`** (Caps-Face/Part7) — FALSITY,
+  `DEAD ROUTE, RECOVERY`: the cascade descent against the instant's own grant.
+  The one form under it that proven inequalities reach is refuted at the
+  evaluator, so nothing instantiates it from below; the store route it replaced
+  cycles.
+- **`subscribeInner-nestCaps`** (Nest-Walk) — FALSITY,
+  `REFUTED, DEAD ROUTE, RECOVERY`: the inner descent's caps invariant, in at
+  one cap and out at the same one. Its entry-width key stops the neighbouring
+  witness reaching it, so nothing has instantiated this shape; the descent
+  installs the iterate.
+- **`pushVals-caps-exit`** (Nest-Walk) — FALSITY,
+  `REFUTED, DEAD ROUTE, RECOVERY`: the wrap's exit, which is the unkeyed walk
+  one hop down under a `thru-outer` frame. Its premises are the WRAP's keys and
+  say nothing about the width the source's own inners deliver, which is the
+  crossing the witness makes.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED, RECOVERY`: the admissibility boolean over any
   subscription's whole burst, read one caps level up — the level the refuting
