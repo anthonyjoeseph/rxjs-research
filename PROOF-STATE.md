@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **turn the leaf's level premise into the walk's per-frame ledger** —
-  the chain leaf now takes a delivery-counted level bound, which is the
-  quantity its one caller has and the flat form did not; what it does
-  not yet have is a body. The predicate it must produce charges a level
-  to every frame and every admitted share chain, so this leg is the
-  induction over the path that splits the premise the way the cascade
-  fold already splits its own: this frame's step against the ladder,
-  the remainder against the tail. The frame-local conjuncts fall out as
-  leaves, which is where the two legs below then stand.
+- **walk the path: fold the proven frame receipt into the predicate** —
+  the leaf is now stated in the frame law's own currency and over the
+  frame law's own data, and every hypothesis it carries propagates down
+  a path unaided, so what remains is the induction itself. Each frame
+  spends the twin, which reports its own increment and re-establishes
+  the caps and the values one level up; the ladder premise is what pays
+  the Σ's ceiling at every frame, since a chain is one rung wide. The
+  sink arm and the frame-local predicates fall out as leaves, and are
+  where the two legs below then stand.
 
 - **spend the parked term's headroom at the chain walk, which now has a
   source** — the charge exists as a conjunct of the caps record and
@@ -251,10 +251,10 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`arr-chain-caps`** (Caps-Face/Part7) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: ONE chain's walk. Its level is
-  no longer free — a free one killed the statement at every program — but
-  charged against this chain's own deliveries, which is what its caller holds.
+- **`chain-walk-caps`** (Caps-Face/Part7) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE, TWIN, PROBED, RECOVERY`: ONE path's walk, at a level
+  charged in FRAMES. The chain leaf above it is a real body now, so the
+  delivery-to-frame conversion is checked and this is the induction alone.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of

@@ -4,7 +4,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: arr-chain-caps @620ba7
+-- TARGET: chain-walk-caps @f65a37
 --
 -- WHAT IS BEING TESTED.  The target hands one chain's walk a level and
 -- asserts `capsOK?` at `frameStep Lv` of the instant's cap at EVERY

@@ -28,7 +28,8 @@ open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst; cong; cong₂)
 
-open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
+open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted;
+  InstEvent)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵛ; Fn; applyFn)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
@@ -37,7 +38,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; 
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; fac-hoist; one-pow; FaceOK; faceAt)
 open import Verify-Budget-Sufficient.Caps-Depth using
-  (depthCascade; depthChain; lub3-l; lub3-m; lub3-r)
+  (depthCascade; depthChain; depthFold; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
   (pathSzSum-cap; deliverLen; deliverNestD; deliverNestF; 1≤deliverNestF; chainsLenSum;
   chainsDelLen; chainsDelNestD; chainsDelNestF; 1≤chainsDelNestF; chainsDelSzSum;
@@ -2375,15 +2376,72 @@ postulate
 --   cascade over three families, one component at a time -- the way to
 --   find where a cascade's growth actually lands.
 postulate
-  arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
-    lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) Lv
-         (suc (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))))
+    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) p ≡ true →
+    depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id →
+    iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id)
+          (pathLen p) L
       ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id) →
-    chainCapsOK (capsAt e sl id) sl (capsH e sl id) Lv nextId a path sched st
+    capsWalkOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now p vals fin sched st
+
+-- AND THE CHAIN'S OWN LEAF IS NOW THAT WALK AT ITS ENTRY, with the one
+-- step of arithmetic between them real: the premise arrives as a
+-- DELIVERY count, which is the currency the cascade fold's invariant is
+-- kept in, and the walk wants a FRAME count, which is the currency the
+-- level ladder climbs in.  `pathSz?` is the conversion -- a chain is at
+-- most `suc (sizeAt S L)` frames, which is exactly one rung -- so the
+-- two statements are the same bound read at the two granularities the
+-- fold and the walk respectively speak, and neither has to know the
+-- other's.
+--
+-- AND THE REST OF THE HYPOTHESES ARE THE FRAME LAW'S OWN, WHICH IS THE
+-- ONLY CLAIM MADE FOR THEM.  A walk is the iterate of one frame's
+-- receipt, so it is stated over that receipt's data: the values' caps,
+-- the path's size receipt, the depth bound.  Each is what the frame law
+-- takes at every frame, each propagates down a path without further
+-- hypothesis -- the path receipt splits into this frame's, the tail's
+-- length and the tail's -- and the sole caller holds all three already,
+-- since it hands the same three to the step face next door.  What is
+-- NOT claimed is that a form without them is false: nothing has
+-- instantiated that, and the argument here is the twin's shape rather
+-- than a witness.
+arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
+  valsCaps? (frameStep Lv (capsAt e sl id)) sl (arrVal a ∷ []) ≡ true →
+  pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) path ≡ true →
+  depthChain nextId a path sched st ≤ capsH e sl id →
+  lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) Lv
+       (suc (delivN st (proj₂ (proj₂ (chainStep nextId a path sched st)))))
+    ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id) →
+  chainCapsOK (capsAt e sl id) sl (capsH e sl id) Lv nextId a path sched st
+arr-chain-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hpz hdp hlv =
+  chain-walk-caps sl id Lv (budgetAt e (Sched.slots sched) nextId) n nextId
+    (arrTick a) (arrSource a) path (arrVal a ∷ [])
+    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    (Arrival.isLast a) sched st sleq cok hvc hpz hdp ENTRY
+  where
+  c   = capsAt e sl id
+  d   = capsH e sl id
+  2≤S = 2≤capsAt-size e sl id
+  ENTRY : iterL (Caps.cSize c) (Caps.cWid c) d (pathLen path) Lv
+            ≤ sizeCount c d ⊔ Caps.cSize c
+  ENTRY = ≤-trans (iterL-mono (pathLen path) _ 2≤S ≤-refl ≤-refl ≤-refl
+                     (≤-trans (pathSz?-len (Caps.cSize (frameStep Lv c)) path hpz)
+                              (n≤1+n _)))
+            (≤-trans (lvls-mono 1 (suc (delivN st (proj₂ (proj₂
+                        (chainStep nextId a path sched st)))))
+                        2≤S ≤-refl ≤-refl ≤-refl (s≤s z≤n))
+                     hlv)
 
 
 -- ONE CHAIN'S STEP IS THE PATH FOLD, so the level it lands at is the
@@ -2491,7 +2549,15 @@ arr-chains-caps-go {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st 
                            (proj₂ (proj₂ (chainStep nextId a path sched
                               (record st { delivered = rid ∷ EvalSt.delivered st }))))) hdp)
 ... | false =
-      arr-chain-caps sl id Lv a nextId path sched st′ sleq cok CH≤
+      arr-chain-caps sl id Lv a nextId path sched st′ sleq cok
+        HVC
+        (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
+        (lub3-m (depthCascade a nextId chains sched st)
+                (depthChain nextId a path sched st′)
+                (depthCascade a nextId chains
+                   (proj₁ (proj₂ (chainStep nextId a path sched st′)))
+                   (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
+        CH≤
     , proj₁ ST
     , FLAT
     , arr-chains-caps-go sl id (Lv + proj₁ ST) a nextId chains
@@ -2519,6 +2585,10 @@ arr-chains-caps-go {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st 
         step⊑ = frameStep-mono-j c 2≤S (z≤n {Lv})
         c⊑ : c ⊑ᶜ frameStep Lv c
         c⊑ = subst (_⊑ᶜ frameStep Lv c) (frameStep-0 c) step⊑
+        HVC0 : valsCaps? c sl (arrVal a ∷ []) ≡ true
+        HVC0 = ∧-intro (∧-intro hvc refl) refl
+        HVC : valsCaps? (frameStep Lv c) sl (arrVal a ∷ []) ≡ true
+        HVC = valsCaps?-lvl c (frameStep Lv c) sl (arrVal a ∷ []) c⊑ HVC0
         ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq cok
                 (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
                 (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc)
