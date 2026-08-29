@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **carry the drain's headroom in the store bound, since nothing
-  downstream of it can** — the selection's caps are now a body over one
-  chain's walk and one chain's step, so the parked drain's two size
-  bounds sit in a leaf small enough to argue about. The argument came
-  out negative: a queue is store content and the caps predicate does
-  price every parked term, but it prices one AT the cap, and the size
-  currency the wet stack measures with is that same projection, so
-  there is no smaller number to spend the constant difference against.
-  The leg is to put the headroom where the bound is stated.
+- **strengthen the store's charge on a parked term, which is now ONE
+  inequality** — the drain's two headroom demands turned out to be one
+  currency: nesting is a size plus the slots a state has not connected,
+  and a proven row already says so, so the queue's conjunct is the
+  parked term's size and the slots and three, under the cap at the
+  walk's level. That is a statement a store predicate can carry, which
+  the nesting one was not. The leg is to charge it in the bound itself
+  and re-establish it where the tick states the store's — the invariant
+  record, not a signature, since every producer owes it.
 
 - **the arithmetic shelf both depth faces spend, now that neither can
   be split** — the cascade side and the subscribe side each read their

@@ -45,6 +45,7 @@ open import Data.Fin  using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.List using (List; []; _∷_; tabulate)
 open import Data.Maybe using (Maybe)
+open import Data.Product using (_×_; _,_)
 open import Data.Nat.ListAction  using (sum)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
@@ -57,7 +58,7 @@ open import Rx.Exp
 open import Rx.Slots using (Slots; scripted; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (sizeAt; memberSource; sameSource)
 open import Verify-Budget-Sufficient.Caps
-  using (iterSize-suc)
+  using (Caps; iterSize-suc)
 open import Verify-Budget-Sufficient.Measures using
   (sum-tab-mono; syncSize-unfoldμ;
                                                       syncSize≤sizeᵉ)
@@ -138,6 +139,30 @@ nest e sl cs = syncSizeᵉ e + resid sl cs
 nest≤ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (e : Exp Γ Δᵍ Δ Θ t)
   (sl : Slots Γ) (cs : List Source) → nest e sl cs ≤ sizeᵉ e + slotsSize sl
 nest≤ e sl cs = +-mono-≤ (syncSize≤sizeᵉ e) (resid≤slots sl cs)
+
+-- THE DRAIN'S TWO HEADROOM CONJUNCTS ARE ONE CURRENCY, and the row
+-- above is why.  A parked inner is charged twice at the drain door --
+-- once as a nesting the connect walk has to fit under the cap, once as
+-- a size the level ceiling has to clear -- and the two read as separate
+-- obligations only because one of them is stated in `nest`.  It is
+-- not: nesting is a SIZE plus the slots the state has not connected
+-- yet, both bounded above by the pair the caller already carries.  So a
+-- single premise -- the parked term's size, the slots, and three, all
+-- under the cap at the walk's own level -- supplies both, and whatever
+-- states the store bound has ONE inequality to establish rather than a
+-- measure it has no access to.
+drain-head-supply : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} (c : Caps) (Lv : ℕ)
+  (o : Exp Γ Δᵍ Δ Θ t) (sl : Slots Γ) (cs : List Source) →
+  Lv + (3 + (sizeᵉ o + slotsSize sl)) ≤ Caps.cSize c →
+  (3 + nest o sl cs ≤ Caps.cSize c)
+  × (Lv + suc (suc (sizeᵉ o)) ≤ Caps.cSize c)
+drain-head-supply c Lv o sl cs h =
+  ≤-trans (s≤s (s≤s (s≤s (nest≤ o sl cs))))
+          (≤-trans (m≤n+m (3 + (sizeᵉ o + slotsSize sl)) Lv) h)
+  , ≤-trans (+-monoʳ-≤ Lv
+              (s≤s (s≤s (≤-trans (m≤m+n (sizeᵉ o) (slotsSize sl))
+                                 (n≤1+n (sizeᵉ o + slotsSize sl))))))
+            h
 
 -- THE SHARE EDGE'S STEP, which is the row the residue exists for.
 -- `sharedConnect` recurses on the slot's stored def with `toℕ i`

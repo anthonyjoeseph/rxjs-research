@@ -68,7 +68,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; ca
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
-open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step)
+open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-supply)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -999,6 +999,14 @@ pathSz?-lvl c Lv p 2≤S h =
 -- the caps face's frame counter in a second currency is the alternative
 -- nobody wants.  Recursion on the QUEUE is what lets the drain's own
 -- induction take its hypothesis apart.
+--
+-- AND THE HEADROOM IS ONE CONJUNCT, NOT TWO.  The ceiling the drain
+-- lifts wants a nesting bound and a size bound on the parked term, and
+-- both are supplied by the single inequality here -- `drain-head
+-- -supply` is what splits it back into the pair, which is why the
+-- currency is the size and not the nesting.  What that buys is not
+-- brevity: whatever states the store bound has to establish this, and
+-- a store predicate has no access to a connect walk's residue.
 capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
@@ -1011,8 +1019,7 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (nestClosOK? c sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
-  × (3 + nest o sl (EvalSt.connectedShares st) ≤ Caps.cSize c)
-  × (Lv + suc (suc (sizeᵉ o)) ≤ Caps.cSize c)
+  × (Lv + (3 + (sizeᵉ o + slotsSize sl)) ≤ Caps.cSize c)
   × capsDrainOK c sl d Lv sf allNid κ id now lim
       (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
       (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
@@ -6249,6 +6256,11 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   splitW′ : drainW sf allNid κ id now q sched₁ st₁ ≤ W
   splitW′ = ≤-trans (drainW-tail sf allNid κ id now o q sched st) hw
 
+  -- the drain's two ceiling premises, off the ONE the queue's own
+  -- conjunct now carries
+  headHere = drain-head-supply c Lv o sl (EvalSt.connectedShares st)
+               (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+
   SUB₀ = subscribeInner-nest c d sl B W Lv sf mergeAllᵒ allNid κ id now o sched st
           (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
           (proj₁ (proj₂ (proj₂ (proj₂ hcd))))
@@ -6259,13 +6271,12 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           hpk hpl
           (ceil-lift c d Lv (nest o sl (EvalSt.connectedShares st))
              (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
-             (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
-             (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))))
+             (proj₁ headHere) (proj₂ headHere)
              (FaceOK.fReg faceHere))
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
-         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))))
+         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          splitW′
          (≤-trans (m≤n⊔m _ _) hd)
