@@ -2625,8 +2625,21 @@ postulate
   -- and when it drains they come out of the node's QUEUE -- parked at
   -- whatever level was current when they were enqueued, which is not
   -- the level this head reads them at.  So the arm's second factor is
-  -- neither an arrival nor an accumulator but a history, and no row of
-  -- this family has instantiated it.
+  -- neither an arrival nor an accumulator but a history, and the climb
+  -- it needs is bought by the charge rather than by anything the
+  -- argument carries.
+  --
+  -- PROBED: `Probed.Step-Frame-Clos-Inner` reaches a PARKED queue by
+  --   running a concurrency of one whose first lane stays open on a hot
+  --   slot, then completes the exit at an instance no registration
+  --   threads.  One layer of a substituting ladder is admitted at the
+  --   base cap and eight overflow it, admitted one level up: the
+  --   drained reading is 26, 250 and 4090 at one, four and eight layers
+  --   against a base of 147.  Covered is the closure conjunct at a
+  --   FLOOR cap -- the ratio, not the `capsAt` recurrence -- at
+  --   `mergeAllᵒ`, the only *All that queues.  Not covered: a queue
+  --   filled at an EARLIER level than it is drained at, which is the
+  --   gap the drain law's own row is about.
   step-frame-clos-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)

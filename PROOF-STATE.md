@@ -214,27 +214,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-
-- **the exiting-inner arm, the last `step-frame-clos` head standing on
-  nothing** — the wrap arm is instantiated and moved, and its harness
-  is most of this one: a `mergeAll` run reaches the node, and the head
-  is handed its values directly. What differs is that this arm passes
-  its values on UNTOUCHED unless it drains, so a load-bearing row has
-  to make it drain — the exiting inner must be the last alive, which a
-  `concatAll` parks. The reading then comes out of the QUEUE rather
-  than out of an argument, which is the same history the leg below is
-  about, so instantiating it aims that design call as well as closing
-  this row.
-
-- **`walk-frame-drain-inner`'s missing level** — the top row, and the
-  one design call the tier still owes. Its caps conjuncts are read at
-  the base cap while the walk holds one only at its level, and raising
-  them through the fit shelf is a recorded dead route, so the level has
-  to arrive another way. The precedented move is the closure key's:
-  stamp the parked entry with the level it was parked at, as a conjunct
-  of the invariant rather than a hypothesis at the head. That is a
-  restatement of a predicate the whole drain cone threads, and the
-  queue is exactly what the leg above instantiates first.
+- **`walk-frame-drain-inner`'s missing level** — the tier's last FALSITY
+  row, and the design call it has owed for two weeks. `capsDrainOK`
+  reads three of its per-entry conjuncts at the BASE cap — the two
+  nesting booleans and the size floor — while the walk holds them only
+  at its own level, and raising them through the fit shelf is a
+  recorded dead route. The queue is now a reached object rather than a
+  hypothesis, so the leg starts by instantiating those three at a
+  parked entry: a base-cap conjunct that fails where the levelled one
+  holds refutes the conclusion outright and licenses the split, instead
+  of guessing which seam to cut.
 
 - **the map head, against the mirror that already pays for it** — the
   frame law reports its climb in `fCharge`, which is the currency the
@@ -246,6 +235,13 @@ does not fit is a finding about the shared statement, not about the head.
   spends — a template's reading times its argument's — and the arm that
   consumes it.
 
+- **the drain's ENTRY half, now that its grant is the right one** — the
+  payload-only form is refuted at a slot reference and the summand
+  repairing it is checked at the refuting family, so nothing about
+  `sight-all-fit`'s statement is undecided. What is left is the
+  induction over the subscription that establishes it, head by head,
+  and it is the leaf three of the fit shelf's rows are waiting behind.
+
 
 ### The ledger
 
@@ -254,9 +250,10 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its caps conjuncts are read at the base cap while
   the walk holds one only at its level; raising them through the fit shelf is
   dead, so the level must arrive another way — a design call.
-- **`step-frame-clos-inner`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+- **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
-  the drained values were parked at a level nothing here reads.
+  the drained values come out of the node's queue. Instantiated at a parked
+  ladder: the drain is not free and its climb is a step per four layers.
 - **`step-frame-clos-thru`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the wrap
   head, whose output is a constructor round a subscribed inner. Instantiated at
   a substituting ladder: the constructor is the cheap half and the report
