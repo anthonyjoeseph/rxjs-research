@@ -32,15 +32,16 @@
 -- over and weighs three.  The gap is the occurrence count, so it grows
 -- without bound in a term the charge does not move with at all.
 --
--- WHAT DIES.  The route that closes the scan clause out of the trade's
--- own slack.  What survives is the shape `Nest-Subst` already proves:
--- the seed's nesting is charged once per OCCURRENCE, so the honest
--- bound carries a factor exponential in the term's sync size.  AND
--- THAT FACTOR CANNOT SIMPLY BE MOVED INTO THE CEILING'S MEASURE: the
--- entry reads the same ceiling against the initial nesting cap, which
--- is `suc` of the program's own nesting plus its slot vocabulary's, and
--- an exponential in the program does not fit under it.  So the repair
--- is neither the trade nor a wider `v`, and that is the finding.
+-- WHAT DIES is exactly one thing: the route that closes the scan clause
+-- out of the trade's own slack.  What survives is the shape
+-- `Nest-Subst` already proves -- the seed's nesting is charged once per
+-- OCCURRENCE, so the honest bound carries a factor exponential in the
+-- term's sync size -- and moving that factor into the ceiling's own
+-- measure is the repair this points at rather than one it rules out.
+-- The entry can afford it: what the entry compares against is a DOUBLE
+-- exponential in the size cap, and the argument that gets there spends
+-- only a single one, so a further single-exponential factor sits inside
+-- the gap between the two.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Eval-Seed-Nest where
 

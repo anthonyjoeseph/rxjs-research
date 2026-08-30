@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **reaching the size factor from inside a clause** — the scan question is
-  answered on the risk side: the leaf HOLDS, by two orders of magnitude at the
-  very shape whose local route is refuted, and the margin widens as the seed
-  deepens while the descent does not move at all. So the ceiling is not the
-  problem; the clause-local comparison is, because it puts summand against
-  summand and never touches the factor the ceiling carries out front. What is
-  owed is a decomposition that spends it — and the same move is what the map
-  burst needs, whose additive path charge is refuted for the same reason. Take
-  both together: it is one change of currency, made twice.
+- **spending the scale factor the measure now carries** — the currency is
+  changed and paid for: the sighted sum is scaled by the SUBJECT's sync size,
+  the entry affords it out of the double exponential it was always compared
+  against, and the unfold clause fell out real. Every structural head now
+  hands its clause one spare doubling. What is left is spending it where it
+  was minted: `sight-scan` against an evaluated seed, and `sight-map-burst`
+  against an applied payload — both refuted additively, both bounded by this
+  tree's own per-occurrence lemmas. Take the two together; they are one
+  argument at two heads.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -272,17 +272,14 @@ does not fit is a finding about the shared statement, not about the head.
   frame's sweep back out, all that is left of a clause whose descent half is
   proven — a take charges the path nothing, drops nothing, and installs a node
   carrying no nesting at all.
-- **`sight-mu`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`: the unfolding, the
-  one descent whose SUBJECT grows, so the measure has to be re-read rather
-  than traded.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
 - **`sight-scan`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: the local
-  route is refuted — an evaluated seed can outnest its term — and widening the
-  measure breaks the entry. But the leaf itself holds by two orders of
-  magnitude at that very shape, so what is missing is a decomposition.
+  route is refuted — an evaluated seed can outnest its term — so the seed is
+  paid for out of the head's own scale factor. The leaf holds by two orders of
+  magnitude at that very shape; what is left is spending the factor.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they

@@ -6,15 +6,16 @@
 -- does not close.
 module Verify-Budget-Sufficient.Depth-Sighted where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm;
+  *-mono-≤; *-monoˡ-≤; ^-monoʳ-≤; +-monoʳ-≤; m≤n+m; n≤1+n)
 open import Data.Bool using (false)
 open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans)
 
-open import Rx.Exp using (Ctx; Closed; Fn; obs; sizeᵉ; evalTm; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
+open import Rx.Exp using (Ctx; Closed; Fn; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
   input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Evaluator using (Sched; EvalSt; Path; map-f; take-f; _↠_; subscribeE;
@@ -22,15 +23,34 @@ open import Rx.Evaluator using (Sched; EvalSt; Path; map-f; take-f; _↠_; subsc
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll)
+open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
+open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; sightCeil; sightCeil-mono; storeNestMax; storeNestMax-install; nestUnit)
 
 -- WHAT THE SUBSCRIBING STATE CAN SEE, named once so the clauses below
 -- read as the trade rather than as four arguments.
+--
+-- THE TRADED SUM IS SCALED, by the SUBJECT's sync size, and the choice
+-- of which sync size is what makes the induction go through.  It is
+-- scaled at all because the two clauses that BUILD a value -- a scan's
+-- seed and a map frame's payload -- pay for what they build once per
+-- OCCURRENCE of the syntax that builds it, which is the shape this
+-- tree proves and the shape an additive charge is refuted at; a
+-- summand of slack cannot meet a factor, and a scaled summand can.
+--
+-- AND THE SUBJECT'S IS THE ONE THAT MOVES THE RIGHT WAY.  Every
+-- structural descent shrinks the sync size while the traded sum stays
+-- put, so each clause gets its exponent for free and the spare factor
+-- the built value needs is exactly the head's own `suc`.  Reading the
+-- PROGRAM's sync size instead would leave the exponent constant along
+-- the walk -- tidier at each edge, and then no clause has any room at
+-- all, since nothing relates a subterm's sync size to the program's
+-- without an invariant the statement does not carry.
 Sight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
   Closed Γ u → Path Γ u t → Sched Γ → EvalSt e → ℕ
 Sight {e = e} b κ sched st =
-  sightCeil (sizeᵉ e) (pathNestD κ + nestDᵉ b)
+  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ b * (pathNestD κ + nestDᵉ b))
             (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 postulate
@@ -82,16 +102,12 @@ postulate
 -- THAN ITS TERM, AND IT IS NOT.  A closed term still BINDS, and a branch
 -- may name what was bound on both sides of a sum the observable measure
 -- takes; the honest bound is the one this tree proves, carrying a factor
--- exponential in the term's sync size.  Nor can that factor simply move
--- into the ceiling's measure, because the ENTRY reads the same ceiling
--- against the initial nesting cap, which is `suc` of the program's own
--- nesting plus its vocabulary's -- an exponential in the program does
--- not fit under it.  So the repair is neither the trade nor a wider
--- measure.  What the ceiling turns out to have is room -- two orders of
--- magnitude of it at that very shape, widening as the seed deepens --
--- so what is missing is a decomposition that reaches it, not a bound.
--- The room is in the SIZE factor, which the local accounting never
--- touches because it compares summand against summand.
+-- exponential in the term's sync size.  The measure carries that factor
+-- now, and the head's own sync size dominates its seed's, so the room
+-- is in hand and what is left is spending it.  The leaf itself was
+-- never in doubt: it holds by orders of magnitude at that very shape,
+-- and the margin widens as the seed deepens while the descent does not
+-- move at all.
 --
 -- REFUTED: `Refuted.Eval-Seed-Nest` is the witness -- a `caseᵗ` whose
 --   left branch names its bound observable both as a fold's SEED and
@@ -101,8 +117,8 @@ postulate
 --   explicit payload rather than an empty environment.
 -- PROBED: `Probed.Depth-Sighted` reads THIS leaf at the empty path --
 --   the program's head is the scan -- on a seed of exactly the refuted
---   shape, at scrutinee depths one and four: three against two hundred
---   and sixty, and three against six hundred and eight.  So the
+--   shape, at scrutinee depths one and four: three against ten decimal
+--   digits, and three against fourteen.  So the
 --   statement survives the shape that killed its route, and the margin
 --   WIDENS along the seed's own axis, the descent not moving with it at
 --   all.  Not covered: any path other than the empty one, any slot
@@ -123,30 +139,23 @@ postulate
 -- at its root.
 --
 -- PROBED: `Probed.Depth-Sighted` reads the assembly at `root`, where
---   this head is the one it lands on, at fold depths two and twenty, at
---   nine and eighty-one against ceilings of four hundred and five
---   thousand; on the family whose mergeAll is unbounded, five against
---   three hundred and seventy-two; and under the vocabulary that
---   connects at once rather than late, four against one thousand three
---   hundred and seventy-eight.  Not covered: any `sl` past the two-slot
---   vocabularies, which is where both remaining families are; every path
---   other than `root`, which is the whole of what generalising added;
---   and the two heads other than `mergeAllᵉ`, which no row reaches.
+--   this head is the one it lands on, at fold depths two and twenty:
+--   descents of nine and eighty-one against ceilings of ten and
+--   thirty-three decimal digits.  On the family whose mergeAll is
+--   unbounded, five against eleven digits; under the vocabulary that
+--   connects at once rather than late, four against nineteen.  The
+--   margin is the scale factor and it outruns every axis the corpus
+--   moves.  Not covered: any `sl` past the two-slot vocabularies, which
+--   is where both remaining families are; every path other than `root`,
+--   which is the whole of what generalising added; and the two heads
+--   other than `mergeAllᵉ`, which no row reaches.
 postulate
   sight-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (op : AllOp) (ist : NodeState Γ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     depthAll g op ist b κ bid now sched st
-      ≤ sightCeil (sizeᵉ e) (pathNestD κ + suc (nestDᵉ b))
+      ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b)))
                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
-
-postulate
-  -- the unfolding, which is LARGER than the μ it replaces, so its trade
-  -- is the one place the subject grows and the measure must be re-read
-  sight-mu : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (body : _) (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    depthE (gs g) (μᵉ body) κ bid now sched st ≤ Sight (μᵉ body) κ sched st
 
 -- ANY SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE, which is the
 -- statement the induction is actually over.  A sweep crosses
@@ -187,7 +196,19 @@ depthE-sighted g (ofᵉ ts)           κ bid now sched st = z≤n
 depthE-sighted g emptyᵉ             κ bid now sched st = z≤n
 depthE-sighted g (deferᵉ b)         κ bid now sched st = z≤n
 depthE-sighted g0 (μᵉ body)         κ bid now sched st = z≤n
-depthE-sighted (gs g) (μᵉ body)     κ bid now sched st = sight-mu g body κ bid now sched st
+-- THE UNFOLD, which is the one descent whose subject is not a subterm
+-- -- and it costs nothing, because both readings of the measure are
+-- INVARIANT under the substitution: the copy a `μ` plants carries the
+-- body's own nesting and the body's own sync size, and the head it
+-- replaces charged a `suc` on top of each.
+depthE-sighted {e = e} (gs g) (μᵉ body) κ bid now sched st =
+  ≤-trans (depthE-sighted g (unfoldμ body) κ bid now sched st)
+          (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
+            (*-mono-≤ (^-monoʳ-≤ 2 (≤-trans (≤-reflexive (syncSize-unfoldμ body))
+                                            (n≤1+n _)))
+                      (+-monoʳ-≤ (pathNestD κ)
+                                 (≤-reflexive (nestD-unfoldμ body))))
+            ≤-refl)
 depthE-sighted g (varᵉ ())          κ bid now sched st
 depthE-sighted g (scanᵉ f z b)      κ bid now sched st = sight-scan g f z b κ bid now sched st
 depthE-sighted {u = u} g (mergeAllᵉ lim b) κ bid now sched st =
@@ -206,10 +227,18 @@ depthE-sighted {e = e} g (takeᵉ c b) κ bid now sched st
 ... | zero  = z≤n
 ... | suc k =
   ⊔-lub (≤-trans (depthE-sighted g b (take-f nid ↠ κ) bid now sched₁ st₀)
-                 (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched)) ≤-refl
+                 (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
+                   (*-monoˡ-≤ (pathNestD κ + nestDᵉ b)
+                     (^-monoʳ-≤ 2 (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ c))
+                                           (n≤1+n _))))
                    (≤-trans (storeNestMax-install nid (take-st (suc k)) sched₁ st)
                             (⊔-lub z≤n ≤-refl))))
-        (sight-take-burst g k b κ bid now sched st)
+        (≤-trans (sight-take-burst g k b κ bid now sched st)
+                 (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
+                   (*-monoˡ-≤ (pathNestD κ + nestDᵉ b)
+                     (^-monoʳ-≤ 2 (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ c))
+                                           (n≤1+n _))))
+                   ≤-refl))
   where
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
@@ -222,10 +251,11 @@ depthE-sighted {e = e} g (takeᵉ c b) κ bid now sched st
 -- and a commutativity on the measure and nothing else.
 depthE-sighted {e = e} g (mapᵉ f b) κ bid now sched st =
   ⊔-lub (≤-trans (depthE-sighted g b (map-f f ↠ κ) bid now sched st)
-                 (≤-reflexive (cong (λ v → sightCeil (sizeᵉ e) v
-                                             (storeNestMax sched st)
-                                             (nestUnit e (Sched.slots sched)))
-                                    (trade f b κ))))
+                 (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
+                   (*-mono-≤ (^-monoʳ-≤ 2 (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))
+                                                   (n≤1+n _)))
+                             (≤-reflexive (trade f b κ)))
+                   ≤-refl))
         (sight-map-burst g f b κ bid now sched st)
   where
   trade : ∀ {s u} (f : Fn _ [] [] [] s u) (b : Closed _ s) (κ : Path _ u _) →

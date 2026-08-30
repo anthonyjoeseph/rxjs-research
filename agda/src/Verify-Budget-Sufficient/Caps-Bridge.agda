@@ -86,7 +86,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeGo-nest; nestCap-sight≤exp; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
+  (caps-tick; cascade-depth-capsH; cascadeGo-nest; nestCap-sight-scaled≤exp; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
@@ -1407,7 +1407,7 @@ abstract
 -- application needs no arithmetic between them.
 depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-    ≤ sightCeil (sizeᵉ e) (nestDᵉ e)
+    ≤ sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e)
                 (storeNestMax (sched-init e ins) (st-init e))
                 (nestUnit e ins)
 depthE-sighted-root e ins =
@@ -1426,26 +1426,29 @@ depthE-sighted-root e ins =
 -- store's bound establishes and what makes the whole comparison
 -- syntactic.
 sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  sightCeil (sizeᵉ e) (nestDᵉ e)
+  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e)
             (storeNestMax (sched-init e ins) (st-init e))
             (nestUnit e ins)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
 sight-root≤exp e ins =
-  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤3C))
-          (nestCap-sight≤exp e ins 0)
+  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤C))
+          (nestCap-sight-scaled≤exp e ins)
   where
   C = nestCapAt e ins 0
+  K = syncSizeᵉ e
   hu : nestUnit e ins ≤ C
   hu = ≤-reflexive (sym (nestCapAt-0 e ins))
-  hv : nestDᵉ e ≤ C
-  hv = ≤-trans (≤-trans (m≤m+n (nestDᵉ e) (slotsNestSum ins)) (n≤1+n _)) hu
+  hv₀ : nestDᵉ e ≤ C
+  hv₀ = ≤-trans (≤-trans (m≤m+n (nestDᵉ e) (slotsNestSum ins)) (n≤1+n _)) hu
+  hv : 2 ^ K * nestDᵉ e ≤ 2 ^ K * C
+  hv = *-monoʳ-≤ (2 ^ K) hv₀
   hs : storeNestMax (sched-init e ins) (st-init e) ≤ C
   hs = ≤-trans (init-storeNest e ins) hu
-  eq : C + C + C ≡ 3 * C
-  eq = solve 1 (λ c → c :+ c :+ c := con 3 :* c) refl C
-  sum≤3C : nestDᵉ e + storeNestMax (sched-init e ins) (st-init e)
-             + nestUnit e ins ≤ 3 * C
-  sum≤3C = ≤-trans (+-mono-≤ (+-mono-≤ hv hs) hu) (≤-reflexive eq)
+  eq : 2 ^ K * C + C + C ≡ (2 ^ K + 2) * C
+  eq = solve 2 (λ k c → k :* c :+ c :+ c := (k :+ con 2) :* c) refl (2 ^ K) C
+  sum≤C : 2 ^ K * nestDᵉ e + storeNestMax (sched-init e ins) (st-init e)
+            + nestUnit e ins ≤ (2 ^ K + 2) * C
+  sum≤C = ≤-trans (+-mono-≤ (+-mono-≤ hv hs) hu) (≤-reflexive eq)
 
 -- AND THE ENTRY FUEL HAS THAT ROOM, so the entry's half of the height
 -- comparison is assembled rather than asserted, out of the same
@@ -1453,7 +1456,7 @@ sight-root≤exp e ins =
 -- `frameBlowup` at the base story, and a blowup's size sits two
 -- exponentials under the story it was driven by.
 sight-root≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  sightCeil (sizeᵉ e) (nestDᵉ e)
+  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e)
             (storeNestMax (sched-init e ins) (st-init e))
             (nestUnit e ins)
     ≤ capsH e ins 0

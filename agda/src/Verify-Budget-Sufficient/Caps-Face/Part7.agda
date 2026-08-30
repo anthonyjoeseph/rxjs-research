@@ -30,7 +30,8 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted;
   InstEvent)
-open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵛ; Fn; applyFn)
+open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵛ; Fn; applyFn;
+                                syncSizeᵉ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
@@ -95,7 +96,8 @@ open import Verify-Budget-Sufficient.Caps using
   lvls-infl; lvls-mono; capsAt-exp-gain; size≤sizeCount; sizeCount; sizeCount-body;
   frameBlowup; iterSize-pow; size-lower)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow)
+  (pathLen; reach-reset; ∧-true; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow;
+   syncSize≤sizeᵉ)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -3818,6 +3820,72 @@ nestCap-sight≤exp e sl id =
   1+z≤S : suc (sizeᵉ e) ≤ Caps.cSize (capsAt e sl id)
   1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
                   (capsAt-base-size e sl id)
+
+-- AND THE SCALE THE DESCENT CARRIES IS AFFORDABLE AT THE ENTRY, which
+-- is what lets the sighted ceiling price a BUILT value.  A descent that
+-- evaluates a term pays once per OCCURRENCE of the syntax that builds
+-- it, so its ceiling reads `2 ^ syncSizeᵉ e` in front of the nesting.
+-- That factor is bounded by two exponentials of the entry cap's size --
+-- the program's sync size is under its own size and its size is under
+-- the cap's -- while the target here is a DOUBLE exponential of that
+-- size, and the unscaled route below spends only one of the two.
+nestCap-sight-scaled≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  suc (sizeᵉ e) * suc ((2 ^ syncSizeᵉ e + 2) * nestCapAt e sl 0)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl 0))
+nestCap-sight-scaled≤exp e sl = ≤-trans (*-mono-≤ 1+z≤S hstep) big
+  where
+  S = Caps.cSize (capsAt e sl 0)
+  C = nestCapAt e sl 0
+  K = syncSizeᵉ e
+  8≤S : 8 ≤ S
+  8≤S = 8≤capsAt-size e sl 0
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 8≤S
+  1+z≤S : suc (sizeᵉ e) ≤ S
+  1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
+                  (capsAt-base-size e sl 0)
+  C≤S : C ≤ S
+  C≤S = ≤-trans (≤-reflexive (nestCapAt-0 e sl)) (nestUnit≤size e sl 0)
+  1≤C : 1 ≤ C
+  1≤C = subst (1 ≤_) (sym (nestCapAt-0 e sl)) (s≤s z≤n)
+  2^K≤2^S : 2 ^ K ≤ 2 ^ S
+  2^K≤2^S =
+    ^-monoʳ-≤ 2 (≤-trans (syncSize≤sizeᵉ e) (≤-trans (n≤1+n (sizeᵉ e)) 1+z≤S))
+  eq3 : (2 ^ K + 2) * C + C ≡ (2 ^ K + 3) * C
+  eq3 = solve 2 (λ k c → (k :+ con 2) :* c :+ c := (k :+ con 3) :* c)
+              refl (2 ^ K) C
+  hstep : suc ((2 ^ K + 2) * C) ≤ (2 ^ S + 3) * S
+  hstep = ≤-trans (≤-trans (≤-reflexive (+-comm 1 ((2 ^ K + 2) * C)))
+                           (+-monoʳ-≤ ((2 ^ K + 2) * C) 1≤C))
+                  (≤-trans (≤-reflexive eq3)
+                           (*-mono-≤ (+-monoˡ-≤ 3 2^K≤2^S) C≤S))
+  1≤2^S : 1 ≤ 2 ^ S
+  1≤2^S = 1≤pow 1 S
+  four′ : 4 * (2 ^ S) ≡ 2 ^ S + 3 * (2 ^ S)
+  four′ = solve 1 (λ p → con 4 :* p := p :+ con 3 :* p) refl (2 ^ S)
+  h4 : 2 ^ S + 3 ≤ 4 * (2 ^ S)
+  h4 = ≤-trans (+-monoʳ-≤ (2 ^ S)
+                 (≤-trans (≤-reflexive (sym (*-identityʳ 3)))
+                          (*-monoʳ-≤ 3 1≤2^S)))
+               (≤-reflexive (sym four′))
+  shape : S * ((4 * (2 ^ S)) * S) ≡ (4 * (S * S)) * (2 ^ S)
+  shape = solve 2 (λ s p → s :* ((con 4 :* p) :* s) := (con 4 :* (s :* s)) :* p)
+                refl S (2 ^ S)
+  S≤SS : S ≤ S * S
+  S≤SS = ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-monoʳ-≤ S 1≤S)
+  fourEq : (S * S + S * S) + (S * S + S * S) ≡ 4 * (S * S)
+  fourEq = solve 1 (λ x → (x :+ x) :+ (x :+ x) := con 4 :* x) refl (S * S)
+  S+S≤2^S : S + S ≤ 2 ^ S
+  S+S≤2^S = ≤-trans (≤-trans (+-mono-≤ S≤SS S≤SS)
+                             (≤-trans (m≤m+n (S * S + S * S) (S * S + S * S))
+                                      (≤-reflexive fourEq)))
+                    (sq4≤2^ S 8≤S)
+  big : S * ((2 ^ S + 3) * S) ≤ 2 ^ (2 ^ S)
+  big = ≤-trans (*-monoʳ-≤ S (*-monoˡ-≤ S h4))
+        (≤-trans (≤-reflexive shape)
+        (≤-trans (*-monoˡ-≤ (2 ^ S) (sq4≤2^ S 8≤S))
+        (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 S S)))
+                 (^-monoʳ-≤ 2 S+S≤2^S))))
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
 -- arrival's nesting is held under it by the caller's premise, the

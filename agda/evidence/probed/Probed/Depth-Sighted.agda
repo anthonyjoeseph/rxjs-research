@@ -25,19 +25,19 @@
 -- nowhere -- `capsAt` sits on the caps recurrence and does not
 -- terminate even natively -- so these are conclusion-side rows, which
 -- is the coverage this can have rather than a gap in the sweeping.
--- TARGET: sight-all @af40e1
+-- TARGET: sight-all @8d81ef
 -- TARGET: sight-scan @d7eb02
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_)
 open import Data.List using (length; map)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ;
+open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; syncSizeᵉ;
   ofᵉ; scanᵉ; mergeAllᵉ; input; varᵗ; inlᵗ; caseᵗ; fstᵗ; strmᵗ; nat̂; emptyᵉ; Tm)
 open import Data.Maybe using (nothing)
 open import Data.List using ([]; _∷_) renaming (map to mapL)
@@ -68,18 +68,18 @@ descRoot k =
 
 sightRoot : ℕ → ℕ
 sightRoot k =
-  sightCeil (sizeᵉ (progU k 2)) (nestDᵉ (progU k 2))
+  sightCeil (sizeᵉ (progU k 2)) (2 ^ syncSizeᵉ (progU k 2) * nestDᵉ (progU k 2))
             (storeNestMax (sched-init (progU k 2) slotsT) (st-init (progU k 2)))
             (nestUnit (progU k 2) slotsT)
 
--- packed base-10^6 so one build returns every figure: Agda aborts a
+-- packed base-10^41 so one build returns every figure: Agda aborts a
 -- module at its first mismatch, so a tuple of pins leaks one number per
 -- build and a sum leaks all of them at once
 rootFigs : ℕ
-rootFigs = descRoot 2 + 1000000 * sightRoot 2
-         + 1000000000000 * descRoot 20 + 1000000000000000000 * sightRoot 20
+rootFigs = descRoot 2 + 100000000000000000000000000000000000000000 * (sightRoot 2
+         + 100000000000000000000000000000000000000000 * (descRoot 20 + 100000000000000000000000000000000000000000 * sightRoot 20))
 
-rootFigs≡ : rootFigs ≡ 5050000081000406000009
+rootFigs≡ : rootFigs ≡ 2816719633707125730125674522348300000000000000000000000000000000000000000810000000000000000000000000000003113851318600000000000000000000000000000000000000009
 
 -- ── the delivery side, at the second cascade ───────────────────────
 
@@ -246,7 +246,7 @@ descRootF w =
 
 sightRootF : ℕ → ℕ
 sightRootF w =
-  sightCeil (sizeᵉ (progF w 2)) (nestDᵉ (progF w 2))
+  sightCeil (sizeᵉ (progF w 2)) (2 ^ syncSizeᵉ (progF w 2) * nestDᵉ (progF w 2))
             (storeNestMax (sched-init (progF w 2) slotsF) (st-init (progF w 2)))
             (nestUnit (progF w 2) slotsF)
 
@@ -257,16 +257,15 @@ descRootH k =
 
 sightRootH : ℕ → ℕ
 sightRootH k =
-  sightCeil (sizeᵉ (progU k 2)) (nestDᵉ (progU k 2))
+  sightCeil (sizeᵉ (progU k 2)) (2 ^ syncSizeᵉ (progU k 2) * nestDᵉ (progU k 2))
             (storeNestMax (sched-init (progU k 2) slotsF) (st-init (progU k 2)))
             (nestUnit (progU k 2) slotsF)
 
 rootWideFigs : ℕ
-rootWideFigs = descRootF 3 + 1000000 * sightRootF 3
-             + 1000000000000 * descRootH 8
-             + 1000000000000000000 * sightRootH 8
+rootWideFigs = descRootF 3 + 100000000000000000000000000000000000000000 * (sightRootF 3
+             + 100000000000000000000000000000000000000000 * (descRootH 8 + 100000000000000000000000000000000000000000 * sightRootH 8))
 
-rootWideFigs≡ : rootWideFigs ≡ 1378000004000372000005
+rootWideFigs≡ : rootWideFigs ≡ 2386907802506363728000000000000000000000000000000000000000040000000000000000000000000000009985798991100000000000000000000000000000000000000005
 
 -- ── which sighted quantity sees the count, and the answer is none ───
 
@@ -359,7 +358,7 @@ descSeed d =
 
 sightSeed : ℕ → ℕ
 sightSeed d =
-  sightCeil (sizeᵉ (progSeed d)) (nestDᵉ (progSeed d))
+  sightCeil (sizeᵉ (progSeed d)) (2 ^ syncSizeᵉ (progSeed d) * nestDᵉ (progSeed d))
             (storeNestMax (sched-init (progSeed d) slotsT) (st-init (progSeed d)))
             (nestUnit (progSeed d) slotsT)
 
@@ -367,8 +366,8 @@ sightSeed d =
 -- ceilings and two descents, so one build says whether the margin
 -- narrows as the seed's own nesting grows
 seedFigs : ℕ
-seedFigs = ((sightSeed 4 * 1000 + descSeed 4) * 1000000
-            + sightSeed 1) * 1000 + descSeed 1
+seedFigs = descSeed 1 + 100000000000000000000000000000000000000000 * (sightSeed 1
+           + 100000000000000000000000000000000000000000 * (descSeed 4 + 100000000000000000000000000000000000000000 * sightSeed 4))
 
-seedFigs≡ : seedFigs ≡ 608003000260003
+seedFigs≡ : seedFigs ≡ 26113401160098000000000000000000000000000000000000000030000000000000000000000000000000174483067200000000000000000000000000000000000000003
 seedFigs≡ = refl
