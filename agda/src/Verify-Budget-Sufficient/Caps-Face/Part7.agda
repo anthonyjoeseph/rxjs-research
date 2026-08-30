@@ -1352,7 +1352,7 @@ chainStep-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainBurstOK W id a path sched st →
   chainCapsOK c ac sl d Lv id a path sched st →
   depthChain id a path sched st ≤ d →
-  pathSz? (Caps.cSize c) path ≡ true →
+  pathSz? (Caps.cSize ac) path ≡ true →
   Lv ≤ sizeCount c d ⊔ Caps.cSize c →
   ⦃ _ : FaceOK c sl ⦄ →
   let r = chainStep id a path sched st in
@@ -1441,7 +1441,7 @@ cascadeGo-nodes-chains : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsBurstOK W a nextId chains sched st →
   chainsCapsOK cp ac sl d Lv a nextId chains sched st →
   depthCascade a nextId chains sched st ≤ d →
-  all (λ rc → pathSz? (Caps.cSize cp) (proj₂ rc)) chains ≡ true →
+  all (λ rc → pathSz? (Caps.cSize ac) (proj₂ rc)) chains ≡ true →
   Lv ≤ sizeCount cp d ⊔ Caps.cSize cp →
   ⦃ _ : FaceOK cp sl ⦄ →
   let r = cascadeGo a nextId chains sched st in
@@ -1707,7 +1707,11 @@ cascadeGo-nest-nodes {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hn
   CH = cascadeGo-nodes-chains (capsAt e sl id) (capsAt e sl (suc id)) (capsH e sl id) (nestBurstAt e sl id)
          sl 0 a nextId chains sched st hsl (1≤nestBurstAt e sl id)
          (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)) (capsAt-⊑-suc e sl id)
-         hburst hcw hdep hpz z≤n
+         hburst hcw hdep
+         (all-impl _ _
+            (λ rc h → pathSz?-widen (proj₂ rc) (proj₁ (capsAt-⊑-suc e sl id)) h)
+            chains hpz)
+         z≤n
          ⦃ faceAt e sl id ⦄
 
   -- the level's own ceiling, and the whole of the collapse: the count
@@ -3356,7 +3360,10 @@ walk-sink-caps sl id L sf (suc gas) nid now src i vals evs fin sched st
   (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _) , _ , _)
 walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
   (sleq , cok , hvc , hcl , _ , hdp , (suc g₀ , P , hfl , hlvP , hR) , hrsz , _) =
-    shareAdmit-sz i (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) hrsz
+    all-impl _ _
+      (λ en h → pathSz?-widen (proj₂ en) (proj₁ (capsAt-⊑-suc e sl id)) h)
+      (shareAdmit i (EvalSt.registry st))
+      (shareAdmit-sz i (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) hrsz)
   , ≤-trans (shareAdmit-len i (EvalSt.registry st))
             (≤-trans (capsOK?-count (frameStep L c) sched st cok)
                      (subst (λ x → Caps.cReg (frameStep L c) ≤ Caps.cReg x)
@@ -3472,6 +3479,7 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
     cok
   , proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc)
   , slSz
+  , hpz
   , walk-frame-clos sl id L sf gas nid now src f p vals evs fin sched st H
   , walk-frame-drain sl id L sf gas nid now src f p vals evs fin sched st H
   , Lt ∸ L

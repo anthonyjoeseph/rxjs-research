@@ -216,17 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **carry the levelled closure key down the registry face, which is the
-  half of the frame law's restatement that has not landed** — the walk
-  now reads its values at `frameStep Lv` and the frame law returns them
-  one level up, on the free tail level the ladder was already
-  definitionally at. What still sits at the BASE is the registry:
-  `regsSz?`, `RegsBase` and both subscribing leaves were stated there
-  on the strength of the law that was refuted, and a base reading is
-  not something the walk can now hand them. The leg is to move those
-  four onto the same levelled cap, and it is arithmetic-free for the
-  same reason the walk's was — the level is where the ladder already
-  puts it.
+- **move `RegsBase` and the two subscribing leaves onto the EXIT cap,
+  now that the nodes face no longer reads a path at the entry one** —
+  the delivery measures were already stated at `ac`, and their path
+  premises have followed; the walk carries its own path receipt at its
+  own level, so nothing lifts an entry-cap reading any more. What is
+  left is the registry itself. `capsAt (suc id)` IS `frameStep
+  (sizeCount c d) c` and the walk's ceiling is that same count, so
+  every level a subscribe can reach fits under it — which is exactly
+  what the refuted leaves could not say at the entry cap. The leg is
+  that restatement and the widening at the sink.
 
 - **the node store's closure half, once there is a cap to state it at**
   — a queued inner is read back out of a `mergeAll-st` by

@@ -101,6 +101,6 @@ chain-level-unbounded-absurd H =
   n≮n (ceil + inc) (≤-trans bound (m≤m+n ceil inc))
   where
   got = H slots 0 lvl arr 0 pth (sched-init prog slots) (st-init prog) refl fits
-  step = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ got))))
+  step = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ got)))))
   inc = proj₁ step
   bound = proj₁ (proj₂ step)
