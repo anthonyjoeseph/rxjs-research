@@ -72,7 +72,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (CeilD; Reached; reached-room; room-gas; room-le; ceil-room; ceil-step; ceil-le; ceil-mu)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (nodeNest; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
+  (nodeNest; allFresh; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Fan-Caps using (fanLen; fanSq; delSq; delSq-mono; delSq-monoᶜ; cSize≤delSq; fanLen-zero; fanSq-zero; fanLen-suc; fanSq-suc)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -4207,9 +4207,9 @@ NestAt {n = n} {Γ = Γ} {t = t} {e = e} c d sl B W Lv g o κ id now sched st =
   × (nodesMax (proj₂ (proj₂ r)) ≤ nodesMax st ⊔ G)
   × (∀ (k : NodeId) → nodeNestAt k (proj₂ (proj₂ r)) ≤ nodeNestAt k st ⊔ G)
 
--- THE `*All` WRAP VOCABULARY.  One op-indexed spelling of what the
--- evaluator writes three ways: the wrap expression a head's premises
--- are read over, and the fresh state installed under it.  Both reduce
+-- THE `*All` WRAP VOCABULARY.  One op-indexed spelling of the wrap
+-- expression the evaluator writes three ways, and the reading a head's
+-- premises are taken over.  It reduces
 -- definitionally at each constructor, so a premise stated over
 -- `allWrap op lim b` IS the merge premise at `mergeAllᵒ`, letter for
 -- letter -- which is what lets one burst statement stand where three
@@ -4219,11 +4219,6 @@ allWrap : ∀ {n} {Γ : Ctx n} {u} → AllOp → Maybe ℕ → Closed Γ (obs u)
 allWrap mergeAllᵒ lim b = mergeAllᵉ lim b
 allWrap switchᵒ   _   b = switchAllᵉ b
 allWrap exhaustᵒ  _   b = exhaustAllᵉ b
-
-allFresh : ∀ {n} {Γ : Ctx n} (u : Ty) → AllOp → Maybe ℕ → NodeState Γ
-allFresh u mergeAllᵒ lim = mergeAll-st {t = u} lim 0 [] false
-allFresh _ switchᵒ   _   = switch-st nothing false
-allFresh _ exhaustᵒ  _   = exhaust-st false false
 
 -- and the facts the wrap vocabulary carries across its ops: a fresh
 -- node passes the FULL invariant's two node keys, the wrap's

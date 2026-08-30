@@ -55,9 +55,10 @@ open import Rx.Evaluator
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; nestClosOK?)
+open import Verify-Budget-Sufficient.Nest-Store using (allFresh)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestCapsOK?; pushValsAdmOK; pushValsWidOK;
-         allWrap; allFresh)
+         allWrap)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂

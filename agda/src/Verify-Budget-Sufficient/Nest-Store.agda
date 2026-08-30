@@ -58,13 +58,14 @@ open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Exp using (Ctx; Closed; sizeᵗ; syncSizeᵉ; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Ty; sizeᵗ; syncSizeᵉ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId;
   NodeId; setNode; installNode;
   NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
   Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive; register;
-  arrSource)
+  arrSource; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ)
+open import Data.Maybe using (Maybe; nothing)
 open import Rx.Prim using (Source)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
@@ -270,6 +271,24 @@ nodeNest (mergeAll-st _ _ q _) = foldr (λ o acc → nestDᵉ o ⊔ acc) 0 q
 nodeNest (take-st _)        = 0
 nodeNest (switch-st _ _)    = 0
 nodeNest (exhaust-st _ _)   = 0
+
+-- THE FRESH STATE A `*All` HEAD INSTALLS, op-indexed, so that one
+-- statement stands where three did: each arm reduces definitionally to
+-- the state the evaluator's own clause writes, and the limit rides only
+-- the merge arm.  It sits beside the measure rather than at the burst
+-- face because the fact every consumer wants of it is the measure's:
+-- none of the three carries a payload, so the install moves the store
+-- not at all and a head's ceiling never has to pay for its own node.
+allFresh : ∀ {n} {Γ : Ctx n} (u : Ty) → AllOp → Maybe ℕ → NodeState Γ
+allFresh u mergeAllᵒ lim = mergeAll-st {t = u} lim 0 [] false
+allFresh _ switchᵒ   _   = switch-st nothing false
+allFresh _ exhaustᵒ  _   = exhaust-st false false
+
+allFresh-nest : ∀ {n} {Γ : Ctx n} (u : Ty) (op : AllOp) (lim : Maybe ℕ) →
+  nodeNest {Γ = Γ} (allFresh u op lim) ≡ 0
+allFresh-nest u mergeAllᵒ lim = refl
+allFresh-nest u switchᵒ   _   = refl
+allFresh-nest u exhaustᵒ  _   = refl
 
 liveNest : ∀ {n} {Γ : Ctx n} → LiveSource Γ → ℕ
 liveNest l =

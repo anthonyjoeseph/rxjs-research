@@ -25,7 +25,14 @@
 -- nowhere -- `capsAt` sits on the caps recurrence and does not
 -- terminate even natively -- so these are conclusion-side rows, which
 -- is the coverage this can have rather than a gap in the sweeping.
--- TARGET: sight-all @17cdb7
+--
+-- THE SUBSCRIBE-SIDE ROWS READ THE `*All` HEAD WHOLE, which is the
+-- join of a proven descent and the burst leaf below it.  A green row
+-- is therefore evidence about the leaf a fortiori -- the burst side is
+-- under the join and the ceiling is the same one -- and it is NOT
+-- evidence that the burst side alone has any particular margin, since
+-- nothing here separates the two summands.
+-- TARGET: sight-all-drain @a59c65
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 

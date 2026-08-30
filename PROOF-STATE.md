@@ -226,16 +226,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the depth face's pair, `cascade-depth-sighted` and `sight-all`** —
-  a round's descent under its sighted nesting scaled by the program's
-  size, and the drain leaf all three `*All` heads share. They meet at
-  the same wrap: the drain wraps its subject one level per head, and
-  the round reads that wrap back at the corner where its two axes
-  compound. The margin is already measured to widen with the instant,
-  so what is undecided is where the statement sits rather than whether
-  it holds. The leg is to state the wrap once, at the index the drain
-  leaves it, prove the drain half against it, and hand the round that
-  receipt instead of re-deriving the sum inside it.
+- **`step-frame-clos`, head by head** — what a frame owes the closure
+  reading it was handed, now that the levelled form is instantiated at
+  the shape that kills the flat one: the rebuild's bill is quadratic
+  in the cap at the worst shape the caller's premises admit, and one
+  step pays it eight times over. So the statement is settled and the
+  five frame heads are what is left, split by whether the head REBUILDS
+  — a take filters and a `from-inner` reacts, so the reading is handed
+  back and the step is spare; a map applies a template, a scan folds
+  and a `thru-outer` wraps, and those three are where the probe's ratio
+  is spent. It is the tier's riskiest row that anything can be done to.
+
+- **the drain leaf `sight-all-drain`, now that its descent half is
+  proven** — the `*All` head is a real body over one leaf, so what is
+  left is a burst under a `thru-outer`: a walk over the values the
+  payload emits, each entered at one nesting level down. The head's
+  own `suc` in the exponent is unspent by the descent half, which is
+  the room the walk has to fit in. The leg is the walk's induction —
+  one `depthInner` per emitted value against the same ceiling — and
+  the emitted values are bounded by the payload the descent half has
+  already been read over, so the two halves share their measure.
 
 - **`subscribeE-burst-nest`'s induction** — the crossing this row was
   ranked for is closed: at the map that kills the flat reading the
@@ -245,15 +255,6 @@ does not fit is a finding about the shared statement, not about the head.
   head by head, against the ordering the arrival entry already gives —
   and it is the row the fit shelf's other leaves are waiting behind,
   so it buys three rows' worth of unblocking, not one.
-
-- **the boundary fit at the arr key, `thruFit-arr-merge`,
-  `thruFit-arr-switch` and `thruFit-arr-exhaust`** — the emit-by-emit
-  fit the three `*All` heads still owe. The recursion and the push
-  around them are already checked, so the leg is one arithmetic: the
-  cap-keyed route does not transport to a key that is not a `nestB`,
-  and what replaces it has to be stated once and spent three times.
-  Doing them as one leg is the point — three heads that differ only in
-  which limit they carry should not each discover the same key.
 
 ### The ledger
 
@@ -271,10 +272,10 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
   where they compound, and the margin WIDENS with the instant.
-- **`sight-all`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain, one leaf
-  for all three `*All` heads — they delegate to the same family and wrap the
-  subject in one level each. Now stratified like its parent, so it carries the
-  inputs-below premise and the wrap sum the input clause is paid from.
+- **`sight-all-drain`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain, one
+  leaf for all three `*All` heads — they delegate to the same family and wrap
+  the subject in one level each. The descent half beside it is now a proven
+  body, so what is left is the burst under a `thru-outer`, and nothing else.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that

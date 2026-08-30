@@ -102,6 +102,12 @@ proof that M does not export it. Two consequences worth knowing:
   tree and re-exports freely, so every such import is skipped. The check
   under-reports by construction and never invents: the finding it does make is
   certain, which is why it is a gate failure rather than a report.
+- **And a name M imports and then SPENDS is invisible to it.** Excising the
+  declarations removes the `using` item, not the call, so a module that draws
+  a definition from elsewhere and uses it reads as a module that has it. This
+  is the blind spot to expect right after a definition MOVES DOWN: the mover's
+  own clause is repaired, a sibling tree's stale clause is not, and only the
+  tower says so — many minutes in, naming the importer and not the new home.
 
 **It is not auto-fixable, and `--fix` leaves it alone.** The repair is the RIGHT
 module, which only a human knows; deleting the item would trade a scope-check

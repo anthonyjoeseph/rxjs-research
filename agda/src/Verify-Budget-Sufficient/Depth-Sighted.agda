@@ -9,12 +9,12 @@ module Verify-Budget-Sufficient.Depth-Sighted where
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm;
   *-mono-≤; *-monoˡ-≤; ^-monoʳ-≤; +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n;
-  *-distribˡ-+; +-identityʳ; <ᵇ⇒<)
+  *-distribˡ-+; +-identityʳ; +-suc; <ᵇ⇒<)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; con)
-open import Data.Bool using (Bool; false; T; _∧_)
+open import Data.Bool using (Bool; T; _∧_)
 open import Data.List using (List; []; _∷_)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (Maybe; nothing)
 open import Data.Fin using (toℕ)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; cong; cong₂; trans; sym; refl; subst)
@@ -26,8 +26,8 @@ open import Rx.Inputs-Below using (ib-unfoldμ)
 open import Decide using (∧ʳ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; Stream; map-f; take-f; _↠_; subscribeE;
-  mintNode; installNode; register; take-st; scan-st; scan-f; share-sink;
-  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st)
+  mintNode; installNode; register; take-st; scan-st; scan-f; share-sink; thru-outer;
+  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll; depthFrame)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
@@ -35,6 +35,7 @@ open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-ne
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
    storeNestMax-install; storeNestMax-register; nestUnit; nodeNest;
+   allFresh; allFresh-nest;
    slotWrap; slotWrapSum; slotWrap≤sum)
 
 -- WHAT THE SUBSCRIBING STATE CAN SEE, named once so the clauses below
@@ -101,8 +102,18 @@ shuffle a c s b s′ h =
 -- factor is spent, and it is the head every program in the corpus wears
 -- at its root.
 --
--- PROBED: `Probed.Depth-Sighted` reads the assembly at `root`, where
---   this head is the one it lands on, at fold depths two and twenty:
+-- AND THE HEAD'S OWN NODE IS FREE, which is what the `suc` in the
+-- exponent is left over to pay for something else with.  A fresh
+-- `*All` state carries no payload in any of its three spellings, so
+-- the install moves the store not at all and the descent's ceiling can
+-- be read back at the state the head was entered in.  Taking the state
+-- as a free parameter would forfeit that: the store place would then
+-- have to be paid for out of the head's own spare factor, and a queue
+-- the caller pre-loaded is not bounded by anything the ceiling reads.
+--
+-- PROBED: `Probed.Depth-Sighted` reads the PARENT at `root`, where this
+--   head is the one it lands on -- the whole `⊔` rather than the burst
+--   side alone, which dominates it -- at fold depths two and twenty:
 --   descents of nine and eighty-one against ceilings of eleven and
 --   thirty-four decimal digits.  On the family whose mergeAll is
 --   unbounded, five against eleven digits; under the vocabulary that
@@ -110,17 +121,23 @@ shuffle a c s b s′ h =
 --   margin is the scale factor and it outruns every axis the corpus
 --   moves.  Not covered: any `sl` past the two-slot vocabularies, which
 --   is where both remaining families are; every path other than `root`,
---   which is the whole of what generalising added; and the two heads
---   other than `mergeAllᵉ`, which no row reaches.
+--   which is the whole of what generalising added; the two heads
+--   other than `mergeAllᵉ`, which no row reaches; and the burst side
+--   read apart from the descent it is joined to.
 postulate
-  sight-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (k : ℕ) (op : AllOp) (ist : NodeState Γ) (b : Closed Γ (obs u))
+  sight-all-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     T (inputsBelowᵉ k b) →
-    depthAll g op ist b κ bid now sched st
-      ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
-                              + k * slotWrapSum (Sched.slots sched))
-                  (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+    let nid    = proj₁ (mintNode sched)
+        sched₁ = proj₂ (mintNode sched)
+        st₀    = installNode nid (allFresh u op lim) st
+        r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+    in depthBurst g bid now (thru-outer op nid) κ
+         (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+       ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
+                               + k * slotWrapSum (Sched.slots sched))
+                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 -- ANY SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE, which is the
 -- statement the induction is actually over.  A sweep crosses
@@ -152,6 +169,15 @@ postulate
 --   ceiling is calibrated against -- a limit-one mergeAll over three
 --   queued inners under nested folds, read at the root subscribe, whose
 --   descent climbs four per fold layer against the bare sum's three.
+sight-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  T (inputsBelowᵉ k b) →
+  depthAll g op (allFresh u op lim) b κ bid now sched st
+    ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
+                            + k * slotWrapSum (Sched.slots sched))
+                (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+
 depthE-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (k : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) → T (inputsBelowᵉ k b) →
@@ -287,12 +313,12 @@ depthE-sighted {e = e} g k (scanᵉ f z b) κ bid now sched st ok =
   hsum′ = shuffle (2 ^ syncSizeᵉ b * (pathNestD (scan-f f nid ↠ κ) + nestDᵉ b))
                   (k * W) (storeNestMax sched₁ st₀)
                   (2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))) sR hsum
-depthE-sighted {u = u} g k (mergeAllᵉ lim b) κ bid now sched st ok =
-  sight-all g k mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ bid now sched st ok
+depthE-sighted g k (mergeAllᵉ lim b) κ bid now sched st ok =
+  sight-all g k mergeAllᵒ lim b κ bid now sched st ok
 depthE-sighted g k (switchAllᵉ b)   κ bid now sched st ok =
-  sight-all g k switchᵒ (switch-st nothing false) b κ bid now sched st ok
+  sight-all g k switchᵒ nothing b κ bid now sched st ok
 depthE-sighted g k (exhaustAllᵉ b)  κ bid now sched st ok =
-  sight-all g k exhaustᵒ (exhaust-st false false) b κ bid now sched st ok
+  sight-all g k exhaustᵒ nothing b κ bid now sched st ok
 -- THE TAKE, whose descent half costs nothing on either side of the
 -- trade: a take charges the path nothing and drops the subject nothing,
 -- and the node it installs carries no nesting at all, so the reading the
@@ -343,3 +369,45 @@ depthE-sighted {e = e} g k (mapᵉ f b) κ bid now sched st ok =
     pathNestD (map-f f ↠ κ) + nestDᵉ b ≡ pathNestD κ + nestDᵉ (mapᵉ f b)
   trade f b κ = trans (cong (_+ nestDᵉ b) (+-comm (nestDᵗ f) (pathNestD κ)))
                       (+-assoc (pathNestD κ) (nestDᵗ f) (nestDᵉ b))
+
+-- THE HEAD ITSELF, and it is a real body now rather than a claim: the
+-- descent half is the same trade every structural clause makes -- the
+-- wrap's own nesting level comes off the subject and onto the path the
+-- payload is subscribed under, so the two readings differ by a `suc`
+-- that commutes across the sum -- and the head's `suc` in the exponent
+-- is left entirely unspent by it.  What the assembly does NOT close is
+-- the burst: a `thru-outer` frame is the one frame that walks, and the
+-- walk is where the drain lives.
+sight-all {e = e} {u = u} g k op lim b κ bid now sched st ok = ⊔-lub sub drn
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (allFresh u op lim) st
+  W      = slotWrapSum (Sched.slots sched)
+  S      = syncSizeᵉ b
+  A      = pathNestD κ + suc (nestDᵉ b)
+  sR     = storeNestMax sched st
+
+  store≤ : storeNestMax sched₁ st₀ ≤ sR
+  store≤ = ≤-trans (storeNestMax-install nid (allFresh u op lim) sched₁ st)
+                   (≤-reflexive (cong (_⊔ sR) (allFresh-nest u op lim)))
+
+  coef : 2 ^ S * (suc (pathNestD κ) + nestDᵉ b) ≤ 2 ^ suc S * A
+  coef = ≤-trans (≤-reflexive (cong (2 ^ S *_) (sym (+-suc (pathNestD κ) (nestDᵉ b)))))
+                 (*-monoˡ-≤ A (^-monoʳ-≤ 2 (n≤1+n S)))
+
+  hsum : (2 ^ S * (suc (pathNestD κ) + nestDᵉ b) + k * W) + storeNestMax sched₁ st₀
+           ≤ (2 ^ suc S * A + k * W) + sR
+  hsum = +-mono-≤ (+-monoˡ-≤ (k * W) coef) store≤
+
+  sub : depthE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+          ≤ sightCeil (sizeᵉ e) (2 ^ suc S * A + k * W) sR
+              (nestUnit e (Sched.slots sched))
+  sub = ≤-trans (depthE-sighted g k b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ok)
+                (sightCeil-sum (sizeᵉ e)
+                   (2 ^ S * (suc (pathNestD κ) + nestDᵉ b) + k * W)
+                   (storeNestMax sched₁ st₀)
+                   (2 ^ suc S * A + k * W) sR
+                   (nestUnit e (Sched.slots sched)) hsum)
+
+  drn = sight-all-drain g k op lim b κ bid now sched st ok
