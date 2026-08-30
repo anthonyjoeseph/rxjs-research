@@ -75,22 +75,33 @@ burst-flat g bid now f κ h []         sched st = refl
 burst-flat g bid now f κ h (em ∷ ems) sched st =
   cong₂ _⊔_ (h _ _ sched st) (burst-flat g bid now f κ h ems _ _)
 
--- THE SLOT READ, and it is the other descent whose subject is not a
--- subterm -- but unlike the unfold it costs something, because the
--- subject is a SHARED DEF the path never charged for and the registry
--- grows under `register` on the way in.  The room it needs is the wrap
--- unit, which is where the slot vocabulary's own nesting is summed; the
--- open question is the SCALE, since the unit sits in the ceiling
--- unscaled while a def's descent reads it through the same
--- per-occurrence factor every other subject does.
+-- THE SLOT READ, and the ceiling cannot pay for it AS WRITTEN.  The
+-- subject becomes a SHARED DEF -- a whole program the path never
+-- charged for and no subterm of the one being walked -- while the
+-- nesting measure reports ZERO at an input, so the descent's reading
+-- is the def's and the head's reading is the path's alone.  Nothing on
+-- the ceiling covers the difference: the wrap unit and the store both
+-- carry the vocabulary's nesting, but they carry it IDENTICALLY on the
+-- two sides of the step, so neither can pay, and the per-occurrence
+-- factor the descent reads it through has no counterpart at all.
 --
--- PROBED: `Probed.Depth-Sighted` reads the assembly at `root` on a
---   scan-headed program whose source is exactly this head, at scrutinee
---   depths one and four: three against ten decimal digits, and three
---   against fourteen.  The descent does not move with the seed at all,
---   which is the axis those rows were built to sweep.  Not covered: any
---   path other than the empty one, any slot vocabulary but the one that
---   connects late, and every instant past the entry.
+-- SO THE REPAIR IS THE MEASURE, NOT THE PROOF, and the hop face has
+-- already made it.  Its input clause was a constant zero, was refuted
+-- at exactly this shape, and was repaired by PARAMETERISING the measure
+-- over a slot environment, instantiated by stratified recursion on the
+-- slot index -- a shared def reads only earlier inputs -- with a
+-- fixpoint saying the staged number at a shared slot IS the def's own.
+-- The nesting measure is the same shape with the same hole in it.
+--
+-- DEAD ROUTE: widening the ceiling instead of the measure.  Adding a
+--   vocabulary term -- under a `⊔` or as a summand, scaled or not --
+--   cannot work for a reason that does not depend on the term chosen:
+--   it is CONSTANT along the walk, so it stands identically on both
+--   sides of the step and the difference it must pay for is still
+--   there.  A step into a def is paid for only by something the head
+--   has and the def does not.
+-- TWIN: `slotHop-fix` is the fixpoint the repaired hop measure rests
+--   on, and it is proven.
 postulate
   sight-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (g : Gas) (i : _) (κ : Path Γ _ t) (bid : Id) (now : Tick)

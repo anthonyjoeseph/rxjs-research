@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the wrap unit's scale, which is what `sight-input` reads** — the subscribe
-  side is down to two leaves. The three burst residues were not hard, they
-  were ZERO: a chain frame pushes no story, so `depthFrame` is flatly zero at
-  `map-f`, `scan-f` and `take-f`, and `burst-flat` folds that over the emitted
-  stream. What is left of the slot read is a real gap: the subject is a shared
-  def, its nesting is summed into the wrap unit, and the unit sits in the
-  ceiling UNSCALED while every other subject is read through the
-  per-occurrence factor. Either the unit carries the factor too, or the def's
-  descent is bounded without it.
+- **the nesting measure's input clause, which reports ZERO** — this is a
+  SHAPE finding and it is the tier's top risk: a descent into a shared def has
+  nothing on the ceiling to pay with, and widening the ceiling cannot help,
+  since any vocabulary term is constant along the walk and stands identically
+  on both sides of the step. The hop face already hit this — its input clause
+  was a constant zero, was refuted at this shape, and was repaired by
+  PARAMETERISING the measure over a slot environment, instantiated by
+  stratified recursion and closed by a fixpoint. Do the same to `nestDᵉ`, and
+  take the cone it moves.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -268,10 +268,10 @@ does not fit is a finding about the shared statement, not about the head.
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
-- **`sight-input`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the slot read, the
-  other descent whose subject is not a subterm — and unlike the unfold it costs
-  something: a shared def the path never charged for. The room is the wrap
-  unit; the question is its scale.
+- **`sight-input`** (Depth-Sighted) — SHAPE, `DEAD ROUTE, TWIN`: the nesting
+  measure reports ZERO at an input, so a descent into a shared def has nothing
+  to pay with. The repair is the measure, not the proof — the hop face was
+  refuted at this exact shape and repaired by a slot environment.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
