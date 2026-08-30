@@ -49,16 +49,39 @@ LEDGER of one-line hooks; everything else lives in the code.
   greps or it errors.
 - **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
-  `### Big picture tier roadmap` naming EXACTLY THREE legs — the next three
-  units of work, ranked riskiest-first — and then a `- **discharging `walk-frame-drain-inner` from the restated
-  predicate** — once the drain's receipts are read at the walk's own
-  level, its obligation is the bundle `WalkHyps` already hands the
-  frame, and the level the ceiling has to admit joins by MAX rather
-  than by sum: the queue's grant permits a level anywhere the count
-  reaches, and the absorber is monotone in it. So the leg is the
-  assembly, not a new fact — thread the receipts, spend the widening
-  shelf on the room facts that stay at base, and let the residue be
-  whatever the bundle genuinely does not carry.
+  `### Big picture tier roadmap
+
+- **the three remaining `step-frame-clos` heads, probed at the arms
+  their sibling's evidence does not reach** — all four heads now report
+  their climb in `fCharge`, and exactly one of them moved off FALSITY,
+  because the size face pays for the template arm and for no other. The
+  other three are unprobed at their own risky shapes: the fold's
+  accumulator comes out of the STORE, the exiting-inner head's values
+  were parked at a level nothing in its hypotheses reads, and the wrap
+  head's bill is a constructor rather than a template. One probe module,
+  three targets, at the family that already killed the flat forms — the
+  cheapest risk per unit of effort left in the tier.
+
+- **`walk-frame-drain-inner`'s missing level** — the top row, and the
+  one design call the tier still owes. Its caps conjuncts are read at
+  the base cap while the walk holds one only at its level, and raising
+  them through the fit shelf is a recorded dead route, so the level has
+  to arrive another way. The precedented move is the closure key's:
+  stamp the parked entry with the level it was parked at, as a conjunct
+  of the invariant rather than a hypothesis at the head. That is a
+  restatement of a predicate the whole drain cone threads, so it is
+  worked after the probe leg has said which of its siblings survive.
+
+- **the map head, against the mirror that already pays for it** — the
+  frame law reports its climb in `fCharge`, which is the currency the
+  size face reports in, and at the map arm that face's charge is
+  `suc (sizeᵗ fn)` and its proof is a real body. So the two arms differ
+  in their MEASURE and in nothing else: one reads `sizeᵛ` of a template
+  applied to an argument, the other `closSizeᵉ` of the same. The leg is
+  the closure counterpart of the substitution bound the size mirror
+  spends — a template's reading times its argument's — and the arm that
+  consumes it.
+
 
 ### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
@@ -272,11 +295,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, PROBED`:
   the wrap head, whose output is a constructor round a subscribed inner — the
   one arm whose bill is a constructor rather than a template.
-- **`sight-all-fit`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`: the drain's
-  ENTRY half — the payload subscribe's burst fits the head's spare factor.
-  Nothing reaches it: every row in the family computes a DESCENT, and this is a
-  claim about the store handed back. It is also the half `inputsBelowᵉ` alone
-  cannot supply.
 - **`step-frame-clos-map`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED×2, PROBED`: the template head. Both fixed forms are refuted, which
   pins the reported-charge one it now has, and the size face's map arm is a
@@ -288,6 +306,10 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
   where they compound, and the margin WIDENS with the instant.
+- **`sight-all-fit`** (Depth-Sighted) — DIFFICULTY, `REFUTED`: the drain's
+  ENTRY half. The payload-only grant is refuted at a slot reference and the
+  summand that repairs it is checked at the refuting family; what is left is
+  the induction over the subscription that establishes it.
 - **`sight-all-walk`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain's WALK
   half, one leaf for all three `*All` heads — they delegate to the same family
   and wrap the subject in one level each. It reads the fit the fold carries,

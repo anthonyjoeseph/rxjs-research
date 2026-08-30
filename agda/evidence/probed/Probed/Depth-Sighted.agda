@@ -33,8 +33,12 @@
 -- evidence that the burst side alone has any particular margin, since
 -- nothing here separates the two summands.  The burst's ENTRY FIT is
 -- not covered at all: it is a hypothesis-side claim about the store
--- the payload subscribe hands back, and no row here computes it.
--- TARGET: sight-all-walk @b3a280
+-- the payload subscribe hands back, and no row here computes it.  Nor
+-- is the fit the walk leaf now ASSUMES: its grant carries a slot
+-- summand these rows never read, and a row that measures only a
+-- conclusion is unmoved by a hypothesis widening -- which is exactly
+-- why re-running them says nothing about the summand.
+-- TARGET: sight-all-walk @7bf051
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 

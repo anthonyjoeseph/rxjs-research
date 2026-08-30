@@ -192,7 +192,8 @@ postulate
     (vals : List (Val Γ (obs u))) (fin : Bool)
     (sch : Sched Γ) (sto : EvalSt e) →
     T (inputsBelowᵉ k b) →
-    thruFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b)))
+    thruFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+                 + k * slotWrapSum (Sched.slots sched))
       g op nid κ bid now vals sch sto →
     depthFrame g bid now (thru-outer op nid) κ vals fin sch sto
       ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
@@ -204,6 +205,25 @@ postulate
 -- descent, so no row that computes a depth reaches it; and its shape
 -- is the fit shelf's, which concludes exactly this at caps hypotheses
 -- the caller does not hold.
+--
+-- THE GRANT CARRIES THE SLOT SUMMAND, and it did not always.  A
+-- payload may emit a slot REFERENCE, whose syntax says nothing about
+-- what the slot holds, so a grant read off the payload alone is
+-- pinned at a constant while subscribing the emitted inner runs the
+-- slot's definition.  The summand every other bound on this face
+-- carries is what pays for that, and adding it here costs the
+-- consumer nothing: the walk leaf READS the fit, so a wider grant is
+-- a weaker hypothesis there, and the ceiling both are spent under
+-- already has the same summand.
+--
+-- REFUTED: `Refuted.Sight-All-Fit-Slot` kills the payload-only grant
+--   at a slot whose definition substitutes per layer -- delivered
+--   `8 16 32 64` against a constant sixteen, meeting it exactly at the
+--   third layer and doubling past it -- and pins the repair by
+--   checking that the summand-carrying grant holds at the deepest of
+--   those rows.  Not covered: the two heads other than `mergeAllᵒ`,
+--   any path other than the one the row subscribes under, and the
+--   store-growth conjuncts, which no row reads apart from the value one.
 postulate
   sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -213,7 +233,8 @@ postulate
         sched₁ = proj₂ (mintNode sched)
         st₀    = installNode nid (allFresh u op lim) st
         r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-    in pushFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b)))
+    in pushFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+                    + k * slotWrapSum (Sched.slots sched))
          g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 
 sight-all-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -246,6 +267,7 @@ sight-all-drain {Γ = Γ} {e = e} {u = u} g k op lim b κ bid now sched st ok =
   st₀    = installNode nid (allFresh u op lim) st
   r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
   G      = 2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+             + k * slotWrapSum (Sched.slots sched)
   C      = sightCeil (sizeᵉ e)
              (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
                + k * slotWrapSum (Sched.slots sched))

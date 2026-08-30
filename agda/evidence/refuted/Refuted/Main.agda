@@ -77,6 +77,9 @@ open import Refuted.Thru-Fit-Frame-Slot
          len₇≡1; grown₇≡128; grown₆≡64; parentGrant₆≡68;
          stepFrame-nodes-slot-absurd; telescope₇≡115; telescope₃≡55;
          parent-premise-absurd; fit-premise-absurd)
+open import Refuted.Sight-All-Fit-Slot
+  using (okb; G≡16; delivered≡; delivered₆≡64; repaired-holds;
+         sight-all-fit-slot-absurd)
 open import Refuted.Shared-Slot-Nest-Arr
   using (arrival≡0; capsPin; contained≡; substituted≡; delivered≡8;
          granted≡5; sharedSlot-nest-arr-absurd; headValPin; packHead≡;
