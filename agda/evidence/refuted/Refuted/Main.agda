@@ -129,6 +129,10 @@ open import Refuted.Frame-Step-Compose
   using (c₀; FrameStepCompose; frameStep-compose-absurd)
 open import Refuted.Nest-Clos-Flat
   using (syntaxes≡; closures≡; premise; broken; nest-clos-flat-absurd)
+open import Refuted.Clos-Wrap-Sum
+  using (wrapSum≡; ownNest≡; closRead≡; traded≡; clos-wrap-sum-absurd)
+open import Refuted.Nest-Clos-Cap-Free
+  using (size≡; clos≡; wid≡; third-lo; third-hi; NestClosCaps; nest-clos-cap-free-absurd)
 
 -- THE CUT AND WRAP FAMILIES ARE CLAIMED HERE AND CONSUMED BY THE PROBE
 -- TREE.  A program family is infrastructure rather than a witness, and

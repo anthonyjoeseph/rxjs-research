@@ -216,15 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the closure reading, which is the one row refuted twice** —
-  `nest-clos-caps` prices ONE inner observable's closure under the
-  frame's cap, and it is what the `thru` head's resolved-size premise
-  stands on. Both refutations killed the flat slot sum, and the stratum
-  term the sighted ceiling just gained is the first thing in the tier
-  that prices a slot's own body rather than counting slots. Ask whether
-  it transports: if a closure's reading is under the wrap sum at its own
-  stratum, the premise is a corollary; if not, the finding is which
-  quantity the fan-out sees that the sum does not.
+- **carrying the closure key, now that deriving it is refuted** —
+  `nest-clos-caps` is false at its own cap, so `WalkHyps` gains a
+  closure conjunct beside `valsCaps?` and the leaf goes. Three sites
+  inside the walk take it: the sink's ring, where the values are fixed
+  across the fold; the frame step, where the output values are BUILT and
+  the preservation is a genuine new leaf; and the chain entry, where it
+  becomes a hypothesis — justified, since the unconditional form is
+  refuted. The leg is those three plus the leaf the frame step needs.
 
 - **the round the sink's ring runs in, which is the last thing it does
   not have** — the ring is now a body end to end, and `sink-round-entry`
@@ -263,10 +262,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's.
-- **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
-  observable's closure reading under the frame's cap, which is the
-  resolved-size premise the `thru` head cannot stand without. The flat slot sum
-  cannot pay for it and the conclusion side is symbolic-or-nothing.
+- **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×4`: REFUTED AT ITS
+  OWN CAP — a `map` spine at width one names the slot once per step, three of
+  syntax against nine of closure, so each cap admits the member that beats it.
+  Not repairable here: the reading has to be carried to the frame head.
 - **`sink-round-entry`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the round the
   sink's ring runs in. `WalkHyps` carries a flat ladder at the sink head, which
   is enough for a path and not for a recursion over registrations; the position

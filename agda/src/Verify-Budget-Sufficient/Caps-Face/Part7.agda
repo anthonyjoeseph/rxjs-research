@@ -2428,22 +2428,39 @@ WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
 -- stronger statement about the same value and not a repackaging of the
 -- receipt beside it.
 --
--- AND THE FLAT SLOT MEASURE CANNOT PAY FOR IT EITHER, which is the
--- finding recorded at `nestClosOK?`'s own definition and the reason the
--- state receipt is carried here rather than the sum: the closure
--- reading is multiplicative in the telescope's depth where the sum is
--- flat, so what has to dominate is `capsAt`'s own size -- an `iterSize`
--- at a count of the caps counting family -- and that family is the one
--- the harness quarantines as unreachable by measurement.  So this leaf
--- is symbolic-or-nothing on the conclusion side, and the arithmetic
--- already in the tree that could reach it is `exp-iterSize`, which puts
--- a power of two under that size.
+-- AND IT IS FALSE AS STATED: THE READING CANNOT BE DERIVED HERE AT ALL,
+-- AT THIS CAP OR ANY OTHER.  The standing reading was that `capsAt`'s
+-- size is a tower and a tower might simply dominate a telescope.  It
+-- cannot, and the tower's size is not what decides it: the deficit is
+-- PER REFERENCE, so the value the premise admits grows with the cap and
+-- carries the deficit up with it.  A `map` spine whose every step is a
+-- template naming the slot costs three of syntax and nine of closure per
+-- step, a fixed ratio at every length, so at each cap one member of the
+-- family is admitted and reads a closure above it.  What has to happen
+-- instead is that the closure key is CARRIED to the frame head, which is
+-- a conjunct the walk's hypotheses do not have and an obligation the
+-- arrival's admission owes.
 --
+-- AND THE WIDTH CONJUNCT VERY NEARLY SAVES IT, which is the half worth
+-- keeping: references CAN be capped by `cWid`, since `outWⱽ (ofᵉ ts)` is
+-- the list's length, so N references side by side run out at the width.
+-- The spine is where that gate is absent -- `outWⱽ` walks straight
+-- through a `mapᵉ` and every `dW` clause is a join -- so the family sits
+-- at width one however many references it names.  Width bounds how many
+-- references arrive TOGETHER; the closure reading counts how many there
+-- are.
+--
+-- REFUTED: `Refuted.Nest-Clos-Cap-Free` -- this statement, verbatim, at
+--   `frameStep 0 (capsAt … 0)`: the spine family above, its length read
+--   off the cap by a hand-rolled third, with `init-capsOK?` supplying the
+--   state premise and `capsAt-base-size`/`capsAt-base-wid` the two
+--   floors.  It is what closes the question `Refuted.Nest-Clos-Flat`
+--   left standing.
 -- REFUTED: `Refuted.Thru-Fit-Frame-Slot` -- the frame head WITHOUT a
 --   resolved-size premise, at a telescope each of whose layers doubles
 --   its predecessor: every term of the grant is pinned at its floor by
 --   an arrival that merely NAMES the slot, so the deficit diverges
---   rather than crossing.  That is the argument for this leaf existing
+--   rather than crossing.  That is the argument for the premise existing
 --   at all, and its `parent-premise-absurd` is the other half -- the
 --   cap those rows are read at does not admit the telescope, so what
 --   they kill is the premise-free form and not this one.
@@ -2452,9 +2469,15 @@ WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
 --   value's own `sizeᵉ`, so the premise holds by construction at every
 --   size the family reaches and raising the cap raises the admitted
 --   value with it; three references to one slot read `4 6 8` of syntax
---   against `10 18 26` of closure.  What that closes is the cheap
---   route: no proof of this leaf can go through `valCaps?` alone, so
---   the specific size of `capsAt` is the only thing left to pay.
+--   against `10 18 26` of closure.
+-- REFUTED: `Refuted.Clos-Wrap-Sum` -- the subscribe-side ceiling's
+--   traded sum, which is the one quantity in the tier that prices a
+--   slot's own BODY rather than counting slots, and so the obvious thing
+--   to transport here.  Both factors of `slotWrap` are
+--   nesting-denominated and one is a bare `nestDᵉ`, so a slot whose
+--   definition wears no `*All` head contributes nothing however large
+--   its body is; a pure-`map` vocabulary reads the whole sum at zero
+--   against a closure of ten, and the stratum SCALE cannot repair it.
 postulate
   nest-clos-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sched : Sched Γ) (st : EvalSt e)
