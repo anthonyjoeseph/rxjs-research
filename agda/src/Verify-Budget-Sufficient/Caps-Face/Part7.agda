@@ -2586,6 +2586,25 @@ postulate
       × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
                       (Caps.cWid (capsAt e sl id)) L)
 
+  -- THE FOLD'S SECOND FACTOR COMES OUT OF THE STORE, and it COMPOUNDS:
+  -- the template is applied once per value handed to the frame, each
+  -- application to the last result, so the arm's bill is the map's
+  -- raised to the burst's length and the only thing bounding the
+  -- accumulator is the store premise directly above.
+  --
+  -- PROBED: `Probed.Step-Frame-Clos-Fold` -- the CLOSURE conjunct
+  --   alone, at a template embedding the accumulator TWICE, over a
+  --   state REACHED by running the program rather than written down.
+  --   The base cap refuses that state, so the rows are read at the
+  --   level its own premise forces: there eight folded values overflow
+  --   and one more level admits them, twelve overflow that and a third
+  --   admits them.  So the report grows by one per four or five values
+  --   while the charge at that level is a power of the size cap in the
+  --   width -- linear against exponential, and the gap is the finding.
+  --   The entry recurrence is sealed, so the rows stand over its base
+  --   floor and cover the RATIO; the width cap is read small so the
+  --   charge is a number.  Not covered: any conjunct but the closure
+  --   one, and any accumulator type but an observable.
   step-frame-clos-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (snid : NodeId)
@@ -2602,6 +2621,12 @@ postulate
       × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
                       (Caps.cWid (capsAt e sl id)) L)
 
+  -- THE EXITING INNER PASSES ITS VALUES ON UNTOUCHED UNLESS IT DRAINS,
+  -- and when it drains they come out of the node's QUEUE -- parked at
+  -- whatever level was current when they were enqueued, which is not
+  -- the level this head reads them at.  So the arm's second factor is
+  -- neither an arrival nor an accumulator but a history, and no row of
+  -- this family has instantiated it.
   step-frame-clos-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)
@@ -2618,6 +2643,11 @@ postulate
       × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
                       (Caps.cWid (capsAt e sl id)) L)
 
+  -- THE WRAP'S BILL IS A CONSTRUCTOR AND NOT A TEMPLATE, which is why
+  -- it is the one arm whose report might honestly be a fixed one -- and
+  -- also why nothing has been instantiated at it: what the frame hands
+  -- on is what SUBSCRIBING the inner emitted, so the factor is the
+  -- inner's own definition rather than anything the head can read.
   step-frame-clos-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
     (op : AllOp) (onid : NodeId)

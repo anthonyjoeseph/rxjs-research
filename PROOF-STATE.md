@@ -51,16 +51,16 @@ LEDGER of one-line hooks; everything else lives in the code.
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
   `### Big picture tier roadmap
 
-- **the three remaining `step-frame-clos` heads, probed at the arms
-  their sibling's evidence does not reach** — all four heads now report
-  their climb in `fCharge`, and exactly one of them moved off FALSITY,
-  because the size face pays for the template arm and for no other. The
-  other three are unprobed at their own risky shapes: the fold's
-  accumulator comes out of the STORE, the exiting-inner head's values
-  were parked at a level nothing in its hypotheses reads, and the wrap
-  head's bill is a constructor rather than a template. One probe module,
-  three targets, at the family that already killed the flat forms — the
-  cheapest risk per unit of effort left in the tier.
+- **the two `step-frame-clos` arms still standing on nothing** — the
+  fold arm is instantiated and moved; the other two are not, and their
+  shared header's evidence turned out to belong to the map probe alone,
+  so the split that credited it correctly left them reading NO
+  EVIDENCE, which is what they are. Each needs its own reached state:
+  the exiting-inner head drains values out of a node QUEUE, parked at a
+  level nothing in its hypotheses reads, and the wrap head passes on
+  what SUBSCRIBING an inner emitted, so its factor is the inner's
+  definition. Both states come from running a `mergeAll`, which is one
+  harness for the two.
 
 - **`walk-frame-drain-inner`'s missing level** — the top row, and the
   one design call the tier still owes. Its caps conjuncts are read at
@@ -69,8 +69,8 @@ LEDGER of one-line hooks; everything else lives in the code.
   to arrive another way. The precedented move is the closure key's:
   stamp the parked entry with the level it was parked at, as a conjunct
   of the invariant rather than a hypothesis at the head. That is a
-  restatement of a predicate the whole drain cone threads, so it is
-  worked after the probe leg has said which of its siblings survive.
+  restatement of a predicate the whole drain cone threads, and the
+  queue is exactly what the arm above instantiates first.
 
 - **the map head, against the mirror that already pays for it** — the
   frame law reports its climb in `fCharge`, which is the currency the
@@ -286,15 +286,17 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its caps conjuncts are read at the base cap while
   the walk holds one only at its level; raising them through the fit shelf is
   dead, so the level must arrive another way — a design call.
-- **`step-frame-clos-scan`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, PROBED`:
-  the fold head. Its accumulator comes from the store, so the store premise is
-  spent here and nowhere else in the family.
-- **`step-frame-clos-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, PROBED`:
-  the exiting-inner head. It passes its values on untouched unless it DRAINS,
-  and the drained values were parked at a level nothing here reads.
-- **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, PROBED`:
-  the wrap head, whose output is a constructor round a subscribed inner — the
-  one arm whose bill is a constructor rather than a template.
+- **`step-frame-clos-inner`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  exiting-inner head. It passes its values on untouched unless it DRAINS, and
+  the drained values were parked at a level nothing here reads.
+- **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  wrap head, whose output is a constructor round a subscribed inner — the one
+  arm whose bill is a constructor rather than a template.
+- **`step-frame-clos-scan`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
+  fold head, whose second factor comes out of the STORE and compounds over the
+  burst. Instantiated at a doubling template on a reached state: the report
+  grows by one per four or five values against a charge exponential in the
+  width.
 - **`step-frame-clos-map`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED×2, PROBED`: the template head. Both fixed forms are refuted, which
   pins the reported-charge one it now has, and the size face's map arm is a
