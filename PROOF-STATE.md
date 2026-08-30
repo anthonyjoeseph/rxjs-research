@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **`walk-frame-drain-inner`, the drain leaf with four of its five
-  heads now proven** — matching on the frame discharged every head that
-  names no node, and doing so exposed what the residue actually owes.
-  Its two caps conjuncts are read at the BASE cap while the walk
-  carries a receipt only at its own level, and `capsOK?` weakens
-  upward only, so past the first level the walk has nothing to hand
-  over. The residue is an INDEX, not a fact about queues. The leg is to
-  settle where that conjunct belongs — levelling it re-denominates the
-  consumer's flat-cap budget, the trade the sink's dead route already
-  records — and only then to state the queue's own conjuncts.
+- **threading the level through the burst-fit shelf, which
+  `walk-frame-drain-inner` now waits on** — the drain's conjunct cannot
+  be raised alone, and re-basing its family at the walk's cap is
+  refuted outright, so the only route left is the discipline the frame
+  face already keeps: invariant at the stepped cap, own increment
+  reported, statement restated at the sum. The shelf that does not keep
+  it is the `pushVals-caps` run and the three fits above it, every one
+  of which reads its receipts flat and indexes only its conclusion. The
+  leg is to thread the level through that shelf — proven twin in hand,
+  so the risk is in the restatement's reach and not in any clause.
 
 - **`step-frame-clos`, the last flat reading the frame face still
   carries** — a rebuilt value's closure is a SUM, so the unconditional
@@ -251,7 +251,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
   `from-inner` head of the drain law, the only frame that names a node. Its
   caps conjuncts are read at the base cap while the walk holds one only at its
   level, and that weakens the wrong way.

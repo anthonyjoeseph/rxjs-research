@@ -3077,11 +3077,28 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- one predicate later, and the repair is to decide where the drain's
 -- caps conjunct belongs before proving anything about the queue.
 --
--- AND THE ANSWER IS NOT SIMPLY TO LEVEL IT, which is why this is
--- stated and not done.  The drain's consumer reads its own budget off
--- the flat cap once per round, so raising the conjunct to the walk's
--- level re-denominates that budget -- the same trade the sink's own
--- dead route records one face over.
+-- AND WHAT OWES IT IS THE WHOLE TOWER UNDER THE CONJUNCT, not this
+-- statement.  The arrival family the drain's grant is spent by, and
+-- the burst fits its `*All` heads delegate to, take their state, value
+-- and closure receipts at a BASE cap and carry the level as a separate
+-- INDEX on the conclusion.  So the conjunct cannot simply be raised --
+-- a premise arriving at a stepped cap reaches none of them, at any
+-- index -- and re-basing the family at the walk's cap is the shortcut
+-- the arithmetic already refuses.  What is left is the discipline the
+-- frame face beside it keeps: take the invariant at the STEPPED cap,
+-- report an increment, restate at the SUM.  That is a restatement of
+-- the shelf and not of this leaf, which is why nothing here moves
+-- until it does.
+--
+-- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`
+-- DEAD ROUTE: raising this conjunct alone to the walk's level and
+--   leaving the family under it based where it is.  It typechecks here
+--   and dies one hop down, at the `*All` heads, which spend the base
+--   receipt against a fit whose conclusion is read at an index over
+--   that same base.
+-- TWIN: `subscribeE-caps` already threads a level exactly this way --
+--   invariant at the stepped cap, conclusion at the sum -- and is
+--   proven.
 postulate
   walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
