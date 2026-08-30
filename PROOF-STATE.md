@@ -216,17 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **move `RegsBase` and the two subscribing leaves onto the EXIT cap,
-  now that the nodes face no longer reads a path at the entry one** —
-  the delivery measures were already stated at `ac`, and their path
-  premises have followed; the walk carries its own path receipt at its
-  own level, so nothing lifts an entry-cap reading any more. What is
-  left is the registry itself. `capsAt (suc id)` IS `frameStep
-  (sizeCount c d) c` and the walk's ceiling is that same count, so
-  every level a subscribe can reach fits under it — which is exactly
-  what the refuted leaves could not say at the entry cap. The leg is
-  that restatement and the widening at the sink.
-
 - **the node store's closure half, once there is a cap to state it at**
   — a queued inner is read back out of a `mergeAll-st` by
   `innerFinish` at a level nothing connects to where it was parked, so
@@ -249,6 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   was built from — since a statement repaired by moving the index is
   exactly the shape that reads as fixed while still being wrong.
 
+- **`step-frame-clos`, the last flat reading the frame face still
+  carries** — a rebuilt value's closure is a SUM, so the unconditional
+  form died at every cap and the surviving statement is made one level
+  up, where a level more than doubles the bound. That much is written
+  down; what is not is whether the doubling actually pays for the sum
+  at the shapes the refutation used, which is a question about a ratio
+  and therefore probeable before any clause is ground. The leg is to
+  instantiate the levelled form at exactly that family — a template
+  spine naming a slot, where the deficit is per reference — and either
+  take the receipt or restate again from what the instantiation shows.
+
 ### The ledger
 
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
@@ -258,16 +258,9 @@ does not fit is a finding about the shared statement, not about the head.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: refuted at
   every cap in its old form, since a rebuilt value's closure is a sum. Now
   stated ONE LEVEL UP, where a level more than doubles the cap.
-- **`subscribeInner-regs-base`** (Caps-Face/Part7) — FALSITY, `REFUTED`:
-  REFUTED as stated. The inner is a closed expression the cap never saw, so a
-  step function built FROM the cap registers a chain that fails `frameSz?`. It
-  is owed a closure premise on the inner, at a levelled cap.
-- **`mergeAllDrain-regs-base`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the
-  same refutation one hop out — it reaches the primitive on a queue element —
-  so it is owed the reading over the whole queue, and becomes a real body.
-- **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
-  across a sink's fan-out, which is the arm the path induction hands off — the
-  ring's obligation rather than a frame's.
+
+
+
 - **`burst-clos`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the closure reading
   of whatever the subscribe burst leaves at the head of the queue. Stated about
   the head because that is what the drain spends; the fact is about the queue.
