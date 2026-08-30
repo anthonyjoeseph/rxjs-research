@@ -216,13 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **instantiate the two surviving leaves before either is ground** —
-  the closures one and the sink one are still statements nothing has
-  reached, and the drain's refutation is the argument for doing it:
-  the same bundle, the same hand-built entry state, and the instrument
-  now exists in the refuted tree rather than needing recovery. A
-  refutation costs a restatement; found after the fold is ground it
-  costs the fold.
+- **the sink leaf instantiated, and the closures one narrowed rather
+  than probed** — the two were one leg because they were the two
+  statements nothing had reached, and only one of them still can be.
+  The closures leaf resolves the slot telescope, whose reading is
+  quarantined as unreachable by measurement, so what it got instead is
+  a body leaving one value under one cap. The sink leaf is the share
+  fold and every term of it computes, so the hand-built entry state
+  the drain's refutation already carries is the instrument — and a
+  refutation there costs a restatement, while the same finding after
+  the fold is ground costs the fold.
 
 - **the flat-versus-moving bound on every chain's stages, which the
   mirror already carries** — the width cap over each stage of each
@@ -258,10 +261,10 @@ does not fit is a finding about the shared statement, not about the head.
   fold at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and the one arm the path induction
   hands off rather than closes.
-- **`walk-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
-  `thru-outer`'s closures under the frame's cap. `⊤` at the other four heads;
-  the weakest of the three, since one frame's values are what the walk already
-  carries.
+- **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED`: one inner
+  observable's closure reading under the frame's cap, which is the resolved-size
+  premise the `thru` head cannot stand without. The flat slot sum cannot pay for
+  it and the conclusion side is symbolic-or-nothing.
 - **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
   the cascade descent against a ceiling every term of which computes. The
   statement the proof spends is now a body over it, carried back by a power of

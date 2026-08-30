@@ -39,7 +39,7 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestF
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
-  fac-hoist; one-pow; FaceOK; faceAt)
+  fac-hoist; one-pow; FaceOK; faceAt; nestClosOK?)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade; depthChain; depthFold; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -129,7 +129,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
    walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid; valCaps?-widen)
-open import Decide using (T-to; T⇒≡true; ∧-intro)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 
 thruOuter-face :
   -- subscribeInner-caps  (.Subscribe-Face)
@@ -2397,20 +2397,78 @@ WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
            ≤ P)
       × Reached (capsAt e sl id) (capsH e sl id) P g)
 
--- THE LEAVES THE PATH INDUCTION CANNOT REACH, each of them a statement
--- about ONE frame or ONE sink rather than about a walk.  The frame-local
--- one is `⊤` at four of the five frame heads, so what it really asserts
--- is a bound on a `thru-outer`'s closures; the sink one is the share
--- fold, which is a second recursion and not this one.
+-- THE ONE VALUE THE FRAME-LOCAL LEAF IS ACTUALLY ABOUT: an inner
+-- observable a `thru-outer` is handed, measured through the slot
+-- telescope rather than as syntax.  `valCaps?` charges the value's own
+-- size and nothing the slots it names expand to, and the two readings
+-- come apart at the first shared definition, so this is a strictly
+-- stronger statement about the same value and not a repackaging of the
+-- receipt beside it.
+--
+-- AND THE FLAT SLOT MEASURE CANNOT PAY FOR IT EITHER, which is the
+-- finding recorded at `nestClosOK?`'s own definition and the reason the
+-- state receipt is carried here rather than the sum: the closure
+-- reading is multiplicative in the telescope's depth where the sum is
+-- flat, so what has to dominate is `capsAt`'s own size -- an `iterSize`
+-- at a count of the caps counting family -- and that family is the one
+-- the harness quarantines as unreachable by measurement.  So this leaf
+-- is symbolic-or-nothing on the conclusion side, and the arithmetic
+-- already in the tree that could reach it is `exp-iterSize`, which puts
+-- a power of two under that size.
+--
+-- REFUTED: `Refuted.Thru-Fit-Frame-Slot` -- the frame head WITHOUT a
+--   resolved-size premise, at a telescope each of whose layers doubles
+--   its predecessor: every term of the grant is pinned at its floor by
+--   an arrival that merely NAMES the slot, so the deficit diverges
+--   rather than crossing.  That is the argument for this leaf existing
+--   at all, and its `parent-premise-absurd` is the other half -- the
+--   cap those rows are read at does not admit the telescope, so what
+--   they kill is the premise-free form and not this one.
 postulate
-  walk-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
-    frameClosOK (frameStep L (capsAt e sl id)) sl f vals
+  nest-clos-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sched : Sched Γ) (st : EvalSt e)
+    (o : Val Γ (obs u)) →
+    Sched.slots sched ≡ sl →
+    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+    valCaps? (frameStep L (capsAt e sl id)) sl (obs u) o ≡ true →
+    nestClosOK? (frameStep L (capsAt e sl id)) sl o ≡ true
 
+-- the leaf over a whole delivered list, which is the shape the frame
+-- head reads it at
+nest-clos-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sched : Sched Γ) (st : EvalSt e)
+  (vs : List (Val Γ (obs u))) →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+  all (valCaps? (frameStep L (capsAt e sl id)) sl (obs u)) vs ≡ true →
+  all (nestClosOK? (frameStep L (capsAt e sl id)) sl) vs ≡ true
+nest-clos-all sl id L sched st []       sleq cok h = refl
+nest-clos-all sl id L sched st (v ∷ vs) sleq cok h =
+  ∧-intro (nest-clos-caps sl id L sched st v sleq cok (∧-trueˡ h))
+          (nest-clos-all sl id L sched st vs sleq cok (∧-trueʳ h))
+
+-- THE FRAME-LOCAL LEAF, WHICH IS `⊤` AT FOUR OF THE FIVE HEADS AND SO
+-- was never a statement about a walk at all.  Matching on the frame
+-- says so in code: only a `thru-outer` carries an obligation, and what
+-- it carries is the closure reading of the values it is about to
+-- subscribe, one value at a time.
+walk-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+  frameClosOK (frameStep L (capsAt e sl id)) sl f vals
+walk-frame-clos sl id L sf gas nid now src (map-f _) p vals evs fin sched st H = tt
+walk-frame-clos sl id L sf gas nid now src (scan-f _ _) p vals evs fin sched st H = tt
+walk-frame-clos sl id L sf gas nid now src (take-f _) p vals evs fin sched st H = tt
+walk-frame-clos sl id L sf gas nid now src (from-inner _ _ _) p vals evs fin sched st H = tt
+walk-frame-clos {e = e} sl id L sf gas nid now src (thru-outer _ _) p vals evs fin sched st
+  (sleq , cok , hvc , _) =
+  nest-clos-all sl id L sched st vals sleq cok
+    (proj₁ (valsCaps?-parts (frameStep L (capsAt e sl id)) sl vals hvc))
+
+postulate
   walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
     (src : Source) (i : Fin n) (vals : List (Val Γ (lookup Γ i)))
