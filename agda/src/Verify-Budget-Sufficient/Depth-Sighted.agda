@@ -8,25 +8,29 @@ module Verify-Budget-Sufficient.Depth-Sighted where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm;
-  *-mono-≤; *-monoˡ-≤; ^-monoʳ-≤; +-monoʳ-≤; m≤n+m; n≤1+n)
+  *-mono-≤; *-monoˡ-≤; ^-monoʳ-≤; +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n;
+  *-distribˡ-+)
+open import Data.Nat.Solver using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; con)
 open import Data.Bool using (false)
 open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans)
+open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans; sym; refl)
 
 open import Rx.Exp using (Ctx; Closed; Fn; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
   input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
 open import Rx.Evaluator using (Sched; EvalSt; Path; map-f; take-f; _↠_; subscribeE;
-  mintNode; installNode; take-st;
+  mintNode; installNode; take-st; scan-st; scan-f;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
-open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ)
+open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; sightCeil; sightCeil-mono; storeNestMax; storeNestMax-install; nestUnit)
+  (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
+   storeNestMax-install; nestUnit; nodeNest)
 
 -- WHAT THE SUBSCRIBING STATE CAN SEE, named once so the clauses below
 -- read as the trade rather than as four arguments.
@@ -90,45 +94,31 @@ postulate
        (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
       ≤ Sight b κ sched st
 
--- THE SCAN, AND ITS DESCENT HALF IS NOT MECHANICAL -- which is the one
--- thing the take clause below made it look like.  The trade is exact and
--- generous: a scan drops its seed's and its function's nesting off the
--- subject and puts only the function's onto the frame, so the measure
--- has the SEED's nesting to spare.  The store then takes it straight
--- back, because a scan installs its evaluated seed as a node and the
--- ceiling reads the store as a summand beside the measure.
+-- THE SCAN FRAME'S OWN SWEEP BACK OUT, all that is left of a clause
+-- whose descent half is proven below -- and the node it sweeps past is
+-- the only one in this family carrying nesting of its own, since a scan
+-- installs its EVALUATED seed.
 --
--- SO THE CLAUSE CLOSES EXACTLY WHEN AN EVALUATED SEED IS NO MORE NESTED
--- THAN ITS TERM, AND IT IS NOT.  A closed term still BINDS, and a branch
--- may name what was bound on both sides of a sum the observable measure
--- takes; the honest bound is the one this tree proves, carrying a factor
--- exponential in the term's sync size.  The measure carries that factor
--- now, and the head's own sync size dominates its seed's, so the room
--- is in hand and what is left is spending it.  The leaf itself was
--- never in doubt: it holds by orders of magnitude at that very shape,
--- and the margin widens as the seed deepens while the descent does not
--- move at all.
---
--- REFUTED: `Refuted.Eval-Seed-Nest` is the witness -- a `caseᵗ` whose
---   left branch names its bound observable both as a fold's SEED and
---   inside the source that fold runs over, weighing three against a
---   term that charges two, with the gap growing as the occurrence
---   count.  `Refuted.Apply-Fn-Nest` is the same failure with an
---   explicit payload rather than an empty environment.
--- PROBED: `Probed.Depth-Sighted` reads THIS leaf at the empty path --
---   the program's head is the scan -- on a seed of exactly the refuted
---   shape, at scrutinee depths one and four: three against ten decimal
---   digits, and three against fourteen.  So the
---   statement survives the shape that killed its route, and the margin
---   WIDENS along the seed's own axis, the descent not moving with it at
---   all.  Not covered: any path other than the empty one, any slot
---   vocabulary but the one that connects late, and every instant past
---   the entry.
+-- PROBED: `Probed.Depth-Sighted` reads the clause this residue belongs
+--   to at the empty path -- the program's head is the scan -- on a seed
+--   of the shape whose local route is refuted, at scrutinee depths one
+--   and four: three against ten decimal digits, and three against
+--   fourteen.  The reading is the whole clause, so it prices this
+--   residue too, and the margin WIDENS along the seed's own axis while
+--   the descent does not move at all.  Not covered: any path other than
+--   the empty one, any slot vocabulary but the one that connects late,
+--   and every instant past the entry.
 postulate
-  sight-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  sight-scan-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (f : _) (z : _) (b : Closed Γ s) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    depthE g (scanᵉ f z b) κ bid now sched st ≤ Sight (scanᵉ f z b) κ sched st
+    (let nid    = proj₁ (mintNode sched)
+         sched₁ = proj₂ (mintNode sched)
+         st₀    = installNode nid (scan-st (evalTm z)) st
+         r      = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁ st₀ in
+     depthBurst g bid now (scan-f f nid) κ
+       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+      ≤ Sight (scanᵉ f z b) κ sched st
 
 -- THE DRAIN, and it is ONE leaf for the three heads rather than three:
 -- all of them delegate to `depthAll`, all of them wrap the subject in
@@ -210,7 +200,66 @@ depthE-sighted {e = e} (gs g) (μᵉ body) κ bid now sched st =
                                  (≤-reflexive (nestD-unfoldμ body))))
             ≤-refl)
 depthE-sighted g (varᵉ ())          κ bid now sched st
-depthE-sighted g (scanᵉ f z b)      κ bid now sched st = sight-scan g f z b κ bid now sched st
+-- THE SCAN, whose descent half IS the trade and whose store transport is
+-- what the scale factor was minted for.  The trade is generous -- the
+-- seed's and the function's nesting come off the subject and only the
+-- function's goes onto the frame -- but the store takes the seed's back,
+-- because the node a scan installs holds the EVALUATED seed and the
+-- ceiling reads the store beside the measure.  So the two sides are
+-- compared as one sum, and the spare the head's own `suc` buys is spent
+-- on an evaluated seed's per-occurrence bound.
+--
+-- AND PER-OCCURRENCE IS THE ONLY BOUND AVAILABLE.  A closed term still
+-- BINDS, and a branch may name what was bound on both sides of a sum
+-- the observable measure takes, so an evaluated seed can outnest the
+-- term that built it.
+--
+-- REFUTED: `Refuted.Eval-Seed-Nest` is the witness -- a `caseᵗ` whose
+--   left branch names its bound observable both as a fold's SEED and
+--   inside the source that fold runs over, weighing three against a
+--   term that charges two, with the gap growing as the occurrence
+--   count.  `Refuted.Apply-Fn-Nest` is the same failure with an
+--   explicit payload rather than an empty environment.
+depthE-sighted {e = e} g (scanᵉ f z b) κ bid now sched st =
+  ⊔-lub (≤-trans (depthE-sighted g b (scan-f f nid ↠ κ) bid now sched₁ st₀)
+                 (sightCeil-sum (sizeᵉ e) (2 ^ syncSizeᵉ b * A)
+                   (storeNestMax sched₁ st₀)
+                   (2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))) sR
+                   (nestUnit e (Sched.slots sched)) hsum))
+        (sight-scan-burst g f z b κ bid now sched st)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (scan-st (evalTm z)) st
+  K      = syncSizeᵉ (scanᵉ f z b)
+  A      = nestDᵗ f + pathNestD κ + nestDᵉ b
+  NV     = nodeNest (scan-st (evalTm z))
+  sR     = storeNestMax sched st
+  z≤K : syncSizeᵗ z ≤ K
+  z≤K = ≤-trans (m≤n+m (syncSizeᵗ z) (syncSizeᵗ f))
+                (≤-trans (m≤m+n _ (syncSizeᵉ b)) (n≤1+n _))
+  b≤K : syncSizeᵉ b ≤ K
+  b≤K = ≤-trans (m≤n+m (syncSizeᵉ b) _) (n≤1+n _)
+  hNV : NV ≤ 2 ^ K * nestDᵗ z
+  hNV = ≤-trans (evalTm-nest-sync z) (*-monoˡ-≤ (nestDᵗ z) (^-monoʳ-≤ 2 z≤K))
+  eqv : 2 ^ K * A + 2 ^ K * nestDᵗ z ≡ 2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))
+  eqv = trans (sym (*-distribˡ-+ (2 ^ K) A (nestDᵗ z)))
+              (cong (2 ^ K *_)
+                (solve 4 (λ x y w v → (x :+ y :+ w) :+ v := y :+ (v :+ x :+ w))
+                       refl (nestDᵗ f) (pathNestD κ) (nestDᵉ b) (nestDᵗ z)))
+  hv : 2 ^ syncSizeᵉ b * A + NV
+         ≤ 2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))
+  hv = ≤-trans (+-mono-≤ (*-monoˡ-≤ A (^-monoʳ-≤ 2 b≤K)) hNV)
+               (≤-reflexive eqv)
+  hsum : 2 ^ syncSizeᵉ b * (pathNestD (scan-f f nid ↠ κ) + nestDᵉ b)
+           + storeNestMax sched₁ st₀
+           ≤ 2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b)) + sR
+  hsum =
+    ≤-trans (+-monoʳ-≤ (2 ^ syncSizeᵉ b * A)
+              (≤-trans (storeNestMax-install nid (scan-st (evalTm z)) sched₁ st)
+                       (m⊔n≤m+n NV sR)))
+            (≤-trans (≤-reflexive (sym (+-assoc (2 ^ syncSizeᵉ b * A) NV sR)))
+                     (+-monoˡ-≤ sR hv))
 depthE-sighted {u = u} g (mergeAllᵉ lim b) κ bid now sched st =
   sight-all g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ bid now sched st
 depthE-sighted g (switchAllᵉ b)     κ bid now sched st =

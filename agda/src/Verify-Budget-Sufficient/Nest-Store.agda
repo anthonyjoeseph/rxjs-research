@@ -475,9 +475,16 @@ nestUnit e sl = suc (nestDᵉ e + slotsNestSum sl)
 sightCeil : ℕ → ℕ → ℕ → ℕ → ℕ
 sightCeil z v s u = suc z * suc (v + s + u)
 
--- and it is monotone in the two places a descent moves, which is what
--- lets one clause's reading be widened to the next's without unfolding
--- the product at the call site
+-- and it is monotone in the SUM of the two places a descent moves, which
+-- is what lets one clause's reading be widened to the next's without
+-- unfolding the product at the call site.  The sum and not the pair,
+-- because a head that INSTALLS trades between them: what it puts in the
+-- store it has already dropped off the measure, and separately neither
+-- side goes the right way.
+sightCeil-sum : ∀ (z v s v′ s′ u : ℕ) → v + s ≤ v′ + s′ →
+  sightCeil z v s u ≤ sightCeil z v′ s′ u
+sightCeil-sum z v s v′ s′ u h = *-monoʳ-≤ (suc z) (s≤s (+-monoˡ-≤ u h))
+
 sightCeil-mono : ∀ (z : ℕ) {v v′ s s′ : ℕ} (u : ℕ) → v ≤ v′ → s ≤ s′ →
   sightCeil z v s u ≤ sightCeil z v′ s′ u
 sightCeil-mono z u hv hs =

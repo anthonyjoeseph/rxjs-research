@@ -26,7 +26,7 @@
 -- terminate even natively -- so these are conclusion-side rows, which
 -- is the coverage this can have rather than a gap in the sweeping.
 -- TARGET: sight-all @8d81ef
--- TARGET: sight-scan @d7eb02
+-- TARGET: sight-scan-burst @0ba0ed
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 

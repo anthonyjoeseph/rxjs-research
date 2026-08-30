@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **spending the scale factor the measure now carries** — the currency is
-  changed and paid for: the sighted sum is scaled by the SUBJECT's sync size,
-  the entry affords it out of the double exponential it was always compared
-  against, and the unfold clause fell out real. Every structural head now
-  hands its clause one spare doubling. What is left is spending it where it
-  was minted: `sight-scan` against an evaluated seed, and `sight-map-burst`
-  against an applied payload — both refuted additively, both bounded by this
-  tree's own per-occurrence lemmas. Take the two together; they are one
-  argument at two heads.
+- **spending the factor a second time, at the map frame** — the scan is done:
+  its descent half is a real body, the evaluated seed is paid for out of the
+  head's own sync size by this tree's per-occurrence bound, and what is left
+  of the clause is a burst residue. `sight-map-burst` is the same argument at
+  the other head — `Refuted.Apply-Fn-Nest` kills the additive path charge
+  exactly as the seed's was killed, and `applyFn-nest-sync` is the bound that
+  replaces it. The difference is where it has to be spent: inside the burst
+  rather than at the trade, so the leg is finding the frame's own reading of
+  the payload and pricing it there.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -276,10 +276,10 @@ does not fit is a finding about the shared statement, not about the head.
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
-- **`sight-scan`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: the local
-  route is refuted — an evaluated seed can outnest its term — so the seed is
-  paid for out of the head's own scale factor. The leaf holds by two orders of
-  magnitude at that very shape; what is left is spending the factor.
+- **`sight-scan-burst`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the scan
+  frame's sweep back out, all that is left of a clause whose descent half is
+  proven — and the node it sweeps past is the only one in the family carrying
+  nesting, since a scan installs its evaluated seed.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
