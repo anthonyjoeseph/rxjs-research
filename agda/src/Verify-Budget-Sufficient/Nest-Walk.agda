@@ -845,6 +845,21 @@ pathSz?-lvl c Lv p 2≤S h =
 -- currency is the size and not the nesting.  What that buys is not
 -- brevity: whatever states the store bound has to establish this, and
 -- a store predicate has no access to a connect walk's residue.
+
+-- AND THREE OF THE QUEUE'S CONJUNCTS ARE AT THE WRONG CAP, which a
+-- witness settles and not a preference.  The spine reading, the closure
+-- reading and the room floor are all taken at the ENTRY cap while the
+-- term they are taken of was parked inside a frame the walk had
+-- already stepped into -- and a step is a widening, so the entry cap
+-- refuses terms the walk admits.  At an entry size of eight, one step
+-- buys a hundred and thirty-six, and every source between the two is
+-- a counterexample; the level is what carries the claim, since at
+-- level zero the step is the identity and nothing could fail.  What
+-- the repair is is a separate question with its own dead route, at
+-- the fit shelf this predicate's grant is eventually spent against.
+-- REFUTED: `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd`,
+--   `Refuted.Drain-Queue-Flat.drain-clos-flat-absurd` and
+--   `Refuted.Drain-Queue-Flat.drain-room-flat-absurd`
 capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)

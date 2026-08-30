@@ -216,27 +216,25 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **threading the level through the burst-fit shelf, which
-  `walk-frame-drain-inner` now waits on** — the drain's conjunct cannot
-  be raised alone, and re-basing its family at the walk's cap is
-  refuted outright, so the only route left is the discipline the frame
-  face already keeps: invariant at the stepped cap, own increment
-  reported, statement restated at the sum. The shelf that does not keep
-  it is the `pushVals-caps` run and the three fits above it, every one
-  of which reads its receipts flat and indexes only its conclusion. The
-  leg is to thread the level through that shelf — proven twin in hand,
-  so the risk is in the restatement's reach and not in any clause.
+- **one probe, two targets, at the family that killed both flat
+  forms** — the template spine naming a slot, three of syntax and nine
+  of closure per step, fed into a `mergeAll`. It answers two rows at
+  once: whether one step, which more than doubles the size, actually
+  pays for `step-frame-clos`'s levelled sum at those shapes; and
+  whether the drain's `⊔`-fold absorber still fits once its premises
+  are read at the walk's level and its conclusion at the ceiling. The
+  absorbers are already checked for the sink's failure shape — no
+  product with a flat size or registry cap — so what is open is the
+  ratio, and the ratio computes.
 
-- **`step-frame-clos`, the last flat reading the frame face still
-  carries** — a rebuilt value's closure is a SUM, so the unconditional
-  form died at every cap and the surviving statement is made one level
-  up, where a level more than doubles the bound. That much is written
-  down; what is not is whether the doubling actually pays for the sum
-  at the shapes the refutation used, which is a question about a ratio
-  and therefore probeable before any clause is ground. The leg is to
-  instantiate the levelled form at exactly that family — a template
-  spine naming a slot, where the deficit is per reference — and either
-  take the receipt or restate again from what the instantiation shows.
+- **restating `capsDrainOK` at the seam `capsWalkOK` was split at** —
+  receipts to the walk's level, room facts staying at base, now that
+  the three base readings are refuted outright rather than suspected.
+  The widening shelf already exists, so the risk is not in any clause:
+  it is that this predicate is threaded through the whole drain cone,
+  and a wrong seam costs a multi-file round. The leg is to cut it
+  where the sink's own split cuts, and take `walk-frame-drain-inner`'s
+  obligation down to receipts `WalkHyps` already carries.
 
 - **the depth face's pair, `cascade-depth-sighted` and `sight-all`** —
   a round's descent under its sighted nesting scaled by the program's
@@ -251,10 +249,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
-  `from-inner` head of the drain law, the only frame that names a node. Its
-  caps conjuncts are read at the base cap while the walk holds one only at its
-  level, and that weakens the wrong way.
+- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
+  `REFUTED, DEAD ROUTE, TWIN`: the `from-inner` head of the drain law, the only
+  frame that names a node. Its caps conjuncts are read at the base cap while
+  the walk holds one only at its level, and that weakens the wrong way.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: refuted at
   every cap in its old form, since a rebuilt value's closure is a sum. Now
   stated ONE LEVEL UP, where a level more than doubles the cap.

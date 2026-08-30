@@ -3090,7 +3090,9 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- the shelf and not of this leaf, which is why nothing here moves
 -- until it does.
 --
--- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`
+-- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`, and
+--   `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd` for the
+--   conjuncts themselves being unreachable from what the walk holds
 -- DEAD ROUTE: raising this conjunct alone to the walk's level and
 --   leaving the family under it based where it is.  It typechecks here
 --   and dies one hop down, at the `*All` heads, which spend the base
