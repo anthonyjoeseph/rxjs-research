@@ -226,17 +226,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the frame law's price is one level per unit of `sizeᵗ`, not one** —
-  the one-level form is refuted, at a template holding `S²` copies of
-  its own argument applied to an argument of closure `S²`, both inside
-  the cap the caller's own premises admit and their product outside the
-  next one. A level is linear in the cap and a rebuild is a product, so
-  the four heads and the body move to the charge the SIZE sibling
-  already pays. The leg is that restatement and its one consumer: the
-  walk's frame fold hands the receipt on at the level it just spent, so
-  what the fold carries down a chain is a SUM of the frames' function
-  sizes — which is what `pathSz?` already bounds, frame by frame.
-
 - **the drain leaf `sight-all-drain`, now that its descent half is
   proven** — the `*All` head is a real body over one leaf, so what is
   left is a burst under a `thru-outer`: a walk over the values the
@@ -256,6 +245,17 @@ does not fit is a finding about the shared statement, not about the head.
   and it is the row the fit shelf's other leaves are waiting behind,
   so it buys three rows' worth of unblocking, not one.
 
+- **the map head, against the mirror that already pays for it** — the
+  frame law now reports its climb in `fCharge`, which is the currency
+  the size face reports in, and at the map arm that face's charge is
+  `suc (sizeᵗ fn)` and its proof is a real body. So the two arms differ
+  in their MEASURE and in nothing else: one reads `sizeᵛ` of a template
+  applied to an argument, the other `closSizeᵉ` of the same. The leg is
+  the closure counterpart of the substitution bound the size mirror
+  spends — a template's reading times its argument's, which is exactly
+  the product the witness built — and the arm that consumes it.
+
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
@@ -272,10 +272,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, PROBED`:
   the wrap head, whose output is a constructor round a subscribed inner — the
   one arm whose bill is a constructor rather than a template.
-- **`step-frame-clos-map`** (Caps-Face/Part7) — SHAPE, `REFUTED×2, PROBED`: the
-  template head of the frame law. Refuted flat AND at one level — a rebuild is
-  a product of two quantities the cap admits — so the level charged must grow
-  with the frame's own function, as the size face's map arm already charges.
+- **`step-frame-clos-map`** (Caps-Face/Part7) — DIFFICULTY,
+  `REFUTED×2, PROBED`: the template head. Both fixed forms are refuted, which
+  pins the reported-charge one it now has, and the size face's map arm is a
+  proven mirror at that same charge — so what is left is the closure measure's
+  own substitution bound.
 
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,

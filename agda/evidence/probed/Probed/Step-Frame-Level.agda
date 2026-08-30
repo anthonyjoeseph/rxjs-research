@@ -1,16 +1,21 @@
 -- ══════════════════════════════════════════════════════════════════
--- ONE STEP PAYS FOR A REBUILD, and by a factor of eight at the worst
--- shape the caller's own premises admit.
+-- ONE STEP PAYS FOR A REBUILD AT A TEMPLATE THAT NAMES A SLOT, and by
+-- a factor of eight -- which is a floor under the charge and not a
+-- licence to fix it at one.
 --
 -- PROBES: `refl` receipts at concrete programs.  See EVIDENCE.md.
 --
 -- WHAT THE QUESTION IS.  A frame REBUILDS the values it passes on, so
 -- the closure reading on its output cannot be taken at the cap its
 -- inputs were read at, and that form is already dead at every cap at
--- once.  The repair states the output one level up.  Whether one level is
--- ENOUGH is arithmetic nobody had run: a rebuild costs the template
--- plus the argument plus a constructor, and what the level buys is a
--- single `iterSize` step.
+-- once.  The repair states the output up a level the head REPORTS, and
+-- the rows price that report: a rebuild costs the template plus the
+-- argument plus a constructor, and what one level buys is a single
+-- `iterSize` step.  One is enough HERE and is not enough in general --
+-- a template that copies its ARGUMENT rather than naming a slot
+-- multiplies where these rows add, and a fixed report dies there.  So
+-- what the rows cover is the slot-naming family, at the ceiling the
+-- path pricing permits, where the report may be one.
 --
 -- WHAT MAKES THE ROWS ADVERSARIAL RATHER THAN CONVENIENT.  Both
 -- factors of the rebuild are pushed to the ceiling the caller's own
@@ -44,8 +49,9 @@
 -- and nothing is claimed of a scan's fold, a wrapper's constructor or
 -- the values an exiting inner drains out of a queue.
 --
--- TARGET: step-frame-clos-map @9e5dda
+-- TARGET: step-frame-clos-map @7cbae4
 -- REFUTED: Refuted.Step-Frame-Clos
+-- REFUTED: Refuted.Step-Frame-Clos-Level
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Step-Frame-Level where
 
