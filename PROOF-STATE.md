@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **carrying the closure key, now that deriving it is refuted** —
-  `nest-clos-caps` is false at its own cap, so `WalkHyps` gains a
-  closure conjunct beside `valsCaps?` and the leaf goes. Three sites
-  inside the walk take it: the sink's ring, where the values are fixed
-  across the fold; the frame step, where the output values are BUILT and
-  the preservation is a genuine new leaf; and the chain entry, where it
-  becomes a hypothesis — justified, since the unconditional form is
-  refuted. The leg is those three plus the leaf the frame step needs.
-
 - **the round the sink's ring runs in, which is the last thing it does
   not have** — the ring is now a body end to end, and `sink-round-entry`
   is what it is entered with: a position, a round's gas, and a `Reached`
@@ -246,6 +237,16 @@ does not fit is a finding about the shared statement, not about the head.
   already bounds that push, or whether `RegsBase` has to be stated at
   the level rather than at the base.
 
+- **the closure key belongs to the QUEUE, and it is currently stated
+  about the queue's head** — carrying it worked: the walk holds the
+  reading, the frame step preserves it, and the chain entry takes it.
+  What it left is two leaves at the instant loop, `burst-clos` and
+  `drain-clos`, each saying that whatever the queue is about to hand
+  over passes — which is a statement about one arrival where the fact
+  is about every arrival the queue holds. The leg is to find which
+  invariant the queue already satisfies can carry the reading as a
+  field, so the two heads become projections instead of postulates.
+
 ### The ledger
 
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
@@ -262,10 +263,16 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's.
-- **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×4`: REFUTED AT ITS
-  OWN CAP — a `map` spine at width one names the slot once per step, three of
-  syntax against nine of closure, so each cap admits the member that beats it.
-  Not repairable here: the reading has to be carried to the frame head.
+- **`burst-clos`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the closure reading
+  of whatever the subscribe burst leaves at the head of the queue. Stated about
+  the head because that is what the drain spends; the fact is about the queue.
+- **`drain-clos`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the same one cascade
+  later, which is what the instant loop's recursion asks for. Same provisional
+  shape, and it goes with `burst-clos` when the queue's invariant carries it.
+- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a frame
+  preserving the closure reading of the values it REBUILDS — a template applied,
+  a scan folded, a wrapper put round an inner. Without it the walk's new
+  conjunct dies at the first hop; deriving it from the caps receipt is refuted.
 - **`sink-round-entry`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the round the
   sink's ring runs in. `WalkHyps` carries a flat ladder at the sink head, which
   is enough for a path and not for a recursion over registrations; the position

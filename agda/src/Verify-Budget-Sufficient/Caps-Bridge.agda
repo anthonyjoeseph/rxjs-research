@@ -88,6 +88,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
   (caps-tick; cascade-depth-capsH; cascadeGo-nest; nestCap-sight-scaled≤exp; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
+open import Verify-Budget-Sufficient.Nest-Walk using
+  (nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -784,11 +786,12 @@ store-growth : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   let r = cascade a nextId sched st
   in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
          * (storeNestMax sched st + nestIncAt e sl id)
-store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC =
+store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC =
   ≤-trans (storeNest-finish a schedG stG)
           (subst (λ m → storeNestMax schedG stG
                           ≤ nestFacAt e sl id
@@ -819,7 +822,7 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC =
       (arr-chains-caps sl id a nextId sched st hsl hcaps
         (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
           (capsOK?-regs (capsAt e sl id) sched st hcaps))
-        valC
+        valC closC
         (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz))
       (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
         (capsOK?-regs (capsAt e sl id) sched st hcaps))
@@ -833,9 +836,10 @@ nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   let r = cascade a nextId sched st
   in nestOK? e sl (suc id) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
-nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC =
+nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC =
   nestOK?-intro e sl (suc id)
     (proj₁ (proj₂ (cascade a nextId sched st)))
     (proj₂ (proj₂ (cascade a nextId sched st)))
@@ -843,7 +847,7 @@ nest-tick {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC =
                          (proj₂ (proj₂ (cascade a nextId sched st))) ≤_)
            (sym (nestCapAt-suc e sl id))
            (≤-trans
-             (store-growth sl id a nextId sched st hsl hcaps hnest hval hsz valC)
+             (store-growth sl id a nextId sched st hsl hcaps hnest hval hsz valC closC)
              (*-monoʳ-≤ (nestFacAt e sl id)
                (+-monoˡ-≤ (nestIncAt e sl id)
                           (nestOK?-store e sl id sched st hnest)))))
@@ -859,6 +863,7 @@ cascade-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      nestOK? e sl id sched st ≡ true →
      nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
      valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+     nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
      let r    = cascade a id sched st
          sl′  = Sched.slots (proj₁ (proj₂ r))
          Ψ′   = ΨAt e sl′
@@ -869,7 +874,7 @@ cascade-wet-via-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
         × (nestOK? e sl′ (suc id)
                    (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true)
-cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC =
+cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC closC =
   dry , invOut , capsOut , nestOut
   where
   sl     = Sched.slots sched
@@ -916,7 +921,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC =
           (nest-tick sl id a id sched st refl pre nok harr
             (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
                   (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC)))
-            valC)
+            valC closC)
 
   capsParts = capsOK?-parts (capsAt e sl′ (suc id)) sched′ st′ capsOut
 
@@ -2069,17 +2074,51 @@ abstract
     in nestOK? e ins 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
   burst-nest e ins = nestOK?-from-floor e ins _ _ (burst-nest-floor e ins)
 
+-- WHERE THE CLOSURE KEY ENTERS THE INSTANT LOOP, and it enters as a
+-- premise because deriving it is refuted.  The walk needs every value
+-- it subscribes measured THROUGH the slot telescope, and no caps
+-- receipt supplies that reading: the deficit is per reference, so the
+-- value a size cap admits grows with the cap and carries the deficit up
+-- with it.  So the loop carries it, one instant at a time, in the only
+-- form the drain can spend -- a statement about the arrival the queue
+-- is about to hand it.
+--
+-- AND THE TWO LEAVES BELOW ARE THE SEED AND THE STEP.  Neither is a
+-- fact about a walk: the seed is what the subscribe burst leaves in the
+-- queue, and the step is what a cascade leaves in it.  What both are
+-- really about is the QUEUE -- so the shape they are stated in is
+-- provisional, and the repair the refutation points at is a field on
+-- the invariant the queue already satisfies rather than a pair of
+-- statements about its head.
+postulate
+  burst-clos : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    let r  = subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+        sc = proj₁ (proj₂ r)
+    in ∀ (a : Arrival Γ) (sc′ : Sched Γ) → sched-next sc ≡ inj₂ (a , sc′) →
+       nestClosOK?ᵛ (capsAt e (Sched.slots sc) 1) (Sched.slots sc)
+                    (arrTy a) (arrVal a) ≡ true
+
+  drain-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (id : Id) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+    let sc = proj₁ (proj₂ (cascade a id sched st))
+    in ∀ (b : Arrival Γ) (sc′ : Sched Γ) → sched-next sc ≡ inj₂ (b , sc′) →
+       nestClosOK?ᵛ (capsAt e (Sched.slots sc) (suc id)) (Sched.slots sc)
+                    (arrTy b) (arrVal b) ≡ true
+
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
   INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
        sched st ≡ true →
   capsOK? (capsAt e (Sched.slots sched) id) sched st ≡ true →
   nestOK? e (Sched.slots sched) id sched st ≡ true →
+  (∀ (a : Arrival Γ) (sched′ : Sched Γ) → sched-next sched ≡ inj₂ (a , sched′) →
+     nestClosOK?ᵛ (capsAt e (Sched.slots sched) id) (Sched.slots sched)
+                  (arrTy a) (arrVal a) ≡ true) →
   hasDry (drain {e = e} fuel id sched st) ≡ false
-drain-dry zero    id sched st inv cOK nOK = refl
-drain-dry (suc k) id sched st inv cOK nOK with sched-next sched in eq
+drain-dry zero    id sched st inv cOK nOK clos = refl
+drain-dry (suc k) id sched st inv cOK nOK clos with sched-next sched in eq
 ... | inj₁ _            = refl
-drain-dry {e = e} (suc k) id sched st inv cOK nOK | inj₂ (a , sched′) =
+drain-dry {e = e} (suc k) id sched st inv cOK nOK clos | inj₂ (a , sched′) =
   let Ψ = ΨAt e (Sched.slots sched)
       B = sizeCapAt e (Sched.slots sched) id
       C = capsAt e (Sched.slots sched) id
@@ -2120,8 +2159,14 @@ drain-dry {e = e} (suc k) id sched st inv cOK nOK | inj₂ (a , sched′) =
                           ≤ nestCapAt e sl id)
                (sym (pop-slots sched eq))
                (pop-head-nest id sched st eq nOK)
+      closC′ : nestClosOK?ᵛ (capsAt e (Sched.slots sched′) id) (Sched.slots sched′)
+                            (arrTy a) (arrVal a) ≡ true
+      closC′ = subst
+                 (λ sl → nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true)
+                 (sym (pop-slots sched eq))
+                 (clos a sched′ refl)
       (dry₁ , inv″ , caps″ , nest″) =
-        cascade-wet-via-caps a id sched′ st inv′ val′ caps′ nest′ harr′ valC′
+        cascade-wet-via-caps a id sched′ st inv′ val′ caps′ nest′ harr′ valC′ closC′
   in hasDry-append (proj₁ (cascade a id sched′ st)) _
        dry₁
        (drain-dry k (suc id)
@@ -2129,7 +2174,8 @@ drain-dry {e = e} (suc k) id sched st inv cOK nOK | inj₂ (a , sched′) =
          (proj₂ (proj₂ (cascade a id sched′ st)))
          inv″
          caps″
-         nest″)
+         nest″
+         (drain-clos id a sched′ st))
 
 -- THE THEOREM.  Same face as .Wet's `budget-sufficient` — it does not
 -- move.  Only the interior changes: it now also seeds and carries
@@ -2144,7 +2190,7 @@ budget-sufficient fuel e ins =
                        (sched-init e ins) (st-init e)))
     _
     (burst-dry e ins)
-    (drain-dry fuel 1 sched₁ st₁ (burst-bounded e ins) caps₁ nest₁)
+    (drain-dry fuel 1 sched₁ st₁ (burst-bounded e ins) caps₁ nest₁ (burst-clos e ins))
   where
   sched₁ = proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                     (sched-init e ins) (st-init e)))
