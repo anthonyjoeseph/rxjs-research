@@ -121,9 +121,9 @@ open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; size
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
   ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
-open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
+open import Rx.Frame-Width using (entryCeil; pWᵉ; pWᵛ; dWᵉ; outWᵉ; innWᵉ; innWᵗ; innWᵗˢ; pmOᵉ; pmOᵗ; pmIᵉ; pmIᵗ; pmIᵗˢ; _∈ᵇ_; outWⱽ;
   innWⱽ; innWᵗⱽ; innWᵗˢⱽ; pmIᵗⱽ; slotPW; slotsPW; slotsPWgo; slotIW; slotsIW; slotsIWgo)
-open import Rx.Evaluator using (Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
+open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; Path; sizeStep; iterSize; foldStep; iterFold)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
@@ -145,9 +145,10 @@ open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Caps using
-  (_⊑ᶜ_; Caps; capsAt; capsAt-base-size; frameStep; frameStep-wid-suc;
+  (_⊑ᶜ_; 2≤capsAt-size; caps; Caps; capsAt; capsAt-base-size; capsH;
+   cSize≤frameBlowup; frameStep; frameStep-wid-suc;
    iterFold-infl; iterFold-mono-count; iterFold-suc; iterSize-infl;
-   iterSize-mono-count; iterSize-suc; sizeStep-infl)
+   iterSize-mono-count; iterSize-suc; size≤sizeCount; sizeCount; sizeStep-infl)
 open import Verify-Budget-Sufficient.Measures using
   (2X≡X+X; all-++-intro; all-impl;
                                                       EnvSize; envSize-lookup; envSize-widen;
@@ -844,6 +845,53 @@ n≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id
 n≤capsAt-size e sl id =
   ≤-trans (≤-trans (n≤slotsSize sl) (m≤n+m (slotsSize sl) (2 + sizeᵉ e)))
           (capsAt-base-size e sl id)
+
+-- AND THE SAME BASE ONCE THE BLOWUP HAS RUN, which is two more than
+-- the undoubled bound and is what the delivery walk's gas asks for.
+-- `capsAt` opens at `2 + sizeᵉ e + slotsSize sl` and is then put
+-- through `frameBlowup`, whose count is at least the cap itself, so
+-- the exponential floor already doubles it -- and twice a base of
+-- `2 + x` clears `4 + x` outright.  Stated apart from the undoubled
+-- bound rather than derived from it, since the doubling is the whole
+-- content.
+--
+-- SEALED, and this is not optional: the consumer instantiates the
+-- walk's gas to the cap this bounds, so a transparent body puts the
+-- `iterSize` exponential inside every statement carrying that gas.
+-- The helpers are hoisted rather than left in a `where` because the
+-- seal has to sit at the top level to hold them out of the types.
+private
+  two-clears : ∀ (x : ℕ) → 4 + x ≤ 2 * (2 + x)
+  two-clears x = ≤-trans (+-monoˡ-≤ (2 + x) (m≤m+n 2 x))
+                         (+-monoʳ-≤ (2 + x)
+                            (≤-reflexive (sym (+-identityʳ (2 + x)))))
+
+  gasB : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → Caps
+  gasB {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+                           (suc (sizeᵉ e + slotsSize sl))
+
+  2≤2^K : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+    2 ≤ 2 ^ sizeCount (gasB e sl) (capsBase e sl)
+  2≤2^K e sl = ≤-trans (≤-reflexive (sym (*-identityʳ 2)))
+                       (^-monoʳ-≤ 2 (≤-trans (s≤s z≤n)
+                          (size≤sizeCount (gasB e sl) (capsBase e sl)
+                             (s≤s (s≤s z≤n)) (s≤s z≤n))))
+
+abstract
+  capsAt-gas-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+    4 + (sizeᵉ e + slotsSize sl) ≤ Caps.cSize (capsAt e sl id)
+  capsAt-gas-size {n = n} e sl zero =
+    ≤-trans (two-clears (sizeᵉ e + slotsSize sl))
+    (≤-trans (*-monoˡ-≤ (2 + (sizeᵉ e + slotsSize sl)) (2≤2^K e sl))
+    (≤-trans (*-monoʳ-≤ (2 ^ sizeCount (gasB e sl) (capsBase e sl))
+                (≤-reflexive (sym (+-assoc 2 (sizeᵉ e) (slotsSize sl)))))
+             (iterSize-2^ (Caps.cSize (gasB e sl))
+                (sizeCount (gasB e sl) (capsBase e sl))
+                (Caps.cSize (gasB e sl)) (s≤s z≤n))))
+  capsAt-gas-size e sl (suc id) =
+    ≤-trans (capsAt-gas-size e sl id)
+            (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
+               (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
 
 -- and over a mapped list, which is the shape inputSize sums in
 all-≤-sum : ∀ {A : Set} (f : A → ℕ) (xs : List A) (B : ℕ) →

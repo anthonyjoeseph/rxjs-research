@@ -216,17 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **one chain's deliveries against the budget read at its own
-  position, which is the whole claim one round down** — the fold now
-  carries the position and the leaf is what it hands the ceiling, so
-  every other part of the room is proven and this is the residue.
-  It is the recursion rather than a step of it: the entry bound is
-  the same statement at the entry level, and this asks for it where
-  the round's ledger has climbed to. So the question is whether the
-  cascade's own delivery theorem can be stated at a level at all, or
-  only at zero — and if only at zero, the position is the wrong
-  vehicle and the ledger has to move instead of the level.
-
 - **instantiate the two surviving leaves before either is ground** —
   the closures one and the sink one are still statements nothing has
   reached, and the drain's refutation is the argument for doing it:
@@ -244,6 +233,16 @@ does not fit is a finding about the shared statement, not about the head.
   that moves per stage, which is the shape a mirror cannot hand over
   and the only part this row still owes.
 
+- **the drain leaf's frame-local half, now that the position is
+  supplied** — the parked queue's row was rewritten around what the
+  fold now hands it, and the delivery position is no longer the part
+  it owes: a bounded `mergeAll` parks its queue at a level the round's
+  ledger has already climbed to, and the reaching that proves so is
+  the same witness the chain leaf just spent. What is left is the
+  frame's own count against the frame's own cap, at one level, with no
+  ladder in it — so this is the commit that finds out whether the leaf
+  was ever more than the position it was missing.
+
 ### The ledger
 
 - **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
@@ -251,9 +250,6 @@ does not fit is a finding about the shared statement, not about the head.
   is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
   outgrows the depth it caps, so the repair is a different vehicle, not an
   index.
-- **`chain-deliv-cap`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one chain's
-  deliveries under the budget read at its own position in the round. The whole
-  claim one round down, so it is the recursion rather than a step of it.
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
@@ -327,9 +323,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
-- **`capsAt-gas-size`** (Caps-Face/Part7) — GRINDABLE, `TWIN`: the entry cap
-  clears the walk's gas, because the blowup at least doubles the base.
-  Arithmetic on `iterSize`, no design left in it.
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
