@@ -216,17 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the last leaf on the nesting ceiling, and it is arithmetic** —
-  the step is a proven body now, and so is everything caps-shaped
-  under it: burst and registry into the next size, the wrap unit into
-  the size, the increment outright, and the delivery size into a
-  closed power of `suc cSize` whose exponent is twice the context
-  depth. `pow-room-ℕ` is what is left — three bare numbers, no
-  recurrence on either side, probed at the tightest corner its own
-  hypotheses allow and refuted past the cap. Discharge it: the route
-  is that a power with an exponent linear in the current size sits
-  under two to a size that is already above two to the current one.
-
 - **denominate the sink's allowance at the instant's EXIT cap** — the
   registry conjunct's re-index died in both directions, and what
   replaces it is that the room a subscribe spends is already tracked as
@@ -247,12 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   together — the entry one has no run under it and is the worked
   instance the round one is shaped against.
 
+- **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
+  and `walk-frame-drain` are the two leaves the walk still has, and
+  they are the same shape twice: a bound owed over a recursion that is
+  not the path. Neither carries evidence that reached its risky
+  region — one has none at all — so the leg is a probe first and a
+  grind second. Instantiate the ring at an admitted registration and
+  the parked queue at a bounded `mergeAll`, and let the rows say which
+  of the two is a restatement.
+
 ### The ledger
 
-- **`pow-room-ℕ`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: three
-  bare numbers — a size, the size it steps to, and an exponent capped by the
-  first — one power of the second under two to the second. Every cap-shaped
-  quantity is discharged into it; nothing sealed appears on either side.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
   round's descent under its sighted nesting scaled by the program's size. The
   shape is settled on both axes, and the third instant is now read too; what no

@@ -68,6 +68,14 @@ comment lines inserted into the same module recheck **zero**.
   gives the dev loop and the gate ONE `_build`. Consequently the stripper's orphan
   sweep walks only `src` and `evidence`, never the mirror wholesale — a wholesale
   sweep would delete `_dev` on every run, which is every run.
+- **THE STRIP IS NOT A SINGLE PROLOGUE — A LONG RUN RE-STRIPS MID-FLIGHT.** `stripped`
+  is a prerequisite of every call site, so a multi-target run takes the mirror afresh
+  before its later stages: the tower goes first and the two evidence trees follow,
+  each reading `agda/src` and `agda/evidence` as they stand AT THAT MOMENT. Editing
+  either tree while such a run is live therefore gives it two different sources, and
+  the failure is not a clean one — the later stage checks text the earlier stage never
+  saw, so a red arrives naming a module the run's own tower already passed. Make the
+  edits before the run or after it, never during.
 - **The map cannot live inside the mirror.** A `-- source line N` marker in the
   stripped files would itself change whenever a comment is added above it, making
   the mirror maximally sensitive to exactly the edits it exists to absorb. Anything

@@ -1833,3 +1833,35 @@ capsAt-exp-gain : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id
 capsAt-exp-gain e sl id =
   exp-size-gain (capsAt e sl id) (capsH e sl id)
     (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
+
+-- AND THE OTHER SIDE OF THE SAME STEP: every size step at least
+-- MULTIPLIES BY THE SIZE, so the count-many steps put a whole power of
+-- the size under the next one.  That floor is far above the doubling
+-- one and it is the half a logarithm has to be read against -- an
+-- upper bound on the next size is what makes its bit length nameable,
+-- and only a lower bound this strong leaves room to pay for it.
+pow≤iterSize : ∀ (S k s : ℕ) → 1 ≤ S → S ^ k * s ≤ iterSize S k s
+pow≤iterSize S zero    s hS = ≤-reflexive (*-identityˡ s)
+pow≤iterSize S (suc k) s hS =
+  ≤-trans (≤-reflexive shape)
+          (≤-trans (*-monoʳ-≤ (S ^ k) Ss≤step)
+                   (pow≤iterSize S k (sizeStep S s) hS))
+  where
+  shape : S ^ suc k * s ≡ S ^ k * (S * s)
+  shape = solve 3 (λ x a b → (x :* a) :* b := a :* (x :* b))
+                  refl S (S ^ k) s
+  Ss≤step : S * s ≤ sizeStep S s
+  Ss≤step = *-monoʳ-≤ S (≤-trans (m≤m+n s (s + 0)) (n≤1+n (s + (s + 0))))
+
+-- THE FLOOR IN THE FORM THE ROOM WANTS IT: the next size is above a
+-- whole power of this one, the exponent being the count and one more
+-- for the seed.  A ceiling on the next size is what makes its bit
+-- length nameable, and a floor this strong is what leaves room to pay
+-- for that length.
+size-lower : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cSize c →
+  Caps.cSize c ^ suc (sizeCount c d) ≤ Caps.cSize (frameBlowup c d)
+size-lower c d 1≤S =
+  ≤-trans (≤-reflexive (*-comm S (S ^ J))) (pow≤iterSize S J S 1≤S)
+  where
+  S = Caps.cSize c
+  J = sizeCount c d

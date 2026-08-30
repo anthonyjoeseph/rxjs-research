@@ -85,6 +85,17 @@ and not a constant. Re-scan before moving it; the scan and the reasoning are in
 another, and you pay for the two in between. `BUDGET=<seconds>` exists for that
 case, and that case only.
 
+**AND A BUDGET-KILLED RUN CACHES NOTHING, so retrying at the same budget makes no
+progress at all** — each attempt redoes the same partial rebuild and is killed at the
+same place. The tell is a file that dev-checked in seconds yesterday and now runs for
+minutes: something LOW in its cone was edited, and the loop is rebuilding that cone
+for real, since it stubs mutual blocks only in the TARGET. The repair is to let ONE
+run finish with a generous `BUDGET=`, after which the cone is warm and the normal
+budget holds again — measured on this tree at three hundred and eighty-one seconds
+for the first run after an edit to the caps recurrence, and fifteen for every run
+after it. Retrying under the default in between costs the whole rebuild each time and
+buys nothing.
+
 **A BUDGET THAT FAILS ON NORMAL WORK IS WORSE THAN NO BUDGET:** it trains everyone
 to pass `BUDGET=` reflexively, and then a real regression sails through. Override
 deliberately when the work has genuinely grown — and move the committed number when

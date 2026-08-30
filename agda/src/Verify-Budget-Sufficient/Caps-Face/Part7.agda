@@ -7,7 +7,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _*_; _^_; _⊔_; _�
 open import Data.Nat.Properties using (m+[n∸m]≡n; <⇒≤; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans;
   ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤;
   +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n;
-  *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm; +-suc)
+  *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm; +-suc; +-comm; ≤-pred)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; map; foldr)
@@ -92,7 +92,8 @@ open import Verify-Budget-Sufficient.Caps using
   capsAt-size-mono; capsAt-wid<size; capsAt-suc-full;
   capsAt-⊑-suc; capsAt-exp≤capsH; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
   frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; J+n≤iterL; lvls-add;
-  lvls-infl; lvls-mono; capsAt-exp-gain; size≤sizeCount; sizeCount; sizeCount-body)
+  lvls-infl; lvls-mono; capsAt-exp-gain; size≤sizeCount; sizeCount; sizeCount-body;
+  frameBlowup; iterSize-pow; size-lower)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; reach-reset; ∧-true; cutThrough-len; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -117,7 +118,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (innerFinish-mergeAll-face; innerFinish-face-keep; thruOuter-face-core)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsAt-gas-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?; powʳ1;
+  (capsAt-gas-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?; powʳ1; sq≤pow;
   pathSz?-widen; regsSz?; slotsCaps?; valCaps?; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps;
@@ -3590,38 +3591,188 @@ nestFacLog≤pow {n = n} e sl id =
                      := con 6 :* x :+ con 6)
                refl n
 
--- THE ONE SIDE THE ARITHMETIC LEAVES OPEN, and it mentions no cap and
--- no recurrence -- three numbers, a size, the size it steps to, and an
--- exponent bounded by the first.  Everything caps-shaped has been
--- discharged into those three: the burst and the registry into the
--- next size, the delivery size into a power of it whose exponent is
--- twice the context depth, and the depth into the size it is under.
--- What remains is that a power of the next size, with an exponent
--- linear in the current one, sits under two to the next size -- and
--- the next size is above two to the current one, times it, so the
--- exponent to be paid for is logarithmic in a quantity the budget is
--- exponential in.
---
--- The three hypotheses are exactly what the caps face supplies and
--- nothing more: the current size is at least eight, the exponent is at
--- most six sizes and nine, and the step at least multiplies by two to
--- the size.
---
--- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
---   times -- the calibration through the wrap factor, the same through
---   the increment alone, and the level-keyed repair at every level the
---   fuel reaches, which closes the escape through a bigger index.
--- PROBED: `Probed.Pow-Room` -- sizes eight, nine and ten, each with
---   the step size at the floor its own hypothesis allows and the
---   exponent at its ceiling, plus one row four times off that floor
---   and one with the exponent at zero.  Two rows past the cap are
---   pinned FALSE, so the cap is what the rows are testing rather than
---   a bound nothing reaches.  Not covered: sizes above ten, and the
---   region where the step size is far above its floor -- both make
---   the claim easier.
-postulate
-  pow-room-ℕ : ∀ (S S′ K : ℕ) → 8 ≤ S → K ≤ 6 * S + 9 → 2 ^ S * S ≤ S′ →
-    S′ + 3 + (2 ^ S + suc S′ ^ K) + suc S′ ^ K ≤ 2 ^ S′
+-- THE CEILING ON THE NEXT SIZE, which is what makes its BIT LENGTH a
+-- nameable number: the step is a quadratic iterated count-many times,
+-- and once the size is at least four its square already sits under two
+-- to it, so every factor the iteration contributes is a power of two
+-- and the whole product is one.
+size-upper : ∀ (c : Caps) (d : ℕ) → 4 ≤ Caps.cSize c →
+  suc (Caps.cSize (frameBlowup c d))
+    ≤ 2 ^ (Caps.cSize c * sizeCount c d + Caps.cSize c + 1)
+size-upper c d 4≤S =
+  ≤-trans (s≤s (≤-trans (iterSize-pow S S J S 1≤S ≤-refl ≤-refl) body))
+          (≤-trans (+-monoˡ-≤ X (1≤pow≤ 2 (S * J + S) (s≤s z≤n)))
+                   (≤-reflexive fin))
+  where
+  S : ℕ
+  S = Caps.cSize c
+  J : ℕ
+  J = sizeCount c d
+  X : ℕ
+  X = 2 ^ (S * J + S)
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 4≤S
+  3S≤ : 3 * S ≤ 2 ^ S
+  3S≤ = ≤-trans (*-monoˡ-≤ S (≤-trans (n≤1+n 3) 4≤S)) (sq≤pow S 4≤S)
+  body : (3 * S) ^ J * S ≤ 2 ^ (S * J + S)
+  body =
+    ≤-trans (*-mono-≤ (≤-trans (^-monoˡ-≤ J 3S≤)
+                               (≤-reflexive (^-*-assoc 2 S J)))
+                      (<⇒≤ (n<2^n S)))
+            (≤-reflexive (sym (^-distribˡ-+-* 2 (S * J) S)))
+  fin : X + X ≡ 2 ^ (S * J + S + 1)
+  fin = trans (sym (2X≡X+X X))
+              (trans (*-comm 2 X) (sym (^-distribˡ-+-* 2 (S * J + S) 1)))
+
+capsAt-size-lower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  Caps.cSize (capsAt e sl id)
+    ^ suc (sizeCount (capsAt e sl id) (capsH e sl id))
+    ≤ Caps.cSize (capsAt e sl (suc id))
+capsAt-size-lower e sl id =
+  size-lower (capsAt e sl id) (capsH e sl id)
+    (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+
+capsAt-size-upper : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (Caps.cSize (capsAt e sl (suc id)))
+    ≤ 2 ^ (Caps.cSize (capsAt e sl id)
+             * sizeCount (capsAt e sl id) (capsH e sl id)
+           + Caps.cSize (capsAt e sl id) + 1)
+capsAt-size-upper e sl id =
+  size-upper (capsAt e sl id) (capsH e sl id)
+    (≤-trans (s≤s (s≤s (s≤s (s≤s z≤n)))) (8≤capsAt-size e sl id))
+
+-- A LINEAR TERM UNDER A POWER, with four factors of the base already
+-- spent.  The induction is on the exponent past five: one more step
+-- multiplies the right by the base and the left by less than two, and
+-- the base is at least eight.  Five is where the base case fits --
+-- five copies of the fourth power are under the fifth once the base is
+-- above five.
+lin≤pow : ∀ (S j : ℕ) → 8 ≤ S → S * S * S * S * (5 + j) ≤ S ^ (5 + j)
+lin≤pow S zero    8≤S =
+  ≤-trans (*-monoʳ-≤ (S * S * S * S) (≤-trans (≤ᵇ⇒≤ 5 8 tt) 8≤S))
+          (≤-reflexive (solve 1 (λ x → x :* x :* x :* x :* x
+                                    := x :* (x :* (x :* (x :* (x :* con 1)))))
+                              refl S))
+lin≤pow S (suc j) 8≤S =
+  ≤-trans (*-monoʳ-≤ (S * S * S * S) grow)
+  (≤-trans (≤-reflexive shape)
+  (≤-trans (*-monoˡ-≤ (S * S * S * S * (5 + j)) 2≤S)
+           (*-monoʳ-≤ S (lin≤pow S j 8≤S))))
+  where
+  grow : 5 + suc j ≤ 2 * (5 + j)
+  grow = ≤-trans (m≤m+n (5 + suc j) (4 + j))
+                 (≤-reflexive (solve 1 (λ x → (con 6 :+ x) :+ (con 4 :+ x)
+                                            := con 2 :* (con 5 :+ x))
+                                     refl j))
+  shape : S * S * S * S * (2 * (5 + j)) ≡ 2 * (S * S * S * S * (5 + j))
+  shape = solve 2 (λ a y → a :* (con 2 :* y) := con 2 :* (a :* y))
+                  refl (S * S * S * S) (5 + j)
+  2≤S : 2 ≤ S
+  2≤S = ≤-trans (≤ᵇ⇒≤ 2 8 tt) 8≤S
+
+lin≤powJ : ∀ (S J : ℕ) → 8 ≤ S → 5 ≤ J → S * S * S * S * J ≤ S ^ J
+lin≤powJ S _ 8≤S (s≤s (s≤s (s≤s (s≤s (s≤s _))))) = lin≤pow S _ 8≤S
+
+-- WHAT THE STEP HAS TO PAY FOR, in the currency the room is stated
+-- in: the exponent times the bit length of the next size, plus the
+-- four constant terms.  Every factor here is linear in the size or in
+-- the count, so the whole obligation is a fourth power of the size
+-- times the count -- and the next size is a power of the size whose
+-- exponent IS the count, which swallows it with four factors to
+-- spare.
+room-arith : ∀ (S J K : ℕ) → 8 ≤ S → S ≤ J → K ≤ 6 * S + 9 →
+  K * (S * J + S + 1) + 4 ≤ S ^ suc J
+room-arith S J K 8≤S S≤J K≤ =
+  ≤-trans (+-monoˡ-≤ 4 (*-mono-≤ (≤-trans K≤ K15) bIsSmall))
+  (≤-trans (+-mono-≤ (≤-reflexive collect) 4≤SSJ)
+  (≤-trans (≤-reflexive (solve 1 (λ y → con 45 :* y :+ y := con 46 :* y)
+                               refl (S * S * J)))
+  (≤-trans (*-monoˡ-≤ (S * S * J) 46≤SS)
+  (≤-trans (≤-reflexive (solve 3 (λ a b y → (a :* b) :* (a :* b :* y)
+                                         := a :* b :* a :* b :* y)
+                               refl S S J))
+  (≤-trans (lin≤powJ S J 8≤S (≤-trans (≤ᵇ⇒≤ 5 8 tt) (≤-trans 8≤S S≤J)))
+           (powʳ1 S (≤-trans (s≤s z≤n) 8≤S) (n≤1+n J)))))))
+  where
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 8≤S
+  1≤J : 1 ≤ J
+  1≤J = ≤-trans 1≤S S≤J
+  1≤SJ : 1 ≤ S * J
+  1≤SJ = *-mono-≤ 1≤S 1≤J
+  S≤SJ : S ≤ S * J
+  S≤SJ = ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-monoʳ-≤ S 1≤J)
+  K15 : 6 * S + 9 ≤ 15 * S
+  K15 = ≤-trans (+-monoʳ-≤ (6 * S)
+                  (≤-trans (≤-reflexive (sym (*-identityʳ 9))) (*-monoʳ-≤ 9 1≤S)))
+                (≤-reflexive (solve 1 (λ x → con 6 :* x :+ con 9 :* x := con 15 :* x)
+                                    refl S))
+  bIsSmall : S * J + S + 1 ≤ 3 * (S * J)
+  bIsSmall = ≤-trans (+-mono-≤ (+-monoʳ-≤ (S * J) S≤SJ) 1≤SJ)
+                     (≤-reflexive (solve 1 (λ y → y :+ y :+ y := con 3 :* y)
+                                         refl (S * J)))
+  collect : 15 * S * (3 * (S * J)) ≡ 45 * (S * S * J)
+  collect = solve 2 (λ x y → con 15 :* x :* (con 3 :* (x :* y))
+                          := con 45 :* (x :* x :* y))
+                  refl S J
+  4≤SSJ : 4 ≤ S * S * J
+  4≤SSJ = ≤-trans (≤ᵇ⇒≤ 4 64 tt) (*-mono-≤ (*-mono-≤ 8≤S 8≤S) 1≤J)
+  46≤SS : 46 ≤ S * S
+  46≤SS = ≤-trans (≤ᵇ⇒≤ 46 64 tt) (*-mono-≤ 8≤S 8≤S)
+
+-- THE CONSTANT PART OF THE ROOM: twice a size and three more sits
+-- under two to that size, once the size is at least six.  The square
+-- lemma does it -- a successor squared is already above a linear term
+-- with four to spare.
+lin≤2^ : ∀ (m : ℕ) → 6 ≤ m → 2 * suc m + 3 ≤ 2 ^ m
+lin≤2^ m 6≤m =
+  ≤-trans (≤-reflexive lhs)
+  (≤-trans (+-monoʳ-≤ (2 * m + 4) 1≤mm)
+  (≤-trans (≤-reflexive (sym rhs)) (sq≤2^ m 6≤m)))
+  where
+  lhs : 2 * suc m + 3 ≡ 2 * m + 4 + 1
+  lhs = solve 1 (λ x → con 2 :* (con 1 :+ x) :+ con 3
+                    := con 2 :* x :+ con 4 :+ con 1)
+              refl m
+  rhs : (2 + m) * (2 + m) ≡ 2 * m + 4 + m * (2 + m)
+  rhs = solve 1 (λ x → (con 2 :+ x) :* (con 2 :+ x)
+                    := con 2 :* x :+ con 4 :+ x :* (con 2 :+ x))
+              refl m
+  1≤mm : 1 ≤ m * (2 + m)
+  1≤mm = *-mono-≤ (≤-trans (≤ᵇ⇒≤ 1 6 tt) 6≤m) (s≤s z≤n)
+
+-- THE ROOM ITSELF, and it is three numbers now.  The budget is two to
+-- the next size; the next size and its bit length are named
+-- separately, because what has to be paid for is the exponent TIMES
+-- that length, and the hypothesis says the next size covers it with
+-- four to spare.  The two halves are then each under half the budget:
+-- the constant part by the square lemma, the two powers because the
+-- length was bought.
+room-gen : ∀ (E S′ K b : ℕ) → 7 ≤ S′ → E ≤ S′ → suc S′ ≤ 2 ^ b →
+  K * b + 4 ≤ S′ →
+  S′ + 3 + (E + suc S′ ^ K) + suc S′ ^ K ≤ 2 ^ S′
+room-gen E (suc S″) K b (s≤s 6≤S″) hE hB hK =
+  ≤-trans (+-monoˡ-≤ P (+-monoʳ-≤ (suc S″ + 3) (+-monoˡ-≤ P hE)))
+  (≤-trans (≤-reflexive regroup)
+  (≤-trans (+-mono-≤ (lin≤2^ S″ 6≤S″) twoP)
+           (≤-reflexive (sym (2X≡X+X (2 ^ S″))))))
+  where
+  P : ℕ
+  P = suc (suc S″) ^ K
+  regroup : suc S″ + 3 + (suc S″ + P) + P ≡ 2 * suc S″ + 3 + (P + P)
+  regroup = solve 2 (λ x p → (con 1 :+ x) :+ con 3 :+ ((con 1 :+ x) :+ p) :+ p
+                          := con 2 :* (con 1 :+ x) :+ con 3 :+ (p :+ p))
+                  refl S″ P
+  P≤ : P ≤ 2 ^ (b * K)
+  P≤ = ≤-trans (^-monoˡ-≤ K hB) (≤-reflexive (^-*-assoc 2 b K))
+  bK+1≤ : suc (b * K) ≤ S″
+  bK+1≤ = ≤-trans (s≤s (≤-reflexive (*-comm b K)))
+                  (≤-pred (≤-trans (≤-reflexive (+-comm 2 (K * b)))
+                          (≤-trans (+-monoʳ-≤ (K * b) (≤ᵇ⇒≤ 2 4 tt)) hK)))
+  twoP : P + P ≤ 2 ^ S″
+  twoP = ≤-trans (+-mono-≤ P≤ P≤)
+         (≤-trans (≤-reflexive (sym (2X≡X+X (2 ^ (b * K)))))
+                  (^-monoʳ-≤ 2 bK+1≤))
 
 nestFac-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
@@ -3634,12 +3785,27 @@ nestFac-room {n = n} e sl id =
                       (+-monoʳ-≤ (2 ^ Caps.cSize (capsAt e sl id))
                                  (nestIncLog≤pow e sl id)))
                     (nestFacLog≤pow e sl id))
-          (pow-room-ℕ (Caps.cSize (capsAt e sl id))
-                      (Caps.cSize (capsAt e sl (suc id)))
-                      (6 * n + 9)
-                      (8≤capsAt-size e sl id)
-                      (+-monoˡ-≤ 9 (*-monoʳ-≤ 6 (n≤capsAt-size e sl id)))
-                      (capsAt-exp-gain e sl id))
+          (room-gen (2 ^ Caps.cSize (capsAt e sl id))
+                    (Caps.cSize (capsAt e sl (suc id)))
+                    (6 * n + 9)
+                    (Caps.cSize (capsAt e sl id) * J
+                      + Caps.cSize (capsAt e sl id) + 1)
+                    (≤-trans (≤ᵇ⇒≤ 7 8 tt) (8≤capsAt-size e sl (suc id)))
+                    (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ _)))
+                                      (*-monoʳ-≤ (2 ^ Caps.cSize (capsAt e sl id))
+                                                 (≤-trans (s≤s z≤n)
+                                                   (2≤capsAt-size e sl id))))
+                             (capsAt-exp-gain e sl id))
+                    (capsAt-size-upper e sl id)
+                    (≤-trans (room-arith (Caps.cSize (capsAt e sl id)) J (6 * n + 9)
+                                (8≤capsAt-size e sl id)
+                                (size≤sizeCount (capsAt e sl id) (capsH e sl id)
+                                  (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id))
+                                (+-monoˡ-≤ 9 (*-monoʳ-≤ 6 (n≤capsAt-size e sl id))))
+                             (capsAt-size-lower e sl id)))
+  where
+  J : ℕ
+  J = sizeCount (capsAt e sl id) (capsH e sl id)
 
 -- WHY THE EXPONENT AND NOT THE SIZE.  The cap exponentiates a caps
 -- field once per instant, so it stands above the size at its own

@@ -66,5 +66,3 @@ open import Probed.Thru-Arr-Slot
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡)
 
-open import Probed.Pow-Room
-  using (rowA; rowB; rowC; rowD; rowE; rowF; rowG)
