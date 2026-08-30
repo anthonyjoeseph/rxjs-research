@@ -49,6 +49,7 @@ open import Rx.Evaluator using (blowH; capsHgo; capsBase;
                                 sLvlD-0; sLvlD-suc; opIterD-0; opIterD-suc;
                                 fIterD-0; fIterD-suc)
 open import Rx.Slots using (Slots; slotsSize)
+open import Rx.Slot-Clos using (slotsClos)
 
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
@@ -465,7 +466,7 @@ capsH e sl id = capsHgo (capsBase e sl) id
 
 capsAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → (id : ℕ) → Caps
 capsAt {n = n} e sl zero =
-  frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
+  frameBlowup (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
                     (suc (entryCeil n sl e))
                     (suc (sizeᵉ e + slotsSize sl)))
               (capsBase e sl)
@@ -975,10 +976,11 @@ capsAt-suc-full e sl id = refl
 2≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 ≤ Caps.cSize (capsAt e sl id)
 2≤capsAt-size {n = n} e sl zero =
-  2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+  2≤frameBlowup-size (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+                           (suc (entryCeil n sl e))
                            (suc (sizeᵉ e + slotsSize sl)))
     (capsBase e sl)
-    (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+    (s≤s (s≤s z≤n))
 2≤capsAt-size e sl (suc id) =
   2≤frameBlowup-size (capsAt e sl id) (capsH e sl id) (2≤capsAt-size e sl id)
 
@@ -1011,7 +1013,8 @@ abstract
 1≤capsAt-reg : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   1 ≤ Caps.cReg (capsAt e sl id)
 1≤capsAt-reg {n = n} e sl zero =
-  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+  1≤frameBlowup-reg (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+                          (suc (entryCeil n sl e))
                           (suc (sizeᵉ e + slotsSize sl)))
     (capsBase e sl)
     (s≤s z≤n)
@@ -1033,13 +1036,37 @@ cSize≤frameBlowup c d h =
 capsAt-base-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   2 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
 capsAt-base-size {n = n} e sl zero =
-  cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
-                          (suc (entryCeil n sl e))
-                          (suc (sizeᵉ e + slotsSize sl)))
-    (capsBase e sl)
-    (≤-trans (s≤s z≤n) (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl))))
+  ≤-trans (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl))
+    (cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+                            (suc (entryCeil n sl e))
+                            (suc (sizeᵉ e + slotsSize sl)))
+      (capsBase e sl)
+      (s≤s z≤n))
 capsAt-base-size e sl (suc id) =
   ≤-trans (capsAt-base-size e sl id)
+          (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
+             (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
+
+-- AND THE TELESCOPE'S STAGED READING SITS UNDER THE SAME CAP.  This is
+-- the summand the base cap grew for: a slot's flat size is what the
+-- width face needs, and the closure face needs the slot read THROUGH
+-- the telescope, which is a different and larger number.  Carrying it
+-- in the base is what lets the slot pricing predicate hold it, and the
+-- pricing predicate is what every walk statement already threads.
+-- REFUTED: `Refuted.Nest-Clos-Stratified`, which is why the reading
+--   cannot instead be recovered from the flat size at any fixed number
+--   of frame levels.
+capsAt-base-clos : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  slotsClos sl ≤ Caps.cSize (capsAt e sl id)
+capsAt-base-clos {n = n} e sl zero =
+  ≤-trans (m≤n+m (slotsClos sl) (2 + sizeᵉ e + slotsSize sl))
+    (cSize≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+                            (suc (entryCeil n sl e))
+                            (suc (sizeᵉ e + slotsSize sl)))
+      (capsBase e sl)
+      (s≤s z≤n))
+capsAt-base-clos e sl (suc id) =
+  ≤-trans (capsAt-base-clos e sl id)
           (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
              (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
 
@@ -1064,11 +1091,11 @@ cWid≤frameBlowup c d h =
 capsAt-base-wid : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   suc (entryCeil n sl e) ≤ Caps.cWid (capsAt e sl id)
 capsAt-base-wid {n = n} e sl zero =
-  cWid≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl)
+  cWid≤frameBlowup (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
                          (suc (entryCeil n sl e))
                          (suc (sizeᵉ e + slotsSize sl)))
     (capsBase e sl)
-    (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+    (s≤s (s≤s z≤n))
 capsAt-base-wid e sl (suc id) =
   ≤-trans (capsAt-base-wid e sl id)
           (cWid≤frameBlowup (capsAt e sl id) (capsH e sl id)
@@ -1150,12 +1177,13 @@ B2-cReg≤cSize : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 B2-cReg≤cSize {n = n} e sl zero =
   frameStep-reg≤size c₀ (sizeCount c₀ (capsBase e sl)) 1≤S₀ hReg₀
   where
-  c₀ = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+  c₀ = caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl) (suc (entryCeil n sl e))
             (suc (sizeᵉ e + slotsSize sl))
   1≤S₀ : 1 ≤ Caps.cSize c₀
   1≤S₀ = ≤-trans (s≤s z≤n) (s≤s (s≤s z≤n))
   hReg₀ : Caps.cReg c₀ ≤ Caps.cSize c₀
-  hReg₀ = s≤s (n≤1+n (sizeᵉ e + slotsSize sl))
+  hReg₀ = s≤s (≤-trans (m≤m+n (sizeᵉ e + slotsSize sl) (slotsClos sl))
+                       (n≤1+n (sizeᵉ e + slotsSize sl + slotsClos sl)))
 B2-cReg≤cSize e sl (suc id) =
   frameStep-reg≤size (capsAt e sl id) (sizeCount (capsAt e sl id) (capsH e sl id))
                      (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
@@ -1229,11 +1257,12 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
   8 ≤ Caps.cSize (capsAt e sl id)
 8≤capsAt-size {n = n} e sl zero =
   8≤frameBlowup-size
-    (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+    (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl) (suc (entryCeil n sl e))
           (suc (sizeᵉ e + slotsSize sl)))
     (capsBase e sl)
     (s≤s z≤n)
-    (≤-trans (+-monoʳ-≤ 2 (sizeᵉ-pos e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+    (≤-trans (≤-trans (+-monoʳ-≤ 2 (sizeᵉ-pos e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+             (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl)))
 8≤capsAt-size e sl (suc id) =
   8≤frameBlowup-size (capsAt e sl id) (capsH e sl id)
     (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
@@ -1511,21 +1540,27 @@ capsAt-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : 
   × (Caps.cWid (capsAt e sl id) ≤ towerℕ (capsH e sl id))
 capsAt-tower {n = n} e sl zero =
   blowup-tower (capsBase e sl)
-    (caps (2 + sizeᵉ e + slotsSize sl)
+    (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
           (suc (entryCeil n sl e))
           (suc sz))
     (m≤m+n 3 _) (s≤s (s≤s z≤n))
     (≤-trans base≤ K)
     (≤-trans suc≤ K)
-    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + sz)) K)
+    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + szc)) K)
   where
   sz = sizeᵉ e + slotsSize sl
+  szc = sz + slotsClos sl
   K : capsBase e sl ≤ towerℕ (capsBase e sl)
   K = k≤towerℕ (capsBase e sl)
+  szc≤ : 2 + szc ≤ capsBase e sl
+  szc≤ = ≤-trans (n≤1+n (2 + szc)) (m≤m+n (3 + szc) (suc (entryCeil n sl e)))
   suc≤ : 2 + sz ≤ capsBase e sl
-  suc≤ = ≤-trans (n≤1+n (2 + sz)) (m≤m+n (3 + sz) (suc (entryCeil n sl e)))
-  base≤ : 2 + sizeᵉ e + slotsSize sl ≤ capsBase e sl
-  base≤ = ≤-trans (≤-reflexive (+-assoc 2 (sizeᵉ e) (slotsSize sl))) suc≤
+  suc≤ = ≤-trans (+-monoʳ-≤ 2 (m≤m+n sz (slotsClos sl))) szc≤
+  base≤ : 2 + sizeᵉ e + slotsSize sl + slotsClos sl ≤ capsBase e sl
+  base≤ = ≤-trans (≤-reflexive
+                    (trans (cong (_+ slotsClos sl) (+-assoc 2 (sizeᵉ e) (slotsSize sl)))
+                           (+-assoc 2 (sizeᵉ e + slotsSize sl) (slotsClos sl))))
+                  szc≤
 capsAt-tower e sl (suc id) =
   blowup-tower (capsH e sl id) (capsAt e sl id)
     (3≤capsH e sl id)
@@ -1728,22 +1763,28 @@ capsAt-exp≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) 
   2 ^ (2 ^ Caps.cSize (capsAt e sl id)) ≤ capsH e sl id
 capsAt-exp≤capsH {n = n} e sl zero =
   blowup-exp≤blowH (capsBase e sl)
-    (caps (2 + sizeᵉ e + slotsSize sl)
+    (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
           (suc (entryCeil n sl e))
           (suc sz))
     (m≤m+n 3 _)
     (s≤s (s≤s z≤n))
     (≤-trans base≤ K)
     (≤-trans suc≤ K)
-    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + sz)) K)
+    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + szc)) K)
   where
   sz = sizeᵉ e + slotsSize sl
+  szc = sz + slotsClos sl
   K : capsBase e sl ≤ towerℕ (capsBase e sl)
   K = k≤towerℕ (capsBase e sl)
+  szc≤ : 2 + szc ≤ capsBase e sl
+  szc≤ = ≤-trans (n≤1+n (2 + szc)) (m≤m+n (3 + szc) (suc (entryCeil n sl e)))
   suc≤ : 2 + sz ≤ capsBase e sl
-  suc≤ = ≤-trans (n≤1+n (2 + sz)) (m≤m+n (3 + sz) (suc (entryCeil n sl e)))
-  base≤ : 2 + sizeᵉ e + slotsSize sl ≤ capsBase e sl
-  base≤ = ≤-trans (≤-reflexive (+-assoc 2 (sizeᵉ e) (slotsSize sl))) suc≤
+  suc≤ = ≤-trans (+-monoʳ-≤ 2 (m≤m+n sz (slotsClos sl))) szc≤
+  base≤ : 2 + sizeᵉ e + slotsSize sl + slotsClos sl ≤ capsBase e sl
+  base≤ = ≤-trans (≤-reflexive
+                    (trans (cong (_+ slotsClos sl) (+-assoc 2 (sizeᵉ e) (slotsSize sl)))
+                           (+-assoc 2 (sizeᵉ e + slotsSize sl) (slotsClos sl))))
+                  szc≤
 capsAt-exp≤capsH e sl (suc id) =
   blowup-exp≤blowH (capsH e sl id) (capsAt e sl id)
     (3≤capsH e sl id)

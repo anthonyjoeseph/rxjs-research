@@ -90,10 +90,10 @@ module Verify-Budget-Sufficient.Caps-Face.Part1 where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_; T)
 open import Data.Maybe   using (Maybe)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-suc; +-identityʳ; +-comm; +-assoc; +-monoˡ-≤;
-  *-monoˡ-≤; *-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ;
-  <⇒≤; ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub;
-  *-identityˡ; *-distribˡ-+)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-identityʳ; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤;
+  *-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ; <⇒≤;
+  ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub; *-identityˡ;
+  *-distribˡ-+)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; map)
@@ -127,9 +127,9 @@ open import Rx.Frame-Width using (entryCeil; pWᵉ; pWᵛ; dWᵉ; outWᵉ; innW�
 open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chain; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; Path; sizeStep; iterSize; foldStep; iterFold)
-open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
+open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize; inputSize)
 open import Rx.Clos-Size using (closSizeᵉ)
-open import Rx.Slot-Clos using (slotClos)
+open import Rx.Slot-Clos using (slotClos; slotClosD; slotsClos; σAt)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -925,11 +925,15 @@ obsCaps? {n = n} c sl o =
 slotCaps? : ∀ {n} {Γ : Ctx n} {k u} → ℕ → ℕ → Slots Γ → Slot Γ k u → Bool
 slotCaps? {u = u} B W sl (scripted (hot async)) =
   all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
+  ∧ (inputSize (hot async) ≤ᵇ B)
 slotCaps? {u = u} B W sl (scripted (cold sync async)) =
   all (λ v → sizeᵛ u v ≤ᵇ B) sync
-  ∧ all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
-slotCaps? {n = n} B W sl (shared d) =
-  (sizeᵉ d ≤ᵇ B) ∧ ((pWᵉ n sl d ≤ᵇ W) ∧ (innWᵉ n sl d ≤ᵇ W))
+  ∧ (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
+     ∧ (inputSize (cold sync async) ≤ᵇ B))
+slotCaps? {n = n} {k = k} B W sl (shared d) =
+  (sizeᵉ d ≤ᵇ B)
+  ∧ ((pWᵉ n sl d ≤ᵇ W)
+     ∧ ((innWᵉ n sl d ≤ᵇ W) ∧ (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B)))
 
 slotsGo? : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Slots Γ → List (Fin n) → Bool
 slotsGo? B W sl []       = true
@@ -941,21 +945,40 @@ slotsCaps? {n = n} B W sl = slotsGo? B W sl (tabulate {n = n} (λ i → i))
 slotCaps?-widen : ∀ {n} {Γ : Ctx n} {k u} (sl : Slots Γ) (s : Slot Γ k u)
   {B B′ W W′ : ℕ} →
   B ≤ B′ → W ≤ W′ → slotCaps? B W sl s ≡ true → slotCaps? B′ W′ sl s ≡ true
-slotCaps?-widen {u = u} sl (scripted (hot async)) le lw h =
-  all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ u (Timed.val tv)) le) async h
-slotCaps?-widen {u = u} sl (scripted (cold sync async)) le lw h =
-  ∧-intro (all-impl _ _ (λ v → ≤ᵇ-widen (sizeᵛ u v) le) sync
-             (proj₁ (∧-true _ _ h)))
-          (all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ u (Timed.val tv)) le) async
-             (proj₂ (∧-true _ _ h)))
-slotCaps?-widen {n = n} sl (shared d) {B} {B′} {W} {W′} le lw h =
+slotCaps?-widen {u = u} sl (scripted (hot async)) {B} le lw h =
+  ∧-intro (all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ u (Timed.val tv)) le) async
+             (proj₁ split))
+          (≤ᵇ-widen (inputSize (hot async)) le (proj₂ split))
+  where
+  split = ∧-true (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async)
+                 (inputSize (hot async) ≤ᵇ B) h
+slotCaps?-widen {u = u} sl (scripted (cold sync async)) {B} le lw h =
+  ∧-intro (all-impl _ _ (λ v → ≤ᵇ-widen (sizeᵛ u v) le) sync (proj₁ split₁))
+          (∧-intro (all-impl _ _ (λ tv → ≤ᵇ-widen (sizeᵛ u (Timed.val tv)) le) async
+                      (proj₁ split₂))
+                   (≤ᵇ-widen (inputSize (cold sync async)) le (proj₂ split₂)))
+  where
+  split₁ = ∧-true (all (λ v → sizeᵛ u v ≤ᵇ B) sync)
+                  (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
+                     ∧ (inputSize (cold sync async) ≤ᵇ B)) h
+  split₂ = ∧-true (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async)
+                  (inputSize (cold sync async) ≤ᵇ B) (proj₂ split₁)
+slotCaps?-widen {n = n} {k = k} sl (shared d) {B} {B′} {W} {W′} le lw h =
   ∧-intro (≤ᵇ-widen (sizeᵉ d) le (proj₁ split₁))
           (∧-intro (≤ᵇ-widen (pWᵉ n sl d) lw (proj₁ split₂))
-                   (≤ᵇ-widen (innWᵉ n sl d) lw (proj₂ split₂)))
+                   (∧-intro (≤ᵇ-widen (innWᵉ n sl d) lw (proj₁ split₃))
+                            (≤ᵇ-widen (suc (closSizeᵉ (σAt sl k) d)) le
+                              (proj₂ split₃))))
   where
   split₁ = ∧-true (sizeᵉ d ≤ᵇ B)
-                  ((pWᵉ n sl d ≤ᵇ W) ∧ (innWᵉ n sl d ≤ᵇ W)) h
-  split₂ = ∧-true (pWᵉ n sl d ≤ᵇ W) (innWᵉ n sl d ≤ᵇ W) (proj₂ split₁)
+                  ((pWᵉ n sl d ≤ᵇ W)
+                     ∧ ((innWᵉ n sl d ≤ᵇ W)
+                        ∧ (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B))) h
+  split₂ = ∧-true (pWᵉ n sl d ≤ᵇ W)
+                  ((innWᵉ n sl d ≤ᵇ W)
+                     ∧ (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B)) (proj₂ split₁)
+  split₃ = ∧-true (innWᵉ n sl d ≤ᵇ W)
+                  (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B) (proj₂ split₂)
 
 -- one slot's condition, read out of the telescope's
 slotsGo?-tab : ∀ {n m} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ)
@@ -1003,7 +1026,8 @@ n≤capsAt-size e sl id =
 -- the types.
 private
   gasB : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → Caps
-  gasB {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+  gasB {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+                           (suc (entryCeil n sl e))
                            (suc (sizeᵉ e + slotsSize sl))
 
   four-clears : ∀ (x m : ℕ) → m ≤ x → 4 + x + m + m ≤ 4 * (2 + x)
@@ -1039,7 +1063,8 @@ abstract
                (≤-trans (n≤slotsSize sl) (m≤n+m (slotsSize sl) (sizeᵉ e))))
     (≤-trans (*-monoˡ-≤ (2 + (sizeᵉ e + slotsSize sl)) (4≤2^K e sl))
     (≤-trans (*-monoʳ-≤ (2 ^ sizeCount (gasB e sl) (capsBase e sl))
-                (≤-reflexive (sym (+-assoc 2 (sizeᵉ e) (slotsSize sl)))))
+                (≤-trans (≤-reflexive (sym (+-assoc 2 (sizeᵉ e) (slotsSize sl))))
+                         (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl))))
              (iterSize-2^ (Caps.cSize (gasB e sl))
                 (sizeCount (gasB e sl) (capsBase e sl))
                 (Caps.cSize (gasB e sl)) (s≤s z≤n))))
@@ -1085,18 +1110,66 @@ slotsIW-lb j sl i = slotsIWgo-tab j sl (λ k → k) i
 -- ONE SLOT, AT ITS OWN MEASURE: slotSize and slotPW are by construction
 -- big enough for everything the slot holds, on their own axis
 slotCaps?-self : ∀ {n} {Γ : Ctx n} {k u} (sl : Slots Γ) (s : Slot Γ k u) →
-  slotCaps? (slotSize s) (slotPW n sl s ⊔ slotIW n sl s) sl s ≡ true
+  slotCaps? (slotSize s ⊔ slotClosD (σAt sl k) s)
+            (slotPW n sl s ⊔ slotIW n sl s) sl s ≡ true
 slotCaps?-self {u = u} sl (scripted (hot async)) =
-  all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _ (n≤1+n _)
+  ∧-intro (all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _
+             (≤-trans (n≤1+n _)
+                      (m≤m⊔n (inputSize (hot async)) (inputSize (hot async)))))
+          (T⇒≡true _ (≤⇒≤ᵇ (m≤n⊔m (inputSize (hot async)) (inputSize (hot async)))))
 slotCaps?-self {u = u} sl (scripted (cold sync async)) =
   ∧-intro (all-≤-sum (sizeᵛ u) sync _
-             (≤-trans (m≤m+n _ _) (n≤1+n _)))
-          (all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _
-             (≤-trans (m≤n+m _ _) (n≤1+n _)))
-slotCaps?-self {n = n} sl (shared d) =
-  ∧-intro (T⇒≡true (sizeᵉ d ≤ᵇ sizeᵉ d) (≤⇒≤ᵇ (≤-refl {sizeᵉ d})))
+             (≤-trans (≤-trans (m≤m+n _ _) (n≤1+n _))
+                      (m≤m⊔n (inputSize (cold sync async))
+                             (inputSize (cold sync async)))))
+          (∧-intro (all-≤-sum (λ tv → sizeᵛ u (Timed.val tv)) async _
+                      (≤-trans (≤-trans (m≤n+m _ _) (n≤1+n _))
+                               (m≤m⊔n (inputSize (cold sync async))
+                                      (inputSize (cold sync async)))))
+                   (T⇒≡true _ (≤⇒≤ᵇ (m≤n⊔m (inputSize (cold sync async))
+                                            (inputSize (cold sync async))))))
+slotCaps?-self {n = n} {k = k} sl (shared d) =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (m≤m⊔n (sizeᵉ d) (suc (closSizeᵉ (σAt sl k) d)))))
           (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (m≤m⊔n (pWᵉ n sl d) (innWᵉ n sl d))))
-                   (T⇒≡true _ (≤⇒≤ᵇ (m≤n⊔m (pWᵉ n sl d) (innWᵉ n sl d)))))
+                   (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (m≤n⊔m (pWᵉ n sl d) (innWᵉ n sl d))))
+                            (T⇒≡true _
+                              (≤⇒≤ᵇ (m≤n⊔m (sizeᵉ d)
+                                            (suc (closSizeᵉ (σAt sl k) d)))))))
+
+-- ONE SLOT'S STAGED CLOSURE READING, out of its own pricing.  This is
+-- the projection the defer park spends: the environment it has to
+-- dominate is `slotClos`, and every slot of it is priced by the very
+-- predicate the walk already threads.
+slotCaps?-clos : ∀ {n} {Γ : Ctx n} {k u} (sl : Slots Γ) (s : Slot Γ k u)
+  (B W : ℕ) → slotCaps? B W sl s ≡ true → slotClosD (σAt sl k) s ≤ B
+slotCaps?-clos {u = u} sl (scripted (hot async)) B W h =
+  ≤ᵇ⇒≤ (inputSize (hot async)) B
+    (T-to (proj₂ (∧-true (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async)
+                         (inputSize (hot async) ≤ᵇ B) h)))
+slotCaps?-clos {u = u} sl (scripted (cold sync async)) B W h =
+  ≤ᵇ⇒≤ (inputSize (cold sync async)) B
+    (T-to (proj₂ (∧-true (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async)
+                         (inputSize (cold sync async) ≤ᵇ B)
+      (proj₂ (∧-true (all (λ v → sizeᵛ u v ≤ᵇ B) sync)
+                     (all (λ tv → sizeᵛ u (Timed.val tv) ≤ᵇ B) async
+                        ∧ (inputSize (cold sync async) ≤ᵇ B)) h)))))
+slotCaps?-clos {n = n} {k = k} sl (shared d) B W h =
+  ≤ᵇ⇒≤ (suc (closSizeᵉ (σAt sl k) d)) B (T-to (proj₂ split₃))
+  where
+  split₁ = ∧-true (sizeᵉ d ≤ᵇ B)
+                  ((pWᵉ n sl d ≤ᵇ W)
+                     ∧ ((innWᵉ n sl d ≤ᵇ W)
+                        ∧ (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B))) h
+  split₂ = ∧-true (pWᵉ n sl d ≤ᵇ W)
+                  ((innWᵉ n sl d ≤ᵇ W)
+                     ∧ (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B)) (proj₂ split₁)
+  split₃ = ∧-true (innWᵉ n sl d ≤ᵇ W)
+                  (suc (closSizeᵉ (σAt sl k) d) ≤ᵇ B) (proj₂ split₂)
+
+slotsCaps?-clos : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) (i : Fin n) →
+  slotsCaps? B W sl ≡ true → slotClos sl i ≤ B
+slotsCaps?-clos B W sl i h =
+  slotCaps?-clos sl (sl i) B W (slotsCaps?-lookup B W sl i h)
 
 slotsGo?-bound : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) (is : List (Fin n)) →
   (∀ (i : Fin n) → slotCaps? B W sl (sl i) ≡ true) → slotsGo? B W sl is ≡ true
@@ -1106,12 +1179,13 @@ slotsGo?-bound B W sl (i ∷ is) h = ∧-intro (h i) (slotsGo?-bound B W sl is h
 -- THE WHOLE TELESCOPE, from the two numbers capsAt's base already
 -- contains
 slotsCaps?-bound : ∀ {n} {Γ : Ctx n} (B W : ℕ) (sl : Slots Γ) →
-  slotsSize sl ≤ B → slotsPW n sl ≤ W → slotsIW n sl ≤ W →
+  slotsSize sl ≤ B → slotsClos sl ≤ B → slotsPW n sl ≤ W → slotsIW n sl ≤ W →
   slotsCaps? B W sl ≡ true
-slotsCaps?-bound {n = n} B W sl h hw hi =
+slotsCaps?-bound {n = n} B W sl h hc hw hi =
   slotsGo?-bound B W sl (tabulate {n = n} (λ i → i))
     (λ i → slotCaps?-widen sl (sl i)
-             (≤-trans (fᵢ≤sum-tab (λ k → slotSize (sl k)) i) h)
+             (⊔-lub (≤-trans (fᵢ≤sum-tab (λ k → slotSize (sl k)) i) h)
+                    (≤-trans (fᵢ≤sum-tab (λ k → slotClos sl k) i) hc))
              (⊔-lub (≤-trans (slotsPW-lb n sl i) hw)
                     (≤-trans (slotsIW-lb n sl i) hi))
              (slotCaps?-self sl (sl i)))

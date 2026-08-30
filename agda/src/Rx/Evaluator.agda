@@ -34,6 +34,7 @@ open import Rx.Frame-Width using (entryCeil)
 -- generator/decoder, not by these types; a forward reference is
 -- rejected there.
 open import Rx.Slots using (scripted; shared; Slots; slotsSize)
+open import Rx.Slot-Clos using (slotsClos)
 
 Stream : ∀ {n} → Ctx n → Ty → Set          -- flat, canonical emission order
 Stream Γ t = List (InstEmit (Val Γ t))
@@ -954,7 +955,8 @@ syncBudget sz m id =
 -- closed bracket on them exists that is worth proving.  Reading it costs
 -- nothing: the height is never normalised
 capsBase : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ
-capsBase {n = n} e sl = 3 + (sizeᵉ e + slotsSize sl) + suc (entryCeil n sl e)
+capsBase {n = n} e sl =
+  3 + (sizeᵉ e + slotsSize sl + slotsClos sl) + suc (entryCeil n sl e)
 
 budgetAt : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → Id → Gas
 budgetAt e sl id = syncBudget (sizeᵉ e + slotsSize sl) (capsBase e sl) id

@@ -216,17 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **restating `defer-park-clos` at a cap that dominates the
-  telescope** — the leaf as written is dead: the premise prices each
-  slot on its own, so a stratified telescope doubling per stage beats
-  any fixed number of frame levels, and the deficit is exponential in
-  a slot count no level mentions. What the site actually has is the
-  caps at the instant, whose size is an `iterSize` tower rather than
-  an arbitrary number, so the leg is to find the premise the init caps
-  can honestly supply — a reading of the whole program under its own
-  telescope — thread it to the defer park, and instantiate the result
-  at the same stratified family before grinding anything.
-
 - **`walk-frame-drain`, the last FALSITY the walk face carries that is
   not about the closure key** — a bounded `mergeAll`'s parked queue,
   owing a delivery position ABOVE the walk's level with gas still left.
@@ -249,6 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   spine naming a slot, where the deficit is per reference — and either
   take the receipt or restate again from what the instantiation shows.
 
+- **the depth face's pair, `cascade-depth-sighted` and `sight-all`** —
+  a round's descent under its sighted nesting scaled by the program's
+  size, and the drain leaf all three `*All` heads share. They meet at
+  the same wrap: the drain wraps its subject one level per head, and
+  the round reads that wrap back at the corner where its two axes
+  compound. The margin is already measured to widen with the instant,
+  so what is undecided is where the statement sits rather than whether
+  it holds. The leg is to state the wrap once, at the index the drain
+  leaves it, prove the drain half against it, and hand the round that
+  receipt instead of re-deriving the sum inside it.
+
 ### The ledger
 
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
@@ -260,11 +260,6 @@ does not fit is a finding about the shared statement, not about the head.
   stated ONE LEVEL UP, where a level more than doubles the cap.
 
 
-
-- **`defer-park-clos`** (Subscribe-Face) — FALSITY, `REFUTED`: the closure
-  reading of a `defer`'s parked body, owed where the frame holds only its
-  written size. Dead at an arbitrary cap; it belongs at one that dominates the
-  telescope.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner

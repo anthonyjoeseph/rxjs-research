@@ -54,6 +54,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st;
   sizeStep; capsBase; sched-next; schedGo; schedHeadOf; schedEarlier; drain; evaluate;
   sched-init; st-init)
 open import Rx.Slots using (Slots; slotsSize)
+open import Rx.Slot-Clos using (slotsClos)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
 -- fnCapBounded?, regsB?, slotsFnCap, INV-parts, pathLen, the Bool
@@ -1836,12 +1837,13 @@ private
   (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   3 + sizeᵉ e + slotsSize sl ≤ Caps.cSize (capsAt e sl id)
  capsAt-base-size⁺-go {n = n} e sl zero =
-  sucSize≤frameBlowup-go (caps (2 + sizeᵉ e + slotsSize sl)
-                               (suc (entryCeil n sl e))
-                               (suc (sizeᵉ e + slotsSize sl)))
-    (capsBase e sl)
-    (≤-trans (m≤m+n 2 (sizeᵉ e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
-    (s≤s z≤n)
+  ≤-trans (s≤s (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl)))
+    (sucSize≤frameBlowup-go (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+                                  (suc (entryCeil n sl e))
+                                  (suc (sizeᵉ e + slotsSize sl)))
+      (capsBase e sl)
+      (s≤s (s≤s z≤n))
+      (s≤s z≤n))
  capsAt-base-size⁺-go e sl (suc id) =
   ≤-trans (capsAt-base-size⁺-go e sl id)
           (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)

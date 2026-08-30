@@ -89,7 +89,7 @@ open import Rx.Prim      using (Tick; Id; Source; InstEmit; _at_from_as_; subscr
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; inputsBelowᵉ; Ctx; Closed; Val; sizeᵉ; sizeᵗ;
   sizeᵗˢ; sizeᵛ; Fn; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; unfoldμ; evalTm; applyFn)
-open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ; innWᵉ)
+open import Rx.Frame-Width using (pWᵉ; pWᵛ; dWᵉ; dWᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; resolve; memberSource; RegId; NodeState; scan-st; take-st;
   mergeAll-st; switch-st; exhaust-st; hasRoom; oneShotBurst; installNode; setNode; lookupNode; NodeId;
   root; share-sink; _↠_; Frame; AllOp; map-f; scan-f; take-f; from-inner; thru-outer; Stream;
@@ -101,6 +101,8 @@ open import Rx.Evaluator using (Sched; EvalSt; resolve; memberSource; RegId; Nod
   foldStep; iterFold; fLvlD; sizeAt; sIterD; sLvlD; opIterD; fIterD; sLvlD-suc)
 open import Rx.Slots using (inputSize; scripted; shared; Slots; slotSize; slotsSize)
 open import Rx.MergeAll-Laws using (drain-queue-shrinks; drain-queue-all)
+open import Rx.Clos-Size using (closSize≤mulᵉ)
+open import Rx.Slot-Clos using (slotClos)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -136,18 +138,18 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Measures using
   (2X≡X+X; all-++-intro; all-impl; lookupNode-park;
                                                       boundedLive; boundedNode; parkRoom; fᵢ≤sum-tab;
-                                                      n<2^n; pathLen; sizeᵉ-pos; ∧-true)
+                                                      n<2^n; pathLen; sizeᵉ-pos; syncSize≤sizeᵉ; ∧-true)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (exhaust-step; mergeAll-step; map-step; mu-step; nest; nest-keeps;
    resid; scan-step; share-step; switch-step; take-step)
 open import Verify-Budget-Sufficient.Caps using
-  (1≤pow≤; _⊑ᶜ_; Caps; frameStep; frameStep-mono-j; frameStep-wid-suc;
-   iterFold-mono-count; iterFold-suc; iterSize-suc)
+  (1≤pow≤; _⊑ᶜ_; Caps; frameStep; frameStep-mono-j; frameStep-size-suc;
+   frameStep-wid-suc; iterFold-mono-count; iterFold-suc; iterSize-suc)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono;
    eventCaps?; frameSz?; k≤iterFold; len≤sizeᵗˢ; obsCaps?; pathSz?; slotCaps?;
    slotsCaps?; slotsCaps?-lookup; suc≤foldStep; valCaps?; valCountᵉ; widLive;
-   widNode; widNode-push; nestClosOK?; closLive; closLive-data)
+   widNode; widNode-push; nestClosOK?; closLive; closLive-data; slotsCaps?-clos)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;
@@ -806,33 +808,45 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- `obsList→mList-strict` does the same for the mergeAll drain's queue.
 ------------------------------------------------------------------
 
--- THE PARKED DEFER'S CLOSURE READING, and it is a leaf because nothing
--- in the caps face carries the reading it asks for.  A defer parks its
--- body on the live queue, so the queue's closure conjunct is owed for a
--- term the subscribe holds only the WRITTEN size of -- and the two
--- measures part company exactly at `input`, where the written size is
--- one symbol and the reading is the whole definition the telescope
--- holds.
+-- THE PARKED DEFER'S CLOSURE READING.  A defer parks its body on the
+-- live queue, so the queue's closure conjunct is owed for a term the
+-- subscribe holds only the WRITTEN size of -- and the two measures
+-- part company exactly at `input`, where the written size is one
+-- symbol and the reading is the whole definition the telescope holds.
 --
--- AS STATED IT IS FALSE, AND THE SHAPE OF THE REPAIR IS THE FINDING.
--- The premise prices each slot SEPARATELY, so a stratified telescope
--- whose every stage names the stage below it twice satisfies it at a
--- cap of seven while the staged reading doubles per stage; the deficit
--- is therefore exponential in the SLOT COUNT, which is a quantity no
--- level of the frame mentions.  So no fixed number of levels buys it,
--- and the arbitrary `c` is what has to go: the statement belongs at a
--- cap that already dominates the telescope's own reading, which is a
--- premise the subscribe face does not thread today and the init caps
--- would have to supply.
--- REFUTED: `Refuted.Nest-Clos-Stratified`
+-- WHAT PAYS FOR THE GAP IS THE SLOT PRICING PREDICATE, which every
+-- statement on this path already threads: it prices each slot's own
+-- STAGED reading against the same cap, so the environment the reading
+-- runs under is dominated by the cap uniformly, and a domination
+-- lemma multiplies it straight through the sync size.  One frame level
+-- then pays the sync-to-written step, because a level multiplies by
+-- the base size and doubles.
+-- REFUTED: `Refuted.Nest-Clos-Stratified`, which is why the pricing
+--   predicate has to carry that conjunct rather than the flat size
+--   alone: a stratified telescope whose every stage names the stage
+--   below it twice is admitted by the flat pricing at a cap of seven
+--   while the staged reading doubles per stage, so the deficit is
+--   exponential in the SLOT COUNT -- a quantity no level of the frame
+--   mentions, and therefore one no fixed number of levels can buy.
 
-postulate
-  defer-park-clos : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-    (o : Val Γ (obs u)) →
-    2 ≤ Caps.cSize c →
-    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-    sizeᵉ o ≤ Caps.cSize (frameStep j c) →
-    nestClosOK? (frameStep (suc j) c) sl o ≡ true
+defer-park-clos : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (o : Val Γ (obs u)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  sizeᵉ o ≤ Caps.cSize (frameStep j c) →
+  nestClosOK? (frameStep (suc j) c) sl o ≡ true
+defer-park-clos c j sl o 2≤S slC hsz =
+  T⇒≡true _ (≤⇒≤ᵇ
+    (≤-trans (closSize≤mulᵉ (slotClos sl) S
+                (λ i → slotsCaps?-clos S (Caps.cWid c) sl i slC)
+                (≤-trans (s≤s z≤n) 2≤S) o)
+    (≤-trans (*-monoʳ-≤ S
+                (≤-trans (≤-trans (syncSize≤sizeᵉ o) hsz)
+                         (≤-trans (m≤m+n Sⱼ (Sⱼ + 0)) (n≤1+n (Sⱼ + (Sⱼ + 0))))))
+             (≤-reflexive (sym (frameStep-size-suc c j))))))
+  where
+  S  = Caps.cSize c
+  Sⱼ = Caps.cSize (frameStep j c)
 
 subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (dep bud ops j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
@@ -1940,17 +1954,12 @@ subscribeE-input-caps {n = n} {Γ = Γ} c dep bud j g i κ id now sl sched st
 ... | shared d | sd | sz | dpt′ =
   sharedSlot-caps c dep bud j g i d κ id now sl sched st 2≤S 1≤R slEq slC slSz inv
     (≤-trans (≤ᵇ⇒≤ (sizeᵉ d) (Caps.cSize c)
-                (T-to (proj₁ (∧-true (sizeᵉ d ≤ᵇ Caps.cSize c)
-                                     ((pWᵉ n sl d ≤ᵇ Caps.cWid c)
-                                        ∧ (innWᵉ n sl d ≤ᵇ Caps.cWid c)) sd))))
+                (T-to (proj₁ (∧-true (sizeᵉ d ≤ᵇ Caps.cSize c) _ sd))))
              (cSize≤frameStep c j 2≤S))
     (≤-trans (m≤n⊔m _ (dWᵉ n sl d))
       (≤-trans (≤ᵇ⇒≤ (pWᵉ n sl d) (Caps.cWid c)
-                  (T-to (proj₁ (∧-true (pWᵉ n sl d ≤ᵇ Caps.cWid c)
-                                       (innWᵉ n sl d ≤ᵇ Caps.cWid c)
-                          (proj₂ (∧-true (sizeᵉ d ≤ᵇ Caps.cSize c)
-                                         ((pWᵉ n sl d ≤ᵇ Caps.cWid c)
-                                            ∧ (innWᵉ n sl d ≤ᵇ Caps.cWid c)) sd))))))
+                  (T-to (proj₁ (∧-true (pWᵉ n sl d ≤ᵇ Caps.cWid c) _
+                          (proj₂ (∧-true (sizeᵉ d ≤ᵇ Caps.cSize c) _ sd))))))
                (cWid≤frameStep c j 2≤S)))
     pC lC
     -- the slot equation, taken AT the `with` that consumes the scrutinee:
@@ -2009,7 +2018,7 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                    (λ v → ≤ᵇ-widen (sizeᵛ (lookup Γ i) v)
                             (cSize≤frameStep c j 2≤S)) sync
             (proj₁ (∧-true (all (λ v → sizeᵛ (lookup Γ i) v ≤ᵇ Caps.cSize c) sync)
-                           true sd)))
+                           _ sd)))
   -- THE COUNT.  One emit, so the length half is `1 ≤ suc _`; and that
   -- emit carries exactly the slot's sync values, whose count the slot
   -- telescope already bounds by cSize — which fits under the width one
@@ -2059,9 +2068,9 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
   NEW    = record { source = SRC ; ordinal = Sched.nextOrdinal sched
                   ; elemTy = lookup Γ i ; pending = resolve now (dd ∷ ds) }
   SCHED₃ = record SCHED₂ { live = NEW ∷ Sched.live SCHED₂ }
-  sdp    = ∧-true (all (λ v → sizeᵛ (lookup Γ i) v ≤ᵇ Caps.cSize c) sync)
-                  (all (λ tv → sizeᵛ (lookup Γ i) (Timed.val tv) ≤ᵇ Caps.cSize c)
-                       (dd ∷ ds)) sd
+  sdp    = ∧-true (all (λ v → sizeᵛ (lookup Γ i) v ≤ᵇ Caps.cSize c) sync) _ sd
+  sdp₂   = ∧-true (all (λ tv → sizeᵛ (lookup Γ i) (Timed.val tv) ≤ᵇ Caps.cSize c)
+                       (dd ∷ ds)) _ (proj₂ sdp)
   SY = valsCaps?-data (frameStep (suc j) c) sl (lookup Γ i) ok sync
          (all-impl (λ v → sizeᵛ (lookup Γ i) v ≤ᵇ Caps.cSize c)
                    (λ v → sizeᵛ (lookup Γ i) v ≤ᵇ Caps.cSize (frameStep (suc j) c))
@@ -2075,7 +2084,7 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                              ≤ᵇ Caps.cSize (frameStep (suc j) c))
                    (λ tv → ≤ᵇ-widen (sizeᵛ (lookup Γ i) (Timed.val tv))
                              (cSize≤frameStep c (suc j) 2≤S)) (dd ∷ ds)
-            (proj₂ sdp))
+            (proj₁ sdp₂))
   WL = resolve-wid-data (Caps.cWid (frameStep (suc j) c)) (Sched.slots sched) ok
          (resolve now (dd ∷ ds))
   -- THE COUNT, exactly as in the no-tail clause: one emit, and it carries

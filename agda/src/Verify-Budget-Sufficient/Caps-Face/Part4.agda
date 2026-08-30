@@ -55,7 +55,7 @@ open import Rx.Slots using (Slots; slotsSize)
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Caps using
-  (_⊑ᶜ_; Caps; capsAt; capsAt-base-size; capsAt-base-wid; fLvl≤fLvlD;
+  (_⊑ᶜ_; Caps; capsAt; capsAt-base-size; capsAt-base-clos; capsAt-base-wid; fLvl≤fLvlD;
    frameStep; frameStep-mono-j; frameStep-reg-suc)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
@@ -733,6 +733,7 @@ slotsCaps?-capsAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (
 slotsCaps?-capsAt {n = n} e sl id =
   slotsCaps?-bound (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) sl
     (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id))
+    (capsAt-base-clos e sl id)
     (≤-trans (≤-trans (slotsPW≤entryCeil n sl e) (n≤1+n _))
              (capsAt-base-wid e sl id))
     (≤-trans (≤-trans (slotsIW≤entryCeil n sl e) (n≤1+n _))

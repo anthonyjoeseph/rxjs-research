@@ -2,7 +2,7 @@
 -- ONE foldStep PER SYNTAX NODE … END OF PLUG SECTION
 module Verify-Budget-Sufficient.Caps-Face.Part2 where
 
-open import Data.Bool    using (true; false; _∧_; if_then_else_)
+open import Data.Bool    using (true; false; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; ⊔-mono-≤; m≤m+n; m≤n+m; n≤1+n; +-mono-≤;
   ^-monoˡ-≤; *-mono-≤; m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ)
@@ -798,14 +798,13 @@ slotsCaps?-slotWid {n = suc m} B W sl h i
                      (≤-trans (m≤n⊔m (outWᵉ (suc m) sl d) (dWᵉ (suc m) sl d)) pw))
             (n≤1+n W)
   where
-  split₁ = ∧-true (sizeᵉ d ≤ᵇ B)
-             ((pWᵉ (suc m) sl d ≤ᵇ W) ∧ (innWᵉ (suc m) sl d ≤ᵇ W)) sd
-  split₂ = ∧-true (pWᵉ (suc m) sl d ≤ᵇ W) (innWᵉ (suc m) sl d ≤ᵇ W)
-             (proj₂ split₁)
+  split₁ = ∧-true (sizeᵉ d ≤ᵇ B) _ sd
+  split₂ = ∧-true (pWᵉ (suc m) sl d ≤ᵇ W) _ (proj₂ split₁)
+  split₃ = ∧-true (innWᵉ (suc m) sl d ≤ᵇ W) _ (proj₂ split₂)
   pw : pWᵉ (suc m) sl d ≤ W
   pw = ≤ᵇ⇒≤ (pWᵉ (suc m) sl d) W (T-to (proj₁ split₂))
   iw : innWᵉ (suc m) sl d ≤ W
-  iw = ≤ᵇ⇒≤ (innWᵉ (suc m) sl d) W (T-to (proj₂ split₂))
+  iw = ≤ᵇ⇒≤ (innWᵉ (suc m) sl d) W (T-to (proj₁ split₃))
 
 ------------------------------------------------------------------
 -- THE WIDTH FACE OF THE EVALUATOR — the piece that makes every

@@ -24,6 +24,8 @@ open import Data.Nat  using (ℕ; zero; suc; _≤_; s≤s; z≤n; _≡ᵇ_; _<�
 open import Data.Nat.Properties
   using (≡ᵇ⇒≡; ≡⇒≡ᵇ; <ᵇ⇒<; <⇒<ᵇ; ≤∧≢⇒<; ≤-pred)
 open import Data.Unit using (tt)
+open import Data.List using (tabulate)
+open import Data.Nat.ListAction using (sum)
 open import Data.Vec  using (lookup)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; cong; sym; trans; subst)
@@ -88,6 +90,15 @@ slotClos-fix : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n)
 slotClos-fix sl i {d} {ok} eq =
   trans (cong (slotClosD (σAt sl (toℕ i))) eq)
         (cong suc (clos-σ-congᵉ (toℕ i) (σAt-agrees sl (toℕ i)) d ok))
+
+-- THE WHOLE TELESCOPE'S STAGED READING, summed the way the flat slot
+-- measure is summed.  This is the number a base cap has to carry, and
+-- nothing already in one does: every flat measure of the slots is
+-- linear in the slot count while the staged reading is not, so the
+-- deficit cannot be bought by any fixed number of frame levels.
+-- REFUTED: `Refuted.Nest-Clos-Stratified`
+slotsClos : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
+slotsClos sl = sum (tabulate λ i → slotClos sl i)
 
 -- EVERY SLOT COSTS AT LEAST THE SYMBOL IT IS WRITTEN AS, which is what
 -- the domination lemma asks of an environment before it will admit it.
