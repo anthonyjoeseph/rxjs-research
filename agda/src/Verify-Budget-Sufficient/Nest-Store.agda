@@ -52,7 +52,7 @@ open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
-  m≤n⊔m; m≤m⊔n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
+  m≤n⊔m; m≤m⊔n; m≤m+n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
   *-identityʳ; *-distribˡ-+; m^n>0)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -752,6 +752,19 @@ nestCap-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 nestCap-mono e sl id =
   ≤-trans (nest-inflate (nestFacAt e sl id) _ (1≤nestFacAt e sl id))
           (≤-reflexive (sym (nestCapAt-suc e sl id)))
+
+-- AND THE BASE CAP SITS UNDER EVERY LATER ONE, one instant at a time.
+-- The step above is what does the work; this only iterates it, and it
+-- is the reading the sighted ceiling needs, since the wrap unit IS the
+-- base cap and the ceiling reads it beside the store's own depth.
+nestCap-mono₀ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  nestCapAt e sl 0 ≤ nestCapAt e sl id
+nestCap-mono₀ e sl zero     = ≤-refl
+nestCap-mono₀ e sl (suc id) =
+  ≤-trans (nestCap-mono₀ e sl id)
+          (≤-trans (m≤m+n (nestCapAt e sl id) (nestIncAt e sl id))
+                   (nestCap-mono e sl id))
 
 -- THE INSTANT-ONE FLOOR, STATED IN A SIGHTED CURRENCY.  The base cap
 -- IS the program's own unit, and the unit is built on `nestDᵉ` -- the

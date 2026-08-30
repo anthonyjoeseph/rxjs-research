@@ -54,7 +54,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
   1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
-  nodeNest; regsNestMax; sightCeil)
+  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-store)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; takeVals; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
@@ -3313,40 +3313,61 @@ postulate
       ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
                   (storeNestMax sched st) (nestUnit e sl)
 
--- THE SIGHTED CEILING AGAINST THE SIZE'S DOUBLE EXPONENTIAL, and this
--- is where the depth face's obligation now sits: not against the fuel
--- as a small number, but against the room the fuel has above the
--- instant's own size cap.  Both hypotheses are the invariants a round
--- arrives under, and everything the ceiling reads is a NESTING depth
--- of something already present when the round starts.
+-- THE SIGHTED CEILING'S WHOLE QUANTITY AGAINST THE SIZE'S DOUBLE
+-- EXPONENTIAL, and this leaf carries no evaluator premise at all: what
+-- the round's invariants supply is that all three of the ceiling's
+-- summands are readings of ONE number, the instant's nesting cap, and
+-- the body below spends them.  So what is left here is arithmetic
+-- between two currencies and nothing about a run.
 --
--- WHY THE EXPONENT AND NOT THE SIZE.  The store's depth is held under
--- the nesting cap, and that cap exponentiates a caps field once per
--- instant -- so it stands above the size at its own instant and no
--- bound denominated in the size can hold it.  Two exponentials is what
--- the cap costs and not one, because the exponent it raises is a
--- POLYNOMIAL of the caps field rather than the field itself.
+-- WHY THE EXPONENT AND NOT THE SIZE.  The cap exponentiates a caps
+-- field once per instant, so it stands above the size at its own
+-- instant and no bound denominated in the size can hold it.  Two
+-- exponentials is what it costs and not one, because the exponent the
+-- cap raises is a POLYNOMIAL of the caps field rather than the field.
 --
 -- AND THE CONSTRAINT THE SHAPE HAS TO RESPECT IS THE INDEX: no summand
 -- may price the cap at the instant AFTER the one being bounded.
--- Nothing here does -- the room this is stated against is read at `id`
--- throughout, and so is every quantity on the left.
+-- Nothing here does -- both sides are read at `id`.
 --
 -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
 --   times -- the calibration through the wrap factor, the same through
 --   the increment alone, and the level-keyed repair at every level the
 --   fuel reaches, which closes the escape through a bigger index.
 postulate
-  sight-nest≤exp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    nestOK? e sl id sched st ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
-              (storeNestMax sched st) (nestUnit e sl)
+  nestCap-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    suc (sizeᵉ e) * suc (3 * nestCapAt e sl id)
       ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+
+-- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
+-- arrival's nesting is held under it by the caller's premise, the
+-- store's by the nesting invariant, and the wrap unit IS the cap at
+-- instant zero -- so the sighted sum is three readings of one number
+-- and the ceiling collapses to a multiple of it.  That collapse is the
+-- whole of what the run-side hypotheses buy.
+sight-nest≤exp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
+            (storeNestMax sched st) (nestUnit e sl)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+sight-nest≤exp {e = e} sl id a sched st hnest hval =
+  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤3C))
+          (nestCap-sight≤exp e sl id)
+  where
+  C = nestCapAt e sl id
+  hu : nestUnit e sl ≤ C
+  hu = ≤-trans (≤-reflexive (sym (nestCapAt-0 e sl))) (nestCap-mono₀ e sl id)
+  eq : C + C + C ≡ 3 * C
+  eq = solve 1 (λ c → c :+ c :+ c := con 3 :* c) refl C
+  sum≤3C : nestDᵛ (arrTy a) (arrVal a) + storeNestMax sched st + nestUnit e sl
+             ≤ 3 * C
+  sum≤3C =
+    ≤-trans (+-mono-≤ (+-mono-≤ hval (nestOK?-store e sl id sched st hnest)) hu)
+            (≤-reflexive eq)
 
 -- AND THE FUEL HAS THAT ROOM, so the comparison the depth face owes
 -- the height is assembled rather than asserted.  The caps recurrence
@@ -3358,15 +3379,13 @@ postulate
 sighted-nest≤capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
   (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (capsAt e sl id) sched st ≡ true →
   nestOK? e sl id sched st ≡ true →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
   sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
             (storeNestMax sched st) (nestUnit e sl)
     ≤ capsH e sl id
-sighted-nest≤capsH {e = e} sl id a sched st hsl hcaps hnest hval =
-  ≤-trans (sight-nest≤exp sl id a sched st hsl hcaps hnest hval)
+sighted-nest≤capsH {e = e} sl id a sched st hnest hval =
+  ≤-trans (sight-nest≤exp sl id a sched st hnest hval)
           (capsAt-exp≤capsH e sl id)
 
 -- THE ROUND'S DEPTH FITS THE INSTANT'S FUEL, assembled rather than
@@ -3393,7 +3412,7 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≤ capsH e sl id
 cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz =
   ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps)
-          (sighted-nest≤capsH sl id a sched st hsl hcaps hnest hval)
+          (sighted-nest≤capsH sl id a sched st hnest hval)
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}

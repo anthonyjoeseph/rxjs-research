@@ -216,14 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **discharge the re-denominated ceiling** — `sight-nest≤exp`, the
-  sighted sum against two exponentials of the instant's OWN size cap.
-  The height comparison it replaced is now assembled: the fuel at an
-  instant sits two exponentials above the size at that same instant,
-  proven at every instant including the base, so the currency question
-  is size-against-size and the index is read at `id` throughout. What
-  is owed is that three nesting depths scaled by the program's size fit
-  under an exponential of a cap the store's invariant is stated in.
+- **discharge `nestCap-sight≤exp`, which is now the ceiling entire** —
+  the three sighted summands turned out to be three readings of ONE
+  number, the instant's nesting cap: the arrival's by the caller's
+  premise, the store's by the invariant, the wrap unit by being that
+  cap at instant zero. So the run-side plumbing is spent and what is
+  left carries no evaluator premise — a multiple of the cap under two
+  exponentials of the size. The cap's own growth is a product across
+  instants of exponentials of POLYNOMIALS of the size, which is why one
+  exponential of room would not have been enough and two are.
 
 - **the same leaf at the entry** — `sight-root≤exp`, where both sides
   are syntax and no run stands between them: the program's nesting, the
@@ -243,10 +244,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`sight-nest≤exp`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the ceiling
-  re-denominated, the height gone from it. Three nesting depths scaled by the
-  program's size, against two exponentials of the instant's own size cap; the
-  ledger constrains only the index, and every reading here is at `id`.
+- **`nestCap-sight≤exp`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the ceiling
+  entire, with no evaluator premise left on it. A multiple of the instant's
+  nesting cap under two exponentials of its size cap; the ledger constrains
+  only the index, and both sides are read at `id`.
 - **`sight-root≤exp`** (Caps-Bridge) — FALSITY, `RECOVERY`: the same leaf at
   the entry, where both sides are syntax and the cap is one blowup off the
   base. The one instance with no run between the two sides.
