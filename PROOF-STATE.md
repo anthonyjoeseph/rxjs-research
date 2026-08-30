@@ -217,15 +217,15 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **the descent's own TRADE, written down instead of described** —
-  with the sighted ceiling read on both axes at three instants and at
-  the corner, both its leaves are DIFFICULTY and the risk left is the
-  proof. Their headers already name the mechanism: edge by edge a
-  descent trades, what a frame takes off the subject it puts on the
-  path, so the bare sum is an EQUALITY along the subscribe walk and the
-  drain under a `from-inner` is the one level with no edge to come out
-  of. That is a statable induction, not a paragraph. State the trade as
-  the assembly, with the drain's per-layer charge as the leaf, and let
-  the size factor be what the leaf's count is multiplied by.
+  the sighted ceiling's two leaves are DIFFICULTY now, and their
+  headers already name the mechanism: edge by edge a descent trades,
+  what a frame takes off the subject it puts on the path, so the bare
+  sum is an EQUALITY along the subscribe walk and the drain under a
+  `from-inner` is the one level with no edge to come out of. That is a
+  statable induction, not a paragraph. State the trade as the assembly,
+  with the drain's per-layer charge as the leaf. More rows will not do
+  it: every family the corpus has is read, so what is left dark is
+  every slot vocabulary past two, and building one is the bigger job.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
