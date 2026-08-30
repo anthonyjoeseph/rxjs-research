@@ -666,6 +666,25 @@ c⊑step c L hS =
 -- below reads its arrivals there, and this ordering is what carries the
 -- one statement still written at the frozen cap into it.  Only the size
 -- half needs the level; the other two are the entry ordering's own.
+--
+-- AND THE SHELF BELOW CANNOT BE RE-BASED AT THE WALK'S LEVEL, which
+-- is a fact about the DENOMINATION and not an arithmetic anyone can
+-- sharpen.  The drain's queue conjuncts are dead at the entry cap, so
+-- the obvious move is to read them at `frameStep Lv c` and thread the
+-- level down through the fit shelf to this ordering.  A burst reading
+-- is priced as ONE step of whatever cap its inputs were read at, so
+-- levelling the inputs turns this left-hand side into a step OF A
+-- STEP, while every ceiling the walk reports is a step of the FIXED
+-- entry cap.  A composed step outgrows the flat one, so no level of
+-- the entry cap dominates it and there is no `j` left to pick.  The
+-- walk's own arms escape this only because they descend by raising
+-- the level of the SAME base, never by stepping a cap already
+-- stepped -- so the level has to reach the parked term some other
+-- way than through the cap the shelf is stated over.
+-- DEAD ROUTE: threading `Lv` through `pushVals-caps-adm` and the
+--   `thruFit-*` shelf to generalise this ordering to a stepped `c`.
+--   `Refuted.Frame-Step-Compose.frameStep-compose-absurd` is the
+--   witness that the resulting side is not bounded by any flat step.
 arrC⊑step : ∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c → Caps.cSize c ≤ j →
   arrCapAt (Caps.cSize c) c ⊑ᶜ frameStep j c
 arrC⊑step c j hS hj =

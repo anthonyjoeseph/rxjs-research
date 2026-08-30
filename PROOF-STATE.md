@@ -226,25 +226,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **restating `capsDrainOK` at the seam `capsWalkOK` was split at** —
-  receipts to the walk's level, room facts staying at base, now that
-  the three base readings are refuted outright rather than suspected.
-  The widening shelf already exists, so the risk is not in any clause:
-  it is that this predicate is threaded through the whole drain cone,
-  and a wrong seam costs a multi-file round. The leg is to cut it
-  where the sink's own split cuts, and take `walk-frame-drain-inner`'s
-  obligation down to receipts `WalkHyps` already carries.
-
-- **discharging `walk-frame-drain-inner` from the restated
-  predicate** — once the drain's receipts are read at the walk's own
-  level, its obligation is the bundle `WalkHyps` already hands the
-  frame, and the level the ceiling has to admit joins by MAX rather
-  than by sum: the queue's grant permits a level anywhere the count
-  reaches, and the absorber is monotone in it. So the leg is the
-  assembly, not a new fact — thread the receipts, spend the widening
-  shelf on the room facts that stay at base, and let the residue be
-  whatever the bundle genuinely does not carry.
-
 - **the depth face's pair, `cascade-depth-sighted` and `sight-all`** —
   a round's descent under its sighted nesting scaled by the program's
   size, and the drain leaf all three `*All` heads share. They meet at
@@ -256,12 +237,31 @@ does not fit is a finding about the shared statement, not about the head.
   leaves it, prove the drain half against it, and hand the round that
   receipt instead of re-deriving the sum inside it.
 
+- **`subscribeE-burst-nest`'s induction** — the crossing this row was
+  ranked for is closed: at the map that kills the flat reading the
+  levelled one holds by thirty-odd orders of magnitude, so nothing
+  about the statement is undecided and the row is now labour with a
+  shape. The leg is the induction over the subscription's own descent,
+  head by head, against the ordering the arrival entry already gives —
+  and it is the row the fit shelf's other leaves are waiting behind,
+  so it buys three rows' worth of unblocking, not one.
+
+- **the boundary fit at the arr key, `thruFit-arr-merge`,
+  `thruFit-arr-switch` and `thruFit-arr-exhaust`** — the emit-by-emit
+  fit the three `*All` heads still owe. The recursion and the push
+  around them are already checked, so the leg is one arithmetic: the
+  cap-keyed route does not transport to a key that is not a `nestB`,
+  and what replaces it has to be stated once and spent three times.
+  Doing them as one leg is the point — three heads that differ only in
+  which limit they carry should not each discover the same key.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
   `REFUTED, DEAD ROUTE, TWIN`: the `from-inner` head of the drain law, the only
   frame that names a node. Its caps conjuncts are read at the base cap while
-  the walk holds one only at its level, and that weakens the wrong way.
+  the walk holds one only at its level; raising them through the fit shelf is
+  dead, so the level must arrive another way — a design call.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: refuted
   at every cap in its old form, since a rebuilt value's closure is a sum. Now
   stated ONE LEVEL UP, where a level more than doubles the cap.
