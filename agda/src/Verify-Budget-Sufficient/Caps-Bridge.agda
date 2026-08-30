@@ -31,7 +31,7 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (nothing)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n; *-monoʳ-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
 open import Data.Nat.Solver using (module +-*-Solver)
@@ -110,7 +110,7 @@ open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; dWᵉ≤capsAt-wid; sizeCount-body; frameBlowup;
   iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize; 1≤capsAt-reg; _⊑ᶜ_; Caps;
-  caps; capsAt; capsAt-suc-full; capsAt-⊑-suc; capsH; frameStep; frameStep-0;
+  caps; capsAt; capsAt-exp≤capsH; capsAt-suc-full; capsAt-⊑-suc; capsH; frameStep; frameStep-0;
   frameStep-mono-j; sizeCount)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
@@ -1255,16 +1255,20 @@ abstract
 --   + pathLen κ ≤ sizeCapAt e sl id` propagates cleanly — each re-entry
 --   pushes one `from-inner` frame, so the depth falls exactly as the
 --   path grows, and `pathSz?` re-establishes at the longer path out of
---   the premises with no new leaf.  But a size cap is not a height:
---   `capsAt e sl (suc id)` is `capsAt e sl id` STEPPED `sizeCount`
---   times, one `sizeStep S s = S * suc (2 * s)` each, and that count is
---   itself under `blowH`'s own pooled summand — so the size cap sits
---   exponentially ABOVE the height it would have to fit under.
---   `blowup-tower` and `capsAt-tower` bracket it from the other side,
---   at `towerℕ` of the height, which is the wrong side.  What has to
---   bound the nesting is the LEVEL count, one nesting level per caps
---   level, and that is the one-instant growth bound the `depOK` note
---   below calls new mathematics.
+--   the premises with no new leaf.  What it cannot then do is cross to
+--   the height: the bound lands in the SIZE currency and the conclusion
+--   is priced in the fuel, and nothing at this site converts one to the
+--   other.  What has to bound the nesting is the LEVEL count, one
+--   nesting level per caps level, and that is the one-instant growth
+--   bound the `depOK` note below calls new mathematics.
+--   AND THE ARITHMETIC ONCE RECORDED AS THE OBSTACLE HERE WAS WRONG,
+--   which is worth more than the route: the size cap does NOT sit above
+--   the height.  `capsAt-exp≤capsH` (.Caps) puts the size at an instant
+--   two exponentials UNDER the fuel at that same instant, at every
+--   instant including the base, since the blowup and the height climb
+--   by one quantity read once each.  So a size-denominated bound IS
+--   convertible, and a route abandoned on the old reading is worth
+--   re-costing rather than inheriting as dead.
 --   AND DO NOT PUT THE POOLED FORMULA IN A STATEMENT to get at it.
 --   `blowH` is `abstract` for a measured reason — with the body visible
 --   the delivery count inlines twice and squares — so the level count
@@ -1421,36 +1425,44 @@ postulate
                   (storeNestMax (sched-init e ins) (st-init e))
                   (nestUnit e ins)
 
--- THE ENTRY CEILING AGAINST THE ENTRY FUEL, and this one is
+-- THE ENTRY CEILING AGAINST THE ENTRY CAP'S SIZE, and this one is
 -- arithmetic rather than evaluation.  Every quantity on the left is
 -- syntax -- the program's nesting, the initial store's, which is the
 -- slot vocabulary's and nothing else, and the wrap unit built from
--- both -- and the right is one `blowH` story over the base cap, which
+-- both -- and the right is two exponentials over a base cap that
 -- already carries the program's size and its slots.  So what is owed
--- is that a constant multiple of the nesting readings sits under a
--- base that reads the SIZE readings, plus the story's own slack.
+-- is that a PRODUCT of the nesting readings sits under an exponential
+-- of a size reading that dominates each of them.
 --
 -- AND THIS IS WHY THE ANCHOR IS THE PLACE THE COMPARISON IS PAID.  At
--- every later instant the store is whatever the run has built and the
--- fuel is a tower over the same recurrence that drives the caps, so
--- the two sides are related only through an invariant.  Here there is
--- no run yet: the store is the vocabulary, and the comparison is
--- between two syntactic readings of one program.
+-- every later instant the store is whatever the run has built, so the
+-- two sides are related only through an invariant.  Here there is no
+-- run yet: the store is the vocabulary, and the comparison is between
+-- two syntactic readings of one program.
 --
 -- RECOVERY: `git show 7e618c7:agda/src/Verify-Budget-Sufficient/Init-Nest.agda`
 --   restores the initial-state nesting-invariant cone -- the empty-store
 --   `⊔`-fold lemmas, the hot-slot nesting reading and `init-nestOK?` --
 --   which is where the left-hand side's own reduction was worked out.
--- RECOVERY: `git show 7e618c7:agda/src/Verify-Budget-Sufficient/Caps.agda`
---   restores the pooled-count arithmetic the right-hand side will want --
---   `M≤dCapᶜ`, `i≤dWalkᶜ` and the `iterSize` bounds around them -- which
---   is what puts the base cap under one `blowH` story's pooled summand.
 postulate
-  sight-root≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     sightCeil (sizeᵉ e) (nestDᵉ e)
               (storeNestMax (sched-init e ins) (st-init e))
               (nestUnit e ins)
-      ≤ capsH e ins 0
+      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
+
+-- AND THE ENTRY FUEL HAS THAT ROOM, so the entry's half of the height
+-- comparison is assembled rather than asserted, out of the same
+-- arithmetic the delivery side spends: the base cap is one
+-- `frameBlowup` at the base story, and a blowup's size sits two
+-- exponentials under the story it was driven by.
+sight-root≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  sightCeil (sizeᵉ e) (nestDᵉ e)
+            (storeNestMax (sched-init e ins) (st-init e))
+            (nestUnit e ins)
+    ≤ capsH e ins 0
+sight-root≤capsH e ins =
+  ≤-trans (sight-root≤exp e ins) (capsAt-exp≤capsH e ins 0)
 
 -- THE ENTRY ANCHOR: THE ROOT SUBSCRIBE'S DEPTH FITS THE ENTRY FUEL.
 -- This is one of the two places the depth face compares itself against

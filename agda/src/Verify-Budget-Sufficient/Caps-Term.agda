@@ -44,7 +44,7 @@ open import Rx.Slots using (Slots)
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; frameStep; iterFold-infl; iterFold-mono-count; iterSize-mono-count)
+  (Caps; frameStep; iterFold-infl; iterFold-mono-count; iterSize-2^; iterSize-mono-count)
 open import Verify-Budget-Sufficient.Measures using
   (n<2^n)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -63,7 +63,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
 -- arithmetic lemmas consumed by thruOuter-face-core's walk helpers
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (evalTm-iterSize; iterSize-+; iterSize-2^; iterSize-mono-s; slotsCaps?; SlotWid; valCaps?)
+  (evalTm-iterSize; iterSize-+; iterSize-mono-s; slotsCaps?; SlotWid; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (evalTm-iterFold; expWid-fromSize; wid-lift)
 open import Verify-Budget-Sufficient.Caps-Face.Part2 using

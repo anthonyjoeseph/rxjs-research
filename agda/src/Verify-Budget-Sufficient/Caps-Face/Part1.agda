@@ -147,7 +147,7 @@ open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; 2≤capsAt-size; caps; Caps; capsAt; capsAt-base-size; capsH;
    cSize≤frameBlowup; frameStep; frameStep-wid-suc;
-   iterFold-infl; iterFold-mono-count; iterFold-suc; iterSize-infl;
+   iterFold-infl; iterFold-mono-count; iterFold-suc; iterSize-2^; iterSize-infl;
    iterSize-mono-count; iterSize-suc; size≤sizeCount; sizeCount; sizeStep-infl)
 open import Verify-Budget-Sufficient.Measures using
   (2X≡X+X; all-++-intro; all-impl;
@@ -438,24 +438,6 @@ iterSize-mono-s : ∀ (S k : ℕ) {s s′ : ℕ} → s ≤ s′ →
   iterSize S k s ≤ iterSize S k s′
 iterSize-mono-s S zero    le = le
 iterSize-mono-s S (suc k) le = iterSize-mono-s S k (sizeStep-mono-s S le)
-
--- EACH FOLD AT LEAST DOUBLES.  This is the whole of what the strmᵗ
--- clause needs: a body of k nodes buys a factor of 2 ^ k, which covers
--- the `sizeᵉ e` multiplier size-subΘᵉ charges for substituting into it
-iterSize-2^ : ∀ (S k s : ℕ) → 1 ≤ S → 2 ^ k * s ≤ iterSize S k s
-iterSize-2^ S zero    s hS = ≤-reflexive (*-identityˡ s)
-iterSize-2^ S (suc k) s hS =
-  ≤-trans (≤-reflexive shape)
-          (≤-trans (*-monoʳ-≤ (2 ^ k) 2s≤step)
-                   (iterSize-2^ S k (sizeStep S s) hS))
-  where
-  shape : 2 ^ suc k * s ≡ 2 ^ k * (2 * s)
-  shape = solve 2 (λ a b → (con 2 :* a) :* b := a :* (con 2 :* b))
-                refl (2 ^ k) s
-  2s≤step : 2 * s ≤ sizeStep S s
-  2s≤step = ≤-trans (n≤1+n (2 * s))
-                    (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
-                             (*-monoˡ-≤ (suc (2 * s)) hS))
 
 -- so k folds off a nonzero seed reach k
 k≤iterSize : ∀ (S k s : ℕ) → 1 ≤ S → 1 ≤ s → k ≤ iterSize S k s

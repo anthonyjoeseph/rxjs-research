@@ -1562,3 +1562,174 @@ size≤sizeCount c d 2≤S 1≤R =
   1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
                          (Caps.cSize c) 0 1≤R)
                 (≤-reflexive (sym (cDel-body c d)))
+
+-- AND THE FUEL AT AN INSTANT IS TWO EXPONENTIALS ABOVE THE SIZE AT
+-- THAT SAME INSTANT, which is the comparison the height side has been
+-- reaching for and the one `blowup-tower` cannot give, since it
+-- brackets by `towerℕ` of the height and that is the wrong side.  Two
+-- and not one, because the currencies that have to fit under the fuel
+-- read the size through a POLYNOMIAL before exponentiating it, and a
+-- single exponential of the size is already spent by the polynomial.
+--
+-- ONE DELIVERY'S CLIMB PASSES THE SIZE IT STARTS FROM.  A delivery is
+-- one `dLvl`, and `dLvl` iterates the frame level `suc (sizeAt S J)`
+-- times from `J`, each turn strictly increasing -- so the level after
+-- a delivery is above the SIZE read at the level before it.  That one
+-- step is the whole content: the blown-up size is `sizeAt` read at the
+-- count, and the count plus one delivery is already past it.
+sizeAt≤lvls-suc : ∀ (S W d J n : ℕ) →
+  sizeAt S (lvls S W d J n) ≤ lvls S W d J (suc n)
+sizeAt≤lvls-suc S W d J n =
+  ≤-trans (≤-trans (n≤1+n (sizeAt S L)) (m≤n+m (suc (sizeAt S L)) L))
+          (J+n≤iterL S W d (suc (sizeAt S L)) L)
+  where L = lvls S W d J n
+
+-- EACH FOLD AT LEAST DOUBLES, so a size read at level `k` carries a
+-- factor of two per fold.  This is stated here rather than beside the
+-- clause work that also spends it, because that face imports this
+-- module and the level ladder is where the exponent is collected.
+iterSize-2^ : ∀ (S k s : ℕ) → 1 ≤ S → 2 ^ k * s ≤ iterSize S k s
+iterSize-2^ S zero    s hS = ≤-reflexive (*-identityˡ s)
+iterSize-2^ S (suc k) s hS =
+  ≤-trans (≤-reflexive shape)
+          (≤-trans (*-monoʳ-≤ (2 ^ k) 2s≤step)
+                   (iterSize-2^ S k (sizeStep S s) hS))
+  where
+  shape : 2 ^ suc k * s ≡ 2 ^ k * (2 * s)
+  shape = solve 2 (λ a b → (con 2 :* a) :* b := a :* (con 2 :* b))
+                refl (2 ^ k) s
+  2s≤step : 2 * s ≤ sizeStep S s
+  2s≤step = ≤-trans (n≤1+n (2 * s))
+                    (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                             (*-monoˡ-≤ (suc (2 * s)) hS))
+
+-- SO ONE LEVEL OF THE LADDER EXPONENTIATES.  The size read at a level
+-- is `iterSize` run that many times off the entry size, and each run
+-- doubles -- so the next level is above two to the current one, and
+-- two levels are above two to the two.
+exp-lvls : ∀ (S W d J n : ℕ) → 1 ≤ S →
+  2 ^ lvls S W d J n ≤ lvls S W d J (suc n)
+exp-lvls S W d J n 1≤S =
+  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ L))))
+                   (≤-trans (*-monoʳ-≤ (2 ^ L) 1≤S) (iterSize-2^ S L S 1≤S)))
+          (sizeAt≤lvls-suc S W d J n)
+  where L = lvls S W d J n
+
+exp2-lvls : ∀ (S W d J n : ℕ) → 1 ≤ S →
+  2 ^ (2 ^ lvls S W d J n) ≤ lvls S W d J (suc (suc n))
+exp2-lvls S W d J n 1≤S =
+  ≤-trans (^-monoʳ-≤ 2 (exp-lvls S W d J n 1≤S))
+          (exp-lvls S W d J (suc n) 1≤S)
+
+-- AND THE POOLED COUNT HAS THE SPARE DELIVERIES TO PAY FOR THEM.  Its
+-- walk runs the pooled registry rather than this caps' one, and the
+-- caps carry a STRICT registry bound under the tower -- so the pooled
+-- walk is at least one position longer.  One position is not one
+-- level: the position pays `suc` of a whole delivery cap, and that cap
+-- is at least two once the fuel has two stories, so the single spare
+-- registration buys the three levels the two exponentials cost.
+2≤dCapᶜ : ∀ (S W R d g J : ℕ) → 2 ≤ S → 1 ≤ R →
+  2 ≤ dCapᶜ S W R d (2 + g) J
+2≤dCapᶜ S W R d g J 2≤S 1≤R =
+  ≤-trans (s≤s (1≤dCapᶜ S W R d g (lvls S W d J 1) 1≤R))
+          (dWalkᶜ-mono {d = d} (suc g) (suc g) 1 (regAt S R J)
+                       2≤S ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl
+                       (1≤regAt S R J 1≤R))
+
+3+dWalkᶜ : ∀ (S W R d g J i : ℕ) → 2 ≤ S → 1 ≤ R → 2 ≤ g →
+  3 + dWalkᶜ S W R d g J i ≤ dWalkᶜ S W R d g J (suc i)
+3+dWalkᶜ S W R d (suc (suc g)) J i 2≤S 1≤R (s≤s (s≤s _)) =
+  ≤-trans (≤-reflexive (+-comm 3 w))
+          (+-monoʳ-≤ w (s≤s (2≤dCapᶜ S W R d g (lvls S W d J (suc w)) 2≤S 1≤R)))
+  where w = dWalkᶜ S W R d (suc (suc g)) J i
+
+cDel+3≤pooled : ∀ (m : ℕ) (c : Caps) →
+  3 ≤ m → 2 ≤ Caps.cSize c →
+  Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
+  Caps.cWid c ≤ towerℕ m →
+  3 + cDel c m ≤ dCapᶜ (towerℕ m) (towerℕ m) (towerℕ m) m (suc (towerℕ m)) 0
+cDel+3≤pooled m c 3≤m 2≤S hS hR hW =
+  ≤-trans (≤-reflexive (cong (3 +_)
+            (trans (cDel-body c m)
+                   (cong (dWalkᶜ S W R m S 0) (*-identityʳ R)))))
+  (≤-trans (+-monoʳ-≤ 3 (dWalkᶜ-mono {d = m} S T R R 2≤S hS hW R≤T hS ≤-refl ≤-refl))
+  (≤-trans (3+dWalkᶜ T T T m T 0 R 2≤T 1≤T 2≤T)
+  (≤-trans (dWalkᶜ-mono {d = m} T T (suc R) T 2≤T ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl hR)
+           (≤-reflexive (cong (dWalkᶜ T T T m T 0) (sym (*-identityʳ T)))))))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  R = Caps.cReg c
+  T = towerℕ m
+  R≤T : R ≤ T
+  R≤T = ≤-trans (n≤1+n R) hR
+  3≤T : 3 ≤ T
+  3≤T = ≤-trans 3≤m (k≤towerℕ m)
+  2≤T : 2 ≤ T
+  2≤T = ≤-trans (s≤s (s≤s z≤n)) 3≤T
+  1≤T : 1 ≤ T
+  1≤T = ≤-trans (s≤s z≤n) 2≤T
+
+blowup-exp≤blowH : ∀ (m : ℕ) (c : Caps) →
+  3 ≤ m → 2 ≤ Caps.cSize c →
+  Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
+  Caps.cWid c ≤ towerℕ m →
+  2 ^ (2 ^ Caps.cSize (frameBlowup c m)) ≤ blowH m
+blowup-exp≤blowH m c 3≤m 2≤S hS hR hW =
+  ≤-trans (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 size≤L₁))
+  (≤-trans (exp2-lvls S W m 0 (suc (cDel c m)) 1≤S)
+  (≤-trans (lvls-mono {d = m} (3 + cDel c m) N 2≤S hS hW ≤-refl
+                      (cDel+3≤pooled m c 3≤m 2≤S hS hR hW))
+  (≤-trans (poolBody≤poolCount T m 1≤T)
+  (≤-trans (m≤n+m (poolCount T m) (poolCount T m))
+  (≤-trans (≤-reflexive (sym (2X≡X+X (poolCount T m))))
+  (≤-trans (m≤n+m (2 * poolCount T m) (6 + m))
+           (≤-reflexive (sym (blowH-body m)))))))))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+  T = towerℕ m
+  N = dCapᶜ T T T m (suc T) 0
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  1≤T : 1 ≤ T
+  1≤T = ≤-trans 1≤S hS
+  size≤L₁ : Caps.cSize (frameBlowup c m) ≤ lvls S W m 0 (suc (cDel c m))
+  size≤L₁ = ≤-trans (≤-reflexive (cong (sizeAt S) (sizeCount-body c m)))
+                    (sizeAt≤lvls-suc S W m 0 (cDel c m))
+
+-- SO THE FUEL AT AN INSTANT IS TWO EXPONENTIALS ABOVE THE SIZE AT THAT
+-- SAME INSTANT, at every instant including the base.  The blowup is
+-- driven by the fuel the previous story reached and `blowH` is what
+-- the fuel climbs by, so the two are one quantity read once each --
+-- and the base is no exception, since the height already starts one
+-- `blowH` up.  What was missing was only that the pooled walk outruns
+-- this caps' own delivery count, and the STRICT registry bracket
+-- supplies it.
+capsAt-exp≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 ^ (2 ^ Caps.cSize (capsAt e sl id)) ≤ capsH e sl id
+capsAt-exp≤capsH {n = n} e sl zero =
+  blowup-exp≤blowH (capsBase e sl)
+    (caps (2 + sizeᵉ e + slotsSize sl)
+          (suc (entryCeil n sl e))
+          (suc sz))
+    (m≤m+n 3 _)
+    (s≤s (s≤s z≤n))
+    (≤-trans base≤ K)
+    (≤-trans suc≤ K)
+    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + sz)) K)
+  where
+  sz = sizeᵉ e + slotsSize sl
+  K : capsBase e sl ≤ towerℕ (capsBase e sl)
+  K = k≤towerℕ (capsBase e sl)
+  suc≤ : 2 + sz ≤ capsBase e sl
+  suc≤ = ≤-trans (n≤1+n (2 + sz)) (m≤m+n (3 + sz) (suc (entryCeil n sl e)))
+  base≤ : 2 + sizeᵉ e + slotsSize sl ≤ capsBase e sl
+  base≤ = ≤-trans (≤-reflexive (+-assoc 2 (sizeᵉ e) (slotsSize sl))) suc≤
+capsAt-exp≤capsH e sl (suc id) =
+  blowup-exp≤blowH (capsH e sl id) (capsAt e sl id)
+    (3≤capsH e sl id)
+    (2≤capsAt-size e sl id)
+    (proj₁ (capsAt-tower e sl id))
+    (proj₁ (proj₂ (capsAt-tower e sl id)))
+    (proj₂ (proj₂ (capsAt-tower e sl id)))

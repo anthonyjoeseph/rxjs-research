@@ -88,7 +88,7 @@ open import Verify-Budget-Sufficient.Deliveries using
   chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
-  capsAt-⊑-suc; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
+  capsAt-⊑-suc; capsAt-exp≤capsH; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
   frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; J+n≤iterL; lvls-add;
   lvls-infl; lvls-mono; size≤sizeCount; sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
@@ -3313,48 +3313,31 @@ postulate
       ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
                   (storeNestMax sched st) (nestUnit e sl)
 
--- THE SIGHTED CEILING AGAINST THE FUEL, and this is the comparison the
--- depth face owes the height, now standing alone.  Its two hypotheses
--- are the invariants a round arrives under, and the statement is that
--- what they hold the run to fits the instant's own depth fuel.
+-- THE SIGHTED CEILING AGAINST THE SIZE'S DOUBLE EXPONENTIAL, and this
+-- is where the depth face's obligation now sits: not against the fuel
+-- as a small number, but against the room the fuel has above the
+-- instant's own size cap.  Both hypotheses are the invariants a round
+-- arrives under, and everything the ceiling reads is a NESTING depth
+-- of something already present when the round starts.
 --
--- AND THE INVARIANT IT NEEDS IS NOT THE ONE IT HAS.  `nestOK?` holds
--- the store under the sealed nesting cap, and that cap is ABOVE the
--- fuel: the cap's per-instant increment reads a delivery square at the
--- NEXT instant's caps, and the caps recurrence steps by a blowup driven
--- by the fuel itself, so the next instant's size already exceeds it.
--- Every route through the cap therefore loses before any exponent is
--- reached, which is what the ledger below records three times over.  So
--- this leaf is where a re-denominated ceiling has to land -- one whose
--- growth per instant is read off the deliveries a round actually makes
--- rather than off the budget it is allowed -- and until that ceiling
--- exists the leaf stands on the hypotheses it can state rather than on
--- the ones that would discharge it.
+-- WHY THE EXPONENT AND NOT THE SIZE.  The store's depth is held under
+-- the nesting cap, and that cap exponentiates a caps field once per
+-- instant -- so it stands above the size at its own instant and no
+-- bound denominated in the size can hold it.  Two exponentials is what
+-- the cap costs and not one, because the exponent it raises is a
+-- POLYNOMIAL of the caps field rather than the field itself.
 --
--- AND THERE IS A SECOND CANDIDATE REPAIR, WHICH IS AN INDEX AND NOT A
--- CURRENCY.  What the ledger below actually proves is that the fuel at
--- an instant sits under the SIZE at the NEXT one, the caps stepping by
--- a blowup the fuel itself drives.  That is an off-by-one-instant gap
--- rather than a scale gap, and the walk this premise is spent inside
--- already exits at the next instant's caps -- which is why the cap's
--- own increment reads them.  So the question worth settling before any
--- currency is rewritten is whether the next instant's size sits under
--- the next instant's fuel: if it does, the premise is stated one
--- instant too low and the repair is at the call site.  Nothing here
--- claims it does -- the two sides are a tower apiece and neither
--- instantiates.
---
--- AND THE MINIMAL DIFF IS THE ONE TO REFUSE: reading the cap's factor
--- at the current instant while keeping it calibrated against the fuel.
--- The second replay in the ledger below was built precisely to kill
--- that, through the increment's summand alone.
+-- AND THE CONSTRAINT THE SHAPE HAS TO RESPECT IS THE INDEX: no summand
+-- may price the cap at the instant AFTER the one being bounded.
+-- Nothing here does -- the room this is stated against is read at `id`
+-- throughout, and so is every quantity on the left.
 --
 -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
 --   times -- the calibration through the wrap factor, the same through
 --   the increment alone, and the level-keyed repair at every level the
 --   fuel reaches, which closes the escape through a bigger index.
 postulate
-  sighted-nest≤capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  sight-nest≤exp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
@@ -3363,7 +3346,28 @@ postulate
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
     sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
               (storeNestMax sched st) (nestUnit e sl)
-      ≤ capsH e sl id
+      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+
+-- AND THE FUEL HAS THAT ROOM, so the comparison the depth face owes
+-- the height is assembled rather than asserted.  The caps recurrence
+-- steps by a blowup the fuel itself drives and `blowH` is what the
+-- fuel climbs by, so the size at an instant and the fuel at that
+-- instant are one quantity read once each -- with two exponentials
+-- between them, bought by the single spare registration the tower
+-- bracket leaves in the pooled walk.
+sighted-nest≤capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
+            (storeNestMax sched st) (nestUnit e sl)
+    ≤ capsH e sl id
+sighted-nest≤capsH {e = e} sl id a sched st hsl hcaps hnest hval =
+  ≤-trans (sight-nest≤exp sl id a sched st hsl hcaps hnest hval)
+          (capsAt-exp≤capsH e sl id)
 
 -- THE ROUND'S DEPTH FITS THE INSTANT'S FUEL, assembled rather than
 -- asserted: the descent goes under what the round can see, and what

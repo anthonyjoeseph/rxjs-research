@@ -216,46 +216,40 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **test the instant shift where it is CHEAP: the nesting ceiling** —
-  the ceiling's increment is priced at a delivery square read off the
-  NEXT instant's caps while the caps step by a blowup the fuel drives,
-  so the ceiling passes the fuel at the first step. The candidate
-  repair is that the gap is off by one INSTANT, not by a scale, and
-  the walk the premise is spent inside already exits at the next
-  instant's caps. That is the same index shift the sink's allowance
-  needs, on a surface of a few sites instead of a hundred and fifty —
-  so its verdict decides the leg below before that one is attempted.
+- **discharge the re-denominated ceiling** — `sight-nest≤exp`, the
+  sighted sum against two exponentials of the instant's OWN size cap.
+  The height comparison it replaced is now assembled: the fuel at an
+  instant sits two exponentials above the size at that same instant,
+  proven at every instant including the base, so the currency question
+  is size-against-size and the index is read at `id` throughout. What
+  is owed is that three nesting depths scaled by the program's size fit
+  under an exponential of a cap the store's invariant is stated in.
 
-- **denominate the sink's allowance at the instant's EXIT cap** —
-  conditional on the leg above. Re-indexing the registry conjunct died
-  in both directions, and what replaces it is that the room a
-  subscribe spends is already tracked as the LEVEL: the walk holds a
-  `capsOK?` at its own level whose fifth conjunct is the length bound,
-  free and unthreaded. It is unspendable only because the allowance
-  below it is denominated at the instant's ENTRY cap. Move that, and
-  the conjunct, its threading and both subscribing leaves go at once.
+- **the same leaf at the entry** — `sight-root≤exp`, where both sides
+  are syntax and no run stands between them: the program's nesting, the
+  slot vocabulary's, and the wrap unit, against two exponentials of a
+  base cap that already reads the size and the slots. This is the half
+  that should fall without a design decision, and it is the worked
+  instance the delivery-side leaf above can be shaped against.
 
-- **the root's fuel comparison, which is now plain arithmetic** — with
-  the ceiling's shape settled, `sight-root≤capsH` reads `suc (size) *
-  suc (three nesting depths) ≤ capsH` at the entry index, and the fuel
-  base already CONTAINS that size beside the slot total and the entry
-  ceiling, with a pooled tower on top of it. Nothing on either side
-  reads a later instant, so the cap-against-fuel mismatch that killed
-  the height vehicle cannot arise here: it is a product against a base
-  that dominates each factor. This is the half of the depth split that
-  should fall without a design decision, and landing it isolates the
-  remaining risk in the delivery-side comparison alone.
+- **denominate the sink's allowance at the instant's EXIT cap** — the
+  registry conjunct's re-index died in both directions, and what
+  replaces it is that the room a subscribe spends is already tracked as
+  the LEVEL: the walk holds a `capsOK?` at its own level whose fifth
+  conjunct is the length bound, free and unthreaded. It is unspendable
+  only because the allowance below it is denominated at the ENTRY cap.
+  The ceiling's verdict does not carry here — that gap closed by room,
+  not by an index — so this leg is a restatement and not a transport.
 
 ### The ledger
 
-- **`sighted-nest≤capsH`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the whole
-  height comparison, now standing alone. The invariant it is handed holds the
-  store under a cap that is ABOVE the fuel, so a re-denominated ceiling is what
-  has to land here; nothing else in the split touches the height.
-- **`sight-root≤capsH`** (Caps-Bridge) — FALSITY, `RECOVERY×2`: the same
-  comparison at the entry, where both sides are syntax — the program's nesting
-  against one `blowH` story over a base cap reading its size. The one instance
-  of the height comparison with no run between the two sides.
+- **`sight-nest≤exp`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the ceiling
+  re-denominated, the height gone from it. Three nesting depths scaled by the
+  program's size, against two exponentials of the instant's own size cap; the
+  ledger constrains only the index, and every reading here is at `id`.
+- **`sight-root≤exp`** (Caps-Bridge) — FALSITY, `RECOVERY`: the same leaf at
+  the entry, where both sides are syntax and the cap is one blowup off the
+  base. The one instance with no run between the two sides.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
   round's descent under its sighted nesting scaled by the program's size. The
   shape is settled by instantiation on both axes; what no row reaches is any
