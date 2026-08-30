@@ -216,29 +216,24 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **denominate the sink's allowance at the instant's EXIT cap, and
-  retire the registry conjunct with both its leaves** — re-indexing
-  died in both directions, and what replaces it is that the walk
-  already carries a levelled `capsOK?` whose fifth conjunct IS the
-  registry-length bound: free, unthreaded, needing no preservation.
-  It cannot be spent only because the fan allowance is denominated at
-  the instant's ENTRY registry cap, which every level of the walk is
-  above. Move that denomination to the exit cap — a constant of the
-  instant, which the walk's own premise puts every level under — and
-  the conjunct, its threading and the two subscribing leaves go at
-  once. The cost lands on the fuel comparison.
+- **test the instant shift where it is CHEAP: the nesting ceiling** —
+  the ceiling's increment is priced at a delivery square read off the
+  NEXT instant's caps while the caps step by a blowup the fuel drives,
+  so the ceiling passes the fuel at the first step. The candidate
+  repair is that the gap is off by one INSTANT, not by a scale, and
+  the walk the premise is spent inside already exits at the next
+  instant's caps. That is the same index shift the sink's allowance
+  needs, on a surface of a few sites instead of a hundred and fifty —
+  so its verdict decides the leg below before that one is attempted.
 
-- **re-denominate the nesting ceiling** — the invariant is read again,
-  by the height comparison itself, and that is where it fails: the
-  ceiling's per-instant increment is priced at a delivery square read
-  off the NEXT instant's caps, and the caps step by a blowup the fuel
-  drives, so the ceiling passes the fuel at the first step. What a
-  round actually deepens the store by is a count of the deliveries it
-  MAKES, not of the deliveries it is allowed. Settle the cheaper
-  candidate first, since it would retire this leg outright: the gap
-  the ledger proves is off by one INSTANT rather than off by a scale,
-  and the walk the premise is spent inside already exits at the next
-  instant's caps.
+- **denominate the sink's allowance at the instant's EXIT cap** —
+  conditional on the leg above. Re-indexing the registry conjunct died
+  in both directions, and what replaces it is that the room a
+  subscribe spends is already tracked as the LEVEL: the walk holds a
+  `capsOK?` at its own level whose fifth conjunct is the length bound,
+  free and unthreaded. It is unspendable only because the allowance
+  below it is denominated at the instant's ENTRY cap. Move that, and
+  the conjunct, its threading and both subscribing leaves go at once.
 
 - **the root's fuel comparison, which is now plain arithmetic** — with
   the ceiling's shape settled, `sight-root≤capsH` reads `suc (size) *

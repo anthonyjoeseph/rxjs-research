@@ -2619,20 +2619,27 @@ postulate
 -- those two sits a length bound frozen at the instant's entry cap,
 -- threaded unchanged across frames and across chains that register.
 --
--- AND THERE IS A SECOND ROUTE THAT RETIRES THE PREDICATE OUTRIGHT,
--- which is worth trying first because it costs no leaf at all.  The
--- walk already carries a `capsOK?` at its OWN level, and that
--- predicate's fifth conjunct IS a registry-length bound -- so the
--- levelled reading is free, needs no threading and no preservation
--- argument, and the only reason it is not spent is that the sink's
--- allowance is denominated one cap lower.  Denominate that allowance
--- at the INSTANT'S EXIT cap instead -- a constant of the instant, not
--- a level, and one the walk's premise already puts every level under
--- -- and the sink's demand is met by the free reading.  Then this
--- predicate's length conjunct, its threading, and both subscribing
--- leaves go together.  What has to be checked is the other end: every
--- deliver measure inflates with it, and the fuel comparison is what
--- pays.
+-- AND THE ROOM A SUBSCRIBE SPENDS IS ALREADY TRACKED -- IT IS THE
+-- LEVEL -- WHICH IS WHY A BUDGET CONJUNCT WOULD RE-DERIVE `frameStep`.
+-- The subscribe faces do not merely preserve the caps receipt; they
+-- report the level it climbs by, and the stepped cap's registry field
+-- IS the entry cap times that level.  So the registrations are
+-- accounted for, at the index the walk actually moves, and the walk
+-- carries the resulting receipt in hand at every state this predicate
+-- is threaded through.  Adding a separate room counter here would
+-- rebuild that accounting one index lower and then owe a proof that
+-- the two agree.
+--
+-- WHAT BLOCKS SPENDING THE FREE READING IS THE ALLOWANCE BELOW IT,
+-- which is denominated at the instant's ENTRY registry cap while every
+-- level of the walk sits above that cap.  Denominating instead at the
+-- instant's EXIT cap -- a constant of the instant rather than a level,
+-- and one the walk's own premise puts every level under, since the
+-- entry size is inside the step count -- meets the sink's demand from
+-- the receipt the walk already holds, and this predicate's length
+-- conjunct, its threading and both subscribing leaves go together.
+-- The cost lands at the other end: every deliver measure inflates with
+-- it, and the fuel comparison is what pays.
 --
 -- DEAD ROUTE: giving this predicate the level the chain count already
 --   uses does NOT repair it.  The consumer holds that level FIXED
