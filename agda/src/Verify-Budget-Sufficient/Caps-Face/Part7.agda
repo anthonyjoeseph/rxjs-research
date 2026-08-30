@@ -3313,18 +3313,20 @@ postulate
       ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
                   (storeNestMax sched st) (nestUnit e sl)
 
--- THE SIGHTED CEILING'S WHOLE QUANTITY AGAINST THE SIZE'S DOUBLE
--- EXPONENTIAL, and this leaf carries no evaluator premise at all: what
--- the round's invariants supply is that all three of the ceiling's
--- summands are readings of ONE number, the instant's nesting cap, and
--- the body below spends them.  So what is left here is arithmetic
--- between two currencies and nothing about a run.
+-- THE CAP UNDER THE SIZE'S DOUBLE EXPONENTIAL, AND NO SYNTAX ON EITHER
+-- SIDE.  Both faces here are caps-denominated: the instant's nesting
+-- cap, times the room the ceiling's three readings and its own unit
+-- cost, against two exponentials of the size at the same instant.  The
+-- program's size is gone from the statement and so is the ceiling's
+-- `suc`, both held by facts the recurrence already carries.
 --
 -- WHY THE EXPONENT AND NOT THE SIZE.  The cap exponentiates a caps
 -- field once per instant, so it stands above the size at its own
 -- instant and no bound denominated in the size can hold it.  Two
 -- exponentials is what it costs and not one, because the exponent the
--- cap raises is a POLYNOMIAL of the caps field rather than the field.
+-- cap raises is a POLYNOMIAL of the caps field rather than the field:
+-- it reads a delivery SQUARE of the caps at the next instant, which is
+-- cubic in a size one exponential would only have matched linearly.
 --
 -- AND THE CONSTRAINT THE SHAPE HAS TO RESPECT IS THE INDEX: no summand
 -- may price the cap at the instant AFTER the one being bounded.
@@ -3335,10 +3337,36 @@ postulate
 --   the increment alone, and the level-keyed repair at every level the
 --   fuel reaches, which closes the escape through a bigger index.
 postulate
-  nestCap-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  nestCap≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
-    suc (sizeᵉ e) * suc (3 * nestCapAt e sl id)
+    Caps.cSize (capsAt e sl id) * (4 * nestCapAt e sl id)
       ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+
+-- AND THE CEILING'S SYNTAX IS PAID BY THE SIZE CAP, which is what lets
+-- the leaf above be stated in caps alone.  The ceiling reads the
+-- program's own size as a factor, and the caps recurrence carries the
+-- base bound at every instant, so that factor sits under the size cap
+-- with no run consulted; the `suc` beside the tripled cap is under a
+-- fourth copy of it because the cap is at least one, being the wrap
+-- unit at instant zero and nondecreasing after.
+nestCap-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  suc (sizeᵉ e) * suc (3 * nestCapAt e sl id)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+nestCap-sight≤exp e sl id =
+  ≤-trans (*-mono-≤ 1+z≤S h4) (nestCap≤exp e sl id)
+  where
+  C = nestCapAt e sl id
+  1≤C : 1 ≤ C
+  1≤C = ≤-trans (subst (1 ≤_) (sym (nestCapAt-0 e sl)) (s≤s z≤n))
+                (nestCap-mono₀ e sl id)
+  four : 4 * C ≡ C + 3 * C
+  four = solve 1 (λ c → con 4 :* c := c :+ con 3 :* c) refl C
+  h4 : suc (3 * C) ≤ 4 * C
+  h4 = ≤-trans (+-monoˡ-≤ (3 * C) 1≤C) (≤-reflexive (sym four))
+  1+z≤S : suc (sizeᵉ e) ≤ Caps.cSize (capsAt e sl id)
+  1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
+                  (capsAt-base-size e sl id)
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
 -- arrival's nesting is held under it by the caller's premise, the
