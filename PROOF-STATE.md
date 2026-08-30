@@ -227,13 +227,6 @@ does not fit is a finding about the shared statement, not about the head.
   from the size recurrence, whose own step is quadratic and whose count
   reads the width.
 
-- **the same leaf at the entry** — `sight-root≤exp`, where both sides
-  are syntax and no run stands between them: the program's nesting, the
-  slot vocabulary's, and the wrap unit, against two exponentials of a
-  base cap that already reads the size and the slots. This is the half
-  that should fall without a design decision, and it is the worked
-  instance the delivery-side leaf above can be shaped against.
-
 - **denominate the sink's allowance at the instant's EXIT cap** — the
   registry conjunct's re-index died in both directions, and what
   replaces it is that the room a subscribe spends is already tracked as
@@ -243,15 +236,22 @@ does not fit is a finding about the shared statement, not about the head.
   The ceiling's verdict does not carry here — that gap closed by room,
   not by an index — so this leg is a restatement and not a transport.
 
+- **the sighted ceiling's OTHER side, at both indices** —
+  `cascade-depth-sighted` and `depthE-sighted-root` are one statement
+  read at a round and at the entry, and with the height comparison now
+  assembled they are all that stands between a descent and its fuel.
+  Both are calibrated by refutation and probed along two axes, so the
+  shape is not in question; what no row reaches is any instant past the
+  second, which is exactly where the growth the first leg is fighting
+  lives. Take them together — the entry one has no run under it and is
+  the worked instance the round one is shaped against.
+
 ### The ledger
 
 - **`nestCap≤exp`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the ceiling
   entire and caps on both sides. The instant's nesting cap, times the room
   its three readings cost, under two exponentials of its size cap; the
   ledger constrains only the index, and both sides are read at `id`.
-- **`sight-root≤exp`** (Caps-Bridge) — FALSITY, `RECOVERY`: the same leaf at
-  the entry, where both sides are syntax and the cap is one blowup off the
-  base. The one instance with no run between the two sides.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
   round's descent under its sighted nesting scaled by the program's size. The
   shape is settled by instantiation on both axes; what no row reaches is any

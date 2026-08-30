@@ -32,7 +32,7 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n; *-monoʳ-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n; *-monoʳ-≤; +-mono-≤;
   +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -86,7 +86,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeGo-nest; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
+  (caps-tick; cascade-depth-capsH; cascadeGo-nest; nestCap-sight≤exp; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
@@ -99,13 +99,14 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (slotsNestSum; storeNestMax; nestCapAt; nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc;
+  (slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc;
   nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch; nestUnit;
   nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax; storeNest-slots≤;
   storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
+open import Verify-Budget-Sufficient.Init-Nest using (init-storeNest)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; dWᵉ≤capsAt-wid; sizeCount-body; frameBlowup;
@@ -1425,31 +1426,39 @@ postulate
                   (storeNestMax (sched-init e ins) (st-init e))
                   (nestUnit e ins)
 
--- THE ENTRY CEILING AGAINST THE ENTRY CAP'S SIZE, and this one is
--- arithmetic rather than evaluation.  Every quantity on the left is
--- syntax -- the program's nesting, the initial store's, which is the
--- slot vocabulary's and nothing else, and the wrap unit built from
--- both -- and the right is two exponentials over a base cap that
--- already carries the program's size and its slots.  So what is owed
--- is that a PRODUCT of the nesting readings sits under an exponential
--- of a size reading that dominates each of them.
+-- THE ENTRY CEILING AGAINST THE ENTRY CAP'S SIZE, and it is the
+-- delivery side's leaf read at instant zero rather than a statement of
+-- its own.  All three of the ceiling's summands are the nesting cap at
+-- that instant: the program's nesting and the slot vocabulary's are
+-- both summands of the wrap unit, and the unit IS the cap there.
 --
 -- AND THIS IS WHY THE ANCHOR IS THE PLACE THE COMPARISON IS PAID.  At
 -- every later instant the store is whatever the run has built, so the
 -- two sides are related only through an invariant.  Here there is no
--- run yet: the store is the vocabulary, and the comparison is between
--- two syntactic readings of one program.
---
--- RECOVERY: `git show 7e618c7:agda/src/Verify-Budget-Sufficient/Init-Nest.agda`
---   restores the initial-state nesting-invariant cone -- the empty-store
---   `⊔`-fold lemmas, the hot-slot nesting reading and `init-nestOK?` --
---   which is where the left-hand side's own reduction was worked out.
-postulate
-  sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    sightCeil (sizeᵉ e) (nestDᵉ e)
-              (storeNestMax (sched-init e ins) (st-init e))
-              (nestUnit e ins)
-      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
+-- run yet: the store is the vocabulary, which is what the initial
+-- store's bound establishes and what makes the whole comparison
+-- syntactic.
+sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  sightCeil (sizeᵉ e) (nestDᵉ e)
+            (storeNestMax (sched-init e ins) (st-init e))
+            (nestUnit e ins)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
+sight-root≤exp e ins =
+  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤3C))
+          (nestCap-sight≤exp e ins 0)
+  where
+  C = nestCapAt e ins 0
+  hu : nestUnit e ins ≤ C
+  hu = ≤-reflexive (sym (nestCapAt-0 e ins))
+  hv : nestDᵉ e ≤ C
+  hv = ≤-trans (≤-trans (m≤m+n (nestDᵉ e) (slotsNestSum ins)) (n≤1+n _)) hu
+  hs : storeNestMax (sched-init e ins) (st-init e) ≤ C
+  hs = ≤-trans (init-storeNest e ins) hu
+  eq : C + C + C ≡ 3 * C
+  eq = solve 1 (λ c → c :+ c :+ c := con 3 :* c) refl C
+  sum≤3C : nestDᵉ e + storeNestMax (sched-init e ins) (st-init e)
+             + nestUnit e ins ≤ 3 * C
+  sum≤3C = ≤-trans (+-mono-≤ (+-mono-≤ hv hs) hu) (≤-reflexive eq)
 
 -- AND THE ENTRY FUEL HAS THAT ROOM, so the entry's half of the height
 -- comparison is assembled rather than asserted, out of the same
