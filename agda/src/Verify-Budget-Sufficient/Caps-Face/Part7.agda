@@ -2619,6 +2619,21 @@ postulate
 -- those two sits a length bound frozen at the instant's entry cap,
 -- threaded unchanged across frames and across chains that register.
 --
+-- AND THERE IS A SECOND ROUTE THAT RETIRES THE PREDICATE OUTRIGHT,
+-- which is worth trying first because it costs no leaf at all.  The
+-- walk already carries a `capsOK?` at its OWN level, and that
+-- predicate's fifth conjunct IS a registry-length bound -- so the
+-- levelled reading is free, needs no threading and no preservation
+-- argument, and the only reason it is not spent is that the sink's
+-- allowance is denominated one cap lower.  Denominate that allowance
+-- at the INSTANT'S EXIT cap instead -- a constant of the instant, not
+-- a level, and one the walk's premise already puts every level under
+-- -- and the sink's demand is met by the free reading.  Then this
+-- predicate's length conjunct, its threading, and both subscribing
+-- leaves go together.  What has to be checked is the other end: every
+-- deliver measure inflates with it, and the fuel comparison is what
+-- pays.
+--
 -- DEAD ROUTE: giving this predicate the level the chain count already
 --   uses does NOT repair it.  The consumer holds that level FIXED
 --   across the cascade -- it advances the chain index and reproduces
@@ -2626,6 +2641,20 @@ postulate
 --   exactly as much room at the point the invariant is threaded as the
 --   flat one does.  The allowance a registration spends has to come
 --   from somewhere the cascade fold actually moves.
+--
+-- DEAD ROUTE: nor may the conjunct be re-denominated UPWARD, at the
+--   stepped cap the walk already preserves and never has to thread.
+--   The dispatch's copy of this bound is spent as the FOLD BUDGET of
+--   the share ring, and that budget is the quantity the fan allowance
+--   is defined at -- its recurrence multiplies by the flat registry
+--   cap once per round -- so a ring walked at a larger budget proves a
+--   bound strictly above the one the sink's conclusion is stated at.
+--   The flat reading is therefore the required one and stays, which
+--   settles what the two subscribing leaves are short of: ROOM, not an
+--   index.  What is owed is a claim about the instant's own registry
+--   cap -- that it outruns the entries a whole instant of subscribes
+--   can append -- and that is a fact about the calibration, provable
+--   where the cap is BUILT rather than anywhere the walk can reach.
 RegsBase : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (st : EvalSt e) → Set
 RegsBase {e = e} sl id st =

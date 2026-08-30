@@ -6792,11 +6792,20 @@ mutual
   -- here instead: the state the sink is reached at is not the state the
   -- cap was read at, and this predicate is what knows the difference.
   --
-  -- RECOVERY: git show f0b8b7c restores `shareAdmit-len` and
-  --   `shareAdmit-sz`, which derived exactly these two from a
-  --   `capsOK?` at one cap -- the admitted list is a sublist of the
-  --   registry, so both were inherited rather than proven.  Whoever
-  --   discharges these conjuncts at a levelled cap wants them back.
+  -- DEAD ROUTE: reading the two off the walk's own LEVELLED `capsOK?`
+  --   instead -- which is preserved across the descent and needs no
+  --   threading at all -- fails in the direction required.  Both
+  --   conjuncts get WEAKER as the cap grows, so a receipt at the
+  --   stepped cap does not deliver one at the flat cap.  And taking
+  --   the whole statement up to the stepped cap instead re-denominates
+  --   the share ring's FOLD BUDGET, which is the quantity the fan
+  --   allowance's own recurrence is defined at -- it multiplies by the
+  --   flat registry cap once per round -- so the sink would prove a
+  --   bound strictly above the one its conclusion is stated at, and no
+  --   widening recovers the difference.  `shareAdmit-len` and
+  --   `shareAdmit-sz` transfer the sublist reading at whatever single
+  --   cap is picked; picking one above the flat instant cap is what
+  --   dies here, not the transfer.
   dispatchCapsOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
@@ -7046,7 +7055,7 @@ shareGoFold-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl → 1 ≤ W → 1 ≤ Caps.cSize c →
     admSz? (Caps.cSize c) ps ≡ true →
-    length ps ≤ k → k ≤ Caps.cReg c →
+    length ps ≤ k →
     shareBurstsOK W sf gas id now i vals fin ps sched st →
     shareCapsOK c sl d Lv sf gas id now i vals fin ps sched st →
     depthShareGo sf gas id now i vals fin ps sched st ≤ d →
@@ -7104,7 +7113,7 @@ shareGo-nodes {e = e} c d W sl Lv sf gas id now i vals fin ps sched st
             (sym (fanLen-suc gas c)) (sym (fanSq-suc gas c))))
   where
   FOLD = shareGoFold-nodes c d W sl Lv sf gas id now i vals fin ps (Caps.cReg c)
-           sched st hsl 1≤W 1≤S hadm hlen ≤-refl hb hc hdp hlv
+           sched st hsl 1≤W 1≤S hadm hlen hb hc hdp hlv
 
 -- AND THE SINK ITSELF IS THREE ARMS OVER THAT FOLD, none of which
 -- touches the nodes map: out of dispatch gas the state is returned
@@ -7333,7 +7342,7 @@ foldPath-nodes {e = e} c d W sl Lv sf gas id now envSrc (f ↠ p) vals evs fin s
 -- two halves are the walk that runs the entry and the fold that runs
 -- the rest -- so the budget decrements where the list does.
 shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin [] k sched st
-                  hsl 1≤W 1≤S hadm hlen hk hb hc hdp hlv =
+                  hsl 1≤W 1≤S hadm hlen hb hc hdp hlv =
   0 , z≤n ,
   ≤-trans (m≤m⊔n (nodesMax st) (nestDᵛˢ vals))
   (≤-trans (m≤m+n _ _)
@@ -7348,11 +7357,11 @@ shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin [] k sched st
   grow : ∀ (F Y : ℕ) → 1 ≤ F → Y ≤ F * Y
   grow F Y 1≤F = ≤-trans (≤-reflexive (sym (*-identityˡ Y))) (*-monoˡ-≤ Y 1≤F)
 shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin ((rid , p) ∷ ps) (suc k)
-                  sched st hsl 1≤W 1≤S hadm (s≤s hlen) hk hb hc hdp hlv
+                  sched st hsl 1≤W 1≤S hadm (s≤s hlen) hb hc hdp hlv
   with any (_≡ᵇ rid) (EvalSt.cancelled st) | hb | hc
 ... | true  | hb′ | hc′ =
   shareGoFold-nodes c d W sl Lv sf gas id now i vals fin ps (suc k) sched st hsl 1≤W 1≤S
-    (proj₂ (∧-true _ _ hadm)) (≤-trans hlen (n≤1+n k)) hk hb′ hc′
+    (proj₂ (∧-true _ _ hadm)) (≤-trans hlen (n≤1+n k)) hb′ hc′
     (≤-trans (m≤m⊔n _ _) hdp) hlv
 ... | false | hb′ | hc′ =
   jt ,
@@ -7380,7 +7389,7 @@ shareGoFold-nodes {e = e} c d W sl Lv sf gas id now i vals fin ((rid , p) ∷ ps
             (proj₁ (∧-true _ _ hadm)) hlv
   TAILr = shareGoFold-nodes c d W sl (Lv + proj₁ (proj₂ hc′)) sf gas id now i vals fin ps k sched₁ st₁
             (trans (foldPath-slots sf gas id now (toℕ i) p vals evs fin sched st′) hsl)
-            1≤W 1≤S (proj₂ (∧-true _ _ hadm)) hlen (≤-trans (n≤1+n k) hk)
+            1≤W 1≤S (proj₂ (∧-true _ _ hadm)) hlen
             (proj₂ hb′) (proj₂ (proj₂ (proj₂ hc′)))
             (lub3-r (depthShareGo sf gas id now i vals fin ps sched st)
                     (depthFold sf gas id now (toℕ i) p vals evs fin sched st′)

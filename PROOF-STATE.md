@@ -216,16 +216,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **re-index the registry's length pricing, which cannot be proven
-  where it stands** — a subscribe APPENDS, and the bound it must
-  preserve is frozen at the instant's entry cap while every quantity
-  beside it in the same signature is levelled: the caps at the frame's
-  stepped cap, the chain count at the ledger's registry allowance.
-  Bumping a level into the predicate is a dead route — the cascade
-  holds that level fixed and advances the chain index instead — so
-  this leg finds the allowance the fold actually moves and
-  re-denominates the conjunct at it. The `take` dispatch is discharged
-  and stays so: it only filters, so it is indifferent to the index.
+- **denominate the sink's allowance at the instant's EXIT cap, and
+  retire the registry conjunct with both its leaves** — re-indexing
+  died in both directions, and what replaces it is that the walk
+  already carries a levelled `capsOK?` whose fifth conjunct IS the
+  registry-length bound: free, unthreaded, needing no preservation.
+  It cannot be spent only because the fan allowance is denominated at
+  the instant's ENTRY registry cap, which every level of the walk is
+  above. Move that denomination to the exit cap — a constant of the
+  instant, which the walk's own premise puts every level under — and
+  the conjunct, its threading and the two subscribing leaves go at
+  once. The cost lands on the fuel comparison.
 
 - **re-denominate the nesting ceiling** — the invariant is read again,
   by the height comparison itself, and that is where it fails: the
