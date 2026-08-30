@@ -48,7 +48,8 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
   chainsDelNestF≡; chainsDelLen-chains; chainsDelNestD-chains; chainsDelSzSum-chains;
   chainsNestF≤; nestDᵉ≤sizeᵉ; shareAdmit-len; shareAdmit-sz)
 open import Verify-Budget-Sufficient.Fan-Caps using
-  (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
+  (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def;
+  delSize-exp)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF; nest-telescope;
   nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
@@ -91,9 +92,9 @@ open import Verify-Budget-Sufficient.Caps using
   capsAt-size-mono; capsAt-wid<size; capsAt-suc-full;
   capsAt-⊑-suc; capsAt-exp≤capsH; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
   frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; J+n≤iterL; lvls-add;
-  lvls-infl; lvls-mono; size≤sizeCount; sizeCount; sizeCount-body)
+  lvls-infl; lvls-mono; capsAt-exp-gain; size≤sizeCount; sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true; cutThrough-len; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X)
+  (pathLen; reach-reset; ∧-true; cutThrough-len; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -116,7 +117,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (innerFinish-mergeAll-face; innerFinish-face-keep; thruOuter-face-core)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsAt-gas-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?;
+  (capsAt-gas-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?; powʳ1;
   pathSz?-widen; regsSz?; slotsCaps?; valCaps?; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps;
@@ -3462,27 +3463,183 @@ nestFac≤exp {n = n} e sl id =
                                             (*-monoˡ-≤ (delSq n (capsAt e sl (suc id)))
                                                        (reg≤size′ e sl id)))))
 
--- THE ONE SIDE THE ARITHMETIC LEAVES OPEN, and it mentions no cap at
--- all.  The wrap factor's exponent, the increment's exponent, the
--- previous instant's budget and the next size, together under ONE
--- exponential of that size.  Both exponents have had their burst,
--- registry and unit discharged into the next size already, so what is
--- being compared is the SIZE recurrence against the DELIVERY
--- recurrence -- and the size steps quadratically once per level while
--- its count is above the width, which is the room the delivery's fixed
--- context depth has to fit inside.
+-- BOTH EXPONENTS UNDER ONE POWER OF THE NEXT SIZE.  Each is a product
+-- whose only non-size factors are a delivery size and a delivery
+-- square, and a delivery size is a closed power of `suc cSize` -- two
+-- factors per unit of context depth, since the length recurrence
+-- multiplies a registry by a successor of the size and the registry
+-- is under that size.  Counting the factors of the two products gives
+-- the same ceiling for both, so the room the step needs stops being
+-- stated over two recurrences and becomes one inequality in three
+-- numbers.
+--
+-- The delivery size at the PREVIOUS instant is read against the next
+-- instant's base too, which is what lets one power serve both: the
+-- size is monotone across the instant, and the bound is monotone in
+-- its base.
+bump : ∀ (a b z : ℕ) → 1 ≤ z → a + 1 ≤ b → a + z ≤ b * z
+bump a b z 1≤z h =
+  ≤-trans (+-monoˡ-≤ z (≤-trans (≤-reflexive (sym (*-identityʳ a)))
+                                (*-monoʳ-≤ a 1≤z)))
+  (≤-trans (+-monoʳ-≤ (a * z) (≤-reflexive (sym (*-identityˡ z))))
+  (≤-trans (≤-reflexive (sym (*-distribʳ-+ z a 1)))
+           (*-monoˡ-≤ z h)))
+
+pow3 : ∀ (b a k : ℕ) → b ^ a * (b ^ k * (b ^ k * b ^ k)) ≡ b ^ (a + (k + (k + k)))
+pow3 b a k =
+  sym (trans (^-distribˡ-+-* b a (k + (k + k)))
+             (cong (b ^ a *_)
+               (trans (^-distribˡ-+-* b k (k + k))
+                      (cong (b ^ k *_) (^-distribˡ-+-* b k k)))))
+
+del-pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (delSize n (capsAt e sl id))
+    ≤ suc (Caps.cSize (capsAt e sl (suc id))) ^ suc (n + n)
+del-pow {n = n} e sl id =
+  ≤-trans (delSize-exp n (capsAt e sl id) (B2-cReg≤cSize e sl id))
+          (^-monoˡ-≤ (suc (n + n)) (s≤s (capsAt-size-mono e sl id)))
+
+del-pow′ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (delSize n (capsAt e sl (suc id)))
+    ≤ suc (Caps.cSize (capsAt e sl (suc id))) ^ suc (n + n)
+del-pow′ {n = n} e sl id =
+  delSize-exp n (capsAt e sl (suc id)) (B2-cReg≤cSize e sl (suc id))
+
+nestIncLog≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestIncLog e sl id ≤ suc (Caps.cSize (capsAt e sl (suc id))) ^ (6 * n + 9)
+nestIncLog≤pow {n = n} e sl id =
+  ≤-trans (*-mono-≤ S′≤B
+            (*-mono-≤ S′≤B (*-mono-≤ f3 (*-mono-≤ f4 S′≤B))))
+          (≤-trans (≤-reflexive collect)
+                   (≤-reflexive (trans (pow3 B 6 K1) (cong (B ^_) expo))))
+  where
+  S′ : ℕ
+  S′ = Caps.cSize (capsAt e sl (suc id))
+  B : ℕ
+  B = suc S′
+  K1 : ℕ
+  K1 = suc (n + n)
+  P : ℕ
+  P = B ^ K1
+  S′≤B : S′ ≤ B
+  S′≤B = n≤1+n S′
+  1≤P : 1 ≤ P
+  1≤P = 1≤pow S′ K1
+  1≤BP : 1 ≤ B * P
+  1≤BP = 1≤pow S′ (suc K1)
+  1≤PP : 1 ≤ P * P
+  1≤PP = ≤-trans (1≤pow S′ (K1 + K1)) (≤-reflexive (^-distribˡ-+-* B K1 K1))
+  3≤B : 2 + 1 ≤ B
+  3≤B = s≤s (2≤capsAt-size e sl (suc id))
+  2≤B : 1 + 1 ≤ B
+  2≤B = ≤-trans (s≤s (s≤s z≤n)) 3≤B
+  f3 : suc (suc (S′ * delSize n (capsAt e sl id))) ≤ B * (B * P)
+  f3 = ≤-trans (+-monoʳ-≤ 2 (*-mono-≤ S′≤B
+                              (≤-trans (n≤1+n (delSize n (capsAt e sl id)))
+                                       (del-pow e sl id))))
+               (bump 2 B (B * P) 1≤BP 3≤B)
+  f4 : suc (delSq n (capsAt e sl (suc id))) ≤ B * (P * P)
+  f4 = ≤-trans (+-monoʳ-≤ 1
+                 (≤-trans (≤-reflexive (delSq-def n (capsAt e sl (suc id))))
+                          (*-mono-≤ (≤-trans (n≤1+n _) (del-pow′ e sl id))
+                                    (≤-trans (n≤1+n _) (del-pow′ e sl id)))))
+               (bump 1 B (P * P) 1≤PP 2≤B)
+  collect : B * (B * ((B * (B * P)) * ((B * (P * P)) * B)))
+              ≡ B ^ 6 * (P * (P * P))
+  collect =
+    solve 2 (λ b p → b :* (b :* ((b :* (b :* p)) :* ((b :* (p :* p)) :* b)))
+                  := (b :* (b :* (b :* (b :* (b :* (b :* con 1)))))) :* (p :* (p :* p)))
+            refl B P
+  expo : 6 + (K1 + (K1 + K1)) ≡ 6 * n + 9
+  expo = solve 1 (λ x → con 6 :+ ((con 1 :+ (x :+ x))
+                                   :+ ((con 1 :+ (x :+ x)) :+ (con 1 :+ (x :+ x))))
+                     := con 6 :* x :+ con 9)
+               refl n
+
+nestFacLog≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestFacLog e sl id ≤ suc (Caps.cSize (capsAt e sl (suc id))) ^ (6 * n + 9)
+nestFacLog≤pow {n = n} e sl id =
+  ≤-trans (*-mono-≤ (≤-refl {B * B}) (*-mono-≤ (del-pow′ e sl id) (*-mono-≤ S′≤B f4)))
+          (≤-trans (≤-reflexive collect)
+                   (≤-trans (≤-reflexive (trans (pow3 B 3 K1) (cong (B ^_) expo)))
+                            (powʳ1 B (s≤s z≤n)
+                                   (+-monoʳ-≤ (6 * n) (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))))))))
+  where
+  S′ : ℕ
+  S′ = Caps.cSize (capsAt e sl (suc id))
+  B : ℕ
+  B = suc S′
+  K1 : ℕ
+  K1 = suc (n + n)
+  P : ℕ
+  P = B ^ K1
+  S′≤B : S′ ≤ B
+  S′≤B = n≤1+n S′
+  f4 : delSq n (capsAt e sl (suc id)) ≤ P * P
+  f4 = ≤-trans (≤-reflexive (delSq-def n (capsAt e sl (suc id))))
+               (*-mono-≤ (≤-trans (n≤1+n _) (del-pow′ e sl id))
+                         (≤-trans (n≤1+n _) (del-pow′ e sl id)))
+  collect : B * B * (P * (B * (P * P))) ≡ B ^ 3 * (P * (P * P))
+  collect =
+    solve 2 (λ b p → b :* b :* (p :* (b :* (p :* p)))
+                  := (b :* (b :* (b :* con 1))) :* (p :* (p :* p)))
+            refl B P
+  expo : 3 + (K1 + (K1 + K1)) ≡ 6 * n + 6
+  expo = solve 1 (λ x → con 3 :+ ((con 1 :+ (x :+ x))
+                                   :+ ((con 1 :+ (x :+ x)) :+ (con 1 :+ (x :+ x))))
+                     := con 6 :* x :+ con 6)
+               refl n
+
+-- THE ONE SIDE THE ARITHMETIC LEAVES OPEN, and it mentions no cap and
+-- no recurrence -- three numbers, a size, the size it steps to, and an
+-- exponent bounded by the first.  Everything caps-shaped has been
+-- discharged into those three: the burst and the registry into the
+-- next size, the delivery size into a power of it whose exponent is
+-- twice the context depth, and the depth into the size it is under.
+-- What remains is that a power of the next size, with an exponent
+-- linear in the current one, sits under two to the next size -- and
+-- the next size is above two to the current one, times it, so the
+-- exponent to be paid for is logarithmic in a quantity the budget is
+-- exponential in.
+--
+-- The three hypotheses are exactly what the caps face supplies and
+-- nothing more: the current size is at least eight, the exponent is at
+-- most six sizes and nine, and the step at least multiplies by two to
+-- the size.
 --
 -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
 --   times -- the calibration through the wrap factor, the same through
 --   the increment alone, and the level-keyed repair at every level the
 --   fuel reaches, which closes the escape through a bigger index.
+-- PROBED: `Probed.Pow-Room` -- sizes eight, nine and ten, each with
+--   the step size at the floor its own hypothesis allows and the
+--   exponent at its ceiling, plus one row four times off that floor
+--   and one with the exponent at zero.  Two rows past the cap are
+--   pinned FALSE, so the cap is what the rows are testing rather than
+--   a bound nothing reaches.  Not covered: sizes above ten, and the
+--   region where the step size is far above its floor -- both make
+--   the claim easier.
 postulate
-  nestFac-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    Caps.cSize (capsAt e sl (suc id)) + 3
-      + (2 ^ Caps.cSize (capsAt e sl id) + nestIncLog e sl id)
-      + nestFacLog e sl id
-      ≤ 2 ^ Caps.cSize (capsAt e sl (suc id))
+  pow-room-ℕ : ∀ (S S′ K : ℕ) → 8 ≤ S → K ≤ 6 * S + 9 → 2 ^ S * S ≤ S′ →
+    S′ + 3 + (2 ^ S + suc S′ ^ K) + suc S′ ^ K ≤ 2 ^ S′
+
+nestFac-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  Caps.cSize (capsAt e sl (suc id)) + 3
+    + (2 ^ Caps.cSize (capsAt e sl id) + nestIncLog e sl id)
+    + nestFacLog e sl id
+    ≤ 2 ^ Caps.cSize (capsAt e sl (suc id))
+nestFac-room {n = n} e sl id =
+  ≤-trans (+-mono-≤ (+-monoʳ-≤ (Caps.cSize (capsAt e sl (suc id)) + 3)
+                      (+-monoʳ-≤ (2 ^ Caps.cSize (capsAt e sl id))
+                                 (nestIncLog≤pow e sl id)))
+                    (nestFacLog≤pow e sl id))
+          (pow-room-ℕ (Caps.cSize (capsAt e sl id))
+                      (Caps.cSize (capsAt e sl (suc id)))
+                      (6 * n + 9)
+                      (8≤capsAt-size e sl id)
+                      (+-monoˡ-≤ 9 (*-monoʳ-≤ 6 (n≤capsAt-size e sl id)))
+                      (capsAt-exp-gain e sl id))
 
 -- WHY THE EXPONENT AND NOT THE SIZE.  The cap exponentiates a caps
 -- field once per instant, so it stands above the size at its own

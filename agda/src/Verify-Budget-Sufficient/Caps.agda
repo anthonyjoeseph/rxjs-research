@@ -1810,3 +1810,26 @@ capsAt-size-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (i
 capsAt-size-mono e sl id =
   cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
     (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+
+-- AND THE SIZE GAIN IS EXPONENTIAL IN THE SIZE ITSELF, which is the
+-- room every ceiling on this face is eventually paid out of.  The
+-- count is above the size, every size step at least doubles, and the
+-- step is taken count-many times -- so the next size is above two to
+-- the current one, times it.  Stated with the factor still attached
+-- because a consumer wanting only the exponential drops it in one
+-- step and a consumer wanting both cannot recover it.
+exp-size-gain : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  2 ^ Caps.cSize c * Caps.cSize c ≤ Caps.cSize (frameBlowup c d)
+exp-size-gain c d 2≤S 1≤R =
+  ≤-trans (*-monoˡ-≤ S (^-monoʳ-≤ 2 (size≤sizeCount c d 2≤S 1≤R)))
+          (iterSize-2^ S J S (≤-trans (s≤s z≤n) 2≤S))
+  where
+  S = Caps.cSize c
+  J = sizeCount c d
+
+capsAt-exp-gain : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 ^ Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+    ≤ Caps.cSize (capsAt e sl (suc id))
+capsAt-exp-gain e sl id =
+  exp-size-gain (capsAt e sl id) (capsH e sl id)
+    (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)

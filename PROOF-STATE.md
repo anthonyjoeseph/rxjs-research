@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the room between the size recurrence and the delivery
-  recurrence** — the ceiling's step is now a BODY over bare numbers,
-  and everything caps-shaped around it is proven too: the burst is a
-  `suc` of the width and the width at an instant is strictly under the
-  size at the NEXT one, the registry is under its own size, the wrap
-  unit is under the size, and the increment is bounded outright. One
-  leaf is left, `nestFac-room`, and it mentions no nesting cap at all —
-  the two exponents, the previous budget and the next size, together
-  under ONE exponential of that size. It is the SIZE recurrence against
-  the DELIVERY recurrence, and the delivery's depth is the program's.
+- **the last leaf on the nesting ceiling, and it is arithmetic** —
+  the step is a proven body now, and so is everything caps-shaped
+  under it: burst and registry into the next size, the wrap unit into
+  the size, the increment outright, and the delivery size into a
+  closed power of `suc cSize` whose exponent is twice the context
+  depth. `pow-room-ℕ` is what is left — three bare numbers, no
+  recurrence on either side, probed at the tightest corner its own
+  hypotheses allow and refuted past the cap. Discharge it: the route
+  is that a power with an exponent linear in the current size sits
+  under two to a size that is already above two to the current one.
 
 - **denominate the sink's allowance at the instant's EXIT cap** — the
   registry conjunct's re-index died in both directions, and what
@@ -249,10 +249,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`nestFac-room`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the wrap
-  factor's exponent, the increment's exponent, the previous budget and the
-  next size, together under one exponential of that size. Burst, registry
-  and unit are discharged into it; only the delivery is left unreduced.
+- **`pow-room-ℕ`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: three
+  bare numbers — a size, the size it steps to, and an exponent capped by the
+  first — one power of the second under two to the second. Every cap-shaped
+  quantity is discharged into it; nothing sealed appears on either side.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
   round's descent under its sighted nesting scaled by the program's size. The
   shape is settled on both axes, and the third instant is now read too; what no

@@ -15,12 +15,13 @@
 -- this, which is what lets the telescope survive with no length factor.
 module Verify-Budget-Sufficient.Fan-Caps where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-trans; ≤-reflexive; n≤1+n; m≤m+n; m≤n+m;
-   +-mono-≤; +-monoʳ-≤; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
+   +-mono-≤; +-monoˡ-≤; +-monoʳ-≤; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
+   +-suc; +-comm; m≤m*n;
    *-assoc; *-identityˡ; *-distribʳ-+)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
 
 open import Verify-Budget-Sufficient.Caps using (Caps)
 
@@ -165,3 +166,44 @@ abstract
     delSq g c ≤ delSq g c′
   delSq-monoᶜ g c c′ hS hR =
     *-mono-≤ (delSize-monoᶜ g c c′ hS hR) (delSize-monoᶜ g c c′ hS hR)
+
+  -- THE LENGTH IN CLOSED FORM, which is what a room inequality can
+  -- actually be stated against: the recurrence multiplies a registry
+  -- by a successor of the size, so a registry under its OWN size turns
+  -- every level into two more factors of `suc cSize` and nothing else.
+  -- The successor is what carries the induction -- the step reads
+  -- `suc (cSize + fanLen)`, never the length alone -- so the bound is
+  -- stated on it, and the delivery size is that same successor with
+  -- one factor already spent.
+  fanLen-exp : (g : ℕ) (c : Caps) → Caps.cReg c ≤ Caps.cSize c →
+    suc (fanLen g c) ≤ suc (Caps.cSize c) ^ (g + g)
+  fanLen-exp zero    c hR = s≤s z≤n
+  fanLen-exp (suc g) c hR =
+    ≤-trans (+-mono-≤ (s≤s z≤n) (*-monoˡ-≤ Y hR))
+            (≤-trans (*-monoʳ-≤ (suc S) step)
+                     (≤-reflexive (cong (suc S ^_) (cong suc (sym (+-suc g g))))))
+    where
+    S : ℕ
+    S = Caps.cSize c
+    f : ℕ
+    f = fanLen g c
+    Y : ℕ
+    Y = suc (S + f)
+    step : Y ≤ suc S * (suc S ^ (g + g))
+    step = ≤-trans (≤-reflexive (sym (+-suc S f)))
+           (≤-trans (+-monoˡ-≤ (suc f) (m≤m*n S (suc f)))
+           (≤-trans (≤-reflexive (+-comm (S * suc f) (suc f)))
+                    (*-monoʳ-≤ (suc S) (fanLen-exp g c hR))))
+
+  delSize-exp : (g : ℕ) (c : Caps) → Caps.cReg c ≤ Caps.cSize c →
+    suc (delSize g c) ≤ suc (Caps.cSize c) ^ suc (g + g)
+  delSize-exp g c hR =
+    ≤-trans (≤-reflexive (sym (+-suc S f)))
+    (≤-trans (+-monoˡ-≤ (suc f) (m≤m*n S (suc f)))
+    (≤-trans (≤-reflexive (+-comm (S * suc f) (suc f)))
+             (*-monoʳ-≤ (suc S) (fanLen-exp g c hR))))
+    where
+    S : ℕ
+    S = Caps.cSize c
+    f : ℕ
+    f = fanLen g c
