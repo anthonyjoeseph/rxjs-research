@@ -25,7 +25,7 @@
 -- nowhere -- `capsAt` sits on the caps recurrence and does not
 -- terminate even natively -- so these are conclusion-side rows, which
 -- is the coverage this can have rather than a gap in the sweeping.
--- TARGET: depthE-sighted-root @20c793
+-- TARGET: depthE-sighted @442c57
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 

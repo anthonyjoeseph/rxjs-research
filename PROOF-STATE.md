@@ -216,16 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the descent's own TRADE, written down instead of described** —
-  the sighted ceiling's two leaves are DIFFICULTY now, and their
-  headers already name the mechanism: edge by edge a descent trades,
-  what a frame takes off the subject it puts on the path, so the bare
-  sum is an EQUALITY along the subscribe walk and the drain under a
-  `from-inner` is the one level with no edge to come out of. That is a
-  statable induction, not a paragraph. State the trade as the assembly,
-  with the drain's per-layer charge as the leaf. More rows will not do
-  it: every family the corpus has is read, so what is left dark is
-  every slot vocabulary past two, and building one is the bigger job.
+- **the trade's own clauses, structural ones first** — the trade is
+  stated and the entry falls out of it with no arithmetic, so what is
+  left is the induction itself. The three structural descents cost
+  nothing: `map` and `*All` move their charge off the subject onto the
+  frame exactly, and `scan` moves less than it drops, so each is a
+  commutativity step against a measure already in the tree. Take those
+  and the two zero clauses first, leaving the slot read, the μ
+  unfolding and the drain as leaves — the drain being the one that has
+  to spend the size factor, and the only one worth a design decision.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -273,10 +272,10 @@ does not fit is a finding about the shared statement, not about the head.
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
   compound, and the margin WIDENS with the instant.
-- **`depthE-sighted-root`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the
-  same statement at the entry, where the store is the initial one. Read on both
-  families and both slot vocabularies with two orders of margin; what is left
-  is every vocabulary past two slots, which is the whole corpus.
+- **`depthE-sighted`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the same
+  statement over ANY subject and path, which is the form the induction runs on
+  — `pathNestD κ + nestDᵉ b` is what every structural descent trades within.
+  The entry is now a body over it; the rows read that body's instance only.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that

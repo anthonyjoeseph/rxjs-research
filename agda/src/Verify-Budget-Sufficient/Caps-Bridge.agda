@@ -99,7 +99,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc;
+  (slotsNestSum; storeNestMax; pathNestD; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc;
   nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch; nestUnit;
   nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax; storeNest-slots≤;
   storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
@@ -1402,33 +1402,63 @@ abstract
 --   `tower-sum-tab` for a slot telescope, and `entryCeil-slotWid`.
 
 ------------------------------------------------------------------
--- THE ROOT SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE.  The entry
--- sweep crosses `thru-outer` frames and drains bounded mergeAlls, and
--- both are paid for out of structure the sweep starts with: the
--- program itself, the initial store, and the program's wrap unit.
--- This is the subscribe-side twin of the delivery-side leaf, at the
--- entry arguments, and the size factor inside `sightCeil` is the same
--- one and answers the same mechanism -- the drain runs under a
--- `from-inner`, which the path measure charges nothing for.
+-- ANY SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE, which is the
+-- statement the induction is actually over.  A sweep crosses
+-- `thru-outer` frames and drains bounded mergeAlls, and both are paid
+-- for out of structure it already has: the subject it is descending,
+-- the path it has built, the store it walks, and the program's own
+-- wrap unit.  The root claim below is this at `root`, where the path
+-- charges nothing.
+--
+-- THE SUBJECT AND THE PATH ARE ONE QUANTITY, and stating it that way
+-- is the whole reason this form can be induced on.  Every structural
+-- descent TRADES: a `map` moves its function's nesting off the subject
+-- and onto the frame it pushes, a `*All` moves its own wrap `suc` the
+-- same way, and a `scan` moves less than it drops.  So `pathNestD κ +
+-- nestDᵉ b` is non-increasing along the walk while neither summand is,
+-- and a bound stated on either alone has to be re-established at every
+-- edge.
+--
+-- WHAT THE SIZE FACTOR PAYS FOR IS THE ONE DESCENT THAT DOES NOT
+-- TRADE.  A drain runs under a `from-inner`, which the path measure
+-- charges nothing for -- deliberately, since the layer it would charge
+-- is the one the `thru-outer` above it already bought -- so a program
+-- whose folds nest spends one per layer against a sum that sees none
+-- of them.  The layers are bounded by the program, which is why the
+-- size enters as a FACTOR rather than a summand: as a summand it is
+-- outrun, one per delivered value against the descent's eight.
 --
 -- REFUTED: `Refuted.Nest-Depth-One` is the subscribe-side witness the
 --   ceiling is calibrated against -- a limit-one mergeAll over three
 --   queued inners under nested folds, read at the root subscribe, whose
 --   descent climbs four per fold layer against the bare sum's three.
--- PROBED: `Probed.Depth-Sighted` reads this side at fold depths two and
---   twenty, at nine and eighty-one against ceilings of four hundred and
---   five thousand; on the family whose mergeAll is unbounded, five
---   against three hundred and seventy-two; and under the vocabulary
---   that connects at once rather than late, four against one thousand
---   three hundred and seventy-eight.  Not covered: any `sl` past the
---   two-slot vocabularies, which is where both remaining families
---   are, and nothing about the premise-free root beyond that.
+-- PROBED: `Probed.Depth-Sighted` reads this at `root` at fold depths
+--   two and twenty, at nine and eighty-one against ceilings of four
+--   hundred and five thousand; on the family whose mergeAll is
+--   unbounded, five against three hundred and seventy-two; and under
+--   the vocabulary that connects at once rather than late, four against
+--   one thousand three hundred and seventy-eight.  Not covered: any
+--   `sl` past the two-slot vocabularies, which is where both remaining
+--   families are; and every path other than `root`, which is the whole
+--   of what generalising added.
 postulate
-  depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-      ≤ sightCeil (sizeᵉ e) (nestDᵉ e)
-                  (storeNestMax (sched-init e ins) (st-init e))
-                  (nestUnit e ins)
+  depthE-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    depthE g b κ bid now sched st
+      ≤ sightCeil (sizeᵉ e) (pathNestD κ + nestDᵉ b)
+                  (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+
+-- AND THE ENTRY IS THAT AT `root`, WHERE THE PATH CHARGES NOTHING, so
+-- the two readings of the subject term are the same term and the
+-- application needs no arithmetic between them.
+depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+    ≤ sightCeil (sizeᵉ e) (nestDᵉ e)
+                (storeNestMax (sched-init e ins) (st-init e))
+                (nestUnit e ins)
+depthE-sighted-root e ins =
+  depthE-sighted (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
 
 -- THE ENTRY CEILING AGAINST THE ENTRY CAP'S SIZE, and it is the
 -- delivery side's leaf read at instant zero rather than a statement of
