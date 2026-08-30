@@ -136,6 +136,9 @@ open import Refuted.Clos-Wrap-Sum
   using (wrapSum≡; ownNest≡; closRead≡; traded≡; clos-wrap-sum-absurd)
 open import Refuted.Nest-Clos-Cap-Free
   using (size≡; clos≡; wid≡; third-lo; third-hi; NestClosCaps; nest-clos-cap-free-absurd)
+open import Refuted.Nest-Clos-Stratified
+  using (slots-priced; size≡1; lvl≡105; read-fails; DeferParkClos;
+         nest-clos-stratified-absurd)
 
 -- THE CUT AND WRAP FAMILIES ARE CLAIMED HERE AND CONSUMED BY THE PROBE
 -- TREE.  A program family is infrastructure rather than a witness, and

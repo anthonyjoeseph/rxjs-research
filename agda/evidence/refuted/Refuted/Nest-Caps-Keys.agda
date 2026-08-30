@@ -55,10 +55,10 @@ open import Verify-Budget-Sufficient.Caps
   using (Caps; caps; frameStep; sizeCount; frameStep-mono-j; opIterD-infl)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; capsOK?; pathSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; capsOK?; pathSz?; nestClosOK?)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?; FaceOK; faceOK)
+open import Verify-Budget-Sufficient.Nest-Walk using (FaceOK; faceOK)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂

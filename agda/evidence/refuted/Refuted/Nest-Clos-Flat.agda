@@ -53,8 +53,7 @@ open import Rx.Slots using (Slots; shared)
 open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Slot-Clos using (slotClos)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (valCaps?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (valCaps?; nestClosOK?)
 
 -- an OBSERVABLE-typed slot, so a reference to it is a value the walk
 -- can actually be handed

@@ -48,9 +48,10 @@ open import Rx.Evaluator
   using (splitEvents; root; sched-init; st-init; subscribeE; mintNode; Stream; _↠_; thru-outer;
   mergeAllᵒ; installNode)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; arrCapAt)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; capsOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1
+  using (nestValOK?; capsOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestClosOK?; burstNest?; allWrap; allFresh)
+  using (burstNest?; allWrap; allFresh)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂

@@ -74,9 +74,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-parts; capsOK?-setNode; face-lift;
    FrameFace; lookupNode-caps; valsCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (applyFn-iterSize; capsOK?; capsOK?-mono; eventCaps?; frameSz?; iterFold-+;
-   iterSize-+; pair≤sizeStep; pathSz?; slotsCaps?; SlotWid; valCaps?; widLive;
-   widNode)
+  (applyFn-iterSize; capsOK?; capsOK?-mono; closLive; eventCaps?;
+   frameSz?; iterFold-+; iterSize-+; pair≤sizeStep; pathSz?; slotsCaps?;
+   SlotWid; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (applyFn-iterFold; frameStep-⊑-+; valCaps?-size; valCaps?-wid; wid-lift)
 open import Verify-Budget-Sufficient.Caps-Face.Part2 using
@@ -282,13 +282,15 @@ capsOK?-addLive : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (l : LiveSource Γ) (sched : Sched Γ) (st : EvalSt e) →
   boundedLive (Caps.cSize c) l ≡ true →
   widLive (Caps.cWid c) (Sched.slots sched) l ≡ true →
+  closLive c (Sched.slots sched) l ≡ true →
   capsOK? c sched st ≡ true →
   capsOK? c (record sched { live = l ∷ Sched.live sched }) st ≡ true
-capsOK?-addLive {Γ = Γ} c l sched st bl wl inv =
+capsOK?-addLive {Γ = Γ} c l sched st bl wl cl inv =
     ∧-intro (∧-intro (∧-intro bl (proj₁ hL)) (proj₂ hL))
     (∧-intro h1
     (∧-intro (∧-intro wl h2)
-    (∧-intro h3 (∧-intro h4 h5))))
+    (∧-intro h3 (∧-intro h4
+    (∧-intro h5 (∧-intro cl h6))))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -299,7 +301,8 @@ capsOK?-addLive {Γ = Γ} c l sched st bl wl inv =
   h2 = proj₁ (proj₂ (proj₂ P))
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
-  h5 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  h6 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
 
 -- AND THE SAME STEP BACKWARDS, which costs no hypothesis at all: every
 -- capsOK? conjunct that reads `live` reads it through an `all`, so the head
@@ -319,7 +322,8 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
     ∧-intro (∧-intro (proj₂ hL) (proj₂ hB))
     (∧-intro h1
     (∧-intro (proj₂ hW)
-    (∧-intro h3 (∧-intro h4 h5))))
+    (∧-intro h3 (∧-intro h4
+    (∧-intro h5 (proj₂ hCL))))))
   where
   sched′ = record sched { live = l ∷ Sched.live sched }
   P  = capsOK?-parts c sched′ st ok
@@ -336,7 +340,12 @@ capsOK?-dropLive {Γ = Γ} c l sched st ok =
   h1 = proj₁ (proj₂ P)
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
-  h5 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))
+  h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  h6 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
+  hCL = ∧-true (closLive c (Sched.slots sched) l)
+               (all (closLive c (Sched.slots sched))
+                    (Sched.live sched))
+               h6
 
 -- and the head of the same conjunct, which the drop throws away and a fresh
 -- cold subscribe then needs: the entry it just prepended is bounded, and the

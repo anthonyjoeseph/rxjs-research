@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the node store's closure half, once there is a cap to state it at**
-  — a queued inner is read back out of a `mergeAll-st` by
-  `innerFinish` at a level nothing connects to where it was parked, so
-  the drain's reading is not threadable and has to be an INVARIANT on
-  the registry face's own predicate. Its shape is settled and its
-  precedent is `widNode`, which reads every queue element against
-  `cWid` and carries no size half; what the refutation moved is only
-  which cap the conjunct is read at. The scan arm stays out of it: an
-  accumulator is never subscribed, and its reading grows for exactly
-  the reason the frame law was refuted.
+- **restating `defer-park-clos` at a cap that dominates the
+  telescope** — the leaf as written is dead: the premise prices each
+  slot on its own, so a stratified telescope doubling per stage beats
+  any fixed number of frame levels, and the deficit is exponential in
+  a slot count no level mentions. What the site actually has is the
+  caps at the instant, whose size is an `iterSize` tower rather than
+  an arbitrary number, so the leg is to find the premise the init caps
+  can honestly supply — a reading of the whole program under its own
+  telescope — thread it to the defer park, and instantiate the result
+  at the same stratified family before grinding anything.
 
 - **`walk-frame-drain`, the last FALSITY the walk face carries that is
   not about the closure key** — a bounded `mergeAll`'s parked queue,
@@ -261,12 +261,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 
-- **`burst-clos`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the closure reading
-  of whatever the subscribe burst leaves at the head of the queue. Stated about
-  the head because that is what the drain spends; the fact is about the queue.
-- **`drain-clos`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the same one cascade
-  later, which is what the instant loop's recursion asks for. Same provisional
-  shape, and it goes with `burst-clos` when the queue's invariant carries it.
+- **`defer-park-clos`** (Subscribe-Face) — FALSITY, `REFUTED`: the closure
+  reading of a `defer`'s parked body, owed where the frame holds only its
+  written size. Dead at an arbitrary cap; it belongs at one that dominates the
+  telescope.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner

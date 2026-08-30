@@ -59,10 +59,10 @@ open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
   using (subscribeE; splitBurst; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; nestCapsOK?; nestClosOK?)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; nestCapsOK?)
 open import Refuted.Demand-Programs using (Γ₂)
 
 -- both slots empty: the source is written into the program, so the

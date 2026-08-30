@@ -87,7 +87,7 @@
 -- reports at the callee's post sched).
 module Verify-Budget-Sufficient.Caps-Face.Part1 where
 
-open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_; T)
 open import Data.Maybe   using (Maybe)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-suc; +-identityʳ; +-comm; +-assoc; +-monoˡ-≤;
@@ -112,12 +112,13 @@ open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _�
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (tt)
+open import Data.Empty   using (⊥-elim)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Prim      using (Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete; Timed;
+open import Rx.Prim      using (Tick; Source; InstEmit; _at_from_as_; InstEvent; init; value; close; handoff; complete; Timed;
   after_,_; hot; cold)
-open import Rx.Exp       using (Ty; natᵗ; _×ᵗ_; obs; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
+open import Rx.Exp       using (Ty; natᵗ; unitᵗ; boolᵗ; _×ᵗ_; _+ᵗ_; obs; isData; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵗˢ; sizeᵛ; syncSizeᵛ; Exp; Tm; Fn; varᵗ; unit̂;
   bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ; inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ; add; sub; mul; eqᵖ;
   ltᵖ; notᵖ; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ;
   exhaustAllᵉ; μᵉ; varᵉ; deferᵉ; evalWith; evalTm; applyFn)
@@ -127,6 +128,8 @@ open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chai
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; Path; sizeStep; iterSize; foldStep; iterFold)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
+open import Rx.Clos-Size using (closSizeᵉ)
+open import Rx.Slot-Clos using (slotClos)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -282,6 +285,98 @@ pathSz? B (f ↠ p)        = frameSz? B f ∧ ((suc (pathLen p) ≤ᵇ B) ∧ pa
 regsSz? : ∀ {n} {Γ : Ctx n} {t} → ℕ → List (RegId × Source × Chain Γ t) → Bool
 regsSz? B = all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en))))
 
+-- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
+-- arr-keyed descent needs and the one `nestValOK?` deliberately does
+-- not have: that predicate is a fact about a VALUE alone, while the
+-- key a subscription is charged at sees through the telescope the
+-- value may reference.  The two coincide on a slot-free arrival.
+-- AND THE FLAT SLOT MEASURE CANNOT STAND IN FOR IT, which is worth
+-- saying because that measure is the one the caps face already carries
+-- as a standing premise and the obvious candidate for generalising this
+-- key away.  `closSizeᵉ` reads `input i` as `slotClos i`, so a
+-- definition naming a slot TWICE pays for it twice, and a telescope in
+-- which each definition doubles its predecessor is closed under
+-- `inputsBelowᵉ`: the closure measure is multiplicative in the
+-- telescope's depth where `slotsSize` is a flat sum of written sizes.
+-- Four such slots already read 27 against 98.  So `slotsSize sl ≤
+-- Caps.cSize c` does not imply this predicate, and the two premises are
+-- independent rather than one subsuming the other.
+
+-- AND WHETHER THE CAP THE TOP INSTANTIATES CAN SATISFY IT IS OPEN, AND
+-- SYMBOLIC-OR-NOTHING.  Every consumer of this key takes it as a
+-- premise, so nothing owes a proof today; what is owed at the top is
+-- that `capsAt`'s own size admits the telescope, and by the paragraph
+-- above that number has to beat a measure exponential in the
+-- telescope's depth.  THE MEASURING ROUTE IS CLOSED: `capsAt`'s size is
+-- `iterSize` at a count the caps counting family produces, and that
+-- family is the one the harness quarantines as unreachable by
+-- measurement -- native code at the smallest arguments, no value -- so
+-- no probe, row or `refl` pin can decide it.  What is left is
+-- arithmetic already in the tree: `exp-iterSize` puts `2 ^ k` under
+-- that size, so the question reduces to whether the count dominates the
+-- slot depth, and that is a statement about the counting family rather
+-- than about this predicate.  `capsOK?` is where it
+-- is carried, so the top-level consumer that owes the answer is the
+-- instant loop rather than the walk.
+
+
+-- AND THE SAME READING FOLDED OVER A WHOLE SUBSCRIPTION, event by
+-- event, which is the shape the caps face already states its own
+-- arrival predicate in.  Only a `value` carries an arrival, so every
+-- other event reads as true outright -- the fold is a filter with the
+-- closure reading attached, not a second traversal.
+
+nestClosOK? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Val Γ (obs u) → Bool
+nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
+
+nestClosOK?ᵛ : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
+nestClosOK?ᵛ c sl unitᵗ    _        = true
+nestClosOK?ᵛ c sl boolᵗ    _        = true
+nestClosOK?ᵛ c sl natᵗ     _        = true
+nestClosOK?ᵛ c sl (s ×ᵗ t) (a , b)  = nestClosOK?ᵛ c sl s a ∧ nestClosOK?ᵛ c sl t b
+nestClosOK?ᵛ c sl (s +ᵗ t) (inj₁ a) = nestClosOK?ᵛ c sl s a
+nestClosOK?ᵛ c sl (s +ᵗ t) (inj₂ b) = nestClosOK?ᵛ c sl t b
+nestClosOK?ᵛ c sl (obs t)  o        = nestClosOK? c sl o
+
+-- THE CLOSURE READING OF WHAT THE SCHEDULE IS HOLDING, and it sits
+-- beside the width one because it is the same shape of fact about the
+-- same queue -- a per-element bound over `Sched.live`.  What it reads
+-- is not the value's own syntax but its size THROUGH the slot
+-- telescope, which is a strictly stronger reading: the deficit is per
+-- reference, so a value the size cap admits carries the deficit up with
+-- it and no caps receipt at any cap implies this one.
+--
+-- SO IT IS CARRIED RATHER THAN DERIVED, which is why it is a conjunct
+-- and not a lemma.  Every consumer that subscribes a value it took off
+-- that queue needs the reading, and the only statement that can supply
+-- it to ALL of them is one every producer re-establishes -- the
+-- hypothesis-in-a-signature form obliges whoever happens to call today
+-- and nobody else.
+--
+-- AND THE NODE TABLE IS NOT HERE, WHICH IS A FINDING AND NOT A CHOICE
+-- OF SCOPE.  The one node the reading would be about is a mergeAll's
+-- parked queue, and the site that writes it is the gate-shut arm of the
+-- inner consume, which holds only the WRITTEN size of the observable it
+-- parks.  Supplying the closure reading there means carrying it on
+-- every observable the walk delivers, and the walk EMITS observables as
+-- well as receiving them -- so the premise would have to be
+-- re-established on the output of every arm, which is the sum the flat
+-- frame reading was killed on.
+-- DEAD ROUTE: deriving the parked queue's reading from the caps
+--   receipts in hand at the park site.  `valCaps?` bounds the written
+--   size against the level's cap, and one level of the frame multiplies
+--   by the base size and doubles -- but `closSizeᵉ` is multiplicative in
+--   the TELESCOPE's depth, which no number the frame steps through
+--   mentions, so no fixed number of levels closes the gap.
+closLive : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → LiveSource Γ → Bool
+closLive c sl l =
+  all (λ tv → nestClosOK?ᵛ c sl (LiveSource.elemTy l) (proj₂ tv))
+      (LiveSource.pending l)
+
+closSt? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+        → Caps → Sched Γ → EvalSt e → Bool
+closSt? c sched st = all (closLive c (Sched.slots sched)) (Sched.live sched)
+
 capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
 capsOK? c sched st =
@@ -294,6 +389,7 @@ capsOK? c sched st =
   ∧ all (λ kv → parkRoom (Caps.cSize c) (slotsSize (Sched.slots sched))
                          (proj₂ kv))
         (EvalSt.nodes st)
+  ∧ closSt? c sched st
 
 ------------------------------------------------------------------
 -- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
@@ -352,16 +448,85 @@ widNode-widen sl (take-st _)     le h = refl
 widNode-widen sl (switch-st _ _) le h = refl
 widNode-widen sl (exhaust-st _ _) le h = refl
 
+-- AND BOTH ARRIVAL BOOLEANS WIDEN WITH THE CAP, which is what lets a
+-- caller read a bound at the level the walk reports and spend it at
+-- the join its own arm needs.  The size field is the only one the
+-- arrival cap moves, and every reading here is against it.
+nestClosOK?ᵛ-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (u : Ty) (v : Val Γ u)
+  {c c′ : Caps} → c ⊑ᶜ c′ →
+  nestClosOK?ᵛ c sl u v ≡ true → nestClosOK?ᵛ c′ sl u v ≡ true
+nestClosOK?ᵛ-widen sl unitᵗ    v        le h = refl
+nestClosOK?ᵛ-widen sl boolᵗ    v        le h = refl
+nestClosOK?ᵛ-widen sl natᵗ     v        le h = refl
+nestClosOK?ᵛ-widen sl (s ×ᵗ t) (a , b)  le h =
+  ∧-intro (nestClosOK?ᵛ-widen sl s a le (proj₁ (∧-true _ _ h)))
+          (nestClosOK?ᵛ-widen sl t b le (proj₂ (∧-true _ _ h)))
+nestClosOK?ᵛ-widen sl (s +ᵗ t) (inj₁ a) le h = nestClosOK?ᵛ-widen sl s a le h
+nestClosOK?ᵛ-widen sl (s +ᵗ t) (inj₂ b) le h = nestClosOK?ᵛ-widen sl t b le h
+nestClosOK?ᵛ-widen sl (obs t)  o        le h =
+  ≤ᵇ-widen (closSizeᵉ (slotClos sl) o) (proj₁ le) h
+
+-- AND A DATA TYPE READS AS TRUE OUTRIGHT, which is what a scripted
+-- slot's live entry needs: `isData` is exactly the absence of `obs`, and
+-- every other arm of the reading is `true` by its clause.
+nestClosOK?ᵛ-data : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) →
+  T (isData u) → (v : Val Γ u) → nestClosOK?ᵛ c sl u v ≡ true
+nestClosOK?ᵛ-data c sl unitᵗ    ok v = refl
+nestClosOK?ᵛ-data c sl boolᵗ    ok v = refl
+nestClosOK?ᵛ-data c sl natᵗ     ok v = refl
+nestClosOK?ᵛ-data c sl (s ×ᵗ u) ok (a , b) with isData s in eqs
+... | true  = ∧-intro (nestClosOK?ᵛ-data c sl s (subst T (sym eqs) tt) a)
+                      (nestClosOK?ᵛ-data c sl u ok b)
+... | false = ⊥-elim ok
+nestClosOK?ᵛ-data c sl (s +ᵗ u) ok (inj₁ a) with isData s in eqs
+... | true  = nestClosOK?ᵛ-data c sl s (subst T (sym eqs) tt) a
+... | false = ⊥-elim ok
+nestClosOK?ᵛ-data c sl (s +ᵗ u) ok (inj₂ b) with isData s
+... | true  = nestClosOK?ᵛ-data c sl u ok b
+... | false = ⊥-elim ok
+nestClosOK?ᵛ-data c sl (obs u)  ok v = ⊥-elim ok
+
+-- and the same over a pending list, stated at the ELEMENT TYPE rather
+-- than at the entry.  A caller holding a live source only through the
+-- record's projections cannot let Agda solve the entry from the goal --
+-- `closLive` reduces THROUGH `elemTy` and `pending`, so unification is
+-- against projections of a meta and blocks -- and the entry a caller
+-- like the hot-slot initialiser has is a literal it would otherwise
+-- have to spell out.
+closLive-pend : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) →
+  T (isData u) → (ps : List (Tick × Val Γ u)) →
+  all (λ tv → nestClosOK?ᵛ c sl u (proj₂ tv)) ps ≡ true
+closLive-pend c sl u ok []             = refl
+closLive-pend c sl u ok ((tk , v) ∷ r) =
+  ∧-intro (nestClosOK?ᵛ-data c sl u ok v) (closLive-pend c sl u ok r)
+
+-- and the same over a live entry's whole pending list
+closLive-data : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (l : LiveSource Γ) →
+  T (isData (LiveSource.elemTy l)) → closLive c sl l ≡ true
+closLive-data c sl l ok =
+  closLive-pend c sl (LiveSource.elemTy l) ok (LiveSource.pending l)
+
+closLive-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (l : LiveSource Γ) {c c′ : Caps} →
+  c ⊑ᶜ c′ →
+  closLive c sl l ≡ true → closLive c′ sl l ≡ true
+closLive-widen sl l le =
+  all-impl _ _ (λ tv → nestClosOK?ᵛ-widen sl (LiveSource.elemTy l) (proj₂ tv) le)
+           (LiveSource.pending l)
+
+
+
+
 capsOK?-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c c′ : Caps) (sched : Sched Γ) (st : EvalSt e) →
   c ⊑ᶜ c′ → capsOK? c sched st ≡ true → capsOK? c′ sched st ≡ true
-capsOK?-mono c c′ sched st (sz≤ , wd≤ , rg≤) h
+capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
   with ∧-true _ _ h
 ... | hSt , hRest with ∧-true _ _ hRest
 ... | hRg , hRest2 with ∧-true _ _ hRest2
 ... | hWL , hRest3 with ∧-true _ _ hRest3
 ... | hWN , hRest4 with ∧-true _ _ hRest4
-... | hLen , hPk =
+... | hLen , hRest5 with ∧-true _ _ hRest5
+... | hPk , hCL =
   ∧-intro (stBounded-widen sz≤ sched st hSt)
   (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
   (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
@@ -369,8 +534,10 @@ capsOK?-mono c c′ sched st (sz≤ , wd≤ , rg≤) h
   (∧-intro (all-impl _ _ (λ kv → widNode-widen (Sched.slots sched) (proj₂ kv) wd≤)
                      (EvalSt.nodes st) hWN)
   (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen)
-           (all-impl _ _ (λ kv → parkRoom-widen sz≤ (proj₂ kv))
-                     (EvalSt.nodes st) hPk)))))
+  (∧-intro (all-impl _ _ (λ kv → parkRoom-widen sz≤ (proj₂ kv))
+                     (EvalSt.nodes st) hPk)
+           (all-impl _ _ (λ l → closLive-widen (Sched.slots sched) l le)
+                     (Sched.live sched) hCL))))))
 
 ------------------------------------------------------------------
 -- THE SYNTAX-LINEAR EVAL RECEIPT — ONE iterSize FOLD PER SYNTAX NODE.

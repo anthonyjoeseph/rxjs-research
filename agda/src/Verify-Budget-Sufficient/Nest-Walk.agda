@@ -60,7 +60,7 @@ open import Verify-Budget-Sufficient.Caps-Term using (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthDisp; depthDrain; depthFin; depthFold; depthFrame; depthInner; depthE; depthReact;
   depthShareGo; lub3-m; lub3-r)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?;
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; valCaps?; widNode; widNode-push; nestValOK?; pathSz?; slotsCaps?; nestClosOK?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen;
   slotsCaps?-widen; frameSz?; capsOK?-mono)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (burstCaps?-widen; valCaps?-wid; valCaps?-size; valCaps?-widen; pathSz?-⊑; frameStep-chain-suc; expWid-fromSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; capsOK?-parts; capsOK?-setNode; switchKill-caps; NodeCaps; lookupNode-caps; capsOK?-nodeSz; capsOK?-nodeWid; capsOK?-nodePark; parkList-push; foldPath-slots; pathSz?-len;
@@ -723,55 +723,6 @@ nestCapsOK?-setNode c nid ns sched st wn inv =
   setNode-nodeWidᴺ? (Caps.cWid c) (Sched.slots sched) nid ns
     (EvalSt.nodes st) wn inv
 
--- THE CAP READ AGAINST THE ARRIVAL'S CLOSURE, which is the shape the
--- arr-keyed descent needs and the one `nestValOK?` deliberately does
--- not have: that predicate is a fact about a VALUE alone, while the
--- key a subscription is charged at sees through the telescope the
--- value may reference.  The two coincide on a slot-free arrival.
--- AND THE FLAT SLOT MEASURE CANNOT STAND IN FOR IT, which is worth
--- saying because that measure is the one the caps face already carries
--- as a standing premise and the obvious candidate for generalising this
--- key away.  `closSizeᵉ` reads `input i` as `slotClos i`, so a
--- definition naming a slot TWICE pays for it twice, and a telescope in
--- which each definition doubles its predecessor is closed under
--- `inputsBelowᵉ`: the closure measure is multiplicative in the
--- telescope's depth where `slotsSize` is a flat sum of written sizes.
--- Four such slots already read 27 against 98.  So `slotsSize sl ≤
--- Caps.cSize c` does not imply this predicate, and the two premises are
--- independent rather than one subsuming the other.
-
--- AND WHETHER THE CAP THE TOP INSTANTIATES CAN SATISFY IT IS OPEN, AND
--- SYMBOLIC-OR-NOTHING.  Every consumer of this key takes it as a
--- premise, so nothing owes a proof today; what is owed at the top is
--- that `capsAt`'s own size admits the telescope, and by the paragraph
--- above that number has to beat a measure exponential in the
--- telescope's depth.  THE MEASURING ROUTE IS CLOSED: `capsAt`'s size is
--- `iterSize` at a count the caps counting family produces, and that
--- family is the one the harness quarantines as unreachable by
--- measurement -- native code at the smallest arguments, no value -- so
--- no probe, row or `refl` pin can decide it.  What is left is
--- arithmetic already in the tree: `exp-iterSize` puts `2 ^ k` under
--- that size, so the question reduces to whether the count dominates the
--- slot depth, and that is a statement about the counting family rather
--- than about this predicate.  No assembly is stated for it here because
--- the walk has no top-level consumer to hang one on yet.
-
-nestClosOK? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Val Γ (obs u) → Bool
-nestClosOK? c sl o = closSizeᵉ (slotClos sl) o ≤ᵇ Caps.cSize c
-
--- AND THE SAME READING FOLDED OVER A WHOLE SUBSCRIPTION, event by
--- event, which is the shape the caps face already states its own
--- arrival predicate in.  Only a `value` carries an arrival, so every
--- other event reads as true outright -- the fold is a filter with the
--- closure reading attached, not a second traversal.
-nestClosOK?ᵛ : ∀ {n} {Γ : Ctx n} → Caps → Slots Γ → (u : Ty) → Val Γ u → Bool
-nestClosOK?ᵛ c sl unitᵗ    _        = true
-nestClosOK?ᵛ c sl boolᵗ    _        = true
-nestClosOK?ᵛ c sl natᵗ     _        = true
-nestClosOK?ᵛ c sl (s ×ᵗ t) (a , b)  = nestClosOK?ᵛ c sl s a ∧ nestClosOK?ᵛ c sl t b
-nestClosOK?ᵛ c sl (s +ᵗ t) (inj₁ a) = nestClosOK?ᵛ c sl s a
-nestClosOK?ᵛ c sl (s +ᵗ t) (inj₂ b) = nestClosOK?ᵛ c sl t b
-nestClosOK?ᵛ c sl (obs t)  o        = nestClosOK? c sl o
 
 eventNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → InstEvent (Val Γ u) → Bool
 eventNest? {u = u} c sl (value v) = nestClosOK?ᵛ c sl u v
@@ -783,22 +734,6 @@ eventNest? c sl complete    = true
 burstNest? : ∀ {n} {Γ : Ctx n} {u} → Caps → Slots Γ → Stream Γ u → Bool
 burstNest? c sl = all (λ em → all (eventNest? c sl) (InstEmit.events em))
 
--- AND BOTH ARRIVAL BOOLEANS WIDEN WITH THE CAP, which is what lets a
--- caller read a bound at the level the walk reports and spend it at
--- the join its own arm needs.  The size field is the only one the
--- arrival cap moves, and every reading here is against it.
-nestClosOK?ᵛ-widen : ∀ {n} {Γ : Ctx n} {c c′ : Caps} (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
-  c ⊑ᶜ c′ → nestClosOK?ᵛ c sl u v ≡ true → nestClosOK?ᵛ c′ sl u v ≡ true
-nestClosOK?ᵛ-widen sl unitᵗ    v        le h = refl
-nestClosOK?ᵛ-widen sl boolᵗ    v        le h = refl
-nestClosOK?ᵛ-widen sl natᵗ     v        le h = refl
-nestClosOK?ᵛ-widen sl (s ×ᵗ t) (a , b)  le h =
-  ∧-intro (nestClosOK?ᵛ-widen sl s a le (proj₁ (∧-true _ _ h)))
-          (nestClosOK?ᵛ-widen sl t b le (proj₂ (∧-true _ _ h)))
-nestClosOK?ᵛ-widen sl (s +ᵗ t) (inj₁ a) le h = nestClosOK?ᵛ-widen sl s a le h
-nestClosOK?ᵛ-widen sl (s +ᵗ t) (inj₂ b) le h = nestClosOK?ᵛ-widen sl t b le h
-nestClosOK?ᵛ-widen {c = c} sl (obs t) o le h =
-  ≤ᵇ-true _ _ (≤-trans (≤ᵇ⇒≤ (closSizeᵉ (slotClos sl) o) (Caps.cSize c) (T-to h)) (proj₁ le))
 
 burstNest?-widen : ∀ {n} {Γ : Ctx n} {u} {c c′ : Caps} (sl : Slots Γ) (str : Stream Γ u) →
   c ⊑ᶜ c′ → burstNest? c sl str ≡ true → burstNest? c′ sl str ≡ true

@@ -63,8 +63,8 @@ open import Rx.Slot-Clos using (slotClos)
 open import Rx.Evaluator using (Sched; EvalSt; mergeAllᵒ; Path; root; _↠_; Frame; map-f; thru-outer; stepFrame; sched-init;
   st-init)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt; frameStep)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?ᵛ)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; nestClosOK?ᵛ)
+
 open import Data.Product using (proj₁)
 open import Data.Bool.ListAction using (all)
 open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)

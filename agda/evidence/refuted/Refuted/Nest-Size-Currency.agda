@@ -46,8 +46,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; subs
 open import Rx.Exp using (Closed; natᵗ; obs; ofᵉ; nat̂; strmᵗ; deferᵉ; mergeAllᵉ; sizeᵉ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?; FaceOK; faceOK)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; nestClosOK?)
+open import Verify-Budget-Sufficient.Nest-Walk using (FaceOK; faceOK)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂

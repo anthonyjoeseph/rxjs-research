@@ -54,9 +54,9 @@ open import Rx.Evaluator
          Stream; _↠_; thru-outer; mergeAllᵒ; installNode)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestCapsOK?; nestClosOK?; pushValsAdmOK; pushValsWidOK;
+  using (nestCapsOK?; pushValsAdmOK; pushValsWidOK;
          allWrap; allFresh)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 

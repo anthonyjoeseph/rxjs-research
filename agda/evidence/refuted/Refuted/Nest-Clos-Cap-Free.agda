@@ -63,9 +63,9 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; frameStep; capsAt; 2≤capsAt-size; capsAt-base-size; capsAt-base-wid)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (valCaps?; capsOK?; capsOK?-mono)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (valCaps?; capsOK?; capsOK?-mono; nestClosOK?)
 open import Verify-Budget-Sufficient.Caps-Bridge using (init-capsOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?; nestClosOK?-size; c⊑step)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?-size; c⊑step)
 
 ----------------------------------------------------------------------
 -- THE VOCABULARY: one shared slot, whose definition is bigger than the

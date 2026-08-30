@@ -7,18 +7,21 @@
 -- as finished facts — an import, not a mutuality — and because
 -- Caps-Bridge should not pay this grind's recheck.
 --
--- THE FIVE CONJUNCTS of `capsOK?` (Caps-Face), at `st-init`:
+-- THE CONJUNCTS of `capsOK?` (Caps-Face), at `st-init`:
 --   (1) stBounded? cSize sched st   — all-concat-tab + mkHot-bounded
 --   (2) regsSz? cSize registry      — refl, the registry is []
 --   (3) all (widLive cWid slots) live — the branch that was open
 --   (4) all (widNode cWid slots) nodes — refl, nodes is []
 --   (5) length registry ≤ᵇ cReg     — refl, 0 ≤ᵇ suc _
+--   (6) all (parkRoom …) nodes      — refl, nodes is []
+--   (7) all (closLive caps slots) live — the closure key, same shape as (3)
 --
--- CONJUNCT (3) IS THE ONE THAT WAS OPEN, and `scripted`'s own index
--- closes it: `scripted` carries `{ok : T (isData t)}`, and EVERY data
--- type has `pWᵛ ≡ 0` (the outWᵛ/dWᵛ/pWᵛ-data-zero family below), so
--- the check reduces to `0 ≤ᵇ cWid`.  Cold and shared slots contribute
--- no live source at all.
+-- CONJUNCTS (3) AND (7) ARE THE TWO WITH CONTENT, and `scripted`'s own
+-- index closes both: `scripted` carries `{ok : T (isData t)}`, EVERY
+-- data type has `pWᵛ ≡ 0` (the outWᵛ/dWᵛ/pWᵛ-data-zero family below),
+-- and every data type reads `true` under the closure measure
+-- (`closLive-pend`), so the checks reduce to `0 ≤ᵇ cWid` and to `true`.
+-- Cold and shared slots contribute no live source at all.
 --
 -- The eight scaffold hypotheses the -core carried are NOT used: they
 -- were kit for a route this proof does not take.
@@ -52,7 +55,7 @@ open import Verify-Budget-Sufficient.Measures
 
 -- capsOK? and widLive live in Caps-Face
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
-  (capsOK?; widLive)
+  (capsOK?; widLive; closLive; closLive-pend)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (pWᵛ-data)
 
@@ -117,6 +120,14 @@ widLive-mkHot {n = n} {Γ = Γ} W ins i with ins i
 ... | scripted (cold _ _) = refl   -- mkHot returns []
 ... | shared _            = refl   -- mkHot returns []
 
+closLive-mkHot : ∀ {n} {Γ : Ctx n} (c : Caps) (ins : Slots Γ) (i : Fin n)
+  → all (closLive c ins) (mkHot ins i) ≡ true
+closLive-mkHot {n = n} {Γ = Γ} c ins i with ins i
+... | scripted {ok = ok} (hot async) =
+      ∧-intro (closLive-pend c ins (lookup Γ i) ok (resolve 0 async)) refl
+... | scripted (cold _ _) = refl   -- mkHot returns []
+... | shared _            = refl   -- mkHot returns []
+
 ----------------------------------------------------------------------
 -- STEP 5.  The main proof.
 --
@@ -148,12 +159,16 @@ init-capsOK?-base-go {n = n} e ins =
       -- (3) all (widLive W ins) live
       C3 = all-concat-tab (widLive W ins) (mkHot ins)
              (λ i → widLive-mkHot W ins i)
+      -- (7) all (closLive (baseCaps e ins) ins) live
+      C7 = all-concat-tab (closLive (baseCaps e ins) ins) (mkHot ins)
+             (λ i → closLive-mkHot (baseCaps e ins) ins i)
   in
-  -- capsOK? (baseCaps e ins) ... = (1) ∧ ((2) ∧ ((3) ∧ ((4) ∧ (5))))
   ∧-intro (∧-intro C1 refl)          -- (1) ∧-true  stBounded? ∧ []
     (∧-intro refl                     -- (2) regsSz? [] = refl
       (∧-intro C3                     -- (3) widLive live
-        (∧-intro refl refl)))         -- (4) widNode [] = refl; (5) 0 ≤ᵇ suc _ = refl
+        (∧-intro refl                 -- (4) widNode [] = refl
+          (∧-intro refl               -- (5) 0 ≤ᵇ suc _ = refl
+            (∧-intro refl C7)))))     -- (6) parkRoom [] = refl; (7) closLive live
 
 abstract
   init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)

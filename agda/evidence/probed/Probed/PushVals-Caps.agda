@@ -62,9 +62,8 @@ open import Rx.Evaluator
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
   AllOp; NodeId; Path)
 open import Verify-Budget-Sufficient.Caps using (arrCapAt; Caps; caps)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; nestValOK?; slotsCaps?)
-open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; nestClosOK?; pushValsCapsOK; pushValsWidOK;
-          pushValsWOK)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; nestValOK?; slotsCaps?; nestClosOK?)
+open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; pushValsCapsOK; pushValsWidOK; pushValsWOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 

@@ -147,7 +147,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono;
    eventCaps?; frameSz?; k≤iterFold; len≤sizeᵗˢ; obsCaps?; pathSz?; slotCaps?;
    slotsCaps?; slotsCaps?-lookup; suc≤foldStep; valCaps?; valCountᵉ; widLive;
-   widNode; widNode-push)
+   widNode; widNode-push; nestClosOK?; closLive; closLive-data)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (2≤frameStep-size; burstCaps?-++; burstCaps?-widen; closeList-caps;
    eventsCaps?-widen; finList-caps; frameStep-+assoc-burst;
@@ -805,6 +805,34 @@ stepFrame-scan-len {u = u} g id now fn nid κ vals fin sched st
 -- `valsCaps→mList-strict` supplies the payload bound there, and
 -- `obsList→mList-strict` does the same for the mergeAll drain's queue.
 ------------------------------------------------------------------
+
+-- THE PARKED DEFER'S CLOSURE READING, and it is a leaf because nothing
+-- in the caps face carries the reading it asks for.  A defer parks its
+-- body on the live queue, so the queue's closure conjunct is owed for a
+-- term the subscribe holds only the WRITTEN size of -- and the two
+-- measures part company exactly at `input`, where the written size is
+-- one symbol and the reading is the whole definition the telescope
+-- holds.
+--
+-- AS STATED IT IS FALSE, AND THE SHAPE OF THE REPAIR IS THE FINDING.
+-- The premise prices each slot SEPARATELY, so a stratified telescope
+-- whose every stage names the stage below it twice satisfies it at a
+-- cap of seven while the staged reading doubles per stage; the deficit
+-- is therefore exponential in the SLOT COUNT, which is a quantity no
+-- level of the frame mentions.  So no fixed number of levels buys it,
+-- and the arbitrary `c` is what has to go: the statement belongs at a
+-- cap that already dominates the telescope's own reading, which is a
+-- premise the subscribe face does not thread today and the init caps
+-- would have to supply.
+-- REFUTED: `Refuted.Nest-Clos-Stratified`
+
+postulate
+  defer-park-clos : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+    (o : Val Γ (obs u)) →
+    2 ≤ Caps.cSize c →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    sizeᵉ o ≤ Caps.cSize (frameStep j c) →
+    nestClosOK? (frameStep (suc j) c) sl o ≡ true
 
 subscribeE-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (dep bud ops j : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
@@ -2011,7 +2039,7 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
   1 , subst (λ x → capsOK? (frameStep x c) SCHED₃ (register SRC κ st) ≡ true)
             (sym (j+1 j))
             (capsOK?-addLive (frameStep (suc j) c) NEW SCHED₂ (register SRC κ st)
-               BL WL (register-caps c j SRC κ sched st 2≤S 1≤R inv pC))
+               BL WL CL (register-caps c j SRC κ sched st 2≤S 1≤R inv pC))
     , subst (λ x → burstCaps? (frameStep x c) sl
                      (((init SRC ∷ map value sync) at id from SRC as subscribe) ∷ [])
                        ≡ true)
@@ -2039,6 +2067,8 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                    (λ v → sizeᵛ (lookup Γ i) v ≤ᵇ Caps.cSize (frameStep (suc j) c))
                    (λ v → ≤ᵇ-widen (sizeᵛ (lookup Γ i) v)
                             (cSize≤frameStep c (suc j) 2≤S)) sync (proj₁ sdp))
+  CL : closLive (frameStep (suc j) c) (Sched.slots SCHED₂) NEW ≡ true
+  CL = closLive-data (frameStep (suc j) c) (Sched.slots SCHED₂) NEW ok
   BL = resolve-caps (Caps.cSize (frameStep (suc j) c)) now (dd ∷ ds)
          (all-impl (λ tv → sizeᵛ (lookup Γ i) (Timed.val tv) ≤ᵇ Caps.cSize c)
                    (λ tv → sizeᵛ (lookup Γ i) (Timed.val tv)
@@ -3083,7 +3113,7 @@ subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud (suc ops′) j g (deferᵉ b
                      (register SRC (thru-outer mergeAllᵒ nid ↠ κ) st₀) ≡ true)
             (sym (j+1 j))
             (capsOK?-addLive (frameStep (suc j) c) NEW SCHED₃
-               (register SRC (thru-outer mergeAllᵒ nid ↠ κ) st₀) BL WL REG)
+               (register SRC (thru-outer mergeAllᵒ nid ↠ κ) st₀) BL WL CL REG)
     , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
                      (((init SRC ∷ []) at bid from SRC as subscribe) ∷ []) ≡ true)
             (sym (j+1 j)) refl
@@ -3116,6 +3146,12 @@ subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud (suc ops′) j g (deferᵉ b
   BL : boundedLive (Caps.cSize (frameStep (suc j) c)) NEW ≡ true
   BL = ∧-intro (T⇒≡true (sizeᵉ body ≤ᵇ Caps.cSize (frameStep (suc j) c))
                  (≤⇒≤ᵇ (≤-trans (≤-trans (n≤1+n (sizeᵉ body)) szb) (proj₁ step⊑))))
+               refl
+  CL : closLive (frameStep (suc j) c) (Sched.slots SCHED₃) NEW ≡ true
+  CL = ∧-intro (subst (λ y → nestClosOK? (frameStep (suc j) c) y body ≡ true)
+                      (sym slEq)
+                      (defer-park-clos c j sl body 2≤S slC
+                         (≤-trans (n≤1+n (sizeᵉ body)) szb)))
                refl
   WL : widLive (Caps.cWid (frameStep (suc j) c)) (Sched.slots SCHED₃) NEW ≡ true
   WL = ∧-intro (subst (λ y → (pWᵛ n y (obs u) body

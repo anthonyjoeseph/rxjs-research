@@ -41,7 +41,7 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestF
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
-  fac-hoist; one-pow; FaceOK; faceAt; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; shareCapsOK)
+  fac-hoist; one-pow; FaceOK; faceAt; shareCapsOK)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade; depthChain; depthFold; depthShareGo; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -122,7 +122,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (innerFinish-mergeAll-face; innerFinish-face-keep; thruOuter-face-core)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?; powʳ1; sq≤pow;
-  pathSz?-widen; regsSz?; regsSz?-widen; slotsCaps?; valCaps?; widNode)
+  pathSz?-widen; regsSz?; regsSz?-widen; slotsCaps?; valCaps?; widNode;
+  nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps;
    scanVals-len; stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)

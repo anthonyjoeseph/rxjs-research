@@ -82,18 +82,17 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
-   regsSz?; slotsCaps?; valCaps?; widLive; widNode; widNode-len)
+   regsSz?; slotsCaps?; valCaps?; widLive; widNode; widNode-len;
+   nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
   (caps-tick; cascade-depth-capsH; cascadeGo-nest; nestCap-sight-scaled≤exp; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
-open import Verify-Budget-Sufficient.Nest-Walk using
-  (nestClosOK?ᵛ)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-parts; capsOK?-regs; slotsCaps?-capsAt)
+  (capsOK?-clos; capsOK?-count; capsOK?-parts; capsOK?-regs; slotsCaps?-capsAt)
 
 -- the depth mirror (S4's currency)
 -- `depthChain` joins `depthE` here because `dry-tick`'s assembly consumes
@@ -495,7 +494,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       hNodeFn = repQ-all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) (suc W) o hfn
       hLen : (length q ≤ᵇ W) ≡ false
       hLen = trans (cong (_≤ᵇ W) (repQ-len (suc W) o)) (sucW≰W W)
-      -- capsOK?'s six conjuncts, NAMED.  ∧-true's Bool arguments must be
+      -- capsOK?'s seven conjuncts, NAMED.  ∧-true's Bool arguments must be
       -- given explicitly: `_` leaves them as metas that Agda will not
       -- solve, because decomposing `?a ∧ ?b = C ∧ REST` needs `_∧_` to be
       -- injective and it is a function.  Same lesson as the ∧-true sites
@@ -505,19 +504,20 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       A5 = (length (EvalSt.registry st) ≤ᵇ Caps.cReg c)
       A6 = all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv))
                (EvalSt.nodes st)
+      A7 = all (closLive c sl) (Sched.live sched)
       A2 = regsSz? B (EvalSt.registry st)
       A1 = stBounded? B sched st
       WD = widNode W sl (mergeAll-st nothing 0 q false)
   in ∧-intro (∧-intro hLive   (∧-intro hNodeSz refl))
              (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
                       (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
-   -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount ∧ park.
-   -- Peel to the widNode conjunct, then to its queue-LENGTH half, and
-   -- read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
-   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ A6)))) hc)
-                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ A6))) t2)
-                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ A6)) t3)
-                t5 = proj₁ (∧-true A4 (A5 ∧ A6) t4)
+   -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount ∧ park
+   -- ∧ closSt?.  Peel to the widNode conjunct, then to its queue-LENGTH
+   -- half, and read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
+   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ A7))))) hc)
+                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ A7)))) t2)
+                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ A7))) t3)
+                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ A7)) t4)
                 w  = proj₁ (∧-true WD true t5)
                 ln = widNode-len W sl nothing 0 q false w
             in f≡t-absurd (trans (sym hLen) ln)
@@ -1030,6 +1030,47 @@ schedGo-widHead W sl (l ∷ ls) eq bs | bl , bls | inj₂ (a″ , l′) | inj₂
 ... | true  | refl = schedHeadOf-widHead W sl l eqH bl
 ... | false | refl = schedGo-widHead W sl ls eqR bls
 
+-- THE HEAD, CLOSURE HALF.  Identical induction to the width half one
+-- module section up, at `capsOK?`'s closure conjunct instead of its
+-- width one -- which is what turns the instant loop's closure premise
+-- from something carried into something projected.
+schedHeadOf-closHead : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  closLive c sl l ≡ true →
+  nestClosOK?ᵛ c sl (arrTy a) (arrVal a) ≡ true
+schedHeadOf-closHead c sl l eq bnd with LiveSource.pending l | eq | bnd
+... | (t , v) ∷ ps | refl | bnd′ = proj₁ (∧-true _ _ bnd′)
+
+schedGo-closHead : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  schedGo ls ≡ inj₂ (a , ls′) →
+  all (closLive c sl) ls ≡ true →
+  nestClosOK?ᵛ c sl (arrTy a) (arrVal a) ≡ true
+schedGo-closHead c sl (l ∷ ls) eq bs
+  with ∧-true (closLive c sl l) (all (closLive c sl) ls) bs
+... | bl , bls with schedHeadOf l in eqH | schedGo ls in eqR
+schedGo-closHead c sl (l ∷ ls) refl bs | bl , bls | inj₁ _ | inj₂ (a′ , ls″) =
+  schedGo-closHead c sl ls eqR bls
+schedGo-closHead c sl (l ∷ ls) refl bs | bl , bls | inj₂ (a″ , l′) | inj₁ _ =
+  schedHeadOf-closHead c sl l eqH bl
+schedGo-closHead c sl (l ∷ ls) eq bs | bl , bls | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with schedEarlier a″ a′ | eq
+... | true  | refl = schedHeadOf-closHead c sl l eqH bl
+... | false | refl = schedGo-closHead c sl ls eqR bls
+
+pop-head-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e)
+  {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  capsOK? c sched st ≡ true →
+  nestClosOK?ᵛ c (Sched.slots sched) (arrTy a) (arrVal a) ≡ true
+pop-head-clos c sched st eq cOK
+  with capsOK?-clos c sched st cOK
+... | cl with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+      schedGo-closHead c (Sched.slots sched) (Sched.live sched) eqL cl
+
 pop-head-widCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e)
   {a : Arrival Γ} {sched′ : Sched Γ} →
@@ -1106,21 +1147,53 @@ pop-widLive : ∀ {n} {Γ : Ctx n} (W : ℕ) (sched : Sched Γ)
 pop-widLive W sched eq h with schedGo (Sched.live sched) in eqL | eq
 ... | inj₂ (a″ , ls) | refl = schedGo-widLive W (Sched.slots sched) (Sched.live sched) eqL h
 
+schedHeadOf-closLive : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (l : LiveSource Γ)
+  {a : Arrival Γ} {l′ : LiveSource Γ} →
+  schedHeadOf l ≡ inj₂ (a , l′) →
+  closLive c sl l ≡ true → closLive c sl l′ ≡ true
+schedHeadOf-closLive c sl l eq bnd with LiveSource.pending l | eq | bnd
+... | (t , v) ∷ ps | refl | bnd′ = proj₂ (∧-true _ _ bnd′)
+
+schedGo-closLive : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (ls : List (LiveSource Γ))
+  {a : Arrival Γ} {ls′ : List (LiveSource Γ)} →
+  schedGo ls ≡ inj₂ (a , ls′) →
+  all (closLive c sl) ls ≡ true → all (closLive c sl) ls′ ≡ true
+schedGo-closLive c sl (l ∷ ls) eq bnd
+  with ∧-true (closLive c sl l) (all (closLive c sl) ls) bnd
+... | bl , bls with schedHeadOf l in eqH | schedGo ls in eqR
+schedGo-closLive c sl (l ∷ ls) refl bnd | bl , bls | inj₁ _ | inj₂ (a′ , ls″) =
+  ∧-intro bl (schedGo-closLive c sl ls eqR bls)
+schedGo-closLive c sl (l ∷ ls) refl bnd | bl , bls | inj₂ (a″ , l′) | inj₁ _ =
+  ∧-intro (schedHeadOf-closLive c sl l eqH bl) bls
+schedGo-closLive c sl (l ∷ ls) eq bnd | bl , bls | inj₂ (a″ , l′) | inj₂ (a′ , ls″)
+  with schedEarlier a″ a′ | eq
+... | true  | refl = ∧-intro (schedHeadOf-closLive c sl l eqH bl) bls
+... | false | refl = ∧-intro bl (schedGo-closLive c sl ls eqR bls)
+
+pop-closSt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (sched : Sched Γ)
+  (st : EvalSt e) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  closSt? c sched st ≡ true → closSt? c sched′ st ≡ true
+pop-closSt c sched st eq h with schedGo (Sched.live sched) in eqL | eq
+... | inj₂ (a″ , ls) | refl =
+      schedGo-closLive c (Sched.slots sched) (Sched.live sched) eqL h
+
 pop-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e)
   {a : Arrival Γ} {sched′ : Sched Γ} →
   sched-next sched ≡ inj₂ (a , sched′) →
   capsOK? c sched st ≡ true → capsOK? c sched′ st ≡ true
 pop-caps c sched st eq h with capsOK?-parts c sched st h
-... | sb , rg , wl , wn , rl , pk =
+... | sb , rg , wl , wn , rl , pk , cl =
   ∧-intro (pop-bounded (Caps.cSize c) sched st eq sb)
   (∧-intro rg
   (∧-intro (pop-widLive (Caps.cWid c) sched eq wl)
   (∧-intro (subst (λ sl → all (λ kv → widNode (Caps.cWid c) sl (proj₂ kv)) (EvalSt.nodes st) ≡ true)
                   (sym (pop-slots sched eq)) wn)
   (∧-intro rl
-           (subst (λ sl → all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv)) (EvalSt.nodes st) ≡ true)
-                  (sym (pop-slots sched eq)) pk)))))
+  (∧-intro (subst (λ sl → all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv)) (EvalSt.nodes st) ≡ true)
+                  (sym (pop-slots sched eq)) pk)
+           (pop-closSt c sched st eq cl))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`
@@ -2074,51 +2147,17 @@ abstract
     in nestOK? e ins 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
   burst-nest e ins = nestOK?-from-floor e ins _ _ (burst-nest-floor e ins)
 
--- WHERE THE CLOSURE KEY ENTERS THE INSTANT LOOP, and it enters as a
--- premise because deriving it is refuted.  The walk needs every value
--- it subscribes measured THROUGH the slot telescope, and no caps
--- receipt supplies that reading: the deficit is per reference, so the
--- value a size cap admits grows with the cap and carries the deficit up
--- with it.  So the loop carries it, one instant at a time, in the only
--- form the drain can spend -- a statement about the arrival the queue
--- is about to hand it.
---
--- AND THE TWO LEAVES BELOW ARE THE SEED AND THE STEP.  Neither is a
--- fact about a walk: the seed is what the subscribe burst leaves in the
--- queue, and the step is what a cascade leaves in it.  What both are
--- really about is the QUEUE -- so the shape they are stated in is
--- provisional, and the repair the refutation points at is a field on
--- the invariant the queue already satisfies rather than a pair of
--- statements about its head.
-postulate
-  burst-clos : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    let r  = subscribeE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-        sc = proj₁ (proj₂ r)
-    in ∀ (a : Arrival Γ) (sc′ : Sched Γ) → sched-next sc ≡ inj₂ (a , sc′) →
-       nestClosOK?ᵛ (capsAt e (Sched.slots sc) 1) (Sched.slots sc)
-                    (arrTy a) (arrVal a) ≡ true
-
-  drain-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : Id) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    let sc = proj₁ (proj₂ (cascade a id sched st))
-    in ∀ (b : Arrival Γ) (sc′ : Sched Γ) → sched-next sc ≡ inj₂ (b , sc′) →
-       nestClosOK?ᵛ (capsAt e (Sched.slots sc) (suc id)) (Sched.slots sc)
-                    (arrTy b) (arrVal b) ≡ true
-
 drain-dry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (fuel : Fuel) (id : Id) (sched : Sched Γ) (st : EvalSt e) →
   INV? (ΨAt e (Sched.slots sched)) (sizeCapAt e (Sched.slots sched) id)
        sched st ≡ true →
   capsOK? (capsAt e (Sched.slots sched) id) sched st ≡ true →
   nestOK? e (Sched.slots sched) id sched st ≡ true →
-  (∀ (a : Arrival Γ) (sched′ : Sched Γ) → sched-next sched ≡ inj₂ (a , sched′) →
-     nestClosOK?ᵛ (capsAt e (Sched.slots sched) id) (Sched.slots sched)
-                  (arrTy a) (arrVal a) ≡ true) →
   hasDry (drain {e = e} fuel id sched st) ≡ false
-drain-dry zero    id sched st inv cOK nOK clos = refl
-drain-dry (suc k) id sched st inv cOK nOK clos with sched-next sched in eq
+drain-dry zero    id sched st inv cOK nOK = refl
+drain-dry (suc k) id sched st inv cOK nOK with sched-next sched in eq
 ... | inj₁ _            = refl
-drain-dry {e = e} (suc k) id sched st inv cOK nOK clos | inj₂ (a , sched′) =
+drain-dry {e = e} (suc k) id sched st inv cOK nOK | inj₂ (a , sched′) =
   let Ψ = ΨAt e (Sched.slots sched)
       B = sizeCapAt e (Sched.slots sched) id
       C = capsAt e (Sched.slots sched) id
@@ -2164,7 +2203,7 @@ drain-dry {e = e} (suc k) id sched st inv cOK nOK clos | inj₂ (a , sched′) =
       closC′ = subst
                  (λ sl → nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true)
                  (sym (pop-slots sched eq))
-                 (clos a sched′ refl)
+                 (pop-head-clos C sched st eq cOK)
       (dry₁ , inv″ , caps″ , nest″) =
         cascade-wet-via-caps a id sched′ st inv′ val′ caps′ nest′ harr′ valC′ closC′
   in hasDry-append (proj₁ (cascade a id sched′ st)) _
@@ -2174,8 +2213,7 @@ drain-dry {e = e} (suc k) id sched st inv cOK nOK clos | inj₂ (a , sched′) =
          (proj₂ (proj₂ (cascade a id sched′ st)))
          inv″
          caps″
-         nest″
-         (drain-clos id a sched′ st))
+         nest″)
 
 -- THE THEOREM.  Same face as .Wet's `budget-sufficient` — it does not
 -- move.  Only the interior changes: it now also seeds and carries
@@ -2190,7 +2228,7 @@ budget-sufficient fuel e ins =
                        (sched-init e ins) (st-init e)))
     _
     (burst-dry e ins)
-    (drain-dry fuel 1 sched₁ st₁ (burst-bounded e ins) caps₁ nest₁ (burst-clos e ins))
+    (drain-dry fuel 1 sched₁ st₁ (burst-bounded e ins) caps₁ nest₁)
   where
   sched₁ = proj₁ (proj₂ (subscribeE (budgetAt e ins 0) e root 0 0
                                     (sched-init e ins) (st-init e)))
