@@ -65,5 +65,5 @@ open import Probed.Thru-Arr-Slot
 
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
-         third2Figs≡; cornerFigs≡; rootWideFigs≡)
+         third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡)
 

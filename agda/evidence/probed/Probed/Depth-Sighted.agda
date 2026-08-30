@@ -26,17 +26,23 @@
 -- terminate even natively -- so these are conclusion-side rows, which
 -- is the coverage this can have rather than a gap in the sweeping.
 -- TARGET: sight-all @af40e1
+-- TARGET: sight-scan @d7eb02
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 
-open import Data.Nat using (ℕ; _+_; _*_)
+open import Data.Nat using (ℕ; suc; _+_; _*_)
 open import Data.List using (length; map)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Closed; natᵗ; sizeᵛ; sizeᵉ)
+open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ;
+  ofᵉ; scanᵉ; mergeAllᵉ; input; varᵗ; inlᵗ; caseᵗ; fstᵗ; strmᵗ; nat̂; emptyᵉ; Tm)
+open import Data.Maybe using (nothing)
+open import Data.List using ([]; _∷_) renaming (map to mapL)
+open import Data.List.Relation.Unary.Any using (here)
+open import Data.Fin using (zero)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
@@ -307,3 +313,62 @@ thirdFigs≡ = refl
 third2Figs≡ = refl
 cornerFigs≡ = refl
 rootWideFigs≡ = refl
+
+
+-- ── THE SCAN'S OWN SEED, which is the one shape the corpus above has
+-- no example of.  Every family there folds from a seed weighing
+-- nothing, so the install a scan makes is free and the clause's
+-- arithmetic never shows.  This one seeds from the term
+-- `Refuted.Eval-Seed-Nest` is built around -- a `caseᵗ` whose branch
+-- names its bound observable on both sides of a sum -- so the node the
+-- scan installs is strictly deeper than the seed's own charge, which is
+-- the state the clause cannot pay for.
+--
+-- LOAD-BEARING, and it is the clause's OWN statement that is read: the
+-- program's head is the scan, so the root call is the leaf at the empty
+-- path rather than an assembly that happens to contain one.  The row
+-- fails exactly when the ceiling loses to the descent at the shape
+-- whose local route is known dead, which is what decides whether the
+-- statement needs restating or only a different decomposition.
+
+-- the scrutinee, wrapped `d` deep, so the seed's own nesting is an AXIS
+-- rather than a constant
+deep : ℕ → Closed Γ₂ natᵗ
+deep 0       = ofᵉ (nat̂ 0 ∷ [])
+deep (suc d) = mergeAllᵉ nothing (ofᵉ (strmᵗ (deep d) ∷ []))
+
+seedTm : ℕ → Tm Γ₂ [] [] [] (obs (obs natᵗ))
+seedTm d =
+  caseᵗ {s = obs natᵗ} {t = obs natᵗ}
+    (inlᵗ (strmᵗ (deep d)))
+    (strmᵗ (scanᵉ (fstᵗ (varᵗ (here refl)))
+                  (varᵗ (here refl))
+                  (mergeAllᵉ nothing (ofᵉ (varᵗ (here refl) ∷ [])))))
+    (strmᵗ emptyᵉ)
+
+-- THE PROGRAM'S HEAD IS THE SCAN ITSELF, so the root call IS the
+-- clause's statement at the empty path rather than a reading of the
+-- assembly that happens to contain one
+progSeed : ℕ → Closed Γ₂ (obs (obs natᵗ))
+progSeed d = scanᵉ (fstᵗ (varᵗ (here refl))) (seedTm d) (input zero)
+
+descSeed : ℕ → ℕ
+descSeed d =
+  depthE (budgetAt (progSeed d) slotsT 0) (progSeed d) root 0 0
+         (sched-init (progSeed d) slotsT) (st-init (progSeed d))
+
+sightSeed : ℕ → ℕ
+sightSeed d =
+  sightCeil (sizeᵉ (progSeed d)) (nestDᵉ (progSeed d))
+            (storeNestMax (sched-init (progSeed d) slotsT) (st-init (progSeed d)))
+            (nestUnit (progSeed d) slotsT)
+
+-- the shallow seed and a seed four layers deep, packed together: two
+-- ceilings and two descents, so one build says whether the margin
+-- narrows as the seed's own nesting grows
+seedFigs : ℕ
+seedFigs = ((sightSeed 4 * 1000 + descSeed 4) * 1000000
+            + sightSeed 1) * 1000 + descSeed 1
+
+seedFigs≡ : seedFigs ≡ 608003000260003
+seedFigs≡ = refl

@@ -87,7 +87,11 @@ postulate
 -- against the initial nesting cap, which is `suc` of the program's own
 -- nesting plus its vocabulary's -- an exponential in the program does
 -- not fit under it.  So the repair is neither the trade nor a wider
--- measure, and what to charge the install to is open.
+-- measure.  What the ceiling turns out to have is room -- two orders of
+-- magnitude of it at that very shape, widening as the seed deepens --
+-- so what is missing is a decomposition that reaches it, not a bound.
+-- The room is in the SIZE factor, which the local accounting never
+-- touches because it compares summand against summand.
 --
 -- REFUTED: `Refuted.Eval-Seed-Nest` is the witness -- a `caseᵗ` whose
 --   left branch names its bound observable both as a fold's SEED and
@@ -95,6 +99,15 @@ postulate
 --   term that charges two, with the gap growing as the occurrence
 --   count.  `Refuted.Apply-Fn-Nest` is the same failure with an
 --   explicit payload rather than an empty environment.
+-- PROBED: `Probed.Depth-Sighted` reads THIS leaf at the empty path --
+--   the program's head is the scan -- on a seed of exactly the refuted
+--   shape, at scrutinee depths one and four: three against two hundred
+--   and sixty, and three against six hundred and eight.  So the
+--   statement survives the shape that killed its route, and the margin
+--   WIDENS along the seed's own axis, the descent not moving with it at
+--   all.  Not covered: any path other than the empty one, any slot
+--   vocabulary but the one that connects late, and every instant past
+--   the entry.
 postulate
   sight-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (f : _) (z : _) (b : Closed Γ s) (κ : Path Γ u t)
