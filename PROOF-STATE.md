@@ -216,15 +216,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the round the sink's ring runs in, which is the last thing it does
-  not have** — the ring is now a body end to end, and `sink-round-entry`
-  is what it is entered with: a position, a round's gas, and a `Reached`
-  at the base. `WalkHyps` carries a FLAT ladder at the sink head, so
-  none of it comes off the walk's own hypotheses. The leg is to find
-  where a round is actually established — the cascade seeds one at
-  `arr-chains-caps` from `base` and a registry count — and ask whether
-  the sink can seed its own the same way, or whether the walk's
-  hypotheses have to carry a round at every head.
+- **the gas floor the sink's nested round runs on** — carrying the
+  walk's own round in `WalkHyps` and handing it to the ring was tried
+  and does not close `sink-round-entry`: the chain the sink sits in
+  already occupies a position, so the ring gets the round `Reached`
+  reaches FROM its level, and that costs a gas. A CONSTANT floor
+  survives one nesting and no more. The counter that does decrease is
+  the walk's own GAS — the depth mirror spends one at exactly this head
+  — so the floor becomes `constants + gas ≤ g` and reproduces itself
+  across a nesting for free. The leg is that restatement: the round
+  package into `WalkHyps` and `RingState`, the two ladder consumers
+  rebuilt off it, and the seed lemma the bigger floor now needs.
 
 - **the base cap the registry is priced under, which is what both
   subscribing leaves are really about** — the frame heads are bodies
@@ -255,8 +257,8 @@ does not fit is a finding about the shared statement, not about the head.
   is the frame-local half.
 - **`subscribeInner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
   subscribe preserving the registry's BASE-cap pricing. The immediate entry has
-  the walked path's length; the recursive ones can push frames of their own, and
-  those are priced at the level's cap rather than the base.
+  the walked path's length; the recursive ones can push frames of their own,
+  and those are priced at the level's cap rather than the base.
 - **`mergeAllDrain-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
   same across a bounded `mergeAll`'s drain, which is the one arm of an inner's
   finish that can subscribe — a queued inner takes the lane just freed.
@@ -270,17 +272,19 @@ does not fit is a finding about the shared statement, not about the head.
   later, which is what the instant loop's recursion asks for. Same provisional
   shape, and it goes with `burst-clos` when the queue's invariant carries it.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a frame
-  preserving the closure reading of the values it REBUILDS — a template applied,
-  a scan folded, a wrapper put round an inner. Without it the walk's new
-  conjunct dies at the first hop; deriving it from the caps receipt is refuted.
-- **`sink-round-entry`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the round the
-  sink's ring runs in. `WalkHyps` carries a flat ladder at the sink head, which
-  is enough for a path and not for a recursion over registrations; the position
-  and the round's gas are not recoverable from a level bound.
-- **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
-  a round's descent under its sighted nesting scaled by the program's size.
-  Both axes are now read at three instants and at the corner where they
-  compound, and the margin WIDENS with the instant.
+  preserving the closure reading of the values it REBUILDS — a template
+  applied, a scan folded, a wrapper put round an inner. Without it the walk's
+  new conjunct dies at the first hop; deriving it from the caps receipt is
+  refuted.
+- **`sink-round-entry`** (Caps-Face/Part7) — SHAPE, `DEAD ROUTE`: the round the
+  sink's ring runs in, which is NESTED and not the walk's own — so it costs a
+  gas, and the walk's constant floor pays for exactly one nesting. The floor
+  wants indexing by whatever measure decreases per round; the depth one does
+  not.
+- **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
+  `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
+  program's size. Both axes are now read at three instants and at the corner
+  where they compound, and the margin WIDENS with the instant.
 - **`sight-all`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain, one leaf
   for all three `*All` heads — they delegate to the same family and wrap the
   subject in one level each. Now stratified like its parent, so it carries the

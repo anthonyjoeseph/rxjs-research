@@ -3267,6 +3267,38 @@ sink-ring-go {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) Lv J g k
 -- entered with.  Neither is recoverable from a level bound, so the
 -- entry package is stated here and the finding is that `WalkHyps` is
 -- flat where the sink head needs it round.
+--
+-- AND THE ROUND IT WANTS IS NESTED, SO THE FLOOR IS THE PART THAT IS
+-- WRONG.  The ring's round is the one `Reached` arrives at FROM the
+-- chain's own level, and that constructor takes a gas: from a round at
+-- `suc g` it reaches one at `g`.  A CONSTANT floor -- four plus the
+-- program, the context size, the walk's gas -- therefore survives one
+-- nesting and no more.  What the walk has to carry is a floor with room
+-- for every nesting still to come, which is a quantity in the same
+-- currency as whatever counts the nestings.  The depth premise beside
+-- it is not that: the ring is handed the same bound the walk holds, so
+-- it cannot be spent as the counter.
+--
+-- AND THE COUNTER IS THE WALK'S OWN GAS, which is already a parameter
+-- of every statement here.  The depth mirror spends one at exactly this
+-- head and nowhere else -- the dispatch measure is defined by matching
+-- a `suc` and handing the ring the predecessor -- and the caps face
+-- matches the same `suc` in the same place.  So a floor of the form
+-- `<constants> + gas ≤ g` reproduces itself across a nesting for free:
+-- the nested round runs at one less gas AND one less `g`, and the two
+-- decrements cancel.  What that costs is the seed, which now has to
+-- clear the constants plus the initial gas rather than the constants
+-- alone.
+--
+-- DEAD ROUTE: carrying the walk's OWN round in `WalkHyps` -- the round
+--   package in place of the flat one -- and handing it to the ring
+--   unchanged.  Everything else about it works: the gas conditions
+--   transfer untouched, the position bound follows from the level
+--   bound, and the admitted list's count comes off the registry's.  The
+--   position is what kills it.  The chain the sink sits in already
+--   OCCUPIES a position of that round, so its registrations cannot be
+--   the next positions of the same one, and sharing is the only thing
+--   that would have made the transfer free.
 postulate
   sink-round-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (gas : ℕ) (i : Fin n)
