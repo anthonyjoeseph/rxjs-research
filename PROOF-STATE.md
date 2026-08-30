@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **spend the exit-cap allowance: retire `RegsBase`'s threading** — the
-  allowance now reads the EXIT cap the whole way up, calibration
-  included, so the walk's own levelled `capsOK?` finally covers the
-  sink's count demand by widening. What is left is the other half of
-  the same move: the length conjunct stops being THREADED and starts
-  being READ, which retires `step-regs-base`'s two subscribing leaves
-  rather than proving them — a preservation lemma cannot supply what an
-  append needs, and never could. Do the deletion before `sink-ring-caps`.
-
 - **the sighted ceiling's OTHER side, at both indices** —
   `cascade-depth-sighted` and `depthE-sighted-root` are one statement
   read at a round and at the entry, and with the height comparison now
@@ -245,6 +236,15 @@ does not fit is a finding about the shared statement, not about the head.
   the parked queue at a bounded `mergeAll`, and let the rows say which
   of the two is a restatement.
 
+- **the two subscribing leaves, now that they are only about SYNTAX** —
+  `thru-regs-base` and `inner-regs-base` no longer owe a count, so what
+  is left of each is that the entry a subscribe appends is priced under
+  the base size cap. A `thru` appends the very path being walked, which
+  the receipt in hand already prices, so that one should fall to the
+  path receipt outright; an inner reaction appends a path built from the
+  inner observable, which it does not, and that is the leaf worth
+  keeping. Split them and find out which.
+
 ### The ledger
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
@@ -263,22 +263,20 @@ does not fit is a finding about the shared statement, not about the head.
   ring at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and all the sink still owes now that
   its opening pair comes off the walk's own registry pricing.
+- **`thru-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a `thru`
+  frame's subscribe preserving the registry's base-cap pricing, now that the
+  count is read rather than threaded and only the SIZE half is left. What it
+  appends is the path being walked, which the receipt in hand already prices.
+- **`inner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same at
+  an inner reaction, and the harder of the two — what it appends is built from
+  the INNER observable, which no receipt in hand prices.
+- **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
+  across a sink's fan-out, which is the arm the path induction hands off — the
+  ring's obligation rather than a frame's.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
-- **`thru-regs-base`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: a `thru`
-  frame's subscribe preserving the registry's base-cap pricing. The path half
-  is priced; the LENGTH half cannot be, since the subscribe appends and the cap
-  it is held under does not move. Restate before touching it.
-- **`inner-regs-base`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the same at
-  an inner reaction, which owes the length half for the same reason and the
-  path half for one more — what it appends is built from the INNER observable,
-  which no receipt in hand prices.
-- **`dispatch-regs-base`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the same
-  across a sink's fan-out, which is the arm the path induction hands off — the
-  ring's obligation rather than a frame's. It inherits whatever index the
-  restatement gives the other two.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that
