@@ -2600,6 +2600,32 @@ postulate
 -- -- so the single content here is the frame that REGISTERS: what it
 -- appends must be priced under the base cap, which is a claim about
 -- program syntax rather than about the level the frame sits at.
+--
+-- ⚠ AND THE SECOND CONJUNCT IS AT THE WRONG INDEX, WHICH IS WHY THE TWO
+-- SUBSCRIBING LEAVES CANNOT BE PROVEN AS THEY STAND.  A subscribe
+-- APPENDS -- `register` puts one entry on the end per source leaf it
+-- reaches -- and the only thing a caller hands in is that the length
+-- was already under the cap.  From that, a conclusion needing the
+-- length PLUS the registrations to sit under the SAME cap has no
+-- source: nothing in either leaf's hypotheses bounds how many entries
+-- the subscribe adds, and the cap does not move.  That is the
+-- hypotheses-cannot-supply-the-conclusion shape, and the tell is the
+-- one that shape usually carries -- an index, not a missing fact.
+--
+-- EVERY NEIGHBOURING QUANTITY IS LEVELLED AND THIS ONE IS FLAT.  The
+-- walk carries its caps at the frame's own stepped cap, whose registry
+-- field grows as it descends, and the cascade bounds its chain count by
+-- the registry allowance read at the round ledger's level.  Between
+-- those two sits a length bound frozen at the instant's entry cap,
+-- threaded unchanged across frames and across chains that register.
+--
+-- DEAD ROUTE: giving this predicate the level the chain count already
+--   uses does NOT repair it.  The consumer holds that level FIXED
+--   across the cascade -- it advances the chain index and reproduces
+--   the ledger at the same level -- so the levelled allowance has
+--   exactly as much room at the point the invariant is threaded as the
+--   flat one does.  The allowance a registration spends has to come
+--   from somewhere the cascade fold actually moves.
 RegsBase : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (st : EvalSt e) → Set
 RegsBase {e = e} sl id st =

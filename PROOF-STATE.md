@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two subscribes that owe the registry's base-cap pricing** —
-  the walk carries that pricing and three leaves still owe its
-  preservation; the `take` dispatch is discharged, and it went by the
-  two sublist lemmas the registry already had rather than by anything
-  about the level it sits at. A sink's fan-out should go the same way,
-  moving with the ring. The content is the pair that SUBSCRIBE — a
-  `thru` appends the very path being walked, which the walk holds
-  priced at that cap, so it should fall next; an inner reaction
-  appends a path built from the inner observable, which no receipt in
-  hand prices. That asymmetry is the finding this leg is for.
+- **re-index the registry's length pricing, which cannot be proven
+  where it stands** — a subscribe APPENDS, and the bound it must
+  preserve is frozen at the instant's entry cap while every quantity
+  beside it in the same signature is levelled: the caps at the frame's
+  stepped cap, the chain count at the ledger's registry allowance.
+  Bumping a level into the predicate is a dead route — the cascade
+  holds that level fixed and advances the chain index instead — so
+  this leg finds the allowance the fold actually moves and
+  re-denominates the conjunct at it. The `take` dispatch is discharged
+  and stays so: it only filters, so it is indifferent to the index.
 
 - **re-denominate the nesting ceiling** — the invariant is read again,
   by the height comparison itself, and that is where it fails: the
@@ -276,21 +276,22 @@ does not fit is a finding about the shared statement, not about the head.
   ring at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and all the sink still owes now that
   its opening pair comes off the walk's own registry pricing.
-- **`thru-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a `thru`
-  frame's subscribe preserving the registry's base-cap pricing. What it appends
-  is the very path being walked, which the walk now carries priced at that cap,
-  so this is the leaf that should fall first.
-- **`inner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same at
-  an inner reaction, where what is appended is built from the INNER observable
-  rather than from the walked path — so the receipt in hand does not price it
-  and this is the harder of the two subscribes.
-- **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
-  across a sink's fan-out, which is the arm the path induction hands off — the
-  ring's obligation rather than a frame's, and it moves with `sink-ring-caps`.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
+- **`thru-regs-base`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: a `thru`
+  frame's subscribe preserving the registry's base-cap pricing. The path half
+  is priced; the LENGTH half cannot be, since the subscribe appends and the cap
+  it is held under does not move. Restate before touching it.
+- **`inner-regs-base`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the same at
+  an inner reaction, which owes the length half for the same reason and the
+  path half for one more — what it appends is built from the INNER observable,
+  which no receipt in hand prices.
+- **`dispatch-regs-base`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the same
+  across a sink's fan-out, which is the arm the path induction hands off — the
+  ring's obligation rather than a frame's. It inherits whatever index the
+  restatement gives the other two.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that
@@ -344,6 +345,7 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
