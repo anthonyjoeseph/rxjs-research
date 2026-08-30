@@ -63,7 +63,7 @@ open import Rx.Evaluator
          installNode; mergeAll-st)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store using (liveNest; slotsNestSum)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 prog : Closed Γ₂ natᵗ
 prog = ofᵉ (nat̂ 0 ∷ [])

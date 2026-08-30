@@ -817,7 +817,8 @@ WalkLevelCore =
 -- refuting row ~2×10¹² years against a practical ceiling of d·k ≈ 21);
 -- the curve was recorded in the deleted probe's series-Q header (the
 -- `--diff-filter=D` line above finds it); the program family itself
--- survives in `.Demand-Programs`, which `Harness.Main` still runs.  Spell it
+-- survives in `Refuted.Demand-Programs`, out in the evidence tree that
+-- is now its only consumer.  Spell it
 -- "series Q" — the receipt that first cited it wrote "Q-series", which
 -- greps as nothing and cost a review cycle.
 

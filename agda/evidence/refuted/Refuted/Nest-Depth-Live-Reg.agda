@@ -57,10 +57,10 @@ open import Rx.Evaluator
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Slots using (Slots)
 
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; progU; insT)
+open import Refuted.Demand-Programs using (Γ₂; progU; insT)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (pathNestD; storeNestMax; nestSyn)
+  using (pathNestD; storeNestMax; nestUnit)
 
 -- the crossing point: the mergeAll drain under twenty nested folds
 prog : Closed Γ₂ natᵗ
@@ -85,7 +85,7 @@ descent = depthE (budgetAt prog slots 0) prog κ 0 0 sd st
 
 liveReg : ℕ
 liveReg = nestDᵉ prog + pathNestD κ + storeNestMax sd st
-          + length (EvalSt.registry st) * nestSyn prog slots
+          + length (EvalSt.registry st) * (2 * nestUnit prog slots)
 
 -- THE FIGURES, PINNED.  Spelled out rather than left inline so that any
 -- repair moving either measure fails here, naming the number, instead of

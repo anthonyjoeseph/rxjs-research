@@ -50,7 +50,7 @@ open import Rx.Evaluator
   using (Sched; EvalSt; mintNode; installNode; scan-st; sched-init; st-init)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 ----------------------------------------------------------------------
 -- THE WITNESS.  A scan whose seed is a `caseᵗ` returning two copies of

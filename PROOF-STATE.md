@@ -216,48 +216,58 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the height vehicle retired and the positional one put in its
-  place, in ONE commit** (Anthony's ruling) — the depth face pays its
-  bill by calibrating a per-instant ceiling against the caps height,
-  and that calibration is machine-refuted three times over: the
-  obligation itself, a replay through the increment's summand built so
-  that re-denominating only the factor stays dead, and the level-keyed
-  repair at every level the fuel reaches. The third is stated over
-  ARBITRARY fuel, so no larger index escapes. Delete the calibration
-  and its support, keep the nesting invariant, and restate the ceiling
-  in sighted current-instant quantities — the floor lemma already
-  shows the shape.
-
-- **the depth bounds carried relative to a REACHED position, paying
-  the height once at the anchor** — the drain face had this disease
-  and this cure, and the cure converted postulates into theorems on
-  contact. So the restated assembly goes in over POSTULATED leaves
-  first, with the new obligations probed at the defer-headed family
-  that already exposed the unit's slack, before anything is ground.
-  The tripwire is explicit: the compositional row already records both
-  computable readings refuted, so if the positional carry dies there
-  too that is the fourth vehicle death in one region and the
-  convergence test's stop — the question becomes whether the face
-  decomposes rightly at all, not which currency.
-
 - **the two subscribes that owe the registry's base-cap pricing** —
-  the walk now carries that pricing and four leaves owe its
-  preservation. Two are near-mechanical: a `take` dispatch only
-  filters, and a sink's fan-out moves with the ring. The content is
-  the pair that SUBSCRIBE — a `thru` appends the very path being
-  walked, which the walk holds priced at that cap, so it should fall
-  first; an inner reaction appends a path built from the inner
-  observable, which no receipt in hand prices. That asymmetry is the
-  finding, and it is what this leg is for.
+  the walk carries that pricing and three leaves still owe its
+  preservation; the `take` dispatch is discharged, and it went by the
+  two sublist lemmas the registry already had rather than by anything
+  about the level it sits at. A sink's fan-out should go the same way,
+  moving with the ring. The content is the pair that SUBSCRIBE — a
+  `thru` appends the very path being walked, which the walk holds
+  priced at that cap, so it should fall next; an inner reaction
+  appends a path built from the inner observable, which no receipt in
+  hand prices. That asymmetry is the finding this leg is for.
 
+- **re-denominate the nesting ceiling** — the invariant is read again,
+  by the height comparison itself, and that is where it fails: the
+  ceiling's per-instant increment is priced at a delivery square read
+  off the NEXT instant's caps, and the caps step by a blowup the fuel
+  drives, so the ceiling passes the fuel at the first step. What a
+  round actually deepens the store by is a count of the deliveries it
+  MAKES, not of the deliveries it is allowed. Settle the cheaper
+  candidate first, since it would retire this leg outright: the gap
+  the ledger proves is off by one INSTANT rather than off by a scale,
+  and the walk the premise is spent inside already exits at the next
+  instant's caps.
+
+- **the root's fuel comparison, which is now plain arithmetic** — with
+  the ceiling's shape settled, `sight-root≤capsH` reads `suc (size) *
+  suc (three nesting depths) ≤ capsH` at the entry index, and the fuel
+  base already CONTAINS that size beside the slot total and the entry
+  ceiling, with a pooled tower on top of it. Nothing on either side
+  reads a later instant, so the cap-against-fuel mismatch that killed
+  the height vehicle cannot arise here: it is a product against a base
+  that dominates each factor. This is the half of the depth split that
+  should fall without a design decision, and landing it isolates the
+  remaining risk in the delivery-side comparison alone.
 
 ### The ledger
 
-- **`nest-height`** (Nest-Store, inside the seal) — FALSITY,
-  `REFUTED, DEAD ROUTE, RECOVERY`: the arithmetic both depth rows spend; the Σ
-  is UNINHABITED at every key and every story. BLOCKED on a ruling — the cap
-  outgrows the depth it caps, so the repair is a different vehicle, not an
-  index.
+- **`sighted-nest≤capsH`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the whole
+  height comparison, now standing alone. The invariant it is handed holds the
+  store under a cap that is ABOVE the fuel, so a re-denominated ceiling is what
+  has to land here; nothing else in the split touches the height.
+- **`sight-root≤capsH`** (Caps-Bridge) — FALSITY, `RECOVERY×2`: the same
+  comparison at the entry, where both sides are syntax — the program's nesting
+  against one `blowH` story over a base cap reading its size. The one instance
+  of the height comparison with no run between the two sides.
+- **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
+  round's descent under its sighted nesting scaled by the program's size. The
+  shape is settled by instantiation on both axes; what no row reaches is any
+  instant past the second, which is where the growth lives.
+- **`depthE-sighted-root`** (Caps-Bridge) — FALSITY, `REFUTED, PROBED`: the
+  same statement at the entry, where the store is the initial one. Read at fold
+  depths two and twenty with two orders of margin; the risk left is every
+  program shape the corpus does not carry.
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
@@ -274,9 +284,6 @@ does not fit is a finding about the shared statement, not about the head.
   an inner reaction, where what is appended is built from the INNER observable
   rather than from the walked path — so the receipt in hand does not price it
   and this is the harder of the two subscribes.
-- **`take-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same at
-  a `take` dispatch, which only ever filters the registry, so an `all`-shaped
-  receipt and a length bound both survive it by construction.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's, and it moves with `sink-ring-caps`.
@@ -284,10 +291,6 @@ does not fit is a finding about the shared statement, not about the head.
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
-- **`cascade-nest-flat`** (Caps-Face/Part7) — DIFFICULTY, `DEAD ROUTE, PROBED`:
-  the cascade descent against a ceiling every term of which computes. The
-  statement the proof spends is now a body over it, carried back by a power of
-  two under the sealed factor.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that
@@ -334,10 +337,6 @@ does not fit is a finding about the shared statement, not about the head.
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`depth-nest-compositional`** (Caps-Bridge) — DIFFICULTY,
-  `REFUTED×2, PROBED`: the subscribe-side depth induction, width-denominated.
-  Both computable readings are refuted — one charge, and the live registry
-  count — so the bound must name the sealed increment, which no probe reaches.
 - **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `TWIN`: every stage
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
@@ -530,3 +529,4 @@ critical path.
   no receipt at all.
 - **FFI, permanently trusted** — `_>>=_`/`getContents`/`putStr` (CLI/IO),
   `randFold`/`natMod` (QuickCheck). Carried, not counted.
+

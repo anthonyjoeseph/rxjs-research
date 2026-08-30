@@ -47,7 +47,7 @@ open import Rx.Evaluator using
   (Sched; EvalSt; Arrival; Path; root; _↠_; take-f; arrTy; sched-init; st-init)
 open import Rx.Slots using (Slots)
 
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; progU; insF)
+open import Refuted.Demand-Programs using (Γ₂; progU; insF)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; capsAt; capsH; sizeCount; frameStep; frameStep-0; frameStep-mono-j;
    2≤capsAt-size; _⊑ᶜ_)

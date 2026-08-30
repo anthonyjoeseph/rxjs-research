@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE NESTING CURRENCY CANNOT SIT UNDER THE CAPS HEIGHT, so the one
--- arithmetic obligation the whole nesting cap rests on is FALSE, and
--- the postulate holding it up is false with it.
+-- arithmetic obligation a per-instant calibration of the cap would rest
+-- on is FALSE, and so is the level-keyed repair of it.
 --
 -- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE`
@@ -58,11 +58,9 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; +-comm; +-suc; +-monoˡ-≤; +-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n;
    1+n≰n; *-monoˡ-≤; *-monoʳ-≤; *-identityˡ; *-identityʳ; ^-monoʳ-≤)
-open import Data.Product using (Σ; _×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (sym; subst)
 
 open import Rx.Exp using (Ctx; Closed; natᵗ)
-open import Rx.Prim using (towerℕ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator using
   (fLvl; fCharge; widAt; sizeAt; iterSize; sizeStep; fLvlD; sLvlD; opIterD; fLvlD-0; fLvlD-suc;
@@ -70,15 +68,15 @@ open import Rx.Evaluator using
 open import Verify-Budget-Sufficient.Measures using (n<2^n)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; capsAt; capsH; frameStep; frameBlowup; sizeCount; sizeCount-body; cDel; cDel-body;
-   1≤dCapᶜ; 2≤capsAt-size; 1≤capsAt-reg; tower-le-blowH;
+   1≤dCapᶜ; 2≤capsAt-size; 1≤capsAt-reg;
    sIterD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; iterL-infl)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; cSize≤delSq)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-room)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nestCapAt; nestCapAt-suc; nestFacAt; nestFacAt-def; 1≤nestFacAt; nestIncAt;
    nestIncAt-def; nestUnit; size≤nestIncAt; realWidAt; realWidAt-def;
-   nestBurstAt; 1≤nestBurstAt; capsHpred; capsH-blow; 1≤capsHpred)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₀; ins₀; progD)
+   nestBurstAt; 1≤nestBurstAt)
+open import Refuted.Demand-Programs using (Γ₀; ins₀; progD)
 
 ----------------------------------------------------------------------
 -- ONE.  THE DEPTH FUEL IS INSIDE THE LEVEL.  `fLvlD` at depth `suc d`
@@ -418,27 +416,3 @@ nestCap-level-absurd pr =
   e = progD 0 0
   sl : Slots Γ₀
   sl = ins₀
-
-----------------------------------------------------------------------
--- AND THE POSTULATE ITSELF.  `nest-height` is the sole support of the
--- obligation above -- the composition is `tower-le-blowH` at the height
--- the Σ hands back -- so refuting the obligation refutes the postulate,
--- and the replay below says so in code rather than in prose.
-----------------------------------------------------------------------
-
-NestHeight : Set
-NestHeight = ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  Σ ℕ λ h →
-    (2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ towerℕ h)
-    × (suc h ≤ towerℕ (capsHpred e sl id))
-
-nest-height-absurd : NestHeight → ⊥
-nest-height-absurd nh = nestCap-3≤capsH-absurd replay
-  where
-  replay : NestCapCapsH
-  replay e sl id =
-    ≤-trans (proj₁ (proj₂ (nh e sl id)))
-            (subst (towerℕ (proj₁ (nh e sl id)) ≤_) (sym (capsH-blow e sl id))
-               (tower-le-blowH (proj₁ (nh e sl id)) (capsHpred e sl id)
-                               (1≤capsHpred e sl id)
-                               (proj₂ (proj₂ (nh e sl id)))))

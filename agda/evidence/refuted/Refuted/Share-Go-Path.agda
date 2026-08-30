@@ -53,7 +53,7 @@ open import Rx.Evaluator
   Path; RegId)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 prog : Closed Γ₂ natᵗ
 prog = input fzero

@@ -63,7 +63,7 @@ open import Rx.Evaluator
 open import Verify-Budget-Sufficient.Nest-Store using (frameNestF; nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nodesMax; nestDᵛˢ; frameNestD)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 ----------------------------------------------------------------------
 -- THE WITNESS.  `Refuted.Step-Frame-Nest-Dup`'s pair -- a payload forty

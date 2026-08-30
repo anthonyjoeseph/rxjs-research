@@ -72,11 +72,11 @@ open import Rx.Evaluator
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵛ)
 
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; progU; insF; sucGU)
+open import Refuted.Demand-Programs using (Γ₂; progU; insF; sucGU)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthCascade)
 open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (chainsNestD; storeNestMax; nestSyn; nestOK?; nestCapAt)
+  using (chainsNestD; storeNestMax; nestUnit; nestOK?; nestCapAt)
 
 prog : Closed Γ₂ natᵗ
 prog = progU 8 2
@@ -112,7 +112,7 @@ row with sched-next (proj₁ after1)
       g   = cascadeGo a 2 ch sd stL
   in depthCascade a 2 ch sd stL
    , (nestDᵛ (arrTy a) (arrVal a) + chainsNestD ch
-      + storeNestMax sd stL + delivN stL (proj₂ (proj₂ g)) * nestSyn prog sl)
+      + storeNestMax sd stL + delivN stL (proj₂ (proj₂ g)) * (2 * nestUnit prog sl))
    , nestOK? prog sl 2 sd stL
    , (nestDᵛ (arrTy a) (arrVal a) ≤ᵇ nestCapAt prog sl 2)
 

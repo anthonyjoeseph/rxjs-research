@@ -38,8 +38,8 @@ open import Rx.Evaluator
          cascade; cascadeLatch; chainsOf)
 open import Rx.Slots using (Slots)
 
-open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progU; progC; progF; insF; sucGU; sucGC; sucGF)
+open import Refuted.Demand-Programs
+  using (Γ₂; progU; progF; insF; sucGU; sucGF; progC; sucGC)
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; regsNestMax)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax)

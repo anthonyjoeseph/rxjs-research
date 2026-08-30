@@ -42,7 +42,7 @@ open import Rx.Evaluator
          mergeAll-st; shareGo; share-sink; Path; RegId; Chain; Sched)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; chainsNestD)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 prog : Closed Γ₂ natᵗ
 prog = input fzero

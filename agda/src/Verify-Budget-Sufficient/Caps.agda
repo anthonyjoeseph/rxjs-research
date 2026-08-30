@@ -1520,30 +1520,6 @@ capsAt-tower e sl (suc id) =
 tower-3 : ∀ (h x : ℕ) → x ≤ towerℕ h → 2 ^ (2 ^ (2 ^ x)) ≤ towerℕ (3 + h)
 tower-3 h x le = ^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 le))
 
--- i ≤ dWalkᶜ S W R d g J i
-i≤dWalkᶜ : ∀ (S W R d g J i : ℕ) → i ≤ dWalkᶜ S W R d g J i
-i≤dWalkᶜ S W R d g J zero    = z≤n
-i≤dWalkᶜ S W R d g J (suc i) =
-  let w = dWalkᶜ S W R d g J i
-      D = dCapᶜ S W R d g (lvls S W d J (suc w))
-  in ≤-trans (s≤s (i≤dWalkᶜ S W R d g J i))
-     (≤-trans (s≤s (m≤m+n w D))
-              (≤-reflexive (sym (+-suc w D))))
-
--- M ≤ dCapᶜ M M M d (suc M) 0 — the count the pool iterates is at least
--- the pooled field itself
-M≤dCapᶜ : ∀ (M d : ℕ) → M ≤ dCapᶜ M M M d (suc M) 0
-M≤dCapᶜ M d =
-  ≤-trans (≤-reflexive (sym (*-identityʳ M)))
-          (i≤dWalkᶜ M M M d M 0 (regAt M M 0))
-
-1≤towerℕ : ∀ m → 1 ≤ towerℕ m
-1≤towerℕ zero    = ≤-refl
-1≤towerℕ (suc m) = ≤-trans (s≤s z≤n) (k≤towerℕ (suc m))
-
-2≤towerℕ : ∀ m → 1 ≤ m → 2 ≤ towerℕ m
-2≤towerℕ m 1≤m = ≤-trans (≤-reflexive refl) (towerℕ-mono {1} {m} 1≤m)
-
 -- THE LEAF: one level step at least exponentiates.  `dLvl` runs `fLvlD`
 -- `suc (sizeAt S J)` times from `J`, and `fLvlD` is inflationary by at
 -- least one, so the step clears `sizeAt S J` — which is `iterSize S J S`,
@@ -1568,40 +1544,6 @@ J+n≤iterL S W d (suc n) J =
   (≤-trans (+-monoˡ-≤ n (sucJ≤fLvlD S W d J))
            (J+n≤iterL S W d n (fLvlD S W d J)))
 
--- (3) THE GROWTH IS IN THE COUNT, NOT IN THE STEP, which is the whole
--- reason a level step outruns the linear reading: `sizeStep S s` is
--- `S * suc (2 * s)`, so it at least DOUBLES for `2 ≤ S`, and `sizeAt S J`
--- iterates it J times.
-2s≤sizeStep : ∀ (S s : ℕ) → 2 ≤ S → 2 * s ≤ sizeStep S s
-2s≤sizeStep S s 2≤S =
-  ≤-trans (*-monoʳ-≤ 2 (≤-trans (s≤2s s) (n≤1+n (2 * s))))
-          (*-monoˡ-≤ (suc (2 * s)) 2≤S)
-
-exp-iterSize : ∀ (S k s : ℕ) → 2 ≤ S → 2 ^ k * s ≤ iterSize S k s
-exp-iterSize S zero    s 2≤S = ≤-reflexive (*-identityˡ s)
-exp-iterSize S (suc k) s 2≤S =
-  ≤-trans (≤-reflexive shuffle)
-  (≤-trans (*-monoʳ-≤ (2 ^ k) (2s≤sizeStep S s 2≤S))
-           (exp-iterSize S k (sizeStep S s) 2≤S))
-  where
-  shuffle : 2 ^ suc k * s ≡ 2 ^ k * (2 * s)
-  shuffle = trans (cong (_* s) (*-comm 2 (2 ^ k))) (*-assoc (2 ^ k) 2 s)
-
-exp≤sizeAt : ∀ (S J : ℕ) → 2 ≤ S → 2 ^ J ≤ sizeAt S J
-exp≤sizeAt S J 2≤S =
-  ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ J))))
-                   (*-monoʳ-≤ (2 ^ J) (≤-trans (s≤s z≤n) 2≤S)))
-          (exp-iterSize S J S 2≤S)
-
--- (4) ONE LEVEL STEP AT LEAST EXPONENTIATES: `dLvl` runs `fLvlD`
--- `suc (sizeAt S J)` times from J, each worth a level, and the count
--- alone already clears `2 ^ J`.
-exp≤dLvl : ∀ (S W d J : ℕ) → 2 ≤ S → 2 ^ J ≤ dLvl S W d J
-exp≤dLvl S W d J 2≤S =
-  ≤-trans (exp≤sizeAt S J 2≤S)
-  (≤-trans (≤-trans (n≤1+n (sizeAt S J)) (m≤n+m (suc (sizeAt S J)) J))
-           (J+n≤iterL S W d (suc (sizeAt S J)) J))
-
 -- AND THE COUNT DOMINATES THE SIZE FIELD ITSELF, which is what lets a
 -- descent's own written size be spent as a LEVEL.  One delivery's
 -- ladder starts at `sizeAt S 0`, and that IS `S`; `iterL` never goes
@@ -1620,38 +1562,3 @@ size≤sizeCount c d 2≤S 1≤R =
   1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
                          (Caps.cSize c) 0 1≤R)
                 (≤-reflexive (sym (cDel-body c d)))
-
--- THE COUNT BUYS A TOWER, one story per level step -- the level ladder
--- read as growth rather than as a linear advance.
-lvls-tower : ∀ (S W d n : ℕ) → 2 ≤ S → towerℕ n ≤ lvls S W d 0 (suc n)
-lvls-tower S W d zero    2≤S = exp≤dLvl S W d 0 2≤S
-lvls-tower S W d (suc n) 2≤S =
-  ≤-trans (^-monoʳ-≤ 2 (lvls-tower S W d n 2≤S))
-          (exp≤dLvl S W d (lvls S W d 0 (suc n)) 2≤S)
-
--- THE POOL AT ANY HEIGHT THE WIDTH MACHINERY CAN REACH, not merely at its
--- own index: `k` is free, paid for by the count `dCapᶜ` already exceeding
--- `towerℕ m`.
-pool-tower : ∀ (k m : ℕ) → 1 ≤ m → suc k ≤ towerℕ m →
-  towerℕ k ≤ poolCount (towerℕ m) m
-pool-tower k m 1≤m hk =
-  ≤-trans (lvls-tower M M m k 2≤M)
-  (≤-trans (lvls-mono {M} {M} {M} {M} {0} {0} {m} (suc k) N
-              2≤M ≤-refl ≤-refl ≤-refl (≤-trans hk (M≤dCapᶜ M m)))
-           (poolBody≤poolCount M m (1≤towerℕ m)))
-  where
-  M = towerℕ m
-  N = dCapᶜ M M M m (suc M) 0
-  2≤M : 2 ≤ M
-  2≤M = 2≤towerℕ m 1≤m
-
--- THE DELIVERABLE.  `blowH` is `abstract`, so `blowH-body` is the only
--- door.
-tower-le-blowH : ∀ (k m : ℕ) → 1 ≤ m → suc k ≤ towerℕ m → towerℕ k ≤ blowH m
-tower-le-blowH k m 1≤m hk =
-  ≤-trans (pool-tower k m 1≤m hk)
-  (≤-trans (m≤m+n P (P + 0))
-  (≤-trans (m≤n+m (2 * P) (6 + m))
-           (≤-reflexive (sym (blowH-body m)))))
-  where
-  P = poolCount (towerℕ m) m

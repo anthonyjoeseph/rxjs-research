@@ -44,7 +44,7 @@ open import Data.Bool.ListAction using (all)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; widLive)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₀; ins₀; natsD)
+open import Refuted.Demand-Programs using (Γ₀; ins₀; natsD)
 
 -- the predicate as it stood: the pending-width bound over the live
 -- list conjoined onto the nodes conjunct `nestCapsOK?` still carries

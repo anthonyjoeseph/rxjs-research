@@ -52,7 +52,7 @@ open import Rx.Evaluator
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; pathNestF; nodeNest)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
 slots = insT 0 0 0

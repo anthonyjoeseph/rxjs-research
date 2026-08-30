@@ -51,7 +51,7 @@ open import Rx.Exp
   using (natᵗ; obs; Fn; Val; applyFn;
          ofᵉ; mapᵉ; switchAllᵉ; varᵗ; nat̂; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂)
+open import Refuted.Demand-Programs using (Γ₂)
 
 -- a payload one `*All` layer deep
 v : Val Γ₂ (obs natᵗ)

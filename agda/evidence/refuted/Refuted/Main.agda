@@ -120,11 +120,19 @@ open import Refuted.Nest-Cap-Height
   using (fLvlD-depth; d≤dLvl; d≤lvls; d≤sizeCount; suc≤sizeStep; add≤iterSize;
          fuel≤blowup; capsH≤levels; capsH≤size; size<fac; fac≤cap; capsH<inc; inc≤cap; level-step; level-crosses;
          NestCapCapsH; nestCap-3≤capsH-absurd; nestCap-3≤capsH-absurd-inc;
-  NestLevelKeyed; nestCap-level-absurd;
-         NestHeight; nest-height-absurd)
+  NestLevelKeyed; nestCap-level-absurd)
 open import Refuted.Chain-Step-Flat
   using (cap; row; latched≡true; pre≡true; post≡false; chain-step-flat-absurd)
 open import Refuted.Frame-Step-Compose
   using (c₀; FrameStepCompose; frameStep-compose-absurd)
 open import Refuted.Nest-Clos-Flat
   using (syntaxes≡; closures≡; premise; broken; nest-clos-flat-absurd)
+
+-- THE CUT AND WRAP FAMILIES ARE CLAIMED HERE AND CONSUMED BY THE PROBE
+-- TREE.  A program family is infrastructure rather than a witness, and
+-- the probe tree cannot hold it: every file under `probed/` must name a
+-- live target, which a family of programs has none of.  So it lives out
+-- here, and the claim root says so rather than letting reachability
+-- report it as dead weight.
+open import Refuted.Demand-Programs
+  using (progC; sucGC; sucGW)

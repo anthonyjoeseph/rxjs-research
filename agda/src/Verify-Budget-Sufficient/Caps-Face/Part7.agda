@@ -50,15 +50,13 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (chainsNestD; chainsNestF; chainsSzSum; pathNestD; pathNestF; 1≤pathNestF; 1≤chainsNestF;
-  nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestOK?-latch;
-  nestOK?-store; nest-sum-fac; nestFacAt; nestFacAt-def; 1≤nestFacAt; nest-inflate;
-  storeNest-latch; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def; size≤nestIncAt;
-  16≤nestFacAt;
-  m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest; nodeNest;
-  regsNestMax)
+  (chainsNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF; nest-telescope;
+  nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
+  1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
+  size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
+  nodeNest; regsNestMax; sightCeil)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
-  switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
+  switch-st; exhaust-st; setNode; lookupNode; takeVals; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
@@ -94,7 +92,7 @@ open import Verify-Budget-Sufficient.Caps using
   frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; J+n≤iterL; lvls-add;
   lvls-infl; lvls-mono; size≤sizeCount; sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true)
+  (pathLen; reach-reset; ∧-true; cutThrough-len)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -127,7 +125,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
    capsOK?-regs; capsOK?-setNode; dropSweep-caps; face-lift; frameBud;
    FrameFace; lookupNode-caps; pathSz?-len; pathSz?-tail; shareLatch-caps;
    slotsCaps?-capsAt; takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK;
-   walkOK-finish)
+   walkOK-finish; cutThrough-regsSz)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -2616,15 +2614,36 @@ RegsBase {e = e} sl id st =
 -- walked, which the receipt above already prices, while an inner
 -- reaction appends a path built from the inner observable, which it
 -- does not.
-postulate
-  take-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick) (tnid : NodeId)
-    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    RegsBase sl id st →
-    RegsBase sl id
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now (take-f tnid) p vals fin sched st)))))
+-- A `take` DISPATCH ONLY EVER FILTERS, so both halves of the pricing
+-- survive it without any claim about what the frame sits under.  The
+-- one arm that touches the registry replaces it by `cutThrough`'s kept
+-- list, which is a sublist of what it was handed: the `all`-shaped
+-- receipt is closed under that by `cutThrough-regsSz` and the length
+-- can only fall by `cutThrough-len`.  Every other arm rewrites the
+-- nodes map alone.
+take-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick) (tnid : NodeId)
+  (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  RegsBase sl id st →
+  RegsBase sl id
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now (take-f tnid) p vals fin sched st)))))
+take-regs-base {e = e} sl id sf nid now tnid p vals fin sched st (hrsz , hrlen)
+  with lookupNode tnid (EvalSt.nodes st)
+... | nothing                    = hrsz , hrlen
+... | just (scan-st _)           = hrsz , hrlen
+... | just (mergeAll-st _ _ _ _) = hrsz , hrlen
+... | just (switch-st _ _)       = hrsz , hrlen
+... | just (exhaust-st _ _)      = hrsz , hrlen
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | false = hrsz , hrlen
+...   | true  =
+  cutThrough-regsSz (Caps.cSize (capsAt e sl id)) tnid (EvalSt.delivered st)
+    (EvalSt.regWatermark st) (EvalSt.dying st) (EvalSt.registry st) hrsz
+  , ≤-trans (cutThrough-len tnid (EvalSt.delivered st) (EvalSt.regWatermark st)
+               (EvalSt.dying st) (EvalSt.registry st)) hrlen
 
+postulate
   inner-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick)
     (op : AllOp) (allNid : NodeId) (inst : NodeId)
@@ -3185,145 +3204,117 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hdp =
                   (≤-trans (≤-reflexive (sym (sizeCount-body c d)))
                            (m≤m⊔n (sizeCount c d) (Caps.cSize c)))
 
--- ONE CASCADE'S DESCENT AGAINST A COMPUTABLE CEILING, which is what
--- the statement below is now read off.  Every term here computes --
--- the arrival's nesting, the chains' nesting, the store the cascade
--- arrives at, and the arrival's own size -- so a row can print a
--- verdict on this one, which is the whole reason it is stated apart
--- from the statement it carries.
+-- ONE ROUND'S DESCENT AGAINST WHAT THE ROUND CAN SEE.  A cascade
+-- descends by crossing `thru-outer` frames and by draining a bounded
+-- mergeAll, and both crossings are paid for out of structure that is
+-- already present when the round starts: the payload it carries, the
+-- store it walks, and the program's own wrap unit.  `sightCeil` is
+-- that sum scaled by the program's size, and the whole right-hand side
+-- is read at the current instant off the run.
 --
--- THE SIXTEEN IS HEADROOM, NOT A MEASUREMENT.  A power of two sits
--- under the sealed factor at any numeral, since that factor's
--- exponent is a squared burst successor times a product of quantities
--- already proven positive; sixteen is several times the largest least
--- factor any sweep has reported, which is where a bound that must not
--- be re-tuned every time the evaluator moves wants to sit.
+-- WHY THE SCALING IS THE WHOLE CONTENT.  Edge by edge a descent
+-- TRADES: what a frame takes off the subject it puts on the path, so
+-- the bare sum is an equality along the subscribe walk.  The drain is
+-- the one level with no edge to come out of -- it runs under a
+-- `from-inner`, which the path measure charges nothing for -- and a
+-- program whose folds nest spends one per layer.  So the gap grows
+-- with a program parameter the sum does not see.
 --
--- DEAD ROUTE: the same form at a factor of ONE is false at the
---   evaluator.  That is the reading the factor's mere POSITIVITY
---   licenses, and `Harness.Main`'s series Y prints the least factor it
---   actually needs: two across the fan and width families at every
---   depth and width swept, three on the unbounded ones, one only where
---   the store already dominates the descent.  A consumer reaching for
---   the positivity rather than for the exponent therefore gets a
---   refuted statement, and the exponent is what makes any larger
---   numeral available.
+-- AND THE SEEN PARAMETER IS A SIZE, WHICH IS WHY THE SUMMANDS COULD
+-- NOT BE MADE BIGGER.  All three of them are NESTING depths, so none
+-- moves with how many values an instant carries: at two programs
+-- differing only in the delivered count, every quantity this statement
+-- reads is identical while the descent moves by a third.  The size is
+-- the only sighted thing that separates them, and it enters as a
+-- FACTOR because as a summand it is outrun -- one per delivered value
+-- against the descent's eight.
 --
--- PROBED: `Probed.Cascade-Nest-Flat` pins the conclusion by `refl` at
---   three families -- the parked drain read one instant in, the skip
---   branch whose selection outruns its delivery, and a family that
---   delivers on every chain it selects -- each with its chain count
---   and its descent pinned beside the verdict, so no row is reading an
---   empty selection.  NOT covered: any PREMISE, all of which compare
---   against a sealed cap and therefore do not reduce; and any state a
---   root subscribe does not reach.
+-- REFUTED: `Refuted.Cascade-Deliv-Depth` is the delivery-side witness
+--   the ceiling is calibrated against -- a limit-one mergeAll over
+--   three inners, read at the second cascade, whose descent climbs six
+--   per fold layer against the bare sum's four.
+-- PROBED: `Probed.Depth-Sighted` reads this side at the second cascade
+--   along both axes -- fold depths two and eight, delivered counts two,
+--   six and twenty -- and at the width family that drains nothing.
+--   Those rows are what killed the two cheaper shapes: a bare factor of
+--   two fails forty-nine against forty-four, and a size SUMMAND fails
+--   one hundred and ninety-three against one hundred and fourteen at
+--   the far end of the count axis.  Not covered: the premises, which do
+--   not compute, and any instant past the second.
 postulate
-  cascade-nest-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
+      ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
+                  (storeNestMax sched st) (nestUnit e sl)
+
+-- THE SIGHTED CEILING AGAINST THE FUEL, and this is the comparison the
+-- depth face owes the height, now standing alone.  Its two hypotheses
+-- are the invariants a round arrives under, and the statement is that
+-- what they hold the run to fits the instant's own depth fuel.
+--
+-- AND THE INVARIANT IT NEEDS IS NOT THE ONE IT HAS.  `nestOK?` holds
+-- the store under the sealed nesting cap, and that cap is ABOVE the
+-- fuel: the cap's per-instant increment reads a delivery square at the
+-- NEXT instant's caps, and the caps recurrence steps by a blowup driven
+-- by the fuel itself, so the next instant's size already exceeds it.
+-- Every route through the cap therefore loses before any exponent is
+-- reached, which is what the ledger below records three times over.  So
+-- this leaf is where a re-denominated ceiling has to land -- one whose
+-- growth per instant is read off the deliveries a round actually makes
+-- rather than off the budget it is allowed -- and until that ceiling
+-- exists the leaf stands on the hypotheses it can state rather than on
+-- the ones that would discharge it.
+--
+-- AND THERE IS A SECOND CANDIDATE REPAIR, WHICH IS AN INDEX AND NOT A
+-- CURRENCY.  What the ledger below actually proves is that the fuel at
+-- an instant sits under the SIZE at the NEXT one, the caps stepping by
+-- a blowup the fuel itself drives.  That is an off-by-one-instant gap
+-- rather than a scale gap, and the walk this premise is spent inside
+-- already exits at the next instant's caps -- which is why the cap's
+-- own increment reads them.  So the question worth settling before any
+-- currency is rewritten is whether the next instant's size sits under
+-- the next instant's fuel: if it does, the premise is stated one
+-- instant too low and the repair is at the call site.  Nothing here
+-- claims it does -- the two sides are a tower apiece and neither
+-- instantiates.
+--
+-- AND THE MINIMAL DIFF IS THE ONE TO REFUSE: reading the cap's factor
+-- at the current instant while keeping it calibrated against the fuel.
+-- The second replay in the ledger below was built precisely to kill
+-- that, through the increment's summand alone.
+--
+-- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
+--   times -- the calibration through the wrap factor, the same through
+--   the increment alone, and the level-keyed repair at every level the
+--   fuel reaches, which closes the escape through a bigger index.
+postulate
+  sighted-nest≤capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (capsAt e sl id) sched st ≡ true →
     nestOK? e sl id sched st ≡ true →
     nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-      ≤ nestDᵛ (arrTy a) (arrVal a)
-        + chainsNestD (chainsOf a st)
-        + 16 * (storeNestMax sched (cascadeLatch a st)
-                + sizeᵛ (arrTy a) (arrVal a))
+    sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
+              (storeNestMax sched st) (nestUnit e sl)
+      ≤ capsH e sl id
 
-
--- ONE CASCADE'S DESCENT AGAINST THE INSTANT'S OWN GRANT, and it is
--- primitive rather than assembled -- which is a change, and the reason
--- is a CYCLE the walk's level device made visible.
+-- THE ROUND'S DEPTH FITS THE INSTANT'S FUEL, assembled rather than
+-- asserted: the descent goes under what the round can see, and what
+-- the round can see goes under the fuel.  The split is the point -- the
+-- first half is a statement about the evaluator at concrete programs
+-- and the second is arithmetic about two currencies, and only the
+-- second is where the height comparison lives.
 --
--- The route that used to assemble this read the descent's depth off
--- the store the walk PRODUCES and then bounded that store by the
--- instant's grant.  That composition is no longer
--- available, because the store bound now needs a depth bound of its
--- own: a walk widens the caps as it descends, the caps recurrence says
--- the widening ends at the instant's EXIT cap, and the per-store depth
--- unit is therefore priced there -- so the increment's own unit reads
--- `capsAt (suc id)`, and the level that gets it there is bounded by
--- `sizeCount (capsAt id) (capsH id)`, which is exactly a depth premise
--- `depthCascade ≤ capsH`.  Assembling depth from store then requires
--- store from depth.
---
--- The break is to state the depth bound outright rather than through
--- the store, which is what the two sides were always saying anyway:
--- the old assembly rested on a postulated store bound throughout, so
--- nothing that was proven has become assumed.  The delivery side's
--- `cascade-depth-capsH` still assembles FROM this, so the tie back to
--- the syntactic ceiling is unchanged.
---
--- THE FORM IT IS READ OFF IS COMPUTABLE, AND THAT IS WHERE THE RISK
--- NOW SITS.  This statement's right-hand side reads two sealed
--- families, so no row prints a verdict on it directly; the leaf above
--- replaces both by quantities that compute, and the two proven
--- inequalities that carry it back -- a power of two under the factor,
--- the arrival's own size under the increment -- are what this body
--- spends.  So the instantiable statement and the consumable one are
--- separated, and only the first has to be probed.
---
--- RECOVERY: git show ae75251:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda
---   restores the store-mediated assembly and the produced-store
---   statement it spent, for whichever side of the cycle is broken
---   another way.  `git show
---   ae75251:agda/evidence/probed/Probed/Cascade-Nest-Store.agda`
---   restores the instantiation harness that pinned it -- three
---   arrivals reaching the bounded drain and the skip branch -- and
---   `git show ae75251:agda/src/Harness/Main.agda` the prefix sweep
---   that asked whether the store growth saturates.  Neither transfers
---   as it stands: this statement's right-hand side reads two sealed
---   families, so no row prints a verdict on it, only on the forms
---   underneath it.
-cascade-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (capsAt e sl id) sched st ≡ true →
-  nestOK? e sl id sched st ≡ true →
-  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-  depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
-    ≤ nestDᵛ (arrTy a) (arrVal a)
-      + chainsNestD (chainsOf a st)
-      + nestFacAt e sl id
-        * (storeNestMax sched (cascadeLatch a st)
-           + nestIncAt e sl id)
-cascade-nest-compositional {e = e} sl id a nextId sched st slEq cok nok harr hsz =
-  ≤-trans (cascade-nest-flat sl id a nextId sched st slEq cok nok harr hsz)
-          (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a) + chainsNestD (chainsOf a st))
-            (*-mono-≤ (16≤nestFacAt e sl id)
-              (+-monoʳ-≤ (storeNestMax sched (cascadeLatch a st))
-                (≤-trans hsz (size≤nestIncAt e sl id)))))
-
-
--- A CASCADE'S CHAINS ARE A SELECTION FROM THE REGISTRY, which the store
--- measure charges, so this premise does not have to be threaded from the
--- caller: `chainsOf` filters the registry by source and type, and a
--- `⊔`-fold dominates any sublist of what it folds.  The arriving
--- PAYLOAD is the one quantity that genuinely is not in the state — the
--- schedule has already popped it — so that one stays a premise, exactly
--- as `valCaps?` does beside it.
---
-chainsGo-nest : ∀ {n} {Γ : Ctx n} {t} (a : Arrival Γ)
-  (rs : List (RegId × Source × Chain Γ t)) →
-  chainsNestD (chainsGo a rs) ≤ regsNestMax rs
-chainsGo-nest a [] = z≤n
-chainsGo-nest a ((rid , s , (u , p)) ∷ r)
-  with sameSource (arrSource a) s | u ≟ᵗ arrTy a
-... | false | _        = ≤-trans (chainsGo-nest a r) (m≤n⊔m (pathNestD p) (regsNestMax r))
-... | true  | no  _    = ≤-trans (chainsGo-nest a r) (m≤n⊔m (pathNestD p) (regsNestMax r))
-... | true  | yes refl = ⊔-mono-≤ ≤-refl (chainsGo-nest a r)
-
-chainsNest≤store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-  chainsNestD (chainsOf a st) ≤ storeNestMax sched st
-chainsNest≤store a sched st =
-  ≤-trans (chainsGo-nest a (EvalSt.registry st))
-          (m≤n⊔m _ (regsNestMax (EvalSt.registry st)))
-
+-- THE SIZE PREMISE IS CARRIED AND NOT SPENT.  It is the caller's, and
+-- it belongs to the statement rather than to this route: a descent
+-- bounded through the payload's NESTING says nothing about the
+-- payload's size, and the consumers that hand this premise in are
+-- pricing the same arrival on the size axis in the same breath.
 cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →
@@ -3334,17 +3325,9 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ capsH e sl id
-cascade-depth-capsH {e = e} sl id a nextId sched st slEq cok nok harr hsz =
-  ≤-trans (cascade-nest-compositional sl id a nextId sched st slEq cok nok harr hsz)
-          (nest-sum-fac e sl id _ _ _ harr
-            (≤-trans (chainsNest≤store a sched st)
-                     (≤-trans (≤-reflexive
-                                (sym (storeNest-latch a sched st)))
-                              store≤cap))
-            store≤cap)
-  where
-  store≤cap = nestOK?-store e sl id sched (cascadeLatch a st)
-                (trans (nestOK?-latch e sl id a sched st) nok)
+cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz =
+  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps)
+          (sighted-nest≤capsH sl id a sched st hsl hcaps hnest hval)
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
@@ -3448,3 +3431,4 @@ caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val =
 
 ------------------------------------------------------------------
 -- HOP DESCENT, the *All clause's missing edge — AND THE OPEN HOLE.
+

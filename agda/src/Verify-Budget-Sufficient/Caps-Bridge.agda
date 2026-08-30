@@ -99,14 +99,13 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store;
-  nestOK?-intro; nestCapAt-suc; nest-sum-3; nestFacAt; nestIncAt; storeNest-latch;
-  storeNest-finish; nestOK?-latch; nestUnit; nestOK?-from-floor; storeNestMax-lub;
-  liveNest; nodeNest; regsNestMax; storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤)
+  (slotsNestSum; storeNestMax; nestCapAt; nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc;
+  nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch; nestUnit;
+  nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax; storeNest-slots≤;
+  storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
-open import Verify-Budget-Sufficient.Init-Nest using (init-nestOK?)
 open import Verify-Budget-Sufficient.Level-Mono using (sizeCount-mono-d)
 open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; dWᵉ≤capsAt-wid; sizeCount-body; frameBlowup;
@@ -1398,177 +1397,71 @@ abstract
 --   `tower-sum-tab` for a slot telescope, and `entryCeil-slotWid`.
 
 ------------------------------------------------------------------
--- ONE LEAF, and the split is where the work now divides.  What is
--- postulated here is the whole of the depth induction and it says nothing
--- about caps: a sweep's depth is under the nesting of its subject, of the
--- path it climbs, of the store it may be handed observables from — all
--- three RAW, read at the instant's entry — plus the instant's own fresh
--- growth, `realWidAt · nestSyn`, because the walk subscribes
--- accumulators its own folds have deepened since the entry reading, and
--- no entry-state measure can see those layers.  The fresh term is
--- real-denominated by the module's law: per-node folds are per-node
--- deliveries, and deliveries are real burst widths, never a cap-side
--- count.  The `capsOK?` premise is retained because the induction's
--- fresh-mint bookkeeping is expected to spend the walk's receipts.
+-- THE ROOT SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE.  The entry
+-- sweep crosses `thru-outer` frames and drains bounded mergeAlls, and
+-- both are paid for out of structure the sweep starts with: the
+-- program itself, the initial store, and the program's wrap unit.
+-- This is the subscribe-side twin of the delivery-side leaf, at the
+-- entry arguments, and the size factor inside `sightCeil` is the same
+-- one and answers the same mechanism -- the drain runs under a
+-- `from-inner`, which the path measure charges nothing for.
 --
--- The arithmetic half is not here and not mirrored: `nest-sum-3`
--- (.Nest-Store) pays three quantities each under `nestCapAt`, plus the
--- fresh term, out of `capsH`, and the delivery side spends the same
--- lemma.
-
--- THE ROOT INSTANCE SURVIVES A PRODUCT, WHICH IS WHAT KILLED THE
--- PREDECESSORS.  `Harness.Main` Series D computes both sides at the
--- root call on the entry state — the instance `depthE≤capsH-root`
--- spends, and the one index whose fresh term is `capsBase` rather than
--- the wrap tower, so a row here can actually fail.  On the scan family's
--- diagonal the measure is the product of the two parameters, exactly,
--- while the bound is a quadratic with leading coefficient seven: the
--- ratio falls from thirty-odd at the smallest program and settles, not
--- crosses.  Both skew directions are wider still.  Nothing refuted.
---
--- AND THE CLIMBED PATH IS FREE, which is the axis the root rows fix and
--- the one where a compositional bound usually breaks.  Series E moves
--- the subject and the path together — `thru-outer` is the only frame the
--- path measure charges, and it peels one `obs`, so a path of nesting j
--- demands a subject j layers up — against the state the root subscribe
--- hands over.  The measure does not move with j AT ALL, while the bound
--- gains both the path's nesting and the subject's, so the margin widens
--- along the whole axis.  The reason is structural and is the property a
--- compositional statement needs: a subject's descent does not read what
--- is above it, because the frames above are charged by the caller.
---
--- TWO WAYS TO BUILD THAT SUBJECT ARE DEGENERATE and both were built
--- before the third worked; `.Demand-Programs` carries which and why, at
--- the family rather than here.
---
--- THE RUNNING STATE CANNOT BE REACHED FROM THE ROOT, AND THAT IS A FACT
--- ABOUT THE MIRROR RATHER THAN A GAP IN THE FAMILIES.  Walking a real
--- run nine cascades deep and re-descending the subject at each step
--- leaves the measure at a constant while the bound rises — on the
--- arrival family, and again on one built specifically to connect its
--- shared slot mid-run rather than in the subscribe burst.  So the row
--- is DEGENERATE and reports nothing, twice, and the second time by
--- construction: the descent's only state read is a slot's, a slot the
--- descent reaches is connected by the very subscribe that reaches it,
--- and a slot connected later is one the descent does not reach.  The
--- two conditions exclude each other.  Whatever a run does to the state
--- afterwards arrives through the burst arm, which this statement's left
--- side does not enter.  `Harness.Main`, measured-not-rechecked.
-
--- AND ONLY ONE AXIS OF THIS STATEMENT CAN REFUTE IT, WHICH IS WORTH
--- SAYING BECAUSE THE COVERAGE QUESTION LOOKS WIDER THAN IT IS.  An
--- axis that moves only the BOUND cannot produce a counterexample: more
--- slack on the right of a `≤` weakens the claim.  The store summand is
--- such an axis, so the running-state rows leaving the measure constant
--- while the bound climbs are not a gap in the coverage — they are the
--- shape a bound-side axis has, and no row over the store could have
--- failed however it were built.  Same for the climbed path, whose
--- summand the measure does not track.
---
--- SO THE COVERAGE QUESTION IS THE SUBJECT'S ALONE, and that is the one
--- the sweeps drive hardest: the measure is the product of the scan
--- family's two parameters, exactly, against a quadratic, at the index
--- whose fresh term is `capsBase` rather than the wrap tower — the
--- tight index, where a row can fail.  The ratio SETTLES rather than
--- crossing, which is a claim about the limit and not about the points
--- sampled.  What remains is the induction.
---
--- RECOVERY: `git show 4c4b120:agda/evidence/probed/Probed/Nest-Depth.agda`
---   restores the count-parametric predecessor's probe harness —
---   twenty-one rows pinning the measure EQUAL to `depthE` on the
---   wrap/fold family, with the running-state plumbing and the
---   duplication witness that keeps the payload-list clause a `⊔`.  The
---   rows are evidence about the RESTATED-AWAY statement; the harness
---   and the row inventory transfer.
-
--- WHY THE WIDTH FACTOR IS THE CONTENT.  A subscribe registers a width
--- of observables, and the tempting reading is that the width term is
--- charged for that registration count while this measures nesting DEPTH
--- -- and depth does not see width, since merging a value with itself
--- adds branches rather than levels.  That reading is right about width
--- and wrong about what the factor is paying for.  The levels this
--- family spends are paid by path terms: `pathNestD` charges a `suc` at
--- `thru-outer` and at no other frame, and edge by edge the walk trades
--- subject for path exactly.  But mergeAll's DRAIN spends a level through
--- `depthFinC` while sitting under a `from-inner` frame, which the path
--- measure charges nothing for -- so those levels have no path term, and
--- a program whose folds nest spends one per layer.  A single constant
--- cannot pay an unbounded count; the width factor can, and does with
--- three orders of magnitude to spare.
---
--- REFUTED: `Refuted.Nest-Depth-One` -- the one-`nestSyn` form of exactly
---   this statement, pinned at its first crossing on `progU 5 2`: descent
---   21 against a bound of 19.  Across the fold parameter the descent
---   reads 4, 5, 9, 13, 17, 21 while the bound reads 9, 11, 13, 15, 17,
---   19 -- about four per layer against a flat two, tying at depth 4.
---
--- REFUTED: `Refuted.Nest-Depth-Live-Reg` -- the same bound with the
---   increment replaced by the LIVE registry count times one charge,
---   which is the shape a leaf every term of which computes would have
---   to take.  A proven inequality does put that reading under the
---   increment, since the count sits under the cap by the caps
---   predicate's own count conjunct, so the trade reads as the harmless
---   direction; but the widening then runs from the candidate leaf UP,
---   which makes the leaf the STRONGER statement and obliges it to be
---   true alone.  It is not: a cap is a ceiling and the registry at the
---   state a root subscribe is entered from is empty, so the whole width
---   term vanishes.  At the witness above, descent 81 against 24, where
---   the single charge managed 74 -- worse than carrying no width factor
---   at all.  So this bound has to name the increment, and the increment
---   is what does not reduce.
---
--- PROBED: `Harness.Main`'s SERIES T reads this bound on the same
---   crossing family and clears it everywhere the narrow form fails --
---   descent 481 against 74249 at a fold depth of 120.  SERIES S adds the
---   scan family across subject, path and fold depth, and SERIES S2 the
---   root subscribe of `progW`, where one emission hands the outer `*All`
---   a whole width of inners and the descent stays flat at 3 while the
---   bound climbs past six billion.  Harness output rather than a probe,
---   so measured-not-rechecked; two S2 rows overflowed the stack
---   computing the bound itself, which bounds the sweep and not the claim.
+-- REFUTED: `Refuted.Nest-Depth-One` is the subscribe-side witness the
+--   ceiling is calibrated against -- a limit-one mergeAll over three
+--   queued inners under nested folds, read at the root subscribe, whose
+--   descent climbs four per fold layer against the bare sum's three.
+-- PROBED: `Probed.Depth-Sighted` reads this side at fold depths two and
+--   twenty, at nine and eighty-one against ceilings of four hundred and
+--   five thousand.  Not covered: `sl` other than the two-slot
+--   instantiations, and nothing about the premise-free root beyond it.
 postulate
-  depth-nest-compositional : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    depthE g b κ bid now sched st
-      ≤ nestDᵉ b + pathNestD κ
-        + storeNestMax sched st
-        + nestIncAt e sl id
+  depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+      ≤ sightCeil (sizeᵉ e) (nestDᵉ e)
+                  (storeNestMax (sched-init e ins) (st-init e))
+                  (nestUnit e ins)
 
-subscribe-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sl : Slots Γ) (id : ℕ) (g : Gas) (b : Closed Γ u) (κ : Path Γ u t)
-  (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (capsAt e sl id) sched st ≡ true →
-  nestOK? e sl id sched st ≡ true →
-  nestDᵉ b ≤ nestCapAt e sl id →
-  pathNestD κ ≤ nestCapAt e sl id →
-  depthE g b κ bid now sched st ≤ capsH e sl id
-subscribe-depth-capsH {e = e} sl id g b κ bid now sched st sleq cok nok hb hk =
-  ≤-trans (depth-nest-compositional sl id g b κ bid now sched st sleq cok)
-          (nest-sum-3 e sl id _ _ _ hb hk
-            (nestOK?-store e sl id sched st nok))
+-- THE ENTRY CEILING AGAINST THE ENTRY FUEL, and this one is
+-- arithmetic rather than evaluation.  Every quantity on the left is
+-- syntax -- the program's nesting, the initial store's, which is the
+-- slot vocabulary's and nothing else, and the wrap unit built from
+-- both -- and the right is one `blowH` story over the base cap, which
+-- already carries the program's size and its slots.  So what is owed
+-- is that a constant multiple of the nesting readings sits under a
+-- base that reads the SIZE readings, plus the story's own slack.
+--
+-- AND THIS IS WHY THE ANCHOR IS THE PLACE THE COMPARISON IS PAID.  At
+-- every later instant the store is whatever the run has built and the
+-- fuel is a tower over the same recurrence that drives the caps, so
+-- the two sides are related only through an invariant.  Here there is
+-- no run yet: the store is the vocabulary, and the comparison is
+-- between two syntactic readings of one program.
+--
+-- RECOVERY: `git show 7e618c7:agda/src/Verify-Budget-Sufficient/Init-Nest.agda`
+--   restores the initial-state nesting-invariant cone -- the empty-store
+--   `⊔`-fold lemmas, the hot-slot nesting reading and `init-nestOK?` --
+--   which is where the left-hand side's own reduction was worked out.
+-- RECOVERY: `git show 7e618c7:agda/src/Verify-Budget-Sufficient/Caps.agda`
+--   restores the pooled-count arithmetic the right-hand side will want --
+--   `M≤dCapᶜ`, `i≤dWalkᶜ` and the `iterSize` bounds around them -- which
+--   is what puts the base cap under one `blowH` story's pooled summand.
+postulate
+  sight-root≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    sightCeil (sizeᵉ e) (nestDᵉ e)
+              (storeNestMax (sched-init e ins) (st-init e))
+              (nestUnit e ins)
+      ≤ capsH e ins 0
 
--- AT THE ROOT both subject premises are the trivial ones: `pathNestD` of
--- `root` is zero, and the cap's base is the subject's own nesting plus
--- the slots'.
+-- THE ENTRY ANCHOR: THE ROOT SUBSCRIBE'S DEPTH FITS THE ENTRY FUEL.
+-- This is one of the two places the depth face compares itself against
+-- `capsH`, and it is assembled from the two leaves above rather than
+-- asserted: the entry descent goes under what the entry can see, and
+-- what the entry can see goes under the entry fuel.
 depthE≤capsH-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
     ≤ capsH e ins 0
 depthE≤capsH-root e ins =
-  subscribe-depth-capsH ins 0 (budgetAt e ins 0) e root 0 0
-    (sched-init e ins) (st-init e)
-    refl
-    (init-capsOK? e ins 0)
-    (init-nestOK? e ins 0)
-    (subst (nestDᵉ e ≤_) (sym (nestCapAt-0 e ins))
-       (≤-trans (m≤m+n (nestDᵉ e)
-                       (slotsNestSum ins))
-                (n≤1+n _)))
-    z≤n
-
+  ≤-trans (depthE-sighted-root e ins) (sight-root≤capsH e ins)
 -- (3) SUBSCRIBEE-WET-VIA-CAPS — P1's subscribe-side mirror.
 -- Mirrors cascade-wet-via-caps structurally.  Its wet hypotheses are
 -- `subscribeE-wet`'s (.Walk-Level); the caps additions are `capsOK?` at
@@ -2246,3 +2139,4 @@ budget-sufficient fuel e ins =
   nest₁ = subst (λ s → nestOK? e s 1 sched₁ st₁ ≡ true)
                 (sym slEq)
                 (burst-nest e ins)
+

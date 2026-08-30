@@ -1,0 +1,186 @@
+-- THE SIGHTED DESCENT CEILING, INSTANTIATED AT THE FAMILY THAT KILLED
+-- THE BARE SUM.  Both leaves of the depth split say a sweep descends no
+-- further than a function of what it can SEE, and every summand is
+-- computed rather than bounded, so the rows below read the two sides at
+-- states the evaluator actually reaches and compare them directly.
+--
+-- LOAD-BEARING ON THE CEILING'S SHAPE, WHICH IS WHAT THEY SETTLED.  A
+-- row fails exactly when the descent passes the ceiling, and two
+-- cheaper shapes were failed here rather than argued away: a bare
+-- multiple of the three nesting summands, and that sum with the
+-- program's size added rather than multiplied.  The rows are read along
+-- BOTH axes the corpus varies -- the fold depth, which every summand
+-- sees, and the delivered count, which none of them does -- because a
+-- ceiling calibrated on one axis is a fitted constant until a second
+-- axis agrees.
+--
+-- THE PARTS ROW IS THE FINDING AND NOT A DIAGNOSTIC.  It reads nine
+-- quantities at two programs that differ only in the delivered count,
+-- and every sighted one of them is identical while the descent moves by
+-- a third; the program's size is the sole separator.  That is what
+-- rules out repairing the ceiling by enlarging a summand, and it is not
+-- visible from either side's pass/fail alone.
+--
+-- THE PREMISES ARE NOT DISCHARGED AND CANNOT BE.  `capsOK?` computes
+-- nowhere -- `capsAt` sits on the caps recurrence and does not
+-- terminate even natively -- so these are conclusion-side rows, which
+-- is the coverage this can have rather than a gap in the sweeping.
+-- TARGET: depthE-sighted-root @20c793
+-- TARGET: cascade-depth-sighted @ebd9e3
+module Probed.Depth-Sighted where
+
+open import Data.Nat using (ℕ; _+_; _*_)
+open import Data.List using (length; map)
+open import Data.Nat.ListAction using (sum)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Sum using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+
+open import Rx.Exp using (Closed; natᵗ; sizeᵛ; sizeᵉ)
+open import Rx.Prim using (gasPad; g0)
+open import Rx.Slots using (Slots)
+open import Rx.Evaluator
+  using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
+         cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
+
+open import Refuted.Demand-Programs
+  using (Γ₂; progU; progF; insT; insF; sucGU; sucGF)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthCascade)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (storeNestMax; nestUnit; sightCeil)
+
+-- ── the subscribe side, at the root ────────────────────────────────
+
+slotsT : Slots Γ₂
+slotsT = insT 1 2 0
+
+descRoot : ℕ → ℕ
+descRoot k =
+  depthE (budgetAt (progU k 2) slotsT 0) (progU k 2) root 0 0
+         (sched-init (progU k 2) slotsT) (st-init (progU k 2))
+
+sightRoot : ℕ → ℕ
+sightRoot k =
+  sightCeil (sizeᵉ (progU k 2)) (nestDᵉ (progU k 2))
+            (storeNestMax (sched-init (progU k 2) slotsT) (st-init (progU k 2)))
+            (nestUnit (progU k 2) slotsT)
+
+-- packed base-10^6 so one build returns every figure: Agda aborts a
+-- module at its first mismatch, so a tuple of pins leaks one number per
+-- build and a sum leaks all of them at once
+rootFigs : ℕ
+rootFigs = descRoot 2 + 1000000 * sightRoot 2
+         + 1000000000000 * descRoot 20 + 1000000000000000000 * sightRoot 20
+
+rootFigs≡ : rootFigs ≡ 5050000081000406000009
+
+-- ── the delivery side, at the second cascade ───────────────────────
+
+slotsF : Slots Γ₂
+slotsF = insF 1 2 2
+
+-- ONE FAMILY'S SECOND CASCADE, WHERE THE DRAIN HAS SOMETHING PARKED.
+-- Written over the program rather than over a fold depth, so the same
+-- three lines read every axis the corpus varies.
+sub : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → Sched Γ₂ × EvalSt p
+sub p sl g = let r = subscribeE (gasPad g g0) p root 0 0
+                                (sched-init p sl) (st-init p)
+             in proj₁ (proj₂ r) , proj₂ (proj₂ r)
+
+after1 : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → Sched Γ₂ × EvalSt p
+after1 p sl g with sched-next (proj₁ (sub p sl g))
+... | inj₁ _        = sub p sl g
+... | inj₂ (a , sd) =
+  let r = cascade a 1 sd (proj₂ (sub p sl g))
+  in proj₁ (proj₂ r) , proj₂ (proj₂ r)
+
+delivRow : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → ℕ × ℕ
+delivRow p sl g with sched-next (proj₁ (after1 p sl g))
+... | inj₁ _        = 0 , 0
+... | inj₂ (a , sd) =
+  let st = proj₂ (after1 p sl g)
+  in depthCascade a 2 (chainsOf a st) sd (cascadeLatch a st)
+   , sightCeil (sizeᵉ p) (nestDᵛ (arrTy a) (arrVal a))
+               (storeNestMax sd st) (nestUnit p (Sched.slots sd))
+
+uRow : ℕ → ℕ × ℕ
+uRow d = delivRow (progU d 2) slotsF (sucGU 1 2 2 d 2)
+
+delivFigs : ℕ
+delivFigs = proj₁ (uRow 2) + 1000000 * proj₂ (uRow 2)
+          + 1000000000000 * proj₁ (uRow 8)
+          + 1000000000000000000 * proj₂ (uRow 8)
+
+delivFigs≡ : delivFigs ≡ 1219000049000319000013
+
+-- ── the count axis, which is where the two cheaper shapes died ──────
+
+-- the delivered COUNT rather than the fold depth, and the WIDTH family,
+-- whose mergeAll is unbounded and therefore drains nothing.
+natsRow : ℕ × ℕ
+natsRow = delivRow (progU 8 6) slotsF (sucGU 1 2 2 8 6)
+
+widRow : ℕ × ℕ
+widRow = delivRow (progF 3 2) slotsF (sucGF 1 2 2 3 2)
+
+axisFigs : ℕ
+axisFigs = proj₁ natsRow + 1000000 * proj₂ natsRow
+         + 1000000000000 * proj₁ widRow
+         + 1000000000000000000 * proj₂ widRow
+
+axisFigs≡ : axisFigs ≡ 465000013001311000081
+
+-- THE COUNT AXIS AT FOUR TIMES THE REACH, which is what separates a
+-- size SUMMAND from a size FACTOR: size gains one per delivered value
+-- and the descent gains eight, so the summand is outrun.
+farRow : ℕ × ℕ
+farRow = delivRow (progU 8 20) slotsF (sucGU 1 2 2 8 20)
+
+farFigs : ℕ
+farFigs = proj₁ farRow + 1000000 * proj₂ farRow
+        + 1000000000000 * sizeᵉ (progU 8 20)
+
+farFigs≡ : farFigs ≡ 70001633000193
+
+-- ── which sighted quantity sees the count, and the answer is none ───
+
+-- Nine readings per program, packed base-1000 in the order named, at
+-- the two programs whose descents differ by a third.
+pendCount : LiveSource Γ₂ → ℕ
+pendCount ls = length (LiveSource.pending ls)
+
+partsRow : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → ℕ
+partsRow p sl g with sched-next (proj₁ (after1 p sl g))
+... | inj₁ _        = 0
+... | inj₂ (a , sd) =
+  let st = proj₂ (after1 p sl g)
+  in nestDᵛ (arrTy a) (arrVal a)
+   + 1000 * storeNestMax sd st
+   + 1000000 * nestUnit p (Sched.slots sd)
+   + 1000000000 * length (chainsOf a st)
+   + 1000000000000 * length (EvalSt.registry st)
+   + 1000000000000000 * sizeᵛ (arrTy a) (arrVal a)
+   + 1000000000000000000 * length (Sched.live sd)
+   + 1000000000000000000000 * sum (map pendCount (Sched.live sd))
+   + 1000000000000000000000000 * sizeᵉ p
+
+partsFigs : ℕ
+partsFigs = partsRow (progU 8 2) slotsF (sucGU 1 2 2 8 2)
+          + 1000000000000000000000000000 * partsRow (progU 8 6) slotsF (sucGU 1 2 2 8 6)
+
+partsFigs≡ : partsFigs ≡ 56000001001001001013009000052000001001001001013009000
+
+-- the size axis on its own, so the slope claims above are readable
+sizeFigs : ℕ
+sizeFigs = sizeᵉ (progU 2 2) + 1000 * sizeᵉ (progU 8 2)
+         + 1000000 * sizeᵉ (progU 20 2) + 1000000000 * sizeᵉ (progF 3 2)
+
+sizeFigs≡ : sizeFigs ≡ 30100052028
+
+rootFigs≡ = refl
+delivFigs≡ = refl
+axisFigs≡ = refl
+farFigs≡ = refl
+partsFigs≡ = refl
+sizeFigs≡ = refl

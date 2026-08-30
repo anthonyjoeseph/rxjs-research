@@ -56,7 +56,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; nestCapsOK?)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂)
+open import Refuted.Demand-Programs using (Γ₂)
 
 sync : ℕ → List ℕ
 sync zero    = []

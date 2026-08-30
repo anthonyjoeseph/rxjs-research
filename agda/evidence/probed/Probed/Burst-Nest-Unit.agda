@@ -44,7 +44,7 @@ open import Rx.Nest-Depth using ()
 
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; nestUnit; nestCapAt; nestCapAt-0; nestCap-mono; nestOK?; nestOK?-intro)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
 slots = insT 0 0 0

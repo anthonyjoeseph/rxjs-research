@@ -43,7 +43,7 @@ module Refuted.Chain-Step-Nodes where
 open import Data.Bool using (false)
 open import Data.Empty using (⊥)
 open import Data.List using (foldr)
-open import Data.Nat using (ℕ; _+_; _≤_; _⊔_)
+open import Data.Nat using (ℕ; _+_; _*_; _≤_; _⊔_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -54,8 +54,8 @@ open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root;
          chainStep; Arrival; Path; _↠_; scan-f; map-f)
 open import Rx.Slots using (Slots)
-open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; nestSyn)
-open import Verify-Budget-Sufficient.Demand-Programs
+open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; nestUnit)
+open import Refuted.Demand-Programs
   using (Γ₂; progF; foldD; insF; sucGF)
 
 prog : Closed Γ₂ natᵗ
@@ -83,7 +83,7 @@ deep d = scan-f (foldD d) 7 ↠ (map-f (nat̂ 0) ↠ root)
 row : ℕ × ℕ
 row = let st = proj₂ sub
           r  = chainStep 1 arr (deep 20) (proj₁ sub) st
-      in nodesMax (proj₂ (proj₂ r)) , nodesMax st + nestSyn prog slots
+      in nodesMax (proj₂ (proj₂ r)) , nodesMax st + (2 * nestUnit prog slots)
 
 -- THE FIGURES, PINNED, so that a repair moving either side fails here
 -- naming the number instead of turning the crossing into an equality

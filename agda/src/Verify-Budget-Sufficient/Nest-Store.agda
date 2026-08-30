@@ -51,28 +51,28 @@ open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Bool.ListAction using (any)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-mono-≤; +-assoc; +-monoʳ-≤; +-monoˡ-≤; +-identityʳ;
-  *-mono-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m; m≤m⊔n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
-  *-identityʳ; *-distribˡ-+; m^n>0; ^-monoʳ-≤)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
+  m≤n⊔m; m≤m⊔n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
+  *-identityʳ; *-distribˡ-+; m^n>0)
 open import Data.Nat.ListAction using (sum)
-open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Rx.Exp using (Ctx; Closed; sizeᵗ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
-open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId; NodeState;
-  scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
-  Arrival; cascadeLatch; Chain; capsBase; cascadeFinish; blowH; shareAdmit; sameSource;
-  dropSource; sweepLive; arrSource)
-open import Rx.Prim using (Source; towerℕ)
+open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId;
+  NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
+  Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive;
+  arrSource)
+open import Rx.Prim using (Source)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsH; 3≤capsH; tower-le-blowH; capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; 2≤capsAt-size)
+open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
-open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; cSize≤delSq)
+open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -403,23 +403,44 @@ storeNest-finish a sched st with Arrival.isLast a
 nestUnit : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → ℕ
 nestUnit e sl = suc (nestDᵉ e + slotsNestSum sl)
 
--- AND A CHAIN IS CHARGED TWO OF THEM, WHICH IS NOT SLACK.  A delivery
--- pays the unit once for the wraps its own walk installs, and a second
--- time for the ones the SHARE SINK installs on its behalf: the sink
--- fans the arriving values into every registration on the share, each
--- walking a path that lives in the registry rather than in the chain
--- being charged, and the path measure charges a sink zero.  A one-unit
--- charge is refuted at exactly that arm — `Refuted.Share-Sink-Nodes`,
--- three against one — and the second unit covers it because a
--- registered path's wraps are the program's wraps like any other.
+-- THE SIGHTED DESCENT CEILING: what a sweep can actually SEE -- the
+-- payload it carries, the store it starts from and the program's own
+-- wrap unit -- scaled by the program's size.  Every quantity here is
+-- read at the current instant off the run itself; none of them reads a
+-- cap, which is the whole point.  The three summands are what a descent
+-- trades among edge by edge, and the size factor pays for the levels no
+-- edge accounts for: the mergeAll drain runs as a walk under a
+-- `from-inner` frame, which the path measure charges nothing for.
 --
--- THE BUDGET IS WHERE THE FACTOR HAS TO LAND, not the unit, and that
--- is why this is stated as a product here rather than by enlarging the
--- unit: the per-chain charge and the per-instant budget are compared
--- against each other, so doubling both would cancel.  Everything above
--- reads this symbolically, so the factor propagates on its own.
-nestSyn : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → ℕ
-nestSyn e sl = 2 * nestUnit e sl
+-- AND THE FACTOR IS A SIZE RATHER THAN A CONSTANT BECAUSE THE THREE
+-- SUMMANDS ARE ALL NESTING DEPTHS, so none of them moves with how many
+-- values an instant carries.  At two programs differing only in the
+-- delivered count, every sighted quantity here -- payload nesting,
+-- store maximum, wrap unit, chain count, registry length, payload size
+-- -- is IDENTICAL while the descent moves by a third; the one thing
+-- that separates them is the program's size.  A ceiling blind to an
+-- axis the descent climbs cannot be repaired by a multiplier, so the
+-- size enters as a factor and not as a summand: size gains one per
+-- delivered value where the descent gains eight, so a summand is
+-- outrun and only a factor is not.  Both cheaper shapes were killed by
+-- instantiation rather than argued away, in `Probed.Depth-Sighted`: a
+-- bare factor of two fails forty-nine against forty-four on the
+-- delivery side, and a size SUMMAND fails one hundred and ninety-three
+-- against one hundred and fourteen at the far end of the count axis.
+--
+-- AND IT IS A COMBINATOR ON FOUR NUMBERS, NOT A MEASURE, so it is
+-- transparent and stays out of the seal.  A consumer needs to unfold
+-- it to spend the two halves of the split it names, and there is no
+-- recurrence under it to renormalise -- which is exactly the property
+-- the sealed currency beside it does not have.
+--
+-- REFUTED: `Refuted.Nest-Depth-One` and `Refuted.Cascade-Deliv-Depth`
+--   are the two witnesses the shape answers, on the subscribe and the
+--   delivery side.  Each pins a program family whose descent climbs
+--   faster per fold layer than the bare sum does -- four against three,
+--   and six against four.
+sightCeil : ℕ → ℕ → ℕ → ℕ → ℕ
+sightCeil z v s u = suc z * suc (v + s + u)
 
 ------------------------------------------------------------------
 -- THE PER-INSTANT NESTING CAP AND THE REAL-WIDTH BUDGET, one paired
@@ -438,7 +459,7 @@ nestSyn e sl = 2 * nestUnit e sl
 -- one exponential — and `capsH` gains `blowH`'s pooled summand, a
 -- tower, per instant.  The bet this recurrence carries is exactly
 -- that: EXPONENTIAL-PER-INSTANT COVERS THE REAL DYNAMICS.
---
+
 -- ⚠ AND THE RECURRENCE BELOW BREAKS THAT LAW, WHICH IS WHY THE HEIGHT
 -- COMPARISON IT FEEDS IS FALSE.  `realWidAt` reads `Caps.cReg` of the
 -- caps recurrence and the factor reads `delSq` of it one instant on,
@@ -463,26 +484,6 @@ nestSyn e sl = 2 * nestUnit e sl
 -- output.  The consumer-facing equations are proven inside the block,
 -- so a probe of this bet takes its cap value through those or
 -- hypothesises the growth side, as the expired probe series did.
---
--- `capsH` IS `blowH` OF SOMETHING AT EVERY INDEX, and this names that
--- something: the height the caps recurrence had reached one instant
--- earlier, which at the entry is its base.  It exists because the only
--- handle anything has ever had on `blowH` is a lemma taking that
--- argument, and the caps recurrence itself never needs to say it -- it
--- iterates, so it never looks back one step.
-capsHpred : ∀ {n} {Γ : Ctx n} {t} → Closed Γ t → Slots Γ → ℕ → ℕ
-capsHpred e sl zero     = capsBase e sl
-capsHpred e sl (suc id) = capsH e sl id
-
-capsH-blow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  capsH e sl id ≡ blowH (capsHpred e sl id)
-capsH-blow e sl zero     = refl
-capsH-blow e sl (suc id) = refl
-
-1≤capsHpred : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  1 ≤ capsHpred e sl id
-1≤capsHpred e sl zero     = s≤s z≤n
-1≤capsHpred e sl (suc id) = ≤-trans (s≤s z≤n) (3≤capsH e sl id)
 
 -- THE WIDTH IS THE REGISTRY CAP, AND IT IS THE ONLY QUANTITY THAT CAN
 -- BE ONE.  What the width pays for is a walk deepening the store once
@@ -686,53 +687,6 @@ abstract
              * (suc (delSize n (capsAt e sl (suc id)))
                 * (realWidAt e sl id * delSq n (capsAt e sl (suc id)))))
 
-  -- AND THE FACTOR IS A POWER OF TWO, SO ITS PROVEN FLOOR IS NOT ONE.
-  -- The positivity beside this one is all a consumer needs when it is
-  -- spending the factor on a single copy, and it is the wrong bound
-  -- entirely for a consumer wanting a COMPUTABLE STAND-IN from below:
-  -- that consumer needs the EXPONENT, and the exponent is a squared
-  -- successor of the burst times a product every factor of which a
-  -- proven inequality already puts at one or above.  So it is four at
-  -- the smallest and the power is sixteen.
-  --
-  -- SIXTEEN IS NOT THE FLOOR, IT IS THE NUMERAL A CONSUMER ASKED FOR.
-  -- The exponent climbs with the width and the delivery square, so any
-  -- numeral is reachable by this same route; a consumer needing more
-  -- copies raises this one rather than finding another argument.
-  16≤nestFacAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) → 16 ≤ nestFacAt e sl id
-  16≤nestFacAt {n = n} e sl id = ^-monoʳ-≤ 2 4≤E
-    where
-    b : ℕ
-    b = nestBurstAt e sl id
-
-    D : ℕ
-    D = delSize n (capsAt e sl (suc id))
-
-    RQ : ℕ
-    RQ = realWidAt e sl id * delSq n (capsAt e sl (suc id))
-
-    1≤S : 1 ≤ Caps.cSize (capsAt e sl (suc id))
-    1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl (suc id))
-
-    1≤Q : 1 ≤ delSq n (capsAt e sl (suc id))
-    1≤Q = ≤-trans 1≤S (cSize≤delSq n (capsAt e sl (suc id)) 1≤S)
-
-    1≤RQ : 1 ≤ RQ
-    1≤RQ = ≤-trans (≤-reflexive (sym (*-identityʳ 1)))
-                   (*-mono-≤ (1≤capsAt-reg e sl id) 1≤Q)
-
-    1≤B : 1 ≤ suc D * RQ
-    1≤B = ≤-trans 1≤RQ
-            (≤-trans (≤-reflexive (sym (*-identityˡ RQ)))
-                     (*-monoˡ-≤ RQ (s≤s (z≤n {D}))))
-
-    4≤E : 4 ≤ suc b * suc b * (suc D * RQ)
-    4≤E = ≤-trans (*-mono-≤ (s≤s (1≤nestBurstAt e sl id))
-                            (s≤s (1≤nestBurstAt e sl id)))
-                  (≤-trans (≤-reflexive (sym (*-identityʳ (suc b * suc b))))
-                           (*-monoʳ-≤ (suc b * suc b) 1≤B))
-
   nestOK? : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
     Sched Γ → EvalSt e → Bool
   nestOK? e sl id sched st = storeNestMax sched st ≤ᵇ nestCapAt e sl id
@@ -789,169 +743,6 @@ abstract
         * (nestCapAt e sl id + nestIncAt e sl id)
   nestCapAt-suc e sl id = refl
 
-  -- THE HEIGHT COMPARISON, and it is the entire bet this module carries,
-  -- reduced to one number.  Both sides of the arithmetic obligation
-  -- below are tower-VALUED, so the comparison between them is a
-  -- comparison of HEIGHTS, and `h` is the height the nesting currency
-  -- has reached at this instant.  The second conjunct is where the bet
-  -- lives: the caps recurrence must have climbed strictly past it, with
-  -- one story to spare, since converting a tower into `blowH` costs
-  -- exactly that story.
-  --
-  -- IT IS STATED INSIDE THE SEAL BECAUSE ONLY IN HERE CAN IT BE PROVEN.
-  -- Discharging it means unfolding `nwAt` on both axes, and the block
-  -- exports equations for the cap but none for the width; stating it
-  -- outside would oblige a future proof to export two more, widening
-  -- the seal for no reason other than where a postulate was typed.
-  --
-  -- AND IT IS FALSE, WHICH IS WHAT THE TWO-SIDED Σ WAS SUPPOSED TO
-  -- MAKE VISIBLE AND DID NOT.  The two conjuncts do pin `h` from both
-  -- sides, so no witness satisfies them by being large enough -- but
-  -- pinning is not satisfiability, and here the interval is empty: the
-  -- currency's own factor already exceeds every tower the second
-  -- conjunct admits.
-  --
-  -- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted) -- the
-  --   Σ is uninhabited at a closed program, by replaying it through
-  --   `tower-le-blowH` into the untowered form and refuting that.
-  -- DEAD ROUTE: restate the second conjunct one story up, so the
-  --   obligation lands at the height two instants later.  The
-  --   arithmetic goes through -- the exit cap is under a tower of the
-  --   next height and the tower-to-story lemma lifts it -- and the
-  --   module checks; the caps step then rejects the depth, being
-  --   instantiated at the fuel the shifted height has left behind.
-  --
-  -- RECOVERY: `git show 725296e:agda/src/Verify-Budget-Sufficient/Nest-Tower.agda`
-  --   holds height arithmetic written for exactly this shape and
-  --   currency-independent: `sum2H`/`sum3H`/`sucH`/`hUp`/`hIn`/`1≤3x`/
-  --   `payL`/`payR` for moving a bound up a tower, and `tower-sum-tab`
-  --   for a slot telescope.
-  postulate
-    nest-height : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-      (id : ℕ) →
-      Σ ℕ λ h →
-        (2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ towerℕ h)
-        × (suc h ≤ towerℕ (capsHpred e sl id))
-
-
-
-------------------------------------------------------------------
--- THE ONE ARITHMETIC OBLIGATION THE WHOLE CURRENCY RESTS ON, and it
--- mentions no evaluator: three quantities each under `nestCapAt`, plus
--- the instant's own fresh growth — its real-width budget times the
--- wrap factor — sum to under `capsH`.  Three because a depth statement
--- reads a subject, a path and a store; the fourth addend because the
--- store is read at the instant's ENTRY while the walk subscribes
--- accumulators the instant's own folds have deepened since.
---
--- ⚠ AND IT IS FALSE AS STATED, WITH NO REPAIR AVAILABLE AT THIS INDEX.
--- The headroom argument this block used to carry -- an exponential per
--- instant off program-shaped bases, against a tower per instant from
--- `blowH` -- rests on a premise the currency stopped satisfying when
--- the width was re-denominated to the registry cap.  `realWidAt` reads
--- `Caps.cReg (capsAt e sl id)` and `nestFacAt` reads
--- `delSq n (capsAt e sl (suc id))` inside an exponent, so ONE instant's
--- factor already exceeds `2 ^ cSize (capsAt e sl (suc id))`, while the
--- budget is the depth height `capsH e sl id` -- and the depth fuel is
--- itself INSIDE that size, since `capsAt e sl (suc id)` steps `capsAt e
--- sl id` exactly `sizeCount c (capsH e sl id)` times and one size step
--- adds at least one.  So `capsH e sl id ≤ cSize (capsAt e sl (suc id))
--- < nestFacAt e sl id ≤ nestCapAt e sl (suc id)`, and `n < 2 ^ n`
--- closes it on its own: no factor, no witness and no widening repairs
--- a cap that reads a caps field and is measured against a caps HEIGHT.
---
--- NOR DOES RAISING THE FUEL, AND THAT IS THE PART THAT COSTS.  The
--- obstruction is parametric in the depth fuel, not a miscalibration of
--- `capsH`: for ANY fuel `F`, `F ≤ cSize (frameBlowup c F)`, because one
--- unit of depth buys at least one level and one level adds at least one
--- to the size.  So raising the fuel raises the exit size it is compared
--- against, and the cap is EXPONENTIAL in that size while the fuel is
--- linear in itself.  No fuel satisfies `F ≥ 2 ^ poly (blowup by F)`.
---
--- WHAT THIS DOES NOT TOUCH IS THE INSTANT THE HEIGHT IS READ AT, and
--- that is the surviving repair.  What fails above is a quantity being
--- its own driver; a height read one or more instants LATER is not fuel
--- for the cap it is asked to dominate, and the fuel-to-size inequality
--- says nothing about it.
---
--- WHAT IS LEFT IS TO STOP READING THE EXIT CAP -- IN EVERY SUMMAND,
--- NOT ONLY IN THE FACTOR.  The obligation is unsatisfiable while ANY
--- part of the currency reads `capsAt` at the instant's own exit, which
--- is the index the depth budget defines.  The increment alone already
--- crosses, by a chain that never reaches an exponent: its unit term is
--- `nestU` keyed on the exit cap's delivery square, `nestU` is a `suc`
--- of its key times a successor, and the fuel is under that key.  So a
--- re-denomination of the factor that leaves the increment's key where
--- it is repairs nothing.
---
--- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), at a
---   closed program, twice -- once through the factor and once through
---   the increment alone -- and the same file refutes the `nest-height`
---   Σ this body is assembled from.
-
--- THE KEY IS CLOSED AS A SUBJECT, and this is the finding that closes
--- it.  The exit cap enters through ONE widening: a cascade's walk
--- reports its own level, the tight cap its states satisfy is the entry
--- cap stepped by that level, and the delivery face widens the level to
--- the recurrence's maximum so the bound can be a function of the
--- instant rather than of a level existential in the run.  Keeping the
--- walk's own level instead fails at EVERY level at or above the depth
--- fuel -- one frame of the size recurrence adds at least its entry
--- size, so the size field at level `j` is at least `j`, and the height
--- is priced in that same fuel.  The only level left is one a walk halts
--- strictly below the fuel at, and the walk face refuses that in its
--- reset-anchor pins: a level cap cannot ceiling a walk which climbs
--- past the level it is keyed at.
---
--- AND THE DESCENT'S OWN FLATTENING IS NOT THE PROBLEM.  Its grant is
--- flattened at a level count the PATH bounds -- the caps face carries
--- `suc (pathLen p) ≤ Caps.cSize c` as a conjunct, at the ENTRY cap --
--- so the per-level charge is priced against a quantity that does not
--- move with the instant.  What moves is the base the factor is keyed
--- on, and that is the widening above.
-
--- THE INSTANT IS NOT THE REPAIR EITHER, AND THE ATTEMPT IS WHAT SAYS
--- SO.  Shifting the story is arithmetically available: the exit cap
--- sits under a tower of the next height, the currency is an
--- exponential of a polynomial in that cap, and the tower-to-story
--- lemma lifts any such tower to the story above -- so the obligation
--- reads true two instants up, and the Σ above needs only its second
--- conjunct restated to deliver it.  The shifted module checks.
---
--- WHAT REFUSES IT IS THE FUEL, AND THE REFUSAL IS STRUCTURAL.  The
--- caps step at an instant is the entry cap blown by THAT INSTANT'S
--- HEIGHT, and the cascade walk's level bound is a count monotone in
--- the depth it is given -- so the walk stays inside the stepped cap
--- only while the depth is under that same height.  A depth proven at
--- a later story therefore has to move the step's fuel to match, and
--- the fuel-to-size inequality is parametric in the fuel: whatever
--- story is chosen, the cap it produces has a size at least that
--- story, and the currency is an exponential of it.  So every story is
--- one the same argument kills, stated at itself.
---
--- WHICH MAKES THE VEHICLE THE SUBJECT, NOT THE INDEX.  What the caps
--- step needs is a bound on the depth the instant ACTUALLY reaches;
--- what this cap offers is a product of per-instant factors that
--- over-approximates it exponentially.  The two cannot be reconciled
--- by moving an index, because the gap is not an offset -- it is the
--- cap growing faster than the quantity it is a cap on.  A repair has
--- to bound the cascade's depth by something that is not this
--- currency.
--- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), which
---   carries the level-keyed obligation as its own statement and kills
---   it at every level the fuel reaches.
-nestCap-3≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) →
-  2 * nestCapAt e sl id + nestCapAt e sl (suc id) ≤ capsH e sl id
-nestCap-3≤capsH e sl id =
-  ≤-trans lo (subst (towerℕ h ≤_) (sym (capsH-blow e sl id))
-                (tower-le-blowH h (capsHpred e sl id)
-                                (1≤capsHpred e sl id) hi))
-  where
-  h  = proj₁ (nest-height e sl id)
-  lo = proj₁ (proj₂ (nest-height e sl id))
-  hi = proj₂ (proj₂ (nest-height e sl id))
-
 -- the instant's own cap sits under the next one, the factor being at
 -- least one
 nestCap-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -999,37 +790,4 @@ nestOK?-from-floor : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 nestOK?-from-floor e sl sched st h =
   nestOK?-intro e sl 1 sched st (≤-trans h (nestCapAt-1-floor e sl))
 
-2*-fold : ∀ (m x y : ℕ) → x ≤ m → y ≤ m → x + y ≤ 2 * m
-2*-fold m x y hx hy =
-  ≤-trans (+-mono-≤ hx hy)
-          (≤-reflexive (cong (m +_) (sym (+-identityʳ m))))
 
--- three parts each under the cap, the fresh term on top, paid out of
--- the height
-nest-sum-3 : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) (x y z : ℕ) →
-  x ≤ nestCapAt e sl id → y ≤ nestCapAt e sl id → z ≤ nestCapAt e sl id →
-  x + y + z + nestIncAt e sl id ≤ capsH e sl id
-nest-sum-3 e sl id x y z hx hy hz =
-  ≤-trans (≤-reflexive (+-assoc (x + y) z (nestIncAt e sl id)))
-    (≤-trans (+-mono-≤ (2*-fold (nestCapAt e sl id) x y hx hy)
-                       (≤-trans (+-monoˡ-≤ (nestIncAt e sl id) hz)
-                                (nestCap-mono e sl id)))
-             (nestCap-3≤capsH e sl id))
-
--- THE SAME SUM, WITH THE WALK'S FANOUT FACTOR ON THE STORE TERM.  A
--- chain walk multiplies rather than adds -- a step function may name
--- its payload twice -- so the store arm of a cascade's descent arrives
--- already scaled by `nestFacAt`, and that scaled arm is exactly the
--- next instant's cap.
-nest-sum-fac : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) (x y z : ℕ) →
-  x ≤ nestCapAt e sl id → y ≤ nestCapAt e sl id → z ≤ nestCapAt e sl id →
-  x + y + nestFacAt e sl id * (z + nestIncAt e sl id)
-    ≤ capsH e sl id
-nest-sum-fac e sl id x y z hx hy hz =
-  ≤-trans (+-mono-≤ (2*-fold (nestCapAt e sl id) x y hx hy)
-                    (≤-trans (*-monoʳ-≤ (nestFacAt e sl id)
-                                        (+-monoˡ-≤ (nestIncAt e sl id) hz))
-                             (≤-reflexive (sym (nestCapAt-suc e sl id)))))
-          (nestCap-3≤capsH e sl id)

@@ -43,8 +43,8 @@ open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
   using (nodeNest; pathNestD; chainsNestD; nestUnit)
 
-open import Verify-Budget-Sufficient.Demand-Programs
-  using (Γ₂; progU; progC; progF; progW; foldD; insF; sucGU; sucGC; sucGF; sucGW)
+open import Refuted.Demand-Programs
+  using (Γ₂; progU; progF; progW; foldD; insF; sucGU; sucGF; progC; sucGC; sucGW)
 
 ----------------------------------------------------------------------
 -- The walk, taken at the arrival the root subscribe leaves behind,

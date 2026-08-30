@@ -50,7 +50,7 @@ open import Rx.Exp
          ofᵉ; mapᵉ; switchAllᵉ; varᵗ; nat̂; strmᵗ)
 open import Rx.Evaluator using (map-f)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; frameNestD)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂)
+open import Refuted.Demand-Programs using (Γ₂)
 
 -- a payload k `*All` layers deep
 deepV : ℕ → Val Γ₂ (obs natᵗ)

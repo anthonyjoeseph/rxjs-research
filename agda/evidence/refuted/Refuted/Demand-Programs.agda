@@ -26,7 +26,7 @@
 -- nothing here: `Harness.Main` is a cheap calculator, and a family that
 -- reached up into the Verify tower would drag the whole thing into
 -- `make harness-build`.
-module Verify-Budget-Sufficient.Demand-Programs where
+module Refuted.Demand-Programs where
 
 open import Data.List using (List; []; _∷_; replicate; _++_)
 open import Data.Nat using (ℕ; suc; _+_)
@@ -39,9 +39,8 @@ open import Data.Maybe using (just; nothing)
 open import Relation.Binary.PropositionalEquality using (refl; _≡_; sym; subst)
 
 open import Rx.Prim using (Timed; after_,_; cold; hot)
-open import Rx.Exp using (Ctx; Closed; Ty; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; takeᵉ; syncSizeᵉ; Tm;
+open import Rx.Exp using (Ctx; Closed; natᵗ; obs; _×ᵗ_; ofᵉ; mergeAllᵉ; scanᵉ; takeᵉ; strmᵗ; fstᵗ; varᵗ; nat̂; syncSizeᵉ; Tm;
   Fn; input; inputsBelowᵉ; inputsBelowᵗ; inputsBelowᵗˢ)
-open import Rx.Evaluator using (root; Path; _↠_; thru-outer; mergeAllᵒ)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
@@ -77,14 +76,6 @@ natsD (suc k) = nat̂ k ∷ natsD k
 progD : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → Closed Γ natᵗ
 progD d k =
   mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ []))) (ofᵉ (natsD k)))
-
--- THE GAS THE FACE'S DEMAND HYPOTHESIS SUPPLIES at the adversarial
--- (smallest) instantiation Ŝ := R̂ := F := 0 and U := 0, where dBound
--- degenerates to `syncSizeᵉ b + hopDᵉ 0 b` and `hasAtLeast-pad` makes
--- `gasPad (suc G) g0 hasAtLeast suc G` hold EXACTLY, nothing spare.
--- So `runDry (sucG p) p ≡ true` REFUTES WalkStmt at p.
-sucG : Closed Γ₀ natᵗ → ℕ
-sucG b = suc (syncSizeᵉ b + hopDᵉ 0 (slotHop 0 ins₀) b)
 
 ----------------------------------------------------------------------
 -- THE SHARED-SLOT FAMILY.  Series Q's slots are EMPTY, so `slotNest`
@@ -123,41 +114,6 @@ insT : ℕ → ℕ → ℕ → Slots Γ₂
 insT ds ks j fzero =
   shared (progD ds ks) {ok = subst T (sym (progD-below 0 ds ks)) tt}
 insT ds ks j (fsuc fzero) = scripted (cold [] (asyncNats j))
-
-progT : ℕ → ℕ → Closed Γ₂ natᵗ
-progT d k =
-  mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ nothing (ofᵉ (strmᵗ (input fzero)
-                   ∷ strmᵗ (input (fsuc fzero))
-                   ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
-
-sucGT : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-sucGT ds ks j d k =
-  suc (syncSizeᵉ (progT d k)
-       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progT d k))
-
--- THE OUTER-BOUNDED FAMILY, which is `progT` with the bound moved to the
--- OUTER `*All` instead of the inner one.  Every other family here leaves
--- the outer unbounded, so every value the scan emits is subscribed on the
--- spot; here the outer fills after one and a later emission PARKS.  It
--- was built to separate two things the others always do together --
--- deepening the scan's accumulator, and minting a node instance for what
--- it emitted -- and it DOES NOT separate them: the inner flattener still
--- mints once per release, so a walk that deepens the store still mints.
--- Kept because the outer-bounded shape is the axis any further attempt on
--- that region has to drive, and because arriving at it again from nothing
--- is most of the cost.
-progO : ℕ → ℕ → Closed Γ₂ natᵗ
-progO d k =
-  mergeAllᵉ (just 1) (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ nothing (ofᵉ (strmᵗ (input fzero)
-                   ∷ strmᵗ (input (fsuc fzero))
-                   ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
-
-sucGO : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-sucGO ds ks j d k =
-  suc (syncSizeᵉ (progO d k)
-       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progO d k))
 
 ----------------------------------------------------------------------
 -- THE LATE-CONNECT FAMILY.  Every other family here connects its shared
@@ -202,6 +158,49 @@ sucGF : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
 sucGF ds ks j w k =
   suc (syncSizeᵉ (progF w k)
        + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progF w k))
+
+-- ONE DELIVERY THAT SUBSCRIBES A WIDTH, which is the shape every other
+-- family here misses.  `wrapD` merges a SINGLETON, so each accumulator
+-- level costs one subscribe and a delivery never registers more than
+-- one observable at a time -- and a bound charging one operator's worth
+-- per delivery cannot be told apart from a bound charging a width on
+-- programs like that.  `wrapW` merges the accumulator with itself `suc
+-- w` times instead, so a single scan emission hands the outer *All a
+-- width of inners to subscribe at one instant.
+wrapW : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
+  Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
+wrapW w t = strmᵗ (mergeAllᵉ nothing (ofᵉ (replicate (suc w) t)))
+
+foldW : ∀ {n} {Γ : Ctx n} → ℕ → Fn Γ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
+foldW w = wrapW w (fstᵗ (varᵗ (here refl)))
+
+progW : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
+progW ww w k =
+  mergeAllᵉ nothing (scanᵉ (foldW ww) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ nothing (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
+                     ++ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ [])))))
+
+progU : ℕ → ℕ → Closed Γ₂ natᵗ
+progU d k =
+  mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
+    (mergeAllᵉ (just 1) (ofᵉ (strmᵗ (input (fsuc fzero))
+                    ∷ strmᵗ (input fzero)
+                    ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
+
+sucGU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
+sucGU ds ks j d k =
+  suc (syncSizeᵉ (progU d k)
+       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progU d k))
+
+----------------------------------------------------------------------
+-- THE CLIMBED-PATH FAMILY.  A compositional depth bound is stated over
+-- an arbitrary subject and an arbitrary rootward path, and the root
+-- call fixes both at their smallest — subject the whole program, path
+-- empty.  This varies them together: `thru-outer` is the one frame the
+-- path measure charges, so a stack of j of them is a path of nesting j,
+-- and the subject it demands is the program under j layers of `obs`.
+-- The two must move together because the frame peels exactly one layer.
+----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
 -- THE CUT FAMILY.  The fan of `progF`, with a `takeᵉ 1` between the fan
@@ -256,111 +255,7 @@ sucGC ds ks j dd w k =
   suc (syncSizeᵉ (progC dd w k)
        + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progC dd w k))
 
--- ONE DELIVERY THAT SUBSCRIBES A WIDTH, which is the shape every other
--- family here misses.  `wrapD` merges a SINGLETON, so each accumulator
--- level costs one subscribe and a delivery never registers more than
--- one observable at a time -- and a bound charging one operator's worth
--- per delivery cannot be told apart from a bound charging a width on
--- programs like that.  `wrapW` merges the accumulator with itself `suc
--- w` times instead, so a single scan emission hands the outer *All a
--- width of inners to subscribe at one instant.
-wrapW : ∀ {n} {Γ : Ctx n} {Θ} → ℕ →
-  Tm Γ [] [] Θ (obs natᵗ) → Tm Γ [] [] Θ (obs natᵗ)
-wrapW w t = strmᵗ (mergeAllᵉ nothing (ofᵉ (replicate (suc w) t)))
-
-foldW : ∀ {n} {Γ : Ctx n} → ℕ → Fn Γ [] [] [] ((obs natᵗ) ×ᵗ natᵗ) (obs natᵗ)
-foldW w = wrapW w (fstᵗ (varᵗ (here refl)))
-
-progW : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
-progW ww w k =
-  mergeAllᵉ nothing (scanᵉ (foldW ww) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ nothing (ofᵉ (replicate (suc w) (strmᵗ (input (fsuc fzero)))
-                     ++ (strmᵗ (input fzero) ∷ strmᵗ (ofᵉ (natsD k)) ∷ [])))))
-
 sucGW : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
 sucGW ds ks j ww w k =
   suc (syncSizeᵉ (progW ww w k)
        + hopDᵉ 0 (slotHop 0 (insF ds ks j)) (progW ww w k))
-
-progU : ℕ → ℕ → Closed Γ₂ natᵗ
-progU d k =
-  mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (just 1) (ofᵉ (strmᵗ (input (fsuc fzero))
-                    ∷ strmᵗ (input fzero)
-                    ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
-
-sucGU : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-sucGU ds ks j d k =
-  suc (syncSizeᵉ (progU d k)
-       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progU d k))
-
--- THE BOUNDED-LIMIT FAMILY, which is `progU` with ONE axis moved and
--- everything else held: the inner mergeAll's limit is `suc lim` rather
--- than 1, over the same three inners.  At `lim = 0` it IS `progU`, so
--- the family contains its own control; at 1 one inner parks behind two
--- lanes and the drain must refill SEVERAL in an instant, which is the
--- only behaviour the two removed primitives could not express between
--- them and so the only region no probe of either face reached.  Holding
--- the fold depth and the source length fixed is the point: a crossing
--- that appears here and not at `lim = 0` is attributable to the gate.
-progB : ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
-progB lim d k =
-  mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (just (suc lim)) (ofᵉ (strmᵗ (input (fsuc fzero))
-                    ∷ strmᵗ (input fzero)
-                    ∷ strmᵗ (ofᵉ (natsD k)) ∷ []))))
-
--- THE GATE IS ONLY A GATE WHEN THE SOURCE OUTRUNS IT.  `progB`'s source
--- carries exactly three inners, so a limit of three is already the
--- unbounded case and the family cannot reach a state where the drain
--- parks anything for more than one refill.  `progN` widens the source
--- alone, leaving every other axis where `progB` has it: at w inners and
--- limit l the drain must refill ⌈w/l⌉ times, which is the regime the
--- bounded argument is actually about.
-progN : ℕ → ℕ → ℕ → ℕ → Closed Γ₂ natᵗ
-progN lim w d k =
-  mergeAllᵉ nothing (scanᵉ (foldD d) (strmᵗ (ofᵉ (nat̂ 0 ∷ [])))
-    (mergeAllᵉ (just (suc lim))
-      (ofᵉ (strmᵗ (input (fsuc fzero)) ∷ strmᵗ (input fzero)
-            ∷ replicate (suc w) (strmᵗ (ofᵉ (natsD k)))))))
-
-sucGN : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-sucGN ds ks j lim w d k =
-  suc (syncSizeᵉ (progN lim w d k)
-       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progN lim w d k))
-
-sucGB : ℕ → ℕ → ℕ → ℕ → ℕ → ℕ → ℕ
-sucGB ds ks j lim d k =
-  suc (syncSizeᵉ (progB lim d k)
-       + hopDᵉ 0 (slotHop 0 (insT ds ks j)) (progB lim d k))
-
-----------------------------------------------------------------------
--- THE CLIMBED-PATH FAMILY.  A compositional depth bound is stated over
--- an arbitrary subject and an arbitrary rootward path, and the root
--- call fixes both at their smallest — subject the whole program, path
--- empty.  This varies them together: `thru-outer` is the one frame the
--- path measure charges, so a stack of j of them is a path of nesting j,
--- and the subject it demands is the program under j layers of `obs`.
--- The two must move together because the frame peels exactly one layer.
-----------------------------------------------------------------------
-
-obsN : ℕ → Ty
-obsN 0       = natᵗ
-obsN (suc j) = obs (obsN j)
-
-pathN : ∀ {n} {Γ : Ctx n} (j : ℕ) → Path Γ (obsN j) natᵗ
-pathN 0       = root
-pathN (suc j) = thru-outer mergeAllᵒ 0 ↠ pathN j
-
--- THE SUBJECT MUST NEST ON ITS OWN, and two constructors in a row make
--- that easy to get wrong.  `ofᵉ` the measure sends to zero outright — a
--- one-shot list reaches no subscribe.  A scan over one is barely better:
--- the frame its burst passes is `scan-f`, which subscribes nothing, and
--- the `thru-outer` above the subject is charged by the CALLER rather
--- than by the subject's own descent.  Either way every row is
--- degenerate however deep the path is.  So the scan's source is the
--- program itself, whose `mergeAllᵉ` is what puts a level on.
-subjN : ∀ {n} {Γ : Ctx n} (j d k : ℕ) → Closed Γ (obsN j)
-subjN 0       d k = progD d k
-subjN (suc j) d k =
-  scanᵉ (fstᵗ (varᵗ (here refl))) (strmᵗ (subjN j d k)) (progD d k)

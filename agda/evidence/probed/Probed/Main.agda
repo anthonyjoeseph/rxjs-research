@@ -29,9 +29,6 @@ open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
-open import Probed.Cascade-Nest-Flat
-  using (U-chains; U-descent; U-holds; C-chains; C-descent; C-holds;
-         F-chains; F-descent; F-holds)
 open import Probed.Burst-Nest-Level
   using (row8≡; row16≡)
 open import Probed.Sync-Factor
@@ -65,3 +62,6 @@ open import Probed.Scan-Arr-Margin
 
 open import Probed.Thru-Arr-Slot
   using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡)
+
+open import Probed.Depth-Sighted
+  using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡)

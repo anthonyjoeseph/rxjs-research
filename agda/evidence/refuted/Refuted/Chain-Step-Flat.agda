@@ -56,7 +56,7 @@ open import Rx.Evaluator
          cascade; cascadeLatch; chainsOf; chainStep)
 open import Rx.Slots using (Slots)
 
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; progU; insF; sucGU)
+open import Refuted.Demand-Programs using (Γ₂; progU; insF; sucGU)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?)
 

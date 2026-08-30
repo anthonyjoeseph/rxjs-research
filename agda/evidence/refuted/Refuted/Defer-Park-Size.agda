@@ -64,7 +64,7 @@ open import Data.Bool.ListAction using (all)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestCapsOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₀; ins₀; natsD)
+open import Refuted.Demand-Programs using (Γ₀; ins₀; natsD)
 
 -- the predicate as it stood: the full-size pending bound conjoined
 -- onto the two width conjuncts `nestCapsOK?` still carries

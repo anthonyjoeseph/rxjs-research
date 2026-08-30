@@ -59,7 +59,7 @@ open import Rx.Evaluator
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; valCaps?)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂)
+open import Refuted.Demand-Programs using (Γ₂)
 
 sync : ℕ → List ℕ
 sync zero    = []

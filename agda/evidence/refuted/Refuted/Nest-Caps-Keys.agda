@@ -59,7 +59,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; capsOK?;
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestClosOK?; FaceOK; faceOK)
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; insT)
+open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
 slots = insT 0 0 0

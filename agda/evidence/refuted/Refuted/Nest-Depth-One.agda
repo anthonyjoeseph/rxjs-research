@@ -45,7 +45,7 @@
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Nest-Depth-One where
 
-open import Data.Nat  using (ℕ; _+_; _≤_)
+open import Data.Nat  using (ℕ; _+_; _*_; _≤_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
 open import Data.Empty using (⊥)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -54,10 +54,10 @@ open import Rx.Exp using (Closed; natᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; sched-init; st-init; root; budgetAt)
 open import Rx.Slots using (Slots)
 
-open import Verify-Budget-Sufficient.Demand-Programs using (Γ₂; progU; insT)
+open import Refuted.Demand-Programs using (Γ₂; progU; insT)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (pathNestD; storeNestMax; nestSyn)
+  using (pathNestD; storeNestMax; nestUnit)
 open import Rx.Nest-Depth using (nestDᵉ)
 
 -- the crossing point: the mergeAll drain under five nested folds
@@ -83,7 +83,7 @@ descent : ℕ
 descent = depthE (budgetAt prog slots 0) prog κ 0 0 sd st
 
 oneSyn : ℕ
-oneSyn = nestDᵉ prog + pathNestD κ + storeNestMax sd st + nestSyn prog slots
+oneSyn = nestDᵉ prog + pathNestD κ + storeNestMax sd st + (2 * nestUnit prog slots)
 
 -- THE FIGURES, PINNED.  Spelled out rather than left inline so that any
 -- repair moving either measure fails here, naming the number, instead of

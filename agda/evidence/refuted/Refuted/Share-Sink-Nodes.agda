@@ -63,7 +63,7 @@ open import Rx.Evaluator
          cascadeLatch; chainsOf; chainStep; arrTy; arrVal; Arrival; Path; RegId)
 open import Rx.Slots using (Slots; shared; scripted)
 open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; pathNestD)
-open import Verify-Budget-Sufficient.Demand-Programs
+open import Refuted.Demand-Programs
   using (Γ₂; progF; asyncNats)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
