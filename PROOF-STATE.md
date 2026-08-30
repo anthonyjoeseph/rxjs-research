@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two subscribing leaves, now that they are only about SYNTAX** —
-  `thru-regs-base` and `inner-regs-base` no longer owe a count, so what
-  is left of each is that the entry a subscribe appends is priced under
-  the base size cap. A `thru` appends the very path being walked, which
-  the receipt in hand already prices, so that one should fall to the
-  path receipt outright; an inner reaction appends a path built from the
-  inner observable, which it does not, and that is the leaf worth
-  keeping. Split them and find out which.
-
 - **the closure reading, which is the one row refuted twice** —
   `nest-clos-caps` prices ONE inner observable's closure under the
   frame's cap, and it is what the `thru` head's resolved-size premise
@@ -245,19 +236,30 @@ does not fit is a finding about the shared statement, not about the head.
   the sink can seed its own the same way, or whether the walk's
   hypotheses have to carry a round at every head.
 
+- **the base cap the registry is priced under, which is what both
+  subscribing leaves are really about** — the frame heads are bodies
+  now, and what is left is one claim about one primitive: a subscribe
+  keeps every registered chain under `Caps.cSize (capsAt e sl id)`.
+  The immediate entry is free — the registered path is the walked one
+  with its head swapped, so it has the same length — and the recursive
+  entries are not, since subscribing an inner pushes frames the base
+  cap never saw. The leg is to find out whether the walk's own ladder
+  already bounds that push, or whether `RegsBase` has to be stated at
+  the level rather than at the base.
+
 ### The ledger
 
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`thru-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a `thru`
-  frame's subscribe preserving the registry's base-cap pricing, now that the
-  count is read rather than threaded and only the SIZE half is left. What it
-  appends is the path being walked, which the receipt in hand already prices.
-- **`inner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same at
-  an inner reaction, and the harder of the two — what it appends is built from
-  the INNER observable, which no receipt in hand prices.
+- **`subscribeInner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
+  subscribe preserving the registry's BASE-cap pricing. The immediate entry has
+  the walked path's length; the recursive ones can push frames of their own, and
+  those are priced at the level's cap rather than the base.
+- **`mergeAllDrain-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  same across a bounded `mergeAll`'s drain, which is the one arm of an inner's
+  finish that can subscribe — a queued inner takes the lane just freed.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's.
