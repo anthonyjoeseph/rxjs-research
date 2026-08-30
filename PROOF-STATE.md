@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **`walk-frame-drain`, the last FALSITY the walk face carries that is
-  not about the closure key** — a bounded `mergeAll`'s parked queue,
-  owing a delivery position ABOVE the walk's level with gas still left.
-  An earlier form of it was refuted at the level, which is what the
-  `RECOVERY` pointer holds, and the fold has since been shown to supply
-  the position; what the leaf still owes is the frame-local half. The
-  leg is to state that half against the fold's receipt rather than
-  against the level, and to instantiate it at the family the refutation
-  was built from — since a statement repaired by moving the index is
-  exactly the shape that reads as fixed while still being wrong.
+- **`walk-frame-drain-inner`, the drain leaf with four of its five
+  heads now proven** — matching on the frame discharged every head that
+  names no node, and doing so exposed what the residue actually owes.
+  Its two caps conjuncts are read at the BASE cap while the walk
+  carries a receipt only at its own level, and `capsOK?` weakens
+  upward only, so past the first level the walk has nothing to hand
+  over. The residue is an INDEX, not a fact about queues. The leg is to
+  settle where that conjunct belongs — levelling it re-denominates the
+  consumer's flat-cap budget, the trade the sink's dead route already
+  records — and only then to state the queue's own conjuncts.
 
 - **`step-frame-clos`, the last flat reading the frame face still
   carries** — a rebuilt value's closure is a SUM, so the unconditional
@@ -251,10 +251,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
-  `mergeAll`'s parked queue, now owing a delivery position above the walk's
-  level with gas left. The fold supplies the position; what the leaf still owes
-  is the frame-local half.
+- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  `from-inner` head of the drain law, the only frame that names a node. Its
+  caps conjuncts are read at the base cap while the walk holds one only at its
+  level, and that weakens the wrong way.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: refuted at
   every cap in its old form, since a rebuilt value's closure is a sum. Now
   stated ONE LEVEL UP, where a level more than doubles the cap.

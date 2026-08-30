@@ -3,7 +3,7 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _∸_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (m+[n∸m]≡n; <⇒≤; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans;
   ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤;
   +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n;
@@ -21,7 +21,7 @@ open import Data.List.Relation.Unary.All.Properties
   using (concat⁺; tabulate⁺)
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Data.List.Properties using (length-map)
-open import Data.Maybe   using (nothing; just)
+open import Data.Maybe   using (Maybe; nothing; just)
 open import Relation.Nullary using (yes; no)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -41,6 +41,7 @@ open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestF
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
+  capsDrainOK;
   fac-hoist; one-pow; FaceOK; faceAt; shareCapsOK)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade; depthChain; depthFold; depthShareGo; lub3-l; lub3-m; lub3-r)
@@ -3064,6 +3065,38 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
                            (reached-room c d P (suc g₀) 2≤S hR))
                   (⊔-lub ≤-refl (size≤sizeCount c d 2≤S (1≤capsAt-reg e sl id))))
 
+-- THE ONE HEAD THAT OWES, AND WHAT IT STILL OWES IS AN INDEX RATHER
+-- THAN A QUANTITY.  Every conjunct the queue asks for is about a term
+-- the store is holding, and the walk arrives carrying receipts about
+-- exactly that store -- but it carries them AT ITS LEVEL, and the two
+-- caps conjuncts here are read at the BASE.  `capsOK?` weakens upward
+-- only, so a receipt at `frameStep L` does not deliver one at the cap
+-- below it, and at every level past the first the walk has nothing to
+-- hand over.  That is not a missing fact about queues: it is the same
+-- base-versus-level split the closure key was moved across, arriving
+-- one predicate later, and the repair is to decide where the drain's
+-- caps conjunct belongs before proving anything about the queue.
+--
+-- AND THE ANSWER IS NOT SIMPLY TO LEVEL IT, which is why this is
+-- stated and not done.  The drain's consumer reads its own budget off
+-- the flat cap once per round, so raising the conjunct to the walk's
+-- level re-denominates that budget -- the same trade the sink's own
+-- dead route records one face over.
+postulate
+  walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (op : AllOp) (allNid : NodeId) (inst : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps sl id L sf gas nid now src (from-inner op allNid inst ↠ p)
+      vals evs fin sched st →
+    ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
+      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+      capsDrainOK (capsAt e sl id) sl (capsH e sl id) L sf allNid p nid now
+        lim (pred act) q sched st
+
+
 -- AND THE DRAIN ONE IS NOW A FRAME-LOCAL STATEMENT, which is what it
 -- had to become.  Its conjunct used to charge the walk's LEVEL against
 -- the BASE size cap, because the proven consumer climbed the relative
@@ -3109,14 +3142,25 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   level taken to be the base size cap, every other premise met by the
 --   entry bounds and the proven node installer.  Whoever puts a level
 --   back into this statement wants that witness back.
-postulate
-  walk-frame-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
-    frameDrainOK (capsAt e sl id) sl (capsH e sl id) L sf nid now f p vals sched st
+
+-- AND FOUR OF THE FIVE HEADS OWE NOTHING, which the match says in
+-- code rather than in prose.  Only a `from-inner` names a node, so
+-- only a `from-inner` can be looking at a `mergeAll` queue; the other
+-- four forward what they are handed and their arm is the unit.
+walk-frame-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+  frameDrainOK (capsAt e sl id) sl (capsH e sl id) L sf nid now f p vals sched st
+
+walk-frame-drain sl id L sf gas nid now src (map-f _) p vals evs fin sched st H = tt
+walk-frame-drain sl id L sf gas nid now src (scan-f _ _) p vals evs fin sched st H = tt
+walk-frame-drain sl id L sf gas nid now src (take-f _) p vals evs fin sched st H = tt
+walk-frame-drain sl id L sf gas nid now src (thru-outer _ _) p vals evs fin sched st H = tt
+walk-frame-drain sl id L sf gas nid now src (from-inner op allNid inst) p vals evs fin sched st H =
+  walk-frame-drain-inner sl id L sf gas nid now src op allNid inst p vals evs fin sched st H
 
 
 
