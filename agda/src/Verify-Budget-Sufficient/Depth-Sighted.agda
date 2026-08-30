@@ -6,23 +6,24 @@
 -- does not close.
 module Verify-Budget-Sufficient.Depth-Sighted where
 
-open import Data.Nat using (ℕ; suc; _+_; _≤_; z≤n)
-open import Data.Nat.Properties using (≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-comm)
+open import Data.Nat using (ℕ; zero; suc; _+_; _≤_; z≤n)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm)
 open import Data.Bool using (false)
 open import Data.List using ([])
 open import Data.Maybe using (nothing)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans)
 
-open import Rx.Exp using (Ctx; Closed; Fn; obs; sizeᵉ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
+open import Rx.Exp using (Ctx; Closed; Fn; obs; sizeᵉ; evalTm; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
   input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
-open import Rx.Evaluator using (Sched; EvalSt; Path; map-f; _↠_; subscribeE;
+open import Rx.Evaluator using (Sched; EvalSt; Path; map-f; take-f; _↠_; subscribeE;
+  mintNode; installNode; take-st;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; sightCeil; storeNestMax; nestUnit)
+  (pathNestD; sightCeil; sightCeil-mono; storeNestMax; storeNestMax-install; nestUnit)
 
 -- WHAT THE SUBSCRIBING STATE CAN SEE, named once so the clauses below
 -- read as the trade rather than as four arguments.
@@ -52,11 +53,38 @@ postulate
 
   -- the three heads that MINT and INSTALL a node before descending, so
   -- each owes a store transport across `installNode` on top of its trade
-  sight-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (c : _) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  -- the take frame's own sweep back out, the residue of a clause whose
+  -- descent half is proven below
+  sight-take-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (k : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
-    depthE g (takeᵉ c b) κ bid now sched st ≤ Sight (takeᵉ c b) κ sched st
+    (let nid    = proj₁ (mintNode sched)
+         sched₁ = proj₂ (mintNode sched)
+         st₀    = installNode nid (take-st (suc k)) st
+         r      = subscribeE g b (take-f nid ↠ κ) bid now sched₁ st₀ in
+     depthBurst g bid now (take-f nid) κ
+       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
+      ≤ Sight b κ sched st
 
+-- THE SCAN, AND ITS DESCENT HALF IS NOT MECHANICAL -- which is the one
+-- thing the take clause below made it look like.  The trade is exact and
+-- generous: a scan drops its seed's and its function's nesting off the
+-- subject and puts only the function's onto the frame, so the measure
+-- has the SEED's nesting to spare.  The store then takes it straight
+-- back, because a scan installs its evaluated seed as a node and the
+-- ceiling reads the store as a summand beside the measure.
+--
+-- SO THE CLAUSE CLOSES EXACTLY WHEN AN EVALUATED SEED IS NO MORE NESTED
+-- THAN ITS TERM, and that is not what this tree has.  What it has is the
+-- same bound scaled by two to the term's sync size, and a FACTOR there
+-- does not fit under a slack that is one summand.  The tight form is not
+-- obviously true either: the value measure joins where the syntactic one
+-- sums, which is what would make it hold, but an observable inside a
+-- seed sums its function against its source, so a variable occurring on
+-- both sides of one `mapᵉ` doubles on substitution while the term it was
+-- substituted into charged nothing.  Refute or prove THAT before either
+-- widening the ceiling or minting the tight lemma.
+postulate
   sight-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (f : _) (z : _) (b : Closed Γ s) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -137,7 +165,6 @@ depthE-sighted g (deferᵉ b)         κ bid now sched st = z≤n
 depthE-sighted g0 (μᵉ body)         κ bid now sched st = z≤n
 depthE-sighted (gs g) (μᵉ body)     κ bid now sched st = sight-mu g body κ bid now sched st
 depthE-sighted g (varᵉ ())          κ bid now sched st
-depthE-sighted g (takeᵉ c b)        κ bid now sched st = sight-take g c b κ bid now sched st
 depthE-sighted g (scanᵉ f z b)      κ bid now sched st = sight-scan g f z b κ bid now sched st
 depthE-sighted {u = u} g (mergeAllᵉ lim b) κ bid now sched st =
   sight-all g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false) b κ bid now sched st
@@ -145,6 +172,25 @@ depthE-sighted g (switchAllᵉ b)     κ bid now sched st =
   sight-all g switchᵒ (switch-st nothing false) b κ bid now sched st
 depthE-sighted g (exhaustAllᵉ b)    κ bid now sched st =
   sight-all g exhaustᵒ (exhaust-st false false) b κ bid now sched st
+-- THE TAKE, whose descent half costs nothing on either side of the
+-- trade: a take charges the path nothing and drops the subject nothing,
+-- and the node it installs carries no nesting at all, so the reading the
+-- recursive call gets is the reading this call was handed.  What is left
+-- of the clause is its burst.
+depthE-sighted {e = e} g (takeᵉ c b) κ bid now sched st
+  with evalTm c
+... | zero  = z≤n
+... | suc k =
+  ⊔-lub (≤-trans (depthE-sighted g b (take-f nid ↠ κ) bid now sched₁ st₀)
+                 (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched)) ≤-refl
+                   (≤-trans (storeNestMax-install nid (take-st (suc k)) sched₁ st)
+                            (⊔-lub z≤n ≤-refl))))
+        (sight-take-burst g k b κ bid now sched st)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (take-st (suc k)) st
+
 -- THE ONE CLAUSE THAT IS THE TRADE ITSELF, and it needs no store
 -- transport: a map mints nothing, so the state the recursive call reads
 -- is the state this call was handed.  The whole step is the charge

@@ -50,10 +50,10 @@ open import Data.Bool using (Bool; true; false; T; _∨_)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_)
 open import Data.Bool.ListAction using (any)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; z≤n; s≤s)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
   m≤n⊔m; m≤m⊔n; m≤m+n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
-  *-identityʳ; *-distribˡ-+; m^n>0)
+  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -61,6 +61,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 open import Rx.Exp using (Ctx; Closed; sizeᵗ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId;
+  NodeId; setNode; installNode;
   NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
   Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive;
   arrSource)
@@ -333,6 +334,38 @@ storeNest-regs≤ sched st =
          ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
          ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)) _
 
+-- INSTALLING A NODE RAISES THE STORE BY AT MOST THAT NODE'S OWN
+-- NESTING, and an install is the only way a subscribe touches the node
+-- place at all.  The other three places are literally the same terms
+-- before and after -- an install is a record update on `nodes` -- so
+-- the whole content sits in the list fold under `setNode`, which either
+-- REPLACES an entry or APPENDS one and in both cases keeps only
+-- summands that were already there.
+nodesNest-setNode : ∀ {n} {Γ : Ctx n} (nid : NodeId) (ns : NodeState Γ)
+  (nodes : List (NodeId × NodeState Γ)) →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (setNode nid ns nodes)
+    ≤ nodeNest ns ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 nodes
+nodesNest-setNode nid ns [] = ≤-refl
+nodesNest-setNode nid ns ((k , s′) ∷ r) with k ≡ᵇ nid
+... | true  = ⊔-lub (m≤m⊔n (nodeNest ns) _)
+                    (≤-trans (m≤n⊔m (nodeNest s′) _) (m≤n⊔m (nodeNest ns) _))
+... | false = ⊔-lub (≤-trans (m≤m⊔n (nodeNest s′) _) (m≤n⊔m (nodeNest ns) _))
+                    (≤-trans (nodesNest-setNode nid ns r)
+                             (⊔-monoʳ-≤ (nodeNest ns) (m≤n⊔m (nodeNest s′) _)))
+
+storeNestMax-install : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (nid : NodeId) (ns : NodeState Γ) (sched : Sched Γ) (st : EvalSt e) →
+  storeNestMax sched (installNode nid ns st)
+    ≤ nodeNest ns ⊔ storeNestMax sched st
+storeNestMax-install nid ns sched st =
+  storeNestMax-lub sched (installNode nid ns st) _
+    (≤-trans (storeNest-slots≤ sched st) (m≤n⊔m (nodeNest ns) _))
+    (≤-trans (storeNest-live≤ sched st) (m≤n⊔m (nodeNest ns) _))
+    (≤-trans (nodesNest-setNode nid ns (EvalSt.nodes st))
+             (⊔-monoʳ-≤ (nodeNest ns) (storeNest-nodes≤ sched st)))
+    (≤-trans (storeNest-regs≤ sched st) (m≤n⊔m (nodeNest ns) _))
+
+
 -- THE LATCH MOVES NO OBSERVABLE.  `cascadeLatch` resets the per-cascade
 -- bookkeeping and may add a completed source; it never touches `nodes`,
 -- and the `Sched` is not its argument — so the store's nesting is
@@ -441,6 +474,14 @@ nestUnit e sl = suc (nestDᵉ e + slotsNestSum sl)
 --   and six against four.
 sightCeil : ℕ → ℕ → ℕ → ℕ → ℕ
 sightCeil z v s u = suc z * suc (v + s + u)
+
+-- and it is monotone in the two places a descent moves, which is what
+-- lets one clause's reading be widened to the next's without unfolding
+-- the product at the call site
+sightCeil-mono : ∀ (z : ℕ) {v v′ s s′ : ℕ} (u : ℕ) → v ≤ v′ → s ≤ s′ →
+  sightCeil z v s u ≤ sightCeil z v′ s′ u
+sightCeil-mono z u hv hs =
+  *-monoʳ-≤ (suc z) (s≤s (+-monoˡ-≤ u (+-mono-≤ hv hs)))
 
 ------------------------------------------------------------------
 -- THE PER-INSTANT NESTING CAP AND THE REAL-WIDTH BUDGET, one paired
