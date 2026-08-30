@@ -99,10 +99,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (slotsNestSum; storeNestMax; pathNestD; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro; nestCapAt-suc;
-  nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch; nestUnit;
-  nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax; storeNest-slots≤;
-  storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
+  (slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro;
+  nestCapAt-suc; nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch;
+  nestUnit; nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax;
+  storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
@@ -122,6 +122,7 @@ open import Verify-Budget-Sufficient.Psi-Split using
 -- statement is the only one reading BOTH vocabularies; this module is
 -- its sole consumer.
 open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
+open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
 
@@ -1400,54 +1401,6 @@ abstract
 --   wanted again whatever the decomposition: `sum2H`/`sum3H`/`sucH`/
 --   `hUp`/`hIn`/`1≤3x`/`payL`/`payR` for moving a bound up a tower,
 --   `tower-sum-tab` for a slot telescope, and `entryCeil-slotWid`.
-
-------------------------------------------------------------------
--- ANY SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE, which is the
--- statement the induction is actually over.  A sweep crosses
--- `thru-outer` frames and drains bounded mergeAlls, and both are paid
--- for out of structure it already has: the subject it is descending,
--- the path it has built, the store it walks, and the program's own
--- wrap unit.  The root claim below is this at `root`, where the path
--- charges nothing.
---
--- THE SUBJECT AND THE PATH ARE ONE QUANTITY, and stating it that way
--- is the whole reason this form can be induced on.  Every structural
--- descent TRADES: a `map` moves its function's nesting off the subject
--- and onto the frame it pushes, a `*All` moves its own wrap `suc` the
--- same way, and a `scan` moves less than it drops.  So `pathNestD κ +
--- nestDᵉ b` is non-increasing along the walk while neither summand is,
--- and a bound stated on either alone has to be re-established at every
--- edge.
---
--- WHAT THE SIZE FACTOR PAYS FOR IS THE ONE DESCENT THAT DOES NOT
--- TRADE.  A drain runs under a `from-inner`, which the path measure
--- charges nothing for -- deliberately, since the layer it would charge
--- is the one the `thru-outer` above it already bought -- so a program
--- whose folds nest spends one per layer against a sum that sees none
--- of them.  The layers are bounded by the program, which is why the
--- size enters as a FACTOR rather than a summand: as a summand it is
--- outrun, one per delivered value against the descent's eight.
---
--- REFUTED: `Refuted.Nest-Depth-One` is the subscribe-side witness the
---   ceiling is calibrated against -- a limit-one mergeAll over three
---   queued inners under nested folds, read at the root subscribe, whose
---   descent climbs four per fold layer against the bare sum's three.
--- PROBED: `Probed.Depth-Sighted` reads this at `root` at fold depths
---   two and twenty, at nine and eighty-one against ceilings of four
---   hundred and five thousand; on the family whose mergeAll is
---   unbounded, five against three hundred and seventy-two; and under
---   the vocabulary that connects at once rather than late, four against
---   one thousand three hundred and seventy-eight.  Not covered: any
---   `sl` past the two-slot vocabularies, which is where both remaining
---   families are; and every path other than `root`, which is the whole
---   of what generalising added.
-postulate
-  depthE-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    depthE g b κ bid now sched st
-      ≤ sightCeil (sizeᵉ e) (pathNestD κ + nestDᵉ b)
-                  (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 -- AND THE ENTRY IS THAT AT `root`, WHERE THE PATH CHARGES NOTHING, so
 -- the two readings of the subject term are the same term and the

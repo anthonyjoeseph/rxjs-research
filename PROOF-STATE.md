@@ -216,15 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the trade's own clauses, structural ones first** — the trade is
-  stated and the entry falls out of it with no arithmetic, so what is
-  left is the induction itself. The three structural descents cost
-  nothing: `map` and `*All` move their charge off the subject onto the
-  frame exactly, and `scan` moves less than it drops, so each is a
-  commutativity step against a measure already in the tree. Take those
-  and the two zero clauses first, leaving the slot read, the μ
-  unfolding and the drain as leaves — the drain being the one that has
-  to spend the size factor, and the only one worth a design decision.
+- **the two clauses that MINT, which is what the trade still owes** — the
+  case analysis is a body now and the zero clauses and the map trade are
+  discharged, so what remains of the structural half is `take` and `scan`.
+  Both are exact on the measure — a take drops nothing and a scan moves less
+  than it drops — and both install a node before descending, so each is a
+  `storeNestMax` transport across `installNode` and nothing else. Take them
+  together: it is one transport lemma spent twice, and it is the last of the
+  descents that costs no design.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -264,6 +263,17 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's.
+- **`sight-input` / `sight-map-burst`** (Depth-Sighted) — FALSITY,
+  `NO EVIDENCE`: the slot read, where gas is peeled and the subject becomes a
+  shared def the path never charged for; and the map frame's own sweep back
+  out. Newborn statements, nothing has instantiated either.
+- **`sight-take` / `sight-scan`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`:
+  the two heads that MINT and INSTALL a node before descending, so each owes a
+  `storeNestMax` transport across `installNode` on top of a trade the measure
+  already makes exact.
+- **`sight-mu`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`: the unfolding, the
+  one descent whose SUBJECT grows, so the measure has to be re-read rather
+  than traded.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
@@ -272,10 +282,10 @@ does not fit is a finding about the shared statement, not about the head.
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
   compound, and the margin WIDENS with the instant.
-- **`depthE-sighted`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the same
-  statement over ANY subject and path, which is the form the induction runs on
-  — `pathNestD κ + nestDᵉ b` is what every structural descent trades within.
-  The entry is now a body over it; the rows read that body's instance only.
+- **`sight-all`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain, one leaf
+  for all three `*All` heads — they delegate to the same family and wrap the
+  subject in one level each. The payload subscribe charges the path nothing,
+  so this is where the ceiling's size FACTOR is spent.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that
