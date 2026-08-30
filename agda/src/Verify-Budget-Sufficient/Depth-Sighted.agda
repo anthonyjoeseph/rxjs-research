@@ -6,26 +6,26 @@
 -- does not close.
 module Verify-Budget-Sufficient.Depth-Sighted where
 
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm;
   *-mono-≤; *-monoˡ-≤; ^-monoʳ-≤; +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n;
   *-distribˡ-+)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; con)
-open import Data.Bool using (false)
-open import Data.List using ([])
+open import Data.Bool using (Bool; false)
+open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
 open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans; sym; refl)
+open import Relation.Binary.PropositionalEquality using (_≡_; cong; cong₂; trans; sym; refl)
 
-open import Rx.Exp using (Ctx; Closed; Fn; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
+open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
   input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick)
-open import Rx.Evaluator using (Sched; EvalSt; Path; map-f; take-f; _↠_; subscribeE;
+open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; Stream; map-f; take-f; _↠_; subscribeE;
   mintNode; installNode; take-st; scan-st; scan-f;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeState; mergeAll-st; switch-st; exhaust-st)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll; depthFrame)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
 open import Verify-Budget-Sufficient.Nest-Store using
@@ -57,68 +57,46 @@ Sight {e = e} b κ sched st =
   sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ b * (pathNestD κ + nestDᵉ b))
             (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
+-- A CHAIN FRAME COSTS THE BURST NOTHING, and the three heads that mint a
+-- node are chain frames.  A `map`, a `scan` and a `take` transform in
+-- place: they push no story, so `depthFrame` is flatly zero at each of
+-- them, and a burst is a fold of `depthFrame` over the emitted stream
+-- with the state threaded through.  The threading is why this is an
+-- induction rather than a computation -- every element is read at a
+-- state the one before it produced -- and it is why the hypothesis
+-- quantifies over the state rather than fixing it.
+burst-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (bid : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t) →
+  (∀ (vals : List (Val Γ s)) (fin : Bool) (sch : Sched Γ) (sto : EvalSt e) →
+     depthFrame g bid now f κ vals fin sch sto ≡ 0) →
+  ∀ (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  depthBurst g bid now f κ ems sched st ≡ 0
+burst-flat g bid now f κ h []         sched st = refl
+burst-flat g bid now f κ h (em ∷ ems) sched st =
+  cong₂ _⊔_ (h _ _ sched st) (burst-flat g bid now f κ h ems _ _)
+
+-- THE SLOT READ, and it is the other descent whose subject is not a
+-- subterm -- but unlike the unfold it costs something, because the
+-- subject is a SHARED DEF the path never charged for and the registry
+-- grows under `register` on the way in.  The room it needs is the wrap
+-- unit, which is where the slot vocabulary's own nesting is summed; the
+-- open question is the SCALE, since the unit sits in the ceiling
+-- unscaled while a def's descent reads it through the same
+-- per-occurrence factor every other subject does.
+--
+-- PROBED: `Probed.Depth-Sighted` reads the assembly at `root` on a
+--   scan-headed program whose source is exactly this head, at scrutinee
+--   depths one and four: three against ten decimal digits, and three
+--   against fourteen.  The descent does not move with the seed at all,
+--   which is the axis those rows were built to sweep.  Not covered: any
+--   path other than the empty one, any slot vocabulary but the one that
+--   connects late, and every instant past the entry.
 postulate
-  -- the slot read: gas is peeled, the subject becomes the shared def --
-  -- a term the program contains but the path never charged for -- and
-  -- the registry grows under `register`.
   sight-input : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (g : Gas) (i : _) (κ : Path Γ _ t) (bid : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) →
     depthE g (input i) κ bid now sched st ≤ Sight (input i) κ sched st
 
-  -- the map burst, which is the frame's own sweep back out.  What it
-  -- may NOT be closed by is the frame's own charge read additively:
-  -- `Refuted.Apply-Fn-Nest` kills `nestDᵛ (applyFn fn v) ≤ nestDᵗ fn +
-  -- nestDᵛ v`, which is exactly what `pathNestD`'s map arm asserts, so
-  -- the payload's nesting has to be charged once per OCCURRENCE here.
-  sight-map-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    (let r = subscribeE g b (map-f f ↠ κ) bid now sched st in
-     depthBurst g bid now (map-f f) κ
-       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-      ≤ Sight (mapᵉ f b) κ sched st
-
-  -- the three heads that MINT and INSTALL a node before descending, so
-  -- each owes a store transport across `installNode` on top of its trade
-  -- the take frame's own sweep back out, the residue of a clause whose
-  -- descent half is proven below
-  sight-take-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (k : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) →
-    (let nid    = proj₁ (mintNode sched)
-         sched₁ = proj₂ (mintNode sched)
-         st₀    = installNode nid (take-st (suc k)) st
-         r      = subscribeE g b (take-f nid ↠ κ) bid now sched₁ st₀ in
-     depthBurst g bid now (take-f nid) κ
-       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-      ≤ Sight b κ sched st
-
--- THE SCAN FRAME'S OWN SWEEP BACK OUT, all that is left of a clause
--- whose descent half is proven below -- and the node it sweeps past is
--- the only one in this family carrying nesting of its own, since a scan
--- installs its EVALUATED seed.
---
--- PROBED: `Probed.Depth-Sighted` reads the clause this residue belongs
---   to at the empty path -- the program's head is the scan -- on a seed
---   of the shape whose local route is refuted, at scrutinee depths one
---   and four: three against ten decimal digits, and three against
---   fourteen.  The reading is the whole clause, so it prices this
---   residue too, and the margin WIDENS along the seed's own axis while
---   the descent does not move at all.  Not covered: any path other than
---   the empty one, any slot vocabulary but the one that connects late,
---   and every instant past the entry.
-postulate
-  sight-scan-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (g : Gas) (f : _) (z : _) (b : Closed Γ s) (κ : Path Γ u t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    (let nid    = proj₁ (mintNode sched)
-         sched₁ = proj₂ (mintNode sched)
-         st₀    = installNode nid (scan-st (evalTm z)) st
-         r      = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁ st₀ in
-     depthBurst g bid now (scan-f f nid) κ
-       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))
-      ≤ Sight (scanᵉ f z b) κ sched st
 
 -- THE DRAIN, and it is ONE leaf for the three heads rather than three:
 -- all of them delegate to `depthAll`, all of them wrap the subject in
@@ -226,11 +204,14 @@ depthE-sighted {e = e} g (scanᵉ f z b) κ bid now sched st =
                    (storeNestMax sched₁ st₀)
                    (2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))) sR
                    (nestUnit e (Sched.slots sched)) hsum))
-        (sight-scan-burst g f z b κ bid now sched st)
+        (≤-trans (≤-reflexive (burst-flat g bid now (scan-f f nid) κ
+                                 (λ _ _ _ _ → refl)
+                                 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))) z≤n)
   where
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
   st₀    = installNode nid (scan-st (evalTm z)) st
+  r      = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁ st₀
   K      = syncSizeᵉ (scanᵉ f z b)
   A      = nestDᵗ f + pathNestD κ + nestDᵉ b
   NV     = nodeNest (scan-st (evalTm z))
@@ -282,16 +263,14 @@ depthE-sighted {e = e} g (takeᵉ c b) κ bid now sched st
                                            (n≤1+n _))))
                    (≤-trans (storeNestMax-install nid (take-st (suc k)) sched₁ st)
                             (⊔-lub z≤n ≤-refl))))
-        (≤-trans (sight-take-burst g k b κ bid now sched st)
-                 (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
-                   (*-monoˡ-≤ (pathNestD κ + nestDᵉ b)
-                     (^-monoʳ-≤ 2 (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ c))
-                                           (n≤1+n _))))
-                   ≤-refl))
+        (≤-trans (≤-reflexive (burst-flat g bid now (take-f nid) κ
+                                 (λ _ _ _ _ → refl)
+                                 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))) z≤n)
   where
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
   st₀    = installNode nid (take-st (suc k)) st
+  r      = subscribeE g b (take-f nid ↠ κ) bid now sched₁ st₀
 
 -- THE ONE CLAUSE THAT IS THE TRADE ITSELF, and it needs no store
 -- transport: a map mints nothing, so the state the recursive call reads
@@ -305,8 +284,11 @@ depthE-sighted {e = e} g (mapᵉ f b) κ bid now sched st =
                                                    (n≤1+n _)))
                              (≤-reflexive (trade f b κ)))
                    ≤-refl))
-        (sight-map-burst g f b κ bid now sched st)
+        (≤-trans (≤-reflexive (burst-flat g bid now (map-f f) κ
+                                 (λ _ _ _ _ → refl)
+                                 (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))) z≤n)
   where
+  r = subscribeE g b (map-f f ↠ κ) bid now sched st
   trade : ∀ {s u} (f : Fn _ [] [] [] s u) (b : Closed _ s) (κ : Path _ u _) →
     pathNestD (map-f f ↠ κ) + nestDᵉ b ≡ pathNestD κ + nestDᵉ (mapᵉ f b)
   trade f b κ = trans (cong (_+ nestDᵉ b) (+-comm (nestDᵗ f) (pathNestD κ)))

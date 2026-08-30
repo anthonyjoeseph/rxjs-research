@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **spending the factor a second time, at the map frame** — the scan is done:
-  its descent half is a real body, the evaluated seed is paid for out of the
-  head's own sync size by this tree's per-occurrence bound, and what is left
-  of the clause is a burst residue. `sight-map-burst` is the same argument at
-  the other head — `Refuted.Apply-Fn-Nest` kills the additive path charge
-  exactly as the seed's was killed, and `applyFn-nest-sync` is the bound that
-  replaces it. The difference is where it has to be spent: inside the burst
-  rather than at the trade, so the leg is finding the frame's own reading of
-  the payload and pricing it there.
+- **the wrap unit's scale, which is what `sight-input` reads** — the subscribe
+  side is down to two leaves. The three burst residues were not hard, they
+  were ZERO: a chain frame pushes no story, so `depthFrame` is flatly zero at
+  `map-f`, `scan-f` and `take-f`, and `burst-flat` folds that over the emitted
+  stream. What is left of the slot read is a real gap: the subject is a shared
+  def, its nesting is summed into the wrap unit, and the unit sits in the
+  ceiling UNSCALED while every other subject is read through the
+  per-occurrence factor. Either the unit carries the factor too, or the def's
+  descent is bounded without it.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -264,22 +264,14 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's.
-- **`sight-input` / `sight-map-burst`** (Depth-Sighted) — FALSITY,
-  `NO EVIDENCE`: the slot read, where gas is peeled and the subject becomes a
-  shared def the path never charged for; and the map frame's own sweep back
-  out. Newborn statements, nothing has instantiated either.
-- **`sight-take-burst`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`: the take
-  frame's sweep back out, all that is left of a clause whose descent half is
-  proven — a take charges the path nothing, drops nothing, and installs a node
-  carrying no nesting at all.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
-- **`sight-scan-burst`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the scan
-  frame's sweep back out, all that is left of a clause whose descent half is
-  proven — and the node it sweeps past is the only one in the family carrying
-  nesting, since a scan installs its evaluated seed.
+- **`sight-input`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the slot read, the
+  other descent whose subject is not a subterm — and unlike the unfold it costs
+  something: a shared def the path never charged for. The room is the wrap
+  unit; the question is its scale.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
