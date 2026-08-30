@@ -132,7 +132,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
   capsOK?-regs; capsOK?-setNode; dropSweep-caps; face-lift; frameBud; FrameFace;
   lookupNode-caps; pathSz?-len; pathSz?-tail; shareLatch-caps; slotsCaps?-capsAt;
-  takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
+  takeDispatch-all; takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro)
@@ -2550,17 +2550,92 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 --   recurrence -- which is what the seal cannot move, the floor being
 --   a lower bound and the step monotone.
 postulate
-  step-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  step-frame-clos-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (fn : Fn Γ [] [] [] s u)
+    (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (f ↠ p) ≡ true →
+    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((map-f fn) ↠ p) ≡ true →
     valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
     all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
     all (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl u)
-        (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true
+        (proj₁ (stepFrame sf nid now (map-f fn) p vals fin sched st)) ≡ true
+
+  step-frame-clos-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (snid : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((scan-f fn snid) ↠ p) ≡ true →
+    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
+    all (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl u)
+        (proj₁ (stepFrame sf nid now (scan-f fn snid) p vals fin sched st)) ≡ true
+
+  step-frame-clos-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (op : AllOp) (allNid inst : NodeId)
+    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (from-inner op allNid inst ↠ p) ≡ true →
+    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
+    all (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl s)
+        (proj₁ (stepFrame sf nid now (from-inner op allNid inst) p vals fin sched st)) ≡ true
+
+  step-frame-clos-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (op : AllOp) (onid : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (thru-outer op onid ↠ p) ≡ true →
+    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl (obs u)) vals ≡ true →
+    all (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl u)
+        (proj₁ (stepFrame sf nid now (thru-outer op onid) p vals fin sched st)) ≡ true
+
+-- AND THE HEAD DECIDES, so the claim is a body over four of them and
+-- not a fifth statement about frames in general.  A `take-f` REBUILDS
+-- NOTHING -- it passes on a prefix of exactly the values it was handed
+-- -- so its arm is the reading widened along the level it was already
+-- being restated at, and neither the template pricing nor the store
+-- premise is spent.  The four that remain are the four that rebuild,
+-- and the level is what each of them has to pay out of.
+step-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (f ↠ p) ≡ true →
+  valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+  all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
+  all (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl u)
+      (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true
+step-frame-clos sl id L sf nid now (map-f fn) p vals fin sched st sleq cok hp hvc hcl =
+  step-frame-clos-map sl id L sf nid now fn p vals fin sched st sleq cok hp hvc hcl
+step-frame-clos sl id L sf nid now (scan-f fn snid) p vals fin sched st sleq cok hp hvc hcl =
+  step-frame-clos-scan sl id L sf nid now fn snid p vals fin sched st sleq cok hp hvc hcl
+step-frame-clos sl id L sf nid now (from-inner op allNid inst) p vals fin sched st sleq cok hp hvc hcl =
+  step-frame-clos-inner sl id L sf nid now op allNid inst p vals fin sched st sleq cok hp hvc hcl
+step-frame-clos sl id L sf nid now (thru-outer op onid) p vals fin sched st sleq cok hp hvc hcl =
+  step-frame-clos-thru sl id L sf nid now op onid p vals fin sched st sleq cok hp hvc hcl
+step-frame-clos {e = e} {s = s} sl id L sf nid now (take-f tnid) p vals fin sched st sleq cok hp hvc hcl =
+  takeDispatch-all (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl s)
+    tnid vals fin sched st (lookupNode tnid (EvalSt.nodes st))
+    (all-impl (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s)
+      (nestClosOK?ᵛ (frameStep (suc L) (capsAt e sl id)) sl s)
+      (λ v h → nestClosOK?ᵛ-widen sl s v
+                 (frameStep-mono-j (capsAt e sl id) (2≤capsAt-size e sl id) (n≤1+n L)) h)
+      vals hcl)
 
 -- THE FRAME-LOCAL LEAF, WHICH IS `⊤` AT FOUR OF THE FIVE HEADS AND SO
 -- was never a statement about a walk at all.  Matching on the frame

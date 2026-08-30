@@ -38,7 +38,13 @@
 -- LOAD-BEARING -- the base cap REFUSES and the stepped cap admits --
 -- which is what makes the level the thing being measured.
 --
--- TARGET: step-frame-clos @68ae2a
+-- AND THE HEAD THE ROWS READ IS THE MAP, which is what they are
+-- evidence about and the only one.  Every row rebuilds by applying a
+-- template to an argument, so what is covered is a `map-f`'s output
+-- and nothing is claimed of a scan's fold, a wrapper's constructor or
+-- the values an exiting inner drains out of a queue.
+--
+-- TARGET: step-frame-clos-map @9e5dda
 -- REFUTED: Refuted.Step-Frame-Clos
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Step-Frame-Level where

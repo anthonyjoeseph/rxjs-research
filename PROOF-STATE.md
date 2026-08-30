@@ -226,16 +226,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **`step-frame-clos`, head by head** — what a frame owes the closure
-  reading it was handed, now that the levelled form is instantiated at
-  the shape that kills the flat one: the rebuild's bill is quadratic
-  in the cap at the worst shape the caller's premises admit, and one
-  step pays it eight times over. So the statement is settled and the
-  five frame heads are what is left, split by whether the head REBUILDS
-  — a take filters and a `from-inner` reacts, so the reading is handed
-  back and the step is spare; a map applies a template, a scan folds
-  and a `thru-outer` wraps, and those three are where the probe's ratio
-  is spent. It is the tier's riskiest row that anything can be done to.
+- **`step-frame-clos-map`, the head the probe already measured** — the
+  frame law is a body over four heads now, and the take is proven: it
+  rebuilds nothing, so its arm is the reading widened along the level
+  it was already being restated at. What the map head owes is exactly
+  what the probe instantiated — a template applied to an argument,
+  both at the cap the caller's premises admit, against a bill one step
+  more than pays. So the leg is the arithmetic behind a green row:
+  `closSizeᵉ` of an application is bounded by the template's own
+  reading and the argument's, and a step of the cap dominates the sum.
 
 - **the drain leaf `sight-all-drain`, now that its descent half is
   proven** — the `*All` head is a real body over one leaf, so what is
@@ -263,9 +262,18 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its caps conjuncts are read at the base cap while
   the walk holds one only at its level; raising them through the fit shelf is
   dead, so the level must arrive another way — a design call.
-- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: refuted
-  at every cap in its old form, since a rebuilt value's closure is a sum. Now
-  stated ONE LEVEL UP, where a level more than doubles the cap.
+- **`step-frame-clos-map`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: the
+  template head of the frame law, one level up. Refuted flat, since a rebuilt
+  value's closure is a sum; the probe's rows are this head's rebuild.
+- **`step-frame-clos-scan`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`:
+  the fold head. Its accumulator comes from the store, so the store premise is
+  spent here and nowhere else in the family.
+- **`step-frame-clos-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`:
+  the exiting-inner head. It passes its values on untouched unless it DRAINS,
+  and the drained values were parked at a level nothing here reads.
+- **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`:
+  the wrap head, whose output is a constructor round a subscribed inner — the
+  one arm whose bill is a constructor rather than a template.
 
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
