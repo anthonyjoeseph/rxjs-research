@@ -2424,6 +2424,14 @@ WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
 --   at all, and its `parent-premise-absurd` is the other half -- the
 --   cap those rows are read at does not admit the telescope, so what
 --   they kill is the premise-free form and not this one.
+-- REFUTED: `Refuted.Nest-Clos-Flat` -- the same reading stated over an
+--   ARBITRARY cap rather than `capsAt`'s.  The witness cap is the
+--   value's own `sizeᵉ`, so the premise holds by construction at every
+--   size the family reaches and raising the cap raises the admitted
+--   value with it; three references to one slot read `4 6 8` of syntax
+--   against `10 18 26` of closure.  What that closes is the cheap
+--   route: no proof of this leaf can go through `valCaps?` alone, so
+--   the specific size of `capsAt` is the only thing left to pay.
 postulate
   nest-clos-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sched : Sched Γ) (st : EvalSt e)
