@@ -216,15 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the ring's advance, in the round currency the cascade already uses** —
-  the room WAS derivable and the package DID have to be restated: the
-  ring now carries a position within a round rather than a level under a
-  ceiling, and the ladder leaf fell out as a body. `sink-entry-advance`
-  is what is left — how far the level moves across one delivery — and its
-  twin `chainStep-caps` proves the same thing for a cascade's chain by
-  instantiating the delivery walk at the fold. The leg is to run that
-  instantiation on `ringFold` and land the advance on `ent-step`.
-
 - **the two subscribing leaves, now that they are only about SYNTAX** —
   `thru-regs-base` and `inner-regs-base` no longer owe a count, so what
   is left of each is that the entry a subscribe appends is priced under
@@ -243,6 +234,16 @@ does not fit is a finding about the shared statement, not about the head.
   it transports: if a closure's reading is under the wrap sum at its own
   stratum, the premise is a corollary; if not, the finding is which
   quantity the fan-out sees that the sum does not.
+
+- **the round the sink's ring runs in, which is the last thing it does
+  not have** — the ring is now a body end to end, and `sink-round-entry`
+  is what it is entered with: a position, a round's gas, and a `Reached`
+  at the base. `WalkHyps` carries a FLAT ladder at the sink head, so
+  none of it comes off the walk's own hypotheses. The leg is to find
+  where a round is actually established — the cascade seeds one at
+  `arr-chains-caps` from `base` and a registry count — and ask whether
+  the sink can seed its own the same way, or whether the walk's
+  hypotheses have to carry a round at every head.
 
 ### The ledger
 
@@ -330,10 +331,6 @@ does not fit is a finding about the shared statement, not about the head.
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
 
-- **`sink-entry-advance`** (Caps-Face/Part7) — GRINDABLE, `TWIN`: how far the
-  level advances across one delivery, and that the ring's round package survives
-  at the store it produced. `chainStep-caps` is the same advance for a cascade's
-  chain, proven by instantiating the delivery walk at the fold.
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
