@@ -93,7 +93,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _�
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; +-suc; +-identityʳ; +-comm; +-assoc; +-monoˡ-≤;
   *-monoˡ-≤; *-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ;
   <⇒≤; ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub;
-  *-identityˡ)
+  *-identityˡ; *-distribˡ-+)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; tabulate; map)
@@ -828,50 +828,56 @@ n≤capsAt-size e sl id =
   ≤-trans (≤-trans (n≤slotsSize sl) (m≤n+m (slotsSize sl) (2 + sizeᵉ e)))
           (capsAt-base-size e sl id)
 
--- AND THE SAME BASE ONCE THE BLOWUP HAS RUN, which is two more than
--- the undoubled bound and is what the delivery walk's gas asks for.
--- `capsAt` opens at `2 + sizeᵉ e + slotsSize sl` and is then put
--- through `frameBlowup`, whose count is at least the cap itself, so
--- the exponential floor already doubles it -- and twice a base of
--- `2 + x` clears `4 + x` outright.  Stated apart from the undoubled
--- bound rather than derived from it, since the doubling is the whole
--- content.
---
 -- SEALED, and this is not optional: the consumer instantiates the
--- walk's gas to the cap this bounds, so a transparent body puts the
--- `iterSize` exponential inside every statement carrying that gas.
--- The helpers are hoisted rather than left in a `where` because the
--- seal has to sit at the top level to hold them out of the types.
+-- walk's gas to the cap the bound below fixes, so a transparent body
+-- puts the `iterSize` exponential inside every statement carrying
+-- that gas.  The helpers are hoisted rather than left in a `where`
+-- because the seal has to sit at the top level to hold them out of
+-- the types.
 private
-  two-clears : ∀ (x : ℕ) → 4 + x ≤ 2 * (2 + x)
-  two-clears x = ≤-trans (+-monoˡ-≤ (2 + x) (m≤m+n 2 x))
-                         (+-monoʳ-≤ (2 + x)
-                            (≤-reflexive (sym (+-identityʳ (2 + x)))))
-
   gasB : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → Caps
   gasB {n = n} e sl = caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
                            (suc (sizeᵉ e + slotsSize sl))
 
-  2≤2^K : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
-    2 ≤ 2 ^ sizeCount (gasB e sl) (capsBase e sl)
-  2≤2^K e sl = ≤-trans (≤-reflexive (sym (*-identityʳ 2)))
-                       (^-monoʳ-≤ 2 (≤-trans (s≤s z≤n)
-                          (size≤sizeCount (gasB e sl) (capsBase e sl)
-                             (s≤s (s≤s z≤n)) (s≤s z≤n))))
+  four-clears : ∀ (x m : ℕ) → m ≤ x → 4 + x + m + m ≤ 4 * (2 + x)
+  four-clears x m h =
+    ≤-trans (≤-reflexive (trans (+-assoc (4 + x) m m) (+-assoc 4 x (m + m))))
+    (≤-trans (+-mono-≤ (m≤m+n 4 4)
+                (+-monoʳ-≤ x
+                   (≤-trans (+-mono-≤ h h)
+                            (+-monoʳ-≤ x (m≤m+n x (x + 0))))))
+             (≤-reflexive (sym (*-distribˡ-+ 4 2 x))))
+
+  4≤2^K : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+    4 ≤ 2 ^ sizeCount (gasB e sl) (capsBase e sl)
+  4≤2^K e sl = ^-monoʳ-≤ 2 (≤-trans (s≤s (s≤s z≤n))
+                   (size≤sizeCount (gasB e sl) (capsBase e sl)
+                      (s≤s (s≤s z≤n)) (s≤s z≤n)))
 
 abstract
-  capsAt-gas-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-    4 + (sizeᵉ e + slotsSize sl) ≤ Caps.cSize (capsAt e sl id)
-  capsAt-gas-size {n = n} e sl zero =
-    ≤-trans (two-clears (sizeᵉ e + slotsSize sl))
-    (≤-trans (*-monoˡ-≤ (2 + (sizeᵉ e + slotsSize sl)) (2≤2^K e sl))
+  -- THE BASE ONCE THE BLOWUP HAS RUN, WITH ROOM FOR THE NESTING, which
+  -- is what the delivery walk's round floor is seeded from.  A nested round is
+  -- entered at one less gas AND one less ledger than the round above
+  -- it, so a floor that carries the gas reproduces itself across a
+  -- nesting for free; what that costs is paid here, at the seed, where
+  -- the constants have to clear the initial gas as well as themselves.
+  -- The dispatch gas is the literal slot count and the base already
+  -- contains the slot telescope as a summand, so the whole floor is at
+  -- most four times the base -- and the exponential clears the factor
+  -- of four because `frameBlowup`'s count is itself at least the cap.
+  capsAt-round-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+    4 + (sizeᵉ e + slotsSize sl) + n + n ≤ Caps.cSize (capsAt e sl id)
+  capsAt-round-size {n = n} e sl zero =
+    ≤-trans (four-clears (sizeᵉ e + slotsSize sl) n
+               (≤-trans (n≤slotsSize sl) (m≤n+m (slotsSize sl) (sizeᵉ e))))
+    (≤-trans (*-monoˡ-≤ (2 + (sizeᵉ e + slotsSize sl)) (4≤2^K e sl))
     (≤-trans (*-monoʳ-≤ (2 ^ sizeCount (gasB e sl) (capsBase e sl))
                 (≤-reflexive (sym (+-assoc 2 (sizeᵉ e) (slotsSize sl)))))
              (iterSize-2^ (Caps.cSize (gasB e sl))
                 (sizeCount (gasB e sl) (capsBase e sl))
                 (Caps.cSize (gasB e sl)) (s≤s z≤n))))
-  capsAt-gas-size e sl (suc id) =
-    ≤-trans (capsAt-gas-size e sl id)
+  capsAt-round-size e sl (suc id) =
+    ≤-trans (capsAt-round-size e sl id)
             (cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
                (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))
 

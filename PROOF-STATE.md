@@ -216,18 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the gas floor the sink's nested round runs on** — carrying the
-  walk's own round in `WalkHyps` and handing it to the ring was tried
-  and does not close `sink-round-entry`: the chain the sink sits in
-  already occupies a position, so the ring gets the round `Reached`
-  reaches FROM its level, and that costs a gas. A CONSTANT floor
-  survives one nesting and no more. The counter that does decrease is
-  the walk's own GAS — the depth mirror spends one at exactly this head
-  — so the floor becomes `constants + gas ≤ g` and reproduces itself
-  across a nesting for free. The leg is that restatement: the round
-  package into `WalkHyps` and `RingState`, the two ladder consumers
-  rebuilt off it, and the seed lemma the bigger floor now needs.
-
 - **the base cap the registry is priced under, which is what both
   subscribing leaves are really about** — the frame heads are bodies
   now, and what is left is one claim about one primitive: a subscribe
@@ -248,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   is about every arrival the queue holds. The leg is to find which
   invariant the queue already satisfies can carry the reading as a
   field, so the two heads become projections instead of postulates.
+
+- **the frame step is the only place the closure reading is not free**
+  — the walk carries it, the ring widens it and the chain entry takes
+  it, and `step-frame-clos` is the one supply site with content: a
+  frame REBUILDS what it passes on, so the reading has to survive a
+  `map` applied, a scan folded, a wrapper put round an inner. Deriving
+  it from the caps receipt beside it is refuted at every cap. The leg
+  is the per-head grind — five frame heads, four of which pass their
+  values through untouched — and finding what the `thru-outer` head
+  can honestly claim, since that is the head the refutation was built
+  against.
 
 ### The ledger
 
@@ -276,11 +275,6 @@ does not fit is a finding about the shared statement, not about the head.
   applied, a scan folded, a wrapper put round an inner. Without it the walk's
   new conjunct dies at the first hop; deriving it from the caps receipt is
   refuted.
-- **`sink-round-entry`** (Caps-Face/Part7) — SHAPE, `DEAD ROUTE`: the round the
-  sink's ring runs in, which is NESTED and not the walk's own — so it costs a
-  gas, and the walk's constant floor pays for exactly one nesting. The floor
-  wants indexing by whatever measure decreases per round; the depth one does
-  not.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
