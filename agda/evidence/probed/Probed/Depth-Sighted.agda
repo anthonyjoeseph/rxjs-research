@@ -25,20 +25,19 @@
 -- nowhere -- `capsAt` sits on the caps recurrence and does not
 -- terminate even natively -- so these are conclusion-side rows, which
 -- is the coverage this can have rather than a gap in the sweeping.
--- TARGET: sight-all @8d81ef
--- TARGET: sight-input @1d2b70
+-- TARGET: sight-all @17cdb7
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_)
+open import Data.Nat using (ℕ; suc; _+_; _*_)
 open import Data.List using (length; map)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
-open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; syncSizeᵉ;
-  ofᵉ; scanᵉ; mergeAllᵉ; input; varᵗ; inlᵗ; caseᵗ; fstᵗ; strmᵗ; nat̂; emptyᵉ; Tm)
+open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; ofᵉ; scanᵉ; mergeAllᵉ; input; varᵗ; inlᵗ; caseᵗ; fstᵗ;
+  strmᵗ; nat̂; emptyᵉ; Tm)
 open import Data.Maybe using (nothing)
 open import Data.List using ([]; _∷_) renaming (map to mapL)
 open import Data.List.Relation.Unary.Any using (here)
@@ -48,13 +47,14 @@ open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
          cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource)
-open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ)
 
 open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; insT; insF; sucGU; sucGF)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthCascade)
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; nestUnit; sightCeil)
+open import Verify-Budget-Sufficient.Depth-Sighted using (Sight)
 
 -- ── the subscribe side, at the root ────────────────────────────────
 
@@ -68,9 +68,7 @@ descRoot k =
 
 sightRoot : ℕ → ℕ
 sightRoot k =
-  sightCeil (sizeᵉ (progU k 2)) (2 ^ syncSizeᵉ (progU k 2) * nestDᵉ (progU k 2))
-            (storeNestMax (sched-init (progU k 2) slotsT) (st-init (progU k 2)))
-            (nestUnit (progU k 2) slotsT)
+  Sight 2 (progU k 2) root (sched-init (progU k 2) slotsT) (st-init (progU k 2))
 
 -- packed base-10^41 so one build returns every figure: Agda aborts a
 -- module at its first mismatch, so a tuple of pins leaks one number per
@@ -79,7 +77,7 @@ rootFigs : ℕ
 rootFigs = descRoot 2 + 100000000000000000000000000000000000000000 * (sightRoot 2
          + 100000000000000000000000000000000000000000 * (descRoot 20 + 100000000000000000000000000000000000000000 * sightRoot 20))
 
-rootFigs≡ : rootFigs ≡ 2816719633707125730125674522348300000000000000000000000000000000000000000810000000000000000000000000000003113851318600000000000000000000000000000000000000009
+rootFigs≡ : rootFigs ≡ 2816719633707125730125674548824844000000000000000000000000000000000000000810000000000000000000000000000003114611536200000000000000000000000000000000000000009
 
 -- ── the delivery side, at the second cascade ───────────────────────
 
@@ -246,9 +244,7 @@ descRootF w =
 
 sightRootF : ℕ → ℕ
 sightRootF w =
-  sightCeil (sizeᵉ (progF w 2)) (2 ^ syncSizeᵉ (progF w 2) * nestDᵉ (progF w 2))
-            (storeNestMax (sched-init (progF w 2) slotsF) (st-init (progF w 2)))
-            (nestUnit (progF w 2) slotsF)
+  Sight 2 (progF w 2) root (sched-init (progF w 2) slotsF) (st-init (progF w 2))
 
 descRootH : ℕ → ℕ
 descRootH k =
@@ -257,15 +253,13 @@ descRootH k =
 
 sightRootH : ℕ → ℕ
 sightRootH k =
-  sightCeil (sizeᵉ (progU k 2)) (2 ^ syncSizeᵉ (progU k 2) * nestDᵉ (progU k 2))
-            (storeNestMax (sched-init (progU k 2) slotsF) (st-init (progU k 2)))
-            (nestUnit (progU k 2) slotsF)
+  Sight 2 (progU k 2) root (sched-init (progU k 2) slotsF) (st-init (progU k 2))
 
 rootWideFigs : ℕ
 rootWideFigs = descRootF 3 + 100000000000000000000000000000000000000000 * (sightRootF 3
              + 100000000000000000000000000000000000000000 * (descRootH 8 + 100000000000000000000000000000000000000000 * sightRootH 8))
 
-rootWideFigs≡ : rootWideFigs ≡ 2386907802506363728000000000000000000000000000000000000000040000000000000000000000000000009985798991100000000000000000000000000000000000000005
+rootWideFigs≡ : rootWideFigs ≡ 2386907802520257360000000000000000000000000000000000000000040000000000000000000000000000009986611637500000000000000000000000000000000000000005
 
 -- ── which sighted quantity sees the count, and the answer is none ───
 
@@ -358,9 +352,7 @@ descSeed d =
 
 sightSeed : ℕ → ℕ
 sightSeed d =
-  sightCeil (sizeᵉ (progSeed d)) (2 ^ syncSizeᵉ (progSeed d) * nestDᵉ (progSeed d))
-            (storeNestMax (sched-init (progSeed d) slotsT) (st-init (progSeed d)))
-            (nestUnit (progSeed d) slotsT)
+  Sight 2 (progSeed d) root (sched-init (progSeed d) slotsT) (st-init (progSeed d))
 
 -- the shallow seed and a seed four layers deep, packed together: two
 -- ceilings and two descents, so one build says whether the margin
@@ -369,5 +361,5 @@ seedFigs : ℕ
 seedFigs = descSeed 1 + 100000000000000000000000000000000000000000 * (sightSeed 1
            + 100000000000000000000000000000000000000000 * (descSeed 4 + 100000000000000000000000000000000000000000 * sightSeed 4))
 
-seedFigs≡ : seedFigs ≡ 26113401160098000000000000000000000000000000000000000030000000000000000000000000000000174483067200000000000000000000000000000000000000003
+seedFigs≡ : seedFigs ≡ 26113411121570000000000000000000000000000000000000000030000000000000000000000000000000175164641600000000000000000000000000000000000000003
 seedFigs≡ = refl

@@ -216,16 +216,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the nesting measure's input clause, which reports ZERO** — this is a
-  SHAPE finding and it is the tier's top risk: a descent into a shared def has
-  nothing on the ceiling to pay with, and widening the ceiling cannot help,
-  since any vocabulary term is constant along the walk and stands identically
-  on both sides of the step. The hop face already hit this — its input clause
-  was a constant zero, was refuted at this shape, and was repaired by
-  PARAMETERISING the measure over a slot environment, instantiated by
-  stratified recursion and closed by a fixpoint. Do the same to `nestDᵉ`, and
-  take the cone it moves.
-
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
   they are the same shape twice: a bound owed over a recursion that is
@@ -243,6 +233,16 @@ does not fit is a finding about the shared statement, not about the head.
   path receipt outright; an inner reaction appends a path built from the
   inner observable, which it does not, and that is the leaf worth
   keeping. Split them and find out which.
+
+- **the closure reading, which is the one row refuted twice** —
+  `nest-clos-caps` prices ONE inner observable's closure under the
+  frame's cap, and it is what the `thru` head's resolved-size premise
+  stands on. Both refutations killed the flat slot sum, and the stratum
+  term the sighted ceiling just gained is the first thing in the tier
+  that prices a slot's own body rather than counting slots. Ask whether
+  it transports: if a closure's reading is under the wrap sum at its own
+  stratum, the premise is a corollary; if not, the finding is which
+  quantity the fan-out sees that the sum does not.
 
 ### The ledger
 
@@ -268,18 +268,14 @@ does not fit is a finding about the shared statement, not about the head.
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
-- **`sight-input`** (Depth-Sighted) — SHAPE, `DEAD ROUTE, TWIN`: the nesting
-  measure reports ZERO at an input, so a descent into a shared def has nothing
-  to pay with. The repair is the measure, not the proof — the hop face was
-  refuted at this exact shape and repaired by a slot environment.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
   compound, and the margin WIDENS with the instant.
 - **`sight-all`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain, one leaf
   for all three `*All` heads — they delegate to the same family and wrap the
-  subject in one level each. The payload subscribe charges the path nothing,
-  so this is where the ceiling's size FACTOR is spent.
+  subject in one level each. Now stratified like its parent, so it carries the
+  inputs-below premise and the wrap sum the input clause is paid from.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that

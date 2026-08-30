@@ -48,7 +48,7 @@ module Verify-Budget-Sufficient.Nest-Store where
 
 open import Data.Bool using (Bool; true; false; T; _∨_)
 open import Data.Unit using (tt)
-open import Data.List using (List; foldr; tabulate; []; _∷_)
+open import Data.List using (List; foldr; tabulate; []; _∷_; _++_)
 open import Data.Bool.ListAction using (any)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
@@ -58,12 +58,12 @@ open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Exp using (Ctx; Closed; sizeᵗ; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; sizeᵗ; syncSizeᵉ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId;
   NodeId; setNode; installNode;
   NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
-  Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive;
+  Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive; register;
   arrSource)
 open import Rx.Prim using (Source)
 open import Data.Fin using (Fin; toℕ)
@@ -71,6 +71,7 @@ open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
+open import Verify-Budget-Sufficient.Measures using (fᵢ≤sum-tab)
 open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; capsAt-⊑-suc)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; delSize-monoᶜ)
@@ -241,6 +242,28 @@ slotNest (shared d)   = nestDᵉ d
 slotsNestSum : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
 slotsNestSum {n = n} sl = sum (tabulate {n = n} (λ i → slotNest (sl i)))
 
+-- WHAT ONE STEP INTO A SLOT COSTS THE SUBJECT READING, and it is read
+-- in the SAME currency the sighted walk's subject term is: the
+-- definition's own nesting, through the per-occurrence factor the walk
+-- charges every subject through.  A scripted slot is obs-free, so it
+-- carries the walk into nothing and is worth zero for the same reason
+-- its nesting is.
+--
+-- IT IS SUMMED RATHER THAN MAXED, and the looseness is deliberate: the
+-- consumer needs only an upper bound for every slot at once, the sum
+-- is what the sibling vocabulary measures already use, and reading one
+-- slot out of a sum is a proven lemma rather than a new fold law.
+slotWrap : ∀ {n} {Γ : Ctx n} {k t} → Slot Γ k t → ℕ
+slotWrap (scripted _) = 0
+slotWrap (shared d)   = 2 ^ syncSizeᵉ d * nestDᵉ d
+
+slotWrapSum : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
+slotWrapSum {n = n} sl = sum (tabulate {n = n} (λ i → slotWrap (sl i)))
+
+slotWrap≤sum : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n) →
+  slotWrap (sl i) ≤ slotWrapSum sl
+slotWrap≤sum sl i = fᵢ≤sum-tab (λ j → slotWrap (sl j)) i
+
 nodeNest : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
 nodeNest (scan-st {t} v)    = nestDᵛ t v
 nodeNest (mergeAll-st _ _ q _) = foldr (λ o acc → nestDᵉ o ⊔ acc) 0 q
@@ -333,6 +356,33 @@ storeNest-regs≤ sched st =
   m≤n⊔m (slotsNestSum (Sched.slots sched)
          ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
          ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)) _
+
+-- A REGISTRATION IS APPENDED, so the registry's ⊔-fold rises by at
+-- most the chain being registered — the one place the sighted walk's
+-- share descent moves the store, and it moves it by exactly the path
+-- the head was already carrying.
+regsNest-snoc : ∀ {n} {Γ : Ctx n} {t}
+  (rs : List (RegId × Source × Chain Γ t)) (x : RegId × Source × Chain Γ t) →
+  regsNestMax (rs ++ x ∷ [])
+    ≤ pathNestD (proj₂ (proj₂ (proj₂ x))) ⊔ regsNestMax rs
+regsNest-snoc []       x = ≤-refl
+regsNest-snoc (c ∷ rs) x =
+  ⊔-lub (≤-trans (m≤m⊔n (pathNestD (proj₂ (proj₂ (proj₂ c)))) (regsNestMax rs))
+                 (m≤n⊔m (pathNestD (proj₂ (proj₂ (proj₂ x)))) _))
+        (≤-trans (regsNest-snoc rs x)
+                 (⊔-mono-≤ ≤-refl
+                   (m≤n⊔m (pathNestD (proj₂ (proj₂ (proj₂ c)))) (regsNestMax rs))))
+
+storeNestMax-register : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (src : Source) (κ : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →
+  storeNestMax sched (register src κ st) ≤ pathNestD κ ⊔ storeNestMax sched st
+storeNestMax-register src κ sched st =
+  storeNestMax-lub sched (register src κ st) _
+    (≤-trans (storeNest-slots≤ sched st) (m≤n⊔m (pathNestD κ) _))
+    (≤-trans (storeNest-live≤  sched st) (m≤n⊔m (pathNestD κ) _))
+    (≤-trans (storeNest-nodes≤ sched st) (m≤n⊔m (pathNestD κ) _))
+    (≤-trans (regsNest-snoc (EvalSt.registry st) _)
+             (⊔-mono-≤ ≤-refl (storeNest-regs≤ sched st)))
 
 -- INSTALLING A NODE RAISES THE STORE BY AT MOST THAT NODE'S OWN
 -- NESTING, and an install is the only way a subscribe touches the node

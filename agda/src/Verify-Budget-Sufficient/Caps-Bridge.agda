@@ -99,7 +99,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (slotsNestSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro;
+  (slotsNestSum; slotWrapSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro;
   nestCapAt-suc; nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch;
   nestUnit; nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax;
   storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
@@ -123,6 +123,7 @@ open import Verify-Budget-Sufficient.Psi-Split using
 -- its sole consumer.
 open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
+open import Rx.Inputs-Below using (ib-topᵉ)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
 
@@ -1407,11 +1408,12 @@ abstract
 -- application needs no arithmetic between them.
 depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-    ≤ sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e)
+    ≤ sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e + n * slotWrapSum ins)
                 (storeNestMax (sched-init e ins) (st-init e))
                 (nestUnit e ins)
-depthE-sighted-root e ins =
-  depthE-sighted (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+depthE-sighted-root {n = n} e ins =
+  depthE-sighted (budgetAt e ins 0) n e root 0 0 (sched-init e ins) (st-init e)
+                 (ib-topᵉ e)
 
 -- THE ENTRY CEILING AGAINST THE ENTRY CAP'S SIZE, and it is the
 -- delivery side's leaf read at instant zero rather than a statement of
@@ -1426,12 +1428,12 @@ depthE-sighted-root e ins =
 -- store's bound establishes and what makes the whole comparison
 -- syntactic.
 sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e)
+  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e + n * slotWrapSum ins)
             (storeNestMax (sched-init e ins) (st-init e))
             (nestUnit e ins)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
-sight-root≤exp e ins =
-  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤C))
+sight-root≤exp {n = n} e ins =
+  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤C′))
           (nestCap-sight-scaled≤exp e ins)
   where
   C = nestCapAt e ins 0
@@ -1449,6 +1451,15 @@ sight-root≤exp e ins =
   sum≤C : 2 ^ K * nestDᵉ e + storeNestMax (sched-init e ins) (st-init e)
             + nestUnit e ins ≤ (2 ^ K + 2) * C
   sum≤C = ≤-trans (+-mono-≤ (+-mono-≤ hv hs) hu) (≤-reflexive eq)
+  W = n * slotWrapSum ins
+  shuffle : ∀ (a w s u : ℕ) → (a + w) + s + u ≡ (a + s + u) + w
+  shuffle = solve 4 (λ a w s u → ((a :+ w) :+ s) :+ u := ((a :+ s) :+ u) :+ w) refl
+  sum≤C′ : (2 ^ K * nestDᵉ e + W) + storeNestMax (sched-init e ins) (st-init e)
+             + nestUnit e ins ≤ (2 ^ K + 2) * C + W
+  sum≤C′ = ≤-trans (≤-reflexive (shuffle (2 ^ K * nestDᵉ e) W
+                                  (storeNestMax (sched-init e ins) (st-init e))
+                                  (nestUnit e ins)))
+                   (+-monoˡ-≤ W sum≤C)
 
 -- AND THE ENTRY FUEL HAS THAT ROOM, so the entry's half of the height
 -- comparison is assembled rather than asserted, out of the same
@@ -1456,7 +1467,7 @@ sight-root≤exp e ins =
 -- `frameBlowup` at the base story, and a blowup's size sits two
 -- exponentials under the story it was driven by.
 sight-root≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e)
+  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e + n * slotWrapSum ins)
             (storeNestMax (sched-init e ins) (st-init e))
             (nestUnit e ins)
     ≤ capsH e ins 0

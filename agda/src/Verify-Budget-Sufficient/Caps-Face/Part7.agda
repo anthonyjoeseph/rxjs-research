@@ -10,7 +10,8 @@ open import Data.Nat.Properties using (m+[n∸m]≡n; <⇒≤; *-assoc; *-identi
   *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm; +-suc; +-comm; ≤-pred)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; _++_; length; map; foldr)
+open import Data.List    using (List; []; _∷_; _++_; length; map; foldr; tabulate)
+open import Data.Nat.ListAction using (sum)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin)
 import Data.Fin as Fin
@@ -56,7 +57,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
   1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
-  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-store; slotNest; nestBurstAt-def; nestCapAt-suc)
+  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-store; slotNest; nestBurstAt-def; nestCapAt-suc;
+  slotWrap; slotWrapSum)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; takeVals; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
@@ -97,7 +99,7 @@ open import Verify-Budget-Sufficient.Caps using
   frameBlowup; iterSize-pow; size-lower)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; reach-reset; ∧-true; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow;
-   syncSize≤sizeᵉ)
+   syncSize≤sizeᵉ; fᵢ≤sum-tab; n≤slotsSize)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -3829,63 +3831,125 @@ nestCap-sight≤exp e sl id =
 -- the program's sync size is under its own size and its size is under
 -- the cap's -- while the target here is a DOUBLE exponential of that
 -- size, and the unscaled route below spends only one of the two.
+-- A CONSTANT SUMMED OVER THE SLOT TELESCOPE, which is what a
+-- pointwise bound on the vocabulary buys once the sum is taken.
+sum-tab-const : ∀ {m} (c : ℕ) → sum (tabulate {n = m} (λ _ → c)) ≡ m * c
+sum-tab-const {zero}  c = refl
+sum-tab-const {suc m} c = cong (c +_) (sum-tab-const {m} c)
+
+-- ONE SLOT'S WRAP UNDER THE VOCABULARY'S SIZE.  The wrap reads a
+-- shared definition through the same per-occurrence factor the walk
+-- charges every subject through, and both of its readings -- the
+-- exponent and the nesting -- are under that definition's own size,
+-- which is one summand of the telescope.  A scripted slot is zero.
+slotWrap≤size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (S : ℕ) →
+  slotsSize sl ≤ S → (i : Fin n) → slotWrap (sl i) ≤ 2 ^ S * S
+slotWrap≤size sl S hS i
+  with sl i | ≤-trans (fᵢ≤sum-tab (λ j → slotSize (sl j)) i) hS
+... | scripted _ | _  = z≤n
+... | shared d   | hd =
+  *-mono-≤ (^-monoʳ-≤ 2 (≤-trans (syncSize≤sizeᵉ d) hd))
+           (≤-trans (nestDᵉ≤sizeᵉ d) hd)
+
+slotWrapSum≤size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (S : ℕ) →
+  slotsSize sl ≤ S → slotWrapSum sl ≤ S * (2 ^ S * S)
+slotWrapSum≤size {n = n} sl S hS =
+  ≤-trans (sum-tab-mono (λ i → slotWrap (sl i)) (λ _ → 2 ^ S * S)
+                        (slotWrap≤size sl S hS))
+          (≤-trans (≤-reflexive (sum-tab-const {n} (2 ^ S * S)))
+                   (*-monoˡ-≤ (2 ^ S * S) (≤-trans (n≤slotsSize sl) hS)))
+
+-- THE ENTRY FITS IN FIVE POWERS OF ITS OWN SIZE, and the entry cap has
+-- two to the size-many.  Every factor of the sighted entry is one
+-- power: the program's size, the scaled nesting cap, and the stratum
+-- term's three -- the stratum index, the telescope length, and one
+-- slot's wrap.  What makes five enough is that the size is at least
+-- eight, so its square already sits under its own exponential.
 nestCap-sight-scaled≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
-  suc (sizeᵉ e) * suc ((2 ^ syncSizeᵉ e + 2) * nestCapAt e sl 0)
+  suc (sizeᵉ e) * suc ((2 ^ syncSizeᵉ e + 2) * nestCapAt e sl 0
+                        + n * slotWrapSum sl)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl 0))
-nestCap-sight-scaled≤exp e sl = ≤-trans (*-mono-≤ 1+z≤S hstep) big
+nestCap-sight-scaled≤exp {n = n} e sl =
+  ≤-trans (*-mono-≤ hz hVN)
+          (≤-trans (≤-reflexive (sym pow5)) (^-monoʳ-≤ 2 five))
   where
   S = Caps.cSize (capsAt e sl 0)
   C = nestCapAt e sl 0
   K = syncSizeᵉ e
+  P = 2 ^ S
   8≤S : 8 ≤ S
   8≤S = 8≤capsAt-size e sl 0
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 8≤S
+  S≤P : S ≤ P
+  S≤P = <⇒≤ (n<2^n S)
+  SS≤P : S * S ≤ P
+  SS≤P = ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (S * S))))
+                          (*-monoˡ-≤ (S * S) {1} {4} (s≤s z≤n)))
+                 (sq4≤2^ S 8≤S)
+  2≤S : 2 ≤ S
+  2≤S = ≤-trans (s≤s (s≤s z≤n)) 8≤S
+  S+S≤P : S + S ≤ P
+  S+S≤P = ≤-trans (≤-reflexive (sym (2X≡X+X S)))
+                  (≤-trans (*-monoˡ-≤ S 2≤S) SS≤P)
+  3≤P : 3 ≤ P
+  3≤P = ≤-trans (≤-trans (s≤s (s≤s (s≤s z≤n))) 8≤S) S≤P
+  1≤P : 1 ≤ P
+  1≤P = ≤-trans (s≤s z≤n) 3≤P
   1+z≤S : suc (sizeᵉ e) ≤ S
   1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
                   (capsAt-base-size e sl 0)
+  hz : suc (sizeᵉ e) ≤ P
+  hz = ≤-trans 1+z≤S S≤P
+  slSz : slotsSize sl ≤ S
+  slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl 0)
   C≤S : C ≤ S
   C≤S = ≤-trans (≤-reflexive (nestCapAt-0 e sl)) (nestUnit≤size e sl 0)
-  1≤C : 1 ≤ C
-  1≤C = subst (1 ≤_) (sym (nestCapAt-0 e sl)) (s≤s z≤n)
-  2^K≤2^S : 2 ^ K ≤ 2 ^ S
-  2^K≤2^S =
-    ^-monoʳ-≤ 2 (≤-trans (syncSize≤sizeᵉ e) (≤-trans (n≤1+n (sizeᵉ e)) 1+z≤S))
-  eq3 : (2 ^ K + 2) * C + C ≡ (2 ^ K + 3) * C
-  eq3 = solve 2 (λ k c → (k :+ con 2) :* c :+ c := (k :+ con 3) :* c)
-              refl (2 ^ K) C
-  hstep : suc ((2 ^ K + 2) * C) ≤ (2 ^ S + 3) * S
-  hstep = ≤-trans (≤-trans (≤-reflexive (+-comm 1 ((2 ^ K + 2) * C)))
-                           (+-monoʳ-≤ ((2 ^ K + 2) * C) 1≤C))
-                  (≤-trans (≤-reflexive eq3)
-                           (*-mono-≤ (+-monoˡ-≤ 3 2^K≤2^S) C≤S))
-  1≤2^S : 1 ≤ 2 ^ S
-  1≤2^S = 1≤pow 1 S
-  four′ : 4 * (2 ^ S) ≡ 2 ^ S + 3 * (2 ^ S)
-  four′ = solve 1 (λ p → con 4 :* p := p :+ con 3 :* p) refl (2 ^ S)
-  h4 : 2 ^ S + 3 ≤ 4 * (2 ^ S)
-  h4 = ≤-trans (+-monoʳ-≤ (2 ^ S)
-                 (≤-trans (≤-reflexive (sym (*-identityʳ 3)))
-                          (*-monoʳ-≤ 3 1≤2^S)))
-               (≤-reflexive (sym four′))
-  shape : S * ((4 * (2 ^ S)) * S) ≡ (4 * (S * S)) * (2 ^ S)
-  shape = solve 2 (λ s p → s :* ((con 4 :* p) :* s) := (con 4 :* (s :* s)) :* p)
-                refl S (2 ^ S)
-  S≤SS : S ≤ S * S
-  S≤SS = ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-monoʳ-≤ S 1≤S)
-  fourEq : (S * S + S * S) + (S * S + S * S) ≡ 4 * (S * S)
-  fourEq = solve 1 (λ x → (x :+ x) :+ (x :+ x) := con 4 :* x) refl (S * S)
-  S+S≤2^S : S + S ≤ 2 ^ S
-  S+S≤2^S = ≤-trans (≤-trans (+-mono-≤ S≤SS S≤SS)
-                             (≤-trans (m≤m+n (S * S + S * S) (S * S + S * S))
-                                      (≤-reflexive fourEq)))
-                    (sq4≤2^ S 8≤S)
-  big : S * ((2 ^ S + 3) * S) ≤ 2 ^ (2 ^ S)
-  big = ≤-trans (*-monoʳ-≤ S (*-monoˡ-≤ S h4))
-        (≤-trans (≤-reflexive shape)
-        (≤-trans (*-monoˡ-≤ (2 ^ S) (sq4≤2^ S 8≤S))
-        (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 S S)))
-                 (^-monoʳ-≤ 2 S+S≤2^S))))
+  2^K≤P : 2 ^ K ≤ P
+  2^K≤P = ^-monoʳ-≤ 2 (≤-trans (syncSize≤sizeᵉ e)
+                               (≤-trans (n≤1+n (sizeᵉ e)) 1+z≤S))
+  2≤P : 2 ≤ P
+  2≤P = ≤-trans (s≤s (s≤s z≤n)) 3≤P
+  collect : (P + P) * S ≡ P * (S + S)
+  collect = solve 2 (λ p s → (p :+ p) :* s := p :* (s :+ s)) refl P S
+  hV : (2 ^ K + 2) * C ≤ P * P
+  hV = ≤-trans (*-mono-≤ (+-mono-≤ 2^K≤P 2≤P) C≤S)
+               (≤-trans (≤-reflexive collect) (*-monoʳ-≤ P S+S≤P))
+  gather : S * (P * S) ≡ P * (S * S)
+  gather = solve 2 (λ p s → s :* (p :* s) := p :* (s :* s)) refl P S
+  hW : slotWrapSum sl ≤ P * P
+  hW = ≤-trans (slotWrapSum≤size sl S slSz)
+               (≤-trans (≤-reflexive gather) (*-monoʳ-≤ P SS≤P))
+  hN : n * slotWrapSum sl ≤ P * (P * P)
+  hN = *-mono-≤ (≤-trans (≤-trans (n≤slotsSize sl) slSz) S≤P) hW
+  1≤PP : 1 ≤ P * P
+  1≤PP = ≤-trans 1≤P (≤-trans (≤-reflexive (sym (*-identityʳ P)))
+                              (*-monoʳ-≤ P 1≤P))
+  1≤PPP : 1 ≤ P * (P * P)
+  1≤PPP = ≤-trans 1≤P (≤-trans (≤-reflexive (sym (*-identityʳ P)))
+                               (*-monoʳ-≤ P 1≤PP))
+  PP≤PPP : P * P ≤ P * (P * P)
+  PP≤PPP = ≤-trans (≤-reflexive (sym (*-identityˡ (P * P))))
+                   (*-monoˡ-≤ (P * P) 1≤P)
+  three : P * (P * P) + (P * (P * P) + P * (P * P)) ≤ P * (P * (P * P))
+  three = ≤-trans (≤-reflexive (solve 1 (λ x → x :+ (x :+ x) := con 3 :* x)
+                                      refl (P * (P * P))))
+                  (*-monoˡ-≤ (P * (P * P)) 3≤P)
+  hVN : suc ((2 ^ K + 2) * C + n * slotWrapSum sl) ≤ P * (P * (P * P))
+  hVN = ≤-trans (+-mono-≤ 1≤PPP (+-mono-≤ (≤-trans hV PP≤PPP) hN)) three
+  pow5 : 2 ^ (S + (S + (S + (S + S)))) ≡ P * (P * (P * (P * P)))
+  pow5 = trans (^-distribˡ-+-* 2 S _)
+               (cong (P *_)
+                 (trans (^-distribˡ-+-* 2 S _)
+                   (cong (P *_)
+                     (trans (^-distribˡ-+-* 2 S _)
+                       (cong (P *_) (^-distribˡ-+-* 2 S S))))))
+  five : S + (S + (S + (S + S))) ≤ 2 ^ S
+  five = ≤-trans (≤-reflexive (solve 1 (λ s → s :+ (s :+ (s :+ (s :+ s)))
+                                                := con 5 :* s) refl S))
+                 (≤-trans (*-monoˡ-≤ S (≤-trans (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))) 8≤S))
+                          SS≤P)
+  -- five powers is what the entry needs; the size has that room
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
 -- arrival's nesting is held under it by the caller's premise, the
