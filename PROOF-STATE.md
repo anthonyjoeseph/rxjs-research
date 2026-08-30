@@ -216,17 +216,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **price the registry at a LEVELLED cap, which is what the frame law's
-  refutation leaves no choice about** — `step-frame-clos` is refuted: a
-  frame REBUILDS the values it passes on, and a rebuilt observable's
-  closure is its template's plus its argument's, so the reading cannot
-  be returned at the cap its inputs were read at, at ANY cap. The
-  registry face was stated at the base on the strength of that law, and
-  the base is now unreachable: `regsSz?`, `RegsBase` and both
-  subscribing leaves have to move onto the same levelled cap `capsOK?`
-  already uses. The leg is that restatement, taken at the walk's own
-  ladder rather than invented beside it: the size face has carried a
-  stepped frame law all along.
+- **carry the levelled closure key down the registry face, which is the
+  half of the frame law's restatement that has not landed** — the walk
+  now reads its values at `frameStep Lv` and the frame law returns them
+  one level up, on the free tail level the ladder was already
+  definitionally at. What still sits at the BASE is the registry:
+  `regsSz?`, `RegsBase` and both subscribing leaves were stated there
+  on the strength of the law that was refuted, and a base reading is
+  not something the walk can now hand them. The leg is to move those
+  four onto the same levelled cap, and it is arithmetic-free for the
+  same reason the walk's was — the level is where the ladder already
+  puts it.
 
 - **the node store's closure half, once there is a cap to state it at**
   — a queued inner is read back out of a `mergeAll-st` by
@@ -256,9 +256,9 @@ does not fit is a finding about the shared statement, not about the head.
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: REFUTED at
-  every cap, not merely at this one. A frame's own function is unbounded here,
-  and bounding it does not repair a rebuilt value's closure, which is a sum.
+- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: refuted at
+  every cap in its old form, since a rebuilt value's closure is a sum. Now
+  stated ONE LEVEL UP, where a level more than doubles the cap.
 - **`subscribeInner-regs-base`** (Caps-Face/Part7) — FALSITY, `REFUTED`:
   REFUTED as stated. The inner is a closed expression the cap never saw, so a
   step function built FROM the cap registers a chain that fails `frameSz?`. It
@@ -275,10 +275,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`drain-clos`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the same one cascade
   later, which is what the instant loop's recursion asks for. Same provisional
   shape, and it goes with `burst-clos` when the queue's invariant carries it.
-- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: a frame
-  preserving the closure reading of the values it REBUILDS — a template
-  applied, a scan folded, a wrapper put round an inner. Now stated at the BASE
-  cap, in and out, which is the form the registry needs and the stronger one.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
