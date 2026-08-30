@@ -216,35 +216,39 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the base-priced path carried instead of widened away, which is
-  what the two pricing leaves are missing** — the cascade holds its
-  chains priced at the BASE cap and widens that receipt to the level's
-  cap at the moment the walk starts, so the walk knows only the weaker
-  form. But a registration appends `thru-outer … ↠ κ` for a tail of
-  the very path being walked, and a tail of a base-priced path is
-  base-priced. So the receipt the two leaves want is already in hand
-  one call above them and is being thrown away: carry it on the walk
-  beside the stepped one, and the frame leaf becomes a proof rather
-  than a postulate. That is the cheapest route open, and the one that
-  says whether the pricing is true at all.
+- **the height vehicle retired and the positional one put in its
+  place, in ONE commit** (Anthony's ruling) — the depth face pays its
+  bill by calibrating a per-instant ceiling against the caps height,
+  and that calibration is machine-refuted three times over: the
+  obligation itself, a replay through the increment's summand built so
+  that re-denominating only the factor stays dead, and the level-keyed
+  repair at every level the fuel reaches. The third is stated over
+  ARBITRARY fuel, so no larger index escapes. Delete the calibration
+  and its support, keep the nesting invariant, and restate the ceiling
+  in sighted current-instant quantities — the floor lemma already
+  shows the shape.
 
-- **the drain leaf's frame-local half, now that the position is
-  supplied** — the parked queue's row was rewritten around what the
-  fold now hands it, and the delivery position is no longer the part
-  it owes: a bounded `mergeAll` parks its queue at a level the round's
-  ledger has already climbed to, and the reaching that proves so is
-  the same witness the chain leaf just spent. What is left is the
-  frame's own count against the frame's own cap, at one level, with no
-  ladder in it — so this is the commit that finds out whether the leaf
-  was ever more than the position it was missing.
-- **the flat-versus-moving bound on every chain's stages, which the
-  mirror already carries** — the width cap over each stage of each
-  chain's walk is the row here whose twin is proven and whose twin
-  crosses the hop that was feared: the same conjunct survives the
-  `thru` boundary on the discharged side, so nothing about the walk is
-  undecided. What is left is arithmetic between a flat cap and one
-  that moves per stage, which is the shape a mirror cannot hand over
-  and the only part this row still owes.
+- **the depth bounds carried relative to a REACHED position, paying
+  the height once at the anchor** — the drain face had this disease
+  and this cure, and the cure converted postulates into theorems on
+  contact. So the restated assembly goes in over POSTULATED leaves
+  first, with the new obligations probed at the defer-headed family
+  that already exposed the unit's slack, before anything is ground.
+  The tripwire is explicit: the compositional row already records both
+  computable readings refuted, so if the positional carry dies there
+  too that is the fourth vehicle death in one region and the
+  convergence test's stop — the question becomes whether the face
+  decomposes rightly at all, not which currency.
+
+- **the two subscribes that owe the registry's base-cap pricing** —
+  the walk now carries that pricing and four leaves owe its
+  preservation. Two are near-mechanical: a `take` dispatch only
+  filters, and a sink's fan-out moves with the ring. The content is
+  the pair that SUBSCRIBE — a `thru` appends the very path being
+  walked, which the walk holds priced at that cap, so it should fall
+  first; an inner reaction appends a path built from the inner
+  observable, which no receipt in hand prices. That asymmetry is the
+  finding, and it is what this leg is for.
 
 
 ### The ledger
@@ -262,14 +266,20 @@ does not fit is a finding about the shared statement, not about the head.
   ring at a sink, which is the walk's SECOND recursion — over admitted
   registrations rather than over a path — and all the sink still owes now that
   its opening pair comes off the walk's own registry pricing.
-- **`step-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one frame
-  preserving the registry's base-cap pricing. Every mutation but one is a
-  filter, so the content is the frame that REGISTERS: whether what it appends
-  is base-priced is the open question and nothing has yet asked it.
-- **`chainStep-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
-  same at the granularity the cascade advances at. A chain's step IS a walk, so
-  this is its frames' obligation aggregated, and the two stand or fall
-  together.
+- **`thru-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a `thru`
+  frame's subscribe preserving the registry's base-cap pricing. What it appends
+  is the very path being walked, which the walk now carries priced at that cap,
+  so this is the leaf that should fall first.
+- **`inner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same at
+  an inner reaction, where what is appended is built from the INNER observable
+  rather than from the walked path — so the receipt in hand does not price it
+  and this is the harder of the two subscribes.
+- **`take-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same at
+  a `take` dispatch, which only ever filters the registry, so an `all`-shaped
+  receipt and a length bound both survive it by construction.
+- **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
+  across a sink's fan-out, which is the arm the path induction hands off — the
+  ring's obligation rather than a frame's, and it moves with `sink-ring-caps`.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum

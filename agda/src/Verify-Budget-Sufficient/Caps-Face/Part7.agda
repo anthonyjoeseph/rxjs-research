@@ -63,7 +63,8 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
   share-sink; root;
-  dCapᶜ; fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick; shareAdmit; shareLatch)
+  dCapᶜ; fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick; shareAdmit; shareLatch;
+  dispatchShare; foldPath)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -2428,6 +2429,7 @@ WalkHyps {e = e} sl id L sf gas nid now src p vals evs fin sched st =
       × Reached (capsAt e sl id) (capsH e sl id) P g)
   × (regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true)
   × (length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id))
+  × (pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true)
 
 -- THE ONE VALUE THE FRAME-LOCAL LEAF IS ACTUALLY ABOUT: an inner
 -- observable a `thru-outer` is handed, measured through the slot
@@ -2533,7 +2535,7 @@ walk-sink-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   dispatchCapsOK (capsAt e sl id) sl (capsH e sl id) L sf gas nid now i vals fin sched st
 walk-sink-caps sl id L sf zero nid now src i vals evs fin sched st H = tt
 walk-sink-caps {e = e} sl id L sf (suc gas) nid now src i vals evs fin sched st
-  H@(_ , _ , _ , _ , _ , _ , hrsz , hrlen) =
+  H@(_ , _ , _ , _ , _ , _ , hrsz , hrlen , _) =
     shareAdmit-sz i (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) hrsz
   , ≤-trans (shareAdmit-len i (EvalSt.registry st)) hrlen
   , sink-ring-caps sl id L sf gas nid now src i vals evs fin sched st H
@@ -2600,16 +2602,76 @@ postulate
 -- -- so the single content here is the frame that REGISTERS: what it
 -- appends must be priced under the base cap, which is a claim about
 -- program syntax rather than about the level the frame sits at.
+RegsBase : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (st : EvalSt e) → Set
+RegsBase {e = e} sl id st =
+  (regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true)
+  × (length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id))
+
+-- THE THREE HEADS THAT CAN TOUCH THE REGISTRY, one leaf each, because
+-- what each of them appends is a different object and only the shapes
+-- share a conclusion.  A `take` dispatch filters and can only shorten;
+-- the other two SUBSCRIBE, and what they hand `register` is where the
+-- pricing is actually at stake -- a `thru` appends the very path being
+-- walked, which the receipt above already prices, while an inner
+-- reaction appends a path built from the inner observable, which it
+-- does not.
 postulate
-  step-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  take-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick) (tnid : NodeId)
+    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
-    length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id) →
-    let st′ = proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))) in
-    (regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st′) ≡ true)
-    × (length (EvalSt.registry st′) ≤ Caps.cReg (capsAt e sl id))
+    RegsBase sl id st →
+    RegsBase sl id
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now (take-f tnid) p vals fin sched st)))))
+
+  inner-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (op : AllOp) (allNid : NodeId) (inst : NodeId)
+    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    RegsBase sl id st →
+    pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+    RegsBase sl id
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now (from-inner op allNid inst) p vals fin sched st)))))
+
+  thru-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+    (op : AllOp) (tnid : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    RegsBase sl id st →
+    pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op tnid ↠ p) ≡ true →
+    RegsBase sl id
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now (thru-outer op tnid) p vals fin sched st)))))
+
+step-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
+  RegsBase sl id
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
+step-regs-base sl id sf nid now (map-f _) p vals fin sched st hrsz hrlen hpb =
+  hrsz , hrlen
+step-regs-base {u = u} sl id sf nid now (scan-f _ snid) p vals fin sched st hrsz hrlen hpb
+  with lookupNode snid (EvalSt.nodes st)
+... | nothing                    = hrsz , hrlen
+... | just (take-st _)           = hrsz , hrlen
+... | just (mergeAll-st _ _ _ _) = hrsz , hrlen
+... | just (switch-st _ _)       = hrsz , hrlen
+... | just (exhaust-st _ _)      = hrsz , hrlen
+... | just (scan-st {w} _) with w ≟ᵗ u
+...   | yes refl = hrsz , hrlen
+...   | no _     = hrsz , hrlen
+step-regs-base sl id sf nid now (take-f tnid) p vals fin sched st hrsz hrlen hpb =
+  take-regs-base sl id sf nid now tnid p vals fin sched st (hrsz , hrlen)
+step-regs-base sl id sf nid now (from-inner op an inst) p vals fin sched st hrsz hrlen hpb =
+  inner-regs-base sl id sf nid now op an inst p vals fin sched st (hrsz , hrlen) hpb
+step-regs-base sl id sf nid now (thru-outer op tnid) p vals fin sched st hrsz hrlen hpb =
+  thru-regs-base sl id sf nid now op tnid p vals fin sched st (hrsz , hrlen) hpb
 
 -- THE WALK ITSELF, WHICH IS THE FRAME LAW ITERATED AND NOTHING ELSE.
 -- Each frame spends the proven step receipt, which reports its own
@@ -2633,7 +2695,7 @@ chain-walk-caps sl id L sf gas nid now src (share-sink i) vals evs fin sched st 
   proj₁ (proj₂ H)
   , walk-sink-caps sl id L sf gas nid now src i vals evs fin sched st H
 chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched st
-  H@(sleq , cok , hvc , hpz , hdp , (g , P , hg , hlvP , hR) , hrsz , hrlen) =
+  H@(sleq , cok , hvc , hpz , hdp , (g , P , hg , hlvP , hR) , hrsz , hrlen , hpb) =
     cok
   , proj₁ (valsCaps?-parts (frameStep L c) sl vals hvc)
   , slSz
@@ -2652,8 +2714,9 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
       , pathSz?-widen p (proj₁ (frameStep-⊑-+ c 2≤S L (proj₁ ST))) pz2
       , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
       , (g , P , hg , TAIL , hR)
-      , proj₁ (step-regs-base sl id sf nid now f p vals fin sched st hrsz hrlen)
-      , proj₂ (step-regs-base sl id sf nid now f p vals fin sched st hrsz hrlen) )
+      , proj₁ (step-regs-base sl id sf nid now f p vals fin sched st hrsz hrlen hpb)
+      , proj₂ (step-regs-base sl id sf nid now f p vals fin sched st hrsz hrlen hpb)
+      , pathSz?-tail (Caps.cSize c) f p hpb )
   where
   c   = capsAt e sl id
   S   = Caps.cSize c
@@ -2721,14 +2784,15 @@ arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      × Reached (capsAt e sl id) (capsH e sl id) P g) →
   regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
   length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
   chainCapsOK (capsAt e sl id) sl (capsH e sl id) Lv nextId a path sched st
 arr-chain-caps {n = n} {e = e} sl id Lv a nextId path sched st sleq cok hvc hpz hdp
-  (g , P , hg , hlvP , hR) hrsz hrlen =
+  (g , P , hg , hlvP , hR) hrsz hrlen hpb =
   chain-walk-caps sl id Lv (budgetAt e (Sched.slots sched) nextId) n nextId
     (arrTick a) (arrSource a) path (arrVal a ∷ [])
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     (Arrival.isLast a) sched st
-    (sleq , cok , hvc , hpz , hdp , (g , P , hg , ENTRY , hR) , hrsz , hrlen)
+    (sleq , cok , hvc , hpz , hdp , (g , P , hg , ENTRY , hR) , hrsz , hrlen , hpb)
   where
   c   = capsAt e sl id
   d   = capsH e sl id
@@ -2876,15 +2940,51 @@ chain-deliv-cap {n = n} {e = e} sl id a nextId path sched st Lv J g i
 -- where a registration is appended.  Separate from the frame's because
 -- the cascade recurses on chains rather than on frames, so this is the
 -- statement at the granularity the ring below actually advances at.
+-- AND THE SHARE ARM IS THE ONE THE PATH INDUCTION HANDS OFF, exactly
+-- as the caps walk does: a sink re-enters chain evaluation over the
+-- admitted registrations, so its preservation is the ring's and not a
+-- frame's.  Everything else about a chain's step is the frame law
+-- iterated, which is why the fold below is a real body over this one
+-- leaf.
 postulate
-  chainStep-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
-    length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id) →
-    let st′ = proj₂ (proj₂ (chainStep nextId a path sched st)) in
-    (regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st′) ≡ true)
-    × (length (EvalSt.registry st′) ≤ Caps.cReg (capsAt e sl id))
+  dispatch-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    RegsBase sl id st →
+    RegsBase sl id (proj₂ (proj₂ (dispatchShare {t = t} sf gas nid now i vals fin sched st)))
+
+foldPath-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (envSrc : Source) (path : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  RegsBase sl id st →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  RegsBase sl id (proj₂ (proj₂ (foldPath sf gas nid now envSrc path vals evs fin sched st)))
+foldPath-regs-base sl id sf gas nid now envSrc root vals evs fin sched st R hpb = R
+foldPath-regs-base sl id sf gas nid now envSrc (share-sink i) vals evs fin sched st R hpb =
+  dispatch-regs-base sl id sf gas nid now i vals fin sched st R
+foldPath-regs-base {e = e} sl id sf gas nid now envSrc (f ↠ p) vals evs fin sched st R hpb =
+  foldPath-regs-base sl id sf gas nid now envSrc p
+    (proj₁ r) (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r)))
+    (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+    (step-regs-base sl id sf nid now f p vals fin sched st (proj₁ R) (proj₂ R) hpb)
+    (pathSz?-tail (Caps.cSize (capsAt e sl id)) f p hpb)
+  where r = stepFrame sf nid now f p vals fin sched st
+
+chainStep-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  length (EvalSt.registry st) ≤ Caps.cReg (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  RegsBase sl id (proj₂ (proj₂ (chainStep nextId a path sched st)))
+chainStep-regs-base {n = n} {e = e} sl id a nextId path sched st hrsz hrlen hpb =
+  foldPath-regs-base sl id (budgetAt e (Sched.slots sched) nextId) n nextId
+    (arrTick a) (arrSource a) path (arrVal a ∷ [])
+    (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
+    (Arrival.isLast a) sched st (hrsz , hrlen) hpb
 
 -- `R` for the tail, related by `lvls-add`.
 arr-chains-caps-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2936,6 +3036,7 @@ arr-chains-caps-go {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st 
                    (proj₁ (proj₂ (chainStep nextId a path sched st′)))
                    (proj₂ (proj₂ (chainStep nextId a path sched st′)))) hdp)
         (g , Pos c d J g i , hg , CH≤ , walk J g i HI hR) hrsz hrlen
+        (proj₁ (∧-true _ _ hpz))
     , proj₁ ST
     , FLAT
     , arr-chains-caps-go sl id (Lv + proj₁ ST) a nextId chains
@@ -2952,8 +3053,10 @@ arr-chains-caps-go {e = e} sl id Lv a nextId ((rid , path) ∷ chains) sched st 
         J g (suc i) hg hgn hR
         (subst (_≤ regAt S (Caps.cReg c) J) (+-suc i (length chains)) hlen)
         (≤-trans (proj₁ (proj₂ ST)) STEP)
-        (proj₁ (chainStep-regs-base sl id a nextId path sched st′ hrsz hrlen))
-        (proj₂ (chainStep-regs-base sl id a nextId path sched st′ hrsz hrlen))
+        (proj₁ (chainStep-regs-base sl id a nextId path sched st′ hrsz hrlen
+                  (proj₁ (∧-true _ _ hpz))))
+        (proj₂ (chainStep-regs-base sl id a nextId path sched st′ hrsz hrlen
+                  (proj₁ (∧-true _ _ hpz))))
   where st′ = record st { delivered = rid ∷ EvalSt.delivered st }
         c   = capsAt e sl id
         S   = Caps.cSize c
