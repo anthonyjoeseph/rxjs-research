@@ -216,26 +216,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the sink leaf narrowed by its own fold, since nothing can
-  instantiate it** — the share fold at a sink is the walk's second
-  recursion and the only row here standing on no evidence at all, and
-  the route that would have bought some is shut: both instruments for
-  a statement priced in caps are closed independently, the typechecker
-  by the seal over the counting family and the harness because those
-  caps do not evaluate. So the risk comes down the way the closures
-  leaf's just did — match on the fold, discharge the arms that assert
-  nothing, and leave a leaf about ONE admitted registration. A leaf
-  that small is provable or refutable at a hand-built entry, which is
-  evidence this row cannot otherwise get.
-
-- **the flat-versus-moving bound on every chain's stages, which the
-  mirror already carries** — the width cap over each stage of each
-  chain's walk is the row here whose twin is proven and whose twin
-  crosses the hop that was feared: the same conjunct survives the
-  `thru` boundary on the discharged side, so nothing about the walk is
-  undecided. What is left is arithmetic between a flat cap and one
-  that moves per stage, which is the shape a mirror cannot hand over
-  and the only part this row still owes.
+- **the base-priced path carried instead of widened away, which is
+  what the two pricing leaves are missing** — the cascade holds its
+  chains priced at the BASE cap and widens that receipt to the level's
+  cap at the moment the walk starts, so the walk knows only the weaker
+  form. But a registration appends `thru-outer … ↠ κ` for a tail of
+  the very path being walked, and a tail of a base-priced path is
+  base-priced. So the receipt the two leaves want is already in hand
+  one call above them and is being thrown away: carry it on the walk
+  beside the stepped one, and the frame leaf becomes a proof rather
+  than a postulate. That is the cheapest route open, and the one that
+  says whether the pricing is true at all.
 
 - **the drain leaf's frame-local half, now that the position is
   supplied** — the parked queue's row was rewritten around what the
@@ -246,6 +237,15 @@ does not fit is a finding about the shared statement, not about the head.
   frame's own count against the frame's own cap, at one level, with no
   ladder in it — so this is the commit that finds out whether the leaf
   was ever more than the position it was missing.
+- **the flat-versus-moving bound on every chain's stages, which the
+  mirror already carries** — the width cap over each stage of each
+  chain's walk is the row here whose twin is proven and whose twin
+  crosses the hop that was feared: the same conjunct survives the
+  `thru` boundary on the discharged side, so nothing about the walk is
+  undecided. What is left is arithmetic between a flat cap and one
+  that moves per stage, which is the shape a mirror cannot hand over
+  and the only part this row still owes.
+
 
 ### The ledger
 
@@ -258,10 +258,18 @@ does not fit is a finding about the shared statement, not about the head.
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`walk-sink-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
-  fold at a sink, which is the walk's SECOND recursion — over admitted
-  registrations rather than over a path — and the one arm the path induction
-  hands off rather than closes.
+- **`sink-ring-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
+  ring at a sink, which is the walk's SECOND recursion — over admitted
+  registrations rather than over a path — and all the sink still owes now that
+  its opening pair comes off the walk's own registry pricing.
+- **`step-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one frame
+  preserving the registry's base-cap pricing. Every mutation but one is a
+  filter, so the content is the frame that REGISTERS: whether what it appends
+  is base-priced is the open question and nothing has yet asked it.
+- **`chainStep-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  same at the granularity the cascade advances at. A chain's step IS a walk, so
+  this is its frames' obligation aggregated, and the two stand or fall
+  together.
 - **`nest-clos-caps`** (Caps-Face/Part7) — FALSITY, `REFUTED×2`: one inner
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
