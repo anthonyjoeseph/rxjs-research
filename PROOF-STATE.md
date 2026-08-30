@@ -49,41 +49,7 @@ LEDGER of one-line hooks; everything else lives in the code.
   greps or it errors.
 - **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
-  `### Big picture tier roadmap
-
-- **the two `step-frame-clos` arms still standing on nothing** — the
-  fold arm is instantiated and moved; the other two are not, and their
-  shared header's evidence turned out to belong to the map probe alone,
-  so the split that credited it correctly left them reading NO
-  EVIDENCE, which is what they are. Each needs its own reached state:
-  the exiting-inner head drains values out of a node QUEUE, parked at a
-  level nothing in its hypotheses reads, and the wrap head passes on
-  what SUBSCRIBING an inner emitted, so its factor is the inner's
-  definition. Both states come from running a `mergeAll`, which is one
-  harness for the two.
-
-- **`walk-frame-drain-inner`'s missing level** — the top row, and the
-  one design call the tier still owes. Its caps conjuncts are read at
-  the base cap while the walk holds one only at its level, and raising
-  them through the fit shelf is a recorded dead route, so the level has
-  to arrive another way. The precedented move is the closure key's:
-  stamp the parked entry with the level it was parked at, as a conjunct
-  of the invariant rather than a hypothesis at the head. That is a
-  restatement of a predicate the whole drain cone threads, and the
-  queue is exactly what the arm above instantiates first.
-
-- **the map head, against the mirror that already pays for it** — the
-  frame law reports its climb in `fCharge`, which is the currency the
-  size face reports in, and at the map arm that face's charge is
-  `suc (sizeᵗ fn)` and its proof is a real body. So the two arms differ
-  in their MEASURE and in nothing else: one reads `sizeᵛ` of a template
-  applied to an argument, the other `closSizeᵉ` of the same. The leg is
-  the closure counterpart of the substitution bound the size mirror
-  spends — a template's reading times its argument's — and the arm that
-  consumes it.
-
-
-### The ledger` carrying
+  `### Big picture tier roadmap` ... `### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
@@ -249,34 +215,36 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the drain's ENTRY FIT, which is the half nothing supplies** — the
-  burst's fold is now checked and its invariant is `pushFitOK`, whose
-  preservation is a projection, so the walk half is a leaf that reads
-  what the fold carries. What is left of the leg is the other leaf:
-  the payload subscribe's own burst fits the head's spare factor. The
-  fit shelf concludes exactly this shape, but at caps hypotheses the
-  drain's caller does not hold — `inputsBelowᵉ` says nothing about a
-  store — so the leg is deciding where those arrive from, and that is
-  a design call before it is a grind.
+- **the exiting-inner arm, the last `step-frame-clos` head standing on
+  nothing** — the wrap arm is instantiated and moved, and its harness
+  is most of this one: a `mergeAll` run reaches the node, and the head
+  is handed its values directly. What differs is that this arm passes
+  its values on UNTOUCHED unless it drains, so a load-bearing row has
+  to make it drain — the exiting inner must be the last alive, which a
+  `concatAll` parks. The reading then comes out of the QUEUE rather
+  than out of an argument, which is the same history the leg below is
+  about, so instantiating it aims that design call as well as closing
+  this row.
 
-- **`subscribeE-burst-nest`'s induction** — the crossing this row was
-  ranked for is closed: at the map that kills the flat reading the
-  levelled one holds by thirty-odd orders of magnitude, so nothing
-  about the statement is undecided and the row is now labour with a
-  shape. The leg is the induction over the subscription's own descent,
-  head by head, against the ordering the arrival entry already gives —
-  and it is the row the fit shelf's other leaves are waiting behind,
-  so it buys three rows' worth of unblocking, not one.
+- **`walk-frame-drain-inner`'s missing level** — the top row, and the
+  one design call the tier still owes. Its caps conjuncts are read at
+  the base cap while the walk holds one only at its level, and raising
+  them through the fit shelf is a recorded dead route, so the level has
+  to arrive another way. The precedented move is the closure key's:
+  stamp the parked entry with the level it was parked at, as a conjunct
+  of the invariant rather than a hypothesis at the head. That is a
+  restatement of a predicate the whole drain cone threads, and the
+  queue is exactly what the leg above instantiates first.
 
 - **the map head, against the mirror that already pays for it** — the
-  frame law now reports its climb in `fCharge`, which is the currency
-  the size face reports in, and at the map arm that face's charge is
+  frame law reports its climb in `fCharge`, which is the currency the
+  size face reports in, and at the map arm that face's charge is
   `suc (sizeᵗ fn)` and its proof is a real body. So the two arms differ
   in their MEASURE and in nothing else: one reads `sizeᵛ` of a template
   applied to an argument, the other `closSizeᵉ` of the same. The leg is
   the closure counterpart of the substitution bound the size mirror
-  spends — a template's reading times its argument's, which is exactly
-  the product the witness built — and the arm that consumes it.
+  spends — a template's reading times its argument's — and the arm that
+  consumes it.
 
 
 ### The ledger
@@ -289,11 +257,12 @@ does not fit is a finding about the shared statement, not about the head.
 - **`step-frame-clos-inner`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
   the drained values were parked at a level nothing here reads.
-- **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
-  wrap head, whose output is a constructor round a subscribed inner — the one
-  arm whose bill is a constructor rather than a template.
-- **`step-frame-clos-scan`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
-  fold head, whose second factor comes out of the STORE and compounds over the
+- **`step-frame-clos-thru`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the wrap
+  head, whose output is a constructor round a subscribed inner. Instantiated at
+  a substituting ladder: the constructor is the cheap half and the report
+  doubles per layer, so the charge is what earns the climb.
+- **`step-frame-clos-scan`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the fold
+  head, whose second factor comes out of the STORE and compounds over the
   burst. Instantiated at a doubling template on a reached state: the report
   grows by one per four or five values against a charge exponential in the
   width.

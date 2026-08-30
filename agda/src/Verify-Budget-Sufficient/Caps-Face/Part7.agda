@@ -2644,10 +2644,23 @@ postulate
                       (Caps.cWid (capsAt e sl id)) L)
 
   -- THE WRAP'S BILL IS A CONSTRUCTOR AND NOT A TEMPLATE, which is why
-  -- it is the one arm whose report might honestly be a fixed one -- and
-  -- also why nothing has been instantiated at it: what the frame hands
-  -- on is what SUBSCRIBING the inner emitted, so the factor is the
-  -- inner's own definition rather than anything the head can read.
+  -- it is the one arm whose report might honestly be a fixed one.  It
+  -- is not: what the frame hands on is what SUBSCRIBING the inner
+  -- emitted, so the factor is the inner's own definition rather than
+  -- anything the head can read, and an arrival of bounded reading can
+  -- emit a report that doubles per layer.  The `j′` here is therefore
+  -- earned the same way the fold arm's is -- by the charge -- and the
+  -- constructor is the cheap half of the arm.
+  --
+  -- PROBED: `Probed.Step-Frame-Clos-Wrap` reaches the node by running a
+  --   `mergeAll` and hands the head a substituting ladder as its
+  --   argument: four layers are admitted at the arrival's own level
+  --   (degenerate, kept as the boundary), eight overflow it and are
+  --   admitted one level up, against a charge exponential in the width
+  --   cap.  Covered is the closure conjunct at a FLOOR cap -- the ratio,
+  --   not the `capsAt` recurrence, which `sizeCount` seals.  Not
+  --   covered: any head but `mergeAllᵒ`, whose node states gate the
+  --   subscription differently.
   step-frame-clos-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
     (op : AllOp) (onid : NodeId)
