@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _∸_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (m+[n∸m]≡n; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans;
+open import Data.Nat.Properties using (m+[n∸m]≡n; <⇒≤; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans;
   ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤;
   +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤; ⊔-identityʳ; m⊔n≤m+n;
   *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm; +-suc)
@@ -35,7 +35,7 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; reached-room; base; walk)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-def; nestU-mono; nestU-room)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
@@ -46,7 +46,7 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
   (pathSzSum-cap; deliverLen; deliverNestD; deliverNestF; 1≤deliverNestF; chainsLenSum;
   chainsDelLen; chainsDelNestD; chainsDelNestF; 1≤chainsDelNestF; chainsDelSzSum;
   chainsDelNestF≡; chainsDelLen-chains; chainsDelNestD-chains; chainsDelSzSum-chains;
-  chainsNestF≤; shareAdmit-len; shareAdmit-sz)
+  chainsNestF≤; nestDᵉ≤sizeᵉ; shareAdmit-len; shareAdmit-sz)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Nest-Store using
@@ -54,7 +54,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
   1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
-  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-store)
+  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-store; slotNest; nestBurstAt-def; nestCapAt-suc)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; takeVals; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
@@ -63,7 +63,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   share-sink; root;
   dCapᶜ; fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick; shareAdmit; shareLatch;
   dispatchShare; foldPath)
-open import Rx.Slots using (Slots; slotsSize)
+open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -87,12 +87,13 @@ open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; foldPath-sink-N; shareGo-cons-N; shareGo-skip-N;
   chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
-  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
+  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; 8≤capsAt-size; B2-cReg≤cSize; Caps; capsAt; capsAt-base-size;
+  capsAt-size-mono; capsAt-wid<size; capsAt-suc-full;
   capsAt-⊑-suc; capsAt-exp≤capsH; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
   frameStep-mono-j; frameStep-reg-mono; iterL-mono; iterSize-mono-count; J+n≤iterL; lvls-add;
   lvls-infl; lvls-mono; size≤sizeCount; sizeCount; sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true; cutThrough-len)
+  (pathLen; reach-reset; ∧-true; cutThrough-len; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -3301,8 +3302,12 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hdp =
 --   Those rows are what killed the two cheaper shapes: a bare factor of
 --   two fails forty-nine against forty-four, and a size SUMMAND fails
 --   one hundred and ninety-three against one hundred and fourteen at
---   the far end of the count axis.  Not covered: the premises, which do
---   not compute, and any instant past the second.
+--   the far end of the count axis.  A THIRD cascade is reached too, on
+--   one family at fold depths two and eight, and the ceiling holds
+--   there with room -- fifteen against three hundred and forty-eight,
+--   fifty-seven against one thousand five hundred and ninety.  Not
+--   covered: the premises, which do not compute; any instant past the
+--   third; and the count axis at the third, which is one family only.
 postulate
   cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -3313,13 +3318,172 @@ postulate
       ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
                   (storeNestMax sched st) (nestUnit e sl)
 
--- THE CAP UNDER THE SIZE'S DOUBLE EXPONENTIAL, AND NO SYNTAX ON EITHER
--- SIDE.  Both faces here are caps-denominated: the instant's nesting
--- cap, times the room the ceiling's three readings and its own unit
--- cost, against two exponentials of the size at the same instant.  The
--- program's size is gone from the statement and so is the ceiling's
--- `suc`, both held by facts the recurrence already carries.
+-- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
+-- scripted slot's own index makes its nesting zero, and a shared one's
+-- is its expression's, which that expression's size dominates.
+slotNest≤slotSize : ∀ {n} {Γ : Ctx n} {k t} (s : Slot Γ k t) →
+  slotNest s ≤ slotSize s
+slotNest≤slotSize (scripted _) = z≤n
+slotNest≤slotSize (shared d)   = nestDᵉ≤sizeᵉ d
+
+slotsNestSum≤slotsSize : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) →
+  slotsNestSum sl ≤ slotsSize sl
+slotsNestSum≤slotsSize sl =
+  sum-tab-mono (λ i → slotNest (sl i)) (λ i → slotSize (sl i))
+               (λ i → slotNest≤slotSize (sl i))
+
+-- FOUR SQUARES UNDER THE EXPONENTIAL, which is where the base case's
+-- room comes from and why the size floor is eight rather than six.
+sq4≤2^ : ∀ (S : ℕ) → 8 ≤ S → 4 * (S * S) ≤ 2 ^ S
+sq4≤2^ (suc (suc k)) (s≤s (s≤s 6≤k)) =
+  ≤-trans (*-monoʳ-≤ 4 (sq≤2^ k 6≤k))
+          (≤-reflexive (sym (^-distribˡ-+-* 2 2 k)))
+
+-- THE STEP'S ARITHMETIC, OVER BARE NUMBERS, and it is a body rather
+-- than a leaf.  Nothing about caps survives here: a cap that steps by
+-- multiplying an exponential onto a sum fits two exponentials of the
+-- next size exactly when that exponent, the increment's own exponent,
+-- the previous budget and the next size all fit ONE.  Stating it over
+-- numerals is what makes the step instantiable at all -- both sides of
+-- the caps-indexed form sit on a recurrence that does not terminate
+-- natively, so the statement it came from could not be reached by any
+-- row.
+nest-step-ℕ : ∀ (S S′ C I C′ L M : ℕ) → 1 ≤ S →
+  C′ ≤ 2 ^ L * (C + I) →
+  I ≤ 2 ^ M →
+  S′ + 3 + (2 ^ S + M) + L ≤ 2 ^ S′ →
+  S * (4 * C) ≤ 2 ^ (2 ^ S) →
+  S′ * (4 * C′) ≤ 2 ^ (2 ^ S′)
+nest-step-ℕ S S′ C I C′ L M 1≤S hC′ hI hroom ih =
+  ≤-trans (*-mono-≤ (<⇒≤ (n<2^n S′)) (*-monoʳ-≤ 4 hC′E))
+          (≤-trans (≤-reflexive (sym collect)) (^-monoʳ-≤ 2 hroom′))
+  where
+  K = 2 ^ S + M
+  C≤4C : C ≤ 4 * C
+  C≤4C = ≤-trans (≤-reflexive (sym (*-identityˡ C)))
+                 (*-monoˡ-≤ C {1} {4} (s≤s z≤n))
+  4C≤S4C : 4 * C ≤ S * (4 * C)
+  4C≤S4C = ≤-trans (≤-reflexive (sym (*-identityˡ (4 * C))))
+                   (*-monoˡ-≤ (4 * C) 1≤S)
+  C≤ : C ≤ 2 ^ K
+  C≤ = ≤-trans (≤-trans C≤4C 4C≤S4C)
+               (≤-trans ih (^-monoʳ-≤ 2 (m≤m+n (2 ^ S) M)))
+  I≤ : I ≤ 2 ^ K
+  I≤ = ≤-trans hI (^-monoʳ-≤ 2 (m≤n+m M (2 ^ S)))
+  CI≤ : C + I ≤ 2 ^ suc K
+  CI≤ = ≤-trans (+-mono-≤ C≤ I≤) (≤-reflexive (sym (2X≡X+X (2 ^ K))))
+  hC′E : C′ ≤ 2 ^ L * 2 ^ suc K
+  hC′E = ≤-trans hC′ (*-monoʳ-≤ (2 ^ L) CI≤)
+  collect : 2 ^ (S′ + (2 + (L + suc K))) ≡ 2 ^ S′ * (4 * (2 ^ L * 2 ^ suc K))
+  collect = trans (^-distribˡ-+-* 2 S′ (2 + (L + suc K)))
+                  (cong (2 ^ S′ *_)
+                    (trans (^-distribˡ-+-* 2 2 (L + suc K))
+                           (cong (4 *_) (^-distribˡ-+-* 2 L (suc K)))))
+  reshape : S′ + (2 + (L + suc K)) ≡ S′ + 3 + K + L
+  reshape = solve 3 (λ s l k → s :+ (con 2 :+ (l :+ (con 1 :+ k)))
+                                 := s :+ con 3 :+ k :+ l)
+                  refl S′ L K
+  hroom′ : S′ + (2 + (L + suc K)) ≤ 2 ^ S′
+  hroom′ = ≤-trans (≤-reflexive reshape) hroom
+
+-- THE PROGRAM'S OWN VOCABULARY UNDER THE INSTANT'S SIZE.  The wrap
+-- unit reads the expression's nesting and the slots', each of which its
+-- own size dominates, and the caps recurrence's base bound already
+-- holds that sum -- so the unit is a caps quantity and the increment
+-- below can be priced without any syntax in it.
+nestUnit≤size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestUnit e sl ≤ Caps.cSize (capsAt e sl id)
+nestUnit≤size e sl id =
+  ≤-trans (≤-trans (s≤s (+-mono-≤ (nestDᵉ≤sizeᵉ e) (slotsNestSum≤slotsSize sl)))
+                   (n≤1+n _))
+          (capsAt-base-size e sl id)
+
+-- THE INCREMENT'S EXPONENT, AND EVERY FIELD IN IT READ AT THE NEXT
+-- INSTANT'S SIZE.  The burst is a `suc` of the width and the width at
+-- an instant is strictly under the size at the next one; the registry
+-- is under its own size and that size is under the next; the wrap unit
+-- is under the size too.  What stays unreduced is the delivery, at both
+-- instants -- which is the recurrence the room has to pay for.
+nestIncLog : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
+nestIncLog {n = n} e sl id =
+  S′ * (S′ * (suc (suc (S′ * delSize n (capsAt e sl id)))
+              * (suc (delSq n (capsAt e sl (suc id))) * S′)))
+  where S′ = Caps.cSize (capsAt e sl (suc id))
+
+-- the burst and the registry at the next size, which both exponents want
+burst≤size′ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestBurstAt e sl id ≤ Caps.cSize (capsAt e sl (suc id))
+burst≤size′ e sl id =
+  ≤-trans (≤-reflexive (nestBurstAt-def e sl id)) (capsAt-wid<size e sl id)
+
+reg≤size′ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  realWidAt e sl id ≤ Caps.cSize (capsAt e sl (suc id))
+reg≤size′ e sl id =
+  ≤-trans (≤-trans (≤-reflexive (realWidAt-def e sl id))
+                   (B2-cReg≤cSize e sl id))
+          (capsAt-size-mono e sl id)
+
+nestInc≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestIncAt e sl id ≤ 2 ^ nestIncLog e sl id
+nestInc≤exp {n = n} e sl id =
+  ≤-trans (≤-trans (≤-reflexive (nestIncAt-def e sl id)) shape)
+          (<⇒≤ (n<2^n (nestIncLog e sl id)))
+  where
+  shape : realWidAt e sl id
+            * (nestBurstAt e sl id
+               * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
+                  * nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)))
+            ≤ nestIncLog e sl id
+  shape =
+    *-mono-≤ (reg≤size′ e sl id)
+      (*-mono-≤ (burst≤size′ e sl id)
+        (*-mono-≤ (s≤s (s≤s (*-monoˡ-≤ (delSize n (capsAt e sl id))
+                                      (reg≤size′ e sl id))))
+                  (≤-trans (≤-reflexive (nestU-def (delSq n (capsAt e sl (suc id)))
+                                                   (nestUnit e sl)))
+                           (*-monoʳ-≤ (suc (delSq n (capsAt e sl (suc id))))
+                                      (≤-trans (nestUnit≤size e sl id)
+                                               (capsAt-size-mono e sl id))))))
+
+-- THE FACTOR'S EXPONENT, read the same way and with the same residue.
+nestFacLog : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
+nestFacLog {n = n} e sl id =
+  suc S′ * suc S′ * (suc (delSize n (capsAt e sl (suc id)))
+                     * (S′ * delSq n (capsAt e sl (suc id))))
+  where S′ = Caps.cSize (capsAt e sl (suc id))
+
+nestFac≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestFacAt e sl id ≤ 2 ^ nestFacLog e sl id
+nestFac≤exp {n = n} e sl id =
+  ≤-trans (≤-reflexive (nestFacAt-def e sl id))
+          (^-monoʳ-≤ 2 (*-mono-≤ (*-mono-≤ (s≤s (burst≤size′ e sl id))
+                                           (s≤s (burst≤size′ e sl id)))
+                                 (*-monoʳ-≤ (suc (delSize n (capsAt e sl (suc id))))
+                                            (*-monoˡ-≤ (delSq n (capsAt e sl (suc id)))
+                                                       (reg≤size′ e sl id)))))
+
+-- THE ONE SIDE THE ARITHMETIC LEAVES OPEN, and it mentions no cap at
+-- all.  The wrap factor's exponent, the increment's exponent, the
+-- previous instant's budget and the next size, together under ONE
+-- exponential of that size.  Both exponents have had their burst,
+-- registry and unit discharged into the next size already, so what is
+-- being compared is the SIZE recurrence against the DELIVERY
+-- recurrence -- and the size steps quadratically once per level while
+-- its count is above the width, which is the room the delivery's fixed
+-- context depth has to fit inside.
 --
+-- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
+--   times -- the calibration through the wrap factor, the same through
+--   the increment alone, and the level-keyed repair at every level the
+--   fuel reaches, which closes the escape through a bigger index.
+postulate
+  nestFac-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    Caps.cSize (capsAt e sl (suc id)) + 3
+      + (2 ^ Caps.cSize (capsAt e sl id) + nestIncLog e sl id)
+      + nestFacLog e sl id
+      ≤ 2 ^ Caps.cSize (capsAt e sl (suc id))
+
 -- WHY THE EXPONENT AND NOT THE SIZE.  The cap exponentiates a caps
 -- field once per instant, so it stands above the size at its own
 -- instant and no bound denominated in the size can hold it.  Two
@@ -3329,18 +3493,49 @@ postulate
 -- cubic in a size one exponential would only have matched linearly.
 --
 -- AND THE CONSTRAINT THE SHAPE HAS TO RESPECT IS THE INDEX: no summand
--- may price the cap at the instant AFTER the one being bounded.
--- Nothing here does -- both sides are read at `id`.
---
--- REFUTED: `Refuted.Nest-Cap-Height` (agda/evidence/refuted), three
---   times -- the calibration through the wrap factor, the same through
---   the increment alone, and the level-keyed repair at every level the
---   fuel reaches, which closes the escape through a bigger index.
-postulate
-  nestCap≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    Caps.cSize (capsAt e sl id) * (4 * nestCapAt e sl id)
-      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+-- may price the cap at the instant AFTER the one being bounded.  The
+-- hypothesis and the conclusion are read one instant apart and that is
+-- the whole of it -- the delivery the exponents read is the next
+-- instant's, which is what the room, not the cap, is charged for.
+nestCap≤exp-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  Caps.cSize (capsAt e sl id) * (4 * nestCapAt e sl id)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)) →
+  Caps.cSize (capsAt e sl (suc id)) * (4 * nestCapAt e sl (suc id))
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl (suc id)))
+nestCap≤exp-suc e sl id ih =
+  nest-step-ℕ (Caps.cSize (capsAt e sl id))
+              (Caps.cSize (capsAt e sl (suc id)))
+              (nestCapAt e sl id) (nestIncAt e sl id)
+              (nestCapAt e sl (suc id))
+              (nestFacLog e sl id) (nestIncLog e sl id)
+              (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
+              hC′ (nestInc≤exp e sl id) (nestFac-room e sl id) ih
+  where
+  hC′ : nestCapAt e sl (suc id)
+          ≤ 2 ^ nestFacLog e sl id
+              * (nestCapAt e sl id + nestIncAt e sl id)
+  hC′ = ≤-trans (≤-reflexive (nestCapAt-suc e sl id))
+                (*-monoˡ-≤ (nestCapAt e sl id + nestIncAt e sl id)
+                           (nestFac≤exp e sl id))
+
+nestCap≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  Caps.cSize (capsAt e sl id) * (4 * nestCapAt e sl id)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+nestCap≤exp e sl zero =
+  ≤-trans (*-monoʳ-≤ S (*-monoʳ-≤ 4 C≤S))
+          (≤-trans (≤-reflexive shape)
+                   (≤-trans (sq4≤2^ S (8≤capsAt-size e sl 0))
+                            (^-monoʳ-≤ 2 (<⇒≤ (n<2^n S)))))
+  where
+  S = Caps.cSize (capsAt e sl 0)
+  shape : S * (4 * S) ≡ 4 * (S * S)
+  shape = solve 1 (λ s → s :* (con 4 :* s) := con 4 :* (s :* s)) refl S
+  C≤S : nestCapAt e sl 0 ≤ S
+  C≤S = ≤-trans (≤-reflexive (nestCapAt-0 e sl)) (nestUnit≤size e sl 0)
+nestCap≤exp e sl (suc id) =
+  nestCap≤exp-suc e sl id (nestCap≤exp e sl id)
 
 -- AND THE CEILING'S SYNTAX IS PAID BY THE SIZE CAP, which is what lets
 -- the leaf above be stated in caps alone.  The ceiling reads the

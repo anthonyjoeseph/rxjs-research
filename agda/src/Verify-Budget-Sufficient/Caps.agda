@@ -1203,28 +1203,46 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
                    (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
 
-6≤frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
-  6 ≤ Caps.cSize (frameBlowup c d)
-6≤frameBlowup-size c d 1≤R 3≤S =
-  ≤-trans (*-mono-≤ 3≤S 2≤suc2S)
-          (iterSize-step≤ S S J (≤-trans (s≤s z≤n) 3≤S) 1≤J)
+8≤frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
+  8 ≤ Caps.cSize (frameBlowup c d)
+8≤frameBlowup-size c d 1≤R 3≤S =
+  ≤-trans (≤-trans 8≤9 (*-mono-≤ 3≤S 3≤suc2S))
+          (iterSize-step≤ S S J 1≤S 1≤J)
   where
   S = Caps.cSize c
-  R = Caps.cReg c
   J = sizeCount c d
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 3≤S
-  2≤suc2S : 2 ≤ suc (2 * S)
-  2≤suc2S = s≤s (≤-trans 1≤S (m≤m+n S (S + 0)))
+  8≤9 : 8 ≤ 3 * 3
+  8≤9 = s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n)))))))
+  3≤suc2S : 3 ≤ suc (2 * S)
+  3≤suc2S = s≤s (*-monoʳ-≤ 2 1≤S)
   1≤J : 1 ≤ J
   1≤J = ≤-trans (s≤s z≤n)
                 (2≤sizeCount c d (≤-trans (s≤s (s≤s z≤n)) 3≤S) 1≤R)
 
+-- AND THE FLOOR IS UNIFORM IN THE INSTANT, base included, because the
+-- base cap is a `frameBlowup` too -- of a record whose size already
+-- reads the program and whose registry is a successor.  Eight is where
+-- `sq≤2^` starts, which is what the nesting side spends this on.
+8≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  8 ≤ Caps.cSize (capsAt e sl id)
+8≤capsAt-size {n = n} e sl zero =
+  8≤frameBlowup-size
+    (caps (2 + sizeᵉ e + slotsSize sl) (suc (entryCeil n sl e))
+          (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
+    (s≤s z≤n)
+    (≤-trans (+-monoʳ-≤ 2 (sizeᵉ-pos e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+8≤capsAt-size e sl (suc id) =
+  8≤frameBlowup-size (capsAt e sl id) (capsH e sl id)
+    (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
+
 6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   6 ≤ Caps.cSize (capsAt e sl (suc id))
 6≤capsAt-size e sl id =
-  6≤frameBlowup-size (capsAt e sl id) (capsH e sl id)
-    (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
+  ≤-trans (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))))
+          (8≤capsAt-size e sl (suc id))
 
 ------------------------------------------------------------------
 -- THE TOWER BOUND ON THE RECURRENCE.  Every level of capsAt sits under
@@ -1733,3 +1751,62 @@ capsAt-exp≤capsH e sl (suc id) =
     (proj₁ (capsAt-tower e sl id))
     (proj₁ (proj₂ (capsAt-tower e sl id)))
     (proj₂ (proj₂ (capsAt-tower e sl id)))
+
+-- THE WIDTH IS UNDER THE NEXT INSTANT'S SIZE, and the route is the
+-- level ladder rather than any comparison of the two recurrences.  The
+-- width only enters the count through `fCharge`, which is a `suc` of a
+-- product one of whose factors is `suc (widAt S W J)` -- and at level
+-- zero `widAt S W 0` IS `W`, so no fold has run yet and the bound needs
+-- nothing about `S`.  One delivery is one `dLvl`, so the count already
+-- clears that charge.
+wid≤dLvl : ∀ (S W d : ℕ) → W ≤ dLvl S W d 0
+wid≤dLvl S W d =
+  ≤-trans (≤-trans W≤fLvl (fLvl≤fLvlD S W d 0))
+          (iterL-infl S W d (sizeAt S 0) (fLvlD S W d 0))
+  where
+  W≤fLvl : W ≤ fLvl S W 0
+  W≤fLvl = ≤-trans (n≤1+n W)
+                   (≤-trans (m≤m*n (suc W) (suc (sizeAt S 0))) (n≤1+n _))
+
+wid≤sizeCount : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  Caps.cWid c ≤ sizeCount c d
+wid≤sizeCount c d 2≤S 1≤R =
+  ≤-trans (≤-trans (wid≤dLvl (Caps.cSize c) (Caps.cWid c) d)
+                   (lvls-mono 1 (cDel c d) 2≤S ≤-refl ≤-refl ≤-refl 1≤D))
+          (≤-reflexive (sym (sizeCount-body c d)))
+  where
+  1≤D : 1 ≤ cDel c d
+  1≤D = ≤-trans (1≤dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d
+                         (Caps.cSize c) 0 1≤R)
+                (≤-reflexive (sym (cDel-body c d)))
+
+-- AND THEN THE SIZE CARRIES IT PAST THE COUNT, because every size step
+-- at least doubles: the count sits under two to itself, and the size
+-- read after that many steps is above `2 ^ count` times the entry size.
+-- So a width that was merely under the count comes out under the size,
+-- with exponential room to spare -- which is what the nesting ceiling's
+-- step has to spend.
+wid<frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  suc (Caps.cWid c) ≤ Caps.cSize (frameBlowup c d)
+wid<frameBlowup-size c d 2≤S 1≤R =
+  ≤-trans (≤-trans (s≤s (wid≤sizeCount c d 2≤S 1≤R)) (n<2^n J))
+          (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ J))))
+                            (*-monoʳ-≤ (2 ^ J) 1≤S))
+                   (iterSize-2^ S J S 1≤S))
+  where
+  S = Caps.cSize c
+  J = sizeCount c d
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+
+capsAt-wid<size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  suc (Caps.cWid (capsAt e sl id)) ≤ Caps.cSize (capsAt e sl (suc id))
+capsAt-wid<size e sl id =
+  wid<frameBlowup-size (capsAt e sl id) (capsH e sl id)
+    (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
+
+capsAt-size-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  Caps.cSize (capsAt e sl id) ≤ Caps.cSize (capsAt e sl (suc id))
+capsAt-size-mono e sl id =
+  cSize≤frameBlowup (capsAt e sl id) (capsH e sl id)
+    (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))

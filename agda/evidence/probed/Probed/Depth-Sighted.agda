@@ -143,6 +143,51 @@ farFigs = proj₁ farRow + 1000000 * proj₂ farRow
 
 farFigs≡ : farFigs ≡ 70001633000193
 
+-- ── THE THIRD INSTANT, WHICH NOTHING HAS EVER REACHED ──────────────
+
+-- Every row above stops at the SECOND cascade, so the ceiling's
+-- coverage ended exactly where the caps recurrence starts growing.
+-- One more `cascade` is the whole apparatus needed to ask -- and the
+-- scripted slot has to be handed a THIRD value, since it emits exactly
+-- as many as it is given and every row above gives it two.  That is
+-- the only reason the region read as unreachable.
+--
+-- LOAD-BEARING, and it fails if the descent passes the ceiling at the
+-- third instant on either fold depth.  It does not: both sides grow,
+-- and the ceiling grows faster.  A zero pair here would have been the
+-- other finding -- the run stopping short, a corpus boundary rather
+-- than a ceiling one.
+after2 : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → Sched Γ₂ × EvalSt p
+after2 p sl g with sched-next (proj₁ (after1 p sl g))
+... | inj₁ _        = after1 p sl g
+... | inj₂ (a , sd) =
+  let r = cascade a 2 sd (proj₂ (after1 p sl g))
+  in proj₁ (proj₂ r) , proj₂ (proj₂ r)
+
+deliv3Row : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → ℕ × ℕ
+deliv3Row p sl g with sched-next (proj₁ (after2 p sl g))
+... | inj₁ _        = 0 , 0
+... | inj₂ (a , sd) =
+  let st = proj₂ (after2 p sl g)
+  in depthCascade a 3 (chainsOf a st) sd (cascadeLatch a st)
+   , sightCeil (sizeᵉ p) (nestDᵛ (arrTy a) (arrVal a))
+               (storeNestMax sd st) (nestUnit p (Sched.slots sd))
+
+-- three scheduled values rather than two, since the corpus's hot slot
+-- emits exactly as many as it is given and every row above took two
+slotsF3 : Slots Γ₂
+slotsF3 = insF 1 2 3
+
+u3Row : ℕ → ℕ × ℕ
+u3Row d = deliv3Row (progU d 2) slotsF3 (sucGU 1 2 3 d 2)
+
+thirdFigs : ℕ
+thirdFigs = proj₁ (u3Row 2) + 1000000 * proj₂ (u3Row 2)
+          + 1000000000000 * proj₁ (u3Row 8)
+          + 1000000000000000000 * proj₂ (u3Row 8)
+
+thirdFigs≡ : thirdFigs ≡ 1590000057000348000015
+
 -- ── which sighted quantity sees the count, and the answer is none ───
 
 -- Nine readings per program, packed base-1000 in the order named, at
@@ -184,3 +229,4 @@ axisFigs≡ = refl
 farFigs≡ = refl
 partsFigs≡ = refl
 sizeFigs≡ = refl
+thirdFigs≡ = refl

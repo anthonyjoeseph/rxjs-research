@@ -131,6 +131,11 @@ abstract
   nestU : (S U : ℕ) → ℕ
   nestU S U = suc S * U
 
+  -- the product read back out of the seal, so a consumer bounding the
+  -- wrap can bound its two factors separately
+  nestU-def : ∀ (S U : ℕ) → nestU S U ≡ suc S * U
+  nestU-def S U = refl
+
   -- and the grant at the cap IS the frame layer's shape, which is what
   -- lets the drain hand its result straight up
   nestB-at : ∀ (S W U B : ℕ) → nestB S W U B S ≤ nestFac S W * (B + nestU S U)

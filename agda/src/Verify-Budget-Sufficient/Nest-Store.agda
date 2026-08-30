@@ -706,6 +706,14 @@ abstract
     realWidAt e sl id ≡ Caps.cReg (capsAt e sl id)
   realWidAt-def e sl id = refl
 
+  -- AND THE BURST THE SAME WAY.  The factor's exponent is keyed on this,
+  -- so a consumer bounding the factor has to see the width the burst is
+  -- a `suc` of -- and the size recurrence is what bounds that width.
+  nestBurstAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    nestBurstAt e sl id ≡ suc (Caps.cWid (capsAt e sl id))
+  nestBurstAt-def e sl id = refl
+
   nestOK?-latch : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
     nestOK? e sl id sched (cascadeLatch a st) ≡ nestOK? e sl id sched st

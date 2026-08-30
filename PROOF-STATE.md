@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **discharge `nestCap≤exp`, now that the ceiling is caps on both
-  sides** — the syntax half landed: the program's size and the
-  ceiling's `suc` are paid by the base bound and by the cap being at
-  least one, so what remains names only `capsAt` and the nesting cap.
-  The induction it wants runs across instants, and the obstacle is
-  legible for the first time — one instant multiplies the cap by an
-  exponential whose exponent reads the DELIVERY SQUARE of the NEXT
-  instant's caps, cubic in that size, so the step must buy its room
-  from the size recurrence, whose own step is quadratic and whose count
-  reads the width.
+- **the room between the size recurrence and the delivery
+  recurrence** — the ceiling's step is now a BODY over bare numbers,
+  and everything caps-shaped around it is proven too: the burst is a
+  `suc` of the width and the width at an instant is strictly under the
+  size at the NEXT one, the registry is under its own size, the wrap
+  unit is under the size, and the increment is bounded outright. One
+  leaf is left, `nestFac-room`, and it mentions no nesting cap at all —
+  the two exponents, the previous budget and the next size, together
+  under ONE exponential of that size. It is the SIZE recurrence against
+  the DELIVERY recurrence, and the delivery's depth is the program's.
 
 - **denominate the sink's allowance at the instant's EXIT cap** — the
   registry conjunct's re-index died in both directions, and what
@@ -240,22 +240,23 @@ does not fit is a finding about the shared statement, not about the head.
   `cascade-depth-sighted` and `depthE-sighted-root` are one statement
   read at a round and at the entry, and with the height comparison now
   assembled they are all that stands between a descent and its fuel.
-  Both are calibrated by refutation and probed along two axes, so the
-  shape is not in question; what no row reaches is any instant past the
-  second, which is exactly where the growth the first leg is fighting
-  lives. Take them together — the entry one has no run under it and is
-  the worked instance the round one is shaped against.
+  Both are calibrated by refutation and probed along two axes, and the
+  region no row used to reach — an instant past the second — is now
+  read: the third cascade holds with room on one family at two fold
+  depths. What is still unread there is the COUNT axis. Take them
+  together — the entry one has no run under it and is the worked
+  instance the round one is shaped against.
 
 ### The ledger
 
-- **`nestCap≤exp`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the ceiling
-  entire and caps on both sides. The instant's nesting cap, times the room
-  its three readings cost, under two exponentials of its size cap; the
-  ledger constrains only the index, and both sides are read at `id`.
+- **`nestFac-room`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the wrap
+  factor's exponent, the increment's exponent, the previous budget and the
+  next size, together under one exponential of that size. Burst, registry
+  and unit are discharged into it; only the delivery is left unreduced.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
   round's descent under its sighted nesting scaled by the program's size. The
-  shape is settled by instantiation on both axes; what no row reaches is any
-  instant past the second, which is where the growth lives.
+  shape is settled on both axes, and the third instant is now read too; what no
+  row reaches there is the delivered count.
 - **`depthE-sighted-root`** (Caps-Bridge) — FALSITY, `REFUTED, PROBED`: the
   same statement at the entry, where the store is the initial one. Read at fold
   depths two and twenty with two orders of margin; the risk left is every
