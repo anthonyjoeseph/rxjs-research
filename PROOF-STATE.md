@@ -216,14 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two leaves the ring's recursion left** — the ring is a body
-  now, so `sink-entry-caps` and `sink-entry-advance` are what one turn
-  of it cannot do for itself: a registered chain's own walk receipt,
-  and how far the level advances across one delivery. Neither can be
-  probed — both are priced in caps, and a cap does not evaluate — so
-  the route is the entry receipt first, since it is the one whose
-  hypotheses are all in hand, and the advance second, since its
-  witness is what the ladder has to name.
+- **the ring's two arithmetic leaves, now that the receipts are gone** —
+  the entry walk is a body, so what is left of it is `sink-entry-ladder`:
+  room at the registered path's LENGTH, where the sink's own package
+  holds room at zero rungs. `sink-entry-advance` is the same currency one
+  turn later — how far the level moves across a delivery. Both are about
+  the ladder and neither is probeable, so the leg is to decide whether
+  the room is derivable from the count at all, or whether the sink's
+  package has to be restated to carry it.
 
 - **the two subscribing leaves, now that they are only about SYNTAX** —
   `thru-regs-base` and `inner-regs-base` no longer owe a count, so what
@@ -250,10 +250,10 @@ does not fit is a finding about the shared statement, not about the head.
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`sink-entry-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
-  admitted registration's own walk receipt at the ring's level. Its path lives
-  in the REGISTRY rather than in the chain being charged, so the receipt is a
-  sub-receipt of nothing the ring holds.
+- **`sink-entry-ladder`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the room
+  a dispatched chain climbs through. Seven of the entry walk's eight hypotheses
+  come off the ring's package; the eighth is a ladder the sink holds at zero
+  rungs and the entry needs at the registered path's length.
 - **`sink-entry-advance`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: how far
   the level advances across one delivery, and that the ring's state package
   survives at the store that delivery produced. The witness is existential

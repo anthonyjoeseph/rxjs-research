@@ -2567,28 +2567,76 @@ ringFold sf gas nid now i vals fin rid p sched st =
         (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
         (record st { delivered = rid ∷ EvalSt.delivered st })
 
+-- THE ONE THING A REGISTERED CHAIN'S WALK IS MISSING, and it is
+-- arithmetic rather than a receipt.  Seven of the walk's eight
+-- hypotheses come off the ring's package directly -- the schedule, the
+-- caps receipt past a `delivered` mark, the values, the path priced at
+-- the level's cap and again at the base one, the depth, the registry --
+-- and the eighth is the ladder, which the ring holds at NO rungs and the
+-- entry needs at the registered path's LENGTH.  The sink's own package
+-- is stated at `pathLen (share-sink i)`, which is zero, so the room a
+-- dispatched chain climbs through is exactly what nothing upstream
+-- carries.
+postulate
+  sink-entry-ladder : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i)))
+    (p : Path Γ (lookup Γ i) t) (Lv : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+    RingState {t = t} sl id i vals Lv sched st →
+    pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+    Σ ℕ λ g → Σ ℕ λ P →
+      (4 + (sizeᵉ e + slotsSize sl) ≤ g)
+      × (iterL (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
+               (capsH e sl id) (pathLen p) Lv
+           ≤ P)
+      × Reached (capsAt e sl id) (capsH e sl id) P g
+
+chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
+  capsWalkOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) L sf gas nid now p vals fin sched st
+
 -- ONE ADMITTED REGISTRATION'S OWN WALK, which is the first of the two
 -- things the ring cannot do for itself.  The entry's path lives in the
 -- REGISTRY rather than in the chain being charged, so its receipt is
--- not a sub-receipt of anything the ring holds: what the ring has is the
--- registry priced at the base cap, and what the entry needs is a walk
--- receipt at the ring's level.  The step between the two is the one the
--- path induction takes at a chain it was handed, taken here at a chain
--- it was not.
-postulate
-  sink-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (rid : RegId) (p : Path Γ (lookup Γ i) t) (Lv : ℕ)
-    (sched : Sched Γ) (st : EvalSt e) →
-    RingState {t = t} sl id i vals Lv sched st →
-    pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
-    depthFold sf gas nid now (Fin.toℕ i) p vals
-      (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
-      (record st { delivered = rid ∷ EvalSt.delivered st })
-      ≤ capsH e sl id →
-    capsWalkOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv sf gas nid now
-      p vals fin sched (record st { delivered = rid ∷ EvalSt.delivered st })
+-- not a sub-receipt of anything the ring holds -- but every hypothesis
+-- the path induction wants of it is one the ring already carries, once
+-- the ladder above is granted.  Writing the body is what says so: the
+-- walk is entered at the ring's level with the entry's own source, and
+-- the only place a `record` update is visible is the `delivered` mark,
+-- which the caps receipt survives and the registry does not see.
+sink-entry-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+  (rid : RegId) (p : Path Γ (lookup Γ i) t) (Lv : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  RingState {t = t} sl id i vals Lv sched st →
+  pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+  depthFold sf gas nid now (Fin.toℕ i) p vals
+    (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+    (record st { delivered = rid ∷ EvalSt.delivered st })
+    ≤ capsH e sl id →
+  capsWalkOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv sf gas nid now
+    p vals fin sched (record st { delivered = rid ∷ EvalSt.delivered st })
+sink-entry-caps {e = e} sl id sf gas nid now i vals fin rid p Lv sched st
+  RS@(sleq , cok , hvc , hrsz , _) hpz hdf =
+  chain-walk-caps sl id Lv sf gas nid now (Fin.toℕ i) p vals
+    (if fin then close (Fin.toℕ i) exhausted ∷ [] else []) fin sched
+    (record st { delivered = rid ∷ EvalSt.delivered st })
+    ( sleq
+    , capsOK?-delivered (frameStep Lv c) rid sched st cok
+    , hvc
+    , pathSz?-widen p (proj₁ (frameStep-⊑-+ c 2≤S 0 Lv)) hpz0
+    , hdf
+    , sink-entry-ladder sl id i vals p Lv sched st RS hpz
+    , hrsz
+    , hpz )
+  where
+  c    = capsAt e sl id
+  2≤S  = 2≤capsAt-size e sl id
+  hpz0 = subst (λ x → pathSz? (Caps.cSize x) p ≡ true) (sym (frameStep-0 c)) hpz
 
 -- AND THE TURN ITSELF, which is the second: how far the level advances
 -- across one delivery, and that the package survives at the state that
@@ -2881,13 +2929,6 @@ step-regs-base sl id sf nid now (thru-outer op tnid) p vals fin sched st hrsz hp
 -- tail's length, the tail's -- so nothing has to be re-established
 -- from outside, which is what made the frame law's data the right
 -- thing to state the walk over.
-chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-  (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
-  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
-  capsWalkOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) L sf gas nid now p vals fin sched st
 chain-walk-caps sl id L sf gas nid now src root vals evs fin sched st H =
   proj₁ (proj₂ H)
 chain-walk-caps sl id L sf gas nid now src (share-sink i) vals evs fin sched st H =
