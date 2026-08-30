@@ -70,9 +70,9 @@ open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg)
+open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; capsAt-⊑-suc)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
-open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap)
+open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; delSize-monoᶜ)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -591,14 +591,16 @@ abstract
   -- increment reading the ENTRY cap is charging a walk for a cap it
   -- has already climbed past.  The STORE COUNT beside it stays at the
   -- entry cap deliberately -- how many stores a walk touches is a
-  -- width fact the entry cap already fixes, and only the per-store
-  -- DEPTH moves with the descent.
+  -- width fact the entry cap already fixes.  What sits beside it is a
+  -- delivery LENGTH rather than a store count, so it is priced at the
+  -- exit cap with the depth: the allowance a sink's ring is walked at
+  -- is the exit cap's, and a length read one cap lower cannot bound it.
   nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestIncAt {n = n} e sl id =
     realWidAt e sl id
       * (nestBurstAt e sl id
-         * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
+         * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl (suc id))))
             * nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)))
 
   -- THE SIZE CAP SITS UNDER ONE INSTANT'S GROWTH, which is what lets a
@@ -616,7 +618,7 @@ abstract
     S = Caps.cSize (capsAt e sl id)
 
     D : ℕ
-    D = delSize n (capsAt e sl id)
+    D = delSize n (capsAt e sl (suc id))
 
     R : ℕ
     R = realWidAt e sl id
@@ -629,7 +631,10 @@ abstract
 
     S≤mid : S ≤ suc (suc (R * D))
     S≤mid =
-      ≤-trans (delSize-cap n (capsAt e sl id))
+      ≤-trans (≤-trans (delSize-cap n (capsAt e sl id))
+                       (delSize-monoᶜ n (capsAt e sl id) (capsAt e sl (suc id))
+                         (proj₁ (capsAt-⊑-suc e sl id))
+                         (proj₂ (proj₂ (capsAt-⊑-suc e sl id)))))
         (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ D)))
                           (*-monoˡ-≤ D (1≤capsAt-reg e sl id)))
                  (≤-trans (n≤1+n (R * D)) (n≤1+n (suc (R * D)))))
@@ -672,7 +677,7 @@ abstract
     nestIncAt e sl id
       ≡ realWidAt e sl id
         * (nestBurstAt e sl id
-           * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl id)))
+           * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl (suc id))))
               * nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)))
   nestIncAt-def e sl id = refl
 

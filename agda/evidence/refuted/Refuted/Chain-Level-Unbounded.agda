@@ -96,7 +96,7 @@ chain-level-unbounded-absurd :
      (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
      Sched.slots sched ≡ sl →
      capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-     chainCapsOK (capsAt e sl id) sl (capsH e sl id) L nextId a path sched st) → ⊥
+     chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) L nextId a path sched st) → ⊥
 chain-level-unbounded-absurd H =
   n≮n (ceil + inc) (≤-trans bound (m≤m+n ceil inc))
   where

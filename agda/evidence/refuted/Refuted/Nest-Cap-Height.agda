@@ -277,7 +277,7 @@ capsH<inc {n = n} e sl id =
   U = nestUnit e sl
   R = realWidAt e sl id
   b = nestBurstAt e sl id
-  D = delSize n (capsAt e sl id)
+  D = delSize n (capsAt e sl (suc id))
 
   1≤S′ : 1 ≤ Caps.cSize (capsAt e sl (suc id))
   1≤S′ = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl (suc id))

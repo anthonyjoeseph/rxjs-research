@@ -216,14 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **denominate the sink's allowance at the instant's EXIT cap** — the
-  registry conjunct's re-index died in both directions, and what
-  replaces it is that the room a subscribe spends is already tracked as
-  the LEVEL: the walk holds a `capsOK?` at its own level whose fifth
-  conjunct is the length bound, free and unthreaded. It is unspendable
-  only because the allowance below it is denominated at the ENTRY cap.
-  The ceiling's verdict does not carry here — that gap closed by room,
-  not by an index — so this leg is a restatement and not a transport.
+- **spend the exit-cap allowance: retire `RegsBase`'s threading** — the
+  allowance now reads the EXIT cap the whole way up, calibration
+  included, so the walk's own levelled `capsOK?` finally covers the
+  sink's count demand by widening. What is left is the other half of
+  the same move: the length conjunct stops being THREADED and starts
+  being READ, which retires `step-regs-base`'s two subscribing leaves
+  rather than proving them — a preservation lemma cannot supply what an
+  append needs, and never could. Do the deletion before `sink-ring-caps`.
 
 - **the sighted ceiling's OTHER side, at both indices** —
   `cascade-depth-sighted` and `depthE-sighted-root` are one statement
