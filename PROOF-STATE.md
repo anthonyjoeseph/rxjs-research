@@ -50,7 +50,17 @@ LEDGER of one-line hooks; everything else lives in the code.
 - **THE BIG PICTURE TIER ROADMAP IS WHAT YOU FOLLOW; THE ROWS ARE THE LEDGER
   IT IS DRAWN FROM (Anthony).** Every tier opens with a
   `### Big picture tier roadmap` naming EXACTLY THREE legs — the next three
-  units of work, ranked riskiest-first — and then a `### The ledger` carrying
+  units of work, ranked riskiest-first — and then a `- **discharging `walk-frame-drain-inner` from the restated
+  predicate** — once the drain's receipts are read at the walk's own
+  level, its obligation is the bundle `WalkHyps` already hands the
+  frame, and the level the ceiling has to admit joins by MAX rather
+  than by sum: the queue's grant permits a level anywhere the count
+  reaches, and the absorber is monotone in it. So the leg is the
+  assembly, not a new fact — thread the receipts, spend the widening
+  shelf on the room facts that stay at base, and let the residue be
+  whatever the bundle genuinely does not carry.
+
+### The ledger` carrying
   the rows. A leg is a GROUP: several postulates sharing a currency, a
   statement together with the sites that consume it, one shelf of mechanical
   rows. Group where the grouping is real and fall back on the risk classes
@@ -216,17 +226,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **one probe, two targets, at the family that killed both flat
-  forms** — the template spine naming a slot, three of syntax and nine
-  of closure per step, fed into a `mergeAll`. It answers two rows at
-  once: whether one step, which more than doubles the size, actually
-  pays for `step-frame-clos`'s levelled sum at those shapes; and
-  whether the drain's `⊔`-fold absorber still fits once its premises
-  are read at the walk's level and its conclusion at the ceiling. The
-  absorbers are already checked for the sink's failure shape — no
-  product with a flat size or registry cap — so what is open is the
-  ratio, and the ratio computes.
-
 - **restating `capsDrainOK` at the seam `capsWalkOK` was split at** —
   receipts to the walk's level, room facts staying at base, now that
   the three base readings are refuted outright rather than suspected.
@@ -235,6 +234,16 @@ does not fit is a finding about the shared statement, not about the head.
   and a wrong seam costs a multi-file round. The leg is to cut it
   where the sink's own split cuts, and take `walk-frame-drain-inner`'s
   obligation down to receipts `WalkHyps` already carries.
+
+- **discharging `walk-frame-drain-inner` from the restated
+  predicate** — once the drain's receipts are read at the walk's own
+  level, its obligation is the bundle `WalkHyps` already hands the
+  frame, and the level the ceiling has to admit joins by MAX rather
+  than by sum: the queue's grant permits a level anywhere the count
+  reaches, and the absorber is monotone in it. So the leg is the
+  assembly, not a new fact — thread the receipts, spend the widening
+  shelf on the room facts that stay at base, and let the residue be
+  whatever the bundle genuinely does not carry.
 
 - **the depth face's pair, `cascade-depth-sighted` and `sight-all`** —
   a round's descent under its sighted nesting scaled by the program's
@@ -253,8 +262,8 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED, DEAD ROUTE, TWIN`: the `from-inner` head of the drain law, the only
   frame that names a node. Its caps conjuncts are read at the base cap while
   the walk holds one only at its level, and that weakens the wrong way.
-- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED`: refuted at
-  every cap in its old form, since a rebuilt value's closure is a sum. Now
+- **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: refuted
+  at every cap in its old form, since a rebuilt value's closure is a sum. Now
   stated ONE LEVEL UP, where a level more than doubles the cap.
 
 

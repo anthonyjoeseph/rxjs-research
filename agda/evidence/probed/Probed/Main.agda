@@ -67,3 +67,8 @@ open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡)
 
+
+open import Probed.Step-Frame-Level
+  using (argOK₄; argOK₁₆; pathOK₄; pathOK₁₆; pathOK₆₇; deg-base;
+         flat₄; step₄; flat₁₆; step₁₆; flat₆₇; step₆₇;
+         floors≡; rebuilds≡; worst≡)

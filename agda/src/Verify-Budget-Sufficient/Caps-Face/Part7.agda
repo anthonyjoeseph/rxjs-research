@@ -2537,6 +2537,18 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 -- written down.
 --
 -- REFUTED: `Refuted.Step-Frame-Clos`.
+-- PROBED: `Probed.Step-Frame-Level` -- the CLOSURE conjunct alone, at
+--   the worst shape the caller's own premises admit: the template
+--   names the slot as many times as the path pricing allows, over a
+--   slot definition fattened until it dominates the entry floor, so
+--   the rebuild's bill is quadratic in the cap and not linear.  The
+--   base cap REFUSES the rebuilt value and one step admits it with a
+--   factor of eight to spare; the row at the smallest slot is
+--   degenerate and kept as the boundary, since there the base cap
+--   already pays.  The entry recurrence is sealed, so the rows stand
+--   over its base FLOOR and cover the ratio rather than the
+--   recurrence -- which is what the seal cannot move, the floor being
+--   a lower bound and the step monotone.
 postulate
   step-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
