@@ -216,19 +216,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **rebase the closure reading, because the registry needs it at the
-  BASE cap and the walk carries it one level up** — the subscribing
-  leaves are refuted as stated, and what repairs them is a premise on
-  the inner, which the frame face already holds. It holds it at
-  `frameStep L (capsAt e sl id)`, the registry is priced at
-  `capsAt e sl id`, and the reading is upward-closed — so widening runs
-  the wrong way. It is available at the base — the instant loop
-  supplies it there and the chain entry widens it away one line later.
-  The leg is the rebasing — `WalkHyps`, `RingState`, `arr-chain-caps`,
-  `step-frame-clos` — which DELETES three widens and adds one at the
-  `thru-outer` head, where `frameStep-0` puts the base back. The risk
-  is `step-frame-clos`, which this STRENGTHENS: a frame rebuilding a
-  value must return the reading at the cap it was handed.
+- **the node store's closure half, which the drain's premise can only
+  come from** — a queued inner is read back out of a `mergeAll-st` by
+  `innerFinish`, at a level nothing connects to the level it was parked
+  at, so the drain's reading is not threadable and has to be an
+  INVARIANT. It goes on `RegsBase`, not into a signature and not on
+  `capsOK?`: the face's own invariant already carries the registry's
+  pricing, the cascade is exactly the family being threaded, and
+  `capsOK?` would drag every producer in the tree. The precedent is
+  `widNode`, which reads every queue element's `pWᵉ` against `cWid`
+  and carries no size half at all. The cost is
+  that every nodes-writing arm — the wrap, a parked value, an *All
+  rewrite — now owes the half, which is the fact being true.
 
 - **restate the two subscribing leaves over the inner, and thread the
   premise to them** — the refutation says exactly what is missing:
@@ -241,17 +240,16 @@ does not fit is a finding about the shared statement, not about the head.
   therefore free once leg one lands, and every `*-regs-base` between
   the ring and the primitive carries it down.
 
-- **the node store's closure field, which is where the drain's premise
-  has to come from** — a queued inner is read back out of a
-  `mergeAll-st` at a level nothing connects to the level it was parked
-  at, so the drain's reading cannot be threaded and must be an
-  invariant. `capsOK?` already carries the WIDTH half of exactly this
-  fact — `widNode` reads every queue element's `pWᵉ` and the queue's
-  length against `cWid` — and carries no size half at all. The leg is
-  to add it: a closure conjunct on the nodes, established where a value
-  is parked and spent where it is drained, which is also what turns
-  `burst-clos` and `drain-clos` from statements about the queue's HEAD
-  into projections of a fact about the queue.
+- **`walk-frame-drain`, the last FALSITY the walk face carries that is
+  not about the closure key** — a bounded `mergeAll`'s parked queue,
+  owing a delivery position ABOVE the walk's level with gas still left.
+  An earlier form of it was refuted at the level, which is what the
+  `RECOVERY` pointer holds, and the fold has since been shown to supply
+  the position; what the leaf still owes is the frame-local half. The
+  leg is to state that half against the fold's receipt rather than
+  against the level, and to instantiate it at the family the refutation
+  was built from — since a statement repaired by moving the index is
+  exactly the shape that reads as fixed while still being wrong.
 
 ### The ledger
 
@@ -277,8 +275,8 @@ does not fit is a finding about the shared statement, not about the head.
   shape, and it goes with `burst-clos` when the queue's invariant carries it.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a frame
   preserving the closure reading of the values it REBUILDS — a template
-  applied, a scan folded, a wrapper put round an inner. Deriving it from the
-  caps receipt is refuted; rebasing it to the base cap strengthens it.
+  applied, a scan folded, a wrapper put round an inner. Now stated at the BASE
+  cap, in and out, which is the form the registry needs and the stronger one.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner

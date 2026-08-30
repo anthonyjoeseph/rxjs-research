@@ -2436,7 +2436,7 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
   (Sched.slots sched ≡ sl)
   × (capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true)
   × (valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true)
-  × (all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl u) vals ≡ true)
+  × (all (nestClosOK?ᵛ (capsAt e sl id) sl u) vals ≡ true)
   × (pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) p ≡ true)
   × (depthFold sf gas nid now src p vals evs fin sched st ≤ capsH e sl id)
   × (Σ ℕ λ g → Σ ℕ λ P →
@@ -2510,10 +2510,14 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 -- the values it passes on -- a template is applied, a scan folds, a
 -- wrapper is put round an inner observable -- so the reading has to
 -- survive that rebuild or the walk's conjunct dies at the first hop.
--- The statement is at the frame's own cap and the level is added
--- afterwards by widening, because the increment the step reports is not
--- available until the step receipt has been spent, and the reading is
--- upward-closed in the cap.
+-- IT IS STATED AT THE BASE CAP, WHICH IS THE ONE THE READING ARRIVES
+-- AT.  The instant loop hands the cascade a reading against `capsAt`
+-- and nothing levelled, so a levelled statement obliges the walk to
+-- widen at its first line and can never get back -- and the registry
+-- the walk must keep priced is at the base too, so what the subscribing
+-- leaves need is exactly the reading that was thrown away.  The
+-- widening is upward-closed and free, so it is done ONCE, where the
+-- walk's stated conclusion asks for the frame's own cap.
 postulate
   step-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
@@ -2521,8 +2525,8 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl u)
+    all (nestClosOK?ᵛ (capsAt e sl id) sl s) vals ≡ true →
+    all (nestClosOK?ᵛ (capsAt e sl id) sl u)
         (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true
 
 -- THE FRAME-LOCAL LEAF, WHICH IS `⊤` AT FOUR OF THE FIVE HEADS AND SO
@@ -2541,8 +2545,14 @@ walk-frame-clos sl id L sf gas nid now src (map-f _) p vals evs fin sched st H =
 walk-frame-clos sl id L sf gas nid now src (scan-f _ _) p vals evs fin sched st H = tt
 walk-frame-clos sl id L sf gas nid now src (take-f _) p vals evs fin sched st H = tt
 walk-frame-clos sl id L sf gas nid now src (from-inner _ _ _) p vals evs fin sched st H = tt
-walk-frame-clos sl id L sf gas nid now src (thru-outer _ _) p vals evs fin sched st
-  (_ , _ , _ , hcl , _) = hcl
+walk-frame-clos {e = e} sl id L sf gas nid now src (thru-outer _ _) p vals evs fin sched st
+  (_ , _ , _ , hcl , _) =
+  all-impl _ _
+    (λ v h → nestClosOK?ᵛ-widen sl _ v
+               (frameStep-mono-j (capsAt e sl id) (2≤capsAt-size e sl id) (z≤n {L})) h)
+    vals
+    (subst (λ x → all (nestClosOK?ᵛ x sl _) vals ≡ true)
+           (sym (frameStep-0 (capsAt e sl id))) hcl)
 
 -- THE ONE THING A FRAME OWES THE REGISTRY'S PRICING, and it is the
 -- whole preservation obligation the walk carries about it.  A frame
@@ -2945,7 +2955,7 @@ RingState {n = n} {Γ = Γ} {e = e} sl id i vals gas Lv J g k sched st =
   (Sched.slots sched ≡ sl)
   × (capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true)
   × (valsCaps? (frameStep Lv (capsAt e sl id)) sl vals ≡ true)
-  × (all (nestClosOK?ᵛ (frameStep Lv (capsAt e sl id)) sl (lookup Γ i)) vals ≡ true)
+  × (all (nestClosOK?ᵛ (capsAt e sl id) sl (lookup Γ i)) vals ≡ true)
   × (regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true)
   × (4 + (sizeᵉ e + slotsSize sl) + n + gas ≤ g)
   × Reached (capsAt e sl id) (capsH e sl id) J (suc g)
@@ -3287,8 +3297,7 @@ sink-ring-go {n = n} {e = e} sl id sf gas nid now i vals fin ((rid , p) ∷ ps) 
       , proj₂ (proj₂ ST)
       , valsCaps?-lvl (frameStep Lv c) (frameStep (Lv + L′) c) sl vals
           (frameStep-⊑-+ c 2≤S Lv L′) hvc
-      , all-impl _ _
-          (λ v h → nestClosOK?ᵛ-widen sl _ v (frameStep-⊑-+ c 2≤S Lv L′) h) vals hcl
+      , hcl
       , foldPath-regs-base sl id sf gas nid now (Fin.toℕ i) p vals EVS fin sched st′ hrsz hpz
       , hfl , hR
       , ≤-trans (proj₁ (proj₂ ST)) STEP
@@ -3455,10 +3464,7 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
       ( trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
       , proj₁ (proj₂ ST)
       , proj₁ (proj₂ (proj₂ ST))
-      , all-impl _ _
-          (λ v h → nestClosOK?ᵛ-widen sl _ v (frameStep-⊑-+ c 2≤S L (proj₁ ST)) h)
-          (proj₁ r)
-          (step-frame-clos sl id L sf nid now f p vals fin sched st sleq cok hcl)
+      , step-frame-clos sl id L sf nid now f p vals fin sched st sleq cok hcl
       , pathSz?-widen p (proj₁ (frameStep-⊑-+ c 2≤S L (proj₁ ST))) pz2
       , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
       , (g , P , hfl , TAIL , hR)
@@ -3522,7 +3528,7 @@ arr-chain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots sched ≡ sl →
   capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
   valsCaps? (frameStep Lv (capsAt e sl id)) sl (arrVal a ∷ []) ≡ true →
-  all (nestClosOK?ᵛ (frameStep Lv (capsAt e sl id)) sl (arrTy a)) (arrVal a ∷ []) ≡ true →
+  all (nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a)) (arrVal a ∷ []) ≡ true →
   pathSz? (Caps.cSize (frameStep Lv (capsAt e sl id))) path ≡ true →
   depthChain nextId a path sched st ≤ capsH e sl id →
   (Σ ℕ λ g → Σ ℕ λ P →
@@ -3774,8 +3780,8 @@ arr-chains-caps-go {n = n} {e = e} sl id Lv a nextId ((rid , path) ∷ chains) s
         HVC0 = ∧-intro (∧-intro hvc refl) refl
         HVC : valsCaps? (frameStep Lv c) sl (arrVal a ∷ []) ≡ true
         HVC = valsCaps?-lvl c (frameStep Lv c) sl (arrVal a ∷ []) c⊑ HVC0
-        HCL : all (nestClosOK?ᵛ (frameStep Lv c) sl (arrTy a)) (arrVal a ∷ []) ≡ true
-        HCL = ∧-intro (nestClosOK?ᵛ-widen sl (arrTy a) (arrVal a) c⊑ hcl) refl
+        HCL : all (nestClosOK?ᵛ c sl (arrTy a)) (arrVal a ∷ []) ≡ true
+        HCL = ∧-intro hcl refl
         ST  = chainStep-caps sl id Lv a nextId path sched st′ sleq cok
                 (pathSz?-widen path (proj₁ c⊑) (proj₁ (∧-true _ _ hpz)))
                 (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc)
