@@ -216,14 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
-  and `walk-frame-drain` are the two leaves the walk still has, and
-  they are the same shape twice: a bound owed over a recursion that is
-  not the path. Neither carries evidence that reached its risky
-  region — one has none at all — so the leg is a probe first and a
-  grind second. Instantiate the ring at an admitted registration and
-  the parked queue at a bounded `mergeAll`, and let the rows say which
-  of the two is a restatement.
+- **the two leaves the ring's recursion left** — the ring is a body
+  now, so `sink-entry-caps` and `sink-entry-advance` are what one turn
+  of it cannot do for itself: a registered chain's own walk receipt,
+  and how far the level advances across one delivery. Neither can be
+  probed — both are priced in caps, and a cap does not evaluate — so
+  the route is the entry receipt first, since it is the one whose
+  hypotheses are all in hand, and the advance second, since its
+  witness is what the ladder has to name.
 
 - **the two subscribing leaves, now that they are only about SYNTAX** —
   `thru-regs-base` and `inner-regs-base` no longer owe a count, so what
@@ -250,10 +250,14 @@ does not fit is a finding about the shared statement, not about the head.
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`sink-ring-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the share
-  ring at a sink, which is the walk's SECOND recursion — over admitted
-  registrations rather than over a path — and all the sink still owes now that
-  its opening pair comes off the walk's own registry pricing.
+- **`sink-entry-caps`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
+  admitted registration's own walk receipt at the ring's level. Its path lives
+  in the REGISTRY rather than in the chain being charged, so the receipt is a
+  sub-receipt of nothing the ring holds.
+- **`sink-entry-advance`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: how far
+  the level advances across one delivery, and that the ring's state package
+  survives at the store that delivery produced. The witness is existential
+  because the ring cannot name a registered chain's length.
 - **`thru-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a `thru`
   frame's subscribe preserving the registry's base-cap pricing, now that the
   count is read rather than threaded and only the SIZE half is left. What it
