@@ -226,15 +226,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the drain leaf `sight-all-drain`, now that its descent half is
-  proven** — the `*All` head is a real body over one leaf, so what is
-  left is a burst under a `thru-outer`: a walk over the values the
-  payload emits, each entered at one nesting level down. The head's
-  own `suc` in the exponent is unspent by the descent half, which is
-  the room the walk has to fit in. The leg is the walk's induction —
-  one `depthInner` per emitted value against the same ceiling — and
-  the emitted values are bounded by the payload the descent half has
-  already been read over, so the two halves share their measure.
+- **the drain's ENTRY FIT, which is the half nothing supplies** — the
+  burst's fold is now checked and its invariant is `pushFitOK`, whose
+  preservation is a projection, so the walk half is a leaf that reads
+  what the fold carries. What is left of the leg is the other leaf:
+  the payload subscribe's own burst fits the head's spare factor. The
+  fit shelf concludes exactly this shape, but at caps hypotheses the
+  drain's caller does not hold — `inputsBelowᵉ` says nothing about a
+  store — so the leg is deciding where those arrive from, and that is
+  a design call before it is a grind.
 
 - **`subscribeE-burst-nest`'s induction** — the crossing this row was
   ranked for is closed: at the map that kills the flat reading the
@@ -272,6 +272,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`step-frame-clos-thru`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, PROBED`:
   the wrap head, whose output is a constructor round a subscribed inner — the
   one arm whose bill is a constructor rather than a template.
+- **`sight-all-fit`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`: the drain's
+  ENTRY half — the payload subscribe's burst fits the head's spare factor.
+  Nothing reaches it: every row in the family computes a DESCENT, and this is a
+  claim about the store handed back. It is also the half `inputsBelowᵉ` alone
+  cannot supply.
 - **`step-frame-clos-map`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED×2, PROBED`: the template head. Both fixed forms are refuted, which
   pins the reported-charge one it now has, and the size face's map arm is a
@@ -283,10 +288,10 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
   where they compound, and the margin WIDENS with the instant.
-- **`sight-all-drain`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain, one
-  leaf for all three `*All` heads — they delegate to the same family and wrap
-  the subject in one level each. The descent half beside it is now a proven
-  body, so what is left is the burst under a `thru-outer`, and nothing else.
+- **`sight-all-walk`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain's WALK
+  half, one leaf for all three `*All` heads — they delegate to the same family
+  and wrap the subject in one level each. It reads the fit the fold carries,
+  which is what a value list quantified freely could not give it.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that

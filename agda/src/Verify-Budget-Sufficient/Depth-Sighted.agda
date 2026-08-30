@@ -24,14 +24,15 @@ open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncS
 open import Rx.Slots using (scripted; shared)
 open import Rx.Inputs-Below using (ib-unfoldμ)
 open import Decide using (∧ʳ)
-open import Rx.Prim using (Gas; g0; gs; Id; Tick)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; Stream; map-f; take-f; _↠_; subscribeE;
   mintNode; installNode; register; take-st; scan-st; scan-f; share-sink; thru-outer;
-  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ)
+  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; stepFrame; splitEvents; NodeId)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll; depthFrame)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
+open import Verify-Budget-Sufficient.Nest-Walk using (pushFitOK; thruFitOK)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
    storeNestMax-install; storeNestMax-register; nestUnit; nodeNest;
@@ -82,6 +83,47 @@ burst-flat g bid now f κ h []         sched st = refl
 burst-flat g bid now f κ h (em ∷ ems) sched st =
   cong₂ _⊔_ (h _ _ sched st) (burst-flat g bid now f κ h ems _ _)
 
+-- AND WHEN THE FRAME IS NOT FLAT, THE FOLD GOES THROUGH ON AN
+-- INVARIANT OVER THE REMAINING STREAM, which is what a burst needs and
+-- what rules out the tidier decomposition.  A `⊔`-fold is bounded by a
+-- bound on each element, so the only real content is that the element
+-- bound survives the threading -- and it cannot be asked for at an
+-- ARBITRARY value list, since a frame that subscribes is handed the
+-- inner it subscribes and nothing outside the stream bounds that.  So
+-- the predicate reads the stream as well as the state, and the second
+-- premise is that one element's step carries it to the tail.  Both are
+-- parameters because choosing them IS the design: a fold wants a fixed
+-- ceiling rather than a per-step growth law, so what goes in here is a
+-- bound and never an increment.
+burst-le : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (C : ℕ)
+  (g : Gas) (bid : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+  (P : Stream Γ s → Sched Γ → EvalSt e → Set) →
+  (∀ (em : InstEmit (Val Γ s)) (ems : Stream Γ s)
+     (sch : Sched Γ) (sto : EvalSt e) → P (em ∷ ems) sch sto →
+     depthFrame g bid now f κ
+       (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+       (proj₂ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em))))
+       sch sto ≤ C) →
+  (∀ (em : InstEmit (Val Γ s)) (ems : Stream Γ s)
+     (sch : Sched Γ) (sto : EvalSt e) → P (em ∷ ems) sch sto →
+     P ems
+       (proj₁ (proj₂ (proj₂ (proj₂
+         (stepFrame g bid now f κ
+           (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+           (proj₂ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em))))
+           sch sto)))))
+       (proj₂ (proj₂ (proj₂ (proj₂
+         (stepFrame g bid now f κ
+           (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+           (proj₂ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em))))
+           sch sto)))))) →
+  ∀ (ems : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) → P ems sched st →
+  depthBurst g bid now f κ ems sched st ≤ C
+burst-le C g bid now f κ P hb hp []         sched st hs = z≤n
+burst-le C g bid now f κ P hb hp (em ∷ ems) sched st hs =
+  ⊔-lub (hb em ems sched st hs)
+        (burst-le C g bid now f κ P hb hp ems _ _ (hp em ems sched st hs))
+
 -- MOVING A CONSTANT SUMMAND ACROSS A TRADED SUM, which is what every
 -- clause below needs once the ceiling's subject place carries a term
 -- the step does not move: the trade is stated on the two places that
@@ -111,6 +153,25 @@ shuffle a c s b s′ h =
 -- have to be paid for out of the head's own spare factor, and a queue
 -- the caller pre-loaded is not bounded by anything the ceiling reads.
 --
+-- SO THE HEAD IS A BODY OVER TWO LEAVES AND THE FOLD ABOVE, and what
+-- the split buys is that the fold is CHECKED rather than asserted: the
+-- burst's invariant is `pushFitOK`, which is defined at a `∷` as its
+-- head's fit times ITSELF at the tail and the stepped state, so the
+-- fold's preservation premise is a projection and no leaf is owed for
+-- it.  The grant the fit is taken at is the head's own spare factor --
+-- the `suc` in the exponent that the descent half leaves unspent -- so
+-- nothing here is calibrated freshly.
+--
+-- WHAT REMAINS IS AN ENTRY FIT AND A WALK, and they are the two halves
+-- a state-only invariant could not separate.  A fold over the burst
+-- cannot ask for its element bound at an ARBITRARY value list: the
+-- frame that walks is handed the inners it subscribes, and nothing
+-- outside the stream bounds those, so the invariant has to read the
+-- stream and the entry has to establish it.  That is the leaf the
+-- caller's hypotheses do not reach -- `inputsBelowᵉ` says nothing
+-- about a store -- and it is where the caps facts the fit shelf
+-- carries would have to arrive from.
+--
 -- PROBED: `Probed.Depth-Sighted` reads the PARENT at `root`, where this
 --   head is the one it lands on -- the whole `⊔` rather than the burst
 --   side alone, which dominates it -- at fold depths two and twenty:
@@ -125,7 +186,26 @@ shuffle a c s b s′ h =
 --   other than `mergeAllᵉ`, which no row reaches; and the burst side
 --   read apart from the descent it is joined to.
 postulate
-  sight-all-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  sight-all-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (k : ℕ) (op : AllOp) (nid : NodeId) (b : Closed Γ (obs u))
+    (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sch : Sched Γ) (sto : EvalSt e) →
+    T (inputsBelowᵉ k b) →
+    thruFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b)))
+      g op nid κ bid now vals sch sto →
+    depthFrame g bid now (thru-outer op nid) κ vals fin sch sto
+      ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
+                              + k * slotWrapSum (Sched.slots sched))
+                  (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+
+-- AND THE ENTRY FIT IS THE HALF NOTHING HERE COVERS.  It is a claim
+-- about the STORE the payload subscribe hands back, not about a
+-- descent, so no row that computes a depth reaches it; and its shape
+-- is the fit shelf's, which concludes exactly this at caps hypotheses
+-- the caller does not hold.
+postulate
+  sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     T (inputsBelowᵉ k b) →
@@ -133,11 +213,43 @@ postulate
         sched₁ = proj₂ (mintNode sched)
         st₀    = installNode nid (allFresh u op lim) st
         r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-    in depthBurst g bid now (thru-outer op nid) κ
-         (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-       ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
-                               + k * slotWrapSum (Sched.slots sched))
-                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+    in pushFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b)))
+         g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+sight-all-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  T (inputsBelowᵉ k b) →
+  let nid    = proj₁ (mintNode sched)
+      sched₁ = proj₂ (mintNode sched)
+      st₀    = installNode nid (allFresh u op lim) st
+      r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+  in depthBurst g bid now (thru-outer op nid) κ
+       (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+     ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
+                             + k * slotWrapSum (Sched.slots sched))
+                 (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+sight-all-drain {Γ = Γ} {e = e} {u = u} g k op lim b κ bid now sched st ok =
+  burst-le C g bid now (thru-outer op nid) κ
+    (pushFitOK G g op nid κ bid now)
+    (λ em ems sch sto fit →
+       sight-all-walk g k op nid b κ bid now sched st
+         (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+         (proj₂ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em))))
+         sch sto ok (proj₁ fit))
+    (λ em ems sch sto fit → proj₂ fit)
+    (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    (sight-all-fit g k op lim b κ bid now sched st ok)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (allFresh u op lim) st
+  r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+  G      = 2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+  C      = sightCeil (sizeᵉ e)
+             (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
+               + k * slotWrapSum (Sched.slots sched))
+             (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 -- ANY SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE, which is the
 -- statement the induction is actually over.  A sweep crosses

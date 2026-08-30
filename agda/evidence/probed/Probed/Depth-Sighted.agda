@@ -27,12 +27,14 @@
 -- is the coverage this can have rather than a gap in the sweeping.
 --
 -- THE SUBSCRIBE-SIDE ROWS READ THE `*All` HEAD WHOLE, which is the
--- join of a proven descent and the burst leaf below it.  A green row
--- is therefore evidence about the leaf a fortiori -- the burst side is
+-- join of a proven descent and the burst below it.  A green row is
+-- therefore evidence about the WALK a fortiori -- the burst side is
 -- under the join and the ceiling is the same one -- and it is NOT
 -- evidence that the burst side alone has any particular margin, since
--- nothing here separates the two summands.
--- TARGET: sight-all-drain @a59c65
+-- nothing here separates the two summands.  The burst's ENTRY FIT is
+-- not covered at all: it is a hypothesis-side claim about the store
+-- the payload subscribe hands back, and no row here computes it.
+-- TARGET: sight-all-walk @b3a280
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 
