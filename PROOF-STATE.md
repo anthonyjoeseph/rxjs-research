@@ -216,14 +216,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the ring's two arithmetic leaves, now that the receipts are gone** —
-  the entry walk is a body, so what is left of it is `sink-entry-ladder`:
-  room at the registered path's LENGTH, where the sink's own package
-  holds room at zero rungs. `sink-entry-advance` is the same currency one
-  turn later — how far the level moves across a delivery. Both are about
-  the ladder and neither is probeable, so the leg is to decide whether
-  the room is derivable from the count at all, or whether the sink's
-  package has to be restated to carry it.
+- **the ring's advance, in the round currency the cascade already uses** —
+  the room WAS derivable and the package DID have to be restated: the
+  ring now carries a position within a round rather than a level under a
+  ceiling, and the ladder leaf fell out as a body. `sink-entry-advance`
+  is what is left — how far the level moves across one delivery — and its
+  twin `chainStep-caps` proves the same thing for a cascade's chain by
+  instantiating the delivery walk at the fold. The leg is to run that
+  instantiation on `ringFold` and land the advance on `ent-step`.
 
 - **the two subscribing leaves, now that they are only about SYNTAX** —
   `thru-regs-base` and `inner-regs-base` no longer owe a count, so what
@@ -250,14 +250,6 @@ does not fit is a finding about the shared statement, not about the head.
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`sink-entry-ladder`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the room
-  a dispatched chain climbs through. Seven of the entry walk's eight hypotheses
-  come off the ring's package; the eighth is a ladder the sink holds at zero
-  rungs and the entry needs at the registered path's length.
-- **`sink-entry-advance`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: how far
-  the level advances across one delivery, and that the ring's state package
-  survives at the store that delivery produced. The witness is existential
-  because the ring cannot name a registered chain's length.
 - **`thru-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a `thru`
   frame's subscribe preserving the registry's base-cap pricing, now that the
   count is read rather than threaded and only the SIZE half is left. What it
@@ -272,6 +264,10 @@ does not fit is a finding about the shared statement, not about the head.
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
+- **`sink-round-entry`** (Caps-Face/Part7) — SHAPE, `NO EVIDENCE`: the round the
+  sink's ring runs in. `WalkHyps` carries a flat ladder at the sink head, which
+  is enough for a path and not for a recursion over registrations; the position
+  and the round's gas are not recoverable from a level bound.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
   a round's descent under its sighted nesting scaled by the program's size.
   Both axes are now read at three instants and at the corner where they
@@ -334,6 +330,10 @@ does not fit is a finding about the shared statement, not about the head.
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
 
+- **`sink-entry-advance`** (Caps-Face/Part7) — GRINDABLE, `TWIN`: how far the
+  level advances across one delivery, and that the ring's round package survives
+  at the store it produced. `chainStep-caps` is the same advance for a cascade's
+  chain, proven by instantiating the delivery walk at the fold.
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
 Built on `budget-sufficient`, so proving anything here while tier 1 is open
