@@ -188,6 +188,80 @@ thirdFigs = proj₁ (u3Row 2) + 1000000 * proj₂ (u3Row 2)
 
 thirdFigs≡ : thirdFigs ≡ 1590000057000348000015
 
+-- THE COUNT AXIS AT THE THIRD INSTANT, AND THE WIDTH FAMILY THERE.
+-- The rows above reach the third cascade on one family at one delivered
+-- count, so the two axes the second instant is read along both stop one
+-- instant short.  These close that: the same fold depth at three times
+-- the count, and the family whose mergeAll is unbounded and therefore
+-- drains nothing, both read where the caps recurrence has already
+-- stepped twice.
+--
+-- LOAD-BEARING, and each fails if its descent passes its ceiling.  A
+-- zero pair is the other finding rather than a pass -- it says the run
+-- stopped before the instant, which is a corpus boundary and not a
+-- ceiling one.
+u3cRow : ℕ × ℕ
+u3cRow = deliv3Row (progU 8 6) slotsF3 (sucGU 1 2 3 8 6)
+
+w3Row : ℕ × ℕ
+w3Row = deliv3Row (progF 3 2) slotsF3 (sucGF 1 2 3 3 2)
+
+third2Figs : ℕ
+third2Figs = proj₁ u3cRow + 1000000 * proj₂ u3cRow
+           + 1000000000000 * proj₁ w3Row
+           + 1000000000000000000 * proj₂ w3Row
+
+third2Figs≡ : third2Figs ≡ 589000017001710000089
+
+-- THE CORNER WHERE BOTH EROSIONS COMPOUND, which is the one cell worth
+-- reading once the other two axes are.  The count is what the ceiling
+-- cannot see, so its margin is the one that narrows -- and the instant
+-- is where the descent has had the most chances to accumulate.  Read
+-- at the far end of the count axis at the third instant, so a shape
+-- that only survives by being taken at small counts fails here.
+u3fRow : ℕ × ℕ
+u3fRow = deliv3Row (progU 8 20) slotsF3 (sucGU 1 2 3 8 20)
+
+cornerFigs : ℕ
+cornerFigs = proj₁ u3fRow + 1000000 * proj₂ u3fRow
+
+cornerFigs≡ : cornerFigs ≡ 2130000201
+
+-- THE ROOT SIDE OFF ITS ONE FAMILY AND ITS ONE SLOT VOCABULARY, which
+-- is the whole of what that side's coverage was missing: every row
+-- above reads the subscribe descent at `progU` under the late-connect
+-- vocabulary alone.  The width family and the hot vocabulary are the
+-- two nearest things it is not, and neither shares the fold depth the
+-- calibration was taken at.
+descRootF : ℕ → ℕ
+descRootF w =
+  depthE (budgetAt (progF w 2) slotsF 0) (progF w 2) root 0 0
+         (sched-init (progF w 2) slotsF) (st-init (progF w 2))
+
+sightRootF : ℕ → ℕ
+sightRootF w =
+  sightCeil (sizeᵉ (progF w 2)) (nestDᵉ (progF w 2))
+            (storeNestMax (sched-init (progF w 2) slotsF) (st-init (progF w 2)))
+            (nestUnit (progF w 2) slotsF)
+
+descRootH : ℕ → ℕ
+descRootH k =
+  depthE (budgetAt (progU k 2) slotsF 0) (progU k 2) root 0 0
+         (sched-init (progU k 2) slotsF) (st-init (progU k 2))
+
+sightRootH : ℕ → ℕ
+sightRootH k =
+  sightCeil (sizeᵉ (progU k 2)) (nestDᵉ (progU k 2))
+            (storeNestMax (sched-init (progU k 2) slotsF) (st-init (progU k 2)))
+            (nestUnit (progU k 2) slotsF)
+
+rootWideFigs : ℕ
+rootWideFigs = descRootF 3 + 1000000 * sightRootF 3
+             + 1000000000000 * descRootH 8
+             + 1000000000000000000 * sightRootH 8
+
+rootWideFigs≡ : rootWideFigs ≡ 1378000004000372000005
+
 -- ── which sighted quantity sees the count, and the answer is none ───
 
 -- Nine readings per program, packed base-1000 in the order named, at
@@ -230,3 +304,6 @@ farFigs≡ = refl
 partsFigs≡ = refl
 sizeFigs≡ = refl
 thirdFigs≡ = refl
+third2Figs≡ = refl
+cornerFigs≡ = refl
+rootWideFigs≡ = refl

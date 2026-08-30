@@ -216,16 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the sighted ceiling's OTHER side, at both indices** —
-  `cascade-depth-sighted` and `depthE-sighted-root` are one statement
-  read at a round and at the entry, and with the height comparison now
-  assembled they are all that stands between a descent and its fuel.
-  Both are calibrated by refutation and probed along two axes, and the
-  region no row used to reach — an instant past the second — is now
-  read: the third cascade holds with room on one family at two fold
-  depths. What is still unread there is the COUNT axis. Take them
-  together — the entry one has no run under it and is the worked
-  instance the round one is shaped against.
+- **the descent's own TRADE, written down instead of described** —
+  with the sighted ceiling read on both axes at three instants and at
+  the corner, both its leaves are DIFFICULTY and the risk left is the
+  proof. Their headers already name the mechanism: edge by edge a
+  descent trades, what a frame takes off the subject it puts on the
+  path, so the bare sum is an EQUALITY along the subscribe walk and the
+  drain under a `from-inner` is the one level with no edge to come out
+  of. That is a statable induction, not a paragraph. State the trade as
+  the assembly, with the drain's per-layer charge as the leaf, and let
+  the size factor be what the leaf's count is multiplied by.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -247,14 +247,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`cascade-depth-sighted`** (Caps-Face/Part7) — FALSITY, `REFUTED, PROBED`: a
-  round's descent under its sighted nesting scaled by the program's size. The
-  shape is settled on both axes, and the third instant is now read too; what no
-  row reaches there is the delivered count.
-- **`depthE-sighted-root`** (Caps-Bridge) — FALSITY, `REFUTED, PROBED`: the
-  same statement at the entry, where the store is the initial one. Read at fold
-  depths two and twenty with two orders of margin; the risk left is every
-  program shape the corpus does not carry.
 - **`walk-frame-drain`** (Caps-Face/Part7) — FALSITY, `RECOVERY`: a bounded
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
@@ -277,6 +269,14 @@ does not fit is a finding about the shared statement, not about the head.
   observable's closure reading under the frame's cap, which is the
   resolved-size premise the `thru` head cannot stand without. The flat slot sum
   cannot pay for it and the conclusion side is symbolic-or-nothing.
+- **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
+  a round's descent under its sighted nesting scaled by the program's size.
+  Both axes are now read at three instants and at the corner where they
+  compound, and the margin WIDENS with the instant.
+- **`depthE-sighted-root`** (Caps-Bridge) — DIFFICULTY, `REFUTED, PROBED`: the
+  same statement at the entry, where the store is the initial one. Read on both
+  families and both slot vocabularies with two orders of margin; what is left
+  is every vocabulary past two slots, which is the whole corpus.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that

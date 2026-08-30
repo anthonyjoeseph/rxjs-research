@@ -1417,8 +1417,12 @@ abstract
 --   descent climbs four per fold layer against the bare sum's three.
 -- PROBED: `Probed.Depth-Sighted` reads this side at fold depths two and
 --   twenty, at nine and eighty-one against ceilings of four hundred and
---   five thousand.  Not covered: `sl` other than the two-slot
---   instantiations, and nothing about the premise-free root beyond it.
+--   five thousand; on the family whose mergeAll is unbounded, five
+--   against three hundred and seventy-two; and under the vocabulary
+--   that connects at once rather than late, four against one thousand
+--   three hundred and seventy-eight.  Not covered: any `sl` past the
+--   two-slot vocabularies, which is where both remaining families
+--   are, and nothing about the premise-free root beyond that.
 postulate
   depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
