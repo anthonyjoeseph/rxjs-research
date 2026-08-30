@@ -2510,14 +2510,30 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 -- the values it passes on -- a template is applied, a scan folds, a
 -- wrapper is put round an inner observable -- so the reading has to
 -- survive that rebuild or the walk's conjunct dies at the first hop.
--- IT IS STATED AT THE BASE CAP, WHICH IS THE ONE THE READING ARRIVES
--- AT.  The instant loop hands the cascade a reading against `capsAt`
--- and nothing levelled, so a levelled statement obliges the walk to
--- widen at its first line and can never get back -- and the registry
--- the walk must keep priced is at the base too, so what the subscribing
--- leaves need is exactly the reading that was thrown away.  The
--- widening is upward-closed and free, so it is done ONCE, where the
--- walk's stated conclusion asks for the frame's own cap.
+--
+-- AND AS WRITTEN IT IS FALSE, AT EVERY CAP RATHER THAN AT THIS ONE.
+-- The cheap half is that a `map-f` carries its OWN function, which
+-- belongs to the frame and not to the program the cap was computed
+-- from, so no hypothesis here bounds it and the output may be an
+-- observable of any size.  The half that matters is that supplying
+-- the missing bound does not repair it: hold the function under the
+-- cap, hold the argument under the cap, and the rebuilt value's
+-- closure is their SUM, which overflows.  So a rebuilt value's reading
+-- cannot be taken at the cap its inputs were read at, whatever that
+-- cap is -- the size face reached the same conclusion for the same
+-- frames when it made its scan law return a STEP.
+--
+-- WHICH MEANS THE REGISTRY FACE CANNOT BE PRICED AT THE BASE EITHER,
+-- and that is the finding this leaves behind.  The subscribing leaves
+-- need a closure reading on what they subscribe; the reading a walk
+-- can carry climbs frame by frame; a registration priced against a cap
+-- the reading has already outgrown is not paid for.  Either the
+-- registry's own pricing becomes levelled -- as `capsOK?` already is,
+-- and for the same reason -- or the frames that rebuild observables
+-- are shown not to reach a subscribe, which is false the moment a
+-- `map` feeding a `mergeAll` is written down.
+--
+-- REFUTED: `Refuted.Step-Frame-Clos`.
 postulate
   step-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
