@@ -2519,12 +2519,21 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 -- cap is -- the size face reached the same conclusion for the same
 -- frames when it made its scan law return a STEP.
 --
--- SO IT IS STATED ONE LEVEL UP, AND THE STEP IS ONE.  A level multiplies
--- the cap by more than two, and what a rebuild costs is the template
--- plus the argument plus a constructor -- so a single step pays it, and
--- the two new premises are what bound the template: the path pricing
--- the caller already carries, and the values' own caps reading.  Both
--- are a caller's, not a new obligation.
+-- SO IT IS STATED ONE LEVEL UP, WITH TWO PREMISES THAT BOUND THE
+-- FRAME'S OWN FUNCTION -- the path pricing the caller already carries
+-- and the values' own caps reading, neither of them a new obligation.
+--
+-- AND ONE LEVEL DOES NOT PAY, WHICH IS WHAT SETS THE PRICE.  With the
+-- template priced by the path and the argument priced by its caps
+-- reading, both factors ARE the cap: a template holding `w` copies of
+-- its argument is admitted at `w` just under the cap, an argument of
+-- closure just under the cap is admitted beside it, and the rebuilt
+-- value is their PRODUCT.  A level multiplies the cap by roughly twice
+-- `cSize`, which is linear, and a linear step cannot pay a square.  So
+-- the charge is one level per unit of `sizeᵗ` of the frame's own
+-- function, which is exactly what the SIZE sibling's map arm charges
+-- -- and the gap between what the two faces charge for one frame was
+-- the tell.
 --
 -- WHICH MEANS THE REGISTRY FACE CANNOT BE PRICED AT THE BASE EITHER,
 -- and that is the finding this leaves behind.  The subscribing leaves
@@ -2536,7 +2545,13 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 -- a subscribe, is false the moment a `map` feeding a `mergeAll` is
 -- written down.
 --
--- REFUTED: `Refuted.Step-Frame-Clos`.
+-- REFUTED: `Refuted.Step-Frame-Clos` -- the cap-free form, at a frame
+--   function no hypothesis bounds.
+-- REFUTED: `Refuted.Step-Frame-Clos-Level` -- the ONE-level form, with
+--   every premise the caller supplies discharged at the witness: a
+--   template of `S²` copies of its argument, applied to an argument of
+--   closure `S²`, both inside the level-one cap, whose product outruns
+--   the level-two cap `S + 2S² + 4S³` on the base supply `8 ≤ S`.
 -- PROBED: `Probed.Step-Frame-Level` -- the CLOSURE conjunct alone, at
 --   the worst shape the caller's own premises admit: the template
 --   names the slot as many times as the path pricing allows, over a

@@ -128,6 +128,8 @@ open import Refuted.Chain-Step-Flat
 open import Refuted.Subscribe-Inner-Regs-Base
   using (subscribeInner-regs-base-absurd)
 open import Refuted.Step-Frame-Clos using (step-frame-clos-absurd)
+open import Refuted.Step-Frame-Clos-Level
+  using (StepFrameClosMap; step-frame-clos-map-absurd)
 open import Refuted.Drain-Queue-Flat
   using (valUp₂; valFlat₂; valUp₄; valFlat₄; valUp₈; valFlat₈;
          closUp₈; closFlat₈; roomUp₈; roomFlat₈;
