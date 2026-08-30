@@ -2618,9 +2618,20 @@ take-regs-base {e = e} sl id sf nid now tnid p vals fin sched st hrsz
 -- claim is the LENGTH conjunct, and the path a subscribe registers is
 -- the walked path with its head replaced -- same length, different
 -- frame.  The immediate registration therefore follows from the
--- receipt in hand; what does not is the RECURSIVE one, since
--- subscribing an inner observable can push frames of its own and those
--- are priced at the level's cap rather than the base.
+-- receipt in hand; what does not is the RECURSIVE one -- and the form
+-- that asks for it carrying nothing about the inner is not merely
+-- unproven, it is false.  A runtime observable is a CLOSED EXPRESSION,
+-- structurally unrelated to the program the cap was computed from, so
+-- a subscribe walks syntax the cap never saw and registers a frame per
+-- node of it; the counterexample is therefore built FROM the cap and
+-- no enlargement of the cap moves it.  What the two heads are owed is
+-- a closure reading on the inner, and WHICH CAP that reading may be
+-- taken at is the whole of the remaining question: the frame face
+-- carries it at the stepped cap, the registry is priced at the base
+-- one, and the reading is upward-closed -- so widening runs the wrong
+-- way and the reading has to be REBASED rather than transported.
+--
+-- REFUTED: `Refuted.Subscribe-Inner-Regs-Base`.
 postulate
   subscribeInner-regs-base : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (fuel : Gas) (op : AllOp) (allNid : NodeId)

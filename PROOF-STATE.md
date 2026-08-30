@@ -216,37 +216,42 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the base cap the registry is priced under, which is what both
-  subscribing leaves are really about** — the frame heads are bodies
-  now, and what is left is one claim about one primitive: a subscribe
-  keeps every registered chain under `Caps.cSize (capsAt e sl id)`.
-  The immediate entry is free — the registered path is the walked one
-  with its head swapped, so it has the same length — and the recursive
-  entries are not, since subscribing an inner pushes frames the base
-  cap never saw. The leg is to find out whether the walk's own ladder
-  already bounds that push, or whether `RegsBase` has to be stated at
-  the level rather than at the base.
+- **rebase the closure reading, because the registry needs it at the
+  BASE cap and the walk carries it one level up** — the subscribing
+  leaves are refuted as stated, and what repairs them is a premise on
+  the inner, which the frame face already holds. It holds it at
+  `frameStep L (capsAt e sl id)`, the registry is priced at
+  `capsAt e sl id`, and the reading is upward-closed — so widening runs
+  the wrong way. It is available at the base — the instant loop
+  supplies it there and the chain entry widens it away one line later.
+  The leg is the rebasing — `WalkHyps`, `RingState`, `arr-chain-caps`,
+  `step-frame-clos` — which DELETES three widens and adds one at the
+  `thru-outer` head, where `frameStep-0` puts the base back. The risk
+  is `step-frame-clos`, which this STRENGTHENS: a frame rebuilding a
+  value must return the reading at the cap it was handed.
 
-- **the closure key belongs to the QUEUE, and it is currently stated
-  about the queue's head** — carrying it worked: the walk holds the
-  reading, the frame step preserves it, and the chain entry takes it.
-  What it left is two leaves at the instant loop, `burst-clos` and
-  `drain-clos`, each saying that whatever the queue is about to hand
-  over passes — which is a statement about one arrival where the fact
-  is about every arrival the queue holds. The leg is to find which
-  invariant the queue already satisfies can carry the reading as a
-  field, so the two heads become projections instead of postulates.
+- **restate the two subscribing leaves over the inner, and thread the
+  premise to them** — the refutation says exactly what is missing:
+  `subscribeInner-regs-base` gets `nestClosOK? (capsAt e sl id) sl o`,
+  and the drain's form gets it over the whole queue. `nestClosOK?-size`
+  is the bridge that pays the registered head's `frameSz?`, since a
+  `mapᵉ`'s closure size dominates its step function's written size. The
+  leg is the threading: `thru-regs-base` takes the reading for its own
+  arriving values, which is `frameClosOK` at the `thru-outer` head and
+  therefore free once leg one lands, and every `*-regs-base` between
+  the ring and the primitive carries it down.
 
-- **the frame step is the only place the closure reading is not free**
-  — the walk carries it, the ring widens it and the chain entry takes
-  it, and `step-frame-clos` is the one supply site with content: a
-  frame REBUILDS what it passes on, so the reading has to survive a
-  `map` applied, a scan folded, a wrapper put round an inner. Deriving
-  it from the caps receipt beside it is refuted at every cap. The leg
-  is the per-head grind — five frame heads, four of which pass their
-  values through untouched — and finding what the `thru-outer` head
-  can honestly claim, since that is the head the refutation was built
-  against.
+- **the node store's closure field, which is where the drain's premise
+  has to come from** — a queued inner is read back out of a
+  `mergeAll-st` at a level nothing connects to the level it was parked
+  at, so the drain's reading cannot be threaded and must be an
+  invariant. `capsOK?` already carries the WIDTH half of exactly this
+  fact — `widNode` reads every queue element's `pWᵉ` and the queue's
+  length against `cWid` — and carries no size half at all. The leg is
+  to add it: a closure conjunct on the nodes, established where a value
+  is parked and spent where it is drained, which is also what turns
+  `burst-clos` and `drain-clos` from statements about the queue's HEAD
+  into projections of a fact about the queue.
 
 ### The ledger
 
@@ -254,13 +259,13 @@ does not fit is a finding about the shared statement, not about the head.
   `mergeAll`'s parked queue, now owing a delivery position above the walk's
   level with gas left. The fold supplies the position; what the leaf still owes
   is the frame-local half.
-- **`subscribeInner-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
-  subscribe preserving the registry's BASE-cap pricing. The immediate entry has
-  the walked path's length; the recursive ones can push frames of their own,
-  and those are priced at the level's cap rather than the base.
-- **`mergeAllDrain-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
-  same across a bounded `mergeAll`'s drain, which is the one arm of an inner's
-  finish that can subscribe — a queued inner takes the lane just freed.
+- **`subscribeInner-regs-base`** (Caps-Face/Part7) — FALSITY, `REFUTED`:
+  REFUTED as stated. The inner is a closed expression the cap never saw, so a
+  step function built FROM the cap registers a chain that fails `frameSz?`. It
+  is owed a closure premise on the inner, at the base cap.
+- **`mergeAllDrain-regs-base`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the
+  same refutation one hop out — it reaches the primitive on a queue element —
+  so it is owed the reading over the whole queue, and becomes a real body.
 - **`dispatch-regs-base`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the same
   across a sink's fan-out, which is the arm the path induction hands off — the
   ring's obligation rather than a frame's.
@@ -272,9 +277,8 @@ does not fit is a finding about the shared statement, not about the head.
   shape, and it goes with `burst-clos` when the queue's invariant carries it.
 - **`step-frame-clos`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a frame
   preserving the closure reading of the values it REBUILDS — a template
-  applied, a scan folded, a wrapper put round an inner. Without it the walk's
-  new conjunct dies at the first hop; deriving it from the caps receipt is
-  refuted.
+  applied, a scan folded, a wrapper put round an inner. Deriving it from the
+  caps receipt is refuted; rebasing it to the base cap strengthens it.
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
