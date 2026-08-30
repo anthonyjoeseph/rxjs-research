@@ -216,15 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the seed's nesting, which is the trade's one arithmetic gap** — the take
-  half of that leg landed and cost nothing, and it is what showed the scan half
-  is not the same job. A scan's trade leaves exactly the SEED's nesting spare
-  and the store takes it straight back, so the clause turns on whether an
-  evaluated seed is more nested than its term. The bound this tree has scales
-  by two to the sync size, which no summand absorbs; the tight form may be
-  false, since an observable inside a seed SUMS its function against its
-  source. Refute it first — a witness there is worth more than the clause, and
-  it rules on whether the ceiling has to widen.
+- **what the scan install is charged to, now that both easy answers are dead**
+  — the seed question is settled the wrong way: an evaluated seed CAN be more
+  nested than its term, so the trade's own slack does not cover the node a scan
+  installs, and moving the honest factor into the ceiling's measure breaks the
+  entry, which reads that same ceiling against a cap no exponential fits under.
+  What is left is to charge the install somewhere else. The store summand and
+  the size factor are the two places the ceiling has, and neither has been
+  read against a scan yet — instantiate both at a fold under a seed that
+  actually nests, and let the figures pick.
 
 - **the walk's SECOND recursion, which is the sink** — `sink-ring-caps`
   and `walk-frame-drain` are the two leaves the walk still has, and
@@ -268,6 +268,10 @@ does not fit is a finding about the shared statement, not about the head.
   `NO EVIDENCE`: the slot read, where gas is peeled and the subject becomes a
   shared def the path never charged for; and the map frame's own sweep back
   out. Newborn statements, nothing has instantiated either.
+- **`sight-scan`** (Depth-Sighted) — FALSITY, `REFUTED`: the descent half
+  closes iff an evaluated seed is no more nested than its term, and that is now
+  refuted. Widening the ceiling's measure does not repair it either — the entry
+  reads the same ceiling against a cap the factor does not fit under.
 - **`sight-take-burst`** (Depth-Sighted) — FALSITY, `NO EVIDENCE`: the take
   frame's sweep back out, all that is left of a clause whose descent half is
   proven — a take charges the path nothing, drops nothing, and installs a node
@@ -443,10 +447,6 @@ In rough order for when the tier opens — statement repairs first, then grinds:
   `subscribeE-hot-live`, `cascadeFinish-hot-live`. Each header states a
   slots-untouched / prepend-only route and no more; the family's one worked
   body sweeps where these three build, prepend and split.
-- **`sight-scan`** (Depth-Sighted) — SHAPE, `NO EVIDENCE`: the descent half
-  closes exactly when an evaluated seed is no more nested than its term, and
-  what this tree has instead carries a sync FACTOR that no summand of slack
-  can absorb. Either the ceiling widens or the tight lemma is earned.
 - **`subscribeE-{switch,exhaust}All-wf`** (Part3) — SHAPE, `TWIN×2`: written
   against a coherence whose statement is still open (the cert sketch in Part8's
   establishment block). The mergeAll face is no longer among them: it is a real

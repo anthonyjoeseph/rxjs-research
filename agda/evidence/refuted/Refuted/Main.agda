@@ -44,6 +44,8 @@ open import Refuted.Share-Sink-Nodes
   using (grown≡3; charge≡1; share-sink-nodes-absurd)
 open import Refuted.Apply-Fn-Nest
   using (subbed≡2; oneWrap≡1; applyFn-nest-absurd)
+open import Refuted.Eval-Seed-Nest
+  using (evald≡3; syntactic≡2; eval-seed-nest-absurd)
 open import Refuted.Step-Frame-Nest-Dup
   using (dup≡80; perFrame≡40; stepFrame-nest-dup-absurd)
 open import Refuted.Thru-Subscribe-Nest

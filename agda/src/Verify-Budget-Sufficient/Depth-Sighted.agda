@@ -42,7 +42,11 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) →
     depthE g (input i) κ bid now sched st ≤ Sight (input i) κ sched st
 
-  -- the map burst, which is the frame's own sweep back out
+  -- the map burst, which is the frame's own sweep back out.  What it
+  -- may NOT be closed by is the frame's own charge read additively:
+  -- `Refuted.Apply-Fn-Nest` kills `nestDᵛ (applyFn fn v) ≤ nestDᵗ fn +
+  -- nestDᵛ v`, which is exactly what `pathNestD`'s map arm asserts, so
+  -- the payload's nesting has to be charged once per OCCURRENCE here.
   sight-map-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
@@ -75,15 +79,22 @@ postulate
 -- ceiling reads the store as a summand beside the measure.
 --
 -- SO THE CLAUSE CLOSES EXACTLY WHEN AN EVALUATED SEED IS NO MORE NESTED
--- THAN ITS TERM, and that is not what this tree has.  What it has is the
--- same bound scaled by two to the term's sync size, and a FACTOR there
--- does not fit under a slack that is one summand.  The tight form is not
--- obviously true either: the value measure joins where the syntactic one
--- sums, which is what would make it hold, but an observable inside a
--- seed sums its function against its source, so a variable occurring on
--- both sides of one `mapᵉ` doubles on substitution while the term it was
--- substituted into charged nothing.  Refute or prove THAT before either
--- widening the ceiling or minting the tight lemma.
+-- THAN ITS TERM, AND IT IS NOT.  A closed term still BINDS, and a branch
+-- may name what was bound on both sides of a sum the observable measure
+-- takes; the honest bound is the one this tree proves, carrying a factor
+-- exponential in the term's sync size.  Nor can that factor simply move
+-- into the ceiling's measure, because the ENTRY reads the same ceiling
+-- against the initial nesting cap, which is `suc` of the program's own
+-- nesting plus its vocabulary's -- an exponential in the program does
+-- not fit under it.  So the repair is neither the trade nor a wider
+-- measure, and what to charge the install to is open.
+--
+-- REFUTED: `Refuted.Eval-Seed-Nest` is the witness -- a `caseᵗ` whose
+--   left branch names its bound observable both as a fold's SEED and
+--   inside the source that fold runs over, weighing three against a
+--   term that charges two, with the gap growing as the occurrence
+--   count.  `Refuted.Apply-Fn-Nest` is the same failure with an
+--   explicit payload rather than an empty environment.
 postulate
   sight-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (g : Gas) (f : _) (z : _) (b : Closed Γ s) (κ : Path Γ u t)
