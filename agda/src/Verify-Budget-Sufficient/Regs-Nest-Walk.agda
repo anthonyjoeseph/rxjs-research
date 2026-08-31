@@ -288,9 +288,33 @@ stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF 
 
 -- THE REGISTRY STAYS PRICED ACROSS A FRAME, which is what lets a walk
 -- that starts under a size cap reach a sink still able to say what the
--- registry holds.  A frame either registers nothing or registers a TAIL
--- of the path it is walking, and a tail of a path legal under the cap
--- is legal under the same cap.
+-- registry holds.  As stated it is read at ONE cap, and that reading is
+-- the part still owed: the two frames that subscribe register paths
+-- built by descending into the subscribed body, so the registered
+-- length is the walked length plus the body's own, and no premise here
+-- bounds a body.  What the walk face pays for the same fact is a ROOM
+-- budget rather than a cap — a length ledger carried at a fixed ceiling
+-- with the subscribe depth reserved inside it, and the depth bounded by
+-- the GAS rather than by any size.  So the repair is a premise, and the
+-- premise is not a size: it is the room the walk has left.
+--
+-- The reading is worse than one missing hypothesis, and that is the
+-- useful half.  A frame's OUTPUT values are bigger than its input ones
+-- by one `iterSize` step, so any room budget derived from the payload
+-- GROWS along the walk while the path shortens by one frame per step.
+-- A single ceiling covering both ends is therefore not a matter of
+-- picking a larger one; the two quantities move apart.  The walk face's
+-- ledger works because its budget comes from the gas, which is spent
+-- rather than grown.
+
+-- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
+--   so that the cap transfers with no premise at all.  The share sink
+--   registers a tail and the take frame filters, but a subscribing
+--   frame descends into the value it received: the `mapᵉ` clause of the
+--   subscribe recursion pushes one frame per operator of the body onto
+--   the continuation before it reaches the leaf that registers, so what
+--   lands in the registry is the walked path UNDER the body, not a
+--   suffix of it.
 postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)

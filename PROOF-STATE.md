@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE PRESERVATION HALF IS DOWN TO ITS ONE FRAME.** The whole-chain
-  reading is a body now, over a walk that spends the frame law at each
-  step and the admitted-entry cap at each sink, so what is left of the
-  registry's price is the single frame: a frame registers only TAILS of
-  the path it is walking, and `pathSz?` on `f ↠ p` already carries the
-  tail's own conjunct. The leg is to write that leaf per frame kind —
-  four register nothing, and the one that does registers a tail — which
-  is the same fold shape read one level down, with the receipt now
-  coming from the premise rather than from a walk.
+- **THE REGISTRY'S PRICE IS NOT A CAP, AND THE CAP READING IS WHAT HAS
+  TO GO.** A subscribing frame registers the walked path UNDER the body
+  it received, so the registered length is the walked length plus the
+  body's — and the body grows one `iterSize` step per frame while the
+  path shortens by one, so no single ceiling covers both ends. The walk
+  face already pays for this fact with a ROOM budget reserved inside a
+  fixed length ledger and bounded by the GAS. The leg is to restate the
+  side condition in that currency: the walk carries room, not a cap,
+  and the sink's admitted entries inherit the room rather than a size.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -276,10 +276,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
-  registry stays priced by the size cap across one frame. A frame registers
-  only tails of the path it walks, and a tail of a legal path is legal — but
-  nothing has read it at a frame that registers.
 - **`walk-share-ΦHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
   potential for the chains a sink fans into. Their factor and depth are the
   registry's, priced by the same cap the walk runs under, and nothing has read
@@ -298,6 +294,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE`: the registry
+  stays priced by the size cap across one frame. A subscribing frame registers
+  the walked path under the body it received, and no premise bounds a body, so
+  the one-cap reading is the part that has to move.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
