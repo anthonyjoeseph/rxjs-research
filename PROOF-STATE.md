@@ -214,16 +214,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **`walk-frame-drain-inner`'s missing level** — the tier's last FALSITY
-  row, and the design call it has owed for two weeks. `capsDrainOK`
-  reads three of its per-entry conjuncts at the BASE cap — the two
-  nesting booleans and the size floor — while the walk holds them only
-  at its own level, and raising them through the fit shelf is a
-  recorded dead route. The queue is now a reached object rather than a
-  hypothesis, so the leg starts by instantiating those three at a
-  parked entry: a base-cap conjunct that fails where the levelled one
-  holds refutes the conclusion outright and licenses the split, instead
-  of guessing which seam to cut.
+- **the arrival family's `arrCapAt` denomination** — both cheap repairs
+  of the drain's queue conjuncts are now machine-refuted: leaving them
+  at the entry cap, and raising them to the walk's level and re-entering
+  the family one level up. What kills the second is the DENOMINATION and
+  not the step — the arrival family answers at the cap it was asked at
+  stepped its own SIZE many times, so entering it one level up squares
+  the index it answers at, while the shelf can only offer a count the
+  program fixes. So the leg restates that family the way the caps face
+  beside it is already proven to work: invariant at the stepped cap, own
+  increment reported, conclusion at the SUM, no arrival cap in it.
 
 - **the map head, against the mirror that already pays for it** — the
   frame law reports its climb in `fCharge`, which is the currency the

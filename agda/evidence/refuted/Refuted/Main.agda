@@ -141,6 +141,8 @@ open import Refuted.Drain-Queue-Flat
          drain-room-flat-absurd)
 open import Refuted.Frame-Step-Compose
   using (c₀; FrameStepCompose; frameStep-compose-absurd)
+open import Refuted.Arr-Cap-Step
+  using (cA; ArrCapStep; arr-cap-step-absurd; arr-cap-step-wide-absurd)
 open import Refuted.Nest-Clos-Flat
   using (syntaxes≡; closures≡; premise; broken; nest-clos-flat-absurd)
 open import Refuted.Clos-Wrap-Sum
