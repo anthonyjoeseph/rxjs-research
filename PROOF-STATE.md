@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FACTOR IS THERE NOW AND THE SIZE PREMISE IS WHAT IS MISSING.**
-  The walk reads its path through `pathΦF`, which gives `thru-outer`
-  two to the instant's size cap and still fits under the same square as
-  before, off the same `pathSz?`. That is not yet enough: at `B = 0` the
-  factor is one again and the refutation still lands, because nothing in
-  the leaf ties `B` to the arrival whose term the subscription runs. The
-  tie is `valsCaps?`, which the cascade already carries and
-  `chain-walk-caps` already PRESERVES across a frame at one ceiling
-  level — so the leg is to bring the fold to where that proof is and
-  take the size receipt from it, rather than re-derive a ceiling the
-  caps recurrence already bounds.
+- **THE GRANT IS WHAT IS LEFT, AND IT IS OWED ONE FRAME AT A TIME.**
+  The outer frame's clause is no longer assumed: it is proven from the
+  sighted grant, since the walk face already bounds what a sighted walk
+  emits and the size-cap factor is what makes affording that grant
+  possible. So the whole debt has moved to `chain-walk-ΦHyp` — a grant
+  at each outer frame of one chain, at the state the walk has reached
+  when that frame runs. The leg is to read it off the caps recurrence
+  rather than rebuild it: `chain-walk-caps` preserves a per-frame
+  ceiling across a frame at one stepped level, which is the shape the
+  grant is owed at, and iterating a per-frame growth instead lands a
+  cap squared above the charge.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -274,10 +274,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   share boundary, where the walk re-enters on every chain at the sink. Their
   depths are under the registry's join, but nothing has read it.
-- **`stepFrame-nest-Φ-thru`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: the outer
-  frame, and it is FALSE as written — the frame subscribes rather than
-  forwards, and its factor of one cannot pay for the substitution that comes
-  back. Held at full strength until the walk can carry a factor here.
+- **`chain-walk-ΦHyp`** (Caps-Face/Part7) — FALSITY, `TWIN`: the sighted grant
+  at every outer frame of one chain, which is all the walk still owes. Four
+  frame kinds owe nothing; the fifth wants a ceiling the caps recurrence
+  already carries, one level per frame, and nothing has yet read it off.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer

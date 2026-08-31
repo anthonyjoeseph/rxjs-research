@@ -184,6 +184,6 @@ walkBefore≡41 = refl
 walkAfter≡80 : walkAfter ≡ 80
 walkAfter≡80 = refl
 
-stepFrame-nest-Φ-thru-absurd : walkAfter ≤ walkBefore → ⊥
+thruΦ-grantless-absurd : walkAfter ≤ walkBefore → ⊥
 -- `80 ≤ᵇ 41` reduces to `false`, so `T` of it IS the empty type
-stepFrame-nest-Φ-thru-absurd h = ≤⇒≤ᵇ h
+thruΦ-grantless-absurd h = ≤⇒≤ᵇ h

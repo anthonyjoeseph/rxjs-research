@@ -27,8 +27,9 @@ open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m;
   ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl)
+open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Unit using (⊤)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent)
@@ -36,8 +37,11 @@ open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; _×ᵗ_; obs)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_;
          NodeId; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
-         foldPath; stepFrame; dispatchShare)
+         foldPath; stepFrame; dispatchShare; thruWalk)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
+open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; thruWalk-nest)
+open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
+open import Verify-Budget-Sufficient.Measures using (thruWrap-vals)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; pathNestD; nest-inflate)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
@@ -53,6 +57,26 @@ valsΦ? : ∀ {n} {Γ : Ctx n} {s t} (B U : ℕ) (path : Path Γ s t)
   (vals : List (Val Γ s)) → Bool
 valsΦ? {s = s} B U path vals =
   all (λ v → pathΦF B path * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
+
+-- WHAT A FRAME OWES BEYOND THE POTENTIAL IT IS HANDED, which is
+-- nothing at four of the five: they forward or substitute, and the
+-- factor the path surrenders pays for it.  The outer frame does not
+-- forward -- it SUBSCRIBES -- so what comes back is bounded by nothing
+-- the incoming values say, and the only thing that does bound it is
+-- the sighted grant the walk face already runs on.  Stating the debt
+-- per frame rather than per statement is what keeps the fold uniform:
+-- four arms discharge it with `tt`, and only the arm that has a
+-- subscription under it has to find a grant.
+FrameΦHyp : ∀ {n} {Γ : Ctx n} {s u t} (B U : ℕ) (f : Frame Γ s u)
+  (path : Path Γ u t) (vals : List (Val Γ s)) (sched : Sched Γ) → Set
+FrameΦHyp B U (map-f _)           path vals sched = ⊤
+FrameΦHyp B U (scan-f _ _)        path vals sched = ⊤
+FrameΦHyp B U (take-f _)          path vals sched = ⊤
+FrameΦHyp B U (from-inner _ _ _)  path vals sched = ⊤
+FrameΦHyp B U (thru-outer op nid) path vals sched =
+  Σ ℕ λ k → Σ ℕ λ G →
+    ValsFit k (Sched.slots sched) G path vals
+    × (pathΦF B path * (G + pathNestD path) ≤ U)
 
 postulate
   -- ONE FRAME'S REGISTRATIONS, under the potential it was handed.  The
@@ -128,6 +152,56 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
                 (nest-inflate E (pathNestD p) (m^n>0 2 (sizeᵗ fn)))))
     (≤-trans (≤-reflexive shape) hv))
 
+-- a UNIFORM bound over the emitted list becomes the pointwise
+-- predicate the potential is stated as, and nothing else is needed:
+-- the depth of each value is under the maximum, and the maximum is
+-- what the grant bounds.
+Φ-of-bound : ∀ {n} {Γ : Ctx n} {u t} (B U G : ℕ) (p : Path Γ u t)
+  (vs : List (Val Γ u)) → nestDᵛˢ vs ≤ G →
+  pathΦF B p * (G + pathNestD p) ≤ U → valsΦ? B U p vs ≡ true
+Φ-of-bound B U G p []       hb hfit = refl
+Φ-of-bound {u = u} B U G p (v ∷ vs) hb hfit =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
+            (≤-trans (*-monoʳ-≤ (pathΦF B p)
+                       (+-monoˡ-≤ (pathNestD p)
+                         (≤-trans (m≤m⊔n (nestDᵛ u v) (nestDᵛˢ vs)) hb)))
+                     hfit)))
+          (Φ-of-bound B U G p vs
+            (≤-trans (m≤n⊔m (nestDᵛ u v) (nestDᵛˢ vs)) hb) hfit)
+
+-- THE OUTER FRAME, DISCHARGED FROM THE GRANT.  The frame's own arm
+-- says nothing about what a subscription returns, so the bound cannot
+-- come from the values handed in; it comes from the walk face, which
+-- already proves that a sighted walk emits nothing deeper than the
+-- grant it ran under.  What the potential then has to afford is the
+-- grant rather than the arrival, and that is what the size-cap factor
+-- at this frame is for -- at a factor of one the two sides trade at a
+-- rate the arrival's depth outruns, which is what running it said.
+--
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` -- eighty against forty-one,
+--   at a payload forty `*All` layers deep behind a step function
+--   naming it on both sides of a `mapᵉ` sum.  The depth is a free
+--   parameter of the witness, so the grant-free reading is closed to
+--   no constant and this one carries a grant.
+thruΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+  FrameΦHyp B U (thru-outer op nid) path vals sched →
+  valsΦ? B U path
+    (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin sched st))
+    ≡ true
+thruΦ sf id now op nid path vals fin sched st B U (k , G , hfit , hnum) =
+  subst (λ vs → valsΦ? B U path vs ≡ true)
+        (sym (thruWrap-vals op nid fin
+               (thruWalk sf op nid path id now vals sched st)))
+        (Φ-of-bound B U G path
+          (proj₁ (thruWalk sf op nid path id now vals sched st))
+          (proj₁ (thruWalk-nest G sf op nid path id now vals sched st
+                   (thruFit-vals k (Sched.slots sched) G sf op nid path id now
+                     vals sched st refl hfit)))
+          hnum)
+
 postulate
   -- THE SCAN FRAME SUBSTITUTES BY THE SAME RULE and pays the same
   -- factor, but it also reads and writes a node, so its emitted value
@@ -174,31 +248,6 @@ postulate
                         fin sched st))
       ≡ true
 
-  -- AND THE OUTER FRAME IS FALSE AS WRITTEN, which is what running it
-  -- said.  The frame does not forward its argument: `thruWalk`
-  -- SUBSCRIBES each observable it is handed, so what comes back is the
-  -- inner's emissions, and a subscription EVALUATES -- the same
-  -- doubling substitution buys at a map frame.  There the path
-  -- surrenders a factor to pay for it; here the factor is one and the
-  -- only currency on offer is the single unit of depth, so the two
-  -- sides trade at a rate the arrival's own depth can outrun.  The
-  -- repair has to be a FACTOR at this frame, in a currency that can see
-  -- the term the subscription evaluates, and the statement is left at
-  -- full strength until the walk can carry one.
-  --
-  -- REFUTED: `Refuted.Thru-Subscribe-Nest` -- eighty against
-  --   forty-one, at a payload forty `*All` layers deep behind a step
-  --   function naming it on both sides of a `mapᵉ` sum.  The depth is a
-  --   free parameter of the witness, so no constant closes the gap.
-  stepFrame-nest-Φ-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-    valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
-    valsΦ? B U path
-      (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin sched st))
-      ≡ true
-
 -- THE POTENTIAL ACROSS ONE FRAME, which is the induction's own
 -- hypothesis: every frame kind either hands its factor to the value it
 -- produces or spends a unit of depth into what it mints, and never
@@ -211,17 +260,36 @@ stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
   (B U : ℕ) →
   valsΦ? B U (f ↠ path) vals ≡ true →
+  FrameΦHyp B U f path vals sched →
   valsΦ? B U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
-stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st B U hΦ =
+stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st B U hΦ _ =
   mapΦ B U fn path vals hΦ
-stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st B U hΦ =
+stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st B U hΦ _ =
   stepFrame-nest-Φ-scan sf id now fn nid path vals fin sched st B U hΦ
-stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st B U hΦ =
+stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st B U hΦ _ =
   stepFrame-nest-Φ-take sf id now nid path vals fin sched st B U hΦ
-stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ =
+stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ _ =
   stepFrame-nest-Φ-inner sf id now op allNid inst path vals fin sched st B U hΦ
-stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U hΦ =
-  stepFrame-nest-Φ-thru sf id now op nid path vals fin sched st B U hΦ
+stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF =
+  thruΦ sf id now op nid path vals fin sched st B U hF
+
+-- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
+-- be collected in one bundle up front: each is owed at the state the
+-- walk has reached by the time that frame runs, so the predicate has
+-- to step alongside the fold it guards.  Four frame kinds contribute
+-- nothing, so on a path with no outer frame this is a tuple of units.
+PathΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (id : Id) (now : Tick) (B U : ℕ) (path : Path Γ u t)
+  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+PathΦHyp sf id now B U root           vals fin sched st = ⊤
+PathΦHyp sf id now B U (share-sink _) vals fin sched st = ⊤
+PathΦHyp sf id now B U (f ↠ p) vals fin sched st =
+  FrameΦHyp B U f p vals sched
+  × PathΦHyp sf id now B U p
+      (proj₁ (stepFrame sf id now f p vals fin sched st))
+      (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
+      (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
 
 foldPath-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -229,20 +297,21 @@ foldPath-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
   valsΦ? B U path vals ≡ true →
+  PathΦHyp sf id now B U path vals fin sched st →
   regsNestMax (EvalSt.registry
     (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
     ≤ regsNestMax (EvalSt.registry st) ⊔ U
-foldPath-nest-regs sf gas id now envSrc root vals evs fin sched st B U hΦ =
+foldPath-nest-regs sf gas id now envSrc root vals evs fin sched st B U hΦ _ =
   m≤m⊔n (regsNestMax (EvalSt.registry st)) U
-foldPath-nest-regs sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ =
+foldPath-nest-regs sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ _ =
   dispatchShare-nest-regs sf gas id now i vals fin sched st B U hΦ
-foldPath-nest-regs sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ =
+foldPath-nest-regs sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ (hF , hR) =
   ≤-trans (foldPath-nest-regs sf gas id now envSrc p
              (proj₁ step) (evs ++ proj₁ (proj₂ step))
              (proj₁ (proj₂ (proj₂ step)))
              (proj₁ (proj₂ (proj₂ (proj₂ step))))
              (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
-             (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ))
+             (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
           (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
                  (m≤n⊔m (regsNestMax (EvalSt.registry st)) U))
   where

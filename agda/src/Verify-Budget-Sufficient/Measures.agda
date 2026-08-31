@@ -91,7 +91,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; resolve; mkH
   setNode; NodeId; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; sched-next; schedHeadOf; schedGo; schedEarlier; cascadeFinish; sweepLive; takeVals;
   cutThrough; pathHasNode; dropSource; Path; splitEvents; retagEvents; hasDry; dryEvent;
-  sameSource; capsHgo; lookupNode)
+  sameSource; capsHgo; lookupNode; thruWrap; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ifEq; ifLe1; ifNeq; ∧-intro; ≤ᵇ-widen)
 
@@ -5410,3 +5410,39 @@ hopDᵛ-data F η (s +ᵗ u) ok (inj₂ b) with isData s
 ... | true  = hopDᵛ-data F η u ok b
 ... | false = ⊥-elim ok
 hopDᵛ-data F η (obs u) ok v = ⊥-elim ok
+
+-- the outer frame's wrapper touches the FINISHED flag and the node
+-- table and nothing else, so the values it returns are the ones the
+-- walk handed it.  It sits here because two faces need it and neither
+-- can import the other: the caps face reads it for a width, the nest
+-- face for a depth, and both are only asking the wrapper to be the
+-- identity on the component they measure.
+thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (fin : Bool)
+  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+  proj₁ (thruWrap op nid fin r) ≡ proj₁ r
+thruWrap-vals op nid false _ = refl
+thruWrap-vals mergeAllᵒ nid true (vs , bs , sd , st)
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+thruWrap-vals switchᵒ nid true (vs , bs , sd , st)
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl
+thruWrap-vals exhaustᵒ nid true (vs , bs , sd , st)
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = refl
+... | just (scan-st _)           = refl
+... | just (take-st _)           = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)       = refl
+... | just (exhaust-st _ _)      = refl

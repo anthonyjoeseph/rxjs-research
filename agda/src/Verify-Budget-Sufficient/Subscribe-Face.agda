@@ -136,7 +136,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
    switchKill-closes-caps; takeDispatch-caps; thruWrap-caps; valsCaps?;
    valsCaps?-lvl; valsCaps→mList-strict)
 open import Verify-Budget-Sufficient.Measures using
-  (2X≡X+X; all-++-intro; all-impl; lookupNode-park;
+  (2X≡X+X; thruWrap-vals; all-++-intro; all-impl; lookupNode-park;
                                                       boundedLive; boundedNode; parkRoom; fᵢ≤sum-tab;
                                                       n<2^n; pathLen; sizeᵉ-pos; syncSize≤sizeᵉ; ∧-true)
 open import Verify-Budget-Sufficient.Caps-Nest using
@@ -161,7 +161,7 @@ open import Verify-Budget-Sufficient.Caps-Term using
   (evalSeed-caps; evalTms-caps; unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (concat-fits; dbl-suc; double≤foldStep; frameStep-+suc; lenWiden;
-   thruWrap-vals; valsIn; valsLen; valsOf)
+   valsIn; valsLen; valsOf)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (mergeAllDrain-keeps; KeepsC; stepFrame-keeps; subscribeE-keeps;
    subscribeInner-keeps; switchKill-keeps; thruConsume-keeps)

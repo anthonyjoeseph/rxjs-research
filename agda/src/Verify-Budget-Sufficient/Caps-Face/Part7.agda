@@ -51,7 +51,7 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (foldPath-nest-regs)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (foldPath-nest-regs; PathΦHyp)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
@@ -3920,6 +3920,33 @@ postulate
 -- still apply -- and the size premise is what bounds it without reading
 -- the run: each frame's size is under the cap and the path's length is
 -- too, so the factor is two to the cap SQUARED and no more.
+postulate
+  -- THE GRANT AT EVERY OUTER FRAME OF ONE CHAIN, which is the whole of
+  -- what the walk still owes.  Four frame kinds owe nothing, so this
+  -- is a tuple of units on any path with no `thru-outer` in it; where
+  -- there IS one, what is owed is a sighted grant covering the values
+  -- reaching that frame -- and the caps recurrence already carries a
+  -- ceiling for exactly those values, one ceiling level per frame.
+  -- The route is to read the grant off that ceiling rather than to
+  -- rebuild one: iterating "the size grows by a factor per frame"
+  -- gives a bound two to the cap squared ABOVE the cap, which the
+  -- charge cannot afford, while the recurrence's own ceiling is what
+  -- the arm is stated against.
+  --
+  -- TWIN: `chain-walk-caps` is the same induction in the caps
+  --   currency, already proven -- it preserves a per-frame ceiling
+  --   across one frame at one stepped level, which is the shape the
+  --   grant here has to be extracted at.
+  chain-walk-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+    PathΦHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
+      (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+      path (arrVal a ∷ []) (Arrival.isLast a) sched st
+
 chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
@@ -3934,6 +3961,7 @@ chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
   foldPath-nest-regs _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
     (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
     (∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl)
+    (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
   where
   Sz = Caps.cSize (capsAt e sl id)
   Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)

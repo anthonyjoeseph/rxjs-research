@@ -106,7 +106,7 @@ open import Rx.Slots using (Slots; slotsSize)
 -- edges, sizeCapAt, capsAt/capsH/frameStep/Caps (via .Caps), the
 -- Keeps ring, and every companion the core is narrowed over
 open import Verify-Budget-Sufficient.Measures using
-  (_hasAtLeast_; all-++-intro; all-impl; lookupNode-park; parkRoom;
+  (thruWrap-vals; _hasAtLeast_; all-++-intro; all-impl; lookupNode-park; parkRoom;
                                                       applyFn-size; boundedLive; boundedNode;
                                                       budget-covers; burstB?; burstB?-widen;
                                                       burstHopD?; connect-anchor; dBound;
@@ -176,7 +176,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face
 open import Verify-Budget-Sufficient.Caps-Term using
   (unfoldμ-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
-  (concat-fits; frameStep-+suc; lenWiden; thruWrap-vals; valsIn; valsLen;
+  (concat-fits; frameStep-+suc; lenWiden; valsIn; valsLen;
    valsOf)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthE; depthAll; depthBurst; depthFrame; depthInner; depthConsume; depthWalk)

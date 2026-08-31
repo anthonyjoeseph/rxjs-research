@@ -53,7 +53,8 @@ open import Rx.Slots using (Slots; slotsSize)
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Measures using
   (all-++-intro; all-impl; hopR; lookupNode-park; n<2^n;
-                                                      pathLen; ∧-true; szB)
+                                                      pathLen; ∧-true; szB;
+   thruWrap-vals)
 open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; Caps; frameStep; frameStep-mono-j; frameStep-wid-suc)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -316,10 +317,6 @@ concat-fits : ∀ {A : Set} (c : Caps) (L : ℕ) (xs ys : List A) →
   length xs ≤ suc (Caps.cWid (frameStep L c)) →
   length ys ≤ suc (Caps.cWid (frameStep L c)) →
   length (xs ++ ys) ≤ suc (Caps.cWid (frameStep (suc L) c))
-thruWrap-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (op : AllOp) (nid : NodeId) (fin : Bool)
-  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
-  proj₁ (thruWrap op nid fin r) ≡ proj₁ r
 
 -- PUBLIC because .Subscribe-Face had verbatim copies of both under the
 -- same names, and this is the lower module.  Same name in two modules is
@@ -346,32 +343,6 @@ private
       (≤-trans (≤-reflexive (+-assoc j a b))
         (≤-trans (n≤1+n (j + (a + b)))
                  (≤-reflexive (sym (+-suc j (a + b))))))
-
-  thruWrap-vals op nid false _ = refl
-  thruWrap-vals mergeAllᵒ nid true (vs , bs , sd , st)
-    with lookupNode nid (EvalSt.nodes st)
-  ... | nothing                = refl
-  ... | just (scan-st _)       = refl
-  ... | just (take-st _)       = refl
-  ... | just (mergeAll-st _ _ _ _)    = refl
-  ... | just (switch-st _ _)   = refl
-  ... | just (exhaust-st _ _)  = refl
-  thruWrap-vals switchᵒ nid true (vs , bs , sd , st)
-    with lookupNode nid (EvalSt.nodes st)
-  ... | nothing                = refl
-  ... | just (scan-st _)       = refl
-  ... | just (take-st _)       = refl
-  ... | just (mergeAll-st _ _ _ _)    = refl
-  ... | just (switch-st _ _)   = refl
-  ... | just (exhaust-st _ _)  = refl
-  thruWrap-vals exhaustᵒ nid true (vs , bs , sd , st)
-    with lookupNode nid (EvalSt.nodes st)
-  ... | nothing                = refl
-  ... | just (scan-st _)       = refl
-  ... | just (take-st _)       = refl
-  ... | just (mergeAll-st _ _ _ _)    = refl
-  ... | just (switch-st _ _)   = refl
-  ... | just (exhaust-st _ _)  = refl
 
   double≤foldStep S w hS = ≤-trans (2*suc≤2^suc w) (^-monoˡ-≤ (suc w) hS)
 
