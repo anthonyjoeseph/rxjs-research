@@ -16,12 +16,9 @@
 -- row holds with the margin the step buys and nothing else.
 --
 -- THE LAYERED REFERENCE ROWS ARE DEGENERATE, and that is the
--- measurement rather than a weakness: they are the family the
--- refutation used, and the summand that repairs it does not repair it
--- marginally.  The delivery doubles per layer -- one, two, four,
--- eight -- while the grant goes a thousand and twenty-five, then
--- sixty-seven million, because the wrap is exponential in a sync size
--- that grows with the layer.  No count of layers closes that.
+-- measurement: the delivery doubles per layer while the grant goes a
+-- thousand and twenty-five, then sixty-seven million, because the
+-- wrap is exponential in a sync size that grows with the layer.
 --
 -- BLOCKED, AND THE FINDING IS THAT IT CANNOT REFUTE HERE: `deferᵉ`
 -- reads depth zero whatever its body is, so a reference to a deferred
@@ -32,11 +29,23 @@
 -- are invisible on the same side, and this axis is unavailable to a
 -- counterexample at THIS statement rather than merely untried.
 --
--- AND THE STORE CONJUNCTS ARE INSTANTIATED AND VACUOUS, which is a
--- coverage boundary rather than coverage: the store reads zero before
--- the consume and zero after it, at the flat witness and at a layered
--- one, so the two rows say only that nothing moved.  Reaching them
--- wants a consume that installs, and this harness's does not.
+
+-- ── the store half ─────────────────────────────────────────────────
+-- AND THE STORE CONJUNCTS ARE REACHED AT THE ONE BRANCH THAT WRITES:
+-- a `mergeAll` with no lane free PARKS its arrival, so the node the
+-- result holds carries a term and the left side moves with the family
+-- -- one to four over the layers against a grant of two to five, a
+-- constant margin.  The tight row parks onto a queue an earlier
+-- consume wrote: a store that SUMMED would outrun a grant naming only
+-- the arriving term, and this one MAXES, so a shallow arrival on a
+-- deep queue holds at EQUALITY off the incoming store alone.  The
+-- subscribing branch's store is BLOCKED rather than untried: three
+-- families were driven through it -- the layered references, the
+-- duplicating arrivals, and an inner `mergeAll` limited to one lane so
+-- that the subscription itself has to park -- and the store reads zero
+-- after every one.  A minted node carries an empty queue, so moving
+-- the reading through a subscribe wants an accumulator holding an
+-- observable, which no arrival this context can build supplies.
 --
 -- AND THE DUPLICATING FAMILY IS LOAD-BEARING AND IS WHY THERE IS NO
 -- FACTOR: over four layers the arrival's size doubles, and what the
@@ -57,7 +66,7 @@ open import Data.Bool using (true; false; T)
 open import Data.Fin using () renaming (zero to fzero)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
@@ -238,3 +247,77 @@ dupDepth = nestDᵛ (obs (obs natᵗ)) (oN 0)
 
 dupDepth≡ : dupDepth ≡ 4030201
 dupDepth≡ = refl
+
+-- ── the store, at a consume that actually WRITES ────────────────────
+-- A `mergeAll` with no lane free parks its arrival instead of
+-- subscribing it, and that is the one branch of the consume that
+-- installs.  Reading the two store conjuncts there is what the rows
+-- above could not do: the node the result holds carries the parked
+-- term, so the left side is the arrival's own nesting rather than the
+-- zero an empty queue reports.
+stP : EvalSt prog
+stP = installNode 0 (mergeAll-st {t = obs natᵗ} (just 0) 0 [] false) (st-init prog)
+
+mxP : Val Γₛ (obs (obs natᵗ)) → (d : Closed Γₛ (obs natᵗ)) →
+      T (inputsBelowᵉ 0 d) → ℕ
+mxP o d ok =
+  nodesMax (proj₂ (proj₂ (proj₂
+    (thruConsume gas mergeAllᵒ 0 κ 0 0 o (sched d ok) stP))))
+
+nAtP : ℕ → Val Γₛ (obs (obs natᵗ)) → (d : Closed Γₛ (obs natᵗ)) →
+       T (inputsBelowᵉ 0 d) → ℕ
+nAtP j o d ok =
+  nodeNestAt j (proj₂ (proj₂ (proj₂
+    (thruConsume gas mergeAllᵒ 0 κ 0 0 o (sched d ok) stP))))
+
+-- LOAD-BEARING: the store the park leaves reads the arrival's own
+-- nesting, so both conjuncts have a left side that MOVES with the
+-- family -- one, two, three, four over the four layers -- against a
+-- grant that goes two, three, four, five.  The margin is a constant
+-- one and does not grow, which is what makes the rows a test.
+storeParkFigs≡ : mxP (oN 0) flat tt + 100 * mxP (oN 1) flat tt
+               + 10000 * mxP (oN 2) flat tt + 1000000 * mxP (oN 3) flat tt
+               ≡ 4030201
+storeParkFigs≡ = refl
+
+grantParkFigs≡ : G (oN 0) flat tt + 100 * G (oN 1) flat tt
+               + 10000 * G (oN 2) flat tt + 1000000 * G (oN 3) flat tt
+               ≡ 5040302
+grantParkFigs≡ = refl
+
+storePark : ((mxP (oN 0) flat tt ≤ᵇ nodesMax stP ⊔ G (oN 0) flat tt) ≡ true)
+          × ((mxP (oN 3) flat tt ≤ᵇ nodesMax stP ⊔ G (oN 3) flat tt) ≡ true)
+          × ((nAtP 0 (oN 3) flat tt ≤ᵇ nodeNestAt 0 stP ⊔ G (oN 3) flat tt) ≡ true)
+          × ((nAtP 1 (oN 3) flat tt ≤ᵇ nodeNestAt 1 stP ⊔ G (oN 3) flat tt) ≡ true)
+storePark = refl , refl , refl , refl
+
+-- AND THE QUEUE THE SECOND PARK LANDS IN IS ONE THE EVALUATOR WROTE,
+-- which is the row the conjunct is actually at risk on: a store
+-- reading that SUMMED over the queue would outgrow a grant naming only
+-- the arriving term, while one that MAXES would not.  It maxes -- a
+-- shallow arrival landing on a deep queue reads the deep one, four
+-- against a grant of two, and the conjunct holds at EQUALITY off the
+-- `nodesMax st` side alone.  That is the tight row in this file.
+st2 : (o : Val Γₛ (obs (obs natᵗ))) (d : Closed Γₛ (obs natᵗ)) →
+      T (inputsBelowᵉ 0 d) → EvalSt prog
+st2 o d ok = proj₂ (proj₂ (proj₂
+  (thruConsume gas mergeAllᵒ 0 κ 0 0 o (sched d ok) stP)))
+
+mx2 : Val Γₛ (obs (obs natᵗ)) → Val Γₛ (obs (obs natᵗ)) →
+      (d : Closed Γₛ (obs natᵗ)) → T (inputsBelowᵉ 0 d) → ℕ
+mx2 o₁ o₂ d ok =
+  nodesMax (proj₂ (proj₂ (proj₂
+    (thruConsume gas mergeAllᵒ 0 κ 0 0 o₂ (sched d ok) (st2 o₁ d ok)))))
+
+store2Figs≡ : mx2 (oN 3) (oN 0) flat tt + 100 * mx2 (oN 0) (oN 3) flat tt
+            + 10000 * mx2 (oN 3) (oN 3) flat tt ≡ 40404
+store2Figs≡ = refl
+
+store2 : ((mx2 (oN 3) (oN 0) flat tt
+             ≤ᵇ nodesMax (st2 (oN 3) flat tt) ⊔ G (oN 0) flat tt) ≡ true)
+       × ((mx2 (oN 0) (oN 3) flat tt
+             ≤ᵇ nodesMax (st2 (oN 0) flat tt) ⊔ G (oN 3) flat tt) ≡ true)
+       × ((mx2 (oN 3) (oN 3) flat tt
+             ≤ᵇ nodesMax (st2 (oN 3) flat tt) ⊔ G (oN 3) flat tt) ≡ true)
+store2 = refl , refl , refl
+

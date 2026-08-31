@@ -277,9 +277,16 @@ StreamFit {Γ = Γ} {u = u} k sl G κ (em ∷ ems) =
 --   definitions the grant outruns the delivery by orders that grow.  A
 --   deferred tower is the shape that would hide depth under a zero
 --   wrap and it delivers nothing at a consume, so that axis is
---   unavailable here rather than clear.  The two STORE conjuncts are
---   instantiated and VACUOUS -- the store reads zero either side of
---   the consume in this family -- so they are not covered.
+--   unavailable here rather than clear.  And the two STORE conjuncts
+--   at the PARKING branch, which is the one that writes: over four
+--   layers the store the park leaves goes one to four against a grant
+--   of two to five, and the tight row parks onto a queue an earlier
+--   consume wrote, where the reading MAXES and the conjunct holds at
+--   equality off the incoming store alone.  The subscribing branch is
+--   BLOCKED rather than untried: three families were driven through
+--   it, including an inner `mergeAll` limited to one lane so the
+--   subscription itself must park, and the store reads zero after
+--   every one -- a minted node carries an empty queue.
 postulate
   sight-thru-val : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (k : ℕ) (sl : Slots Γ) (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)

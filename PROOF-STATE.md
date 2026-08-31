@@ -226,16 +226,6 @@ does not fit is a finding about the shared statement, not about the head.
   carrier is not the move: what a queued term is charged is what has
   to change, and that is Anthony's question rather than a grind.
 
-- **the store conjuncts of the emitted-inner price, which nothing has
-  ever asked a question of** — the value half of `sight-thru-val` now
-  holds at the very family that killed it, and the two conjuncts left
-  are about the STORE the consume leaves behind. Every instantiation
-  on record reaches them with an empty node table, so each reads as an
-  `all` over nothing: green, and evidence for nothing. The leg is to
-  drive the consume to a state whose table is non-empty — the same
-  harness the value half used, one emission further in — and let the
-  rows say whether the class comes down or a witness lands.
-
 - **the drain's other seven conjuncts, which the dead ceiling was
   blocking** — `walk-frame-drain-inner` is one postulate over a whole
   queue, and only ONE of its per-entry conjuncts is the refuted
@@ -245,16 +235,27 @@ does not fit is a finding about the shared statement, not about the head.
   seven, and leave the ceiling as the single named leaf it now is —
   which is what makes the spiral one row instead of a whole face.
 
+
+- **the drain's ENTRY and WALK halves, which the body above will ask
+  for next** — `sight-all-stream` prices what the payload's emitted
+  values cost and `sight-all-walk` what walking them costs, one leaf
+  for all three `*All` heads. Both are already inhabited at the
+  duplicating family that refuted their predecessors, so the design
+  risk is spent and what is left is the induction over the emitted
+  stream. Taking them straight after the drain body is what keeps the
+  three in one currency: the body consumes exactly what these two
+  price, so a restatement in either lands while the consumer is open.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
   the `from-inner` head of the drain law, the only frame that names a node. Its
   per-entry ceiling has now outlived three carriers, the last of them refuted
   at every cap, so the obligation itself is what is open.
-- **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
-  emitted inner costs the outer frame to subscribe. The value conjunct holds at
-  the family that refuted it; the two STORE conjuncts keep the class, reading
-  vacuously wherever the consume has been instantiated.
+- **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
+  ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
+  now instantiated where they move — the store at the PARKING branch, tight to
+  equality — and the subscribing branch is blocked rather than uncovered.
 - **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED×2, PROBED`: the
   drain's ENTRY half, a claim about the payload's emitted VALUES. The fold is
   now inhabited at the duplicating family that refuted its predecessor, and at

@@ -68,7 +68,8 @@ open import Probed.Sight-All-Stream
 open import Probed.Sight-Thru-Val
   using (fitRef; sidesRef≡; grantRef₀≡; grantRef₁≡;
          grantFlat≡; delFlat≡; fitFlat; storeFlat; storeRef; storeFigs≡;
-         fitOwn; grantHid≡; delHid≡; dupCols≡; dupDepth≡)
+         fitOwn; grantHid≡; delHid≡; dupCols≡; dupDepth≡;
+         storeParkFigs≡; grantParkFigs≡; storePark; store2Figs≡; store2)
 
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
