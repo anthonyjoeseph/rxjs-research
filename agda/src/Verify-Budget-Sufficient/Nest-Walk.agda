@@ -828,23 +828,43 @@ pathSz?-lvl c Lv p 2≤S h =
 -- both are supplied by the single inequality here -- `drain-head
 -- -supply` is what splits it back into the pair, which is why the
 -- currency is the size and not the nesting.  What that buys is not
--- brevity: whatever states the store bound has to establish this, and
--- a store predicate has no access to a connect walk's residue.
+-- brevity: whatever states the store bound has to establish this.
 
--- AND THREE OF THE QUEUE'S CONJUNCTS ARE AT THE WRONG CAP, which a
--- witness settles and not a preference.  The spine reading, the closure
--- reading and the room floor are all taken at the ENTRY cap while the
--- term they are taken of was parked inside a frame the walk had
--- already stepped into -- and a step is a widening, so the entry cap
--- refuses terms the walk admits.  At an entry size of eight, one step
--- buys a hundred and thirty-six, and every source between the two is
--- a counterexample; the level is what carries the claim, since at
--- level zero the step is the identity and nothing could fail.  What
--- the repair is is a separate question with its own dead route, at
--- the fit shelf this predicate's grant is eventually spent against.
+-- AND THE SIZE CURRENCY IS WHAT THE BASE CAP REFUSES, which leaves
+-- this floor the one conjunct here with no producer.  A term is
+-- parked by the consuming edge when its node is out of room, so what
+-- lands in the queue is an ARRIVAL -- admitted at the cap the walk
+-- had STEPPED to, while the floor is read at the base one.  Nesting
+-- does not carry that defect: it sits under the size plus the slots
+-- and a substitution need not move it, so the honest floor is the
+-- nesting bound the ceiling actually wants.  And the argument for
+-- writing it in the size currency -- that whatever states the store
+-- bound cannot see a connect walk's residue -- does not hold, since
+-- that predicate ranges over the whole state and the residue is a
+-- field of it.
+
+-- AND THE QUEUE'S READINGS SIT AT THE WALK'S LEVEL, NOT AT THE ENTRY
+-- CAP, which a witness settles and not a preference.  A term the
+-- queue holds was parked inside a frame the walk had already stepped
+-- into, and a step is a widening, so the entry cap refuses terms the
+-- walk admits: at an entry size of eight one step buys a hundred and
+-- thirty-six, and every source between the two is a counterexample.
+-- The room floor is the one conjunct still read at the entry cap, and
+-- it is refused for the same reason -- so nothing the walk holds
+-- supplies it, and that is the gap its producer is left carrying.
 -- REFUTED: `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd`,
 --   `Refuted.Drain-Queue-Flat.drain-clos-flat-absurd` and
 --   `Refuted.Drain-Queue-Flat.drain-room-flat-absurd`
+
+-- AND THE LEVEL CLIMBS ALONG THE QUEUE, because the STATE does.
+-- Subscribing one queued inner installs nodes the caps did not have
+-- to cover, and the only face that reports a caps receipt for a
+-- post-subscribe state reports it at a strictly later level, while
+-- `capsOK?` weakens upward only.  A tail pinned to the head's level
+-- therefore has no producer at any queue longer than one -- not a
+-- hard obligation but an unsatisfiable one -- so the tail carries its
+-- own level with a floor at the head's, which is the same freedom the
+-- per-entry nesting conjunct beside it already takes.
 capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
@@ -861,10 +881,11 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (Σ ℕ λ g → Σ ℕ λ Lv′ →
       (4 + nest o sl (EvalSt.connectedShares st) ≤ g)
       × (Lv ≤ Lv′) × Reached c d Lv′ g)
-  × capsDrainOK c sl d Lv sf allNid κ id now lim
-      (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
-      (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
-      (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+  × (Σ ℕ λ Lv″ → (Lv ≤ Lv″) ×
+      capsDrainOK c sl d Lv″ sf allNid κ id now lim
+        (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
+        (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+        (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
   where r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
 
 -- THE SUBSCRIPTION'S OWN DESCENT, AND IT IS NOW A CASE SPLIT.  What was
@@ -6299,13 +6320,20 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
                       (FaceOK.fSize faceHere)
                       (proj₂ (proj₂ (proj₂ (proj₂ roomHere))))))))
 
-  IH₀ = mergeAllDrain-nest c d sl B W Lv sf allNid κ id now lim
+  -- the tail's own level, and the path receipts widened onto it: the
+  -- queue's later entries are read at a level at or above the head's,
+  -- so the two path facts travel by the step's own widening
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+  Lv″   = proj₁ tailΣ
+  step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ))
+
+  IH₀ = mergeAllDrain-nest c d sl B W Lv″ sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
-         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))))
+         (proj₂ (proj₂ tailΣ))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          splitW′
          (≤-trans (m≤n⊔m _ _) hd)
-         hpk hpl
+         (pathSz?-⊑ κ step″ hpk) (≤-trans hpl (proj₁ step″))
 
   jS = proj₁ SUB₀
   jI = proj₁ IH₀

@@ -3252,21 +3252,31 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
                            (reached-room c d P (suc g₀) 2≤S hR))
                   (⊔-lub ≤-refl (size≤sizeCount c d 2≤S (1≤capsAt-reg e sl id))))
 
--- THE ONE HEAD THAT OWES, AND WHAT IT OWES IS NOW ABOUT THE QUEUE AND
--- NOTHING ELSE.  Every conjunct the drain asks for is read at the
--- walk's OWN level, so the state receipt the walk arrives holding is
--- the one the queue wants, and the arrival family under it takes its
--- state, value and closure receipts at that same stepped cap and
--- reports an increment over it.  What is left is the per-entry half:
--- each queued inner must be shown admissible -- its written size under
--- the level's size cap, its slot width under the level's width cap,
--- its closure under the level's key -- and a level at or above the
--- walk's must be exhibited at which the entry's nest is reached.  None
--- of that is available from the frame's own hypotheses, because the
--- queue is a term the STORE is holding and the frame's bundle speaks
--- about the arrival it was handed; the route is the node invariant,
--- which is where a queued entry's admissibility has to be recorded if
--- it is to be recovered here.
+-- THE ONE HEAD THAT OWES, AND A CENSUS SAYS WHICH CONJUNCTS THOSE
+-- ARE.  The state and slot conjuncts are the frame's own hypotheses,
+-- and TWO of the per-entry readings are already recorded: the store
+-- predicate carries a written-size field and a width field per NODE,
+-- and the lookup hypothesis here names the very node whose queue is
+-- being read, so the entry's size and its slot width come off the
+-- receipt the frame arrives holding.
+--
+-- WHAT IS ACTUALLY OWED IS THREE THINGS, and they fail for three
+-- different reasons.  The entry's CLOSURE key is recorded nowhere --
+-- the store predicate's closure half ranges over the live list and
+-- never over the node table -- but it does not want a field, because
+-- a key read through a CAPPED telescope is at most the cap times the
+-- term's plain size, and the size is recorded; one level absorbs the
+-- factor, which is the ratio the map arm of the closure face already
+-- spends.  The ROOM FLOOR is the one with no producer at all: it is
+-- recorded in the WRITTEN-size currency and re-established one level
+-- up at every park, while the queue asks it at the BASE cap, and a
+-- written size is exactly the reading a substitution moves.  What the
+-- ceiling underneath actually wants is the NESTING, which is a SYNC
+-- size plus the unconnected slots -- the reading a substitution does
+-- not move -- and the parking edge is already holding a nesting
+-- receipt for the arrival it parks.  And the REACHED level is a fact
+-- about the ceiling rather than about the store, so no field could
+-- hold it.
 --
 -- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`;
 --   `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd` for the

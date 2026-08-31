@@ -214,17 +214,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **record a queued inner's admissibility in the node invariant** —
-  with the drain's conjuncts now read at the walk's own level, the
-  state receipt the frame arrives holding is the one the queue wants,
-  and what is left in `walk-frame-drain-inner` is per-ENTRY: each
-  queued term's written size, slot width and closure key under the
-  level's caps, plus a level at or above the walk's at which its nest
-  is reached. The frame's bundle speaks about the ARRIVAL, not about
-  what the store is holding, so no hypothesis there can supply it —
-  which puts the fact on the node record, where every producer must
-  establish it and every consumer may spend it. Refute first, at a
-  queue whose entry is larger than the arrival that enqueued it.
+- **move the drain's room floor into the nesting currency** — the
+  census on `walk-frame-drain-inner` leaves one conjunct with no
+  producer at all, and the header carries why. Size and width are
+  already recorded per NODE; the closure key wants no field, since the
+  map arm's ratio buys it off the size one level up. The floor is
+  recorded in the WRITTEN size and re-established one level up at
+  every park, while the ceiling under it asks the BASE cap — and a
+  written size is what a substitution moves. The ceiling wants the
+  NESTING, a sync size the substitution leaves alone, and the parking
+  edge already holds a nesting receipt for what it parks. The leg is
+  that restatement and the field that carries it.
 
 - **the drain's ENTRY half, now that its grant is the right one** — the
   payload-only form is refuted at a slot reference and the summand
