@@ -82,4 +82,3 @@ open import Probed.Depth-Sighted
 open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)
 open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)
 open import Probed.Sight-Fit-Width using (figures≡; oldRow≡; newRow≡)
-open import Probed.Step-Frame-Nest-Phi using (figures≡; holds; addFails)

@@ -21,20 +21,26 @@ module Verify-Budget-Sufficient.Regs-Nest-Walk where
 open import Data.Bool using (Bool; true)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
-open import Data.List using (List; _++_)
-open import Data.Nat using (ℕ; _+_; _*_; _⊔_; _≤_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m)
+open import Data.List using (List; []; _∷_; _++_; map)
+open import Data.Nat using (ℕ; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m;
+  ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0)
+open import Data.Nat.Solver using (module +-*-Solver)
+open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent)
-open import Rx.Exp using (Ctx; Closed; Val)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; _×ᵗ_; obs)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_;
+         NodeId; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
          foldPath; stepFrame; dispatchShare)
-open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; pathNestD; pathNestF)
+  using (regsNestMax; pathNestD; pathNestF; nest-inflate)
+open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
 -- have left to climb -- and SCALED by the path's own factor, because
@@ -75,37 +81,6 @@ postulate
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
 
-  -- AND THE POTENTIAL ITSELF ACROSS THE FRAME, which is the induction's
-  -- own hypothesis.  A step function may name its payload on both sides
-  -- of an additive `nestDᵉ`, so ONE substitution installs the payload's
-  -- nesting twice while the path gives up only the function's own --
-  -- which is why the potential carries the path's factor and not just
-  -- its depth.  A map frame surrenders two to its own size and the
-  -- value it produces may claim exactly that, so the two moves cancel
-  -- and nothing accumulates along the walk.
-  --
-  -- REFUTED: `Refuted.Apply-Fn-Nest` kills the additive reading of this
-  --   same statement, at the smallest term of that shape -- a `mapᵉ`
-  --   whose source and whose step function are the same outer variable,
-  --   applied to a payload one `switchAllᵉ` deep.  Two against a charge
-  --   of one, and that is the factor this form pays.
-  --
-  -- PROBED: `Probed.Step-Frame-Nest-Phi` walks that very term through
-  --   this statement's map clause -- the factor sixty-four against a
-  --   substituted depth of two -- with the additive reading run beside
-  --   it as a control, reading false.  Covered: the `map-f` clause at
-  --   the refuting step function, over the empty path.  NOT covered:
-  --   `scan-f`, which substitutes by the same rule but also moves a
-  --   node; `from-inner`, whose emitted value comes from the inner run
-  --   rather than from the frame; and `thru-outer`, which spends depth
-  --   where these spend factor.
-  stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (U : ℕ) →
-    valsΦ? U (f ↠ path) vals ≡ true →
-    valsΦ? U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
-
   -- THE SHARE BOUNDARY, where the walk leaves this chain and re-enters
   -- on every chain registered at the sink.  Those chains' own depths
   -- are under the registry's join by construction, which is why the
@@ -118,6 +93,123 @@ postulate
     regsNestMax (EvalSt.registry
       (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
+
+-- ONE MAP FRAME, and it is the clause the additive reading died at.  A
+-- step function may name its payload on both sides of an additive
+-- `nestDᵉ`, so ONE substitution installs the payload's nesting twice
+-- while the path gives up only the function's own -- which is why the
+-- potential carries the path's factor and not just its depth.  Here
+-- the two moves cancel exactly: the frame surrenders two to its own
+-- size, substitution may claim precisely that, and what is left is the
+-- same product read one frame further down.
+mapΦ : ∀ {n} {Γ : Ctx n} {s u t} (U : ℕ) (fn : Fn Γ [] [] [] s u)
+  (p : Path Γ u t) (vals : List (Val Γ s)) →
+  valsΦ? U (map-f fn ↠ p) vals ≡ true →
+  valsΦ? U p (map (applyFn fn) vals) ≡ true
+mapΦ U fn p [] h = refl
+mapΦ {s = s} {u = u} U fn p (v ∷ vs) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ step)) (mapΦ U fn p vs (∧-trueʳ h))
+  where
+  F = pathNestF p
+  E = 2 ^ sizeᵗ fn
+  hv : E * F * (nestDᵛ s v + (nestDᵗ fn + pathNestD p)) ≤ U
+  hv = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
+  shape : F * (E * (nestDᵗ fn + nestDᵛ s v) + E * pathNestD p)
+            ≡ E * F * (nestDᵛ s v + (nestDᵗ fn + pathNestD p))
+  shape = solve 5 (λ f e d nt np →
+            f :* (e :* (nt :+ d) :+ e :* np)
+              := e :* f :* (d :+ (nt :+ np)))
+          refl F E (nestDᵛ s v) (nestDᵗ fn) (pathNestD p)
+  step : F * (nestDᵛ u (applyFn fn v) + pathNestD p) ≤ U
+  step =
+    ≤-trans (*-monoʳ-≤ F (+-monoˡ-≤ (pathNestD p) (applyFn-nest fn v)))
+    (≤-trans (*-monoʳ-≤ F (+-monoʳ-≤ (E * (nestDᵗ fn + nestDᵛ s v))
+                (nest-inflate E (pathNestD p) (m^n>0 2 (sizeᵗ fn)))))
+    (≤-trans (≤-reflexive shape) hv))
+
+postulate
+  -- THE SCAN FRAME SUBSTITUTES BY THE SAME RULE and pays the same
+  -- factor, but it also reads and writes a node, so its emitted value
+  -- is the accumulator's image rather than the payload's and the
+  -- substitution above cannot be pointed at it unchanged.
+  --
+  -- RECOVERY: git show 8175756:agda/evidence/probed/Probed/Step-Frame-Nest-Phi.agda
+  --   restores the harness that walked the refuting term through the
+  --   map clause -- the same shape a scan clause has to be run at.
+  stepFrame-nest-Φ-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (nid : NodeId) (path : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
+    valsΦ? U (scan-f fn nid ↠ path) vals ≡ true →
+    valsΦ? U path
+      (proj₁ (stepFrame sf id now (scan-f fn nid) path vals fin sched st))
+      ≡ true
+
+  -- THE TAKE FRAME CARRIES A FACTOR OF ONE AND NO DEPTH, so its
+  -- hypothesis and its conclusion are the same statement read either
+  -- side of the gate: what is owed is only that the values it lets
+  -- through are among the ones handed to it.
+  stepFrame-nest-Φ-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (path : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (U : ℕ) →
+    valsΦ? U (take-f nid ↠ path) vals ≡ true →
+    valsΦ? U path
+      (proj₁ (stepFrame sf id now (take-f nid) path vals fin sched st))
+      ≡ true
+
+  -- THE INNER FRAME'S OUTPUT DOES NOT COME FROM THE FRAME AT ALL -- it
+  -- is what the inner run produced -- and the frame's factor is one, so
+  -- there is nothing here to pay a deepening with.  What has to hold is
+  -- that an inner run cannot hand out a value deeper than the potential
+  -- the outer walk was already carrying.
+  stepFrame-nest-Φ-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
+    valsΦ? U (from-inner op allNid inst ↠ path) vals ≡ true →
+    valsΦ? U path
+      (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals
+                        fin sched st))
+      ≡ true
+
+  -- AND THE OUTER FRAME SPENDS DEPTH WHERE THE MAP FRAME SPENDS
+  -- FACTOR.  Its value is one `obs` shallower than the one it was
+  -- handed, and the path it stands on is one unit of depth richer, so
+  -- the two sides of the potential trade rather than cancel -- the only
+  -- clause where the currency changes hands.
+  stepFrame-nest-Φ-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
+    valsΦ? U (thru-outer op nid ↠ path) vals ≡ true →
+    valsΦ? U path
+      (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin sched st))
+      ≡ true
+
+-- THE POTENTIAL ACROSS ONE FRAME, which is the induction's own
+-- hypothesis: every frame kind either hands its factor to the value it
+-- produces or spends a unit of depth into what it mints, and never
+-- both.  The map clause is the one that is DERIVED rather than
+-- assumed, and it is derived from the substitution bound directly --
+-- so the shape of this whole statement is tested at the frame kind
+-- where the currency was chosen, instead of asserted at all five.
+stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (U : ℕ) →
+  valsΦ? U (f ↠ path) vals ≡ true →
+  valsΦ? U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st U hΦ =
+  mapΦ U fn path vals hΦ
+stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st U hΦ =
+  stepFrame-nest-Φ-scan sf id now fn nid path vals fin sched st U hΦ
+stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st U hΦ =
+  stepFrame-nest-Φ-take sf id now nid path vals fin sched st U hΦ
+stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st U hΦ =
+  stepFrame-nest-Φ-inner sf id now op allNid inst path vals fin sched st U hΦ
+stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st U hΦ =
+  stepFrame-nest-Φ-thru sf id now op nid path vals fin sched st U hΦ
 
 foldPath-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)

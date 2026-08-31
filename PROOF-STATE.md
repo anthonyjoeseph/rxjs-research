@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE MAP CLAUSE IS COVERED AND THE STATE-TOUCHING ONES ARE NOT.**
-  The repriced potential was run at the very term that refuted the
-  additive reading and it holds with the factor to spare, the additive
-  control reading false beside it. What that leaves is the two clauses
-  whose output value does not come from the frame at all: `from-inner`
-  emits what the inner run produced, and `thru-outer` spends DEPTH where
-  the map frame spends factor — and both carry a factor of one, so
-  neither has anything to pay a deepening with. The leg is to reach both
-  by RUNNING a cascade over an `*All`, and read the potential either
-  side of the frame the evaluator itself presents.
+- **THE MAP CLAUSE IS PROVEN AND THE FRAME LAW IS A BODY NOW; THE
+  OUTER FRAME IS WHERE THE CURRENCY CHANGES HANDS.** Substitution's
+  bound discharges the clause the additive reading died at, which
+  leaves four leaves and one of them is not like the others:
+  `thru-outer` hands back a value one `obs` shallower and stands on a
+  path one unit of depth richer, so its two sides TRADE rather than
+  cancel, and it carries a factor of one to trade with. That is the
+  clause a wrong potential fails at. The leg is to reach it by RUNNING
+  a cascade over an `*All` and reading the potential either side of the
+  frame the evaluator itself presents.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -273,10 +273,21 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   share boundary, where the walk re-enters on every chain at the sink. Their
   depths are under the registry's join, but nothing has read it.
-- **`stepFrame-nest-Φ`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: the
-  potential, under the factor the path can still apply, survives one frame.
-  Covered at the map clause against the term that refuted the additive reading;
-  the clauses whose value comes from the run are untouched.
+- **`stepFrame-nest-Φ-thru`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  outer frame, whose value loses an `obs` while its path gains a unit of depth.
+  The one clause where the potential's two sides trade, and it has a factor of
+  one to trade with.
+- **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  inner frame, whose emitted value comes from the inner run and not from the
+  frame. Nothing yet says an inner run cannot outrun the potential the outer
+  walk was carrying.
+- **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: the scan
+  frame substitutes by the same rule the map clause is now proven from, but
+  emits the accumulator's image rather than the payload's.
+- **`stepFrame-nest-Φ-take`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  gate, factor one and no depth, so hypothesis and conclusion are one statement
+  read either side of it. What is owed is that its output values are among its
+  inputs.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
