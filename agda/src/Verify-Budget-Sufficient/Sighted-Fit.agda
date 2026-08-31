@@ -154,6 +154,19 @@ valsFitG-le k sl G G′ P P′ t (o ∷ os) hp hg (h , hs) =
 --   those rows.  Not covered: the two heads other than `mergeAllᵒ`,
 --   any path other than the one the row subscribes under, and the
 --   store-growth conjuncts, which no row reads apart from the value one.
+-- PROBED: `Probed.Sight-Fit-Width` runs the REPAIR against the family
+--   that killed this form, at the script lengths the crossing is taken
+--   at.  The old grant is reproduced holding at twelve and failing at
+--   thirteen; the `nestB` grant at a size base of ONE -- the smallest
+--   the family admits, so every real cap widens into the row -- holds
+--   at twelve, thirteen and sixteen.  The width is read at the head's
+--   own BURST rather than at `descW`, which is sealed: the burst count
+--   is a join summand of every `descW` arm, so it is a lower bound and
+--   the row is the conservative one.  The delivered side doubles per
+--   script value while `syncSizeᵉ` reads twelve throughout, which is
+--   what puts the width in the exponent.  Not covered: any head but
+--   this `scanᵉ` family, any path but `root`, a slot telescope of more
+--   than one live script, and the size base above one.
 -- PROBED: `Probed.Sight-All-Stream` INHABITS the fold -- the statement
 --   itself, not a boolean mirror of it -- at the duplicating payload
 --   the refutations above are taken at, and at three layers of that

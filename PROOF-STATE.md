@@ -215,18 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ENTRY FOLD IS REFUTED, AND ITS EXPONENT IS WHAT MOVES** —
-  `subscribeE-fit` prices a subscription's emitted values at a tower
-  over `syncSizeᵉ`, which reads ONE at a scripted input, so a cold
-  script's synchronous burst is invisible to it while a `scanᵉ` over
-  that input applies its step once per script value. The route the
-  ruling above wants this currency for is the same one, so the repair
-  is owed twice over: restate the fit in `nestB`, whose exponent
-  already carries a WIDTH beside the size cap, against a `descW`
-  bound — the shape the caps face's own two subscription-nesting
-  results have. Then the `*All` entry's body and the walk are rebuilt
-  on it, and `mapVals-nest-sync`, `takeVals-nest` and `scanVals-nest`
-  stay the three frames' halves.
+- **THE ENTRY FOLD'S REPAIR IS MEASURED; NOW IT IS TYPED.**
+  `subscribeE-fit`'s tower over `syncSizeᵉ` is blind to a script, and
+  the `nestB` grant at a size base of one closes the crossing at the
+  very family that opened it — twelve, thirteen and sixteen script
+  values, the width read at the head's own burst so the row is the
+  conservative one. So the remaining work is the restatement and its
+  cascade: a named grant carrying the width, a `descW` premise on the
+  fit, and the thirty sites that spell the old tower out — the `*All`
+  entry's stream, fit and drain, the sighted ceiling they are read
+  under, and the bridge's own entry reading.
 
 - **the cascade's own descent, which is the tier's other risk and
   does not touch the queue at all** — `cascade-depth-sighted` prices a
@@ -257,7 +255,7 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
   what is open.
-- **`subscribeE-fit`** (Sighted-Fit) — FALSITY, `REFUTED×3, PROBED`: what ANY
+- **`subscribeE-fit`** (Sighted-Fit) — FALSITY, `REFUTED×3, PROBED×2`: what ANY
   subscription's emitted VALUES cost. Refuted at a doubling `scanᵉ` over a
   script — a crossing, 4095 against 4096 at twelve values and 8191 at thirteen
   — so the exponent has to see an instant's width.
