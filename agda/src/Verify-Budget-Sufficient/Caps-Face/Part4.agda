@@ -1422,27 +1422,6 @@ takeVals-caps : ∀ {n} {Γ : Ctx n} {s} (c : Caps) (sl : Slots Γ)
   all (valCaps? c sl s) (proj₁ (takeVals k vals)) ≡ true
 takeVals-caps {s = s} c sl k vals h = takeVals-all (valCaps? c sl s) k vals h
 
--- AND THE PAYLOAD HALF OF THAT CLAUSE HOLDS OF ANY PREDICATE, which
--- is the reading every face wants of a take: the frame filters, so
--- whatever was true of each value it was handed is true of each value
--- it passes on, and no face-specific arithmetic enters.  Stated
--- separately from the caps clause because the two are wanted at
--- different faces and only this half is denomination-free.
-takeDispatch-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (P : Val Γ s → Bool) (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) (mns : Maybe (NodeState Γ)) →
-  all P vals ≡ true →
-  all P (proj₁ (takeDispatch {t = t} nid vals fin sched st mns)) ≡ true
-takeDispatch-all P nid vals fin sched st (just (take-st k)) h
-  with proj₂ (proj₂ (takeVals k vals))
-... | true  = takeVals-all P k vals h
-... | false = takeVals-all P k vals h
-takeDispatch-all P nid vals fin sched st nothing                    h = refl
-takeDispatch-all P nid vals fin sched st (just (scan-st _))         h = refl
-takeDispatch-all P nid vals fin sched st (just (mergeAll-st _ _ _ _)) h = refl
-takeDispatch-all P nid vals fin sched st (just (switch-st _ _))     h = refl
-takeDispatch-all P nid vals fin sched st (just (exhaust-st _ _))    h = refl
-
 -- THE take-f CLAUSE, and it spends no folds: j′ = 0 either way
 takeDispatch-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)

@@ -66,7 +66,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
   share-sink; root; dCapᶜ; dWalkᶜ; fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick;
-  shareAdmit; shareLatch; foldPath; fCharge)
+  shareAdmit; shareLatch; foldPath)
 open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -126,14 +126,13 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   pathSz?-widen; regsSz?; regsSz?-widen; slotsCaps?; valCaps?; widNode;
   nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
-  (face-charge; face-charge1; face-vals; mapFrame-caps; mapFrame-clos; scanFrame-caps;
-   scanFrame-clos;
+  (clos-lift; face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps;
    scanVals-len; stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
   capsOK?-regs; capsOK?-setNode; dropSweep-caps; face-lift; frameBud; FrameFace;
   lookupNode-caps; pathSz?-len; pathSz?-tail; shareLatch-caps; slotsCaps?-capsAt;
-  takeDispatch-all; takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
+  takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro)
@@ -223,7 +222,7 @@ innerFinish-face :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
@@ -316,7 +315,7 @@ innerReact-face :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (d j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick)
@@ -456,7 +455,7 @@ stepFrame-face :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (c : Caps) (d j : ℕ) (sl : Slots Γ) (g : Gas) (id : Id) (now : Tick)
   (f : Frame Γ s u) (κ : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
@@ -607,7 +606,7 @@ walkH :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (c : Caps) (d : ℕ) (sl : Slots Γ) →
   2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
   slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
@@ -720,7 +719,7 @@ cascadeGo-deliveries :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -834,7 +833,7 @@ cascadeGo-level :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -922,7 +921,7 @@ cascadeGo-caps :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (d : ℕ) (a : Arrival Γ) (id : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -2502,286 +2501,6 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 --   its body is; a pure-`map` vocabulary reads the whole sum at zero
 --   against a closure of ten, and the stratum SCALE cannot repair it.
 
--- WHAT A FRAME OWES THE READING IT WAS HANDED, and it is the whole
--- content of carrying the key rather than deriving it.  A frame REBUILDS
--- the values it passes on -- a template is applied, a scan folds, a
--- wrapper is put round an inner observable -- so the reading has to
--- survive that rebuild or the walk's conjunct dies at the first hop.
---
--- AND AS WRITTEN IT IS FALSE, AT EVERY CAP RATHER THAN AT THIS ONE.
--- The cheap half is that a `map-f` carries its OWN function, which
--- belongs to the frame and not to the program the cap was computed
--- from, so no hypothesis here bounds it and the output may be an
--- observable of any size.  The half that matters is that supplying
--- the missing bound does not repair it: hold the function under the
--- cap, hold the argument under the cap, and the rebuilt value's
--- closure is their SUM, which overflows.  So a rebuilt value's reading
--- cannot be taken at the cap its inputs were read at, whatever that
--- cap is -- the size face reached the same conclusion for the same
--- frames when it made its scan law return a STEP.
---
--- SO IT IS STATED UP A LEVEL IT REPORTS, WITH TWO PREMISES THAT BOUND
--- THE FRAME'S OWN FUNCTION -- the path pricing the caller already
--- carries and the values' own caps reading, neither of them a new
--- obligation -- and a receipt saying the climb fits `fCharge`, which
--- is the currency the SIZE sibling reports in and the currency the
--- walk's own ladder converts from.  A fixed increment is what makes
--- the statement false; a reported one leaves the arithmetic where the
--- head can see its own function.
---
--- AND ONE LEVEL DOES NOT PAY, WHICH IS WHAT SETS THE PRICE.  With the
--- template priced by the path and the argument priced by its caps
--- reading, both factors ARE the cap: a template holding `w` copies of
--- its argument is admitted at `w` just under the cap, an argument of
--- closure just under the cap is admitted beside it, and the rebuilt
--- value is their PRODUCT.  A level multiplies the cap by roughly twice
--- `cSize`, which is linear, and a linear step cannot pay a square.  So
--- the charge is one level per unit of `sizeᵗ` of the frame's own
--- function, which is exactly what the SIZE sibling's map arm charges
--- -- and the gap between what the two faces charge for one frame was
--- the tell.
---
--- WHICH MEANS THE REGISTRY FACE CANNOT BE PRICED AT THE BASE EITHER,
--- and that is the finding this leaves behind.  The subscribing leaves
--- need a closure reading on what they subscribe; the reading a walk
--- can carry climbs frame by frame; a registration priced against a cap
--- the reading has already outgrown is not paid for.  So the registry's
--- own pricing becomes levelled, as `capsOK?` already is and for the
--- same reason -- the alternative, that a rebuilding frame never reaches
--- a subscribe, is false the moment a `map` feeding a `mergeAll` is
--- written down.
---
--- REFUTED: `Refuted.Step-Frame-Clos` -- the cap-free form, at a frame
---   function no hypothesis bounds.
--- REFUTED: `Refuted.Step-Frame-Clos-Level` -- the ONE-level form, with
---   every premise the caller supplies discharged at the witness: a
---   template of `S²` copies of its argument, applied to an argument of
---   closure `S²`, both inside the level-one cap, whose product outruns
---   the level-two cap `S + 2S² + 4S³` on the base supply `8 ≤ S`.
-step-frame-clos-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-  (fn : Fn Γ [] [] [] s u)
-  (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-  pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((map-f fn) ↠ p) ≡ true →
-  valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-  all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-  Σ ℕ λ j′ →
-    (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
-         (proj₁ (stepFrame sf nid now (map-f fn) p vals fin sched st)) ≡ true)
-    × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                    (Caps.cWid (capsAt e sl id)) L)
-step-frame-clos-map {e = e} {s = s} sl id L sf nid now fn p vals fin sched st hsl hc hpk hvc hcl =
-  suc (sizeᵗ fn)
-  , mapFrame-clos c L sl fn vals (2≤capsAt-size e sl id) (slotsCaps?-capsAt e sl id)
-      (proj₁ (∧-true (all (valCaps? (frameStep L c) sl s) vals)
-                     (length vals ≤ᵇ suc (Caps.cWid (frameStep L c))) hvc))
-  , face-charge1 c L (sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS))
-  where
-  c = capsAt e sl id
-  B = Caps.cSize (frameStep L c)
-  fS = proj₁ (∧-true (frameSz? B (map-f fn))
-                     ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpk)
-
--- THE FOLD'S SECOND FACTOR COMES OUT OF THE STORE, and it COMPOUNDS:
--- the template is applied once per value handed to the frame, each
--- application to the last result, so the arm's bill is the map's
--- raised to the burst's length.  The accumulator the first rung folds
--- is not one of the caller's values, so its reading arrives from the
--- node the frame names -- which is what the store premise is for, and
--- what makes the seven other node shapes report nothing.
---
--- AND THE CHARGE LANDS EXACTLY.  `face-charge` is a product of the
--- width factor and the size factor, the burst's length pays the first
--- and the template's own size the second, so the report
--- `suc (length vals * suc (sizeᵗ fn))` is the size arm's own count
--- plus the one level the closure reading costs over it.
-step-frame-clos-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (snid : NodeId)
-  (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-  pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((scan-f fn snid) ↠ p) ≡ true →
-  valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-  all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-  Σ ℕ λ j′ →
-    (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
-         (proj₁ (stepFrame sf nid now (scan-f fn snid) p vals fin sched st)) ≡ true)
-    × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                    (Caps.cWid (capsAt e sl id)) L)
-step-frame-clos-scan {e = e} {s = s} {u = u} sl id L sf nid now fn snid p vals fin
-                     sched st hsl hc hpk hvc hcl
-  with lookupNode snid (EvalSt.nodes st)
-     | lookupNode-caps (frameStep L (capsAt e sl id)) (Sched.slots sched) snid
-         (EvalSt.nodes st)
-         (capsOK?-nodeSz (frameStep L (capsAt e sl id)) sched st hc)
-         (capsOK?-nodeWid (frameStep L (capsAt e sl id)) sched st hc)
-... | nothing                    | _ = 0 , refl , z≤n
-... | just (take-st _)           | _ = 0 , refl , z≤n
-... | just (mergeAll-st _ _ _ _) | _ = 0 , refl , z≤n
-... | just (switch-st _ _)       | _ = 0 , refl , z≤n
-... | just (exhaust-st _ _)      | _ = 0 , refl , z≤n
-... | just (scan-st {w} ac)      | nb with w ≟ᵗ u
-...   | no _     = 0 , refl , z≤n
-...   | yes refl =
-  suc (length vals * suc (sizeᵗ fn))
-  , scanFrame-clos c L sl fn ac vals (2≤capsAt-size e sl id)
-      (slotsCaps?-capsAt e sl id)
-      (∧-intro (proj₁ nb)
-               (subst (λ x → (pWᵛ _ x u ac ≤ᵇ Caps.cWid (frameStep L c)) ≡ true)
-                      hsl (proj₂ nb)))
-      hv
-  , face-charge c L (length vals) (sizeᵗ fn)
-      (≤ᵇ⇒≤ (length vals) (suc (Caps.cWid (frameStep L c))) (T-to hL))
-      (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS))
-  where
-  c  = capsAt e sl id
-  B  = Caps.cSize (frameStep L c)
-  hp = ∧-true (all (valCaps? (frameStep L c) sl s) vals)
-              (length vals ≤ᵇ suc (Caps.cWid (frameStep L c))) hvc
-  hv = proj₁ hp
-  hL = proj₂ hp
-  fS = proj₁ (∧-true (frameSz? B (scan-f fn snid))
-                     ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpk)
-
-
-postulate
-  -- THE EXITING INNER PASSES ITS VALUES ON UNTOUCHED UNLESS IT DRAINS,
-  -- and when it drains they come out of the node's QUEUE -- parked at
-  -- whatever level was current when they were enqueued, which is not
-  -- the level this head reads them at.  So the arm's second factor is
-  -- neither an arrival nor an accumulator but a history, and the drain
-  -- SUBSCRIBES what it finds parked, so what it emits is priced by the
-  -- subscribe ladder and not by anything the argument carries.
-  --
-  -- DEAD ROUTE: through the frame face's own caps report.  The closure
-  --   reading is the caps reading times the cap and `clos-lift` pays
-  --   for that factor with exactly ONE level.  Both heads that remain
-  --   SUBSCRIBE, so the only caps reading available for what they emit
-  --   is `stepFrame-caps`'s, and that report is `L + j′ ≤ fLvlD` --
-  --   saturated at the very level the walk widens everything to.  The
-  --   closure conjunct therefore lands one level ABOVE it, and no
-  --   charge closes the gap, because the gap is not a charge: what is
-  --   missing is a level of SLACK in the ladder the caps face reports
-  --   into.  The two arms that are proven are proven because they
-  --   rebuild without subscribing, so their size ladder is frame-local
-  --   and the extra level fits inside `fCharge`.
-  -- PROBED: `Probed.Step-Frame-Clos-Inner` reaches a PARKED queue by
-  --   running a concurrency of one whose first lane stays open on a hot
-  --   slot, then completes the exit at an instance no registration
-  --   threads.  One layer of a substituting ladder is admitted at the
-  --   base cap and eight overflow it, admitted one level up: the
-  --   drained reading is 26, 250 and 4090 at one, four and eight layers
-  --   against a base of 147.  Covered is the closure conjunct at a
-  --   FLOOR cap -- the ratio, not the `capsAt` recurrence -- at
-  --   `mergeAllᵒ`, the only *All that queues.  Not covered: a queue
-  --   filled at an EARLIER level than it is drained at, which is the
-  --   gap the drain law's own row is about.
-  step-frame-clos-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (op : AllOp) (allNid inst : NodeId)
-    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (from-inner op allNid inst ↠ p) ≡ true →
-    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-    Σ ℕ λ j′ →
-      (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl s)
-           (proj₁ (stepFrame sf nid now (from-inner op allNid inst) p vals fin sched st)) ≡ true)
-      × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                      (Caps.cWid (capsAt e sl id)) L)
-
-  -- THE WRAP'S BILL IS A CONSTRUCTOR AND NOT A TEMPLATE, which is why
-  -- it is the one arm whose report might honestly be a fixed one.  It
-  -- is not: what the frame hands on is what SUBSCRIBING the inner
-  -- emitted, so the factor is the inner's own definition rather than
-  -- anything the head can read, and an arrival of bounded reading can
-  -- emit a report that doubles per layer.  So the `j′` here is not the
-  -- fold arm's charge at all: it is whatever the subscribe cost, and
-  -- the constructor is the cheap half of the arm.
-  --
-  -- DEAD ROUTE: through the frame face's own caps report.  The closure
-  --   reading is the caps reading times the cap and `clos-lift` pays
-  --   for that factor with exactly ONE level.  Both heads that remain
-  --   SUBSCRIBE, so the only caps reading available for what they emit
-  --   is `stepFrame-caps`'s, and that report is `L + j′ ≤ fLvlD` --
-  --   saturated at the very level the walk widens everything to.  The
-  --   closure conjunct therefore lands one level ABOVE it, and no
-  --   charge closes the gap, because the gap is not a charge: what is
-  --   missing is a level of SLACK in the ladder the caps face reports
-  --   into.  The two arms that are proven are proven because they
-  --   rebuild without subscribing, so their size ladder is frame-local
-  --   and the extra level fits inside `fCharge`.
-  -- PROBED: `Probed.Step-Frame-Clos-Wrap` reaches the node by running a
-  --   `mergeAll` and hands the head a substituting ladder as its
-  --   argument: four layers are admitted at the arrival's own level
-  --   (degenerate, kept as the boundary), eight overflow it and are
-  --   admitted one level up, against a charge exponential in the width
-  --   cap.  Covered is the closure conjunct at a FLOOR cap -- the ratio,
-  --   not the `capsAt` recurrence, which `sizeCount` seals.  Not
-  --   covered: any head but `mergeAllᵒ`, whose node states gate the
-  --   subscription differently.
-  step-frame-clos-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (op : AllOp) (onid : NodeId)
-    (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (thru-outer op onid ↠ p) ≡ true →
-    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl (obs u)) vals ≡ true →
-    Σ ℕ λ j′ →
-      (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
-           (proj₁ (stepFrame sf nid now (thru-outer op onid) p vals fin sched st)) ≡ true)
-      × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                      (Caps.cWid (capsAt e sl id)) L)
-
--- AND THE HEAD DECIDES, so the claim is a body over four of them and
--- not a fifth statement about frames in general.  A `take-f` REBUILDS
--- NOTHING -- it passes on a prefix of exactly the values it was handed
--- -- so its arm is the reading widened along the level it was already
--- being restated at, and neither the template pricing nor the store
--- premise is spent.  The four that remain are the four that rebuild,
--- and the level is what each of them has to pay out of.
-step-frame-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-  (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-  pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) (f ↠ p) ≡ true →
-  valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-  all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-  Σ ℕ λ j′ →
-    (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
-         (proj₁ (stepFrame sf nid now f p vals fin sched st)) ≡ true)
-    × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                    (Caps.cWid (capsAt e sl id)) L)
-step-frame-clos sl id L sf nid now (map-f fn) p vals fin sched st sleq cok hp hvc hcl =
-  step-frame-clos-map sl id L sf nid now fn p vals fin sched st sleq cok hp hvc hcl
-step-frame-clos sl id L sf nid now (scan-f fn snid) p vals fin sched st sleq cok hp hvc hcl =
-  step-frame-clos-scan sl id L sf nid now fn snid p vals fin sched st sleq cok hp hvc hcl
-step-frame-clos sl id L sf nid now (from-inner op allNid inst) p vals fin sched st sleq cok hp hvc hcl =
-  step-frame-clos-inner sl id L sf nid now op allNid inst p vals fin sched st sleq cok hp hvc hcl
-step-frame-clos sl id L sf nid now (thru-outer op onid) p vals fin sched st sleq cok hp hvc hcl =
-  step-frame-clos-thru sl id L sf nid now op onid p vals fin sched st sleq cok hp hvc hcl
-step-frame-clos {e = e} {s = s} sl id L sf nid now (take-f tnid) p vals fin sched st sleq cok hp hvc hcl =
-  0
-  , subst (λ x → all (nestClosOK?ᵛ (frameStep x (capsAt e sl id)) sl s)
-                     (proj₁ (stepFrame sf nid now (take-f tnid) p vals fin sched st))
-                   ≡ true)
-          (sym (+-identityʳ L))
-          (takeDispatch-all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s)
-             tnid vals fin sched st (lookupNode tnid (EvalSt.nodes st)) hcl)
-  , z≤n
-
 -- THE FRAME-LOCAL LEAF, WHICH IS `⊤` AT FOUR OF THE FIVE HEADS AND SO
 -- was never a statement about a walk at all.  Matching on the frame
 -- says so in code: only a `thru-outer` carries an obligation, and what
@@ -3458,9 +3177,14 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
         , valsCaps?-lvl _ _ sl (proj₁ r)
             (frameStep-mono-j c 2≤S ST≤t) (proj₁ (proj₂ (proj₂ ST)))
         , all-impl _ _
-            (λ v h → nestClosOK?ᵛ-widen sl _ v (frameStep-mono-j c 2≤S CL≤t) h)
+            (λ v h → nestClosOK?ᵛ-widen sl _ v (frameStep-mono-j c 2≤S STs≤t) h)
             (proj₁ r)
-            (proj₁ (proj₂ CL))
+            (clos-lift c (L + proj₁ ST) sl (proj₁ r) 2≤S (slotsCaps?-capsAt e sl id)
+              (all-impl _ _
+                 (λ v → valCaps?-size (frameStep (L + proj₁ ST) c) sl _ v)
+                 (proj₁ r)
+                 (proj₁ (valsCaps?-parts (frameStep (L + proj₁ ST) c) sl (proj₁ r)
+                           (proj₁ (proj₂ (proj₂ ST)))))))
         , pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S L≤t)) pz2
         , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
         , (g , P , hfl , hlvP , hR) ))
@@ -3488,13 +3212,12 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
           hvc ≤-refl
           (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdp)
   Lt  = fLvlD S W d L
+  STs≤t : suc (L + proj₁ ST) ≤ Lt
+  STs≤t = proj₂ (proj₂ (proj₂ (proj₂ ST)))
   ST≤t : L + proj₁ ST ≤ Lt
-  ST≤t = proj₂ (proj₂ (proj₂ (proj₂ ST)))
+  ST≤t = ≤-trans (n≤1+n (L + proj₁ ST)) STs≤t
   sucL≤t : suc L ≤ Lt
   sucL≤t = sucJ≤fLvlD S W d L
-  CL  = step-frame-clos sl id L sf nid now f p vals fin sched st sleq cok hpz hvc hcl
-  CL≤t : L + proj₁ CL ≤ Lt
-  CL≤t = face-lift c d L (proj₁ CL) (proj₂ (proj₂ CL))
   L≤t : L ≤ Lt
   L≤t = ≤-trans (n≤1+n L) sucL≤t
   hLt : L + (Lt ∸ L) ≡ Lt
@@ -4744,7 +4467,7 @@ caps-tick :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →

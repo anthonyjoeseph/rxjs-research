@@ -176,7 +176,7 @@ innerFinish-mergeAll-face-go :
          × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
          × (all (eventCaps? (frameStep (j + j′) c) sl)
                 (proj₁ (proj₂ r)) ≡ true)
-         × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+         × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
     -- burstCaps?-∷  (.Caps-Face)
     (∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
       (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
@@ -274,7 +274,7 @@ innerFinish-mergeAll-face-go ifc k₁ k₂ k₃ k₄ k₅
                         (lookupNode allNid (EvalSt.nodes st)))
       rearranged =
         ( proj₁ res
-        , proj₂ (proj₂ (proj₂ (proj₂ res)))
+        , ≤-trans (n≤1+n (j + proj₁ res)) (proj₂ (proj₂ (proj₂ (proj₂ res))))
         , proj₁ (proj₂ res)
         , proj₁ (proj₂ (proj₂ res))
         , proj₁ (proj₂ (proj₂ (proj₂ res))))
@@ -920,7 +920,7 @@ innerFinish-mergeAll-face-core :
          × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
          × (all (eventCaps? (frameStep (j + j′) c) sl)
                 (proj₁ (proj₂ r)) ≡ true)
-         × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+         × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
     (∀ {n} {Γ : Ctx n} {u} (c : Caps) (sl : Slots Γ)
       (em : InstEmit (Val Γ u)) (str : Stream Γ u) →
       all (eventCaps? c sl) (InstEmit.events em) ≡ true →
@@ -1004,7 +1004,7 @@ innerFinish-mergeAll-face :
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
   ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (d j : ℕ) (g : Gas) (allNid inst : NodeId)
   (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))

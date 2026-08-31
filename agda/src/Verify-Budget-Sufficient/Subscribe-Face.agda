@@ -168,8 +168,8 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
 -- the composition gate, and `chain-desc`: the supply an operator clause
 -- spends when it splits its index and hands the source the predecessor
 open import Verify-Budget-Sufficient.Caps-Chain using
-  (burst-index; burst-nil; burst-step; chain-desc; concat-frame; connect-step; defer-step;
-  frame-nil; frame-recv; frame-step; inner-nil; inner-step; leaf-lvl; of-step; op-step;
+  (burst-index; burst-nil; burst-step; chain-desc; concat-frame-sadd; connect-step; defer-step;
+  frame-nil-sadd; frame-recv-sadd; frame-step-sadd; inner-nil; inner-step; leaf-lvl; of-step; op-step;
   op-step-eval; op-step-mu; op-step-share; queue-push; walk-index; walk-nil; walk-none)
 -- the `suc` the per-cons fold charge puts on a walk's reported witness
 open import Verify-Budget-Sufficient.Caps-Sadd using (walk-step-suc)
@@ -1692,13 +1692,13 @@ innerFinish-zero′ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      × (valsCaps? (frameStep (j + j′) c) sl vals ≡ true)
      × (all (eventCaps? {n = n} {Γ = Γ} {u = t} (frameStep (j + j′) c) sl) []
           ≡ true)
-     × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
+     × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 innerFinish-zero′ {t = t} c dep j sl vals sched st 2≤S inv vC =
   proj₁ Z , proj₁ (proj₂ Z)
     , face-vals c j (proj₁ Z) sl vals 2≤S (proj₁ (proj₂ (proj₂ Z)))
         (valsLen (frameStep j c) sl vals vC)
     , proj₂ (proj₂ (proj₂ Z))
-    , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
+    , frame-nil-sadd (Caps.cSize c) (Caps.cWid c) dep j
   where
   Z = innerFinish-zero {t = t} c j sl vals sched st inv
         (valsOf (frameStep j c) sl vals vC)
@@ -1729,7 +1729,7 @@ innerFinish-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      × (all (eventCaps? (frameStep (j + j′) c) sl)
             (proj₁ (proj₂ r)) ≡ true)
      -- the inside of ONE frame, so it reports in stepFrame's shape
-     × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
+     × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 
 -- FLATTEN: decrement the live count, drain the queue and reinstall the
 -- residue, which comes back from mergeAllDrain-caps with the very bound
@@ -1801,7 +1801,7 @@ innerFinish-caps {n = n} {s = s} c dep bud j g mergeAllᵒ allNid inst κ id now
      -- its `k` is `frameBud c j` on the nose and `concat-frame`'s own `hk`
      -- is `≤-refl`.  The `suc` on `j′` is the frame's slot, and
      -- `concat-frame` pays for it out of the room the queue did not use
-     , concat-frame (Caps.cSize c) (Caps.cWid c) dep′
+     , concat-frame-sadd (Caps.cSize c) (Caps.cWid c) dep′
          (suc (sizeAt (Caps.cSize c) (suc j))) (length q) j j′ 2≤S
          (≤ᵇ⇒≤ (length q) (Caps.cWid (frameStep j c)) (T-to wnLen))
          ≤-refl
@@ -1892,7 +1892,7 @@ innerFinish-caps c dep bud j g switchᵒ allNid inst κ id now vals sl sched st
                sched st refl refl refl inv)
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
+    , refl , frame-nil-sadd (Caps.cSize c) (Caps.cWid c) dep j
 
 -- EXHAUST: clear the busy flag
 innerFinish-caps c dep bud j g exhaustᵒ allNid inst κ id now vals sl sched st
@@ -1912,7 +1912,7 @@ innerFinish-caps c dep bud j g exhaustᵒ allNid inst κ id now vals sl sched st
                sched st refl refl refl inv)
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
+    , refl , frame-nil-sadd (Caps.cSize c) (Caps.cWid c) dep j
 
 subscribeE-input-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (dep bud j : ℕ) (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
@@ -2137,13 +2137,13 @@ innerReact-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
      × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
      × (all (eventCaps? (frameStep (j + j′) c) sl) (proj₁ (proj₂ r)) ≡ true)
      -- the inside of ONE frame too
-     × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
+     × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 innerReact-caps c dep bud j g op allNid inst κ id now vals false sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC fb dpt =
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
+    , refl , frame-nil-sadd (Caps.cSize c) (Caps.cWid c) dep j
 innerReact-caps c dep bud j g op allNid inst κ id now vals true sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC fb dpt
   with any (aliveThroughᶠ inst st) (EvalSt.registry st)
@@ -2151,7 +2151,7 @@ innerReact-caps c dep bud j g op allNid inst κ id now vals true sl sched st
   0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true) (sym (+-identityʳ j)) inv
     , subst (λ x → valsCaps? (frameStep x c) sl vals ≡ true)
             (sym (+-identityʳ j)) vC
-    , refl , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
+    , refl , frame-nil-sadd (Caps.cSize c) (Caps.cWid c) dep j
 ... | false = innerFinish-caps c dep bud j g op allNid inst κ id now vals sl sched st
                 2≤S 1≤R slEq slC slSz inv pS lC vC fb dpt
 
@@ -2183,7 +2183,7 @@ stepFrame-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
      -- ONE FRAME, and no index: a frame is a single arc of the cycle, and
      -- it is the ONE arc that spends a unit of depth fuel — its payload
      -- walk runs at `dep` minus one, on the REFRESHED budget
-     × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
+     × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 
 -- MAP: nothing touches the state, so the invariant is only widened
 stepFrame-caps {u = u} c dep bud j g id now (map-f fn) κ vals fin sl sched st
@@ -2197,7 +2197,7 @@ stepFrame-caps {u = u} c dep bud j g id now (map-f fn) κ vals fin sl sched st
      -- ONE FOLD PER NODE of the step function, and `mapFrame-caps`'s
      -- witness reduces to exactly that, so the receipt is read off `fS`
      -- here rather than reported through the callee's Σ
-     , frame-recv (Caps.cSize c) (Caps.cWid c) dep j j′
+     , frame-recv-sadd (Caps.cSize c) (Caps.cWid c) dep j j′
          (face-charge1 c j (sizeᵗ fn)
             (≤ᵇ⇒≤ (sizeᵗ fn) (Caps.cSize (frameStep j c)) (T-to fS)))
   where
@@ -2222,7 +2222,7 @@ stepFrame-caps c dep bud j g id now (scan-f fn nid) κ vals fin sl sched st
     -- a scan's receipt is a PRODUCT and cannot be read off the call
     -- site — seven of the callee's eight clauses charge nothing and one
     -- charges the folds — so it is reported, and spent here
-    , frame-recv (Caps.cSize c) (Caps.cWid c) dep j (proj₁ SC)
+    , frame-recv-sadd (Caps.cSize c) (Caps.cWid c) dep j (proj₁ SC)
         (proj₂ (proj₂ (proj₂ (proj₂ SC))))
   where
   SC = stepFrame-scan-caps c j g id now fn nid κ vals fin sl sched st
@@ -2243,7 +2243,7 @@ stepFrame-caps c dep bud j g id now (take-f nid) κ vals fin sl sched st 2≤S 1
                            (lookupNode nid (EvalSt.nodes st)))
                         (valsLen (frameStep j c) sl vals vC)))
     , subst (λ x → all (eventCaps? (frameStep x c) sl) (proj₁ (proj₂ TD)) ≡ true)
-            (sym (+-identityʳ j)) (proj₂ (proj₂ TDc)) , frame-nil (Caps.cSize c) (Caps.cWid c) dep j
+            (sym (+-identityʳ j)) (proj₂ (proj₂ TDc)) , frame-nil-sadd (Caps.cSize c) (Caps.cWid c) dep j
   where
   TD  = takeDispatch nid vals fin sched st (lookupNode nid (EvalSt.nodes st))
   TDc = takeDispatch-caps (frameStep j c) nid vals fin sl sched st
@@ -2288,7 +2288,7 @@ stepFrame-caps c (suc dep′) bud j g id now (thru-outer op nid) κ vals fin sl 
                 (valsLen (frameStep (j + j′) c) sl (proj₁ WK)
                    (proj₁ (proj₂ (proj₂ TW)))))
      , proj₂ (proj₂ WR)
-     , frame-step (Caps.cSize c) (Caps.cWid c) dep′ j 0 j′ 2≤S z≤n
+     , frame-step-sadd (Caps.cSize c) (Caps.cWid c) dep′ j 0 j′ 2≤S (s≤s z≤n)
          (subst (λ x → x + j′
                          ≤ sIterD (Caps.cSize c) (Caps.cWid c) dep′
                              (frameBud c j) (suc (Caps.cWid (frameStep j c))) x)
@@ -2403,7 +2403,7 @@ pushBurst-caps {Γ = Γ} {t = t} {s = s} {u = u} c dep bud j g id now f κ (em �
     -- `burst-step` is the gate's fIterD row and this is the clause it
     -- exists for; the index descends with the emit list
     , burst-step (Caps.cSize c) (Caps.cWid c) dep bud (length ems) j j₁ j₂ 2≤S
-        (proj₂ (proj₂ (proj₂ (proj₂ SF))))
+        (≤-trans (n≤1+n (j + j₁)) (proj₂ (proj₂ (proj₂ (proj₂ SF)))))
         (proj₂ (proj₂ (proj₂ (proj₂ IH))))
   where
   E    = InstEmit.events em

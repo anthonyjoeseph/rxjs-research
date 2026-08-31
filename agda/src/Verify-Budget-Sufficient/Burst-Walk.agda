@@ -516,7 +516,7 @@ IfcFace =
        × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
        × (all (eventCaps? (frameStep (j + j′) c) sl)
               (proj₁ (proj₂ r)) ≡ true)
-       × (j + j′ ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)
 
 -- THE WET FACE (WetFace) — exactly what `stepFrame-face` does NOT say.
 -- Ψ-pure: no caps, no level index, no growth witness.

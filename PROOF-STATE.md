@@ -214,16 +214,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **one spare level in the ladder the caps face reports into** — the
-  closure reading is the caps reading times the cap, and `clos-lift`
-  now pays for that factor with exactly ONE level, which is what both
-  proven closure arms spend. The two open arms SUBSCRIBE, so the only
-  caps reading for what they emit is the frame face's, whose report
-  saturates the level the walk widens everything to. So the whole
-  remaining question is whether that level has one to spare — a fact
-  about `fLvlD` against `stepFrame-caps`'s report, provable or
-  refutable without touching either arm, and settling it settles both.
-
 - **the queued entry's REACHED level, which is the drain head's last
   residue** — every other conjunct of `walk-frame-drain-inner` now
   comes off the store predicate at the walk's own level, and the
@@ -244,6 +234,15 @@ does not fit is a finding about the shared statement, not about the head.
   at the same harness the value price used, so probe the emitted
   stream before stating the induction's measure.
 
+- **the drain's own residue, read where the spare level put it** — the
+  level leg just showed that a report and the ceiling it is compared
+  against can differ by a unit nobody was collecting, and the drain
+  residue is the same shape one currency over: a queued entry's nest is
+  read at a level the walk reached, and the receipt has to come from
+  the walk's position rather than from a field. So take the ceiling
+  entry the head already spends and ask what the position relation
+  gives at the level BELOW it, before stating anything new.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED, TWIN`:
@@ -254,15 +253,6 @@ does not fit is a finding about the shared statement, not about the head.
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading
   vacuously wherever the consume has been instantiated.
-
-- **`step-frame-clos-inner`** (Caps-Face/Part7) — SHAPE, `DEAD ROUTE, PROBED`:
-  the exiting-inner head. It DRAINS by subscribing what it finds parked, so
-  what it emits is priced by the subscribe ladder — and the closure reading
-  costs one level over the caps reading the ladder already saturates.
-- **`step-frame-clos-thru`** (Caps-Face/Part7) — SHAPE, `DEAD ROUTE, PROBED`:
-  the wrap head, whose output is a constructor round a SUBSCRIBED inner. Same
-  saturation as its sibling, and the same repair: the level the walk widens to
-  has to have one to spare, which is a fact about the ladder.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the

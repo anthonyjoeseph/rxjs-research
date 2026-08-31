@@ -4,8 +4,8 @@ module Verify-Budget-Sufficient.Caps-Face.Part5 where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _⊔_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-identityʳ; +-suc; m≤m+n; n≤1+n; +-mono-≤; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤;
-  ⊔-lub)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-identityʳ; m≤m+n; n≤1+n; +-mono-≤; *-mono-≤; *-monoʳ-≤;
+  +-monoʳ-≤; ⊔-lub)
 open import Data.Empty   using (⊥-elim)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -492,10 +492,30 @@ mapFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC fS vC =
 -- caps face has already priced at a level is priced for closure one
 -- level up, whatever produced it.
 --
--- WHICH IS WHY A SUBSCRIBING FRAME'S CLOSURE CANNOT BE IN A NARROWER
--- CURRENCY THAN ITS CAPS READING: this is the only route from a value
--- to its key that does not re-derive the value, and it inherits
--- whatever ladder priced the size.
+-- SO NO HEAD OWES A CLOSURE LAW OF ITS OWN, WHICH IS THE WHOLE REASON
+-- THIS IS STATED OVER A LIST AND NOT OVER A FRAME.  A per-head law has
+-- to re-derive the rebuilt value from the ARGUMENT's reading, and the
+-- two rebuilding heads make that false: both factors are the cap and
+-- the rebuild is their product.  Reading the OUTPUT's own size instead
+-- needs nothing about how it was made, so the walk spends this once,
+-- at whatever level the caps face left the values it is carrying.
+--
+-- AND THE SLOT PREMISE IS WHAT MAKES IT TRUE.  With no ceiling on the
+-- telescope a slot definition is free, the ratio between the two
+-- readings is unbounded in the slot COUNT, and no number of levels
+-- pays for the rebuild.
+-- REFUTED: `Refuted.Nest-Clos-Stratified` -- that ratio, with the
+--   ceiling removed.
+-- REFUTED: `Refuted.Step-Frame-Clos` -- the per-head form, cap-free,
+--   at a frame function no hypothesis bounds.
+-- REFUTED: `Refuted.Step-Frame-Clos-Level` -- the per-head form at ONE
+--   level with every caller premise discharged: a template of `S²`
+--   copies applied to an argument of closure `S²`, both inside the
+--   level-one cap, whose product outruns the level-two cap.
+-- RECOVERY: `git show 35762e6` restores the two per-head probes, whose
+--   harness reaches a PARKED `mergeAll` queue by running a concurrency
+--   of one whose first lane stays open on a hot slot -- the expensive
+--   half of instantiating anything about a drain.
 clos-lift : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   (vs : List (Val Γ u)) →
   2 ≤ Caps.cSize c →
@@ -523,55 +543,6 @@ clos-lift {Γ = Γ} {u = u} c j sl vs 2≤S slC vC =
     ≤-trans (≤-trans (closSizeᵛ≤mul (slotClos sl) S σ≤S 1≤S u v)
                      (*-monoʳ-≤ S (≤-trans (≤ᵇ⇒≤ (sizeᵛ u v) B (T-to hv)) B≤)))
             (≤-reflexive (sym eqStep))
-
--- ONE map-f FRAME'S CLOSURE LADDER, AND THE ARGUMENT'S OWN CLOSURE IS
--- NOT WHAT PAYS FOR IT.  The rebuilt value's key is read THROUGH the
--- slot telescope and the telescope is capped, so the key is at most
--- the cap times the value's PLAIN size -- a reading the caller's size
--- receipt already supplies.  The closure face therefore costs what the
--- size face costs plus one factor of the cap, and a single level
--- absorbs that factor outright, a step multiplying by roughly twice
--- the size field.  So the charge is `suc (sizeᵗ fn)`, the same one the
--- size mirror pays, and not a second ladder.
---
--- AND THE SLOT PREMISE IS WHAT MAKES IT TRUE.  Without a ceiling on
--- the telescope a slot definition is free, the ratio between the two
--- readings is unbounded in the slot COUNT, and no number of levels
--- pays for the rebuild.
--- REFUTED: `Refuted.Nest-Clos-Stratified`, which is that ratio with
---   the ceiling removed.
-mapFrame-clos : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-  (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
-  2 ≤ Caps.cSize c →
-  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  all (valCaps? (frameStep j c) sl s) vals ≡ true →
-  all (nestClosOK?ᵛ (frameStep (j + suc (sizeᵗ fn)) c) sl u)
-      (map (applyFn fn) vals) ≡ true
-mapFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC vC =
-  subst (λ k → all (nestClosOK?ᵛ (frameStep k c) sl u)
-                   (map (applyFn fn) vals) ≡ true)
-        (sym (+-suc j a))
-        (clos-lift c (j + a) sl (map (applyFn fn) vals) 2≤S slC (go vals vC))
-  where
-  S   = Caps.cSize c
-  B   = Caps.cSize (frameStep j c)
-  a   = sizeᵗ fn
-  1≤S = ≤-trans (s≤s z≤n) 2≤S
-  sz : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
-       sizeᵛ u (applyFn fn v) ≤ Caps.cSize (frameStep (j + a) c)
-  sz v hv =
-    ≤-trans (applyFn-iterSize S B 1≤S fn v
-               (≤ᵇ⇒≤ (sizeᵛ s v) B
-                  (T-to (valCaps?-size (frameStep j c) sl s v hv))))
-            (≤-reflexive (sym (iterSize-+ S j a S)))
-  go : (vs : List (Val Γ s)) → all (valCaps? (frameStep j c) sl s) vs ≡ true →
-       all (λ w → sizeᵛ u w ≤ᵇ Caps.cSize (frameStep (j + a) c))
-           (map (applyFn fn) vs) ≡ true
-  go []       h = refl
-  go (v ∷ vs) h
-    with ∧-true (valCaps? (frameStep j c) sl s v)
-                (all (valCaps? (frameStep j c) sl s) vs) h
-  ... | hd , tl = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (sz v hd))) (go vs tl)
 
 -- ONE scan-f FRAME'S SIZE LADDER.  Here the folds DO compose — scanVals
 -- threads the accumulator, so payload i is `applyFn` applied i times —
@@ -737,47 +708,6 @@ scanFrame-caps {n = n} {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC fS
             (λ v hv → ≤ᵇ-widen (pWᵛ n sl s v) (n≤1+n V)
                         (valCaps?-wid (frameStep j c) sl s v hv))
             vals vC)
-
--- ONE scan-f FRAME'S CLOSURE LADDER, at the count its size mirror
--- already pays plus the one level the map arm's argument buys.  The
--- folded value's key is read THROUGH the capped telescope, so it is at
--- most the cap times the value's PLAIN size, and the plain size at the
--- fold's own count is exactly what the size ladder reports.  A level
--- multiplies the size field by roughly twice itself, which absorbs
--- that factor, so the closure face costs `suc (length vals * suc
--- (sizeᵗ fn))` -- the size arm's own count with one step added, and
--- `face-charge`'s product at the burst's length pays for it.
---
--- AND THE ACCUMULATOR IS WHY THE PREMISE LIST IS THE CAPS ARM'S AND
--- NOT THE MAP ARM'S: the first rung folds a value the caller never
--- handed over, so its own reading has to arrive from the store.
-scanFrame-clos : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
-  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac0 : Val Γ u) (vals : List (Val Γ s)) →
-  2 ≤ Caps.cSize c →
-  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
-  valCaps? (frameStep j c) sl u ac0 ≡ true →
-  all (valCaps? (frameStep j c) sl s) vals ≡ true →
-  all (nestClosOK?ᵛ (frameStep (j + suc (length vals * suc (sizeᵗ fn))) c) sl u)
-      (proj₁ (scanVals fn ac0 vals)) ≡ true
-scanFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC aC vC =
-  subst (λ k → all (nestClosOK?ᵛ (frameStep k c) sl u)
-                   (proj₁ (scanVals fn ac0 vals)) ≡ true)
-        (sym (+-suc j a))
-        (clos-lift c (j + a) sl (proj₁ (scanVals fn ac0 vals)) 2≤S slC
-          (all-impl (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
-                    (λ w → sizeᵛ u w ≤ᵇ Caps.cSize (frameStep (j + a) c))
-                    (λ w hw → subst (λ k → (sizeᵛ u w ≤ᵇ k) ≡ true)
-                                    (sym (iterSize-+ S j a S)) hw)
-                    (proj₁ (scanVals fn ac0 vals)) (proj₁ SV)))
-  where
-  S  = Caps.cSize c
-  B  = Caps.cSize (frameStep j c)
-  a  = length vals * suc (sizeᵗ fn)
-  SV = scanVals-size S B 2≤S fn ac0 vals
-         (≤ᵇ⇒≤ (sizeᵛ u ac0) B
-            (T-to (valCaps?-size (frameStep j c) sl u ac0 aC)))
-         (all-impl (valCaps? (frameStep j c) sl s) (λ v → sizeᵛ s v ≤ᵇ B)
-            (λ v → valCaps?-size (frameStep j c) sl s v) vals vC)
 
 ------------------------------------------------------------------
 -- stepFrame-caps, GROUND.  Five clauses over the four leaves above and

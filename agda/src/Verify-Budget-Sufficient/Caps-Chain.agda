@@ -61,9 +61,8 @@ open import Rx.Evaluator
          fLvlD-0; fLvlD-suc; sIterD-suc; sLvlD-suc; opIterD-suc;
          fIterD-suc; fIterD-0; sIterD-0)
 open import Verify-Budget-Sufficient.Caps
-  using (widAt-mono; iterSize-infl;
-         fLvlD-infl; sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl;
-         sIterD-mono; sLvlD-mono; opIterD-mono; fIterD-mono)
+  using (widAt-mono; iterSize-infl; sLvlD-infl; opIterD-infl; fIterD-infl; sIterD-infl; sIterD-mono;
+  sLvlD-mono; opIterD-mono; fIterD-mono)
 -- the payload edge's three rungs are lifted with +1-superadditivity, the
 -- only place that needs to move a report to a HIGHER entry level rather
 -- than to a wider transformer
@@ -552,26 +551,6 @@ inner-step S W d k j j₂ 2≤S ih =
 -- RECEIPT fits at depth zero, and only a WALK does not.
 ------------------------------------------------------------------
 
--- a frame that moves nothing: every clause whose witness is 0
-frame-nil : ∀ (S W d j : ℕ) → j + 0 ≤ fLvlD S W d j
-frame-nil S W d j = ≤-trans (≤-reflexive (+-identityʳ j)) (fLvlD-infl S W d j)
-
--- and a frame that pays only its own receipt.  At zero the receipt sits
--- in `fLvl`'s summand with the width still to spare; at `suc d` it sits
--- in the `fLvl` the walk STARTS from, so `sIterD-infl` finishes.  Both
--- branches are inflation — the receipt never needs the walk
-frame-recv : ∀ (S W d j j₀ : ℕ) → j₀ ≤ fCharge S W j →
-  j + j₀ ≤ fLvlD S W d j
-frame-recv S W zero j j₀ h =
-  ≤-trans (≤-trans (+-monoʳ-≤ j h)
-                   (m≤m+n (j + fCharge S W j) (suc (widAt S W j))))
-          (≤-reflexive (sym (fLvlD-0 S W j)))
-frame-recv S W (suc d) j j₀ h =
-  ≤-trans (≤-trans (+-monoʳ-≤ j h)
-                   (sIterD-infl S W d (suc (sizeAt S (suc j)))
-                                (suc (widAt S W j)) (fLvl S W j)))
-          (≤-reflexive (sym (fLvlD-suc S W d j)))
-
 -- AND A WALK THAT HAS NOT SPENT ITS WHOLE PAYLOAD ALLOWANCE HAS ONE
 -- LEVEL IN HAND — which is what the concat FINISH needs and the
 -- thru-outer frame does not.  Both frames report through `frame-step`,
@@ -600,46 +579,104 @@ walk-room S W d k m j j₁ 2≤S hm h =
         (sIterD-mono (suc m) (suc (widAt S W j)) d d k k 2≤S
                      ≤-refl ≤-refl ≤-refl ≤-refl ≤-refl (s≤s hm))))
 
--- j ≤ fLvl S W j, since fLvl S W J = J + fCharge S W J.  The frame's own
--- receipt, absorbed by inflation rather than spent
-j≤fLvl : ∀ (S W j : ℕ) → j ≤ fLvl S W j
-j≤fLvl S W j = m≤m+n j (fCharge S W j)
+-- AND THE SAME UNIT IS THERE AT EVERY DEPTH FOR A FRAME THAT ONLY PAYS
+-- ITS OWN RECEIPT, on both clauses and for two different reasons.  At
+-- zero the width summand sits beside the charge and is worth one on its
+-- own; at a successor the walk runs at least one payload, and one
+-- payload starts from the level above the one it was entered at.  So a
+-- receipt-only frame never reaches its own ceiling, and it gets the
+-- unit without any of the seed slack a subscribing frame has to go
+-- looking for.
+sucfLvl≤fLvlD : ∀ (S W d J : ℕ) → suc (fLvl S W J) ≤ fLvlD S W d J
+sucfLvl≤fLvlD S W zero J =
+  ≤-trans (≤-trans (≤-reflexive (+-comm 1 (fLvl S W J)))
+                   (+-monoʳ-≤ (fLvl S W J) (s≤s z≤n)))
+          (≤-reflexive (sym (fLvlD-0 S W J)))
+sucfLvl≤fLvlD S W (suc d) J =
+  ≤-trans (≤-trans (sLvlD-infl S W d K (suc (fLvl S W J)))
+                   (sIterD-infl S W d K (widAt S W J)
+                      (sLvlD S W d K (suc (fLvl S W J)))))
+          (≤-reflexive (sym (trans (fLvlD-suc S W d J)
+                                   (sIterD-suc S W d K (widAt S W J)
+                                      (fLvl S W J)))))
+  where
+  K = suc (sizeAt S (suc J))
+
+frame-recv-sadd : ∀ (S W d j j₀ : ℕ) → j₀ ≤ fCharge S W j →
+  suc (j + j₀) ≤ fLvlD S W d j
+frame-recv-sadd S W d j j₀ h =
+  ≤-trans (s≤s (+-monoʳ-≤ j h)) (sucfLvl≤fLvlD S W d j)
+
+frame-nil-sadd : ∀ (S W d j : ℕ) → suc (j + 0) ≤ fLvlD S W d j
+frame-nil-sadd S W d j = frame-recv-sadd S W d j 0 z≤n
+
+-- A SUBSCRIBING FRAME'S OWN LEVEL, AND THE UNIT ITS CLOSURE READING
+-- NEEDS.  A frame reports at its own entry level, and the `suc d`
+-- clause of `fLvlD` starts its walk from `fLvl S W j` instead -- a
+-- whole frame charge higher, and never less than one.  Crossing that
+-- gap by plain monotonicity in the seed discards the unit; crossing it
+-- through `sIterD-sadd` collects it.  That is what a head that
+-- SUBSCRIBES has to spend, and the only thing it has: the values it
+-- emits are priced by the walk rather than by the frame, so their
+-- closure reading -- the caps reading times the cap -- lands one level
+-- above the caps report and has nothing else to pay out of.
+--
+-- The strict receipt premise is free where it is spent.  A thru-outer
+-- reports no receipt of its own at all, so `j₀` is zero there and
+-- `fCharge` is a successor by construction.
+frame-step-sadd : ∀ (S W d j j₀ j₁ : ℕ) → 2 ≤ S →
+  suc j₀ ≤ fCharge S W j →
+  (j + j₀) + j₁
+    ≤ sIterD S W d (suc (sizeAt S (suc j))) (suc (widAt S W j)) (j + j₀) →
+  suc (j + (j₀ + j₁)) ≤ fLvlD S W (suc d) j
+frame-step-sadd S W d j j₀ j₁ 2≤S rcpt walk =
+  ≤-trans
+    (≤-trans (≤-trans (≤-reflexive (cong suc (sym (+-assoc j j₀ j₁))))
+                      (s≤s walk))
+             (sIterD-sadd {S} {W} {j + j₀} (suc (widAt S W j)) d
+                (suc (sizeAt S (suc j))) 2≤S))
+    (≤-trans (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d
+                (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j)))
+                2≤S ≤-refl ≤-refl seed ≤-refl ≤-refl ≤-refl)
+             (≤-reflexive (sym (fLvlD-suc S W d j))))
+  where
+  seed : suc (j + j₀) ≤ fLvl S W j
+  seed = ≤-trans (≤-reflexive (sym (+-suc j j₀))) (+-monoʳ-≤ j rcpt)
 
 -- A DRAIN INSIDE A FRAME, which is `walk-room` carried the rest of the
--- way home.  `mergeAllDrain-caps` reports its walk in `sIterD` currency at
--- the budget the frame RE-READ; the enclosing `innerFinish-caps` has to
--- report in `fLvlD` at one higher depth, and this is that conversion.
---
--- Note what does NOT appear: `frame-step`, and any explicit `fCharge`
--- receipt.  The `suc j₁` is already what `walk-room` buys — one spare
--- payload slot is worth one level — and `fLvlD`'s own base point
--- `fLvl S W j` absorbs the frame's charge by plain inflation.  So the
--- frame pays for itself out of the room the queue did not use.
+-- way home with the seed unit kept.  `mergeAllDrain-caps` reports its
+-- walk in `sIterD` currency at the budget the frame RE-READ; the
+-- enclosing `innerFinish-caps` has to report in `fLvlD` at one higher
+-- depth, and this is that conversion.  The `suc j₁` is what `walk-room`
+-- buys -- one spare payload slot is worth one level -- and it is
+-- separate from the seed unit, which is the frame's own charge.
 --
 -- `hk` is FREE at the call site rather than an extra burden: a frame
--- hands its drain the REFRESHED budget `sizeAt S (suc j)`, exactly as
--- `stepFrame-caps`'s thru-outer clause hands `thruWalk-caps` the same
--- thing, so the reported `k` IS `frameBud c j = suc (sizeAt S (suc j))`
--- and `hk` is `≤-refl`
-concat-frame : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S →
+-- hands its drain the REFRESHED budget, exactly as `stepFrame-caps`'s
+-- thru-outer clause hands `thruWalk-caps` the same thing, so the
+-- reported `k` IS `frameBud c j` and `hk` is `≤-refl`.
+concat-frame-sadd : ∀ (S W d k m j j₁ : ℕ) → 2 ≤ S →
   m ≤ widAt S W j →
   k ≤ suc (sizeAt S (suc j)) →
   j + j₁ ≤ sIterD S W d k m j →
-  j + suc j₁ ≤ fLvlD S W (suc d) j
-concat-frame S W d k m j j₁ 2≤S hm hk h =
+  suc (j + suc j₁) ≤ fLvlD S W (suc d) j
+concat-frame-sadd S W d k m j j₁ 2≤S hm hk h =
   ≤-trans
     (≤-trans
-      -- the queue-length index up to the full `suc (widAt S W j)`
-      (walk-room S W d k m j j₁ 2≤S hm h)
-      -- `k` up to the budget `fLvlD`'s `suc d` clause reads
-      (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d k
-         (suc (sizeAt S (suc j))) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl hk ≤-refl))
+      (s≤s (≤-trans
+             (walk-room S W d k m j j₁ 2≤S hm h)
+             (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d k
+                (suc (sizeAt S (suc j))) 2≤S ≤-refl ≤-refl ≤-refl ≤-refl hk ≤-refl)))
+      (sIterD-sadd {S} {W} {j} (suc (widAt S W j)) d
+         (suc (sizeAt S (suc j))) 2≤S))
     (≤-trans
-      -- and the entry level from `j` up to `fLvl S W j`
       (sIterD-mono (suc (widAt S W j)) (suc (widAt S W j)) d d
          (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j))) 2≤S ≤-refl ≤-refl
-         (j≤fLvl S W j) ≤-refl ≤-refl ≤-refl)
+         seed ≤-refl ≤-refl ≤-refl)
       (≤-reflexive (sym (fLvlD-suc S W d j))))
+  where
+  seed : suc j ≤ fLvl S W j
+  seed = ≤-trans (≤-reflexive (+-comm 1 j)) (+-monoʳ-≤ j (s≤s z≤n))
 
 ------------------------------------------------------------------
 -- § 7.  THE TWO ENTRIES THAT SUBSCRIBE NOTHING.
