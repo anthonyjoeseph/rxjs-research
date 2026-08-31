@@ -215,14 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the park site that must issue the ceiling it stores** — exactly
-  one arm writes a `mergeAll` queue, the gate-shut arm of the inner
-  consume, so once the drain reads its entry off a stored ceiling
-  there is a single producer to satisfy and no census to run. That
-  arm's own frame holds a ceiling with an operator to spare, which is
-  the level-jump lemma's premise verbatim; the leg is that descent
-  plus carrying the new field across every writer of the node table,
-  which is where the cost actually lands.
+- **the two ends of the carried ceiling: the writer and the reader** —
+  the invariant now rides with the store, quantified over the level
+  rather than held at one, so nothing has to climb it and the threading
+  is done. What is open is the pair it left. One is the frame leaf: a
+  step moves the state, and exactly one of the five arms writes a queue
+  at all. The other is the drain reading its entry back out, which
+  wants the postulate it sits in turned into a body over smaller ones —
+  eight conjuncts a cons cell, of which the ceiling is the one the
+  store now answers. Take the writer first: it is the arm whose own
+  frame holds a ceiling with an operator to spare.
 
 - **the store conjuncts of the emitted-inner price, which nothing has
   ever asked a question of** — the value half of `sight-thru-val` now
@@ -250,14 +252,24 @@ does not fit is a finding about the shared statement, not about the head.
   the `from-inner` head of the drain law, the only frame that names a node. The
   queue now carries a stored ceiling, the reached-level form having been
   refuted in the gas currency, so what is left is a producer for that field.
+- **`walk-store-ceil-frame`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
+  frame keeps the parked terms' ceiling under a fixed level. Four of the five
+  arms forward what they are handed; the fifth writes a queue, and nothing has
+  instantiated that the fifth keeps it.
+
+- **`entry-store-ceil`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a cascade
+  round begins at a store the previous round left, so the invariant is claimed
+  rather than derived at the entry. Nothing has instantiated it and no producer
+  is named.
+
 - **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading
   vacuously wherever the consume has been instantiated.
-- **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED×2, PROBED`:
-  the drain's ENTRY half, a claim about the payload's emitted VALUES. The
-  fold is now inhabited at the duplicating family that refuted its
-  predecessor, and at three layers of it.
+- **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED×2, PROBED`: the
+  drain's ENTRY half, a claim about the payload's emitted VALUES. The fold is
+  now inhabited at the duplicating family that refuted its predecessor, and at
+  three layers of it.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
