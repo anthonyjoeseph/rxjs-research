@@ -214,16 +214,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the arrival family's `arrCapAt` denomination** — both cheap repairs
-  of the drain's queue conjuncts are now machine-refuted: leaving them
-  at the entry cap, and raising them to the walk's level and re-entering
-  the family one level up. What kills the second is the DENOMINATION and
-  not the step — the arrival family answers at the cap it was asked at
-  stepped its own SIZE many times, so entering it one level up squares
-  the index it answers at, while the shelf can only offer a count the
-  program fixes. So the leg restates that family the way the caps face
-  beside it is already proven to work: invariant at the stepped cap, own
-  increment reported, conclusion at the SUM, no arrival cap in it.
+- **STOPPED: the level-in-the-cap region has closed a FOURTH
+  subdivision** — leaving the drain's conjuncts at the entry cap;
+  absorbing the level by composing steps; reading the caps premises at
+  a stepped cap with the grant left at the entry one; and now raising
+  the conjuncts and re-entering the arrival family one level up, which
+  its `arrCapAt` denomination refuses by a RATE. That is past the
+  convergence test's stop condition, so a fifth split is not the
+  answer and this leg is a question rather than work: does the level
+  stop being carried by the cap, or does this family report an
+  increment the way the caps face beside it is proven to? Legs below
+  are independent of the answer.
 
 - **the map head, against the mirror that already pays for it** — the
   frame law reports its climb in `fCharge`, which is the currency the
@@ -283,7 +284,7 @@ does not fit is a finding about the shared statement, not about the head.
   and wrap the subject in one level each. It reads the fit the fold carries,
   which is what a value list quantified freely could not give it.
 - **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
+  `REFUTED×2, DEAD ROUTE×3, PROBED×2, RECOVERY`: the admissibility boolean over
   any subscription's whole burst, read one caps level up. At the map that
   refutes the flat reading the levelled one holds by thirty-odd orders of
   magnitude, so the crossing is closed and what is left is the induction.

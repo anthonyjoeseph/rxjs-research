@@ -4500,13 +4500,24 @@ postulate
   --   to beat a bound the caps face spends everywhere.  A key that
   --   dominates an emission is therefore not a key at this cap, and the
   --   cap has to move -- which is the LEVEL and nothing else.
+  -- REFUTED: `Refuted.Arr-Cap-Step.arr-cap-step-absurd` closes the
+  --   FOURTH subdivision of this region -- raising the drain's queue
+  --   conjuncts to the walk's level and re-entering this family one
+  --   level up.  What refuses it is this statement's DENOMINATION: it
+  --   answers at the cap it was asked at stepped that cap's own SIZE
+  --   many times, so entering one level up squares the index it
+  --   answers at, against an index the program's count fixes.  Four
+  --   closed subdivisions is past the convergence test's own stop
+  --   condition, so what is owed here is a decision about the
+  --   mechanism and not a fifth split: the level has to stop being
+  --   carried by the cap at all, or this family has to report an
+  --   increment the way the caps face beside it is proven to.
   -- DEAD ROUTE: reading the caps premises at a stepped cap while the
   --   grant stays at the entry one -- the cheap form of the level,
   --   confined to this family and needing no instant index.  The merge
   --   step spends the arrival's closure size AS the grant's exponent,
   --   so the two occurrences of the cap are one quantity and the split
-  --   is not a split.  This is the third closed subdivision of the same
-  --   region, which is what puts the finding on the mechanism.
+  --   is not a split.
   -- PROBED: `Probed.PushVals-Caps`, whose coverage and its boundary
   --   are stated at `pushVals-caps-burstW` below.
   -- PROBED: `Probed.Burst-Nest-Level` reaches the region the flat
