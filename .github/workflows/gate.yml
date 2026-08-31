@@ -1,0 +1,64 @@
+name: Gate
+
+# `make gate` is this repo's merge gate (see CLAUDE.md). On a fresh checkout
+# there is never a `.gate-heavy-stamp` (it's gitignored — local dev-loop
+# state only), so `make gate` always finds itself in the "cold-cache case"
+# and takes the full `gate-heavy` path: every cheap check, the whole Agda
+# tower, refuted, probed, and the bug cache. That is the point — CI always
+# gets the strong guarantee, never the light-gate bet on unchanged consumers.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    # A cold full gate has run 13m-35m at recorded tower sizes and grows with
+    # the tower (typecheck-performance-numbers.md). Toolchain install adds more
+    # on a cache miss. Generous on purpose; tighten once real runs land.
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Building Agda 2.8.0 from source (cabal) is the expensive, cacheable
+      # part of toolchain setup; the stdlib clone is small but free to cache
+      # alongside it. Keyed on the install script so a version bump there
+      # busts the cache automatically.
+      - name: Cache Agda toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal
+            ~/agda-stdlib-2.3
+          key: agda-toolchain-${{ runner.os }}-${{ hashFiles('scripts/install-agda.sh') }}
+          restore-keys: |
+            agda-toolchain-${{ runner.os }}-
+
+      - name: Install Agda toolchain
+        run: bash scripts/install-agda.sh
+
+      - name: Add toolchain to PATH
+        run: |
+          echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
+          echo "LC_ALL=C.UTF-8" >> "$GITHUB_ENV"
+          echo "LANG=C.UTF-8" >> "$GITHUB_ENV"
+
+      # A cold full-tower check has peaked near this container's RAM ceiling
+      # on one deeply-nested-mutual-block module and been OOM-killed (see
+      # .claude/hooks/session-start.sh, which carries the same fix locally).
+      - name: Enable swap
+        run: |
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
+      - name: make gate
+        run: make gate
