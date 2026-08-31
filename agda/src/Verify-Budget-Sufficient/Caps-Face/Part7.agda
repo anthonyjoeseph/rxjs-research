@@ -3814,6 +3814,18 @@ postulate
 -- exponential room this face runs on is index-aligned by construction,
 -- its step lemma pricing no summand at the cap after the one bounded.
 --
+-- AND THE PATH PREMISE IS NOT A CONVENIENCE.  A charge naming the
+-- program alone cannot hold against a path built by hand: the path is
+-- universally quantified, a frame carries its own function, and a
+-- frame whose function wraps twenty times installs a node twenty deep
+-- against a program that never mentions it.  So the unconditional form
+-- is FALSE and the conditioned one replaces it rather than weakening
+-- it.  The premise costs the consumer nothing -- the walk's own caller
+-- derives it from the caps invariant it already holds, one
+-- application, so it is a fact the round has rather than a fact the
+-- round must acquire.
+--
+-- REFUTED: Refuted.Chain-Step-Nodes
 -- REFUTED: Refuted.Chain-Step-Live-Additive
 -- DEAD ROUTE: spending the unconditional live-growth bound and
 --   discharging its three disjuncts against the entry cap.  Two go;
@@ -3830,28 +3842,46 @@ postulate
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
     foldr (λ l acc → liveNest l ⊔ acc) 0
           (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ (nestUnit e sl + nestIncAt e sl id)
 
+-- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the second
+--   cascade of two reachable families, taking the chain the evaluator
+--   itself presents rather than one built by hand -- five to six at the
+--   fold family against a charge of thirty-three, eight to sixteen at
+--   the demand family against seventy-one.  The charge read there is
+--   the SYNTACTIC one the increment is proven to dominate, so a green
+--   row is a stronger claim than the arm.  NOT covered: any family
+--   whose chain deepens the node table by more than one step, and the
+--   increment itself, which computes nowhere.
 postulate
   chainStep-nest-nodesC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
     foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
           (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
           ⊔ (nestUnit e sl + nestIncAt e sl id)
 
+-- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the same two
+--   families and the registry does not move at either -- nine to nine
+--   and two to two.  So the rows say the arm holds and say nothing
+--   about a chain that registers something deep: what a chain writes to
+--   the registry is uncovered, and only the two components beside it
+--   were seen to move at all.
 postulate
   chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
     regsNestMax (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ (nestUnit e sl + nestIncAt e sl id)
 
@@ -3873,17 +3903,18 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
   nestUnit e sl + nestIncAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   storeNestMax (proj₁ (proj₂ (chainStep nextId a path sched st)))
                (proj₂ (proj₂ (chainStep nextId a path sched st))) ≤ S
-chainStep-store≤ {e = e} sl id a nextId S path sched st hsl hsz hinc hS =
+chainStep-store≤ {e = e} sl id a nextId S path sched st hsl hsz hp hinc hS =
   storeNestMax-lub sd′ st′ S SL
-    (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz)
+    (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz hp)
              (⊔-lub (≤-trans (storeNest-live≤  sched st) hS) hinc))
-    (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz)
+    (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz hp)
              (⊔-lub (≤-trans (storeNest-nodes≤ sched st) hS) hinc))
-    (≤-trans (chainStep-nest-regsC  sl id a nextId path sched st hsl hsz)
+    (≤-trans (chainStep-nest-regsC  sl id a nextId path sched st hsl hsz hp)
              (⊔-lub (≤-trans (storeNest-regs≤  sched st) hS) hinc))
   where
   sd′ = proj₁ (proj₂ (chainStep nextId a path sched st))
@@ -3903,22 +3934,25 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   nestUnit e sl + nestIncAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   depthCascade a nextId chains sched st
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
-cascade-depth-go sl id a nextId S []               sched st hsl hsz hinc hS = z≤n
-cascade-depth-go sl id a nextId S ((rid , c) ∷ cs) sched st hsl hsz hinc hS =
-  ⊔-lub (cascade-depth-go sl id a nextId S cs sched st hsl hsz hinc hS)
+cascade-depth-go sl id a nextId S []               sched st hsl hsz hps hinc hS = z≤n
+cascade-depth-go {e = e} sl id a nextId S ((rid , c) ∷ cs) sched st hsl hsz hps hinc hS =
+  ⊔-lub (cascade-depth-go sl id a nextId S cs sched st hsl hsz hpr hinc hS)
         (⊔-lub (chain-depth-sighted sl a nextId S c sched st₀ hsl hS)
                (cascade-depth-go sl id a nextId S cs
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                   (trans (chainStep-slots nextId a c sched st₀) hsl)
-                  hsz hinc
-                  (chainStep-store≤ sl id a nextId S c sched st₀ hsl hsz hinc hS)))
+                  hsz hpr hinc
+                  (chainStep-store≤ sl id a nextId S c sched st₀ hsl hsz hpc hinc hS)))
   where
   st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
   r   = chainStep nextId a c sched st₀
+  hpc = proj₁ (∧-true (pathSz? (Caps.cSize (capsAt e sl id)) c) _ hps)
+  hpr = proj₂ (∧-true (pathSz? (Caps.cSize (capsAt e sl id)) c) _ hps)
 
 cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -3933,6 +3967,8 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hsz =
   cascade-depth-go sl id a nextId (nestCapAt e sl id + nestIncAt e sl id)
     (chainsOf a st) sched (cascadeLatch a st) hsl hsz
+    (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
+      (capsOK?-regs (capsAt e sl id) sched st hok))
     (+-monoˡ-≤ (nestIncAt e sl id) (unit≤cap e sl id))
     (≤-trans (nestOK?-store e sl id sched (cascadeLatch a st)
                (trans (nestOK?-latch e sl id a sched st) hn))

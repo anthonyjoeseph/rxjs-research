@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE THREE ARMS ARE FINALLY PROBEABLE, THROUGH A SURROGATE THE
-  TREE ALREADY PROVES DOMINATED.** They now charge a chain's growth to
-  `nestUnit + nestIncAt`, and the increment sits on the caps
-  recurrence, so neither side computes. But the increment is proven to
-  dominate the size cap, which is proven to dominate `2 + sizeᵉ`, and
-  THAT charge is pure syntax: it runs. So the leg is to instantiate
-  `grown ≤ pre ⊔ (nestUnit + (2 + sizeᵉ))` across the corpus — the
-  family that killed the depth currency first, since it is the one
-  where a mint arrives from a deferred body the arrival never carried.
+- **TWO ARMS ARE COVERED AND THE THIRD IS UNREACHED, WHICH IS NOW THE
+  RISK.** The surrogate charge runs at two reachable families and holds
+  with room — the node table moves at both, the registry at neither.
+  The LIVE fold reads zero before and after at both, so those rows are
+  degenerate and the live arm has no evidence at all. Every family that
+  ever moved it used a path built by hand, which the new premise rules
+  out. So the leg is a REACHABLE program whose chain grows the live
+  fold: a limited merge whose parked inner is drained by the chain, run
+  from a program that contains the path rather than beside one.
 
 - **THE CEILING'S TWO HALVES ARE CHARGED TO TWO COPIES OF THE FUEL,
   AND ONLY ONE COPY IS ESTABLISHED.** Reading the round at the cap PLUS
@@ -265,18 +265,18 @@ does not fit is a finding about the shared statement, not about the head.
   an increment. The tree's bridge puts one copy under the fuel and says nothing
   about the second.
 - **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: a chain's live list against the program rather than
-  against the store it started from. The path PRODUCT the unconditional bound
-  offers cannot supply it, and the depth-additive repair dies at a mint from a
-  deferred body.
-- **`chainStep-nest-nodesC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: the node table after one chain, charged to one
-  instant's increment. Unprobeable as stated — the increment sits on the caps
-  recurrence — but its syntactic surrogate runs.
-- **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: the registry after one chain, charged to one
-  instant's increment. The whole-walk version is proven, but against the entry
-  store times a factor, which is the shape a walk cannot carry.
+  `REFUTED×2, DEAD ROUTE×2`: a chain's live list against the program rather
+  than against the store it started from. The path PRODUCT the unconditional
+  bound offers cannot supply it, and the depth-additive repair dies at a mint
+  from a deferred body.
+- **`chainStep-nest-nodesC`** (Caps-Face/Part7) — FALSITY, `PROBED`: the node
+  table after one chain, charged to one instant's increment. Unprobeable as
+  stated — the increment sits on the caps recurrence — but its syntactic
+  surrogate runs.
+- **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY, `PROBED`: the
+  registry after one chain, charged to one instant's increment. The whole-walk
+  version is proven, but against the entry store times a factor, which is the
+  shape a walk cannot carry.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
