@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NOTHING ABOUT THE SINK IS ASSERTED ANY MORE; WHAT IS LEFT IS THE
-  REGISTRY'S PRICE.** All three share arms are folds now, and writing
-  them found what the old statements were hiding: a sink hands the
-  values to chains whose paths live in the REGISTRY, so a hypothesis
-  about the walked path says nothing about theirs. Two grants and two
-  preservation leaves carry that, and the leg is to stop asserting the
-  preservation half — `chainStep-regsSz` is the same walk one level up
-  from `stepFrame-regsSz`, over the same three functions, and the fold
-  is now written three times in this tree.
+- **THE PRESERVATION HALF IS DOWN TO ITS ONE FRAME.** The whole-chain
+  reading is a body now, over a walk that spends the frame law at each
+  step and the admitted-entry cap at each sink, so what is left of the
+  registry's price is the single frame: a frame registers only TAILS of
+  the path it is walking, and `pathSz?` on `f ↠ p` already carries the
+  tail's own conjunct. The leg is to write that leaf per frame kind —
+  four register nothing, and the one that does registers a tail — which
+  is the same fold shape read one level down, with the receipt now
+  coming from the premise rather than from a walk.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -284,10 +284,6 @@ does not fit is a finding about the shared statement, not about the head.
   potential for the chains a sink fans into. Their factor and depth are the
   registry's, priced by the same cap the walk runs under, and nothing has read
   the claim that the cap's exponential covers them.
-- **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
-  registry stays priced across a WHOLE chain, which a fold over the selection
-  needs and the frame version does not give. The sink's fan-out is what makes
-  it more than an iteration, and nothing has read it.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer

@@ -18,7 +18,7 @@
 -- thing being proven at every frame kind.
 module Verify-Budget-Sufficient.Regs-Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
@@ -47,7 +47,9 @@ open import Verify-Budget-Sufficient.Measures using (thruWrap-vals)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; pathNestD; nest-inflate; dropSource-nest)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?; frameSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (shareAdmit-caps)
+open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -298,6 +300,88 @@ postulate
     regsSz? S (EvalSt.registry st) ≡ true →
     regsSz? S (EvalSt.registry
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st)))))) ≡ true
+
+-- AND THE PRICE SURVIVES A WHOLE CHAIN, which is what a fold over a
+-- selection needs and the frame law alone does not give: the next chain
+-- runs at the state the last one left.  The sink is what makes this more
+-- than the frame law iterated -- the fan-out registers on behalf of
+-- paths the registry already holds, and the admitted list inherits the
+-- registry's own receipt, so the cap the walk entered under is the cap
+-- it leaves under.
+mutual
+  foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (path : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    pathSz? B path ≡ true →
+    regsSz? B (EvalSt.registry st) ≡ true →
+    regsSz? B (EvalSt.registry
+      (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))) ≡ true
+  foldPath-regsSz sf gas id now envSrc root vals evs fin sched st B _ hreg = hreg
+  foldPath-regsSz sf gas id now envSrc (share-sink i) vals evs fin sched st B _ hreg =
+    dispatchShare-regsSz sf gas id now i vals fin sched st B hreg
+  foldPath-regsSz sf gas id now envSrc (f ↠ p) vals evs fin sched st B hpz hreg =
+    foldPath-regsSz sf gas id now envSrc p
+      (proj₁ step) (evs ++ proj₁ (proj₂ step))
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step)))) B
+      hpTail (stepFrame-regsSz sf id now f p vals fin sched st B hpz hreg)
+    where
+    step = stepFrame sf id now f p vals fin sched st
+    hpTail : pathSz? B p ≡ true
+    hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
+                     (proj₂ (∧-true (frameSz? B f)
+                              ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+
+  dispatchShare-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    regsSz? B (EvalSt.registry st) ≡ true →
+    regsSz? B (EvalSt.registry
+      (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))) ≡ true
+  dispatchShare-regsSz sf zero id now i vals fin sched st B hreg = hreg
+  dispatchShare-regsSz sf (suc gas) id now i vals false sched st B hreg =
+    shareGo-regsSz sf gas id now i vals false
+      (shareAdmit i (EvalSt.registry st)) sched st B
+      (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
+  dispatchShare-regsSz {t = t} sf (suc gas) id now i vals true sched st B hreg =
+    dropSource-all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en)))) (toℕ i)
+      (EvalSt.registry (proj₂ (proj₂ GO))) went
+    where
+    GO = shareGo {t = t} sf gas id now i vals true
+           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
+    went : regsSz? B (EvalSt.registry (proj₂ (proj₂ GO))) ≡ true
+    went = shareGo-regsSz sf gas id now i vals true
+             (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B
+             (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
+
+  shareGo-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    all (λ rp → pathSz? B (proj₂ rp)) ps ≡ true →
+    regsSz? B (EvalSt.registry st) ≡ true →
+    regsSz? B (EvalSt.registry
+      (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))) ≡ true
+  shareGo-regsSz sf gas id now i vals fin [] sched st B _ hreg = hreg
+  shareGo-regsSz sf gas id now i vals fin ((rid , p) ∷ ps) sched st B hps hreg
+    with any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ... | true  = shareGo-regsSz sf gas id now i vals fin ps sched st B
+                  (proj₂ (∧-true (pathSz? B p) _ hps)) hreg
+  ... | false =
+    shareGo-regsSz sf gas id now i vals fin ps
+      (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B
+      (proj₂ (∧-true (pathSz? B p) _ hps))
+      (foldPath-regsSz sf gas id now (toℕ i) p vals EVS fin sched st₀ B
+        (proj₁ (∧-true (pathSz? B p) _ hps)) hreg)
+    where
+    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+    EVS = if fin then close (toℕ i) exhausted ∷ [] else []
+    FP  = foldPath sf gas id now (toℕ i) p vals EVS fin sched st₀
 
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the

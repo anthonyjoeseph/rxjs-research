@@ -54,7 +54,7 @@ open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; FrameΦHyp; valsΦ?;
-   stepFrame-nest-Φ; stepFrame-regsSz; Φ-to-bound)
+   stepFrame-nest-Φ; stepFrame-regsSz; foldPath-regsSz; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Live-Nest-Walk using
   (foldPath-nest-live; PathLiveHyp; valsSz?; walk-LiveHyp-go)
@@ -4272,19 +4272,18 @@ chainsNest-all D U (c ∷ cs) h =
                                           (chainsNestD cs))) h))
 
 -- THE REGISTRY STAYS PRICED ACROSS A WHOLE CHAIN, which is what a fold
--- over the selection needs and a single frame's version does not give:
--- the next chain runs at the state the last one left.  A chain
--- registers only tails of paths already legal under the cap, and the
--- sink's fan-out registers only tails of paths the registry already
--- holds, so the cap the walk entered under is the cap it leaves under.
-postulate
-  chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (B : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    pathSz? B path ≡ true →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
-      ≡ true
+-- over the selection needs and the frame law alone does not give: the
+-- next chain runs at the state the last one left.  `chainStep` IS
+-- `foldPath`, so this is the walk read at the arrival's own entry.
+chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  pathSz? B path ≡ true →
+  regsSz? B (EvalSt.registry st) ≡ true →
+  regsSz? B (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
+    ≡ true
+chainStep-regsSz B a nextId path sched st hp hreg =
+  foldPath-regsSz _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st B hp hreg
 
 cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
