@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN IS DOWN TO SIX LEAVES, AND FIVE OF THEM ARE ONE FRAME.**
-  Every whole-walk assertion on `chainStep` is gone: three folds, both
-  their side conditions discharged, and what is left is a frame leaf
-  and a share leaf per arm plus the size step. The leg is the SHARE
-  leaves, taken as one — all three say what a sink's fan-out can leave
-  in one field of the store, all three are charged the registry's join
-  for the same reason, and the registry's own is the one with nothing
-  under it. Their common shape is a selection from the registry
-  re-entered chain by chain, which is a fold this tree has written
-  twice already.
+- **NOTHING ABOUT THE SINK IS ASSERTED ANY MORE; WHAT IS LEFT IS THE
+  REGISTRY'S PRICE.** All three share arms are folds now, and writing
+  them found what the old statements were hiding: a sink hands the
+  values to chains whose paths live in the REGISTRY, so a hypothesis
+  about the walked path says nothing about theirs. Two grants and two
+  preservation leaves carry that, and the leg is to stop asserting the
+  preservation half — `chainStep-regsSz` is the same walk one level up
+  from `stepFrame-regsSz`, over the same three functions, and the fold
+  is now written three times in this tree.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -262,10 +261,10 @@ does not fit is a finding about the shared statement, not about the head.
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
-- **`dispatchShare-nest-live`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
-  share boundary at the live list, carrying the slots and the registry's join
-  for the two mints the walked path does not say. Nothing has read the repaired
-  form.
+- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: the size
+  side condition for the chains a sink fans into, which live in the registry
+  rather than on the walked path. It reads the registry's own size price, and
+  nothing has read it.
 - **`stepFrame-sz`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: one frame's
   size step, at the caps face's own iterate. A frame substitutes and the caps
   face prices substitution at one `sizeStep`, so the emitted values should sit
@@ -274,16 +273,21 @@ does not fit is a finding about the shared statement, not about the head.
   frame stores at the nodes map, under the potential it was handed. Three of
   the five kinds store; the whole-chain surrogate covers the composite at two
   families and discharges none of the premise.
-- **`dispatchShare-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`:
-  the share boundary at the nodes map. The path-denominated reading died here,
-  so the statement carries the registry's join — the term the fan-out actually
-  sits at — and nothing has read the repaired form.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
-  share boundary, where the walk re-enters on every chain at the sink. Their
-  depths are under the registry's join, but nothing has read it.
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  registry stays priced by the size cap across one frame. A frame registers
+  only tails of the path it walks, and a tail of a legal path is legal — but
+  nothing has read it at a frame that registers.
+- **`walk-share-ΦHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  potential for the chains a sink fans into. Their factor and depth are the
+  registry's, priced by the same cap the walk runs under, and nothing has read
+  the claim that the cap's exponential covers them.
+- **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+  registry stays priced across a WHOLE chain, which a fold over the selection
+  needs and the frame version does not give. The sink's fan-out is what makes
+  it more than an iteration, and nothing has read it.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer

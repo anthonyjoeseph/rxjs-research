@@ -22,22 +22,26 @@
 -- REFUTED: Refuted.Share-Sink-Nodes
 module Verify-Budget-Sufficient.Nodes-Nest-Walk where
 
-open import Data.Bool using (Bool; true)
-open import Data.Fin using (Fin)
-open import Data.List using (List; _++_; foldr)
-open import Data.Nat using (ℕ; _⊔_; _≤_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool.ListAction using (any)
+open import Data.Fin using (Fin; toℕ)
+open import Data.List using (List; []; _∷_; _++_; foldr)
+open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_; _≡ᵇ_)
+open import Data.Vec using (lookup)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m)
-open import Data.Product using (_,_; proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
 
-open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent)
+open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Evaluator
-  using (Sched; EvalSt; Path; root; share-sink; _↠_;
-         foldPath; stepFrame; dispatchShare)
+  using (Sched; EvalSt; Path; root; share-sink; _↠_; RegId;
+         foldPath; stepFrame; dispatchShare;
+         shareGo; shareAdmit; shareLatch)
 open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; regsNestMax)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsΦ?; PathΦHyp; stepFrame-nest-Φ; stepFrame-nest-regs)
+  using (valsΦ?; PathΦHyp; DispatchΦHyp; ShareGoΦHyp;
+         stepFrame-nest-Φ; stepFrame-nest-regs; foldPath-nest-regs)
 
 postulate
   -- ONE FRAME'S NODE STORES, under the potential it was handed.  Only
@@ -69,60 +73,113 @@ postulate
         (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ⊔ U
 
-  -- THE SHARE BOUNDARY, and this is the arm the path-denominated
-  -- reading was refuted at.  What the sink fans into is a selection
-  -- from the registry, so the stores those chains make are bounded by
-  -- the registry's join -- which the statement carries, and which is
-  -- what the refuted form was missing rather than a tighter charge.
-  dispatchShare-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-    (vals : List (Val Γ _)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (B U : ℕ) →
-    valsΦ? B U (share-sink {t = t} i) vals ≡ true →
+-- THE WALK, AND THE FAN-OUT IT RE-ENTERS.  The frame clause spends
+-- three facts and no more: the nodes leaf for what this frame stored,
+-- the registry leaf for the term the statement carries, and the
+-- potential's own step law -- which is the same one the registry walk
+-- spends, so the two arms stay in lockstep and a frame kind that broke
+-- one would break both.  The sink's clause spends the registry's whole
+-- fan-out bound, which is a theorem of the registry arm rather than an
+-- assumption of this one.
+mutual
+  foldPath-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (path : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U path vals ≡ true →
+    PathΦHyp sf gas id now B U path vals fin sched st →
     foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
-      (EvalSt.nodes
-        (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
+      (EvalSt.nodes (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
           ⊔ regsNestMax (EvalSt.registry st) ⊔ U
+  foldPath-nest-nodes sf gas id now envSrc root vals evs fin sched st B U hΦ _ =
+    ≤-trans (m≤m⊔n (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))
+                   (regsNestMax (EvalSt.registry st)))
+            (m≤m⊔n _ U)
+  foldPath-nest-nodes sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ hD =
+    dispatchShare-nest-nodes sf gas id now i vals fin sched st B U hD
+  foldPath-nest-nodes sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ (hF , hR) =
+    ≤-trans (foldPath-nest-nodes sf gas id now envSrc p
+               (proj₁ step) (evs ++ proj₁ (proj₂ step))
+               (proj₁ (proj₂ (proj₂ step)))
+               (proj₁ (proj₂ (proj₂ (proj₂ step))))
+               (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
+               (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
+            (⊔-lub (⊔-lub (≤-trans (stepFrame-nest-nodes sf id now f p vals fin sched st B U hΦ)
+                                   (⊔-lub (≤-trans (m≤m⊔n N R) (m≤m⊔n _ U))
+                                          (m≤n⊔m (N ⊔ R) U)))
+                          (≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
+                                   (⊔-lub (≤-trans (m≤n⊔m N R) (m≤m⊔n _ U))
+                                          (m≤n⊔m (N ⊔ R) U))))
+                   (m≤n⊔m (N ⊔ R) U))
+    where
+    step = stepFrame sf id now f p vals fin sched st
+    N = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+    R = regsNestMax (EvalSt.registry st)
 
--- THE WALK, telescoping the two leaves down the path.  The frame
--- clause spends three facts and no more: the nodes leaf for what this
--- frame stored, the registry leaf for the term the statement carries,
--- and the potential's own step law -- which is the same one the
--- registry walk spends, so the two arms stay in lockstep and a frame
--- kind that broke one would break both.
-foldPath-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  (path : Path Γ u t) (vals : List (Val Γ u))
-  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-  valsΦ? B U path vals ≡ true →
-  PathΦHyp sf id now B U path vals fin sched st →
-  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
-    (EvalSt.nodes (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
-    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-        ⊔ regsNestMax (EvalSt.registry st) ⊔ U
-foldPath-nest-nodes sf gas id now envSrc root vals evs fin sched st B U hΦ _ =
-  ≤-trans (m≤m⊔n (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))
-                 (regsNestMax (EvalSt.registry st)))
-          (m≤m⊔n _ U)
-foldPath-nest-nodes sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ _ =
-  dispatchShare-nest-nodes sf gas id now i vals fin sched st B U hΦ
-foldPath-nest-nodes sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ (hF , hR) =
-  ≤-trans (foldPath-nest-nodes sf gas id now envSrc p
-             (proj₁ step) (evs ++ proj₁ (proj₂ step))
-             (proj₁ (proj₂ (proj₂ step)))
-             (proj₁ (proj₂ (proj₂ (proj₂ step))))
-             (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
-             (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
-          (⊔-lub (⊔-lub (≤-trans (stepFrame-nest-nodes sf id now f p vals fin sched st B U hΦ)
-                                 (⊔-lub (≤-trans (m≤m⊔n N R) (m≤m⊔n _ U))
-                                        (m≤n⊔m (N ⊔ R) U)))
-                        (≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
-                                 (⊔-lub (≤-trans (m≤n⊔m N R) (m≤m⊔n _ U))
-                                        (m≤n⊔m (N ⊔ R) U))))
-                 (m≤n⊔m (N ⊔ R) U))
-  where
-  step = stepFrame sf id now f p vals fin sched st
-  N = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-  R = regsNestMax (EvalSt.registry st)
+  -- THE SINK, and none of its three arms touches the node map itself.
+  -- Out of dispatch gas the state is returned untouched; the latch
+  -- writes the completed and dying ledgers; and the finishing arm
+  -- rewrites the registry and the live set.  So the whole of the map's
+  -- growth is the fold's.
+  dispatchShare-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    DispatchΦHyp sf gas id now B U i vals fin sched st →
+    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+      (EvalSt.nodes (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
+      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+          ⊔ regsNestMax (EvalSt.registry st) ⊔ U
+  dispatchShare-nest-nodes sf zero id now i vals fin sched st B U _ =
+    ≤-trans (m≤m⊔n (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))
+                   (regsNestMax (EvalSt.registry st)))
+            (m≤m⊔n _ U)
+  dispatchShare-nest-nodes sf (suc gas) id now i vals false sched st B U hS =
+    shareGo-nest-nodes sf gas id now i vals false
+      (shareAdmit i (EvalSt.registry st)) sched st B U hS
+  dispatchShare-nest-nodes sf (suc gas) id now i vals true sched st B U hS =
+    shareGo-nest-nodes sf gas id now i vals true
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B U hS
+
+  -- ONE ADMITTED REGISTRATION AT A TIME.  The join telescopes on both
+  -- components at once: the map is bounded by the map it entered on
+  -- joined with the registry it entered on, and the REGISTRY it entered
+  -- on is bounded by the one this fold started at -- which is the
+  -- registry arm's own walk theorem, spent here rather than assumed.
+  shareGo-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    ShareGoΦHyp sf gas id now B U i vals fin ps sched st →
+    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+      (EvalSt.nodes (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st))))
+      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+          ⊔ regsNestMax (EvalSt.registry st) ⊔ U
+  shareGo-nest-nodes sf gas id now i vals fin [] sched st B U _ =
+    ≤-trans (m≤m⊔n (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))
+                   (regsNestMax (EvalSt.registry st)))
+            (m≤m⊔n _ U)
+  shareGo-nest-nodes sf gas id now i vals fin ((rid , p) ∷ ps) sched st B U hS
+    with any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ... | true  = shareGo-nest-nodes sf gas id now i vals fin ps sched st B U hS
+  ... | false =
+    ≤-trans (shareGo-nest-nodes sf gas id now i vals fin ps
+               (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B U (proj₂ (proj₂ hS)))
+            (⊔-lub (⊔-lub (foldPath-nest-nodes sf gas id now (toℕ i) p vals
+                             EVS fin sched st₀ B U
+                             (proj₁ hS) (proj₁ (proj₂ hS)))
+                          (≤-trans (foldPath-nest-regs sf gas id now (toℕ i) p vals
+                                      EVS fin sched st₀ B U
+                                      (proj₁ hS) (proj₁ (proj₂ hS)))
+                                   (⊔-lub (≤-trans (m≤n⊔m N R) (m≤m⊔n _ U))
+                                          (m≤n⊔m (N ⊔ R) U))))
+                   (m≤n⊔m (N ⊔ R) U))
+    where
+    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+    EVS = if fin then close (toℕ i) exhausted ∷ [] else []
+    FP  = foldPath sf gas id now (toℕ i) p vals EVS fin sched st₀
+    N = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+    R = regsNestMax (EvalSt.registry st)
