@@ -43,7 +43,7 @@ open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_)
-open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤ᵇ⇒≤)
+open import Data.Nat.Properties using (≤-refl; ≤⇒≤ᵇ; ≤ᵇ⇒≤)
 open import Data.Product using (proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
@@ -51,9 +51,9 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; subst)
 
 open import Rx.Prim using (Gas; g0; gasPad)
 open import Rx.Exp
-  using (Ctx; Closed; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; input;
-  inputsBelowᵉ; syncSizeᵉ)
-open import Rx.Nest-Depth using (nestDᵉ)
+  using (Ctx; Closed; Fn; Val; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; input;
+  inputsBelowᵉ; syncSizeᵉ; syncSizeᵛ)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; root; _↠_; thru-outer; mergeAllᵒ;
@@ -171,3 +171,25 @@ sight-all-fit-slot-absurd :
 sight-all-fit-slot-absurd fit =
   ≤⇒≤ᵇ (subst (λ z → deliveredOf (dDup 6) tt ≤ z) G≡16
           (proj₁ (proj₁ fit)))
+
+----------------------------------------------------------------------
+-- AND THE LEAF UNDER IT DIES AT THE SAME REFERENCE, one shelf down.
+-- The fit's grant at least reads the PAYLOAD's syntax; the per-value
+-- grant reads the ARRIVAL, and a reference has neither depth nor size
+-- to read, so at the root it is pinned at zero against every delivery
+-- in the column above.
+----------------------------------------------------------------------
+
+ref : Val Γₛ (obs (obs natᵗ))
+ref = input fzero
+
+Gv : ℕ
+Gv = 2 ^ syncSizeᵛ (obs (obs natᵗ)) ref
+       * (pathNestD κ + nestDᵛ (obs (obs natᵗ)) ref)
+
+Gv≡0 : Gv ≡ 0
+Gv≡0 = refl
+
+sight-thru-val-slot-absurd :
+  (∀ (G′ : ℕ) → Gv ≤ G′ → deliveredOf (dDup 6) tt ≤ G′) → ⊥
+sight-thru-val-slot-absurd h = ≤⇒≤ᵇ (h Gv ≤-refl)

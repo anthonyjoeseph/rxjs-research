@@ -862,6 +862,29 @@ subscribeE-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 subscribeE-slots g b κ id now sched st =
   slotsEq (subscribeE-keeps g b κ id now sched st)
 
+-- and the same two faces at the wrap's own steps, which is what a
+-- reading keyed on the TELESCOPE needs when it is threaded over a
+-- burst: the grant names the slots, and every step has to be shown
+-- reading the same ones
+thruConsume-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (proj₂ (thruConsume g op nid κ id now o sched st))))
+    ≡ Sched.slots sched
+thruConsume-slots g op nid κ id now o sched st =
+  slotsEq (thruConsume-keeps g op nid κ id now o sched st)
+
+stepFrame-slots : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (g : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots (proj₁ (proj₂ (proj₂ (proj₂
+    (stepFrame g id now f κ vals fin sched st)))))
+    ≡ Sched.slots sched
+stepFrame-slots g id now f κ vals fin sched st =
+  slotsEq (stepFrame-keeps g id now f κ vals fin sched st)
+
 subscribeE-connected-mono : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (b : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) (s : Source) →

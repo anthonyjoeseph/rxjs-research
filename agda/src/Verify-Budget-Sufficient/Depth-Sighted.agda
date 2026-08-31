@@ -22,7 +22,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; cong; cong₂; t
 
 open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; syncSizeᵛ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
   input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; inputsBelowᵉ; inputsBelowᵗ)
-open import Rx.Slots using (scripted; shared)
+open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Inputs-Below using (ib-unfoldμ)
 open import Decide using (∧ʳ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
@@ -35,6 +35,8 @@ open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (pushFitOK; thruFitOK; nestDᵛˢ; nodesMax; nodeNestAt)
+open import Verify-Budget-Sufficient.Keeps-Ring using
+  (thruConsume-slots; stepFrame-slots; subscribeE-slots)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
    storeNestMax-install; storeNestMax-register; nestUnit; nodeNest;
@@ -202,6 +204,44 @@ postulate
                               + k * slotWrapSum (Sched.slots sched))
                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
+-- THE GRANT READ AT ONE EMITTED VALUE, and then at a list and at a
+-- stream.  These carry no STATE, which is the point of separating them
+-- from the fit: what the outer frame needs of the payload's burst is a
+-- property of the values and the telescope, so the threading the fit
+-- does is discharged once here rather than being carried into the
+-- payload's own descent.
+--
+-- AND THE SLOT SUMMAND IS THE VALUE'S, NOT THE FOLD'S.  An emitted
+-- inner may be a slot REFERENCE, which carries neither depth nor size
+-- to read, so the arrival-only reading is pinned at a constant -- at
+-- the root it is pinned at ZERO -- while subscribing it runs the
+-- slot's definition.  `inputsBelowᵉ` says which slots the value may
+-- name and the wrap sum is what they hold, so the pair of them is the
+-- charge, and it is read against the telescope the step is taken over
+-- rather than against a schedule.
+-- REFUTED: `Refuted.Sight-All-Fit-Slot` pins it at the reference,
+--   where the arrival-only grant is zero against a delivery of
+--   sixty-four, and checks that the summand-carrying grant holds at
+--   the deepest of those rows.
+ValFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
+  (κ : Path Γ u t) → Val Γ (obs u) → Set
+ValFit {u = u} k sl G κ o =
+  T (inputsBelowᵉ k o)
+  × (2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o)
+       + k * slotWrapSum sl ≤ G)
+
+ValsFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
+  (κ : Path Γ u t) → List (Val Γ (obs u)) → Set
+ValsFit k sl G κ []       = ⊤
+ValsFit k sl G κ (o ∷ os) = ValFit k sl G κ o × ValsFit k sl G κ os
+
+StreamFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
+  (κ : Path Γ u t) → Stream Γ (obs u) → Set
+StreamFit k sl G κ []                       = ⊤
+StreamFit {Γ = Γ} {u = u} k sl G κ (em ∷ ems) =
+  ValsFit k sl G κ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+  × StreamFit k sl G κ ems
+
 -- WHAT ONE INNER COSTS TO SUBSCRIBE, and it is a claim about a VALUE
 -- rather than about the payload's syntax -- which is why no reading of
 -- the payload establishes it.  The outer frame does not FORWARD what
@@ -215,65 +255,51 @@ postulate
 --   no constant charge closes it.
 postulate
   sight-thru-val : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (k : ℕ) (sl : Slots Γ) (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+    (κ : Path Γ u t) (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) →
-    2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o) ≤ G →
+    Sched.slots sched ≡ sl →
+    ValFit k sl G κ o →
     let rc = thruConsume g op nid κ id now o sched st in
     (nestDᵛˢ (proj₁ rc) ≤ G)
     × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G)
     × ((j : NodeId) → nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G)
 
--- THE GRANT READ AT ONE EMITTED VALUE, and then at a list and at a
--- stream.  These carry NO state, which is the point of separating them
--- from the fit: what the outer frame needs of the payload's burst is a
--- property of the values alone, so the state threading the fit does is
--- discharged once here rather than being carried into the payload's
--- own descent.
-ValFit : ∀ {n} {Γ : Ctx n} {u t} (G : ℕ) (κ : Path Γ u t) → Val Γ (obs u) → Set
-ValFit {u = u} G κ o =
-  2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o) ≤ G
-
-ValsFit : ∀ {n} {Γ : Ctx n} {u t} (G : ℕ) (κ : Path Γ u t) →
-  List (Val Γ (obs u)) → Set
-ValsFit G κ []       = ⊤
-ValsFit G κ (o ∷ os) = ValFit G κ o × ValsFit G κ os
-
-StreamFit : ∀ {n} {Γ : Ctx n} {u t} (G : ℕ) (κ : Path Γ u t) →
-  Stream Γ (obs u) → Set
-StreamFit G κ []                       = ⊤
-StreamFit {Γ = Γ} {u = u} G κ (em ∷ ems) =
-  ValsFit G κ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
-  × StreamFit G κ ems
-
 -- AND THE THREADING IS A FOLD OVER THAT, spending one value bound per
--- step: the grant does not move, so the state the previous consume
--- left is only where the next one is read, never what it is read
--- against.
+-- step: neither the grant nor the telescope moves, so the state the
+-- previous consume left is only where the next one is read, never what
+-- it is read against.
 thruFit-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-  (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (k : ℕ) (sl : Slots Γ) (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
   (sched : Sched Γ) (st : EvalSt e) →
-  ValsFit G κ os → thruFitOK G g op nid κ id now os sched st
-thruFit-vals G g op nid κ id now []       sched st _        = tt
-thruFit-vals G g op nid κ id now (o ∷ os) sched st (h , hs) =
+  Sched.slots sched ≡ sl →
+  ValsFit k sl G κ os → thruFitOK G g op nid κ id now os sched st
+thruFit-vals k sl G g op nid κ id now []       sched st hsl _        = tt
+thruFit-vals k sl G g op nid κ id now (o ∷ os) sched st hsl (h , hs) =
   proj₁ hv , proj₁ (proj₂ hv) , proj₂ (proj₂ hv)
-  , thruFit-vals G g op nid κ id now os
-      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc))) hs
+  , thruFit-vals k sl G g op nid κ id now os
+      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc)))
+      (trans (thruConsume-slots g op nid κ id now o sched st) hsl) hs
   where
   rc = thruConsume g op nid κ id now o sched st
-  hv = sight-thru-val G g op nid κ id now o sched st h
+  hv = sight-thru-val k sl G g op nid κ id now o sched st hsl h
 
 pushFit-stream : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
-  (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (k : ℕ) (sl : Slots Γ) (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
+  (κ : Path Γ u t) (id : Id) (now : Tick) (str : Stream Γ (obs u))
   (sched : Sched Γ) (st : EvalSt e) →
-  StreamFit G κ str → pushFitOK G g op nid κ id now str sched st
-pushFit-stream G g op nid κ id now []         sched st _        = tt
-pushFit-stream {Γ = Γ} {u = u} G g op nid κ id now (em ∷ ems) sched st (h , hs) =
-  thruFit-vals G g op nid κ id now (proj₁ sp) sched st h
-  , pushFit-stream G g op nid κ id now ems
-      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) hs
+  Sched.slots sched ≡ sl →
+  StreamFit k sl G κ str → pushFitOK G g op nid κ id now str sched st
+pushFit-stream k sl G g op nid κ id now []         sched st hsl _        = tt
+pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
+               hsl (h , hs) =
+  thruFit-vals k sl G g op nid κ id now (proj₁ sp) sched st hsl h
+  , pushFit-stream k sl G g op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf))))
+      (trans (stepFrame-slots g id now (thru-outer op nid) κ
+                (proj₁ sp) (proj₂ (proj₂ sp)) sched st) hsl)
+      hs
   where
   sp = splitEvents {A = Val Γ u} (InstEmit.events em)
   sf = stepFrame g id now (thru-outer op nid) κ
@@ -311,8 +337,9 @@ postulate
         sched₁ = proj₂ (mintNode sched)
         st₀    = installNode nid (allFresh u op lim) st
         r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-    in StreamFit (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-                    + k * slotWrapSum (Sched.slots sched)) κ (proj₁ r)
+    in StreamFit k (Sched.slots sched)
+         (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+            + k * slotWrapSum (Sched.slots sched)) κ (proj₁ r)
 
 sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
@@ -326,10 +353,11 @@ sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
                   + k * slotWrapSum (Sched.slots sched))
        g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
 sight-all-fit {u = u} g k op lim b κ bid now sched st ok =
-  pushFit-stream
+  pushFit-stream k (Sched.slots sched)
     (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
        + k * slotWrapSum (Sched.slots sched))
     g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    (subscribeE-slots g b (thru-outer op nid ↠ κ) bid now sched₁ st₀)
     (sight-all-stream g k op lim b κ bid now sched st ok)
   where
   nid    = proj₁ (mintNode sched)

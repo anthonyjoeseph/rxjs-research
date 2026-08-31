@@ -214,13 +214,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the entry half's two leaves, now that the state threading is
-  checked** — `sight-all-fit` is a body, so what is owed is a claim
-  about VALUES with no state in it (`sight-all-stream`) and a claim
-  about subscribing ONE of them (`sight-thru-val`). Take the second
-  first: it is where the refuted additive currency was replaced, its
-  sides compute at a concrete inner, and the payload's own descent
-  cannot be aimed until it is known what one emitted value costs.
+- **what ONE emitted inner costs, which is the whole entry half now** —
+  the per-value grant is refuted twice over at a slot reference and
+  carries the wrap summand as a result, so `sight-thru-val`'s statement
+  is settled and nothing above it is. It is the sync-currency price of
+  a subscription: the arrival's own tower against what substituting the
+  slot's definition delivers. Its sides compute, so probe the margin at
+  the refuting family before grinding, and `sight-all-stream` cannot be
+  aimed until the price is known.
 
 - **the other three closure arms, by the ratio the map arm just paid** —
   the map head fell without any closure mirror of the evaluator at all:
@@ -249,9 +250,10 @@ does not fit is a finding about the shared statement, not about the head.
   Every conjunct but one now comes off the store predicate at the walk's own
   level; the residue is the REACHED level for a queued entry's nest.
 - **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED`: what ONE emitted
-  inner costs the outer frame to subscribe, in the sync currency. The additive
-  form is refuted — an emitted value outruns the observable it came from by the
-  substitutions the step function performs — and nothing has instantiated this.
+  inner costs the outer frame to subscribe, in the sync currency. Refuted
+  twice: additively, and at a slot reference where the arrival-only grant reads
+  zero. The repaired form carries the wrap summand and nothing has instantiated
+  it.
 - **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
   the drained values come out of the node's queue. Instantiated at a parked
