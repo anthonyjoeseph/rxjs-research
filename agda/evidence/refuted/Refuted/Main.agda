@@ -170,3 +170,4 @@ open import Refuted.Thru-Park-Free
 -- report it as dead weight.
 open import Refuted.Demand-Programs
   using (progC; sucGC; sucGW)
+open import Refuted.Sight-Fit-Scan using (figs≡; ok₂; scan-fit-absurd)

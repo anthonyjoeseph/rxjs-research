@@ -113,17 +113,33 @@ valsFitG-le k sl G G′ P P′ t (o ∷ os) hp hg (h , hs) =
 -- a weaker hypothesis there, and the ceiling both are spent under
 -- already has the same summand.
 --
--- AND THE PAYLOAD'S SIZE IS THE RIGHT EXPONENT ON THIS SIDE, WHICH IS
--- NOT A GENERAL LICENCE FOR IT.  A payload may MAP, and its step
--- function may name its argument twice; then one application emits a
--- term holding two copies of what arrived, so an emitted value's sync
--- size is about DOUBLE the payload's.  A tower is therefore owed, and
--- it is owed HERE, where the exponent is syntax of the program and
--- nothing between the two is substituted.  What may not carry one is
--- the charge the fold makes per ARRIVAL: an arrival is what the
--- substitution produced, so a tower over it has an exponent that is
--- itself exponential in the program and this grant cannot reach it.
+-- AND THE PAYLOAD'S SIZE IS THE WRONG EXPONENT: THE STATEMENT AS
+-- WRITTEN IS FALSE.  A tower over program syntax is owed here rather
+-- than per arrival -- that much survives -- but `syncSizeᵉ` reads ONE
+-- at a scripted input, so a cold script's synchronous burst is a width
+-- the exponent cannot see, while a `scanᵉ` over that input applies its
+-- step function once per script value.  Point a step function at its
+-- accumulator in both additive slots an inner `scanᵉ` offers and one
+-- application doubles the delivered nesting: the left side is a power
+-- of two in the SCRIPT's length and the grant is a constant.
 --
+-- WHAT THE REPAIR IS.  Not a larger constant and not the telescope
+-- summand, since a script is charged to neither -- `slotWrapSum` reads
+-- nought at a scripted slot.  The currency that already sees a burst
+-- is `nestB`, whose exponent carries a WIDTH beside the size cap, and
+-- the caps face states its own two subscription-nesting results in it
+-- against a `descW` bound.  So the fit is restated in that currency
+-- with a width parameter, which is the shape its neighbours already
+-- have rather than a new invention.
+--
+-- REFUTED: `Refuted.Sight-Fit-Scan.scan-fit-absurd` is the one that
+--   kills the statement above: a `scanᵉ` whose step doubles, over a
+--   scripted slot, delivering `2 ^ N - 1` against a grant of four
+--   thousand and ninety-six at every N.  It is a CROSSING and not a
+--   scale error -- twelve script values hold at 4095 against 4096,
+--   tight to one, and thirteen fail at 8191 -- and the grant is the
+--   same number in both rows, which is the finding.  Not covered: the
+--   `mapᵉ` and `takeᵉ` frames, and any path but `root`.
 -- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`
 --   kills the arrival-tower fold at a flat telescope where the wrap is
 --   nought: sixteen against eighteen in the exponents, so a quarter of

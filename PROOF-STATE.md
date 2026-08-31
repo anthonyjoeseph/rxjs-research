@@ -215,26 +215,30 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **STOP CONDITION — THE QUEUED TERM'S CEILING IS SPIRALLING, AND THE
-  MECHANISM UNDER IT IS WHAT HAS TO MOVE.** Three successive
-  subdivisions of one region, every one FALSITY: the drain reading the
-  entry flat, the drain minting it from a level the cascade reached,
-  and the park carrying it forward in the store. The third reaches
-  UPSTREAM — it says the invariant the last commit put in the walk is
-  unsatisfiable at every cap and every term — so the region is not
-  shrinking. The convergence test's own answer is that a fourth
-  carrier is not the move: what a queued term is charged is what has
-  to change, and that is Anthony's question rather than a grind.
+- **CHARGE THE QUEUED TERM AT DELIVERY, NOT AT DRAIN — Anthony's
+  ruling on the spiral.**
+  The store stops carrying a ceiling at all: what it carries is the
+  term's price at its DELIVERY path, fixed when the term is emitted
+  and never climbing, so no level is named and the invariant becomes
+  statable. The drain derives its ceiling from the parent frame's own
+  remaining budget, and the delivery price is the debit its fold
+  spends. Unverified is the decomposition — the frame's remaining
+  ladder at the drain level dominating a queued term's, folded with
+  the level climbing entry by entry. Probe it at a program that really
+  queues, at length two or more, before any statement moves.
 
-- **the entry fold's induction, now that the statement admits one** —
-  `subscribeE-fit` is stated at ANY delivered type, which is what the
-  `map` clause needs: a frame's burst is its payload's burst pushed
-  through the function, and the payload's type is whatever the program
-  says. The exponents already line up — the head's own doubling is what
-  `mapVals-nest-sync` charges, and `takeVals-nest` and `scanVals-nest`
-  are the other two frames' halves, all three proven. What is left is
-  the walk, mirroring `depthE-sighted` clause for clause below it.
-
+- **THE ENTRY FOLD IS REFUTED, AND ITS EXPONENT IS WHAT MOVES** —
+  `subscribeE-fit` prices a subscription's emitted values at a tower
+  over `syncSizeᵉ`, which reads ONE at a scripted input, so a cold
+  script's synchronous burst is invisible to it while a `scanᵉ` over
+  that input applies its step once per script value. The route the
+  ruling above wants this currency for is the same one, so the repair
+  is owed twice over: restate the fit in `nestB`, whose exponent
+  already carries a WIDTH beside the size cap, against a `descW`
+  bound — the shape the caps face's own two subscription-nesting
+  results have. Then the `*All` entry's body and the walk are rebuilt
+  on it, and `mapVals-nest-sync`, `takeVals-nest` and `scanVals-nest`
+  stay the three frames' halves.
 
 - **the cascade's own descent, which is the tier's other risk and
   does not touch the queue at all** — `cascade-depth-sighted` prices a
@@ -251,14 +255,14 @@ does not fit is a finding about the shared statement, not about the head.
   the `from-inner` head of the drain law, the only frame that names a node. Its
   per-entry ceiling has now outlived three carriers, the last of them refuted
   at every cap, so the obligation itself is what is open.
+- **`subscribeE-fit`** (Sighted-Fit) — FALSITY, `REFUTED×3, PROBED`: what ANY
+  subscription's emitted VALUES cost. Refuted at a doubling `scanᵉ` over a
+  script — a crossing, 4095 against 4096 at twelve values and 8191 at thirteen
+  — so the exponent has to see an instant's width.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
   equality — and the subscribing branch is blocked rather than uncovered.
-- **`subscribeE-fit`** (Sighted-Fit) — DIFFICULTY, `REFUTED×2, PROBED`: what
-  ANY subscription's emitted VALUES cost, at any delivered type and read at
-  the path they arrive under. The `*All` entry is a body over it, and the fold
-  is inhabited at the family that refuted its predecessor.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
