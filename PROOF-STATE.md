@@ -214,16 +214,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **instantiate the repaired entry fold at the family that killed its
-  predecessor** — the fold now charges a SUM with no factor over the
-  arrival, and every row that pinned the old form was re-run and still
-  holds, but those rows read the consume rather than the entry, so
-  nothing has yet asked whether the payload-side grant covers the
-  demand across a whole subscribe. The refutation's own harness runs
-  that subscribe already and its `StreamFitOld` is one edit from the
-  live fold, so the region is reachable for the cost of a probe. Green
-  moves the row off FALSITY; red is the third refutation of this
-  region and a stop.
 
 - **the park site that must issue the ceiling it stores** — exactly
   one arm writes a `mergeAll` queue, the gate-shut arm of the inner
@@ -244,6 +234,16 @@ does not fit is a finding about the shared statement, not about the head.
   harness the value half used, one emission further in — and let the
   rows say whether the class comes down or a witness lands.
 
+- **reach the entry fold at an arrival the wrap summand exists for** —
+  every row now standing on the entry runs at `root` with a flat slot,
+  so the telescope summand and the wrap are BOTH nought and the two
+  conjuncts that pay for a slot REFERENCE are green over nothing. That
+  is the shape a sibling refutation already crossed at the consume, one
+  hop further in, so the region is known dangerous and known reachable.
+  The leg is to run the entry subscribe under a telescope with a
+  layered definition in it and let the rows say whether the grant's
+  payload-side tower covers what substituting the slot lets through.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
@@ -254,10 +254,10 @@ does not fit is a finding about the shared statement, not about the head.
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading
   vacuously wherever the consume has been instantiated.
-- **`sight-all-stream`** (Depth-Sighted) — FALSITY, `REFUTED×2`: the drain's
-  ENTRY half, a claim about the payload's emitted VALUES. The fold it
-  establishes now charges each arrival a sum with no factor over it, and
-  nothing has instantiated that form at the entry.
+- **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED×2, PROBED`:
+  the drain's ENTRY half, a claim about the payload's emitted VALUES. The
+  fold is now inhabited at the duplicating family that refuted its
+  predecessor, and at three layers of it.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the

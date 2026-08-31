@@ -63,6 +63,8 @@ open import Probed.Scan-Arr-Margin
 open import Probed.Thru-Arr-Slot
   using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡)
 
+open import Probed.Sight-All-Stream
+  using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡)
 open import Probed.Sight-Thru-Val
   using (fitRef; sidesRef≡; grantRef₀≡; grantRef₁≡;
          grantFlat≡; delFlat≡; fitFlat; storeFlat; storeRef; storeFigs≡;

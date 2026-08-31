@@ -372,6 +372,17 @@ pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
 --   those rows.  Not covered: the two heads other than `mergeAllᵒ`,
 --   any path other than the one the row subscribes under, and the
 --   store-growth conjuncts, which no row reads apart from the value one.
+-- PROBED: `Probed.Sight-All-Stream` INHABITS the fold -- the statement
+--   itself, not a boolean mirror of it -- at the duplicating payload
+--   the refutations above are taken at, and at three layers of that
+--   duplication.  The two columns are the receipt: the charge reads
+--   one, two, three, four while the grant's exponent reads sixteen,
+--   twenty-three, thirty, thirty-seven, so one side is linear in the
+--   layer and the other a tower over something linear in it.  Not
+--   covered: the two other heads; any path but `root`, which pins the
+--   telescope summand at nought and the wrap with it; a telescope of
+--   more than one slot; and an ARRIVAL that is a slot reference, which
+--   is the one shape the wrap summand exists for.
 postulate
   sight-all-stream : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
