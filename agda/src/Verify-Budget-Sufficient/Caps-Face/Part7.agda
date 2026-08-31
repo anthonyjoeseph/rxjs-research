@@ -3106,6 +3106,15 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   readings feed, symbolic-or-nothing by the descent family's own
 --   dead route; the two heads other than `mergeAllᵒ`; and a queue
 --   whose entries differ from one another in size.
+-- PROBED: `Probed.Drain-Queue-Length` reads the other half the fold
+--   names -- the queue's LENGTH, since one unit of the frame's
+--   measure is spent per entry.  A limit-one merge over a scripted
+--   input parks one short of the script at three lengths, against a
+--   syntax size that does not move, so no bound naming the program's
+--   own size can hold; the slot vocabulary dominates at all three.
+--   Not covered: a source that parks without a script, a limit other
+--   than one, a merge nested in another's drain, and the cap, which
+--   is a tower and is not instantiated.
 postulate
   walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)

@@ -75,3 +75,4 @@ open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡)
 open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)
+open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)

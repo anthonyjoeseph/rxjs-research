@@ -937,6 +937,16 @@ def agda_flags(args) -> list[str]:
     # cone -- the exact thrash the `-W` lockstep above exists to prevent.
     # `sync_mirror()` runs first so the mirror is current.
     flags = ["-i", "src", "-i", "refuted", "-i", "_dev", "-W", "error"]
+    # AND THE EVIDENCE TREES ARE REACHED BY PATH, NOT BY A SECOND CACHE.  The
+    # mirror keeps them under `evidence/`, where their own `.agda-lib` declares
+    # `include: refuted probed ../src`; the gate gets that by starting Agda in
+    # that directory, which this loop cannot do without moving the generated
+    # `_dev` module.  Naming the two directories from here resolves the same
+    # modules and lands them in the same build directory, since Agda derives
+    # that from the nearest `.agda-lib` ABOVE THE FILE rather than from the
+    # invocation.  It does NOT reopen the src/evidence boundary: a src module
+    # never names an evidence one, and this loop checks one target at a time.
+    flags += ["-i", "evidence/refuted", "-i", "evidence/probed"]
     # --holes deliberately adds NOTHING here.  Its flags are scoped to the
     # GENERATED module by a file-level OPTIONS pragma instead (HOLES_PRAGMA
     # below).  A command-line --allow-unsolved-metas applies to EVERY module

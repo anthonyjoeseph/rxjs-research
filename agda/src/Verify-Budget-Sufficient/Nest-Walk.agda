@@ -3564,11 +3564,13 @@ thruFit-vals {u = u} c L sl B W m m′ fuel exhaustᵒ nid κ id now (o ∷ os) 
 -- slot telescope the width is read against is what the state chain
 -- preserves.
 --
--- THE QUEUE LENGTH IS NOT AMONG THEM, and the reason is that nothing
--- asks: the parking write is discharged by the table's own push lemma,
--- which reports one level up and takes no room premise at all.  A
--- record conjunct the caps cannot supply is what forced it to be owed
--- by the walk, and a level is what stopped anyone owing it.
+-- THE QUEUE LENGTH IS NOT AMONG THEM, and it used to be that nothing
+-- asked: the parking write is discharged by the table's own push
+-- lemma, which reports one level up and takes no room premise at all.
+-- The drain's ceiling fold asks now, spending one unit of the frame's
+-- measure per entry -- but the bound it wants is owed by the record
+-- that bounds the queue at all, not by this frame, so what belongs
+-- here is only the note that the demand exists.
 thruRoom-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (L : ℕ) (W : ℕ) (sl : Slots Γ)
   (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)

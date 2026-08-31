@@ -215,6 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
+- **THE QUEUE'S LENGTH BECOMES A RECORD FIELD.** The drain's fold
+  holds ONE ceiling at the frame's level and spends one operator unit
+  per entry, so its measure names the queue's LENGTH — and every
+  conjunct of the park record is per entry, so a queue of any length
+  satisfies it. The probe settles which cap it can be stated at: a
+  scripted source parks one short of the script while the program's
+  syntax does not move, so a bound naming `sizeᵉ` is refuted, and the
+  slot vocabulary dominates at every length. So the leg is the field
+  and its cascade — the parking write re-establishing it, the drain
+  reading it — and only then the receipt the walk owes.
+
 - **THE ENTRY FOLD IS REFUTED, AND ITS EXPONENT IS WHAT MOVES** —
   `subscribeE-fit` prices a subscription's emitted values at a tower
   over `syncSizeᵉ`, which reads ONE at a scripted input, so a cold
@@ -228,18 +239,6 @@ does not fit is a finding about the shared statement, not about the head.
   on it, and `mapVals-nest-sync`, `takeVals-nest` and `scanVals-nest`
   stay the three frames' halves.
 
-- **THE PRODUCER'S CEILING: WHERE THE FRAME-LEVEL RECEIPT COMES
-  FROM.** The drain's fold now holds ONE ceiling at the frame's level
-  and spends one operator unit per entry, and one unit is proven to
-  buy a whole sweep — so the entry no longer names a roof and the
-  store is statable. What is unpaid is the other end: the walk's own
-  drain statement must PRODUCE that receipt, and the hypothesis record
-  it is stated over carries no ceiling at all. Anthony's ruling says
-  the chain already hands a `CeilD` to every frame and the drain's is
-  not special, so the leg is to find where the chain delivers it and
-  either thread it in or add the field, with the two existential
-  bounds the wrapper needs read off the park field.
-
 - **the cascade's own descent, which is the tier's other risk and
   does not touch the queue at all** — `cascade-depth-sighted` prices a
   round's descent under its sighted nesting scaled by the program's
@@ -252,7 +251,7 @@ does not fit is a finding about the shared statement, not about the head.
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED×2, TWIN, PROBED`: the `from-inner` head of the drain law, the only
+  `REFUTED×2, TWIN, PROBED×2`: the `from-inner` head of the drain law, the only
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
   what is open.
