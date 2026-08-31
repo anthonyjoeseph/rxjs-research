@@ -6308,7 +6308,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           hpk hpl
           (ceil-park c d Lv (nest o sl (EvalSt.connectedShares st))
              (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
-             (proj₁ headHere) (proj₂ headHere) (FaceOK.fReg faceHere)
+             (proj₂ headHere) (FaceOK.fReg faceHere)
              (room-le c d Lv (proj₁ (proj₂ roomHere))
                 (4 + nest o sl (EvalSt.connectedShares st))
                 (FaceOK.fSize faceHere)

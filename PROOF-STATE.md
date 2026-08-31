@@ -214,17 +214,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the drain's ceiling entry, at the cap the term was parked in** —
-  the room floor now reads at the walk's level, where the store's own
-  park field supplies it, and the debt that move creates is one shelf
-  down in `ceil-park-suc`: a domination whose two charges are read at
-  the stepped cap. It inherits the shelf's coverage boundary — neither
-  side of the room finishes at the smallest legal cap, so no probe
-  reaches it and no witness will be cheap. The work is symbolic: the
-  budget on the right carries the nesting, so what has to be settled
-  is whether raising the charge raises that budget by at least as
-  much, and the proven base-cap row is the shape to follow.
-
 - **the drain's ENTRY half, now that its grant is the right one** — the
   payload-only form is refuted at a slot reference and the summand
   repairing it is checked at the refuting family, so nothing about
@@ -242,6 +231,15 @@ does not fit is a finding about the shared statement, not about the head.
   leg is those three arms and whatever the fold's compounding charge
   costs over the map's flat one.
 
+- **the queued entry's REACHED level, which is the drain head's last
+  residue** — every other conjunct of `walk-frame-drain-inner` now
+  comes off the store predicate at the walk's own level, and the
+  ceiling entry the head spends is proven outright. What is left is
+  not a fact about the store at all: it is that the level the queue's
+  head is read at was actually walked to, so no field could hold it
+  and the receipt has to come from the walk's own position relation.
+  The shape to follow is the reset the level-jump lemma already
+  performs, which pays a level to re-anchor a charge.
 
 ### The ledger
 
@@ -249,11 +247,6 @@ does not fit is a finding about the shared statement, not about the head.
   the `from-inner` head of the drain law, the only frame that names a node.
   Every conjunct but one now comes off the store predicate at the walk's own
   level; the residue is the REACHED level for a queued entry's nest.
-- **`ceil-park-suc`** (Nest-Ceiling) — FALSITY, `NO EVIDENCE`: the drain's
-  ceiling entry, with both charges read at the frame the term was parked in
-  rather than at the base cap. The count it is measured against carries the
-  nesting too, so the question is whether raising the charge raises the budget
-  by enough.
 - **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
   the drained values come out of the node's queue. Instantiated at a parked

@@ -60,11 +60,14 @@
 -- exactly ((g−1, k−1)).  The TOP (`climb-paid`) spends two more units:
 -- one unfolding cDel's dCapᶜ into a walk, one descending into a
 -- position because level 0 has only regAt S R 0 = R positions and
--- R MAY BE 1.  Hence the guard `3 + k ≤ S` — see § THE TOP FORM.
+-- R MAY BE 1.  Hence `3 + k ≤ S` at the ledger's own root, which is
+-- where the gas is fixed at `suc S` and nowhere else — see § THE TOP
+-- FORM.
 
 -- CORNERS respected: k at the guard boundary (gas is exact, no
 -- headroom on the k-descent); S = 2 (tails at the deepest level
--- survive because suc m ≤ S forces m ≤ 1); d = 0 vs d ≥ 1 (fLvlD's
+-- survive because the descent count is bounded by the level's own
+-- size, which is the cap itself at the root); d = 0 vs d ≥ 1 (fLvlD's
 -- gains differ, so every estimate is read off the fLvl RECEIPT, which
 -- carries suc (widAt) * suc (sizeAt) per single step, never off
 -- per-step containment — the depth-(d−1) machinery inside a depth-d
@@ -75,16 +78,18 @@ module Verify-Budget-Sufficient.Op-Budget where
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties
   using (≤-refl; ≤-reflexive; ≤-trans; n≤1+n; m≤n+m; m≤m+n; *-identityˡ; *-identityʳ; *-monoˡ-≤;
-  *-monoʳ-≤; *-mono-≤; *-suc; *-assoc; *-comm; ≤-pred; +-suc; +-identityʳ; +-mono-≤; +-monoʳ-≤;
+  *-monoʳ-≤; *-mono-≤; *-suc; *-assoc; *-comm; *-zeroʳ; ≤-pred; +-suc; +-assoc; +-identityʳ;
+  +-mono-≤; +-monoˡ-≤; +-monoʳ-≤;
   <⇒≤; ^-monoˡ-≤)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
 open import Rx.Evaluator
   using (sizeAt; widAt; opIterD; sLvlD; dLvl; lvls; dCapᶜ; dWalkᶜ; regAt; fLvl; iterFold; foldStep;
-  fIterD; opIterD-0; opIterD-suc; sLvlD-0; sLvlD-suc; fLvlD)
+  fIterD; opIterD-0; opIterD-suc; sLvlD-0; sLvlD-suc; fLvlD; iterL)
 open import Verify-Budget-Sufficient.Caps
-  using (caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD; iterL-infl; lvls-infl; 1≤regAt;
+  using (caps; cDel; cDel-body; sizeAt-mono; widAt-mono; fLvl≤fLvlD; iterL-infl; iterSize-infl;
+  lvls-infl; 1≤regAt;
   dCapᶜ-mono; dWalkᶜ-mono; dWalkᶜ-front; lvls-mono; lvls-add; dLvl-mono; 2≤dLvl)
 open import Verify-Budget-Sufficient.Measures using
   (n<2^n)
@@ -307,34 +312,57 @@ round-tail-glue S W R d g k Z J i 2≤S 1≤R 2≤g hZ =
            (≤-reflexive (cong (λ p → lvls S W d J (dWalkᶜ S W R d g J p))
                               (trans (+-suc i 0) (cong suc (+-identityʳ i))))))))
 
--- the boost: five sub-rounds' worth of positions exist at one
--- dLvl-boosted level — the fLvl receipt's width factor is ≥ 3 once the
--- level clears 2, so dLvl Q ≥ 3·suc (sizeAt S Y), and regAt multiplies
--- by S ≥ 2 and R ≥ 1 on top
-boost-5x : ∀ S W R d Y Q → 2 ≤ S → 1 ≤ R → 2 ≤ Q → Y ≤ Q →
+-- ONE FRAME BUYS FOUR LEVELS, which is what the boost is counted out
+-- of.  The charge is one plus a product whose size factor is already
+-- three at the smallest cap this development admits, so no width is
+-- needed to reach four and none is asked for.
+4≤fLvl : ∀ S W J → 2 ≤ S → J + 4 ≤ fLvl S W J
+4≤fLvl S W J 2≤S =
+  +-monoʳ-≤ J
+    (s≤s (≤-trans (≤-reflexive (sym (*-identityˡ 3)))
+                  (*-mono-≤ (s≤s (z≤n {widAt S W J}))
+                            (s≤s (≤-trans 2≤S
+                                   (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S) J S))))))
+
+-- and the ladder pays it once per iteration, so a level's descent is
+-- linear in the count it iterates rather than merely inflationary
+iterL-4 : ∀ S W d k J → 2 ≤ S → J + 4 * k ≤ iterL S W d k J
+iterL-4 S W d zero    J 2≤S =
+  ≤-reflexive (trans (cong (J +_) (*-zeroʳ 4)) (+-identityʳ J))
+iterL-4 S W d (suc k) J 2≤S =
+  ≤-trans (≤-reflexive (trans (cong (J +_) (*-suc 4 k))
+                              (sym (+-assoc J 4 (4 * k)))))
+    (≤-trans (+-monoˡ-≤ (4 * k)
+               (≤-trans (4≤fLvl S W J 2≤S) (fLvl≤fLvlD S W d J)))
+             (iterL-4 S W d k (fLvlD S W d J) 2≤S))
+
+-- THE BOOST, AND IT NEEDS NOTHING OF THE LEVEL.  `dLvl` iterates the
+-- frame transformer once per unit of its level's size, so the
+-- descended level is four times that size outright -- a count the
+-- width route could only reach from two levels up, which is exactly
+-- the reading a term parked at level one cannot supply.  `regAt`
+-- multiplies by S ≥ 2 and R ≥ 1 on top, so five sub-rounds' worth of
+-- positions fit with a whole factor to spare.
+dLvl-4 : ∀ S W d Y Q → 2 ≤ S → Y ≤ Q → 4 * suc (sizeAt S Y) ≤ dLvl S W d Q
+dLvl-4 S W d Y Q 2≤S hY =
+  ≤-trans (*-monoʳ-≤ 4 (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl hY)))
+          (≤-trans (m≤n+m (4 * suc (sizeAt S Q)) Q)
+                   (iterL-4 S W d (suc (sizeAt S Q)) Q 2≤S))
+
+boost-5x : ∀ S W R d Y Q → 2 ≤ S → 1 ≤ R → Y ≤ Q →
   5 * suc (sizeAt S Y) ≤ regAt S R (dLvl S W d Q)
-boost-5x S W R d Y Q 2≤S 1≤R 2≤Q hY =
-  ≤-trans (*-monoˡ-≤ (suc (sizeAt S Y)) 5≤6)
-  (≤-trans (≤-reflexive (*-assoc 2 3 (suc (sizeAt S Y))))
-  (≤-trans (*-monoʳ-≤ 2 three-x≤dLvl)
+boost-5x S W R d Y Q 2≤S 1≤R hY =
+  ≤-trans (*-monoˡ-≤ (suc (sizeAt S Y)) 5≤8)
+  (≤-trans (≤-reflexive (*-assoc 2 4 (suc (sizeAt S Y))))
+  (≤-trans (*-monoʳ-≤ 2 (dLvl-4 S W d Y Q 2≤S hY))
   (≤-trans (*-monoˡ-≤ (dLvl S W d Q) 2≤S)
   (≤-trans (≤-reflexive (*-comm S (dLvl S W d Q)))
   (≤-trans (n≤1+n (dLvl S W d Q * S))
   (≤-trans (≤-reflexive (sym (*-identityˡ (suc (dLvl S W d Q * S)))))
            (*-monoˡ-≤ (suc (dLvl S W d Q * S)) 1≤R)))))))
   where
-  5≤6 : 5 ≤ 6
-  5≤6 = s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))
-  3≤sw : 3 ≤ suc (widAt S W Q)
-  3≤sw = s≤s (≤-trans 2≤Q
-               (≤-trans (m≤m+n Q W) (iterFold-gain S Q W 2≤S)))
-  three-x≤dLvl : 3 * suc (sizeAt S Y) ≤ dLvl S W d Q
-  three-x≤dLvl =
-    ≤-trans (*-mono-≤ 3≤sw
-              (s≤s (sizeAt-mono (≤-trans (s≤s z≤n) 2≤S) ≤-refl hY)))
-    (≤-trans (n≤1+n _)
-    (≤-trans (m≤n+m (suc (suc (widAt S W Q) * suc (sizeAt S Q))) Q)
-    (≤-trans (fLvl≤fLvlD S W d Q) (fLvlD-le-dLvl S W d Q))))
+  5≤8 : 5 ≤ 8
+  5≤8 = s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))
 
 mutual
   -- THE POSITION-FORM INVARIANT: m rounds cost 5m positions; the walk
@@ -483,7 +511,7 @@ mutual
     fit : dWalkᶜ S W R d g′ Pw (5 * m′) ≤ dWalkᶜ S W R d g′ Pw (regAt S R Pw)
     fit = dWalkᶜ-mono g′ g′ (5 * m′) (regAt S R Pw) 2≤S ≤-refl ≤-refl ≤-refl
             ≤-refl ≤-refl
-            (boost-5x S W R d J₀X P₃ 2≤S 1≤R 2≤P₃
+            (boost-5x S W R d J₀X P₃ 2≤S 1≤R
               (≤-trans jump P₂≤P₃))
 
     sub-paid : G S W d (opIterD S W d k′ m′ J₀X)
@@ -508,7 +536,8 @@ mutual
 --   cannot be sequenced there; it must descend into one position's
 --   sub-budget — a SECOND unit — landing on a walk of gas index S−1 at
 --   level A₁ = dLvl S W d 0, where positions are plentiful
---   (regAt S R A₁ ≥ suc (A₁·S) ≥ 5·S, since 5 ≤ A₁ — `5≤dLvl0`).
+--   (regAt S R A₁ ≥ suc (A₁·S), and the descent's own iteration
+--   count already buys the factor — `boost-5x`).
 --   walk-paid on that walk needs `2 + k ≤ S − 1`.  Hence 3 + k ≤ S.
 --
 -- The `2` inside walk-paid's own guard is irreducible: at k = 0 the
@@ -518,74 +547,19 @@ mutual
 -- So `3 + k ≤ S` is not slack this scheme happens to want; it is what
 -- the recurrence costs.
 --
--- CONSEQUENCE FOR SRC — a statement repair on `opIterD-budget`
--- and `opIterD-dominated`, whose guard `k ≤ S` becomes `3 + k ≤ S`,
--- and thence on `sub-charge-capsOK-lift-core`'s nestOK premise
--- (`nest b sl cs ≤ cSize c` becomes `3 + nest b sl cs ≤ cSize c`).
--- That premise is threaded, not derived, so the obligation lands on
--- nestOK's suppliers, where it is PLAUSIBLY FREE: cSize (capsAt e sl
--- id) is `frameBlowup` applied to `caps (2 + sizeᵉ e + slotsSize sl)
--- …`, i.e. an iterSize tower ABOVE 2 + sizeᵉ e + slotsSize sl, while
--- nest≤ bounds nest by sizeᵉ + slotsSize.  It is a repair to make
--- deliberately and to discharge as a NAMED obligation, never to
--- absorb silently.
 ------------------------------------------------------------------
 
--- The first descent needs a level with room.  `2≤dLvl` is not enough
--- (5·S positions are wanted against suc (A₁·S) available), so unroll
--- iterL TWICE: dLvl S W d 0 = iterL S W d (suc (sizeAt S 0)) 0 and
--- sizeAt S 0 = S ≥ 2, so at least two fLvlD-steps run, the first
--- clearing 4 (fLvl S W 0 = suc (suc W * suc S) ≥ 4) and the second
--- adding its own fCharge ≥ 2.
-5≤dLvl0 : ∀ S W d → 2 ≤ S → 5 ≤ dLvl S W d 0
-5≤dLvl0 zero          W d ()
-5≤dLvl0 (suc zero)    W d (s≤s ())
-5≤dLvl0 (suc (suc s)) W d 2≤S =
-  ≤-trans 5≤6 (≤-trans 6≤F₁ (iterL-infl S W d (suc s) F₁))
-  where
-  S = suc (suc s)
-  F₀ = fLvlD S W d 0
-  F₁ = fLvlD S W d F₀
-
-  5≤6 : 5 ≤ 6
-  5≤6 = s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))
-
-  -- fLvl S W 0 = suc (suc W * suc S), and suc W * suc S ≥ 1 * 3
-  4≤F₀ : 4 ≤ F₀
-  4≤F₀ = ≤-trans (s≤s (≤-trans (≤-reflexive (sym (*-identityˡ 3)))
-                               (*-mono-≤ (s≤s (z≤n {W}))
-                                         (s≤s (s≤s (s≤s (z≤n {s})))))))
-                 (fLvl≤fLvlD S W d 0)
-
-  -- one more step costs its own fCharge, which is ≥ suc (1 * 1)
-  2≤charge : 2 ≤ suc (suc (widAt S W F₀) * suc (sizeAt S F₀))
-  2≤charge = s≤s (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
-                          (*-mono-≤ (s≤s (z≤n {widAt S W F₀}))
-                                    (s≤s (z≤n {sizeAt S F₀}))))
-
-  6≤F₁ : 6 ≤ F₁
-  6≤F₁ = ≤-trans (+-mono-≤ 4≤F₀ 2≤charge) (fLvl≤fLvlD S W d F₀)
-
--- and the same at any level, since the ladder only climbs: a level is
--- at least zero, so the descended walk there is at least the descended
--- walk at the bottom
-5≤dLvl : ∀ S W d J → 2 ≤ S → 5 ≤ dLvl S W d J
-5≤dLvl S W d J 2≤S =
-  ≤-trans (5≤dLvl0 S W d 2≤S)
-          (dLvl-mono {S} {S} {W} {W} {0} {J} {d} 2≤S ≤-refl ≤-refl z≤n)
-
 -- the descended walk has room for the entry's 4 positions and the
--- m rounds' 5m
-top-positions : ∀ S W R d m J → 2 ≤ S → 1 ≤ R → suc m ≤ S →
+-- m rounds' 5m -- and it has that room against the term's own cap at
+-- the level, not against the base one, because the boost is counted
+-- out of the level's own iteration count
+top-positions : ∀ S W R d m J → 2 ≤ S → 1 ≤ R → m ≤ sizeAt S J →
   4 + 5 * m ≤ regAt S R (dLvl S W d J)
 top-positions S W R d m J 2≤S 1≤R hm =
   ≤-trans (n≤1+n (4 + 5 * m))
   (≤-trans (≤-reflexive (sym (*-suc 5 m)))
-  (≤-trans (*-monoʳ-≤ 5 hm)
-  (≤-trans (*-monoˡ-≤ S (5≤dLvl S W d J 2≤S))
-  (≤-trans (n≤1+n (dLvl S W d J * S))
-  (≤-trans (≤-reflexive (sym (*-identityˡ (suc (dLvl S W d J * S)))))
-           (*-monoˡ-≤ (suc (dLvl S W d J * S)) 1≤R))))))
+  (≤-trans (*-monoʳ-≤ 5 (s≤s hm))
+           (boost-5x S W R d J J 2≤S 1≤R ≤-refl)))
 
 -- THE TOP UNROLLING, at cDel's own gas, and AT ANY LEVEL.  Nothing in
 -- the proof was ever about the bottom: the entry position is spent from
@@ -594,10 +568,10 @@ top-positions S W R d m J 2≤S 1≤R hm =
 -- costs is paid on the OTHER side -- the budget is the cascade's walk
 -- from that level, so a consumer standing high must say what walk it
 -- still has, which is the whole content the flat form was hiding.
-climb-paid-at : ∀ S W d k m R J → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
+climb-paid-at : ∀ S W d k m R J → 2 ≤ S → m ≤ sizeAt S J → 1 ≤ R →
   G S W d (climb S W d k m J) ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
-climb-paid-at zero      W d k m R J ()  hk hm hR
-climb-paid-at (suc S′)  W d k m R J 2≤S hk hm hR = ≤-trans step2 step1
+climb-paid-at zero      W d k m R J ()  hm hR
+climb-paid-at (suc S′)  W d k m R J 2≤S hm hR = ≤-trans step2 step1
   where
   S  = suc S′
   g  = 3 + k
@@ -663,11 +637,11 @@ climb-paid-at (suc S′)  W d k m R J 2≤S hk hm hR = ≤-trans step2 step1
 -- `2≤dLvl` holds unconditionally, so the claim read `2 ≤ 0`.
 ------------------------------------------------------------------
 
-opIterD-budget : ∀ S W d k m R J → 2 ≤ S → 3 + k ≤ S → suc m ≤ S → 1 ≤ R →
+opIterD-budget : ∀ S W d k m R J → 2 ≤ S → m ≤ sizeAt S J → 1 ≤ R →
   lvls S W d (climb S W d k m J) (suc (widAt S W (climb S W d k m J)))
     ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
-opIterD-budget S W d k m R J 2≤S hk hm hR =
-  climb-paid-at S W d k m R J 2≤S hk hm hR
+opIterD-budget S W d k m R J 2≤S hm hR =
+  climb-paid-at S W d k m R J 2≤S hm hR
 
 -- THE CONSUMER-FACING FORM.  m = 0 is real (opIterD-0 gives 0 on the
 -- left); m = suc _ is the proven fIterD tail (fIterD-lvls) over the
@@ -691,21 +665,21 @@ abstract
   -- the seal rather than under a private alias because the seal is what
   -- the contract is about, and a second name for one fact is a
   -- duplicate whatever its visibility.
-  opIterD-dominated-at : ∀ S W d k m R J → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
+  opIterD-dominated-at : ∀ S W d k m R J → 2 ≤ S → m ≤ sizeAt S J → 1 ≤ R →
     opIterD S W d k m J ≤ lvls S W d J (dCapᶜ S W R d (4 + k) J)
-  opIterD-dominated-at S W d k zero    R J 2≤S hk hm hR =
+  opIterD-dominated-at S W d k zero    R J 2≤S hm hR =
     ≤-trans (≤-reflexive (opIterD-0 S W d k J))
             (lvls-infl S W d J (dCapᶜ S W R d (4 + k) J))
-  opIterD-dominated-at S W d k (suc m) R J 2≤S hk hm hR =
+  opIterD-dominated-at S W d k (suc m) R J 2≤S hm hR =
     ≤-trans (≤-reflexive (opIterD-suc S W d k m J))
       (≤-trans (fIterD-lvls S W d k
                   (suc (widAt S W (climb S W d k m J))) (climb S W d k m J) 2≤S)
-               (opIterD-budget S W d k m R J 2≤S hk hm hR))
+               (opIterD-budget S W d k m R J 2≤S (≤-trans (n≤1+n m) hm) hR))
 
   opIterD-dominated : ∀ S W d k m R → 2 ≤ S → 3 + k ≤ S → m ≤ S → 1 ≤ R →
     opIterD S W d k m 0 ≤ lvls S W d 0 (cDel (caps S W R) d)
   opIterD-dominated S W d k m R 2≤S hk hm hR =
-    ≤-trans (opIterD-dominated-at S W d k m R 0 2≤S hk hm hR)
+    ≤-trans (opIterD-dominated-at S W d k m R 0 2≤S hm hR)
     (≤-trans (lvls-mono (dCapᶜ S W R d (4 + k) 0) (dCapᶜ S W R d (suc S) 0)
                 2≤S ≤-refl ≤-refl ≤-refl
                 (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {0} {0} {d}
