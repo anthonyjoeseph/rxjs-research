@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _∸_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (m+[n∸m]≡n; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤;
+open import Data.Nat.Properties using (m+[n∸m]≡n; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; *-cancelˡ-≤;
   ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤;
   *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤;
   ⊔-identityʳ; m⊔n≤m+n; *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm; +-suc; ≤-pred)
@@ -37,8 +37,9 @@ open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; reached-room; room-step; room-descend; base; walk)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
+open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
+  (nestDᵛˢ; foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
   capsDrainOK;
   fac-hoist; one-pow; FaceOK; faceAt; shareCapsOK)
 open import Verify-Budget-Sufficient.Caps-Depth using
@@ -52,7 +53,7 @@ open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
-  (foldPath-nest-regs; PathΦHyp; FrameΦHyp; valsΦ?; stepFrame-nest-Φ)
+  (foldPath-nest-regs; PathΦHyp; FrameΦHyp; valsΦ?; stepFrame-nest-Φ; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
@@ -97,7 +98,7 @@ open import Verify-Budget-Sufficient.Caps using
   iterSize-mono-count; lvls-add; lvls-infl; lvls-mono; size≤sizeCount; sizeCount;
   sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true; all-impl)
+  (pathLen; reach-reset; ∧-true; all-impl; 2X≡X+X)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -133,9 +134,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid; valCaps?-widen)
-open import Decide using (T-to; T⇒≡true; ∧-intro)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
-  (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestCap-inc-sight≤capsH)
+  (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestCap-inc-sight≤capsH;
+   nestUnit≤size)
 
 thruOuter-face :
   -- subscribeInner-caps  (.Subscribe-Face)
@@ -3933,31 +3935,98 @@ pathNestD-step (take-f _)         p = ≤-refl
 pathNestD-step (from-inner _ _ _) p = ≤-refl
 pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
 
-postulate
-  -- THE GRANT AT ONE OUTER FRAME, which is the whole of what the walk
-  -- still owes: the four other frame kinds owe nothing, so a path with
-  -- no `thru-outer` in it needs none of this.  What is owed is a
-  -- SIGHTED grant covering the values that reach this frame -- a
-  -- ceiling on each one's depth plus the store's per-slot wrap, which
-  -- the delivery face's fit demands and the potential does not carry.
-  -- The three premises are what the walk holds there: every frame's
-  -- size is under the cap, the path's remaining depth is under the
-  -- unit, and the potential at this frame is under the charge.
-  --
-  -- TWIN: `chain-walk-caps` is the same induction in the caps
-  --   currency, already proven -- it preserves a per-frame ceiling
-  --   across one frame at one stepped level, which is the shape the
-  --   grant here has to be extracted at.
-  walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (op : AllOp) (nid : NodeId)
-    (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ) →
-    Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
-    pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
-    valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-           (thru-outer op nid ↠ p) vals ≡ true →
-    FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-              (thru-outer op nid) p vals sched
+-- THE GRANT AT ONE OUTER FRAME, which was the whole of what the walk
+-- still owed: the four other frame kinds owe nothing, so a path with
+-- no `thru-outer` in it needs none of this.  What is owed is a SIGHTED
+-- grant covering the values that reach this frame -- a ceiling on each
+-- one's depth plus the store's per-slot wrap, which the delivery
+-- face's fit demands and the potential does not carry.
+--
+-- THE GRANT IS NAMED, NOT SEARCHED FOR: the path's remaining depth,
+-- plus the maximum depth in flight, plus the wrap the whole context
+-- can charge.  The first two come off the premises directly and the
+-- input guard is free once the context is read whole, so the only
+-- content is that the charge affords it -- and it does, in three
+-- pieces that each land on one summand.  The maximum in flight is
+-- paid by the outer frame's OWN factor, which is two to the cap and
+-- so at least two; the path's depth is under the unit twice over,
+-- since the unit is under the cap; and the wrap is charged at the cap
+-- while the grant spends it at the context's width, which is smaller.
+-- The doubling in the charge is what lets the first piece sit beside
+-- the other two rather than competing with them.
+walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
+  pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+         (thru-outer op nid ↠ p) vals ≡ true →
+  FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+            (thru-outer op nid) p vals sched
+walk-thru-fit {n = n} {e = e} sl id op nid p vals sched hsl hpz hnd hΦ =
+  n , G
+  , subst (λ z → ValsFit n z G p vals) (sym hsl)
+      (valsFit-of-max sl p vals M ≤-refl)
+  , *-cancelˡ-≤ 2
+      (≤-trans (≤-reflexive spread)
+        (≤-trans (+-mono-≤ hA2 hBC2)
+                 (≤-reflexive (sym (2X≡X+X (nestWalkAt e sl id))))))
+  where
+  S    = Caps.cSize (capsAt e sl id)
+  Q    = pathΦF S p
+  D    = pathNestD p
+  M    = nestDᵛˢ vals
+  W    = slotWrapSum sl
+  X    = nestUnit e sl + S + S * W
+  G    = D + M + n * W
+  hpp  : pathSz? S p ≡ true
+  hpp  = ∧-trueʳ hpz
+  2≤S  = 2≤capsAt-size e sl id
+  1≤S  = ≤-trans (s≤s z≤n) 2≤S
+  Q≤   : Q ≤ 2 ^ (S * S)
+  Q≤   = pathΦF-cap S p hpp
+  D≤   : D ≤ nestUnit e sl
+  D≤   = ≤-trans (n≤1+n D) hnd
+  n≤S  : n ≤ S
+  n≤S  = n≤capsAt-size e sl id
+  2≤2^S : 2 ≤ 2 ^ S
+  2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
+  -- the values in flight, paid by the outer frame's own factor
+  hA   : 2 ^ S * (Q * M) ≤ nestWalkAt e sl id
+  hA   = ≤-trans (≤-reflexive (sym (*-assoc (2 ^ S) Q M)))
+                 (Φ-to-bound S (nestWalkAt e sl id) (thru-outer op nid ↠ p)
+                             vals hΦ)
+  hA2  : 2 * (Q * M) ≤ nestWalkAt e sl id
+  hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
+  halfShape : ∀ q d → 2 * (q * d) ≡ q * (2 * d)
+  halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
+                        refl q d
+  -- the path's own depth, and the wrap, against the charge's own half
+  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ (S * S) * X
+  hBC  =
+    ≤-trans (+-mono-≤
+              (≤-trans (≤-reflexive (halfShape Q D))
+                       (*-mono-≤ Q≤ (≤-trans (*-monoʳ-≤ 2 D≤)
+                                       (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl)))
+                                                (+-monoʳ-≤ (nestUnit e sl)
+                                                  (nestUnit≤size e sl id))))))
+              (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
+            (≤-reflexive (sym (*-distribˡ-+ (2 ^ (S * S))
+                                (nestUnit e sl + S) (S * W))))
+  hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestWalkAt e sl id
+  hBC2 = subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
+               (sym (nestWalkAt-def e sl id))
+               (≤-trans (*-monoʳ-≤ 2 hBC)
+                        (≤-reflexive (sym (*-assoc 2 (2 ^ (S * S)) X))))
+  spread : 2 * (Q * (G + D))
+             ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
+  spread =
+    solve 4 (λ q d m w →
+               con 2 :* (q :* (d :+ m :+ w :+ d))
+                 := con 2 :* (q :* m)
+                    :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
+          refl Q D M (n * W)
 
 -- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
 -- which is the point of separating it from the walk below: the four
@@ -4032,7 +4101,8 @@ entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φf
            ≤ nestWalkAt e sl id
   Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
                (sym (nestWalkAt-def e sl id))
-               (*-mono-≤ (pathΦF-cap Sz path hp)
+               (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
+                                  (^-monoʳ-≤ 2 (n≤1+n (Sz * Sz))))
                          (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
                                   (m≤m+n (nestUnit e sl + Sz)
                                          (Sz * slotWrapSum sl))))

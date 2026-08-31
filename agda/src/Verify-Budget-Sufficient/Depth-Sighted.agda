@@ -8,7 +8,7 @@ module Verify-Budget-Sufficient.Depth-Sighted where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm; *-monoˡ-≤; ^-monoʳ-≤; +-mono-≤;
-  +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n; +-identityʳ; +-suc; <ᵇ⇒<)
+  +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n; +-identityʳ; +-suc; <ᵇ⇒<; m≤m⊔n; m≤n⊔m)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; con)
 open import Data.Bool using (Bool; T; _∧_)
@@ -29,7 +29,7 @@ open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; Stream; map-f; take-f; _↠_; subscribeE;
   mintNode; installNode; register; take-st; scan-st; scan-f; share-sink; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; stepFrame; splitEvents; NodeId; thruConsume)
-open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll; depthFrame)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
@@ -38,13 +38,13 @@ open import Verify-Budget-Sufficient.Nest-Walk using
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (thruConsume-slots; stepFrame-slots; subscribeE-slots)
 open import Verify-Budget-Sufficient.Sighted-Fit using
-  (ValFitG; ValsFitG; StreamFitG; valsFitG-le; splitVals-irr; subscribeE-fit)
+  (ValFitG; ValsFitG; StreamFitG; valsFitG-le; splitVals-irr; subscribeE-fit; ib-topᵛ)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestB; nestB-base)
 open import Verify-Budget-Sufficient.Nest-Burst using
   (descW; descW-map; descW-scan; descW-take; descW-mu; descW-merge; descW-switch;
    descW-exhaust; descW-conn; connW-gs)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax; storeNestMax-install;
+  (pathNestD; slotWrapSum; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax; storeNestMax-install;
   storeNestMax-register; nestUnit; nodeNest; allFresh; allFresh-nest; fitB; fitG; fitB-mono;
   fitB-add; slotWrapB; slotWrapBSum; slotWrapB≤sum)
 
@@ -244,6 +244,23 @@ ValFit {u = u} k sl G κ = ValFitG k sl G (pathNestD κ) (obs u)
 ValsFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → List (Val Γ (obs u)) → Set
 ValsFit {u = u} k sl G κ = ValsFitG k sl G (pathNestD κ) (obs u)
+
+-- A FIT NAMED FROM A MAXIMUM, which is how a consumer that holds a
+-- ceiling on the values in flight hands one over: the grant is the
+-- path's remaining depth plus that ceiling plus the store's wrap, so
+-- every value is under it by being under the maximum, and the input
+-- guard costs nothing at all once the whole context is read.
+valsFit-of-max : ∀ {n} {Γ : Ctx n} {u t} (sl : Slots Γ) (p : Path Γ u t)
+  (vals : List (Val Γ (obs u))) (M : ℕ) → nestDᵛˢ vals ≤ M →
+  ValsFit n sl (pathNestD p + M + n * slotWrapSum sl) p vals
+valsFit-of-max sl p []       M hm = tt
+valsFit-of-max {n = n} {u = u} sl p (v ∷ vs) M hm =
+  ( ib-topᵛ (obs u) v
+  , +-monoˡ-≤ (n * slotWrapSum sl)
+      (+-monoʳ-≤ (pathNestD p)
+        (≤-trans (m≤m⊔n (nestDᵛ (obs u) v) (nestDᵛˢ vs)) hm)) )
+  , valsFit-of-max sl p vs M
+      (≤-trans (m≤n⊔m (nestDᵛ (obs u) v) (nestDᵛˢ vs)) hm)
 
 -- AND THE STREAM SIDE KEEPS ITS OWN CLAUSES, annotated the way its
 -- CONSUMERS annotate: the invariant a burst fold carries is typed by

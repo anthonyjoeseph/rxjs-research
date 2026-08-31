@@ -22,9 +22,10 @@ open import Data.Bool using (Bool; true)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0)
+open import Data.Nat using (ℕ; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
+  ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0;
+  *-zeroʳ; *-distribˡ-⊔)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -168,6 +169,27 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
                      hfit)))
           (Φ-of-bound B U G p vs
             (≤-trans (m≤n⊔m (nestDᵛ u v) (nestDᵛˢ vs)) hb) hfit)
+
+-- AND THE READING BACK, which is what a consumer needs to NAME a
+-- grant: the pointwise predicate bounds every value's depth under the
+-- same product, so it bounds their maximum under it too.  The path's
+-- own depth does not come back out -- at the empty list there is
+-- nothing to have carried it -- so this reads the values alone and a
+-- consumer that wants the path's share takes it from the premise it
+-- was handed.
+Φ-to-bound : ∀ {n} {Γ : Ctx n} {u t} (B U : ℕ) (p : Path Γ u t)
+  (vs : List (Val Γ u)) → valsΦ? B U p vs ≡ true →
+  pathΦF B p * nestDᵛˢ vs ≤ U
+Φ-to-bound B U p []       h =
+  ≤-trans (≤-reflexive (*-zeroʳ (pathΦF B p))) z≤n
+Φ-to-bound {u = u} B U p (v ∷ vs) h =
+  ≤-trans (≤-reflexive (*-distribˡ-⊔ (pathΦF B p) (nestDᵛ u v) (nestDᵛˢ vs)))
+          (⊔-lub head (Φ-to-bound B U p vs (∧-trueʳ h)))
+  where
+  head : pathΦF B p * nestDᵛ u v ≤ U
+  head =
+    ≤-trans (*-monoʳ-≤ (pathΦF B p) (m≤m+n (nestDᵛ u v) (pathNestD p)))
+            (≤ᵇ⇒≤ _ U (T-to (∧-trueˡ h)))
 
 -- THE OUTER FRAME, DISCHARGED FROM THE GRANT.  The frame's own arm
 -- says nothing about what a subscription returns, so the bound cannot

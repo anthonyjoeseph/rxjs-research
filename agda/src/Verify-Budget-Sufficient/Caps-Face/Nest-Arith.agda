@@ -90,14 +90,14 @@ abstract
   nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestWalkAt e sl id =
-    2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+    2 ^ suc (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
       * (nestUnit e sl + Caps.cSize (capsAt e sl id)
          + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
 
   nestWalkAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestWalkAt e sl id
-      ≡ 2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+      ≡ 2 ^ suc (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
           * (nestUnit e sl + Caps.cSize (capsAt e sl id)
              + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
   nestWalkAt-def _ _ _ = refl
@@ -108,10 +108,11 @@ abstract
   unit+size≤nestWalkAt e sl id =
     ≤-trans (m≤m+n (nestUnit e sl + Caps.cSize (capsAt e sl id))
                    (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
-      (nest-inflate (2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+      (nest-inflate (2 ^ suc (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
                     (nestUnit e sl + Caps.cSize (capsAt e sl id)
                      + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
-                    (m^n>0 2 (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
+                    (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
+                                   * Caps.cSize (capsAt e sl id)))))
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
 -- scripted slot's own index makes its nesting zero, and a shared one's
@@ -720,7 +721,7 @@ walk-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 walk-sight≤exp e sl id =
   subst (λ z → suc (sizeᵉ e) * (3 * z) ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)))
         (sym (nestWalkAt-def e sl id))
-        (≤-trans (*-mono-≤ hz (*-mono-≤ h3 (*-monoʳ-≤ (2 ^ (S * S)) hM)))
+        (≤-trans (*-mono-≤ hz (*-mono-≤ h3 (*-monoʳ-≤ (2 ^ suc (S * S)) hM)))
         (≤-trans (≤-reflexive collapse)
                  (^-monoʳ-≤ 2 expfit)))
   where
@@ -781,29 +782,29 @@ walk-sight≤exp e sl id =
   hM : nestUnit e sl + S + S * slotWrapSum sl ≤ 2 ^ (1 + 3 * S)
   hM = ≤-trans (+-mono-≤ (≤-trans hA (^-monoʳ-≤ 2 (m≤n*m S 3))) hB)
                (≤-reflexive dbl)
-  collapse : 2 ^ S * (2 ^ S * (2 ^ (S * S) * 2 ^ (1 + 3 * S)))
-               ≡ 2 ^ (S + (S + (S * S + (1 + 3 * S))))
+  collapse : 2 ^ S * (2 ^ S * (2 ^ suc (S * S) * 2 ^ (1 + 3 * S)))
+               ≡ 2 ^ (S + (S + (suc (S * S) + (1 + 3 * S))))
   collapse =
     trans (cong (λ z → 2 ^ S * (2 ^ S * z))
-                (sym (^-distribˡ-+-* 2 (S * S) (1 + 3 * S))))
+                (sym (^-distribˡ-+-* 2 (suc (S * S)) (1 + 3 * S))))
     (trans (cong (2 ^ S *_)
-                 (sym (^-distribˡ-+-* 2 S (S * S + (1 + 3 * S)))))
-           (sym (^-distribˡ-+-* 2 S (S + (S * S + (1 + 3 * S))))))
-  shapeL : S + (S + (S * S + (1 + 3 * S))) ≡ S * S + (5 * S + 1)
-  shapeL = solve 1 (λ s → s :+ (s :+ (s :* s :+ (con 1 :+ con 3 :* s)))
-                            := s :* s :+ (con 5 :* s :+ con 1))
+                 (sym (^-distribˡ-+-* 2 S (suc (S * S) + (1 + 3 * S)))))
+           (sym (^-distribˡ-+-* 2 S (S + (suc (S * S) + (1 + 3 * S))))))
+  shapeL : S + (S + (suc (S * S) + (1 + 3 * S))) ≡ S * S + (5 * S + 2)
+  shapeL = solve 1 (λ s → s :+ (s :+ ((con 1 :+ s :* s) :+ (con 1 :+ con 3 :* s)))
+                            := s :* s :+ (con 5 :* s :+ con 2))
                  refl S
   fourSq : 4 * (S * S) ≡ S * S + 3 * (S * S)
   fourSq = solve 1 (λ s → con 4 :* (s :* s) := s :* s :+ con 3 :* (s :* s))
                  refl S
   sixEq : 5 * S + S ≡ 3 * (2 * S)
   sixEq = solve 1 (λ s → con 5 :* s :+ s := con 3 :* (con 2 :* s)) refl S
-  h531 : 5 * S + 1 ≤ 3 * (S * S)
+  h531 : 5 * S + 2 ≤ 3 * (S * S)
   h531 =
-    ≤-trans (+-monoʳ-≤ (5 * S) 1≤S)
+    ≤-trans (+-monoʳ-≤ (5 * S) 2≤S)
     (≤-trans (≤-reflexive sixEq)
              (*-monoʳ-≤ 3 (*-monoˡ-≤ S 2≤S)))
-  expfit : S + (S + (S * S + (1 + 3 * S))) ≤ 2 ^ S
+  expfit : S + (S + (suc (S * S) + (1 + 3 * S))) ≤ 2 ^ S
   expfit =
     ≤-trans (≤-reflexive shapeL)
     (≤-trans (+-monoʳ-≤ (S * S) h531)

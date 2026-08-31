@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE GRANT IS DOWN TO ONE FRAME; NOW BUY IT.** The walk around it is
-  a real induction: the potential steps by the frame law, the size
-  receipt and the depth premise come off the path's head, and four frame
-  kinds are units — so `walk-thru-fit` is the whole residue, at one
-  outer frame with three premises. Buying it means naming the grant as
-  the path's own remaining depth plus what reaches the frame plus the
-  store's wrap, and the charge already has the room: the widened wrap
-  summand pays the third, and the unit under the size cap pays the first
-  two twice over. The uniform reading of the pointwise potential is what
-  the naming needs, and it is the converse of a lemma already proven.
+- **THE REGISTRY ARM IS WHOLE; THE OTHER TWO ARE NOT.** The chain's walk
+  now stands with no postulate under it — the grant is bought at the one
+  frame that owes it, out of the charge's own doubling. What that leaves
+  on the same `chainStep` are the LIVE and NODE arms, still postulated
+  whole, and they are the same induction over the same walk against two
+  other fields of the store. The leg is the NODE arm, since it moves at
+  every family and the registry arm's shape is now a worked instance:
+  the same `PathΦHyp` side-condition, the same frame law, and a per-arm
+  step leaf where the registry arm has `stepFrame-nest-regs`.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -273,10 +272,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   share boundary, where the walk re-enters on every chain at the sink. Their
   depths are under the registry's join, but nothing has read it.
-- **`walk-thru-fit`** (Caps-Face/Part7) — FALSITY, `TWIN`: the sighted grant at
-  ONE outer frame, now that the walk around it is a real induction. Its three
-  premises are what the walk holds there — every frame under the cap, the
-  remaining depth under the unit, the potential under the charge.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer
