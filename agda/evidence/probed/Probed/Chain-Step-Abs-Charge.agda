@@ -3,7 +3,6 @@
 -- STARTED FROM.
 --
 -- TARGET: chainStep-nest-nodesC @532695
--- TARGET: chainStep-nest-regsC @b7e851
 --
 -- WHY A SURROGATE AND NOT THE STATEMENT.  The three arms charge the
 -- growth to `nestUnit` plus the instant's SIZE CAP, and a cap does not
@@ -20,14 +19,15 @@
 -- evaluator itself presents at the second cascade, where the premise
 -- holds by the caps invariant the round already carries.
 --
--- WHAT IS LOAD-BEARING, AND WHAT IS NOT.  The node and registry rows
--- can fail: both move under a real `chainStep` at one family or the
--- other, and the charge names the program and the slot vocabulary
--- alone -- no term of it reads the state the chain produced.  The LIVE
--- rows are DEGENERATE and are pinned as such: the fold reads zero
--- before and after at both families, so no charge could have lost
--- there and the live arm is UNREACHED by this corpus.  That is why it
--- is not a target here.  The pins are separate from the ordering, so a
+-- WHAT IS LOAD-BEARING, AND WHAT IS NOT.  The node rows can fail: the
+-- table moves under a real `chainStep` at one family or the other, and
+-- the charge names the program and the slot vocabulary alone -- no term
+-- of it reads the state the chain produced.  The LIVE rows are
+-- DEGENERATE and are pinned as such: the fold reads zero before and
+-- after at both families, so no charge could have lost there and the
+-- live arm is UNREACHED by this corpus.  The REGISTRY rows are pins
+-- too, on a fold whose whole-chain statement is a definition now, and
+-- they hold the evaluator to the reading that body was written from.  The pins are separate from the ordering, so a
 -- repair moving either side fails naming a number.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Chain-Step-Abs-Charge where

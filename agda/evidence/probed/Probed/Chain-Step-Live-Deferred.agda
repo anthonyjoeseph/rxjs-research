@@ -3,7 +3,6 @@
 -- RUNNING RATHER THAN BY BUILDING THE PATH.
 --
 -- TARGET: chainStep-nest-liveC @358ade
--- TARGET: chainStep-nest-regsC @b7e851
 --
 -- WHY THIS PROGRAM.  A live source's nesting is the nesting of its
 -- PENDING values, and the evaluator mints a live carrying a nested
@@ -24,7 +23,9 @@
 -- zero.  Both sides are pinned before the ordering is taken.  The
 -- charge is the syntactic surrogate the tree proves the arms' increment
 -- dominates, so green here implies the arm at this program and red here
--- does not refute it.
+-- does not refute it.  The REGISTRY rows beside it are pins rather than
+-- evidence: that fold's whole-chain statement is a definition now, and
+-- they hold the evaluator to the reading it was written from.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Chain-Step-Live-Deferred where
 

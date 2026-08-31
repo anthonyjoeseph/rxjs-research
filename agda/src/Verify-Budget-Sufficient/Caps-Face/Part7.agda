@@ -51,6 +51,7 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def;
   delSize-exp)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (foldPath-nest-regs)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF; nest-telescope;
   nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
@@ -3913,42 +3914,23 @@ postulate
 -- assumed: the selection comes from the registry, and the registry's
 -- join is already under the unit there.
 --
--- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the same two
---   families and the registry does not move at either -- nine to nine
---   and two to two.  So the rows say the arm holds and say nothing
---   about a chain that registers something deep: what a chain writes to
---   the registry is uncovered, and only the two components beside it
---   were seen to move at all.
--- PROBED: `Probed.Chain-Step-Live-Deferred` reads it again at the one
---   family that mints a registration mid-step, and it is flat there
---   too -- one either side, at two body depths.  Covered, and it is a
---   boundary rather than a gap: a registration is minted at the depth
---   of the CONTINUATION it hangs off, not at the depth of what is
---   subscribed, so no amount of nesting in the subscribed value can
---   raise this fold.
--- PROBED: `Probed.Chain-Step-Regs-Rootward` builds the shape those two
---   left uncovered -- *All frames stacked ROOTWARD of the leaf, over a
---   `deferᵉ` at an iterated observable type, so the registration a
---   chain mints sits `k + 1` frames from the root -- and reads it at
---   two stack depths.  The fold moves with the stack and is EQUAL
---   either side of the chain at both, which is the mechanism rather
---   than another flat family: the frame carrying the emitted
---   observable is charged the `thru-outer` frames that observable will
---   push, and where the count stops at a defer gate the defer's own
---   registration adds back the one frame the gate dropped.  So the
---   chain cannot outrun the depth it came from, and what is left
---   uncovered is only a chain whose own path is deeper than the
---   registry it is read against, which no reachable state presents.
-postulate
-  chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
-    regsNestMax (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
-      ≤ regsNestMax (EvalSt.registry st) ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
+-- THE BODY IS THE WALK, and the charge it spends is the UNIT alone --
+-- the cap beside it is slack this statement never needs, kept because
+-- the two arms above are stated in that currency and the consumer joins
+-- all three.
+chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  regsNestMax (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
+    ≤ regsNestMax (EvalSt.registry st) ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
+chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
+  ≤-trans (foldPath-nest-regs _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
+             (nestUnit e sl) (∧-intro (T⇒≡true _ (≤⇒≤ᵇ hΦ)) refl))
+          (⊔-mono-≤ ≤-refl (m≤m+n (nestUnit e sl) (Caps.cSize (capsAt e sl id))))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.

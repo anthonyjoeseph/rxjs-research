@@ -215,15 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY ARM CAN NOW BE WRITTEN, AND THE BODY IS THE LEG.** The
-  premise the route needs is in place: the chain's own depth plus the
-  arrival's nesting, under the unit, derived at the walk from the
-  cascade-level join rather than assumed. What remains is the induction
-  it was added for — `chainStep` is `foldPath`, so the body walks the
-  path frame by frame, with the potential non-increasing at each: a map
-  frame spends its own charge into the values it produces, and a
-  thru-outer spends one frame into the registration it mints. The leg
-  is that walk, over per-frame leaves, in its own module.
+- **THE WALK IS WRITTEN AND ITS POTENTIAL IS ALREADY REFUTED, WHICH IS
+  THE FINDING.** `chainStep-nest-regsC` is a definition now, standing on
+  three leaves — one frame's registrations, the potential's survival
+  across that frame, and the share boundary. The middle one is FALSE as
+  written: substitution is multiplicative in the nesting currency, and
+  the tree has held the refutation for it since the map frame's charge
+  was first stated. So the leg is not to grind the leaves but to price
+  the walk again: a factor per frame is a factor per unit of path
+  length, which no join can carry, so the question is whether the arm
+  belongs in the factored currency the proven whole-walk version
+  already uses.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -266,13 +268,19 @@ does not fit is a finding about the shared statement, not about the head.
   table after one chain, charged to one instant's increment. Unprobeable as
   stated — the increment sits on the caps recurrence — but its syntactic
   surrogate runs.
-- **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY, `PROBED×3`: the
-  registry after one chain, charged to the instant's cap. It now carries the
-  chain's own depth as a premise, derived at the walk from the cascade-level
-  join, since neither the size premise nor `pathSz?` reaches that quantity.
+- **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
+  frame registers, under the potential it was handed. Instantiation at the
+  rootward stack says the tie is exact, so there is no slack to spend.
+- **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  share boundary, where the walk re-enters on every chain at the sink. Their
+  depths are under the registry's join, but nothing has read it.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
+- **`stepFrame-nest-Φ`** (Regs-Nest-Walk) — SHAPE, `REFUTED`: the potential —
+  values' nesting plus the path still to climb — survives one frame. It does
+  not, at the map clause: substitution is multiplicative in this currency, so
+  the restatement owes a factor per frame and it reaches the arm above.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
