@@ -23,36 +23,62 @@
 -- the previous form is nought and the two exponents face each other
 -- with nothing in between.
 --
--- WHAT THIS DOES NOT KILL.  Nothing about the per-VALUE price: the
--- value fit reads the arrival's own tower, which is exactly the
--- quantity the substitution moved, so it tracks the growth this
--- refutes.  What is dead is reading the entry grant off the payload.
+-- WHAT THIS DOES NOT KILL.  Nothing about the payload-side grant as
+-- such: the same tower bounds the DESCENT into the payload, where the
+-- exponent and the thing measured are both syntax of the program and
+-- no substitution comes between them.  What is dead is charging an
+-- ARRIVAL against it, since an arrival is what substitution produces.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Sight-All-Stream-Dup where
 
+open import Data.Bool using (T)
 open import Data.Empty using (⊥)
 open import Data.Fin using () renaming (zero to fzero)
 open import Data.List using (List; []; _∷_)
 open import Data.Vec using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
-open import Data.Product using (proj₁; proj₂)
-open import Data.Unit using (tt)
+open import Data.Product using (_×_; proj₁; proj₂)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gasPad; InstEmit)
 open import Rx.Exp
-  using (Ctx; Closed; Fn; Val; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; syncSizeᵉ;
-  syncSizeᵛ)
+  using (Ctx; Closed; Fn; Val; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂;
+         strmᵗ; varᵗ; syncSizeᵉ; syncSizeᵛ; inputsBelowᵉ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; Stream; root; _↠_; thru-outer; mergeAllᵒ;
          subscribeE; splitEvents; mintNode; installNode; sched-init; st-init)
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; allFresh; slotWrapSum)
-open import Verify-Budget-Sufficient.Depth-Sighted using (StreamFit)
+
+-- THE FOLD IS LOCALISED, and it has to be: the repair these rows
+-- forced MOVED the measure, so the entry fit in `src` now charges the
+-- arrival's depth with no factor over it.  Reading today's fold would
+-- read today's charge and refute nothing.  What is spelled out here is
+-- the form the rows were taken against -- a tower in the ARRIVAL's own
+-- sync size, times the telescope, plus the wrap the slots hold.
+ValFitOld : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
+  (κ : Path Γ u t) → Val Γ (obs u) → Set
+ValFitOld {u = u} k sl G κ o =
+  T (inputsBelowᵉ k o)
+  × (2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o)
+       + k * slotWrapSum sl ≤ G)
+
+ValsFitOld : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
+  (κ : Path Γ u t) → List (Val Γ (obs u)) → Set
+ValsFitOld k sl G κ []       = ⊤
+ValsFitOld k sl G κ (o ∷ os) = ValFitOld k sl G κ o × ValsFitOld k sl G κ os
+
+StreamFitOld : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
+  (κ : Path Γ u t) → Stream Γ (obs u) → Set
+StreamFitOld k sl G κ []                       = ⊤
+StreamFitOld {Γ = Γ} {u = u} k sl G κ (em ∷ ems) =
+  ValsFitOld k sl G κ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+  × StreamFitOld k sl G κ ems
 
 -- a FLAT slot, so the wrap summand is nought and the two towers face
 -- each other with nothing in between
@@ -132,7 +158,7 @@ sides = lhs 0 + 10000000000 * G 0
 sides≡ : sides ≡ 1310720000262144
 sides≡ = refl
 
-sight-all-stream-dup-absurd : StreamFit 1 sl (G 0) κ (proj₁ (runOf 0)) → ⊥
+sight-all-stream-dup-absurd : StreamFitOld 1 sl (G 0) κ (proj₁ (runOf 0)) → ⊥
 sight-all-stream-dup-absurd fit = ≤⇒≤ᵇ (proj₂ (proj₁ (proj₁ fit)))
 
 ----------------------------------------------------------------------
@@ -194,5 +220,5 @@ emitted≡ : emitted ≡ 186090042018
 emitted≡ = refl
 
 sight-all-stream-nest-absurd :
-  StreamFit 1 sl (Gn 2) κ (proj₁ (runN 2)) → ⊥
+  StreamFitOld 1 sl (Gn 2) κ (proj₁ (runN 2)) → ⊥
 sight-all-stream-nest-absurd fit = ≤⇒≤ᵇ (proj₂ (proj₁ (proj₁ fit)))

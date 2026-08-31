@@ -214,18 +214,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the fit's tower moves onto the PATH, where the fold already
-  exists** — the arrival-side tower is refuted twice, and the
-  measurement that follows says which side to read instead: over four
-  layers of duplicating map the consume DELIVERS one, two, three,
-  four, the arrival's depth digit for digit, with the tower
-  contributing nothing. `Nest-Store` already carries a factor per
-  frame — a map's step function weighs `2 ^ sizeᵗ f`, and `pathNestF`
-  multiplies them along the walk — and its own header argues the case
-  independently. So the leg is to read the fit's tower there rather
-  than at the arrival, propagate through the stream fold and the
-  grants above it, and RE-RUN rather than restamp the probe rows that
-  pinned the old statement.
+- **instantiate the repaired entry fold at the family that killed its
+  predecessor** — the fold now charges a SUM with no factor over the
+  arrival, and every row that pinned the old form was re-run and still
+  holds, but those rows read the consume rather than the entry, so
+  nothing has yet asked whether the payload-side grant covers the
+  demand across a whole subscribe. The refutation's own harness runs
+  that subscribe already and its `StreamFitOld` is one edit from the
+  live fold, so the region is reachable for the cost of a probe. Green
+  moves the row off FALSITY; red is the third refutation of this
+  region and a stop.
 
 - **the park site that must issue the ceiling it stores** — exactly
   one arm writes a `mergeAll` queue, the gate-shut arm of the inner
@@ -257,9 +255,9 @@ does not fit is a finding about the shared statement, not about the head.
   the family that refuted it; the two STORE conjuncts keep the class, reading
   vacuously wherever the consume has been instantiated.
 - **`sight-all-stream`** (Depth-Sighted) — FALSITY, `REFUTED×2`: the drain's
-  ENTRY half, a claim about the payload's emitted VALUES. A map whose step
-  names its argument twice emits a term about double the payload's sync size,
-  and the grant's exponent is the payload's, so the tower is outrun.
+  ENTRY half, a claim about the payload's emitted VALUES. The fold it
+  establishes now charges each arrival a sum with no factor over it, and
+  nothing has instantiated that form at the entry.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the

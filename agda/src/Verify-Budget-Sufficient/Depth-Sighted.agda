@@ -20,8 +20,9 @@ open import Data.Fin using (toℕ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; cong; cong₂; trans; sym; refl; subst)
 
-open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; syncSizeᵛ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
-  input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; inputsBelowᵉ; inputsBelowᵗ)
+open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ;
+  μᵉ; varᵉ; input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; inputsBelowᵉ;
+  inputsBelowᵗ)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Inputs-Below using (ib-unfoldμ)
 open import Decide using (∧ʳ)
@@ -219,35 +220,32 @@ postulate
 -- name and the wrap sum is what they hold, so the pair of them is the
 -- charge, and it is read against the telescope the step is taken over
 -- rather than against a schedule.
--- AND THE TOWER IS READ AT THE WRONG QUANTITY, which is a finding
--- about this format rather than about any one grant that instantiates
--- it.  A duplicating map doubles the ARRIVAL's size per layer while
--- costing the program a fixed number of constructors, and it moves the
--- arrival's DEPTH by one.  The two exponents measured side by side over
--- four layers run sixteen, twenty-three,
--- thirty, thirty-seven against eighteen, forty-two, ninety, a hundred
--- and eighty-six.  So a tower read at the arrival's SIZE has an
--- exponent exponential in the program, and no tower read at the program
--- can bound it; the depth it is standing in for grows by one a layer.
--- And the delivery says the same from the other side: over those four
--- layers the consume hands back one, two, three, four -- the arrival's
--- depth, digit for digit -- so on this family the exponent is standing
--- in for nothing at all.  Where a delivery HAS outrun the depth it was
--- the slot's definition doing it, and the wrap summand beside the tower
--- is what already pays for that.
--- REFUTED: `Refuted.Sight-All-Fit-Slot` pins it at the reference,
---   where the arrival-only grant is zero against a delivery of
---   sixty-four, and checks that the summand-carrying grant holds at
+-- AND THERE IS NO TOWER HERE, WHICH IS THE WHOLE OF WHAT THIS FORMAT
+-- ASKS.  A duplicating map doubles the ARRIVAL's size per layer while
+-- costing the program a fixed number of constructors, so an exponent
+-- read at the arrival is itself exponential in the program and nothing
+-- read at the program bounds it.  What the arrival's size was standing
+-- in for is its DEPTH, which moves by one a layer, and the delivery
+-- agrees digit for digit: over four such layers the consume hands back
+-- one, two, three, four.  Where a delivery HAS outrun the arrival's
+-- depth it was a slot's definition doing it, and the summand beside
+-- the depth is what pays for that.  So the charge is a sum of the two
+-- things a consume can spend -- the telescope it is read under, and
+-- what the slots the arrival may name hold -- with no factor at all.
+-- REFUTED: `Refuted.Sight-All-Fit-Slot` pins the summand's half at the
+--   reference, where the arrival-only grant is zero against a delivery
+--   of sixty-four, and checks that the summand-carrying grant holds at
 --   the deepest of those rows.
 -- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-nest-absurd`
---   is where the two columns of exponents above are measured, two
---   layers of duplication up.
+--   measures the exponents that ruled out the factor, two layers of
+--   duplication up: sixteen, twenty-three, thirty, thirty-seven on the
+--   program against eighteen, forty-two, ninety, a hundred and
+--   eighty-six on the arrival.
 ValFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → Val Γ (obs u) → Set
 ValFit {u = u} k sl G κ o =
   T (inputsBelowᵉ k o)
-  × (2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o)
-       + k * slotWrapSum sl ≤ G)
+  × (pathNestD κ + nestDᵛ (obs u) o + k * slotWrapSum sl ≤ G)
 
 ValsFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → List (Val Γ (obs u)) → Set
@@ -349,23 +347,23 @@ pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
 -- a weaker hypothesis there, and the ceiling both are spent under
 -- already has the same summand.
 --
--- AND THE PAYLOAD'S SIZE IS THE WRONG EXPONENT WHATEVER SUMMAND SITS
--- BESIDE IT.  A payload may MAP, and its step function may name its
--- argument twice; then one application emits a term holding two copies
--- of what arrived, so the emitted value's sync size is about DOUBLE the
--- payload's while the grant's exponent stays the payload's.  Both sides
--- are towers of two, so a constant factor between the EXPONENTS is not
--- a scale error: the ratio is itself a tower, and every layer of
--- padding doubles it.  The summand cannot help, since it is read off
--- the telescope and the witness uses a flat one, where it is nought.
--- What the grant has to read is a size that survives substitution.
+-- AND THE PAYLOAD'S SIZE IS THE RIGHT EXPONENT ON THIS SIDE, WHICH IS
+-- NOT A GENERAL LICENCE FOR IT.  A payload may MAP, and its step
+-- function may name its argument twice; then one application emits a
+-- term holding two copies of what arrived, so an emitted value's sync
+-- size is about DOUBLE the payload's.  A tower is therefore owed, and
+-- it is owed HERE, where the exponent is syntax of the program and
+-- nothing between the two is substituted.  What may not carry one is
+-- the charge the fold makes per ARRIVAL: an arrival is what the
+-- substitution produced, so a tower over it has an exponent that is
+-- itself exponential in the program and this grant cannot reach it.
 --
--- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`,
---   at a flat telescope where the wrap is nought: sixteen against
---   eighteen in the exponents, so a quarter of a million delivered
---   against a grant of a hundred and thirty-one thousand.  And
---   `Refuted.Sight-All-Stream-Dup.sight-all-stream-nest-absurd` again
---   two layers up, where the same rows measure the gap COMPOUNDING.
+-- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`
+--   kills the arrival-tower fold at a flat telescope where the wrap is
+--   nought: sixteen against eighteen in the exponents, so a quarter of
+--   a million demanded against this grant of a hundred and thirty-one
+--   thousand.  And `…nest-absurd` again two layers up, where the same
+--   rows measure the gap COMPOUNDING.
 -- REFUTED: `Refuted.Sight-All-Fit-Slot` kills the payload-only grant
 --   at a slot whose definition substitutes per layer -- delivered
 --   `8 16 32 64` against a constant sixteen, meeting it exactly at the

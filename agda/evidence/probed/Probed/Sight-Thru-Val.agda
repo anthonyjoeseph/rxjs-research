@@ -1,17 +1,17 @@
 -- ══════════════════════════════════════════════════════════════════
--- THE PRICE OF ONE ARRIVING INNER, at the family that killed the
--- grant's first form.  The per-value fit reads the arrival's own tower
--- plus the wrap the telescope carries; the refutation showed the first
--- summand alone is pinned at zero when the arrival is a REFERENCE, so
--- the rows here ask whether the second one pays for what substituting
--- the slot lets through.
+-- THE PRICE OF ONE ARRIVING INNER, at the family that pins what the
+-- fit may charge.  The per-value fit is a sum with no factor in it --
+-- the telescope the consume is read under, the arrival's own depth,
+-- and the wrap the slots hold -- and the first two are pinned at a
+-- constant when the arrival is a REFERENCE, so the rows here ask
+-- whether the wrap pays for what substituting the slot lets through.
 --
 -- PROBES: `refl` receipts at concrete programs.  See EVIDENCE.md.
 --
 -- WHAT IS LOAD-BEARING is the FLAT row, and it is the only one.  The
 -- wrap is a power of two in the definition's sync size times its
 -- depth, so it vanishes exactly when the definition has no `*All` in
--- it, and then the whole grant is the path's own step -- two, fixed,
+-- it, and then the whole grant is the path's own step -- one, fixed,
 -- against whatever the substitution delivers.  It reads zero, so the
 -- row holds with the margin the step buys and nothing else.
 --
@@ -19,13 +19,13 @@
 -- measurement rather than a weakness: they are the family the
 -- refutation used, and the summand that repairs it does not repair it
 -- marginally.  The delivery doubles per layer -- one, two, four,
--- eight -- while the grant goes a thousand and twenty-six, then
+-- eight -- while the grant goes a thousand and twenty-five, then
 -- sixty-seven million, because the wrap is exponential in a sync size
 -- that grows with the layer.  No count of layers closes that.
 --
 -- BLOCKED, AND THE FINDING IS THAT IT CANNOT REFUTE HERE: `deferᵉ`
 -- reads depth zero whatever its body is, so a reference to a deferred
--- tower has a zero wrap and the fixed grant of two -- the shape that
+-- tower has a zero wrap and the fixed grant of one -- the shape that
 -- ought to be dangerous.  It delivers nothing at all, at every layer,
 -- because a consume does not unfold a defer; the subscription that
 -- would is a later step.  So the hiding measure and the hidden depth
@@ -38,12 +38,11 @@
 -- one, so the two rows say only that nothing moved.  Reaching them
 -- wants a consume that installs, and this harness's does not.
 --
--- AND THE DUPLICATING FAMILY IS LOAD-BEARING AND SETTLES WHAT THE
--- TOWER IS FOR: over four layers the arrival's size doubles, and what
--- the consume DELIVERS reads one, two, three, four -- the arrival's
--- depth, digit for digit, with the tower contributing nothing.  So on
--- this family the grant's exponent is not standing in for the
--- delivery, which is what the entry witness saw from the other side.
+-- AND THE DUPLICATING FAMILY IS LOAD-BEARING AND IS WHY THERE IS NO
+-- FACTOR: over four layers the arrival's size doubles, and what the
+-- consume DELIVERS reads one, two, three, four -- the arrival's depth,
+-- digit for digit.  So a tower over that depth would be paying for
+-- nothing here, while its exponent ran away with the arrival.
 --
 -- NOT COVERED: a telescope of
 -- more than one slot, where the sum is over slots rather than one of
@@ -59,7 +58,7 @@ open import Data.Fin using () renaming (zero to fzero)
 open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
@@ -67,8 +66,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gasPad)
 open import Rx.Exp
-  using (Ctx; Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂;
-         strmᵗ; varᵗ; caseᵗ; inlᵗ; input; inputsBelowᵉ; syncSizeᵛ; deferᵉ)
+  using (Ctx; Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; input;
+  inputsBelowᵉ; deferᵉ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
@@ -108,12 +107,11 @@ sched d ok = sched-init prog (sl d ok)
 stM : EvalSt prog
 stM = installNode 0 (mergeAll-st {t = obs natᵗ} nothing 0 [] false) (st-init prog)
 
--- the arrival's own tower plus the wrap the telescope carries, at the
--- one input this context has
+-- the telescope the consume is read under, the arrival's own depth,
+-- and the wrap the slots hold, at the one input this context has
 G : Val Γₛ (obs (obs natᵗ)) → (d : Closed Γₛ (obs natᵗ)) →
     T (inputsBelowᵉ 0 d) → ℕ
-G o d ok = 2 ^ syncSizeᵛ (obs (obs natᵗ)) o
-             * (pathNestD κ + nestDᵛ (obs (obs natᵗ)) o)
+G o d ok = pathNestD κ + nestDᵛ (obs (obs natᵗ)) o
          + 1 * slotWrapSum (sl d ok)
 
 del : Val Γₛ (obs (obs natᵗ)) → (d : Closed Γₛ (obs natᵗ)) →
@@ -149,10 +147,10 @@ sidesRef≡ : del ref (dDup 0) tt + 10 * del ref (dDup 1) tt
           + 100 * del ref (dDup 2) tt + 1000 * del ref (dDup 3) tt ≡ 8421
 sidesRef≡ = refl
 
-grantRef₀≡ : G ref (dDup 0) tt ≡ 1026
+grantRef₀≡ : G ref (dDup 0) tt ≡ 1025
 grantRef₀≡ = refl
 
-grantRef₁≡ : G ref (dDup 1) tt ≡ 67108866
+grantRef₁≡ : G ref (dDup 1) tt ≡ 67108865
 grantRef₁≡ = refl
 
 -- the one shape where the wrap vanishes: a definition with no *All in
@@ -160,7 +158,7 @@ grantRef₁≡ = refl
 flat : Closed Γₛ (obs natᵗ)
 flat = ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ [])
 
-grantFlat≡ : G ref flat tt ≡ 2
+grantFlat≡ : G ref flat tt ≡ 1
 grantFlat≡ = refl
 
 delFlat≡ : del ref flat tt ≡ 0
@@ -202,7 +200,7 @@ fitOwn = refl , refl , refl
 hid : ℕ → Closed Γₛ (obs natᵗ)
 hid k = ofᵉ (strmᵗ (deferᵉ (mergeAllᵉ nothing (dDup k))) ∷ [])
 
-grantHid≡ : G ref (hid 3) tt ≡ 2
+grantHid≡ : G ref (hid 3) tt ≡ 1
 grantHid≡ = refl
 
 delHid≡ : del ref (hid 0) tt + 10 * del ref (hid 1) tt
