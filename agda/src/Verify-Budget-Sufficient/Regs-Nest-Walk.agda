@@ -4,11 +4,12 @@
 -- in the registry is an induction over the path with one leaf per
 -- clause -- and the quantity that survives the induction is not the
 -- registry alone but the POTENTIAL: the nesting of the values in flight
--- plus the depth of the path still to come.  Every frame spends its own
--- charge into one or the other and never into both, which is why the
--- potential is what the walk carries and the registry is only read off
--- it: a map frame hands its charge to the values it produces, and a
--- thru-outer spends one frame into the registration it mints.
+-- plus the depth of the path still to come, scaled by the factor that
+-- path can still apply to them.  Every frame spends its own charge into
+-- one of the three and never into two, which is why the potential is
+-- what the walk carries and the registry is only read off it: a map
+-- frame trades its factor for the values it produces, and a thru-outer
+-- spends one unit of depth into the registration it mints.
 --
 -- WHY THE TWO STEP LEAVES ARE SEPARATE.  One says the registry does not
 -- outrun the potential; the other says the potential itself survives
@@ -21,7 +22,7 @@ open import Data.Bool using (Bool; true)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
 open import Data.List using (List; _++_)
-open import Data.Nat using (ℕ; _+_; _⊔_; _≤_; _≤ᵇ_)
+open import Data.Nat using (ℕ; _+_; _*_; _⊔_; _≤_; _≤ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_)
@@ -32,14 +33,19 @@ open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_;
          foldPath; stepFrame; dispatchShare)
 open import Rx.Nest-Depth using (nestDᵛ)
-open import Verify-Budget-Sufficient.Nest-Store using (regsNestMax; pathNestD)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (regsNestMax; pathNestD; pathNestF)
 
 -- the potential, read off the values still in flight and the path they
--- have left to climb
+-- have left to climb -- and SCALED by the path's own factor, because
+-- what a frame does to a value is substitution and substitution is
+-- multiplicative in this currency.  The factor is spent frame by frame:
+-- each one hands its share to the value it produces, so the product
+-- shrinks exactly as fast as the value it multiplies can grow.
 valsΦ? : ∀ {n} {Γ : Ctx n} {s t} (U : ℕ) (path : Path Γ s t)
   (vals : List (Val Γ s)) → Bool
 valsΦ? {s = s} U path vals =
-  all (λ v → nestDᵛ s v + pathNestD path ≤ᵇ U) vals
+  all (λ v → pathNestF path * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
 
 postulate
   -- ONE FRAME'S REGISTRATIONS, under the potential it was handed.  The
@@ -70,22 +76,19 @@ postulate
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
 
   -- AND THE POTENTIAL ITSELF ACROSS THE FRAME, which is the induction's
-  -- own hypothesis and the half that DOES fail -- as stated, at the map
-  -- clause.  A step function may name its payload on both
-  -- sides of an additive `nestDᵉ`, so ONE substitution installs the
-  -- payload's nesting twice while the path gave up only the function's
-  -- own; the gap is the occurrence count and grows without bound.  So
-  -- the potential is not preserved additively, and what it is owed is
-  -- the currency the proven substitution face already uses: a factor
-  -- the syntax can see, the step function's size.  What
-  -- that costs is not local -- a factor per frame is a factor per unit
-  -- of path length, which is the shape the arm above cannot carry as a
-  -- join, so the restatement reaches its consumer.
+  -- own hypothesis.  A step function may name its payload on both sides
+  -- of an additive `nestDᵉ`, so ONE substitution installs the payload's
+  -- nesting twice while the path gives up only the function's own --
+  -- which is why the potential carries the path's factor and not just
+  -- its depth.  A map frame surrenders two to its own size and the
+  -- value it produces may claim exactly that, so the two moves cancel
+  -- and nothing accumulates along the walk.
   --
-  -- REFUTED: `Refuted.Apply-Fn-Nest`, at the smallest term of that
-  --   shape -- a `mapᵉ` whose source and whose step function are the
-  --   same outer variable, applied to a payload one `switchAllᵉ` deep.
-  --   Two against a charge of one.
+  -- REFUTED: `Refuted.Apply-Fn-Nest` kills the additive reading of this
+  --   same statement, at the smallest term of that shape -- a `mapᵉ`
+  --   whose source and whose step function are the same outer variable,
+  --   applied to a payload one `switchAllᵉ` deep.  Two against a charge
+  --   of one, and that is the factor this form pays.
   stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
