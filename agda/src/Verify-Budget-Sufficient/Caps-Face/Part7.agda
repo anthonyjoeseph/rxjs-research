@@ -32,7 +32,7 @@ open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; c
   InstEvent)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵛ; Fn; applyFn)
 open import Rx.Frame-Width using (pWᵛ)
-open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; reached-room; room-step; room-descend; base; walk)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
@@ -51,7 +51,8 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (foldPath-nest-regs; PathΦHyp)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using
+  (foldPath-nest-regs; PathΦHyp; FrameΦHyp; valsΦ?; stepFrame-nest-Φ)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
@@ -3920,32 +3921,138 @@ postulate
 -- still apply -- and the size premise is what bounds it without reading
 -- the run: each frame's size is under the cap and the path's length is
 -- too, so the factor is two to the cap SQUARED and no more.
+-- THE PATH'S OWN DEPTH ONLY GROWS ROOTWARD, which is what lets a
+-- premise taken at the chain's entry be spent at every frame the walk
+-- reaches: four clauses add a term's depth or nothing, and the outer
+-- frame adds one.
+pathNestD-step : ∀ {n} {Γ : Ctx n} {s u t} (f : Frame Γ s u) (p : Path Γ u t) →
+  pathNestD p ≤ pathNestD (f ↠ p)
+pathNestD-step (map-f fn)         p = m≤n+m (pathNestD p) (nestDᵗ fn)
+pathNestD-step (scan-f fn _)      p = m≤n+m (pathNestD p) (nestDᵗ fn)
+pathNestD-step (take-f _)         p = ≤-refl
+pathNestD-step (from-inner _ _ _) p = ≤-refl
+pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
+
 postulate
-  -- THE GRANT AT EVERY OUTER FRAME OF ONE CHAIN, which is the whole of
-  -- what the walk still owes.  Four frame kinds owe nothing, so this
-  -- is a tuple of units on any path with no `thru-outer` in it; where
-  -- there IS one, what is owed is a sighted grant covering the values
-  -- reaching that frame -- and the caps recurrence already carries a
-  -- ceiling for exactly those values, one ceiling level per frame.
-  -- The route is to read the grant off that ceiling rather than to
-  -- rebuild one: iterating "the size grows by a factor per frame"
-  -- gives a bound two to the cap squared ABOVE the cap, which the
-  -- charge cannot afford, while the recurrence's own ceiling is what
-  -- the arm is stated against.
+  -- THE GRANT AT ONE OUTER FRAME, which is the whole of what the walk
+  -- still owes: the four other frame kinds owe nothing, so a path with
+  -- no `thru-outer` in it needs none of this.  What is owed is a
+  -- SIGHTED grant covering the values that reach this frame -- a
+  -- ceiling on each one's depth plus the store's per-slot wrap, which
+  -- the delivery face's fit demands and the potential does not carry.
+  -- The three premises are what the walk holds there: every frame's
+  -- size is under the cap, the path's remaining depth is under the
+  -- unit, and the potential at this frame is under the charge.
   --
   -- TWIN: `chain-walk-caps` is the same induction in the caps
   --   currency, already proven -- it preserves a per-frame ceiling
   --   across one frame at one stepped level, which is the shape the
   --   grant here has to be extracted at.
-  chain-walk-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (op : AllOp) (nid : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ) →
     Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
-    PathΦHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
-      (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-      path (arrVal a ∷ []) (Arrival.isLast a) sched st
+    pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
+    pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+           (thru-outer op nid ↠ p) vals ≡ true →
+    FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+              (thru-outer op nid) p vals sched
+
+-- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
+-- which is the point of separating it from the walk below: the four
+-- silent kinds are units, so the walk's recursion never mentions them.
+frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (f : Frame Γ s u) (p : Path Γ u t)
+  (vals : List (Val Γ s)) (sched : Sched Γ) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
+  pathNestD (f ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) (f ↠ p) vals ≡ true →
+  FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+            f p vals sched
+frameΦ-fit sl id (map-f _)          p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (scan-f _ _)       p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (take-f _)         p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (from-inner _ _ _) p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (thru-outer op nid) p vals sched hsl hpz hnd hΦ =
+  walk-thru-fit sl id op nid p vals sched hsl hpz hnd hΦ
+
+-- THE WALK ITSELF, and it is the fold's own recursion with the grant
+-- hung off each frame.  Nothing here is arithmetic: the potential is
+-- stepped by the frame law, the size receipt and the depth premise are
+-- read off the path's head, and the slot equality survives a frame
+-- because a frame never rewrites the schedule's slots.
+walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  pathNestD path ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) path vals ≡ true →
+  PathΦHyp sf nid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    path vals fin sched st
+walk-ΦHyp-go sl id sf nid now root           vals fin sched st _ _ _ _ = tt
+walk-ΦHyp-go sl id sf nid now (share-sink _) vals fin sched st _ _ _ _ = tt
+walk-ΦHyp-go {e = e} sl id sf nid now (f ↠ p) vals fin sched st hsl hpz hnd hΦ =
+    hF
+  , walk-ΦHyp-go sl id sf nid now p (proj₁ step)
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step))))
+      (trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) hsl)
+      hpz′
+      (≤-trans (pathNestD-step f p) hnd)
+      (stepFrame-nest-Φ sf nid now f p vals fin sched st
+        (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) hΦ hF)
+  where
+  step = stepFrame sf nid now f p vals fin sched st
+  hF = frameΦ-fit sl id f p vals sched hsl hpz hnd hΦ
+  B  = Caps.cSize (capsAt e sl id)
+  hpz′ : pathSz? B p ≡ true
+  hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
+                 (proj₂ (∧-true (frameSz? B f)
+                          ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+
+-- THE ARRIVAL'S OWN POTENTIAL, which is the entry reading BOTH the
+-- walk's side-condition and the fold's own premise are spent at: one
+-- value on the path, so the depth premise the arm was stated with is
+-- the whole of it once the path's factor is applied.
+entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (path : Path Γ (arrTy a) t) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) path
+         (arrVal a ∷ []) ≡ true
+entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
+  where
+  Sz = Caps.cSize (capsAt e sl id)
+  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+           ≤ nestWalkAt e sl id
+  Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
+               (sym (nestWalkAt-def e sl id))
+               (*-mono-≤ (pathΦF-cap Sz path hp)
+                         (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
+                                  (m≤m+n (nestUnit e sl + Sz)
+                                         (Sz * slotWrapSum sl))))
+
+-- AND THE CHAIN ENTERS THE WALK WITH IT, the path's remaining depth
+-- being under the same unit the arrival's is read against.
+chain-walk-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  PathΦHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ =
+  walk-ΦHyp-go sl id _ nextId (arrTick a) path (arrVal a ∷ [])
+    (Arrival.isLast a) sched st hsl hp
+    (≤-trans (m≤n+m (pathNestD path) (nestDᵛ (arrTy a) (arrVal a))) hΦ)
+    (entryΦ sl id a path hp hΦ)
 
 chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -3960,18 +4067,8 @@ chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
   foldPath-nest-regs _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
     (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-    (∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl)
+    (entryΦ sl id a path hp hΦ)
     (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
-  where
-  Sz = Caps.cSize (capsAt e sl id)
-  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
-           ≤ nestWalkAt e sl id
-  Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
-               (sym (nestWalkAt-def e sl id))
-               (*-mono-≤ (pathΦF-cap Sz path hp)
-                         (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
-                                  (m≤m+n (nestUnit e sl + Sz)
-                                         (Sz * slotWrapSum sl))))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.

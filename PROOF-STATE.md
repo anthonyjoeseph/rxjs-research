@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHARGE NOW AFFORDS THE GRANT; READING IT OFF IS WHAT IS LEFT.**
-  The fit a sighted walk needs carries a per-slot wrap the walk's charge
-  did not price, and the sole producer of that fit demands it, so the
-  charge grew by the size cap times the store's wrap sum — and the
-  ceiling still closes, since the widened exponent is a square plus a
-  linear term and the cap's own exponential swallows both. What remains
-  is `chain-walk-ΦHyp`: a grant at each outer frame of one chain, at the
-  state the walk has reached when that frame runs. Read it off
-  `chain-walk-caps`, which preserves a per-frame ceiling across a frame
-  at one stepped level — the shape the grant is owed at.
+- **THE GRANT IS DOWN TO ONE FRAME; NOW BUY IT.** The walk around it is
+  a real induction: the potential steps by the frame law, the size
+  receipt and the depth premise come off the path's head, and four frame
+  kinds are units — so `walk-thru-fit` is the whole residue, at one
+  outer frame with three premises. Buying it means naming the grant as
+  the path's own remaining depth plus what reaches the frame plus the
+  store's wrap, and the charge already has the room: the widened wrap
+  summand pays the third, and the unit under the size cap pays the first
+  two twice over. The uniform reading of the pointwise potential is what
+  the naming needs, and it is the converse of a lemma already proven.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -273,10 +273,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   share boundary, where the walk re-enters on every chain at the sink. Their
   depths are under the registry's join, but nothing has read it.
-- **`chain-walk-ΦHyp`** (Caps-Face/Part7) — FALSITY, `TWIN`: the sighted grant
-  at every outer frame of one chain, which is all the walk still owes. Four
-  frame kinds owe nothing; the fifth wants a ceiling the caps recurrence
-  already carries, one level per frame, and nothing has yet read it off.
+- **`walk-thru-fit`** (Caps-Face/Part7) — FALSITY, `TWIN`: the sighted grant at
+  ONE outer frame, now that the walk around it is a real induction. Its three
+  premises are what the walk holds there — every frame under the cap, the
+  remaining depth under the unit, the potential under the charge.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer
