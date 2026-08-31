@@ -15,8 +15,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong
 open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; opIterD-mono; opIterD-infl; sizeCount; sizeCount-body; cDel-body; lvls-add;
-  lvls-mono; dWalkᶜ-mono; dCapᶜ-mono)
-open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated-at)
+  lvls-mono; dWalkᶜ-mono)
 open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
 
 -- THE CEILING, CARRIED RELATIVELY -- what the walk owes and cannot
@@ -143,35 +142,6 @@ RoomG c d Lv g =
   lvls (Caps.cSize c) (Caps.cWid c) d Lv
     (dCapᶜ (Caps.cSize c) (Caps.cWid c) (Caps.cReg c) d g Lv)
     ≤ sizeCount c d ⊔ Caps.cSize c
-
--- THE PARKED TERM ASKS IT AT THE LEVEL IT WAS PARKED AT, which is the
--- only cap anything holds about it.  A queue's entry arrived at a
--- frame the walk had already stepped into and was written to the node
--- table there, so the store predicate re-establishes its size one
--- level up at every park and the base reading is not available at any
--- queue at all.  Both premises are therefore read at the stepped cap,
--- and the domination survives the move because the descent count the
--- budget module bounds is itself counted out of the level's own
--- iteration ladder rather than out of the base cap -- so a term whose
--- size only fits the stepped cap is paid for by the same level that
--- stepped it.
---
--- AND IT SUBSUMES THE BASE READING RATHER THAN WEAKENING IT: the cap
--- only grows down the ladder, so a term readable at the base cap is
--- readable here by inflation, and a separate base-cap row would be
--- the same statement with a smaller domain.
--- REFUTED: `Refuted.Drain-Queue-Flat.drain-room-flat-absurd`, which
---   is the base reading being unavailable to a queue.
-ceil-park : ∀ (c : Caps) (d Lv k m : ℕ) → 2 ≤ Caps.cSize c →
-  m ≤ Caps.cSize (frameStep Lv c) → 1 ≤ Caps.cReg c →
-  RoomG c d Lv (4 + k) →
-  CeilD c d Lv k m
-ceil-park c d Lv k m 2≤S hm 1≤R room L′ hL =
-  ≤-trans hL
-    (≤-trans (opIterD-dominated-at (Caps.cSize c) (Caps.cWid c) d k m
-                (Caps.cReg c) Lv 2≤S hm 1≤R)
-             room)
-
 -- AND THE RECEIPT DESCENDS THE WALK EXACTLY, WHICH IS WHY IT IS ASKED
 -- FOR AND NOT PROBED.  Neither side of the room can be instantiated:
 -- both are levels in the delivery ladder, and the ladder outruns
@@ -250,22 +220,6 @@ reached-room c d .0 .(suc (Caps.cSize c)) 2≤S base =
           (m≤m⊔n (sizeCount c d) (Caps.cSize c))
 reached-room c d _ g 2≤S (walk J g′ i hi r) =
   room-descend c d g′ J i 2≤S hi (reached-room c d J (suc g′) 2≤S r)
-
--- AND LESS GAS IS LESS ROOM, so a term asks for what it costs rather
--- than for what the level happens to hold.
-room-gas : ∀ (c : Caps) (d Lv g g′ : ℕ) → 2 ≤ Caps.cSize c → g′ ≤ g →
-  RoomG c d Lv g → RoomG c d Lv g′
-room-gas c d Lv g g′ 2≤S hg room =
-  ≤-trans (lvls-mono (dCapᶜ S W R d g′ Lv) (dCapᶜ S W R d g Lv)
-             2≤S ≤-refl ≤-refl ≤-refl
-             (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {Lv} {Lv} {d}
-                g′ g 2≤S ≤-refl ≤-refl ≤-refl hg ≤-refl))
-          room
-  where
-  S = Caps.cSize c
-  W = Caps.cWid c
-  R = Caps.cReg c
-
 -- ONE CHAIN OF A ROUND ADVANCES THE POSITION BY ITS OWN BUDGET, and
 -- the fold's actual climb is under it exactly when the chain's
 -- deliveries are.  `dWalkᶜ` at a `suc` is the ledger plus one restart
@@ -287,23 +241,3 @@ ent-step c d J g i D 2≤S hD =
   w = dWalkᶜ S W R d g J i
   C = dCapᶜ S W R d g (Pos c d J g i)
 
-
--- THE WALK'S LEVEL IS BOUNDED BY A DELIVERY POSITION, NOT EQUAL TO ONE.
--- A chain advances its level by one `fLvlD` charge per frame, while the
--- cascade's walk advances by whole `dLvl` restarts, so the levels a
--- chain visits sit BETWEEN two positions the walk lands on.  Room is
--- monotone the useful way: both the ladder from a level and the budget
--- read at it grow with the level, so a receipt at the position ABOVE
--- covers every level under it, and the reaching obligation is a `≤`.
-room-le : ∀ (c : Caps) (d Lv Lv′ g : ℕ) → 2 ≤ Caps.cSize c → Lv ≤ Lv′ →
-  RoomG c d Lv′ g → RoomG c d Lv g
-room-le c d Lv Lv′ g 2≤S hLv room =
-  ≤-trans (lvls-mono (dCapᶜ S W R d g Lv) (dCapᶜ S W R d g Lv′)
-             2≤S ≤-refl ≤-refl hLv
-             (dCapᶜ-mono {S} {S} {W} {W} {R} {R} {Lv} {Lv′} {d}
-                g g 2≤S ≤-refl ≤-refl ≤-refl ≤-refl hLv))
-          room
-  where
-  S = Caps.cSize c
-  W = Caps.cWid c
-  R = Caps.cReg c

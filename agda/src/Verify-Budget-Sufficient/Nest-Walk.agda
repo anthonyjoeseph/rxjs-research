@@ -68,10 +68,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using (capsOK?-nextNode; ca
 open import Verify-Budget-Sufficient.Node-Table using (lookupNode-setNode; lookupNode-setNode-other)
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; ≡ᵇ→≡)
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
-open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-supply)
+open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
-  (CeilD; Reached; reached-room; room-gas; room-le; ceil-park; ceil-step; ceil-le; ceil-mu;
-  ceil-here)
+  (CeilD; ceil-step; ceil-le; ceil-mu; ceil-here)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; allFresh; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -822,27 +821,6 @@ pathSz?-lvl c Lv p 2≤S h =
 -- the caps face's frame counter in a second currency is the alternative
 -- nobody wants.  Recursion on the QUEUE is what lets the drain's own
 -- induction take its hypothesis apart.
---
--- AND THE HEADROOM IS ONE CONJUNCT, NOT TWO.  The ceiling the drain
--- lifts wants a nesting bound and a size bound on the parked term, and
--- both are supplied by the single inequality here -- `drain-head
--- -supply` is what splits it back into the pair, which is why the
--- currency is the size and not the nesting.  What that buys is not
--- brevity: whatever states the store bound has to establish this.
-
--- AND THE SIZE CURRENCY IS WHAT THE BASE CAP REFUSES, which leaves
--- this floor the one conjunct here with no producer.  A term is
--- parked by the consuming edge when its node is out of room, so what
--- lands in the queue is an ARRIVAL -- admitted at the cap the walk
--- had STEPPED to, while the floor is read at the base one.  Nesting
--- does not carry that defect -- it sits under a sync size plus the
--- slots, and a substitution need not move either -- but replacing the
--- floor with it is only half a repair, because the ceiling underneath
--- charges a DESCENT COUNT beside the nesting and that count is
--- instantiated at the written size.  What the argument for the size
--- currency rested on does not hold either: whatever states the store
--- bound ranges over the whole state, and a connect walk's residue is
--- a field of it.
 
 -- AND THE QUEUE'S READINGS SIT AT THE WALK'S LEVEL, NOT AT THE ENTRY
 -- CAP, which a witness settles and not a preference.  A term the
@@ -850,12 +828,25 @@ pathSz?-lvl c Lv p 2≤S h =
 -- into, and a step is a widening, so the entry cap refuses terms the
 -- walk admits: at an entry size of eight one step buys a hundred and
 -- thirty-six, and every source between the two is a counterexample.
--- The room floor is the one conjunct still read at the entry cap, and
--- it is refused for the same reason -- so nothing the walk holds
--- supplies it, and that is the gap its producer is left carrying.
--- REFUTED: `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd`,
---   `Refuted.Drain-Queue-Flat.drain-clos-flat-absurd` and
---   `Refuted.Drain-Queue-Flat.drain-room-flat-absurd`
+-- REFUTED: `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd` and
+--   `Refuted.Drain-Queue-Flat.drain-clos-flat-absurd`; and
+--   `Refuted.Drain-Queue-Flat.drain-room-flat-absurd` for the room
+--   floor that used to sit beside them, which the carried ceiling
+--   retires rather than relocates
+
+-- AND THE CEILING IS CARRIED, NOT MANUFACTURED, which is the one
+-- conjunct here whose currency had to change rather than its cap.  A
+-- reached level cannot supply it: the relation issuing one is rooted at
+-- `suc` the entry size cap and every position spends one, so the fuel it
+-- can offer is under that root, while the parked term's nesting is
+-- bounded only at the cap the walk STEPPED to and one step takes the
+-- size past its own square.  The ceiling itself has no such root -- it
+-- descends by one operator per frame from wherever the parking frame
+-- held it -- so the entry states what the drain actually spends and the
+-- producer is the arm that parked the term.
+-- REFUTED: `Refuted.Drain-Reach-Gas.drain-reach-gas-absurd`, the
+--   reached-level form at one level, with `drain-reach-gas-base` beside
+--   it meeting the same obligation at level zero.
 
 -- AND THE LEVEL CLIMBS ALONG THE QUEUE, because the STATE does.
 -- Subscribing one queued inner installs nodes the caps did not have
@@ -878,10 +869,7 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (nestClosOK? (frameStep Lv c) sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
-  × (3 + (sizeᵉ o + slotsSize sl) ≤ Caps.cSize (frameStep Lv c))
-  × (Σ ℕ λ g → Σ ℕ λ Lv′ →
-      (4 + nest o sl (EvalSt.connectedShares st) ≤ g)
-      × (Lv ≤ Lv′) × Reached c d Lv′ g)
+  × CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o)))
   × (Σ ℕ λ Lv″ → (Lv ≤ Lv″) ×
       capsDrainOK c sl d Lv″ sf allNid κ id now lim
         (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
@@ -6291,13 +6279,6 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   splitW′ : drainW sf allNid κ id now q sched₁ st₁ ≤ W
   splitW′ = ≤-trans (drainW-tail sf allNid κ id now o q sched st) hw
 
-  -- the drain's two ceiling premises, off the ONE the queue's own
-  -- conjunct now carries
-  roomHere = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
-
-  headHere = drain-head-supply (frameStep Lv c) o sl (EvalSt.connectedShares st)
-               (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
-
   SUB₀ = subscribeInner-nest c d sl B W Lv sf mergeAllᵒ allNid κ id now o sched st
           (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
           (proj₁ (proj₂ (proj₂ (proj₂ hcd))))
@@ -6306,25 +6287,12 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
           hpk hpl
-          (ceil-park c d Lv (nest o sl (EvalSt.connectedShares st))
-             (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
-             (proj₂ headHere) (FaceOK.fReg faceHere)
-             (room-le c d Lv (proj₁ (proj₂ roomHere))
-                (4 + nest o sl (EvalSt.connectedShares st))
-                (FaceOK.fSize faceHere)
-                (proj₁ (proj₂ (proj₂ (proj₂ roomHere))))
-                (room-gas c d (proj₁ (proj₂ roomHere)) (proj₁ roomHere)
-                   (4 + nest o sl (EvalSt.connectedShares st))
-                   (FaceOK.fSize faceHere)
-                   (proj₁ (proj₂ (proj₂ roomHere)))
-                   (reached-room c d (proj₁ (proj₂ roomHere)) (proj₁ roomHere)
-                      (FaceOK.fSize faceHere)
-                      (proj₂ (proj₂ (proj₂ (proj₂ roomHere))))))))
+          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
 
   -- the tail's own level, and the path receipts widened onto it: the
   -- queue's later entries are read at a level at or above the head's,
   -- so the two path facts travel by the step's own widening
-  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
   Lv″   = proj₁ tailΣ
   step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ))
 

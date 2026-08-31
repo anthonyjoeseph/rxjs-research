@@ -214,18 +214,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the ceiling travels WITH the parked term, since the reached
-  relation cannot issue it** — the drain's per-entry ceiling entry is
-  refuted in the GAS currency: a reached gas is rooted at `suc` the
-  entry size cap and every walk position spends one, while the parked
-  term's nesting is bounded only at the cap the walk stepped to, so
-  the fuel the entry asks for is one the relation never offers. The
-  route that survives is the one `ceil-entry-step` already performs
-  for a fresh subscribe — mint the operator index at the arrival
-  level's own cap and descend the count — so swap the queue conjunct
-  from a reached level to the ceiling itself, and let the consumer
-  project what it now builds through `ceil-park`.
-
 - **the stream the entry hands the fold, now that one value's price is
   known** — `sight-all-stream` is the only leaf left under the entry
   fit, and it is a claim about what the child's own subscribe EMITS
@@ -245,13 +233,22 @@ does not fit is a finding about the shared statement, not about the head.
   plus carrying the new field across every writer of the node table,
   which is where the cost actually lands.
 
+- **the store conjuncts of the emitted-inner price, which nothing has
+  ever asked a question of** — the value half of `sight-thru-val` now
+  holds at the very family that killed it, and the two conjuncts left
+  are about the STORE the consume leaves behind. Every instantiation
+  on record reaches them with an empty node table, so each reads as an
+  `all` over nothing: green, and evidence for nothing. The leg is to
+  drive the consume to a state whose table is non-empty — the same
+  harness the value half used, one emission further in — and let the
+  rows say whether the class comes down or a witness lands.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
   the `from-inner` head of the drain law, the only frame that names a node.
-  Every conjunct but one comes off the store predicate at the walk's own level;
-  the ceiling entry is refuted in the gas currency and wants the parked term's
-  own ceiling instead.
+  The queue now carries a stored ceiling, the reached-level form having been
+  refuted in the gas currency, so what is left is a producer for that field.
 - **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading
