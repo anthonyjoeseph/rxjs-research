@@ -56,8 +56,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt; nestFacAt-def;
   1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
-  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-store; slotNest;
-  nestBurstAt-def; nestCapAt-suc)
+  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; slotNest; nestBurstAt-def;
+  nestCapAt-suc; nestOK?-latch; nestOK?-deliv)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
@@ -3664,8 +3664,7 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 -- mergeAll, and both crossings are paid for out of structure that is
 -- already present when the round starts: the payload it carries, the
 -- store it walks, and the program's own wrap unit.  `sightCeil` is
--- that sum scaled by the program's size, and the whole right-hand side
--- is read at the current instant off the run.
+-- that sum scaled by the program's size.
 --
 -- WHY THE SCALING IS THE WHOLE CONTENT.  Edge by edge a descent
 -- TRADES: what a frame takes off the subject it puts on the path, so
@@ -3684,13 +3683,22 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 -- FACTOR because as a summand it is outrun -- one per delivered value
 -- against the descent's eight.
 --
--- AND ONE CHAIN'S DESCENT UNDER THE ROUND'S CEILING, which is where every
--- frame of the round is crossed.  The store enters as a BOUND rather
--- than as a reading off the state, and that is what makes the round
--- inducible at all: the chains after the first are walked at states
--- their predecessors moved, so a ceiling pinned to the entry store
--- would have to be re-established once per chain.
+-- AND THE STORE SLOT IS THE CAP, NOT THE READING, WHICH IS WHAT MAKES
+-- THE ROUND INDUCIBLE.  A round states its ceiling once and spends it
+-- at every chain, and the chains after the first run on states their
+-- predecessors moved -- so the slot has to hold across the walk.  The
+-- reading does not: a chain subscribes what its delivery reaches and
+-- installs the nodes for it, and both the live fold and the node fold
+-- are places the measure reads.  The CAP does, and it costs the
+-- consumer nothing, because the arithmetic below already collapses all
+-- three of the ceiling's summands to that same cap.
 --
+-- REFUTED: `Refuted.Chain-Step-Store` is why the reading could not be
+--   carried -- nine before one chain and sixteen after, at the instant
+--   the round's own rows are read at, with two further families in the
+--   same corpus growing at the same instant.  What died is the plan to
+--   thread the entry store across the chains; the growth has to be
+--   priced, and pricing it against the cap is what the leaves below do.
 -- DEAD ROUTE: descending into `depthE` and spending `depthE-sighted`
 --   cannot close this.  That ceiling carries the FOLD's grant in its
 --   subject place -- a tower over the payload -- where this one
@@ -3723,72 +3731,85 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   over them, so it cannot reach this side.
 --   Every row reads the whole ROUND rather than one chain, and the
 --   round's descent is the JOIN over its chains, so a green row is a
---   green row for each chain it contains -- taken at the tightest
---   store bound there is, the entry store itself.
+--   green row for each chain it contains.  NOT covered: the store slot
+--   as the statement now reads it -- every row is taken at the entry
+--   store, which is BELOW the cap the leaves are stated at, so the
+--   rows are a strictly stronger reading of that slot and say nothing
+--   about how much room the cap adds.
 postulate
   chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (S : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    storeNestMax sched st ≤ S →
+    nestOK? e sl id sched st ≡ true →
     depthChain nextId a path sched st
-      ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+      ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
+                  (nestCapAt e sl id) (nestUnit e sl)
 
--- AND THAT BOUND SURVIVES A CHAIN, which is the other half of the same
+-- AND THAT CAP SURVIVES A CHAIN, which is the other half of the same
 -- design: the round states its ceiling once and spends it at every
 -- later chain, so what a chain may do to the store is exactly what the
--- ceiling has to absorb.
+-- cap has to absorb.
+--
+-- AND IT IS NOT A COROLLARY OF THE GROWTH BOUND THIS TREE ALREADY HAS,
+-- WHICH IS THE WHOLE OF WHY IT IS A LEAF.  The walk's own store bound
+-- lands at the SUCCESSOR cap -- a factor times the cap plus an
+-- increment, which is by definition the next instant's -- and the tick
+-- statement above it spends exactly that to close an instant.  So the
+-- discipline says a round STARTS under its own cap and ENDS under the
+-- next one, and says nothing about the states between.  What this leaf
+-- claims is that the growth an instant actually performs stays under
+-- the instant's own cap, which is the design's intent and is not
+-- anywhere derived.  Neither side of it can be instantiated: the cap
+-- sits on the caps recurrence, which does not terminate even natively.
 postulate
-  chainStep-storeNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (S : ℕ) (a : Arrival Γ) (nextId : Id)
+  chainStep-nestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    storeNestMax sched st ≤ S →
-    storeNestMax (proj₁ (proj₂ (chainStep nextId a path sched st)))
-                 (proj₂ (proj₂ (chainStep nextId a path sched st))) ≤ S
-
--- AND THE LATCH WRITES NO NESTING.  Closing a spent source touches the
--- live list's completion flag, and not one of the four places the
--- store's nesting is read from.
-postulate
-  cascadeLatch-storeNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
-    storeNestMax sched (cascadeLatch a st) ≤ storeNestMax sched st
+    Sched.slots sched ≡ sl →
+    nestOK? e sl id sched st ≡ true →
+    nestOK? e sl id (proj₁ (proj₂ (chainStep nextId a path sched st)))
+                    (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true
 
 -- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
 -- the one `depthCascade` reports: the tail at the incoming state, the
 -- live chain at the delivered-marked one, and the tail again at the
 -- state that chain left.
 cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (S : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  storeNestMax sched st ≤ S →
+  nestOK? e sl id sched st ≡ true →
   depthCascade a nextId chains sched st
-    ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
-cascade-depth-go sl S a nextId []               sched st hsl hS = z≤n
-cascade-depth-go sl S a nextId ((rid , c) ∷ cs) sched st hsl hS =
-  ⊔-lub (cascade-depth-go sl S a nextId cs sched st hsl hS)
-        (⊔-lub (chain-depth-sighted sl S a nextId c sched st₀ hsl hS)
-               (cascade-depth-go sl S a nextId cs
+    ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
+                (nestCapAt e sl id) (nestUnit e sl)
+cascade-depth-go sl id a nextId []               sched st hsl hn = z≤n
+cascade-depth-go sl id a nextId ((rid , c) ∷ cs) sched st hsl hn =
+  ⊔-lub (cascade-depth-go sl id a nextId cs sched st hsl hn)
+        (⊔-lub (chain-depth-sighted sl id a nextId c sched st₀ hsl hn₀)
+               (cascade-depth-go sl id a nextId cs
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                   (trans (chainStep-slots nextId a c sched st₀) hsl)
-                  (chainStep-storeNest S a nextId c sched st₀ hS)))
+                  (chainStep-nestOK sl id a nextId c sched st₀ hsl hn₀)))
   where
   st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
   r   = chainStep nextId a c sched st₀
+  hn₀ = trans (nestOK?-deliv _ sl id (rid ∷ EvalSt.delivered st) sched st) hn
 
 cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
-                (storeNestMax sched st) (nestUnit e sl)
-cascade-depth-sighted sl id a nextId sched st hsl hok =
-  cascade-depth-go sl (storeNestMax sched st) a nextId (chainsOf a st)
-    sched (cascadeLatch a st) hsl (cascadeLatch-storeNest a sched st)
+                (nestCapAt e sl id) (nestUnit e sl)
+cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn =
+  cascade-depth-go sl id a nextId (chainsOf a st)
+    sched (cascadeLatch a st) hsl
+    (trans (nestOK?-latch e sl id a sched st) hn)
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
 -- scripted slot's own index makes its nesting zero, and a shared one's
@@ -4356,14 +4377,12 @@ nestCap-sight≤exp e sl id =
 -- and the ceiling collapses to a multiple of it.  That collapse is the
 -- whole of what the run-side hypotheses buy.
 sight-nest≤exp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
-  (sched : Sched Γ) (st : EvalSt e) →
-  nestOK? e sl id sched st ≡ true →
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (S : ℕ) →
+  S ≤ nestCapAt e sl id →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
-            (storeNestMax sched st) (nestUnit e sl)
+  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
-sight-nest≤exp {e = e} sl id a sched st hnest hval =
+sight-nest≤exp {e = e} sl id a S hS hval =
   ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤3C))
           (nestCap-sight≤exp e sl id)
   where
@@ -4372,11 +4391,9 @@ sight-nest≤exp {e = e} sl id a sched st hnest hval =
   hu = ≤-trans (≤-reflexive (sym (nestCapAt-0 e sl))) (nestCap-mono₀ e sl id)
   eq : C + C + C ≡ 3 * C
   eq = solve 1 (λ c → c :+ c :+ c := con 3 :* c) refl C
-  sum≤3C : nestDᵛ (arrTy a) (arrVal a) + storeNestMax sched st + nestUnit e sl
-             ≤ 3 * C
+  sum≤3C : nestDᵛ (arrTy a) (arrVal a) + S + nestUnit e sl ≤ 3 * C
   sum≤3C =
-    ≤-trans (+-mono-≤ (+-mono-≤ hval (nestOK?-store e sl id sched st hnest)) hu)
-            (≤-reflexive eq)
+    ≤-trans (+-mono-≤ (+-mono-≤ hval hS) hu) (≤-reflexive eq)
 
 -- AND THE FUEL HAS THAT ROOM, so the comparison the depth face owes
 -- the height is assembled rather than asserted.  The caps recurrence
@@ -4386,15 +4403,13 @@ sight-nest≤exp {e = e} sl id a sched st hnest hval =
 -- between them, bought by the single spare registration the tower
 -- bracket leaves in the pooled walk.
 sighted-nest≤capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ)
-  (sched : Sched Γ) (st : EvalSt e) →
-  nestOK? e sl id sched st ≡ true →
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (S : ℕ) →
+  S ≤ nestCapAt e sl id →
   nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
-  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
-            (storeNestMax sched st) (nestUnit e sl)
+  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ capsH e sl id
-sighted-nest≤capsH {e = e} sl id a sched st hnest hval =
-  ≤-trans (sight-nest≤exp sl id a sched st hnest hval)
+sighted-nest≤capsH {e = e} sl id a S hS hval =
+  ≤-trans (sight-nest≤exp sl id a S hS hval)
           (capsAt-exp≤capsH e sl id)
 
 -- THE ROUND'S DEPTH FITS THE INSTANT'S FUEL, assembled rather than
@@ -4419,9 +4434,9 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ capsH e sl id
-cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz =
-  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps)
-          (sighted-nest≤capsH sl id a sched st hnest hval)
+cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
+  ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest)
+          (sighted-nest≤capsH sl id a (nestCapAt e sl id) ≤-refl hval)
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
