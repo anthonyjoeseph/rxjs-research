@@ -848,6 +848,21 @@ pathSz?-lvl c Lv p 2≤S h =
 --   reached-level form at one level, with `drain-reach-gas-base` beside
 --   it meeting the same obligation at level zero.
 
+-- AND CARRYING IT IN THE STORE FAILS TOO, WHICH IS THE THIRD ROUTE
+-- AND THE ONE THAT SAYS THE MECHANISM IS WRONG.  A queue is
+-- written by one arm and read by another with arbitrary walking in
+-- between, so a store invariant cannot name the reader's level and has
+-- to quantify over levels -- and no range of levels works, because a
+-- ceiling holds exactly where the TERM's own ladder fits under the
+-- roof, which is a fact about the term rather than about the range.
+-- The three routes are the drain reading it flat, the drain minting it
+-- from a reached level, and the park carrying it forward; all three
+-- die at the same obligation, so what is owed here is not a fourth
+-- carrier but a different account of what a queued term costs.
+-- REFUTED: `Refuted.Thru-Park-Free.park-absurd`, the store's per-term
+--   conjunct at every cap and every term, with `ceil-absurd-at` beside
+--   it showing the failure is the level and not the range's endpoint.
+
 -- AND THE LEVEL CLIMBS ALONG THE QUEUE, because the STATE does.
 -- Subscribing one queued inner installs nodes the caps did not have
 -- to cover, and the only face that reports a caps receipt for a

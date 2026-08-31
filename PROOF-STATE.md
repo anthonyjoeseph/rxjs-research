@@ -215,26 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two arms that subscribe** — the frame leaf is a body now, and
-  it split the question cleanly. Three of the five arms rewrite one
-  node of their own and are the write-preservation lemma at a point,
-  proven; the other two reach the inner subscriber, and only they can
-  install a queue, connect a share, or park a term in a queue that
-  already exists. Take the `thru-outer` arm first: it is the SOLE
-  writer of a queue anywhere in the evaluator, so the term it parks is
-  a term the frame is holding, with its own ceiling and an operator to
-  spare. The `from-inner` arm parks nothing and only has to survive
-  the shares its subscribe connects, which is an antitonicity the nest
-  face already proves.
-
-- **the drain reading its entry back out** — the other end of the
-  carried ceiling, and the one the whole invariant was built for. It
-  wants the postulate it sits in turned into a body recursing on the
-  queue exactly as the evaluator's own drain does: eight conjuncts a
-  cons cell, of which the ceiling is the one the store now answers and
-  the rest are readings a sibling face already carries. The level
-  climbs along the queue because the STATE does, so the tail's
-  ceilings transport across a subscribe that connects a share.
+- **STOP CONDITION — THE QUEUED TERM'S CEILING IS SPIRALLING, AND THE
+  MECHANISM UNDER IT IS WHAT HAS TO MOVE.** Three successive
+  subdivisions of one region, every one FALSITY: the drain reading the
+  entry flat, the drain minting it from a level the cascade reached,
+  and the park carrying it forward in the store. The third reaches
+  UPSTREAM — it says the invariant the last commit put in the walk is
+  unsatisfiable at every cap and every term — so the region is not
+  shrinking. The convergence test's own answer is that a fourth
+  carrier is not the move: what a queued term is charged is what has
+  to change, and that is Anthony's question rather than a grind.
 
 - **the store conjuncts of the emitted-inner price, which nothing has
   ever asked a question of** — the value half of `sight-thru-val` now
@@ -246,26 +236,21 @@ does not fit is a finding about the shared statement, not about the head.
   harness the value half used, one emission further in — and let the
   rows say whether the class comes down or a witness lands.
 
+- **the drain's other seven conjuncts, which the dead ceiling was
+  blocking** — `walk-frame-drain-inner` is one postulate over a whole
+  queue, and only ONE of its per-entry conjuncts is the refuted
+  ceiling. The rest are readings a sibling face already carries at the
+  walk's own level. The leg is to turn the postulate into a body
+  recursing on the queue as the evaluator's drain does, discharge the
+  seven, and leave the ceiling as the single named leaf it now is —
+  which is what makes the spiral one row instead of a whole face.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
-  the `from-inner` head of the drain law, the only frame that names a node. The
-  queue now carries a stored ceiling, the reached-level form having been
-  refuted in the gas currency, so what is left is a producer for that field.
-- **`store-ceil-thru`** (Drain-Store) — FALSITY, `NO EVIDENCE`: the outer *All
-  arm keeps the parked terms' ceiling. It is the sole writer of a queue in the
-  evaluator, so it is the one arm that must ISSUE a receipt rather than forward
-  one, and nothing has instantiated that it can.
-
-- **`store-ceil-inner`** (Drain-Store) — FALSITY, `NO EVIDENCE`: the inner-exit
-  arm keeps it. It parks nothing, so what it owes is survival across the shares
-  its subscribe connects; no instantiation reaches a state where one does.
-
-- **`entry-store-ceil`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a cascade
-  round begins at a store the previous round left, so the invariant is claimed
-  rather than derived at the entry. Nothing has instantiated it and no producer
-  is named.
-
+  the `from-inner` head of the drain law, the only frame that names a node. Its
+  per-entry ceiling has now outlived three carriers, the last of them refuted
+  at every cap, so the obligation itself is what is open.
 - **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading

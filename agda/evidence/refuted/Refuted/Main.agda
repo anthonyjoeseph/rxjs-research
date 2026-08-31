@@ -159,6 +159,9 @@ open import Refuted.Nest-Clos-Stratified
   using (flat-priced; size≡1; lvl≡105; read-fails; staged-rejects; DeferParkClos;
          nest-clos-stratified-absurd)
 
+open import Refuted.Thru-Park-Free
+  using (opIterD-strict; ParkOne; park-absurd; ceil-absurd-at)
+
 -- THE CUT AND WRAP FAMILIES ARE CLAIMED HERE AND CONSUMED BY THE PROBE
 -- TREE.  A program family is infrastructure rather than a witness, and
 -- the probe tree cannot hold it: every file under `probed/` must name a
