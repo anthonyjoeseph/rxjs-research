@@ -27,6 +27,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Pin GHC/cabal explicitly rather than letting install-agda.sh's `apt-get
+      # install ghc cabal-install` take whatever Ubuntu's apt repo currently
+      # defaults to. That default drifts with the runner image — this failed
+      # its first real run with apt's GHC 9.14.1 (base-4.22), which Agda 2.8.0
+      # rejects (`base >=4.13.0.0 && <4.22`). Versions match the ones already
+      # validated in scripts/install-agda.sh's own header comment.
+      - name: Set up GHC + cabal
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.4.7"
+          cabal-version: "3.8.1.0"
+
       # Building Agda 2.8.0 from source (cabal) is the expensive, cacheable
       # part of toolchain setup; the stdlib clone is small but free to cache
       # alongside it. Keyed on the install script so a version bump there
