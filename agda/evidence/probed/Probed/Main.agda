@@ -31,6 +31,8 @@ open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
 open import Probed.Burst-Nest-Level
   using (row8≡; row16≡)
+open import Probed.Burst-Nest-Ladder
+  using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡)
 open import Probed.Sync-Factor
   using (dupSync≡6; dupOut≡2; dupA-holds;
          dupOut₃≡6; dupB-holds;

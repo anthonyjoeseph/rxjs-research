@@ -4530,6 +4530,19 @@ postulate
   --   than one frame, which is where the level's own growth rate would
   --   be tested; and every premise about a cap this face quantifies
   --   over, since the rows pick a concrete one.
+  -- PROBED: `Probed.Burst-Nest-Ladder` measures what the increment
+  --   costs, at the substitution depth the probe above names as
+  --   uncovered: a ladder whose every rung substitutes the rung below
+  --   it whole.  The level the arrivals need is ONE at every depth --
+  --   entry size 28, 39, 50 against largest emitted 39, 61, 83 -- and
+  --   the control, the same shape with a step function naming its
+  --   payload once, is admitted at the entry cap and needs ZERO.  So
+  --   the increment is flat in the depth while this statement's own
+  --   denomination charges the entry SIZE many steps, which is the
+  --   measurement the restatement rests on.  NOT covered: the sweep
+  --   the increment must fit inside and the ceiling that converts it,
+  --   both SEALED and so uninstantiable at any input; and any head but
+  --   `mergeAllᵒ`.
   -- RECOVERY: `git show e55d850` restores the level-lifting machinery
   --   these four used to need -- `arrCapAt-size`, `nestValOK?-cap`,
   --   `allWrap-1≤`.  It went out with the nest half, which stopped
