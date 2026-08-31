@@ -89,6 +89,16 @@ postulate
   --   whose source and whose step function are the same outer variable,
   --   applied to a payload one `switchAllᵉ` deep.  Two against a charge
   --   of one, and that is the factor this form pays.
+  --
+  -- PROBED: `Probed.Step-Frame-Nest-Phi` walks that very term through
+  --   this statement's map clause -- the factor sixty-four against a
+  --   substituted depth of two -- with the additive reading run beside
+  --   it as a control, reading false.  Covered: the `map-f` clause at
+  --   the refuting step function, over the empty path.  NOT covered:
+  --   `scan-f`, which substitutes by the same rule but also moves a
+  --   node; `from-inner`, whose emitted value comes from the inner run
+  --   rather than from the frame; and `thru-outer`, which spends depth
+  --   where these spend factor.
   stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)

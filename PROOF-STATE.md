@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE WALK IS REPRICED AND NOTHING HAS INSTANTIATED IT.** The
-  potential now carries the path's own FACTOR beside its depth, which is
-  what a substitution can be charged against, and the ceiling still
-  closes at ONE instant: the factor is two to the cap squared, since
-  every frame's size is under the cap and so is the count of frames.
-  Three leaves stand under it and none has been run — and the map clause
-  is exactly where the additive reading died, so the leg is to
-  instantiate the repriced one there: a `mapᵉ` naming its payload twice,
-  walked, with the factor read either side of the frame.
+- **THE MAP CLAUSE IS COVERED AND THE STATE-TOUCHING ONES ARE NOT.**
+  The repriced potential was run at the very term that refuted the
+  additive reading and it holds with the factor to spare, the additive
+  control reading false beside it. What that leaves is the two clauses
+  whose output value does not come from the frame at all: `from-inner`
+  emits what the inner run produced, and `thru-outer` spends DEPTH where
+  the map frame spends factor — and both carry a factor of one, so
+  neither has anything to pay a deepening with. The leg is to reach both
+  by RUNNING a cascade over an `*All`, and read the potential either
+  side of the frame the evaluator itself presents.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -272,11 +273,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   share boundary, where the walk re-enters on every chain at the sink. Their
   depths are under the registry's join, but nothing has read it.
-- **`stepFrame-nest-Φ`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: the potential —
-  the values' nesting plus the path left to climb, under the factor that path
-  can still apply — survives one frame. Repriced after the additive reading was
-  refuted at the map clause; nothing has instantiated the form that replaced
-  it.
+- **`stepFrame-nest-Φ`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: the
+  potential, under the factor the path can still apply, survives one frame.
+  Covered at the map clause against the term that refuted the additive reading;
+  the clauses whose value comes from the run are untouched.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
