@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY'S PRICE IS NOT A CAP, AND THE CAP READING IS WHAT HAS
-  TO GO.** A subscribing frame registers the walked path UNDER the body
-  it received, so the registered length is the walked length plus the
-  body's — and the body grows one `iterSize` step per frame while the
-  path shortens by one, so no single ceiling covers both ends. The walk
-  face already pays for this fact with a ROOM budget reserved inside a
-  fixed length ledger and bounded by the GAS. The leg is to restate the
-  side condition in that currency: the walk carries room, not a cap,
-  and the sink's admitted entries inherit the room rather than a size.
+- **THE REGISTRY'S PRICE IS ALREADY PROVEN, IN A CURRENCY THE NEST FACE
+  DOES NOT READ.** The caps law for the fold carries `capsOK?` across
+  this very recursion, sink included, and the size price is one of its
+  conjuncts — but it reports at a level the walk ACCUMULATES, because a
+  chain fans into chains and no ceiling fixed beforehand bounds that.
+  The nest face charges at the instant's BASE cap. So the leg is not a
+  proof: it is to decide which side moves — the nest charge read at an
+  accumulated level, or the fan-out's level bounded by the instant's own
+  ledger — and to state the seam as one postulate either way.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -294,10 +294,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE`: the registry
-  stays priced by the size cap across one frame. A subscribing frame registers
-  the walked path under the body it received, and no premise bounds a body, so
-  the one-cap reading is the part that has to move.
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE×2`: the registry
+  stays priced by the size cap across one frame. The caps face proves this walk
+  already, at an accumulated level; what is owed is the seam between that level
+  and the base cap the nest face charges at.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to

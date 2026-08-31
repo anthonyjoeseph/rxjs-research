@@ -298,14 +298,20 @@ stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF 
 -- the GAS rather than by any size.  So the repair is a premise, and the
 -- premise is not a size: it is the room the walk has left.
 --
--- The reading is worse than one missing hypothesis, and that is the
--- useful half.  A frame's OUTPUT values are bigger than its input ones
--- by one `iterSize` step, so any room budget derived from the payload
--- GROWS along the walk while the path shortens by one frame per step.
--- A single ceiling covering both ends is therefore not a matter of
--- picking a larger one; the two quantities move apart.  The walk face's
--- ledger works because its budget comes from the gas, which is spent
--- rather than grown.
+-- AND IT IS THE LENGTH ALONE, which is worth knowing before anyone
+-- reaches for a bigger cap.  The other half of `pathSz?` reads a
+-- frame's step function, and a subscribe installs a syntactic subterm
+-- of what the store already held, so the frames a registration adds are
+-- covered by the cap that covers the program.  Only the length moves.
+--
+-- AND THE CAPS FACE ALREADY PROVES THIS WALK, which is the part that
+-- makes the statement above a duplicate rather than a gap: `foldPath`'s
+-- caps law carries `capsOK?` across exactly this recursion, sink
+-- included, and the registry's size price is one of its conjuncts.  It
+-- reports at a level the walk ACCUMULATES rather than at the level it
+-- entered under, and that is not slack to be tightened — see the dead
+-- route below.  What is owed here is therefore not a proof but a
+-- decision about the currency the nest face reads its own charge in.
 
 -- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
 --   so that the cap transfers with no premise at all.  The share sink
@@ -315,6 +321,16 @@ stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF 
 --   the continuation before it reaches the leaf that registers, so what
 --   lands in the registry is the walked path UNDER the body, not a
 --   suffix of it.
+-- DEAD ROUTE: and a ROOM LEDGER at a fixed ceiling does not repair it,
+--   which is the more useful half because it says why the caps face
+--   accumulates.  Carrying `pathLen p + L ≤ B` over the registry closes
+--   the frame clause and closes the sink's ADMISSION, but not the sink's
+--   RE-ENTRY: a chain fans into chains, so the level the ledger must
+--   reserve is the cumulative depth of the fan-out rather than the depth
+--   of the path in hand, and no ceiling fixed before the walk starts
+--   bounds it.  That is why the level is existential downstream, and it
+--   is a fact about the fan-out rather than about how the bound is
+--   phrased.
 postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
