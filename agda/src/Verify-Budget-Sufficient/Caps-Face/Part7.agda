@@ -3825,6 +3825,20 @@ postulate
 -- application, so it is a fact the round has rather than a fact the
 -- round must acquire.
 --
+-- AND THE ONE SITE THAT MOVES THE LIVE FOLD IS THE DEFERRED BODY,
+-- WHICH IS WHY EVERY FAMILY IN THE CORPUS READS ZERO ON BOTH SIDES.  A
+-- live source's nesting is the maximum nesting of its PENDING values,
+-- and the evaluator mints a live carrying a value of positive nesting
+-- in exactly one clause: subscribing a `deferᵉ`, whose pending entry is
+-- the body itself at observable type.  A scripted slot cannot supply
+-- one -- scripts are data-typed by construction -- so a reachable
+-- growth has to be a body the PROGRAM produces mid-chain, which needs
+-- an *All whose inner is a deferred nest reached through a mapping
+-- frame.  A program of that shape reaches it and the arm holds there:
+-- the fold rises with the nest while the charge rises with the syntax
+-- that carries it, so the two grow together and the ordering is a race
+-- rather than a constant against a zero.
+--
 -- REFUTED: Refuted.Chain-Step-Nodes
 -- REFUTED: Refuted.Chain-Step-Live-Additive
 -- DEAD ROUTE: spending the unconditional live-growth bound and
@@ -3836,6 +3850,16 @@ postulate
 --   The entry lifts and the arms carry over, but the consumer does
 --   not: its fuel is the exponential at THIS instant, which the caps
 --   recurrence pins to this instant's cap.
+-- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
+--   RUNNING, at the one program shape that can move the fold: a `mapᵉ`
+--   over the async input handing the outer *All a deferred nest per
+--   arrival, so the chain the evaluator presents subscribes it and the
+--   live it mints carries the body.  Covered: the fold rising 0 to 1
+--   and 0 to 3 as the nest deepens, against a syntactic charge of
+--   eighteen and twenty-six that the tree proves this arm's increment
+--   dominates -- so both sides move and the ordering is load-bearing
+--   on the depth axis.  Not covered: a fold already nonzero at entry,
+--   where the growth would compound rather than start from zero.
 postulate
   chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

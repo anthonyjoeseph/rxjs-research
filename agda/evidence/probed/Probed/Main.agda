@@ -47,6 +47,8 @@ open import Probed.PushVals-Caps
          burstsG≡; burstsA≡)
 open import Probed.Chain-Step-Abs-Charge
   using (figures≡; fits; figuresB≡; fitsB)
+open import Probed.Chain-Step-Live-Deferred
+  using (figures≡; fits)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
 open import Probed.Thru-Step-Indexed

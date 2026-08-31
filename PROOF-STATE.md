@@ -215,16 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **TWO ARMS ARE COVERED AND THE THIRD IS UNREACHED, WHICH IS NOW THE
-  RISK.** The surrogate charge runs at two reachable families and holds
-  with room — the node table moves at both, the registry at neither.
-  The LIVE fold reads zero before and after at both, so those rows are
-  degenerate and the live arm has no evidence at all. Every family that
-  ever moved it used a path built by hand, which the new premise rules
-  out. So the leg is a REACHABLE program whose chain grows the live
-  fold: a limited merge whose parked inner is drained by the chain, run
-  from a program that contains the path rather than beside one.
-
 - **THE CEILING'S TWO HALVES ARE CHARGED TO TWO COPIES OF THE FUEL,
   AND ONLY ONE COPY IS ESTABLISHED.** Reading the round at the cap PLUS
   the increment is what makes the bound walk-preservable, and the split
@@ -244,6 +234,17 @@ does not fit is a finding about the shared statement, not about the head.
   LOWER bound on the caps base — so the leg is to instantiate both at
   the corpus the ceiling is already read at, and find out whether the
   cap's own exponential has the room a tower in a width asks for.
+
+- **THE REGISTRY ARM IS THE ONE STILL PINNED AT A CONSTANT.** The live
+  arm now has a program that moves it and the node table moves at both
+  demand families, but every row taken against the registry component
+  reads the same number before and after the chain — nine to nine at
+  one family, two to two at the other. A charge that could not have
+  lost is not evidence, so this arm's receipt is degenerate whatever it
+  reports. Registrations deepen when a delivery SUBSCRIBES an inner and
+  the chain leaves it standing, so the leg is a program whose chain
+  registers on a path deeper than any the entry put there, and the arm
+  re-read against it.
 
 ### The ledger
 
@@ -265,10 +266,10 @@ does not fit is a finding about the shared statement, not about the head.
   an increment. The tree's bridge puts one copy under the fuel and says nothing
   about the second.
 - **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2`: a chain's live list against the program rather
-  than against the store it started from. The path PRODUCT the unconditional
-  bound offers cannot supply it, and the depth-additive repair dies at a mint
-  from a deferred body.
+  `REFUTED×2, DEAD ROUTE×2, PROBED`: a chain's live list against the program
+  rather than against the store it started from. The surrogate charge now runs
+  at a program whose chain mints a live from a deferred nest, which is the one
+  shape that moves the fold.
 - **`chainStep-nest-nodesC`** (Caps-Face/Part7) — FALSITY, `PROBED`: the node
   table after one chain, charged to one instant's increment. Unprobeable as
   stated — the increment sits on the caps recurrence — but its syntactic
