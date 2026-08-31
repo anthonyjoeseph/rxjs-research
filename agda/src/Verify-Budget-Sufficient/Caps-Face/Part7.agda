@@ -55,7 +55,8 @@ open import Verify-Budget-Sufficient.Fan-Caps using
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; FrameΦHyp; valsΦ?; stepFrame-nest-Φ; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
-open import Verify-Budget-Sufficient.Live-Nest-Walk using (foldPath-nest-live; PathLiveHyp)
+open import Verify-Budget-Sufficient.Live-Nest-Walk using
+  (foldPath-nest-live; PathLiveHyp; valsSz?; walk-LiveHyp-go)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
@@ -69,7 +70,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
   share-sink; root; dCapᶜ; dWalkᶜ; fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick;
-  shareAdmit; shareLatch; foldPath)
+  shareAdmit; shareLatch; foldPath; iterSize)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -94,7 +95,7 @@ open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; foldPath-sink-N; shareGo-cons-N; shareGo-skip-N;
   chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
-  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
+  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; 8≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
   capsAt-⊑-suc; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
   frameStep-mono-j; frameStep-reg-mono; iterL-infl; sucJ≤fLvlD; regAt-mono; iterL-mono;
   iterSize-mono-count; lvls-add; lvls-infl; lvls-mono; size≤sizeCount; sizeCount;
@@ -139,7 +140,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestCap-inc-sight≤capsH;
-   nestUnit≤size)
+   nestUnit≤size; iterSize≤walkFac; walkFac≤nestWalkAt)
 
 thruOuter-face :
   -- subscribeInner-caps  (.Subscribe-Face)
@@ -4102,22 +4103,33 @@ chainStep-nest-nodesC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
     (entryΦ sl id a path hp hΦ)
     (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
 
-postulate
-  -- THE SIZE-SIDE SIDE CONDITION, at every outer frame the chain
-  -- reaches.  Its `PathΦHyp` twin is a real body now, discharged from
-  -- the sighted grant one frame at a time; this one is the same walk
-  -- against the size cap instead of the potential, and what it needs
-  -- at each frame is a bound on the size of the values arriving there
-  -- -- which is what the caps face tracks and what the entry's own
-  -- size premise starts.
-  chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    PathLiveHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
-      (nestWalkAt e sl id) path (arrVal a ∷ []) (Arrival.isLast a) sched st
+-- THE SIZE-SIDE SIDE CONDITION, DISCHARGED.  The walk reads the bound
+-- at the level it has reached and each frame moves the level by one,
+-- so what the caller owes is the entry reading -- which is the size
+-- premise it already carries -- and affordability at every level the
+-- path can reach.  A path legal under the size cap has at most a
+-- cap's worth of frames, so those levels stop at the cap and one
+-- arithmetic fact covers all of them.
+chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  PathLiveHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
+    (nestWalkAt e sl id) path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-LiveHyp {e = e} sl id a nextId path sched st hsl hsz hp =
+  walk-LiveHyp-go _ nextId (arrTick a) S (nestWalkAt e sl id) 0 path
+    (arrVal a ∷ []) (Arrival.isLast a) sched st afford entrySz
+    (pathSz?-len S path hp)
+  where
+  S = Caps.cSize (capsAt e sl id)
+  afford : ∀ k → k ≤ S → iterSize S k S ≤ nestWalkAt e sl id
+  afford k hk =
+    ≤-trans (iterSize≤walkFac S k S (8≤capsAt-size e sl id) hk ≤-refl)
+            (walkFac≤nestWalkAt e sl id)
+  entrySz : valsSz? (iterSize S 0 S) (arrVal a ∷ []) ≡ true
+  entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ hsz)) refl
 
 -- THE LIVE ARM, the third and last of the chain's arms to become the
 -- walk rather than an assertion about it.  Two extra terms over the

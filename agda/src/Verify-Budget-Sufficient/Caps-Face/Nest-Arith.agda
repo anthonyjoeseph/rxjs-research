@@ -11,7 +11,7 @@ module Verify-Budget-Sufficient.Caps-Face.Nest-Arith where
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (<⇒≤; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans; ≤-refl;
   ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤;
-  +-mono-≤; *-distribʳ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0; m≤n*m)
+  +-mono-≤; *-distribʳ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0; m≤n*m; *-assoc)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Fin     using (Fin)
@@ -28,6 +28,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (_at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
+open import Rx.Evaluator using (iterSize)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-def)
 open import Verify-Budget-Sufficient.Deliver-Measure using
   (nestDᵉ≤sizeᵉ)
@@ -159,6 +160,53 @@ sq4≤2^ : ∀ (S : ℕ) → 8 ≤ S → 4 * (S * S) ≤ 2 ^ S
 sq4≤2^ (suc (suc k)) (s≤s (s≤s 6≤k)) =
   ≤-trans (*-monoʳ-≤ 4 (sq≤2^ k 6≤k))
           (≤-reflexive (sym (^-distribˡ-+-* 2 2 k)))
+
+-- THE INSTANT'S SIZE GROWTH, UNDER THE WALK'S OWN FACTOR.  A frame
+-- multiplies the size by a fixed step, and a path legal under the size
+-- cap has at most a cap's worth of frames -- so what a chain can do to
+-- the size of the values it carries is a cap-th power of a cap.  That
+-- sits under an exponential of the cap SQUARED with room to spare,
+-- which is the second thing the size floor of eight buys and the
+-- reason a size side condition can be stated at the walk's ceiling
+-- rather than at the instant's exit cap.
+iterSize≤walkFac : ∀ (S j s : ℕ) → 8 ≤ S → j ≤ S → s ≤ S →
+  iterSize S j s ≤ 2 ^ (S * S) * S
+iterSize≤walkFac S j s h8 hj hs =
+  ≤-trans (iterSize-pow S S j s 1≤S ≤-refl hs) (*-monoˡ-≤ S powFit)
+  where
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (≤ᵇ⇒≤ 1 8 tt) h8
+  3≤4S : 3 ≤ 4 * S
+  3≤4S = ≤-trans (≤ᵇ⇒≤ 3 4 tt)
+                 (≤-trans (≤-reflexive (sym (*-identityʳ 4)))
+                          (*-monoʳ-≤ 4 1≤S))
+  3S≤2^S : 3 * S ≤ 2 ^ S
+  3S≤2^S =
+    ≤-trans (*-monoˡ-≤ S 3≤4S)
+            (≤-trans (≤-reflexive (*-assoc 4 S S)) (sq4≤2^ S h8))
+  powFit : (3 * S) ^ j ≤ 2 ^ (S * S)
+  powFit =
+    ≤-trans (^-monoˡ-≤ j 3S≤2^S)
+            (≤-trans (≤-reflexive (^-*-assoc 2 S j))
+                     (^-monoʳ-≤ 2 (*-monoʳ-≤ S hj)))
+
+-- AND THAT GROWTH IS AFFORDABLE, which is the half a bare arithmetic
+-- statement cannot say.  The charge carries one exponential of the cap
+-- squared with a `suc` to spare and a sum with the cap in it, so the
+-- power and its trailing factor each land on one half and nothing has
+-- to be widened to make room.
+walkFac≤nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+    * Caps.cSize (capsAt e sl id)
+    ≤ nestWalkAt e sl id
+walkFac≤nestWalkAt e sl id =
+  subst (2 ^ (S * S) * S ≤_) (sym (nestWalkAt-def e sl id))
+    (*-mono-≤ (^-monoʳ-≤ 2 (n≤1+n (S * S)))
+              (≤-trans (m≤n+m S (nestUnit e sl))
+                       (m≤m+n (nestUnit e sl + S) (S * slotWrapSum sl))))
+  where
+  S = Caps.cSize (capsAt e sl id)
 
 -- THE STEP'S ARITHMETIC, OVER BARE NUMBERS, and it is a body rather
 -- than a leaf.  Nothing about caps survives here: a cap that steps by

@@ -29,24 +29,40 @@ module Verify-Budget-Sufficient.Live-Nest-Walk where
 open import Data.Bool using (Bool; true)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin using (Fin)
-open import Data.List using (List; _++_; foldr)
-open import Data.Nat using (ℕ; _⊔_; _≤_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m)
+open import Data.List using (List; []; _∷_; _++_; foldr)
+open import Data.Nat using (ℕ; suc; _+_; _⊔_; _≤_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
+  ≤-reflexive; +-suc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; cong; sym; subst)
+open import Data.Unit using (⊤; tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen)
 open import Rx.Exp using (Ctx; Closed; Val; sizeᵛ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_;
          map-f; scan-f; take-f; from-inner; thru-outer;
-         foldPath; stepFrame; dispatchShare)
+         iterSize; foldPath; stepFrame; dispatchShare)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
+open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsΦ?; PathΦHyp; stepFrame-nest-Φ; stepFrame-nest-regs)
+
+-- THE SIZE READING OF A BURST, which is the currency the outer
+-- frame's side condition is denominated in and the only one that sees
+-- through a defer gate.
+valsSz? : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (vals : List (Val Γ s)) → Bool
+valsSz? {s = s} V vals = all (λ v → sizeᵛ s v ≤ᵇ V) vals
+
+valsSz?-mono : ∀ {n} {Γ : Ctx n} {s} (V V′ : ℕ) (vals : List (Val Γ s)) →
+  V ≤ V′ → valsSz? V vals ≡ true → valsSz? V′ vals ≡ true
+valsSz?-mono V V′ []       h _  = refl
+valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
+  ∧-intro (≤ᵇ-widen (sizeᵛ s v) h (∧-trueˡ hv))
+          (valsSz?-mono V V′ vs h (∧-trueʳ hv))
 
 -- WHAT AN OUTER FRAME OWES BEYOND THE POTENTIAL, stated at the one
 -- kind that can subscribe.  A size bound rather than a depth one,
@@ -59,8 +75,7 @@ FrameLiveHyp U (map-f _)          path vals = ⊤
 FrameLiveHyp U (scan-f _ _)       path vals = ⊤
 FrameLiveHyp U (take-f _)         path vals = ⊤
 FrameLiveHyp U (from-inner _ _ _) path vals = ⊤
-FrameLiveHyp {s = s} U (thru-outer _ _) path vals =
-  all (λ v → sizeᵛ s v ≤ᵇ U) vals ≡ true
+FrameLiveHyp U (thru-outer _ _) path vals = valsSz? U vals ≡ true
 
 -- the same shape `PathΦHyp` has, and threaded by the same fold: the
 -- values a frame sees are the ones the frames above it produced, so a
@@ -124,6 +139,65 @@ postulate
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ slotsNestSum (Sched.slots sched)
           ⊔ regsNestMax (EvalSt.registry st) ⊔ U
+
+-- FOUR KINDS OWE NOTHING AND ONE OWES THE BOUND, which is the whole
+-- content of the side condition read at one frame.
+frameLive-of-sz : ∀ {n} {Γ : Ctx n} {s u t} (U : ℕ) (f : Frame Γ s u)
+  (path : Path Γ u t) (vals : List (Val Γ s)) →
+  valsSz? U vals ≡ true → FrameLiveHyp U f path vals
+frameLive-of-sz U (map-f _)          path vals _ = tt
+frameLive-of-sz U (scan-f _ _)       path vals _ = tt
+frameLive-of-sz U (take-f _)         path vals _ = tt
+frameLive-of-sz U (from-inner _ _ _) path vals _ = tt
+frameLive-of-sz U (thru-outer _ _)   path vals h = h
+
+-- THE SIZE SIDE CONDITION, DISCHARGED BY THE SAME WALK IT GUARDS.  The
+-- values a frame sees are the ones the frames above it produced, so
+-- the bound has to step: it is read at the LEVEL the walk has reached
+-- rather than at one number, and each frame moves the level by one.
+-- A path legal under the size cap has at most a cap's worth of frames,
+-- which is what keeps the level under the cap and lets the caller
+-- discharge affordability once for every level at once.
+postulate
+  -- ONE FRAME'S SIZE STEP.  A frame substitutes, and the caps face
+  -- prices substitution at exactly one `sizeStep` -- so the values a
+  -- frame emits sit at the next level of the same iterate, whatever
+  -- the frame does.
+  stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (S j : ℕ) →
+    valsSz? (iterSize S j S) vals ≡ true →
+    valsSz? (iterSize S (suc j) S)
+      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+
+walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (id : Id) (now : Tick) (S U j : ℕ) (path : Path Γ u t)
+  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  (∀ k → k ≤ S → iterSize S k S ≤ U) →
+  valsSz? (iterSize S j S) vals ≡ true →
+  j + pathLen path ≤ S →
+  PathLiveHyp sf id now U path vals fin sched st
+walk-LiveHyp-go sf id now S U j root           vals fin sched st _ _ _ = tt
+walk-LiveHyp-go sf id now S U j (share-sink _) vals fin sched st _ _ _ = tt
+walk-LiveHyp-go sf id now S U j (f ↠ p) vals fin sched st afford hsz hj =
+    hHead
+  , walk-LiveHyp-go sf id now S U (suc j) p
+      (proj₁ step)
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step))))
+      afford
+      (stepFrame-sz sf id now f p vals fin sched st S j hsz)
+      (≤-trans (≤-reflexive (sym (+-suc j (pathLen p)))) hj)
+  where
+  step = stepFrame sf id now f p vals fin sched st
+  j≤S : j ≤ S
+  j≤S = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
+  atU : valsSz? U vals ≡ true
+  atU = valsSz?-mono (iterSize S j S) U vals (afford j j≤S) hsz
+  hHead : FrameLiveHyp U f p vals
+  hHead = frameLive-of-sz U f p vals atU
 
 -- THE WALK.  Four facts per frame and no more: the live leaf for what
 -- this frame minted, the slots' invariance for the term the script

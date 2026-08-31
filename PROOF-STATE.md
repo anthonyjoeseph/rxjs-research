@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIZE SIDE CONDITION IS THE ONE THING THE WALKS STILL ASSERT
-  WHOLE.** All three arms are folds now, and their frame and share
-  leaves are each about one thing a delivery writes — but the live
-  fold's side condition is threaded and never discharged, so
-  `chain-walk-LiveHyp` asserts at every outer frame what its potential
-  twin proves one frame at a time. The leg is that discharge, and it is
-  the same shape the potential's was: a per-frame fit, four unit arms,
-  and one real obligation where a frame can subscribe. What it needs
-  that the potential did not is a size bound that SURVIVES a frame,
-  which the caps face already tracks and this walk does not carry.
+- **THE CHAIN IS DOWN TO SIX LEAVES, AND FIVE OF THEM ARE ONE FRAME.**
+  Every whole-walk assertion on `chainStep` is gone: three folds, both
+  their side conditions discharged, and what is left is a frame leaf
+  and a share leaf per arm plus the size step. The leg is the SHARE
+  leaves, taken as one — all three say what a sink's fan-out can leave
+  in one field of the store, all three are charged the registry's join
+  for the same reason, and the registry's own is the one with nothing
+  under it. Their common shape is a selection from the registry
+  re-entered chain by chain, which is a fold this tree has written
+  twice already.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -266,14 +266,14 @@ does not fit is a finding about the shared statement, not about the head.
   share boundary at the live list, carrying the slots and the registry's join
   for the two mints the walked path does not say. Nothing has read the repaired
   form.
-- **`chain-walk-LiveHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the size
-  side condition at every outer frame a chain reaches. Its potential twin is a
-  real body now; this one is the same walk against the size cap, and nothing
-  yet carries the entry's size premise down the path.
-- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
-  one frame stores at the nodes map, under the potential it was handed. Three
-  of the five kinds store; the whole-chain surrogate covers the composite at
-  two families and discharges none of the premise.
+- **`stepFrame-sz`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: one frame's
+  size step, at the caps face's own iterate. A frame substitutes and the caps
+  face prices substitution at one `sizeStep`, so the emitted values should sit
+  at the next level — and nothing has read it here.
+- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `PROBED`: what one
+  frame stores at the nodes map, under the potential it was handed. Three of
+  the five kinds store; the whole-chain surrogate covers the composite at two
+  families and discharges none of the premise.
 - **`dispatchShare-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`:
   the share boundary at the nodes map. The path-denominated reading died here,
   so the statement carries the registry's join — the term the fan-out actually

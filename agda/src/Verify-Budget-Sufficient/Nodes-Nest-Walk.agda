@@ -47,6 +47,18 @@ postulate
   -- what each writes is a value the potential already covers, since
   -- the factor the frame surrenders is exactly the substitution it
   -- performs.
+  --
+  -- PROBED: `Probed.Chain-Step-Abs-Charge` reaches this leaf by RUNNING
+  --   a whole chain over it, at the second cascade of two reachable
+  --   families, taking the chain the evaluator itself presents rather
+  --   than one built by hand -- five to six at the fold family against
+  --   a charge of thirty-three, eight to sixteen at the demand family
+  --   against seventy-one.  The charge read there is the SYNTACTIC one
+  --   the size cap is proven to dominate, and the rows discharge no
+  --   premise, so each is a stronger claim than the leaf instance.  NOT
+  --   covered: one frame in isolation, since the rows read the
+  --   composite; and any family whose chain deepens the node table by
+  --   more than one step.
   stepFrame-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : _) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
