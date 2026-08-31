@@ -57,7 +57,7 @@ open import Verify-Budget-Sufficient.Nest-Store using
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
   nestFacAt-def; 1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
-  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-latch; nestOK?-store;
+  nodeNest; regsNestMax; sightCeil; slotWrapSum; nestCapAt-0; nestCap-mono₀; nestOK?-latch; nestOK?-store;
   storeNestMax-lub; storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
@@ -3969,7 +3969,9 @@ chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
   Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
                (sym (nestWalkAt-def e sl id))
                (*-mono-≤ (pathΦF-cap Sz path hp)
-                         (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz)))
+                         (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
+                                  (m≤m+n (nestUnit e sl + Sz)
+                                         (Sz * slotWrapSum sl))))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.

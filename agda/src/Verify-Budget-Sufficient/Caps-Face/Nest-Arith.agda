@@ -11,7 +11,7 @@ module Verify-Budget-Sufficient.Caps-Face.Nest-Arith where
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (<⇒≤; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans; ≤-refl;
   ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤;
-  +-mono-≤; *-distribʳ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0)
+  +-mono-≤; *-distribʳ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0; m≤n*m)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Fin     using (Fin)
@@ -36,7 +36,7 @@ open import Verify-Budget-Sufficient.Fan-Caps using
 open import Verify-Budget-Sufficient.Nest-Store using
   (nestCapAt; nestFacAt; nestFacAt-def; nest-inflate; realWidAt; realWidAt-def; nestIncAt;
   nestIncAt-def; nestBurstAt; nestUnit; slotsNestSum; nestCapAt-0; nestCap-mono₀; slotNest;
-  nestBurstAt-def; nestCapAt-suc)
+  nestBurstAt-def; nestCapAt-suc; slotWrap; slotWrapSum)
 open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -60,7 +60,8 @@ open import Verify-Budget-Sufficient.Caps using
   capsAt-base-size; capsAt-size-mono; capsAt-wid<size; capsH; capsAt-exp-gain; size≤sizeCount;
   sizeCount; frameBlowup; iterSize-pow; size-lower; capsAt-exp2≤capsH)
 open import Verify-Budget-Sufficient.Measures using
-  (n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow)
+  (n<2^n; sq≤2^; sum-tab-mono; sum-tab-const; fᵢ≤sum-tab; n≤slotsSize;
+   syncSize≤sizeᵉ; 2X≡X+X; 1≤pow)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
@@ -90,22 +91,27 @@ abstract
     (id : ℕ) → ℕ
   nestWalkAt e sl id =
     2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-      * (nestUnit e sl + Caps.cSize (capsAt e sl id))
+      * (nestUnit e sl + Caps.cSize (capsAt e sl id)
+         + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
 
   nestWalkAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestWalkAt e sl id
       ≡ 2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-          * (nestUnit e sl + Caps.cSize (capsAt e sl id))
+          * (nestUnit e sl + Caps.cSize (capsAt e sl id)
+             + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
   nestWalkAt-def _ _ _ = refl
 
   unit+size≤nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestUnit e sl + Caps.cSize (capsAt e sl id) ≤ nestWalkAt e sl id
   unit+size≤nestWalkAt e sl id =
-    nest-inflate (2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
-                 (nestUnit e sl + Caps.cSize (capsAt e sl id))
-                 (m^n>0 2 (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+    ≤-trans (m≤m+n (nestUnit e sl + Caps.cSize (capsAt e sl id))
+                   (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
+      (nest-inflate (2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+                    (nestUnit e sl + Caps.cSize (capsAt e sl id)
+                     + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
+                    (m^n>0 2 (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
 -- scripted slot's own index makes its nesting zero, and a shared one's
@@ -120,6 +126,31 @@ slotsNestSum≤slotsSize : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) →
 slotsNestSum≤slotsSize sl =
   sum-tab-mono (λ i → slotNest (sl i)) (λ i → slotSize (sl i))
                (λ i → slotNest≤slotSize (sl i))
+
+-- ONE SLOT'S WRAP UNDER THE VOCABULARY'S SIZE.  The wrap reads a shared
+-- definition through the same per-occurrence factor the walk charges
+-- every subject through, and both of its readings -- the exponent and
+-- the nesting -- are under that definition's own size, which is one
+-- summand of the telescope.  A scripted slot is zero.
+slotWrap≤size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (S : ℕ) →
+  slotsSize sl ≤ S → (i : Fin n) → slotWrap (sl i) ≤ 2 ^ S * S
+slotWrap≤size sl S hS i
+  with sl i | ≤-trans (fᵢ≤sum-tab (λ j → slotSize (sl j)) i) hS
+... | scripted _ | _  = z≤n
+... | shared d   | hd =
+  *-mono-≤ (^-monoʳ-≤ 2 (≤-trans (syncSize≤sizeᵉ d) hd))
+           (≤-trans (nestDᵉ≤sizeᵉ d) hd)
+
+-- AND THE WHOLE TELESCOPE'S, which is the per-slot ceiling times a
+-- length -- and the length is under the size too, since a slot costs at
+-- least one.
+slotWrapSum≤size : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (S : ℕ) →
+  slotsSize sl ≤ S → slotWrapSum sl ≤ S * (2 ^ S * S)
+slotWrapSum≤size {n = n} sl S hS =
+  ≤-trans (sum-tab-mono (λ i → slotWrap (sl i)) (λ _ → 2 ^ S * S)
+                        (slotWrap≤size sl S hS))
+          (≤-trans (≤-reflexive (sum-tab-const {n} (2 ^ S * S)))
+                   (*-monoˡ-≤ (2 ^ S * S) (≤-trans (n≤slotsSize sl) hS)))
 
 -- FOUR SQUARES UNDER THE EXPONENTIAL, which is where the base case's
 -- room comes from and why the size floor is eight rather than six.
@@ -688,45 +719,95 @@ walk-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
 walk-sight≤exp e sl id =
   subst (λ z → suc (sizeᵉ e) * (3 * z) ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)))
-        (sym (nestWalkAt-def e sl id)) (
-  ≤-trans (*-mono-≤ 1+z≤S (*-monoʳ-≤ 3 (*-monoʳ-≤ E unit2S)))
-  (≤-trans (≤-reflexive shape)
-  (≤-trans (*-monoˡ-≤ E six≤2^)
-  (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 (1 + S) (S * S))))
-           (^-monoʳ-≤ 2 exp≤)))))
+        (sym (nestWalkAt-def e sl id))
+        (≤-trans (*-mono-≤ hz (*-mono-≤ h3 (*-monoʳ-≤ (2 ^ (S * S)) hM)))
+        (≤-trans (≤-reflexive collapse)
+                 (^-monoʳ-≤ 2 expfit)))
   where
   S = Caps.cSize (capsAt e sl id)
-  E = 2 ^ (S * S)
   8≤S : 8 ≤ S
   8≤S = 8≤capsAt-size e sl id
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 8≤S
+  2≤S : 2 ≤ S
+  2≤S = ≤-trans (s≤s (s≤s z≤n)) 8≤S
   S≤SS : S ≤ S * S
   S≤SS = ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-monoʳ-≤ S 1≤S)
-  1≤SS : 1 ≤ S * S
-  1≤SS = ≤-trans 1≤S S≤SS
+  S≤2^S : S ≤ 2 ^ S
+  S≤2^S = <⇒≤ (n<2^n S)
+  2S≤2^S : 2 * S ≤ 2 ^ S
+  2S≤2^S =
+    ≤-trans (*-monoˡ-≤ S (≤ᵇ⇒≤ 2 4 tt))
+            (≤-trans (*-monoʳ-≤ 4 S≤SS) (sq4≤2^ S 8≤S))
+  SS≤2^S : S * S ≤ 2 ^ S
+  SS≤2^S = ≤-trans (m≤n*m (S * S) 4) (sq4≤2^ S 8≤S)
+  slSz : slotsSize sl ≤ S
+  slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e))
+                 (capsAt-base-size e sl id)
   1+z≤S : suc (sizeᵉ e) ≤ S
   1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
                   (capsAt-base-size e sl id)
+  hz : suc (sizeᵉ e) ≤ 2 ^ S
+  hz = ≤-trans 1+z≤S S≤2^S
+  h3 : 3 ≤ 2 ^ S
+  h3 = ≤-trans (≤-trans (≤ᵇ⇒≤ 3 8 tt) 8≤S) S≤2^S
   unit2S : nestUnit e sl + S ≤ 2 * S
   unit2S = ≤-trans (+-monoˡ-≤ S (nestUnit≤size e sl id))
                    (≤-reflexive (solve 1 (λ s → s :+ s := con 2 :* s) refl S))
-  shape : S * (3 * (E * (2 * S))) ≡ 6 * (S * S) * E
-  shape = solve 2 (λ s ee → s :* (con 3 :* (ee :* (con 2 :* s)))
-                              := con 6 :* (s :* s) :* ee) refl S E
-  six≤2^ : 6 * (S * S) ≤ 2 ^ (1 + S)
-  six≤2^ =
-    ≤-trans (*-monoˡ-≤ (S * S) (≤ᵇ⇒≤ 6 8 tt))
-    (≤-trans (≤-reflexive (solve 1 (λ x → con 8 :* x := con 2 :* (con 4 :* x))
-                                 refl (S * S)))
-             (*-monoʳ-≤ 2 (sq4≤2^ S 8≤S)))
-  exp≤ : 1 + S + S * S ≤ 2 ^ S
-  exp≤ =
-    ≤-trans (+-monoˡ-≤ (S * S) (+-mono-≤ 1≤SS S≤SS))
-    (≤-trans (≤-reflexive (solve 1 (λ x → x :+ x :+ x := con 3 :* x)
-                                 refl (S * S)))
-    (≤-trans (*-monoˡ-≤ (S * S) (≤ᵇ⇒≤ 3 4 tt))
-             (sq4≤2^ S 8≤S)))
+  -- THE UNIT AND THE SIZE, one exponential
+  hA : nestUnit e sl + S ≤ 2 ^ S
+  hA = ≤-trans unit2S 2S≤2^S
+  -- AND THE TELESCOPE'S WRAP, three of them: the per-slot ceiling is one
+  -- exponential times a size, the length is another size, and the
+  -- summand outside is the third.
+  wrapShape : S * (S * (2 ^ S * S)) ≡ 2 ^ S * (S * (S * S))
+  wrapShape = solve 2 (λ s p → s :* (s :* (p :* s)) := p :* (s :* (s :* s)))
+                    refl S (2 ^ S)
+  3SEq : S + (S + S) ≡ 3 * S
+  3SEq = solve 1 (λ s → s :+ (s :+ s) := con 3 :* s) refl S
+  tripleEq : 2 ^ S * (2 ^ S * 2 ^ S) ≡ 2 ^ (3 * S)
+  tripleEq =
+    trans (cong (2 ^ S *_) (sym (^-distribˡ-+-* 2 S S)))
+    (trans (sym (^-distribˡ-+-* 2 S (S + S)))
+           (cong (2 ^_) 3SEq))
+  hB : S * slotWrapSum sl ≤ 2 ^ (3 * S)
+  hB =
+    ≤-trans (*-monoʳ-≤ S (slotWrapSum≤size sl S slSz))
+    (≤-trans (≤-reflexive wrapShape)
+    (≤-trans (*-monoʳ-≤ (2 ^ S) (*-mono-≤ S≤2^S SS≤2^S))
+             (≤-reflexive tripleEq)))
+  dbl : 2 ^ (3 * S) + 2 ^ (3 * S) ≡ 2 ^ (1 + 3 * S)
+  dbl = sym (2X≡X+X (2 ^ (3 * S)))
+  hM : nestUnit e sl + S + S * slotWrapSum sl ≤ 2 ^ (1 + 3 * S)
+  hM = ≤-trans (+-mono-≤ (≤-trans hA (^-monoʳ-≤ 2 (m≤n*m S 3))) hB)
+               (≤-reflexive dbl)
+  collapse : 2 ^ S * (2 ^ S * (2 ^ (S * S) * 2 ^ (1 + 3 * S)))
+               ≡ 2 ^ (S + (S + (S * S + (1 + 3 * S))))
+  collapse =
+    trans (cong (λ z → 2 ^ S * (2 ^ S * z))
+                (sym (^-distribˡ-+-* 2 (S * S) (1 + 3 * S))))
+    (trans (cong (2 ^ S *_)
+                 (sym (^-distribˡ-+-* 2 S (S * S + (1 + 3 * S)))))
+           (sym (^-distribˡ-+-* 2 S (S + (S * S + (1 + 3 * S))))))
+  shapeL : S + (S + (S * S + (1 + 3 * S))) ≡ S * S + (5 * S + 1)
+  shapeL = solve 1 (λ s → s :+ (s :+ (s :* s :+ (con 1 :+ con 3 :* s)))
+                            := s :* s :+ (con 5 :* s :+ con 1))
+                 refl S
+  fourSq : 4 * (S * S) ≡ S * S + 3 * (S * S)
+  fourSq = solve 1 (λ s → con 4 :* (s :* s) := s :* s :+ con 3 :* (s :* s))
+                 refl S
+  sixEq : 5 * S + S ≡ 3 * (2 * S)
+  sixEq = solve 1 (λ s → con 5 :* s :+ s := con 3 :* (con 2 :* s)) refl S
+  h531 : 5 * S + 1 ≤ 3 * (S * S)
+  h531 =
+    ≤-trans (+-monoʳ-≤ (5 * S) 1≤S)
+    (≤-trans (≤-reflexive sixEq)
+             (*-monoʳ-≤ 3 (*-monoˡ-≤ S 2≤S)))
+  expfit : S + (S + (S * S + (1 + 3 * S))) ≤ 2 ^ S
+  expfit =
+    ≤-trans (≤-reflexive shapeL)
+    (≤-trans (+-monoʳ-≤ (S * S) h531)
+    (≤-trans (≤-reflexive (sym fourSq)) (sq4≤2^ S 8≤S)))
 
 -- THE SPLIT ITSELF IS RING ARITHMETIC: the ceiling's factor distributes
 -- over the two halves of its store slot, so each half is priced by its

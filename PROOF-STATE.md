@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE GRANT IS WHAT IS LEFT, AND IT IS OWED ONE FRAME AT A TIME.**
-  The outer frame's clause is no longer assumed: it is proven from the
-  sighted grant, since the walk face already bounds what a sighted walk
-  emits and the size-cap factor is what makes affording that grant
-  possible. So the whole debt has moved to `chain-walk-ΦHyp` — a grant
-  at each outer frame of one chain, at the state the walk has reached
-  when that frame runs. The leg is to read it off the caps recurrence
-  rather than rebuild it: `chain-walk-caps` preserves a per-frame
-  ceiling across a frame at one stepped level, which is the shape the
-  grant is owed at, and iterating a per-frame growth instead lands a
-  cap squared above the charge.
+- **THE CHARGE NOW AFFORDS THE GRANT; READING IT OFF IS WHAT IS LEFT.**
+  The fit a sighted walk needs carries a per-slot wrap the walk's charge
+  did not price, and the sole producer of that fit demands it, so the
+  charge grew by the size cap times the store's wrap sum — and the
+  ceiling still closes, since the widened exponent is a square plus a
+  linear term and the cap's own exponential swallows both. What remains
+  is `chain-walk-ΦHyp`: a grant at each outer frame of one chain, at the
+  state the walk has reached when that frame runs. Read it off
+  `chain-walk-caps`, which preserves a per-frame ceiling across a frame
+  at one stepped level — the shape the grant is owed at.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
