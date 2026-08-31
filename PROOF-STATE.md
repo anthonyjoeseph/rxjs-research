@@ -226,25 +226,24 @@ does not fit is a finding about the shared statement, not about the head.
   carrier is not the move: what a queued term is charged is what has
   to change, and that is Anthony's question rather than a grind.
 
-- **the drain's other seven conjuncts, which the dead ceiling was
-  blocking** — `walk-frame-drain-inner` is one postulate over a whole
-  queue, and only ONE of its per-entry conjuncts is the refuted
-  ceiling. The rest are readings a sibling face already carries at the
-  walk's own level. The leg is to turn the postulate into a body
-  recursing on the queue as the evaluator's drain does, discharge the
-  seven, and leave the ceiling as the single named leaf it now is —
-  which is what makes the spiral one row instead of a whole face.
+- **the drain's ENTRY and WALK halves, which the ceiling does not
+  block** — `sight-all-stream` prices what the payload's emitted values
+  cost and `sight-all-walk` what walking them costs, one leaf for all
+  three `*All` heads. Both are inhabited at the duplicating family that
+  refuted their predecessors, so the design risk is spent and what is
+  left is the induction over the emitted stream. Neither mentions a
+  parked term, which is why they are the leg to take while the entry's
+  own obligation is out for a ruling.
 
 
-- **the drain's ENTRY and WALK halves, which the body above will ask
-  for next** — `sight-all-stream` prices what the payload's emitted
-  values cost and `sight-all-walk` what walking them costs, one leaf
-  for all three `*All` heads. Both are already inhabited at the
-  duplicating family that refuted their predecessors, so the design
-  risk is spent and what is left is the induction over the emitted
-  stream. Taking them straight after the drain body is what keeps the
-  three in one currency: the body consumes exactly what these two
-  price, so a restatement in either lands while the consumer is open.
+- **the cascade's own descent, which is the tier's other risk and
+  does not touch the queue at all** — `cascade-depth-sighted` prices a
+  round's descent under its sighted nesting scaled by the program's
+  size, and both its axes are already read at three instants and at
+  the corner where they compound, with the margin WIDENING as the
+  instant grows. It is the largest DIFFICULTY row in the tier that is
+  independent of the drain entirely, so it is what the schedule should
+  hold while the ceiling question is out for a ruling.
 
 ### The ledger
 

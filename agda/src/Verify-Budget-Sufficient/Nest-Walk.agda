@@ -863,6 +863,21 @@ pathSz?-lvl c Lv p 2≤S h =
 --   conjunct at every cap and every term, with `ceil-absurd-at` beside
 --   it showing the failure is the level and not the range's endpoint.
 
+-- AND THE CEILING IS NOT ONE CONJUNCT AMONG EIGHT THAT COULD BE LEFT
+-- AS A LEAF WHILE THE REST ARE GROUND.  The other seven are all
+-- derivable from readings the caller already holds -- the park field
+-- gives the size and the room, the width field gives the slot width,
+-- the closure key is the size lifted one level, and the tail's state
+-- comes off the subscribe's own caps lemma.  What blocks discharging
+-- them is the Σ: the tail's LEVEL is chosen by whoever proves the
+-- spine, so a proof of the seven has to pick it, and a ceiling
+-- supplied alongside would then have to hold at every level that
+-- choice could land on -- which is the quantified form the witness
+-- above kills.  So the eight stand or fall together, and the entry is
+-- one obligation rather than seven plus a leaf.
+-- DEAD ROUTE: proving the seven derivable conjuncts into a body and
+--   leaving the ceiling as its single postulated leaf.
+
 -- AND THE LEVEL CLIMBS ALONG THE QUEUE, because the STATE does.
 -- Subscribing one queued inner installs nodes the caps did not have
 -- to cover, and the only face that reports a caps receipt for a
