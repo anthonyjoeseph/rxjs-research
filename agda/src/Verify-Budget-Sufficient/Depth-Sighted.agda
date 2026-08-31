@@ -219,10 +219,23 @@ postulate
 -- name and the wrap sum is what they hold, so the pair of them is the
 -- charge, and it is read against the telescope the step is taken over
 -- rather than against a schedule.
+-- AND THE TOWER IS READ AT THE WRONG QUANTITY, which is a finding
+-- about this format rather than about any one grant that instantiates
+-- it.  A duplicating map doubles the ARRIVAL's size per layer while
+-- costing the program a fixed number of constructors, and it moves the
+-- arrival's DEPTH by one.  The two exponents measured side by side over
+-- four layers run sixteen, twenty-three,
+-- thirty, thirty-seven against eighteen, forty-two, ninety, a hundred
+-- and eighty-six.  So a tower read at the arrival's SIZE has an
+-- exponent exponential in the program, and no tower read at the program
+-- can bound it; the depth it is standing in for grows by one a layer.
 -- REFUTED: `Refuted.Sight-All-Fit-Slot` pins it at the reference,
 --   where the arrival-only grant is zero against a delivery of
 --   sixty-four, and checks that the summand-carrying grant holds at
 --   the deepest of those rows.
+-- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-nest-absurd`
+--   is where the two columns of exponents above are measured, two
+--   layers of duplication up.
 ValFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → Val Γ (obs u) → Set
 ValFit {u = u} k sl G κ o =
@@ -344,7 +357,9 @@ pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
 -- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`,
 --   at a flat telescope where the wrap is nought: sixteen against
 --   eighteen in the exponents, so a quarter of a million delivered
---   against a grant of a hundred and thirty-one thousand.
+--   against a grant of a hundred and thirty-one thousand.  And
+--   `Refuted.Sight-All-Stream-Dup.sight-all-stream-nest-absurd` again
+--   two layers up, where the same rows measure the gap COMPOUNDING.
 -- REFUTED: `Refuted.Sight-All-Fit-Slot` kills the payload-only grant
 --   at a slot whose definition substitutes per layer -- delivered
 --   `8 16 32 64` against a constant sixteen, meeting it exactly at the

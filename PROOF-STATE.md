@@ -214,17 +214,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **what substitution actually costs, measured before a currency is
-  chosen** — one duplicating map outruns a grant whose exponent is the
-  payload's sync size, and the worry is that NESTING them compounds:
-  each layer names its argument twice, so k layers cost a constant
-  each in the payload and double what is emitted. If that holds, no
-  single tower in the payload's size can pay and the fit's own
-  `2 ^ syncSizeᵛ` shape is what has to move, not just its argument —
-  which reaches every bound on this face. The closure size is the
-  obvious candidate and is the WRONG one: it weighs slot references,
-  and this growth is in the value variables. So measure the nested
-  family at the harness the witness already builds, then restate.
+- **the fit's tower moves off the arrival's SIZE and onto its DEPTH** —
+  the compounding is measured and it is decisive: over four layers of
+  duplicating map the grant's exponent runs sixteen, twenty-three,
+  thirty, thirty-seven while the demand's runs eighteen, forty-two,
+  ninety, a hundred and eighty-six. So no tower read at the program can
+  bound one read at the arrival, and the argument is not which grant
+  but which QUANTITY `ValFit` raises two to. The depth the tower was
+  standing in for moves by one a layer, and every consumer of the fit
+  reads it, so the leg is to restate the pair over the depth and check
+  what the sighted ceiling above still owes.
 
 - **the park site that must issue the ceiling it stores** — exactly
   one arm writes a `mergeAll` queue, the gate-shut arm of the inner
