@@ -95,7 +95,7 @@ open import Verify-Budget-Sufficient.Caps using
   cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0; frameStep-mono-j;
   frameStep-reg-mono; iterL-infl; sucJ≤fLvlD; regAt-mono; iterL-mono; iterSize-mono-count;
   lvls-add; lvls-infl; lvls-mono; capsAt-exp-gain; size≤sizeCount; sizeCount; sizeCount-body;
-  frameBlowup; iterSize-pow; size-lower)
+  frameBlowup; iterSize-pow; size-lower; capsAt-exp2≤capsH)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; reach-reset; ∧-true; all-impl; n<2^n; sq≤2^; sum-tab-mono; 2X≡X+X; 1≤pow)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -4573,15 +4573,6 @@ postulate
     suc (sizeᵉ e) * (3 * nestIncAt e sl id)
       ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
 
--- AND THE FUEL HAS TO HOLD BOTH HALVES AT ONCE, which is a separate
--- ask from holding either.  The tree's own bridge puts ONE copy of the
--- exponential under the fuel; the ceiling now reads a cap and an
--- increment, and the split below charges each to its own copy.
-postulate
-  exp2≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-    2 ^ (2 ^ Caps.cSize (capsAt e sl id)) + 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
-      ≤ capsH e sl id
-
 -- THE SPLIT ITSELF IS RING ARITHMETIC: the ceiling's factor distributes
 -- over the two halves of its store slot, so each half is priced by its
 -- own leaf and neither has to be read at the other's index.
@@ -4602,7 +4593,7 @@ nestCap-inc-sight≤capsH e sl id =
   ≤-trans (≤-reflexive (sight-split (sizeᵉ e) (nestCapAt e sl id) (nestIncAt e sl id)))
           (≤-trans (+-mono-≤ (nestCap-sight≤exp e sl id)
                              (nestInc-sight≤exp e sl id))
-                   (exp2≤capsH e sl id))
+                   (capsAt-exp2≤capsH e sl id))
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
 -- arrival's nesting is held under it by the caller's premise, the

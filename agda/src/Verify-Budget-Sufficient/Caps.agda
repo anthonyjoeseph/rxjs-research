@@ -1667,21 +1667,24 @@ cDel+3≤pooled m c 3≤m 2≤S hS hR hW =
   1≤T : 1 ≤ T
   1≤T = ≤-trans (s≤s z≤n) 2≤T
 
-blowup-exp≤blowH : ∀ (m : ℕ) (c : Caps) →
+-- THE EXPONENTIAL LANDS UNDER THE POOLED COUNT, WHICH IS THE HALF THE
+-- FUEL CARRIES TWICE.  `blowH` is `6 + m + 2 · poolCount`, so a
+-- consumer wanting the exponential once takes this and pays the
+-- doubling away, and a consumer wanting it TWICE takes it at both
+-- summands.  The split is here rather than at the two consumers
+-- because the climb -- size into a level, level into the pooled walk --
+-- is the whole content and neither reading may re-derive it.
+blowup-exp≤pool : ∀ (m : ℕ) (c : Caps) →
   3 ≤ m → 2 ≤ Caps.cSize c →
   Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
   Caps.cWid c ≤ towerℕ m →
-  2 ^ (2 ^ Caps.cSize (frameBlowup c m)) ≤ blowH m
-blowup-exp≤blowH m c 3≤m 2≤S hS hR hW =
+  2 ^ (2 ^ Caps.cSize (frameBlowup c m)) ≤ poolCount (towerℕ m) m
+blowup-exp≤pool m c 3≤m 2≤S hS hR hW =
   ≤-trans (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 size≤L₁))
   (≤-trans (exp2-lvls S W m 0 (suc (cDel c m)) 1≤S)
   (≤-trans (lvls-mono {d = m} (3 + cDel c m) N 2≤S hS hW ≤-refl
                       (cDel+3≤pooled m c 3≤m 2≤S hS hR hW))
-  (≤-trans (poolBody≤poolCount T m 1≤T)
-  (≤-trans (m≤n+m (poolCount T m) (poolCount T m))
-  (≤-trans (≤-reflexive (sym (2X≡X+X (poolCount T m))))
-  (≤-trans (m≤n+m (2 * poolCount T m) (6 + m))
-           (≤-reflexive (sym (blowH-body m)))))))))
+           (poolBody≤poolCount T m 1≤T)))
   where
   S = Caps.cSize c
   W = Caps.cWid c
@@ -1695,26 +1698,49 @@ blowup-exp≤blowH m c 3≤m 2≤S hS hR hW =
   size≤L₁ = ≤-trans (≤-reflexive (cong (sizeAt S) (sizeCount-body c m)))
                     (sizeAt≤lvls-suc S W m 0 (cDel c m))
 
--- SO THE FUEL AT AN INSTANT IS TWO EXPONENTIALS ABOVE THE SIZE AT THAT
--- SAME INSTANT, at every instant including the base.  The blowup is
--- driven by the fuel the previous story reached and `blowH` is what
--- the fuel climbs by, so the two are one quantity read once each --
--- and the base is no exception, since the height already starts one
--- `blowH` up.  What was missing was only that the pooled walk outruns
--- this caps' own delivery count, and the STRICT registry bracket
--- supplies it.
-capsAt-exp≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  2 ^ (2 ^ Caps.cSize (capsAt e sl id)) ≤ capsH e sl id
-capsAt-exp≤capsH {n = n} e sl zero =
-  blowup-exp≤blowH (capsBase e sl)
-    (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
-          (suc (entryCeil n sl e))
-          (suc sz))
-    (m≤m+n 3 _)
-    (s≤s (s≤s z≤n))
-    (≤-trans base≤ K)
-    (≤-trans suc≤ K)
-    (≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + szc)) K)
+pool2≤blowH : ∀ (m : ℕ) →
+  poolCount (towerℕ m) m + poolCount (towerℕ m) m ≤ blowH m
+pool2≤blowH m =
+  ≤-trans (≤-reflexive (sym (2X≡X+X (poolCount (towerℕ m) m))))
+  (≤-trans (m≤n+m (2 * poolCount (towerℕ m) m) (6 + m))
+           (≤-reflexive (sym (blowH-body m))))
+
+blowup-exp2≤blowH : ∀ (m : ℕ) (c : Caps) →
+  3 ≤ m → 2 ≤ Caps.cSize c →
+  Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
+  Caps.cWid c ≤ towerℕ m →
+  2 ^ (2 ^ Caps.cSize (frameBlowup c m)) + 2 ^ (2 ^ Caps.cSize (frameBlowup c m))
+    ≤ blowH m
+blowup-exp2≤blowH m c 3≤m 2≤S hS hR hW =
+  ≤-trans (+-mono-≤ ex ex) (pool2≤blowH m)
+  where
+  ex = blowup-exp≤pool m c 3≤m 2≤S hS hR hW
+
+blowup-exp≤blowH : ∀ (m : ℕ) (c : Caps) →
+  3 ≤ m → 2 ≤ Caps.cSize c →
+  Caps.cSize c ≤ towerℕ m → suc (Caps.cReg c) ≤ towerℕ m →
+  Caps.cWid c ≤ towerℕ m →
+  2 ^ (2 ^ Caps.cSize (frameBlowup c m)) ≤ blowH m
+blowup-exp≤blowH m c 3≤m 2≤S hS hR hW =
+  ≤-trans (m≤n+m P P) (blowup-exp2≤blowH m c 3≤m 2≤S hS hR hW)
+  where
+  P = 2 ^ (2 ^ Caps.cSize (frameBlowup c m))
+
+-- THE BASE INSTANT'S BLOWUP PREMISES, packaged once.  `capsAt`'s base
+-- is a `frameBlowup` like every later instant's, but its caps and its
+-- story index are written out rather than named, so the five side
+-- conditions have to be re-derived from the base arithmetic -- and two
+-- readings of that same blowup would otherwise re-derive them twice.
+capsBase-blow-prem : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  let c = caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+               (suc (entryCeil _ sl e))
+               (suc (sizeᵉ e + slotsSize sl))
+      m = capsBase e sl
+  in (3 ≤ m) × (2 ≤ Caps.cSize c) × (Caps.cSize c ≤ towerℕ m)
+     × (suc (Caps.cReg c) ≤ towerℕ m) × (Caps.cWid c ≤ towerℕ m)
+capsBase-blow-prem {n = n} e sl =
+  m≤m+n 3 _ , s≤s (s≤s z≤n) , ≤-trans base≤ K , ≤-trans suc≤ K
+  , ≤-trans (m≤n+m (suc (entryCeil n sl e)) (3 + szc)) K
   where
   sz = sizeᵉ e + slotsSize sl
   szc = sz + slotsClos sl
@@ -1729,8 +1755,50 @@ capsAt-exp≤capsH {n = n} e sl zero =
                     (trans (cong (_+ slotsClos sl) (+-assoc 2 (sizeᵉ e) (slotsSize sl)))
                            (+-assoc 2 (sizeᵉ e + slotsSize sl) (slotsClos sl))))
                   szc≤
+
+-- SO THE FUEL AT AN INSTANT IS TWO EXPONENTIALS ABOVE THE SIZE AT THAT
+-- SAME INSTANT, at every instant including the base.  The blowup is
+-- driven by the fuel the previous story reached and `blowH` is what
+-- the fuel climbs by, so the two are one quantity read once each --
+-- and the base is no exception, since the height already starts one
+-- `blowH` up.  What was missing was only that the pooled walk outruns
+-- this caps' own delivery count, and the STRICT registry bracket
+-- supplies it.
+capsAt-exp≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 ^ (2 ^ Caps.cSize (capsAt e sl id)) ≤ capsH e sl id
+capsAt-exp≤capsH e sl zero =
+  blowup-exp≤blowH _ _
+    (proj₁ (capsBase-blow-prem e sl))
+    (proj₁ (proj₂ (capsBase-blow-prem e sl)))
+    (proj₁ (proj₂ (proj₂ (capsBase-blow-prem e sl))))
+    (proj₁ (proj₂ (proj₂ (proj₂ (capsBase-blow-prem e sl)))))
+    (proj₂ (proj₂ (proj₂ (proj₂ (capsBase-blow-prem e sl)))))
 capsAt-exp≤capsH e sl (suc id) =
   blowup-exp≤blowH (capsH e sl id) (capsAt e sl id)
+    (3≤capsH e sl id)
+    (2≤capsAt-size e sl id)
+    (proj₁ (capsAt-tower e sl id))
+    (proj₁ (proj₂ (capsAt-tower e sl id)))
+    (proj₂ (proj₂ (capsAt-tower e sl id)))
+
+-- THE SAME READING, WITH THE FUEL'S SECOND COPY SPENT.  The round's
+-- ceiling is a cap PLUS an increment and each half is priced by its own
+-- exponential, so the consumer needs the pair rather than the single
+-- reading -- and the pair costs nothing extra, since the fuel carries
+-- the pooled count twice and the single reading was already throwing
+-- one copy away.
+capsAt-exp2≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 ^ (2 ^ Caps.cSize (capsAt e sl id)) + 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+    ≤ capsH e sl id
+capsAt-exp2≤capsH e sl zero =
+  blowup-exp2≤blowH _ _
+    (proj₁ (capsBase-blow-prem e sl))
+    (proj₁ (proj₂ (capsBase-blow-prem e sl)))
+    (proj₁ (proj₂ (proj₂ (capsBase-blow-prem e sl))))
+    (proj₁ (proj₂ (proj₂ (proj₂ (capsBase-blow-prem e sl)))))
+    (proj₂ (proj₂ (proj₂ (proj₂ (capsBase-blow-prem e sl)))))
+capsAt-exp2≤capsH e sl (suc id) =
+  blowup-exp2≤blowH (capsH e sl id) (capsAt e sl id)
     (3≤capsH e sl id)
     (2≤capsAt-size e sl id)
     (proj₁ (capsAt-tower e sl id))

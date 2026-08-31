@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CEILING'S TWO HALVES ARE CHARGED TO TWO COPIES OF THE FUEL,
-  AND ONLY ONE COPY IS ESTABLISHED.** Reading the round at the cap PLUS
-  the increment is what makes the bound walk-preservable, and the split
-  prices each half separately: the cap half is proven, the increment
-  half is a leaf, and the doubling is another. The tree's bridge puts
-  ONE exponential under the fuel and says nothing about a second, and
-  the increment reads the delivery square at the NEXT instant — the
-  quantity this face's step lemma deliberately never prices here. So
-  the leg is those two leaves, and whether the fuel is wide enough.
+- **THE DOUBLING WAS FREE AND THE INCREMENT IS THE REAL ASK.** The fuel
+  turned out to carry the pooled count TWICE — the single-exponential
+  reading was throwing one copy away — so the second copy is now proven
+  and the ceiling's split costs nothing. What is left is the increment
+  half: it reads the delivery square at the NEXT instant, the one
+  quantity this face's recurrence deliberately never prices here, and
+  the tree's gain lemma runs the other way (this instant's exponential
+  is BELOW the next instant's size). So the leg is whether that half is
+  true at all, and the first move is to instantiate it rather than
+  grind it.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -261,10 +262,6 @@ does not fit is a finding about the shared statement, not about the head.
   instant's INCREMENT under the exponential at that same instant. The cap half
   of the same ceiling is proven; the increment reads the delivery square at the
   NEXT instant, which the recurrence deliberately does not price here.
-- **`exp2≤capsH`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the fuel holding
-  TWO copies of the exponential, since the round's ceiling now reads a cap and
-  an increment. The tree's bridge puts one copy under the fuel and says nothing
-  about the second.
 - **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2, PROBED`: a chain's live list against the program
   rather than against the store it started from. The surrogate charge now runs
