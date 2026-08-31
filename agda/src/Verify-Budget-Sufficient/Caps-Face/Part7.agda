@@ -3802,17 +3802,20 @@ postulate
 -- so a `map-f` whose function is a deferred constant hands the frame a
 -- value as deep as the constant while the charge does not move at all.
 -- Whatever pays for these arms has to see inside a deferred body, and
--- only a SIZE measure does -- which the increment carries and no
+-- only a SIZE measure does -- which the size cap carries and no
 -- depth-built quantity does.
 --
--- AND THE PRICE OF THAT IS PAID AT THE FUEL, WHICH IS WHERE THE OPEN
--- QUESTION NOW SITS.  A bound covering one increment is not the cap,
--- so the round's ceiling reads the cap PLUS the increment, and the two
--- halves are charged to their own copies of the exponential.  The cap
--- half is proven; the increment half and the doubling are the leaves
--- left.  Reading the ceiling at the SUCCESSOR cap instead is dead: the
--- exponential room this face runs on is index-aligned by construction,
--- its step lemma pricing no summand at the cap after the one bounded.
+-- AND THE SIZE CAP IS THE LARGEST CHARGE THE FUEL CAN AFFORD, WHICH IS
+-- WHY IT IS THAT AND NOT THE INSTANT'S INCREMENT.  A bound covering
+-- one chain's growth is not the cap, so the round's ceiling reads the
+-- cap PLUS the charge and each half is priced by its own copy of the
+-- exponential -- and the fuel carries exactly two.  The size cap fits
+-- under one with room, being a quadratic under a double exponential of
+-- itself.  Everything about this is index-aligned by construction: the
+-- exponential room this face runs on prices no summand at the cap
+-- after the one being bounded, so a charge naming the next instant is
+-- unaffordable however true it is, and reading the ceiling at the
+-- SUCCESSOR cap instead is dead for the same reason.
 --
 -- AND THE PATH PREMISE IS NOT A CONVENIENCE.  A charge naming the
 -- program alone cannot hold against a path built by hand: the path is
@@ -3850,13 +3853,18 @@ postulate
 --   The entry lifts and the arms carry over, but the consumer does
 --   not: its fuel is the exponential at THIS instant, which the caps
 --   recurrence pins to this instant's cap.
+-- DEAD ROUTE: charging the arms the instant's INCREMENT, which is what
+--   they carried while they mirrored the entry burst.  The increment's
+--   own exponent reads the delivery at the NEXT instant, and the size
+--   there is already a blowup story above the fuel available here, so
+--   no reading of it fits under this instant's exponential.
 -- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
 --   RUNNING, at the one program shape that can move the fold: a `mapᵉ`
 --   over the async input handing the outer *All a deferred nest per
 --   arrival, so the chain the evaluator presents subscribes it and the
 --   live it mints carries the body.  Covered: the fold rising 0 to 1
 --   and 0 to 3 as the nest deepens, against a syntactic charge of
---   eighteen and twenty-six that the tree proves this arm's increment
+--   eighteen and twenty-six that the tree proves this arm's size cap
 --   dominates -- so both sides move and the ordering is load-bearing
 --   on the depth axis.  Not covered: a fold already nonzero at entry,
 --   where the growth would compound rather than start from zero.
@@ -3870,7 +3878,7 @@ postulate
     foldr (λ l acc → liveNest l ⊔ acc) 0
           (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-          ⊔ (nestUnit e sl + nestIncAt e sl id)
+          ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
 
 -- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the second
 --   cascade of two reachable families, taking the chain the evaluator
@@ -3891,7 +3899,7 @@ postulate
     foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
           (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
       ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-          ⊔ (nestUnit e sl + nestIncAt e sl id)
+          ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
 
 -- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the same two
 --   families and the registry does not move at either -- nine to nine
@@ -3907,7 +3915,7 @@ postulate
     sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
     regsNestMax (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
-      ≤ regsNestMax (EvalSt.registry st) ⊔ (nestUnit e sl + nestIncAt e sl id)
+      ≤ regsNestMax (EvalSt.registry st) ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.
@@ -3928,7 +3936,7 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-  nestUnit e sl + nestIncAt e sl id ≤ S →
+  nestUnit e sl + Caps.cSize (capsAt e sl id) ≤ S →
   storeNestMax sched st ≤ S →
   storeNestMax (proj₁ (proj₂ (chainStep nextId a path sched st)))
                (proj₂ (proj₂ (chainStep nextId a path sched st))) ≤ S
@@ -3959,7 +3967,7 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
-  nestUnit e sl + nestIncAt e sl id ≤ S →
+  nestUnit e sl + Caps.cSize (capsAt e sl id) ≤ S →
   storeNestMax sched st ≤ S →
   depthCascade a nextId chains sched st
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
@@ -3987,16 +3995,16 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
-                (nestCapAt e sl id + nestIncAt e sl id) (nestUnit e sl)
+                (nestCapAt e sl id + Caps.cSize (capsAt e sl id)) (nestUnit e sl)
 cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hsz =
-  cascade-depth-go sl id a nextId (nestCapAt e sl id + nestIncAt e sl id)
+  cascade-depth-go sl id a nextId (nestCapAt e sl id + Caps.cSize (capsAt e sl id))
     (chainsOf a st) sched (cascadeLatch a st) hsl hsz
     (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
       (capsOK?-regs (capsAt e sl id) sched st hok))
-    (+-monoˡ-≤ (nestIncAt e sl id) (unit≤cap e sl id))
+    (+-monoˡ-≤ (Caps.cSize (capsAt e sl id)) (unit≤cap e sl id))
     (≤-trans (nestOK?-store e sl id sched (cascadeLatch a st)
                (trans (nestOK?-latch e sl id a sched st) hn))
-             (m≤m+n (nestCapAt e sl id) (nestIncAt e sl id)))
+             (m≤m+n (nestCapAt e sl id) (Caps.cSize (capsAt e sl id))))
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
 -- scripted slot's own index makes its nesting zero, and a shared one's
@@ -4557,21 +4565,38 @@ nestCap-sight≤exp e sl id =
   1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
                   (capsAt-base-size e sl id)
 
--- AND ONE INSTANT'S INCREMENT FITS BESIDE IT.  The round's ceiling is
--- read at the cap PLUS the increment rather than at the cap, because
--- that is the smallest bound a walk over the chains can preserve: what
--- a chain adds is priced against the program, so a bound already
--- covering one increment covers every later chain too.  What is not
--- yet established is that the fuel at this instant has the room for
--- the increment as well -- the exponential above dominates the cap
--- with slack, and the increment reads the delivery square at the NEXT
--- instant, which is the one quantity the caps recurrence deliberately
--- does not price here.
-postulate
-  nestInc-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    suc (sizeᵉ e) * (3 * nestIncAt e sl id)
-      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+-- AND THE CHARGE BESIDE IT IS THE SIZE CAP, which is what keeps the
+-- whole ceiling at ONE instant.  A chain's growth is priced against
+-- the program, and the size cap dominates the program's syntax at
+-- every instant, so the walk's bound needs no quantity read at the
+-- next instant -- and a quadratic in the cap sits under the cap's own
+-- exponential with room to spare.
+--
+-- DEAD ROUTE: charging the walk the INCREMENT instead, which is what
+--   the arms first carried by mirroring the entry burst.  The
+--   increment's exponent reads the delivery at the NEXT instant and
+--   the size there is already a blowup story above this instant's
+--   fuel, so no reading of it fits under the exponential the fuel
+--   supplies here.  That is the index constraint the cap's own step
+--   lemma states, arriving at the consumer rather than at the step.
+size-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  suc (sizeᵉ e) * (3 * Caps.cSize (capsAt e sl id))
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
+size-sight≤exp e sl id =
+  ≤-trans (*-mono-≤ 1+z≤S 3S≤4S)
+  (≤-trans (≤-reflexive shape)
+  (≤-trans (sq4≤2^ S (8≤capsAt-size e sl id))
+           (^-monoʳ-≤ 2 (<⇒≤ (n<2^n S)))))
+  where
+  S = Caps.cSize (capsAt e sl id)
+  1+z≤S : suc (sizeᵉ e) ≤ S
+  1+z≤S = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e))) (m≤m+n (2 + sizeᵉ e) _))
+                  (capsAt-base-size e sl id)
+  3S≤4S : 3 * S ≤ 4 * S
+  3S≤4S = *-monoˡ-≤ S (≤ᵇ⇒≤ 3 4 tt)
+  shape : S * (4 * S) ≡ 4 * (S * S)
+  shape = solve 1 (λ s → s :* (con 4 :* s) := con 4 :* (s :* s)) refl S
 
 -- THE SPLIT ITSELF IS RING ARITHMETIC: the ceiling's factor distributes
 -- over the two halves of its store slot, so each half is priced by its
@@ -4587,12 +4612,13 @@ sight-split z C I =
 
 nestCap-inc-sight≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  suc (sizeᵉ e) * suc (3 * (nestCapAt e sl id + nestIncAt e sl id))
+  suc (sizeᵉ e) * suc (3 * (nestCapAt e sl id + Caps.cSize (capsAt e sl id)))
     ≤ capsH e sl id
 nestCap-inc-sight≤capsH e sl id =
-  ≤-trans (≤-reflexive (sight-split (sizeᵉ e) (nestCapAt e sl id) (nestIncAt e sl id)))
+  ≤-trans (≤-reflexive (sight-split (sizeᵉ e) (nestCapAt e sl id)
+                                    (Caps.cSize (capsAt e sl id))))
           (≤-trans (+-mono-≤ (nestCap-sight≤exp e sl id)
-                             (nestInc-sight≤exp e sl id))
+                             (size-sight≤exp e sl id))
                    (capsAt-exp2≤capsH e sl id))
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
@@ -4661,11 +4687,13 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
   ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest hsz)
           (sighted-nest≤capsH sl id a B B ≤-refl
-             (≤-trans hval (m≤m+n (nestCapAt e sl id) (nestIncAt e sl id)))
-             (≤-trans (unit≤cap e sl id) (m≤m+n (nestCapAt e sl id) (nestIncAt e sl id)))
+             (≤-trans hval
+               (m≤m+n (nestCapAt e sl id) (Caps.cSize (capsAt e sl id))))
+             (≤-trans (unit≤cap e sl id)
+               (m≤m+n (nestCapAt e sl id) (Caps.cSize (capsAt e sl id))))
              (nestCap-inc-sight≤capsH e sl id))
   where
-  B = nestCapAt e sl id + nestIncAt e sl id
+  B = nestCapAt e sl id + Caps.cSize (capsAt e sl id)
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}

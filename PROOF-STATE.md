@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DOUBLING WAS FREE AND THE INCREMENT IS THE REAL ASK.** The fuel
-  turned out to carry the pooled count TWICE — the single-exponential
-  reading was throwing one copy away — so the second copy is now proven
-  and the ceiling's split costs nothing. What is left is the increment
-  half: it reads the delivery square at the NEXT instant, the one
-  quantity this face's recurrence deliberately never prices here, and
-  the tree's gain lemma runs the other way (this instant's exponential
-  is BELOW the next instant's size). So the leg is whether that half is
-  true at all, and the first move is to instantiate it rather than
-  grind it.
+- **THE THREE ARMS ARE THE WHOLE OF WHAT IS LEFT ON THIS FACE, AND
+  NONE OF THEM IS INSTANTIATED AT MORE THAN TWO FAMILIES.** The fuel
+  question is closed — the ceiling's two halves are both proven under
+  it — so what the round now rests on is the arms themselves: a chain
+  grows each store component by at most the wrap unit plus the
+  instant's size cap. The registry arm has never moved in a row, the
+  node arm moves at both demand families, and the live arm moves at
+  one program built for it. The leg is to widen that: a family whose
+  chain leaves a deeper registration standing, and a second live-moving
+  program whose fold is already nonzero when the chain starts.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -236,16 +236,16 @@ does not fit is a finding about the shared statement, not about the head.
   the corpus the ceiling is already read at, and find out whether the
   cap's own exponential has the room a tower in a width asks for.
 
-- **THE REGISTRY ARM IS THE ONE STILL PINNED AT A CONSTANT.** The live
-  arm now has a program that moves it and the node table moves at both
-  demand families, but every row taken against the registry component
-  reads the same number before and after the chain — nine to nine at
-  one family, two to two at the other. A charge that could not have
-  lost is not evidence, so this arm's receipt is degenerate whatever it
-  reports. Registrations deepen when a delivery SUBSCRIBES an inner and
-  the chain leaves it standing, so the leg is a program whose chain
-  registers on a path deeper than any the entry put there, and the arm
-  re-read against it.
+- **AND THEN THE ARMS STOP BEING POSTULATES.** Each one is a single
+  `chainStep` against a real function, and the step walks the path
+  frame by frame — so the arm is an induction over that walk with one
+  leaf per frame kind, not a monolith. Its premises are already the
+  right ones: the path premise bounds every frame's size, the arrival
+  premise bounds the payload, and the charge names the instant's cap.
+  Writing the body is what tests whether those three actually suffice,
+  which no probe can do — a green row says the numbers fit, and only a
+  reducing body says the hypotheses reach. The leg is the node arm
+  first, since it is the one that moves at every family.
 
 ### The ledger
 
@@ -258,12 +258,8 @@ does not fit is a finding about the shared statement, not about the head.
   whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
   `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
   the cap has the room.
-- **`nestInc-sight≤exp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
-  instant's INCREMENT under the exponential at that same instant. The cap half
-  of the same ceiling is proven; the increment reads the delivery square at the
-  NEXT instant, which the recurrence deliberately does not price here.
 - **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2, PROBED`: a chain's live list against the program
+  `REFUTED×2, DEAD ROUTE×3, PROBED`: a chain's live list against the program
   rather than against the store it started from. The surrogate charge now runs
   at a program whose chain mints a live from a deferred nest, which is the one
   shape that moves the fold.

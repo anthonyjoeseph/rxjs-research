@@ -2,18 +2,17 @@
 -- WHAT ONE CHAIN ADDS, CHARGED TO THE PROGRAM AND NOT TO THE STORE IT
 -- STARTED FROM.
 --
--- TARGET: chainStep-nest-nodesC @502f2c
--- TARGET: chainStep-nest-regsC @adbf14
+-- TARGET: chainStep-nest-nodesC @532695
+-- TARGET: chainStep-nest-regsC @c7e44c
 --
 -- WHY A SURROGATE AND NOT THE STATEMENT.  The three arms charge the
--- growth to `nestUnit + nestIncAt`, and the increment sits on the caps
--- recurrence, which does not terminate even natively -- so neither
--- side of the arms as written can be instantiated.  What the tree
--- proves is that the increment dominates the size cap and the size cap
--- dominates `2 + sizeᵉ`, so the charge read here is pure syntax and is
--- SMALLER than the arms'.  Every row is therefore a stronger claim
--- than the arm it is evidence for: green here implies the arm at this
--- program, red here does not refute it.
+-- growth to `nestUnit` plus the instant's SIZE CAP, and a cap does not
+-- evaluate -- so the right side of the arms as written cannot be
+-- instantiated at all.  What the tree proves is that the size cap
+-- dominates `2 + sizeᵉ` at every instant, so the charge read here is
+-- pure syntax and is SMALLER than the arms'.  Every row is therefore a
+-- stronger claim than the arm it is evidence for: green here implies
+-- the arm at this program, red here does not refute it.
 --
 -- WHY THE CHAINS COME FROM THE RUN.  The arms carry a `pathSz?`
 -- premise, and a path built by hand does not satisfy it -- that is the
@@ -74,8 +73,8 @@ liveMax sched = foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
 nodesMax : EvalSt prog → ℕ
 nodesMax st = foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
 
--- the syntactic charge the tree proves one instant's increment
--- dominates, through the size cap
+-- the syntactic charge the instant's size cap dominates, and the arms
+-- are stated at that cap
 charge : ℕ
 charge = nestUnit prog slots + (2 + sizeᵉ prog)
 
