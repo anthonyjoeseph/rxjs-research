@@ -29,6 +29,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Runs first, before the expensive toolchain build: a broken swap step
+      # should fail in seconds, not after a 20-minute cold Agda build.
+      # A cold full-tower check has peaked near this container's RAM ceiling
+      # on one deeply-nested-mutual-block module and been OOM-killed (see
+      # .claude/hooks/session-start.sh, which carries the same fix locally).
+      # The runner image ships its own active swapfile at this same path, so
+      # a bare fallocate here fails with "Text file busy" — drop it first.
+      - name: Enable swap
+        run: |
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
       # Pin GHC/cabal explicitly rather than letting install-agda.sh's `apt-get
       # install ghc cabal-install` take whatever Ubuntu's apt repo currently
       # defaults to. That default drifts with the runner image — this failed
@@ -70,20 +86,6 @@ jobs:
           echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
           echo "LC_ALL=C.UTF-8" >> "$GITHUB_ENV"
           echo "LANG=C.UTF-8" >> "$GITHUB_ENV"
-
-      # A cold full-tower check has peaked near this container's RAM ceiling
-      # on one deeply-nested-mutual-block module and been OOM-killed (see
-      # .claude/hooks/session-start.sh, which carries the same fix locally).
-      # The runner image ships its own active swapfile at this same path, so
-      # a bare fallocate here fails with "Text file busy" — drop it first.
-      - name: Enable swap
-        run: |
-          sudo swapoff -a || true
-          sudo rm -f /swapfile
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
 
       - name: make gate
         run: make gate
