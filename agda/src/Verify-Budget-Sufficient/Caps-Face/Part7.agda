@@ -3907,6 +3907,16 @@ postulate
 --   about a chain that registers something deep: what a chain writes to
 --   the registry is uncovered, and only the two components beside it
 --   were seen to move at all.
+-- PROBED: `Probed.Chain-Step-Live-Deferred` reads it again at the one
+--   family that mints a registration mid-step, and it is flat there
+--   too -- one either side, at two body depths.  Covered, and it is a
+--   boundary rather than a gap: a registration is minted at the depth
+--   of the CONTINUATION it hangs off, not at the depth of what is
+--   subscribed, so no amount of nesting in the subscribed value can
+--   raise this fold.  Not covered, and it is now the only candidate
+--   left: a chain reached through a continuation that is itself long,
+--   which needs a program whose *All frames stack rootward rather than
+--   inside the value.
 postulate
   chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

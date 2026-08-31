@@ -3,6 +3,7 @@
 -- RUNNING RATHER THAN BY BUILDING THE PATH.
 --
 -- TARGET: chainStep-nest-liveC @358ade
+-- TARGET: chainStep-nest-regsC @c7e44c
 --
 -- WHY THIS PROGRAM.  A live source's nesting is the nesting of its
 -- PENDING values, and the evaluator mints a live carrying a nested
@@ -46,7 +47,8 @@ open import Rx.Evaluator
 open import Rx.Slots using (Slots)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
-open import Verify-Budget-Sufficient.Nest-Store using (liveNest; nestUnit)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (liveNest; nestUnit; regsNestMax)
 open import Refuted.Demand-Programs using (Γ₂; insF)
 
 slots : Slots Γ₂
@@ -75,26 +77,39 @@ liveMax sched = foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
 charge : ℕ → ℕ
 charge m = nestUnit (progL m) slots + (2 + sizeᵉ (progL m))
 
--- the fold before and after the first chain of the first arrival's
--- cascade, taken off states the evaluator reached
-row : (m : ℕ) → ℕ × ℕ
-row m with sched-next (proj₁ (sub m))
-... | inj₁ _        = 0 , 0
+-- the two components before and after the first chain of the first
+-- arrival's cascade, taken off states the evaluator reached
+reading : (m : ℕ) → (ℕ × ℕ) × (ℕ × ℕ)
+reading m with sched-next (proj₁ (sub m))
+... | inj₁ _        = (0 , 0) , (0 , 0)
 ... | inj₂ (a , sd) with chainsOf a (proj₂ (sub m))
-...   | []            = 0 , 0
+...   | []            = (0 , 0) , (0 , 0)
 ...   | (rid , c) ∷ _ =
         let st₀ = cascadeLatch a (proj₂ (sub m))
             r   = chainStep 1 a c sd st₀
-        in liveMax sd , liveMax (proj₁ (proj₂ r))
+        in (liveMax sd , liveMax (proj₁ (proj₂ r)))
+         , (regsNestMax (EvalSt.registry st₀)
+           , regsNestMax (EvalSt.registry (proj₂ (proj₂ r))))
+
+row : (m : ℕ) → ℕ × ℕ
+row m = proj₁ (reading m)
+
+regsRow : (m : ℕ) → ℕ × ℕ
+regsRow m = proj₂ (reading m)
 
 packed : ℕ
 packed = proj₁ (row 1) + 100 * proj₂ (row 1) + 10000 * charge 1
        + 1000000 * proj₁ (row 3) + 100000000 * proj₂ (row 3)
        + 10000000000 * charge 3
+       + 1000000000000 * proj₁ (regsRow 1) + 100000000000000 * proj₂ (regsRow 1)
+       + 10000000000000000 * proj₁ (regsRow 3)
+       + 1000000000000000000 * proj₂ (regsRow 3)
 
-figures≡ : packed ≡ 260300180100
+figures≡ : packed ≡ 1010101260300180100
 figures≡ = refl
 
 fits : (proj₂ (row 1) ≤ᵇ proj₁ (row 1) ⊔ charge 1)
-     ∧ (proj₂ (row 3) ≤ᵇ proj₁ (row 3) ⊔ charge 3) ≡ true
+     ∧ (proj₂ (row 3) ≤ᵇ proj₁ (row 3) ⊔ charge 3)
+     ∧ (proj₂ (regsRow 1) ≤ᵇ proj₁ (regsRow 1) ⊔ charge 1)
+     ∧ (proj₂ (regsRow 3) ≤ᵇ proj₁ (regsRow 3) ⊔ charge 3) ≡ true
 fits = refl
