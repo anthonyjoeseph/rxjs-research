@@ -126,7 +126,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   pathSz?-widen; regsSz?; regsSz?-widen; slotsCaps?; valCaps?; widNode;
   nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
-  (face-charge; face-charge1; face-vals; mapFrame-caps; scanFrame-caps;
+  (face-charge; face-charge1; face-vals; mapFrame-caps; mapFrame-clos; scanFrame-caps;
    scanVals-len; stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
@@ -2557,41 +2557,49 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 --   template of `S²` copies of its argument, applied to an argument of
 --   closure `S²`, both inside the level-one cap, whose product outruns
 --   the level-two cap `S + 2S² + 4S³` on the base supply `8 ≤ S`.
--- PROBED: `Probed.Step-Frame-Level` -- the CLOSURE conjunct alone, at
---   the worst shape the caller's own premises admit: the template
---   names the slot as many times as the path pricing allows, over a
---   slot definition fattened until it dominates the entry floor, so
---   the rebuild's bill is quadratic in the cap and not linear.  The
---   base cap REFUSES the rebuilt value and one step admits it with a
---   factor of eight to spare; the row at the smallest slot is
---   degenerate and kept as the boundary, since there the base cap
---   already pays.  The entry recurrence is sealed, so the rows stand
---   over its base FLOOR and cover the ratio rather than the
---   recurrence -- which is what the seal cannot move, the floor being
---   a lower bound and the step monotone.
-postulate
-  step-frame-clos-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (fn : Fn Γ [] [] [] s u)
-    (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((map-f fn) ↠ p) ≡ true →
-    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-    Σ ℕ λ j′ →
-      (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
-           (proj₁ (stepFrame sf nid now (map-f fn) p vals fin sched st)) ≡ true)
-      × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                      (Caps.cWid (capsAt e sl id)) L)
+step-frame-clos-map : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] s u)
+  (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((map-f fn) ↠ p) ≡ true →
+  valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+  all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
+  Σ ℕ λ j′ →
+    (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
+         (proj₁ (stepFrame sf nid now (map-f fn) p vals fin sched st)) ≡ true)
+    × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
+                    (Caps.cWid (capsAt e sl id)) L)
+step-frame-clos-map {e = e} {s = s} sl id L sf nid now fn p vals fin sched st hsl hc hpk hvc hcl =
+  suc (sizeᵗ fn)
+  , mapFrame-clos c L sl fn vals (2≤capsAt-size e sl id) (slotsCaps?-capsAt e sl id)
+      (proj₁ (∧-true (all (valCaps? (frameStep L c) sl s) vals)
+                     (length vals ≤ᵇ suc (Caps.cWid (frameStep L c))) hvc))
+  , face-charge1 c L (sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS))
+  where
+  c = capsAt e sl id
+  B = Caps.cSize (frameStep L c)
+  fS = proj₁ (∧-true (frameSz? B (map-f fn))
+                     ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpk)
 
+postulate
   -- THE FOLD'S SECOND FACTOR COMES OUT OF THE STORE, and it COMPOUNDS:
   -- the template is applied once per value handed to the frame, each
   -- application to the last result, so the arm's bill is the map's
   -- raised to the burst's length and the only thing bounding the
   -- accumulator is the store premise directly above.
   --
+  -- TWIN: `mapFrame-clos`, the same face at the map frame, which pays
+  --   for the closure reading without any closure mirror of the
+  --   evaluator: the key is read through a CAPPED telescope, so it is
+  --   at most the cap times the value's plain size, and one level
+  --   absorbs that factor.  The size half here is `scanFrame-caps`,
+  --   also proven, and the extra level fits the charge exactly --
+  --   `face-charge` at the burst's length and the template's size is
+  --   `suc (length vals * suc (sizeᵗ fn))`, which is the size arm's
+  --   own count plus the one step this face adds.
   -- PROBED: `Probed.Step-Frame-Clos-Fold` -- the CLOSURE conjunct
   --   alone, at a template embedding the accumulator TWICE, over a
   --   state REACHED by running the program rather than written down.

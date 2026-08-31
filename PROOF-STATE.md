@@ -226,22 +226,22 @@ does not fit is a finding about the shared statement, not about the head.
   establish it and every consumer may spend it. Refute first, at a
   queue whose entry is larger than the arrival that enqueued it.
 
-- **the map head, against the mirror that already pays for it** — the
-  frame law reports its climb in `fCharge`, which is the currency the
-  size face reports in, and at the map arm that face's charge is
-  `suc (sizeᵗ fn)` and its proof is a real body. So the two arms differ
-  in their MEASURE and in nothing else: one reads `sizeᵛ` of a template
-  applied to an argument, the other `closSizeᵉ` of the same. The leg is
-  the closure counterpart of the substitution bound the size mirror
-  spends — a template's reading times its argument's — and the arm that
-  consumes it.
-
 - **the drain's ENTRY half, now that its grant is the right one** — the
   payload-only form is refuted at a slot reference and the summand
   repairing it is checked at the refuting family, so nothing about
   `sight-all-fit`'s statement is undecided. What is left is the
   induction over the subscription that establishes it, head by head,
   and it is the leaf three of the fit shelf's rows are waiting behind.
+
+- **the other three closure arms, by the ratio the map arm just paid** —
+  the map head fell without any closure mirror of the evaluator at all:
+  a value's key is read THROUGH the telescope, the telescope is capped,
+  so the key is at most the cap times the value's PLAIN size, and one
+  level absorbs that factor because a step multiplies by roughly twice
+  the size field. Every arm therefore needs only its SIZE mirror plus
+  one more level, and the scan arm's mirror is already a real body. The
+  leg is those three arms and whatever the fold's compounding charge
+  costs over the map's flat one.
 
 
 ### The ledger
@@ -258,17 +258,6 @@ does not fit is a finding about the shared statement, not about the head.
   head, whose output is a constructor round a subscribed inner. Instantiated at
   a substituting ladder: the constructor is the cheap half and the report
   doubles per layer, so the charge is what earns the climb.
-- **`step-frame-clos-scan`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the fold
-  head, whose second factor comes out of the STORE and compounds over the
-  burst. Instantiated at a doubling template on a reached state: the report
-  grows by one per four or five values against a charge exponential in the
-  width.
-- **`step-frame-clos-map`** (Caps-Face/Part7) — DIFFICULTY,
-  `REFUTED×2, PROBED`: the template head. Both fixed forms are refuted, which
-  pins the reported-charge one it now has, and the size face's map arm is a
-  proven mirror at that same charge — so what is left is the closure measure's
-  own substitution bound.
-
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
@@ -335,6 +324,12 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+
+- **`step-frame-clos-scan`** (Caps-Face/Part7) — GRINDABLE, `TWIN, PROBED`: the
+  fold head, whose second factor comes out of the STORE and compounds over the
+  burst. Instantiated at a doubling template on a reached state: the report
+  grows by one per four or five values against a charge exponential in the
+  width.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

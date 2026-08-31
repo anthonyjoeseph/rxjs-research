@@ -77,7 +77,3 @@ open import Probed.Step-Frame-Clos-Inner
 open import Probed.Step-Frame-Clos-Wrap
   using (readingsʷ≡; capOKʷ; argOKʷ; valsOKʷ; pathOKʷ; deg₄ʷ; flat₈ʷ; step₈ʷ;
          chargeOKʷ)
-open import Probed.Step-Frame-Level
-  using (argOK₄; argOK₁₆; pathOK₄; pathOK₁₆; pathOK₆₇; deg-base;
-         flat₄; step₄; flat₁₆; step₁₆; flat₆₇; step₆₇;
-         floors≡; rebuilds≡; worst≡)

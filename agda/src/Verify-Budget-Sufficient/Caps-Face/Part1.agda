@@ -128,7 +128,7 @@ open import Rx.Evaluator using (capsBase; Sched; EvalSt; LiveSource; RegId; Chai
   exhaust-st; root; share-sink; _↠_; Frame; map-f; scan-f; take-f; from-inner; thru-outer;
   Stream; Path; sizeStep; iterSize; foldStep; iterFold)
 open import Rx.Slots using (scripted; shared; Slot; Slots; slotSize; slotsSize; inputSize)
-open import Rx.Clos-Size using (closSizeᵉ)
+open import Rx.Clos-Size using (closSizeᵉ; closSize≤mulᵉ)
 open import Rx.Slot-Clos using (slotClos; slotClosD; slotsClos; σAt)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -157,6 +157,7 @@ open import Verify-Budget-Sufficient.Measures using
                                                       EnvSize; envSize-lookup; envSize-widen;
                                                       fᵢ≤sum-tab; n<2^n; n≤slotsSize;
                                                       pathLen; size-subΘᵉ; sizeᵗ-pos;
+                                                      syncSize≤sizeᵉ;
                                                       parkRoom; parkRoom-widen;
                                                       stBounded-widen; stBounded?; ∧-true)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
@@ -512,6 +513,63 @@ closLive-widen : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (l : LiveSource Γ) {c c�
 closLive-widen sl l le =
   all-impl _ _ (λ tv → nestClosOK?ᵛ-widen sl (LiveSource.elemTy l) (proj₂ tv) le)
            (LiveSource.pending l)
+
+-- THE VALUE READING OF THE CLOSURE KEY, AND IT IS A MAX RATHER THAN A
+-- SUM.  That is not a choice: `nestClosOK?ᵛ` is a CONJUNCTION over the
+-- observable leaves of a value, so the one number it compares against
+-- the cap is the largest leaf, and a data leaf carries no observable
+-- and therefore no closure at all.  Stating the measure makes the
+-- predicate an inequality, which is what an arithmetic bound can be
+-- spent against; the predicate itself is a Bool and nothing composes
+-- with it.
+closSizeᵛ : ∀ {n} {Γ : Ctx n} (σ : Fin n → ℕ) (u : Ty) → Val Γ u → ℕ
+closSizeᵛ σ unitᵗ    _        = 0
+closSizeᵛ σ boolᵗ    _        = 0
+closSizeᵛ σ natᵗ     _        = 0
+closSizeᵛ σ (s ×ᵗ t) (a , b)  = closSizeᵛ σ s a ⊔ closSizeᵛ σ t b
+closSizeᵛ σ (s +ᵗ t) (inj₁ a) = closSizeᵛ σ s a
+closSizeᵛ σ (s +ᵗ t) (inj₂ b) = closSizeᵛ σ t b
+closSizeᵛ σ (obs t)  o        = closSizeᵉ σ o
+
+-- and it DECIDES the predicate: at an observable the comparison is the
+-- predicate's own leaf clause, and at a pair ⊔ is the conjunction
+closSizeᵛ-OK : ∀ {n} {Γ : Ctx n} (c : Caps) (sl : Slots Γ) (u : Ty) (v : Val Γ u) →
+  closSizeᵛ (slotClos sl) u v ≤ Caps.cSize c → nestClosOK?ᵛ c sl u v ≡ true
+closSizeᵛ-OK c sl unitᵗ    v        h = refl
+closSizeᵛ-OK c sl boolᵗ    v        h = refl
+closSizeᵛ-OK c sl natᵗ     v        h = refl
+closSizeᵛ-OK c sl (s ×ᵗ t) (a , b)  h =
+  ∧-intro (closSizeᵛ-OK c sl s a (≤-trans (m≤m⊔n _ _) h))
+          (closSizeᵛ-OK c sl t b (≤-trans (m≤n⊔m _ _) h))
+closSizeᵛ-OK c sl (s +ᵗ t) (inj₁ a) h = closSizeᵛ-OK c sl s a h
+closSizeᵛ-OK c sl (s +ᵗ t) (inj₂ b) h = closSizeᵛ-OK c sl t b h
+closSizeᵛ-OK c sl (obs t)  o        h = T⇒≡true _ (≤⇒≤ᵇ h)
+
+-- THE CLOSURE IS THE PLAIN SIZE TIMES A CEILING ON THE TELESCOPE, at
+-- the VALUE level.  `Rx.Clos-Size` proves the expression half against
+-- the SYNC size; the plain size dominates that, so a caller holding
+-- nothing but a size receipt and a slot ceiling -- which is exactly
+-- what a caps arrival carries -- can read a closure bound off it.  The
+-- price is one factor of the ceiling, and a single frame level pays it
+-- because a level MULTIPLIES by the cap.
+closSizeᵛ≤mul : ∀ {n} {Γ : Ctx n} (σ : Fin n → ℕ) (M : ℕ) →
+  (∀ i → σ i ≤ M) → 1 ≤ M → (u : Ty) (v : Val Γ u) →
+  closSizeᵛ σ u v ≤ M * sizeᵛ u v
+closSizeᵛ≤mul σ M hσ 1≤M unitᵗ    v        = z≤n
+closSizeᵛ≤mul σ M hσ 1≤M boolᵗ    v        = z≤n
+closSizeᵛ≤mul σ M hσ 1≤M natᵗ     v        = z≤n
+closSizeᵛ≤mul σ M hσ 1≤M (s ×ᵗ t) (a , b)  =
+  ⊔-lub (≤-trans (closSizeᵛ≤mul σ M hσ 1≤M s a)
+                 (*-monoʳ-≤ M (≤-trans (m≤m+n _ _) (n≤1+n _))))
+        (≤-trans (closSizeᵛ≤mul σ M hσ 1≤M t b)
+                 (*-monoʳ-≤ M (≤-trans (m≤n+m _ _) (n≤1+n _))))
+closSizeᵛ≤mul σ M hσ 1≤M (s +ᵗ t) (inj₁ a) =
+  ≤-trans (closSizeᵛ≤mul σ M hσ 1≤M s a) (*-monoʳ-≤ M (n≤1+n _))
+closSizeᵛ≤mul σ M hσ 1≤M (s +ᵗ t) (inj₂ b) =
+  ≤-trans (closSizeᵛ≤mul σ M hσ 1≤M t b) (*-monoʳ-≤ M (n≤1+n _))
+closSizeᵛ≤mul σ M hσ 1≤M (obs t)  o        =
+  ≤-trans (closSize≤mulᵉ σ M hσ 1≤M o) (*-monoʳ-≤ M (syncSize≤sizeᵉ o))
+
 
 
 

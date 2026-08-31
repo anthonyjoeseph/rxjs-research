@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part5 where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _≤_; _⊔_; _≤ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-identityʳ; m≤m+n; n≤1+n; +-mono-≤; *-mono-≤; +-monoʳ-≤;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-identityʳ; +-suc; m≤m+n; n≤1+n; +-mono-≤; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤;
   ⊔-lub)
 open import Data.Empty   using (⊥-elim)
 open import Data.Nat.Solver     using (module +-*-Solver)
@@ -25,7 +25,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; cong; cong₂; subst)
+  using (_≡_; refl; sym; trans; cong; cong₂; subst)
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; Timed; after_,_)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; Ctx; Closed; Val; sizeᵗ; sizeᵛ; Fn;
@@ -35,6 +35,7 @@ open import Rx.Evaluator using (Sched; EvalSt; LiveSource; resolve; scanVals; No
   mergeAll-st; switch-st; exhaust-st; lookupNode; NodeId; scan-f; takeVals; takeDispatch; Path;
   stepFrame; fCharge; sizeStep; iterSize; iterFold)
 open import Rx.Slots using (Slots)
+open import Rx.Slot-Clos using (slotClos)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
 -- conjuncts and adds the walk itself:
@@ -56,7 +57,7 @@ open import Verify-Budget-Sufficient.Measures using
   (all-impl; boundedLive; boundedNode; fnCapᵛ; ∧-true)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; iterFold-infl; iterFold-mono-count; iterSize-infl;
-   iterSize-mono-count)
+   iterSize-mono-count; iterSize-suc)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
@@ -75,8 +76,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
    FrameFace; lookupNode-caps; valsCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (applyFn-iterSize; capsOK?; capsOK?-mono; closLive; eventCaps?;
-   frameSz?; iterFold-+; iterSize-+; pair≤sizeStep; pathSz?; slotsCaps?;
-   SlotWid; valCaps?; widLive; widNode)
+   closSizeᵛ; closSizeᵛ-OK; closSizeᵛ≤mul;
+   frameSz?; iterFold-+; iterSize-+; nestClosOK?ᵛ; pair≤sizeStep; pathSz?;
+   slotsCaps?; slotsCaps?-clos; SlotWid; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (applyFn-iterFold; frameStep-⊑-+; valCaps?-size; valCaps?-wid; wid-lift)
 open import Verify-Budget-Sufficient.Caps-Face.Part2 using
@@ -480,6 +482,67 @@ mapFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC fS vC =
                 (all (valCaps? (frameStep j c) sl s) vs) h
   ... | hd , tl =
     ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (sz v hd))) (T⇒≡true _ (≤⇒≤ᵇ (wd v hd))))
+            (go vs tl)
+
+-- ONE map-f FRAME'S CLOSURE LADDER, AND THE ARGUMENT'S OWN CLOSURE IS
+-- NOT WHAT PAYS FOR IT.  The rebuilt value's key is read THROUGH the
+-- slot telescope and the telescope is capped, so the key is at most
+-- the cap times the value's PLAIN size -- a reading the caller's size
+-- receipt already supplies.  The closure face therefore costs what the
+-- size face costs plus one factor of the cap, and a single level
+-- absorbs that factor outright, a step multiplying by roughly twice
+-- the size field.  So the charge is `suc (sizeᵗ fn)`, the same one the
+-- size mirror pays, and not a second ladder.
+--
+-- AND THE SLOT PREMISE IS WHAT MAKES IT TRUE.  Without a ceiling on
+-- the telescope a slot definition is free, the ratio between the two
+-- readings is unbounded in the slot COUNT, and no number of levels
+-- pays for the rebuild.
+-- REFUTED: `Refuted.Nest-Clos-Stratified`, which is that ratio with
+--   the ceiling removed.
+mapFrame-clos : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  all (nestClosOK?ᵛ (frameStep (j + suc (sizeᵗ fn)) c) sl u)
+      (map (applyFn fn) vals) ≡ true
+mapFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC vC = go vals vC
+  where
+  S   = Caps.cSize c
+  B   = Caps.cSize (frameStep j c)
+  a   = sizeᵗ fn
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  X   = iterSize S (j + a) S
+  σ≤S : ∀ i → slotClos sl i ≤ S
+  σ≤S i = slotsCaps?-clos S (Caps.cWid c) sl i slC
+  eqStep : Caps.cSize (frameStep (j + suc a) c) ≡ S * suc (2 * X)
+  eqStep = trans (cong (λ k → iterSize S k S) (+-suc j a))
+                 (iterSize-suc S (j + a) S)
+  X≤ : X ≤ suc (2 * X)
+  X≤ = ≤-trans (m≤m+n X (X + 0)) (n≤1+n (X + (X + 0)))
+  sz : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
+       closSizeᵛ (slotClos sl) u (applyFn fn v)
+         ≤ Caps.cSize (frameStep (j + suc a) c)
+  sz v hv =
+    ≤-trans (≤-trans (closSizeᵛ≤mul (slotClos sl) S σ≤S 1≤S u (applyFn fn v))
+                     (*-monoʳ-≤ S (≤-trans szv X≤)))
+            (≤-reflexive (sym eqStep))
+    where
+    szv : sizeᵛ u (applyFn fn v) ≤ X
+    szv = ≤-trans (applyFn-iterSize S B 1≤S fn v
+                     (≤ᵇ⇒≤ (sizeᵛ s v) B
+                        (T-to (valCaps?-size (frameStep j c) sl s v hv))))
+                  (≤-reflexive (sym (iterSize-+ S j a S)))
+  go : (vs : List (Val Γ s)) → all (valCaps? (frameStep j c) sl s) vs ≡ true →
+       all (nestClosOK?ᵛ (frameStep (j + suc a) c) sl u)
+           (map (applyFn fn) vs) ≡ true
+  go []       h = refl
+  go (v ∷ vs) h
+    with ∧-true (valCaps? (frameStep j c) sl s v)
+                (all (valCaps? (frameStep j c) sl s) vs) h
+  ... | hd , tl =
+    ∧-intro (closSizeᵛ-OK (frameStep (j + suc a) c) sl u (applyFn fn v) (sz v hd))
             (go vs tl)
 
 -- ONE scan-f FRAME'S SIZE LADDER.  Here the folds DO compose — scanVals
