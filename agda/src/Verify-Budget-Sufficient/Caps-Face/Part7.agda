@@ -47,7 +47,8 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
   (pathSzSum-cap; deliverLen; deliverNestD; deliverNestF; 1≤deliverNestF; chainsLenSum;
   chainsDelLen; chainsDelNestD; chainsDelNestF; 1≤chainsDelNestF; chainsDelSzSum;
   chainsDelNestF≡; chainsDelLen-chains; chainsDelNestD-chains; chainsDelSzSum-chains;
-  chainsNestF≤; shareAdmit-len; shareAdmit-sz; admSz?; pathNestF-cap)
+  chainsNestF≤; shareAdmit-len; shareAdmit-sz; admSz?)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using (foldPath-nest-regs)
@@ -3931,14 +3932,15 @@ chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       ⊔ (nestWalkAt e sl id)
 chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
   foldPath-nest-regs _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
-    (nestWalkAt e sl id) (∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl)
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    (∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl)
   where
   Sz = Caps.cSize (capsAt e sl id)
-  Φfit : pathNestF path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
            ≤ nestWalkAt e sl id
-  Φfit = subst (pathNestF path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
+  Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
                (sym (nestWalkAt-def e sl id))
-               (*-mono-≤ (pathNestF-cap Sz path hp)
+               (*-mono-≤ (pathΦF-cap Sz path hp)
                          (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz)))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and

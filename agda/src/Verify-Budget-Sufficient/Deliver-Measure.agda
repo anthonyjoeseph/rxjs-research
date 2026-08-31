@@ -21,9 +21,9 @@ open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_; length; foldr)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; n≤1+n; ≤-reflexive; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⇒m≤1+n; +-assoc; +-comm; +-mono-≤;
-  +-monoʳ-≤; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; m^n>0; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  ^-distribˡ-+-*; ^-monoʳ-≤)
+  (≤-refl; ≤-trans; n≤1+n; ≤-reflexive; ≤ᵇ⇒≤; m≤m+n; m≤n+m; m≤n⇒m≤1+n; +-assoc; +-comm;
+  +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; m^n>0; ⊔-lub; m≤m⊔n; m≤n⊔m;
+  ^-distribˡ-+-*)
 open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
@@ -154,24 +154,6 @@ pathSzSum-cap : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
 pathSzSum-cap B p h =
   ≤-trans (pathSzSum-len B p h) (*-monoˡ-≤ B (pathSz?-len B p h))
 
--- AND THE PATH'S FACTOR IS THAT SUM EXPONENTIATED, which is what makes
--- the multiplicative currency readable off the same premise as the
--- additive one.  A frame's factor is two to its own size and the path
--- multiplies them, so the telescope is one exponential over the sum --
--- and the sum is already under the square of the cap.
-pathNestF≡ : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) →
-  pathNestF p ≡ 2 ^ pathSzSum p
-pathNestF≡ root           = refl
-pathNestF≡ (share-sink _) = refl
-pathNestF≡ (f ↠ p)        =
-  trans (cong₂ _*_ (frameNestF≡ f) (pathNestF≡ p))
-        (sym (^-distribˡ-+-* 2 (frameSzD f) (pathSzSum p)))
-
-pathNestF-cap : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
-  pathSz? B p ≡ true → pathNestF p ≤ 2 ^ (B * B)
-pathNestF-cap B p h =
-  ≤-trans (≤-reflexive (pathNestF≡ p))
-          (^-monoʳ-≤ 2 (pathSzSum-cap B p h))
 
 -- THE DELIVER MEASURES: the path measures with the sink clause charging
 -- its fan-out allowance instead of zero.  Frames step exactly as the

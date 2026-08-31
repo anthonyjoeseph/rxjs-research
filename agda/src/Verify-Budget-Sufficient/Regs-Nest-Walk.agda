@@ -39,7 +39,8 @@ open import Rx.Evaluator
          foldPath; stepFrame; dispatchShare)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; pathNestD; pathNestF; nest-inflate)
+  using (regsNestMax; pathNestD; nest-inflate)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -48,10 +49,10 @@ open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 -- multiplicative in this currency.  The factor is spent frame by frame:
 -- each one hands its share to the value it produces, so the product
 -- shrinks exactly as fast as the value it multiplies can grow.
-valsΦ? : ∀ {n} {Γ : Ctx n} {s t} (U : ℕ) (path : Path Γ s t)
+valsΦ? : ∀ {n} {Γ : Ctx n} {s t} (B U : ℕ) (path : Path Γ s t)
   (vals : List (Val Γ s)) → Bool
-valsΦ? {s = s} U path vals =
-  all (λ v → pathNestF path * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
+valsΦ? {s = s} B U path vals =
+  all (λ v → pathΦF B path * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
 
 postulate
   -- ONE FRAME'S REGISTRATIONS, under the potential it was handed.  The
@@ -75,8 +76,8 @@ postulate
   stepFrame-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (U : ℕ) →
-    valsΦ? U (f ↠ path) vals ≡ true →
+    (B U : ℕ) →
+    valsΦ? B U (f ↠ path) vals ≡ true →
     regsNestMax (EvalSt.registry
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
@@ -88,8 +89,8 @@ postulate
   dispatchShare-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ _)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (U : ℕ) →
-    valsΦ? U (share-sink {t = t} i) vals ≡ true →
+    (B U : ℕ) →
+    valsΦ? B U (share-sink {t = t} i) vals ≡ true →
     regsNestMax (EvalSt.registry
       (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
@@ -102,15 +103,15 @@ postulate
 -- the two moves cancel exactly: the frame surrenders two to its own
 -- size, substitution may claim precisely that, and what is left is the
 -- same product read one frame further down.
-mapΦ : ∀ {n} {Γ : Ctx n} {s u t} (U : ℕ) (fn : Fn Γ [] [] [] s u)
+mapΦ : ∀ {n} {Γ : Ctx n} {s u t} (B U : ℕ) (fn : Fn Γ [] [] [] s u)
   (p : Path Γ u t) (vals : List (Val Γ s)) →
-  valsΦ? U (map-f fn ↠ p) vals ≡ true →
-  valsΦ? U p (map (applyFn fn) vals) ≡ true
-mapΦ U fn p [] h = refl
-mapΦ {s = s} {u = u} U fn p (v ∷ vs) h =
-  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ step)) (mapΦ U fn p vs (∧-trueʳ h))
+  valsΦ? B U (map-f fn ↠ p) vals ≡ true →
+  valsΦ? B U p (map (applyFn fn) vals) ≡ true
+mapΦ B U fn p [] h = refl
+mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ step)) (mapΦ B U fn p vs (∧-trueʳ h))
   where
-  F = pathNestF p
+  F = pathΦF B p
   E = 2 ^ sizeᵗ fn
   hv : E * F * (nestDᵛ s v + (nestDᵗ fn + pathNestD p)) ≤ U
   hv = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
@@ -139,9 +140,9 @@ postulate
   stepFrame-nest-Φ-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
     (nid : NodeId) (path : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
-    valsΦ? U (scan-f fn nid ↠ path) vals ≡ true →
-    valsΦ? U path
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U (scan-f fn nid ↠ path) vals ≡ true →
+    valsΦ? B U path
       (proj₁ (stepFrame sf id now (scan-f fn nid) path vals fin sched st))
       ≡ true
 
@@ -152,9 +153,9 @@ postulate
   stepFrame-nest-Φ-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (path : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (U : ℕ) →
-    valsΦ? U (take-f nid ↠ path) vals ≡ true →
-    valsΦ? U path
+    (B U : ℕ) →
+    valsΦ? B U (take-f nid ↠ path) vals ≡ true →
+    valsΦ? B U path
       (proj₁ (stepFrame sf id now (take-f nid) path vals fin sched st))
       ≡ true
 
@@ -166,9 +167,9 @@ postulate
   stepFrame-nest-Φ-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
-    valsΦ? U (from-inner op allNid inst ↠ path) vals ≡ true →
-    valsΦ? U path
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U (from-inner op allNid inst ↠ path) vals ≡ true →
+    valsΦ? B U path
       (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals
                         fin sched st))
       ≡ true
@@ -192,9 +193,9 @@ postulate
   stepFrame-nest-Φ-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
-    valsΦ? U (thru-outer op nid ↠ path) vals ≡ true →
-    valsΦ? U path
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
+    valsΦ? B U path
       (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin sched st))
       ≡ true
 
@@ -208,41 +209,41 @@ postulate
 stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-  (U : ℕ) →
-  valsΦ? U (f ↠ path) vals ≡ true →
-  valsΦ? U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
-stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st U hΦ =
-  mapΦ U fn path vals hΦ
-stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st U hΦ =
-  stepFrame-nest-Φ-scan sf id now fn nid path vals fin sched st U hΦ
-stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st U hΦ =
-  stepFrame-nest-Φ-take sf id now nid path vals fin sched st U hΦ
-stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st U hΦ =
-  stepFrame-nest-Φ-inner sf id now op allNid inst path vals fin sched st U hΦ
-stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st U hΦ =
-  stepFrame-nest-Φ-thru sf id now op nid path vals fin sched st U hΦ
+  (B U : ℕ) →
+  valsΦ? B U (f ↠ path) vals ≡ true →
+  valsΦ? B U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st B U hΦ =
+  mapΦ B U fn path vals hΦ
+stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st B U hΦ =
+  stepFrame-nest-Φ-scan sf id now fn nid path vals fin sched st B U hΦ
+stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st B U hΦ =
+  stepFrame-nest-Φ-take sf id now nid path vals fin sched st B U hΦ
+stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ =
+  stepFrame-nest-Φ-inner sf id now op allNid inst path vals fin sched st B U hΦ
+stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U hΦ =
+  stepFrame-nest-Φ-thru sf id now op nid path vals fin sched st B U hΦ
 
 foldPath-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u))
   (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) (U : ℕ) →
-  valsΦ? U path vals ≡ true →
+  (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+  valsΦ? B U path vals ≡ true →
   regsNestMax (EvalSt.registry
     (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
     ≤ regsNestMax (EvalSt.registry st) ⊔ U
-foldPath-nest-regs sf gas id now envSrc root vals evs fin sched st U hΦ =
+foldPath-nest-regs sf gas id now envSrc root vals evs fin sched st B U hΦ =
   m≤m⊔n (regsNestMax (EvalSt.registry st)) U
-foldPath-nest-regs sf gas id now envSrc (share-sink i) vals evs fin sched st U hΦ =
-  dispatchShare-nest-regs sf gas id now i vals fin sched st U hΦ
-foldPath-nest-regs sf gas id now envSrc (f ↠ p) vals evs fin sched st U hΦ =
+foldPath-nest-regs sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ =
+  dispatchShare-nest-regs sf gas id now i vals fin sched st B U hΦ
+foldPath-nest-regs sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ =
   ≤-trans (foldPath-nest-regs sf gas id now envSrc p
              (proj₁ step) (evs ++ proj₁ (proj₂ step))
              (proj₁ (proj₂ (proj₂ step)))
              (proj₁ (proj₂ (proj₂ (proj₂ step))))
-             (proj₂ (proj₂ (proj₂ (proj₂ step)))) U
-             (stepFrame-nest-Φ sf id now f p vals fin sched st U hΦ))
-          (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st U hΦ)
+             (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
+             (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ))
+          (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
                  (m≤n⊔m (regsNestMax (EvalSt.registry st)) U))
   where
   step = stepFrame sf id now f p vals fin sched st

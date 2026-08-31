@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OUTER FRAME IS REFUTED, SO THE WALK NEEDS A SECOND FACTOR.**
-  Eighty against forty-one: the frame SUBSCRIBES what it is handed and
-  a subscription evaluates, so the same doubling a map frame pays for
-  with its factor arrives at a frame whose factor is one. The repair is
-  a factor the frame can see — two to the instant's SIZE cap, which the
-  path premise already supplies — so the leg is a B-indexed companion
-  to `pathNestF` giving `thru-outer` that factor, its cap lemma off the
-  same `pathSz?`, and the walk rethreaded through it. What that will
-  expose is the size side: the potential will have to carry the
-  arrival's syntax as well as its depth.
+- **THE FACTOR IS THERE NOW AND THE SIZE PREMISE IS WHAT IS MISSING.**
+  The walk reads its path through `pathΦF`, which gives `thru-outer`
+  two to the instant's size cap and still fits under the same square as
+  before, off the same `pathSz?`. That is not yet enough: at `B = 0` the
+  factor is one again and the refutation still lands, because nothing in
+  the leaf ties `B` to the arrival whose term the subscription runs. The
+  tie is `valsCaps?`, which the cascade already carries and
+  `chain-walk-caps` already PRESERVES across a frame at one ceiling
+  level — so the leg is to bring the fold to where that proof is and
+  take the size receipt from it, rather than re-derive a ceiling the
+  caps recurrence already bounds.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own

@@ -104,6 +104,13 @@ lines, one being cited eight times. Every single site already named the declarat
 backticks beside the number, so deleting 141 of them cost nothing: the name is the part
 that works, and `make find` takes names.
 
+**EDIT A SINGLE FILE WITH THE `Edit` TOOL, NOT WITH `sed` OR A PYTHON HEREDOC
+(Anthony).** Auto mode says to prefer Bash for file work; that preference does not
+extend to editing, and reaching for a shell rewrite of one file costs tokens and a
+round trip to do what one tool call does directly. The carve-out is a genuinely
+multi-hunk patch, where an `assert old in s` per hunk fails loudly on a stale anchor
+and the file is written once at the end — never half-applied.
+
 ## THE GATE — `make gate`, and what each check will not let you do
 
 Cheap checks run FIRST, deliberately: an unreachable name or an unsafe pragma is
