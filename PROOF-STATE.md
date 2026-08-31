@@ -214,15 +214,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **what ONE emitted inner costs, which is the whole entry half now** —
-  the per-value grant is refuted twice over at a slot reference and
-  carries the wrap summand as a result, so `sight-thru-val`'s statement
-  is settled and nothing above it is. It is the sync-currency price of
-  a subscription: the arrival's own tower against what substituting the
-  slot's definition delivers. Its sides compute, so probe the margin at
-  the refuting family before grinding, and `sight-all-stream` cannot be
-  aimed until the price is known.
-
 - **the other three closure arms, by the ratio the map arm just paid** —
   the map head fell without any closure mirror of the evaluator at all:
   a value's key is read THROUGH the telescope, the telescope is capped,
@@ -243,17 +234,26 @@ does not fit is a finding about the shared statement, not about the head.
   The shape to follow is the reset the level-jump lemma already
   performs, which pays a level to re-anchor a charge.
 
+- **the stream the entry hands the fold, now that one value's price is
+  known** — `sight-all-stream` is the only leaf left under the entry
+  fit, and it is a claim about what the child's own subscribe EMITS
+  rather than about what consuming an emission costs. The grant is the
+  payload's tower at the stepped path, and the descent conserves
+  exactly that sum, so the leg is the descent's own induction with the
+  `*All` step's `suc` traded onto the payload side. Its sides compute
+  at the same harness the value price used, so probe the emitted
+  stream before stating the induction's measure.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED, TWIN`:
   the `from-inner` head of the drain law, the only frame that names a node.
   Every conjunct but one now comes off the store predicate at the walk's own
   level; the residue is the REACHED level for a queued entry's nest.
-- **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED`: what ONE emitted
-  inner costs the outer frame to subscribe, in the sync currency. Refuted
-  twice: additively, and at a slot reference where the arrival-only grant reads
-  zero. The repaired form carries the wrap summand and nothing has instantiated
-  it.
+- **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
+  emitted inner costs the outer frame to subscribe. The value conjunct holds at
+  the family that refuted it; the two STORE conjuncts keep the class, reading
+  vacuously wherever the consume has been instantiated.
 - **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
   the drained values come out of the node's queue. Instantiated at a parked

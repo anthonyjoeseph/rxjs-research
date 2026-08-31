@@ -253,6 +253,16 @@ StreamFit {Γ = Γ} {u = u} k sl G κ (em ∷ ems) =
 --   the observable it came from by the number of times the step
 --   function names its payload, and that depth is a free parameter, so
 --   no constant charge closes it.
+-- PROBED: `Probed.Sight-Thru-Val` at the reference family the wrap was
+--   added for.  The VALUE conjunct only: at a flat definition the wrap
+--   vanishes and the grant is the path's own step, two against a
+--   delivery of zero, which is the tight row; at the layered
+--   definitions the grant outruns the delivery by orders that grow.  A
+--   deferred tower is the shape that would hide depth under a zero
+--   wrap and it delivers nothing at a consume, so that axis is
+--   unavailable here rather than clear.  The two STORE conjuncts are
+--   instantiated and VACUOUS -- the store reads zero either side of
+--   the consume in this family -- so they are not covered.
 postulate
   sight-thru-val : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (k : ℕ) (sl : Slots Γ) (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId)
