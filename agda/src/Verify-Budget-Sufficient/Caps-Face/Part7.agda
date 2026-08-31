@@ -55,6 +55,7 @@ open import Verify-Budget-Sufficient.Fan-Caps using
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; FrameΦHyp; valsΦ?; stepFrame-nest-Φ; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
+open import Verify-Budget-Sufficient.Live-Nest-Walk using (foldPath-nest-live; PathLiveHyp)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
@@ -3833,57 +3834,6 @@ postulate
 -- application, so it is a fact the round has rather than a fact the
 -- round must acquire.
 --
--- AND THE ONE SITE THAT MOVES THE LIVE FOLD IS THE DEFERRED BODY,
--- WHICH IS WHY EVERY FAMILY IN THE CORPUS READS ZERO ON BOTH SIDES.  A
--- live source's nesting is the maximum nesting of its PENDING values,
--- and the evaluator mints a live carrying a value of positive nesting
--- in exactly one clause: subscribing a `deferᵉ`, whose pending entry is
--- the body itself at observable type.  A scripted slot cannot supply
--- one -- scripts are data-typed by construction -- so a reachable
--- growth has to be a body the PROGRAM produces mid-chain, which needs
--- an *All whose inner is a deferred nest reached through a mapping
--- frame.  A program of that shape reaches it and the arm holds there:
--- the fold rises with the nest while the charge rises with the syntax
--- that carries it, so the two grow together and the ordering is a race
--- rather than a constant against a zero.
---
--- REFUTED: Refuted.Chain-Step-Nodes
--- REFUTED: Refuted.Chain-Step-Live-Additive
--- DEAD ROUTE: spending the unconditional live-growth bound and
---   discharging its three disjuncts against the entry cap.  Two go;
---   the third is the path factor above, and it is not repairable by a
---   premise, only by a tighter growth statement.
--- DEAD ROUTE: restating the whole walk one instant up, so the arms
---   preserve the successor cap and the round's ceiling is read there.
---   The entry lifts and the arms carry over, but the consumer does
---   not: its fuel is the exponential at THIS instant, which the caps
---   recurrence pins to this instant's cap.
--- DEAD ROUTE: charging the arms the instant's INCREMENT, which is what
---   they carried while they mirrored the entry burst.  The increment's
---   own exponent reads the delivery at the NEXT instant, and the size
---   there is already a blowup story above the fuel available here, so
---   no reading of it fits under this instant's exponential.
--- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
---   RUNNING, at the one program shape that can move the fold: a `mapᵉ`
---   over the async input handing the outer *All a deferred nest per
---   arrival, so the chain the evaluator presents subscribes it and the
---   live it mints carries the body.  Covered: the fold rising 0 to 1
---   and 0 to 3 as the nest deepens, against a syntactic charge of
---   eighteen and twenty-six that the tree proves this arm's size cap
---   dominates -- so both sides move and the ordering is load-bearing
---   on the depth axis.  Not covered: a fold already nonzero at entry,
---   where the growth would compound rather than start from zero.
-postulate
-  chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    foldr (λ l acc → liveNest l ⊔ acc) 0
-          (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
-      ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-          ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
 
 -- AND THIS ONE CARRIES THE CHAIN'S OWN DEPTH, which the two arms above
 -- do not.  A registration this chain mints sits at the frames of the
@@ -4152,6 +4102,50 @@ chainStep-nest-nodesC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
     (entryΦ sl id a path hp hΦ)
     (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
 
+postulate
+  -- THE SIZE-SIDE SIDE CONDITION, at every outer frame the chain
+  -- reaches.  Its `PathΦHyp` twin is a real body now, discharged from
+  -- the sighted grant one frame at a time; this one is the same walk
+  -- against the size cap instead of the potential, and what it needs
+  -- at each frame is a bound on the size of the values arriving there
+  -- -- which is what the caps face tracks and what the entry's own
+  -- size premise starts.
+  chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    PathLiveHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
+      (nestWalkAt e sl id) path (arrVal a ∷ []) (Arrival.isLast a) sched st
+
+-- THE LIVE ARM, the third and last of the chain's arms to become the
+-- walk rather than an assertion about it.  Two extra terms over the
+-- registry arm's conclusion: the slots, because a scripted slot's
+-- subscribe mints out of script data, and the registry's join, because
+-- a share fans into chains that mint out of their own.  The round
+-- holds all three under the same ceiling, so the consumer pays for
+-- neither.
+chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  foldr (λ l acc → liveNest l ⊔ acc) 0
+        (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+        ⊔ slotsNestSum (Sched.slots sched)
+        ⊔ regsNestMax (EvalSt.registry st)
+        ⊔ (nestWalkAt e sl id)
+chainStep-nest-liveC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
+  foldPath-nest-live _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    (entryΦ sl id a path hp hΦ)
+    (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
+    (chain-walk-LiveHyp sl id a nextId path sched st hsl hsz hp)
+
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.
 unit≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
@@ -4165,6 +4159,22 @@ unit≤cap e sl id =
 -- These three price it against the program instead, so the walk's
 -- bound survives a chain exactly when it already covers one instant's
 -- increment, which is a condition on the bound and not on the walk.
+-- REFUTED: Refuted.Chain-Step-Nodes
+-- REFUTED: Refuted.Chain-Step-Live-Additive
+-- DEAD ROUTE: spending the unconditional live-growth bound and
+--   discharging its three disjuncts against the entry cap.  Two go;
+--   the third is the path factor above, and it is not repairable by a
+--   premise, only by a tighter growth statement.
+-- DEAD ROUTE: restating the whole walk one instant up, so the arms
+--   preserve the successor cap and the round's ceiling is read there.
+--   The entry lifts and the arms carry over, but the consumer does
+--   not: its fuel is the exponential at THIS instant, which the caps
+--   recurrence pins to this instant's cap.
+-- DEAD ROUTE: charging the arms the instant's INCREMENT, which is what
+--   they carried while they mirrored the entry burst.  The increment's
+--   own exponent reads the delivery at the NEXT instant, and the size
+--   there is already a blowup story above the fuel available here, so
+--   no reading of it fits under this instant's exponential.
 chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
@@ -4178,8 +4188,11 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                (proj₂ (proj₂ (chainStep nextId a path sched st))) ≤ S
 chainStep-store≤ {e = e} sl id a nextId S path sched st hsl hsz hp hΦ hinc hS =
   storeNestMax-lub sd′ st′ S SL
-    (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz hp)
-             (⊔-lub (≤-trans (storeNest-live≤  sched st) hS) (≤-trans flat hinc)))
+    (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz hp hΦ)
+             (⊔-lub (⊔-lub (⊔-lub (≤-trans (storeNest-live≤  sched st) hS)
+                                  (≤-trans (storeNest-slots≤ sched st) hS))
+                           (≤-trans (storeNest-regs≤ sched st) hS))
+                    hinc))
     (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz hp hΦ)
              (⊔-lub (⊔-lub (≤-trans (storeNest-nodes≤ sched st) hS)
                            (≤-trans (storeNest-regs≤ sched st) hS))

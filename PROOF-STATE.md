@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LIVE ARM IS THE LAST MONOLITH ON THE CHAIN.** Two of the three
-  arms are now walks over the same potential with two leaves each; the
-  live arm is still one postulate asserting the whole induction, and it
-  is the one carrying two refutations and three dead routes. The leg is
-  the same decomposition a third time — a frame leaf and a share leaf
-  under a fold — and the question it has to settle first is which extra
-  term the conclusion needs, since the nodes arm needed the registry's
-  join and a live list is fed from the pending values a subscription
-  mints rather than from anything the walked path stores.
+- **THE SIZE SIDE CONDITION IS THE ONE THING THE WALKS STILL ASSERT
+  WHOLE.** All three arms are folds now, and their frame and share
+  leaves are each about one thing a delivery writes — but the live
+  fold's side condition is threaded and never discharged, so
+  `chain-walk-LiveHyp` asserts at every outer frame what its potential
+  twin proves one frame at a time. The leg is that discharge, and it is
+  the same shape the potential's was: a per-frame fit, four unit arms,
+  and one real obligation where a frame can subscribe. What it needs
+  that the potential did not is a size bound that SURVIVES a frame,
+  which the caps face already tracks and this walk does not carry.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -257,11 +258,18 @@ does not fit is a finding about the shared statement, not about the head.
   whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
   `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
   the cap has the room.
-- **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×3, PROBED`: a chain's live list against the program
-  rather than against the store it started from. The surrogate charge now runs
-  at a program whose chain mints a live from a deferred nest, which is the one
-  shape that moves the fold.
+- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `PROBED`: what one
+  frame mints on the live list. Four kinds mint nothing; the outer frame
+  subscribes, and a deferred body is the one payload the depth measures cannot
+  see, so this leaf runs on a SIZE side condition.
+- **`dispatchShare-nest-live`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  share boundary at the live list, carrying the slots and the registry's join
+  for the two mints the walked path does not say. Nothing has read the repaired
+  form.
+- **`chain-walk-LiveHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the size
+  side condition at every outer frame a chain reaches. Its potential twin is a
+  real body now; this one is the same walk against the size cap, and nothing
+  yet carries the entry's size premise down the path.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
   one frame stores at the nodes map, under the potential it was handed. Three
   of the five kinds store; the whole-chain surrogate covers the composite at
