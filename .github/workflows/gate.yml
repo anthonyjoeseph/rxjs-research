@@ -10,6 +10,8 @@ name: Gate
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
@@ -33,11 +35,18 @@ jobs:
       # its first real run with apt's GHC 9.14.1 (base-4.22), which Agda 2.8.0
       # rejects (`base >=4.13.0.0 && <4.22`). Versions match the ones already
       # validated in scripts/install-agda.sh's own header comment.
+      # cabal-update disabled: haskell-actions/setup's own `cabal update` runs
+      # before install-agda.sh gets a chance to patch ~/.cabal/config for TUF
+      # secure-repo fetch, and this failed run 2 with "root.json does not have
+      # enough signatures signed with the appropriate keys" — install-agda.sh
+      # already carries the `secure: False` fix for exactly this, so let it be
+      # the one that runs `cabal update`.
       - name: Set up GHC + cabal
         uses: haskell-actions/setup@v2
         with:
           ghc-version: "9.4.7"
           cabal-version: "3.8.1.0"
+          cabal-update: false
 
       # Building Agda 2.8.0 from source (cabal) is the expensive, cacheable
       # part of toolchain setup; the stdlib clone is small but free to cache
