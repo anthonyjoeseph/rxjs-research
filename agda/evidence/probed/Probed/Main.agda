@@ -74,5 +74,4 @@ open import Probed.Sight-Thru-Val
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡)
-
-
+open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)

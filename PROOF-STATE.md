@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CHARGE THE QUEUED TERM AT DELIVERY, NOT AT DRAIN — Anthony's
-  ruling on the spiral.**
-  The store stops carrying a ceiling at all: what it carries is the
-  term's price at its DELIVERY path, fixed when the term is emitted
-  and never climbing, so no level is named and the invariant becomes
-  statable. The drain derives its ceiling from the parent frame's own
-  remaining budget, and the delivery price is the debit its fold
-  spends. Unverified is the decomposition — the frame's remaining
-  ladder at the drain level dominating a queued term's, folded with
-  the level climbing entry by entry. Probe it at a program that really
-  queues, at length two or more, before any statement moves.
+- **THE DELIVERY-SIDE PRICE: THE CLIMB'S CURRENCY IS WHAT IS LEFT.** Anthony's ruling: the store stops carrying a ceiling and
+  carries the term's price at its DELIVERY path, fixed when the term
+  is emitted and never climbing. The probe is in — queue read off the
+  installed node at lengths two and four, every entry's measures under
+  the frame's — so the queue does not exhaust the measure. What it
+  does NOT reach is the climb: one level per entry is charged rather
+  than measured, while the drain climbs whatever the subscribe's caps
+  lemma chose, bounded in the SWEEP currency. So the fold wants the
+  multi-level ladder step, and what is open is arithmetic: does that
+  climb fit the quadratic room one unit buys.
 
 - **THE ENTRY FOLD IS REFUTED, AND ITS EXPONENT IS WHAT MOVES** —
   `subscribeE-fit` prices a subscription's emitted values at a tower
@@ -251,10 +250,11 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
-  the `from-inner` head of the drain law, the only frame that names a node. Its
-  per-entry ceiling has now outlived three carriers, the last of them refuted
-  at every cap, so the obligation itself is what is open.
+- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
+  `REFUTED×2, TWIN, PROBED`: the `from-inner` head of the drain law, the only
+  frame that names a node. Its per-entry ceiling has now outlived three
+  carriers, the last of them refuted at every cap, so the obligation itself is
+  what is open.
 - **`subscribeE-fit`** (Sighted-Fit) — FALSITY, `REFUTED×3, PROBED`: what ANY
   subscription's emitted VALUES cost. Refuted at a doubling `scanᵉ` over a
   script — a crossing, 4095 against 4096 at twelve values and 8191 at thirteen

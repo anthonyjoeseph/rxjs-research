@@ -3038,6 +3038,34 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- REACHED level is a fact about the ceiling rather than about the
 -- store, so no field could hold it.
 --
+-- AND THE ACCOUNT THAT REPLACES ALL OF THIS CHARGES THE TERM AT
+-- DELIVERY RATHER THAN AT DRAIN (Anthony's ruling).  The demand is not
+-- wrong: a drained descent really does run at the global cursor and
+-- really does push it.  What cannot be done is to have anyone hold
+-- that fact AHEAD of time, because whether it holds is settled jointly
+-- by the term's ladder and the budget remaining when the drain
+-- happens.  So the store stops carrying a ceiling: what it carries is
+-- the term's price at the path it was DELIVERED under, which is fixed
+-- when the term is emitted and never climbs, so no level is named and
+-- the invariant becomes statable at all.  The drain then derives its
+-- ceiling from the parent frame's own remaining budget -- the chain
+-- already hands one to every frame, and this one is not special -- and
+-- the delivery price is the debit the drain's fold spends.
+--
+-- WHAT THE ITERATED FACT DECOMPOSES INTO, AND WHERE THE REMAINING
+-- RISK SITS.  One unit of the operator measure is proven to buy one
+-- level and the ledger is proven monotone in both measures, so an
+-- entry drained one level above the last needs its closure measure
+-- under the frame's and its operator measure plus its POSITION under
+-- the frame's -- both computable, both read green.  But one level per
+-- entry is not what the drain climbs: the subscribe's own caps lemma
+-- hands back a climb it chooses, bounded in the SWEEP currency rather
+-- than in operator units, so the entry-by-entry step wants the
+-- multi-level form -- many levels for one unit, on a climb fitting
+-- under a quadratic in the cap.  That fit is the open half, and it is
+-- an arithmetic question about the two currencies rather than one a
+-- program can answer.
+
 -- AND THE REACHED LEVEL IS NOT MERELY UNSUPPLIED -- A WITNESS KILLS
 -- IT, in the GAS currency, which is the same base-cap defect the
 -- three readings above already suffered.  A reached gas is rooted at `suc`
@@ -3064,6 +3092,19 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- TWIN: `subscribeE-caps` already threads a level exactly this way --
 --   invariant at the stepped cap, conclusion at the sum -- and is
 --   proven.
+-- PROBED: `Probed.Drain-Queue-Ladder` reads the two computable halves
+--   at a `mergeAll` limited to one over parked inners, at queue
+--   lengths TWO and FOUR -- the queue read off the node the run
+--   installed, so the entries are the ones the evaluator parked.  Both
+--   dominate with room: the frame reads eighteen and eighty-seven
+--   against entries at eleven, charged twenty-nine and thirty once
+--   one level per entry is paid for.  Not covered, and the first is
+--   the one that matters: the climb is CHARGED at one level per entry
+--   rather than measured, so nothing here reaches the sweep-currency
+--   climb the subscribe actually takes; the ledger comparison the
+--   readings feed, symbolic-or-nothing by the descent family's own
+--   dead route; the two heads other than `mergeAllᵒ`; and a queue
+--   whose entries differ from one another in size.
 postulate
   walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
