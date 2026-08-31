@@ -3700,6 +3700,14 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   fifty-seven against one thousand five hundred and ninety.  Not
 --   covered: the premises, which do not compute; any instant past the
 --   third; and the count axis at the third, which is one family only.
+--   The DOUBLING family is covered and is the one axis that turns out
+--   not to be one: a step naming its accumulator in both additive
+--   slots an inner `scanᵉ` offers -- the family that kills the entry
+--   fold's width-free grant -- leaves the descent at TWO across the
+--   second instant, the third, and twice the script length, while the
+--   ceiling moves eighty-four to ninety-eight.  What that family grows
+--   is a SUM over an instant's emitted values and a descent is a JOIN
+--   over them, so it cannot reach this side.
 postulate
   cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

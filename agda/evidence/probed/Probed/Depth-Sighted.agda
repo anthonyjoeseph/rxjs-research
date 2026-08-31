@@ -54,13 +54,13 @@ open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; ofᵉ; scanᵉ; mergeAllᵉ; input; varᵗ; inlᵗ; caseᵗ; fstᵗ;
-  strmᵗ; nat̂; emptyᵉ; Tm; syncSizeᵉ)
+  strmᵗ; nat̂; emptyᵉ; Tm; syncSizeᵉ; Fn; _×ᵗ_)
 open import Data.Maybe using (nothing)
 open import Data.List using ([]; _∷_) renaming (map to mapL)
 open import Data.Bool using (Bool; true)
-open import Data.List.Relation.Unary.Any using (here)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin using (zero) renaming (suc to fsuc)
-open import Rx.Prim using (gasPad; g0)
+open import Rx.Prim using (gasPad; g0; cold; hot)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
@@ -68,7 +68,7 @@ open import Rx.Evaluator
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 
 open import Refuted.Demand-Programs
-  using (Γ₂; progU; progF; insT; insF; sucGU; sucGF)
+  using (Γ₂; progU; progF; insT; insF; sucGU; sucGF; asyncNats)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthCascade)
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; nestUnit; sightCeil; pathNestD)
@@ -440,3 +440,62 @@ seedRow = (descSeed 1 ≤ᵇ sightSeed 1) ∷ (descSeed 4 ≤ᵇ sightSeed 4) �
 
 seedRow≡ : seedRow ≡ true ∷ true ∷ []
 seedRow≡ = refl
+
+-- ── THE DOUBLING FAMILY AT A CASCADE ───────────────────────────────
+
+-- Every family above wraps its accumulator a FIXED number of layers
+-- per value, so the delivered nesting is linear in the instant and a
+-- ceiling reading the arrival cannot be outrun by it.  This step names
+-- its accumulator in both additive slots an inner `scanᵉ` offers, so
+-- one application DOUBLES what the subscription delivers -- the family
+-- that kills the entry fold's width-free grant, run where the
+-- cascade's ceiling is read.  Its script is HOT, so the applications
+-- land at separate instants rather than inside one subscribe frame.
+--
+-- AND THE AXIS DOES NOT REACH THIS SIDE, WHICH IS THE FINDING.  The
+-- descent reads TWO at the second instant, at the third, and at twice
+-- the script length, while the ceiling moves eighty-four to ninety-
+-- eight; doubling the script changes neither column by one.  What the
+-- doubling grows is a SUM over an instant's emitted values, and a
+-- descent is a JOIN over them -- so the quantity that crossed the
+-- fold's grant is invisible here, and the ceiling is not exposed to
+-- the family that took the fold apart.
+--
+-- LOAD-BEARING, and it fails if the descent passes the ceiling at
+-- either instant.  A zero pair is the other finding rather than a
+-- pass: it says the run stopped before the instant.
+deepen : Fn Γ₂ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+deepen = strmᵗ (mergeAllᵉ nothing
+           (scanᵉ (fstᵗ (varᵗ (there (here refl))))
+                  (fstᵗ (varᵗ (here refl)))
+                  (input (fsuc zero))))
+
+progX : Closed Γ₂ natᵗ
+progX = mergeAllᵉ nothing (scanᵉ deepen (strmᵗ emptyᵉ) (input (fsuc zero)))
+
+slX : ℕ → Slots Γ₂
+slX j zero          = scripted (cold [] [])
+slX j (fsuc zero)   = scripted (hot (asyncNats j))
+
+xRow2 : ℕ × ℕ
+xRow2 = delivRow progX (slX 4) 400
+
+xRow3 : ℕ × ℕ
+xRow3 = deliv3Row progX (slX 4) 400
+
+xRow3L : ℕ × ℕ
+xRow3L = deliv3Row progX (slX 8) 400
+
+dblFigs : ℕ
+dblFigs = proj₁ xRow2 + 1000000 * proj₂ xRow2
+        + 1000000000000 * proj₁ xRow3
+        + 1000000000000000000 * proj₂ xRow3
+
+dblFigs≡ : dblFigs ≡ 98000002000084000002
+dblFigs≡ = refl
+
+dblLongFigs : ℕ
+dblLongFigs = proj₁ xRow3L + 1000000 * proj₂ xRow3L
+
+dblLongFigs≡ : dblLongFigs ≡ 98000002
+dblLongFigs≡ = refl

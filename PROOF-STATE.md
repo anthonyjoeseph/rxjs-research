@@ -215,14 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the cascade's own descent, which is the tier's other risk and
-  does not touch the queue at all** — `cascade-depth-sighted` prices a
-  round's descent under its sighted nesting scaled by the program's
-  size, and both its axes are already read at three instants and at
-  the corner where they compound, with the margin WIDENING as the
-  instant grows. It is the largest DIFFICULTY row in the tier that is
-  independent of the drain entirely, so it is what the schedule should
-  hold while the ceiling question is out for a ruling.
+- **THE CASCADE'S DESCENT IS NOT EXPOSED TO THE FAMILY THAT TOOK THE
+  ENTRY FOLD APART, so what is left is the assembly.** The doubling
+  step leaves `cascade-depth-sighted`'s descent at two across two
+  instants and twice the script length, because what it grows is a SUM
+  over an instant's emitted values while a descent is a JOIN over them.
+  The obvious route is dead all the same: the descent bottoms out in
+  `depthE`, whose proven ceiling carries the FOLD's grant in its
+  subject place where this one carries the arrival's nesting, and two
+  upper bounds in different currencies do not compose. So the leg is
+  the real body — induction over the chains, a per-chain leaf over the
+  path walk, and the store-growth transport the join needs.
 
 - **THE CEILING HAS NO BASE, AND THE TWO LADDERS HAVE TO MEET.**
   `CeilD` is threaded by every subscription statement in the nest walk
