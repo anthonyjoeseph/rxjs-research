@@ -30,7 +30,7 @@ open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; Stream; map-f; take-f; _↠_; subscribeE;
   mintNode; installNode; register; take-st; scan-st; scan-f; share-sink; thru-outer;
   AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; stepFrame; splitEvents; NodeId; thruConsume)
-open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll; depthFrame)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
@@ -38,6 +38,8 @@ open import Verify-Budget-Sufficient.Nest-Walk using
   (pushFitOK; thruFitOK; nestDᵛˢ; nodesMax; nodeNestAt)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (thruConsume-slots; stepFrame-slots; subscribeE-slots)
+open import Verify-Budget-Sufficient.Sighted-Fit using
+  (ValFitG; ValsFitG; StreamFitG; valsFitG-le; splitVals-irr; subscribeE-fit)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
    storeNestMax-install; storeNestMax-register; nestUnit; nodeNest;
@@ -241,64 +243,41 @@ postulate
 --   duplication up: sixteen, twenty-three, thirty, thirty-seven on the
 --   program against eighteen, forty-two, ninety, a hundred and
 --   eighty-six on the arrival.
-ValFitP : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (sl : Slots Γ) (G P : ℕ)
-  → Val Γ (obs u) → Set
-ValFitP {u = u} k sl G P o =
-  T (inputsBelowᵉ k o)
-  × (P + nestDᵛ (obs u) o + k * slotWrapSum sl ≤ G)
 
-ValsFitP : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (sl : Slots Γ) (G P : ℕ)
-  → List (Val Γ (obs u)) → Set
-ValsFitP k sl G P []       = ⊤
-ValsFitP k sl G P (o ∷ os) = ValFitP k sl G P o × ValsFitP k sl G P os
-
-StreamFitP : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (sl : Slots Γ) (G P : ℕ)
-  → Stream Γ (obs u) → Set
-StreamFitP k sl G P []                       = ⊤
-StreamFitP {Γ = Γ} {u = u} k sl G P (em ∷ ems) =
-  ValsFitP k sl G P (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
-  × StreamFitP k sl G P ems
-
--- AND THE PATH IS READ FOR ITS NESTING AND FOR NOTHING ELSE, so the
--- three above take that number and the three here are what a consumer
--- writes.  Splitting them is what lets the fold be stated at a path
--- and established at a LONGER one: the entry proves the charge under
--- the frame it pushed, and the head spends it under the path it was
--- entered at, which is the same statement at a smaller charge.
+-- AND THE PATH IS SPELLED AS A PATH HERE, since a consumer on this
+-- face holds one.  The fold itself takes the NUMBER, which is what
+-- lets it be established under the frame the head pushed and spent
+-- under the path the head was entered at.
 ValFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → Val Γ (obs u) → Set
-ValFit k sl G κ = ValFitP k sl G (pathNestD κ)
+ValFit {u = u} k sl G κ = ValFitG k sl G (pathNestD κ) (obs u)
 
 ValsFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → List (Val Γ (obs u)) → Set
-ValsFit k sl G κ = ValsFitP k sl G (pathNestD κ)
+ValsFit {u = u} k sl G κ = ValsFitG k sl G (pathNestD κ) (obs u)
 
+-- AND THE STREAM SIDE KEEPS ITS OWN CLAUSES, annotated the way its
+-- CONSUMERS annotate: the invariant a burst fold carries is typed by
+-- the frame's output, and the equation above is what carries the
+-- general form across to it.
 StreamFit : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G : ℕ)
   (κ : Path Γ u t) → Stream Γ (obs u) → Set
-StreamFit k sl G κ = StreamFitP k sl G (pathNestD κ)
+StreamFit k sl G κ []                       = ⊤
+StreamFit {Γ = Γ} {u = u} k sl G κ (em ∷ ems) =
+  ValsFit k sl G κ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+  × StreamFit k sl G κ ems
 
--- BOTH PLACES MOVE THE SAME WAY, which is the whole content of the
--- split: a smaller charge and a larger grant are each a weakening, so
--- one lemma carries a fold from where it was proven to where it is
--- spent.
-valsFitP-le : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (sl : Slots Γ) (G G′ P P′ : ℕ)
-  (os : List (Val Γ (obs u))) → P ≤ P′ → G′ ≤ G →
-  ValsFitP k sl G′ P′ os → ValsFitP k sl G P os
-valsFitP-le k sl G G′ P P′ []       hp hg h        = tt
-valsFitP-le {u = u} k sl G G′ P P′ (o ∷ os) hp hg (h , hs) =
-  (proj₁ h
-  , ≤-trans (+-monoˡ-≤ (k * slotWrapSum sl)
-              (+-monoˡ-≤ (nestDᵛ (obs u) o) hp))
-            (≤-trans (proj₂ h) hg))
-  , valsFitP-le k sl G G′ P P′ os hp hg hs
-
-streamFitP-le : ∀ {n} {Γ : Ctx n} {u} (k : ℕ) (sl : Slots Γ) (G G′ P P′ : ℕ)
-  (str : Stream Γ (obs u)) → P ≤ P′ → G′ ≤ G →
-  StreamFitP k sl G′ P′ str → StreamFitP k sl G P str
-streamFitP-le k sl G G′ P P′ []         hp hg h        = tt
-streamFitP-le k sl G G′ P P′ (em ∷ ems) hp hg (h , hs) =
-  valsFitP-le k sl G G′ P P′ _ hp hg h
-  , streamFitP-le k sl G G′ P P′ ems hp hg hs
+streamFit-le : ∀ {n} {Γ : Ctx n} {u t} (k : ℕ) (sl : Slots Γ) (G G′ P′ : ℕ)
+  (κ : Path Γ u t) (str : Stream Γ (obs u)) → pathNestD κ ≤ P′ → G′ ≤ G →
+  StreamFitG k sl G′ P′ (obs u) str → StreamFit k sl G κ str
+streamFit-le k sl G G′ P′ κ []         hp hg h        = tt
+streamFit-le {Γ = Γ} {u = u} k sl G G′ P′ κ (em ∷ ems) hp hg (h , hs) =
+  valsFitG-le k sl G G′ (pathNestD κ) P′ (obs u) _ hp hg
+    (subst (ValsFitG k sl G′ P′ (obs u))
+           (splitVals-irr {Γ = Γ} {A = Val Γ (obs u)} {B = Val Γ u}
+             (InstEmit.events em))
+           h)
+  , streamFit-le k sl G G′ P′ κ ems hp hg hs
 
 -- WHAT ONE INNER COSTS TO SUBSCRIBE, and it is a claim about a VALUE
 -- rather than about the payload's syntax -- which is why no reading of
@@ -380,67 +359,6 @@ pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
   sf = stepFrame g id now (thru-outer op nid) κ
          (proj₁ sp) (proj₂ (proj₂ sp)) sched st
 
--- AND WHAT IS LEFT IS THE PAYLOAD'S OWN BURST, read as values.  It is
--- the half nothing here covers: a claim about the STORE the payload
--- subscribe hands back rather than about a descent, so no row that
--- computes a depth reaches it.
---
--- THE GRANT CARRIES THE SLOT SUMMAND, and it did not always.  A
--- payload may emit a slot REFERENCE, whose syntax says nothing about
--- what the slot holds, so a grant read off the payload alone is
--- pinned at a constant while subscribing the emitted inner runs the
--- slot's definition.  The summand every other bound on this face
--- carries is what pays for that, and adding it here costs the
--- consumer nothing: the walk leaf READS the fit, so a wider grant is
--- a weaker hypothesis there, and the ceiling both are spent under
--- already has the same summand.
---
--- AND THE PAYLOAD'S SIZE IS THE RIGHT EXPONENT ON THIS SIDE, WHICH IS
--- NOT A GENERAL LICENCE FOR IT.  A payload may MAP, and its step
--- function may name its argument twice; then one application emits a
--- term holding two copies of what arrived, so an emitted value's sync
--- size is about DOUBLE the payload's.  A tower is therefore owed, and
--- it is owed HERE, where the exponent is syntax of the program and
--- nothing between the two is substituted.  What may not carry one is
--- the charge the fold makes per ARRIVAL: an arrival is what the
--- substitution produced, so a tower over it has an exponent that is
--- itself exponential in the program and this grant cannot reach it.
---
--- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`
---   kills the arrival-tower fold at a flat telescope where the wrap is
---   nought: sixteen against eighteen in the exponents, so a quarter of
---   a million demanded against this grant of a hundred and thirty-one
---   thousand.  And `…nest-absurd` again two layers up, where the same
---   rows measure the gap COMPOUNDING.
--- REFUTED: `Refuted.Sight-All-Fit-Slot` kills the payload-only grant
---   at a slot whose definition substitutes per layer -- delivered
---   `8 16 32 64` against a constant sixteen, meeting it exactly at the
---   third layer and doubling past it -- and pins the repair by
---   checking that the summand-carrying grant holds at the deepest of
---   those rows.  Not covered: the two heads other than `mergeAllᵒ`,
---   any path other than the one the row subscribes under, and the
---   store-growth conjuncts, which no row reads apart from the value one.
--- PROBED: `Probed.Sight-All-Stream` INHABITS the fold -- the statement
---   itself, not a boolean mirror of it -- at the duplicating payload
---   the refutations above are taken at, and at three layers of that
---   duplication.  The two columns are the receipt: the charge reads
---   one, two, three, four while the grant's exponent reads sixteen,
---   twenty-three, thirty, thirty-seven, so one side is linear in the
---   layer and the other a tower over something linear in it.  Not
---   covered: the two other heads; any path but `root`, which pins the
---   telescope summand at nought and the wrap with it; a telescope of
---   more than one slot; and an ARRIVAL that is a slot reference, which
---   is the one shape the wrap summand exists for.
-postulate
-  subscribeE-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (k : ℕ) (b : Closed Γ (obs u)) (κ : Path Γ (obs u) t)
-    (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    T (inputsBelowᵉ k b) →
-    StreamFitP k (Sched.slots sched)
-      (2 ^ syncSizeᵉ b * (pathNestD κ + nestDᵉ b)
-         + k * slotWrapSum (Sched.slots sched))
-      (pathNestD κ)
-      (proj₁ (subscribeE g b κ bid now sched st))
 
 -- AND THE HEAD READS IT UNDER THE FRAME IT PUSHED, which is the whole
 -- of what this clause is.  The leaf is stated at the path the payload
@@ -463,10 +381,10 @@ sight-all-stream : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
        (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
           + k * slotWrapSum (Sched.slots sched)) κ (proj₁ r)
 sight-all-stream {u = u} g k op lim b κ bid now sched st ok =
-  streamFitP-le k (Sched.slots sched)
+  streamFit-le k (Sched.slots sched)
     (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b)) + k * W)
     (2 ^ syncSizeᵉ b * (suc (pathNestD κ) + nestDᵉ b) + k * W)
-    (pathNestD κ) (suc (pathNestD κ)) (proj₁ r) (n≤1+n (pathNestD κ))
+    (suc (pathNestD κ)) κ (proj₁ r) (n≤1+n (pathNestD κ))
     (≤-reflexive (cong (λ z → 2 ^ syncSizeᵉ b * z + k * W)
                        (sym (+-suc (pathNestD κ) (nestDᵉ b)))))
     (subscribeE-fit g k b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ok)

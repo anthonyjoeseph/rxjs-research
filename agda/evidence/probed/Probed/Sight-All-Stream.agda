@@ -33,7 +33,7 @@
 -- and an arrival that is a slot REFERENCE, which is the shape the wrap
 -- summand exists for and which the consume's own probe carries.
 --
--- TARGET: subscribeE-fit @9858bb
+-- TARGET: subscribeE-fit @48e936
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Sight-All-Stream where
 
@@ -58,7 +58,7 @@ open import Rx.Evaluator
   using (Sched; EvalSt; Path; root; _↠_; thru-outer; mergeAllᵒ;
          subscribeE; splitEvents; mintNode; installNode; sched-init; st-init)
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; allFresh; slotWrapSum)
-open import Verify-Budget-Sufficient.Depth-Sighted using (StreamFitP)
+open import Verify-Budget-Sufficient.Sighted-Fit using (StreamFitG)
 
 Γₛ : Ctx 1
 Γₛ = obs natᵗ ∷ᵛ []ᵛ
@@ -111,7 +111,7 @@ G j = 2 ^ syncSizeᵉ (b j) * (pathNestD κ′ + nestDᵉ (b j))
     + 1 * slotWrapSum sl
 
 -- LOAD-BEARING: the whole fold, inhabited, at the duplicating payload
-fitDup : StreamFitP 1 sl (G 0) (pathNestD κ′) (proj₁ (runOf 0))
+fitDup : StreamFitG 1 sl (G 0) (pathNestD κ′) (obs (obs natᵗ)) (proj₁ (runOf 0))
 fitDup = ((tt , ≤ᵇ⇒≤ _ _ tt) , tt) , tt
 
 oDup : ℕ → Val Γₛ (obs (obs natᵗ))
@@ -153,13 +153,13 @@ Gn k = 2 ^ syncSizeᵉ (bN k) * (pathNestD κ′ + nestDᵉ (bN k))
      + 1 * slotWrapSum sl
 
 -- LOAD-BEARING: three layers up, where the arrival's size is a tower
-fitN₁ : StreamFitP 1 sl (Gn 1) (pathNestD κ′) (proj₁ (runN 1))
+fitN₁ : StreamFitG 1 sl (Gn 1) (pathNestD κ′) (obs (obs natᵗ)) (proj₁ (runN 1))
 fitN₁ = ((tt , ≤ᵇ⇒≤ _ _ tt) , tt) , tt
 
-fitN₂ : StreamFitP 1 sl (Gn 2) (pathNestD κ′) (proj₁ (runN 2))
+fitN₂ : StreamFitG 1 sl (Gn 2) (pathNestD κ′) (obs (obs natᵗ)) (proj₁ (runN 2))
 fitN₂ = ((tt , ≤ᵇ⇒≤ _ _ tt) , tt) , tt
 
-fitN₃ : StreamFitP 1 sl (Gn 3) (pathNestD κ′) (proj₁ (runN 3))
+fitN₃ : StreamFitG 1 sl (Gn 3) (pathNestD κ′) (obs (obs natᵗ)) (proj₁ (runN 3))
 fitN₃ = ((tt , ≤ᵇ⇒≤ _ _ tt) , tt) , tt
 
 -- and the two columns, read off the RUN rather than off a hand-built
