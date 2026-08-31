@@ -37,7 +37,7 @@ open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; reached-room; room-step; room-descend; base; walk)
-open import Verify-Budget-Sufficient.Drain-Store using (storeCeil)
+open import Verify-Budget-Sufficient.Drain-Store using (storeCeil; frame-store-ceil)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-def; nestU-mono; nestU-room)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
@@ -2444,7 +2444,8 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
                (pathLen p) L
            ≤ P)
       × Reached (capsAt e sl id) (capsH e sl id) P g)
-  × storeCeil (capsAt e sl id) (capsH e sl id) sl st
+  × storeCeil (capsAt e sl id) (capsH e sl id) sl
+      (EvalSt.connectedShares st) (EvalSt.nodes st)
 
 -- AND THE PARKED TERMS' CEILING IS CARRIED TOO, for the reason the
 -- reading above is: it is a fact about terms this walk never saw.  A
@@ -2453,27 +2454,10 @@ WalkHyps {n = n} {e = e} {u = u} sl id L sf gas nid now src p vals evs fin sched
 -- nothing to derive it FROM -- the level-rooted relation beside it
 -- cannot issue one in that currency, and no reading of the state
 -- mentions a term parked before the walk started.  It rides, one
--- implication per queued term, and the walk's job is to climb it.
+-- implication per queued term, and every level under the count is
+-- asked for at once so that no reader has to climb to its own.
 -- REFUTED: `Refuted.Drain-Reach-Gas.drain-reach-gas-absurd`, which is
 --   what rules out deriving the entry from the level the walk reached.
-
--- AND ONE FRAME PRESERVES IT, WHICH IS THE LEAF THE CARRYING COSTS.
--- The climb is proven -- a residue in the operator index pays a level
--- at a time and the walk's own ladder bounds how far it may climb --
--- so what is left is the STATE moving under a fixed level.  A frame
--- may install a node, extend the queue of one, or connect a share, and
--- only the second and third touch what the invariant reads; the first
--- is fresh and carries no queue at all.  Stated at the frame rather
--- than at the walk because that is where the state moves, and because
--- the arm that WRITES a queue is one of the five.
-postulate
-  walk-store-ceil-frame : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    storeCeil (capsAt e sl id) (capsH e sl id) sl st →
-    storeCeil (capsAt e sl id) (capsH e sl id) sl
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
 
 -- AND A WALK IS ENTERED AT A STORE SOMEBODY ELSE LEFT, which is where
 -- the invariant is born.  Neither entry -- the cascade's per-chain walk
@@ -2486,7 +2470,8 @@ postulate
   entry-store-ceil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    storeCeil (capsAt e sl id) (capsH e sl id) sl st
+    storeCeil (capsAt e sl id) (capsH e sl id) sl
+      (EvalSt.connectedShares st) (EvalSt.nodes st)
 
 -- THE CLOSURE READING IS CARRIED BY THE WALK, NOT DERIVED AT THE
 -- FRAME.  A `thru-outer` is handed an inner observable and owes its
@@ -3242,7 +3227,8 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
         , pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S L≤t)) pz2
         , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
         , (g , P , hfl , hlvP , hR)
-        , walk-store-ceil-frame sl id L sf nid now f p vals fin sched st hsc ))
+        , frame-store-ceil (capsAt e sl id) (capsH e sl id) sl sf nid now
+            f p vals fin sched st hsc ))
   where
   c   = capsAt e sl id
   S   = Caps.cSize c

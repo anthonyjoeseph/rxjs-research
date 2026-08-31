@@ -215,16 +215,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **the two ends of the carried ceiling: the writer and the reader** —
-  the invariant now rides with the store, quantified over the level
-  rather than held at one, so nothing has to climb it and the threading
-  is done. What is open is the pair it left. One is the frame leaf: a
-  step moves the state, and exactly one of the five arms writes a queue
-  at all. The other is the drain reading its entry back out, which
-  wants the postulate it sits in turned into a body over smaller ones —
-  eight conjuncts a cons cell, of which the ceiling is the one the
-  store now answers. Take the writer first: it is the arm whose own
-  frame holds a ceiling with an operator to spare.
+- **the two arms that subscribe** — the frame leaf is a body now, and
+  it split the question cleanly. Three of the five arms rewrite one
+  node of their own and are the write-preservation lemma at a point,
+  proven; the other two reach the inner subscriber, and only they can
+  install a queue, connect a share, or park a term in a queue that
+  already exists. Take the `thru-outer` arm first: it is the SOLE
+  writer of a queue anywhere in the evaluator, so the term it parks is
+  a term the frame is holding, with its own ceiling and an operator to
+  spare. The `from-inner` arm parks nothing and only has to survive
+  the shares its subscribe connects, which is an antitonicity the nest
+  face already proves.
+
+- **the drain reading its entry back out** — the other end of the
+  carried ceiling, and the one the whole invariant was built for. It
+  wants the postulate it sits in turned into a body recursing on the
+  queue exactly as the evaluator's own drain does: eight conjuncts a
+  cons cell, of which the ceiling is the one the store now answers and
+  the rest are readings a sibling face already carries. The level
+  climbs along the queue because the STATE does, so the tail's
+  ceilings transport across a subscribe that connects a share.
 
 - **the store conjuncts of the emitted-inner price, which nothing has
   ever asked a question of** — the value half of `sight-thru-val` now
@@ -236,26 +246,20 @@ does not fit is a finding about the shared statement, not about the head.
   harness the value half used, one emission further in — and let the
   rows say whether the class comes down or a witness lands.
 
-- **reach the entry fold at an arrival the wrap summand exists for** —
-  every row now standing on the entry runs at `root` with a flat slot,
-  so the telescope summand and the wrap are BOTH nought and the two
-  conjuncts that pay for a slot REFERENCE are green over nothing. That
-  is the shape a sibling refutation already crossed at the consume, one
-  hop further in, so the region is known dangerous and known reachable.
-  The leg is to run the entry subscribe under a telescope with a
-  layered definition in it and let the rows say whether the grant's
-  payload-side tower covers what substituting the slot lets through.
-
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
   the `from-inner` head of the drain law, the only frame that names a node. The
   queue now carries a stored ceiling, the reached-level form having been
   refuted in the gas currency, so what is left is a producer for that field.
-- **`walk-store-ceil-frame`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
-  frame keeps the parked terms' ceiling under a fixed level. Four of the five
-  arms forward what they are handed; the fifth writes a queue, and nothing has
-  instantiated that the fifth keeps it.
+- **`store-ceil-thru`** (Drain-Store) — FALSITY, `NO EVIDENCE`: the outer *All
+  arm keeps the parked terms' ceiling. It is the sole writer of a queue in the
+  evaluator, so it is the one arm that must ISSUE a receipt rather than forward
+  one, and nothing has instantiated that it can.
+
+- **`store-ceil-inner`** (Drain-Store) — FALSITY, `NO EVIDENCE`: the inner-exit
+  arm keeps it. It parks nothing, so what it owes is survival across the shares
+  its subscribe connects; no instantiation reaches a state where one does.
 
 - **`entry-store-ceil`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a cascade
   round begins at a store the previous round left, so the invariant is claimed
