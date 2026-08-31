@@ -214,15 +214,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the queued entry's REACHED level, which is the drain head's last
-  residue** — every other conjunct of `walk-frame-drain-inner` now
-  comes off the store predicate at the walk's own level, and the
-  ceiling entry the head spends is proven outright. What is left is
-  not a fact about the store at all: it is that the level the queue's
-  head is read at was actually walked to, so no field could hold it
-  and the receipt has to come from the walk's own position relation.
-  The shape to follow is the reset the level-jump lemma already
-  performs, which pays a level to re-anchor a charge.
+- **the ceiling travels WITH the parked term, since the reached
+  relation cannot issue it** — the drain's per-entry ceiling entry is
+  refuted in the GAS currency: a reached gas is rooted at `suc` the
+  entry size cap and every walk position spends one, while the parked
+  term's nesting is bounded only at the cap the walk stepped to, so
+  the fuel the entry asks for is one the relation never offers. The
+  route that survives is the one `ceil-entry-step` already performs
+  for a fresh subscribe — mint the operator index at the arrival
+  level's own cap and descend the count — so swap the queue conjunct
+  from a reached level to the ceiling itself, and let the consumer
+  project what it now builds through `ceil-park`.
 
 - **the stream the entry hands the fold, now that one value's price is
   known** — `sight-all-stream` is the only leaf left under the entry
@@ -234,21 +236,22 @@ does not fit is a finding about the shared statement, not about the head.
   at the same harness the value price used, so probe the emitted
   stream before stating the induction's measure.
 
-- **the drain's own residue, read where the spare level put it** — the
-  level leg just showed that a report and the ceiling it is compared
-  against can differ by a unit nobody was collecting, and the drain
-  residue is the same shape one currency over: a queued entry's nest is
-  read at a level the walk reached, and the receipt has to come from
-  the walk's position rather than from a field. So take the ceiling
-  entry the head already spends and ask what the position relation
-  gives at the level BELOW it, before stating anything new.
+- **the park site that must issue the ceiling it stores** — exactly
+  one arm writes a `mergeAll` queue, the gate-shut arm of the inner
+  consume, so once the drain reads its entry off a stored ceiling
+  there is a single producer to satisfy and no census to run. That
+  arm's own frame holds a ceiling with an operator to spare, which is
+  the level-jump lemma's premise verbatim; the leg is that descent
+  plus carrying the new field across every writer of the node table,
+  which is where the cost actually lands.
 
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED, TWIN`:
+- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
   the `from-inner` head of the drain law, the only frame that names a node.
-  Every conjunct but one now comes off the store predicate at the walk's own
-  level; the residue is the REACHED level for a queued entry's nest.
+  Every conjunct but one comes off the store predicate at the walk's own level;
+  the ceiling entry is refuted in the gas currency and wants the parked term's
+  own ceiling instead.
 - **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading

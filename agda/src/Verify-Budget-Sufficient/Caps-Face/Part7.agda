@@ -3030,23 +3030,31 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- never over the node table -- but it does not want a field, because
 -- a key read through a CAPPED telescope is at most the cap times the
 -- term's plain size, and the size is recorded; one level absorbs the
--- factor, which is the ratio the map arm of the closure face already
--- spends.  The ROOM FLOOR comes off the store predicate's own park
--- field, which is what fixes the cap it is read at: the field is
--- re-established one level up at every park, so the floor is a
--- statement about the walk's level and the base reading is available
--- to no queue at all.  And the REACHED level is a fact about the
--- ceiling rather than about the store, so no field could hold it.
+-- factor, which is the ratio `clos-lift` already spends.  The ROOM
+-- FLOOR comes off the store predicate's own park field, which is what
+-- fixes the cap it is read at: the field is re-established one level
+-- up at every park, so the floor is a statement about the walk's level
+-- and the base reading is available to no queue at all.  And the
+-- REACHED level is a fact about the ceiling rather than about the
+-- store, so no field could hold it.
 --
--- SO WHAT THE HEAD ACTUALLY OWES IS THE REACHED LEVEL, and the debt
--- the move creates is one shelf down, at the ceiling entry the drain
--- spends: a term parked inside a stepped frame asks its domination
--- with both charges read at that frame's cap rather than at the base
--- one.  The count on the right of that domination carries the nesting
--- too, so raising the ceiling on the charge raises the budget it is
--- measured against, and whether it raises it by enough is the open
--- question -- a named arithmetic leaf rather than a missing field.
---
+-- AND THE REACHED LEVEL IS NOT MERELY UNSUPPLIED -- A WITNESS KILLS
+-- IT, in the GAS currency, which is the same base-cap defect the
+-- three readings above already suffered.  A reached gas is rooted at `suc`
+-- the ENTRY size cap and every walk position spends one, so no gas the
+-- relation offers exceeds that root; the nesting the ceiling entry is
+-- asked for is bounded only at the cap the walk has STEPPED to, and one
+-- step multiplies the size by better than the size itself.  So the
+-- entry demands a fuel above the entry cap and the relation cannot
+-- issue one -- and the fuel is not slack that could be found elsewhere,
+-- since the delivery recurrence grows without bound in it while the
+-- count it is measured against does not move.  Handing over the walk's
+-- OWN ceiling entry does not help: the same reading caps that one too.
+-- REFUTED: `Refuted.Drain-Reach-Gas.drain-reach-gas-absurd`, at one
+--   level, with `drain-reach-gas-base` beside it proving the same
+--   obligation at level zero -- where the room floor the entry already
+--   carries IS the gas floor and the bottom constructor supplies the
+--   level.
 -- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`;
 --   `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd` for the
 --   conjuncts themselves being unreachable from what the walk holds;
