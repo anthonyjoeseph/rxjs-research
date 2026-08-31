@@ -3052,19 +3052,20 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- already hands one to every frame, and this one is not special -- and
 -- the delivery price is the debit the drain's fold spends.
 --
--- WHAT THE ITERATED FACT DECOMPOSES INTO, AND WHERE THE REMAINING
--- RISK SITS.  One unit of the operator measure is proven to buy one
--- level and the ledger is proven monotone in both measures, so an
--- entry drained one level above the last needs its closure measure
--- under the frame's and its operator measure plus its POSITION under
--- the frame's -- both computable, both read green.  But one level per
--- entry is not what the drain climbs: the subscribe's own caps lemma
--- hands back a climb it chooses, bounded in the SWEEP currency rather
--- than in operator units, so the entry-by-entry step wants the
--- multi-level form -- many levels for one unit, on a climb fitting
--- under a quadratic in the cap.  That fit is the open half, and it is
--- an arithmetic question about the two currencies rather than one a
--- program can answer.
+-- AND THE ITERATED FACT IS NOW PROVEN, IN THE CURRENCY THE SUBSCRIBE
+-- ALREADY REPORTS IN.  One unit of the operator measure buys one
+-- LEVEL, which is not what the drain climbs -- the subscribe's caps
+-- lemma hands back a climb it chooses, bounded by a SWEEP rather than
+-- in operator units -- and the multi-level step that would have taken
+-- it wants a climb under a quadratic in the cap, which nothing
+-- supplies.  The repair is that the quadratic was never the price: the
+-- entry step spends its room only on lifting a sweep to the level the
+-- ladder's own recursion starts a sweep at, so a climb reported
+-- DIRECTLY under that sweep needs no room at all.  One operator unit
+-- therefore buys a whole sweep, and a queue whose entries each climb
+-- within one costs one unit each -- so the fold holds a single
+-- frame-level ceiling and spends it entry by entry, and the store
+-- carries an offset with a sweep bound in place of a roof.
 
 -- AND THE REACHED LEVEL IS NOT MERELY UNSUPPLIED -- A WITNESS KILLS
 -- IT, in the GAS currency, which is the same base-cap defect the
@@ -3099,9 +3100,9 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   dominate with room: the frame reads eighteen and eighty-seven
 --   against entries at eleven, charged twenty-nine and thirty once
 --   one level per entry is paid for.  Not covered, and the first is
---   the one that matters: the climb is CHARGED at one level per entry
---   rather than measured, so nothing here reaches the sweep-currency
---   climb the subscribe actually takes; the ledger comparison the
+--   the one that matters: the position is CHARGED rather than
+--   measured, so nothing here reaches the sweep-currency climb the
+--   subscribe actually takes; the ledger comparison the
 --   readings feed, symbolic-or-nothing by the descent family's own
 --   dead route; the two heads other than `mergeAllᵒ`; and a queue
 --   whose entries differ from one another in size.

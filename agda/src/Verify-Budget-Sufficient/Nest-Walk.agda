@@ -45,7 +45,8 @@ open import Rx.Evaluator using
   aliveThroughᶠ; mergeAllDrain; subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE;
   splitBurst; Stream; mintNode; installNode; pushBurst; oneShotBurst; splitEvents; thruConsume;
   thruWalk; thruWrap; retagEvents; subscribeSharedSlot; memberSource; mintSource;
-  sharedConnect; sharedPlumb; burstCompleted; register; dropSource; opIterD)
+  sharedConnect; sharedPlumb; burstCompleted; register; dropSource; opIterD; sLvlD;
+  sizeAt)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; subscribeE-keeps; subscribeInner-keeps; stepFrame-keeps; thruConsume-keeps)
 open import Verify-Budget-Sufficient.Caps using
@@ -70,7 +71,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; 
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
-  (CeilD; ceil-step; ceil-le; ceil-mu; ceil-here)
+  (CeilD; ceil-step; ceil-le; ceil-mu; ceil-here; ceil-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; allFresh; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -863,18 +864,22 @@ pathSz?-lvl c Lv p 2≤S h =
 --   conjunct at every cap and every term, with `ceil-absurd-at` beside
 --   it showing the failure is the level and not the range's endpoint.
 
--- AND THE CEILING IS NOT ONE CONJUNCT AMONG EIGHT THAT COULD BE LEFT
--- AS A LEAF WHILE THE REST ARE GROUND.  The other seven are all
--- derivable from readings the caller already holds -- the park field
--- gives the size and the room, the width field gives the slot width,
--- the closure key is the size lifted one level, and the tail's state
--- comes off the subscribe's own caps lemma.  What blocks discharging
--- them is the Σ: the tail's LEVEL is chosen by whoever proves the
--- spine, so a proof of the seven has to pick it, and a ceiling
--- supplied alongside would then have to hold at every level that
--- choice could land on -- which is the quantified form the witness
--- above kills.  So the eight stand or fall together, and the entry is
--- one obligation rather than seven plus a leaf.
+-- AND THE RESOLUTION IS THAT THE CEILING LEAVES THE STORE ALTOGETHER
+-- (Anthony's ruling: charge the term at delivery, not at drain).  The
+-- entry keeps the seven conjuncts a caller already holds -- the park
+-- field gives the size and the room, the width field gives the slot
+-- width, the closure key is the size lifted one level, and the tail's
+-- state comes off the subscribe's own caps lemma -- and stops naming a
+-- roof at all.  What replaces the eighth is a CLIMB WITNESS in the
+-- tail's own Σ, stated in the sweep currency the subscribe's caps
+-- lemma already reports its `j′` in, so the entry says how far the
+-- level moved rather than that some roof survives the move.  Then the
+-- ceiling is a hypothesis of the fold, held once at the frame's level
+-- against the whole queue, and each entry spends one operator unit of
+-- it; the two existential bounds the wrapper carries are what make
+-- that single receipt serve every entry.  Neither the reader's level
+-- nor the term's ladder is named in the store, which is exactly what
+-- the witness below said could not be named.
 -- DEAD ROUTE: proving the seven derivable conjuncts into a body and
 --   leaving the ceiling as its single postulated leaf.
 
@@ -885,27 +890,50 @@ pathSz?-lvl c Lv p 2≤S h =
 -- `capsOK?` weakens upward only.  A tail pinned to the head's level
 -- therefore has no producer at any queue longer than one -- not a
 -- hard obligation but an unsatisfiable one -- so the tail carries its
--- own level with a floor at the head's, which is the same freedom the
--- per-entry nesting conjunct beside it already takes.
-capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+-- own level as an OFFSET from the head's, bounded above by the sweep
+-- the subscribe's caps lemma reports its climb in.  Bounding it is
+-- what a bare floor could not do: an offset with no roof lets the
+-- queue walk the level as far as it likes, and then one operator unit
+-- per entry does not pay for it.
+capsDrainAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (d Lv B̂ Ŝ : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
-capsDrainOK c sl d Lv sf allNid κ id now lim act [] sched st =
+capsDrainAt c sl d Lv B̂ Ŝ sf allNid κ id now lim act [] sched st =
   (Sched.slots sched ≡ sl) × (capsOK? (frameStep Lv c) sched st ≡ true)
-capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sched st =
+capsDrainAt {n = n} {s = s} c sl d Lv B̂ Ŝ sf allNid κ id now lim act (o ∷ q) sched st =
   (Sched.slots sched ≡ sl) × (capsOK? (frameStep Lv c) sched st ≡ true)
   × (nestValOK? (frameStep Lv c) (obs s) o ≡ true)
   × (nestClosOK? (frameStep Lv c) sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
-  × CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o)))
-  × (Σ ℕ λ Lv″ → (Lv ≤ Lv″) ×
-      capsDrainOK c sl d Lv″ sf allNid κ id now lim
+  × (nest o sl (EvalSt.connectedShares st) ≤ B̂)
+  × (sizeᵉ o ≤ Ŝ)
+  × (Σ ℕ λ r₀ →
+      (Lv + r₀ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) d B̂
+         (suc (Lv + suc (sizeAt (Caps.cSize c) Lv)
+                 * suc (sizeAt (Caps.cSize c) Lv)))) ×
+      capsDrainAt c sl d (Lv + r₀) B̂ Ŝ sf allNid κ id now lim
         (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
   where r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+
+-- AND THE TWO BOUNDS ARE THE DRAIN'S OWN, NOT ITS CALLER'S, so they are
+-- existential here and shared down the whole queue.  Sharing is what
+-- makes the ceiling chain: one frame-level receipt, one unit of it
+-- spent per entry, and an entry admitted by a bound its own successor
+-- is also admitted by.  Neither bound is free -- enlarging either
+-- widens the ledger the ceiling has to dominate -- so the pair is
+-- pinned from both sides rather than upward-closed.
+capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
+  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
+capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st =
+  Σ ℕ λ B̂ → Σ ℕ λ Ŝ →
+    CeilD c d Lv B̂ (suc (length q + Ŝ))
+    × capsDrainAt c sl d Lv B̂ Ŝ sf allNid κ id now lim act q sched st
 
 -- THE SUBSCRIPTION'S OWN DESCENT, AND IT IS NOW A CASE SPLIT.  What was
 -- one postulate over the whole of `subscribeE` is a real body over one
@@ -6289,6 +6317,11 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   , ≤-trans (nestDᵛˢ-++ vs vs′) (⊔-lub SUBd IHd)
   , ≤-trans IHn (⊔-lub SUBn (m≤n⊔m (nodesMax st) _))
   where
+  B̂     = proj₁ hcd
+  Ŝ     = proj₁ (proj₂ hcd)
+  ceilQ = proj₁ (proj₂ (proj₂ hcd))
+  hcdA  = proj₂ (proj₂ (proj₂ hcd))
+
   r₁    = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
   vs    = proj₁ (proj₂ r₁)
   done  = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
@@ -6309,26 +6342,42 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   splitW′ : drainW sf allNid κ id now q sched₁ st₁ ≤ W
   splitW′ = ≤-trans (drainW-tail sf allNid κ id now o q sched st) hw
 
-  SUB₀ = subscribeInner-nest c d sl B W Lv sf mergeAllᵒ allNid κ id now o sched st
-          (proj₁ hcd) (proj₁ (proj₂ hcd)) (proj₁ (proj₂ (proj₂ hcd)))
-          (proj₁ (proj₂ (proj₂ (proj₂ hcd))))
-          (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) splitW
-          (≤-trans (m≤m⊔n _ _) hd)
-          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))
-          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
-          hpk hpl
-          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
-
   -- the tail's own level, and the path receipts widened onto it: the
   -- queue's later entries are read at a level at or above the head's,
   -- so the two path facts travel by the step's own widening
-  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
-  Lv″   = proj₁ tailΣ
-  step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ))
+  hB̂    = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
+  hŜ    = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
+  r₀    = proj₁ tailΣ
+  Lv″   = Lv + r₀
+  step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (m≤m+n Lv r₀)
+
+  -- THE HEAD'S CEILING IS READ OFF THE FRAME'S, and the tail's is the
+  -- frame's with one unit spent on the climb the subscribe reports.
+  ceilHere : CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o)))
+  ceilHere = ceil-le c d Lv B̂ (nest o sl (EvalSt.connectedShares st))
+               (suc (length (o ∷ q) + Ŝ)) (suc (suc (sizeᵉ o)))
+               (FaceOK.fSize faceHere) hB̂
+               (s≤s (≤-trans (s≤s hŜ) (+-monoˡ-≤ Ŝ (s≤s z≤n))))
+               ceilQ
+
+  ceilTail : CeilD c d Lv″ B̂ (suc (length q + Ŝ))
+  ceilTail = ceil-sweep-step c d Lv B̂ (suc (length q + Ŝ)) r₀
+               (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ)) ceilQ
+
+  SUB₀ = subscribeInner-nest c d sl B W Lv sf mergeAllᵒ allNid κ id now o sched st
+          (proj₁ hcdA) (proj₁ (proj₂ hcdA)) (proj₁ (proj₂ (proj₂ hcdA)))
+          (proj₁ (proj₂ (proj₂ (proj₂ hcdA))))
+          (≤-trans (m≤m⊔n (nestDᵉ o) (queueNest q)) hq) splitW
+          (≤-trans (m≤m⊔n _ _) hd)
+          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))
+          (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
+          hpk hpl
+          ceilHere
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv″ sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
-         (proj₂ (proj₂ tailΣ))
+         (B̂ , Ŝ , ceilTail , proj₂ (proj₂ tailΣ))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          splitW′
          (≤-trans (m≤n⊔m _ _) hd)

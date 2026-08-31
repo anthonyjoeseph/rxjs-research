@@ -12,11 +12,11 @@ open import Data.Nat.Properties using
   *-mono-≤; m≤m⊔n; +-identityʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
-open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
+open import Rx.Evaluator using (opIterD; sLvlD; sizeAt; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; opIterD-mono; opIterD-infl; sizeCount; sizeCount-body; cDel-body; lvls-add;
   lvls-mono; dWalkᶜ-mono)
-open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
+open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; op-step-sweep; quad-arith)
 
 -- THE CEILING, CARRIED RELATIVELY -- what the walk owes and cannot
 -- produce.  A level is only meaningful under a ceiling, and the
@@ -102,6 +102,27 @@ ceil-entry-step c d Lv k m r 2≤S fits H L′ hL =
           (≤-trans hL
              (≤-reflexive
                 (sym (sLvlD-suc (Caps.cSize c) (Caps.cWid c) d k (Lv + r)))))))
+
+-- AND A CLIMB REPORTED IN THE SWEEP CURRENCY NEEDS NO ROOM AT ALL,
+-- which is the form a drained queue takes.  A subscribe hands back the
+-- level it climbed to bounded by a SWEEP from where it started, not by
+-- the quadratic the step above asks for, so the two currencies do not
+-- meet and the entry step cannot be applied to it.  What they do meet
+-- at is the ledger itself: one unit of the operator measure already
+-- contains a whole sweep, so a climb under that sweep is a climb the
+-- unit pays for.  The recursion nests them, so a queue whose entries
+-- each climb within a sweep spends one unit per entry and nothing more.
+ceil-sweep-step : ∀ (c : Caps) (d Lv k m r : ℕ) → 2 ≤ Caps.cSize c →
+  Lv + r ≤ sLvlD (Caps.cSize c) (Caps.cWid c) d k
+             (suc (Lv + suc (sizeAt (Caps.cSize c) Lv)
+                     * suc (sizeAt (Caps.cSize c) Lv))) →
+  CeilD c d Lv k (suc m) → CeilD c d (Lv + r) k m
+ceil-sweep-step c d Lv k m r 2≤S climb H L′ hL =
+  subst (λ x → x ≤ sizeCount c d ⊔ Caps.cSize c)
+        (sym (+-assoc Lv r L′))
+        (H (r + L′)
+           (op-step-sweep (Caps.cSize c) (Caps.cWid c) d k m Lv r L′ 2≤S
+              climb hL))
 
 -- AND A μ IS ONE OF THEM: it subscribes a LARGER term, so the receipt is
 -- the quadratic the unfolding costs and the room is exactly the room the

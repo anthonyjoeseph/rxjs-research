@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DELIVERY-SIDE PRICE: THE CLIMB'S CURRENCY IS WHAT IS LEFT.** Anthony's ruling: the store stops carrying a ceiling and
-  carries the term's price at its DELIVERY path, fixed when the term
-  is emitted and never climbing. The probe is in — queue read off the
-  installed node at lengths two and four, every entry's measures under
-  the frame's — so the queue does not exhaust the measure. What it
-  does NOT reach is the climb: one level per entry is charged rather
-  than measured, while the drain climbs whatever the subscribe's caps
-  lemma chose, bounded in the SWEEP currency. So the fold wants the
-  multi-level ladder step, and what is open is arithmetic: does that
-  climb fit the quadratic room one unit buys.
-
 - **THE ENTRY FOLD IS REFUTED, AND ITS EXPONENT IS WHAT MOVES** —
   `subscribeE-fit` prices a subscription's emitted values at a tower
   over `syncSizeᵉ`, which reads ONE at a scripted input, so a cold
@@ -238,6 +227,18 @@ does not fit is a finding about the shared statement, not about the head.
   results have. Then the `*All` entry's body and the walk are rebuilt
   on it, and `mapVals-nest-sync`, `takeVals-nest` and `scanVals-nest`
   stay the three frames' halves.
+
+- **THE PRODUCER'S CEILING: WHERE THE FRAME-LEVEL RECEIPT COMES
+  FROM.** The drain's fold now holds ONE ceiling at the frame's level
+  and spends one operator unit per entry, and one unit is proven to
+  buy a whole sweep — so the entry no longer names a roof and the
+  store is statable. What is unpaid is the other end: the walk's own
+  drain statement must PRODUCE that receipt, and the hypothesis record
+  it is stated over carries no ceiling at all. Anthony's ruling says
+  the chain already hands a `CeilD` to every frame and the drain's is
+  not special, so the leg is to find where the chain delivers it and
+  either thread it in or add the field, with the two existential
+  bounds the wrapper needs read off the park field.
 
 - **the cascade's own descent, which is the tier's other risk and
   does not touch the queue at all** — `cascade-depth-sighted` prices a
