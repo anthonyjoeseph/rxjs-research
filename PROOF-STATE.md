@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE MAP CLAUSE IS PROVEN AND THE FRAME LAW IS A BODY NOW; THE
-  OUTER FRAME IS WHERE THE CURRENCY CHANGES HANDS.** Substitution's
-  bound discharges the clause the additive reading died at, which
-  leaves four leaves and one of them is not like the others:
-  `thru-outer` hands back a value one `obs` shallower and stands on a
-  path one unit of depth richer, so its two sides TRADE rather than
-  cancel, and it carries a factor of one to trade with. That is the
-  clause a wrong potential fails at. The leg is to reach it by RUNNING
-  a cascade over an `*All` and reading the potential either side of the
-  frame the evaluator itself presents.
+- **THE OUTER FRAME IS REFUTED, SO THE WALK NEEDS A SECOND FACTOR.**
+  Eighty against forty-one: the frame SUBSCRIBES what it is handed and
+  a subscription evaluates, so the same doubling a map frame pays for
+  with its factor arrives at a frame whose factor is one. The repair is
+  a factor the frame can see — two to the instant's SIZE cap, which the
+  path premise already supplies — so the leg is a B-indexed companion
+  to `pathNestF` giving `thru-outer` that factor, its cap lemma off the
+  same `pathSz?`, and the walk rethreaded through it. What that will
+  expose is the size side: the potential will have to carry the
+  arrival's syntax as well as its depth.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -273,10 +273,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`dispatchShare-nest-regs`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   share boundary, where the walk re-enters on every chain at the sink. Their
   depths are under the registry's join, but nothing has read it.
-- **`stepFrame-nest-Φ-thru`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
-  outer frame, whose value loses an `obs` while its path gains a unit of depth.
-  The one clause where the potential's two sides trade, and it has a factor of
-  one to trade with.
+- **`stepFrame-nest-Φ-thru`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: the outer
+  frame, and it is FALSE as written — the frame subscribes rather than
+  forwards, and its factor of one cannot pay for the substitution that comes
+  back. Held at full strength until the walk can carry a factor here.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer

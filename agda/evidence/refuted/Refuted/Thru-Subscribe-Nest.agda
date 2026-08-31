@@ -159,3 +159,31 @@ stepFrame-nodes-thru-caps-absurd h = ≤⇒≤ᵇ h
 
 valCapsFails : valCaps? c₀ slots (obs (obs (obs natᵗ))) o ≡ false
 valCapsFails = refl
+
+----------------------------------------------------------------------
+-- AND THE POTENTIAL FALLS AT THE SAME FRAME, in the currency the walk
+-- carries now.  The walk's charge is a product -- the factor the path
+-- can still apply, times the depth in flight plus the depth still to
+-- climb -- and `frameNestF` reads a `thru-outer` as ONE, so all this
+-- frame has to pay a doubling with is the single unit `pathNestD`
+-- charges.  Eighty against forty-one again, and the arrival's depth is
+-- a free parameter, so no constant closes it: the repair has to be a
+-- FACTOR at this frame, in a currency that can see the term the
+-- subscription evaluates.
+----------------------------------------------------------------------
+
+-- the two sides of the walk's per-frame law at the empty path, where
+-- the factor is one and the depth still to climb is zero
+walkBefore walkAfter : ℕ
+walkBefore = frameNestF f * (nestDᵛˢ vals + frameNestD f)
+walkAfter  = nestDᵛˢ (proj₁ (stepFrame gas 0 0 f root vals false sched₀ st₀))
+
+walkBefore≡41 : walkBefore ≡ 41
+walkBefore≡41 = refl
+
+walkAfter≡80 : walkAfter ≡ 80
+walkAfter≡80 = refl
+
+stepFrame-nest-Φ-thru-absurd : walkAfter ≤ walkBefore → ⊥
+-- `80 ≤ᵇ 41` reduces to `false`, so `T` of it IS the empty type
+stepFrame-nest-Φ-thru-absurd h = ≤⇒≤ᵇ h

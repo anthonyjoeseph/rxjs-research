@@ -173,11 +173,22 @@ postulate
                         fin sched st))
       ≡ true
 
-  -- AND THE OUTER FRAME SPENDS DEPTH WHERE THE MAP FRAME SPENDS
-  -- FACTOR.  Its value is one `obs` shallower than the one it was
-  -- handed, and the path it stands on is one unit of depth richer, so
-  -- the two sides of the potential trade rather than cancel -- the only
-  -- clause where the currency changes hands.
+  -- AND THE OUTER FRAME IS FALSE AS WRITTEN, which is what running it
+  -- said.  The frame does not forward its argument: `thruWalk`
+  -- SUBSCRIBES each observable it is handed, so what comes back is the
+  -- inner's emissions, and a subscription EVALUATES -- the same
+  -- doubling substitution buys at a map frame.  There the path
+  -- surrenders a factor to pay for it; here the factor is one and the
+  -- only currency on offer is the single unit of depth, so the two
+  -- sides trade at a rate the arrival's own depth can outrun.  The
+  -- repair has to be a FACTOR at this frame, in a currency that can see
+  -- the term the subscription evaluates, and the statement is left at
+  -- full strength until the walk can carry one.
+  --
+  -- REFUTED: `Refuted.Thru-Subscribe-Nest` -- eighty against
+  --   forty-one, at a payload forty `*All` layers deep behind a step
+  --   function naming it on both sides of a `mapᵉ` sum.  The depth is a
+  --   free parameter of the witness, so no constant closes the gap.
   stepFrame-nest-Φ-thru : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)

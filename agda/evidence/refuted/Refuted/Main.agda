@@ -55,7 +55,8 @@ open import Refuted.Step-Frame-Nest-Dup
 open import Refuted.Thru-Subscribe-Nest
   using (emitted≡80; perValue≡41; stepFrame-nodes-thru-absurd;
          parent≡41; stepFrame-nodes-at-thru-absurd;
-         capsZeroThru; capsCharge≡41; stepFrame-nodes-thru-caps-absurd; valCapsFails)
+         capsZeroThru; capsCharge≡41; stepFrame-nodes-thru-caps-absurd; valCapsFails;
+         walkBefore≡41; walkAfter≡80; stepFrame-nest-Φ-thru-absurd)
 open import Refuted.Scan-Burst-Nest
   using (premises; burst≡14; delivered≡16383; charged≡12288;
          delivered₁₃≡8191; charged₁₃≡12288; subscribeE-nest-burst-absurd)
