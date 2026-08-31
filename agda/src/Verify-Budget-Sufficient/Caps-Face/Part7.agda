@@ -54,6 +54,7 @@ open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; FrameΦHyp; valsΦ?; stepFrame-nest-Φ; Φ-to-bound)
+open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
@@ -3884,27 +3885,6 @@ postulate
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
 
--- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the second
---   cascade of two reachable families, taking the chain the evaluator
---   itself presents rather than one built by hand -- five to six at the
---   fold family against a charge of thirty-three, eight to sixteen at
---   the demand family against seventy-one.  The charge read there is
---   the SYNTACTIC one the increment is proven to dominate, so a green
---   row is a stronger claim than the arm.  NOT covered: any family
---   whose chain deepens the node table by more than one step, and the
---   increment itself, which computes nowhere.
-postulate
-  chainStep-nest-nodesC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
-          (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
-      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-          ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
-
 -- AND THIS ONE CARRIES THE CHAIN'S OWN DEPTH, which the two arms above
 -- do not.  A registration this chain mints sits at the frames of the
 -- subscribed value over the REMAINING path, so its depth is the
@@ -4140,6 +4120,38 @@ chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
     (entryΦ sl id a path hp hΦ)
     (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
 
+-- THE NODES ARM IS THE SAME WALK AT THE OTHER PLACE A FRAME STORES,
+-- and it is the same three inputs: the entry potential, the walk's
+-- per-frame side-condition, and the fold.  What it adds to the
+-- registry arm's conclusion is the registry's own join, because a
+-- chain that reaches a share fans into paths this one does not walk
+-- and stores at their nodes -- the term the path-denominated reading
+-- was refuted for missing.  The consumer pays nothing for it: the
+-- round already holds the registry under the same ceiling.
+--
+-- AND IT TAKES THE DEPTH PREMISE THE REGISTRY ARM TAKES.  That is not
+-- a convenience of the one call site -- without it the walk has no
+-- entry potential, so there is no induction to run at all, and the
+-- monolithic form it replaces was asserting the whole walk rather
+-- than owing this.
+chainStep-nest-nodesC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+        (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
+    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+        ⊔ regsNestMax (EvalSt.registry st)
+        ⊔ (nestWalkAt e sl id)
+chainStep-nest-nodesC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
+  foldPath-nest-nodes _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    (entryΦ sl id a path hp hΦ)
+    (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
+
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.
 unit≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
@@ -4168,8 +4180,10 @@ chainStep-store≤ {e = e} sl id a nextId S path sched st hsl hsz hp hΦ hinc hS
   storeNestMax-lub sd′ st′ S SL
     (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz hp)
              (⊔-lub (≤-trans (storeNest-live≤  sched st) hS) (≤-trans flat hinc)))
-    (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz hp)
-             (⊔-lub (≤-trans (storeNest-nodes≤ sched st) hS) (≤-trans flat hinc)))
+    (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz hp hΦ)
+             (⊔-lub (⊔-lub (≤-trans (storeNest-nodes≤ sched st) hS)
+                           (≤-trans (storeNest-regs≤ sched st) hS))
+                    hinc))
     (≤-trans (chainStep-nest-regsC  sl id a nextId path sched st hsl hsz hp hΦ)
              (⊔-lub (≤-trans (storeNest-regs≤  sched st) hS) hinc))
   where

@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY ARM IS WHOLE; THE OTHER TWO ARE NOT.** The chain's walk
-  now stands with no postulate under it — the grant is bought at the one
-  frame that owes it, out of the charge's own doubling. What that leaves
-  on the same `chainStep` are the LIVE and NODE arms, still postulated
-  whole, and they are the same induction over the same walk against two
-  other fields of the store. The leg is the NODE arm, since it moves at
-  every family and the registry arm's shape is now a worked instance:
-  the same `PathΦHyp` side-condition, the same frame law, and a per-arm
-  step leaf where the registry arm has `stepFrame-nest-regs`.
+- **THE LIVE ARM IS THE LAST MONOLITH ON THE CHAIN.** Two of the three
+  arms are now walks over the same potential with two leaves each; the
+  live arm is still one postulate asserting the whole induction, and it
+  is the one carrying two refutations and three dead routes. The leg is
+  the same decomposition a third time — a frame leaf and a share leaf
+  under a fold — and the question it has to settle first is which extra
+  term the conclusion needs, since the nodes arm needed the registry's
+  join and a live list is fed from the pending values a subscription
+  mints rather than from anything the walked path stores.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -262,10 +262,14 @@ does not fit is a finding about the shared statement, not about the head.
   rather than against the store it started from. The surrogate charge now runs
   at a program whose chain mints a live from a deferred nest, which is the one
   shape that moves the fold.
-- **`chainStep-nest-nodesC`** (Caps-Face/Part7) — FALSITY, `PROBED`: the node
-  table after one chain, charged to one instant's increment. Unprobeable as
-  stated — the increment sits on the caps recurrence — but its syntactic
-  surrogate runs.
+- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
+  one frame stores at the nodes map, under the potential it was handed. Three
+  of the five kinds store; the whole-chain surrogate covers the composite at
+  two families and discharges none of the premise.
+- **`dispatchShare-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`:
+  the share boundary at the nodes map. The path-denominated reading died here,
+  so the statement carries the registry's join — the term the fan-out actually
+  sits at — and nothing has read the repaired form.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
