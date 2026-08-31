@@ -330,6 +330,21 @@ pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
 -- a weaker hypothesis there, and the ceiling both are spent under
 -- already has the same summand.
 --
+-- AND THE PAYLOAD'S SIZE IS THE WRONG EXPONENT WHATEVER SUMMAND SITS
+-- BESIDE IT.  A payload may MAP, and its step function may name its
+-- argument twice; then one application emits a term holding two copies
+-- of what arrived, so the emitted value's sync size is about DOUBLE the
+-- payload's while the grant's exponent stays the payload's.  Both sides
+-- are towers of two, so a constant factor between the EXPONENTS is not
+-- a scale error: the ratio is itself a tower, and every layer of
+-- padding doubles it.  The summand cannot help, since it is read off
+-- the telescope and the witness uses a flat one, where it is nought.
+-- What the grant has to read is a size that survives substitution.
+--
+-- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`,
+--   at a flat telescope where the wrap is nought: sixteen against
+--   eighteen in the exponents, so a quarter of a million delivered
+--   against a grant of a hundred and thirty-one thousand.
 -- REFUTED: `Refuted.Sight-All-Fit-Slot` kills the payload-only grant
 --   at a slot whose definition substitutes per layer -- delivered
 --   `8 16 32 64` against a constant sixteen, meeting it exactly at the

@@ -214,15 +214,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the stream the entry hands the fold, now that one value's price is
-  known** — `sight-all-stream` is the only leaf left under the entry
-  fit, and it is a claim about what the child's own subscribe EMITS
-  rather than about what consuming an emission costs. The grant is the
-  payload's tower at the stepped path, and the descent conserves
-  exactly that sum, so the leg is the descent's own induction with the
-  `*All` step's `suc` traded onto the payload side. Its sides compute
-  at the same harness the value price used, so probe the emitted
-  stream before stating the induction's measure.
+- **what substitution actually costs, measured before a currency is
+  chosen** — one duplicating map outruns a grant whose exponent is the
+  payload's sync size, and the worry is that NESTING them compounds:
+  each layer names its argument twice, so k layers cost a constant
+  each in the payload and double what is emitted. If that holds, no
+  single tower in the payload's size can pay and the fit's own
+  `2 ^ syncSizeᵛ` shape is what has to move, not just its argument —
+  which reaches every bound on this face. The closure size is the
+  obvious candidate and is the WRONG one: it weighs slot references,
+  and this growth is in the value variables. So measure the nested
+  family at the harness the witness already builds, then restate.
 
 - **the park site that must issue the ceiling it stores** — exactly
   one arm writes a `mergeAll` queue, the gate-shut arm of the inner
@@ -246,22 +248,22 @@ does not fit is a finding about the shared statement, not about the head.
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED×2, TWIN`:
-  the `from-inner` head of the drain law, the only frame that names a node.
-  The queue now carries a stored ceiling, the reached-level form having been
+  the `from-inner` head of the drain law, the only frame that names a node. The
+  queue now carries a stored ceiling, the reached-level form having been
   refuted in the gas currency, so what is left is a producer for that field.
 - **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED, PROBED`: what ONE
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading
   vacuously wherever the consume has been instantiated.
+- **`sight-all-stream`** (Depth-Sighted) — FALSITY, `REFUTED×2`: the drain's
+  ENTRY half, a claim about the payload's emitted VALUES. A map whose step
+  names its argument twice emits a term about double the payload's sync size,
+  and the grant's exponent is the payload's, so the tower is outrun.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
   where they compound, and the margin WIDENS with the instant.
-- **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED`: the drain's
-  ENTRY half as a claim about the payload's emitted VALUES, with no state in
-  it. The payload-only grant is refuted at a slot reference and the summand
-  that repairs it is checked at the refuting family.
 - **`sight-all-walk`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain's WALK
   half, one leaf for all three `*All` heads — they delegate to the same family
   and wrap the subject in one level each. It reads the fit the fold carries,
