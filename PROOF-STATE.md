@@ -214,12 +214,13 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the drain's ENTRY half, now that its grant is the right one** — the
-  payload-only form is refuted at a slot reference and the summand
-  repairing it is checked at the refuting family, so nothing about
-  `sight-all-fit`'s statement is undecided. What is left is the
-  induction over the subscription that establishes it, head by head,
-  and it is the leaf three of the fit shelf's rows are waiting behind.
+- **the entry half's two leaves, now that the state threading is
+  checked** — `sight-all-fit` is a body, so what is owed is a claim
+  about VALUES with no state in it (`sight-all-stream`) and a claim
+  about subscribing ONE of them (`sight-thru-val`). Take the second
+  first: it is where the refuted additive currency was replaced, its
+  sides compute at a concrete inner, and the payload's own descent
+  cannot be aimed until it is known what one emitted value costs.
 
 - **the other three closure arms, by the ratio the map arm just paid** —
   the map head fell without any closure mirror of the evaluator at all:
@@ -247,6 +248,10 @@ does not fit is a finding about the shared statement, not about the head.
   the `from-inner` head of the drain law, the only frame that names a node.
   Every conjunct but one now comes off the store predicate at the walk's own
   level; the residue is the REACHED level for a queued entry's nest.
+- **`sight-thru-val`** (Depth-Sighted) — FALSITY, `REFUTED`: what ONE emitted
+  inner costs the outer frame to subscribe, in the sync currency. The additive
+  form is refuted — an emitted value outruns the observable it came from by the
+  substitutions the step function performs — and nothing has instantiated this.
 - **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
   the drained values come out of the node's queue. Instantiated at a parked
@@ -260,10 +265,10 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
   where they compound, and the margin WIDENS with the instant.
-- **`sight-all-fit`** (Depth-Sighted) — DIFFICULTY, `REFUTED`: the drain's
-  ENTRY half. The payload-only grant is refuted at a slot reference and the
-  summand that repairs it is checked at the refuting family; what is left is
-  the induction over the subscription that establishes it.
+- **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED`: the drain's
+  ENTRY half as a claim about the payload's emitted VALUES, with no state in
+  it. The payload-only grant is refuted at a slot reference and the summand
+  that repairs it is checked at the refuting family.
 - **`sight-all-walk`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain's WALK
   half, one leaf for all three `*All` heads — they delegate to the same family
   and wrap the subject in one level each. It reads the fit the fold carries,

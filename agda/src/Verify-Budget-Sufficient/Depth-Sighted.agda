@@ -15,11 +15,12 @@ open +-*-Solver using (solve; _:=_; _:+_; con)
 open import Data.Bool using (Bool; T; _∧_)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (Maybe; nothing)
+open import Data.Unit using (⊤; tt)
 open import Data.Fin using (toℕ)
-open import Data.Product using (proj₁; proj₂)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; cong; cong₂; trans; sym; refl; subst)
 
-open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
+open import Rx.Exp using (Ctx; Closed; Fn; Val; obs; sizeᵉ; syncSizeᵉ; syncSizeᵗ; syncSizeᵛ; evalTm; unfoldμ; ofᵉ; emptyᵉ; deferᵉ; μᵉ; varᵉ;
   input; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; inputsBelowᵉ; inputsBelowᵗ)
 open import Rx.Slots using (scripted; shared)
 open import Rx.Inputs-Below using (ib-unfoldμ)
@@ -27,12 +28,13 @@ open import Decide using (∧ʳ)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; InstEmit)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Frame; Stream; map-f; take-f; _↠_; subscribeE;
   mintNode; installNode; register; take-st; scan-st; scan-f; share-sink; thru-outer;
-  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; stepFrame; splitEvents; NodeId)
-open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ)
+  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; stepFrame; splitEvents; NodeId; thruConsume)
+open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthBurst; depthAll; depthFrame)
 open import Verify-Budget-Sufficient.Measures using (syncSize-unfoldμ)
 open import Verify-Budget-Sufficient.Nest-Subst using (nestD-unfoldμ; evalTm-nest-sync)
-open import Verify-Budget-Sufficient.Nest-Walk using (pushFitOK; thruFitOK)
+open import Verify-Budget-Sufficient.Nest-Walk using
+  (pushFitOK; thruFitOK; nestDᵛˢ; nodesMax; nodeNestAt)
 open import Verify-Budget-Sufficient.Nest-Store using
   (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
    storeNestMax-install; storeNestMax-register; nestUnit; nodeNest;
@@ -200,11 +202,87 @@ postulate
                               + k * slotWrapSum (Sched.slots sched))
                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
--- AND THE ENTRY FIT IS THE HALF NOTHING HERE COVERS.  It is a claim
--- about the STORE the payload subscribe hands back, not about a
--- descent, so no row that computes a depth reaches it; and its shape
--- is the fit shelf's, which concludes exactly this at caps hypotheses
--- the caller does not hold.
+-- WHAT ONE INNER COSTS TO SUBSCRIBE, and it is a claim about a VALUE
+-- rather than about the payload's syntax -- which is why no reading of
+-- the payload establishes it.  The outer frame does not FORWARD what
+-- the payload emits: it subscribes it, so what has to be priced is the
+-- emitted observable itself, and the currency has to be one that
+-- survives the substitution the subscription performs.
+-- REFUTED: `Refuted.Thru-Subscribe-Nest` kills the per-value form in
+--   the additive currency -- an emitted value comes out deeper than
+--   the observable it came from by the number of times the step
+--   function names its payload, and that depth is a free parameter, so
+--   no constant charge closes it.
+postulate
+  sight-thru-val : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) →
+    2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o) ≤ G →
+    let rc = thruConsume g op nid κ id now o sched st in
+    (nestDᵛˢ (proj₁ rc) ≤ G)
+    × (nodesMax (proj₂ (proj₂ (proj₂ rc))) ≤ nodesMax st ⊔ G)
+    × ((j : NodeId) → nodeNestAt j (proj₂ (proj₂ (proj₂ rc))) ≤ nodeNestAt j st ⊔ G)
+
+-- THE GRANT READ AT ONE EMITTED VALUE, and then at a list and at a
+-- stream.  These carry NO state, which is the point of separating them
+-- from the fit: what the outer frame needs of the payload's burst is a
+-- property of the values alone, so the state threading the fit does is
+-- discharged once here rather than being carried into the payload's
+-- own descent.
+ValFit : ∀ {n} {Γ : Ctx n} {u t} (G : ℕ) (κ : Path Γ u t) → Val Γ (obs u) → Set
+ValFit {u = u} G κ o =
+  2 ^ syncSizeᵛ (obs u) o * (pathNestD κ + nestDᵛ (obs u) o) ≤ G
+
+ValsFit : ∀ {n} {Γ : Ctx n} {u t} (G : ℕ) (κ : Path Γ u t) →
+  List (Val Γ (obs u)) → Set
+ValsFit G κ []       = ⊤
+ValsFit G κ (o ∷ os) = ValFit G κ o × ValsFit G κ os
+
+StreamFit : ∀ {n} {Γ : Ctx n} {u t} (G : ℕ) (κ : Path Γ u t) →
+  Stream Γ (obs u) → Set
+StreamFit G κ []                       = ⊤
+StreamFit {Γ = Γ} {u = u} G κ (em ∷ ems) =
+  ValsFit G κ (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
+  × StreamFit G κ ems
+
+-- AND THE THREADING IS A FOLD OVER THAT, spending one value bound per
+-- step: the grant does not move, so the state the previous consume
+-- left is only where the next one is read, never what it is read
+-- against.
+thruFit-vals : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) →
+  ValsFit G κ os → thruFitOK G g op nid κ id now os sched st
+thruFit-vals G g op nid κ id now []       sched st _        = tt
+thruFit-vals G g op nid κ id now (o ∷ os) sched st (h , hs) =
+  proj₁ hv , proj₁ (proj₂ hv) , proj₂ (proj₂ hv)
+  , thruFit-vals G g op nid κ id now os
+      (proj₁ (proj₂ (proj₂ rc))) (proj₂ (proj₂ (proj₂ rc))) hs
+  where
+  rc = thruConsume g op nid κ id now o sched st
+  hv = sight-thru-val G g op nid κ id now o sched st h
+
+pushFit-stream : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (G : ℕ) (g : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (str : Stream Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  StreamFit G κ str → pushFitOK G g op nid κ id now str sched st
+pushFit-stream G g op nid κ id now []         sched st _        = tt
+pushFit-stream {Γ = Γ} {u = u} G g op nid κ id now (em ∷ ems) sched st (h , hs) =
+  thruFit-vals G g op nid κ id now (proj₁ sp) sched st h
+  , pushFit-stream G g op nid κ id now ems
+      (proj₁ (proj₂ (proj₂ (proj₂ sf)))) (proj₂ (proj₂ (proj₂ (proj₂ sf)))) hs
+  where
+  sp = splitEvents {A = Val Γ u} (InstEmit.events em)
+  sf = stepFrame g id now (thru-outer op nid) κ
+         (proj₁ sp) (proj₂ (proj₂ sp)) sched st
+
+-- AND WHAT IS LEFT IS THE PAYLOAD'S OWN BURST, read as values.  It is
+-- the half nothing here covers: a claim about the STORE the payload
+-- subscribe hands back rather than about a descent, so no row that
+-- computes a depth reaches it.
 --
 -- THE GRANT CARRIES THE SLOT SUMMAND, and it did not always.  A
 -- payload may emit a slot REFERENCE, whose syntax says nothing about
@@ -225,7 +303,7 @@ postulate
 --   any path other than the one the row subscribes under, and the
 --   store-growth conjuncts, which no row reads apart from the value one.
 postulate
-  sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  sight-all-stream : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     T (inputsBelowᵉ k b) →
@@ -233,9 +311,31 @@ postulate
         sched₁ = proj₂ (mintNode sched)
         st₀    = installNode nid (allFresh u op lim) st
         r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-    in pushFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-                    + k * slotWrapSum (Sched.slots sched))
-         g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    in StreamFit (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+                    + k * slotWrapSum (Sched.slots sched)) κ (proj₁ r)
+
+sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  T (inputsBelowᵉ k b) →
+  let nid    = proj₁ (mintNode sched)
+      sched₁ = proj₂ (mintNode sched)
+      st₀    = installNode nid (allFresh u op lim) st
+      r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
+  in pushFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+                  + k * slotWrapSum (Sched.slots sched))
+       g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+sight-all-fit {u = u} g k op lim b κ bid now sched st ok =
+  pushFit-stream
+    (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
+       + k * slotWrapSum (Sched.slots sched))
+    g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+    (sight-all-stream g k op lim b κ bid now sched st ok)
+  where
+  nid    = proj₁ (mintNode sched)
+  sched₁ = proj₂ (mintNode sched)
+  st₀    = installNode nid (allFresh u op lim) st
+  r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
 
 sight-all-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
