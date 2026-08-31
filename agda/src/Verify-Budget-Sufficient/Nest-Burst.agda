@@ -50,7 +50,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
+  (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; _×ᵗ_; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
   switchAllᵉ; exhaustAllᵉ; μᵉ; input; inputsBelowᵉ)
 open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator using
@@ -186,6 +186,20 @@ abstract
     descW g b (map-f f ↠ κ) id now sched st
       ≤ descW g (mapᵉ f b) κ id now sched st
   descW-map g f b κ id now sched st = m≤n⊔m _ _
+
+  -- AND THE FOLD'S HALF, which is `descW-map`'s shape at a head that
+  -- mints a node: the child is read under the fresh node's path and the
+  -- initial accumulator's install, so a consumer that has widened the
+  -- parent's width still has to name the same state the clause does.
+  descW-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+    (b : Closed Γ s) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
+          (proj₂ (mintNode sched))
+          (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
+      ≤ descW g (scanᵉ f z b) κ id now sched st
+  descW-scan g f z b κ id now sched st = m≤n⊔m _ _
 
   -- AND THE UNFOLDING'S HALF AT THE μ HEAD, which is the one place the
   -- child is not a subterm.  That is exactly why the width premise is

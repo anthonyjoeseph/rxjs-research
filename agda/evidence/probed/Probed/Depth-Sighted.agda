@@ -34,40 +34,74 @@
 -- nothing here separates the two summands.  The burst's ENTRY FIT is
 -- not covered at all: it is a hypothesis-side claim about the store
 -- the payload subscribe hands back, and no row here computes it.  Nor
--- is the fit the walk leaf now ASSUMES: its grant carries a slot
--- summand these rows never read, and a row that measures only a
--- conclusion is unmoved by a hypothesis widening -- which is exactly
--- why re-running them says nothing about the summand.
--- TARGET: sight-all-walk @7bf051
+-- is the fit the walk leaf ASSUMES: its grant carries a slot summand
+-- these rows never read, and a row that measures only a conclusion is
+-- unmoved by a hypothesis widening -- which is exactly why re-running
+-- them says nothing about the summand.
+--
+-- THE WIDTH IS READ AT NOUGHT, which is the smallest number the
+-- ceiling admits and so the strongest reading: the grant is monotone
+-- in it, so a row holding here holds at every legal `descW` bound.
+-- TARGET: sight-all-walk @b9a208
 -- TARGET: cascade-depth-sighted @ebd9e3
 module Probed.Depth-Sighted where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_)
-open import Data.List using (length; map)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_)
+open import Data.List using (List; length; map)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; ofᵉ; scanᵉ; mergeAllᵉ; input; varᵗ; inlᵗ; caseᵗ; fstᵗ;
-  strmᵗ; nat̂; emptyᵉ; Tm)
+  strmᵗ; nat̂; emptyᵉ; Tm; syncSizeᵉ)
 open import Data.Maybe using (nothing)
 open import Data.List using ([]; _∷_) renaming (map to mapL)
+open import Data.Bool using (Bool; true)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Fin using (zero)
+open import Data.Fin using (zero) renaming (suc to fsuc)
 open import Rx.Prim using (gasPad; g0)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; Slot; scripted; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
          cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource)
-open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 
 open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; insT; insF; sucGU; sucGF)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthCascade)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (storeNestMax; nestUnit; sightCeil)
-open import Verify-Budget-Sufficient.Depth-Sighted using (Sight)
+  using (storeNestMax; nestUnit; sightCeil; pathNestD)
+
+
+-- THE CEILING WRITTEN OUT, because the grant it reads sits inside the
+-- sealed `nestB` and a sealed family does not reduce for a row.  What
+-- follows is that grant's body at the root, at a width of NOUGHT --
+-- the smallest number the ceiling admits and therefore the strongest
+-- reading, since the grant is monotone in the width, so a row holding
+-- here holds at every legal `descW` bound.  The slot sum is spelled at
+-- the two slots this context has rather than folded, which is the same
+-- number.
+fac : ∀ {t} (p : Closed Γ₂ t) → ℕ → ℕ
+fac p m = ((2 ^ sizeᵉ p) ^ suc 0) ^ m
+
+wrap1 : ∀ {t j u} (p : Closed Γ₂ t) (sl : Slots Γ₂) → Slot Γ₂ j u → ℕ
+wrap1 p sl (scripted _) = 0
+wrap1 p sl (shared d)   =
+  fac p (syncSizeᵉ d) * (nestDᵉ d + suc (syncSizeᵉ d) * nestUnit p sl)
+
+fitOf : ∀ {t} (p : Closed Γ₂ t) (sl : Slots Γ₂) → ℕ
+fitOf {t} p sl =
+  fac p (syncSizeᵉ p)
+    * ((pathNestD (root {Γ = Γ₂} {t = t}) + nestDᵉ p)
+        + suc (syncSizeᵉ p) * nestUnit p sl)
+  + 2 * (wrap1 p sl (sl zero) + wrap1 p sl (sl (fsuc zero)))
+
+Sight : ∀ {t} (p : Closed Γ₂ t) (sl : Slots Γ₂) → ℕ
+Sight p sl =
+  sightCeil (sizeᵉ p) (fitOf p sl)
+            (storeNestMax (sched-init p sl) (st-init p))
+            (nestUnit p sl)
 
 -- ── the subscribe side, at the root ────────────────────────────────
 
@@ -81,16 +115,31 @@ descRoot k =
 
 sightRoot : ℕ → ℕ
 sightRoot k =
-  Sight 2 (progU k 2) root (sched-init (progU k 2) slotsT) (st-init (progU k 2))
+  Sight (progU k 2) slotsT
 
--- packed base-10^41 so one build returns every figure: Agda aborts a
--- module at its first mismatch, so a tuple of pins leaks one number per
--- build and a sum leaks all of them at once
+-- THE CEILING IS NO LONGER A FIGURE TO PRINT, AND THAT IS THE READING.
+-- Its grant is a tower whose exponent is the program's size times its
+-- sync size, so a packed decimal of it would be thousands of digits
+-- while the descent beside it is one.  So each section below reports
+-- the two DESCENTS and the two EXPONENTS -- both small, both packed --
+-- and states the comparison as its own row.  The margin is the gap
+-- between a digit and a power of two in a two-figure exponent, which
+-- is what the columns say and what a printed ceiling would not.
+--
+-- LOAD-BEARING: a row fails exactly when the descent passes the
+-- ceiling.  Packed base-10^6, since Agda aborts a module at its first
+-- mismatch and a sum leaks every field at once.  Base 10^9.
 rootFigs : ℕ
-rootFigs = descRoot 2 + 100000000000000000000000000000000000000000 * (sightRoot 2
-         + 100000000000000000000000000000000000000000 * (descRoot 20 + 100000000000000000000000000000000000000000 * sightRoot 20))
+rootFigs = descRoot 2 + 1000000000 * descRoot 20
+         + 1000000000000000000 * (sizeᵉ (progU 2 2) * syncSizeᵉ (progU 2 2))
+         + 1000000000000000000000000000 * (sizeᵉ (progU 20 2) * syncSizeᵉ (progU 20 2))
 
-rootFigs≡ : rootFigs ≡ 2816719633707125730125674548824844000000000000000000000000000000000000000810000000000000000000000000000003114611536200000000000000000000000000000000000000009
+rootFigs≡ : rootFigs ≡ 10000000000784000000081000000009
+
+rootRow : List Bool
+rootRow = (descRoot 2 ≤ᵇ sightRoot 2) ∷ (descRoot 20 ≤ᵇ sightRoot 20) ∷ []
+
+rootRow≡ : rootRow ≡ true ∷ true ∷ []
 
 -- ── the delivery side, at the second cascade ───────────────────────
 
@@ -257,7 +306,7 @@ descRootF w =
 
 sightRootF : ℕ → ℕ
 sightRootF w =
-  Sight 2 (progF w 2) root (sched-init (progF w 2) slotsF) (st-init (progF w 2))
+  Sight (progF w 2) slotsF
 
 descRootH : ℕ → ℕ
 descRootH k =
@@ -266,13 +315,19 @@ descRootH k =
 
 sightRootH : ℕ → ℕ
 sightRootH k =
-  Sight 2 (progU k 2) root (sched-init (progU k 2) slotsF) (st-init (progU k 2))
+  Sight (progU k 2) slotsF
 
 rootWideFigs : ℕ
-rootWideFigs = descRootF 3 + 100000000000000000000000000000000000000000 * (sightRootF 3
-             + 100000000000000000000000000000000000000000 * (descRootH 8 + 100000000000000000000000000000000000000000 * sightRootH 8))
+rootWideFigs = descRootF 3 + 1000000000 * descRootH 8
+             + 1000000000000000000 * (sizeᵉ (progF 3 2) * syncSizeᵉ (progF 3 2))
+             + 1000000000000000000000000000 * (sizeᵉ (progU 8 2) * syncSizeᵉ (progU 8 2))
 
-rootWideFigs≡ : rootWideFigs ≡ 2386907802520257360000000000000000000000000000000000000000040000000000000000000000000000009986611637500000000000000000000000000000000000000005
+rootWideFigs≡ : rootWideFigs ≡ 2704000000900000000004000000005
+
+rootWideRow : List Bool
+rootWideRow = (descRootF 3 ≤ᵇ sightRootF 3) ∷ (descRootH 8 ≤ᵇ sightRootH 8) ∷ []
+
+rootWideRow≡ : rootWideRow ≡ true ∷ true ∷ []
 
 -- ── which sighted quantity sees the count, and the answer is none ───
 
@@ -310,6 +365,8 @@ sizeFigs = sizeᵉ (progU 2 2) + 1000 * sizeᵉ (progU 8 2)
 sizeFigs≡ : sizeFigs ≡ 30100052028
 
 rootFigs≡ = refl
+rootRow≡ = refl
+rootWideRow≡ = refl
 delivFigs≡ = refl
 axisFigs≡ = refl
 farFigs≡ = refl
@@ -365,14 +422,21 @@ descSeed d =
 
 sightSeed : ℕ → ℕ
 sightSeed d =
-  Sight 2 (progSeed d) root (sched-init (progSeed d) slotsT) (st-init (progSeed d))
+  Sight (progSeed d) slotsT
 
 -- the shallow seed and a seed four layers deep, packed together: two
 -- ceilings and two descents, so one build says whether the margin
 -- narrows as the seed's own nesting grows
 seedFigs : ℕ
-seedFigs = descSeed 1 + 100000000000000000000000000000000000000000 * (sightSeed 1
-           + 100000000000000000000000000000000000000000 * (descSeed 4 + 100000000000000000000000000000000000000000 * sightSeed 4))
+seedFigs = descSeed 1 + 1000000000 * descSeed 4
+         + 1000000000000000000 * (sizeᵉ (progSeed 1) * syncSizeᵉ (progSeed 1))
+         + 1000000000000000000000000000 * (sizeᵉ (progSeed 4) * syncSizeᵉ (progSeed 4))
 
-seedFigs≡ : seedFigs ≡ 26113411121570000000000000000000000000000000000000000030000000000000000000000000000000175164641600000000000000000000000000000000000000003
+seedFigs≡ : seedFigs ≡ 1369000000625000000003000000003
 seedFigs≡ = refl
+
+seedRow : List Bool
+seedRow = (descSeed 1 ≤ᵇ sightSeed 1) ∷ (descSeed 4 ≤ᵇ sightSeed 4) ∷ []
+
+seedRow≡ : seedRow ≡ true ∷ true ∷ []
+seedRow≡ = refl

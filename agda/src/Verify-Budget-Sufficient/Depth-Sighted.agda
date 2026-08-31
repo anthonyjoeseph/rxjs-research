@@ -7,9 +7,8 @@
 module Verify-Budget-Sufficient.Depth-Sighted where
 
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm;
-  *-mono-≤; *-monoˡ-≤; ^-monoʳ-≤; +-mono-≤; +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n;
-  *-distribˡ-+; +-identityʳ; +-suc; <ᵇ⇒<)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; +-assoc; +-comm; *-monoˡ-≤; ^-monoʳ-≤; +-mono-≤;
+  +-monoʳ-≤; +-monoˡ-≤; m≤n+m; m≤m+n; n≤1+n; m⊔n≤m+n; +-identityʳ; +-suc; <ᵇ⇒<)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; con)
 open import Data.Bool using (Bool; T; _∧_)
@@ -40,11 +39,14 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
   (thruConsume-slots; stepFrame-slots; subscribeE-slots)
 open import Verify-Budget-Sufficient.Sighted-Fit using
   (ValFitG; ValsFitG; StreamFitG; valsFitG-le; splitVals-irr; subscribeE-fit)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestB; nestB-base)
+open import Verify-Budget-Sufficient.Nest-Burst using
+  (descW; descW-map; descW-scan; descW-take; descW-mu; descW-merge; descW-switch;
+   descW-exhaust; descW-conn; connW-gs)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax;
-   storeNestMax-install; storeNestMax-register; nestUnit; nodeNest;
-   allFresh; allFresh-nest;
-   slotWrap; slotWrapSum; slotWrap≤sum)
+  (pathNestD; sightCeil; sightCeil-mono; sightCeil-sum; storeNestMax; storeNestMax-install;
+  storeNestMax-register; nestUnit; nodeNest; allFresh; allFresh-nest; fitB; fitG; fitB-mono;
+  fitB-add; slotWrapB; slotWrapBSum; slotWrapB≤sum)
 
 -- WHAT THE SUBSCRIBING STATE CAN SEE, named once so the clauses below
 -- read as the trade rather than as four arguments.
@@ -66,10 +68,9 @@ open import Verify-Budget-Sufficient.Nest-Store using
 -- all, since nothing relates a subterm's sync size to the program's
 -- without an invariant the statement does not carry.
 Sight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u} →
-  ℕ → Closed Γ u → Path Γ u t → Sched Γ → EvalSt e → ℕ
-Sight {e = e} k b κ sched st =
-  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ b * (pathNestD κ + nestDᵉ b)
-                        + k * slotWrapSum (Sched.slots sched))
+  ℕ → ℕ → Closed Γ u → Path Γ u t → Sched Γ → EvalSt e → ℕ
+Sight {e = e} k Wd b κ sched st =
+  sightCeil (sizeᵉ e) (fitG e (Sched.slots sched) k Wd κ b)
             (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 -- A CHAIN FRAME COSTS THE BURST NOTHING, and the three heads that mint a
@@ -131,18 +132,6 @@ burst-le C g bid now f κ P hb hp (em ∷ ems) sched st hs =
   ⊔-lub (hb em ems sched st hs)
         (burst-le C g bid now f κ P hb hp ems _ _ (hp em ems sched st hs))
 
--- MOVING A CONSTANT SUMMAND ACROSS A TRADED SUM, which is what every
--- clause below needs once the ceiling's subject place carries a term
--- the step does not move: the trade is stated on the two places that
--- DO move, and the constant rides along.
-shuffle : ∀ (a c s b s′ : ℕ) → a + s ≤ b + s′ → (a + c) + s ≤ (b + c) + s′
-shuffle a c s b s′ h =
-  ≤-trans (≤-reflexive (swap a c s))
-          (≤-trans (+-monoˡ-≤ c h) (≤-reflexive (sym (swap b c s′))))
-  where
-  swap : ∀ (x y z : ℕ) → (x + y) + z ≡ (x + z) + y
-  swap = solve 3 (λ x y z → (x :+ y) :+ z := (x :+ z) :+ y) refl
-
 -- THE DRAIN, and it is ONE leaf for the three heads rather than three:
 -- all of them delegate to `depthAll`, all of them wrap the subject in
 -- exactly one nesting level, and none of them is distinguished by
@@ -194,17 +183,17 @@ shuffle a c s b s′ h =
 --   read apart from the descent it is joined to.
 postulate
   sight-all-walk : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (k : ℕ) (op : AllOp) (nid : NodeId) (b : Closed Γ (obs u))
+    (g : Gas) (k Wd : ℕ) (op : AllOp) (nid : NodeId) (b : Closed Γ (obs u))
     (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
     (vals : List (Val Γ (obs u))) (fin : Bool)
     (sch : Sched Γ) (sto : EvalSt e) →
     T (inputsBelowᵉ k b) →
-    thruFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-                 + k * slotWrapSum (Sched.slots sched))
+    thruFitOK (fitB e (Sched.slots sched) k Wd
+                 (pathNestD κ + suc (nestDᵉ b)) (syncSizeᵉ b))
       g op nid κ bid now vals sch sto →
     depthFrame g bid now (thru-outer op nid) κ vals fin sch sto
-      ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
-                              + k * slotWrapSum (Sched.slots sched))
+      ≤ sightCeil (sizeᵉ e) (fitB e (Sched.slots sched) k Wd
+                               (pathNestD κ + suc (nestDᵉ b)) (suc (syncSizeᵉ b)))
                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 -- THE GRANT READ AT ONE EMITTED VALUE, and then at a list and at a
@@ -370,49 +359,51 @@ pushFit-stream {Γ = Γ} {u = u} k sl G g op nid κ id now (em ∷ ems) sched st
 -- head's node, its limit or which of the three spellings it wears
 -- reaches the leaf at all.
 sight-all-stream : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (g : Gas) (k Wd : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   T (inputsBelowᵉ k b) →
   let nid    = proj₁ (mintNode sched)
       sched₁ = proj₂ (mintNode sched)
       st₀    = installNode nid (allFresh u op lim) st
       r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-  in StreamFit k (Sched.slots sched)
-       (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-          + k * slotWrapSum (Sched.slots sched)) κ (proj₁ r)
-sight-all-stream {u = u} g k op lim b κ bid now sched st ok =
-  streamFit-le k (Sched.slots sched)
-    (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b)) + k * W)
-    (2 ^ syncSizeᵉ b * (suc (pathNestD κ) + nestDᵉ b) + k * W)
+  in descW g b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ≤ Wd →
+     StreamFit k (Sched.slots sched)
+       (fitB e (Sched.slots sched) k Wd
+          (pathNestD κ + suc (nestDᵉ b)) (syncSizeᵉ b)) κ (proj₁ r)
+sight-all-stream {e = e} {u = u} g k Wd op lim b κ bid now sched st ok hd =
+  streamFit-le k sl
+    (fitB e sl k Wd (pathNestD κ + suc (nestDᵉ b)) (syncSizeᵉ b))
+    (fitB e sl k Wd (suc (pathNestD κ) + nestDᵉ b) (syncSizeᵉ b))
     (suc (pathNestD κ)) κ (proj₁ r) (n≤1+n (pathNestD κ))
-    (≤-reflexive (cong (λ z → 2 ^ syncSizeᵉ b * z + k * W)
-                       (sym (+-suc (pathNestD κ) (nestDᵉ b)))))
-    (subscribeE-fit g k b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ok)
+    (fitB-mono e sl k ≤-refl
+       (≤-reflexive (sym (+-suc (pathNestD κ) (nestDᵉ b)))) ≤-refl)
+    (subscribeE-fit g k Wd b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ok hd)
   where
+  sl     = Sched.slots sched
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
   st₀    = installNode nid (allFresh u op lim) st
   r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-  W      = slotWrapSum (Sched.slots sched)
 
 sight-all-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (g : Gas) (k Wd : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   T (inputsBelowᵉ k b) →
   let nid    = proj₁ (mintNode sched)
       sched₁ = proj₂ (mintNode sched)
       st₀    = installNode nid (allFresh u op lim) st
       r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-  in pushFitOK (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-                  + k * slotWrapSum (Sched.slots sched))
+  in descW g b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ≤ Wd →
+     pushFitOK (fitB e (Sched.slots sched) k Wd
+                  (pathNestD κ + suc (nestDᵉ b)) (syncSizeᵉ b))
        g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-sight-all-fit {u = u} g k op lim b κ bid now sched st ok =
+sight-all-fit {e = e} {u = u} g k Wd op lim b κ bid now sched st ok hd =
   pushFit-stream k (Sched.slots sched)
-    (2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-       + k * slotWrapSum (Sched.slots sched))
+    (fitB e (Sched.slots sched) k Wd
+       (pathNestD κ + suc (nestDᵉ b)) (syncSizeᵉ b))
     g op nid κ bid now (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
     (subscribeE-slots g b (thru-outer op nid ↠ κ) bid now sched₁ st₀)
-    (sight-all-stream g k op lim b κ bid now sched st ok)
+    (sight-all-stream g k Wd op lim b κ bid now sched st ok hd)
   where
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
@@ -420,39 +411,40 @@ sight-all-fit {u = u} g k op lim b κ bid now sched st ok =
   r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
 
 sight-all-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (g : Gas) (k Wd : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   T (inputsBelowᵉ k b) →
   let nid    = proj₁ (mintNode sched)
       sched₁ = proj₂ (mintNode sched)
       st₀    = installNode nid (allFresh u op lim) st
       r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-  in depthBurst g bid now (thru-outer op nid) κ
+  in descW g b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ≤ Wd →
+     depthBurst g bid now (thru-outer op nid) κ
        (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-     ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
-                             + k * slotWrapSum (Sched.slots sched))
+     ≤ sightCeil (sizeᵉ e) (fitB e (Sched.slots sched) k Wd
+                              (pathNestD κ + suc (nestDᵉ b)) (suc (syncSizeᵉ b)))
                  (storeNestMax sched st) (nestUnit e (Sched.slots sched))
-sight-all-drain {Γ = Γ} {e = e} {u = u} g k op lim b κ bid now sched st ok =
+sight-all-drain {Γ = Γ} {e = e} {u = u} g k Wd op lim b κ bid now sched st ok hd =
   burst-le C g bid now (thru-outer op nid) κ
     (pushFitOK G g op nid κ bid now)
     (λ em ems sch sto fit →
-       sight-all-walk g k op nid b κ bid now sched st
+       sight-all-walk g k Wd op nid b κ bid now sched st
          (proj₁ (splitEvents {A = Val Γ u} (InstEmit.events em)))
          (proj₂ (proj₂ (splitEvents {A = Val Γ u} (InstEmit.events em))))
          sch sto ok (proj₁ fit))
     (λ em ems sch sto fit → proj₂ fit)
     (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-    (sight-all-fit g k op lim b κ bid now sched st ok)
+    (sight-all-fit g k Wd op lim b κ bid now sched st ok hd)
   where
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
   st₀    = installNode nid (allFresh u op lim) st
   r      = subscribeE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-  G      = 2 ^ syncSizeᵉ b * (pathNestD κ + suc (nestDᵉ b))
-             + k * slotWrapSum (Sched.slots sched)
+  G      = fitB e (Sched.slots sched) k Wd
+             (pathNestD κ + suc (nestDᵉ b)) (syncSizeᵉ b)
   C      = sightCeil (sizeᵉ e)
-             (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
-               + k * slotWrapSum (Sched.slots sched))
+             (fitB e (Sched.slots sched) k Wd
+                (pathNestD κ + suc (nestDᵉ b)) (suc (syncSizeᵉ b)))
              (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 -- ANY SUBSCRIBE'S DESCENT AGAINST WHAT IT CAN SEE, which is the
@@ -486,76 +478,88 @@ sight-all-drain {Γ = Γ} {e = e} {u = u} g k op lim b κ bid now sched st ok =
 --   queued inners under nested folds, read at the root subscribe, whose
 --   descent climbs four per fold layer against the bare sum's three.
 sight-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (g : Gas) (k : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
+  (g : Gas) (k Wd : ℕ) (op : AllOp) (lim : Maybe ℕ) (b : Closed Γ (obs u))
   (κ : Path Γ u t) (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
   T (inputsBelowᵉ k b) →
-  depthAll g op (allFresh u op lim) b κ bid now sched st
-    ≤ sightCeil (sizeᵉ e) (2 ^ suc (syncSizeᵉ b) * (pathNestD κ + suc (nestDᵉ b))
-                            + k * slotWrapSum (Sched.slots sched))
-                (storeNestMax sched st) (nestUnit e (Sched.slots sched))
+  let nid    = proj₁ (mintNode sched)
+      sched₁ = proj₂ (mintNode sched)
+      st₀    = installNode nid (allFresh u op lim) st
+  in descW g b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ≤ Wd →
+     depthAll g op (allFresh u op lim) b κ bid now sched st
+       ≤ sightCeil (sizeᵉ e) (fitB e (Sched.slots sched) k Wd
+                                (pathNestD κ + suc (nestDᵉ b)) (suc (syncSizeᵉ b)))
+                   (storeNestMax sched st) (nestUnit e (Sched.slots sched))
 
 depthE-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (g : Gas) (k : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
+  (g : Gas) (k Wd : ℕ) (b : Closed Γ u) (κ : Path Γ u t) (bid : Id) (now : Tick)
   (sched : Sched Γ) (st : EvalSt e) → T (inputsBelowᵉ k b) →
-  depthE g b κ bid now sched st ≤ Sight k b κ sched st
-depthE-sighted g0 k (input i) κ bid now sched st ok
+  descW g b κ bid now sched st ≤ Wd →
+  depthE g b κ bid now sched st ≤ Sight k Wd b κ sched st
+depthE-sighted g0 k Wd (input i) κ bid now sched st ok hW
   with Sched.slots sched i
 ... | scripted _ = z≤n
 ... | shared d   = z≤n
-depthE-sighted {e = e} (gs g) k (input i) κ bid now sched st ok
+depthE-sighted {e = e} (gs g) k Wd (input i) κ bid now sched st ok hW
   with Sched.slots sched i in eqsl
 ... | scripted _        = z≤n
 ... | shared d {okd} =
-  ≤-trans (depthE-sighted g (toℕ i) d (share-sink i) bid now sched st₁ okd)
+  ≤-trans (depthE-sighted g (toℕ i) Wd d (share-sink i) bid now sched st₁ okd hchild)
           (sightCeil-sum (sizeᵉ e)
-            (2 ^ syncSizeᵉ d * (0 + nestDᵉ d) + toℕ i * W)
+            (nestB (sizeᵉ e) Wd U (0 + nestDᵉ d) (syncSizeᵉ d) + toℕ i * W)
             (storeNestMax sched st₁)
-            (2 ^ 1 * (pathNestD κ + 0) + k * W)
+            (nestB (sizeᵉ e) Wd U (pathNestD κ + 0) 1 + k * W)
             (storeNestMax sched st) (nestUnit e (Sched.slots sched)) step)
   where
-  W  = slotWrapSum (Sched.slots sched)
+  U  = nestUnit e (Sched.slots sched)
+  W  = slotWrapBSum e (Sched.slots sched) Wd
   st₁ = register (toℕ i) κ
           (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st })
-  wrap≤ : 2 ^ syncSizeᵉ d * (0 + nestDᵉ d) ≤ W
-  wrap≤ = subst (λ w → slotWrap w ≤ W) eqsl (slotWrap≤sum (Sched.slots sched) i)
+  hchild : descW g d (share-sink i) bid now sched st₁ ≤ Wd
+  hchild = ≤-trans (connW-gs g i d κ bid now sched st)
+                   (≤-trans (descW-conn (gs g) i d {okd} κ bid now sched st eqsl) hW)
+  wrap≤ : nestB (sizeᵉ e) Wd U (0 + nestDᵉ d) (syncSizeᵉ d) ≤ W
+  wrap≤ = subst (λ w → slotWrapB e (Sched.slots sched) Wd w ≤ W) eqsl
+                (slotWrapB≤sum e (Sched.slots sched) Wd i)
   strat : suc (toℕ i) * W ≤ k * W
   strat = *-monoˡ-≤ W (<ᵇ⇒< (toℕ i) k ok)
   store≤ : storeNestMax sched st₁ ≤ pathNestD κ + storeNestMax sched st
   store≤ = ≤-trans (storeNestMax-register (toℕ i) κ sched
                      (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
                    (m⊔n≤m+n (pathNestD κ) (storeNestMax sched st))
-  head≥ : pathNestD κ ≤ 2 ^ 1 * (pathNestD κ + 0)
+  head≥ : pathNestD κ ≤ nestB (sizeᵉ e) Wd U (pathNestD κ + 0) 1
   head≥ = ≤-trans (≤-reflexive (sym (+-identityʳ (pathNestD κ))))
-                  (m≤m+n (pathNestD κ + 0) (pathNestD κ + 0 + 0))
-  step : (2 ^ syncSizeᵉ d * (0 + nestDᵉ d) + toℕ i * W) + storeNestMax sched st₁
-           ≤ (2 ^ 1 * (pathNestD κ + 0) + k * W) + storeNestMax sched st
+                  (nestB-base (sizeᵉ e) Wd U (pathNestD κ + 0) 1)
+  step : (nestB (sizeᵉ e) Wd U (0 + nestDᵉ d) (syncSizeᵉ d) + toℕ i * W)
+           + storeNestMax sched st₁
+           ≤ (nestB (sizeᵉ e) Wd U (pathNestD κ + 0) 1 + k * W)
+               + storeNestMax sched st
   step =
     ≤-trans (+-mono-≤ (+-monoˡ-≤ (toℕ i * W) wrap≤) store≤)
     (≤-trans (+-monoˡ-≤ (pathNestD κ + storeNestMax sched st) strat)
     (≤-trans (≤-reflexive (sym (+-assoc (k * W) (pathNestD κ) (storeNestMax sched st))))
              (+-monoˡ-≤ (storeNestMax sched st)
                (≤-trans (+-monoʳ-≤ (k * W) head≥)
-                        (≤-reflexive (+-comm (k * W) (2 ^ 1 * (pathNestD κ + 0))))))))
-depthE-sighted g k (ofᵉ ts)           κ bid now sched st ok = z≤n
-depthE-sighted g k emptyᵉ             κ bid now sched st ok = z≤n
-depthE-sighted g k (deferᵉ b)         κ bid now sched st ok = z≤n
-depthE-sighted g0 k (μᵉ body)         κ bid now sched st ok = z≤n
+                        (≤-reflexive (+-comm (k * W)
+                          (nestB (sizeᵉ e) Wd U (pathNestD κ + 0) 1)))))))
+depthE-sighted g k Wd (ofᵉ ts)           κ bid now sched st ok hW = z≤n
+depthE-sighted g k Wd emptyᵉ             κ bid now sched st ok hW = z≤n
+depthE-sighted g k Wd (deferᵉ b)         κ bid now sched st ok hW = z≤n
+depthE-sighted g0 k Wd (μᵉ body)         κ bid now sched st ok hW = z≤n
 -- THE UNFOLD, which is the one descent whose subject is not a subterm
 -- -- and it costs nothing, because both readings of the measure are
 -- INVARIANT under the substitution: the copy a `μ` plants carries the
 -- body's own nesting and the body's own sync size, and the head it
 -- replaces charged a `suc` on top of each.
-depthE-sighted {e = e} (gs g) k (μᵉ body) κ bid now sched st ok =
-  ≤-trans (depthE-sighted g k (unfoldμ body) κ bid now sched st
-             (ib-unfoldμ k body ok))
+depthE-sighted {e = e} (gs g) k Wd (μᵉ body) κ bid now sched st ok hW =
+  ≤-trans (depthE-sighted g k Wd (unfoldμ body) κ bid now sched st
+             (ib-unfoldμ k body ok)
+             (≤-trans (descW-mu g body κ bid now sched st) hW))
           (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
-            (+-monoˡ-≤ (k * slotWrapSum (Sched.slots sched))
-              (*-mono-≤ (^-monoʳ-≤ 2 (≤-trans (≤-reflexive (syncSize-unfoldμ body))
-                                              (n≤1+n _)))
-                        (+-monoʳ-≤ (pathNestD κ)
-                                   (≤-reflexive (nestD-unfoldμ body)))))
+            (fitB-mono e (Sched.slots sched) k ≤-refl
+              (+-monoʳ-≤ (pathNestD κ) (≤-reflexive (nestD-unfoldμ body)))
+              (≤-trans (≤-reflexive (syncSize-unfoldμ body)) (n≤1+n _)))
             ≤-refl)
-depthE-sighted g k (varᵉ ())        κ bid now sched st ok
+depthE-sighted g k Wd (varᵉ ())        κ bid now sched st ok hW
 -- THE SCAN, whose descent half IS the trade and whose store transport is
 -- what the scale factor was minted for.  The trade is generous -- the
 -- seed's and the function's nesting come off the subject and only the
@@ -576,15 +580,16 @@ depthE-sighted g k (varᵉ ())        κ bid now sched st ok
 --   term that charges two, with the gap growing as the occurrence
 --   count.  `Refuted.Apply-Fn-Nest` is the same failure with an
 --   explicit payload rather than an empty environment.
-depthE-sighted {e = e} g k (scanᵉ f z b) κ bid now sched st ok =
-  ⊔-lub (≤-trans (depthE-sighted g k b (scan-f f nid ↠ κ) bid now sched₁ st₀
+depthE-sighted {e = e} g k Wd (scanᵉ f z b) κ bid now sched st ok hW =
+  ⊔-lub (≤-trans (depthE-sighted g k Wd b (scan-f f nid ↠ κ) bid now sched₁ st₀
                     (∧ʳ (inputsBelowᵗ k z) (inputsBelowᵉ k b)
                         (∧ʳ (inputsBelowᵗ k f)
-                            (inputsBelowᵗ k z ∧ inputsBelowᵉ k b) ok)))
-                 (sightCeil-sum (sizeᵉ e) (2 ^ syncSizeᵉ b * A + k * W)
+                            (inputsBelowᵗ k z ∧ inputsBelowᵉ k b) ok))
+                    (≤-trans (descW-scan g f z b κ bid now sched st) hW))
+                 (sightCeil-sum (sizeᵉ e) (fitB e sl k Wd A (syncSizeᵉ b))
                    (storeNestMax sched₁ st₀)
-                   (2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b)) + k * W) sR
-                   (nestUnit e (Sched.slots sched)) hsum′))
+                   (fitB e sl k Wd (pathNestD κ + nestDᵉ (scanᵉ f z b)) K) sR
+                   (nestUnit e (Sched.slots sched)) hsum))
         (≤-trans (≤-reflexive (burst-flat g bid now (scan-f f nid) κ
                                  (λ _ _ _ _ → refl)
                                  (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)))) z≤n)
@@ -594,7 +599,7 @@ depthE-sighted {e = e} g k (scanᵉ f z b) κ bid now sched st ok =
   st₀    = installNode nid (scan-st (evalTm z)) st
   r      = subscribeE g b (scan-f f nid ↠ κ) bid now sched₁ st₀
   K      = syncSizeᵉ (scanᵉ f z b)
-  W      = slotWrapSum (Sched.slots sched)
+  sl     = Sched.slots sched
   A      = nestDᵗ f + pathNestD κ + nestDᵉ b
   NV     = nodeNest (scan-st (evalTm z))
   sR     = storeNestMax sched st
@@ -605,52 +610,47 @@ depthE-sighted {e = e} g k (scanᵉ f z b) κ bid now sched st ok =
   b≤K = ≤-trans (m≤n+m (syncSizeᵉ b) _) (n≤1+n _)
   hNV : NV ≤ 2 ^ K * nestDᵗ z
   hNV = ≤-trans (evalTm-nest-sync z) (*-monoˡ-≤ (nestDᵗ z) (^-monoʳ-≤ 2 z≤K))
-  eqv : 2 ^ K * A + 2 ^ K * nestDᵗ z ≡ 2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))
-  eqv = trans (sym (*-distribˡ-+ (2 ^ K) A (nestDᵗ z)))
-              (cong (2 ^ K *_)
-                (solve 4 (λ x y w v → (x :+ y :+ w) :+ v := y :+ (v :+ x :+ w))
-                       refl (nestDᵗ f) (pathNestD κ) (nestDᵉ b) (nestDᵗ z)))
-  hv : 2 ^ syncSizeᵉ b * A + NV
-         ≤ 2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))
-  hv = ≤-trans (+-mono-≤ (*-monoˡ-≤ A (^-monoʳ-≤ 2 b≤K)) hNV)
-               (≤-reflexive eqv)
-  hsum : 2 ^ syncSizeᵉ b * (pathNestD (scan-f f nid ↠ κ) + nestDᵉ b)
-           + storeNestMax sched₁ st₀
-           ≤ 2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b)) + sR
+  eqv : A + nestDᵗ z ≡ pathNestD κ + nestDᵉ (scanᵉ f z b)
+  eqv = solve 4 (λ x y w v → (x :+ y :+ w) :+ v := y :+ (v :+ x :+ w))
+               refl (nestDᵗ f) (pathNestD κ) (nestDᵉ b) (nestDᵗ z)
+  hv : fitB e sl k Wd A (syncSizeᵉ b) + NV
+         ≤ fitB e sl k Wd (pathNestD κ + nestDᵉ (scanᵉ f z b)) K
+  hv = ≤-trans (+-monoʳ-≤ (fitB e sl k Wd A (syncSizeᵉ b)) hNV)
+               (≤-trans (fitB-add e sl k Wd A (syncSizeᵉ b) (nestDᵗ z) K b≤K)
+                        (fitB-mono e sl k ≤-refl (≤-reflexive eqv) ≤-refl))
+  hsum : fitB e sl k Wd A (syncSizeᵉ b) + storeNestMax sched₁ st₀
+           ≤ fitB e sl k Wd (pathNestD κ + nestDᵉ (scanᵉ f z b)) K + sR
   hsum =
-    ≤-trans (+-monoʳ-≤ (2 ^ syncSizeᵉ b * A)
+    ≤-trans (+-monoʳ-≤ (fitB e sl k Wd A (syncSizeᵉ b))
               (≤-trans (storeNestMax-install nid (scan-st (evalTm z)) sched₁ st)
                        (m⊔n≤m+n NV sR)))
-            (≤-trans (≤-reflexive (sym (+-assoc (2 ^ syncSizeᵉ b * A) NV sR)))
+            (≤-trans (≤-reflexive
+                       (sym (+-assoc (fitB e sl k Wd A (syncSizeᵉ b)) NV sR)))
                      (+-monoˡ-≤ sR hv))
-  hsum′ : (2 ^ syncSizeᵉ b * (pathNestD (scan-f f nid ↠ κ) + nestDᵉ b) + k * W)
-            + storeNestMax sched₁ st₀
-            ≤ (2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b)) + k * W) + sR
-  hsum′ = shuffle (2 ^ syncSizeᵉ b * (pathNestD (scan-f f nid ↠ κ) + nestDᵉ b))
-                  (k * W) (storeNestMax sched₁ st₀)
-                  (2 ^ K * (pathNestD κ + nestDᵉ (scanᵉ f z b))) sR hsum
-depthE-sighted g k (mergeAllᵉ lim b) κ bid now sched st ok =
-  sight-all g k mergeAllᵒ lim b κ bid now sched st ok
-depthE-sighted g k (switchAllᵉ b)   κ bid now sched st ok =
-  sight-all g k switchᵒ nothing b κ bid now sched st ok
-depthE-sighted g k (exhaustAllᵉ b)  κ bid now sched st ok =
-  sight-all g k exhaustᵒ nothing b κ bid now sched st ok
+depthE-sighted g k Wd (mergeAllᵉ lim b) κ bid now sched st ok hW =
+  sight-all g k Wd mergeAllᵒ lim b κ bid now sched st ok
+    (≤-trans (descW-merge g lim b κ bid now sched st) hW)
+depthE-sighted g k Wd (switchAllᵉ b)   κ bid now sched st ok hW =
+  sight-all g k Wd switchᵒ nothing b κ bid now sched st ok
+    (≤-trans (descW-switch g b κ bid now sched st) hW)
+depthE-sighted g k Wd (exhaustAllᵉ b)  κ bid now sched st ok hW =
+  sight-all g k Wd exhaustᵒ nothing b κ bid now sched st ok
+    (≤-trans (descW-exhaust g b κ bid now sched st) hW)
 -- THE TAKE, whose descent half costs nothing on either side of the
 -- trade: a take charges the path nothing and drops the subject nothing,
 -- and the node it installs carries no nesting at all, so the reading the
 -- recursive call gets is the reading this call was handed.  What is left
 -- of the clause is its burst.
-depthE-sighted {e = e} g k (takeᵉ c b) κ bid now sched st ok
-  with evalTm c
+depthE-sighted {e = e} g k Wd (takeᵉ c b) κ bid now sched st ok hW
+  with evalTm c in eqc
 ... | zero  = z≤n
 ... | suc m =
-  ⊔-lub (≤-trans (depthE-sighted g k b (take-f nid ↠ κ) bid now sched₁ st₀
-                    (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok))
+  ⊔-lub (≤-trans (depthE-sighted g k Wd b (take-f nid ↠ κ) bid now sched₁ st₀
+                    (∧ʳ (inputsBelowᵗ k c) (inputsBelowᵉ k b) ok)
+                    (≤-trans (descW-take g c b κ bid now sched st m eqc) hW))
                  (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
-                   (+-monoˡ-≤ (k * slotWrapSum (Sched.slots sched))
-                     (*-monoˡ-≤ (pathNestD κ + nestDᵉ b)
-                       (^-monoʳ-≤ 2 (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ c))
-                                             (n≤1+n _)))))
+                   (fitB-mono e (Sched.slots sched) k ≤-refl ≤-refl
+                     (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ c)) (n≤1+n _)))
                    (≤-trans (storeNestMax-install nid (take-st (suc m)) sched₁ st)
                             (⊔-lub z≤n ≤-refl))))
         (≤-trans (≤-reflexive (burst-flat g bid now (take-f nid) κ
@@ -667,14 +667,14 @@ depthE-sighted {e = e} g k (takeᵉ c b) κ bid now sched st ok
 -- is the state this call was handed.  The whole step is the charge
 -- moving off the subject and onto the frame, which is an associativity
 -- and a commutativity on the measure and nothing else.
-depthE-sighted {e = e} g k (mapᵉ f b) κ bid now sched st ok =
-  ⊔-lub (≤-trans (depthE-sighted g k b (map-f f ↠ κ) bid now sched st
-                    (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok))
+depthE-sighted {e = e} g k Wd (mapᵉ f b) κ bid now sched st ok hW =
+  ⊔-lub (≤-trans (depthE-sighted g k Wd b (map-f f ↠ κ) bid now sched st
+                    (∧ʳ (inputsBelowᵗ k f) (inputsBelowᵉ k b) ok)
+                    (≤-trans (descW-map g f b κ bid now sched st) hW))
                  (sightCeil-mono (sizeᵉ e) (nestUnit e (Sched.slots sched))
-                   (+-monoˡ-≤ (k * slotWrapSum (Sched.slots sched))
-                     (*-mono-≤ (^-monoʳ-≤ 2 (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f))
-                                                     (n≤1+n _)))
-                               (≤-reflexive (trade f b κ))))
+                   (fitB-mono e (Sched.slots sched) k ≤-refl
+                     (≤-reflexive (trade f b κ))
+                     (≤-trans (m≤n+m (syncSizeᵉ b) (syncSizeᵗ f)) (n≤1+n _)))
                    ≤-refl))
         (≤-trans (≤-reflexive (burst-flat g bid now (map-f f) κ
                                  (λ _ _ _ _ → refl)
@@ -694,12 +694,12 @@ depthE-sighted {e = e} g k (mapᵉ f b) κ bid now sched st ok =
 -- is left entirely unspent by it.  What the assembly does NOT close is
 -- the burst: a `thru-outer` frame is the one frame that walks, and the
 -- walk is where the drain lives.
-sight-all {e = e} {u = u} g k op lim b κ bid now sched st ok = ⊔-lub sub drn
+sight-all {e = e} {u = u} g k Wd op lim b κ bid now sched st ok hd = ⊔-lub sub drn
   where
   nid    = proj₁ (mintNode sched)
   sched₁ = proj₂ (mintNode sched)
   st₀    = installNode nid (allFresh u op lim) st
-  W      = slotWrapSum (Sched.slots sched)
+  sl     = Sched.slots sched
   S      = syncSizeᵉ b
   A      = pathNestD κ + suc (nestDᵉ b)
   sR     = storeNestMax sched st
@@ -708,22 +708,22 @@ sight-all {e = e} {u = u} g k op lim b κ bid now sched st ok = ⊔-lub sub drn
   store≤ = ≤-trans (storeNestMax-install nid (allFresh u op lim) sched₁ st)
                    (≤-reflexive (cong (_⊔ sR) (allFresh-nest u op lim)))
 
-  coef : 2 ^ S * (suc (pathNestD κ) + nestDᵉ b) ≤ 2 ^ suc S * A
-  coef = ≤-trans (≤-reflexive (cong (2 ^ S *_) (sym (+-suc (pathNestD κ) (nestDᵉ b)))))
-                 (*-monoˡ-≤ A (^-monoʳ-≤ 2 (n≤1+n S)))
+  coef : fitB e sl k Wd (suc (pathNestD κ) + nestDᵉ b) S
+           ≤ fitB e sl k Wd A (suc S)
+  coef = fitB-mono e sl k ≤-refl
+           (≤-reflexive (sym (+-suc (pathNestD κ) (nestDᵉ b)))) (n≤1+n S)
 
-  hsum : (2 ^ S * (suc (pathNestD κ) + nestDᵉ b) + k * W) + storeNestMax sched₁ st₀
-           ≤ (2 ^ suc S * A + k * W) + sR
-  hsum = +-mono-≤ (+-monoˡ-≤ (k * W) coef) store≤
+  hsum : fitB e sl k Wd (suc (pathNestD κ) + nestDᵉ b) S + storeNestMax sched₁ st₀
+           ≤ fitB e sl k Wd A (suc S) + sR
+  hsum = +-mono-≤ coef store≤
 
   sub : depthE g b (thru-outer op nid ↠ κ) bid now sched₁ st₀
-          ≤ sightCeil (sizeᵉ e) (2 ^ suc S * A + k * W) sR
-              (nestUnit e (Sched.slots sched))
-  sub = ≤-trans (depthE-sighted g k b (thru-outer op nid ↠ κ) bid now sched₁ st₀ ok)
+          ≤ sightCeil (sizeᵉ e) (fitB e sl k Wd A (suc S)) sR (nestUnit e sl)
+  sub = ≤-trans (depthE-sighted g k Wd b (thru-outer op nid ↠ κ) bid now
+                   sched₁ st₀ ok hd)
                 (sightCeil-sum (sizeᵉ e)
-                   (2 ^ S * (suc (pathNestD κ) + nestDᵉ b) + k * W)
+                   (fitB e sl k Wd (suc (pathNestD κ) + nestDᵉ b) S)
                    (storeNestMax sched₁ st₀)
-                   (2 ^ suc S * A + k * W) sR
-                   (nestUnit e (Sched.slots sched)) hsum)
+                   (fitB e sl k Wd A (suc S)) sR (nestUnit e sl) hsum)
 
-  drn = sight-all-drain g k op lim b κ bid now sched st ok
+  drn = sight-all-drain g k Wd op lim b κ bid now sched st ok hd

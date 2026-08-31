@@ -1,11 +1,11 @@
--- THE PROPOSED REPAIR, RUN AGAINST THE FAMILY THAT KILLED THE CURRENT
--- FORM.  The entry fold prices a subscription's emitted values at a
--- tower over `syncSizeᵉ`, and that exponent is blind to a script: the
--- refutation drives a doubling `scanᵉ` over a cold script and crosses
--- the grant between twelve and thirteen script values.  The repair
--- named in the statement's own header moves the fold into the `nestB`
--- currency, whose exponent carries a WIDTH beside the size cap.  These
--- rows ask whether that width closes the crossing.
+-- THE ENTRY FOLD'S GRANT, RUN AGAINST THE FAMILY THAT KILLS ITS
+-- PREDECESSOR.  A grant read as a tower over `syncSizeᵉ` alone is
+-- blind to a script: a doubling `scanᵉ` over a cold script crosses
+-- such a grant between twelve and thirteen script values, and both
+-- forms are computed here so the crossing is a column rather than a
+-- claim.  The fold's own currency is `nestB`, whose exponent carries a
+-- WIDTH beside the size base, and these rows ask whether that width
+-- closes the crossing.
 --
 -- THE WIDTH IS READ AT THE BURST AND NOT AT `descW`, WHICH IS WHAT
 -- MAKES THE ROWS LOAD-BEARING RATHER THAN UNFALSIFIABLE.  `descW` is
@@ -19,9 +19,9 @@
 -- AND THE GRANT IS WRITTEN OUT RATHER THAN CALLED, because `nestB` is
 -- sealed for the reason every caps family is.  The expression below is
 -- its body at a size base of one, which is the strongest reading: the
--- family is monotone in the base, so a consumer at any real cap widens
--- into these rows rather than out of them.
--- TARGET: subscribeE-fit @48e936
+-- family is monotone in the base, so the run's own size -- which is
+-- what the statement takes -- widens into these rows, never out.
+-- TARGET: subscribeE-fit @d8da3b
 module Probed.Sight-Fit-Width where
 
 open import Data.Bool using (Bool; true; false)
@@ -35,7 +35,7 @@ open import Rx.Exp using (Val; natᵗ; obs; syncSizeᵉ)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
   using (Stream; Path; splitEvents; splitBurst; subscribeE; root; sched-init; st-init)
-open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum; nestUnit)
+open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum; slotWrapBSum; nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
 open import Refuted.Demand-Programs using (Γ₂)
 open import Refuted.Scan-Burst-Nest using (prog; slots; gas)
@@ -70,7 +70,7 @@ grantNew N =
   ((2 ^ 1) ^ suc (wid N)) ^ syncSizeᵉ prog
     * ((pathNestD κ₀ + nestDᵉ prog)
         + suc (syncSizeᵉ prog) * nestUnit prog (slots N))
-  + 2 * slotWrapSum (slots N)
+  + 2 * slotWrapBSum prog (slots N) (wid N)
 
 -- THE THREE FIGURES THE ROWS TURN ON, and the exponent is the finding:
 -- the delivered side doubles per script value while `syncSizeᵉ` does

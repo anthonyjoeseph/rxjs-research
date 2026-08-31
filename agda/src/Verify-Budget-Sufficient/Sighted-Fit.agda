@@ -7,7 +7,7 @@ module Verify-Budget-Sufficient.Sighted-Fit where
 
 open import Data.Bool using (Bool; T; true; _∧_)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; _+_; _*_; _^_; _≤_)
+open import Data.Nat using (ℕ; _+_; _*_; _≤_)
 open import Data.Nat.Properties using (≤-trans; +-monoˡ-≤)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
@@ -15,12 +15,12 @@ open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import Rx.Prim using (Gas; Id; Tick; InstEmit; InstEvent; init; value; close; handoff; complete)
-open import Rx.Exp using (Ty; Ctx; Closed; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs;
-  inputsBelowᵉ; syncSizeᵉ)
+open import Rx.Exp using (Ty; Ctx; Closed; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ)
 open import Rx.Slots using (Slots)
-open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Stream; subscribeE; splitEvents)
-open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum)
+open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum; fitG)
+open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 
 -- WHICH INPUTS A STORED VALUE MAY NAME, charged through its type
 -- exactly as its nesting is, and for the same reason: `Val` is a
@@ -113,33 +113,29 @@ valsFitG-le k sl G G′ P P′ t (o ∷ os) hp hg (h , hs) =
 -- a weaker hypothesis there, and the ceiling both are spent under
 -- already has the same summand.
 --
--- AND THE PAYLOAD'S SIZE IS THE WRONG EXPONENT: THE STATEMENT AS
--- WRITTEN IS FALSE.  A tower over program syntax is owed here rather
--- than per arrival -- that much survives -- but `syncSizeᵉ` reads ONE
--- at a scripted input, so a cold script's synchronous burst is a width
--- the exponent cannot see, while a `scanᵉ` over that input applies its
--- step function once per script value.  Point a step function at its
+-- WHY THE GRANT IS A `nestB` AGAINST A WIDTH, AND NOT A TOWER OVER
+-- THE PAYLOAD'S SIZE ALONE.  `syncSizeᵉ` reads ONE at a scripted
+-- input, so a cold script's synchronous burst is a width no exponent
+-- over program syntax can see, while a `scanᵉ` over that input applies
+-- its step function once per script value -- point that step at its
 -- accumulator in both additive slots an inner `scanᵉ` offers and one
--- application doubles the delivered nesting: the left side is a power
--- of two in the SCRIPT's length and the grant is a constant.
+-- application doubles the delivered nesting.  A larger constant does
+-- not reach it and neither does the telescope summand, since a script
+-- is charged to neither.  `nestB` is the currency that sees a burst:
+-- its exponent carries a WIDTH beside the size base, and the caps face
+-- states its own subscription-nesting results in it against exactly
+-- this `descW` bound, so the shape here is its neighbours' rather than
+-- an invention.
 --
--- WHAT THE REPAIR IS.  Not a larger constant and not the telescope
--- summand, since a script is charged to neither -- `slotWrapSum` reads
--- nought at a scripted slot.  The currency that already sees a burst
--- is `nestB`, whose exponent carries a WIDTH beside the size cap, and
--- the caps face states its own two subscription-nesting results in it
--- against a `descW` bound.  So the fit is restated in that currency
--- with a width parameter, which is the shape its neighbours already
--- have rather than a new invention.
---
--- REFUTED: `Refuted.Sight-Fit-Scan.scan-fit-absurd` is the one that
---   kills the statement above: a `scanᵉ` whose step doubles, over a
---   scripted slot, delivering `2 ^ N - 1` against a grant of four
---   thousand and ninety-six at every N.  It is a CROSSING and not a
---   scale error -- twelve script values hold at 4095 against 4096,
---   tight to one, and thirteen fail at 8191 -- and the grant is the
---   same number in both rows, which is the finding.  Not covered: the
---   `mapᵉ` and `takeᵉ` frames, and any path but `root`.
+-- REFUTED: `Refuted.Sight-Fit-Scan.scan-fit-absurd` kills the
+--   width-free form -- a tower over `syncSizeᵉ` alone: a `scanᵉ` whose
+--   step doubles, over a scripted slot, delivering `2 ^ N - 1` against
+--   a grant of four thousand and ninety-six at every N.  It is a
+--   CROSSING and not a scale error -- twelve script values hold at
+--   4095 against 4096, tight to one, and thirteen fail at 8191 -- and
+--   the grant is the same number in both rows, which is the finding.
+--   Not covered: the `mapᵉ` and `takeᵉ` frames, and any path but
+--   `root`.
 -- REFUTED: `Refuted.Sight-All-Stream-Dup.sight-all-stream-dup-absurd`
 --   kills the arrival-tower fold at a flat telescope where the wrap is
 --   nought: sixteen against eighteen in the exponents, so a quarter of
@@ -154,12 +150,12 @@ valsFitG-le k sl G G′ P P′ t (o ∷ os) hp hg (h , hs) =
 --   those rows.  Not covered: the two heads other than `mergeAllᵒ`,
 --   any path other than the one the row subscribes under, and the
 --   store-growth conjuncts, which no row reads apart from the value one.
--- PROBED: `Probed.Sight-Fit-Width` runs the REPAIR against the family
---   that killed this form, at the script lengths the crossing is taken
---   at.  The old grant is reproduced holding at twelve and failing at
---   thirteen; the `nestB` grant at a size base of ONE -- the smallest
---   the family admits, so every real cap widens into the row -- holds
---   at twelve, thirteen and sixteen.  The width is read at the head's
+-- PROBED: `Probed.Sight-Fit-Width` runs this grant against the family
+--   that kills the width-free one, at the script lengths the crossing
+--   is taken at.  The width-free grant is reproduced holding at twelve
+--   and failing at thirteen; this one at a size base of ONE -- the
+--   smallest the family admits, so every real size widens into the
+--   row -- holds at twelve, thirteen and sixteen.  The width is read at the head's
 --   own BURST rather than at `descW`, which is sealed: the burst count
 --   is a join summand of every `descW` arm, so it is a lower bound and
 --   the row is the conservative one.  The delivered side doubles per
@@ -180,11 +176,11 @@ valsFitG-le k sl G G′ P P′ t (o ∷ os) hp hg (h , hs) =
 --   is the one shape the wrap summand exists for.
 postulate
   subscribeE-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (g : Gas) (k : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
+    (g : Gas) (k W : ℕ) (b : Closed Γ s) (κ : Path Γ s t)
     (bid : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     T (inputsBelowᵉ k b) →
+    descW g b κ bid now sched st ≤ W →
     StreamFitG k (Sched.slots sched)
-      (2 ^ syncSizeᵉ b * (pathNestD κ + nestDᵉ b)
-         + k * slotWrapSum (Sched.slots sched))
+      (fitG e (Sched.slots sched) k W κ b)
       (pathNestD κ) s
       (proj₁ (subscribeE g b κ bid now sched st))

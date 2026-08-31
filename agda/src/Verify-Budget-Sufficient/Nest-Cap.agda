@@ -24,7 +24,7 @@ module Verify-Budget-Sufficient.Nest-Cap where
 open import Data.Nat using (ℕ; suc; pred; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
-   +-monoʳ-≤; +-monoˡ-≤; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
+   +-monoʳ-≤; +-monoˡ-≤; +-assoc; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
    +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤;
    *-suc; *-comm; ^-*-assoc; ^-monoʳ-≤; ^-monoˡ-≤; +-comm; pred[n]≤n)
 open import Relation.Binary.PropositionalEquality
@@ -76,6 +76,55 @@ abstract
   nestB-monoS hS W U B m =
     *-monoˡ-≤ (B + suc m * U)
       (^-monoˡ-≤ m (^-monoˡ-≤ (suc W) (pow-mono-exp 2 (s≤s z≤n) hS)))
+
+  -- AND IN THE DESCENT'S OWN DEPTH, which is the summand a head moves
+  -- when it takes its child's reading onto its own path: the trade is
+  -- between the path and the subject and their SUM is what the grant
+  -- names, so a head that widens the sum widens nothing else.
+  nestB-monoB : ∀ (S W U : ℕ) {B B′ : ℕ} → B ≤ B′ → ∀ (m : ℕ) →
+    nestB S W U B m ≤ nestB S W U B′ m
+  nestB-monoB S W U hB m =
+    *-monoʳ-≤ (((2 ^ S) ^ suc W) ^ m) (+-monoˡ-≤ (suc m * U) hB)
+
+  -- AND IN THE WIDTH, which is the axis the whole currency is for.  A
+  -- burst is what a size class cannot see, so it sits in the exponent
+  -- and a wider reading is a WEAKER claim -- which is why a consumer
+  -- holding any bound on its own descent may widen into the grant
+  -- rather than having to hit it.
+  nestB-monoW : ∀ (S : ℕ) {W W′ : ℕ} → W ≤ W′ → ∀ (U B m : ℕ) →
+    nestB S W U B m ≤ nestB S W′ U B m
+  nestB-monoW S hW U B m =
+    *-monoˡ-≤ (B + suc m * U)
+      (^-monoˡ-≤ m (pow-mono-exp (2 ^ S) (1≤pow≤ 2 S (s≤s z≤n)) (s≤s hW)))
+
+  -- A LEVEL'S WORTH OF ROOM AT THE DEPTH THE GRANT IS OPENED AT, which
+  -- is what a head that STORES something built out of its own syntax
+  -- needs.  The stored thing is charged per occurrence -- a power of
+  -- two in the head's own sync size -- and the grant's per-level factor
+  -- is at least that power once the base is positive, so the whole
+  -- charge is bought by moving the depth up by what was stored.
+  nestB-add : ∀ (S W U B m z m′ : ℕ) → 1 ≤ S → m ≤ m′ →
+    nestB S W U B m + 2 ^ m′ * z ≤ nestB S W U (B + z) m′
+  nestB-add S W U B m z m′ hS hm =
+    ≤-trans (+-mono-≤ (nestB-mono S W U B hm) fac) (≤-reflexive gather)
+    where
+    F : ℕ
+    F = (2 ^ S) ^ suc W
+    2≤F : 2 ≤ F
+    2≤F = ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ 2)))
+                           (pow-mono-exp 2 (s≤s z≤n) hS))
+                  (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
+                           (*-monoʳ-≤ (2 ^ S) (1≤pow≤ (2 ^ S) W
+                              (1≤pow≤ 2 S (s≤s z≤n)))))
+    fac : 2 ^ m′ * z ≤ F ^ m′ * z
+    fac = *-monoˡ-≤ z (^-monoˡ-≤ m′ 2≤F)
+    gather : F ^ m′ * (B + suc m′ * U) + F ^ m′ * z
+               ≡ F ^ m′ * (B + z + suc m′ * U)
+    gather = trans (sym (*-distribˡ-+ (F ^ m′) (B + suc m′ * U) z))
+                   (cong (F ^ m′ *_)
+                     (trans (+-assoc B (suc m′ * U) z)
+                       (trans (cong (B +_) (+-comm (suc m′ * U) z))
+                              (sym (+-assoc B z (suc m′ * U))))))
 
   -- THE GRANT'S FACTOR, NAMED SEPARATELY BECAUSE THE FRAME LAYER
   -- SPENDS IT WITHOUT THE REST.  Once the descent has been flattened at

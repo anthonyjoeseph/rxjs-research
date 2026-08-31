@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ENTRY FOLD'S REPAIR IS MEASURED; NOW IT IS TYPED.**
-  `subscribeE-fit`'s tower over `syncSizeᵉ` is blind to a script, and
-  the `nestB` grant at a size base of one closes the crossing at the
-  very family that opened it — twelve, thirteen and sixteen script
-  values, the width read at the head's own burst so the row is the
-  conservative one. So the remaining work is the restatement and its
-  cascade: a named grant carrying the width, a `descW` premise on the
-  fit, and the thirty sites that spell the old tower out — the `*All`
-  entry's stream, fit and drain, the sighted ceiling they are read
-  under, and the bridge's own entry reading.
-
 - **the cascade's own descent, which is the tier's other risk and
   does not touch the queue at all** — `cascade-depth-sighted` prices a
   round's descent under its sighted nesting scaled by the program's
@@ -248,6 +237,16 @@ does not fit is a finding about the shared statement, not about the head.
   entry at that level, which is what lets the walk hand the drain a
   ceiling instead of asserting one.
 
+- **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
+  INSTANTIATED.** The fold's grant carries a width, so the bridge's own
+  root reading needs one: `entry-descW` bounds the entry descent by the
+  caps base's width coordinate, and `entry-fit≤exp` carries the whole
+  sighted ceiling at that width to `2 ^ (2 ^ cSize)`. The second has no
+  upper reading anywhere in the tree — `entryCeil` appears only as a
+  LOWER bound on the caps base — so the leg is to instantiate both at
+  the corpus the ceiling is already read at, and find out whether the
+  cap's own exponential has the room a tower in a width asks for.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
@@ -255,10 +254,13 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
   what is open.
-- **`subscribeE-fit`** (Sighted-Fit) — FALSITY, `REFUTED×3, PROBED×2`: what ANY
-  subscription's emitted VALUES cost. Refuted at a doubling `scanᵉ` over a
-  script — a crossing, 4095 against 4096 at twelve values and 8191 at thirteen
-  — so the exponent has to see an instant's width.
+- **`entry-fit≤exp`** (Caps-Bridge) — FALSITY, `RECOVERY`: the entry reading's
+  whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
+  `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
+  the cap has the room.
+- **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
+  width under the caps base's own width coordinate. Nothing has instantiated
+  it, and `descW` is sealed, so only the conclusion side is reachable.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
@@ -268,6 +270,10 @@ does not fit is a finding about the shared statement, not about the head.
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
   program's size. Both axes are now read at three instants and at the corner
   where they compound, and the margin WIDENS with the instant.
+- **`subscribeE-fit`** (Sighted-Fit) — DIFFICULTY, `REFUTED×3, PROBED×2`: what
+  ANY subscription's emitted VALUES cost, in the `nestB` currency against a
+  `descW` bound. The family that kills the width-free form holds here at and
+  past its crossing; every head but the `scanᵉ` one is uncovered.
 - **`sight-all-walk`** (Depth-Sighted) — DIFFICULTY, `PROBED`: the drain's WALK
   half, one leaf for all three `*All` heads — they delegate to the same family
   and wrap the subject in one level each. It reads the fit the fold carries,

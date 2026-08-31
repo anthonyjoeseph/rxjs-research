@@ -53,12 +53,12 @@ open import Data.Bool.ListAction using (any)
 open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
   m≤n⊔m; m≤m⊔n; m≤m+n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
-  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤)
+  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤; +-comm)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Exp using (Ctx; Closed; Ty; sizeᵗ; syncSizeᵉ; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Ty; sizeᵗ; sizeᵉ; syncSizeᵉ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId;
   NodeId; setNode; installNode;
@@ -72,9 +72,9 @@ open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Measures using (fᵢ≤sum-tab)
+open import Verify-Budget-Sufficient.Measures using (fᵢ≤sum-tab; sum-tab-mono; sizeᵉ-pos)
 open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; capsAt-⊑-suc)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base; nestB; nestB-mono; nestB-monoB; nestB-monoW; nestB-add)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; delSize-monoᶜ)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
@@ -260,10 +260,6 @@ slotWrap (shared d)   = 2 ^ syncSizeᵉ d * nestDᵉ d
 
 slotWrapSum : ∀ {n} {Γ : Ctx n} → Slots Γ → ℕ
 slotWrapSum {n = n} sl = sum (tabulate {n = n} (λ i → slotWrap (sl i)))
-
-slotWrap≤sum : ∀ {n} {Γ : Ctx n} (sl : Slots Γ) (i : Fin n) →
-  slotWrap (sl i) ≤ slotWrapSum sl
-slotWrap≤sum sl i = fᵢ≤sum-tab (λ j → slotWrap (sl j)) i
 
 nodeNest : ∀ {n} {Γ : Ctx n} → NodeState Γ → ℕ
 nodeNest (scan-st {t} v)    = nestDᵛ t v
@@ -504,6 +500,109 @@ storeNest-finish a sched st with Arrival.isLast a
 -- function is syntax from one of exactly those two places.
 nestUnit : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) → ℕ
 nestUnit e sl = suc (nestDᵉ e + slotsNestSum sl)
+
+-- WHAT A SHARED SLOT'S OWN SUBSCRIPTION COSTS, in the same currency
+-- the grant below is written in.  The additive reading beside it pays
+-- for an ARRIVAL that merely names the slot; this one pays for
+-- RUNNING the definition, which is a subscription like any other and
+-- so is priced like one.
+slotWrapB : ∀ {n} {Γ : Ctx n} {t} {j s} (e : Closed Γ t) (sl : Slots Γ)
+  (W : ℕ) → Slot Γ j s → ℕ
+slotWrapB e sl W (scripted _) = 0
+slotWrapB e sl W (shared d)   =
+  nestB (sizeᵉ e) W (nestUnit e sl) (nestDᵉ d) (syncSizeᵉ d)
+
+slotWrapBSum : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (W : ℕ) → ℕ
+slotWrapBSum {n = n} e sl W =
+  sum (tabulate {n = n} (λ i → slotWrapB e sl W (sl i)))
+
+slotWrapB≤sum : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (W : ℕ) (i : Fin n) → slotWrapB e sl W (sl i) ≤ slotWrapBSum e sl W
+slotWrapB≤sum e sl W i = fᵢ≤sum-tab (λ j → slotWrapB e sl W (sl j)) i
+
+slotWrapB-monoW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  {W W′ : ℕ} → W ≤ W′ → ∀ {j s} (x : Slot Γ j s) →
+  slotWrapB e sl W x ≤ slotWrapB e sl W′ x
+slotWrapB-monoW e sl hW (scripted _) = z≤n
+slotWrapB-monoW e sl hW (shared d)   =
+  nestB-monoW (sizeᵉ e) hW (nestUnit e sl) (nestDᵉ d) (syncSizeᵉ d)
+
+slotWrapBSum-monoW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  {W W′ : ℕ} → W ≤ W′ → slotWrapBSum e sl W ≤ slotWrapBSum e sl W′
+slotWrapBSum-monoW e sl hW =
+  sum-tab-mono (λ i → slotWrapB e sl _ (sl i)) (λ i → slotWrapB e sl _ (sl i))
+               (λ i → slotWrapB-monoW e sl hW (sl i))
+
+-- WHAT A SUBSCRIPTION'S EMITTED VALUES ARE READ AGAINST, and the
+-- exponent is the whole of why it is written in this currency rather
+-- than as a tower over the subject's own syntax.  A step function is
+-- written once and applied once per value of an instant, so the class
+-- that prices it has to see how WIDE an instant can be -- and program
+-- syntax cannot: a cold script is invisible to it, while a fold over
+-- that script applies its step once per script value.  `nestB` reads
+-- a width beside the size base, so the burst a subscription exhibits
+-- sits in the exponent where the doubling is.  The form the tower
+-- replaces is refuted in `Refuted.Sight-Fit-Scan`, and both grants are
+-- run side by side at that family's own script lengths in
+-- `Probed.Sight-Fit-Width`.
+--
+-- THE BASE IS THE PROGRAM'S OWN SIZE, WHICH IS A RUN-SIDE QUANTITY AND
+-- NOT A CAP.  The walk face states the same class at `Caps.cSize`, and
+-- this face reads no cap at all by design; the size is what every
+-- frame law here needs a level of, since a head is at least one node
+-- bigger than the function it installs, and the bridge that meets the
+-- caps face crosses the two bases by monotonicity alone.
+--
+-- AND THE THREE QUANTITIES ARE NAMED SEPARATELY FROM THE TERM THEY ARE
+-- READ OFF.  Every descent TRADES between the path and the subject, so
+-- their sum is one number and no consumer ever moves them apart; and a
+-- head's own reading differs from its child's in the sum, the burst and
+-- the syntax INDEPENDENTLY -- a `*All` moves its wrap onto the path and
+-- says nothing about the child's exponent.  A form taking a path and a
+-- term can only be widened by exhibiting another path and another term,
+-- which the heads that need it do not have.
+fitB : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (k W B m : ℕ) → ℕ
+fitB e sl k W B m =
+  nestB (sizeᵉ e) W (nestUnit e sl) B m + k * slotWrapBSum e sl W
+
+fitG : ∀ {n} {Γ : Ctx n} {t u} (e : Closed Γ t) (sl : Slots Γ)
+  (k W : ℕ) (κ : Path Γ u t) (b : Closed Γ u) → ℕ
+fitG e sl k W κ b =
+  fitB e sl k W (pathNestD κ + nestDᵉ b) (syncSizeᵉ b)
+
+-- AND EVERY DESCENT WIDENS IT ON THOSE THREE AXES AND NO OTHER.
+fitB-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (k : ℕ) {W W′ B B′ m m′ : ℕ} → W ≤ W′ → B ≤ B′ → m ≤ m′ →
+  fitB e sl k W B m ≤ fitB e sl k W′ B′ m′
+fitB-mono e sl k {W} {W′} {B} {B′} {m} hW hB hm =
+  +-mono-≤
+    (≤-trans (nestB-monoW (sizeᵉ e) hW (nestUnit e sl) B m)
+      (≤-trans (nestB-monoB (sizeᵉ e) W′ (nestUnit e sl) hB m)
+               (nestB-mono (sizeᵉ e) W′ (nestUnit e sl) B′ hm)))
+    (*-monoʳ-≤ k (slotWrapBSum-monoW e sl hW))
+
+-- AND A HEAD THAT STORES SOMETHING BUILT OUT OF ITS OWN SYNTAX PAYS
+-- FOR IT BY MOVING THE DEPTH UP, which is the one widening that is not
+-- pure monotonicity: the stored thing is charged per occurrence, and a
+-- level of the grant's own factor is what that costs.
+fitB-add : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (k W B m z m′ : ℕ) → m ≤ m′ →
+  fitB e sl k W B m + 2 ^ m′ * z ≤ fitB e sl k W (B + z) m′
+fitB-add e sl k W B m z m′ hm =
+  ≤-trans (≤-reflexive rearr)
+          (+-monoˡ-≤ (k * slotWrapBSum e sl W)
+            (nestB-add (sizeᵉ e) W (nestUnit e sl) B m z m′ (sizeᵉ-pos e) hm))
+  where
+  N : ℕ
+  N = nestB (sizeᵉ e) W (nestUnit e sl) B m
+  KS : ℕ
+  KS = k * slotWrapBSum e sl W
+  rearr : (N + KS) + 2 ^ m′ * z ≡ (N + 2 ^ m′ * z) + KS
+  rearr = trans (+-assoc N KS (2 ^ m′ * z))
+                (trans (cong (N +_) (+-comm KS (2 ^ m′ * z)))
+                       (sym (+-assoc N (2 ^ m′ * z) KS)))
 
 -- THE SIGHTED DESCENT CEILING: what a sweep can actually SEE -- the
 -- payload it carries, the store it starts from and the program's own

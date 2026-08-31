@@ -32,8 +32,8 @@ module Verify-Budget-Sufficient.Caps-Bridge where
 open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n; *-monoʳ-≤; +-mono-≤;
-  +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n;
+  *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; foldr)
@@ -88,7 +88,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeGo-nest; nestCap-sight-scaled≤exp; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
+  (caps-tick; cascade-depth-capsH; cascadeGo-nest; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
   chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
@@ -101,7 +101,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Depth using (depthE)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (slotsNestSum; slotWrapSum; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro;
+  (slotsNestSum; fitG; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro;
   nestCapAt-suc; nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch;
   nestUnit; nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax;
   storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
@@ -125,6 +125,8 @@ open import Verify-Budget-Sufficient.Psi-Split using
 -- its sole consumer.
 open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
+open import Verify-Budget-Sufficient.Nest-Burst using (descW)
+open import Rx.Frame-Width using (entryCeil)
 open import Rx.Inputs-Below using (ib-topᵉ)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
@@ -1485,60 +1487,71 @@ abstract
 -- AND THE ENTRY IS THAT AT `root`, WHERE THE PATH CHARGES NOTHING, so
 -- the two readings of the subject term are the same term and the
 -- application needs no arithmetic between them.
+-- AND THE WIDTH THE ENTRY IS READ AT IS THE ONE THE CAPS RECURRENCE
+-- STARTS FROM, which is what makes this a leaf rather than an
+-- invention.  The sighted fold's grant carries a burst width in its
+-- exponent, so the root call has to name one; `capsBase` already picks
+-- `suc (entryCeil n ins e)` for its own width coordinate, and the
+-- entry cap's lower bound on the width is stated against exactly that
+-- number.  What is owed here is that the SEMANTIC widest burst under
+-- the root subscribe sits under that syntactic ceiling.
+postulate
+  entry-descW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    descW (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+      ≤ suc (entryCeil n ins e)
+
 depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-    ≤ sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e + n * slotWrapSum ins)
+    ≤ sightCeil (sizeᵉ e) (fitG e ins n (suc (entryCeil n ins e)) root e)
                 (storeNestMax (sched-init e ins) (st-init e))
                 (nestUnit e ins)
 depthE-sighted-root {n = n} e ins =
-  depthE-sighted (budgetAt e ins 0) n e root 0 0 (sched-init e ins) (st-init e)
-                 (ib-topᵉ e)
+  depthE-sighted (budgetAt e ins 0) n (suc (entryCeil n ins e)) e root 0 0
+                 (sched-init e ins) (st-init e) (ib-topᵉ e) (entry-descW e ins)
 
 -- THE ENTRY CEILING AGAINST THE ENTRY CAP'S SIZE, and it is the
 -- delivery side's leaf read at instant zero rather than a statement of
--- its own.  All three of the ceiling's summands are the nesting cap at
--- that instant: the program's nesting and the slot vocabulary's are
--- both summands of the wrap unit, and the unit IS the cap there.
+-- its own.  All three of the ceiling's summands are read off the
+-- vocabulary: the program's nesting and the slot telescope's are both
+-- summands of the wrap unit, and the initial store IS the vocabulary,
+-- which is what makes the whole comparison syntactic.  At every later
+-- instant the store is whatever the run has built and the two sides are
+-- related only through an invariant, so the anchor is the one place
+-- this can be paid at all.
 --
--- AND THIS IS WHY THE ANCHOR IS THE PLACE THE COMPARISON IS PAID.  At
--- every later instant the store is whatever the run has built, so the
--- two sides are related only through an invariant.  Here there is no
--- run yet: the store is the vocabulary, which is what the initial
--- store's bound establishes and what makes the whole comparison
--- syntactic.
+-- WHAT THE WIDTH COSTS IS THE TOP OF THE LADDER, AND ONLY THE TOP.
+-- The fold's grant now doubles once per unit of program size per unit
+-- of BURST WIDTH, so the exponent carries `entryCeil` -- a syntactic
+-- ceiling with no upper reading anywhere in this tree, only the lower
+-- bound the caps base is built from.  The entry cap has room for a
+-- polynomial in its own size and a tower is not one, so the summands
+-- against the cap are still assembled here and the comparison against
+-- the cap's exponential is what is owed.
+-- RECOVERY: `git show e2b61e5:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda`
+--   restores the five-powers argument the leaf below supersedes --
+--   `nestCap-sight-scaled≤exp`, `slotWrapSum≤size`, `slotWrap≤size` --
+--   which is the ladder from a sum of vocabulary readings to
+--   `2 ^ (2 ^ cSize)` and transfers whole once the exponent is bounded.
+postulate
+  entry-fit≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+    suc (sizeᵉ e) * suc (fitG e ins n (suc (entryCeil n ins e)) root e
+                          + nestCapAt e ins 0 + nestUnit e ins)
+      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
+
 sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e + n * slotWrapSum ins)
+  sightCeil (sizeᵉ e) (fitG e ins n (suc (entryCeil n ins e)) root e)
             (storeNestMax (sched-init e ins) (st-init e))
             (nestUnit e ins)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
 sight-root≤exp {n = n} e ins =
-  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤C′))
-          (nestCap-sight-scaled≤exp e ins)
+  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e))
+            (s≤s (+-monoˡ-≤ (nestUnit e ins)
+                   (+-monoʳ-≤ (fitG e ins n (suc (entryCeil n ins e)) root e) hs))))
+          (entry-fit≤exp e ins)
   where
-  C = nestCapAt e ins 0
-  K = syncSizeᵉ e
-  hu : nestUnit e ins ≤ C
-  hu = ≤-reflexive (sym (nestCapAt-0 e ins))
-  hv₀ : nestDᵉ e ≤ C
-  hv₀ = ≤-trans (≤-trans (m≤m+n (nestDᵉ e) (slotsNestSum ins)) (n≤1+n _)) hu
-  hv : 2 ^ K * nestDᵉ e ≤ 2 ^ K * C
-  hv = *-monoʳ-≤ (2 ^ K) hv₀
-  hs : storeNestMax (sched-init e ins) (st-init e) ≤ C
-  hs = ≤-trans (init-storeNest e ins) hu
-  eq : 2 ^ K * C + C + C ≡ (2 ^ K + 2) * C
-  eq = solve 2 (λ k c → k :* c :+ c :+ c := (k :+ con 2) :* c) refl (2 ^ K) C
-  sum≤C : 2 ^ K * nestDᵉ e + storeNestMax (sched-init e ins) (st-init e)
-            + nestUnit e ins ≤ (2 ^ K + 2) * C
-  sum≤C = ≤-trans (+-mono-≤ (+-mono-≤ hv hs) hu) (≤-reflexive eq)
-  W = n * slotWrapSum ins
-  shuffle : ∀ (a w s u : ℕ) → (a + w) + s + u ≡ (a + s + u) + w
-  shuffle = solve 4 (λ a w s u → ((a :+ w) :+ s) :+ u := ((a :+ s) :+ u) :+ w) refl
-  sum≤C′ : (2 ^ K * nestDᵉ e + W) + storeNestMax (sched-init e ins) (st-init e)
-             + nestUnit e ins ≤ (2 ^ K + 2) * C + W
-  sum≤C′ = ≤-trans (≤-reflexive (shuffle (2 ^ K * nestDᵉ e) W
-                                  (storeNestMax (sched-init e ins) (st-init e))
-                                  (nestUnit e ins)))
-                   (+-monoˡ-≤ W sum≤C)
+  hs : storeNestMax (sched-init e ins) (st-init e) ≤ nestCapAt e ins 0
+  hs = ≤-trans (init-storeNest e ins)
+               (≤-reflexive (sym (nestCapAt-0 e ins)))
 
 -- AND THE ENTRY FUEL HAS THAT ROOM, so the entry's half of the height
 -- comparison is assembled rather than asserted, out of the same
@@ -1546,7 +1559,7 @@ sight-root≤exp {n = n} e ins =
 -- `frameBlowup` at the base story, and a blowup's size sits two
 -- exponentials under the story it was driven by.
 sight-root≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-  sightCeil (sizeᵉ e) (2 ^ syncSizeᵉ e * nestDᵉ e + n * slotWrapSum ins)
+  sightCeil (sizeᵉ e) (fitG e ins n (suc (entryCeil n ins e)) root e)
             (storeNestMax (sched-init e ins) (st-init e))
             (nestUnit e ins)
     ≤ capsH e ins 0

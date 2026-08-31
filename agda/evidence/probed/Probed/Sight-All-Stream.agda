@@ -16,10 +16,11 @@
 -- the charge that replaced it, which reads the arrival's DEPTH.
 --
 -- WHAT THE COLUMNS SAY, over four layers of that duplication: the
--- charge reads two, three, four, five while the grant's EXPONENT reads
--- sixteen, twenty-three, thirty, thirty-seven.  One side is linear in
--- the layer and the other is a tower over something linear in it, so
--- the margin is not a scale that a deeper family could close.
+-- charge reads two, three, four, five while the payload's sync size
+-- reads sixteen, twenty-three, thirty, thirty-seven -- and that figure
+-- is the grant's exponent scaled by the program's own size, so the
+-- grant is a tower over something linear in the layer while the charge
+-- is linear in it.  The margin is not a scale a deeper family closes.
 --
 -- THE PATH IS THE ONE THE PAYLOAD IS SUBSCRIBED UNDER, which is the
 -- frame the head has just pushed rather than the head's own outer
@@ -29,11 +30,12 @@
 --
 -- NOT COVERED: the two heads other than `mergeAllᵒ`; any outer path
 -- other than `root`, so the telescope summand is nought at every row
--- here and the wrap is nought with it; a telescope of more than one slot;
--- and an arrival that is a slot REFERENCE, which is the shape the wrap
+-- here; a telescope of more than one slot; a burst width above nought,
+-- which the grant is monotone in and so weakens out of these rows; and
+-- an arrival that is a slot REFERENCE, which is the shape the wrap
 -- summand exists for and which the consume's own probe carries.
 --
--- TARGET: subscribeE-fit @48e936
+-- TARGET: subscribeE-fit @d8da3b
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Sight-All-Stream where
 
@@ -51,13 +53,13 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Gas; g0; gasPad; InstEmit)
 open import Rx.Exp
   using (Ctx; Closed; Fn; Val; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂;
-         strmᵗ; varᵗ; syncSizeᵉ)
+         strmᵗ; varᵗ; syncSizeᵉ; sizeᵉ)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵛ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; root; _↠_; thru-outer; mergeAllᵒ;
          subscribeE; splitEvents; mintNode; installNode; sched-init; st-init)
-open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; allFresh; slotWrapSum)
+open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; allFresh; slotWrapSum; nestUnit)
 open import Verify-Budget-Sufficient.Sighted-Fit using (StreamFitG)
 
 Γₛ : Ctx 1
@@ -106,9 +108,25 @@ runOf j =
     (proj₂ (mintNode sched))
     (installNode nid (allFresh (obs natᵗ) mergeAllᵒ nothing) st)
 
+-- THE GRANT AS THE STATEMENT NOW READS IT, written out because
+-- `nestB` is sealed for the reason every caps family is.  The width is
+-- read at ZERO -- the smallest number the grant admits, so the family
+-- is monotone out of these rows and a row holding here holds at every
+-- legal `descW` bound.  The size base is the run's own, which is what
+-- the statement takes rather than a choice made here.
+U : ℕ
+U = nestUnit prog sl
+
+fac : ℕ → ℕ
+fac m = ((2 ^ sizeᵉ prog) ^ suc 0) ^ m
+
+wrapB : ℕ
+wrapB = fac (syncSizeᵉ flat) * (nestDᵉ flat + suc (syncSizeᵉ flat) * U)
+
 G : ℕ → ℕ
-G j = 2 ^ syncSizeᵉ (b j) * (pathNestD κ′ + nestDᵉ (b j))
-    + 1 * slotWrapSum sl
+G j = fac (syncSizeᵉ (b j))
+        * ((pathNestD κ′ + nestDᵉ (b j)) + suc (syncSizeᵉ (b j)) * U)
+    + 1 * wrapB
 
 -- LOAD-BEARING: the whole fold, inhabited, at the duplicating payload
 fitDup : StreamFitG 1 sl (G 0) (pathNestD κ′) (obs (obs natᵗ)) (proj₁ (runOf 0))
@@ -124,7 +142,7 @@ sides = demand 0 + 1000000 * G 0
   demand : ℕ → ℕ
   demand j = pathNestD κ′ + nestDᵛ (obs (obs natᵗ)) (oDup j) + 1 * slotWrapSum sl
 
-sides≡ : sides ≡ 131072000002
+sides≡ : sides ≡ 1505335087771022414758371393536000002
 sides≡ = refl
 
 -- ── and the family where the refuted gap COMPOUNDED ────────────────
@@ -149,8 +167,9 @@ runN k =
     (installNode nid (allFresh (obs natᵗ) mergeAllᵒ nothing) st)
 
 Gn : ℕ → ℕ
-Gn k = 2 ^ syncSizeᵉ (bN k) * (pathNestD κ′ + nestDᵉ (bN k))
-     + 1 * slotWrapSum sl
+Gn k = fac (syncSizeᵉ (bN k))
+         * ((pathNestD κ′ + nestDᵉ (bN k)) + suc (syncSizeᵉ (bN k)) * U)
+     + 1 * wrapB
 
 -- LOAD-BEARING: three layers up, where the arrival's size is a tower
 fitN₁ : StreamFitG 1 sl (Gn 1) (pathNestD κ′) (obs (obs natᵗ)) (proj₁ (runN 1))
