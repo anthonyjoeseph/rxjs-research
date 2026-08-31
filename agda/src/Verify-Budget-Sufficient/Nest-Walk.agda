@@ -70,7 +70,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; 
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step; drain-head-supply)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
-  (CeilD; Reached; reached-room; room-gas; room-le; ceil-room; ceil-step; ceil-le; ceil-mu;
+  (CeilD; Reached; reached-room; room-gas; room-le; ceil-park; ceil-step; ceil-le; ceil-mu;
   ceil-here)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; allFresh; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
@@ -835,13 +835,14 @@ pathSz?-lvl c Lv p 2≤S h =
 -- parked by the consuming edge when its node is out of room, so what
 -- lands in the queue is an ARRIVAL -- admitted at the cap the walk
 -- had STEPPED to, while the floor is read at the base one.  Nesting
--- does not carry that defect: it sits under the size plus the slots
--- and a substitution need not move it, so the honest floor is the
--- nesting bound the ceiling actually wants.  And the argument for
--- writing it in the size currency -- that whatever states the store
--- bound cannot see a connect walk's residue -- does not hold, since
--- that predicate ranges over the whole state and the residue is a
--- field of it.
+-- does not carry that defect -- it sits under a sync size plus the
+-- slots, and a substitution need not move either -- but replacing the
+-- floor with it is only half a repair, because the ceiling underneath
+-- charges a DESCENT COUNT beside the nesting and that count is
+-- instantiated at the written size.  What the argument for the size
+-- currency rested on does not hold either: whatever states the store
+-- bound ranges over the whole state, and a connect walk's residue is
+-- a field of it.
 
 -- AND THE QUEUE'S READINGS SIT AT THE WALK'S LEVEL, NOT AT THE ENTRY
 -- CAP, which a witness settles and not a preference.  A term the
@@ -877,7 +878,7 @@ capsDrainOK {n = n} {s = s} c sl d Lv sf allNid κ id now lim act (o ∷ q) sche
   × (nestClosOK? (frameStep Lv c) sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
-  × (3 + (sizeᵉ o + slotsSize sl) ≤ Caps.cSize c)
+  × (3 + (sizeᵉ o + slotsSize sl) ≤ Caps.cSize (frameStep Lv c))
   × (Σ ℕ λ g → Σ ℕ λ Lv′ →
       (4 + nest o sl (EvalSt.connectedShares st) ≤ g)
       × (Lv ≤ Lv′) × Reached c d Lv′ g)
@@ -6294,7 +6295,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   -- conjunct now carries
   roomHere = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
 
-  headHere = drain-head-supply c o sl (EvalSt.connectedShares st)
+  headHere = drain-head-supply (frameStep Lv c) o sl (EvalSt.connectedShares st)
                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))))
 
   SUB₀ = subscribeInner-nest c d sl B W Lv sf mergeAllᵒ allNid κ id now o sched st
@@ -6305,7 +6306,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcd)))))
           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcd))))))
           hpk hpl
-          (ceil-room c d Lv (nest o sl (EvalSt.connectedShares st))
+          (ceil-park c d Lv (nest o sl (EvalSt.connectedShares st))
              (suc (suc (sizeᵉ o))) (FaceOK.fSize faceHere)
              (proj₁ headHere) (proj₂ headHere) (FaceOK.fReg faceHere)
              (room-le c d Lv (proj₁ (proj₂ roomHere))

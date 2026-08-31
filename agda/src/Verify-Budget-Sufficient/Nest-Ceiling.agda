@@ -6,7 +6,7 @@
 -- already the tower's most expensive.
 module Verify-Budget-Sufficient.Nest-Ceiling where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; s≤s)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤_; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; +-mono-≤; +-monoʳ-≤;
   *-mono-≤; m≤m⊔n; +-identityʳ)
@@ -14,7 +14,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong
 
 open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; frameStep; opIterD-mono; opIterD-infl; sizeCount; sizeCount-body; cDel-body;
+  (Caps; frameStep; frameStep-0; opIterD-mono; opIterD-infl; sizeCount; sizeCount-body; cDel-body;
   lvls-add; lvls-mono; dWalkᶜ-mono; dCapᶜ-mono)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated-at)
 open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
@@ -153,6 +153,45 @@ ceil-room c d Lv k m 2≤S hk hm 1≤R room L′ hL =
     (≤-trans (opIterD-dominated-at (Caps.cSize c) (Caps.cWid c) d k m
                 (Caps.cReg c) Lv 2≤S hk hm 1≤R)
              room)
+
+-- AND THE PARKED TERM ASKS IT AT THE LEVEL IT WAS PARKED AT, which is
+-- the only cap anything holds about it.  A queue's entry arrived at a
+-- frame the walk had already stepped into and was written to the node
+-- table there, so the store predicate re-establishes its size one
+-- level up at every park and the base reading is not available at any
+-- queue at all.  Both premises therefore move to the stepped cap, and
+-- what has to hold is that the domination survives the move: the
+-- count on the right carries `4 + k` too, so raising the ceiling on
+-- `k` raises the budget it is measured against, and the question is
+-- whether it raises it by enough.
+--
+-- AND IT IS NOT A WEAKENING OF THE ROW ABOVE, which stays at the base
+-- cap for the terms that can be read there -- an entry the cascade
+-- subscribes directly is one, and pays nothing for it.
+-- REFUTED: `Refuted.Drain-Queue-Flat.drain-room-flat-absurd`, which
+--   is the base reading being unavailable to a queue.
+
+-- and the zero level is not part of the question: the step is the
+-- identity there, so that clause IS the row above and the leaf is
+-- everything past it
+postulate
+  ceil-park-suc : ∀ (c : Caps) (d Lv k m : ℕ) → 2 ≤ Caps.cSize c →
+    3 + k ≤ Caps.cSize (frameStep (suc Lv) c) →
+    m ≤ Caps.cSize (frameStep (suc Lv) c) → 1 ≤ Caps.cReg c →
+    RoomG c d (suc Lv) (4 + k) →
+    CeilD c d (suc Lv) k m
+
+ceil-park : ∀ (c : Caps) (d Lv k m : ℕ) → 2 ≤ Caps.cSize c →
+  3 + k ≤ Caps.cSize (frameStep Lv c) →
+  m ≤ Caps.cSize (frameStep Lv c) → 1 ≤ Caps.cReg c →
+  RoomG c d Lv (4 + k) →
+  CeilD c d Lv k m
+ceil-park c d zero k m 2≤S hk hm 1≤R room =
+  ceil-room c d 0 k m 2≤S
+    (subst (λ x → 3 + k ≤ Caps.cSize x) (frameStep-0 c) hk)
+    (subst (λ x → m ≤ Caps.cSize x) (frameStep-0 c) hm) 1≤R room
+ceil-park c d (suc Lv) k m 2≤S hk hm 1≤R room =
+  ceil-park-suc c d Lv k m 2≤S hk hm 1≤R room
 
 -- AND THE RECEIPT DESCENDS THE WALK EXACTLY, WHICH IS WHY IT IS ASKED
 -- FOR AND NOT PROBED.  Neither side of the room can be instantiated:

@@ -3267,16 +3267,21 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- a key read through a CAPPED telescope is at most the cap times the
 -- term's plain size, and the size is recorded; one level absorbs the
 -- factor, which is the ratio the map arm of the closure face already
--- spends.  The ROOM FLOOR is the one with no producer at all: it is
--- recorded in the WRITTEN-size currency and re-established one level
--- up at every park, while the queue asks it at the BASE cap, and a
--- written size is exactly the reading a substitution moves.  What the
--- ceiling underneath actually wants is the NESTING, which is a SYNC
--- size plus the unconnected slots -- the reading a substitution does
--- not move -- and the parking edge is already holding a nesting
--- receipt for the arrival it parks.  And the REACHED level is a fact
--- about the ceiling rather than about the store, so no field could
--- hold it.
+-- spends.  The ROOM FLOOR comes off the store predicate's own park
+-- field, which is what fixes the cap it is read at: the field is
+-- re-established one level up at every park, so the floor is a
+-- statement about the walk's level and the base reading is available
+-- to no queue at all.  And the REACHED level is a fact about the
+-- ceiling rather than about the store, so no field could hold it.
+--
+-- SO WHAT THE HEAD ACTUALLY OWES IS THE REACHED LEVEL, and the debt
+-- the move creates is one shelf down, at the ceiling entry the drain
+-- spends: a term parked inside a stepped frame asks its domination
+-- with both charges read at that frame's cap rather than at the base
+-- one.  The count on the right of that domination carries the nesting
+-- too, so raising the ceiling on the charge raises the budget it is
+-- measured against, and whether it raises it by enough is the open
+-- question -- a named arithmetic leaf rather than a missing field.
 --
 -- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`;
 --   `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd` for the
