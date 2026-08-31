@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ROUND'S CEILING NOW READS THE CAP AND NOT THE STORE, SO WHAT
-  IS LEFT IS THE TWO LEAVES THAT LIVE UNDER IT.** The entry-store form
-  is refuted — nine before one chain, sixteen after — so the walk
-  carries `nestOK?` instead, and the consumer pays nothing because the
-  arithmetic already collapsed all three of the ceiling's summands to
-  that same cap. Neither leaf has been instantiated, and neither can
-  be: `nestCapAt` sits on the caps recurrence and computes nowhere. So
-  the leg is proof, and `chainStep-nestOK` first — it is the one that
-  says the caps discipline actually holds across a chain, which every
-  later leaf reads as given.
+- **THE TRANSPORT IS SPLIT FOUR WAYS AND THE INDEX IS PINNED, SO WHAT
+  IS LEFT IS A TIGHTER GROWTH STATEMENT.** The store is four places
+  under one `⊔`; the slot arm is paid, and the three that survive are
+  each about one thing a delivery writes. The index cannot move: the
+  tree's growth bound lands at the SUCCESSOR cap, and taking the
+  ceiling there breaks the consumer, whose fuel is read at THIS
+  instant. So the arms stay here, and the live one already has a dead
+  route — the growth bound offers a path PRODUCT where the measured
+  growth is a step of one. The leg is what a chain actually stores.
 
 - **THE CEILING HAS NO BASE, AND THE TWO LADDERS HAVE TO MEET.**
   `CeilD` is threaded by every subscription statement in the nest walk
@@ -260,10 +259,16 @@ does not fit is a finding about the shared statement, not about the head.
   whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
   `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
   the cap has the room.
-- **`chainStep-nestOK`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the caps
-  discipline's nesting bound survives one chain. Its predecessor — the same
-  claim about the store READING rather than the cap — is refuted, and this form
-  is unprobeable on both sides, since `nestCapAt` computes nowhere.
+- **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: a
+  chain's live list under the instant's own cap. The unconditional growth bound
+  beside it offers a path PRODUCT as its third disjunct, which outruns the cap
+  and is not repairable by a premise.
+- **`chainStep-nest-nodesC`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
+  node table under the instant's own cap after one chain. Unprobeable on both
+  sides — `nestCapAt` sits on the caps recurrence and computes nowhere.
+- **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
+  registry under the instant's own cap after one chain. The whole-walk version
+  of it is proven, but against the entry store plus an increment, not the cap.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.

@@ -57,7 +57,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
   nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; slotNest; nestBurstAt-def;
-  nestCapAt-suc; nestOK?-latch; nestOK?-deliv)
+  nestCapAt-suc; nestOK?-latch; nestOK?-deliv; nestOK?-store; nestOK?-intro; storeNestMax-lub;
+  storeNest-slots≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
   from-inner; thru-outer; cascadeLatch; cascadeFinish; takeDispatch; arrSource; chainsOf;
@@ -3762,14 +3763,79 @@ postulate
 -- the instant's own cap, which is the design's intent and is not
 -- anywhere derived.  Neither side of it can be instantiated: the cap
 -- sits on the caps recurrence, which does not terminate even natively.
+-- AND THE STORE IS FOUR PLACES UNDER ONE `⊔`, SO THIS SPLITS FOUR WAYS
+-- RATHER THAN INDUCTING ONCE, which is the same split the round's
+-- growth statement takes and for the same reason: the four arms are
+-- nowhere near equally hard.  The slot arm needs no leaf at all -- a
+-- chain threads the vocabulary untouched, so its sum is the one the
+-- entry cap already covers -- and the three that survive are each a
+-- statement about one thing a delivery writes.
+-- THE LIVE ARM CANNOT BE ASSEMBLED FROM THE GROWTH BOUND BESIDE IT,
+-- AND THAT IS WORTH KNOWING BEFORE ANYONE TRIES.  Two of that bound's
+-- three disjuncts are places the store measure reads, so the entry cap
+-- covers them outright; the third is the chain's own PATH factor times
+-- the arrival's size, and the path factor is a PRODUCT over the path's
+-- frames while the cap at a small instant is a `suc` of two syntactic
+-- depths.  The product outruns it, and no premise the round can supply
+-- changes that -- a legal path of length the size cap already carries
+-- a factor exponential in that cap.  What the arm needs is a bound on
+-- what the chain ACTUALLY stores, which the measured growth says is a
+-- step of one or seven, not a bound on what its path could cost.
+--
+-- DEAD ROUTE: spending the unconditional live-growth bound and
+--   discharging its three disjuncts against the entry cap.  Two go;
+--   the third is the path factor above, and it is not repairable by a
+--   premise, only by a tighter growth statement.
 postulate
-  chainStep-nestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     nestOK? e sl id sched st ≡ true →
-    nestOK? e sl id (proj₁ (proj₂ (chainStep nextId a path sched st)))
-                    (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true
+    foldr (λ l acc → liveNest l ⊔ acc) 0
+          (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
+      ≤ nestCapAt e sl id
+
+postulate
+  chainStep-nest-nodesC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    nestOK? e sl id sched st ≡ true →
+    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+          (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
+      ≤ nestCapAt e sl id
+
+postulate
+  chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    nestOK? e sl id sched st ≡ true →
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
+      ≤ nestCapAt e sl id
+
+chainStep-nestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  nestOK? e sl id sched st ≡ true →
+  nestOK? e sl id (proj₁ (proj₂ (chainStep nextId a path sched st)))
+                  (proj₂ (proj₂ (chainStep nextId a path sched st))) ≡ true
+chainStep-nestOK {e = e} sl id a nextId path sched st hsl hn =
+  nestOK?-intro e sl id sd′ st′
+    (storeNestMax-lub sd′ st′ (nestCapAt e sl id) SL
+      (chainStep-nest-liveC  sl id a nextId path sched st hsl hn)
+      (chainStep-nest-nodesC sl id a nextId path sched st hsl hn)
+      (chainStep-nest-regsC  sl id a nextId path sched st hsl hn))
+  where
+  sd′ = proj₁ (proj₂ (chainStep nextId a path sched st))
+  st′ = proj₂ (proj₂ (chainStep nextId a path sched st))
+  SL : slotsNestSum (Sched.slots sd′) ≤ nestCapAt e sl id
+  SL = ≤-trans (≤-reflexive (cong slotsNestSum
+                              (chainStep-slots nextId a path sched st)))
+               (≤-trans (storeNest-slots≤ sched st)
+                        (nestOK?-store e sl id sched st hn))
 
 -- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
 -- the one `depthCascade` reports: the tail at the incoming state, the
