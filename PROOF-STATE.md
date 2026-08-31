@@ -214,15 +214,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the other three closure arms, by the ratio the map arm just paid** —
-  the map head fell without any closure mirror of the evaluator at all:
-  a value's key is read THROUGH the telescope, the telescope is capped,
-  so the key is at most the cap times the value's PLAIN size, and one
-  level absorbs that factor because a step multiplies by roughly twice
-  the size field. Every arm therefore needs only its SIZE mirror plus
-  one more level, and the scan arm's mirror is already a real body. The
-  leg is those three arms and whatever the fold's compounding charge
-  costs over the map's flat one.
+- **the two closure arms with no value ladder under them** — the fold
+  arm is now a body over its own ladder, so what is left is the arms
+  that rebuild NOTHING: the exiting inner passes its values on
+  untouched unless it DRAINS, and the thru-outer wraps them. Neither
+  has a `Frame-clos` lemma to stand on, because neither applies a
+  function; the reading has to come off the values already in hand,
+  and the only climb either needs is whatever the queue's history
+  costs. That makes the inner arm the risky one and the thru arm the
+  cheap one, so take them in that order.
 
 - **the queued entry's REACHED level, which is the drain head's last
   residue** — every other conjunct of `walk-frame-drain-inner` now
@@ -328,12 +328,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
-
-- **`step-frame-clos-scan`** (Caps-Face/Part7) — GRINDABLE, `TWIN, PROBED`: the
-  fold head, whose second factor comes out of the STORE and compounds over the
-  burst. Instantiated at a doubling template on a reached state: the report
-  grows by one per four or five values against a charge exponential in the
-  width.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

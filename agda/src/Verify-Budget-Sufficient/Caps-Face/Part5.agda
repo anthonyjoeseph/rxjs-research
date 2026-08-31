@@ -710,6 +710,62 @@ scanFrame-caps {n = n} {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC fS
                         (valCaps?-wid (frameStep j c) sl s v hv))
             vals vC)
 
+-- ONE scan-f FRAME'S CLOSURE LADDER, at the count its size mirror
+-- already pays plus the one level the map arm's argument buys.  The
+-- folded value's key is read THROUGH the capped telescope, so it is at
+-- most the cap times the value's PLAIN size, and the plain size at the
+-- fold's own count is exactly what the size ladder reports.  A level
+-- multiplies the size field by roughly twice itself, which absorbs
+-- that factor, so the closure face costs `suc (length vals * suc
+-- (sizeᵗ fn))` -- the size arm's own count with one step added, and
+-- `face-charge`'s product at the burst's length pays for it.
+--
+-- AND THE ACCUMULATOR IS WHY THE PREMISE LIST IS THE CAPS ARM'S AND
+-- NOT THE MAP ARM'S: the first rung folds a value the caller never
+-- handed over, so its own reading has to arrive from the store.
+scanFrame-clos : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (ac0 : Val Γ u) (vals : List (Val Γ s)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  valCaps? (frameStep j c) sl u ac0 ≡ true →
+  all (valCaps? (frameStep j c) sl s) vals ≡ true →
+  all (nestClosOK?ᵛ (frameStep (j + suc (length vals * suc (sizeᵗ fn))) c) sl u)
+      (proj₁ (scanVals fn ac0 vals)) ≡ true
+scanFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC aC vC =
+  all-impl (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
+           (nestClosOK?ᵛ (frameStep (j + suc a) c) sl u)
+           (λ w hw → closSizeᵛ-OK (frameStep (j + suc a) c) sl u w (sz w hw))
+           (proj₁ (scanVals fn ac0 vals))
+           (proj₁ SV)
+  where
+  S   = Caps.cSize c
+  B   = Caps.cSize (frameStep j c)
+  a   = length vals * suc (sizeᵗ fn)
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  X   = iterSize S (j + a) S
+  σ≤S : ∀ i → slotClos sl i ≤ S
+  σ≤S i = slotsCaps?-clos S (Caps.cWid c) sl i slC
+  eqStep : Caps.cSize (frameStep (j + suc a) c) ≡ S * suc (2 * X)
+  eqStep = trans (cong (λ k → iterSize S k S) (+-suc j a))
+                 (iterSize-suc S (j + a) S)
+  X≤ : X ≤ suc (2 * X)
+  X≤ = ≤-trans (m≤m+n X (X + 0)) (n≤1+n (X + (X + 0)))
+  sz : (w : Val Γ u) → (sizeᵛ u w ≤ᵇ iterSize S a B) ≡ true →
+       closSizeᵛ (slotClos sl) u w ≤ Caps.cSize (frameStep (j + suc a) c)
+  sz w hw =
+    ≤-trans (≤-trans (closSizeᵛ≤mul (slotClos sl) S σ≤S 1≤S u w)
+                     (*-monoʳ-≤ S (≤-trans szw X≤)))
+            (≤-reflexive (sym eqStep))
+    where
+    szw : sizeᵛ u w ≤ X
+    szw = ≤-trans (≤ᵇ⇒≤ (sizeᵛ u w) (iterSize S a B) (T-to hw))
+                  (≤-reflexive (sym (iterSize-+ S j a S)))
+  SV = scanVals-size S B 2≤S fn ac0 vals
+         (≤ᵇ⇒≤ (sizeᵛ u ac0) B
+            (T-to (valCaps?-size (frameStep j c) sl u ac0 aC)))
+         (all-impl (valCaps? (frameStep j c) sl s) (λ v → sizeᵛ s v ≤ᵇ B)
+            (λ v → valCaps?-size (frameStep j c) sl s v) vals vC)
+
 ------------------------------------------------------------------
 -- stepFrame-caps, GROUND.  Five clauses over the four leaves above and
 -- the two value postulates; the only arithmetic is widening the entry

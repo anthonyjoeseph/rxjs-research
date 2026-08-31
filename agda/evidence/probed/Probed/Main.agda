@@ -73,9 +73,6 @@ open import Probed.Depth-Sighted
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡)
 
 
-open import Probed.Step-Frame-Clos-Fold
-  using (caps≡; readings≡; capOK₃; capOK₃′; flat₃; step₃; flat₁₂; step₁₂;
-         valsOK; pathOK; chargeOK)
 open import Probed.Step-Frame-Clos-Inner
   using (readingsⁱ≡; capOKⁱ; argOKⁱ; valsOKⁱ; pathOKⁱ; degⁱ; flat₈ⁱ; step₈ⁱ;
          chargeOKⁱ)

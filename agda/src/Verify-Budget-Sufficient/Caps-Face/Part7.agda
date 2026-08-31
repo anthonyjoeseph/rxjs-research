@@ -127,6 +127,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (face-charge; face-charge1; face-vals; mapFrame-caps; mapFrame-clos; scanFrame-caps;
+   scanFrame-clos;
    scanVals-len; stepFrame-face-zero; takeDispatch-len; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-nodeSz; capsOK?-nodeWid;
@@ -2584,51 +2585,71 @@ step-frame-clos-map {e = e} {s = s} sl id L sf nid now fn p vals fin sched st hs
   fS = proj₁ (∧-true (frameSz? B (map-f fn))
                      ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpk)
 
-postulate
-  -- THE FOLD'S SECOND FACTOR COMES OUT OF THE STORE, and it COMPOUNDS:
-  -- the template is applied once per value handed to the frame, each
-  -- application to the last result, so the arm's bill is the map's
-  -- raised to the burst's length and the only thing bounding the
-  -- accumulator is the store premise directly above.
-  --
-  -- TWIN: `mapFrame-clos`, the same face at the map frame, which pays
-  --   for the closure reading without any closure mirror of the
-  --   evaluator: the key is read through a CAPPED telescope, so it is
-  --   at most the cap times the value's plain size, and one level
-  --   absorbs that factor.  The size half here is `scanFrame-caps`,
-  --   also proven, and the extra level fits the charge exactly --
-  --   `face-charge` at the burst's length and the template's size is
-  --   `suc (length vals * suc (sizeᵗ fn))`, which is the size arm's
-  --   own count plus the one step this face adds.
-  -- PROBED: `Probed.Step-Frame-Clos-Fold` -- the CLOSURE conjunct
-  --   alone, at a template embedding the accumulator TWICE, over a
-  --   state REACHED by running the program rather than written down.
-  --   The base cap refuses that state, so the rows are read at the
-  --   level its own premise forces: there eight folded values overflow
-  --   and one more level admits them, twelve overflow that and a third
-  --   admits them.  So the report grows by one per four or five values
-  --   while the charge at that level is a power of the size cap in the
-  --   width -- linear against exponential, and the gap is the finding.
-  --   The entry recurrence is sealed, so the rows stand over its base
-  --   floor and cover the RATIO; the width cap is read small so the
-  --   charge is a number.  Not covered: any conjunct but the closure
-  --   one, and any accumulator type but an observable.
-  step-frame-clos-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
-    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (snid : NodeId)
-    (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
-    pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((scan-f fn snid) ↠ p) ≡ true →
-    valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
-    all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
-    Σ ℕ λ j′ →
-      (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
-           (proj₁ (stepFrame sf nid now (scan-f fn snid) p vals fin sched st)) ≡ true)
-      × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
-                      (Caps.cWid (capsAt e sl id)) L)
+-- THE FOLD'S SECOND FACTOR COMES OUT OF THE STORE, and it COMPOUNDS:
+-- the template is applied once per value handed to the frame, each
+-- application to the last result, so the arm's bill is the map's
+-- raised to the burst's length.  The accumulator the first rung folds
+-- is not one of the caller's values, so its reading arrives from the
+-- node the frame names -- which is what the store premise is for, and
+-- what makes the seven other node shapes report nothing.
+--
+-- AND THE CHARGE LANDS EXACTLY.  `face-charge` is a product of the
+-- width factor and the size factor, the burst's length pays the first
+-- and the template's own size the second, so the report
+-- `suc (length vals * suc (sizeᵗ fn))` is the size arm's own count
+-- plus the one level the closure reading costs over it.
+step-frame-clos-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (nid : Id) (now : Tick)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (snid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep L (capsAt e sl id)) sched st ≡ true →
+  pathSz? (Caps.cSize (frameStep L (capsAt e sl id))) ((scan-f fn snid) ↠ p) ≡ true →
+  valsCaps? (frameStep L (capsAt e sl id)) sl vals ≡ true →
+  all (nestClosOK?ᵛ (frameStep L (capsAt e sl id)) sl s) vals ≡ true →
+  Σ ℕ λ j′ →
+    (all (nestClosOK?ᵛ (frameStep (L + j′) (capsAt e sl id)) sl u)
+         (proj₁ (stepFrame sf nid now (scan-f fn snid) p vals fin sched st)) ≡ true)
+    × (j′ ≤ fCharge (Caps.cSize (capsAt e sl id))
+                    (Caps.cWid (capsAt e sl id)) L)
+step-frame-clos-scan {e = e} {s = s} {u = u} sl id L sf nid now fn snid p vals fin
+                     sched st hsl hc hpk hvc hcl
+  with lookupNode snid (EvalSt.nodes st)
+     | lookupNode-caps (frameStep L (capsAt e sl id)) (Sched.slots sched) snid
+         (EvalSt.nodes st)
+         (capsOK?-nodeSz (frameStep L (capsAt e sl id)) sched st hc)
+         (capsOK?-nodeWid (frameStep L (capsAt e sl id)) sched st hc)
+... | nothing                    | _ = 0 , refl , z≤n
+... | just (take-st _)           | _ = 0 , refl , z≤n
+... | just (mergeAll-st _ _ _ _) | _ = 0 , refl , z≤n
+... | just (switch-st _ _)       | _ = 0 , refl , z≤n
+... | just (exhaust-st _ _)      | _ = 0 , refl , z≤n
+... | just (scan-st {w} ac)      | nb with w ≟ᵗ u
+...   | no _     = 0 , refl , z≤n
+...   | yes refl =
+  suc (length vals * suc (sizeᵗ fn))
+  , scanFrame-clos c L sl fn ac vals (2≤capsAt-size e sl id)
+      (slotsCaps?-capsAt e sl id)
+      (∧-intro (proj₁ nb)
+               (subst (λ x → (pWᵛ _ x u ac ≤ᵇ Caps.cWid (frameStep L c)) ≡ true)
+                      hsl (proj₂ nb)))
+      hv
+  , face-charge c L (length vals) (sizeᵗ fn)
+      (≤ᵇ⇒≤ (length vals) (suc (Caps.cWid (frameStep L c))) (T-to hL))
+      (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to fS))
+  where
+  c  = capsAt e sl id
+  B  = Caps.cSize (frameStep L c)
+  hp = ∧-true (all (valCaps? (frameStep L c) sl s) vals)
+              (length vals ≤ᵇ suc (Caps.cWid (frameStep L c))) hvc
+  hv = proj₁ hp
+  hL = proj₂ hp
+  fS = proj₁ (∧-true (frameSz? B (scan-f fn snid))
+                     ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpk)
 
+
+postulate
   -- THE EXITING INNER PASSES ITS VALUES ON UNTOUCHED UNLESS IT DRAINS,
   -- and when it drains they come out of the node's QUEUE -- parked at
   -- whatever level was current when they were enqueued, which is not
