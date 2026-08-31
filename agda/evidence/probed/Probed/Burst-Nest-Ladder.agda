@@ -4,7 +4,7 @@
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-burst-nest @d2c32b
+-- TARGET: subscribeE-burst-nestL @2bcf96
 --
 -- WHAT IS BEING TESTED, AND IT IS A DENOMINATION AND NOT A BOOLEAN.
 -- This statement answers at the cap it was asked at stepped that cap's

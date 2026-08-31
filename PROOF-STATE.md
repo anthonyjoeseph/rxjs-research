@@ -214,17 +214,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **restate `subscribeE-burst-nest` to report its own increment** —
-  four subdivisions of this region are closed, and all four died on
-  the same quantity: `arrCapAt` re-bases the answer at the asked cap's
-  own SIZE, so entering the family any level up squares the index.
-  Reporting an increment deletes `arrCapAt` from the type, and levels
-  then only ever add off the one entry base. The measurement that
-  licenses it is now taken: the increment the arrivals actually need
-  is ONE at every substitution depth, against a denomination charging
-  the entry size many steps. Premises at `frameStep Lv c`, `Σ L`
-  conclusion at `frameStep (Lv + L) c`, bounded by the sweep the
-  carried ceiling already converts — full strength, no weakening.
+- **lift the drain's caps conjuncts to the level the walk holds them
+  at** — `capsDrainOK` reads its state, value and closure receipts at
+  the BASE cap while its size and width receipts already read at
+  `frameStep Lv c`, and the walk arrives holding all five at its own
+  level. `capsOK?` weakens upward only, so past the first level the
+  walk has nothing to hand over, and that mixture is the whole of what
+  `walk-frame-drain-inner` still owes. The DEAD ROUTE that used to
+  block the lift — the `*All` heads spending a base receipt — went
+  with the restatement above. Refute first, at level zero.
 
 - **the map head, against the mirror that already pays for it** — the
   frame law reports its climb in `fCharge`, which is the currency the
@@ -283,11 +281,11 @@ does not fit is a finding about the shared statement, not about the head.
   half, one leaf for all three `*All` heads — they delegate to the same family
   and wrap the subject in one level each. It reads the fit the fold carries,
   which is what a value list quantified freely could not give it.
-- **`subscribeE-burst-nest`** (Nest-Walk) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE×3, PROBED×3, RECOVERY`: the admissibility boolean over
-  any subscription's whole burst, read one caps level up. At the map that
-  refutes the flat reading the levelled one holds by thirty-odd orders of
-  magnitude, so the crossing is closed and what is left is the induction.
+- **`subscribeE-burst-nestL`** (Nest-Walk) — DIFFICULTY,
+  `REFUTED×2, DEAD ROUTE×5, PROBED×2, RECOVERY×2`: the admissibility boolean
+  over any subscription's whole burst, reporting the level it needs as an
+  increment off the entry base. The increment is measured FLAT in substitution
+  depth, so what is left is the induction.
 - **`evalWith-nest-sync`** (Nest-Subst) — DIFFICULTY, `TWIN, PROBED`: the
   substitution walk's sync-denominated charge at an arbitrary environment; the
   one-entry instances are probed where the currencies split, the wider

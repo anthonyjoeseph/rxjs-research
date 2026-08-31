@@ -45,7 +45,16 @@ open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤-refl; m≤n+m)
 open import Data.Product using (proj₁)
 
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; caps; frameStep; arrCapAt; _⊑ᶜ_)
+  using (Caps; caps; frameStep; _⊑ᶜ_)
+
+-- THE CAP-FORMER THESE ROWS ARE STATED OVER: the entry cap with its
+-- SIZE stepped and its width and register frozen.  `src` no longer
+-- has it -- reading the arrivals at a frozen width is what this
+-- evidence kills -- so what is stated here carries its own, which is
+-- the rule for a refutation and keeps `src` free to delete it.
+arrCapAt : ℕ → Caps → Caps
+arrCapAt j c = caps (Caps.cSize (frameStep j c)) (Caps.cWid c) (Caps.cReg c)
+
 
 -- the smallest cap this development admits.  Nothing turns on the
 -- choice: the gap is a rate, so a larger cap widens it

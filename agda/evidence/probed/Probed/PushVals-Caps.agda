@@ -12,15 +12,6 @@
 -- only, and the measure is sealed, so instantiating it would need a
 -- lower bound of the kind the arr-keyed scan probes pin.
 --
--- AND THE TWO ARRIVAL BOOLEANS ARE READ AT THE *All-HEADED PATH ONLY,
--- which is a coverage boundary and named as one.  Those two targets
--- are stated over ANY subscription at ANY path; every row here enters
--- through a `thru-outer` continuation, because that is the shape the
--- consumers of those statements stand at.  The clauses no row reaches
--- are therefore the ones a bare path takes -- and the risky two of
--- those, the defer and the scripted slot, ARE reached, since the gate
--- and async bodies below put both under a `*All` head.
---
 -- AND THE LEVEL IS A BOUNDARY, not a gap: the three leaves now take the
 -- caps level as a parameter, and these rows are taken at the level the
 -- head's own written size fixes -- the SMALLEST any arm passes, since an
@@ -34,7 +25,6 @@
 -- layout makes the name unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: subscribeE-burst-nest @d2c32b
 -- TARGET: pushVals-caps-burstW @338e1f
 module Probed.PushVals-Caps where
 
@@ -61,11 +51,20 @@ open import Rx.Evaluator
   splitEvents;
   switchᵒ; exhaustᵒ; mergeAll-st; switch-st; exhaust-st; Sched; EvalSt; Stream;
   AllOp; NodeId; Path)
-open import Verify-Budget-Sufficient.Caps using (arrCapAt; Caps; caps)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; nestValOK?; slotsCaps?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; pushValsCapsOK; pushValsWidOK; pushValsWOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Refuted.Demand-Programs using (Γ₂; insT)
+
+-- THE CAP-FORMER THESE ROWS ARE STATED OVER: the entry cap with its
+-- SIZE stepped and its width and register frozen.  `src` no longer
+-- has it -- reading the arrivals at a frozen width is what this
+-- evidence kills -- so what is stated here carries its own, which is
+-- the rule for a refutation and keeps `src` free to delete it.
+arrCapAt : ℕ → Caps → Caps
+arrCapAt j c = caps (Caps.cSize (frameStep j c)) (Caps.cWid c) (Caps.cReg c)
+
 
 slots : Slots Γ₂
 slots = insT 0 0 0

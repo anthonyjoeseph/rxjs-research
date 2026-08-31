@@ -503,62 +503,6 @@ iterSize-infl S hS zero    s = ≤-refl
 iterSize-infl S hS (suc k) s =
   ≤-trans (sizeStep-infl S s hS) (iterSize-infl S hS k (sizeStep S s))
 
--- THE SIZE AXIS STEPPED ALONE, AND THE WIDTH LEFT EXACTLY WHERE IT
--- WAS -- the cap a descent's ARRIVALS are read at.  An arrival is the
--- head's syntax with payloads substituted in, so it crosses the size
--- field, and the level is the parameter.
---
--- The width field does NOT move, and that is measured rather than
--- assumed: a step function naming its payload twice mentions ONE
--- pending observable twice, and the frame measure counts observables.
--- Leaving it alone is what keeps the blast radius at nothing.  The
--- state invariant this face preserves reads the width field and no
--- size at all, so at this cap it REDUCES to the same proposition it
--- was at the entry cap -- the whole burst walk can therefore run one
--- cap up while its conclusion is still the one the parent asked for,
--- with no transport anywhere.
---
--- AND IT IS DELIBERATELY NOT SEALED, against the standing rule that a
--- cap named in a premise is worse than a body.  That reduction is the
--- whole design: it holds because the projection meets a `caps`
--- constructor, so sealing this would turn an identity the checker sees
--- for free into a transport at every site of the burst walk.  What the
--- rule is really about -- a body reaching the caps recurrence -- is
--- paid by `frameStep`, which is transparent already and appears in
--- these types either way; this adds one application of it.
---
--- AND THE LEVEL IS A PARAMETER RATHER THAN THE HEAD'S OWN SIZE, which
--- is what lets the two halves of a `*All` arm be spent together.  The
--- arm reads its arrivals at the level its own written size fixes, and
--- it also holds a CHILD's burst bound reported at whatever level the
--- child stepped to; fixing either level in the cap forces a transport
--- of the other.  Taking the level as an argument lets the arm read
--- both at their join, where neither moves.
---
--- AND THE ONE UNIT THE FROZEN WIDTH COSTS CANNOT BE BOUGHT BY STEPPING
--- IT.  The gap is exactly one: the invariant bounds a parked queue by
--- the field and an arriving value needs one more than that, so a width
--- stepped by one level makes the room a projection and every site
--- swaps.  It dies on COMPOSITION rather than at any one of them --
--- this cap does not nest, because the inner cap's base size is larger
--- and no monotonicity brings a step of a step back under one step of
--- the entry, which is what an inner subscribe inside a burst step
--- asks for.  Freezing the report at entry-plus-one-step closes that
--- arm and dies one level further out, for a reason no constant can be
--- chosen around: the thru chain subscribes ONCE PER ARRIVAL at a cap
--- it threads unchanged across the fold, so a walk that steps the cap
--- steps it again at every arrival and the residue is a per-arrival
--- RECURRENCE.  What the arrivals owe is the level EXISTENTIALLY BOUND,
--- which is the shape the proven caps face already reports in.
--- DEAD ROUTE: stepping this width, by one level or by any constant.
--- RECOVERY: `git show 0e96e46` restores the one-step form with the
---   node-width widening and its lift to the nest predicate, and
---   `git show bfbf2b4` the constant-step form with all fifty-four
---   sites swapped; both are wanted again only if the arrivals are ever
---   re-read at a cap that is not existentially levelled.
-arrCapAt : ℕ → Caps → Caps
-arrCapAt j c = caps (Caps.cSize (frameStep j c)) (Caps.cWid c) (Caps.cReg c)
-
 iterSize-mono-count : ∀ (S s : ℕ) → 1 ≤ S → ∀ {j j′ : ℕ} → j ≤ j′ →
   iterSize S j s ≤ iterSize S j′ s
 iterSize-mono-count S s hS {j′ = j′} z≤n      = iterSize-infl S hS j′ s

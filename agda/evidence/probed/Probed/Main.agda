@@ -29,8 +29,6 @@ open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
-open import Probed.Burst-Nest-Level
-  using (row8≡; row16≡)
 open import Probed.Burst-Nest-Ladder
   using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡)
 open import Probed.Sync-Factor
