@@ -325,10 +325,10 @@ directives, and report review. Standing protocol, per Anthony:
 - **Workers commit and push per green task**, gate-green, in the repo's commit voice; and
   **never reach into another worker's lane to tidy a shared file**
   ([docs/delegation.md](docs/delegation.md)).
-- **Merging green work to main is authorized** — Anthony: "merge to main when you can."
-  After each verified-green worker leg, the design session merges the working branch to
-  main. Standing for the current autonomous run; it does not extend to spec changes,
-  which still require asking first.
+- **Land green work via a PR, never a direct push to main** — after each verified-green
+  worker leg, open a PR from the working branch instead of pushing to main directly, and
+  merge once GitHub Actions' gate run is green (see below). Standing for the current
+  autonomous run; it does not extend to spec changes, which still require asking first.
 - **Run continuously** — Anthony: "continue and continue, don't stop for context window
   or usage credits." When a worker leg finishes, review it, merge it, launch the next.
   The stop conditions are the three in **Autonomy** and there are no others; this
@@ -341,7 +341,9 @@ the light path when the changed set is light-checkable and the full tower when i
 and it prints which and why. Choosing the expensive path by habit is how the cheap
 checks — the ones that fail in seconds — get skipped in favour of many minutes. The heavy
 path takes many minutes and the Bash tool's ceiling is 600 s per foreground call, so
-iterate with **`make agda-dev`** (seconds) and reach for the gate to merge. Timings:
+iterate with **`make agda-dev`** (seconds). **DO NOT RUN `make gate` YOURSELF TO MERGE —
+open a PR and let the `Gate` GitHub Actions workflow run it**, and subscribe to the PR
+with `subscribe_pr_activity` to learn when the run completes rather than polling. Timings:
 `typecheck-performance-numbers.md`.
 
 **AND THE CARVE-OUT IS TERMINATION, NOT ANY NAMEABLE REASON (Anthony).** Forcing
