@@ -214,15 +214,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **lift the drain's caps conjuncts to the level the walk holds them
-  at** — `capsDrainOK` reads its state, value and closure receipts at
-  the BASE cap while its size and width receipts already read at
-  `frameStep Lv c`, and the walk arrives holding all five at its own
-  level. `capsOK?` weakens upward only, so past the first level the
-  walk has nothing to hand over, and that mixture is the whole of what
-  `walk-frame-drain-inner` still owes. The DEAD ROUTE that used to
-  block the lift — the `*All` heads spending a base receipt — went
-  with the restatement above. Refute first, at level zero.
+- **record a queued inner's admissibility in the node invariant** —
+  with the drain's conjuncts now read at the walk's own level, the
+  state receipt the frame arrives holding is the one the queue wants,
+  and what is left in `walk-frame-drain-inner` is per-ENTRY: each
+  queued term's written size, slot width and closure key under the
+  level's caps, plus a level at or above the walk's at which its nest
+  is reached. The frame's bundle speaks about the ARRIVAL, not about
+  what the store is holding, so no hypothesis there can supply it —
+  which puts the fact on the node record, where every producer must
+  establish it and every consumer may spend it. Refute first, at a
+  queue whose entry is larger than the arrival that enqueued it.
 
 - **the map head, against the mirror that already pays for it** — the
   frame law reports its climb in `fCharge`, which is the currency the
@@ -244,11 +246,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE, TWIN`: the `from-inner` head of the drain law, the only
-  frame that names a node. Its caps conjuncts are read at the base cap while
-  the walk holds one only at its level; raising them through the fit shelf is
-  dead, so the level must arrive another way — a design call.
+- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY, `REFUTED, TWIN`:
+  the `from-inner` head of the drain law, the only frame that names a node. Its
+  conjuncts now read at the walk's own level, so what is left is per-entry
+  admissibility of terms the STORE holds — a node-invariant call.
 - **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
   exiting-inner head. It passes its values on untouched unless it DRAINS, and
   the drained values come out of the node's queue. Instantiated at a parked

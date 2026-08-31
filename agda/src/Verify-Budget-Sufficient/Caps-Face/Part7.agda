@@ -3244,30 +3244,21 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
                            (reached-room c d P (suc g₀) 2≤S hR))
                   (⊔-lub ≤-refl (size≤sizeCount c d 2≤S (1≤capsAt-reg e sl id))))
 
--- THE ONE HEAD THAT OWES, AND WHAT IT STILL OWES IS AN INDEX RATHER
--- THAN A QUANTITY.  Every conjunct the queue asks for is about a term
--- the store is holding, and the walk arrives carrying receipts about
--- exactly that store -- but it carries them AT ITS LEVEL, and the two
--- caps conjuncts here are read at the BASE.  `capsOK?` weakens upward
--- only, so a receipt at `frameStep L` does not deliver one at the cap
--- below it, and at every level past the first the walk has nothing to
--- hand over.  That is not a missing fact about queues: it is the same
--- base-versus-level split the closure key was moved across, arriving
--- one predicate later, and the repair is to decide where the drain's
--- caps conjunct belongs before proving anything about the queue.
---
--- AND WHAT OWES IT IS THE WHOLE TOWER UNDER THE CONJUNCT, not this
--- statement.  The arrival family the drain's grant is spent by, and
--- the burst fits its `*All` heads delegate to, take their state, value
--- and closure receipts at a BASE cap and carry the level as a separate
--- INDEX on the conclusion.  So the conjunct cannot simply be raised --
--- a premise arriving at a stepped cap reaches none of them, at any
--- index -- and re-basing the family at the walk's cap is the shortcut
--- the arithmetic already refuses.  What is left is the discipline the
--- frame face beside it keeps: take the invariant at the STEPPED cap,
--- report an increment, restate at the SUM.  That is a restatement of
--- the shelf and not of this leaf, which is why nothing here moves
--- until it does.
+-- THE ONE HEAD THAT OWES, AND WHAT IT OWES IS NOW ABOUT THE QUEUE AND
+-- NOTHING ELSE.  Every conjunct the drain asks for is read at the
+-- walk's OWN level, so the state receipt the walk arrives holding is
+-- the one the queue wants, and the arrival family under it takes its
+-- state, value and closure receipts at that same stepped cap and
+-- reports an increment over it.  What is left is the per-entry half:
+-- each queued inner must be shown admissible -- its written size under
+-- the level's size cap, its slot width under the level's width cap,
+-- its closure under the level's key -- and a level at or above the
+-- walk's must be exhibited at which the entry's nest is reached.  None
+-- of that is available from the frame's own hypotheses, because the
+-- queue is a term the STORE is holding and the frame's bundle speaks
+-- about the arrival it was handed; the route is the node invariant,
+-- which is where a queued entry's admissibility has to be recorded if
+-- it is to be recovered here.
 --
 -- REFUTED: `Refuted.Frame-Step-Compose.frameStep-compose-absurd`;
 --   `Refuted.Drain-Queue-Flat.drain-spine-flat-absurd` for the
@@ -3275,11 +3266,6 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   and `Refuted.Arr-Cap-Step.arr-cap-step-absurd` for the raise that
 --   also re-enters the arrival family one level up, which is the one
 --   route the two above leave standing
--- DEAD ROUTE: raising this conjunct alone to the walk's level and
---   leaving the family under it based where it is.  It typechecks here
---   and dies one hop down, at the `*All` heads, which spend the base
---   receipt against a fit whose conclusion is read at an index over
---   that same base.
 -- TWIN: `subscribeE-caps` already threads a level exactly this way --
 --   invariant at the stepped cap, conclusion at the sum -- and is
 --   proven.

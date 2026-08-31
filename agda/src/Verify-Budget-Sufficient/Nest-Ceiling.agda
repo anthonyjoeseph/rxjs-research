@@ -9,12 +9,12 @@ module Verify-Budget-Sufficient.Nest-Ceiling where
 open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; +-mono-≤; +-monoʳ-≤;
-  *-mono-≤; m≤m⊔n)
+  *-mono-≤; m≤m⊔n; +-identityʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
 open import Rx.Evaluator using (opIterD; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; frameStep; opIterD-mono; sizeCount; sizeCount-body; cDel-body;
+  (Caps; frameStep; opIterD-mono; opIterD-infl; sizeCount; sizeCount-body; cDel-body;
   lvls-add; lvls-mono; dWalkᶜ-mono; dCapᶜ-mono)
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated-at)
 open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
@@ -40,6 +40,22 @@ CeilD c d Lv k m =
 -- ledger equation saying a sweep at the successor level with the
 -- operator unspent sits under the sweep with it spent, and the two
 -- monotonicities put the child's own measures under the parent's.
+-- AND THE LEVEL THE RECEIPT IS HELD AT IS ITSELF UNDER THE CEILING,
+-- which is the reading a walk needs when it reports at the level it
+-- ARRIVED at rather than at one it climbed to.  It is the receipt at
+-- no further climb, and it is separate because the receipt is stated
+-- relatively -- `Lv + L'` -- so the nil case is an arithmetic step
+-- rather than an instance.
+ceil-here : ∀ (c : Caps) (d Lv k m : ℕ) →
+  CeilD c d Lv k m →
+  Lv ≤ sizeCount c d ⊔ Caps.cSize c
+ceil-here c d Lv k m hceil =
+  subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
+   (hceil 0
+    (subst (_≤ opIterD (Caps.cSize c) (Caps.cWid c) d k m Lv)
+           (sym (+-identityʳ Lv))
+           (opIterD-infl (Caps.cSize c) (Caps.cWid c) d k m Lv)))
+
 ceil-step : ∀ (c : Caps) (d Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
   k′ ≤ k → suc m′ ≤ m → CeilD c d Lv k m → CeilD c d (suc Lv) k′ m′
 ceil-step c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
