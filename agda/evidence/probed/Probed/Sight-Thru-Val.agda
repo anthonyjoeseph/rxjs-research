@@ -38,6 +38,13 @@
 -- one, so the two rows say only that nothing moved.  Reaching them
 -- wants a consume that installs, and this harness's does not.
 --
+-- AND THE DUPLICATING FAMILY IS LOAD-BEARING AND SETTLES WHAT THE
+-- TOWER IS FOR: over four layers the arrival's size doubles, and what
+-- the consume DELIVERS reads one, two, three, four -- the arrival's
+-- depth, digit for digit, with the tower contributing nothing.  So on
+-- this family the grant's exponent is not standing in for the
+-- delivery, which is what the entry witness saw from the other side.
+--
 -- NOT COVERED: a telescope of
 -- more than one slot, where the sum is over slots rather than one of
 -- them; and the two other operators, the arr-keyed sibling's rows
@@ -201,3 +208,35 @@ grantHid≡ = refl
 delHid≡ : del ref (hid 0) tt + 10 * del ref (hid 1) tt
         + 100 * del ref (hid 2) tt + 1000 * del ref (hid 3) tt ≡ 0
 delHid≡ = refl
+
+-- ── the duplicating family, where the grant's exponent was outrun ───
+-- The arrivals here are the ones the entry burst actually carries:
+-- `Refuted.Sight-All-Stream-Dup` pins the emitted sizes and they follow
+-- exactly this recurrence.  What the rows ask is which side the
+-- DELIVERY tracks -- the size that doubles, or the depth that does not
+
+vN : ℕ → Closed Γₛ natᵗ
+vN zero    = mergeAllᵉ nothing (ofᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ [])) ∷ []))
+vN (suc k) = mergeAllᵉ nothing
+               (ofᵉ (strmᵗ (vN k) ∷ strmᵗ (vN k) ∷ []))
+
+oN : ℕ → Val Γₛ (obs (obs natᵗ))
+oN k = ofᵉ (strmᵗ (vN k) ∷ strmᵗ (vN k) ∷ [])
+
+-- the three columns, packed: what is delivered, the arrival's depth,
+-- and the arrival's size
+dupCols : ℕ
+dupCols = del (oN 0) flat tt + 100 * del (oN 1) flat tt
+        + 10000 * del (oN 2) flat tt + 1000000 * del (oN 3) flat tt
+
+dupCols≡ : dupCols ≡ 4030201
+dupCols≡ = refl
+
+dupDepth : ℕ
+dupDepth = nestDᵛ (obs (obs natᵗ)) (oN 0)
+         + 100 * nestDᵛ (obs (obs natᵗ)) (oN 1)
+         + 10000 * nestDᵛ (obs (obs natᵗ)) (oN 2)
+         + 1000000 * nestDᵛ (obs (obs natᵗ)) (oN 3)
+
+dupDepth≡ : dupDepth ≡ 4030201
+dupDepth≡ = refl

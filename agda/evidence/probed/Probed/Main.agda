@@ -66,7 +66,7 @@ open import Probed.Thru-Arr-Slot
 open import Probed.Sight-Thru-Val
   using (fitRef; sidesRef≡; grantRef₀≡; grantRef₁≡;
          grantFlat≡; delFlat≡; fitFlat; storeFlat; storeRef; storeFigs≡;
-         fitOwn; grantHid≡; delHid≡)
+         fitOwn; grantHid≡; delHid≡; dupCols≡; dupDepth≡)
 
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;

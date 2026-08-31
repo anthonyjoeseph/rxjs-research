@@ -229,6 +229,12 @@ postulate
 -- and eighty-six.  So a tower read at the arrival's SIZE has an
 -- exponent exponential in the program, and no tower read at the program
 -- can bound it; the depth it is standing in for grows by one a layer.
+-- And the delivery says the same from the other side: over those four
+-- layers the consume hands back one, two, three, four -- the arrival's
+-- depth, digit for digit -- so on this family the exponent is standing
+-- in for nothing at all.  Where a delivery HAS outrun the depth it was
+-- the slot's definition doing it, and the wrap summand beside the tower
+-- is what already pays for that.
 -- REFUTED: `Refuted.Sight-All-Fit-Slot` pins it at the reference,
 --   where the arrival-only grant is zero against a delivery of
 --   sixty-four, and checks that the summand-carrying grant holds at

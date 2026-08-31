@@ -214,16 +214,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the fit's tower moves off the arrival's SIZE and onto its DEPTH** —
-  the compounding is measured and it is decisive: over four layers of
-  duplicating map the grant's exponent runs sixteen, twenty-three,
-  thirty, thirty-seven while the demand's runs eighteen, forty-two,
-  ninety, a hundred and eighty-six. So no tower read at the program can
-  bound one read at the arrival, and the argument is not which grant
-  but which QUANTITY `ValFit` raises two to. The depth the tower was
-  standing in for moves by one a layer, and every consumer of the fit
-  reads it, so the leg is to restate the pair over the depth and check
-  what the sighted ceiling above still owes.
+- **the fit's tower moves onto the PATH, where the fold already
+  exists** — the arrival-side tower is refuted twice, and the
+  measurement that follows says which side to read instead: over four
+  layers of duplicating map the consume DELIVERS one, two, three,
+  four, the arrival's depth digit for digit, with the tower
+  contributing nothing. `Nest-Store` already carries a factor per
+  frame — a map's step function weighs `2 ^ sizeᵗ f`, and `pathNestF`
+  multiplies them along the walk — and its own header argues the case
+  independently. So the leg is to read the fit's tower there rather
+  than at the arrival, propagate through the stream fold and the
+  grants above it, and RE-RUN rather than restamp the probe rows that
+  pinned the old statement.
 
 - **the park site that must issue the ceiling it stores** — exactly
   one arm writes a `mergeAll` queue, the gate-shut arm of the inner
