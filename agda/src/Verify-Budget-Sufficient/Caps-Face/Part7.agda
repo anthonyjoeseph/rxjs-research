@@ -3913,10 +3913,20 @@ postulate
 --   boundary rather than a gap: a registration is minted at the depth
 --   of the CONTINUATION it hangs off, not at the depth of what is
 --   subscribed, so no amount of nesting in the subscribed value can
---   raise this fold.  Not covered, and it is now the only candidate
---   left: a chain reached through a continuation that is itself long,
---   which needs a program whose *All frames stack rootward rather than
---   inside the value.
+--   raise this fold.
+-- PROBED: `Probed.Chain-Step-Regs-Rootward` builds the shape those two
+--   left uncovered -- *All frames stacked ROOTWARD of the leaf, over a
+--   `deferᵉ` at an iterated observable type, so the registration a
+--   chain mints sits `k + 1` frames from the root -- and reads it at
+--   two stack depths.  The fold moves with the stack and is EQUAL
+--   either side of the chain at both, which is the mechanism rather
+--   than another flat family: the frame carrying the emitted
+--   observable is charged the `thru-outer` frames that observable will
+--   push, and where the count stops at a defer gate the defer's own
+--   registration adds back the one frame the gate dropped.  So the
+--   chain cannot outrun the depth it came from, and what is left
+--   uncovered is only a chain whose own path is deeper than the
+--   registry it is read against, which no reachable state presents.
 postulate
   chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)

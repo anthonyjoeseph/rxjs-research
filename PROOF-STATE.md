@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY ARM CANNOT BE MOVED BY DEPTH IN THE VALUE, AND THAT
-  NARROWS WHAT IS LEFT TO ONE SHAPE.** A registration is minted at the
-  depth of the CONTINUATION it hangs off, not of what is subscribed —
-  so the deferred family, which is the corpus's best minting candidate,
-  reads flat at every body depth, and so does the wrapping family at
-  every instant it reaches. The only candidate left is a chain whose
-  continuation is itself long, which needs *All frames stacked
-  ROOTWARD rather than nested inside the emitted value. That is a new
-  program family, and it is also what a live fold already nonzero at
-  entry would need. The leg is that family, and both arms re-read
-  against it.
+- **THE REGISTRY ARM'S TIE IS A ROUTE, AND THE ARM IS WHERE IT GETS
+  SPENT.** The rootward family reads the fold EQUAL either side of a
+  chain at both stack depths, and the reason is the measure: a frame is
+  charged the `thru-outer` frames the observable it carries will push,
+  and where the count stops at a defer gate the defer's own
+  registration adds back the frame the gate dropped. So a chain leaves
+  nothing deeper than the path it came from — which is a proof shape,
+  not a coverage claim. The leg is to write it: `chainStep-nest-regsC`
+  becomes a real body over per-frame leaves, taking the chain's own
+  path out of the registry it is read against.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -268,7 +267,7 @@ does not fit is a finding about the shared statement, not about the head.
   table after one chain, charged to one instant's increment. Unprobeable as
   stated — the increment sits on the caps recurrence — but its syntactic
   surrogate runs.
-- **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY, `PROBED×2`: the
+- **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY, `PROBED×3`: the
   registry after one chain, charged to one instant's increment. The whole-walk
   version is proven, but against the entry store times a factor, which is the
   shape a walk cannot carry.
