@@ -215,28 +215,25 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CURRENCY IS THE QUESTION NOW, NOT THE STATEMENT: THE LIVE ARM
-  NEEDS A SIZE CHARGE AND THE CAP IS DEPTH-DENOMINATED.** Both routes
-  into it are dead — a path PRODUCT the cap cannot hold, and the
-  additive depth that replaces it, which is blind to a deferred body
-  and fails on the family it was tight on. Moving the ceiling one
-  instant up is where a size charge would fit and is dead too: the
-  exponential room is index-aligned by construction. So the leg is to
-  state the growth bound with a store-INDEPENDENT size disjunct — the
-  only shape a walk can carry — and price it against the cap.
+- **THE THREE ARMS ARE FINALLY PROBEABLE, THROUGH A SURROGATE THE
+  TREE ALREADY PROVES DOMINATED.** They now charge a chain's growth to
+  `nestUnit + nestIncAt`, and the increment sits on the caps
+  recurrence, so neither side computes. But the increment is proven to
+  dominate the size cap, which is proven to dominate `2 + sizeᵉ`, and
+  THAT charge is pure syntax: it runs. So the leg is to instantiate
+  `grown ≤ pre ⊔ (nestUnit + (2 + sizeᵉ))` across the corpus — the
+  family that killed the depth currency first, since it is the one
+  where a mint arrives from a deferred body the arrival never carried.
 
-- **THE CEILING HAS NO BASE, AND THE TWO LADDERS HAVE TO MEET.**
-  `CeilD` is threaded by every subscription statement in the nest walk
-  and MANUFACTURED by none: every one of its lemmas either takes one
-  and returns one or reads a level off one, so the whole apparatus is
-  fed by hypothesis down to the drain, whose producer is a postulate.
-  What the walk holds instead is a reached level in the DELIVERY
-  ladder — `Reached`, with its remaining gas, and `ring-room` turning
-  that into the conclusion `ceil-here` gives.
-  So the leg is the bridge between the two currencies: the subscribe
-  ledger's `opIterD` sweep from a level against the delivery walk's
-  entry at that level, which is what lets the walk hand the drain a
-  ceiling instead of asserting one.
+- **THE CEILING'S TWO HALVES ARE CHARGED TO TWO COPIES OF THE FUEL,
+  AND ONLY ONE COPY IS ESTABLISHED.** Reading the round at the cap PLUS
+  the increment is what makes the bound walk-preservable, and the split
+  prices each half separately: the cap half is proven, the increment
+  half is a leaf, and the doubling is another. The tree's bridge puts
+  ONE exponential under the fuel and says nothing about a second, and
+  the increment reads the delivery square at the NEXT instant — the
+  quantity this face's step lemma deliberately never prices here. So
+  the leg is those two leaves, and whether the fuel is wide enough.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -259,18 +256,27 @@ does not fit is a finding about the shared statement, not about the head.
   whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
   `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
   the cap has the room.
+- **`nestInc-sight≤exp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: one
+  instant's INCREMENT under the exponential at that same instant. The cap half
+  of the same ceiling is proven; the increment reads the delivery square at the
+  NEXT instant, which the recurrence deliberately does not price here.
+- **`exp2≤capsH`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the fuel holding
+  TWO copies of the exponential, since the round's ceiling now reads a cap and
+  an increment. The tree's bridge puts one copy under the fuel and says nothing
+  about the second.
 - **`chainStep-nest-liveC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: a chain's live list under the instant's own cap. The
-  unconditional growth bound beside it offers a path PRODUCT as its third
-  disjunct, which outruns the cap and is not repairable by a premise.
+  `REFUTED, DEAD ROUTE×2`: a chain's live list against the program rather than
+  against the store it started from. The path PRODUCT the unconditional bound
+  offers cannot supply it, and the depth-additive repair dies at a mint from a
+  deferred body.
 - **`chainStep-nest-nodesC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: the node table under the instant's own cap after one
-  chain. Unprobeable on both sides — `nestCapAt` sits on the caps recurrence
-  and computes nowhere.
+  `REFUTED, DEAD ROUTE×2`: the node table after one chain, charged to one
+  instant's increment. Unprobeable as stated — the increment sits on the caps
+  recurrence — but its syntactic surrogate runs.
 - **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY,
-  `REFUTED, DEAD ROUTE×2`: the registry under the instant's own cap after one
-  chain. The whole-walk version of it is proven, but against the entry store
-  plus an increment, not the cap.
+  `REFUTED, DEAD ROUTE×2`: the registry after one chain, charged to one
+  instant's increment. The whole-walk version is proven, but against the entry
+  store times a factor, which is the shape a walk cannot carry.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.

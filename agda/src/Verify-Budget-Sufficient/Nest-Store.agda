@@ -941,16 +941,6 @@ abstract
   nestOK?-latch e sl id a sched st =
     cong (_≤ᵇ nestCapAt e sl id) (storeNest-latch a sched st)
 
-  -- AND THE DELIVERED LIST IS NOT ONE OF THE FOUR PLACES.  The walk
-  -- marks each registration as it takes it, and the mark is invisible
-  -- to the measure -- but the predicate is sealed, so a consumer
-  -- crossing that record update has no way to see it without this.
-  nestOK?-deliv : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) (d : List RegId) (sched : Sched Γ) (st : EvalSt e) →
-    nestOK? e sl id sched (record st { delivered = d })
-      ≡ nestOK? e sl id sched st
-  nestOK?-deliv e sl id d sched st = refl
-
   -- reading the store bound back out of the predicate
   nestOK?-store : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) (sched : Sched Γ) (st : EvalSt e) →
