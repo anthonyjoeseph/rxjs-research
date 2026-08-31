@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CASCADE'S DESCENT IS NOT EXPOSED TO THE FAMILY THAT TOOK THE
-  ENTRY FOLD APART, so what is left is the assembly.** The doubling
-  step leaves `cascade-depth-sighted`'s descent at two across two
-  instants and twice the script length, because what it grows is a SUM
-  over an instant's emitted values while a descent is a JOIN over them.
-  The obvious route is dead all the same: the descent bottoms out in
-  `depthE`, whose proven ceiling carries the FOLD's grant in its
-  subject place where this one carries the arrival's nesting, and two
-  upper bounds in different currencies do not compose. So the leg is
-  the real body — induction over the chains, a per-chain leaf over the
-  path walk, and the store-growth transport the join needs.
+- **THE ROUND NOW STATES ITS CEILING ONCE AND SPENDS IT PER CHAIN, SO
+  THE STORE TRANSPORT IS WHAT THE JOIN RESTS ON.** `cascade-depth-go`
+  carries the store as a BOUND, which is what makes the induction go
+  through at chains walked on states their predecessors moved — and
+  the price is `chainStep-storeNest`, which says a chain's own step
+  never raises that bound. Nothing has instantiated it, and it is
+  suspect at the one place the store is written: registering a chain
+  admits `pathNestD κ ⊔ storeNestMax`, so a chain registering under a
+  deeper path is the shape that would refute it. So the leg is to
+  build that program and find out — a refutation moves the round's
+  ceiling, not the leaf.
 
 - **THE CEILING HAS NO BASE, AND THE TWO LADDERS HAVE TO MEET.**
   `CeilD` is threaded by every subscription statement in the nest walk
@@ -261,6 +261,13 @@ does not fit is a finding about the shared statement, not about the head.
   whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
   `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
   the cap has the room.
+- **`chainStep-storeNest`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: a
+  chain's step leaves the round's store bound where it found it. Registration
+  admits `pathNestD κ ⊔ storeNestMax`, so a chain registering under a deeper
+  path than the round entered at is the refutation shape.
+- **`cascadeLatch-storeNest`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`:
+  closing a spent source writes no nesting. It touches the live list's
+  completion flag and none of the four places the store's nesting is read from.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
@@ -269,10 +276,10 @@ does not fit is a finding about the shared statement, not about the head.
   now instantiated where they move — the store at the PARKING branch, tight to
   equality — and the subscribing branch is blocked rather than uncovered.
 
-- **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
-  `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
-  program's size. Both axes are now read at three instants and at the corner
-  where they compound, and the margin WIDENS with the instant.
+- **`chain-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
+  `REFUTED, DEAD ROUTE, PROBED`: ONE chain's descent under the round's ceiling,
+  the store entering as a bound. The rows read the round, whose descent is the
+  join over its chains, so they cover each chain at the tightest store there is.
 - **`subscribeE-fit`** (Sighted-Fit) — DIFFICULTY, `REFUTED×3, PROBED×2`: what
   ANY subscription's emitted VALUES cost, in the `nestB` currency against a
   `descW` bound. The family that kills the width-free form holds here at and

@@ -43,7 +43,7 @@
 -- ceiling admits and so the strongest reading: the grant is monotone
 -- in it, so a row holding here holds at every legal `descW` bound.
 -- TARGET: sight-all-walk @b9a208
--- TARGET: cascade-depth-sighted @ebd9e3
+-- TARGET: chain-depth-sighted @777064
 module Probed.Depth-Sighted where
 
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_)
