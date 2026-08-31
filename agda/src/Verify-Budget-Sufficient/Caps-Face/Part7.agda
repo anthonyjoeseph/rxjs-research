@@ -3781,11 +3781,37 @@ postulate
 -- a factor exponential in that cap.  What the arm needs is a bound on
 -- what the chain ACTUALLY stores, which the measured growth says is a
 -- step of one or seven, not a bound on what its path could cost.
+
+-- AND THE TIGHTER STATEMENT MAY NOT BE DEPTH-DENOMINATED, WHICH IS THE
+-- SECOND THING TO KNOW BEFORE TRYING.  The obvious repair replaces the
+-- path PRODUCT by the path's additive depth, which the cap has room
+-- for and which holds at every family the corpus reaches -- exactly,
+-- four against four, at the transforming frame.  It fails one
+-- step further along that same family: both nesting-depth measures
+-- read ZERO into a `deferᵉ` body, so a `map-f` whose function is a
+-- deferred constant hands the frame a value as deep as the constant
+-- while the charge does not move at all.  Whatever pays for the live
+-- arm has to see inside a deferred body, and only a SIZE measure does.
 --
+-- AND THE INDEX MAY NOT MOVE TO BUY THAT ROOM.  The cap's increment is
+-- size-denominated, so reading the round's ceiling at the SUCCESSOR
+-- cap is the one place a size charge would fit -- and the exponential
+-- room this face runs on is index-aligned by construction: its step
+-- lemma carries the hypothesis and the conclusion one instant apart
+-- and prices no summand at the cap after the one being bounded.  A
+-- ceiling at the successor cap is therefore asking the fuel at THIS
+-- instant for room the recurrence deliberately does not grant.
+--
+-- REFUTED: Refuted.Chain-Step-Live-Additive
 -- DEAD ROUTE: spending the unconditional live-growth bound and
 --   discharging its three disjuncts against the entry cap.  Two go;
 --   the third is the path factor above, and it is not repairable by a
 --   premise, only by a tighter growth statement.
+-- DEAD ROUTE: restating the whole walk one instant up, so the arms
+--   preserve the successor cap and the round's ceiling is read there.
+--   The entry lifts and the arms carry over, but the consumer does
+--   not: its fuel is the exponential at THIS instant, which the caps
+--   recurrence pins to this instant's cap.
 postulate
   chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -4443,23 +4469,28 @@ nestCap-sight≤exp e sl id =
 -- and the ceiling collapses to a multiple of it.  That collapse is the
 -- whole of what the run-side hypotheses buy.
 sight-nest≤exp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (S : ℕ) →
-  S ≤ nestCapAt e sl id →
-  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (B S : ℕ) →
+  S ≤ B →
+  nestDᵛ (arrTy a) (arrVal a) ≤ B →
+  nestUnit e sl ≤ B →
+  suc (sizeᵉ e) * suc (3 * B) ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)) →
   sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
-sight-nest≤exp {e = e} sl id a S hS hval =
-  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤3C))
-          (nestCap-sight≤exp e sl id)
+sight-nest≤exp {e = e} sl id a B S hS hval hu room =
+  ≤-trans (*-monoʳ-≤ (suc (sizeᵉ e)) (s≤s sum≤3B)) room
   where
-  C = nestCapAt e sl id
-  hu : nestUnit e sl ≤ C
-  hu = ≤-trans (≤-reflexive (sym (nestCapAt-0 e sl))) (nestCap-mono₀ e sl id)
-  eq : C + C + C ≡ 3 * C
-  eq = solve 1 (λ c → c :+ c :+ c := con 3 :* c) refl C
-  sum≤3C : nestDᵛ (arrTy a) (arrVal a) + S + nestUnit e sl ≤ 3 * C
-  sum≤3C =
+  eq : B + B + B ≡ 3 * B
+  eq = solve 1 (λ b → b :+ b :+ b := con 3 :* b) refl B
+  sum≤3B : nestDᵛ (arrTy a) (arrVal a) + S + nestUnit e sl ≤ 3 * B
+  sum≤3B =
     ≤-trans (+-mono-≤ (+-mono-≤ hval hS) hu) (≤-reflexive eq)
+
+-- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
+-- the recurrence nondecreasing after it.
+unit≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestUnit e sl ≤ nestCapAt e sl id
+unit≤cap e sl id =
+  ≤-trans (≤-reflexive (sym (nestCapAt-0 e sl))) (nestCap-mono₀ e sl id)
 
 -- AND THE FUEL HAS THAT ROOM, so the comparison the depth face owes
 -- the height is assembled rather than asserted.  The caps recurrence
@@ -4469,13 +4500,15 @@ sight-nest≤exp {e = e} sl id a S hS hval =
 -- between them, bought by the single spare registration the tower
 -- bracket leaves in the pooled walk.
 sighted-nest≤capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (S : ℕ) →
-  S ≤ nestCapAt e sl id →
-  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (B S : ℕ) →
+  S ≤ B →
+  nestDᵛ (arrTy a) (arrVal a) ≤ B →
+  nestUnit e sl ≤ B →
+  suc (sizeᵉ e) * suc (3 * B) ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)) →
   sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ capsH e sl id
-sighted-nest≤capsH {e = e} sl id a S hS hval =
-  ≤-trans (sight-nest≤exp sl id a S hS hval)
+sighted-nest≤capsH {e = e} sl id a B S hS hval hu room =
+  ≤-trans (sight-nest≤exp sl id a B S hS hval hu room)
           (capsAt-exp≤capsH e sl id)
 
 -- THE ROUND'S DEPTH FITS THE INSTANT'S FUEL, assembled rather than
@@ -4502,7 +4535,8 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≤ capsH e sl id
 cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
   ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest)
-          (sighted-nest≤capsH sl id a (nestCapAt e sl id) ≤-refl hval)
+          (sighted-nest≤capsH sl id a (nestCapAt e sl id) (nestCapAt e sl id)
+             ≤-refl hval (unit≤cap e sl id) (nestCap-sight≤exp e sl id))
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
