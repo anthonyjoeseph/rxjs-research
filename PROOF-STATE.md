@@ -214,15 +214,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 
 ### Big picture tier roadmap
-- **the two closure arms with no value ladder under them** — the fold
-  arm is now a body over its own ladder, so what is left is the arms
-  that rebuild NOTHING: the exiting inner passes its values on
-  untouched unless it DRAINS, and the thru-outer wraps them. Neither
-  has a `Frame-clos` lemma to stand on, because neither applies a
-  function; the reading has to come off the values already in hand,
-  and the only climb either needs is whatever the queue's history
-  costs. That makes the inner arm the risky one and the thru arm the
-  cheap one, so take them in that order.
+- **one spare level in the ladder the caps face reports into** — the
+  closure reading is the caps reading times the cap, and `clos-lift`
+  now pays for that factor with exactly ONE level, which is what both
+  proven closure arms spend. The two open arms SUBSCRIBE, so the only
+  caps reading for what they emit is the frame face's, whose report
+  saturates the level the walk widens everything to. So the whole
+  remaining question is whether that level has one to spare — a fact
+  about `fLvlD` against `stepFrame-caps`'s report, provable or
+  refutable without touching either arm, and settling it settles both.
 
 - **the queued entry's REACHED level, which is the drain head's last
   residue** — every other conjunct of `walk-frame-drain-inner` now
@@ -254,14 +254,15 @@ does not fit is a finding about the shared statement, not about the head.
   emitted inner costs the outer frame to subscribe. The value conjunct holds at
   the family that refuted it; the two STORE conjuncts keep the class, reading
   vacuously wherever the consume has been instantiated.
-- **`step-frame-clos-inner`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
-  exiting-inner head. It passes its values on untouched unless it DRAINS, and
-  the drained values come out of the node's queue. Instantiated at a parked
-  ladder: the drain is not free and its climb is a step per four layers.
-- **`step-frame-clos-thru`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the wrap
-  head, whose output is a constructor round a subscribed inner. Instantiated at
-  a substituting ladder: the constructor is the cheap half and the report
-  doubles per layer, so the charge is what earns the climb.
+
+- **`step-frame-clos-inner`** (Caps-Face/Part7) — SHAPE, `DEAD ROUTE, PROBED`:
+  the exiting-inner head. It DRAINS by subscribing what it finds parked, so
+  what it emits is priced by the subscribe ladder — and the closure reading
+  costs one level over the caps reading the ladder already saturates.
+- **`step-frame-clos-thru`** (Caps-Face/Part7) — SHAPE, `DEAD ROUTE, PROBED`:
+  the wrap head, whose output is a constructor round a SUBSCRIBED inner. Same
+  saturation as its sibling, and the same repair: the level the walk widens to
+  has to have one to spare, which is a fact about the ladder.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the

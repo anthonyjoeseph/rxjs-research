@@ -2654,10 +2654,22 @@ postulate
   -- and when it drains they come out of the node's QUEUE -- parked at
   -- whatever level was current when they were enqueued, which is not
   -- the level this head reads them at.  So the arm's second factor is
-  -- neither an arrival nor an accumulator but a history, and the climb
-  -- it needs is bought by the charge rather than by anything the
-  -- argument carries.
+  -- neither an arrival nor an accumulator but a history, and the drain
+  -- SUBSCRIBES what it finds parked, so what it emits is priced by the
+  -- subscribe ladder and not by anything the argument carries.
   --
+  -- DEAD ROUTE: through the frame face's own caps report.  The closure
+  --   reading is the caps reading times the cap and `clos-lift` pays
+  --   for that factor with exactly ONE level.  Both heads that remain
+  --   SUBSCRIBE, so the only caps reading available for what they emit
+  --   is `stepFrame-caps`'s, and that report is `L + j′ ≤ fLvlD` --
+  --   saturated at the very level the walk widens everything to.  The
+  --   closure conjunct therefore lands one level ABOVE it, and no
+  --   charge closes the gap, because the gap is not a charge: what is
+  --   missing is a level of SLACK in the ladder the caps face reports
+  --   into.  The two arms that are proven are proven because they
+  --   rebuild without subscribing, so their size ladder is frame-local
+  --   and the extra level fits inside `fCharge`.
   -- PROBED: `Probed.Step-Frame-Clos-Inner` reaches a PARKED queue by
   --   running a concurrency of one whose first lane stays open on a hot
   --   slot, then completes the exit at an instance no registration
@@ -2690,10 +2702,22 @@ postulate
   -- is not: what the frame hands on is what SUBSCRIBING the inner
   -- emitted, so the factor is the inner's own definition rather than
   -- anything the head can read, and an arrival of bounded reading can
-  -- emit a report that doubles per layer.  The `j′` here is therefore
-  -- earned the same way the fold arm's is -- by the charge -- and the
-  -- constructor is the cheap half of the arm.
+  -- emit a report that doubles per layer.  So the `j′` here is not the
+  -- fold arm's charge at all: it is whatever the subscribe cost, and
+  -- the constructor is the cheap half of the arm.
   --
+  -- DEAD ROUTE: through the frame face's own caps report.  The closure
+  --   reading is the caps reading times the cap and `clos-lift` pays
+  --   for that factor with exactly ONE level.  Both heads that remain
+  --   SUBSCRIBE, so the only caps reading available for what they emit
+  --   is `stepFrame-caps`'s, and that report is `L + j′ ≤ fLvlD` --
+  --   saturated at the very level the walk widens everything to.  The
+  --   closure conjunct therefore lands one level ABOVE it, and no
+  --   charge closes the gap, because the gap is not a charge: what is
+  --   missing is a level of SLACK in the ladder the caps face reports
+  --   into.  The two arms that are proven are proven because they
+  --   rebuild without subscribing, so their size ladder is frame-local
+  --   and the extra level fits inside `fCharge`.
   -- PROBED: `Probed.Step-Frame-Clos-Wrap` reaches the node by running a
   --   `mergeAll` and hands the head a substituting ladder as its
   --   argument: four layers are admitted at the arrival's own level

@@ -25,7 +25,7 @@ open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Sum     using (inj₁; inj₂)
 open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; cong; cong₂; subst)
+  using (_≡_; refl; sym; cong; cong₂; subst)
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; Timed; after_,_)
 open import Rx.Exp       using (Ty; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; _≟ᵗ_; isData; Ctx; Closed; Val; sizeᵗ; sizeᵛ; Fn;
@@ -484,6 +484,46 @@ mapFrame-caps {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC fS vC =
     ∧-intro (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (sz v hd))) (T⇒≡true _ (≤⇒≤ᵇ (wd v hd))))
             (go vs tl)
 
+-- THE CLOSURE READING IS THE CAPS READING TIMES THE CAP, AND ONE
+-- LEVEL PAYS FOR THAT FACTOR.  A value's key is read THROUGH the slot
+-- telescope, the telescope is capped by the slot premise, so the key
+-- is at most the size cap times the value's PLAIN size -- and a level
+-- multiplies the size field by roughly twice itself.  So any list the
+-- caps face has already priced at a level is priced for closure one
+-- level up, whatever produced it.
+--
+-- WHICH IS WHY A SUBSCRIBING FRAME'S CLOSURE CANNOT BE IN A NARROWER
+-- CURRENCY THAN ITS CAPS READING: this is the only route from a value
+-- to its key that does not re-derive the value, and it inherits
+-- whatever ladder priced the size.
+clos-lift : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (j : ℕ) (sl : Slots Γ)
+  (vs : List (Val Γ u)) →
+  2 ≤ Caps.cSize c →
+  slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+  all (λ v → sizeᵛ u v ≤ᵇ Caps.cSize (frameStep j c)) vs ≡ true →
+  all (nestClosOK?ᵛ (frameStep (suc j) c) sl u) vs ≡ true
+clos-lift {Γ = Γ} {u = u} c j sl vs 2≤S slC vC =
+  all-impl (λ v → sizeᵛ u v ≤ᵇ Caps.cSize (frameStep j c))
+           (nestClosOK?ᵛ (frameStep (suc j) c) sl u)
+           (λ v hv → closSizeᵛ-OK (frameStep (suc j) c) sl u v (sz v hv))
+           vs vC
+  where
+  S   = Caps.cSize c
+  B   = Caps.cSize (frameStep j c)
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  σ≤S : ∀ i → slotClos sl i ≤ S
+  σ≤S i = slotsCaps?-clos S (Caps.cWid c) sl i slC
+  eqStep : Caps.cSize (frameStep (suc j) c) ≡ S * suc (2 * B)
+  eqStep = iterSize-suc S j S
+  B≤ : B ≤ suc (2 * B)
+  B≤ = ≤-trans (m≤m+n B (B + 0)) (n≤1+n (B + (B + 0)))
+  sz : (v : Val Γ u) → (sizeᵛ u v ≤ᵇ B) ≡ true →
+       closSizeᵛ (slotClos sl) u v ≤ Caps.cSize (frameStep (suc j) c)
+  sz v hv =
+    ≤-trans (≤-trans (closSizeᵛ≤mul (slotClos sl) S σ≤S 1≤S u v)
+                     (*-monoʳ-≤ S (≤-trans (≤ᵇ⇒≤ (sizeᵛ u v) B (T-to hv)) B≤)))
+            (≤-reflexive (sym eqStep))
+
 -- ONE map-f FRAME'S CLOSURE LADDER, AND THE ARGUMENT'S OWN CLOSURE IS
 -- NOT WHAT PAYS FOR IT.  The rebuilt value's key is read THROUGH the
 -- slot telescope and the telescope is capped, so the key is at most
@@ -507,43 +547,31 @@ mapFrame-clos : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   all (valCaps? (frameStep j c) sl s) vals ≡ true →
   all (nestClosOK?ᵛ (frameStep (j + suc (sizeᵗ fn)) c) sl u)
       (map (applyFn fn) vals) ≡ true
-mapFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC vC = go vals vC
+mapFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn vals 2≤S slC vC =
+  subst (λ k → all (nestClosOK?ᵛ (frameStep k c) sl u)
+                   (map (applyFn fn) vals) ≡ true)
+        (sym (+-suc j a))
+        (clos-lift c (j + a) sl (map (applyFn fn) vals) 2≤S slC (go vals vC))
   where
   S   = Caps.cSize c
   B   = Caps.cSize (frameStep j c)
   a   = sizeᵗ fn
   1≤S = ≤-trans (s≤s z≤n) 2≤S
-  X   = iterSize S (j + a) S
-  σ≤S : ∀ i → slotClos sl i ≤ S
-  σ≤S i = slotsCaps?-clos S (Caps.cWid c) sl i slC
-  eqStep : Caps.cSize (frameStep (j + suc a) c) ≡ S * suc (2 * X)
-  eqStep = trans (cong (λ k → iterSize S k S) (+-suc j a))
-                 (iterSize-suc S (j + a) S)
-  X≤ : X ≤ suc (2 * X)
-  X≤ = ≤-trans (m≤m+n X (X + 0)) (n≤1+n (X + (X + 0)))
   sz : (v : Val Γ s) → valCaps? (frameStep j c) sl s v ≡ true →
-       closSizeᵛ (slotClos sl) u (applyFn fn v)
-         ≤ Caps.cSize (frameStep (j + suc a) c)
+       sizeᵛ u (applyFn fn v) ≤ Caps.cSize (frameStep (j + a) c)
   sz v hv =
-    ≤-trans (≤-trans (closSizeᵛ≤mul (slotClos sl) S σ≤S 1≤S u (applyFn fn v))
-                     (*-monoʳ-≤ S (≤-trans szv X≤)))
-            (≤-reflexive (sym eqStep))
-    where
-    szv : sizeᵛ u (applyFn fn v) ≤ X
-    szv = ≤-trans (applyFn-iterSize S B 1≤S fn v
-                     (≤ᵇ⇒≤ (sizeᵛ s v) B
-                        (T-to (valCaps?-size (frameStep j c) sl s v hv))))
-                  (≤-reflexive (sym (iterSize-+ S j a S)))
+    ≤-trans (applyFn-iterSize S B 1≤S fn v
+               (≤ᵇ⇒≤ (sizeᵛ s v) B
+                  (T-to (valCaps?-size (frameStep j c) sl s v hv))))
+            (≤-reflexive (sym (iterSize-+ S j a S)))
   go : (vs : List (Val Γ s)) → all (valCaps? (frameStep j c) sl s) vs ≡ true →
-       all (nestClosOK?ᵛ (frameStep (j + suc a) c) sl u)
+       all (λ w → sizeᵛ u w ≤ᵇ Caps.cSize (frameStep (j + a) c))
            (map (applyFn fn) vs) ≡ true
   go []       h = refl
   go (v ∷ vs) h
     with ∧-true (valCaps? (frameStep j c) sl s v)
                 (all (valCaps? (frameStep j c) sl s) vs) h
-  ... | hd , tl =
-    ∧-intro (closSizeᵛ-OK (frameStep (j + suc a) c) sl u (applyFn fn v) (sz v hd))
-            (go vs tl)
+  ... | hd , tl = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (sz v hd))) (go vs tl)
 
 -- ONE scan-f FRAME'S SIZE LADDER.  Here the folds DO compose — scanVals
 -- threads the accumulator, so payload i is `applyFn` applied i times —
@@ -732,34 +760,19 @@ scanFrame-clos : ∀ {n} {Γ : Ctx n} {s u} (c : Caps) (j : ℕ) (sl : Slots Γ)
   all (nestClosOK?ᵛ (frameStep (j + suc (length vals * suc (sizeᵗ fn))) c) sl u)
       (proj₁ (scanVals fn ac0 vals)) ≡ true
 scanFrame-clos {Γ = Γ} {s = s} {u = u} c j sl fn ac0 vals 2≤S slC aC vC =
-  all-impl (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
-           (nestClosOK?ᵛ (frameStep (j + suc a) c) sl u)
-           (λ w hw → closSizeᵛ-OK (frameStep (j + suc a) c) sl u w (sz w hw))
-           (proj₁ (scanVals fn ac0 vals))
-           (proj₁ SV)
+  subst (λ k → all (nestClosOK?ᵛ (frameStep k c) sl u)
+                   (proj₁ (scanVals fn ac0 vals)) ≡ true)
+        (sym (+-suc j a))
+        (clos-lift c (j + a) sl (proj₁ (scanVals fn ac0 vals)) 2≤S slC
+          (all-impl (λ w → sizeᵛ u w ≤ᵇ iterSize S a B)
+                    (λ w → sizeᵛ u w ≤ᵇ Caps.cSize (frameStep (j + a) c))
+                    (λ w hw → subst (λ k → (sizeᵛ u w ≤ᵇ k) ≡ true)
+                                    (sym (iterSize-+ S j a S)) hw)
+                    (proj₁ (scanVals fn ac0 vals)) (proj₁ SV)))
   where
-  S   = Caps.cSize c
-  B   = Caps.cSize (frameStep j c)
-  a   = length vals * suc (sizeᵗ fn)
-  1≤S = ≤-trans (s≤s z≤n) 2≤S
-  X   = iterSize S (j + a) S
-  σ≤S : ∀ i → slotClos sl i ≤ S
-  σ≤S i = slotsCaps?-clos S (Caps.cWid c) sl i slC
-  eqStep : Caps.cSize (frameStep (j + suc a) c) ≡ S * suc (2 * X)
-  eqStep = trans (cong (λ k → iterSize S k S) (+-suc j a))
-                 (iterSize-suc S (j + a) S)
-  X≤ : X ≤ suc (2 * X)
-  X≤ = ≤-trans (m≤m+n X (X + 0)) (n≤1+n (X + (X + 0)))
-  sz : (w : Val Γ u) → (sizeᵛ u w ≤ᵇ iterSize S a B) ≡ true →
-       closSizeᵛ (slotClos sl) u w ≤ Caps.cSize (frameStep (j + suc a) c)
-  sz w hw =
-    ≤-trans (≤-trans (closSizeᵛ≤mul (slotClos sl) S σ≤S 1≤S u w)
-                     (*-monoʳ-≤ S (≤-trans szw X≤)))
-            (≤-reflexive (sym eqStep))
-    where
-    szw : sizeᵛ u w ≤ X
-    szw = ≤-trans (≤ᵇ⇒≤ (sizeᵛ u w) (iterSize S a B) (T-to hw))
-                  (≤-reflexive (sym (iterSize-+ S j a S)))
+  S  = Caps.cSize c
+  B  = Caps.cSize (frameStep j c)
+  a  = length vals * suc (sizeᵗ fn)
   SV = scanVals-size S B 2≤S fn ac0 vals
          (≤ᵇ⇒≤ (sizeᵛ u ac0) B
             (T-to (valCaps?-size (frameStep j c) sl u ac0 aC)))
