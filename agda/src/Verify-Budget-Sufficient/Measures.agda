@@ -265,29 +265,27 @@ boundedNode B (exhaust-st _ _)     = true
 -- so the node predicate stays a function of the node: the schedule
 -- carries the slots, and the conjunct reads them off it at the one
 -- place the two meet.
--- AND THE QUEUE'S LENGTH IS NOT AMONG WHAT THIS BOUNDS, WHICH IS NOW
--- AN OBLIGATION AND NOT MERELY AN ABSENCE.  Every conjunct here is
--- PER ENTRY -- each parked term's size, with room above it for the
--- frame the drain will open -- so a queue of any length satisfies it.
--- That was free while nothing asked; the drain's ceiling fold asks,
--- because it spends one unit of the frame's remaining operator
--- measure per entry and so names the length in its measure.  A bound
--- on the length is therefore owed HERE, where the queue is bounded at
--- all, rather than at the fold: a hypothesis at the fold obliges
--- today's caller, while a conjunct here obliges the parking write.
+-- AND THE QUEUE'S LENGTH IS NOT AMONG WHAT THIS BOUNDS, AND IS NOT
+-- OWED HERE EITHER, BECAUSE THE WIDTH HALF OF THE SAME RECORD ALREADY
+-- CARRIES IT.  Every conjunct here is PER ENTRY -- each parked term's
+-- size, with room above it for the frame the drain will open -- so a
+-- queue of any length satisfies this predicate; the drain's ceiling
+-- fold does name the length, spending one unit of the frame's
+-- remaining operator measure per entry, and the cardinality it needs
+-- is `widNode`'s second conjunct, stated at the WIDTH cap and
+-- re-established by the same parking write that widens the per-entry
+-- half.  The two caps are not interchangeable and the width one is
+-- the right home: a cons costs one unit of width and nothing of size,
+-- which is why the push already pays for it there.
 --
--- AND THE CAP IT CAN BE STATED AT IS THE SLOT VOCABULARY, NOT THE
--- PROGRAM'S SYNTAX.  A source whose entries sit inside the program
--- cannot make the queue outgrow `sizeᵉ`; a SCRIPT can, and does.
--- Instantiated in `Probed.Drain-Queue-Length`: a limit-one merge over
--- a scripted input mapped to deferred inners parks one short of the
--- script -- two, five and eleven at scripts of three, six and twelve
--- -- against a syntax size of eight that does not move, so a length
--- bound naming `sizeᵉ` alone is refuted before it is written, while
--- the slot vocabulary sits two above the script and dominates at
--- every length.  What that probe does NOT reach, and what a field
--- stated here would still owe, is a source that parks without a
--- script and a merge nested inside another's drain.
+-- The length is measured in `Probed.Drain-Queue-Length`: a limit-one
+-- merge over a scripted input mapped to deferred inners parks one
+-- short of the script -- two, five and eleven at scripts of three,
+-- six and twelve -- against a syntax size of eight that does not
+-- move, so a length bound naming `sizeᵉ` alone would be refuted
+-- before it was written.  What that probe does not reach is a source
+-- that parks without a script and a merge nested inside another's
+-- drain.
 
 parkRoom : ∀ {n} {Γ : Ctx n} → ℕ → ℕ → NodeState Γ → Bool
 parkRoom B Z (scan-st _)        = true

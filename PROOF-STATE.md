@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE QUEUE'S LENGTH BECOMES A RECORD FIELD.** The drain's fold
-  holds ONE ceiling at the frame's level and spends one operator unit
-  per entry, so its measure names the queue's LENGTH — and every
-  conjunct of the park record is per entry, so a queue of any length
-  satisfies it. The probe settles which cap it can be stated at: a
-  scripted source parks one short of the script while the program's
-  syntax does not move, so a bound naming `sizeᵉ` is refuted, and the
-  slot vocabulary dominates at every length. So the leg is the field
-  and its cascade — the parking write re-establishing it, the drain
-  reading it — and only then the receipt the walk owes.
-
 - **THE ENTRY FOLD IS REFUTED, AND ITS EXPONENT IS WHAT MOVES** —
   `subscribeE-fit` prices a subscription's emitted values at a tower
   over `syncSizeᵉ`, which reads ONE at a scripted input, so a cold
@@ -247,6 +236,19 @@ does not fit is a finding about the shared statement, not about the head.
   instant grows. It is the largest DIFFICULTY row in the tier that is
   independent of the drain entirely, so it is what the schedule should
   hold while the ceiling question is out for a ruling.
+
+- **THE CEILING HAS NO BASE, AND THE TWO LADDERS HAVE TO MEET.**
+  `CeilD` is threaded by every subscription statement in the nest walk
+  and MANUFACTURED by none: every one of its lemmas either takes one
+  and returns one or reads a level off one, so the whole apparatus is
+  fed by hypothesis down to the drain, whose producer is a postulate.
+  What the walk holds instead is a reached level in the DELIVERY
+  ladder — `Reached`, with its remaining gas, and `ring-room` turning
+  that into the conclusion `ceil-here` gives.
+  So the leg is the bridge between the two currencies: the subscribe
+  ledger's `opIterD` sweep from a level against the delivery walk's
+  entry at that level, which is what lets the walk hand the drain a
+  ceiling instead of asserting one.
 
 ### The ledger
 
