@@ -226,14 +226,14 @@ does not fit is a finding about the shared statement, not about the head.
   carrier is not the move: what a queued term is charged is what has
   to change, and that is Anthony's question rather than a grind.
 
-- **the drain's ENTRY and WALK halves, which the ceiling does not
-  block** — `sight-all-stream` prices what the payload's emitted values
-  cost and `sight-all-walk` what walking them costs, one leaf for all
-  three `*All` heads. Both are inhabited at the duplicating family that
-  refuted their predecessors, so the design risk is spent and what is
-  left is the induction over the emitted stream. Neither mentions a
-  parked term, which is why they are the leg to take while the entry's
-  own obligation is out for a ruling.
+- **the drain's ENTRY half, now stated where it can be induced on** —
+  `sight-all-stream` is a body over `subscribeE-fit`, which prices ANY
+  subscription's emitted values at the path they are delivered under, so
+  the head's node, its limit and which of the three spellings it wears
+  reach the statement not at all. What remains is the induction over the
+  evaluator itself, and its one missing piece is a per-value reading at
+  types other than `obs`, which the descent's own induction never needed.
+  `sight-all-walk` follows it, reading the fold this leg establishes.
 
 
 - **the cascade's own descent, which is the tier's other risk and
@@ -255,10 +255,10 @@ does not fit is a finding about the shared statement, not about the head.
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
   equality — and the subscribing branch is blocked rather than uncovered.
-- **`sight-all-stream`** (Depth-Sighted) — DIFFICULTY, `REFUTED×2, PROBED`: the
-  drain's ENTRY half, a claim about the payload's emitted VALUES. The fold is
-  now inhabited at the duplicating family that refuted its predecessor, and at
-  three layers of it.
+- **`subscribeE-fit`** (Depth-Sighted) — DIFFICULTY, `REFUTED×2, PROBED`: what
+  ANY subscription's emitted VALUES cost, read at the path they are delivered
+  under. The `*All` entry is a body over it now, and the fold is inhabited at
+  the family that refuted its predecessor.
 
 - **`cascade-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
   `REFUTED, PROBED`: a round's descent under its sighted nesting scaled by the
