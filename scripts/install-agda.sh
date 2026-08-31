@@ -47,6 +47,14 @@ log "Agda ${AGDA_VERSION} (cabal)"
 if command -v agda >/dev/null 2>&1 && [ "$(agda --numeric-version 2>/dev/null)" = "$AGDA_VERSION" ]; then
   echo "Agda ${AGDA_VERSION} already installed at $(command -v agda)"
 else
+  # cabal's default secure-repo (TUF) fetch reaches for CDN mirror hosts that
+  # some sandboxed environments block at the network-policy layer, even
+  # though hackage.haskell.org itself is reachable. Force legacy fetching
+  # (stays on that one host) before the first `cabal update`.
+  cabal user-config init -f >/dev/null 2>&1 || true
+  if [ -f "$HOME/.cabal/config" ] && ! grep -q '^\s*secure: False' "$HOME/.cabal/config"; then
+    sed -i '/^repository hackage.haskell.org/,/^$/ s/^\(\s*\)-- secure: True/\1secure: False/' "$HOME/.cabal/config"
+  fi
   cabal update
   cabal install "Agda-${AGDA_VERSION}" --overwrite-policy=always
 fi
