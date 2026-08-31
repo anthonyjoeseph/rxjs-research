@@ -2,7 +2,7 @@
 -- THE REGISTRY ARM AT THE ONE SHAPE THAT DEEPENS A REGISTRATION: *All
 -- FRAMES STACKED ROOTWARD OF THE LEAF, NOT NESTED INSIDE THE VALUE.
 --
--- TARGET: chainStep-nest-regsC @c7e44c
+-- TARGET: chainStep-nest-regsC @b7e851
 --
 -- WHY THIS PROGRAM AND NOT A DEEPER VALUE.  A registration carries the
 -- path of the CONTINUATION it hangs off, and only `thru-outer` counts

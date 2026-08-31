@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY ARM'S TIE IS A ROUTE, AND THE ARM IS WHERE IT GETS
-  SPENT.** The rootward family reads the fold EQUAL either side of a
-  chain at both stack depths, and the reason is the measure: a frame is
-  charged the `thru-outer` frames the observable it carries will push,
-  and where the count stops at a defer gate the defer's own
-  registration adds back the frame the gate dropped. So a chain leaves
-  nothing deeper than the path it came from — which is a proof shape,
-  not a coverage claim. The leg is to write it: `chainStep-nest-regsC`
-  becomes a real body over per-frame leaves, taking the chain's own
-  path out of the registry it is read against.
+- **THE REGISTRY ARM CAN NOW BE WRITTEN, AND THE BODY IS THE LEG.** The
+  premise the route needs is in place: the chain's own depth plus the
+  arrival's nesting, under the unit, derived at the walk from the
+  cascade-level join rather than assumed. What remains is the induction
+  it was added for — `chainStep` is `foldPath`, so the body walks the
+  path frame by frame, with the potential non-increasing at each: a map
+  frame spends its own charge into the values it produces, and a
+  thru-outer spends one frame into the registration it mints. The leg
+  is that walk, over per-frame leaves, in its own module.
 
 - **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
   INSTANTIATED.** The fold's grant carries a width, so the bridge's own
@@ -268,9 +267,9 @@ does not fit is a finding about the shared statement, not about the head.
   stated — the increment sits on the caps recurrence — but its syntactic
   surrogate runs.
 - **`chainStep-nest-regsC`** (Caps-Face/Part7) — FALSITY, `PROBED×3`: the
-  registry after one chain, charged to one instant's increment. The whole-walk
-  version is proven, but against the entry store times a factor, which is the
-  shape a walk cannot carry.
+  registry after one chain, charged to the instant's cap. It now carries the
+  chain's own depth as a premise, derived at the walk from the cascade-level
+  join, since neither the size premise nor `pathSz?` reaches that quantity.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
   it, and `descW` is sealed, so only the conclusion side is reachable.
