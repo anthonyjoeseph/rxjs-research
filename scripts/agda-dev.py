@@ -500,6 +500,10 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
     # the reordering.  Source order is scope-valid by construction -- the
     # file compiles -- so keeping each stub where it already sits needs no
     # regex enumerating what a signature may mention.
+    def is_term_pragma(it) -> bool:
+        return (it.name is None and "TERMINATING" in
+                "\n".join(p.lines[it.start : it.end]))
+
     def back_up(B: int) -> int:
         while True:
             moved = False
@@ -510,8 +514,7 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
                 if ci is not None and si < B <= ci:
                     B = si
                     moved = True
-            while B > 0 and p.items[B - 1].name is None and "TERMINATING" in \
-                    "\n".join(p.lines[p.items[B - 1].start : p.items[B - 1].end]):
+            while B > 0 and is_term_pragma(p.items[B - 1]):
                 B -= 1
                 moved = True
             if not moved:
@@ -569,6 +572,18 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             if stub_lines is not None:
                 stub_lines[m] = (first, len(out))
             out.append("")
+        # A STUB IS A POSTULATE, AND NO TERMINATION PRAGMA MAY PRECEDE ONE.
+        # `back_up` keeps a stub from landing BETWEEN the pragma and its
+        # declaration, which is the placement question; this is the separate
+        # one it cannot answer.  When the annotated definition is itself
+        # replaced by a postulate the pragma has nothing left to annotate --
+        # ahead of the stub it is an InvalidTerminationCheckPragma, and
+        # behind it it silently re-aims at whatever declaration comes next.
+        # Either way `-W error` fails the module, in a file that is correct.
+        if is_term_pragma(it):
+            tgt = next((jt.name for jt in p.items[idx + 1:] if jt.name), None)
+            if tgt is not None and tgt in all_stubs:
+                continue
         if it.kind == "pass" and it.start == p.module_line:
             out.append(f"module {mod} where")
             continue
