@@ -55,6 +55,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st;
   sched-init; st-init)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Slot-Clos using (slotsClos)
+open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
 -- fnCapBounded?, regsB?, slotsFnCap, INV-parts, pathLen, the Bool
@@ -129,7 +130,7 @@ open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Rx.Frame-Width using (entryCeil)
-open import Rx.Burst-Ceil using (bCeilᵉ; slotsBCeil; bCeil≤ceil; slotsB≤slotsCeil)
+open import Rx.Burst-Ceil using (bCeil≤ceil; slotsB≤slotsCeil)
 open import Rx.Inputs-Below using (ib-topᵉ)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
@@ -1506,28 +1507,6 @@ abstract
 -- comparable at all, and it is the hypothesis the walk face's own
 -- burst lemmas already carry.
 --
--- AND IT IS MET BY THE BURST CEILING, NOT THE JOINED ONE, which is the
--- part that had to be found rather than written.  The joined ceiling
--- descends into defers and reads every measure at every node; a
--- subscribe frame does neither, and the gap is not slack -- it is
--- fatal at the μ head, where `descW` descends into the UNFOLDING while
--- a ceiling reads the body.  `bCeilᵉ` cuts at the defer exactly as the
--- descent does, which is the same mechanism that makes `hopD-unfoldμ`
--- an equality: a μ's variable is reachable only from under a defer, so
--- a ceiling that stops there cannot see the plug.  It is still under
--- the joined reading node for node, so the caps base goes on paying.
--- REFUTED: `Refuted.Ceil-Unfold-Mu` -- the joined ceiling is NOT
---   monotone across an unfold, and not by a constant either: the plug
---   lands once per occurrence, so k mentions of the μ-var read k copies
---   of the μ's own width against a ceiling that counted the var at
---   zero.  Eighteen against six at three mentions, twelve at two.
-postulate
-  descW-ceil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    descW g o κ id now sched st ≤ bCeilᵉ n sl o ⊔ slotsBCeil n sl
-
 entry-descW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   descW (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
     ≤ suc (entryCeil n ins e)

@@ -30,13 +30,15 @@
 module Rx.Burst-Ceil where
 
 open import Data.Nat  using (ℕ; _⊔_; _≤_; z≤n)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; ⊔-mono-≤; m≤n⊔m)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; ⊔-mono-≤; m≤m⊔n; m≤n⊔m)
+import Data.Fin as Fin
 open import Data.Fin  using (Fin)
 open import Data.List using (List; []; _∷_; tabulate)
+open import Data.Maybe using (Maybe)
 
 open import Rx.Exp using (Ctx; Exp; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ;
                           scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
-                          varᵉ; deferᵉ)
+                          varᵉ; deferᵉ; Fn; Tm; natᵗ; obs; _×ᵗ_)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
 open import Rx.Frame-Width
   using (outWⱽ; ceilᵉ; ownᵉ; kidsᵉ; ceilᵗ; slotCeil; slotsCeilgo; slotsCeil;
@@ -130,3 +132,60 @@ slotsBgo≤go j sl (i ∷ is) =
 slotsB≤slotsCeil : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) →
   slotsBCeil j sl ≤ slotsCeil j sl
 slotsB≤slotsCeil {n = n} j sl = slotsBgo≤go j sl (tabulate {n = n} (λ i → i))
+
+-- AND A SLOT IS UNDER THE TELESCOPE IT SITS IN, which is what the
+-- descent's connect clause spends: the walk re-enters on the
+-- definition, and the ceiling it has to land under is the telescope's
+-- rather than the node's.
+slotsBgo-tab : ∀ {n m} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ)
+  (f : Fin m → Fin n) (i : Fin m) →
+  slotBCeil j sl (sl (f i)) ≤ slotsBCeilgo j sl (tabulate f)
+slotsBgo-tab j sl f Fin.zero    = m≤m⊔n _ _
+slotsBgo-tab j sl f (Fin.suc i) =
+  ≤-trans (slotsBgo-tab j sl (λ k → f (Fin.suc k)) i) (m≤n⊔m _ _)
+
+slotsB-lb : ∀ {n} {Γ : Ctx n} (j : ℕ) (sl : Slots Γ) (i : Fin n) →
+  slotBCeil j sl (sl i) ≤ slotsBCeil j sl
+slotsB-lb j sl i = slotsBgo-tab j sl (λ k → k) i
+
+-- A CHILD IS UNDER ITS PARENT'S CEILING, one head at a time.  Every
+-- one of these is the right side of the join the ceiling already is,
+-- so they are the same projection wearing seven names -- and they are
+-- named rather than inlined because the descent's induction spends
+-- exactly one per clause and the operand of the join is stuck on the
+-- slot fuel, so an underscore does not solve.
+bCeil-map : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (j : ℕ) (sl : Slots Γ)
+  (f : Fn Γ Δᵍ Δ Θ s u) (b : Exp Γ Δᵍ Δ Θ s) →
+  bCeilᵉ j sl b ≤ bCeilᵉ j sl (mapᵉ f b)
+bCeil-map j sl f b = m≤n⊔m (outWⱽ j [] sl (mapᵉ f b)) (bCeilᵉ j sl b)
+
+bCeil-take : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (j : ℕ) (sl : Slots Γ)
+  (c : Tm Γ Δᵍ Δ Θ natᵗ) (b : Exp Γ Δᵍ Δ Θ u) →
+  bCeilᵉ j sl b ≤ bCeilᵉ j sl (takeᵉ c b)
+bCeil-take j sl c b = m≤n⊔m (outWⱽ j [] sl (takeᵉ c b)) (bCeilᵉ j sl b)
+
+bCeil-scan : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ s u} (j : ℕ) (sl : Slots Γ)
+  (f : Fn Γ Δᵍ Δ Θ (u ×ᵗ s) u) (z : Tm Γ Δᵍ Δ Θ u) (b : Exp Γ Δᵍ Δ Θ s) →
+  bCeilᵉ j sl b ≤ bCeilᵉ j sl (scanᵉ f z b)
+bCeil-scan j sl f z b = m≤n⊔m (outWⱽ j [] sl (scanᵉ f z b)) (bCeilᵉ j sl b)
+
+bCeil-merge : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (j : ℕ) (sl : Slots Γ)
+  (lim : Maybe ℕ) (b : Exp Γ Δᵍ Δ Θ (obs u)) →
+  bCeilᵉ j sl b ≤ bCeilᵉ j sl (mergeAllᵉ lim b)
+bCeil-merge j sl lim b = m≤n⊔m (outWⱽ j [] sl (mergeAllᵉ lim b)) (bCeilᵉ j sl b)
+
+bCeil-switch : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (j : ℕ) (sl : Slots Γ)
+  (b : Exp Γ Δᵍ Δ Θ (obs u)) →
+  bCeilᵉ j sl b ≤ bCeilᵉ j sl (switchAllᵉ b)
+bCeil-switch j sl b = m≤n⊔m (outWⱽ j [] sl (switchAllᵉ b)) (bCeilᵉ j sl b)
+
+bCeil-exhaust : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (j : ℕ) (sl : Slots Γ)
+  (b : Exp Γ Δᵍ Δ Θ (obs u)) →
+  bCeilᵉ j sl b ≤ bCeilᵉ j sl (exhaustAllᵉ b)
+bCeil-exhaust j sl b = m≤n⊔m (outWⱽ j [] sl (exhaustAllᵉ b)) (bCeilᵉ j sl b)
+
+-- AND THE READING AT THE NODE ITSELF, which is the other side of every
+-- one of them and is what the burst leaf lands on.
+outW≤bCeil : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u} (j : ℕ) (sl : Slots Γ)
+  (e : Exp Γ Δᵍ Δ Θ u) → outWⱽ j [] sl e ≤ bCeilᵉ j sl e
+outW≤bCeil j sl e = m≤m⊔n (outWⱽ j [] sl e) (bKidsᵉ j sl e)
