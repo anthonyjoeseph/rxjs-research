@@ -33,7 +33,7 @@ open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Maybe   using (nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n;
-  *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤)
+  *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; *-suc; *-identityʳ; ⊔-monoˡ-≤; ⊔-monoʳ-≤; ⊔-mono-≤; ^-monoʳ-≤)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; foldr)
@@ -55,6 +55,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st;
   sched-init; st-init)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Slot-Clos using (slotsClos)
+open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 
 -- the whole wet family (INV?, ΨAt, sizeCapAt, sizeCapAt-mono, valB?,
 -- fnCapBounded?, regsB?, slotsFnCap, INV-parts, pathLen, the Bool
@@ -114,7 +115,9 @@ open import Verify-Budget-Sufficient.Caps
   using (2≤capsAt-size; capsAt-base-size; capsAt-base-wid; dWᵉ≤capsAt-wid; sizeCount-body; frameBlowup;
   iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize; 1≤capsAt-reg; _⊑ᶜ_; Caps;
   caps; capsAt; capsAt-exp≤capsH; capsAt-suc-full; capsAt-⊑-suc; capsH; frameStep; frameStep-0;
-  frameStep-mono-j; sizeCount)
+  frameStep-mono-j; sizeCount; capsAt-entry-room)
+open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
+  using (entry-fit≤pow)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -127,6 +130,7 @@ open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Rx.Frame-Width using (entryCeil)
+open import Rx.Burst-Ceil using (bCeil≤ceil; slotsB≤slotsCeil)
 open import Rx.Inputs-Below using (ib-topᵉ)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
@@ -1495,10 +1499,22 @@ abstract
 -- entry cap's lower bound on the width is stated against exactly that
 -- number.  What is owed here is that the SEMANTIC widest burst under
 -- the root subscribe sits under that syntactic ceiling.
-postulate
-  entry-descW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    descW (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-      ≤ suc (entryCeil n ins e)
+-- AND THE ROOT IS AN INSTANCE OF A SUBTERM READING, which is what
+-- makes the entry provable at all rather than merely stated.  `descW`
+-- RECURSES, so a claim naming one term at `root` has nothing to induct
+-- on; the statement has to quantify over the subterm the recursion has
+-- reached.  The slots equation is what makes the slot clause
+-- comparable at all, and it is the hypothesis the walk face's own
+-- burst lemmas already carry.
+--
+entry-descW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  descW (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+    ≤ suc (entryCeil n ins e)
+entry-descW {n = n} e ins =
+  ≤-trans (≤-trans (descW-ceil (budgetAt e ins 0) ins e root 0 0
+                               (sched-init e ins) (st-init e) refl)
+                   (⊔-mono-≤ (bCeil≤ceil n ins e) (slotsB≤slotsCeil n ins)))
+          (n≤1+n (entryCeil n ins e))
 
 depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
@@ -1520,23 +1536,29 @@ depthE-sighted-root {n = n} e ins =
 -- this can be paid at all.
 --
 -- WHAT THE WIDTH COSTS IS THE TOP OF THE LADDER, AND ONLY THE TOP.
--- The fold's grant now doubles once per unit of program size per unit
--- of BURST WIDTH, so the exponent carries `entryCeil` -- a syntactic
--- ceiling with no upper reading anywhere in this tree, only the lower
--- bound the caps base is built from.  The entry cap has room for a
--- polynomial in its own size and a tower is not one, so the summands
--- against the cap are still assembled here and the comparison against
--- the cap's exponential is what is owed.
--- RECOVERY: `git show e2b61e5:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda`
---   restores the five-powers argument the leaf below supersedes --
---   `nestCap-sight-scaled≤exp`, `slotWrapSum≤size`, `slotWrap≤size` --
---   which is the ladder from a sum of vocabulary readings to
---   `2 ^ (2 ^ cSize)` and transfers whole once the exponent is bounded.
-postulate
-  entry-fit≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    suc (sizeᵉ e) * suc (fitG e ins n (suc (entryCeil n ins e)) root e
-                          + nestCapAt e ins 0 + nestUnit e ins)
-      ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
+-- The fold's grant doubles once per unit of program size per unit of
+-- BURST WIDTH, so the exponent carries `entryCeil`, and the entry cap
+-- has room for a polynomial in its own size where a tower is not one.
+-- The exponent is therefore split off and paid separately: everything
+-- the sighted entry reads -- the program, the slot telescope, the wrap
+-- unit, the nesting cap -- is a summand of the BASE cap's size, and the
+-- burst width IS the base cap's width, so the whole exponent is a
+-- linear reading of the two base coordinates.
+--
+-- AND THE WIDTH DOES HAVE AN UPPER READING, which is what makes the
+-- split pay rather than merely relocate.  A blowup's count is above
+-- both base coordinates at once and every size step at least multiplies
+-- by the size, so the size the base blowup LANDS on already dominates
+-- the linear reading -- `capsAt-entry-room` -- and the ladder from the
+-- sighted product up to one exponential of that reading is arithmetic
+-- in the vocabulary alone, which is where `entry-fit≤pow` proves it.
+entry-fit≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  suc (sizeᵉ e) * suc (fitG e ins n (suc (entryCeil n ins e)) root e
+                        + nestCapAt e ins 0 + nestUnit e ins)
+    ≤ 2 ^ (2 ^ Caps.cSize (capsAt e ins 0))
+entry-fit≤exp e ins =
+  ≤-trans (entry-fit≤pow e ins)
+          (^-monoʳ-≤ 2 (^-monoʳ-≤ 2 (capsAt-entry-room e ins)))
 
 sight-root≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   sightCeil (sizeᵉ e) (fitG e ins n (suc (entryCeil n ins e)) root e)

@@ -42,16 +42,17 @@ open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Bool using (false; T)
 open import Data.Nat using (ℕ; suc; _⊔_; _≤_)
-open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; m≤m⊔n; m≤n⊔m)
+open import Data.Nat.Properties using (≤-refl; ≤-reflexive; ≤-trans; m≤m⊔n; m≤n⊔m; ⊔-identityʳ)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
 open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; cong)
 
-open import Rx.Prim using (Tick; Id; Gas; g0; gs)
+open import Rx.Prim using (Tick; Id; Gas; g0; gs; ObservableInput)
 open import Rx.Exp using
   (Ctx; Closed; Exp; Val; Fn; Tm; natᵗ; obs; _×ᵗ_; unfoldμ; evalTm; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ;
-  switchAllᵉ; exhaustAllᵉ; μᵉ; input; inputsBelowᵉ)
+  switchAllᵉ; exhaustAllᵉ; μᵉ; input; inputsBelowᵉ; ofᵉ; emptyᵉ; deferᵉ;
+  isData)
 open import Rx.Slots using (Slot; scripted; shared)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer; from-inner; NodeId;
@@ -327,3 +328,163 @@ abstract
       (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
       ≤ drainW sf allNid κ id now (o ∷ q) sched st
   drainW-tail sf allNid κ id now o q sched st = m≤n⊔m _ _
+
+  -- AND THE JOIN ITSELF AT EVERY HEAD, which is what a proof ABOUT the
+  -- whole descent needs and the projections above deliberately do not
+  -- give.  A projection hands a consumer one side; an induction has to
+  -- discharge BOTH, so it needs the equation rather than either half.
+  -- Exporting the equation rather than a `⊔-lub` wrapper keeps the
+  -- elimination on the consumer's side, where the two bounds are
+  -- already in hand and the shape of the join is the only thing
+  -- missing.  The clauses are the seal's whole content at these heads,
+  -- so every body here is `refl`.
+  descW-map-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (f : Fn Γ [] [] [] s u) (b : Closed Γ s) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (mapᵉ f b) κ id now sched st
+      ≡ burstW g (mapᵉ f b) κ id now sched st
+          ⊔ descW g b (map-f f ↠ κ) id now sched st
+  descW-map-eq g f b κ id now sched st = refl
+
+  descW-scan-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u) (z : Tm Γ [] [] [] u)
+    (b : Closed Γ s) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (scanᵉ f z b) κ id now sched st
+      ≡ burstW g (scanᵉ f z b) κ id now sched st
+          ⊔ descW g b (scan-f f (proj₁ (mintNode sched)) ↠ κ) id now
+              (proj₂ (mintNode sched))
+              (installNode (proj₁ (mintNode sched)) (scan-st (evalTm z)) st)
+  descW-scan-eq g f z b κ id now sched st = refl
+
+  descW-merge-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (lim : Maybe ℕ) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (mergeAllᵉ lim b) κ id now sched st
+      ≡ burstW g (mergeAllᵉ lim b) κ id now sched st
+          ⊔ descW g b (thru-outer mergeAllᵒ (proj₁ (mintNode sched)) ↠ κ) id now
+              (proj₂ (mintNode sched))
+              (installNode (proj₁ (mintNode sched))
+                           (mergeAll-st {t = u} lim 0 [] false) st)
+  descW-merge-eq g lim b κ id now sched st = refl
+
+  descW-switch-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (switchAllᵉ b) κ id now sched st
+      ≡ burstW g (switchAllᵉ b) κ id now sched st
+          ⊔ descW g b (thru-outer switchᵒ (proj₁ (mintNode sched)) ↠ κ) id now
+              (proj₂ (mintNode sched))
+              (installNode (proj₁ (mintNode sched)) (switch-st nothing false) st)
+  descW-switch-eq g b κ id now sched st = refl
+
+  descW-exhaust-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Closed Γ (obs u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (exhaustAllᵉ b) κ id now sched st
+      ≡ burstW g (exhaustAllᵉ b) κ id now sched st
+          ⊔ descW g b (thru-outer exhaustᵒ (proj₁ (mintNode sched)) ↠ κ) id now
+              (proj₂ (mintNode sched))
+              (installNode (proj₁ (mintNode sched)) (exhaust-st false false) st)
+  descW-exhaust-eq g b κ id now sched st = refl
+
+  descW-mu-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (fuel : Gas) (body : Exp Γ (u ∷ []) [] [] u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW (gs fuel) (μᵉ body) κ id now sched st
+      ≡ burstW (gs fuel) (μᵉ body) κ id now sched st
+          ⊔ descW fuel (unfoldμ body) κ id now sched st
+  descW-mu-eq fuel body κ id now sched st = refl
+
+  descW-mu0-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (body : Exp Γ (u ∷ []) [] [] u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g0 (μᵉ body) κ id now sched st ≡ burstW g0 (μᵉ body) κ id now sched st
+  descW-mu0-eq body κ id now sched st = refl
+
+  -- AND THE FILTER HEAD IN BOTH DIRECTIONS OF ITS OWN SPLIT.  The count
+  -- is evaluated inside the clause, so neither reading is available
+  -- until it is in hand -- which is why this is two statements and not
+  -- one, and why each carries the equation as a hypothesis.
+  descW-take0-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    evalTm cnt ≡ 0 →
+    descW g (takeᵉ cnt b) κ id now sched st
+      ≡ burstW g (takeᵉ cnt b) κ id now sched st
+  descW-take0-eq g cnt b κ id now sched st h with evalTm cnt | h
+  ... | .0 | refl = ⊔-identityʳ _
+
+  descW-takeS-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (cnt : Tm Γ [] [] [] natᵗ) (b : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (k : ℕ) → evalTm cnt ≡ suc k →
+    descW g (takeᵉ cnt b) κ id now sched st
+      ≡ burstW g (takeᵉ cnt b) κ id now sched st
+          ⊔ descW g b (take-f (proj₁ (mintNode sched)) ↠ κ) id now
+              (proj₂ (mintNode sched))
+              (installNode (proj₁ (mintNode sched)) (take-st (suc k)) st)
+  descW-takeS-eq g cnt b κ id now sched st k h with evalTm cnt | h
+  ... | .(suc k) | refl = refl
+
+  descW-input-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (input i) κ id now sched st
+      ≡ burstW g (input i) κ id now sched st
+          ⊔ slotW g i κ id now sched st (Sched.slots sched i)
+  descW-input-eq g i κ id now sched st = refl
+
+  slotW-scripted-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    {ok : T (isData (lookup Γ i))} (v : ObservableInput (Val Γ (lookup Γ i))) →
+    slotW g i κ id now sched st (scripted {ok = ok} v) ≡ 0
+  slotW-scripted-eq g i κ id now sched st v = refl
+
+  slotW-shared-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (g : Gas) (i : Fin n) (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e)
+    (d : Closed Γ (lookup Γ i)) {ok : T (inputsBelowᵉ (toℕ i) d)} →
+    slotW g i κ id now sched st (shared d {ok = ok})
+      ≡ connW g i d κ id now sched st
+  slotW-shared-eq g i κ id now sched st d = refl
+
+  connW-g0-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (i : Fin n) (d : Closed Γ (lookup Γ i)) (κ : Path Γ (lookup Γ i) t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    connW g0 i d κ id now sched st ≡ 0
+  connW-g0-eq i d κ id now sched st = refl
+
+  connW-gs-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (fuel : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    connW (gs fuel) i d κ id now sched st
+      ≡ descW fuel d (share-sink i) id now sched
+          (register (toℕ i) κ
+            (record st { connectedShares = toℕ i ∷ EvalSt.connectedShares st }))
+  connW-gs-eq fuel i d κ id now sched st = refl
+
+  -- AND THE THREE HEADS THE DESCENT DOES NOT ENTER, where the join has
+  -- one side and the equation says so.  A defer is one of them, and
+  -- that is the whole reason a ceiling that stops at a defer can bound
+  -- this family at all.
+  descW-of-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (ts : List (Tm Γ [] [] [] u)) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (ofᵉ ts) κ id now sched st ≡ burstW g (ofᵉ ts) κ id now sched st
+  descW-of-eq g ts κ id now sched st = refl
+
+  descW-empty-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g emptyᵉ κ id now sched st ≡ burstW g emptyᵉ κ id now sched st
+  descW-empty-eq g κ id now sched st = refl
+
+  descW-defer-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (b : Exp Γ [] [] [] u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    descW g (deferᵉ b) κ id now sched st
+      ≡ burstW g (deferᵉ b) κ id now sched st
+  descW-defer-eq g b κ id now sched st = refl

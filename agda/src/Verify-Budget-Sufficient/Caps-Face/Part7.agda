@@ -4,7 +4,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7 where
 
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _∸_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (m+[n∸m]≡n; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤;
+open import Data.Nat.Properties using (m+[n∸m]≡n; *-assoc; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; *-cancelˡ-≤;
   ≤-trans; ≤-refl; ≤-reflexive; +-identityʳ; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤;
   *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤; ⊔-mono-≤;
   ⊔-identityʳ; m⊔n≤m+n; *-distribˡ-+; *-distribʳ-+; m≤m*n; ^-*-assoc; *-comm; +-suc; ≤-pred)
@@ -32,13 +32,14 @@ open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; c
   InstEvent)
 open import Rx.Exp       using (_×ᵗ_; obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵉ; sizeᵗ; sizeᵛ; Fn; applyFn)
 open import Rx.Frame-Width using (pWᵛ)
-open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; ent-step; reached-room; room-step; room-descend; base; walk)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-def; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; innerFinish-caps; stepFrame-caps)
+open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
+  (nestDᵛˢ; foldPath-nodes; nodesMax; burstsOK; capsWalkOK; dispatchCapsOK; frameClosOK; frameDrainOK;
   capsDrainOK;
   fac-hoist; one-pow; FaceOK; faceAt; shareCapsOK)
 open import Verify-Budget-Sufficient.Caps-Depth using
@@ -51,13 +52,18 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanLen; fanSq; delSize; delSq; delSq-monoᶜ; delSize-cap; delSq-cap; delSize-def; delSq-def)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (foldPath-nest-regs; PathΦHyp)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using
+  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; FrameΦHyp; valsΦ?;
+   stepFrame-nest-Φ; stepFrame-regsSz; foldPath-regsSz; Φ-to-bound)
+open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
+open import Verify-Budget-Sufficient.Live-Nest-Walk using
+  (foldPath-nest-live; PathLiveHyp; valsSz?; walk-LiveHyp-go)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; chainsNestF; chainsSzSum; pathNestF; 1≤pathNestF; 1≤chainsNestF;
   nest-telescope; nest-scale; pow-distrib-*; storeNestMax; nestCapAt; nestOK?; nestFacAt;
   nestFacAt-def; 1≤nestFacAt; nest-inflate; realWidAt; realWidAt-def; nestIncAt; nestIncAt-def;
   size≤nestIncAt; m≤m^burst; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum; liveNest;
-  nodeNest; regsNestMax; sightCeil; nestCapAt-0; nestCap-mono₀; nestOK?-latch; nestOK?-store;
+  nodeNest; regsNestMax; sightCeil; slotWrapSum; nestCapAt-0; nestCap-mono₀; nestOK?-latch; nestOK?-store;
   storeNestMax-lub; storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId; Chain; scan-st; take-st; mergeAll-st;
   switch-st; exhaust-st; setNode; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f; take-f;
@@ -65,7 +71,7 @@ open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; scanVals; RegId;
   chainsGo; cascadeGo; Path; arrTy; stepFrame; subscribeInner; mergeAllᵒ; switchᵒ; exhaustᵒ;
   thruWalk; thruWrap; innerFinish; innerReact; aliveThroughᶠ; cascade; sameSource; regAt;
   share-sink; root; dCapᶜ; dWalkᶜ; fLvlD; lvls; iterL; sLvlD; chainStep; budgetAt; arrTick;
-  shareAdmit; shareLatch; foldPath)
+  shareAdmit; shareLatch; foldPath; iterSize)
 open import Rx.Slots using (Slots; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -90,13 +96,13 @@ open import Verify-Budget-Sufficient.Deliveries using
   (delivN; delivN-cons; delivN-split; foldPath-sink-N; shareGo-cons-N; shareGo-skip-N;
   chainStep-deliv; cascadeGo-deliv; ⊑ᵈ-trans)
 open import Verify-Budget-Sufficient.Caps using
-  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
+  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; 8≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full;
   capsAt-⊑-suc; capsH; cDel; _⊑ᶜ_; cDel-body; dCapᶜ-mono; dWalkᶜ-mono; frameStep; frameStep-0;
   frameStep-mono-j; frameStep-reg-mono; iterL-infl; sucJ≤fLvlD; regAt-mono; iterL-mono;
   iterSize-mono-count; lvls-add; lvls-infl; lvls-mono; size≤sizeCount; sizeCount;
   sizeCount-body)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; reach-reset; ∧-true; all-impl)
+  (pathLen; reach-reset; ∧-true; all-impl; 2X≡X+X)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 -- the nesting measure the subscribe budget descends on, and the frame
@@ -132,9 +138,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   takeDispatch-caps; valsCaps?; valsCaps?-lvl; walkOK; walkOK-finish)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size; valCaps?-wid; valCaps?-widen)
-open import Decide using (T-to; T⇒≡true; ∧-intro)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
-  (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestCap-inc-sight≤capsH)
+  (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestCap-inc-sight≤capsH;
+   nestUnit≤size; iterSize≤walkFac; walkFac≤nestWalkAt)
 
 thruOuter-face :
   -- subscribeInner-caps  (.Subscribe-Face)
@@ -3829,78 +3836,6 @@ postulate
 -- application, so it is a fact the round has rather than a fact the
 -- round must acquire.
 --
--- AND THE ONE SITE THAT MOVES THE LIVE FOLD IS THE DEFERRED BODY,
--- WHICH IS WHY EVERY FAMILY IN THE CORPUS READS ZERO ON BOTH SIDES.  A
--- live source's nesting is the maximum nesting of its PENDING values,
--- and the evaluator mints a live carrying a value of positive nesting
--- in exactly one clause: subscribing a `deferᵉ`, whose pending entry is
--- the body itself at observable type.  A scripted slot cannot supply
--- one -- scripts are data-typed by construction -- so a reachable
--- growth has to be a body the PROGRAM produces mid-chain, which needs
--- an *All whose inner is a deferred nest reached through a mapping
--- frame.  A program of that shape reaches it and the arm holds there:
--- the fold rises with the nest while the charge rises with the syntax
--- that carries it, so the two grow together and the ordering is a race
--- rather than a constant against a zero.
---
--- REFUTED: Refuted.Chain-Step-Nodes
--- REFUTED: Refuted.Chain-Step-Live-Additive
--- DEAD ROUTE: spending the unconditional live-growth bound and
---   discharging its three disjuncts against the entry cap.  Two go;
---   the third is the path factor above, and it is not repairable by a
---   premise, only by a tighter growth statement.
--- DEAD ROUTE: restating the whole walk one instant up, so the arms
---   preserve the successor cap and the round's ceiling is read there.
---   The entry lifts and the arms carry over, but the consumer does
---   not: its fuel is the exponential at THIS instant, which the caps
---   recurrence pins to this instant's cap.
--- DEAD ROUTE: charging the arms the instant's INCREMENT, which is what
---   they carried while they mirrored the entry burst.  The increment's
---   own exponent reads the delivery at the NEXT instant, and the size
---   there is already a blowup story above the fuel available here, so
---   no reading of it fits under this instant's exponential.
--- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
---   RUNNING, at the one program shape that can move the fold: a `mapᵉ`
---   over the async input handing the outer *All a deferred nest per
---   arrival, so the chain the evaluator presents subscribes it and the
---   live it mints carries the body.  Covered: the fold rising 0 to 1
---   and 0 to 3 as the nest deepens, against a syntactic charge of
---   eighteen and twenty-six that the tree proves this arm's size cap
---   dominates -- so both sides move and the ordering is load-bearing
---   on the depth axis.  Not covered: a fold already nonzero at entry,
---   where the growth would compound rather than start from zero.
-postulate
-  chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    foldr (λ l acc → liveNest l ⊔ acc) 0
-          (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
-      ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-          ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
-
--- PROBED: `Probed.Chain-Step-Abs-Charge` reads this arm at the second
---   cascade of two reachable families, taking the chain the evaluator
---   itself presents rather than one built by hand -- five to six at the
---   fold family against a charge of thirty-three, eight to sixteen at
---   the demand family against seventy-one.  The charge read there is
---   the SYNTACTIC one the increment is proven to dominate, so a green
---   row is a stronger claim than the arm.  NOT covered: any family
---   whose chain deepens the node table by more than one step, and the
---   increment itself, which computes nowhere.
-postulate
-  chainStep-nest-nodesC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
-          (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
-      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
-          ⊔ (nestUnit e sl + Caps.cSize (capsAt e sl id))
 
 -- AND THIS ONE CARRIES THE CHAIN'S OWN DEPTH, which the two arms above
 -- do not.  A registration this chain mints sits at the frames of the
@@ -3920,32 +3855,231 @@ postulate
 -- still apply -- and the size premise is what bounds it without reading
 -- the run: each frame's size is under the cap and the path's length is
 -- too, so the factor is two to the cap SQUARED and no more.
+-- THE PATH'S OWN DEPTH ONLY GROWS ROOTWARD, which is what lets a
+-- premise taken at the chain's entry be spent at every frame the walk
+-- reaches: four clauses add a term's depth or nothing, and the outer
+-- frame adds one.
+pathNestD-step : ∀ {n} {Γ : Ctx n} {s u t} (f : Frame Γ s u) (p : Path Γ u t) →
+  pathNestD p ≤ pathNestD (f ↠ p)
+pathNestD-step (map-f fn)         p = m≤n+m (pathNestD p) (nestDᵗ fn)
+pathNestD-step (scan-f fn _)      p = m≤n+m (pathNestD p) (nestDᵗ fn)
+pathNestD-step (take-f _)         p = ≤-refl
+pathNestD-step (from-inner _ _ _) p = ≤-refl
+pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
+
+-- THE GRANT AT ONE OUTER FRAME, which was the whole of what the walk
+-- still owed: the four other frame kinds owe nothing, so a path with
+-- no `thru-outer` in it needs none of this.  What is owed is a SIGHTED
+-- grant covering the values that reach this frame -- a ceiling on each
+-- one's depth plus the store's per-slot wrap, which the delivery
+-- face's fit demands and the potential does not carry.
+--
+-- THE GRANT IS NAMED, NOT SEARCHED FOR: the path's remaining depth,
+-- plus the maximum depth in flight, plus the wrap the whole context
+-- can charge.  The first two come off the premises directly and the
+-- input guard is free once the context is read whole, so the only
+-- content is that the charge affords it -- and it does, in three
+-- pieces that each land on one summand.  The maximum in flight is
+-- paid by the outer frame's OWN factor, which is two to the cap and
+-- so at least two; the path's depth is under the unit twice over,
+-- since the unit is under the cap; and the wrap is charged at the cap
+-- while the grant spends it at the context's width, which is smaller.
+-- The doubling in the charge is what lets the first piece sit beside
+-- the other two rather than competing with them.
+walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
+  pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+         (thru-outer op nid ↠ p) vals ≡ true →
+  FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+            (thru-outer op nid) p vals sched
+walk-thru-fit {n = n} {e = e} sl id op nid p vals sched hsl hpz hnd hΦ =
+  n , G
+  , subst (λ z → ValsFit n z G p vals) (sym hsl)
+      (valsFit-of-max sl p vals M ≤-refl)
+  , *-cancelˡ-≤ 2
+      (≤-trans (≤-reflexive spread)
+        (≤-trans (+-mono-≤ hA2 hBC2)
+                 (≤-reflexive (sym (2X≡X+X (nestWalkAt e sl id))))))
+  where
+  S    = Caps.cSize (capsAt e sl id)
+  Q    = pathΦF S p
+  D    = pathNestD p
+  M    = nestDᵛˢ vals
+  W    = slotWrapSum sl
+  X    = nestUnit e sl + S + S * W
+  G    = D + M + n * W
+  hpp  : pathSz? S p ≡ true
+  hpp  = ∧-trueʳ hpz
+  2≤S  = 2≤capsAt-size e sl id
+  1≤S  = ≤-trans (s≤s z≤n) 2≤S
+  Q≤   : Q ≤ 2 ^ (S * S)
+  Q≤   = pathΦF-cap S p hpp
+  D≤   : D ≤ nestUnit e sl
+  D≤   = ≤-trans (n≤1+n D) hnd
+  n≤S  : n ≤ S
+  n≤S  = n≤capsAt-size e sl id
+  2≤2^S : 2 ≤ 2 ^ S
+  2≤2^S = ≤-trans (≤-reflexive (sym (*-identityʳ 2))) (^-monoʳ-≤ 2 1≤S)
+  -- the values in flight, paid by the outer frame's own factor
+  hA   : 2 ^ S * (Q * M) ≤ nestWalkAt e sl id
+  hA   = ≤-trans (≤-reflexive (sym (*-assoc (2 ^ S) Q M)))
+                 (Φ-to-bound S (nestWalkAt e sl id) (thru-outer op nid ↠ p)
+                             vals hΦ)
+  hA2  : 2 * (Q * M) ≤ nestWalkAt e sl id
+  hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
+  halfShape : ∀ q d → 2 * (q * d) ≡ q * (2 * d)
+  halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
+                        refl q d
+  -- the path's own depth, and the wrap, against the charge's own half
+  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ (S * S) * X
+  hBC  =
+    ≤-trans (+-mono-≤
+              (≤-trans (≤-reflexive (halfShape Q D))
+                       (*-mono-≤ Q≤ (≤-trans (*-monoʳ-≤ 2 D≤)
+                                       (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl)))
+                                                (+-monoʳ-≤ (nestUnit e sl)
+                                                  (nestUnit≤size e sl id))))))
+              (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
+            (≤-reflexive (sym (*-distribˡ-+ (2 ^ (S * S))
+                                (nestUnit e sl + S) (S * W))))
+  hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestWalkAt e sl id
+  hBC2 = subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
+               (sym (nestWalkAt-def e sl id))
+               (≤-trans (*-monoʳ-≤ 2 hBC)
+                        (≤-reflexive (sym (*-assoc 2 (2 ^ (S * S)) X))))
+  spread : 2 * (Q * (G + D))
+             ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
+  spread =
+    solve 4 (λ q d m w →
+               con 2 :* (q :* (d :+ m :+ w :+ d))
+                 := con 2 :* (q :* m)
+                    :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
+          refl Q D M (n * W)
+
+-- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
+-- which is the point of separating it from the walk below: the four
+-- silent kinds are units, so the walk's recursion never mentions them.
+frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (f : Frame Γ s u) (p : Path Γ u t)
+  (vals : List (Val Γ s)) (sched : Sched Γ) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
+  pathNestD (f ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) (f ↠ p) vals ≡ true →
+  FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+            f p vals sched
+frameΦ-fit sl id (map-f _)          p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (scan-f _ _)       p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (take-f _)         p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (from-inner _ _ _) p vals sched _ _ _ _ = tt
+frameΦ-fit sl id (thru-outer op nid) p vals sched hsl hpz hnd hΦ =
+  walk-thru-fit sl id op nid p vals sched hsl hpz hnd hΦ
+
+-- THE WALK ITSELF, and it is the fold's own recursion with the grant
+-- hung off each frame.  Nothing here is arithmetic: the potential is
+-- stepped by the frame law, the size receipt and the depth premise are
+-- read off the path's head, and the slot equality survives a frame
+-- because a frame never rewrites the schedule's slots.
+-- THE REGISTRY-SIDE GRANT FOR THE POTENTIAL, and it is the same gap the
+-- live arm's is: a sink hands the values to chains whose paths are in
+-- the registry, and the potential is a statement about a PATH, so the
+-- one the walk carries says nothing about theirs.  What makes it
+-- statable is that the registry is priced by the same size cap: an
+-- admitted path's factor is under the cap's exponential exactly as this
+-- chain's is, and its depth is under the same unit.
 postulate
-  -- THE GRANT AT EVERY OUTER FRAME OF ONE CHAIN, which is the whole of
-  -- what the walk still owes.  Four frame kinds owe nothing, so this
-  -- is a tuple of units on any path with no `thru-outer` in it; where
-  -- there IS one, what is owed is a sighted grant covering the values
-  -- reaching that frame -- and the caps recurrence already carries a
-  -- ceiling for exactly those values, one ceiling level per frame.
-  -- The route is to read the grant off that ceiling rather than to
-  -- rebuild one: iterating "the size grows by a factor per frame"
-  -- gives a bound two to the cap squared ABOVE the cap, which the
-  -- charge cannot afford, while the recurrence's own ceiling is what
-  -- the arm is stated against.
-  --
-  -- TWIN: `chain-walk-caps` is the same induction in the caps
-  --   currency, already proven -- it preserves a per-frame ceiling
-  --   across one frame at one stepped level, which is the shape the
-  --   grant here has to be extracted at.
-  chain-walk-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  walk-share-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
-    PathΦHyp (budgetAt e (Sched.slots sched) nextId) nextId (arrTick a)
-      (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-      path (arrVal a ∷ []) (Arrival.isLast a) sched st
+    regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+    nestUnit e sl ≤ nestUnit e sl →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+      (share-sink {t = t} i) vals ≡ true →
+    DispatchΦHyp sf gas nid now (Caps.cSize (capsAt e sl id))
+      (nestWalkAt e sl id) i vals fin sched st
+
+walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  pathNestD path ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) path vals ≡ true →
+  PathΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    path vals fin sched st
+walk-ΦHyp-go sl id sf gas nid now root vals fin sched st _ _ _ _ _ = tt
+walk-ΦHyp-go sl id sf gas nid now (share-sink i) vals fin sched st hsl _ hreg hnd hΦ =
+  walk-share-ΦHyp sl id sf gas nid now i vals fin sched st hsl hreg ≤-refl hΦ
+walk-ΦHyp-go {e = e} sl id sf gas nid now (f ↠ p) vals fin sched st hsl hpz hreg hnd hΦ =
+    hF
+  , walk-ΦHyp-go sl id sf gas nid now p (proj₁ step)
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step))))
+      (trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) hsl)
+      hpz′
+      (stepFrame-regsSz sf nid now f p vals fin sched st
+        (Caps.cSize (capsAt e sl id)) hpz hreg)
+      (≤-trans (pathNestD-step f p) hnd)
+      (stepFrame-nest-Φ sf nid now f p vals fin sched st
+        (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) hΦ hF)
+  where
+  step = stepFrame sf nid now f p vals fin sched st
+  hF = frameΦ-fit sl id f p vals sched hsl hpz hnd hΦ
+  B  = Caps.cSize (capsAt e sl id)
+  hpz′ : pathSz? B p ≡ true
+  hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
+                 (proj₂ (∧-true (frameSz? B f)
+                          ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+
+-- THE ARRIVAL'S OWN POTENTIAL, which is the entry reading BOTH the
+-- walk's side-condition and the fold's own premise are spent at: one
+-- value on the path, so the depth premise the arm was stated with is
+-- the whole of it once the path's factor is applied.
+entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (path : Path Γ (arrTy a) t) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) path
+         (arrVal a ∷ []) ≡ true
+entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
+  where
+  Sz = Caps.cSize (capsAt e sl id)
+  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+           ≤ nestWalkAt e sl id
+  Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
+               (sym (nestWalkAt-def e sl id))
+               (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
+                                  (^-monoʳ-≤ 2 (n≤1+n (Sz * Sz))))
+                         (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
+                                  (m≤m+n (nestUnit e sl + Sz)
+                                         (Sz * slotWrapSum sl))))
+
+-- AND THE CHAIN ENTERS THE WALK WITH IT, the path's remaining depth
+-- being under the same unit the arrival's is read against.
+chain-walk-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (gas : ℕ)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  PathΦHyp (budgetAt e (Sched.slots sched) nextId) gas nextId (arrTick a)
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-ΦHyp sl id a nextId gas path sched st hsl hp hreg hΦ =
+  walk-ΦHyp-go sl id _ gas nextId (arrTick a) path (arrVal a ∷ [])
+    (Arrival.isLast a) sched st hsl hp hreg
+    (≤-trans (m≤n+m (pathNestD path) (nestDᵛ (arrTy a) (arrVal a))) hΦ)
+    (entryΦ sl id a path hp hΦ)
 
 chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -3953,23 +4087,106 @@ chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
   regsNestMax (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
     ≤ regsNestMax (EvalSt.registry st)
       ⊔ (nestWalkAt e sl id)
-chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hΦ =
+chainStep-nest-regsC {e = e} sl id a nextId path sched st hsl hsz hp hreg hΦ =
   foldPath-nest-regs _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
     (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-    (∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl)
-    (chain-walk-ΦHyp sl id a nextId path sched st hsl hp hΦ)
+    (entryΦ sl id a path hp hΦ)
+    (chain-walk-ΦHyp sl id a nextId _ path sched st hsl hp hreg hΦ)
+
+-- THE NODES ARM IS THE SAME WALK AT THE OTHER PLACE A FRAME STORES,
+-- and it is the same three inputs: the entry potential, the walk's
+-- per-frame side-condition, and the fold.  What it adds to the
+-- registry arm's conclusion is the registry's own join, because a
+-- chain that reaches a share fans into paths this one does not walk
+-- and stores at their nodes -- the term the path-denominated reading
+-- was refuted for missing.  The consumer pays nothing for it: the
+-- round already holds the registry under the same ceiling.
+--
+-- AND IT TAKES THE DEPTH PREMISE THE REGISTRY ARM TAKES.  That is not
+-- a convenience of the one call site -- without it the walk has no
+-- entry potential, so there is no induction to run at all, and the
+-- monolithic form it replaces was asserting the whole walk rather
+-- than owing this.
+chainStep-nest-nodesC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+        (EvalSt.nodes (proj₂ (proj₂ (chainStep nextId a path sched st))))
+    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+        ⊔ regsNestMax (EvalSt.registry st)
+        ⊔ (nestWalkAt e sl id)
+chainStep-nest-nodesC {e = e} sl id a nextId path sched st hsl hsz hp hreg hΦ =
+  foldPath-nest-nodes _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    (entryΦ sl id a path hp hΦ)
+    (chain-walk-ΦHyp sl id a nextId _ path sched st hsl hp hreg hΦ)
+
+-- THE SIZE-SIDE SIDE CONDITION, DISCHARGED.  The walk reads the bound
+-- at the level it has reached and each frame moves the level by one,
+-- so what the caller owes is the entry reading -- which is the size
+-- premise it already carries -- and affordability at every level the
+-- path can reach.  A path legal under the size cap has at most a
+-- cap's worth of frames, so those levels stop at the cap and one
+-- arithmetic fact covers all of them.
+chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (gas : ℕ)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  PathLiveHyp (budgetAt e (Sched.slots sched) nextId) gas nextId (arrTick a)
+    (nestWalkAt e sl id) path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-LiveHyp {e = e} sl id a nextId gas path sched st hsl hsz hp hreg =
+  walk-LiveHyp-go _ gas nextId (arrTick a) S (nestWalkAt e sl id) 0 path
+    (arrVal a ∷ []) (Arrival.isLast a) sched st afford entrySz hp hreg
+    (pathSz?-len S path hp)
   where
-  Sz = Caps.cSize (capsAt e sl id)
-  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
-           ≤ nestWalkAt e sl id
-  Φfit = subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
-               (sym (nestWalkAt-def e sl id))
-               (*-mono-≤ (pathΦF-cap Sz path hp)
-                         (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz)))
+  S = Caps.cSize (capsAt e sl id)
+  afford : ∀ k → k ≤ S → iterSize S k S ≤ nestWalkAt e sl id
+  afford k hk =
+    ≤-trans (iterSize≤walkFac S k S (8≤capsAt-size e sl id) hk ≤-refl)
+            (walkFac≤nestWalkAt e sl id)
+  entrySz : valsSz? (iterSize S 0 S) (arrVal a ∷ []) ≡ true
+  entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ hsz)) refl
+
+-- THE LIVE ARM, the third and last of the chain's arms to become the
+-- walk rather than an assertion about it.  Two extra terms over the
+-- registry arm's conclusion: the slots, because a scripted slot's
+-- subscribe mints out of script data, and the registry's join, because
+-- a share fans into chains that mint out of their own.  The round
+-- holds all three under the same ceiling, so the consumer pays for
+-- neither.
+chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
+  foldr (λ l acc → liveNest l ⊔ acc) 0
+        (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+        ⊔ slotsNestSum (Sched.slots sched)
+        ⊔ regsNestMax (EvalSt.registry st)
+        ⊔ (nestWalkAt e sl id)
+chainStep-nest-liveC {e = e} sl id a nextId path sched st hsl hsz hp hreg hΦ =
+  foldPath-nest-live _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
+    (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+    (entryΦ sl id a path hp hΦ)
+    (chain-walk-ΦHyp sl id a nextId _ path sched st hsl hp hreg hΦ)
+    (chain-walk-LiveHyp sl id a nextId _ path sched st hsl hsz hp hreg)
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.
@@ -3984,24 +4201,46 @@ unit≤cap e sl id =
 -- These three price it against the program instead, so the walk's
 -- bound survives a chain exactly when it already covers one instant's
 -- increment, which is a condition on the bound and not on the walk.
+-- REFUTED: Refuted.Chain-Step-Nodes
+-- REFUTED: Refuted.Chain-Step-Live-Additive
+-- DEAD ROUTE: spending the unconditional live-growth bound and
+--   discharging its three disjuncts against the entry cap.  Two go;
+--   the third is the path factor above, and it is not repairable by a
+--   premise, only by a tighter growth statement.
+-- DEAD ROUTE: restating the whole walk one instant up, so the arms
+--   preserve the successor cap and the round's ceiling is read there.
+--   The entry lifts and the arms carry over, but the consumer does
+--   not: its fuel is the exponential at THIS instant, which the caps
+--   recurrence pins to this instant's cap.
+-- DEAD ROUTE: charging the arms the instant's INCREMENT, which is what
+--   they carried while they mirrored the entry burst.  The increment's
+--   own exponent reads the delivery at the NEXT instant, and the size
+--   there is already a blowup story above the fuel available here, so
+--   no reading of it fits under this instant's exponential.
 chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
   nestWalkAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   storeNestMax (proj₁ (proj₂ (chainStep nextId a path sched st)))
                (proj₂ (proj₂ (chainStep nextId a path sched st))) ≤ S
-chainStep-store≤ {e = e} sl id a nextId S path sched st hsl hsz hp hΦ hinc hS =
+chainStep-store≤ {e = e} sl id a nextId S path sched st hsl hsz hp hreg hΦ hinc hS =
   storeNestMax-lub sd′ st′ S SL
-    (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz hp)
-             (⊔-lub (≤-trans (storeNest-live≤  sched st) hS) (≤-trans flat hinc)))
-    (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz hp)
-             (⊔-lub (≤-trans (storeNest-nodes≤ sched st) hS) (≤-trans flat hinc)))
-    (≤-trans (chainStep-nest-regsC  sl id a nextId path sched st hsl hsz hp hΦ)
+    (≤-trans (chainStep-nest-liveC  sl id a nextId path sched st hsl hsz hp hreg hΦ)
+             (⊔-lub (⊔-lub (⊔-lub (≤-trans (storeNest-live≤  sched st) hS)
+                                  (≤-trans (storeNest-slots≤ sched st) hS))
+                           (≤-trans (storeNest-regs≤ sched st) hS))
+                    hinc))
+    (≤-trans (chainStep-nest-nodesC sl id a nextId path sched st hsl hsz hp hreg hΦ)
+             (⊔-lub (⊔-lub (≤-trans (storeNest-nodes≤ sched st) hS)
+                           (≤-trans (storeNest-regs≤ sched st) hS))
+                    hinc))
+    (≤-trans (chainStep-nest-regsC  sl id a nextId path sched st hsl hsz hp hreg hΦ)
              (⊔-lub (≤-trans (storeNest-regs≤  sched st) hS) hinc))
   where
   sd′ = proj₁ (proj₂ (chainStep nextId a path sched st))
@@ -4032,6 +4271,20 @@ chainsNest-all D U (c ∷ cs) h =
             (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
                                           (chainsNestD cs))) h))
 
+-- THE REGISTRY STAYS PRICED ACROSS A WHOLE CHAIN, which is what a fold
+-- over the selection needs and the frame law alone does not give: the
+-- next chain runs at the state the last one left.  `chainStep` IS
+-- `foldPath`, so this is the walk read at the arrival's own entry.
+chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  pathSz? B path ≡ true →
+  regsSz? B (EvalSt.registry st) ≡ true →
+  regsSz? B (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
+    ≡ true
+chainStep-regsSz B a nextId path sched st hp hreg =
+  foldPath-regsSz _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st B hp hreg
+
 cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -4041,19 +4294,23 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   all (λ rc → nestDᵛ (arrTy a) (arrVal a) + pathNestD (proj₂ rc)
                 ≤ᵇ nestUnit e sl) chains ≡ true →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
   nestWalkAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   depthCascade a nextId chains sched st
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
-cascade-depth-go sl id a nextId S []               sched st hsl hsz hps hΦs hinc hS = z≤n
-cascade-depth-go {e = e} sl id a nextId S ((rid , c) ∷ cs) sched st hsl hsz hps hΦs hinc hS =
-  ⊔-lub (cascade-depth-go sl id a nextId S cs sched st hsl hsz hpr hΦr hinc hS)
+cascade-depth-go sl id a nextId S [] sched st hsl hsz hps hΦs hreg hinc hS = z≤n
+cascade-depth-go {e = e} sl id a nextId S ((rid , c) ∷ cs) sched st hsl hsz hps hΦs hreg hinc hS =
+  ⊔-lub (cascade-depth-go sl id a nextId S cs sched st hsl hsz hpr hΦr hreg hinc hS)
         (⊔-lub (chain-depth-sighted sl a nextId S c sched st₀ hsl hS)
                (cascade-depth-go sl id a nextId S cs
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
                   (trans (chainStep-slots nextId a c sched st₀) hsl)
-                  hsz hpr hΦr hinc
-                  (chainStep-store≤ sl id a nextId S c sched st₀ hsl hsz hpc
+                  hsz hpr hΦr
+                  (chainStep-regsSz (Caps.cSize (capsAt e sl id)) a nextId c sched st₀
+                     hpc hreg)
+                  hinc
+                  (chainStep-store≤ sl id a nextId S c sched st₀ hsl hsz hpc hreg
                      (≤ᵇ⇒≤ (nestDᵛ (arrTy a) (arrVal a) + pathNestD c)
                            (nestUnit e sl) (T-to hΦc))
                      hinc hS)))
@@ -4066,6 +4323,16 @@ cascade-depth-go {e = e} sl id a nextId S ((rid , c) ∷ cs) sched st hsl hsz hp
                          ≤ᵇ nestUnit e sl) _ hΦs)
   hΦr = proj₂ (∧-true (nestDᵛ (arrTy a) (arrVal a) + pathNestD c
                          ≤ᵇ nestUnit e sl) _ hΦs)
+
+-- the cascade's opening ledger write is not a registry write, on
+-- either branch of the spent-source test
+latch-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (B : ℕ) (a : Arrival Γ) (st : EvalSt e) →
+  regsSz? B (EvalSt.registry st) ≡ true →
+  regsSz? B (EvalSt.registry (cascadeLatch a st)) ≡ true
+latch-regsSz B a st h with Arrival.isLast a
+... | true  = h
+... | false = h
 
 cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -4085,6 +4352,8 @@ cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hsz =
       (capsOK?-regs (capsAt e sl id) sched st hok))
     (chainsNest-all (nestDᵛ (arrTy a) (arrVal a)) (nestUnit e sl) (chainsOf a st)
       (arr-chains-nest-syn sl id a sched st hsl hok hn))
+    (latch-regsSz (Caps.cSize (capsAt e sl id)) a st
+      (capsOK?-regs (capsAt e sl id) sched st hok))
     (m≤n+m (nestWalkAt e sl id)
            (nestCapAt e sl id))
     (≤-trans (nestOK?-store e sl id sched (cascadeLatch a st)

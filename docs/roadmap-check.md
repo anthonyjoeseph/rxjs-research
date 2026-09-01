@@ -217,8 +217,16 @@ should be SPLIT, and the answer is usually yes.
 ## `make roadmap-moved` — the roadmap cannot stay the same across commits
 
 `scripts/check-roadmap-moved.py` compares the working tree's `PROOF-STATE.md`
-against `git show HEAD:PROOF-STATE.md` and fails when they are the same. That is
-the whole algorithm. Three details:
+against `git show HEAD:PROOF-STATE.md` and fails when they are the same — that
+is the check mid-work, disk carrying a pending edit against the last commit.
+Once that edit is committed, disk and HEAD are identical by construction (a CI
+checkout is always in exactly this state), so the same comparison would always
+read "unchanged" no matter what the commit did — it would be comparing HEAD
+against itself. The script detects this (this file matches its ref *and* the
+whole tree is clean — not merely this file, since a dirty tree that just hasn't
+touched the roadmap YET must still fail) and falls back to comparing HEAD
+against HEAD~1 instead, which is the question a clean checkout actually needs
+answered: did HEAD's own commit move the file. Five details:
 
 - **Normalisation.** Trailing whitespace on each line, and trailing blank lines,
   are stripped before comparing — so the cheapest way to satisfy the check is to
@@ -227,8 +235,24 @@ the whole algorithm. Three details:
 - **`--baseline-file F`** replaces the git lookup with a plain file, which is how
   the selftest drives both directions without touching the repo's history.
   `--ref R` compares against another commit; `--file F` picks another roadmap.
+  The HEAD~1 fallback and the exemption below only apply at the default ref —
+  an explicit `--ref` is a deliberate comparison point and is read literally.
 - **No `PROOF-STATE.md` at the ref** (a first commit, an orphan branch) passes,
   because there is nothing to have moved away from.
+- **Infra-only exemption.** An unchanged roadmap is only a finding when there
+  was proof work to report: if nothing under `agda/` changed either (over the
+  same two endpoints the movement comparison used — disk-vs-ref mid-work,
+  HEAD-vs-HEAD~1 once committed), the commit had no leg to retire or restate,
+  and the check prints SKIP rather than FAIL. "Changed" means changed once
+  full-line comments are stripped, reusing `strip-comments.py`'s own
+  stripper — the same principle the `agda/_stripped-comments/` mirror already
+  rests on, that a comment-only edit is invisible to Agda. A file the stripper
+  refuses to touch (a block comment present) or one that was added or deleted
+  is conservatively treated as changed, since comment-only-ness cannot be
+  established. Any edit that survives stripping gets no pass, however small.
+- **`make gate` runs from a clean CI checkout**, so in practice it is almost
+  always the HEAD~1 branch that fires there; the disk-vs-ref branch is what
+  the local dev loop exercises before a commit exists to fall back to.
 
 **Why a dumb check is the right one here.** A **leg is one commit of work** —
 that is what the unit means — so every commit either retires a leg (promote the

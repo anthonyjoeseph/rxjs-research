@@ -2,7 +2,17 @@
 -- WHAT ONE CHAIN ADDS, CHARGED TO THE PROGRAM AND NOT TO THE STORE IT
 -- STARTED FROM.
 --
--- TARGET: chainStep-nest-nodesC @532695
+-- TARGET: stepFrame-nest-nodes @367a68
+--
+-- WHAT THE ROWS REACH, now that the whole-chain arm is a definition
+-- over a per-frame leaf.  A `chainStep` IS the fold of that leaf down
+-- the chain's path, so a reading taken either side of a real
+-- `chainStep` bounds the leaf COMPOSED across every frame the chain
+-- has -- indirect coverage, and weaker than instantiating one frame,
+-- but coverage of the composite the walk actually spends.  What the
+-- rows do NOT do is discharge the leaf's potential premise: they read
+-- the inequality with that premise unasked, which makes each row a
+-- stronger claim than the leaf instance rather than a weaker one.
 --
 -- WHY A SURROGATE AND NOT THE STATEMENT.  The three arms charge the
 -- growth to `nestUnit` plus the instant's SIZE CAP, and a cap does not

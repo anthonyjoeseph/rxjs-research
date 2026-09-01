@@ -957,33 +957,33 @@ dev-changed-selftest:
 	@fail=0; \
 	  m=agda/src/Verify-Budget-Sufficient/Walk-Level.agda; \
 	  n=agda/src/Verify-Budget-Sufficient/Walk-Level/Arms.agda; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files $$m 2>&1); ec=$$?; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$m 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'FULL GATE REQUIRED' \
 	    || { echo "SELFTEST FAIL: a multi-member block did not escalate — agda-dev stubs those, so a light gate there is not a check"; fail=1; }; \
 	  [ $$ec -eq 2 ] \
 	    || { echo "SELFTEST FAIL: escalation exited $$ec, not 2 — make must go red"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files $$n 2>&1); ec=$$?; \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$n 2>&1); ec=$$?; \
 	  echo "$$out" | grep -q 'light gate sufficient' \
 	    || { echo "SELFTEST FAIL: a module with NO multi-member block escalated — the light gate would never be usable"; fail=1; }; \
 	  [ $$ec -eq 0 ] \
 	    || { echo "SELFTEST FAIL: the no-block case exited $$ec, not 0"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --max-files 2 --files $$n $$m $$n $$m 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --max-files 2 --files $$n $$m $$n $$m 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE  4 changed modules' \
 	    || { echo "SELFTEST FAIL: a changed set over the ceiling did not escalate — N dev checks cost more than the one full build they replace"; fail=1; }; \
 	  w=agda/src/Verify-Budget-Sufficient/Caps-Face/Part5.agda; \
-	  scripts/dev-changed.py --verdict-only $(NODRIFT) --files $$w >/dev/null 2>&1 \
+	  scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files $$w >/dev/null 2>&1 \
 	    || { echo "SELFTEST FAIL: a wide consumer cone escalated to the tower — a wide cone is the one thing the light path leaves unchecked, so the answer is to CHECK the cone (a few dev passes), never to buy the whole build"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --files $$n 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only --drift -1 --assume-stamp HEAD --files $$n 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE.*commits since' \
 	    || { echo "SELFTEST FAIL: drift is invisible to --verdict-only — \`make gate\` routes on that verdict, so it would take the light path with the consumers long unchecked"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files agda/evidence/refuted/Refuted/Main.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
 	    && { echo "SELFTEST FAIL: an evidence file escalated to the tower — no src file may import that tree, so the tower cannot be broken by it and buying half an hour checks nothing about it"; fail=1; }; \
 	  echo "$$out" | grep -q 'OWED  make refuted' \
 	    || { echo "SELFTEST FAIL: an evidence change did not report its own tree's target as OWED — not escalating is only safe because the light gate then RUNS that target"; fail=1; }; \
 	  [ "$$(scripts/dev-changed.py --owed-only --files agda/evidence/probed/Probed/Main.agda)" = "probed" ] \
 	    || { echo "SELFTEST FAIL: --owed-only did not name the probed tree — gate-light reads exactly this to decide what to check"; fail=1; }; \
-	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --files agda/nope/Other.agda 2>&1); \
+	  out=$$(scripts/dev-changed.py --verdict-only $(NODRIFT) --assume-stamp HEAD --files agda/nope/Other.agda 2>&1); \
 	  echo "$$out" | grep -q 'ESCALATE' \
 	    || { echo "SELFTEST FAIL: a file outside agda/src and outside every evidence tree did not escalate — nothing would have checked it"; fail=1; }; \
 	  out=$$(scripts/dev-changed.py --plan --deps --files $$n 2>&1); \

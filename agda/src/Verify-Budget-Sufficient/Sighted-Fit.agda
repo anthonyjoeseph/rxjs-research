@@ -16,6 +16,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong)
 
 open import Rx.Prim using (Gas; Id; Tick; InstEmit; InstEvent; init; value; close; handoff; complete)
 open import Rx.Exp using (Ty; Ctx; Closed; Val; unitᵗ; boolᵗ; natᵗ; _×ᵗ_; _+ᵗ_; obs; inputsBelowᵉ)
+open import Rx.Inputs-Below using (ib-topᵉ; ∧⁺)
 open import Rx.Slots using (Slots)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; Stream; subscribeE; splitEvents)
@@ -37,6 +38,19 @@ inputsBelowᵛ k (s ×ᵗ t) (a , b)  = inputsBelowᵛ k s a ∧ inputsBelowᵛ 
 inputsBelowᵛ k (s +ᵗ t) (inj₁ a) = inputsBelowᵛ k s a
 inputsBelowᵛ k (s +ᵗ t) (inj₂ b) = inputsBelowᵛ k t b
 inputsBelowᵛ k (obs t)  e        = inputsBelowᵉ k e
+
+-- AND EVERY STORED VALUE SITS AT THE TOP STRATUM, so the guard costs a
+-- consumer nothing once it reads the whole context: the type's own
+-- induction bottoms out at `obs`, where the program's top-stratum fact
+-- answers it, and every other leaf is data that names no input at all.
+ib-topᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) → T (inputsBelowᵛ n t v)
+ib-topᵛ unitᵗ    _        = tt
+ib-topᵛ boolᵗ    _        = tt
+ib-topᵛ natᵗ     _        = tt
+ib-topᵛ (s ×ᵗ t) (a , b)  = ∧⁺ _ _ (ib-topᵛ s a) (ib-topᵛ t b)
+ib-topᵛ (s +ᵗ t) (inj₁ a) = ib-topᵛ s a
+ib-topᵛ (s +ᵗ t) (inj₂ b) = ib-topᵛ t b
+ib-topᵛ (obs t)  ex       = ib-topᵉ ex
 
 -- THE FIT, AT AN ARBITRARY DELIVERED TYPE, and the generality is what
 -- makes it inducible rather than a nicety.  A `map` frame's burst is

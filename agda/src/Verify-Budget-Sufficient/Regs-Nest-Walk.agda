@@ -18,33 +18,38 @@
 -- thing being proven at every frame kind.
 module Verify-Budget-Sufficient.Regs-Nest-Walk where
 
-open import Data.Bool using (Bool; true)
-open import Data.Bool.ListAction using (all)
-open import Data.Fin using (Fin)
+open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool.ListAction using (all; any)
+open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
+  ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0;
+  *-zeroʳ; *-distribˡ-⊔)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Vec using (lookup)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true)
-open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent)
+open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; _×ᵗ_; obs)
 open import Rx.Evaluator
-  using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_;
-         NodeId; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
-         foldPath; stepFrame; dispatchShare; thruWalk)
+  using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
+  take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
+  shareAdmit; shareLatch)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; thruWalk-nest)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures using (thruWrap-vals)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; pathNestD; nest-inflate)
+  using (regsNestMax; pathNestD; nest-inflate; dropSource-nest)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?; frameSz?)
+open import Verify-Budget-Sufficient.Caps-Face.Part4 using (shareAdmit-caps)
+open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -106,19 +111,6 @@ postulate
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
 
-  -- THE SHARE BOUNDARY, where the walk leaves this chain and re-enters
-  -- on every chain registered at the sink.  Those chains' own depths
-  -- are under the registry's join by construction, which is why the
-  -- same charge covers the fan-out.
-  dispatchShare-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-    (vals : List (Val Γ _)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (B U : ℕ) →
-    valsΦ? B U (share-sink {t = t} i) vals ≡ true →
-    regsNestMax (EvalSt.registry
-      (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
-      ≤ regsNestMax (EvalSt.registry st) ⊔ U
-
 -- ONE MAP FRAME, and it is the clause the additive reading died at.  A
 -- step function may name its payload on both sides of an additive
 -- `nestDᵉ`, so ONE substitution installs the payload's nesting twice
@@ -168,6 +160,27 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
                      hfit)))
           (Φ-of-bound B U G p vs
             (≤-trans (m≤n⊔m (nestDᵛ u v) (nestDᵛˢ vs)) hb) hfit)
+
+-- AND THE READING BACK, which is what a consumer needs to NAME a
+-- grant: the pointwise predicate bounds every value's depth under the
+-- same product, so it bounds their maximum under it too.  The path's
+-- own depth does not come back out -- at the empty list there is
+-- nothing to have carried it -- so this reads the values alone and a
+-- consumer that wants the path's share takes it from the premise it
+-- was handed.
+Φ-to-bound : ∀ {n} {Γ : Ctx n} {u t} (B U : ℕ) (p : Path Γ u t)
+  (vs : List (Val Γ u)) → valsΦ? B U p vs ≡ true →
+  pathΦF B p * nestDᵛˢ vs ≤ U
+Φ-to-bound B U p []       h =
+  ≤-trans (≤-reflexive (*-zeroʳ (pathΦF B p))) z≤n
+Φ-to-bound {u = u} B U p (v ∷ vs) h =
+  ≤-trans (≤-reflexive (*-distribˡ-⊔ (pathΦF B p) (nestDᵛ u v) (nestDᵛˢ vs)))
+          (⊔-lub head (Φ-to-bound B U p vs (∧-trueʳ h)))
+  where
+  head : pathΦF B p * nestDᵛ u v ≤ U
+  head =
+    ≤-trans (*-monoʳ-≤ (pathΦF B p) (m≤m+n (nestDᵛ u v) (pathNestD p)))
+            (≤ᵇ⇒≤ _ U (T-to (∧-trueˡ h)))
 
 -- THE OUTER FRAME, DISCHARGED FROM THE GRANT.  The frame's own arm
 -- says nothing about what a subscription returns, so the bound cannot
@@ -273,46 +286,288 @@ stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B
 stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF =
   thruΦ sf id now op nid path vals fin sched st B U hF
 
+-- THE REGISTRY STAYS PRICED ACROSS A FRAME, and the two things missing
+-- from this reading of it are both already carried by the walks that
+-- thread it, which is the ruling.  A subscribing frame registers the
+-- walked path with its head swapped plus one frame per syntax node of
+-- the INNER OBSERVABLE it received -- and an inner is a runtime value,
+-- structurally unrelated to the program the cap is read from, so a
+-- statement whose only premises are the path's own price cannot see it
+-- at all.  That is the whole content of both refutations below: each
+-- builds an inner FROM the cap and beats it.
+--
+-- SO THE SIDE THAT MOVES IS THIS ONE, IN TWO PLACES.  The arriving
+-- values need their SIZE reading as a premise -- and `sizeᵛ` at an
+-- observable IS `sizeᵉ`, so that reading bounds the inner's syntax
+-- outright and every witness of that family dies against it.  Then the
+-- registered length is the walked length plus the inner's, both under
+-- the level, and the level's own step is what pays for the sum: one
+-- frame, one level, exactly as the SIZE sibling directly above charges
+-- it.  A fixed cap has nothing to pay with, which is why no repair of
+-- the hypotheses alone survives while this one does.
+
+-- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
+--   so that the cap transfers with no premise at all.  The share sink
+--   registers a tail and the take frame filters, but a subscribing
+--   frame descends into the value it received: the `mapᵉ` clause of the
+--   subscribe recursion pushes one frame per operator of the body onto
+--   the continuation before it reaches the leaf that registers, so what
+--   lands in the registry is the walked path UNDER the body, not a
+--   suffix of it.
+-- DEAD ROUTE: and a ROOM LEDGER at a fixed ceiling does not repair it,
+--   which is the more useful half because it says why the caps face
+--   accumulates.  Carrying `pathLen p + L ≤ B` over the registry closes
+--   the frame clause and closes the sink's ADMISSION, but not the sink's
+--   RE-ENTRY: a chain fans into chains, so the level the ledger must
+--   reserve is the cumulative depth of the fan-out rather than the depth
+--   of the path in hand, and no ceiling fixed before the walk starts
+--   bounds it.  That is why the level is existential downstream, and it
+--   is a fact about the fan-out rather than about how the bound is
+--   phrased.
+-- REFUTED: `Refuted.Subscribe-Inner-Regs-Base` -- the subscribe this
+--   statement's two subscribing frames perform does not preserve a
+--   fixed cap, symbolically and at every cap.
+-- REFUTED: `Refuted.Caps-Face` -- the same statement one level up was
+--   deleted as false and redundant against `subscribeE-caps`, which is
+--   ground because it reports at a level.
+postulate
+  stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (S : ℕ) →
+    pathSz? S (f ↠ path) ≡ true →
+    regsSz? S (EvalSt.registry st) ≡ true →
+    regsSz? S (EvalSt.registry
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st)))))) ≡ true
+
+-- AND THE PRICE SURVIVES A WHOLE CHAIN, which is what a fold over a
+-- selection needs and the frame law alone does not give: the next chain
+-- runs at the state the last one left.  The sink is what makes this more
+-- than the frame law iterated -- the fan-out registers on behalf of
+-- paths the registry already holds, and the admitted list inherits the
+-- registry's own receipt, so the cap the walk entered under is the cap
+-- it leaves under.
+mutual
+  foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (path : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    pathSz? B path ≡ true →
+    regsSz? B (EvalSt.registry st) ≡ true →
+    regsSz? B (EvalSt.registry
+      (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))) ≡ true
+  foldPath-regsSz sf gas id now envSrc root vals evs fin sched st B _ hreg = hreg
+  foldPath-regsSz sf gas id now envSrc (share-sink i) vals evs fin sched st B _ hreg =
+    dispatchShare-regsSz sf gas id now i vals fin sched st B hreg
+  foldPath-regsSz sf gas id now envSrc (f ↠ p) vals evs fin sched st B hpz hreg =
+    foldPath-regsSz sf gas id now envSrc p
+      (proj₁ step) (evs ++ proj₁ (proj₂ step))
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step)))) B
+      hpTail (stepFrame-regsSz sf id now f p vals fin sched st B hpz hreg)
+    where
+    step = stepFrame sf id now f p vals fin sched st
+    hpTail : pathSz? B p ≡ true
+    hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
+                     (proj₂ (∧-true (frameSz? B f)
+                              ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+
+  dispatchShare-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    regsSz? B (EvalSt.registry st) ≡ true →
+    regsSz? B (EvalSt.registry
+      (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))) ≡ true
+  dispatchShare-regsSz sf zero id now i vals fin sched st B hreg = hreg
+  dispatchShare-regsSz sf (suc gas) id now i vals false sched st B hreg =
+    shareGo-regsSz sf gas id now i vals false
+      (shareAdmit i (EvalSt.registry st)) sched st B
+      (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
+  dispatchShare-regsSz {t = t} sf (suc gas) id now i vals true sched st B hreg =
+    dropSource-all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en)))) (toℕ i)
+      (EvalSt.registry (proj₂ (proj₂ GO))) went
+    where
+    GO = shareGo {t = t} sf gas id now i vals true
+           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
+    went : regsSz? B (EvalSt.registry (proj₂ (proj₂ GO))) ≡ true
+    went = shareGo-regsSz sf gas id now i vals true
+             (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B
+             (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
+
+  shareGo-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    all (λ rp → pathSz? B (proj₂ rp)) ps ≡ true →
+    regsSz? B (EvalSt.registry st) ≡ true →
+    regsSz? B (EvalSt.registry
+      (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))) ≡ true
+  shareGo-regsSz sf gas id now i vals fin [] sched st B _ hreg = hreg
+  shareGo-regsSz sf gas id now i vals fin ((rid , p) ∷ ps) sched st B hps hreg
+    with any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ... | true  = shareGo-regsSz sf gas id now i vals fin ps sched st B
+                  (proj₂ (∧-true (pathSz? B p) _ hps)) hreg
+  ... | false =
+    shareGo-regsSz sf gas id now i vals fin ps
+      (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B
+      (proj₂ (∧-true (pathSz? B p) _ hps))
+      (foldPath-regsSz sf gas id now (toℕ i) p vals EVS fin sched st₀ B
+        (proj₁ (∧-true (pathSz? B p) _ hps)) hreg)
+    where
+    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+    EVS = if fin then close (toℕ i) exhausted ∷ [] else []
+    FP  = foldPath sf gas id now (toℕ i) p vals EVS fin sched st₀
+
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the
 -- walk has reached by the time that frame runs, so the predicate has
 -- to step alongside the fold it guards.  Four frame kinds contribute
 -- nothing, so on a path with no outer frame this is a tuple of units.
-PathΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (id : Id) (now : Tick) (B U : ℕ) (path : Path Γ u t)
-  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
-PathΦHyp sf id now B U root           vals fin sched st = ⊤
-PathΦHyp sf id now B U (share-sink _) vals fin sched st = ⊤
-PathΦHyp sf id now B U (f ↠ p) vals fin sched st =
-  FrameΦHyp B U f p vals sched
-  × PathΦHyp sf id now B U p
-      (proj₁ (stepFrame sf id now f p vals fin sched st))
-      (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
-      (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
+--
+-- AND THE SINK IS NOT A LEAF OF IT, WHICH IS WHAT THE UNIT CLAUSE USED
+-- TO SAY.  A `share-sink` hands the values to every chain the registry
+-- admits, and each of those walks a path of its OWN -- so the potential
+-- the sink was handed says nothing about what those chains carry, since
+-- the sink's own factor is one and its own depth is zero while an
+-- admitted path has both.  The debt is therefore per admitted entry, at
+-- the state the fan-out fold reaches it in, and the predicate telescopes
+-- through the fold exactly as it does through a chain.
+mutual
+  PathΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (B U : ℕ) (path : Path Γ u t)
+    (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+  PathΦHyp sf gas id now B U root vals fin sched st = ⊤
+  PathΦHyp sf gas id now B U (share-sink i) vals fin sched st =
+    DispatchΦHyp sf gas id now B U i vals fin sched st
+  PathΦHyp sf gas id now B U (f ↠ p) vals fin sched st =
+    FrameΦHyp B U f p vals sched
+    × PathΦHyp sf gas id now B U p
+        (proj₁ (stepFrame sf id now f p vals fin sched st))
+        (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
+        (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
 
-foldPath-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-  (path : Path Γ u t) (vals : List (Val Γ u))
-  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-  valsΦ? B U path vals ≡ true →
-  PathΦHyp sf id now B U path vals fin sched st →
-  regsNestMax (EvalSt.registry
-    (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
-    ≤ regsNestMax (EvalSt.registry st) ⊔ U
-foldPath-nest-regs sf gas id now envSrc root vals evs fin sched st B U hΦ _ =
-  m≤m⊔n (regsNestMax (EvalSt.registry st)) U
-foldPath-nest-regs sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ _ =
-  dispatchShare-nest-regs sf gas id now i vals fin sched st B U hΦ
-foldPath-nest-regs sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ (hF , hR) =
-  ≤-trans (foldPath-nest-regs sf gas id now envSrc p
-             (proj₁ step) (evs ++ proj₁ (proj₂ step))
-             (proj₁ (proj₂ (proj₂ step)))
-             (proj₁ (proj₂ (proj₂ (proj₂ step))))
-             (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
-             (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
-          (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
-                 (m≤n⊔m (regsNestMax (EvalSt.registry st)) U))
-  where
-  step = stepFrame sf id now f p vals fin sched st
+  -- one dispatch level, and it owes nothing when the telescope is spent
+  -- -- that arm of the evaluator returns the state untouched.
+  DispatchΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (B U : ℕ) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  DispatchΦHyp {t = t} sf zero id now B U i vals fin sched st = ⊤
+  DispatchΦHyp {t = t} sf (suc gas) id now B U i vals fin sched st =
+    ShareGoΦHyp {t = t} sf gas id now B U i vals fin
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
+
+  -- the fan-out fold's own obligations: a cancelled registration is
+  -- skipped and owes nothing, and a delivered one owes the potential at
+  -- ITS path plus that path's own walk debt.
+  ShareGoΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (B U : ℕ) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  ShareGoΦHyp sf gas id now B U i vals fin [] sched st = ⊤
+  ShareGoΦHyp {t = t} sf gas id now B U i vals fin ((rid , p) ∷ ps) sched st =
+    if any (_≡ᵇ rid) (EvalSt.cancelled st)
+    then ShareGoΦHyp {t = t} sf gas id now B U i vals fin ps sched st
+    else ((valsΦ? B U p vals ≡ true)
+      × PathΦHyp sf gas id now B U p vals fin sched
+          (record st { delivered = rid ∷ EvalSt.delivered st })
+      × ShareGoΦHyp {t = t} sf gas id now B U i vals fin ps
+          (proj₁ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st }))))
+          (proj₂ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st })))))
+
+-- THE WALK, AND THE FAN-OUT IT RE-ENTERS, in the evaluator's own
+-- recursion: a chain descends to a sink, the sink spends one level of
+-- the dispatch telescope, and the fold re-enters a chain per admitted
+-- registration.  Nothing here is arithmetic -- every clause is the same
+-- three-way join, and the only inequality that is not a projection is
+-- the frame leaf's.
+mutual
+  foldPath-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
+    (path : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U path vals ≡ true →
+    PathΦHyp sf gas id now B U path vals fin sched st →
+    regsNestMax (EvalSt.registry
+      (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
+      ≤ regsNestMax (EvalSt.registry st) ⊔ U
+  foldPath-nest-regs sf gas id now envSrc root vals evs fin sched st B U hΦ _ =
+    m≤m⊔n (regsNestMax (EvalSt.registry st)) U
+  foldPath-nest-regs sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ hD =
+    dispatchShare-nest-regs sf gas id now i vals fin sched st B U hD
+  foldPath-nest-regs sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ (hF , hR) =
+    ≤-trans (foldPath-nest-regs sf gas id now envSrc p
+               (proj₁ step) (evs ++ proj₁ (proj₂ step))
+               (proj₁ (proj₂ (proj₂ step)))
+               (proj₁ (proj₂ (proj₂ (proj₂ step))))
+               (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
+               (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
+            (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
+                   (m≤n⊔m (regsNestMax (EvalSt.registry st)) U))
+    where
+    step = stepFrame sf id now f p vals fin sched st
+
+  -- THE SINK'S THREE ARMS, and only the fold is work.  Out of dispatch
+  -- gas the state is returned untouched; the latch writes the completed
+  -- and dying ledgers and not the registry; and the finishing arm only
+  -- DROPS registrations, which a join cannot be raised by.
+  dispatchShare-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    DispatchΦHyp sf gas id now B U i vals fin sched st →
+    regsNestMax (EvalSt.registry
+      (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
+      ≤ regsNestMax (EvalSt.registry st) ⊔ U
+  dispatchShare-nest-regs sf zero id now i vals fin sched st B U _ =
+    m≤m⊔n (regsNestMax (EvalSt.registry st)) U
+  dispatchShare-nest-regs sf (suc gas) id now i vals false sched st B U hS =
+    shareGo-nest-regs sf gas id now i vals false
+      (shareAdmit i (EvalSt.registry st)) sched st B U hS
+  dispatchShare-nest-regs {t = t} sf (suc gas) id now i vals true sched st B U hS =
+    ≤-trans (dropSource-nest (toℕ i)
+              (EvalSt.registry (proj₂ (proj₂ (shareGo {t = t} sf gas id now i vals true
+                (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st))))))
+            (shareGo-nest-regs sf gas id now i vals true
+              (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B U hS)
+
+  -- ONE ADMITTED REGISTRATION AT A TIME, and the join telescopes: each
+  -- chain leaves the registry under the registry it entered on joined
+  -- with the charge, and the next chain enters on that one.
+  shareGo-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    ShareGoΦHyp sf gas id now B U i vals fin ps sched st →
+    regsNestMax (EvalSt.registry
+      (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st))))
+      ≤ regsNestMax (EvalSt.registry st) ⊔ U
+  shareGo-nest-regs sf gas id now i vals fin [] sched st B U _ =
+    m≤m⊔n (regsNestMax (EvalSt.registry st)) U
+  shareGo-nest-regs sf gas id now i vals fin ((rid , p) ∷ ps) sched st B U hS
+    with any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ... | true  = shareGo-nest-regs sf gas id now i vals fin ps sched st B U hS
+  ... | false =
+    ≤-trans (shareGo-nest-regs sf gas id now i vals fin ps
+               (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B U
+               (proj₂ (proj₂ hS)))
+            (⊔-lub (foldPath-nest-regs sf gas id now (toℕ i) p vals
+                      (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀
+                      B U (proj₁ hS) (proj₁ (proj₂ hS)))
+                   (m≤n⊔m (regsNestMax (EvalSt.registry st)) U))
+    where
+    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+    FP  = foldPath sf gas id now (toℕ i) p vals
+            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched st₀

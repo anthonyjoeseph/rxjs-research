@@ -778,6 +778,13 @@ sum-tab-mono {zero}  f g h = z≤n
 sum-tab-mono {suc m} f g h =
   +-mono-≤ (h Fin.zero) (sum-tab-mono _ _ (λ i → h (Fin.suc i)))
 
+-- a CONSTANT summed over the telescope, which is what a pointwise bound
+-- on the vocabulary buys once the sum is taken: a per-slot ceiling and
+-- this equation together price the whole telescope by its length.
+sum-tab-const : ∀ {m} (c : ℕ) → sum (tabulate {n = m} (λ _ → c)) ≡ m * c
+sum-tab-const {zero}  c = refl
+sum-tab-const {suc m} c = cong (c +_) (sum-tab-const {m} c)
+
 -- a sum of n terms each at least 1 is at least n.  The counting step of
 -- the telescope-length bound (n≤slotsSize, below): it is what turns
 -- "the slots FIT in the size budget V" into "there are at most V of
