@@ -18,14 +18,13 @@
 -- thing being proven at every frame kind.
 module Verify-Budget-Sufficient.Regs-Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
-  ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0;
-  *-zeroʳ; *-distribˡ-⊔)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
+  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -33,13 +32,13 @@ open import Data.Vec using (lookup)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; _×ᵗ_; obs)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
-  shareAdmit; shareLatch)
+  shareAdmit; shareLatch; iterSize)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; thruWalk-nest)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
@@ -47,9 +46,8 @@ open import Verify-Budget-Sufficient.Measures using (thruWrap-vals)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; pathNestD; nest-inflate; dropSource-nest)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?; frameSz?)
-open import Verify-Budget-Sufficient.Caps-Face.Part4 using (shareAdmit-caps)
-open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all)
+open import Verify-Budget-Sufficient.Caps-Face.Part1
+  using (pathSz?; regsSz?; frameSz?)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -286,25 +284,84 @@ stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B
 stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF =
   thruΦ sf id now op nid path vals fin sched st B U hF
 
--- THE REGISTRY STAYS PRICED ACROSS A FRAME, and the two things missing
--- from this reading of it are both already carried by the walks that
--- thread it, which is the ruling.  A subscribing frame registers the
--- walked path with its head swapped plus one frame per syntax node of
--- the INNER OBSERVABLE it received -- and an inner is a runtime value,
--- structurally unrelated to the program the cap is read from, so a
--- statement whose only premises are the path's own price cannot see it
--- at all.  That is the whole content of both refutations below: each
--- builds an inner FROM the cap and beats it.
+-- THE SIZE READING OF A BURST, which is the currency every side
+-- condition that must see through a defer gate is denominated in: the
+-- nesting measures read ZERO into a deferred body, and size does not.
+valsSz? : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (vals : List (Val Γ s)) → Bool
+valsSz? {s = s} V vals = all (λ v → sizeᵛ s v ≤ᵇ V) vals
+
+valsSz?-mono : ∀ {n} {Γ : Ctx n} {s} (V V′ : ℕ) (vals : List (Val Γ s)) →
+  V ≤ V′ → valsSz? V vals ≡ true → valsSz? V′ vals ≡ true
+valsSz?-mono V V′ []       h _  = refl
+valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
+  ∧-intro (≤ᵇ-widen (sizeᵛ s v) h (∧-trueˡ hv))
+          (valsSz?-mono V V′ vs h (∧-trueʳ hv))
+
+-- ONE FRAME'S SIZE STEP, AND THE FRAME IS READ AT THE PROGRAM'S CAP
+-- WHILE THE VALUES ARE READ AT THE LEVEL.  That split is not a
+-- convenience: it is what `sizeStep` computes.  A `map-f` emits
+-- `applyFn fn v`, and `evalWith` sends `pairᵗ` to BOTH arms, so a
+-- duplicator of `k` leaves takes a value of size `V` to `(k-1) + k·V`
+-- -- a PRODUCT of the frame's size and the value's.  `sizeStep S L` is
+-- `S·(1+2L)`, which covers `S + S·L` with room and nothing larger, so
+-- the frame's factor has to be the base cap `S` for one level to pay.
 --
--- SO THE SIDE THAT MOVES IS THIS ONE, IN TWO PLACES.  The arriving
--- values need their SIZE reading as a premise -- and `sizeᵛ` at an
--- observable IS `sizeᵉ`, so that reading bounds the inner's syntax
--- outright and every witness of that family dies against it.  Then the
--- registered length is the walked length plus the inner's, both under
--- the level, and the level's own step is what pays for the sum: one
--- frame, one level, exactly as the SIZE sibling directly above charges
--- it.  A fixed cap has nothing to pay with, which is why no repair of
--- the hypotheses alone survives while this one does.
+-- AND THE FRAME READING IS STILL NOT ENOUGH, BECAUSE ONE ARM EMITS THE
+-- NODE STORE.  A `scan-f` answers with its accumulator, fetched out of
+-- `EvalSt.nodes`, and its own syntax may be a projection that hands
+-- that accumulator straight back -- so the emitted size is the STORED
+-- value's, which neither reading here sees.  What is owed is the store
+-- reading `stBounded?` already makes at a `scan-st`, threaded through
+-- the walk at the level, and the two walks that spend this leaf carry
+-- no such premise today.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Store` -- the scan arm at the
+--   smallest frame there is, against a store the statement quantifies
+--   over and says nothing about.  The same witness dies against
+--   `boundedNode` at the base cap, so the premise is named rather
+--   than invented.
+-- REFUTED: `Refuted.Frame-Step-Size-Level` -- both halves.  With no
+--   reading of the frame at all the conclusion needs information no
+--   hypothesis carries, and a three-leaf duplicator beats the level by
+--   inspection.  Reading the frame at the LEVEL instead does not
+--   repair it: both factors are then capped at `L`, the emission is
+--   quadratic in `L` and one level is linear in it, and the crossing
+--   arrives at `j = 1` for every `S ≥ 2`.
+postulate
+  stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (S j : ℕ) →
+    frameSz? S f ≡ true →
+    valsSz? (iterSize S j S) vals ≡ true →
+    valsSz? (iterSize S (suc j) S)
+      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+
+-- THE REGISTRY STAYS PRICED ACROSS A FRAME, AT AN ACCUMULATED LEVEL --
+-- and the level is what makes the statement true, not how it is
+-- phrased.  A subscribing frame registers the walked path with its head
+-- swapped plus one frame per syntax node of the INNER OBSERVABLE it
+-- received, and an inner is a runtime value, structurally unrelated to
+-- the program a fixed cap is read from: that is the whole content of
+-- both refutations below, each of which builds an inner FROM the cap
+-- and beats it.
+--
+-- SO THE ARRIVING VALUES' SIZE IS A PREMISE, AND ONE FRAME COSTS ONE
+-- LEVEL.  `sizeᵛ` at an observable IS `sizeᵉ`, so the size reading
+-- bounds the inner's syntax outright and every witness of that family
+-- dies against it; the registered length is then the walked length plus
+-- the inner's, both under the level, and `sizeStep` pays for exactly
+-- that sum, being `S + 2·X` at `X` the level in hand.  A fixed cap has
+-- nothing to pay with, which is why no repair of the hypotheses alone
+-- survives while this one does.
+--
+-- AND THE CURRENCY IS THE SIZE SIBLINGS', DELIBERATELY, SO A WALK
+-- THREADING BOTH SPENDS ONE COUNT.  The registry costs exactly one
+-- level per frame; the values cost one where the frame is read at the
+-- base cap and one PLUS a reported growth index where it is not, so
+-- the level a walk arrives at is always the values' and the registry
+-- reading widens up to meet it.  At `j = 0` the iterate is the cap
+-- itself, definitionally, so an entry reading transports for free.
 
 -- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
 --   so that the cap transfers with no premise at all.  The share sink
@@ -344,93 +401,12 @@ postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (S : ℕ) →
-    pathSz? S (f ↠ path) ≡ true →
-    regsSz? S (EvalSt.registry st) ≡ true →
-    regsSz? S (EvalSt.registry
+    (S j : ℕ) →
+    valsSz? (iterSize S j S) vals ≡ true →
+    pathSz? (iterSize S j S) (f ↠ path) ≡ true →
+    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    regsSz? (iterSize S (suc j) S) (EvalSt.registry
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st)))))) ≡ true
-
--- AND THE PRICE SURVIVES A WHOLE CHAIN, which is what a fold over a
--- selection needs and the frame law alone does not give: the next chain
--- runs at the state the last one left.  The sink is what makes this more
--- than the frame law iterated -- the fan-out registers on behalf of
--- paths the registry already holds, and the admitted list inherits the
--- registry's own receipt, so the cap the walk entered under is the cap
--- it leaves under.
-mutual
-  foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
-    (path : Path Γ u t) (vals : List (Val Γ u))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
-    pathSz? B path ≡ true →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry
-      (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))) ≡ true
-  foldPath-regsSz sf gas id now envSrc root vals evs fin sched st B _ hreg = hreg
-  foldPath-regsSz sf gas id now envSrc (share-sink i) vals evs fin sched st B _ hreg =
-    dispatchShare-regsSz sf gas id now i vals fin sched st B hreg
-  foldPath-regsSz sf gas id now envSrc (f ↠ p) vals evs fin sched st B hpz hreg =
-    foldPath-regsSz sf gas id now envSrc p
-      (proj₁ step) (evs ++ proj₁ (proj₂ step))
-      (proj₁ (proj₂ (proj₂ step)))
-      (proj₁ (proj₂ (proj₂ (proj₂ step))))
-      (proj₂ (proj₂ (proj₂ (proj₂ step)))) B
-      hpTail (stepFrame-regsSz sf id now f p vals fin sched st B hpz hreg)
-    where
-    step = stepFrame sf id now f p vals fin sched st
-    hpTail : pathSz? B p ≡ true
-    hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
-                     (proj₂ (∧-true (frameSz? B f)
-                              ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
-
-  dispatchShare-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry
-      (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))) ≡ true
-  dispatchShare-regsSz sf zero id now i vals fin sched st B hreg = hreg
-  dispatchShare-regsSz sf (suc gas) id now i vals false sched st B hreg =
-    shareGo-regsSz sf gas id now i vals false
-      (shareAdmit i (EvalSt.registry st)) sched st B
-      (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
-  dispatchShare-regsSz {t = t} sf (suc gas) id now i vals true sched st B hreg =
-    dropSource-all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en)))) (toℕ i)
-      (EvalSt.registry (proj₂ (proj₂ GO))) went
-    where
-    GO = shareGo {t = t} sf gas id now i vals true
-           (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
-    went : regsSz? B (EvalSt.registry (proj₂ (proj₂ GO))) ≡ true
-    went = shareGo-regsSz sf gas id now i vals true
-             (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B
-             (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
-
-  shareGo-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
-    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (ps : List (RegId × Path Γ (lookup Γ i) t))
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
-    all (λ rp → pathSz? B (proj₂ rp)) ps ≡ true →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry
-      (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))) ≡ true
-  shareGo-regsSz sf gas id now i vals fin [] sched st B _ hreg = hreg
-  shareGo-regsSz sf gas id now i vals fin ((rid , p) ∷ ps) sched st B hps hreg
-    with any (_≡ᵇ rid) (EvalSt.cancelled st)
-  ... | true  = shareGo-regsSz sf gas id now i vals fin ps sched st B
-                  (proj₂ (∧-true (pathSz? B p) _ hps)) hreg
-  ... | false =
-    shareGo-regsSz sf gas id now i vals fin ps
-      (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B
-      (proj₂ (∧-true (pathSz? B p) _ hps))
-      (foldPath-regsSz sf gas id now (toℕ i) p vals EVS fin sched st₀ B
-        (proj₁ (∧-true (pathSz? B p) _ hps)) hreg)
-    where
-    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
-    EVS = if fin then close (toℕ i) exhausted ∷ [] else []
-    FP  = foldPath sf gas id now (toℕ i) p vals EVS fin sched st₀
 
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the

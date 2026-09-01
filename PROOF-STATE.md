@@ -215,23 +215,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY FACE IS RESTATED IN PLACE, AT AN ACCUMULATED LEVEL.**
-  Borrowing the reading from the caps face is refuted as a ROUTE: the
-  depth cascade is what spends these walks, and its ceiling is a
-  premise of the lemma producing the caps receipt, so a cascade taking
-  that receipt proves its ceiling from its ceiling. The caps face sits
-  above the cascade, not beside it. So the ladder has to be built here
-  — the frame law reports at a level, the fold carries one, and the
-  sink's re-entry is what the level pays for.
+- **`pathSz?`'s TWO CONJUNCTS ARE OWED AT DIFFERENT NUMBERS, SO NO
+  SINGLE LEVEL PRICES A REGISTRY.** The frame factor has to stay at
+  the program's cap — one level pays `S + S·L` and a level-side
+  reading makes the emission quadratic where the level is linear —
+  while the length ledger has to climb, because a subscribing frame
+  registers a chain longer than the one it walked by the inner's own
+  operator count. Both single-number readings are refuted, so every
+  face above is choosing which conjunct to get wrong. Split the
+  reading — frame held at the cap, length carried by the level — and
+  measure what the split costs the statements that spend it, before
+  the folds above are restated against a currency that cannot hold.
 
-- **THEN THE CHAIN AND CASCADE FOLDS ABOVE IT, WHICH IS WHERE THE
-  LEVEL EITHER ESCAPES OR DOES NOT.** A chain is the frame law
-  iterated and a cascade is a fold over chains, and neither
-  conclusion names the cap — so the level stays internal if the
-  existential is placed at the fold rather than at the statement.
-  The measure to check first is the sink: a chain fans into chains,
-  so what the level must reserve is the fan-out's cumulative depth,
-  and that is the one place a bound fixed before the walk fails.
+- **THEN THE CASCADE CARRIES THE LENGTH LEDGER ACROSS CHAINS.** With
+  the reading split, the chain door stops being a collapse and becomes
+  an accumulation: each chain leaves its registry priced one inner
+  longer, and the fold over chains feeds that registry in as the next
+  chain's premise. Thread the climbing half through that fold and bound
+  what accumulates by `nestWalkAt`, the quantity the store side of the
+  same fold is already carried against — the frame half rides along
+  unchanged, which is the point of splitting.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -254,12 +257,12 @@ does not fit is a finding about the shared statement, not about the head.
   see, so this leaf runs on a SIZE side condition.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: the size
   side condition for the chains a sink fans into, which live in the registry
-  rather than on the walked path. It reads the registry's own size price, and
-  nothing has read it.
-- **`stepFrame-sz`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: one frame's
-  size step, at the caps face's own iterate. A frame substitutes and the caps
-  face prices substitution at one `sizeStep`, so the emitted values should sit
-  at the next level — and nothing has read it here.
+  rather than on the walked path. It reads the registry's price at the level
+  the walk has reached, and nothing has read it.
+- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
+  step, the frame read at the program's cap and the values at the level.
+  Refuted three ways: no frame reading, the frame read at the level, and the
+  scan arm, which emits the node store that no premise here reads.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `PROBED`: what one
   frame stores at the nodes map, under the potential it was handed. Three of
   the five kinds store; the whole-chain surrogate covers the composite at two
@@ -269,7 +272,7 @@ does not fit is a finding about the shared statement, not about the head.
   rootward stack says the tie is exact, so there is no slack to spend.
 - **`walk-share-ΦHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
   potential for the chains a sink fans into. Their factor and depth are the
-  registry's, priced by the same cap the walk runs under, and nothing has read
+  registry's, priced at the level the walk has reached, and nothing has read
   the claim that the cap's exponential covers them.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
@@ -282,10 +285,14 @@ does not fit is a finding about the shared statement, not about the head.
   gate, factor one and no depth, so hypothesis and conclusion are one statement
   read either side of it. What is owed is that its output values are among its
   inputs.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE×3`:
-  the registry stays priced by the size cap across one frame. False at a fixed
-  cap, and refuted twice over; what repairs it is the arriving values' size
-  reading plus one level per frame, both of which the header names.
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
+  the registry stays priced across one frame, now at an accumulated level and
+  under the arriving values' size. The restatement kills every witness of the
+  family that refuted the fixed cap; whether ONE level pays is unread.
+- **`chainStep-regsSz`** (Caps-Face/Part7) — SHAPE, `REFUTED`: the whole
+  chain's registry price, at the ENTRY cap. False there: a subscribing frame
+  registers a path LONGER than the one priced, so the cap owes a level and the
+  cascade above has to carry it.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

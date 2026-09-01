@@ -278,6 +278,25 @@ frameSz? B (thru-outer _ _)   = true
 -- non-matching definition unfolds on a NEUTRAL path, so every type
 -- mentioning a registered chain grows the body instead of staying stuck,
 -- and J-Budget-Probe OOMs at 13 GB on precisely that
+
+-- BUT THE TWO CONJUNCTS ARE OWED AT DIFFERENT NUMBERS, WHICH IS WHAT
+-- MAKES A REGISTRY PRICED BY THIS PREDICATE AT ONE LEVEL UNSATISFIABLE.
+-- The frame reading has to be taken at the PROGRAM'S CAP: `sizeStep`
+-- pays `S + S·L` and no more, so the frame's factor is the base cap and
+-- reading it at an accumulated level instead makes the emission
+-- quadratic where one level is linear -- `Refuted.Frame-Step-Size-Level`
+-- names the crossing.  The LENGTH reading runs the other way and must
+-- rise with the level, because a subscribing frame registers a chain
+-- longer than the one it was walking, by the inner's own operator count
+-- -- `Refuted.Chain-Step-Regs-Cap` is that gap at a concrete cap.
+--
+-- SO A FACE THAT PRICES A REGISTRY WITH THIS PREDICATE AT A SINGLE
+-- NUMBER IS CHOOSING WHICH CONJUNCT TO GET WRONG, and no choice of
+-- level repairs it: the cap that keeps the frames payable is too small
+-- for the lengths, and the level that admits the lengths is too large
+-- for the frames.  What is owed is a SPLIT reading -- the frame factor
+-- held at the cap while the length ledger climbs -- and it is owed here,
+-- at the definition, rather than in any one statement that spends it.
 pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
 pathSz? B root           = true
 pathSz? B (share-sink i) = true
