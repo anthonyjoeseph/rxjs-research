@@ -286,32 +286,25 @@ stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B
 stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF =
   thruΦ sf id now op nid path vals fin sched st B U hF
 
--- THE REGISTRY STAYS PRICED ACROSS A FRAME, which is what lets a walk
--- that starts under a size cap reach a sink still able to say what the
--- registry holds.  As stated it is read at ONE cap, and that reading is
--- the part still owed: the two frames that subscribe register paths
--- built by descending into the subscribed body, so the registered
--- length is the walked length plus the body's own, and no premise here
--- bounds a body.  What the walk face pays for the same fact is a ROOM
--- budget rather than a cap — a length ledger carried at a fixed ceiling
--- with the subscribe depth reserved inside it, and the depth bounded by
--- the GAS rather than by any size.  So the repair is a premise, and the
--- premise is not a size: it is the room the walk has left.
+-- THE REGISTRY STAYS PRICED ACROSS A FRAME, and the two things missing
+-- from this reading of it are both already carried by the walks that
+-- thread it, which is the ruling.  A subscribing frame registers the
+-- walked path with its head swapped plus one frame per syntax node of
+-- the INNER OBSERVABLE it received -- and an inner is a runtime value,
+-- structurally unrelated to the program the cap is read from, so a
+-- statement whose only premises are the path's own price cannot see it
+-- at all.  That is the whole content of both refutations below: each
+-- builds an inner FROM the cap and beats it.
 --
--- AND IT IS THE LENGTH ALONE, which is worth knowing before anyone
--- reaches for a bigger cap.  The other half of `pathSz?` reads a
--- frame's step function, and a subscribe installs a syntactic subterm
--- of what the store already held, so the frames a registration adds are
--- covered by the cap that covers the program.  Only the length moves.
---
--- AND THE CAPS FACE ALREADY PROVES THIS WALK, which is the part that
--- makes the statement above a duplicate rather than a gap: `foldPath`'s
--- caps law carries `capsOK?` across exactly this recursion, sink
--- included, and the registry's size price is one of its conjuncts.  It
--- reports at a level the walk ACCUMULATES rather than at the level it
--- entered under, and that is not slack to be tightened — see the dead
--- route below.  What is owed here is therefore not a proof but a
--- decision about the currency the nest face reads its own charge in.
+-- SO THE SIDE THAT MOVES IS THIS ONE, IN TWO PLACES.  The arriving
+-- values need their SIZE reading as a premise -- and `sizeᵛ` at an
+-- observable IS `sizeᵉ`, so that reading bounds the inner's syntax
+-- outright and every witness of that family dies against it.  Then the
+-- registered length is the walked length plus the inner's, both under
+-- the level, and the level's own step is what pays for the sum: one
+-- frame, one level, exactly as the SIZE sibling directly above charges
+-- it.  A fixed cap has nothing to pay with, which is why no repair of
+-- the hypotheses alone survives while this one does.
 
 -- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
 --   so that the cap transfers with no premise at all.  The share sink
@@ -331,6 +324,12 @@ stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF 
 --   bounds it.  That is why the level is existential downstream, and it
 --   is a fact about the fan-out rather than about how the bound is
 --   phrased.
+-- REFUTED: `Refuted.Subscribe-Inner-Regs-Base` -- the subscribe this
+--   statement's two subscribing frames perform does not preserve a
+--   fixed cap, symbolically and at every cap.
+-- REFUTED: `Refuted.Caps-Face` -- the same statement one level up was
+--   deleted as false and redundant against `subscribeE-caps`, which is
+--   ground because it reports at a level.
 postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
