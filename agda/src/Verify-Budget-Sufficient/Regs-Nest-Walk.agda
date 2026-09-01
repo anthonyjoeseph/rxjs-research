@@ -324,6 +324,16 @@ stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF 
 --   bounds it.  That is why the level is existential downstream, and it
 --   is a fact about the fan-out rather than about how the bound is
 --   phrased.
+-- DEAD ROUTE: and neither does deleting this face and reading the
+--   registry off the caps face's own levelled walk, which is the repair
+--   the redundancy note below invites.  The projector and the levelled
+--   walk predicate both exist and the two walks do rewrite clause for
+--   clause, but the consumer does not: the depth cascade is what spends
+--   these walks, and its own ceiling is a PREMISE of the lemma that
+--   produces the caps receipt, so a cascade taking that receipt would be
+--   proving its ceiling from its ceiling.  The caps face sits ABOVE the
+--   depth cascade, not beside it, and that ordering is what the
+--   redundancy reading misses.
 -- REFUTED: `Refuted.Subscribe-Inner-Regs-Base` -- the subscribe this
 --   statement's two subscribing frames perform does not preserve a
 --   fixed cap, symbolically and at every cap.

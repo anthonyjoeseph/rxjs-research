@@ -215,37 +215,31 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SEAM IS DECIDED AND THE NEST FACE IS WHAT MOVES.** A fixed cap
-  is refuted twice over: a subscribing frame lands frames read off an
-  INNER observable, which no premise about the path can see. Both
-  witnesses die against the arriving values' SIZE reading, since
-  `sizeᵛ` at an observable is `sizeᵉ` — and the registered length is
-  then the walked length plus the inner's, which one level pays for
-  exactly as the size sibling beside it is already charged. So the leg
-  is to restate the frame law with that premise and the ladder, and to
-  thread both through the walks. The live walk already carries them
-  both; the potential walk carries a factor reading instead, and the
-  fold carries neither.
+- **THE REGISTRY FACE IS RESTATED IN PLACE, AT AN ACCUMULATED LEVEL.**
+  Borrowing the reading from the caps face is refuted as a ROUTE: the
+  depth cascade is what spends these walks, and its ceiling is a
+  premise of the lemma producing the caps receipt, so a cascade taking
+  that receipt proves its ceiling from its ceiling. The caps face sits
+  above the cascade, not beside it. So the ladder has to be built here
+  — the frame law reports at a level, the fold carries one, and the
+  sink's re-entry is what the level pays for.
 
-- **THE PAYLOAD COUNT SURVIVED ITS PROBE TIGHT, SO THE LEG IS NOW THE
-  PROOF OF IT.** Nine rows hold and three are EQUALITIES — the two
-  `*All` heads, where the reading is a product and the only place it
-  could under-count, and the literal. The defer reads zero against
-  zero, which is what the ceiling's right to stop there rests on. What
-  the rows did not reach is a frame BELOW the root: they all run from
-  `st-init`, so the quantification over an arbitrary stored state is
-  untested, and that is where the induction has to be anyway. Build it
-  on `splitBurst-len`, which already bounds a split's length by the
-  stream's times a per-emit value count — the missing half is that a
-  frame's emit stream is itself bounded by the term's own reading.
+- **THEN THE CHAIN AND CASCADE FOLDS ABOVE IT, WHICH IS WHERE THE
+  LEVEL EITHER ESCAPES OR DOES NOT.** A chain is the frame law
+  iterated and a cascade is a fold over chains, and neither
+  conclusion names the cap — so the level stays internal if the
+  existential is placed at the fold rather than at the statement.
+  The measure to check first is the sink: a chain fans into chains,
+  so what the level must reserve is the fan-out's cumulative depth,
+  and that is the one place a bound fixed before the walk fails.
 
-- **THEN THE FOLD, WHERE THE LEVEL CANNOT STAY PUT.** The fold's own
-  registry law and its share half thread the price chain by chain, and
-  a chain fans into chains — so the level a fan-out reaches is not
-  fixed before the walk starts, and the conclusion has to become the
-  existential the caps face already reports. That is the one place the
-  ladder does not simply thread, and it is also where the fold has to
-  start carrying a values reading it does not carry today.
+- **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
+  cascade's ceiling feeds the caps receipt and the sighted collapse,
+  both of which are stated against a fixed cap today. Either they
+  transport along the cap ordering unchanged, in which case the leg
+  is mechanical, or the level reaches their conclusions and the
+  restatement cascades into the bridge — that is the risk worth
+  measuring before the fold above it is finished, not after.
 
 ### The ledger
 
@@ -288,7 +282,7 @@ does not fit is a finding about the shared statement, not about the head.
   gate, factor one and no depth, so hypothesis and conclusion are one statement
   read either side of it. What is owed is that its output values are among its
   inputs.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE×2`:
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced by the size cap across one frame. False at a fixed
   cap, and refuted twice over; what repairs it is the arriving values' size
   reading plus one level per frame, both of which the header names.
