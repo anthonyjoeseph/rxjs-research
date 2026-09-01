@@ -23,7 +23,7 @@ open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; m≤n+m;
   ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0;
   *-zeroʳ; *-distribˡ-⊔; +-identityʳ; +-suc; +-assoc; n≤1+n)
 open import Data.Nat.Solver using (module +-*-Solver)
@@ -49,7 +49,7 @@ open import Verify-Budget-Sufficient.Nest-Store
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
 open import Verify-Budget-Sufficient.Caps using (iterSize-mono-count)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; regsSz?; frameSz?; pathSz?-widen; regsSz?-widen)
+  using (pathSz?; regsSz?; frameSz?; pathSz?-widen; regsSz?-widen; k≤iterSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (shareAdmit-caps)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all; all-impl)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
@@ -301,6 +301,37 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
   ∧-intro (≤ᵇ-widen (sizeᵛ s v) h (∧-trueˡ hv))
           (valsSz?-mono V V′ vs h (∧-trueʳ hv))
 
+-- AND A BURST IS FINITE, SO SOME LEVEL HOLDS IT -- WHICH IS WHAT
+-- MAKES AN UNPINNED EXISTENTIAL LEVEL ASSERT NOTHING.  The iterate is
+-- inflationary and reaches its own count once the base is nonzero, so
+-- the count needed for a list is read off the list itself and the
+-- statement `some level holds this burst` is true of EVERY burst,
+-- however it arose.  That is stated here as a lemma rather than left
+-- implicit in a postulate's header, because the consumer that would
+-- spend such a count needs it bounded BEFORE the walk runs and this
+-- one is chosen after, so a face reporting it is reporting the burst's
+-- own size back to itself.
+valsMax : ∀ {n} {Γ : Ctx n} {s} (vals : List (Val Γ s)) → ℕ
+valsMax         []       = 0
+valsMax {s = s} (v ∷ vs) = sizeᵛ s v ⊔ valsMax vs
+
+valsSz?-max : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (vals : List (Val Γ s)) →
+  valsMax vals ≤ V → valsSz? V vals ≡ true
+valsSz?-max V []               le = refl
+valsSz?-max {s = s} V (v ∷ vs) le =
+  ∧-intro (T⇒≡true (sizeᵛ s v ≤ᵇ V)
+            (≤⇒≤ᵇ (≤-trans (m≤m⊔n (sizeᵛ s v) (valsMax vs)) le)))
+          (valsSz?-max V vs (≤-trans (m≤n⊔m (sizeᵛ s v) (valsMax vs)) le))
+
+valsSz?-some : ∀ {n} {Γ : Ctx n} {s} (S : ℕ) → 1 ≤ S → (j : ℕ)
+  (vals : List (Val Γ s)) →
+  Σ ℕ λ j′ → valsSz? (iterSize S (suc (j + j′)) S) vals ≡ true
+valsSz?-some S hS j vals =
+  valsMax vals ,
+  valsSz?-max (iterSize S (suc (j + valsMax vals)) S) vals
+    (≤-trans (≤-trans (m≤n+m (valsMax vals) j) (n≤1+n (j + valsMax vals)))
+             (k≤iterSize S (suc (j + valsMax vals)) S hS hS))
+
 -- ONE FRAME'S SIZE STEP, AND THE FRAME IS READ AT THE PROGRAM'S CAP
 -- WHILE THE VALUES ARE READ AT THE LEVEL.  That split is not a
 -- convenience: it is what `sizeStep` computes.  A `map-f` emits
@@ -339,37 +370,6 @@ postulate
     frameSz? S f ≡ true →
     valsSz? (iterSize S j S) vals ≡ true →
     valsSz? (iterSize S (suc j) S)
-      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
-
--- AND WHERE THE FRAME CANNOT BE READ AT THE PROGRAM'S CAP, THE GROWTH
--- INDEX IS EXISTENTIAL.  A chain re-entered through a share sink is
--- walked out of the REGISTRY, and a registered path carries one frame
--- per syntax node of an inner observable -- a runtime value, priced at
--- the level and not at the program.  So the sibling above does not
--- apply there, the emission genuinely is quadratic, and no FIXED
--- number of levels covers it, since the crossing moves with the level.
--- What is true is that the iterate is unbounded once `1 ≤ S`, so some
--- level covers a finite emission; the count is what the walk reports.
--- The scan arm's store defect is this leaf's too, and the existential
--- does not absorb it: no index covers a value the statement never
--- reads, so this leaf owes the same `stBounded?` premise its sibling
--- does.
---
--- REFUTED: `Refuted.Frame-Step-Size-Store` -- stated against the
---   sibling, and the witness's frame is a projection, so the growth
---   index it would be handed is nothing.
--- TWIN: `stepFrame-caps` reports exactly this shape and is proven -- a
---   growth index `j′` with the post-state landed at `j + j′` -- which
---   is the precedent for reading the existential as the honest form
---   rather than as a weakening.
-postulate
-  stepFrame-sz-lvl : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (S j : ℕ) →
-    1 ≤ S →
-    valsSz? (iterSize S j S) vals ≡ true →
-    Σ ℕ λ j′ → valsSz? (iterSize S (suc (j + j′)) S)
       (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 
 -- THE REGISTRY STAYS PRICED ACROSS A FRAME, AT AN ACCUMULATED LEVEL --
@@ -451,8 +451,30 @@ postulate
 -- with frames of its own, so what a whole walk accumulates is the
 -- fan-out's cumulative depth and not the depth of the path in hand.
 -- No quantity read before the walk starts bounds that, which is why
--- the count is existential here and fixed in the frame law above --
--- and why placing it at the fold keeps it out of every conclusion.
+-- the count is existential here and fixed in the frame law above.
+
+-- AND THAT EXISTENTIAL IS WHY THIS FACE ASSERTS LESS THAN IT READS
+-- AS.  The reported count is chosen AFTER the walk has run, and the
+-- registry it must cover is finite, so every conjunct of the Σ is
+-- upward-closed in the witness and the level can always be raised to
+-- meet whatever came out -- the vacuity shape, arriving at a face
+-- rather than at a lone statement.  The frame arm now says so in
+-- code: what it spends is `valsSz?-some`, which reads the emission's
+-- own size back off the emission and never looks at the frame.
+--
+-- SO THE REPAIR IS A DETERMINED COUNT, NOT A THREADED PREMISE.  The
+-- consumers that would spend a walk's level are keyed to `k ≤ S`,
+-- which an after-the-fact witness can never satisfy, so no premise
+-- added here makes this shape spendable; the count has to be a
+-- function of the path -- one level per frame, which is what the
+-- statement above already claims in prose.
+--
+-- DEAD ROUTE: threading the store reading `stBounded?` through this
+--   family to repair it.  The store defect is real at a FIXED count,
+--   where the level is named before the emission is seen, and that is
+--   where the premise is owed; at an existential count there is
+--   nothing to repair, because the statement was already true of any
+--   burst whatsoever.
 mutual
   foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
@@ -478,7 +500,7 @@ mutual
     where
     step = stepFrame sf id now f p vals fin sched st
     L    = iterSize S j S
-    SZ   = stepFrame-sz-lvl sf id now f p vals fin sched st S j hS hv
+    SZ   = valsSz?-some S hS j (proj₁ step)
     j′   = proj₁ SZ
     j≤   : j ≤ suc (j + j′)
     j≤   = ≤-trans (m≤m+n j j′) (n≤1+n (j + j′))

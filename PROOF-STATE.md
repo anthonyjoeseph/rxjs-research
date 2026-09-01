@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE STORE READING IS THREADED THROUGH THE WALK, WHICH IS WHAT BOTH
-  SIZE LEAVES TURNED OUT TO OWE.** A `scan-f` emits its accumulator out
-  of the node store and its own syntax may be a projection, so no
-  reading of the frame or of the arriving values bounds what comes out
-  — refuted at the smallest frame there is. `stBounded?` already makes
-  exactly that reading and the witness dies against it, so the premise
-  is named. Threading it means a preservation leaf per frame and per
-  chain, and the fold's conclusion becoming a pair, since the sink
-  re-enters at a state the fold itself produced.
+- **THE WALK'S LEVEL COUNT MUST BE DETERMINED BY THE PATH, BECAUSE AN
+  EXISTENTIAL ONE ASSERTS NOTHING.** The registry face reports a count
+  chosen after the walk has run, over a registry that is finite, so
+  every conjunct is upward-closed in the witness and the level can
+  always be raised to meet whatever came out. The frame leaf under it
+  is now proven from the iterate's inflation alone, never looking at
+  the frame — so the vacuity is in code rather than argued. Restate
+  the fold at one level per frame, which is what its own prose already
+  claims, and check the sink, where a chain fans into chains and the
+  count is a sum rather than a length.
 
 - **THEN THE COLLAPSE AT THE CHAIN DOOR, WHICH IS WHERE THE LEVEL
   EITHER ESCAPES OR DOES NOT.** The chain fold is the frame law
@@ -262,10 +263,6 @@ does not fit is a finding about the shared statement, not about the head.
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
   scan arm, which emits the node store that no premise here reads.
-- **`stepFrame-sz-lvl`** (Regs-Nest-Walk) — FALSITY, `REFUTED, TWIN`: the same
-  step where the frame comes out of the REGISTRY and so cannot be read at the
-  program's cap, reporting an existential growth index. It inherits the scan
-  arm's store defect, which no index absorbs, and owes the same premise.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `PROBED`: what one
   frame stores at the nodes map, under the potential it was handed. Three of
   the five kinds store; the whole-chain surrogate covers the composite at two
