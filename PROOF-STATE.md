@@ -215,27 +215,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE WALK'S LEVEL COUNT MUST BE DETERMINED BY THE PATH, BECAUSE AN
-  EXISTENTIAL ONE ASSERTS NOTHING.** The registry face reports a count
-  chosen after the walk has run, over a registry that is finite, so
-  every conjunct is upward-closed in the witness and the level can
-  always be raised to meet whatever came out. The frame leaf under it
-  is now proven from the iterate's inflation alone, never looking at
-  the frame — so the vacuity is in code rather than argued. Restate
-  the fold at one level per frame, which is what its own prose already
-  claims, and check the sink, where a chain fans into chains and the
-  count is a sum rather than a length.
+- **`pathSz?`'s TWO CONJUNCTS ARE OWED AT DIFFERENT NUMBERS, SO NO
+  SINGLE LEVEL PRICES A REGISTRY.** The frame factor has to stay at
+  the program's cap — one level pays `S + S·L` and a level-side
+  reading makes the emission quadratic where the level is linear —
+  while the length ledger has to climb, because a subscribing frame
+  registers a chain longer than the one it walked by the inner's own
+  operator count. Both single-number readings are refuted, so every
+  face above is choosing which conjunct to get wrong. Split the
+  reading — frame held at the cap, length carried by the level — and
+  measure what the split costs the statements that spend it, before
+  the folds above are restated against a currency that cannot hold.
 
-- **THEN THE CASCADE CARRIES THE LEVEL, BECAUSE THE CHAIN DOOR DOES
-  NOT COLLAPSE IT.** One chain leaves the registry priced above the
-  cap it entered on: a subscribing frame registers the inner's
-  operators on top of the head it swapped, so the registered path
-  outruns the priced one by the inner's own count, and the arrival's
-  size premise is what pays for that. Restate the door at a level and
-  thread it through the fold over chains, where each output registry
-  is the next chain's premise — so the level accumulates once per
-  chain and what must bound it is `nestWalkAt`, the quantity the
-  store side of the same fold is already carried against.
+- **THEN THE CASCADE CARRIES THE LENGTH LEDGER ACROSS CHAINS.** With
+  the reading split, the chain door stops being a collapse and becomes
+  an accumulation: each chain leaves its registry priced one inner
+  longer, and the fold over chains feeds that registry in as the next
+  chain's premise. Thread the climbing half through that fold and bound
+  what accumulates by `nestWalkAt`, the quantity the store side of the
+  same fold is already carried against — the frame half rides along
+  unchanged, which is the point of splitting.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
