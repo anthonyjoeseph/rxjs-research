@@ -71,7 +71,7 @@ open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest-cons; nest-keeps; refresh-supplies-nest;
    refresh-supplies-nest-strict; three-level-supply)
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
--- new hypothesis ranges over (see below, ~6307).  The rest of the family
+-- new hypothesis ranges over.  The rest of the family
 -- carries THE DEPTH PREMISE down the frame chain, and it threads by
 -- IDENTITY because the mirror is definitionally equal at every hop:
 --   depthFrame … (from-inner op allNid inst) … fin = depthReact … fin

@@ -150,11 +150,32 @@ its own subject cannot fire against itself. At the sweep that introduced it,
 **6 — Explanation budget.** The prose before the first evidence marker, with
 sha-bearing lines free. Nothing evidential is ever what has to give.
 
-**7 — Line numbers.** No comment cites a line, in any of three forms:
-`Module.agda:414`, the extensionless `Wet:514`, or the prose `line 1920`. The
-rule is CLAUDE.md's own, arriving in the source tree: a stale *name* fails a
-`grep` loudly, while a stale line number **resolves**, points at unrelated
-code, and is believed.
+**7 — Line numbers.** No comment cites a line, in any of six forms — three
+exact, `Module.agda:414`, the extensionless `Wet:514`, and the prose
+`line 1920`; and three approximate, a tilde-number alone in its parentheses
+`(~882)`, one introduced by `see below`/`see above`, and one counting
+`~1200 lines`. The rule is CLAUDE.md's own, arriving in the source tree: a
+stale *name* fails a `grep` loudly, while a stale line number **resolves**,
+points at unrelated code, and is believed.
+
+**The approximate form is the same citation wearing a tilde, and it is worse
+than the exact one.** A tilde reads as a hedge and so gets written where an
+exact number would have felt too confident — which is precisely the citation
+least likely to be maintained. The check was blind to it for as long as it
+existed, and reported a tidy zero the whole time: at the sweep that closed the
+gap the two trees held **eleven** such citations, one of them copy-pasted into
+**nine module headers** and pointing at a line none of those files has, having
+survived a module split exactly as `Wet.agda:4125` did. Every one of the nine
+already named the declaration it meant.
+
+The precision that keeps it usable is that **a tilde carrying a unit is not a
+citation**: `~120 MB`, `~1400 call sites`, a `~19730-digit` number and the bare
+`(43690)` the walk climbs to are quantities, and a quantity addresses nobody.
+So the parenthesised form requires the tilde — banning `(43690)` would fire on
+a value — and the counting form requires the word `lines`. Both properties are
+pinned in the selftest, the miss in `lineref/` and the near miss in `clean/`,
+one citation per fixture line because the checker reports only the first match
+on a line.
 
 The census that added the check measured how far gone it already was. Of the
 36 `file:line` citations, **ten pointed past the end of the file they named** —

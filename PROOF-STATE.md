@@ -215,26 +215,23 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **`pathSz?`'s TWO CONJUNCTS ARE OWED AT DIFFERENT NUMBERS, SO NO
-  SINGLE LEVEL PRICES A REGISTRY.** The frame factor has to stay at
-  the program's cap — one level pays `S + S·L` and a level-side
-  reading makes the emission quadratic where the level is linear —
-  while the length ledger has to climb, because a subscribing frame
-  registers a chain longer than the one it walked by the inner's own
-  operator count. Both single-number readings are refuted, so every
-  face above is choosing which conjunct to get wrong. Split the
-  reading — frame held at the cap, length carried by the level — and
-  measure what the split costs the statements that spend it, before
-  the folds above are restated against a currency that cannot hold.
+- **THE LEVELS A CASCADE REACHES ARE A WIDTH TIMES A CAP, AND THE
+  CEILING ON OFFER PAYS FOR A CAP.** With the level threaded through
+  the chain spine, the whole selection's affordability is one leaf:
+  the walk enters chain `k` at whatever the first `k-1` left, so the
+  range is the chains' total length plus their count, and the registry
+  admits a selection as wide as itself. The proven arithmetic covers
+  `k ≤ S`; the range here needs a cube where that lands on a square.
+  Decide whether `nestWalkAt` widens or the level count comes down,
+  and get a witness before the faces above are built on either.
 
-- **THEN THE CASCADE CARRIES THE LENGTH LEDGER ACROSS CHAINS.** With
-  the reading split, the chain door stops being a collapse and becomes
-  an accumulation: each chain leaves its registry priced one inner
-  longer, and the fold over chains feeds that registry in as the next
-  chain's premise. Thread the climbing half through that fold and bound
-  what accumulates by `nestWalkAt`, the quantity the store side of the
-  same fold is already carried against — the frame half rides along
-  unchanged, which is the point of splitting.
+- **THEN THE CHAIN DOOR'S ONE LEVEL, WHICH NOTHING HAS INSTANTIATED.**
+  The door now reports one `sizeStep` per chain, which is the reading
+  the refuted fixed cap forced; that `S·(1+2L)` dominates `L + S` is
+  the argument, and an argument is not a row. The statement computes
+  on both sides at concrete programs, so probe it where the refutation
+  bit — a subscribing frame whose inner is at the cap — and either
+  bank the receipt or find the second inner that outruns one level.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -289,10 +286,14 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Caps-Face/Part7) — SHAPE, `REFUTED`: the whole
-  chain's registry price, at the ENTRY cap. False there: a subscribing frame
-  registers a path LONGER than the one priced, so the cap owes a level and the
-  cascade above has to carry it.
+- **`cascade-afford-wide`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
+  levels a whole cascade reaches ABOVE the cap, held under the walk's ceiling.
+  The half below the cap is the proven one-chain fact; this half is a width
+  times a cap against an exponential of a cap squared, and unread.
+- **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the whole
+  chain's registry price, now stepping the level by one rather than collapsing
+  to the entry cap. The fixed-cap form is refuted; that one `sizeStep` covers
+  what a subscribe registers is argued and uninstantiated.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

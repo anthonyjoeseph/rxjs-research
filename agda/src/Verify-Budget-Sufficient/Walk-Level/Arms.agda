@@ -571,7 +571,7 @@ scripted-cold-async-four {n = n} {Γ = Γ} c Ψ F Ŝ R̂ G ℓ L̂ dep bud ops j
 -- (block 42, 15 members — `make agda-dev ARGS='--list …'` shows them free).
 -- The regs lemma sits ABOVE that block with the dry/hop helpers it spends
 -- (retagEvents-dry, mapValue-hop, mapValue-dry, any-dry-++).  The regsLen?
--- helpers do NOT: capsOK⇒regsLen and regsLen?-mono sit ~1200 lines BELOW,
+-- helpers do NOT: capsOK⇒regsLen and regsLen?-mono sit far BELOW,
 -- after the block, so anything of theirs a future clause wants moves up too.
 --
 -- ═══ TWO CHORES BEFORE THE GRIND, NEITHER STRUCTURAL ═══

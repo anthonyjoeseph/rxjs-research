@@ -30,9 +30,8 @@ open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; foldr)
-open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
-  ≤-reflexive; +-suc; m≤n+m)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; +-suc)
 open import Data.Vec using (lookup)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
@@ -182,33 +181,43 @@ postulate
 -- values a frame sees are the ones the frames above it produced, so
 -- the bound has to step: it is read at the LEVEL the walk has reached
 -- rather than at one number, and each frame moves the level by one.
--- A path legal under the size cap has at most a cap's worth of frames,
--- which is what keeps the level under the cap and lets the caller
--- discharge affordability once for every level at once.
+--
+-- AND THE LEVEL BUDGET IS A PARAMETER, NOT THE SIZE CAP.  Reading it as
+-- the cap is exactly right for ONE chain entered at level zero -- a
+-- path legal under the cap has at most a cap's worth of frames -- and
+-- it is wrong the moment a caller walks a second chain, because the
+-- level it enters at is whatever the first chain left.  A selection of
+-- `W` chains reaches a level on the order of `W` caps, so a budget
+-- pinned to the cap is unsatisfiable there however the arithmetic is
+-- arranged, and the affordability the caller owes is the one thing
+-- that has to widen with it.  Keeping the two apart is what lets one
+-- statement serve both: `Lv := S` recovers the single-chain reading.
 walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U j : ℕ) (path : Path Γ u t)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (path : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  (∀ k → k ≤ S → iterSize S k S ≤ U) →
+  (∀ k → k ≤ Lv → iterSize S k S ≤ U) →
+  1 ≤ S →
   valsSz? (iterSize S j S) vals ≡ true →
   pathSz? S path ≡ true →
   regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
-  j + pathLen path ≤ S →
+  j + pathLen path ≤ Lv →
   PathLiveHyp sf gas id now U path vals fin sched st
-walk-LiveHyp-go sf gas id now S U j root vals fin sched st _ _ _ _ _ = tt
-walk-LiveHyp-go sf gas id now S U j (share-sink i) vals fin sched st afford hsz _ hreg hj =
+walk-LiveHyp-go sf gas id now S U Lv j root vals fin sched st _ _ _ _ _ _ = tt
+walk-LiveHyp-go sf gas id now S U Lv j (share-sink i) vals fin sched st afford _ hsz _ hreg hj =
   walk-share-LiveHyp sf gas id now S U j i vals fin sched st
-    (valsSz?-mono (iterSize S j S) U vals (afford j j≤S) hsz) hreg
+    (valsSz?-mono (iterSize S j S) U vals (afford j j≤Lv) hsz) hreg
   where
-  j≤S : j ≤ S
-  j≤S = ≤-trans (m≤m+n j 0) hj
-walk-LiveHyp-go sf gas id now S U j (f ↠ p) vals fin sched st afford hsz hpz hreg hj =
+  j≤Lv : j ≤ Lv
+  j≤Lv = ≤-trans (m≤m+n j 0) hj
+walk-LiveHyp-go sf gas id now S U Lv j (f ↠ p) vals fin sched st afford 1≤S hsz hpz hreg hj =
     hHead
-  , walk-LiveHyp-go sf gas id now S U (suc j) p
+  , walk-LiveHyp-go sf gas id now S U Lv (suc j) p
       (proj₁ step)
       (proj₁ (proj₂ (proj₂ step)))
       (proj₁ (proj₂ (proj₂ (proj₂ step))))
       (proj₂ (proj₂ (proj₂ (proj₂ step))))
       afford
+      1≤S
       (stepFrame-sz sf id now f p vals fin sched st S j hfz hsz)
       hpTail
       (stepFrame-regsSz sf id now f p vals fin sched st S j hsz
@@ -216,12 +225,10 @@ walk-LiveHyp-go sf gas id now S U j (f ↠ p) vals fin sched st afford hsz hpz h
       (≤-trans (≤-reflexive (sym (+-suc j (pathLen p)))) hj)
   where
   step = stepFrame sf id now f p vals fin sched st
-  j≤S : j ≤ S
-  j≤S = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
-  1≤S : 1 ≤ S
-  1≤S = ≤-trans (s≤s z≤n) (≤-trans (m≤n+m (suc (pathLen p)) j) hj)
+  j≤Lv : j ≤ Lv
+  j≤Lv = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
   atU : valsSz? U vals ≡ true
-  atU = valsSz?-mono (iterSize S j S) U vals (afford j j≤S) hsz
+  atU = valsSz?-mono (iterSize S j S) U vals (afford j j≤Lv) hsz
   hHead : FrameLiveHyp U f p vals
   hHead = frameLive-of-sz U f p vals atU
   hfz : frameSz? S f ≡ true

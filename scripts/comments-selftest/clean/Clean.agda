@@ -30,3 +30,9 @@ postulate numerals : Set
 -- so the prefix is required to be a real module basename, which is what
 -- keeps the sixth check from being a rule people route around.
 postulate signals : Set
+
+-- AND AN APPROXIMATE QUANTITY IS NOT A CITATION EITHER.  The peak was
+-- ~120 MB, the evaluator has ~1400 call sites, the fuel is a ~19730-digit
+-- number and the walk climbs to (43690) -- each carries a unit or is a
+-- value, so none of them addresses a reader to a position in a file.
+postulate approximate : Set

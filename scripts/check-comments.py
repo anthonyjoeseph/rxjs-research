@@ -99,6 +99,19 @@ The check is deliberately blind to whether the number happens to be right
 today.  A correct line number is a decay clock that has not gone off yet, and
 policing correctness would mean re-validating every citation on every edit to
 every cited file — which is the maintenance burden that produced the rot.
+
+AND THE APPROXIMATE FORM IS THE SAME CITATION WEARING A TILDE, which is the
+near miss the first two forms walked past: `(see below, ~6307)` names no
+module, carries no `line`, and so read as prose to every pattern above while
+reading as a position to a human.  It rotted exactly as predicted and then
+some — one such line was copy-pasted into NINE module headers and pointed at a
+line none of them has, the citation surviving a module split that moved
+everything it was reaching for.  A tilde-number cannot be banned outright,
+because an approximate QUANTITY is ordinary and legitimate here (`~120 MB`,
+`~1400 sites`, a `~19730-digit` number), so what is banned is the tilde-number
+that ADDRESSES A READER: bare inside its own parentheses, following a `see
+below`/`see above`, or counting `lines`.  A quantity carries its unit and none
+of the three forms fits it.
 """
 
 import argparse
@@ -182,9 +195,18 @@ RULE_LINE = re.compile(r"^[-=─━═_*+#.·]{3,}\s*$")
 # position in a file, which is the thing that rots.  `line` is required to be
 # followed by a number of at least two digits so that ordinary prose about "line
 # 1" of a derivation is not swept up.
+#
+# The three tilde forms are the approximate citation, and each is required to
+# address a reader rather than measure something: a tilde-number alone in its
+# parentheses, one introduced by `see below`/`see above`, and one counting
+# `lines`.  A quantity is spared because it carries a unit -- `(43690)` without
+# the tilde is a VALUE the walk climbs to and stays legal too.
 LINEREF = re.compile(
     r"[A-Za-z][A-Za-z0-9_./-]*\.agda:\d+"
     r"|\blines?\s+\d{2,}\b"
+    r"|\(\s*~\d{2,}\s*\)"
+    r"|\bsee\s+(?:below|above)\b[^.\n]{0,24}?~?\d{2,}"
+    r"|~\d{2,}\s+lines?\b"
 )
 
 # AND THE SAME CITATION WITHOUT THE EXTENSION — `Wet:514`, `Evaluator:729`,

@@ -98,7 +98,7 @@ leaf-lvl S W d k m j =
 -- the emit is stepped through the ONE frame just built (`stepFrame-caps`,
 -- which reports the level that frame LEAVES) and the rest of the burst
 -- runs from there.  The gate had no fIterD row at all — .Caps-Face's pass
--- memo (~6090) names both this and `burst-index` below as what the
+-- memo names both this and `burst-index` below as what the
 -- signature pass would need, and `pushBurst-caps` is the head that needs
 -- them: it recurses on `em ∷ ems`, so its index is the EMIT COUNT
 burst-step : ∀ (S W d k m j j₁ j₂ : ℕ) → 2 ≤ S →
