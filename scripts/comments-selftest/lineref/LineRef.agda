@@ -10,3 +10,9 @@ postulate leaf : Set
 -- often: the supplier is `subscribeInner-caps` (Subscribe-Face:951), and
 -- the arithmetic rides Wet:514.
 postulate extensionless : Set
+
+-- AND THE APPROXIMATE FORM, which is the near miss the two above walked
+-- past: a tilde-number alone in its parentheses (~882).
+-- A reader is sent to one directly (see below, ~6307).
+-- And one counts ~1200 lines BELOW.
+postulate approximate : Set

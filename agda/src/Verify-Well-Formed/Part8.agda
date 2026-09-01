@@ -429,8 +429,8 @@ subscribeE-wf fuel (deferᵉ body) κ id now sched st S binv deq nodry =
 -- subscribeE-wf BODY
 -- Forward type declaration is at the start of this section.
 -- All five proven lemmas it calls are defined above:
---   oneShotBurst-wf  (~882), subscribeE-map-wf  (~1920),
---   subscribeE-scan-wf (~2003), subscribeE-take-wf (~3060).
+--   oneShotBurst-wf, subscribeE-map-wf,
+--   subscribeE-scan-wf, subscribeE-take-wf.
 -- Gap and per-clause postulates are also defined above.
 -- ════════════════════════════════════════════════════════════════
 
@@ -651,7 +651,7 @@ record FoldInv {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 -- WHY A THREE-WAY INVARIANT (the frame case is NOT a live↔registry
 -- pass-through).  stepFrame mutates the registry — subscribeInner adds an
 -- entry AND emits `init`; a take/switch cut removes an entry AND emits
--- `close` (Evaluator take-f, lines ~540) — but stepFrame does NOT step the
+-- `close` (Evaluator take-f) — but stepFrame does NOT step the
 -- protocol.  live S only catches up when the ACCUMULATED evs are applied at
 -- the terminal root/share emit.  So mid-fold the registry LEADS and live LAGS
 -- by exactly the pending evs.  The invariant threading through frames is thus

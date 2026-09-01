@@ -62,7 +62,7 @@ open import Verify-Budget-Sufficient.Caps using
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
--- new hypothesis ranges over (see below, ~6307).  The rest of the family
+-- new hypothesis ranges over.  The rest of the family
 -- carries THE DEPTH PREMISE down the frame chain, and it threads by
 -- IDENTITY because the mirror is definitionally equal at every hop:
 --   depthFrame … (from-inner op allNid inst) … fin = depthReact … fin

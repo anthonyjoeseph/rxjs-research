@@ -164,7 +164,7 @@ open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
--- new hypothesis ranges over (see below, ~6307).  The rest of the family
+-- new hypothesis ranges over.  The rest of the family
 -- carries THE DEPTH PREMISE down the frame chain, and it threads by
 -- IDENTITY because the mirror is definitionally equal at every hop:
 --   depthFrame … (from-inner op allNid inst) … fin = depthReact … fin
@@ -279,24 +279,26 @@ frameSz? B (thru-outer _ _)   = true
 -- mentioning a registered chain grows the body instead of staying stuck,
 -- and J-Budget-Probe OOMs at 13 GB on precisely that
 
--- BUT THE TWO CONJUNCTS ARE OWED AT DIFFERENT NUMBERS, WHICH IS WHAT
--- MAKES A REGISTRY PRICED BY THIS PREDICATE AT ONE LEVEL UNSATISFIABLE.
--- The frame reading has to be taken at the PROGRAM'S CAP: `sizeStep`
--- pays `S + S·L` and no more, so the frame's factor is the base cap and
--- reading it at an accumulated level instead makes the emission
--- quadratic where one level is linear -- `Refuted.Frame-Step-Size-Level`
--- names the crossing.  The LENGTH reading runs the other way and must
--- rise with the level, because a subscribing frame registers a chain
--- longer than the one it was walking, by the inner's own operator count
--- -- `Refuted.Chain-Step-Regs-Cap` is that gap at a concrete cap.
+-- AND THE WALKED PATH AND THE REGISTRY ARE PRICED AT DIFFERENT
+-- NUMBERS, WHICH IS A FACT ABOUT THE TWO USES AND NOT ABOUT THE TWO
+-- CONJUNCTS.  The path in hand is read at the PROGRAM'S CAP, because
+-- its frames have to pay for what they emit and one level buys only
+-- `S + S·L` against a duplicator that is quadratic in what it is
+-- capped by -- `Refuted.Frame-Step-Size-Level` names that crossing.
+-- The REGISTRY is read at a climbing level instead, and must be:
+-- a subscribing frame registers a chain longer than the one it was
+-- walking, by the inner's own operator count, so a fixed reading of
+-- it is refuted outright by `Refuted.Chain-Step-Regs-Cap`.
 --
--- SO A FACE THAT PRICES A REGISTRY WITH THIS PREDICATE AT A SINGLE
--- NUMBER IS CHOOSING WHICH CONJUNCT TO GET WRONG, and no choice of
--- level repairs it: the cap that keeps the frames payable is too small
--- for the lengths, and the level that admits the lengths is too large
--- for the frames.  What is owed is a SPLIT reading -- the frame factor
--- held at the cap while the length ledger climbs -- and it is owed here,
--- at the definition, rather than in any one statement that spends it.
+-- SO THE PREDICATE IS RIGHT AS IT STANDS AND THE OBLIGATION IS ON ITS
+-- CALLERS: price the walked path at the cap, the registry at the
+-- level, and never carry one number for both.  One level covers one
+-- chain's growth -- `sizeStep S L` is `S·(1+2L)`, which dominates
+-- `L + S` for every positive cap -- so the registry side climbs by a
+-- DETERMINED count and not by a witness chosen after the fact.  The
+-- walk face on this spine already reads it exactly that way; what
+-- does not is the cascade's own chain door, which is where the
+-- refuted fixed reading survived.
 pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
 pathSz? B root           = true
 pathSz? B (share-sink i) = true
