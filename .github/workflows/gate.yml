@@ -26,8 +26,14 @@ jobs:
     # on a cache miss. Generous on purpose; tighten once real runs land.
     timeout-minutes: 120
     steps:
+      # fetch-depth: 0 (full history) -- comments-check resolves `RECOVERY:`
+      # shas with `git cat-file`, and those name ordinary ancestor commits
+      # that a shallow (default depth-1) clone simply does not have, so the
+      # lookup fails and a genuine, resolvable reference reads as dangling.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Runs first, before the expensive toolchain build: a broken swap step
       # should fail in seconds, not after a 20-minute cold Agda build.
