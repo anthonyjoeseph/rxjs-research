@@ -389,6 +389,10 @@ imports-selftest:
 	  done; \
 	  echo "$$out" | grep -q '3 PHANTOM name(s)' \
 	    || { echo "SELFTEST FAIL: expected exactly 3 phantom names — a count over 3 means the check guessed at a module it cannot read, and every Fixture.* name in this tree names no file"; fail=1; }; \
+	  echo "$$out" | grep -q 'PHANTOM MODULE  Phantom-Src.Nowhere' \
+	    || { echo "SELFTEST FAIL: an import of a module of this tree that has NO FILE went unreported — Agda meets that as a hard FileNotFound, and a split is what leaves them"; fail=1; }; \
+	  echo "$$out" | grep -q '1 PHANTOM module(s)' \
+	    || { echo "SELFTEST FAIL: expected exactly 1 phantom module — every Fixture.* module named here also has no file, and firing on those would mean the check is reading a namespace it cannot see the root of"; fail=1; }; \
 	  echo "$$out" | grep -qE 'Phantom.agda:.*(DEAD IMPORT|dead name)' \
 	    && { echo "SELFTEST FAIL: a phantom row also fired as dead — a phantom is a name that does not EXIST, not one that goes unused, and a row that fires both ways cannot tell them apart"; fail=1; }; \
 	  echo "$$out" | grep -q 'Main.agda:.*BLANKET IMPORT  Fixture.Root-Blanket' \
@@ -427,6 +431,8 @@ imports-selftest:
 	    || { echo "SELFTEST FAIL: the blanket findings vanished after --fix"; fail=1; }; \
 	  echo "$$after" | grep -q '3 PHANTOM name(s)' \
 	    || { echo "SELFTEST FAIL: --fix deleted a phantom name — the repair is the RIGHT module, which the fixer cannot know, and deleting the item trades a scope-check warning for an unbound name"; fail=1; }; \
+	  echo "$$after" | grep -q '1 PHANTOM module(s)' \
+	    || { echo "SELFTEST FAIL: --fix deleted a phantom module — same reason as a phantom name, one level up: only a human knows which module the definition moved to"; fail=1; }; \
 	  diff -q scripts/imports-selftest/Main.agda $$tmp/Main.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the CLAIM ROOT"; fail=1; }; \
 	  grep -q 'live-used' $$tmp/Fires.agda \
@@ -442,7 +448,7 @@ imports-selftest:
 	  diff -q scripts/imports-selftest/Quiet.agda $$tmp/Quiet.agda >/dev/null \
 	    || { echo "SELFTEST FAIL: --fix rewrote the file it must not touch"; fail=1; }; \
 	  rm -rf $$tmp; \
-	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module)"; \
+	  if [ $$fail -eq 0 ]; then echo "imports-selftest: PASS (fires on a comment-only mention, a multi-line clause, a token near-miss and a dead name beside a live one; not on an infix mixfix, a MIXFIX SECTION (one or many holes), a renaming, a qualified import or a \`module M\` entry whose use is an \`open M\`; --fix is idempotent on BOTH counts and spares the live names, a dead \`module M\` item included; the claim root is exempt from the USE check but not from the blanket rule; a sole-route edge is held back as a WIRING finding rather than deleted, jointly as well as one at a time; and an import with no \`using\` list is BLANKET, while \`using ()\` and a qualified import are not; and a \`public\` re-export is illegal outright, named or bare; and a file with no module declaration, or one disagreeing with its path, is reported before any finding about its imports; and a name no module of this tree contains is PHANTOM, read on the source side of a renaming and with a \`module\` keyword off, surviving --fix because only a human knows the right module; and a MODULE of this tree that has no file is PHANTOM too, while an out-of-tree namespace is not)"; \
 	  else echo "$$out"; exit 1; fi
 
 # PROVES dup-check IS LOAD-BEARING, against a fixture outside agda/src.  It

@@ -171,7 +171,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
    valCaps?-size)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (cSize≤frameStep; valsCaps?-parts)
-open import Verify-Budget-Sufficient.Caps-Face.Part7 using
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Frame-Face using
   (stepFrame-face)
 open import Verify-Budget-Sufficient.Caps-Face.Part6 using
   (valsLen; valsOf)

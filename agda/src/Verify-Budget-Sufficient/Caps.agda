@@ -1175,41 +1175,49 @@ iterSize-step≤ S s (suc j) hS _ = iterSize-infl S hS j (sizeStep S s)
                    (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
           (capsAt-base-size e sl id)
 
-8≤frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
-  8 ≤ Caps.cSize (frameBlowup c d)
-8≤frameBlowup-size c d 1≤R 3≤S =
-  ≤-trans (≤-trans 8≤9 (*-mono-≤ 3≤S 3≤suc2S))
-          (iterSize-step≤ S S J 1≤S 1≤J)
+21≤frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 1 ≤ Caps.cReg c → 3 ≤ Caps.cSize c →
+  21 ≤ Caps.cSize (frameBlowup c d)
+21≤frameBlowup-size c d 1≤R 3≤S =
+  ≤-trans (*-mono-≤ 3≤S 7≤suc2S) (iterSize-step≤ S S J 1≤S 1≤J)
   where
   S = Caps.cSize c
   J = sizeCount c d
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 3≤S
-  8≤9 : 8 ≤ 3 * 3
-  8≤9 = s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n)))))))
-  3≤suc2S : 3 ≤ suc (2 * S)
-  3≤suc2S = s≤s (*-monoʳ-≤ 2 1≤S)
+  -- the second factor is read at THREE rather than at one, which is
+  -- where the whole raise comes from: one `sizeStep` at the minimum cap
+  -- is already three sevens, and nothing about the recurrence changes.
+  7≤suc2S : 7 ≤ suc (2 * S)
+  7≤suc2S = s≤s (*-monoʳ-≤ 2 3≤S)
   1≤J : 1 ≤ J
   1≤J = ≤-trans (s≤s z≤n)
                 (2≤sizeCount c d (≤-trans (s≤s (s≤s z≤n)) 3≤S) 1≤R)
 
 -- AND THE FLOOR IS UNIFORM IN THE INSTANT, base included, because the
 -- base cap is a `frameBlowup` too -- of a record whose size already
--- reads the program and whose registry is a successor.  Eight is where
--- `sq≤2^` starts, which is what the nesting side spends this on.
-8≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  8 ≤ Caps.cSize (capsAt e sl id)
-8≤capsAt-size {n = n} e sl zero =
-  8≤frameBlowup-size
+-- reads the program and whose registry is a successor.  Twenty-one is
+-- where the nesting side's CUBE overtakes its exponential, which is
+-- what a cascade's level range costs once the range is read as a width
+-- times a cap rather than as one chain's frames.
+21≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  21 ≤ Caps.cSize (capsAt e sl id)
+21≤capsAt-size {n = n} e sl zero =
+  21≤frameBlowup-size
     (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl) (suc (entryCeil n sl e))
           (suc (sizeᵉ e + slotsSize sl)))
     (capsBase e sl)
     (s≤s z≤n)
     (≤-trans (≤-trans (+-monoʳ-≤ 2 (sizeᵉ-pos e)) (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
              (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl)))
-8≤capsAt-size e sl (suc id) =
-  8≤frameBlowup-size (capsAt e sl id) (capsH e sl id)
+21≤capsAt-size e sl (suc id) =
+  21≤frameBlowup-size (capsAt e sl id) (capsH e sl id)
     (1≤capsAt-reg e sl id) (3≤capsAt-size e sl id)
+
+8≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  8 ≤ Caps.cSize (capsAt e sl id)
+8≤capsAt-size e sl id =
+  ≤-trans (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))))))
+          (21≤capsAt-size e sl id)
 
 6≤capsAt-size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   6 ≤ Caps.cSize (capsAt e sl (suc id))

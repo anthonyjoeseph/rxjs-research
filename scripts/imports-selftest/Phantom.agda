@@ -17,6 +17,17 @@ open import Phantom-Src using (real-thing; module Sub-Mod; gone; hidden)
 -- the one item here that is correct.
 open import Phantom-Src using () renaming (real-thing to r2; absent to a2)
 
+-- AND THE MODULE ITSELF CAN BE PHANTOM, which is the worse of the two and
+-- the one this file was blind to.  A phantom NAME is a warning against a file
+-- that is otherwise correct; a phantom MODULE is a hard `FileNotFound` that
+-- stops the build.  It arrives from a SPLIT: the old file goes, the tree the
+-- split was swept for is green, and a consumer in ANOTHER tree still names
+-- the module that no longer exists.  `Fixture.Deep` in Phantom-Src is not
+-- this and must never fire -- `Fixture` roots no file here, so it is out of
+-- tree and unreadable -- while `Phantom-Src` does root one, which is what
+-- makes the row below askable at all.
+open import Phantom-Src.Nowhere using (never-was)
+
 -- THERE IS NO MIXFIX ROW HERE, deliberately.  An import spells an operator
 -- in full -- `using (_⊗_)`, never a section -- so the token the check looks
 -- for is the token the defining module writes, and no mutation of the
@@ -30,4 +41,4 @@ open import Phantom-Src using () renaming (real-thing to r2; absent to a2)
 -- a name that goes unused, and a row that could also fire as a dead name would
 -- not tell the two apart.
 alive : Set
-alive = real-thing Sub-Mod.inner gone hidden r2 a2
+alive = real-thing Sub-Mod.inner gone hidden r2 a2 never-was

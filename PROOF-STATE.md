@@ -215,23 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEVELS A CASCADE REACHES ARE A WIDTH TIMES A CAP, AND THE
-  CEILING ON OFFER PAYS FOR A CAP.** With the level threaded through
-  the chain spine, the whole selection's affordability is one leaf:
-  the walk enters chain `k` at whatever the first `k-1` left, so the
-  range is the chains' total length plus their count, and the registry
-  admits a selection as wide as itself. The proven arithmetic covers
-  `k ≤ S`; the range here needs a cube where that lands on a square.
-  Decide whether `nestWalkAt` widens or the level count comes down,
-  and get a witness before the faces above are built on either.
-
-- **THEN THE CHAIN DOOR'S ONE LEVEL, WHICH NOTHING HAS INSTANTIATED.**
-  The door now reports one `sizeStep` per chain, which is the reading
-  the refuted fixed cap forced; that `S·(1+2L)` dominates `L + S` is
-  the argument, and an argument is not a row. The statement computes
-  on both sides at concrete programs, so probe it where the refutation
-  bit — a subscribing frame whose inner is at the cap — and either
-  bank the receipt or find the second inner that outruns one level.
+- **THE CHAIN DOOR'S ONE LEVEL — THE HARNESS IS DRAFTED, THE ROWS ARE
+  NOT.** The door reports one `sizeStep` per chain, and that
+  `S·(1+2L)` dominates `L + S` is an argument, not a row. Both sides
+  compute at concrete programs, and a staged instantiation at the
+  shape the refutation bit — a subscribing frame whose inner is at
+  the cap — now exists in draft. What remains is the numbers, every
+  pin being a placeholder, plus the target's statement fingerprint
+  and the wire into `Probed.Main`. Expect a second inner that outruns
+  one level; absent one the receipt banks and the row drops a class.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -241,9 +233,20 @@ does not fit is a finding about the shared statement, not about the head.
   restatement cascades into the bridge — that is the risk worth
   measuring before the fold above it is finished, not after.
 
+- **THEN THE DRAIN LAW'S ONE FRAME THAT NAMES A NODE, WHOSE
+  OBLIGATION HAS OUTLIVED ITS THREE CARRIERS.** The `from-inner` head
+  is the tier's worst row and the only one whose per-entry ceiling has
+  been refuted at every cap it was stated against, so what is open is
+  not a proof but the obligation: nothing yet says what a frame naming
+  a node may cost that a frame naming none may not. Read the three
+  dead carriers for the shape they share before minting a fourth —
+  a carrier refuted at every cap is evidence about the QUANTITY, not
+  about the cap it was read at — and instantiate the candidate at the
+  frame the refutations bit before it is stated.
+
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
+- **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, TWIN, PROBED×2`: the `from-inner` head of the drain law, the only
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
@@ -267,7 +270,7 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`walk-share-ΦHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
   potential for the chains a sink fans into. Their factor and depth are the
   registry's, priced at the level the walk has reached, and nothing has read
   the claim that the cap's exponential covers them.
@@ -286,11 +289,7 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`cascade-afford-wide`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
-  levels a whole cascade reaches ABOVE the cap, held under the walk's ceiling.
-  The half below the cap is the proven one-chain fact; this half is a width
-  times a cap against an exponential of a cap squared, and unread.
-- **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the whole
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the whole
   chain's registry price, now stepping the level by one rather than collapsing
   to the entry cap. The fixed-cap form is refuted; that one `sizeStep` covers
   what a subscribe registers is argued and uninstantiated.
@@ -303,7 +302,7 @@ does not fit is a finding about the shared statement, not about the head.
   now instantiated where they move — the store at the PARKING branch, tight to
   equality — and the subscribing branch is blocked rather than uncovered.
 
-- **`chain-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
+- **`chain-depth-sighted`** (Part7/Arrival-Caps) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
   ceiling, whose store slot is the CAP. The rows read the round at the entry
   store, which is below that cap, so they say nothing about the room it adds.
@@ -342,7 +341,7 @@ does not fit is a finding about the shared statement, not about the head.
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
   the floor assembles all four. The unit alone is refuted by a defer-headed
   program; a size bound makes it compute.
-- **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
+- **`chainStep-nest-live`** (Part7/Cascade-Caps) — DIFFICULTY, `REFUTED, PROBED`:
   one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
   chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the
   cascade door — now instantiated at the family that killed the depth form, and
@@ -352,16 +351,16 @@ does not fit is a finding about the shared statement, not about the head.
   conjunct this head's accumulator read demanded, so the shape is settled; what
   remains is the fold arithmetic at the sync-keyed grant and the seed's
   `evalTm-nest-sync` spend.
-- **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
+- **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY, `REFUTED, PROBED`:
   the selection's paths and the arrival's payload land inside one unit — the
   fact that ties the walk's charge back to the program. Free-list form refuted;
   probeable.
-- **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
+- **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `TWIN`: every stage
+- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY, `TWIN`: every stage
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.

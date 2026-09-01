@@ -90,3 +90,29 @@ definition, seal it in the SAME edit** — no consumer ever needs more than the 
 A plain `abstract` block rejects untyped `where`-bindings and with-abstractions, so
 those bodies use private-impl + abstract-alias: `private f-go : T; f-go = …` then
 `abstract f : T; f = f-go`.
+
+## A numeric offset inside an EXPONENT costs two to the power of the offset
+
+An induction that starts at a threshold has to say so in its index, and the two ways of
+saying it are not the same price. Writing the shifted index as `14 + j` gives the
+exponent two spellings — `2 ^ (14 + j)` and `2 ^ suc¹⁴ j` — that differ at every rung,
+and the conversion checker reconciling them descends into BOTH halves of each doubling.
+The cost is therefore exponential in the threshold rather than linear in it, which is
+why the same idiom is fine at a small threshold and fatal at a larger one: a square
+overtakes the exponential early and survives the numeral form; a cube overtakes it seven
+rungs later and does not. Measured on this tree's cube, the numeral form blew past
+several GB and never finished while the all-`suc` form checks in seconds
+(`typecheck-performance-numbers.md` carries both).
+
+**The tell is a `with` that converts a `≤` premise into a shifted index** — whichever
+lemma does the converting. Both `m≤n⇒∃[o]m+o≡n` and `≤⇒≤″` blow up identically here, so
+the cost is the mixed spellings and not the lemma, and swapping one for the other buys
+nothing.
+
+**The repair is to carry the threshold in `suc` form throughout**, so the two sides meet
+already identical: name the shifted index with a helper built from explicit `suc`s, state
+the induction over that helper, spell the recursive call's argument out rather than
+binding it in a `where` (the termination checker is syntactic), and discharge the
+`n ≤ S` entry point with a single clause matching that many `s≤s` — the premise's shape
+fixes the subject's as it goes, so one clause covers. The tree's proven precedent for
+this shape is `sq≤2^` in `Verify-Budget-Sufficient/Measures.agda`.

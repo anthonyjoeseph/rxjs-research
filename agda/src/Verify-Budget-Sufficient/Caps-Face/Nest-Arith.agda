@@ -11,7 +11,8 @@ module Verify-Budget-Sufficient.Caps-Face.Nest-Arith where
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (<⇒≤; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans; ≤-refl;
   ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤;
-  +-mono-≤; *-distribʳ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0; m≤n*m; *-assoc)
+  +-mono-≤; *-distribʳ-+; *-distribˡ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0; m≤n*m;
+  *-assoc)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Fin     using (Fin)
@@ -60,7 +61,8 @@ open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 --     postulating.  `walkH` below instantiates that record and
 --     `cascadeGo-deliveries` is the theorem it buys.
 open import Verify-Budget-Sufficient.Caps using
-  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; 8≤capsAt-size; B2-cReg≤cSize; Caps; capsAt;
+  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; 8≤capsAt-size; 21≤capsAt-size; B2-cReg≤cSize;
+  Caps; capsAt;
   capsAt-base-size; capsAt-size-mono; capsAt-wid<size; capsH; capsAt-exp-gain; size≤sizeCount;
   sizeCount; frameBlowup; iterSize-pow; size-lower; capsAt-exp2≤capsH)
 open import Verify-Budget-Sufficient.Measures using
@@ -94,14 +96,18 @@ abstract
   nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestWalkAt e sl id =
-    2 ^ suc (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+    2 ^ suc (Caps.cSize (capsAt e sl id)
+               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+             + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
       * (nestUnit e sl + Caps.cSize (capsAt e sl id)
          + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
 
   nestWalkAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     nestWalkAt e sl id
-      ≡ 2 ^ suc (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+      ≡ 2 ^ suc (Caps.cSize (capsAt e sl id)
+                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+                 + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
           * (nestUnit e sl + Caps.cSize (capsAt e sl id)
              + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
   nestWalkAt-def _ _ _ = refl
@@ -112,11 +118,18 @@ abstract
   unit+size≤nestWalkAt e sl id =
     ≤-trans (m≤m+n (nestUnit e sl + Caps.cSize (capsAt e sl id))
                    (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
-      (nest-inflate (2 ^ suc (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+      (nest-inflate (2 ^ suc (Caps.cSize (capsAt e sl id)
+                                * (Caps.cSize (capsAt e sl id)
+                                   * Caps.cSize (capsAt e sl id))
+                              + Caps.cSize (capsAt e sl id)
+                                * Caps.cSize (capsAt e sl id)))
                     (nestUnit e sl + Caps.cSize (capsAt e sl id)
                      + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
                     (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
-                                   * Caps.cSize (capsAt e sl id)))))
+                                     * (Caps.cSize (capsAt e sl id)
+                                        * Caps.cSize (capsAt e sl id))
+                                   + Caps.cSize (capsAt e sl id)
+                                     * Caps.cSize (capsAt e sl id)))))
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
 -- scripted slot's own index makes its nesting zero, and a shared one's
@@ -164,16 +177,93 @@ sq4≤2^ (suc (suc k)) (s≤s (s≤s 6≤k)) =
   ≤-trans (*-monoʳ-≤ 4 (sq≤2^ k 6≤k))
           (≤-reflexive (sym (^-distribˡ-+-* 2 2 k)))
 
+-- ONE CUBE'S EXPANSION, which is the whole ring content of the
+-- induction below: a successor adds a SQUARE's worth of terms to a
+-- cube.
+cubeStep : ∀ (t : ℕ) →
+  suc t * (suc t * suc t) ≡ t * (t * t) + (3 * (t * t) + (3 * t + 1))
+cubeStep = solve 1 (λ a → (con 1 :+ a) :* ((con 1 :+ a) :* (con 1 :+ a))
+                        := a :* (a :* a)
+                           :+ (con 3 :* (a :* a) :+ (con 3 :* a :+ con 1)))
+                 refl
+
+-- AND WHAT IT ADDS IS UNDER THE CUBE ITSELF from seven on, so a
+-- successor at most DOUBLES the cube -- which is exactly what one more
+-- factor of two buys.
+cubeGap : ∀ (t : ℕ) → 7 ≤ t → 3 * (t * t) + (3 * t + 1) ≤ t * (t * t)
+cubeGap t 7≤t =
+  ≤-trans (+-monoʳ-≤ (3 * (t * t)) lin)
+          (≤-trans (≤-reflexive sevenEq) (*-monoˡ-≤ (t * t) 7≤t))
+  where
+  1≤t : 1 ≤ t
+  1≤t = ≤-trans (s≤s z≤n) 7≤t
+  t≤tt : t ≤ t * t
+  t≤tt = ≤-trans (≤-reflexive (sym (*-identityʳ t))) (*-monoʳ-≤ t 1≤t)
+  fourEq : 3 * t + t ≡ 4 * t
+  fourEq = solve 1 (λ a → con 3 :* a :+ a := con 4 :* a) refl t
+  lin : 3 * t + 1 ≤ 4 * (t * t)
+  lin = ≤-trans (+-monoʳ-≤ (3 * t) 1≤t)
+                (≤-trans (≤-reflexive fourEq) (*-monoʳ-≤ 4 t≤tt))
+  sevenEq : 3 * (t * t) + 4 * (t * t) ≡ 7 * (t * t)
+  sevenEq = solve 1 (λ a → con 3 :* a :+ con 4 :* a := con 7 :* a) refl (t * t)
+
+-- THE THRESHOLD IS CARRIED IN SUC FORM, AND THAT IS A COST DECISION
+-- RATHER THAN A SPELLING ONE.  Writing the shifted index as `14 + j`
+-- gives the exponent two spellings that differ at EVERY rung, and the
+-- conversion check reconciling them descends into both halves of each
+-- doubling, so a threshold that reads as a numeral costs two to the
+-- power of the threshold.  The square below runs at six and survives
+-- that; a cube starts at fourteen and does not.  Everything here --
+-- the statement, the pattern, the recursive call -- therefore names
+-- `from14`, so the two sides meet already identical.
+from14 : ℕ → ℕ
+from14 j =
+  suc (suc (suc (suc (suc (suc (suc (suc (suc (suc (suc (suc (suc (suc j)))))))))))))
+
+7≤from14 : ∀ (j : ℕ) → 7 ≤ from14 j
+7≤from14 j = s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))))
+
+-- FOUR CUBES UNDER THE EXPONENTIAL, and FOURTEEN is where that starts
+-- -- the cube overtakes seven rungs later than the square does, which
+-- is the whole reason the caps floor had to be read at a bigger
+-- number.  Below fourteen the statement is FALSE rather than merely
+-- unproven, so the base case is where it first holds and not where it
+-- is convenient.
+cube-exp : ∀ (j : ℕ) →
+  4 * (from14 j * (from14 j * from14 j)) ≤ 2 ^ from14 j
+cube-exp zero    = ≤ᵇ⇒≤ 10976 16384 tt
+cube-exp (suc j) =
+  ≤-trans (≤-reflexive step)
+          (≤-trans (+-mono-≤ (cube-exp j)
+                             (≤-trans (*-monoʳ-≤ 4 (cubeGap t (7≤from14 j)))
+                                      (cube-exp j)))
+                   (≤-reflexive (sym (2X≡X+X (2 ^ t)))))
+  where
+  t = from14 j
+  step : 4 * (suc t * (suc t * suc t))
+           ≡ 4 * (t * (t * t)) + 4 * (3 * (t * t) + (3 * t + 1))
+  step = trans (cong (4 *_) (cubeStep t))
+               (*-distribˡ-+ 4 (t * (t * t)) (3 * (t * t) + (3 * t + 1)))
+
+-- ONE CLAUSE COVERS, because fourteen `s≤s` is the only way the
+-- premise can be built and it fixes the subject's shape as it goes.
+cube4≤2^ : ∀ (S : ℕ) → 14 ≤ S → 4 * (S * (S * S)) ≤ 2 ^ S
+cube4≤2^ _
+  (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s _))))))))))))))
+  = cube-exp _
+
 -- THE INSTANT'S SIZE GROWTH, UNDER THE WALK'S OWN FACTOR.  A frame
--- multiplies the size by a fixed step, and a path legal under the size
--- cap has at most a cap's worth of frames -- so what a chain can do to
--- the size of the values it carries is a cap-th power of a cap.  That
--- sits under an exponential of the cap SQUARED with room to spare,
--- which is the second thing the size floor of eight buys and the
--- reason a size side condition can be stated at the walk's ceiling
--- rather than at the instant's exit cap.
-iterSize≤walkFac : ∀ (S j s : ℕ) → 8 ≤ S → j ≤ S → s ≤ S →
-  iterSize S j s ≤ 2 ^ (S * S) * S
+-- multiplies the size by a fixed step, and the levels a whole cascade
+-- reaches run to the selection's total length plus its count -- a
+-- WIDTH times a cap plus a width, both of which the caps invariant
+-- pins under the cap.  So what a selection can do to the size of the
+-- values it carries is a (cap-squared-plus-a-cap)-th power of a cap,
+-- and that sits under an exponential of the cap CUBED.  It is the
+-- range and not the base that decides the exponent here, which is why
+-- widening the range from one chain's frames to a whole selection's
+-- moved the charge by a whole factor of the cap.
+iterSize≤walkFac : ∀ (S j s : ℕ) → 8 ≤ S → j ≤ S * S + S → s ≤ S →
+  iterSize S j s ≤ 2 ^ (S * (S * S) + S * S) * S
 iterSize≤walkFac S j s h8 hj hs =
   ≤-trans (iterSize-pow S S j s 1≤S ≤-refl hs) (*-monoˡ-≤ S powFit)
   where
@@ -187,11 +277,15 @@ iterSize≤walkFac S j s h8 hj hs =
   3S≤2^S =
     ≤-trans (*-monoˡ-≤ S 3≤4S)
             (≤-trans (≤-reflexive (*-assoc 4 S S)) (sq4≤2^ S h8))
-  powFit : (3 * S) ^ j ≤ 2 ^ (S * S)
+  expShape : S * (S * S + S) ≡ S * (S * S) + S * S
+  expShape = solve 1 (λ a → a :* (a :* a :+ a) := a :* (a :* a) :+ a :* a)
+                   refl S
+  powFit : (3 * S) ^ j ≤ 2 ^ (S * (S * S) + S * S)
   powFit =
     ≤-trans (^-monoˡ-≤ j 3S≤2^S)
             (≤-trans (≤-reflexive (^-*-assoc 2 S j))
-                     (^-monoʳ-≤ 2 (*-monoʳ-≤ S hj)))
+                     (^-monoʳ-≤ 2 (≤-trans (*-monoʳ-≤ S hj)
+                                           (≤-reflexive expShape))))
 
 -- AND THAT GROWTH IS AFFORDABLE, which is the half a bare arithmetic
 -- statement cannot say.  The charge carries one exponential of the cap
@@ -200,12 +294,14 @@ iterSize≤walkFac S j s h8 hj hs =
 -- to be widened to make room.
 walkFac≤nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  2 ^ (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+  2 ^ (Caps.cSize (capsAt e sl id)
+         * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+       + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
     * Caps.cSize (capsAt e sl id)
     ≤ nestWalkAt e sl id
 walkFac≤nestWalkAt e sl id =
-  subst (2 ^ (S * S) * S ≤_) (sym (nestWalkAt-def e sl id))
-    (*-mono-≤ (^-monoʳ-≤ 2 (n≤1+n (S * S)))
+  subst (2 ^ (S * (S * S) + S * S) * S ≤_) (sym (nestWalkAt-def e sl id))
+    (*-mono-≤ (^-monoʳ-≤ 2 (n≤1+n (S * (S * S) + S * S)))
               (≤-trans (m≤n+m S (nestUnit e sl))
                        (m≤m+n (nestUnit e sl + S) (S * slotWrapSum sl))))
   where
@@ -772,13 +868,19 @@ walk-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
 walk-sight≤exp e sl id =
   subst (λ z → suc (sizeᵉ e) * (3 * z) ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)))
         (sym (nestWalkAt-def e sl id))
-        (≤-trans (*-mono-≤ hz (*-mono-≤ h3 (*-monoʳ-≤ (2 ^ suc (S * S)) hM)))
+        (≤-trans (*-mono-≤ hz (*-mono-≤ h3 (*-monoʳ-≤ (2 ^ E) hM)))
         (≤-trans (≤-reflexive collapse)
                  (^-monoʳ-≤ 2 expfit)))
   where
   S = Caps.cSize (capsAt e sl id)
+  -- the cube the walk's charge now carries, named once so the two
+  -- collapse equations and the fit below read the same expression
+  C = S * (S * S)
+  E = suc (C + S * S)
   8≤S : 8 ≤ S
   8≤S = 8≤capsAt-size e sl id
+  14≤S : 14 ≤ S
+  14≤S = ≤-trans (≤ᵇ⇒≤ 14 21 tt) (21≤capsAt-size e sl id)
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 8≤S
   2≤S : 2 ≤ S
@@ -833,33 +935,42 @@ walk-sight≤exp e sl id =
   hM : nestUnit e sl + S + S * slotWrapSum sl ≤ 2 ^ (1 + 3 * S)
   hM = ≤-trans (+-mono-≤ (≤-trans hA (^-monoʳ-≤ 2 (m≤n*m S 3))) hB)
                (≤-reflexive dbl)
-  collapse : 2 ^ S * (2 ^ S * (2 ^ suc (S * S) * 2 ^ (1 + 3 * S)))
-               ≡ 2 ^ (S + (S + (suc (S * S) + (1 + 3 * S))))
+  collapse : 2 ^ S * (2 ^ S * (2 ^ E * 2 ^ (1 + 3 * S)))
+               ≡ 2 ^ (S + (S + (E + (1 + 3 * S))))
   collapse =
     trans (cong (λ z → 2 ^ S * (2 ^ S * z))
-                (sym (^-distribˡ-+-* 2 (suc (S * S)) (1 + 3 * S))))
+                (sym (^-distribˡ-+-* 2 E (1 + 3 * S))))
     (trans (cong (2 ^ S *_)
-                 (sym (^-distribˡ-+-* 2 S (suc (S * S) + (1 + 3 * S)))))
-           (sym (^-distribˡ-+-* 2 S (S + (suc (S * S) + (1 + 3 * S))))))
-  shapeL : S + (S + (suc (S * S) + (1 + 3 * S))) ≡ S * S + (5 * S + 2)
-  shapeL = solve 1 (λ s → s :+ (s :+ ((con 1 :+ s :* s) :+ (con 1 :+ con 3 :* s)))
-                            := s :* s :+ (con 5 :* s :+ con 2))
+                 (sym (^-distribˡ-+-* 2 S (E + (1 + 3 * S)))))
+           (sym (^-distribˡ-+-* 2 S (S + (E + (1 + 3 * S))))))
+  -- THE EXPONENT SUM IS A CUBE PLUS A SQUARE PLUS A LINE, and the
+  -- three summands are each paid by one cube, which is what the four
+  -- on offer covers.
+  shapeL : S + (S + (E + (1 + 3 * S))) ≡ C + (S * S + (5 * S + 2))
+  shapeL = solve 1 (λ a → a :+ (a :+ ((con 1 :+ (a :* (a :* a) :+ a :* a))
+                                       :+ (con 1 :+ con 3 :* a)))
+                            := a :* (a :* a)
+                               :+ (a :* a :+ (con 5 :* a :+ con 2)))
                  refl S
-  fourSq : 4 * (S * S) ≡ S * S + 3 * (S * S)
-  fourSq = solve 1 (λ s → con 4 :* (s :* s) := s :* s :+ con 3 :* (s :* s))
-                 refl S
-  sixEq : 5 * S + S ≡ 3 * (2 * S)
-  sixEq = solve 1 (λ s → con 5 :* s :+ s := con 3 :* (con 2 :* s)) refl S
-  h531 : 5 * S + 2 ≤ 3 * (S * S)
-  h531 =
+  S≤C : S * S ≤ C
+  S≤C = *-monoʳ-≤ S S≤SS
+  6≤SS : 6 ≤ S * S
+  6≤SS = ≤-trans (≤-trans (≤ᵇ⇒≤ 6 14 tt) 14≤S) S≤SS
+  sixEq : 5 * S + S ≡ 6 * S
+  sixEq = solve 1 (λ a → con 5 :* a :+ a := con 6 :* a) refl S
+  lin≤C : 5 * S + 2 ≤ C
+  lin≤C =
     ≤-trans (+-monoʳ-≤ (5 * S) 2≤S)
     (≤-trans (≤-reflexive sixEq)
-             (*-monoʳ-≤ 3 (*-monoˡ-≤ S 2≤S)))
-  expfit : S + (S + (suc (S * S) + (1 + 3 * S))) ≤ 2 ^ S
+    (≤-trans (*-monoˡ-≤ S 6≤SS) (≤-reflexive (*-assoc S S S))))
+  threeC : C + (C + C) ≡ 3 * C
+  threeC = solve 1 (λ c → c :+ (c :+ c) := con 3 :* c) refl C
+  expfit : S + (S + (E + (1 + 3 * S))) ≤ 2 ^ S
   expfit =
     ≤-trans (≤-reflexive shapeL)
-    (≤-trans (+-monoʳ-≤ (S * S) h531)
-    (≤-trans (≤-reflexive (sym fourSq)) (sq4≤2^ S 8≤S)))
+    (≤-trans (+-monoʳ-≤ C (+-mono-≤ S≤C lin≤C))
+    (≤-trans (≤-reflexive threeC)
+    (≤-trans (*-monoˡ-≤ C (≤ᵇ⇒≤ 3 4 tt)) (cube4≤2^ S 14≤S))))
 
 -- THE SPLIT ITSELF IS RING ARITHMETIC: the ceiling's factor distributes
 -- over the two halves of its store slot, so each half is priced by its

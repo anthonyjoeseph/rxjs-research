@@ -33,8 +33,7 @@ yours. `gate-light` and `gate-heavy` force a path.
 | `wiring-selftest` | [wiring.md](wiring.md) | ship a wiring checker that has stopped firing |
 | `wiring-gate` | [wiring.md](wiring.md) | leave a definition, postulate or module with no route to Main |
 | `wiring-refuted` | [wiring.md](wiring.md) | leave a refutation `Refuted.Main` does not claim |
-| `wiring-probed` | [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out, and why it may carry counts the roadmap may not |
-| [evidence.md](evidence.md) | leave a probe `Probed.Main` does not claim |
+| `wiring-probed` | [evidence.md](evidence.md) | leave a probe `Probed.Main` does not claim |
 | `evidence-selftest` | [evidence.md](evidence.md) | ship an evidence checker that has stopped firing |
 | `evidence-check` | [evidence.md](evidence.md) | let proof code depend on a probe or a refutation, or keep a probe whose target is discharged |
 | `unsafe-check` | [unsafe-check.md](unsafe-check.md) | slip an unsafe pragma onto the proof path |
@@ -67,4 +66,5 @@ yours. `gate-light` and `gate-heavy` force a path.
 | [harness.md](harness.md) | `make harness` — the compiled calculator, and why its numbers prove nothing |
 | [typecheck-cost.md](typecheck-cost.md) | the cost model: what actually makes a module slow, and the `abstract` mandate |
 | [agda-traps.md](agda-traps.md) | language and stdlib traps, each of which reports against the wrong thing |
+| [notify.md](notify.md) | `make notify` — the ntfy.sh push a gate sends on the way out, and why it may carry counts the roadmap may not |
 | [evidence.md](evidence.md) | `agda/evidence/` — the library boundary that makes a `src` import of a probe or a refutation unresolvable, and how a probe expires |
