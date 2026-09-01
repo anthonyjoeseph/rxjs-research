@@ -567,6 +567,18 @@ chainsNest-all D U (c ∷ cs) h =
 --   of six.  Both premises hold and the registered chain has length
 --   eight, so what broke was the length ledger rather than any size
 --   reading, and no further hypothesis repairs it.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Level` -- the ROOTWARD re-entry, over
+--   a stack of one to eight `mergeAllᵉ` flattens whose sources are each
+--   other, every figure read off a state the evaluator reached and
+--   every depth pinned to the arm that measures a real `chainStep`.
+--   The registered length grows by exactly ONE per flatten level while
+--   the inner's own size grows by four, so the descent does not recurse
+--   and the one axis that could refute this form is closed along that
+--   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, where
+--   `foldPath` and `dispatchShare` are mutually recursive and the depth
+--   is the share telescope rather than the syntax -- the programs there
+--   reach the scripted slot only, so no row says anything about it.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)

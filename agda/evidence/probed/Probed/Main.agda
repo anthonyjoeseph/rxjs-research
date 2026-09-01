@@ -84,3 +84,7 @@ open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)
 open import Probed.Sight-Fit-Width using (figures≡; oldRow≡; newRow≡)
 
 open import Probed.Burst-OutW using (readout≡)
+
+open import Probed.Chain-Step-Regs-Level
+  using (reaches; figures₁; figures₂; figures₃; figures₄; figures₆; figures₈;
+         one-per-level; under-inner)
