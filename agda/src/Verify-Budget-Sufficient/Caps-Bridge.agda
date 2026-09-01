@@ -88,9 +88,18 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
-open import Verify-Budget-Sufficient.Caps-Face.Part7 using
-  (caps-tick; cascade-depth-capsH; cascadeGo-nest; chains-count-width; arr-chains-nest-syn; arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts; arr-chains-caps; cascadeGo-slots; cascadeLatch-caps;
-  chainsOf-caps; chainsOf-length)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
+  (cascadeGo-slots; cascadeLatch-caps; chainsOf-caps; chainsOf-length)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nodes using
+  (chains-count-width)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nest using
+  (cascadeGo-nest; arr-chains-nest-syn)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Ledger using
+  (arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps using
+  (arr-chains-caps)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
+  (caps-tick; cascade-depth-capsH)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -547,7 +556,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
 -- happens to supply it" is not the reason, the refutation is.
 --
 -- WHERE THE TWELVE PREMISES CAME FROM, and none of them needed new
--- mathematics.  `caps-tick` (.Caps-Face/Part7) already discharges the
+-- mathematics.  `caps-tick` (.Caps-Face/Part7/Depth-Fit) already discharges the
 -- caps-side eight for `cascadeGo-caps` at THIS EXACT call — same `c`,
 -- same `chainsOf a st`, same `cascadeLatch a st` — and `fn-tick` (above,
 -- in this file) already discharges the Ψ-side four for `cascadeGo-walk`.
@@ -1315,7 +1324,7 @@ abstract
 -- state predicate the caps ledger already carries at every level and
 -- `capsH` is that ledger's own level count, so the statement below is
 -- the ledger bounding the nesting it has already paid for.  Its
--- delivery-side sibling `cascade-depth-capsH` (.Caps-Face/Part7) is the
+-- delivery-side sibling `cascade-depth-capsH` (.Caps-Face/Part7/Depth-Fit) is the
 -- same statement over `depthCascade`, and one induction should cover
 -- both — neither is proven, so neither is the other's precedent.
 --

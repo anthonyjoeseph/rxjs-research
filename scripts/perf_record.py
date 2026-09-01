@@ -87,6 +87,45 @@ def _load(text: str) -> dict:
     return data
 
 
+def _prune(data: dict) -> list[str]:
+    """Drop rows whose target file no longer exists.  Returns the dropped keys.
+
+    A row here is a measurement OF A MODULE, so when the module is deleted or
+    split the row stops being stale and starts being false: it names a file
+    the tree does not have, and every other decay in this repo has a check
+    behind it precisely because prose nobody maintains is believed.  Pruning
+    on write rather than in a gate target is the cheap half -- the file is
+    only ever rewritten by this module, so there is no window in which an
+    orphan row can be read.
+
+    Only `agda-dev <path>` rows are resolvable; a target like
+    "make gate-heavy (full gate, N modules)" names no file and is left alone.
+    """
+    src = os.path.join(ROOT, "agda", "src")
+    dropped = []
+    for key in list(data):
+        km = KEY.match(key)
+        target = km.group(2) if km else key
+        if not target.startswith("agda-dev "):
+            continue
+        rel = target[len("agda-dev "):].strip()
+        if rel.startswith("-"):       # a flag, not a path (e.g. --list)
+            continue
+        if not os.path.exists(os.path.normpath(os.path.join(src, rel))):
+            dropped.append(key)
+            del data[key]
+    return dropped
+
+
+def _write(text: str, data: dict) -> None:
+    head, rest = text.split(BEGIN, 1)
+    _, tail = rest.split(END, 1)
+    tmp = DOC + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(head + _render(data) + tail)
+    os.replace(tmp, DOC)          # atomic: a killed build cannot truncate the doc
+
+
 def _render(data: dict) -> str:
     out = [
         BEGIN,
@@ -131,6 +170,7 @@ def record(target: str, seconds: float, floor: bool = False, env: str | None = N
 
     key = f"{env or detect_env.detect_env()}|{target}"
     data = _load(text)
+    orphans = bool(_prune(data))
     row = data.get(key)
     if row is None:
         if floor:
@@ -160,21 +200,31 @@ def record(target: str, seconds: float, floor: bool = False, env: str | None = N
             row["runs"] -= 1
             row["last"] = prev_last
 
-    if not changed:
+    if not changed and not orphans:
         return False
 
-    head, rest = text.split(BEGIN, 1)
-    _, tail = rest.split(END, 1)
-    tmp = DOC + ".tmp"
-    with open(tmp, "w") as f:
-        f.write(head + _render(data) + tail)
-    os.replace(tmp, DOC)          # atomic: a killed build cannot truncate the doc
+    _write(text, data)
     return True
 
 
 def main(argv: list[str]) -> int:
+    if len(argv) == 2 and argv[1] == "--prune":
+        if not os.path.exists(DOC):
+            return 0
+        text = open(DOC).read()
+        if BEGIN not in text or END not in text:
+            return 0
+        data = _load(text)
+        dropped = _prune(data)
+        if dropped:
+            _write(text, data)
+        for key in sorted(dropped):
+            print(f"perf_record: dropped orphan row {key}")
+        print(f"perf_record: {len(dropped)} orphan row(s), {len(data)} remain")
+        return 0
     if len(argv) != 3:
-        print("usage: perf_record.py <target> <seconds>", file=sys.stderr)
+        print("usage: perf_record.py <target> <seconds> | perf_record.py --prune",
+              file=sys.stderr)
         return 2
     try:
         secs = float(argv[2])

@@ -244,7 +244,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`walk-frame-drain-inner`** (Caps-Face/Part7) — FALSITY,
+- **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, TWIN, PROBED×2`: the `from-inner` head of the drain law, the only
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
@@ -268,7 +268,7 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`walk-share-ΦHyp`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
   potential for the chains a sink fans into. Their factor and depth are the
   registry's, priced at the level the walk has reached, and nothing has read
   the claim that the cap's exponential covers them.
@@ -287,7 +287,7 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the whole
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the whole
   chain's registry price, now stepping the level by one rather than collapsing
   to the entry cap. The fixed-cap form is refuted; that one `sizeStep` covers
   what a subscribe registers is argued and uninstantiated.
@@ -300,7 +300,7 @@ does not fit is a finding about the shared statement, not about the head.
   now instantiated where they move — the store at the PARKING branch, tight to
   equality — and the subscribing branch is blocked rather than uncovered.
 
-- **`chain-depth-sighted`** (Caps-Face/Part7) — DIFFICULTY,
+- **`chain-depth-sighted`** (Part7/Arrival-Caps) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
   ceiling, whose store slot is the CAP. The rows read the round at the entry
   store, which is below that cap, so they say nothing about the room it adds.
@@ -339,7 +339,7 @@ does not fit is a finding about the shared statement, not about the head.
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
   the floor assembles all four. The unit alone is refuted by a defer-headed
   program; a size bound makes it compute.
-- **`chainStep-nest-live`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
+- **`chainStep-nest-live`** (Part7/Cascade-Caps) — DIFFICULTY, `REFUTED, PROBED`:
   one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
   chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the
   cascade door — now instantiated at the family that killed the depth form, and
@@ -349,16 +349,16 @@ does not fit is a finding about the shared statement, not about the head.
   conjunct this head's accumulator read demanded, so the shape is settled; what
   remains is the fold arithmetic at the sync-keyed grant and the seed's
   `evalTm-nest-sync` spend.
-- **`arr-chains-nest-syn`** (Caps-Face/Part7) — DIFFICULTY, `REFUTED, PROBED`:
+- **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY, `REFUTED, PROBED`:
   the selection's paths and the arrival's payload land inside one unit — the
   fact that ties the walk's charge back to the program. Free-list form refuted;
   probeable.
-- **`cascadeGo-nest-regs`** (Caps-Face/Part7) — DIFFICULTY, `PROBED`: the
+- **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`arr-chains-bursts`** (Caps-Face/Part7) — DIFFICULTY, `TWIN`: every stage
+- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY, `TWIN`: every stage
   of every chain's walk under the width cap. The mirror carries the identical
   conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.
