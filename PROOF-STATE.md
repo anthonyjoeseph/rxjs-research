@@ -226,15 +226,16 @@ does not fit is a finding about the shared statement, not about the head.
   claims, and check the sink, where a chain fans into chains and the
   count is a sum rather than a length.
 
-- **THEN THE COLLAPSE AT THE CHAIN DOOR, WHICH IS WHERE THE LEVEL
-  EITHER ESCAPES OR DOES NOT.** The chain fold is the frame law
-  iterated and the cascade is a fold over chains; neither conclusion
-  names the cap, so the level stays internal — as far as the chain
-  door, which reports at the ENTRY cap and is a leaf saying exactly
-  that. What it owes is a collapse. The measure to check first is
-  the sink: a chain fans into chains, so what the level must reserve
-  is the fan-out's cumulative depth, and that is the one place a
-  bound fixed before the walk fails.
+- **THEN THE CASCADE CARRIES THE LEVEL, BECAUSE THE CHAIN DOOR DOES
+  NOT COLLAPSE IT.** One chain leaves the registry priced above the
+  cap it entered on: a subscribing frame registers the inner's
+  operators on top of the head it swapped, so the registered path
+  outruns the priced one by the inner's own count, and the arrival's
+  size premise is what pays for that. Restate the door at a level and
+  thread it through the fold over chains, where each output registry
+  is the next chain's premise — so the level accumulates once per
+  chain and what must bound it is `nestWalkAt`, the quantity the
+  store side of the same fold is already carried against.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -289,10 +290,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `NO EVIDENCE`: the whole
-  chain's registry price, at the ENTRY cap — the door where the fold's
-  accumulated level must collapse back to what the cascade was handed. Nothing
-  says the fan-out's cumulative depth fits under it.
+- **`chainStep-regsSz`** (Caps-Face/Part7) — SHAPE, `REFUTED`: the whole
+  chain's registry price, at the ENTRY cap. False there: a subscribing frame
+  registers a path LONGER than the one priced, so the cap owes a level and the
+  cascade above has to carry it.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

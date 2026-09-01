@@ -4284,17 +4284,34 @@ chainsNest-all D U (c ∷ cs) h =
             (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
                                           (chainsNestD cs))) h))
 
--- THE REGISTRY STAYS PRICED ACROSS A WHOLE CHAIN, AT THE ENTRY CAP --
--- and the level is what is owed, not the walk.  `chainStep` IS
--- `foldPath`, and the fold beneath this now reports at an ACCUMULATED
--- LEVEL rather than at the cap it entered on, because a sink fans into
--- chains whose re-entry no quantity read before the walk bounds.  So
--- the walk itself is discharged and what remains here is the COLLAPSE:
--- that the level a whole chain accumulates stays affordable at this
--- cap, the way `iterSize≤walkFac` already makes a bounded run of levels
--- affordable against the walk factor.  The arrival's size is a premise
--- for the reason the frame law takes one -- a subscribing frame
--- registers the INNER's syntax, which no reading of the path sees.
+-- THE REGISTRY ACROSS A WHOLE CHAIN, AND THE ENTRY CAP IS NOT WHAT IT
+-- COMES OUT PRICED AT.  `chainStep` IS `foldPath`, and a subscribing
+-- frame does not register the path it was walking: it swaps its own
+-- head for a `from-inner` and pushes one frame per operator of the
+-- inner observable, so what lands in the registry is LONGER than what
+-- the path premise priced.  `pathSz?` charges a length at every frame
+-- -- `suc (pathLen tail) ≤ᵇ B` -- so a cap that admits a walked chain
+-- has nothing left to pay the inner with.
+--
+-- AND THE ARRIVAL'S SIZE PREMISE IS WHAT BUYS THOSE FRAMES, WHICH IS
+-- WHY NO FURTHER READING REPAIRS THIS.  `sizeᵛ` at an observable IS
+-- `sizeᵉ`, so that premise bounds the inner's syntax by the cap -- and
+-- an inner that FITS the cap still contributes its operator count to
+-- the registered path's length.  Two premises each read at `B`
+-- therefore admit a registered chain of nearly `2B`, so what is owed
+-- is a LEVEL, which `sizeStep` pays for, and not a hypothesis.
+--
+-- SO THE LEVEL ESCAPES THE CHAIN DOOR RATHER THAN COLLAPSING AT IT.
+-- The consumer spends this once per chain, feeding each output
+-- registry in as the next chain's premise, so a level restated here
+-- accumulates down the selection and it is the CASCADE that must carry
+-- it -- against `nestWalkAt`, the way `iterSize≤walkFac` already makes
+-- a bounded run of levels affordable against the walk factor.
+--
+-- REFUTED: `Refuted.Chain-Step-Regs-Cap` -- a five-node inner and a
+--   six-frame chain against a cap of six.  Both premises hold and the
+--   registered chain has length eight, so what breaks is the length
+--   ledger rather than any size reading.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (B : ℕ) (a : Arrival Γ) (nextId : Id)
