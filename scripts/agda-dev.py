@@ -147,6 +147,7 @@ from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perf_record  # noqa: E402  (needs the path fixup above)
+import detect_env  # noqa: E402
 
 # MODULES THIS TOOL CANNOT DEV-CHECK, with the reason and the exact error it
 # produces, so nobody rediscovers them by running into a red wall.  They are
@@ -177,11 +178,26 @@ MEM_FRACTION = 0.5
 
 
 def total_ram() -> int:
+    """Physical RAM in bytes.  macOS has no `/proc`, so `sysctl` comes first;
+    every other environment this repo runs in (a cloud container, a GitHub
+    Actions runner) is Linux, and read `/proc/meminfo` for real instead of
+    falling back to a number measured on one specific laptop.  Found by
+    measuring a cloud container at 15 GB and watching this report a fitted
+    concurrency computed from an assumed 8 GB regardless -- the fallback was
+    silently wrong on the one platform that always hits it."""
     try:
         return int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True,
                                   text=True).stdout.strip())
     except Exception:
-        return 8 << 30
+        pass
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) * 1024
+    except Exception:
+        pass
+    return 8 << 30
 
 
 def child_peak_bytes() -> int:
@@ -191,9 +207,16 @@ def child_peak_bytes() -> int:
 
 
 def jobs_for(peak: int, ceiling: int) -> int:
+    """Concurrency is a memory budget (see MEM_FRACTION above), but memory
+    alone oversubscribes a real cloud container once `total_ram` reports its
+    true 15 GB: 15 GB * MEM_FRACTION / a 0.7 GB/run peak fits 6-way
+    concurrency in the memory budget, and that container has 4 cores -- CPU
+    contention, not RAM, would then dominate the wall clock.  Cap by core
+    count too; a laptop with cores to spare never notices the extra min()."""
     if peak <= 0:
         return 1
-    return max(1, min(ceiling, int(total_ram() * MEM_FRACTION // peak)))
+    cores = os.cpu_count() or ceiling
+    return max(1, min(ceiling, cores, int(total_ram() * MEM_FRACTION // peak)))
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AGDA = os.path.join(REPO, "agda")
@@ -1360,12 +1383,18 @@ def main() -> int:
                          "4.9s per-process interface toll too often; large ones "
                          "rebuild the mutual block they exist to avoid.")
     ap.add_argument("--clean", action="store_true", help="remove the generated dev modules and exit")
-    ap.add_argument("--budget", type=float, default=45,
+    ap.add_argument("--budget", type=float,
+                    default=detect_env.AGDA_DEV_BUDGET[detect_env.detect_env()],
                     help="wall-clock budget in seconds; exceeding it FAILS.  This is "
                          "the loop's whole purpose, so it is enforced rather than "
                          "documented -- a loop that quietly drifts to two minutes has "
-                         "stopped being a loop.  Makefile passes 45, set from a full "
-                         "cold scan: max 35.0s, median 6.6s, nothing in 36-90s.")
+                         "stopped being a loop.  The Makefile passes this explicitly "
+                         "from AGDA_DEV_BUDGET (scripts/detect_env.py picks the value "
+                         "for whichever of local/cloud/CI is running); this default is "
+                         "only what a standalone invocation ever sees.  The laptop "
+                         "figure is set from a full cold scan: max 35.0s, median "
+                         "6.6s, nothing in 36-90s -- see typecheck-performance-"
+                         "numbers.md for that scan and the cloud container's own.")
     ap.add_argument("--falsify", action="store_true",
                     help="SELF-TEST: corrupt a real body in src, confirm the dev "
                          "check goes RED, restore.  Run this whenever the stubbing "

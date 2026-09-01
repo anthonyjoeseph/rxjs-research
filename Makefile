@@ -187,7 +187,17 @@ help:
 # chain only.  DEV-GREEN MEANS THE TYPES LINE UP, NOT THAT THE PROOF IS VALID
 # -- `make gate-heavy` stays the merge gate.  There is deliberately no whole-project
 # sweep.  All of it, with the measurements: docs/agda-dev.md.
-AGDA_DEV_BUDGET ?= 45
+#
+# THE DEFAULT IS PER-ENVIRONMENT, NOT A CONSTANT.  45 was a laptop's own
+# cold-scan number applied everywhere, including a cloud container running
+# this same repo where it is too tight (scripts/detect_env.py has the
+# measurements).  `scripts/detect_env.py` decides which of the three
+# environments this campaign ever runs in (local / cloud container / GitHub
+# Actions) is live and looks up its budget; `?=` means BUDGET= and an
+# explicit AGDA_DEV_BUDGET= on the command line still win outright, and the
+# detector never even runs in that case.
+AGDA_DEV_BUDGET ?= $(shell scripts/detect_env.py --budget)
+AGDA_DEV_CONE_BUDGET ?= $(shell scripts/detect_env.py --cone-budget)
 agda-dev:
 	scripts/agda-dev.py --budget $(if $(BUDGET),$(BUDGET),$(AGDA_DEV_BUDGET)) \
 	  $(if $(HOLES),--holes) $(ARGS)
@@ -1019,8 +1029,11 @@ dev-changed-selftest:
 
 # Only the modules THIS TREE has touched since the last commit — a dev check is
 # cheap singly and stops being cheap in bulk, so the driver has a ceiling.
+# CONE_BUDGET=<seconds> overrides the total cone-sweep ceiling the same way
+# BUDGET= overrides the per-module one above.
 dev-changed:
 	@scripts/dev-changed.py --budget $(AGDA_DEV_BUDGET) \
+	  --cone-budget $(if $(CONE_BUDGET),$(CONE_BUDGET),$(AGDA_DEV_CONE_BUDGET)) \
 	  $(if $(DRIFT),--drift $(DRIFT)) $(if $(DEPS),--deps) $(ARGS)
 
 # ─────────────────────────────────────────────────────────────────────────
