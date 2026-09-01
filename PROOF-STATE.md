@@ -215,15 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN DOOR'S ONE LEVEL — THE HARNESS IS DRAFTED, THE ROWS ARE
-  NOT.** The door reports one `sizeStep` per chain, and that
-  `S·(1+2L)` dominates `L + S` is an argument, not a row. Both sides
-  compute at concrete programs, and a staged instantiation at the
-  shape the refutation bit — a subscribing frame whose inner is at
-  the cap — now exists in draft. What remains is the numbers, every
-  pin being a placeholder, plus the target's statement fingerprint
-  and the wire into `Probed.Main`. Expect a second inner that outruns
-  one level; absent one the receipt banks and the row drops a class.
+- **THE CHAIN DOOR'S ONE LEVEL — THE HARNESS IS DRAFTED, AND ITS
+  COVERAGE IS NARROWER THAN THE LEG ASSUMED.** The door reports one
+  `sizeStep` per chain, and that `S·(1+2L)` dominates `L + S` is an
+  argument, not a row. The draft sweeps the ROOTWARD re-entry only —
+  `foldPath` also recurses SIDEWAYS at a `share-sink`, whose depth is
+  the share telescope rather than the syntax, and the draft's programs
+  reach the scripted slot, never the shared one. So a green banks the
+  rootward stack alone and the row does not drop a class on it. What
+  remains is the numbers, every pin a placeholder, the wire into
+  `Probed.Main`, and then a second family that puts a share-sink on a
+  walked path.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
