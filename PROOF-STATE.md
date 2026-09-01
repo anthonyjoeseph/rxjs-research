@@ -215,17 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEVELS A CASCADE REACHES ARE A WIDTH TIMES A CAP, AND THE
-  CEILING ON OFFER PAYS FOR A CAP.** With the level threaded through
-  the chain spine, the whole selection's affordability is one leaf:
-  the walk enters chain `k` at whatever the first `k-1` left, so the
-  range is the chains' total length plus their count, and the registry
-  admits a selection as wide as itself. The proven arithmetic covers
-  `k ≤ S`; the range here needs a cube where that lands on a square.
-  Decide whether `nestWalkAt` widens or the level count comes down,
-  and get a witness before the faces above are built on either.
-
-- **THEN THE CHAIN DOOR'S ONE LEVEL, WHICH NOTHING HAS INSTANTIATED.**
+- **THE CHAIN DOOR'S ONE LEVEL, WHICH NOTHING HAS INSTANTIATED.**
   The door now reports one `sizeStep` per chain, which is the reading
   the refuted fixed cap forced; that `S·(1+2L)` dominates `L + S` is
   the argument, and an argument is not a row. The statement computes
@@ -240,6 +230,17 @@ does not fit is a finding about the shared statement, not about the head.
   is mechanical, or the level reaches their conclusions and the
   restatement cascades into the bridge — that is the risk worth
   measuring before the fold above it is finished, not after.
+
+- **THEN THE DRAIN LAW'S ONE FRAME THAT NAMES A NODE, WHOSE
+  OBLIGATION HAS OUTLIVED ITS THREE CARRIERS.** The `from-inner` head
+  is the tier's worst row and the only one whose per-entry ceiling has
+  been refuted at every cap it was stated against, so what is open is
+  not a proof but the obligation: nothing yet says what a frame naming
+  a node may cost that a frame naming none may not. Read the three
+  dead carriers for the shape they share before minting a fourth —
+  a carrier refuted at every cap is evidence about the QUANTITY, not
+  about the cap it was read at — and instantiate the candidate at the
+  frame the refutations bit before it is stated.
 
 ### The ledger
 
@@ -286,10 +287,6 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`cascade-afford-wide`** (Caps-Face/Part7) — FALSITY, `DEAD ROUTE`: the
-  levels a whole cascade reaches ABOVE the cap, held under the walk's ceiling.
-  The half below the cap is the proven one-chain fact; this half is a width
-  times a cap against an exponential of a cap squared, and unread.
 - **`chainStep-regsSz`** (Caps-Face/Part7) — FALSITY, `REFUTED`: the whole
   chain's registry price, now stepping the level by one rather than collapsing
   to the entry cap. The fixed-cap form is refuted; that one `sizeStep` covers
