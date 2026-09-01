@@ -21,9 +21,11 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
-    # A cold full gate has run 13m-35m at recorded tower sizes and grows with
-    # the tower (typecheck-performance-numbers.md). Toolchain install adds more
-    # on a cache miss. Generous on purpose; tighten once real runs land.
+    # The 13m-35m range in typecheck-performance-numbers.md is a single
+    # fastest-recorded LOCAL run per tower size, not a CI reading -- the one
+    # completed CI run so far took ~74 min for `make gate` alone (~1h36m
+    # total, toolchain cache cold) on this shared runner. Generous on
+    # purpose; tighten once more real runs land.
     timeout-minutes: 120
     steps:
       # fetch-depth: 0 (full history) -- comments-check resolves `RECOVERY:`
@@ -92,6 +94,33 @@ jobs:
           echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
           echo "LC_ALL=C.UTF-8" >> "$GITHUB_ENV"
           echo "LANG=C.UTF-8" >> "$GITHUB_ENV"
+
+      # This is NOT the light-gate bet the top-of-file comment refuses: that
+      # bet is `.gate-heavy-stamp`, a Makefile-level "skip whole check
+      # categories if history looks unchanged" shortcut, deliberately never
+      # given to CI. This is Agda's OWN interface cache (`.agdai` under
+      # `agda/_stripped-comments/_build`, one shared tree for src + evidence
+      # — docs/agda-build.md) restored before `make gate` runs. `make gate`
+      # still runs the exact same full gate-heavy command, every check
+      # category, every file — nothing here changes what gets checked, only
+      # whether Agda has to re-elaborate a module whose content (source +
+      # imports + the `-W` flags baked into the interface's own validity key)
+      # is unchanged since the cached run. That is a per-module, content-hash
+      # decision Agda itself makes and re-verifies on every checkout; a stale
+      # or missing entry just means normal cold checking for that module, so
+      # a bad restore cannot pass something that should fail.
+      #
+      # Save key includes the commit so every green run leaves a fresh
+      # snapshot (cache entries are immutable per key); restore-keys drops
+      # the commit to pick up the newest prior snapshot regardless of exact
+      # match, and Agda decides per-module what in it is still valid.
+      - name: Cache Agda interfaces
+        uses: actions/cache@v4
+        with:
+          path: agda/_stripped-comments/_build
+          key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            agda-interfaces-${{ runner.os }}-
 
       - name: make gate
         run: make gate
