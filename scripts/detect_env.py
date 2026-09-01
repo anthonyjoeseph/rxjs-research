@@ -57,12 +57,21 @@ def detect_env() -> str:
 # container spanning the laptop's own range (Main.agda 6.7s->19.7s,
 # Verify-Budget-Sufficient/Caps.agda 21.5s->48.9s, Wet/Part2.agda
 # 35.0s->42.8s, Subscribe-Face.agda 22.3s->54.3s) -- worst observed 54.3s,
-# against a laptop max of 35.0s.  120 sits well clear of that worst sample
-# with room for the run-to-run variance those four already show (a 1.2x-2.9x
-# spread against the laptop, not a single clean ratio), the same margin-over-
-# variance the laptop budget itself demands, just wider because the sample is
-# smaller.  Re-scan (typecheck-performance-numbers.md, "## cloud container")
-# before moving it, same as the laptop's.
+# against a laptop max of 35.0s.  A budget has to sit clear of that worst
+# sample with room for the run-to-run variance those four already show (a
+# 1.2x-2.9x spread against the laptop, not a single clean ratio), the same
+# margin-over-variance the laptop budget itself demands, just wider because
+# the sample is smaller.
+#
+# THE CLOUD FIGURE IS A RULING, NOT A DERIVATION (Anthony: "we can expand the
+# 120 sec budget to 160 - that number's a bit arbitrary").  Any number well
+# clear of 54.3s satisfies the argument above, and the argument does not pick
+# one -- 120 was as arbitrary as 160, which is the point.  So do not read it
+# back as evidence about the container: it is the ceiling that says a dev
+# check has stopped being a dev check, and where that line sits is a call
+# about how long a loop may take, not a measurement.  Re-scan
+# (typecheck-performance-numbers.md, "## cloud container") before lowering it
+# below the sample, same as the laptop's.
 #
 # CI has no measurement of its own yet: GitHub-hosted runners are the same
 # shape as the cloud container (4 cores, comparable RAM, both non-macOS), and
@@ -76,18 +85,20 @@ def detect_env() -> str:
 # evidence instead of borrowed from the cloud container's.
 AGDA_DEV_BUDGET = {
     LOCAL: 45,
-    CLOUD: 120,
-    CI: 120,
+    CLOUD: 160,
+    CI: 160,
 }
 
 # `dev-changed --cone-budget`: the TOTAL wall-clock a whole cone sweep may
 # spend, as opposed to the per-module ceiling above.  Scaled by the same
-# ratio (120/45, rounded) since a cone sweep is many of the same checks back
-# to back and nothing about it is cheaper per module than the figure above.
+# ratio as the per-module figure, rounded, since a cone sweep is many of the
+# same checks back to back and nothing about it is cheaper per module.  It
+# moves WITH that figure for the same reason: a cone ceiling left behind
+# would fail a sweep of modules every one of which passed its own check.
 CONE_BUDGET = {
     LOCAL: 300,
-    CLOUD: 800,
-    CI: 800,
+    CLOUD: 1070,
+    CI: 1070,
 }
 
 

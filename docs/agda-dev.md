@@ -73,8 +73,10 @@ and exits 2.
 
 ## The per-file budget is enforced, not advisory
 
-Over budget is a FAILURE, with the usual causes printed. The number lives in the
-Makefile (`AGDA_DEV_BUDGET`) and is set from a full cold scan of every module,
+Over budget is a FAILURE, with the usual causes printed. The number reaches the
+Makefile as `AGDA_DEV_BUDGET` but is picked per environment by
+`scripts/detect_env.py` (see below), and the laptop's is set from a full cold
+scan of every module,
 sitting in the GAP in that distribution rather than just above the worst case —
 **the gap is what makes a budget safe, not the margin**, because a budget set to
 the worst observed time fails about half the time, that time being a distribution
@@ -126,14 +128,19 @@ the correct fallback for a signal nobody has set. The Makefile does
 explicit `AGDA_DEV_BUDGET=`/`AGDA_DEV_CONE_BUDGET=` on the command line win
 outright and the detector never runs at all.
 
-**The cloud figure is real, measured on a real container, and openly a
-smaller sample than the laptop's exhaustive cold scan** — session time did
-not allow a full 66-module cloud scan. The reasoning and the four modules it
-was measured against are in `scripts/detect_env.py` itself; the actual green
-rows are in `typecheck-performance-numbers.md`'s cloud-container section,
-which grows every time a real `agda-dev`/`gate-heavy` run completes there.
-CI currently borrows the cloud figure as a placeholder (same non-macOS shape)
-until it accumulates its own tagged rows the same way.
+**The cloud figure has a measured FLOOR and a chosen CEILING, and only the
+floor is evidence.** Four representative modules were dev-checked cold on a
+real container — openly a smaller sample than the laptop's exhaustive cold
+scan, since session time did not allow a full 66-module one — and they put a
+worst case under the budget. Every number well clear of that satisfies the
+argument, and the argument picks none of them, so where the ceiling actually
+sits is Anthony's call about how long a loop may take. Do not read the cloud
+budget back as a measurement of the container. The four modules and the
+reasoning are in `scripts/detect_env.py` itself; the actual green rows are in
+`typecheck-performance-numbers.md`'s cloud-container section, which grows
+every time a real `agda-dev`/`gate-heavy` run completes there. CI currently
+borrows the cloud figure as a placeholder (same non-macOS shape) until it
+accumulates its own tagged rows the same way.
 
 **A budget derived on one environment is not evidence for another,
 ever** — do not eyeball a cloud number and decide the laptop's 45s "should"
