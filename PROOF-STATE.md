@@ -225,18 +225,17 @@ does not fit is a finding about the shared statement, not about the head.
   accumulated level, or the fan-out's level bounded by the instant's own
   ledger — and to state the seam as one postulate either way.
 
-- **SPLIT THE ROOT'S ONE REMAINING LEAF, AND STATE ITS μ CLAUSE AS ITS
-  OWN ROW.** `entry-descW` is what the entry reading still stands on,
-  and it is stated only at the root, where nothing can induct. The leg
-  is the assembly: generalise it to an arbitrary subterm against
-  `ceilᵉ ⊔ slotsCeil`, carrying `Sched.slots sched ≡ sl` the way the
-  walk face's own burst lemmas already do, and let the structural
-  clauses fall out of `kidsᵉ`. Two leaves are left. The semantic one is
-  a single frame's payload count under `ownᵉ`, which is what `outWᵉ`
-  was defined to mean and where `splitBurst-len` already reduces the
-  count to emits times per-emit values. The other is the μ clause, and
-  it is the risk: `descW` descends into the UNFOLDING while `ceilᵉ`
-  reads the body, so the assembly needs the join to survive an unfold.
+- **THE μ CLAUSE NEEDS A LEVEL, SO GIVE THE CEILING ONE.** The
+  syntactic route is closed: the joined ceiling is not monotone across
+  an unfold, and the gap is a MULTIPLICITY — k mentions of the μ-var
+  become k copies of the μ's own width — so widening the measure buys
+  nothing. The caps face already prices exactly this edge, and the leg
+  is to copy that shape: charge the unfold existentially in a level,
+  deriving the width half from the size hypothesis, the way
+  `unfoldμ-caps` does. Restate `descW-ceil` against a level-indexed
+  ceiling, re-run the same witness against the restatement, and only
+  then walk the structural heads — unaffected, and still wanting the
+  mirror projections `descW`'s seal does not export.
 
 - **AND THEN THE ARMS STOP BEING POSTULATES.** Each one is a single
   `chainStep` against a real function, and the step walks the path
@@ -290,10 +289,10 @@ does not fit is a finding about the shared statement, not about the head.
   gate, factor one and no depth, so hypothesis and conclusion are one statement
   read either side of it. What is owed is that its output values are among its
   inputs.
-- **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
-  width under the caps base's own width coordinate. Nothing has instantiated
-  it, and `descW` is sealed; what it joins over is the same syntax `ceilᵉ`
-  recurses on, which is where a clause-for-clause comparison would go.
+- **`descW-ceil`** (Caps-Bridge) — FALSITY, `REFUTED`: the descent's width at
+  any subterm under the joined syntactic ceiling. `descW` is sealed and nothing
+  has instantiated it; the syntactic route is closed, because the ceiling is
+  not monotone across the unfold its μ clause descends into.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE×2`: the registry
   stays priced by the size cap across one frame. The caps face proves this walk
   already, at an accumulated level; what is owed is the seam between that level

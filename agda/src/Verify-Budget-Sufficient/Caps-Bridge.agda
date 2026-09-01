@@ -128,7 +128,7 @@ open import Verify-Budget-Sufficient.Psi-Split using
 open import Verify-Budget-Sufficient.Walk-Level using (subscribeE-wet)
 open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
-open import Rx.Frame-Width using (entryCeil)
+open import Rx.Frame-Width using (entryCeil; ceilᵉ; slotsCeil)
 open import Rx.Inputs-Below using (ib-topᵉ)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
@@ -1497,10 +1497,49 @@ abstract
 -- entry cap's lower bound on the width is stated against exactly that
 -- number.  What is owed here is that the SEMANTIC widest burst under
 -- the root subscribe sits under that syntactic ceiling.
+-- AND THE ROOT IS AN INSTANCE OF A SUBTERM READING, which is what
+-- makes the entry provable at all rather than merely stated.  `descW`
+-- RECURSES, so a claim naming one term at `root` has nothing to induct
+-- on; the statement has to quantify over the subterm the recursion has
+-- reached.  It then meets a ceiling built the same way: `ceilᵉ` joins
+-- `ownᵉ` with its children's ceilings through `kidsᵉ`, over the same
+-- syntax `descW` descends, and `slotsCeil` covers the slot head the
+-- connect re-enters the walk on -- which is why the entry reading
+-- carries that join and not `ceilᵉ` alone.  The slots equation is what
+-- makes the slot clause comparable at all, and it is the hypothesis
+-- the walk face's own burst lemmas already carry.
+--
+-- THE μ CLAUSE IS THE RISK AND THE SYNTACTIC ROUTE TO IT IS CLOSED.
+-- `descW` descends into the UNFOLDING while `ceilᵉ` reads the BODY, so
+-- comparing the two joins clause for clause needs the ceiling to be
+-- weakly monotone across an unfold, and it is not.  What breaks it is
+-- a MULTIPLICITY rather than a missing summand: the plug is
+-- substituted once per occurrence, so k mentions of the μ-var become k
+-- copies of the μ's own width against a ceiling that counted the var
+-- at zero.  Widening the measure therefore buys nothing, and the edge
+-- has to be charged the way the caps face already charges it --
+-- existentially in a LEVEL, with the width half derived from the size
+-- hypothesis, which is what `unfoldμ-caps` does.  What is not settled
+-- is the statement itself: `descW` is a burst reading at subscribe and
+-- a defer delivers nothing there, so the copies the ceiling counts may
+-- be invisible to the descent.  Nothing has instantiated it, and the
+-- family is sealed.
+-- REFUTED: `Refuted.Ceil-Unfold-Mu` -- eighteen against six at three
+--   mentions, twelve at two, both read off the real measure.
 postulate
-  entry-descW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    descW (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
-      ≤ suc (entryCeil n ins e)
+  descW-ceil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    descW g o κ id now sched st ≤ ceilᵉ n sl o ⊔ slotsCeil n sl
+
+entry-descW : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  descW (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
+    ≤ suc (entryCeil n ins e)
+entry-descW {n = n} e ins =
+  ≤-trans (descW-ceil (budgetAt e ins 0) ins e root 0 0
+                      (sched-init e ins) (st-init e) refl)
+          (n≤1+n (entryCeil n ins e))
 
 depthE-sighted-root : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   depthE (budgetAt e ins 0) e root 0 0 (sched-init e ins) (st-init e)
