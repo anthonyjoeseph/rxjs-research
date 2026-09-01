@@ -10,8 +10,6 @@ name: Gate
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
@@ -21,56 +19,13 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
-    # The 13m-35m range in typecheck-performance-numbers.md is a single
-    # fastest-recorded LOCAL run per tower size, not a CI reading -- the one
-    # completed CI run so far took ~74 min for `make gate` alone (~1h36m
-    # total, toolchain cache cold) on this shared runner. Generous on
-    # purpose; tighten once more real runs land.
+    # A cold full gate has run 13m-35m at recorded tower sizes and grows with
+    # the tower (typecheck-performance-numbers.md). Toolchain install adds more
+    # on a cache miss. Generous on purpose; tighten once real runs land.
     timeout-minutes: 120
     steps:
-      # fetch-depth: 0 (full history) -- comments-check resolves `RECOVERY:`
-      # shas with `git cat-file`, and those name ordinary ancestor commits
-      # that a shallow (default depth-1) clone simply does not have, so the
-      # lookup fails and a genuine, resolvable reference reads as dangling.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # Runs first, before the expensive toolchain build: a broken swap step
-      # should fail in seconds, not after a 20-minute cold Agda build.
-      # A cold full-tower check has peaked near this container's RAM ceiling
-      # on one deeply-nested-mutual-block module and been OOM-killed (see
-      # .claude/hooks/session-start.sh, which carries the same fix locally).
-      # The runner image ships its own active swapfile at this same path, so
-      # a bare fallocate here fails with "Text file busy" — drop it first.
-      - name: Enable swap
-        run: |
-          sudo swapoff -a || true
-          sudo rm -f /swapfile
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-
-      # Pin GHC/cabal explicitly rather than letting install-agda.sh's `apt-get
-      # install ghc cabal-install` take whatever Ubuntu's apt repo currently
-      # defaults to. That default drifts with the runner image — this failed
-      # its first real run with apt's GHC 9.14.1 (base-4.22), which Agda 2.8.0
-      # rejects (`base >=4.13.0.0 && <4.22`). Versions match the ones already
-      # validated in scripts/install-agda.sh's own header comment.
-      # cabal-update disabled: haskell-actions/setup's own `cabal update` runs
-      # before install-agda.sh gets a chance to patch ~/.cabal/config for TUF
-      # secure-repo fetch, and this failed run 2 with "root.json does not have
-      # enough signatures signed with the appropriate keys" — install-agda.sh
-      # already carries the `secure: False` fix for exactly this, so let it be
-      # the one that runs `cabal update`.
-      - name: Set up GHC + cabal
-        uses: haskell-actions/setup@v2
-        with:
-          ghc-version: "9.4.7"
-          cabal-version: "3.8.1.0"
-          cabal-update: false
 
       # Building Agda 2.8.0 from source (cabal) is the expensive, cacheable
       # part of toolchain setup; the stdlib clone is small but free to cache
@@ -95,48 +50,15 @@ jobs:
           echo "LC_ALL=C.UTF-8" >> "$GITHUB_ENV"
           echo "LANG=C.UTF-8" >> "$GITHUB_ENV"
 
-      # This is NOT the light-gate bet the top-of-file comment refuses: that
-      # bet is `.gate-heavy-stamp`, a Makefile-level "skip whole check
-      # categories if history looks unchanged" shortcut, deliberately never
-      # given to CI. This is Agda's OWN interface cache (`.agdai` files)
-      # restored before `make gate` runs. `make gate` still runs the exact
-      # same full gate-heavy command, every check category, every file --
-      # nothing here changes what gets checked, only whether Agda has to
-      # re-elaborate a module whose content (source + imports + the `-W`
-      # flags baked into the interface's own validity key) is unchanged
-      # since the cached run. That is a per-module, content-hash decision
-      # Agda itself makes and re-verifies on every checkout; a stale or
-      # missing entry just means normal cold checking for that module, so a
-      # bad restore cannot pass something that should fail.
-      #
-      # TWO separate directories, not one -- Agda resolves each file's
-      # build dir by walking UP from the file to the NEAREST enclosing
-      # .agda-lib, and `agda/_stripped-comments/evidence/` has its own
-      # (`include: refuted probed ../src`), closer to any file actually
-      # inside `evidence/refuted` or `evidence/probed` than the top-level
-      # one. src files still land in the one shared top-level dir either
-      # way, since evidence/.agda-lib is never an ancestor of src/ -- but a
-      # refuted or probed file's interface lands under
-      # `evidence/_build`, confirmed by running a real evidence check
-      # locally and watching that directory appear. Caching only the
-      # top-level dir left refuted/probed always cold regardless of this
-      # cache -- caught live: a dispatched run on an UNCHANGED commit
-      # (so a perfect hit should have made every module instant) sat for
-      # real time re-checking `Refuted/Cascade-Nest-PerDeliv.agda`.
-      #
-      # Save key includes the commit so every green run leaves a fresh
-      # snapshot (cache entries are immutable per key); restore-keys drops
-      # the commit to pick up the newest prior snapshot regardless of exact
-      # match, and Agda decides per-module what in it is still valid.
-      - name: Cache Agda interfaces
-        uses: actions/cache@v4
-        with:
-          path: |
-            agda/_stripped-comments/_build
-            agda/_stripped-comments/evidence/_build
-          key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
-          restore-keys: |
-            agda-interfaces-${{ runner.os }}-
+      # A cold full-tower check has peaked near this container's RAM ceiling
+      # on one deeply-nested-mutual-block module and been OOM-killed (see
+      # .claude/hooks/session-start.sh, which carries the same fix locally).
+      - name: Enable swap
+        run: |
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
 
       - name: make gate
         run: make gate
