@@ -159,6 +159,9 @@ open import Refuted.Frame-Step-Size-Level
   using (StepFrameSz; StepFrameSzFramed; figuresA≡; figuresB≡;
          rowA≡false; rowB≡false; premA; premB; premC;
          stepFrame-sz-absurd; stepFrame-sz-framed-absurd)
+open import Refuted.Frame-Step-Size-Store
+  using (P; vP; fnS; stS; figures≡; premFrame; premVals; rowS≡false;
+         storeReading; stepFrame-sz-store-absurd)
 open import Refuted.Arr-Cap-Step
   using (cA; ArrCapStep; arr-cap-step-absurd; arr-cap-step-wide-absurd)
 open import Refuted.Nest-Clos-Flat

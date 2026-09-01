@@ -310,6 +310,20 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- `S·(1+2L)`, which covers `S + S·L` with room and nothing larger, so
 -- the frame's factor has to be the base cap `S` for one level to pay.
 --
+-- AND THE FRAME READING IS STILL NOT ENOUGH, BECAUSE ONE ARM EMITS THE
+-- NODE STORE.  A `scan-f` answers with its accumulator, fetched out of
+-- `EvalSt.nodes`, and its own syntax may be a projection that hands
+-- that accumulator straight back -- so the emitted size is the STORED
+-- value's, which neither reading here sees.  What is owed is the store
+-- reading `stBounded?` already makes at a `scan-st`, threaded through
+-- the walk at the level, and the two walks that spend this leaf carry
+-- no such premise today.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Store` -- the scan arm at the
+--   smallest frame there is, against a store the statement quantifies
+--   over and says nothing about.  The same witness dies against
+--   `boundedNode` at the base cap, so the premise is named rather
+--   than invented.
 -- REFUTED: `Refuted.Frame-Step-Size-Level` -- both halves.  With no
 --   reading of the frame at all the conclusion needs information no
 --   hypothesis carries, and a three-leaf duplicator beats the level by
@@ -336,7 +350,14 @@ postulate
 -- number of levels covers it, since the crossing moves with the level.
 -- What is true is that the iterate is unbounded once `1 ≤ S`, so some
 -- level covers a finite emission; the count is what the walk reports.
+-- The scan arm's store defect is this leaf's too, and the existential
+-- does not absorb it: no index covers a value the statement never
+-- reads, so this leaf owes the same `stBounded?` premise its sibling
+-- does.
 --
+-- REFUTED: `Refuted.Frame-Step-Size-Store` -- stated against the
+--   sibling, and the witness's frame is a projection, so the growth
+--   index it would be handed is nothing.
 -- TWIN: `stepFrame-caps` reports exactly this shape and is proven -- a
 --   growth index `j′` with the post-state landed at `j + j′` -- which
 --   is the precedent for reading the existential as the honest form
