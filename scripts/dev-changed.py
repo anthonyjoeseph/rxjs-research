@@ -174,10 +174,16 @@ def consumers(mods: set[str]) -> set[str]:
     return seen - mods
 
 
-def commits_since_full() -> int | None:
-    if not os.path.exists(STAMP):
-        return None
-    sha = open(STAMP, encoding="utf-8").read().strip().split()[0]
+def commits_since_full(assume_stamp: str | None = None) -> int | None:
+    """`assume_stamp` (selftest only) substitutes for a real STAMP file so a
+    case can pin the cold-cache axis without writing one — a real stamp
+    written mid-`gate-cheap` would falsely claim a heavy gate that has not
+    yet run its tower, corrupting the drift signal `make gate` later trusts."""
+    sha = assume_stamp
+    if sha is None:
+        if not os.path.exists(STAMP):
+            return None
+        sha = open(STAMP, encoding="utf-8").read().strip().split()[0]
     out = git("rev-list", "--count", sha + "..HEAD").strip()
     return int(out) if out.isdigit() else None
 
@@ -226,6 +232,12 @@ def main() -> int:
                          "real check")
     ap.add_argument("--stamp", action="store_true",
                     help="record HEAD as the last green full gate, and exit")
+    ap.add_argument("--assume-stamp", default=None,
+                    help="selftest only: pin the last-green-heavy-gate axis to "
+                         "this ref without touching .gate-heavy-stamp, so a "
+                         "case testing another trigger is not drowned out by "
+                         "the cold-cache escalation in an environment where no "
+                         "heavy gate has ever completed")
     a = ap.parse_args()
 
     if a.stamp:
@@ -288,7 +300,7 @@ def main() -> int:
             escalate.append(f"{f}: {k} multi-member mutual block(s) — agda-dev "
                             f"stubs them, so a dev pass here is not a check")
 
-    n = commits_since_full()
+    n = commits_since_full(a.assume_stamp)
     if n is None:
         escalate.append("no record of a green `make gate` in this working copy "
                         "— the stamp is written by the heavy gate and wiped by a "
