@@ -215,36 +215,37 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY'S PRICE IS ALREADY PROVEN, IN A CURRENCY THE NEST FACE
-  DOES NOT READ.** The caps law for the fold carries `capsOK?` across
-  this very recursion, sink included, and the size price is one of its
-  conjuncts — but it reports at a level the walk ACCUMULATES, because a
-  chain fans into chains and no ceiling fixed beforehand bounds that.
-  The nest face charges at the instant's BASE cap. So the leg is not a
-  proof: it is to decide which side moves — the nest charge read at an
-  accumulated level, or the fan-out's level bounded by the instant's own
-  ledger — and to state the seam as one postulate either way.
+- **THE SEAM IS DECIDED AND THE NEST FACE IS WHAT MOVES.** A fixed cap
+  is refuted twice over: a subscribing frame lands frames read off an
+  INNER observable, which no premise about the path can see. Both
+  witnesses die against the arriving values' SIZE reading, since
+  `sizeᵛ` at an observable is `sizeᵉ` — and the registered length is
+  then the walked length plus the inner's, which one level pays for
+  exactly as the size sibling beside it is already charged. So the leg
+  is to restate the frame law with that premise and the ladder, and to
+  thread both through the walks. The live walk already carries them
+  both; the potential walk carries a factor reading instead, and the
+  fold carries neither.
 
-- **THE ENTRY READING NOW STANDS ON TWO LEAVES, AND NEITHER HAS BEEN
-  INSTANTIATED.** The fold's grant carries a width, so the bridge's own
-  root reading needs one: `entry-descW` bounds the entry descent by the
-  caps base's width coordinate, and `entry-fit≤exp` carries the whole
-  sighted ceiling at that width to `2 ^ (2 ^ cSize)`. The second has no
-  upper reading anywhere in the tree — `entryCeil` appears only as a
-  LOWER bound on the caps base — so the leg is to instantiate both at
-  the corpus the ceiling is already read at, and find out whether the
-  cap's own exponential has the room a tower in a width asks for.
+- **THE PAYLOAD COUNT SURVIVED ITS PROBE TIGHT, SO THE LEG IS NOW THE
+  PROOF OF IT.** Nine rows hold and three are EQUALITIES — the two
+  `*All` heads, where the reading is a product and the only place it
+  could under-count, and the literal. The defer reads zero against
+  zero, which is what the ceiling's right to stop there rests on. What
+  the rows did not reach is a frame BELOW the root: they all run from
+  `st-init`, so the quantification over an arbitrary stored state is
+  untested, and that is where the induction has to be anyway. Build it
+  on `splitBurst-len`, which already bounds a split's length by the
+  stream's times a per-emit value count — the missing half is that a
+  frame's emit stream is itself bounded by the term's own reading.
 
-- **AND THEN THE ARMS STOP BEING POSTULATES.** Each one is a single
-  `chainStep` against a real function, and the step walks the path
-  frame by frame — so the arm is an induction over that walk with one
-  leaf per frame kind, not a monolith. Its premises are already the
-  right ones: the path premise bounds every frame's size, the arrival
-  premise bounds the payload, and the charge names the instant's cap.
-  Writing the body is what tests whether those three actually suffice,
-  which no probe can do — a green row says the numbers fit, and only a
-  reducing body says the hypotheses reach. The leg is the node arm
-  first, since it is the one that moves at every family.
+- **THEN THE FOLD, WHERE THE LEVEL CANNOT STAY PUT.** The fold's own
+  registry law and its share half thread the price chain by chain, and
+  a chain fans into chains — so the level a fan-out reaches is not
+  fixed before the walk starts, and the conclusion has to become the
+  existential the caps face already reports. That is the one place the
+  ladder does not simply thread, and it is also where the fold has to
+  start carrying a values reading it does not carry today.
 
 ### The ledger
 
@@ -253,10 +254,6 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
   what is open.
-- **`entry-fit≤exp`** (Caps-Bridge) — FALSITY, `RECOVERY`: the entry reading's
-  whole sighted ceiling against `2 ^ (2 ^ cSize)`. Its exponent carries
-  `entryCeil`, which this tree only ever bounds from BELOW, so nothing yet says
-  the cap has the room.
 - **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `PROBED`: what one
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
@@ -291,13 +288,14 @@ does not fit is a finding about the shared statement, not about the head.
   gate, factor one and no depth, so hypothesis and conclusion are one statement
   read either side of it. What is owed is that its output values are among its
   inputs.
-- **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
-  width under the caps base's own width coordinate. Nothing has instantiated
-  it, and `descW` is sealed, so only the conclusion side is reachable.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE×2`: the registry
-  stays priced by the size cap across one frame. The caps face proves this walk
-  already, at an accumulated level; what is owed is the seam between that level
-  and the base cap the nest face charges at.
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `REFUTED×2, DEAD ROUTE×2`:
+  the registry stays priced by the size cap across one frame. False at a fixed
+  cap, and refuted twice over; what repairs it is the arriving values' size
+  reading plus one level per frame, both of which the header names.
+- **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
+  emits no more payloads than its term syntactically carries. The last semantic
+  step under the descent's ceiling; nine rows hold at the root frame, three of
+  them tight, and a frame below the root is the uncovered axis.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to

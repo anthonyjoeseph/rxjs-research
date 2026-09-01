@@ -54,7 +54,7 @@ open import Rx.Slot-Clos using (slotsClos)
 -- for n<2^n (foldStep's inflationary proof) and the whole stratum below,
 -- which .Caps-Face and .Wet both re-export through this module
 open import Verify-Budget-Sufficient.Measures using
-  (2X≡X+X; k≤towerℕ; n<2^n; sizeᵉ-pos; sq≤2^; towerℕ-mono)
+  (2X≡X+X; k≤towerℕ; n<2^n; sizeᵉ-pos; sq≤2^; towerℕ-mono; one≤3^)
 open import Rx.Prim using (towerℕ)
 
 ------------------------------------------------------------------
@@ -1918,3 +1918,85 @@ size-lower c d 1≤S =
   where
   S = Caps.cSize c
   J = sizeCount c d
+
+-- A LINEAR READING UNDER A POWER OF THREE, which is the one shape the
+-- room argument below needs and the doubling lemmas beside it cannot
+-- give: three summands are wanted, not two, and a base of three is
+-- what the size floor already supplies.
+lin3≤pow3 : ∀ (J : ℕ) → 1 ≤ J → 4 + 3 * J ≤ 3 ^ J * 3
+lin3≤pow3 (suc zero)    _ = s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))))
+lin3≤pow3 (suc (suc k)) _ =
+  ≤-trans (≤-reflexive shape)
+          (≤-trans (+-mono-≤ (lin3≤pow3 (suc k) (s≤s z≤n)) 3≤P)
+                   (≤-trans grow (≤-reflexive (sym assoc))))
+  where
+  P = 3 ^ suc k * 3
+  3≤P : 3 ≤ P
+  3≤P = ≤-trans (≤-reflexive (sym (*-identityˡ 3)))
+                (*-monoˡ-≤ 3 (one≤3^ (suc k)))
+  shape : 4 + 3 * suc (suc k) ≡ (4 + 3 * suc k) + 3
+  shape = solve 1 (λ x → con 4 :+ con 3 :* (con 1 :+ x)
+                           := (con 4 :+ con 3 :* x) :+ con 3)
+                refl (suc k)
+  dbl : 2 * P ≡ P + P
+  dbl = solve 1 (λ x → con 2 :* x := x :+ x) refl P
+  grow : P + P ≤ 3 * P
+  grow = ≤-trans (≤-reflexive (sym dbl))
+                 (*-monoˡ-≤ P {2} {3} (s≤s (s≤s z≤n)))
+  assoc : 3 ^ suc (suc k) * 3 ≡ 3 * (3 ^ suc k * 3)
+  assoc = solve 1 (λ x → (con 3 :* x) :* con 3 := con 3 :* (x :* con 3))
+                refl (3 ^ suc k)
+
+-- AN UPPER READING OF THE WIDTH, WHICH THIS FACE HAS NEVER HAD.  Every
+-- earlier bound on a blowup ran the other way: the width is the number
+-- the base cap is BUILT from, so it read as an input with nothing above
+-- it.  But the count a blowup iterates is itself above the width -- the
+-- level ladder clears one fold charge, and one fold charge is where the
+-- width enters -- while every size step at least multiplies by the
+-- size.  So the size a blowup lands on is above a whole power of the
+-- entry size with the count as exponent, and the count is above both
+-- coordinates at once.  The three summands are exactly what an entry
+-- exponent is assembled from: two readings of the base size and one of
+-- the base width, all under the single size the blowup produced.
+room-frameBlowup : ∀ (c : Caps) (d : ℕ) → 3 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
+  4 + (Caps.cSize c + Caps.cSize c) + Caps.cWid c
+    ≤ Caps.cSize (frameBlowup c d)
+room-frameBlowup c d 3≤S 1≤R =
+  ≤-trans (≤-trans (+-mono-≤ (+-monoʳ-≤ 4 (+-mono-≤ S≤J S≤J)) W≤J)
+                   (≤-reflexive shape))
+          (≤-trans (lin3≤pow3 J 1≤J) pow≤)
+  where
+  S = Caps.cSize c
+  J = sizeCount c d
+  2≤S : 2 ≤ S
+  2≤S = ≤-trans (s≤s (s≤s z≤n)) 3≤S
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+  S≤J : S ≤ J
+  S≤J = size≤sizeCount c d 2≤S 1≤R
+  W≤J : Caps.cWid c ≤ J
+  W≤J = wid≤sizeCount c d 2≤S 1≤R
+  1≤J : 1 ≤ J
+  1≤J = ≤-trans 1≤S S≤J
+  shape : 4 + (J + J) + J ≡ 4 + 3 * J
+  shape = solve 1 (λ j → con 4 :+ (j :+ j) :+ j := con 4 :+ con 3 :* j)
+                refl J
+  pow≤ : 3 ^ J * 3 ≤ Caps.cSize (frameBlowup c d)
+  pow≤ = ≤-trans (*-mono-≤ (^-monoˡ-≤ J 3≤S) 3≤S) (pow≤iterSize S J S 1≤S)
+
+capsAt-entry-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) →
+  4 + ((2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+     + (2 + sizeᵉ e + slotsSize sl + slotsClos sl))
+    + suc (entryCeil n sl e)
+    ≤ Caps.cSize (capsAt e sl 0)
+capsAt-entry-room {n = n} e sl =
+  room-frameBlowup
+    (caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl) (suc (entryCeil n sl e))
+          (suc (sizeᵉ e + slotsSize sl)))
+    (capsBase e sl)
+    3≤Z (s≤s z≤n)
+  where
+  3≤Z : 3 ≤ 2 + sizeᵉ e + slotsSize sl + slotsClos sl
+  3≤Z = ≤-trans (≤-trans (+-monoʳ-≤ 2 (sizeᵉ-pos e))
+                         (m≤m+n (2 + sizeᵉ e) (slotsSize sl)))
+                (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl))

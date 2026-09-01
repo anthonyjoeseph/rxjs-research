@@ -10,6 +10,8 @@ name: Gate
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch: {}
 
 concurrency:
@@ -24,8 +26,30 @@ jobs:
     # on a cache miss. Generous on purpose; tighten once real runs land.
     timeout-minutes: 120
     steps:
+      # fetch-depth: 0 (full history) -- comments-check resolves `RECOVERY:`
+      # shas with `git cat-file`, and those name ordinary ancestor commits
+      # that a shallow (default depth-1) clone simply does not have, so the
+      # lookup fails and a genuine, resolvable reference reads as dangling.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Runs first, before the expensive toolchain build: a broken swap step
+      # should fail in seconds, not after a 20-minute cold Agda build.
+      # A cold full-tower check has peaked near this container's RAM ceiling
+      # on one deeply-nested-mutual-block module and been OOM-killed (see
+      # .claude/hooks/session-start.sh, which carries the same fix locally).
+      # The runner image ships its own active swapfile at this same path, so
+      # a bare fallocate here fails with "Text file busy" — drop it first.
+      - name: Enable swap
+        run: |
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
 
       # Pin GHC/cabal explicitly rather than letting install-agda.sh's `apt-get
       # install ghc cabal-install` take whatever Ubuntu's apt repo currently
@@ -33,11 +57,18 @@ jobs:
       # its first real run with apt's GHC 9.14.1 (base-4.22), which Agda 2.8.0
       # rejects (`base >=4.13.0.0 && <4.22`). Versions match the ones already
       # validated in scripts/install-agda.sh's own header comment.
+      # cabal-update disabled: haskell-actions/setup's own `cabal update` runs
+      # before install-agda.sh gets a chance to patch ~/.cabal/config for TUF
+      # secure-repo fetch, and this failed run 2 with "root.json does not have
+      # enough signatures signed with the appropriate keys" — install-agda.sh
+      # already carries the `secure: False` fix for exactly this, so let it be
+      # the one that runs `cabal update`.
       - name: Set up GHC + cabal
         uses: haskell-actions/setup@v2
         with:
           ghc-version: "9.4.7"
           cabal-version: "3.8.1.0"
+          cabal-update: false
 
       # Building Agda 2.8.0 from source (cabal) is the expensive, cacheable
       # part of toolchain setup; the stdlib clone is small but free to cache
@@ -61,16 +92,6 @@ jobs:
           echo "$HOME/.cabal/bin" >> "$GITHUB_PATH"
           echo "LC_ALL=C.UTF-8" >> "$GITHUB_ENV"
           echo "LANG=C.UTF-8" >> "$GITHUB_ENV"
-
-      # A cold full-tower check has peaked near this container's RAM ceiling
-      # on one deeply-nested-mutual-block module and been OOM-killed (see
-      # .claude/hooks/session-start.sh, which carries the same fix locally).
-      - name: Enable swap
-        run: |
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
 
       - name: make gate
         run: make gate

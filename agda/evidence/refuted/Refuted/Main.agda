@@ -52,6 +52,9 @@ open import Refuted.Eval-Seed-Nest
   using (evald≡3; syntactic≡2; eval-seed-nest-absurd)
 open import Refuted.Step-Frame-Nest-Dup
   using (dup≡80; perFrame≡40; stepFrame-nest-dup-absurd)
+open import Refuted.Ceil-Unfold-Mu
+  using (parked≡6; unfolded≡18; ceil-unfoldμ-absurd;
+         parked₂≡6; unfolded₂≡12)
 open import Refuted.Thru-Subscribe-Nest
   using (emitted≡80; perValue≡41; stepFrame-nodes-thru-absurd;
          parent≡41; stepFrame-nodes-at-thru-absurd;

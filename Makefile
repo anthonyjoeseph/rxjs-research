@@ -391,7 +391,7 @@ imports-selftest:
 	    echo "$$out" | grep -q "RE-EXPORT  $$n" \
 	      || { echo "SELFTEST FAIL: $$n is a \`public\` re-export and was not reported — they are illegal (Anthony)"; fail=1; }; \
 	  done; \
-	  echo "$$out" | grep -q '2 \`public\` re-export(s)' \
+	  echo "$$out" | grep -q '2 `public` re-export(s)' \
 	    || { echo "SELFTEST FAIL: expected exactly 2 public re-exports"; fail=1; }; \
 	  echo "$$out" | grep -q '4 BLANKET import(s)' \
 	    || { echo "SELFTEST FAIL: expected exactly 4 blanket imports"; fail=1; }; \

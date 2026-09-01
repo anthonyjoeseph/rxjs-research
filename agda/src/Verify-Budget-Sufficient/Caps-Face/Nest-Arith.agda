@@ -27,17 +27,20 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst; cong)
 
 open import Rx.Prim      using (_at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; sizeᵉ)
-open import Rx.Evaluator using (iterSize)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-def)
+open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ)
+open import Rx.Evaluator using (iterSize; root)
+open import Rx.Frame-Width using (entryCeil)
+open import Rx.Slot-Clos using (slotsClos)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-def; nestB; nestB≤pow)
 open import Verify-Budget-Sufficient.Deliver-Measure using
   (nestDᵉ≤sizeᵉ)
+open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (delSize; delSq; delSq-def; delSize-exp)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nestCapAt; nestFacAt; nestFacAt-def; nest-inflate; realWidAt; realWidAt-def; nestIncAt;
   nestIncAt-def; nestBurstAt; nestUnit; slotsNestSum; nestCapAt-0; nestCap-mono₀; slotNest;
-  nestBurstAt-def; nestCapAt-suc; slotWrap; slotWrapSum)
+  nestBurstAt-def; nestCapAt-suc; slotWrap; slotWrapSum; fitG; slotWrapB; slotWrapBSum)
 open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 
 -- .Delivery-Walk re-exports BOTH prerequisites of the cascade
@@ -881,3 +884,200 @@ nestCap-inc-sight≤capsH e sl id =
                              (walk-sight≤exp e sl id))
                    (capsAt-exp2≤capsH e sl id))
 
+-- THE GRANT AT THE VOCABULARY, WHICH IS WHERE EVERY READING IT TAKES
+-- ALREADY LIVES.  A grant reads four numbers off the program and its
+-- slot telescope -- the base size, the nesting unit, the descent depth
+-- and the sync size -- and each of the four is a summand of the base
+-- cap's size coordinate.  So one number bounds all four, and the whole
+-- grant collapses onto a power of two whose exponent is a fixed
+-- polynomial in that number and the burst width.
+nestB-vocab : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (V W B m : ℕ) → sizeᵉ e ≤ V → nestUnit e ins ≤ V → B ≤ V → m ≤ V →
+  nestB (sizeᵉ e) W (nestUnit e ins) B m
+    ≤ 2 ^ (V * suc W * V + (V + suc V * V))
+nestB-vocab e ins V W B m hz hu hB hm =
+  ≤-trans (nestB≤pow (sizeᵉ e) W (nestUnit e ins) B m)
+          (^-monoʳ-≤ 2 (+-mono-≤ (*-mono-≤ (*-monoˡ-≤ (suc W) hz) hm)
+                                 (+-mono-≤ hB (*-mono-≤ (s≤s hm) hu))))
+
+slotWrapB≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (V W : ℕ) → sizeᵉ e ≤ V → nestUnit e ins ≤ V → slotsSize ins ≤ V →
+  (i : Fin n) →
+  slotWrapB e ins W (ins i) ≤ 2 ^ (V * suc W * V + (V + suc V * V))
+slotWrapB≤pow e ins V W hz hu hs i
+  with ins i | ≤-trans (fᵢ≤sum-tab (λ j → slotSize (ins j)) i) hs
+... | scripted _ | _  = z≤n
+... | shared d   | hd =
+  nestB-vocab e ins V W (nestDᵉ d) (syncSizeᵉ d) hz hu
+              (≤-trans (nestDᵉ≤sizeᵉ d) hd) (≤-trans (syncSize≤sizeᵉ d) hd)
+
+slotWrapBSum≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (V W : ℕ) → sizeᵉ e ≤ V → nestUnit e ins ≤ V → slotsSize ins ≤ V →
+  slotWrapBSum e ins W ≤ V * 2 ^ (V * suc W * V + (V + suc V * V))
+slotWrapBSum≤pow {n = n} e ins V W hz hu hs =
+  ≤-trans (sum-tab-mono (λ i → slotWrapB e ins W (ins i)) (λ _ → 2 ^ EXP)
+                        (slotWrapB≤pow e ins V W hz hu hs))
+          (≤-trans (≤-reflexive (sum-tab-const {n} (2 ^ EXP)))
+                   (*-monoˡ-≤ (2 ^ EXP) (≤-trans (n≤slotsSize ins) hs)))
+  where
+  EXP = V * suc W * V + (V + suc V * V)
+
+-- AND THE ROOT'S WHOLE FIT IS TWO OF THEM, the descent's own and one
+-- per slot -- so a length under the vocabulary turns the telescope's
+-- sum into a square of it, and nothing else in the fit reads anything
+-- the four numbers above do not already cover.
+fit-root≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
+  (V W : ℕ) → sizeᵉ e ≤ V → nestUnit e ins ≤ V → slotsSize ins ≤ V →
+  n ≤ V →
+  fitG e ins n W root e ≤ suc (V * V) * 2 ^ (V * suc W * V + (V + suc V * V))
+fit-root≤pow e ins V W hz hu hs hn =
+  +-mono-≤ (nestB-vocab e ins V W (nestDᵉ e) (syncSizeᵉ e) hz hu
+              (≤-trans (nestDᵉ≤sizeᵉ e) hz) (≤-trans (syncSize≤sizeᵉ e) hz))
+           (≤-trans (*-mono-≤ hn (slotWrapBSum≤pow e ins V W hz hu hs))
+                    (≤-reflexive (sym (*-assoc V V (2 ^ EXP)))))
+  where
+  EXP = V * suc W * V + (V + suc V * V)
+
+-- THE ENTRY'S SIGHTED CEILING UNDER TWO EXPONENTIALS OF THE
+-- VOCABULARY, which is the whole ladder the bridge's root reading
+-- stands on.  Everything the ceiling reads is a summand of the base
+-- cap's SIZE coordinate and the burst width IS its WIDTH coordinate,
+-- so the grant's exponent is a product of two numbers already on the
+-- record rather than a quantity the comparison has to invent.  A
+-- product of readings sits under a sum of their own exponentials,
+-- which is what turns the polynomial into the single exponent a cap
+-- can be compared with, and seven copies of one power is all the
+-- collapse ever costs.
+entry-fit≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  suc (sizeᵉ e) * suc (fitG e ins n (suc (entryCeil n ins e)) root e
+                        + nestCapAt e ins 0 + nestUnit e ins)
+    ≤ 2 ^ (2 ^ (4 + ((2 + sizeᵉ e + slotsSize ins + slotsClos ins)
+                    + (2 + sizeᵉ e + slotsSize ins + slotsClos ins))
+                  + suc (entryCeil n ins e)))
+entry-fit≤pow {n = n} e ins =
+  ≤-trans (*-mono-≤ hsz hinner)
+          (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 V (2 + (V + V) + EXP))))
+                   (^-monoʳ-≤ 2 hexp))
+  where
+  V = 2 + sizeᵉ e + slotsSize ins + slotsClos ins
+  W = suc (entryCeil n ins e)
+  EXP = V * suc W * V + (V + suc V * V)
+  R = 2 ^ EXP
+  K = suc (V * V)
+  P = 2 ^ V
+  PW = 2 ^ W
+  Q = P * P * PW
+
+  hsucz : suc (sizeᵉ e) ≤ V
+  hsucz = ≤-trans (≤-trans (n≤1+n (suc (sizeᵉ e)))
+                           (m≤m+n (2 + sizeᵉ e) (slotsSize ins)))
+                  (m≤m+n (2 + sizeᵉ e + slotsSize ins) (slotsClos ins))
+  hV : sizeᵉ e ≤ V
+  hV = ≤-trans (n≤1+n (sizeᵉ e)) hsucz
+  1≤V : 1 ≤ V
+  1≤V = ≤-trans (s≤s z≤n) hsucz
+  hVP : V ≤ P
+  hVP = <⇒≤ (n<2^n V)
+  hsz : suc (sizeᵉ e) ≤ P
+  hsz = ≤-trans hsucz hVP
+  hsucVP : suc V ≤ P
+  hsucVP = n<2^n V
+  1≤P : 1 ≤ P
+  1≤P = 1≤pow≤ 2 V (s≤s z≤n)
+  1≤PW : 1 ≤ PW
+  1≤PW = 1≤pow≤ 2 W (s≤s z≤n)
+  1≤R : 1 ≤ R
+  1≤R = 1≤pow≤ 2 EXP (s≤s z≤n)
+
+  hs : slotsSize ins ≤ V
+  hs = ≤-trans (m≤n+m (slotsSize ins) (2 + sizeᵉ e))
+               (m≤m+n (2 + sizeᵉ e + slotsSize ins) (slotsClos ins))
+  hn : n ≤ V
+  hn = ≤-trans (n≤slotsSize ins) hs
+  hu : nestUnit e ins ≤ V
+  hu = ≤-trans (s≤s (+-mono-≤ (nestDᵉ≤sizeᵉ e) (slotsNestSum≤slotsSize ins)))
+               (≤-trans (n≤1+n (suc (sizeᵉ e + slotsSize ins)))
+                        (m≤m+n (2 + sizeᵉ e + slotsSize ins) (slotsClos ins)))
+  hB : nestCapAt e ins 0 ≤ V
+  hB = ≤-trans (≤-reflexive (nestCapAt-0 e ins)) hu
+
+  -- the inner sum, collapsed onto one power
+  hVV : V * V ≤ P * P
+  hVV = *-mono-≤ hVP hVP
+  hVVpow : V * V ≤ 2 ^ (V + V)
+  hVVpow = ≤-trans hVV (≤-reflexive (sym (^-distribˡ-+-* 2 V V)))
+  1≤VV : 1 ≤ 2 ^ (V + V)
+  1≤VV = 1≤pow≤ 2 (V + V) (s≤s z≤n)
+  hG : K + (V + V + 1) ≤ 2 ^ (2 + (V + V))
+  hG = ≤-trans (+-mono-≤ (+-mono-≤ 1≤VV hVVpow)
+                         (+-mono-≤ (<⇒≤ (n<2^n (V + V))) 1≤VV))
+               (≤-trans (≤-reflexive (four (2 ^ (V + V))))
+                        (≤-reflexive (sym (^-distribˡ-+-* 2 2 (V + V)))))
+    where
+    four : ∀ (x : ℕ) → x + x + (x + x) ≡ 4 * x
+    four x = solve 1 (λ y → y :+ y :+ (y :+ y) := con 4 :* y) refl x
+
+  hinner : suc (fitG e ins n W root e + nestCapAt e ins 0 + nestUnit e ins)
+             ≤ 2 ^ (2 + (V + V) + EXP)
+  hinner =
+    ≤-trans (s≤s (+-mono-≤ (+-mono-≤ (fit-root≤pow e ins V W hV hu hs hn) hB) hu))
+      (≤-trans (≤-reflexive shift)
+        (≤-trans (+-monoʳ-≤ (K * R) lift)
+          (≤-trans (≤-reflexive (sym (*-distribʳ-+ R K (V + V + 1))))
+            (≤-trans (*-monoˡ-≤ R hG)
+                     (≤-reflexive (sym (^-distribˡ-+-* 2 (2 + (V + V)) EXP)))))))
+    where
+    shift : suc (K * R + V + V) ≡ K * R + (V + V + 1)
+    shift = solve 3 (λ a b c → con 1 :+ (a :+ b :+ c) := a :+ (b :+ c :+ con 1))
+                  refl (K * R) V V
+    lift : V + V + 1 ≤ (V + V + 1) * R
+    lift = ≤-trans (≤-reflexive (sym (*-identityʳ (V + V + 1))))
+                   (*-monoʳ-≤ (V + V + 1) 1≤R)
+
+  -- and the exponent under the cap's own reading
+  V≤Q : V ≤ Q
+  V≤Q = ≤-trans hVP
+          (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ P)))
+                            (*-monoʳ-≤ P 1≤P))
+                   (≤-trans (≤-reflexive (sym (*-identityʳ (P * P))))
+                            (*-monoʳ-≤ (P * P) 1≤PW)))
+  2≤Q : 2 ≤ Q
+  2≤Q = ≤-trans (≤-trans (^-monoʳ-≤ 2 1≤V) (≤-reflexive refl)) (≤-trans hPQ ≤-refl)
+    where
+    hPQ : P ≤ Q
+    hPQ = ≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ P)))
+                           (*-monoʳ-≤ P 1≤P))
+                  (≤-trans (≤-reflexive (sym (*-identityʳ (P * P))))
+                           (*-monoʳ-≤ (P * P) 1≤PW))
+  hprod : V * suc W * V ≤ Q
+  hprod = ≤-trans (*-mono-≤ (*-mono-≤ hVP (n<2^n W)) hVP)
+                  (≤-reflexive swap)
+    where
+    swap : P * PW * P ≡ P * P * PW
+    swap = solve 2 (λ a b → a :* b :* a := a :* a :* b) refl P PW
+  hsucVV : suc V * V ≤ Q
+  hsucVV = ≤-trans (*-mono-≤ hsucVP hVP)
+             (≤-trans (≤-reflexive (sym (*-identityʳ (P * P))))
+                      (*-monoʳ-≤ (P * P) 1≤PW))
+
+  hexp : V + (2 + (V + V) + EXP) ≤ 2 ^ (4 + (V + V) + W)
+  hexp =
+    ≤-trans (+-mono-≤ V≤Q
+              (+-mono-≤ (+-mono-≤ 2≤Q (+-mono-≤ V≤Q V≤Q))
+                        (+-mono-≤ hprod (+-mono-≤ V≤Q hsucVV))))
+      (≤-trans (≤-reflexive seven)
+        (≤-trans (*-monoˡ-≤ Q {7} {16}
+                    (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s z≤n))))))))
+                 (≤-reflexive (sym sixteen))))
+    where
+    seven : Q + (Q + (Q + Q) + (Q + (Q + Q))) ≡ 7 * Q
+    seven = solve 1 (λ q → q :+ (q :+ (q :+ q) :+ (q :+ (q :+ q))) := con 7 :* q)
+                  refl Q
+    sixteen : 2 ^ (4 + (V + V) + W) ≡ 16 * Q
+    sixteen =
+      trans (^-distribˡ-+-* 2 (4 + (V + V)) W)
+        (trans (cong (_* PW)
+                 (trans (^-distribˡ-+-* 2 4 (V + V))
+                        (cong (16 *_) (^-distribˡ-+-* 2 V V))))
+               (solve 2 (λ a b → con 16 :* a :* b := con 16 :* (a :* b))
+                      refl (P * P) PW))
