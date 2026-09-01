@@ -225,15 +225,18 @@ does not fit is a finding about the shared statement, not about the head.
   accumulated level, or the fan-out's level bounded by the instant's own
   ledger — and to state the seam as one postulate either way.
 
-- **THE ENTRY'S EXPONENT IS PAID, SO THE LADDER UNDER IT IS THE WHOLE
-  REMAINING LEAF.** The width DOES have an upper reading: a blowup's
-  count is above both base coordinates at once, so the size the base
-  blowup lands on already dominates a linear reading of them, and the
-  ceiling's own comparison is now a real body over that. What is left
-  is `entry-fit≤pow` — the sighted product up to one exponential of
-  that reading — which the recovered five-powers argument was written
-  for and which is arithmetic in the vocabulary alone. The leg is to
-  land it, and then `entry-descW`, the last leaf under the root.
+- **SPLIT THE ROOT'S ONE REMAINING LEAF, AND STATE ITS μ CLAUSE AS ITS
+  OWN ROW.** `entry-descW` is what the entry reading still stands on,
+  and it is stated only at the root, where nothing can induct. The leg
+  is the assembly: generalise it to an arbitrary subterm against
+  `ceilᵉ ⊔ slotsCeil`, carrying `Sched.slots sched ≡ sl` the way the
+  walk face's own burst lemmas already do, and let the structural
+  clauses fall out of `kidsᵉ`. Two leaves are left. The semantic one is
+  a single frame's payload count under `ownᵉ`, which is what `outWᵉ`
+  was defined to mean and where `splitBurst-len` already reduces the
+  count to emits times per-emit values. The other is the μ clause, and
+  it is the risk: `descW` descends into the UNFOLDING while `ceilᵉ`
+  reads the body, so the assembly needs the join to survive an unfold.
 
 - **AND THEN THE ARMS STOP BEING POSTULATES.** Each one is a single
   `chainStep` against a real function, and the step walks the path
@@ -253,10 +256,6 @@ does not fit is a finding about the shared statement, not about the head.
   frame that names a node. Its per-entry ceiling has now outlived three
   carriers, the last of them refuted at every cap, so the obligation itself is
   what is open.
-- **`entry-fit≤pow`** (Caps-Bridge) — FALSITY, `RECOVERY`: the entry reading's
-  sighted ceiling against one exponential of a linear reading of the base cap's
-  two coordinates. The room above it is now proven, so what is open is the
-  ladder from the product to the power, and nothing has instantiated it.
 - **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `PROBED`: what one
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
@@ -293,7 +292,8 @@ does not fit is a finding about the shared statement, not about the head.
   inputs.
 - **`entry-descW`** (Caps-Bridge) — FALSITY, `NO EVIDENCE`: the entry descent's
   width under the caps base's own width coordinate. Nothing has instantiated
-  it, and `descW` is sealed, so only the conclusion side is reachable.
+  it, and `descW` is sealed; what it joins over is the same syntax `ceilᵉ`
+  recurses on, which is where a clause-for-clause comparison would go.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE×2`: the registry
   stays priced by the size cap across one frame. The caps face proves this walk
   already, at an accumulated level; what is owed is the seam between that level

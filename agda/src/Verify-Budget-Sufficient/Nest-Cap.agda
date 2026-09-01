@@ -26,11 +26,12 @@ open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; m≤m+n; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
    +-monoʳ-≤; +-monoˡ-≤; +-assoc; *-identityˡ; *-identityʳ; *-assoc; *-distribˡ-+; *-distribʳ-+;
    +-identityʳ; n≤1+n; m≤n+m; pred-mono-≤; +-suc; ^-distribˡ-+-*; +-mono-≤;
-   *-suc; *-comm; ^-*-assoc; ^-monoʳ-≤; ^-monoˡ-≤; +-comm; pred[n]≤n)
+   *-suc; *-comm; ^-*-assoc; ^-monoʳ-≤; ^-monoˡ-≤; +-comm; pred[n]≤n; <⇒≤)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; cong)
 
 open import Verify-Budget-Sufficient.Caps using (1≤pow≤)
+open import Verify-Budget-Sufficient.Measures using (n<2^n)
 
 -- ITERATING A BASE OF AT LEAST ONE ONLY GROWS, and the stdlib's own
 -- form of this asks for a `NonZero` instance the caller here cannot
@@ -96,6 +97,26 @@ abstract
   nestB-monoW S hW U B m =
     *-monoˡ-≤ (B + suc m * U)
       (^-monoˡ-≤ m (pow-mono-exp (2 ^ S) (1≤pow≤ 2 S (s≤s z≤n)) (s≤s hW)))
+
+  -- THE GRANT UNDER A SINGLE POWER OF TWO, which is the form a bound
+  -- stated against a CAP has to meet it in.  A ceiling on this face is
+  -- one exponential of a linear reading of the vocabulary, and nothing
+  -- compares with an exponential except an exponent -- so the whole
+  -- grant has to be collapsed onto one before the comparison can be
+  -- made at all.  The per-level factor already IS a power of two once
+  -- its two exponents are multiplied out, and the unit term beside it
+  -- goes under one for free, so the collapse costs nothing but the
+  -- reassociation.
+  nestB≤pow : ∀ (S W U B m : ℕ) →
+    nestB S W U B m ≤ 2 ^ (S * suc W * m + (B + suc m * U))
+  nestB≤pow S W U B m =
+    ≤-trans (*-mono-≤ (≤-reflexive fac) (<⇒≤ (n<2^n (B + suc m * U))))
+            (≤-reflexive (sym (^-distribˡ-+-* 2 (S * suc W * m)
+                                                (B + suc m * U))))
+    where
+    fac : ((2 ^ S) ^ suc W) ^ m ≡ 2 ^ (S * suc W * m)
+    fac = trans (cong (_^ m) (^-*-assoc 2 S (suc W)))
+                (^-*-assoc 2 (S * suc W) m)
 
   -- A LEVEL'S WORTH OF ROOM AT THE DEPTH THE GRANT IS OPENED AT, which
   -- is what a head that STORES something built out of its own syntax

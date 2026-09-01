@@ -115,6 +115,8 @@ open import Verify-Budget-Sufficient.Caps
   iterSize-mono-count; 2≤sizeCount; cSize≤frameBlowup; B2-cReg≤cSize; 1≤capsAt-reg; _⊑ᶜ_; Caps;
   caps; capsAt; capsAt-exp≤capsH; capsAt-suc-full; capsAt-⊑-suc; capsH; frameStep; frameStep-0;
   frameStep-mono-j; sizeCount; capsAt-entry-room)
+open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
+  using (entry-fit≤pow)
 open import Verify-Budget-Sufficient.Burst-Walk
   using (cascadeGo-nodry)
 open import Verify-Budget-Sufficient.Psi-Split using
@@ -1533,22 +1535,9 @@ depthE-sighted-root {n = n} e ins =
 -- split pay rather than merely relocate.  A blowup's count is above
 -- both base coordinates at once and every size step at least multiplies
 -- by the size, so the size the base blowup LANDS on already dominates
--- the linear reading -- `capsAt-entry-room`.  What is left for the leaf
--- is the ladder from the sighted product up to one exponential of that
--- reading, which is arithmetic in the vocabulary alone.
--- RECOVERY: `git show e2b61e5:agda/src/Verify-Budget-Sufficient/Caps-Face/Part7.agda`
---   restores the five-powers argument the leaf below supersedes --
---   `nestCap-sight-scaled≤exp`, `slotWrapSum≤size`, `slotWrap≤size` --
---   which is the ladder from a sum of vocabulary readings to
---   `2 ^ (2 ^ cSize)` and transfers whole once the exponent is bounded.
-postulate
-  entry-fit≤pow : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    suc (sizeᵉ e) * suc (fitG e ins n (suc (entryCeil n ins e)) root e
-                          + nestCapAt e ins 0 + nestUnit e ins)
-      ≤ 2 ^ (2 ^ (4 + ((2 + sizeᵉ e + slotsSize ins + slotsClos ins)
-                      + (2 + sizeᵉ e + slotsSize ins + slotsClos ins))
-                    + suc (entryCeil n ins e)))
-
+-- the linear reading -- `capsAt-entry-room` -- and the ladder from the
+-- sighted product up to one exponential of that reading is arithmetic
+-- in the vocabulary alone, which is where `entry-fit≤pow` proves it.
 entry-fit≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
   suc (sizeᵉ e) * suc (fitG e ins n (suc (entryCeil n ins e)) root e
                         + nestCapAt e ins 0 + nestUnit e ins)
