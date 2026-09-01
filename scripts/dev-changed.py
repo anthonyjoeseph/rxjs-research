@@ -44,6 +44,9 @@ import subprocess
 import time
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import detect_env  # noqa: E402  (needs the path fixup above)
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join("agda", "src")
 
@@ -192,7 +195,13 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--files", nargs="*", default=None,
                     help="override the changed set (selftest / manual use)")
-    ap.add_argument("--budget", default="45")
+    ap.add_argument("--budget",
+                    default=str(detect_env.AGDA_DEV_BUDGET[detect_env.detect_env()]),
+                    help="per-module dev-check budget in seconds.  Defaults to "
+                         "the detected environment's own figure (see "
+                         "scripts/detect_env.py); the Makefile passes this "
+                         "explicitly from AGDA_DEV_BUDGET, so this default is "
+                         "only what a standalone invocation ever sees.")
     ap.add_argument("--max-files", type=int, default=6,
                     help="above this many changed modules, escalate: N "
                          "sequential dev checks cost more than one full "
@@ -208,8 +217,12 @@ def main() -> int:
                          "a few dev passes rather than the whole build")
     ap.add_argument("--deps", action="store_true",
                     help="also dev-check the reverse-dependency cone")
-    ap.add_argument("--cone-budget", type=int, default=300,
-                    help="total wall-clock seconds the CONE sweep may spend. "
+    ap.add_argument("--cone-budget", type=int,
+                    default=detect_env.CONE_BUDGET[detect_env.detect_env()],
+                    help="total wall-clock seconds the CONE sweep may spend, "
+                         "defaulting to the detected environment's own figure "
+                         "(scripts/detect_env.py; the Makefile passes this "
+                         "explicitly). "
                          "The per-module budget bounds one check; nothing "
                          "bounded the sum, so a changed set low in the tower "
                          "(48-module cone) could outspend the one build that "

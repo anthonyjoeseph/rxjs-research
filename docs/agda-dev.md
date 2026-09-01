@@ -104,6 +104,43 @@ it has, rather than overriding twice.
 Rationale, measurements and the closed performance experiments also live in
 `scripts/agda-dev.py`'s docstring; read that before re-opening any of it.
 
+## The budget is per-environment, not a laptop constant
+
+`AGDA_DEV_BUDGET` (and `dev-changed`'s `--cone-budget`) used to be one number,
+`45`, applied everywhere this tooling runs. It was measured on one laptop and
+was simply wrong for the other two places this campaign runs: a cloud
+container's four representative modules ran 1.2x-2.9x the laptop's own figure
+for the same module, and `45` there is not a gap above the worst case, it is
+routinely *below* it.
+
+**`scripts/detect_env.py` picks the budget now, not the Makefile.** It decides
+which of the three environments (`local` / `cloud` / `ci`) is live —
+`GITHUB_ACTIONS=true` settles CI outright; `CLAUDE_CODE_REMOTE=true` or a
+non-empty `CLAUDE_CODE_CONTAINER_ID` settles a Claude Code Remote container
+(deliberately not the generic `CLAUDECODE=1`, which is set identically whether
+Claude Code is running interactively on a laptop or inside a spawned
+container, and so cannot tell the two apart); absent both, it is the laptop,
+the correct fallback for a signal nobody has set. The Makefile does
+`AGDA_DEV_BUDGET ?= $(shell scripts/detect_env.py --budget)` and the same for
+`AGDA_DEV_CONE_BUDGET`, so `?=` still means `BUDGET=`/`CONE_BUDGET=` and an
+explicit `AGDA_DEV_BUDGET=`/`AGDA_DEV_CONE_BUDGET=` on the command line win
+outright and the detector never runs at all.
+
+**The cloud figure is real, measured on a real container, and openly a
+smaller sample than the laptop's exhaustive cold scan** — session time did
+not allow a full 66-module cloud scan. The reasoning and the four modules it
+was measured against are in `scripts/detect_env.py` itself; the actual green
+rows are in `typecheck-performance-numbers.md`'s cloud-container section,
+which grows every time a real `agda-dev`/`gate-heavy` run completes there.
+CI currently borrows the cloud figure as a placeholder (same non-macOS shape)
+until it accumulates its own tagged rows the same way.
+
+**A budget derived on one environment is not evidence for another,
+ever** — do not eyeball a cloud number and decide the laptop's 45s "should"
+also move, and do not re-scan the laptop to fix a cloud timeout. Each
+environment's figure is re-scanned and re-derived independently, from that
+environment's own rows.
+
 ## A RED `agda-dev` on any file in `src` is a critical failure
 
 **It must be GREEN on every file in `agda/src`, always.** A failure is a P0 defect
