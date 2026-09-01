@@ -1,7 +1,7 @@
 # `make bug-cache` — type-level unit tests
 
 When you discover an implementation bug, capture it immediately as a **type-level
-unit test** in `agda/src/Implementation/Unit-Test.agda` — a `_ : impl prog ≡ expected`
+unit test** under `agda/src/Implementation/Unit-Test/` — a `_ : impl prog ≡ expected`
 that Agda checks by `refl` at compile time.
 
 These are a **performance cache** of discovered work: faster to recheck than
@@ -26,6 +26,29 @@ Green there is the impl≡spec finish line.
 
 `QuickCheck` reads `SEED [RUNS] [DEPTH]` on stdin (runs before depth; defaults 200
 and 4): DEPTH caps program nesting, a hard size cap.
+
+## One module per case, and why
+
+A pin is a `refl` over a whole `evaluate` run, and each one costs minutes. Held as
+rows in a single file they are all re-checked whenever any one is appended, so the
+gate's bill grows with the cache — and the file stops being dev-checkable long
+before the cache is large. Agda's interface cache is per module, so a case in its
+own module is checked once and then free.
+
+So the layout is:
+
+- `Unit-Test/Prelude.agda` — the two statements a case can take (`Agree`,
+  `WellFormedOutput`) and the fixed context they are stated over.
+- `Unit-Test/Case-<seed>.agda` — one cached counterexample, its pin named
+  `wf-<seed>` or `agree-<seed>`.
+- `Unit-Test.agda` — the **ledger**: one import-and-pin block per case. The pin is
+  anonymous on purpose, because a `MODULE_ROOTS` file's reachability is seeded from
+  its anonymous pins, and that is what wires each case module home.
+
+The generator writes all three parts and then runs `make imports-fix`: a case
+module gets a wide import block (nothing knows which constructors a generated
+program uses) and a dead import is an `imports-check` failure, so the prune is
+owed rather than optional.
 
 ## Why the target exists
 
