@@ -25,7 +25,7 @@ open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
   ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0;
-  *-zeroʳ; *-distribˡ-⊔)
+  *-zeroʳ; *-distribˡ-⊔; +-identityʳ; +-suc; +-assoc; n≤1+n)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -33,13 +33,13 @@ open import Data.Vec using (lookup)
 open import Data.Unit using (⊤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; _×ᵗ_; obs)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
-  shareAdmit; shareLatch)
+  shareAdmit; shareLatch; iterSize)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; thruWalk-nest)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
@@ -47,9 +47,11 @@ open import Verify-Budget-Sufficient.Measures using (thruWrap-vals)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; pathNestD; nest-inflate; dropSource-nest)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?; frameSz?)
+open import Verify-Budget-Sufficient.Caps using (iterSize-mono-count)
+open import Verify-Budget-Sufficient.Caps-Face.Part1
+  using (pathSz?; regsSz?; frameSz?; pathSz?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (shareAdmit-caps)
-open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all)
+open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all; all-impl)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -286,25 +288,56 @@ stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B
 stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF =
   thruΦ sf id now op nid path vals fin sched st B U hF
 
--- THE REGISTRY STAYS PRICED ACROSS A FRAME, and the two things missing
--- from this reading of it are both already carried by the walks that
--- thread it, which is the ruling.  A subscribing frame registers the
--- walked path with its head swapped plus one frame per syntax node of
--- the INNER OBSERVABLE it received -- and an inner is a runtime value,
--- structurally unrelated to the program the cap is read from, so a
--- statement whose only premises are the path's own price cannot see it
--- at all.  That is the whole content of both refutations below: each
--- builds an inner FROM the cap and beats it.
+-- THE SIZE READING OF A BURST, which is the currency every side
+-- condition that must see through a defer gate is denominated in: the
+-- nesting measures read ZERO into a deferred body, and size does not.
+valsSz? : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (vals : List (Val Γ s)) → Bool
+valsSz? {s = s} V vals = all (λ v → sizeᵛ s v ≤ᵇ V) vals
+
+valsSz?-mono : ∀ {n} {Γ : Ctx n} {s} (V V′ : ℕ) (vals : List (Val Γ s)) →
+  V ≤ V′ → valsSz? V vals ≡ true → valsSz? V′ vals ≡ true
+valsSz?-mono V V′ []       h _  = refl
+valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
+  ∧-intro (≤ᵇ-widen (sizeᵛ s v) h (∧-trueˡ hv))
+          (valsSz?-mono V V′ vs h (∧-trueʳ hv))
+
+postulate
+  -- ONE FRAME'S SIZE STEP.  A frame substitutes, and the caps face
+  -- prices substitution at exactly one `sizeStep` -- so the values a
+  -- frame emits sit at the next level of the same iterate, whatever
+  -- the frame does.
+  stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (S j : ℕ) →
+    valsSz? (iterSize S j S) vals ≡ true →
+    valsSz? (iterSize S (suc j) S)
+      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+
+-- THE REGISTRY STAYS PRICED ACROSS A FRAME, AT AN ACCUMULATED LEVEL --
+-- and the level is what makes the statement true, not how it is
+-- phrased.  A subscribing frame registers the walked path with its head
+-- swapped plus one frame per syntax node of the INNER OBSERVABLE it
+-- received, and an inner is a runtime value, structurally unrelated to
+-- the program a fixed cap is read from: that is the whole content of
+-- both refutations below, each of which builds an inner FROM the cap
+-- and beats it.
 --
--- SO THE SIDE THAT MOVES IS THIS ONE, IN TWO PLACES.  The arriving
--- values need their SIZE reading as a premise -- and `sizeᵛ` at an
--- observable IS `sizeᵉ`, so that reading bounds the inner's syntax
--- outright and every witness of that family dies against it.  Then the
--- registered length is the walked length plus the inner's, both under
--- the level, and the level's own step is what pays for the sum: one
--- frame, one level, exactly as the SIZE sibling directly above charges
--- it.  A fixed cap has nothing to pay with, which is why no repair of
--- the hypotheses alone survives while this one does.
+-- SO THE ARRIVING VALUES' SIZE IS A PREMISE, AND ONE FRAME COSTS ONE
+-- LEVEL.  `sizeᵛ` at an observable IS `sizeᵉ`, so the size reading
+-- bounds the inner's syntax outright and every witness of that family
+-- dies against it; the registered length is then the walked length plus
+-- the inner's, both under the level, and `sizeStep` pays for exactly
+-- that sum, being `S + 2·X` at `X` the level in hand.  A fixed cap has
+-- nothing to pay with, which is why no repair of the hypotheses alone
+-- survives while this one does.
+--
+-- AND THE CURRENCY IS THE SIZE SIBLING'S, DELIBERATELY.  `stepFrame-sz`
+-- steps the values a frame emits by the same one `iterSize`, so a walk
+-- threading both spends ONE level per frame rather than one each, and
+-- the caller discharges affordability for every level at once.  At
+-- `j = 0` the iterate is the cap itself, definitionally, so an entry
+-- reading transports for free.
 
 -- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
 --   so that the cap transfers with no premise at all.  The share sink
@@ -344,93 +377,133 @@ postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (S : ℕ) →
-    pathSz? S (f ↠ path) ≡ true →
-    regsSz? S (EvalSt.registry st) ≡ true →
-    regsSz? S (EvalSt.registry
+    (S j : ℕ) →
+    valsSz? (iterSize S j S) vals ≡ true →
+    pathSz? (iterSize S j S) (f ↠ path) ≡ true →
+    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    regsSz? (iterSize S (suc j) S) (EvalSt.registry
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st)))))) ≡ true
 
--- AND THE PRICE SURVIVES A WHOLE CHAIN, which is what a fold over a
--- selection needs and the frame law alone does not give: the next chain
--- runs at the state the last one left.  The sink is what makes this more
--- than the frame law iterated -- the fan-out registers on behalf of
--- paths the registry already holds, and the admitted list inherits the
--- registry's own receipt, so the cap the walk entered under is the cap
--- it leaves under.
+-- AND THE PRICE SURVIVES A WHOLE CHAIN, AT A LEVEL THE WALK CHOOSES
+-- RATHER THAN ONE THE STATEMENT NAMES.  The next chain runs at the
+-- state the last one left, so a chain is the frame law iterated and
+-- costs one level per frame.  The SINK is what makes this more: it
+-- fans out to paths the registry holds, each re-entering this fold
+-- with frames of its own, so what a whole walk accumulates is the
+-- fan-out's cumulative depth and not the depth of the path in hand.
+-- No quantity read before the walk starts bounds that, which is why
+-- the count is existential here and fixed in the frame law above --
+-- and why placing it at the fold keeps it out of every conclusion.
 mutual
   foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
-    pathSz? B path ≡ true →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry
+    (sched : Sched Γ) (st : EvalSt e) (S j : ℕ) →
+    1 ≤ S →
+    valsSz? (iterSize S j S) vals ≡ true →
+    pathSz? (iterSize S j S) path ≡ true →
+    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    Σ ℕ λ k → regsSz? (iterSize S (j + k) S) (EvalSt.registry
       (proj₂ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st)))) ≡ true
-  foldPath-regsSz sf gas id now envSrc root vals evs fin sched st B _ hreg = hreg
-  foldPath-regsSz sf gas id now envSrc (share-sink i) vals evs fin sched st B _ hreg =
-    dispatchShare-regsSz sf gas id now i vals fin sched st B hreg
-  foldPath-regsSz sf gas id now envSrc (f ↠ p) vals evs fin sched st B hpz hreg =
-    foldPath-regsSz sf gas id now envSrc p
-      (proj₁ step) (evs ++ proj₁ (proj₂ step))
-      (proj₁ (proj₂ (proj₂ step)))
-      (proj₁ (proj₂ (proj₂ (proj₂ step))))
-      (proj₂ (proj₂ (proj₂ (proj₂ step)))) B
-      hpTail (stepFrame-regsSz sf id now f p vals fin sched st B hpz hreg)
+  foldPath-regsSz sf gas id now envSrc root vals evs fin sched st S j hS _ _ hreg =
+    0 , subst (λ x → regsSz? (iterSize S x S) (EvalSt.registry st) ≡ true)
+              (sym (+-identityʳ j)) hreg
+  foldPath-regsSz sf gas id now envSrc (share-sink i) vals evs fin sched st S j hS hv _ hreg =
+    dispatchShare-regsSz sf gas id now i vals fin sched st S j hS hv hreg
+  foldPath-regsSz sf gas id now envSrc (f ↠ p) vals evs fin sched st S j hS hv hpz hreg =
+    suc (proj₁ rec) , subst at (sym (+-suc j (proj₁ rec))) (proj₂ rec)
     where
     step = stepFrame sf id now f p vals fin sched st
-    hpTail : pathSz? B p ≡ true
-    hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
-                     (proj₂ (∧-true (frameSz? B f)
-                              ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+    L    = iterSize S j S
+    hpTail : pathSz? (iterSize S (suc j) S) p ≡ true
+    hpTail = pathSz?-widen p (iterSize-mono-count S S hS (n≤1+n j))
+               (proj₂ (∧-true (suc (pathLen p) ≤ᵇ L) (pathSz? L p)
+                        (proj₂ (∧-true (frameSz? L f)
+                                 ((suc (pathLen p) ≤ᵇ L) ∧ pathSz? L p) hpz))))
+    rec = foldPath-regsSz sf gas id now envSrc p
+            (proj₁ step) (evs ++ proj₁ (proj₂ step))
+            (proj₁ (proj₂ (proj₂ step)))
+            (proj₁ (proj₂ (proj₂ (proj₂ step))))
+            (proj₂ (proj₂ (proj₂ (proj₂ step)))) S (suc j) hS
+            (stepFrame-sz sf id now f p vals fin sched st S j hv)
+            hpTail
+            (stepFrame-regsSz sf id now f p vals fin sched st S j hv hpz hreg)
+    at : ℕ → Set
+    at x = regsSz? (iterSize S x S) (EvalSt.registry
+             (proj₂ (proj₂ (foldPath sf gas id now envSrc p
+               (proj₁ step) (evs ++ proj₁ (proj₂ step))
+               (proj₁ (proj₂ (proj₂ step)))
+               (proj₁ (proj₂ (proj₂ (proj₂ step))))
+               (proj₂ (proj₂ (proj₂ (proj₂ step)))))))) ≡ true
 
   dispatchShare-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry
+    (sched : Sched Γ) (st : EvalSt e) (S j : ℕ) →
+    1 ≤ S →
+    valsSz? (iterSize S j S) vals ≡ true →
+    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    Σ ℕ λ k → regsSz? (iterSize S (j + k) S) (EvalSt.registry
       (proj₂ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st)))) ≡ true
-  dispatchShare-regsSz sf zero id now i vals fin sched st B hreg = hreg
-  dispatchShare-regsSz sf (suc gas) id now i vals false sched st B hreg =
+  dispatchShare-regsSz sf zero id now i vals fin sched st S j hS hv hreg =
+    0 , subst (λ x → regsSz? (iterSize S x S) (EvalSt.registry st) ≡ true)
+              (sym (+-identityʳ j)) hreg
+  dispatchShare-regsSz sf (suc gas) id now i vals false sched st S j hS hv hreg =
     shareGo-regsSz sf gas id now i vals false
-      (shareAdmit i (EvalSt.registry st)) sched st B
-      (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
-  dispatchShare-regsSz {t = t} sf (suc gas) id now i vals true sched st B hreg =
-    dropSource-all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en)))) (toℕ i)
-      (EvalSt.registry (proj₂ (proj₂ GO))) went
+      (shareAdmit i (EvalSt.registry st)) sched st S j hS hv
+      (shareAdmit-caps (iterSize S j S) i (EvalSt.registry st) hreg) hreg
+  dispatchShare-regsSz {t = t} sf (suc gas) id now i vals true sched st S j hS hv hreg =
+    proj₁ GOR ,
+    dropSource-all
+      (λ en → pathSz? (iterSize S (j + proj₁ GOR) S) (proj₂ (proj₂ (proj₂ en))))
+      (toℕ i) (EvalSt.registry (proj₂ (proj₂ GO))) (proj₂ GOR)
     where
     GO = shareGo {t = t} sf gas id now i vals true
            (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
-    went : regsSz? B (EvalSt.registry (proj₂ (proj₂ GO))) ≡ true
-    went = shareGo-regsSz sf gas id now i vals true
-             (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B
-             (shareAdmit-caps B i (EvalSt.registry st) hreg) hreg
+    GOR = shareGo-regsSz sf gas id now i vals true
+            (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) S j hS hv
+            (shareAdmit-caps (iterSize S j S) i (EvalSt.registry st) hreg) hreg
 
   shareGo-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
-    all (λ rp → pathSz? B (proj₂ rp)) ps ≡ true →
-    regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? B (EvalSt.registry
+    (sched : Sched Γ) (st : EvalSt e) (S j : ℕ) →
+    1 ≤ S →
+    valsSz? (iterSize S j S) vals ≡ true →
+    all (λ rp → pathSz? (iterSize S j S) (proj₂ rp)) ps ≡ true →
+    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    Σ ℕ λ k → regsSz? (iterSize S (j + k) S) (EvalSt.registry
       (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps sched st)))) ≡ true
-  shareGo-regsSz sf gas id now i vals fin [] sched st B _ hreg = hreg
-  shareGo-regsSz sf gas id now i vals fin ((rid , p) ∷ ps) sched st B hps hreg
+  shareGo-regsSz sf gas id now i vals fin [] sched st S j hS hv _ hreg =
+    0 , subst (λ x → regsSz? (iterSize S x S) (EvalSt.registry st) ≡ true)
+              (sym (+-identityʳ j)) hreg
+  shareGo-regsSz sf gas id now i vals fin ((rid , p) ∷ ps) sched st S j hS hv hps hreg
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
-  ... | true  = shareGo-regsSz sf gas id now i vals fin ps sched st B
-                  (proj₂ (∧-true (pathSz? B p) _ hps)) hreg
+  ... | true  = shareGo-regsSz sf gas id now i vals fin ps sched st S j hS hv
+                  (proj₂ (∧-true (pathSz? (iterSize S j S) p) _ hps)) hreg
   ... | false =
-    shareGo-regsSz sf gas id now i vals fin ps
-      (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B
-      (proj₂ (∧-true (pathSz? B p) _ hps))
-      (foldPath-regsSz sf gas id now (toℕ i) p vals EVS fin sched st₀ B
-        (proj₁ (∧-true (pathSz? B p) _ hps)) hreg)
+    proj₁ FPR + proj₁ REC , subst at (+-assoc j (proj₁ FPR) (proj₁ REC)) (proj₂ REC)
     where
     st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
     EVS = if fin then close (toℕ i) exhausted ∷ [] else []
     FP  = foldPath sf gas id now (toℕ i) p vals EVS fin sched st₀
+    FPR = foldPath-regsSz sf gas id now (toℕ i) p vals EVS fin sched st₀ S j hS hv
+            (proj₁ (∧-true (pathSz? (iterSize S j S) p) _ hps)) hreg
+    up  = iterSize-mono-count S S hS (m≤m+n j (proj₁ FPR))
+    REC = shareGo-regsSz sf gas id now i vals fin ps
+            (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) S (j + proj₁ FPR) hS
+            (valsSz?-mono (iterSize S j S) (iterSize S (j + proj₁ FPR) S) vals up hv)
+            (all-impl (λ rp → pathSz? (iterSize S j S) (proj₂ rp))
+                      (λ rp → pathSz? (iterSize S (j + proj₁ FPR) S) (proj₂ rp))
+                      (λ rp → pathSz?-widen (proj₂ rp) up) ps
+                      (proj₂ (∧-true (pathSz? (iterSize S j S) p) _ hps)))
+            (proj₂ FPR)
+    at : ℕ → Set
+    at x = regsSz? (iterSize S x S) (EvalSt.registry
+             (proj₂ (proj₂ (shareGo sf gas id now i vals fin ps
+               (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)))))) ≡ true
 
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the

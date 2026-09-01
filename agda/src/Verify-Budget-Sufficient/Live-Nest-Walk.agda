@@ -27,20 +27,19 @@
 module Verify-Budget-Sufficient.Live-Nest-Walk where
 
 open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
-open import Data.Bool.ListAction using (all; any)
+open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; foldr)
-open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
-  ≤-reflexive; +-suc)
+  ≤-reflexive; +-suc; m≤n+m)
 open import Data.Vec using (lookup)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; cong; sym; subst)
 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-widen)
-open import Rx.Exp using (Ctx; Closed; Val; sizeᵛ)
+open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId;
          map-f; scan-f; take-f; from-inner; thru-outer;
@@ -50,24 +49,14 @@ open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; sweepLive-nest)
+open import Verify-Budget-Sufficient.Caps using (iterSize-infl)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsΦ?; PathΦHyp; DispatchΦHyp; ShareGoΦHyp;
-         stepFrame-nest-Φ; stepFrame-nest-regs; stepFrame-regsSz; foldPath-nest-regs)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?; frameSz?)
+  using (valsΦ?; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; valsSz?-mono;
+         stepFrame-nest-Φ; stepFrame-nest-regs; stepFrame-regsSz; stepFrame-sz;
+         foldPath-nest-regs)
+open import Verify-Budget-Sufficient.Caps-Face.Part1
+  using (pathSz?; regsSz?; frameSz?; pathSz?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (foldPath-slots)
-
--- THE SIZE READING OF A BURST, which is the currency the outer
--- frame's side condition is denominated in and the only one that sees
--- through a defer gate.
-valsSz? : ∀ {n} {Γ : Ctx n} {s} (V : ℕ) (vals : List (Val Γ s)) → Bool
-valsSz? {s = s} V vals = all (λ v → sizeᵛ s v ≤ᵇ V) vals
-
-valsSz?-mono : ∀ {n} {Γ : Ctx n} {s} (V V′ : ℕ) (vals : List (Val Γ s)) →
-  V ≤ V′ → valsSz? V vals ≡ true → valsSz? V′ vals ≡ true
-valsSz?-mono V V′ []       h _  = refl
-valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
-  ∧-intro (≤ᵇ-widen (sizeᵛ s v) h (∧-trueˡ hv))
-          (valsSz?-mono V V′ vs h (∧-trueʳ hv))
 
 -- WHAT AN OUTER FRAME OWES BEYOND THE POTENTIAL, stated at the one
 -- kind that can subscribe.  A size bound rather than a depth one,
@@ -176,17 +165,17 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- for chains that live in the REGISTRY, and their side conditions are
 -- owed at their own paths -- so what has to be supplied is a reading of
 -- the registry, not another reading of this path.  The registry is
--- priced by the same size cap the walk runs under, which is what makes
--- the grant statable at all: every admitted path is legal under the
--- cap, so every admitted walk starts at level zero of the same iterate
--- the chain started at.
+-- priced by the size cap the walk runs under, READ AT THE LEVEL THE
+-- WALK HAS REACHED, which is what makes the grant statable at all:
+-- every admitted path is legal under that reading, so every admitted
+-- walk starts at level zero of the same iterate the chain started at.
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U : ℕ) (i : Fin n)
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U j : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
     valsSz? U vals ≡ true →
-    regsSz? S (EvalSt.registry st) ≡ true →
+    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
     DispatchLiveHyp sf gas id now U i vals fin sched st
 
 -- THE SIZE SIDE CONDITION, DISCHARGED BY THE SAME WALK IT GUARDS.  The
@@ -196,31 +185,18 @@ postulate
 -- A path legal under the size cap has at most a cap's worth of frames,
 -- which is what keeps the level under the cap and lets the caller
 -- discharge affordability once for every level at once.
-postulate
-  -- ONE FRAME'S SIZE STEP.  A frame substitutes, and the caps face
-  -- prices substitution at exactly one `sizeStep` -- so the values a
-  -- frame emits sit at the next level of the same iterate, whatever
-  -- the frame does.
-  stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (S j : ℕ) →
-    valsSz? (iterSize S j S) vals ≡ true →
-    valsSz? (iterSize S (suc j) S)
-      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
-
 walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U j : ℕ) (path : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   (∀ k → k ≤ S → iterSize S k S ≤ U) →
   valsSz? (iterSize S j S) vals ≡ true →
   pathSz? S path ≡ true →
-  regsSz? S (EvalSt.registry st) ≡ true →
+  regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
   j + pathLen path ≤ S →
   PathLiveHyp sf gas id now U path vals fin sched st
 walk-LiveHyp-go sf gas id now S U j root vals fin sched st _ _ _ _ _ = tt
 walk-LiveHyp-go sf gas id now S U j (share-sink i) vals fin sched st afford hsz _ hreg hj =
-  walk-share-LiveHyp sf gas id now S U i vals fin sched st
+  walk-share-LiveHyp sf gas id now S U j i vals fin sched st
     (valsSz?-mono (iterSize S j S) U vals (afford j j≤S) hsz) hreg
   where
   j≤S : j ≤ S
@@ -235,12 +211,15 @@ walk-LiveHyp-go sf gas id now S U j (f ↠ p) vals fin sched st afford hsz hpz h
       afford
       (stepFrame-sz sf id now f p vals fin sched st S j hsz)
       hpTail
-      (stepFrame-regsSz sf id now f p vals fin sched st S hpz hreg)
+      (stepFrame-regsSz sf id now f p vals fin sched st S j hsz
+         (pathSz?-widen (f ↠ p) (iterSize-infl S 1≤S j S) hpz) hreg)
       (≤-trans (≤-reflexive (sym (+-suc j (pathLen p)))) hj)
   where
   step = stepFrame sf id now f p vals fin sched st
   j≤S : j ≤ S
   j≤S = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) (≤-trans (m≤n+m (suc (pathLen p)) j) hj)
   atU : valsSz? U vals ≡ true
   atU = valsSz?-mono (iterSize S j S) U vals (afford j j≤S) hsz
   hHead : FrameLiveHyp U f p vals
