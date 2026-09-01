@@ -225,16 +225,17 @@ does not fit is a finding about the shared statement, not about the head.
   accumulated level, or the fan-out's level bounded by the instant's own
   ledger — and to state the seam as one postulate either way.
 
-- **THE ONE FRAME'S PAYLOAD COUNT IS NOW THE WHOLE SEMANTIC GAP, AND
-  BOTH ITS SIDES COMPUTE.** The descent's ceiling is a real body: every
-  head, the slot connect and the unfold are discharged, and what they
-  reduce to is one statement — a single subscribe frame emits no more
-  payloads than the term syntactically carries. `burstW` runs the
-  evaluator and `outWⱽ` is a fold, so the row is probeable end to end,
-  which no other leaf on this face has been. Probe it before writing a
-  line of proof: at a scripted slot, at a shared one, at the `*All`
-  heads whose reading is a PRODUCT, and at a defer, which the ceiling
-  reads as zero and the evaluator may not.
+- **THE PAYLOAD COUNT SURVIVED ITS PROBE TIGHT, SO THE LEG IS NOW THE
+  PROOF OF IT.** Nine rows hold and three are EQUALITIES — the two
+  `*All` heads, where the reading is a product and the only place it
+  could under-count, and the literal. The defer reads zero against
+  zero, which is what the ceiling's right to stop there rests on. What
+  the rows did not reach is a frame BELOW the root: they all run from
+  `st-init`, so the quantification over an arbitrary stored state is
+  untested, and that is where the induction has to be anyway. Build it
+  on `splitBurst-len`, which already bounds a split's length by the
+  stream's times a per-emit value count — the missing half is that a
+  frame's emit stream is itself bounded by the term's own reading.
 
 - **AND THEN THE ARMS STOP BEING POSTULATES.** Each one is a single
   `chainStep` against a real function, and the step walks the path
@@ -288,15 +289,14 @@ does not fit is a finding about the shared statement, not about the head.
   gate, factor one and no depth, so hypothesis and conclusion are one statement
   read either side of it. What is owed is that its output values are among its
   inputs.
-- **`burst-outW`** (Desc-Ceil) — FALSITY, `NO EVIDENCE`: one subscribe frame
-  emits no more payloads than its term syntactically carries. The last semantic
-  step under the descent's ceiling, and the only one there; both sides compute,
-  and nothing has instantiated either.
-
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE×2`: the registry
   stays priced by the size cap across one frame. The caps face proves this walk
   already, at an accumulated level; what is owed is the seam between that level
   and the base cap the nest face charges at.
+- **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
+  emits no more payloads than its term syntactically carries. The last semantic
+  step under the descent's ceiling; nine rows hold at the root frame, three of
+  them tight, and a frame below the root is the uncovered axis.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to

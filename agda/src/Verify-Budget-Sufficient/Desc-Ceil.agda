@@ -73,6 +73,13 @@ open import Verify-Budget-Sufficient.Nest-Burst using
 -- the evaluator's connect does.  The slots equation is what ties the
 -- two descents together, and it is the hypothesis every consumer of
 -- this face already holds.
+-- PROBED: `Probed.Burst-OutW` -- nine rows at the root frame, three of
+--   them EQUALITIES and so load-bearing: `ofᵉ` at three, and the two
+--   `*All` heads at six, which is where the reading is a product and
+--   the only place it could be under-counted.  The defer reads zero
+--   against zero, which is the row the ceiling's right to stop there
+--   rests on.  NOT covered: a frame below the root, a scan head, and a
+--   shared slot whose definition itself reaches a share.
 postulate
   burst-outW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)
