@@ -3250,10 +3250,6 @@ thruConsume-caps c L sl W fuel exhaustᵒ nid κ id now o sched st hsl hc hv hpk
 --   the premises therefore means adopting the j-indexed shape through
 --   every clause of the nest descent and every join in its arithmetic,
 --   which is a restatement of the face and not a spend of the other.
--- RECOVERY: `git show ba436bd` restores the attempt -- the imports, the
---   `thruFaceOK`/`thruCapsOK` entry pair and the level-free ∀L fold
---   over a burst -- wanted again only if the nest face is ever moved to
---   the j-indexed shape on purpose.
 thruWalk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (L : ℕ) (sl : Slots Γ) (W : ℕ) (fuel : Gas) (op : AllOp) (nid : NodeId)
   (κ : Path Γ u t) (id : Id) (now : Tick) (os : List (Val Γ (obs u)))
