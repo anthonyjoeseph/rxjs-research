@@ -22,7 +22,7 @@ open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n;
   ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0;
   *-zeroʳ; *-distribˡ-⊔; +-identityʳ; +-suc; +-assoc; n≤1+n)
@@ -31,7 +31,7 @@ open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Data.Unit using (⊤)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
@@ -49,7 +49,7 @@ open import Verify-Budget-Sufficient.Nest-Store
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
 open import Verify-Budget-Sufficient.Caps using (iterSize-mono-count)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; regsSz?; frameSz?; pathSz?-widen)
+  using (pathSz?; regsSz?; frameSz?; pathSz?-widen; regsSz?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (shareAdmit-caps)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true; dropSource-all; all-impl)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
@@ -301,17 +301,54 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
   ∧-intro (≤ᵇ-widen (sizeᵛ s v) h (∧-trueˡ hv))
           (valsSz?-mono V V′ vs h (∧-trueʳ hv))
 
+-- ONE FRAME'S SIZE STEP, AND THE FRAME IS READ AT THE PROGRAM'S CAP
+-- WHILE THE VALUES ARE READ AT THE LEVEL.  That split is not a
+-- convenience: it is what `sizeStep` computes.  A `map-f` emits
+-- `applyFn fn v`, and `evalWith` sends `pairᵗ` to BOTH arms, so a
+-- duplicator of `k` leaves takes a value of size `V` to `(k-1) + k·V`
+-- -- a PRODUCT of the frame's size and the value's.  `sizeStep S L` is
+-- `S·(1+2L)`, which covers `S + S·L` with room and nothing larger, so
+-- the frame's factor has to be the base cap `S` for one level to pay.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Level` -- both halves.  With no
+--   reading of the frame at all the conclusion needs information no
+--   hypothesis carries, and a three-leaf duplicator beats the level by
+--   inspection.  Reading the frame at the LEVEL instead does not
+--   repair it: both factors are then capped at `L`, the emission is
+--   quadratic in `L` and one level is linear in it, and the crossing
+--   arrives at `j = 1` for every `S ≥ 2`.
 postulate
-  -- ONE FRAME'S SIZE STEP.  A frame substitutes, and the caps face
-  -- prices substitution at exactly one `sizeStep` -- so the values a
-  -- frame emits sit at the next level of the same iterate, whatever
-  -- the frame does.
   stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (S j : ℕ) →
+    frameSz? S f ≡ true →
     valsSz? (iterSize S j S) vals ≡ true →
     valsSz? (iterSize S (suc j) S)
+      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+
+-- AND WHERE THE FRAME CANNOT BE READ AT THE PROGRAM'S CAP, THE GROWTH
+-- INDEX IS EXISTENTIAL.  A chain re-entered through a share sink is
+-- walked out of the REGISTRY, and a registered path carries one frame
+-- per syntax node of an inner observable -- a runtime value, priced at
+-- the level and not at the program.  So the sibling above does not
+-- apply there, the emission genuinely is quadratic, and no FIXED
+-- number of levels covers it, since the crossing moves with the level.
+-- What is true is that the iterate is unbounded once `1 ≤ S`, so some
+-- level covers a finite emission; the count is what the walk reports.
+--
+-- TWIN: `stepFrame-caps` reports exactly this shape and is proven -- a
+--   growth index `j′` with the post-state landed at `j + j′` -- which
+--   is the precedent for reading the existential as the honest form
+--   rather than as a weakening.
+postulate
+  stepFrame-sz-lvl : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (S j : ℕ) →
+    1 ≤ S →
+    valsSz? (iterSize S j S) vals ≡ true →
+    Σ ℕ λ j′ → valsSz? (iterSize S (suc (j + j′)) S)
       (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 
 -- THE REGISTRY STAYS PRICED ACROSS A FRAME, AT AN ACCUMULATED LEVEL --
@@ -332,12 +369,13 @@ postulate
 -- nothing to pay with, which is why no repair of the hypotheses alone
 -- survives while this one does.
 --
--- AND THE CURRENCY IS THE SIZE SIBLING'S, DELIBERATELY.  `stepFrame-sz`
--- steps the values a frame emits by the same one `iterSize`, so a walk
--- threading both spends ONE level per frame rather than one each, and
--- the caller discharges affordability for every level at once.  At
--- `j = 0` the iterate is the cap itself, definitionally, so an entry
--- reading transports for free.
+-- AND THE CURRENCY IS THE SIZE SIBLINGS', DELIBERATELY, SO A WALK
+-- THREADING BOTH SPENDS ONE COUNT.  The registry costs exactly one
+-- level per frame; the values cost one where the frame is read at the
+-- base cap and one PLUS a reported growth index where it is not, so
+-- the level a walk arrives at is always the values' and the registry
+-- reading widens up to meet it.  At `j = 0` the iterate is the cap
+-- itself, definitionally, so an entry reading transports for free.
 
 -- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
 --   so that the cap transfers with no premise at all.  The share sink
@@ -412,12 +450,19 @@ mutual
   foldPath-regsSz sf gas id now envSrc (share-sink i) vals evs fin sched st S j hS hv _ hreg =
     dispatchShare-regsSz sf gas id now i vals fin sched st S j hS hv hreg
   foldPath-regsSz sf gas id now envSrc (f ↠ p) vals evs fin sched st S j hS hv hpz hreg =
-    suc (proj₁ rec) , subst at (sym (+-suc j (proj₁ rec))) (proj₂ rec)
+    suc (j′ + proj₁ rec)
+      , subst at (trans (cong suc (+-assoc j j′ (proj₁ rec)))
+                        (sym (+-suc j (j′ + proj₁ rec))))
+              (proj₂ rec)
     where
     step = stepFrame sf id now f p vals fin sched st
     L    = iterSize S j S
-    hpTail : pathSz? (iterSize S (suc j) S) p ≡ true
-    hpTail = pathSz?-widen p (iterSize-mono-count S S hS (n≤1+n j))
+    SZ   = stepFrame-sz-lvl sf id now f p vals fin sched st S j hS hv
+    j′   = proj₁ SZ
+    j≤   : j ≤ suc (j + j′)
+    j≤   = ≤-trans (m≤m+n j j′) (n≤1+n (j + j′))
+    hpTail : pathSz? (iterSize S (suc (j + j′)) S) p ≡ true
+    hpTail = pathSz?-widen p (iterSize-mono-count S S hS j≤)
                (proj₂ (∧-true (suc (pathLen p) ≤ᵇ L) (pathSz? L p)
                         (proj₂ (∧-true (frameSz? L f)
                                  ((suc (pathLen p) ≤ᵇ L) ∧ pathSz? L p) hpz))))
@@ -425,10 +470,12 @@ mutual
             (proj₁ step) (evs ++ proj₁ (proj₂ step))
             (proj₁ (proj₂ (proj₂ step)))
             (proj₁ (proj₂ (proj₂ (proj₂ step))))
-            (proj₂ (proj₂ (proj₂ (proj₂ step)))) S (suc j) hS
-            (stepFrame-sz sf id now f p vals fin sched st S j hv)
+            (proj₂ (proj₂ (proj₂ (proj₂ step)))) S (suc (j + j′)) hS
+            (proj₂ SZ)
             hpTail
-            (stepFrame-regsSz sf id now f p vals fin sched st S j hv hpz hreg)
+            (regsSz?-widen (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ step)))))
+              (iterSize-mono-count S S hS (s≤s (m≤m+n j j′)))
+              (stepFrame-regsSz sf id now f p vals fin sched st S j hv hpz hreg))
     at : ℕ → Set
     at x = regsSz? (iterSize S x S) (EvalSt.registry
              (proj₂ (proj₂ (foldPath sf gas id now envSrc p

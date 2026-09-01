@@ -209,7 +209,7 @@ walk-LiveHyp-go sf gas id now S U j (f ↠ p) vals fin sched st afford hsz hpz h
       (proj₁ (proj₂ (proj₂ (proj₂ step))))
       (proj₂ (proj₂ (proj₂ (proj₂ step))))
       afford
-      (stepFrame-sz sf id now f p vals fin sched st S j hsz)
+      (stepFrame-sz sf id now f p vals fin sched st S j hfz hsz)
       hpTail
       (stepFrame-regsSz sf id now f p vals fin sched st S j hsz
          (pathSz?-widen (f ↠ p) (iterSize-infl S 1≤S j S) hpz) hreg)
@@ -224,6 +224,9 @@ walk-LiveHyp-go sf gas id now S U j (f ↠ p) vals fin sched st afford hsz hpz h
   atU = valsSz?-mono (iterSize S j S) U vals (afford j j≤S) hsz
   hHead : FrameLiveHyp U f p vals
   hHead = frameLive-of-sz U f p vals atU
+  hfz : frameSz? S f ≡ true
+  hfz = proj₁ (∧-true (frameSz? S f)
+                 ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)
   hpTail : pathSz? S p ≡ true
   hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                     (proj₂ (∧-true (frameSz? S f)

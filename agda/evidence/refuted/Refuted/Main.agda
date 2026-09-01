@@ -155,6 +155,10 @@ open import Refuted.Drain-Queue-Flat
          drain-room-flat-absurd)
 open import Refuted.Frame-Step-Compose
   using (c₀; FrameStepCompose; frameStep-compose-absurd)
+open import Refuted.Frame-Step-Size-Level
+  using (StepFrameSz; StepFrameSzFramed; figuresA≡; figuresB≡;
+         rowA≡false; rowB≡false; premA; premB; premC;
+         stepFrame-sz-absurd; stepFrame-sz-framed-absurd)
 open import Refuted.Arr-Cap-Step
   using (cA; ArrCapStep; arr-cap-step-absurd; arr-cap-step-wide-absurd)
 open import Refuted.Nest-Clos-Flat

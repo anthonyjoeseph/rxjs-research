@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE RESTATED FRAME LAW IS PROBED BEFORE ANYTHING ELSE RESTS ON
-  IT.** The registry face reports at a level now and the fold carries
-  one, so a whole ladder stands on two unread leaves: what one frame
-  emits, and what one frame registers, each stepped by a single
-  `iterSize`. Both sides compute, so the risky region is reachable by
-  instantiation — a subscribing frame handed an inner built FROM the
-  cap, which is the family that killed the fixed form. One level
-  suffices only if `sizeStep` pays for the walked length and the
-  inner's syntax together, and nobody has run that at a program.
+- **THE FRAME LAW'S SIZE HALF WAS PROBED AND CAME BACK FALSE TWICE, SO
+  WHAT REMAINS IS EVIDENCE FOR THE TWO LEAVES IT SPLIT INTO.**
+  Substitution is a PRODUCT of the frame's size and the value's, and
+  one level is `S·(1+2L)` — linear. So an unread frame cannot work and
+  a frame read at the LEVEL cannot either; both are refuted at a
+  duplicator. The base-cap leaf is the arithmetic `sizeStep` was built
+  for and is unprobed; the existential leaf is unprobed and its risk is
+  not the constant but whether ANY finite index covers a sink re-entry.
+  Run the duplicator family at both before the fold above them moves.
 
 - **THEN THE COLLAPSE AT THE CHAIN DOOR, WHICH IS WHERE THE LEVEL
   EITHER ESCAPES OR DOES NOT.** The chain fold is the frame law
@@ -258,10 +258,14 @@ does not fit is a finding about the shared statement, not about the head.
   side condition for the chains a sink fans into, which live in the registry
   rather than on the walked path. It reads the registry's price at the level
   the walk has reached, and nothing has read it.
-- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: one frame's
-  size step, at the same iterate the registry face now spends. A frame
-  substitutes and the caps face prices substitution at one `sizeStep`, so the
-  emitted values sit at the next level — unread, and the ladder rests on it.
+- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: one frame's size
+  step, the frame read at the program's cap and the values at the level.
+  Refuted with no frame reading and refuted again with the frame read at the
+  level; the base-cap form is what `sizeStep`'s arithmetic pays for, unprobed.
+- **`stepFrame-sz-lvl`** (Regs-Nest-Walk) — FALSITY, `TWIN`: the same step
+  where the frame comes out of the REGISTRY and so cannot be read at the
+  program's cap, reporting an existential growth index. The open question is
+  not the constant but whether any finite index covers a sink re-entry.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `PROBED`: what one
   frame stores at the nodes map, under the potential it was handed. Three of
   the five kinds store; the whole-chain surrogate covers the composite at two

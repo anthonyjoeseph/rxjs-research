@@ -4031,7 +4031,7 @@ walk-ΦHyp-go {e = e} sl id sf gas nid now j (f ↠ p) vals fin sched st hsl hpz
       (proj₂ (proj₂ (proj₂ (proj₂ step))))
       (trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) hsl)
       hpz′
-      (stepFrame-sz sf nid now f p vals fin sched st B j hsz)
+      (stepFrame-sz sf nid now f p vals fin sched st B j hfz hsz)
       (stepFrame-regsSz sf nid now f p vals fin sched st B j hsz
         (pathSz?-widen (f ↠ p) (iterSize-infl B 1≤B j B) hpz) hreg)
       (≤-trans (pathNestD-step f p) hnd)
@@ -4043,6 +4043,9 @@ walk-ΦHyp-go {e = e} sl id sf gas nid now j (f ↠ p) vals fin sched st hsl hpz
   B  = Caps.cSize (capsAt e sl id)
   1≤B : 1 ≤ B
   1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+  hfz : frameSz? B f ≡ true
+  hfz = proj₁ (∧-true (frameSz? B f)
+                ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
   hpz′ : pathSz? B p ≡ true
   hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
                  (proj₂ (∧-true (frameSz? B f)
