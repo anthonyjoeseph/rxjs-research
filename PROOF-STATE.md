@@ -215,13 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN DOOR'S ONE LEVEL, WHICH NOTHING HAS INSTANTIATED.**
-  The door now reports one `sizeStep` per chain, which is the reading
-  the refuted fixed cap forced; that `S·(1+2L)` dominates `L + S` is
-  the argument, and an argument is not a row. The statement computes
-  on both sides at concrete programs, so probe it where the refutation
-  bit — a subscribing frame whose inner is at the cap — and either
-  bank the receipt or find the second inner that outruns one level.
+- **THE CHAIN DOOR'S ONE LEVEL — THE HARNESS IS DRAFTED, THE ROWS ARE
+  NOT.** The door reports one `sizeStep` per chain, and that
+  `S·(1+2L)` dominates `L + S` is an argument, not a row. Both sides
+  compute at concrete programs, and a staged instantiation at the
+  shape the refutation bit — a subscribing frame whose inner is at
+  the cap — now exists in draft. What remains is the numbers, every
+  pin being a placeholder, plus the target's statement fingerprint
+  and the wire into `Probed.Main`. Expect a second inner that outruns
+  one level; absent one the receipt banks and the row drops a class.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,

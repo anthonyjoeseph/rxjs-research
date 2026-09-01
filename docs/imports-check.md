@@ -40,8 +40,8 @@ scripts/check-imports.py --keep-names        # module edges only, no name-level
 — an `open import M using (…)` where *none* of the imported names is used,
 which is the set that moves the module graph. And a dead NAME inside a clause
 that still has a live one, which does not. The sections below carry the rest:
-a PHANTOM name, a missing or mismatched module header, a BLANKET import, a
-`public` re-export, and the orphan guard's WIRING findings.
+a PHANTOM name, a PHANTOM module, a missing or mismatched module header, a
+BLANKET import, a `public` re-export, and the orphan guard's WIRING findings.
 
 The name-level half used to be an opt-in `--names` flag, on the argument that a
 clause with one live name holds the edge open so the other thirty cost nothing a
@@ -119,6 +119,41 @@ file wants, and `split_list` returns the bound name for exactly that reason.
 Reading the bound side reports a phantom on the item that is CORRECT and stays
 silent on the one that is not: it fires and misses in the same breath. The
 fixture pins both directions.
+
+## A PHANTOM MODULE — named as a module of this tree, with no file behind it
+
+The strictly worse half of the same failure, and the one nothing here could
+see until a real regression walked through the gap:
+
+```
+Refuted/Chain-Level-Unbounded.agda:56: PHANTOM MODULE
+Verify-Budget-Sufficient.Caps-Face.Part7  — its first name roots this tree, so
+it is a module of it, and no file holds it.
+```
+
+**A phantom NAME is a warning against a file that is otherwise correct; a
+phantom MODULE is a hard `FileNotFound` that stops the build outright.** Same
+cost either way — many minutes down the tower — and the same milliseconds to
+decide from the disk.
+
+**The shape it catches is a module being SPLIT.** The old file goes; the tree
+the split was swept for is green, and a consumer in ANOTHER tree still names
+the module that no longer exists. That cross-tree half is what makes it easy to
+miss by hand: the sweep that found every reference in `agda/src` had no reason
+to be pointed at `agda/evidence/refuted`, and a single grep flag can hide the
+one line that mattered.
+
+**Askability is decided by the first namespace component**, and only that. A
+module whose root names a directory or file of one of the trees in play is a
+module of that tree, so its absence is a finding; anything else — stdlib, or a
+fixture's out-of-tree stand-in — is unreadable from here and skipped, exactly
+as the name check skips it. The fixture pins both sides: one real phantom
+module fires, and every out-of-tree namespace in the same tree does not.
+
+**It reads the DISK, not the walked set.** A run scoped to a single file
+(`--src <path>`) walks one module, so a walked-set answer would call every
+sibling that file imports a phantom. Like the name check it is not
+auto-fixable: only a human knows which module the definition went to.
 
 ## THE FILE'S OWN NAME IS CHECKED FIRST
 

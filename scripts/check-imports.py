@@ -321,6 +321,24 @@ def module_of(path: str) -> str:
     return p[:-5].replace(os.sep, ".") if p.endswith(".agda") else p
 
 
+def tree_modules() -> set:
+    """Every module of the trees in play that actually HAS A FILE, by name.
+
+    Read off the DISK rather than off the walked set, and the difference is
+    the whole correctness of the phantom-module check: a run scoped to one
+    file (`--src <path>`) walks exactly one module, so a walked-set answer
+    would call every sibling that file imports a phantom.
+    """
+    out = set()
+    for t in TREES:
+        if not os.path.isdir(t):
+            continue
+        for dp, _, fn in os.walk(t):
+            out |= {module_of(os.path.join(dp, f))
+                    for f in fn if f.endswith(".agda")}
+    return out
+
+
 def import_graph(files: list[str]) -> dict[str, set[str]]:
     g = {}
     for path in files:
@@ -507,6 +525,20 @@ def main() -> int:
     exports = {module_of(path): body_tokens(res[1], res[2])
                for path, (_, res) in per_file.items()}
 
+    # AND WHETHER THE MODULE IS THERE AT ALL, which is the strictly worse
+    # failure of the two and the one nothing here could see.  A phantom NAME is
+    # a warning Agda raises against a file that is itself correct; a phantom
+    # MODULE is a hard `FileNotFound` that stops the build, and it arrives from
+    # a SPLIT -- the old file goes and a consumer the sweep did not cover still
+    # names it.  Deciding it needs only the disk, so it is seconds against the
+    # many minutes it takes the tower to reach the importer.
+    #
+    # A module is ASKABLE when its first namespace component roots a file in
+    # one of these trees; anything else is stdlib or out of tree, unreadable
+    # from here, and skipped exactly as the name check skips it.
+    on_disk = tree_modules()
+    tree_ns = {m.split(".")[0] for m in on_disk}
+
     held_edges = set()
     while True:
         trimmed = {m: (ds - (candidates.get(m, set()) - {d for (sm, d) in held_edges if sm == m}))
@@ -535,8 +567,9 @@ def main() -> int:
         return at_risk & (reachable(graph, [dst]) | {dst})
 
     n_decl = n_dead = n_name = n_skip = n_file = n_wire = n_blanket = n_reex = 0
-    n_mod = n_phantom = 0
+    n_mod = n_phantom = n_pmod = 0
     wiring, blankets, reexports, misnamed, phantoms = [], [], [], [], []
+    phantom_mods = []
     for path in files:
         kind, res = per_file[path]
         (raw, stripped, decls, dead_decls, dead_names, skipped, blanket,
@@ -554,6 +587,9 @@ def main() -> int:
         # same crash as anyone else's.  Only INTRA-TREE modules can be asked:
         # a stdlib module is not a file here, and stdlib re-exports freely.
         for d in decls:
+            if d.mod not in on_disk and d.mod.split(".")[0] in tree_ns:
+                phantom_mods.append((path, d))
+                continue
             if d.mod not in exports or not ("using" in d.clauses
                                             or "renaming" in d.clauses):
                 continue
@@ -609,6 +645,13 @@ def main() -> int:
             print(f"{path}:1: MODULE NAME MISMATCH — declares `{declared}`, "
                   f"but its path says `{want}`.")
 
+    for path, d in phantom_mods:
+        n_pmod += 1
+        print(f"{path}:{d.line}: PHANTOM MODULE  {d.mod}  — its first name "
+              f"roots this tree, so it is a module of it, and no file holds it. "
+              f"Agda stops the build with `FileNotFound`. Point it at the "
+              f"module the definition moved to, or delete it.")
+
     for path, d, nm in phantoms:
         n_phantom += 1
         print(f"{path}:{d.line}: PHANTOM NAME  {nm}  — {d.mod} does not "
@@ -652,6 +695,13 @@ def main() -> int:
         print(f"imports-check: and {n_mod} file(s) whose module DECLARATION is "
               f"missing or does not match the path — every import of one of "
               f"those crashes Agda")
+    if n_pmod:
+        print(f"imports-check: and {n_pmod} PHANTOM module(s) — named as a module "
+              f"of this tree, with no file behind the name.  A SPLIT leaves these: "
+              f"the tree the split was swept for goes green and a consumer outside "
+              f"it still names the old module, which Agda meets as a hard "
+              f"`FileNotFound` many minutes down the tower.  Not auto-fixable: "
+              f"only a human knows which module the definition went to")
     if n_phantom:
         print(f"imports-check: and {n_phantom} PHANTOM name(s) — imported from a "
               f"module of this tree that does not contain the name at all.  Agda "
@@ -672,9 +722,10 @@ def main() -> int:
     if (n_dead or n_name) and not args.fix:
         print("imports-check: run `make imports-fix` to delete them")
     if args.fix:
-        return 1 if (n_wire or n_blanket or n_reex or n_mod or n_phantom) else 0
+        return 1 if (n_wire or n_blanket or n_reex or n_mod or n_phantom
+                     or n_pmod) else 0
     return 1 if (n_dead or n_name or n_wire or n_blanket or n_reex
-                 or n_mod or n_phantom) else 0
+                 or n_mod or n_phantom or n_pmod) else 0
 
 
 if __name__ == "__main__":

@@ -53,7 +53,7 @@ open import Verify-Budget-Sufficient.Caps using
    2≤capsAt-size; _⊑ᶜ_)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; capsOK?-mono)
 open import Verify-Budget-Sufficient.Caps-Bridge using (init-capsOK?)
-open import Verify-Budget-Sufficient.Caps-Face.Part7 using (chainCapsOK)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using (chainCapsOK)
 
 prog : Closed Γ₂ natᵗ
 prog = progU 2 2
