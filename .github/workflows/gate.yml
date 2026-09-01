@@ -98,17 +98,31 @@ jobs:
       # This is NOT the light-gate bet the top-of-file comment refuses: that
       # bet is `.gate-heavy-stamp`, a Makefile-level "skip whole check
       # categories if history looks unchanged" shortcut, deliberately never
-      # given to CI. This is Agda's OWN interface cache (`.agdai` under
-      # `agda/_stripped-comments/_build`, one shared tree for src + evidence
-      # — docs/agda-build.md) restored before `make gate` runs. `make gate`
-      # still runs the exact same full gate-heavy command, every check
-      # category, every file — nothing here changes what gets checked, only
-      # whether Agda has to re-elaborate a module whose content (source +
-      # imports + the `-W` flags baked into the interface's own validity key)
-      # is unchanged since the cached run. That is a per-module, content-hash
-      # decision Agda itself makes and re-verifies on every checkout; a stale
-      # or missing entry just means normal cold checking for that module, so
-      # a bad restore cannot pass something that should fail.
+      # given to CI. This is Agda's OWN interface cache (`.agdai` files)
+      # restored before `make gate` runs. `make gate` still runs the exact
+      # same full gate-heavy command, every check category, every file --
+      # nothing here changes what gets checked, only whether Agda has to
+      # re-elaborate a module whose content (source + imports + the `-W`
+      # flags baked into the interface's own validity key) is unchanged
+      # since the cached run. That is a per-module, content-hash decision
+      # Agda itself makes and re-verifies on every checkout; a stale or
+      # missing entry just means normal cold checking for that module, so a
+      # bad restore cannot pass something that should fail.
+      #
+      # TWO separate directories, not one -- Agda resolves each file's
+      # build dir by walking UP from the file to the NEAREST enclosing
+      # .agda-lib, and `agda/_stripped-comments/evidence/` has its own
+      # (`include: refuted probed ../src`), closer to any file actually
+      # inside `evidence/refuted` or `evidence/probed` than the top-level
+      # one. src files still land in the one shared top-level dir either
+      # way, since evidence/.agda-lib is never an ancestor of src/ -- but a
+      # refuted or probed file's interface lands under
+      # `evidence/_build`, confirmed by running a real evidence check
+      # locally and watching that directory appear. Caching only the
+      # top-level dir left refuted/probed always cold regardless of this
+      # cache -- caught live: a dispatched run on an UNCHANGED commit
+      # (so a perfect hit should have made every module instant) sat for
+      # real time re-checking `Refuted/Cascade-Nest-PerDeliv.agda`.
       #
       # Save key includes the commit so every green run leaves a fresh
       # snapshot (cache entries are immutable per key); restore-keys drops
@@ -117,7 +131,9 @@ jobs:
       - name: Cache Agda interfaces
         uses: actions/cache@v4
         with:
-          path: agda/_stripped-comments/_build
+          path: |
+            agda/_stripped-comments/_build
+            agda/_stripped-comments/evidence/_build
           key: agda-interfaces-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             agda-interfaces-${{ runner.os }}-
