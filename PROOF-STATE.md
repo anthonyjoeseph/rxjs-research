@@ -225,17 +225,17 @@ does not fit is a finding about the shared statement, not about the head.
   accumulated level, or the fan-out's level bounded by the instant's own
   ledger — and to state the seam as one postulate either way.
 
-- **THE μ CLAUSE NEEDS A LEVEL, SO GIVE THE CEILING ONE.** The
-  syntactic route is closed: the joined ceiling is not monotone across
-  an unfold, and the gap is a MULTIPLICITY — k mentions of the μ-var
-  become k copies of the μ's own width — so widening the measure buys
-  nothing. The caps face already prices exactly this edge, and the leg
-  is to copy that shape: charge the unfold existentially in a level,
-  deriving the width half from the size hypothesis, the way
-  `unfoldμ-caps` does. Restate `descW-ceil` against a level-indexed
-  ceiling, re-run the same witness against the restatement, and only
-  then walk the structural heads — unaffected, and still wanting the
-  mirror projections `descW`'s seal does not export.
+- **PROVE THE BURST CEILING UNMOVED BY AN UNFOLD, AND THE μ CLAUSE IS
+  DONE.** The narrow ceiling has landed and `descW-ceil` is stated
+  against it, so what is left is the induction. Its μ clause now wants
+  `bCeilᵉ` of an unfolding to equal `bCeilᵉ` of the μ — and the
+  measures it is built from already read equal at the two witnesses
+  that broke the joined one, because both cut at the defer the plug can
+  only be reached through. `hopD-elimGᵉ` is the worked instance: a
+  structural induction over the substitution with `refl` at the defer
+  and at the variable. What that leaves is the semantic leaf, one
+  frame's payload count under `outWⱽ`, and the mirror
+  `⊔`-eliminations `descW`'s seal does not export.
 
 - **AND THEN THE ARMS STOP BEING POSTULATES.** Each one is a single
   `chainStep` against a real function, and the step walks the path
@@ -290,9 +290,9 @@ does not fit is a finding about the shared statement, not about the head.
   read either side of it. What is owed is that its output values are among its
   inputs.
 - **`descW-ceil`** (Caps-Bridge) — FALSITY, `REFUTED`: the descent's width at
-  any subterm under the joined syntactic ceiling. `descW` is sealed and nothing
-  has instantiated it; the syntactic route is closed, because the ceiling is
-  not monotone across the unfold its μ clause descends into.
+  any subterm, under the defer-cutting burst ceiling rather than the joined
+  one. `descW` is sealed and nothing has instantiated it; the joined reading is
+  refuted at the μ head, and the narrow one is unprobed there.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — SHAPE, `DEAD ROUTE×2`: the registry
   stays priced by the size cap across one frame. The caps face proves this walk
   already, at an accumulated level; what is owed is the seam between that level
