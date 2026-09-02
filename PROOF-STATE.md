@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SAY WHAT BOUNDS A WALK'S BURST — NOTHING IN THE TREE DOES.**
-  `burstsOK` carries its bound as a free parameter along a whole path
-  and no consumer instantiates it, so how many values a frame is handed
-  mid-walk is an open choice. Every closed denomination for the fold's
-  count is conditional on it, and the recurrence route is closed too:
-  `nestCapAt` charges the PREVIOUS instant's width, which
-  `capsAt-wid<size` puts under this instant's size, while the depth
-  ledger is spent during its own instant by `cascade-depth-capsH` and so
-  charges a width only under the NEXT one. Pick the quantity, instantiate
-  it where the walk admits values, and the fold's arm is decided with it.
-
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
   produced: the receipt is read at factor one and depth zero, while an
@@ -250,6 +239,16 @@ does not fit is a finding about the shared statement, not about the head.
   not pay, the walk's receipt bounding how many terms are queued and
   never what each carries. The drain arm of `stepFrame-nest-live` is
   the same lookup and moves with it.
+
+- **THEN INSTANTIATE WHAT IS MERELY UNREAD.** Two registry-face rows are
+  FALSITY by the class's own rule rather than by a refutation — nothing
+  has reached them. `stepFrame-regsSz` is now read at an accumulated
+  level and under the arriving values' size, and whether ONE level pays
+  is unread; `stepFrame-nest-live`'s repaired completion arm, carrying
+  the registry face's drain fit, is likewise uninstantiated. A probe is
+  what moves either, and the level-currency harness is already built
+  where the refutations that killed the fixed cap live — so this is one
+  commit that buys two classes, and the cheapest evidence in the tier.
 
 ### The ledger
 
@@ -286,14 +285,14 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
+  the fold's new grant. Unaffordable, not mis-shaped: the count is under the exit
+  width, which outruns two-to-two-to the size at every instant, so no story buys
+  room. BLOCKED on whether this face prices a threading frame at all.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
   `drainW`, so nothing is free. Two obligations are drain ledgers this face has
   and must route; the third is the merge node's own queue depth.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the fold's new grant. Count and factor both exist proven — `burstsOK` and
-  `nestFac` — and every denomination is closed, the store face's recurrence
-  included, so what is undecided is the burst: nothing instantiates `burstsOK`.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only

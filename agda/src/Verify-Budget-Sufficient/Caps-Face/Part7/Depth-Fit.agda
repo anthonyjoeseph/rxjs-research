@@ -389,17 +389,53 @@ postulate
   -- steps geometrically, so a width read one instant late is above
   -- every exponential this instant's fuel affords.
 
-  -- SO WHAT IS ACTUALLY UNDECIDED IS THE BURST ITSELF, AND THE
-  -- DEVELOPMENT HAS NEVER SAID.  `burstsOK` carries its bound as a
-  -- free parameter along a whole path and no consumer anywhere
-  -- instantiates it, so what bounds how many values one frame is
-  -- handed mid-walk is an open choice rather than a fact this face may
-  -- read off.  Everything above is conditional on that choice: at a
-  -- width cap the four denominations are closed and the currency has
-  -- to move; at anything polynomial in this instant's size cap they
-  -- were closed against a quantity the walk never reaches, and the
-  -- formula standing here is already the right shape.  That is the
-  -- question to settle before another budget is drawn.
+  -- AND THE BURST IS DECIDED AFTER ALL -- BY THE PROVEN CAPS FACE, AND
+  -- AGAINST THIS ARM.  `burstsOK` carries its bound as a free parameter
+  -- and no consumer instantiates it, which reads as an open choice; the
+  -- mirror has already made it.  `valsCaps?` is the per-value predicate
+  -- CONJOINED with `length vs` under `suc` of the width, and the walk
+  -- reads it at the cap the walk has advanced to, so a mid-walk count is
+  -- bounded by the width there and by nothing smaller.  The uniform
+  -- reading `burstsOK` needs is the walk's endpoint, which is this
+  -- instant's exit cap by monotonicity in the hop count -- one number
+  -- covering every hop, and the same one `nestBurstAt` takes.
+
+  -- AND NO STORY BUYS THE ROOM, WHICH IS WHAT MAKES THIS A MECHANISM
+  -- FINDING RATHER THAN AN INDEX ONE.  The instinct once the numbers are
+  -- side by side is that the charge is spent one story too low -- the gas
+  -- an instant runs under is denominated a `blowH` story above the index
+  -- the depth ledger reads, and the shortfall looks like exactly that
+  -- gap.  It is not.  Within an instant the size cap steps geometrically
+  -- per fold and the width cap steps through a power tower, so the width
+  -- at ANY instant is above two-to-two-to the size at that SAME instant,
+  -- and the ceiling a story supplies is that double exponential whichever
+  -- story is chosen.  Moving up one moves both sides.
+  --
+  -- WHAT DOMINATES A WIDTH IS THE NEXT INSTANT'S SIZE AND NOTHING
+  -- EARLIER, and the store face affords its own burst charge by being
+  -- checked exactly there: its factor is two to a square of the burst,
+  -- read against the ceiling at the instant AFTER the one that produced
+  -- it. The depth ledger is spent DURING its own instant, so the same
+  -- charge has no such ceiling to reach for.  That is the whole
+  -- asymmetry, and it is a property of where the two faces are checked
+  -- rather than of what either one charges -- so the repair is not a
+  -- restatement of this arm but a decision about whether the depth face
+  -- prices a threading frame at all.
+
+  -- SO THE ARM IS NOT MIS-SHAPED, IT IS UNAFFORDABLE, and that is a
+  -- class and not a repair.  The count is under the exit cap's width and
+  -- under nothing smaller, the fold charges a power in the count, and
+  -- the fuel this instant runs at affords an exponent of two to its own
+  -- size.  A count at least the size is all that is known, and that
+  -- already leaves the room.  No ledger, no field and no recurrence
+  -- changes the two numbers being compared, so what has to move is the
+  -- depth face's decision to price a fold inside the instant that
+  -- performs it.
+  -- REFUTED: `Refuted.Walk-Phi-Room`, whose `walk-fold-room-absurd`
+  --   states the affordability as the product it is and kills it at the
+  --   floor of twenty-one, with `size₄` pinning that four folds already
+  --   carry the next cap past two to that floor -- so the count it
+  --   spends is one the recurrence admits rather than one invented.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
