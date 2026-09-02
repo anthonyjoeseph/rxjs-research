@@ -215,19 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SPINE AT HEIGHT, WHICH IS NOW THE ONLY ROUTE LEFT TO A LONGER
-  WALK.** The separation holds both beside the structure pricing `B`
-  and inside it, and the second reading killed the duplicator route to
-  a longer walk: three walked frames read as one. The nesting family
-  is the only shape
-  known to make a registration track the walk's PRODUCT, and it has
-  been read at one depth and one height. Sweep both up together
-  against the frame step, as the refuting sweep did against the
-  doubling: the grant is quadratic in the caps while the spine is a
-  product of two quantities the caps dominate, so the margin should
-  widen. If it closes, the currency is wrong, not the constant.
-
-- **THEN THE TWO ROWS THAT CLAIM NOTHING, WHICH ARE THE CHEAPEST RISK
+- **THE TWO ROWS THAT CLAIM NOTHING, WHICH ARE THE CHEAPEST RISK
   IN THE TIER.** `stepFrame-nest-Φ-take` and `stepFrame-nest-Φ-inner`
   sit at FALSITY on nothing at all, and one is plainly instantiable:
   the gate carries factor one and no depth, so what is owed is that
@@ -248,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   record per row whether either side reaches a program. A row no
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
+
+- **THEN THE SPINE AFTER A DELIVERY HAS CUT IT, THE ONE ARRIVAL EVERY
+  SWEEP OF `foldPath-regsLen` HAS TAKEN AT ITS EASIEST.** Every row on
+  that leaf reads the FIRST arrival, where the walked path is longest
+  and the registry emptiest — the two columns rise together there, so
+  no reading can tell a grant that answers the walk from one that
+  answers the program. A later arrival has the fold's own
+  registrations standing in `B` and a path the deliveries before it
+  have cut, which is where the separation comes from the RUN rather
+  than the shape, and where the step is spent against something it
+  produced itself. Read the nesting spine at its second and third.
 
 ### The ledger
 
@@ -295,11 +294,11 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED×2`: one fold's
+- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED×4`: one fold's
   registry price as ONE FRAME STEP of two caps — the walked path's `S`, the
-  standing registry's `B ≥ S`. The doubling was refuted; the separated form
-  holds both beside and inside the structure pricing `B`, margin widening. A
-  LONGER walk is unread.
+  standing registry's `B ≥ S`. The doubling was refuted; the family that
+  refuted it now fits either side of the crossover. Only a LATER arrival is
+  unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

@@ -260,6 +260,32 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   the walked DEPTH moved no column, three frames reading identically
 --   to one, so the construction does not lengthen the walked chain and
 --   a walk that is longer than the standing entries is still unread.
+-- PROBED: `Probed.Fold-Regs-Nest-Grid` -- the NESTING spine, which is
+--   the shape that refuted the doubling and the only one known to make
+--   a registration track the walk's PRODUCT rather than its maximum:
+--   `k` frames each wrapping `d` flatten levels compose down one
+--   spine, so the exit rises with `k * d` while the walked path rises
+--   with `k` alone.  Depth cannot refute -- it raises the frame's own
+--   syntax, and the cap is a MAXIMUM over that syntax and the walked
+--   length, so a deeper frame buys the room it costs -- which leaves
+--   height as the one measure-side axis and one stretch worth
+--   spending programs on: the heights at which the path is still
+--   shorter than the syntax, where both caps sit PINNED and the grant
+--   does not answer a taller spine.  Read at two such heights the caps
+--   hold at thirteen while the exit climbs nineteen to thirty-one, so
+--   the margin is shrinking there and the step still fits with room.
+--   NOT COVERED here: whether that stretch ends, which is the sibling.
+-- PROBED: `Probed.Fold-Regs-Nest-Cross` -- that it does end, which is
+--   what makes the shrinking stretch above safe rather than a trend.
+--   Past the height at which the spine outgrows the frame the caps
+--   track the height instead of the syntax: at the first such height
+--   they read fifteen against an exit of forty, the grant having gone
+--   from three hundred fifty-one to four hundred sixty-five for nine
+--   registrations more.  So the grant is quadratic in a cap the spine
+--   itself drives while the exit is linear in it, and the margin
+--   widens from there rather than closing.  NOT COVERED: one depth,
+--   and one arrival -- the spine is read where it is longest, not
+--   where a second delivery has already cut it.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
