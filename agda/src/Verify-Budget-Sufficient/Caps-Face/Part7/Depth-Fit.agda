@@ -591,8 +591,28 @@ chainsNest-all D U (c ∷ cs) h =
 --   step and two after it at every one of the five depths -- the
 --   sideways route lengthens no registered path at all, while the
 --   registry count tracks the telescope and is unchanged across the
---   step.  NOT COVERED: a share fanning out to MORE THAN ONE registered
---   chain, and a telescope deeper than four.
+--   step.  NOT COVERED: a telescope deeper than four, and a share
+--   fanning out to more than one chain, which
+--   `Probed.Chain-Step-Regs-Fan` takes up.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Fan` -- the DIAMOND, the share shape
+--   both re-entry sweeps left out: each of them fans every share to
+--   exactly one registered chain and so measures a share as a relay.
+--   Width is varied in the PROGRAM rather than in the telescope, `w`
+--   branches of the root reading one `input`, over three slots at
+--   widths one to four; and two further rows put a width-`w` fan over
+--   a share whose own def is a two-way fan, which is where width
+--   compounds with depth.  The emit count separates a relay from a
+--   fan outright and reads as the fan: the compounded rows deliver
+--   twice their width, not their width.  The maximum registered path
+--   length is THREE before the step and three after it in every row,
+--   width one through four and compounded alike -- so a fan multiplies
+--   registry ENTRIES and the emit stream, and lengthens no entry.
+--   NOT COVERED: the operator KIND at the frames of a sinking chain.
+--   Every row of all three sweeps flattens with `mergeAllᵉ`, and it is
+--   the subscribing arm of `stepFrame` that the `+ S` above is about,
+--   so a chain whose frames CUT (`takeᵉ`, `switchAllᵉ`, `exhaustAllᵉ`)
+--   is the axis still holding this row's class.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)

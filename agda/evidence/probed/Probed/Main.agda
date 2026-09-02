@@ -91,3 +91,7 @@ open import Probed.Chain-Step-Regs-Level
 
 open import Probed.Chain-Step-Regs-Share
   using (reaches; figures₀; figures₁; figures₂; figures₃; figures₄; one-per-hop)
+
+open import Probed.Chain-Step-Regs-Fan
+  using (reaches; figures₁; figures₂; figures₃; figures₄;
+         figuresD₂; figuresD₃; flat-in-width)
