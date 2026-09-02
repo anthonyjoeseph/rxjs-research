@@ -75,7 +75,7 @@ open import Refuted.Thru-Scan-Burst-Nest
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
 open import Refuted.Scan-Phi-Burst
-  using (Φ-hyp-burst; scan-Φ-burst-absurd)
+  using (Φ-hyp-burst; scan-Φ-burst-absurd; live-factor; refuted-factor)
 open import Refuted.Scan-Nodes-Burst
   using (before≡0; after≡65; budget≡64; stepFrame-nest-nodes-burst-absurd)
 open import Refuted.Subscribe-Caps-Nest

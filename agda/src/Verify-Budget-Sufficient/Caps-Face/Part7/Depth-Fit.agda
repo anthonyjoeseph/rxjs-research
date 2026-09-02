@@ -315,29 +315,39 @@ postulate
   --   binder, which is what says the ledger is not the repair rather
   --   than that some width is too small.
 
-  -- AND THE WIDTH IS A PARAMETER THE STORE FACE ALREADY CARRIES, which
-  -- is what this arm is short of rather than a fact the development
-  -- lacks.  `nestFac S W` is `((2 ^ S) ^ suc W) ^ S` -- the burst power
-  -- written INTO the factor instead of fitted under it -- `nestBurstAt`
-  -- is the width it is read at, `burst≤size′` bounds that width by the
-  -- size cap, and `nestFac≤exp` with `nestFacLog≤pow` take the whole
-  -- power down to a polynomial the caps recurrence affords.  The fold
-  -- itself is already proven in that currency: `scanVals-nest` and
-  -- `stepFrame-emit-scan` state this very step under `length vals ≤ W`
-  -- and conclude at `(2 ^ sizeᵗ fn) ^ W`.  The walk's own factor now
-  -- reads the same way -- the burst power written in, at the instant's
-  -- size cap, which is the one quantity bounding how wide a burst the
-  -- invariant admits -- so what is left is the premise that the count
-  -- is under that cap, and the walk is the one face threading no such
-  -- premise.
+  -- AND NEITHER THE COUNT NOR ITS FACTOR IS MISSING FROM THE
+  -- DEVELOPMENT, which is what narrows this to one question.  The
+  -- factor is the store face's `nestFac S W`, `((2 ^ S) ^ suc W) ^ S`
+  -- -- the burst power written INTO the factor instead of fitted under
+  -- it -- and `nestFac≤exp` with `nestFacLog≤pow` take the whole power
+  -- down to a polynomial in a size cap.  The fold is proven in that
+  -- currency: `scanVals-nest` and `stepFrame-emit-scan` state this very
+  -- step under `length vals ≤ W` and conclude at `(2 ^ sizeᵗ fn) ^ W`.
+  -- The count hypothesis is proven too, and walk-shaped: `burstsOK`
+  -- carries a bound along a path exactly as this walk carries its size
+  -- receipt, `burstsHead` projects the head, `burstsDrain` the frame's
+  -- own obligation, and `chainBurstOK` packages one chain's worth.  So
+  -- the residue is not a fact to prove but a place to read: WHERE this
+  -- arm's factor is denominated.
+
+  -- AND IT CANNOT BE READ AT THIS INSTANT'S SIZE CAP, WHICH IS WHAT
+  -- THIS ARM'S FACTOR IS PRICED AT.  The quantity bounding a burst is
+  -- the WIDTH -- `nestBurstAt` is `suc` of it -- and the width and the
+  -- size of one caps triple are ordered the wrong way from the first
+  -- fold on, a fold taking the width through `S ^ suc w` and the size
+  -- through `S * suc (2 * s)`.  `burst≤size′` does put the burst under
+  -- a size cap, and the cap it names is the NEXT instant's.  So a count
+  -- premise at this instant's cap is not one the development can
+  -- supply, however the ledger is shaped, and no conjunct on the values
+  -- reaches the difference.
+  -- REFUTED: `Refuted.Caps-Face`, whose `wid≤size-absurd` orders the two
+  --   axes at one triple and whose `scan-count-under-ceiling-absurd`
+  --   kills the squared form beside it.
   -- DEAD ROUTE: denominating this arm at `frameStep j` of the instant's
   --   caps instead, so the receipt is read at a cap the fold has
   --   already advanced.  The width axis exponentiates per fold, so j
   --   folds put it above `towerℕ j`, and a count that reads it gives up
-  --   the linear height `capsAt-tower` proves.  The next instant is
-  --   closed from the other side: `chainStep-store≤` records that its
-  --   consumer's fuel is the exponential at THIS instant, which the
-  --   caps recurrence pins to this instant's cap.
+  --   the linear height `capsAt-tower` proves.
 
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)

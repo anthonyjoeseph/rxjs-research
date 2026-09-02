@@ -323,12 +323,15 @@ thruΦ sf id now op nid path vals fin sched st B U (k , G , hfit , hnum) =
 --   eighty -- the pair is what puts the gap in the stored depth
 --   rather than in a constant.
 -- REFUTED: `Refuted.Scan-Phi-Burst.scan-Φ-burst-absurd` kills the
---   store-grant-only reading at this arm's OWN currency: the
---   accumulator is a bare `ofᵉ`, so every grant a state can carry is
---   discharged for nothing and the premise still holds at the budget
---   the frame surrenders, while sixty-five folds leave sixty-five
---   layers.  `Refuted.Scan-Fold-Burst` is the same witness read on
---   the iteration's quantity, which is what makes the two faces
+--   store-grant-only reading against a CONSTANT-in-burst frame charge,
+--   which it states itself rather than importing: the accumulator is a
+--   bare `ofᵉ`, so every grant a state can carry is discharged for
+--   nothing and the premise still holds at the budget such a frame
+--   surrenders, while sixty-five folds leave sixty-five layers.  Its
+--   `live-factor` pins what the arm's factor is worth today against
+--   that reading, so a further repricing fails there naming a number.
+--   `Refuted.Scan-Fold-Burst` is the same witness read on the
+--   iteration's quantity, which is what makes the two faces
 --   comparable.
 scanΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)

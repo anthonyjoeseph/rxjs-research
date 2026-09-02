@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **BOUND THE BURST BY THE CAP THE WALK ALREADY CARRIES.** The
-  factor half is landed: a fold is priced per value in the burst, at
-  the instant's size cap, so `pathΦF-cap` is a cube and the sealed
-  exponent under `nestWalkAt` fits it with one to spare. The count is
-  what is left, and the parameter this leg used to name is refuted — a
-  width the ledger picks admits any burst, so the number has to be the
-  size cap `valsΦ?` already takes. Add that conjunct to the ledger and
-  thread it across a frame step the way the size side condition is
-  threaded, discharge it at the walk's singleton entry, and land the
-  fold arm's local discharge with both sides reading one power.
+- **MOVE WHERE THE WALK'S FACTOR IS DENOMINATED, WHICH IS THE ONE
+  THING LEFT UNDECIDED.** A count premise at this instant's size cap
+  is refuted, not merely missing: the burst is bounded by the WIDTH,
+  and width and size of one triple are ordered the wrong way from the
+  first fold on. `burst≤size′` does bound a burst by a size cap, and
+  names the NEXT instant's — where the store face already lives,
+  `nestFacLog≤pow` leaving polynomial room. The route recorded dead
+  against that move rests on a ceiling nothing supplies: `nestΦAt` has
+  no affordability lemma and `chainStep-store≤` no consumer. State that
+  lemma first, and let it decide whether the factor moves up an instant
+  or the mechanism does.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -290,10 +291,10 @@ does not fit is a finding about the shared statement, not about the head.
   the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
   `drainW`, so nothing is free. Two obligations are drain ledgers this face has
   and must route; the third is the merge node's own queue depth.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
-  of the fold's new grant. The factor now buys a burst up to the instant's size
-  cap, moving the crossing from the second value to the twenty-fourth; a width
-  the ledger picks still admits it, so the count premise is what is missing.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED, DEAD ROUTE`: the
+  producing side of the fold's new grant. Count and factor both exist proven —
+  `burstsOK` and `nestFac` — so what is wrong is where this arm reads them: its
+  factor is priced at a cap the count is refuted against.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
