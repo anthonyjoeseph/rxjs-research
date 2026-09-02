@@ -1,6 +1,6 @@
 -- THE DRAIN ARM, REACHED AT LAST, AND BY A DOOR THE RUNNING FAMILIES
--- DO NOT HAVE.  `mergeAllDrain-nest-live` subscribes out
--- of a *All node's QUEUE, and no program family in this tree fills
+-- DO NOT HAVE.  `subscribeInner-nest-live` is spent by a drain walking
+-- a *All node's QUEUE, and no program family in this tree fills
 -- one: an unlimited outer never refuses room, and every inner these
 -- families build completes inside its own subscribe burst, so the
 -- active count is back at zero before the next arrival is read.  The
@@ -8,7 +8,7 @@
 -- carrying a parked queue is an instance by construction -- which is
 -- the door, and it costs a node install rather than a new program.
 --
--- TARGET: mergeAllDrain-nest-live @ab1809
+-- TARGET: subscribeInner-nest-live @0a9007
 
 -- WHAT THE ROWS MEASURE IS THE ASYMMETRY THE ARM TURNS ON.  The gate
 -- truncates: a queue entry `deferᵉ b` reads as nesting ZERO wherever
@@ -35,9 +35,7 @@
 -- this arm, and it is what a discharge has to spend.
 
 -- NOT COVERED: the switch and exhaust ops, whose finish arms write a
--- node and drain nothing; a queue deeper than one entry, where the
--- drain's own recursion is read rather than a single subscription; a
--- non-empty registry, which routes the reaction to its absorbing arm
+-- node and drain nothing; a non-empty registry, which routes the reaction to its absorbing arm
 -- before the finish is reached at all; and the hypotheses, which are a
 -- Σ carrying a universally quantified numeric conjunct and are not
 -- dischargeable by computation -- so a row here is evidence about the

@@ -29,7 +29,7 @@ module Verify-Budget-Sufficient.Live-Nest-Walk where
 open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; _++_; foldr)
+open import Data.List using (List; []; _∷_; _++_; foldr; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; n≤1+n; ≤-reflexive; +-suc)
 open import Data.Vec using (lookup)
@@ -40,30 +40,34 @@ open import Relation.Nullary using (yes; no)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; obs; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; obs; sizeᵉ; _≟ᵗ_)
+open import Rx.Slots using (Slots)
+open import Rx.Frame-Width using (dWᵉ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; AllOp; NodeId; map-f; scan-f;
   take-f; from-inner; thru-outer; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
   mergeAllᵒ; switchᵒ; exhaustᵒ; innerFinish; mergeAllDrain; aliveThroughᶠ;
   lookupNode; takeVals; iterSize; foldPath; stepFrame; dispatchShare; shareGo; shareAdmit;
-  shareLatch)
+  shareLatch; subscribeInner; hasRoom)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; nestUnit; sweepLive-nest)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; frameStep; sizeCount; iterSize-infl; iterSize-mono-count)
-open import Verify-Budget-Sufficient.Nest-Walk using (FaceOK; capsDrainOK)
+  using (Caps; frameStep; sizeCount; iterSize-infl; iterSize-mono-count; frameStep-mono-j)
+open import Verify-Budget-Sufficient.Nest-Walk using (FaceOK; faceHere; capsDrainOK)
+open import Verify-Budget-Sufficient.Nest-Ceiling using (ceil-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
-open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthFin; depthDrain)
+open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; drainW-here; drainW-tail)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthFin; depthDrain; depthInner)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; valsSz?-mono;
          stepFrame-nest-Φ; stepFrame-nest-regs; stepFrame-regsSz; stepFrame-sz;
          foldPath-nest-regs)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; regsSz?; frameSz?; pathSz?-widen)
+  using (pathSz?; regsSz?; frameSz?; pathSz?-widen; capsOK?; nestValOK?; nestClosOK?)
+open import Verify-Budget-Sufficient.Caps-Face.Part3 using (pathSz?-⊑)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (foldPath-slots)
 
 -- WHAT AN OUTER FRAME OWES BEYOND THE POTENTIAL, stated at the one
@@ -166,31 +170,31 @@ postulate
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ slotsNestSum (Sched.slots sched) ⊔ U
 
-  -- THE QUEUE'S OWN MINT, AND THIS IS WHERE THE GATE IS PRICED.  The
-  -- drain subscribes the observables the merge node was parking, so
-  -- what it can put on the live list is read off the QUEUE and off
-  -- nothing the walk handed down -- which is why every premise here
-  -- is the caps bundle the node lookup delivers and none of them
-  -- mentions a value.
+  -- THE SINGLE SUBSCRIPTION, AND THIS IS WHERE THE GATE IS PRICED.
+  -- The drain walks its queue and mints once per parked entry, and
+  -- both readings the conclusion joins are `⊔`-folds -- so the queue
+  -- combines by max rather than accumulating, and what the whole walk
+  -- can leave on the live list is what ONE subscribe leaves.  That is
+  -- why the recursion is a real body below and this is the only thing
+  -- still asserted.
   --
   -- AND NO LARGER NUMBER WOULD HAVE REPAIRED IT, WHICH IS WHAT FIXES
   -- THE CURRENCY.  The depth measure TRUNCATES at the gate -- that is
   -- what makes a recursive body safe -- so a parked term reads zero
   -- wherever the NODE is read, which is the one state quantity the
   -- consuming fit's store residue is built above, alongside incoming
-  -- values the drain does not carry.  Draining subscribes the entry,
-  -- and the mint puts the body itself on the live list at observable
-  -- type, where the truncation does not apply and the fold reads its
-  -- full depth.  So a premise bounding the queue's NESTING is
-  -- satisfied by the counterexample unchanged, and the increment this
-  -- statement has to cover is the queued body's own depth against a
-  -- residue of zero.
+  -- values the drain does not carry.  Subscribing the entry puts the
+  -- body itself on the live list at observable type, where the
+  -- truncation does not apply and the fold reads its full depth.  So a
+  -- premise bounding the queue's NESTING is satisfied by the
+  -- counterexample unchanged, and the increment this statement has to
+  -- cover is the subscribed body's own depth against a residue of zero.
   --
-  -- SO ONLY THE CAP-DERIVED SIDE CAN PAY, and the drain bundle is
-  -- what carries it: the caps ledger comes in at the level, and its
-  -- park receipt reads `sizeᵉ` -- one unit per gate layer, where the
-  -- depth reads none.  That is which premise is load-bearing here and
-  -- it is what a discharge spends.  The registry face's drain arm
+  -- SO ONLY THE CAP-DERIVED SIDE CAN PAY, and the entry's own park
+  -- receipt is what carries it: the caps ledger comes in at the level,
+  -- and that receipt reads `sizeᵉ` -- one unit per gate layer, where
+  -- the depth reads none.  That is which premise is load-bearing here
+  -- and it is what a discharge spends.  The registry face's drain arm
   -- fell to the same emptiness at the same node and takes the same
   -- bundle, so two faces discharge from ONE producer.
   --
@@ -200,55 +204,141 @@ postulate
   --   now carries, `Refuted.Drain-Regs-Nest` found the drain arm
   --   reading a payload no walk handed it -- on the registry axis,
   --   where the same emptiness clears the same premise.
-  -- PROBED: `Probed.Frame-Drain-Live` reaches this drain through the
-  --   completion frame that runs it, by a door the running families do
-  --   not have: an unlimited outer never refuses room, so its queue is
-  --   empty on every row, and bounding the limit does not fix it either,
-  --   since a queue fills only while an earlier inner is still ACTIVE
-  --   and every inner those families build finishes inside its own
-  --   subscribe burst.  The frame above quantifies over an arbitrary
-  --   state, so a parked queue is installed instead.  Covered:
-  --   a limit-one node whose single parked entry is a gated nest, at
+  -- PROBED: `Probed.Frame-Drain-Live` reaches this subscribe through
+  --   the completion frame and the drain that run it, by a door the
+  --   running families do not have: an unlimited outer never refuses
+  --   room, so its queue is empty on every row, and bounding the limit
+  --   does not fix it either, since a queue fills only while an earlier
+  --   inner is still ACTIVE and every inner those families build
+  --   finishes inside its own subscribe burst.  The frame above
+  --   quantifies over an arbitrary state, so a parked queue is
+  --   installed instead.  Covered: one parked entry, a gated nest, at
   --   depths zero through four, with the incoming live list empty, the
   --   slot telescope scripted and the registry empty so the reaction
   --   reaches the finish.  Not covered: the switch and exhaust ops,
-  --   whose finish arms drain nothing; a queue past one entry, where the
-  --   drain's own recursion is what is read; and the hypotheses, which
-  --   carry a quantified numeric conjunct and do not compute -- so a row
-  --   is evidence about the CONCLUSION, unconditional where green.
-  mergeAllDrain-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (d W Lv G B U : ℕ) (sf : Gas) (allNid : NodeId)
-    (κ : Path Γ s t) (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
-    (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
-    ⦃ _ : FaceOK c (Sched.slots sched) ⦄ →
-    capsDrainOK c (Sched.slots sched) d Lv sf allNid κ id now lim act q sched st →
-    drainW sf allNid κ id now q sched st ≤ W →
-    depthDrain sf allNid κ id now q sched st ≤ d →
+  --   whose finish arms drain nothing; and the hypotheses, which carry
+  --   a quantified numeric conjunct and do not compute -- so a row is
+  --   evidence about the CONCLUSION, unconditional where green.
+  subscribeInner-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (d W Lv G B U : ℕ) (sf : Gas) (op : AllOp)
+    (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    ⦃ _ : FaceOK c sl ⦄ →
+    Sched.slots sched ≡ sl →
+    capsOK? (frameStep Lv c) sched st ≡ true →
+    nestValOK? (frameStep Lv c) (obs s) o ≡ true →
+    nestClosOK? (frameStep Lv c) sl o ≡ true →
+    sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
+    dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
+    innerW sf op allNid κ id now o sched st ≤ W →
+    depthInner sf op allNid κ id now o sched st ≤ d →
     pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
     (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
        pathΦF B κ
          * (nestFac (Caps.cSize (frameStep j c)) W
-              * (G + nestU (Caps.cSize (frameStep j c))
-                       (nestUnit e (Sched.slots sched)))
+              * (G + nestU (Caps.cSize (frameStep j c)) (nestUnit e sl))
             + pathΦD B κ) ≤ U) →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
-        (mergeAllDrain sf allNid κ id now lim act q sched st)))))))
+        (subscribeInner sf op allNid κ id now o sched st)))))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-          ⊔ slotsNestSum (Sched.slots sched) ⊔ U
+          ⊔ slotsNestSum sl ⊔ U
 
 -- WIDENING INTO THE CONCLUSION, which is all four of the arms that do
 -- not mint.  The conclusion joins the incoming fold with two terms a
 -- frame never writes, so a step that hands its own schedule back is
 -- discharged by the join's own left projections and by nothing about
 -- the frame.
-live-into : ∀ {n} {Γ : Ctx n} (sched : Sched Γ) (U : ℕ) →
+live-into : ∀ {n} {Γ : Ctx n} {S : ℕ} (sched : Sched Γ) (U : ℕ) →
   foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ⊔ S ⊔ U
+live-into {S = S} sched U = ≤-trans (m≤m⊔n _ S) (m≤m⊔n _ U)
+
+-- THE DRAIN'S OWN RECURSION, AND IT COSTS WHAT ONE SUBSCRIPTION COSTS.
+-- `mergeAllDrain` walks the parked inners and hands back the last
+-- schedule, and the conclusion's two readings are both `⊔`-folds -- so
+-- the queue combines by max and the bound is RE-ESTABLISHED at every
+-- entry rather than accumulated.  What makes that composable is that
+-- the join the statement is bounded by is idempotent in its own two
+-- right summands: the tail's bound is stated against the head's
+-- schedule, and collapsing the two is three projections.
+--
+-- AND THE SLOT TELESCOPE IS A PARAMETER RATHER THAN A READING, which
+-- is what removes the obligation this recursion would otherwise carry.
+-- Stated over `Sched.slots sched` the tail would need the slots
+-- PRESERVED across a subscribe before the induction could even be
+-- typed; the caps bundle already carries the equation at every entry,
+-- so taking the telescope abstractly and letting the bundle supply it
+-- is strictly cheaper than proving preservation.
+mergeAllDrain-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (d W Lv G B U : ℕ) (sf : Gas) (allNid : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
+  (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+  ⦃ _ : FaceOK c sl ⦄ →
+  capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st →
+  drainW sf allNid κ id now q sched st ≤ W →
+  depthDrain sf allNid κ id now q sched st ≤ d →
+  pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
+  (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
+     pathΦF B κ
+       * (nestFac (Caps.cSize (frameStep j c)) W
+            * (G + nestU (Caps.cSize (frameStep j c)) (nestUnit e sl))
+          + pathΦD B κ) ≤ U) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0
+    (Sched.live (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+      (mergeAllDrain sf allNid κ id now lim act q sched st)))))))
     ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-        ⊔ slotsNestSum (Sched.slots sched) ⊔ U
-live-into sched U =
-  ≤-trans (m≤m⊔n _ (slotsNestSum (Sched.slots sched))) (m≤m⊔n _ U)
+        ⊔ slotsNestSum sl ⊔ U
+mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act []
+  sched st hcd hw hd hpk hpl hu = live-into sched U
+mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
+  sched st hcd hw hd hpk hpl hu
+  with hasRoom lim act
+... | false = live-into sched U
+... | true  = ≤-trans IH₀ (⊔-lub (⊔-lub SUB₀ S≤) U≤)
+  where
+  B̂     = proj₁ hcd
+  Ŝ     = proj₁ (proj₂ hcd)
+  ceilQ = proj₁ (proj₂ (proj₂ hcd))
+  hcdA  = proj₂ (proj₂ (proj₂ hcd))
+
+  r₁     = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+  done   = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+  st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
+  r₀    = proj₁ tailΣ
+  step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (m≤m+n Lv r₀)
+
+  SUB₀ = subscribeInner-nest-live c sl d W Lv G B U sf mergeAllᵒ allNid κ id now
+           o sched st
+           (proj₁ hcdA) (proj₁ (proj₂ hcdA)) (proj₁ (proj₂ (proj₂ hcdA)))
+           (proj₁ (proj₂ (proj₂ (proj₂ hcdA))))
+           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))
+           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
+           (≤-trans (drainW-here sf allNid κ id now o q sched st) hw)
+           (≤-trans (m≤m⊔n _ _) hd)
+           hpk hpl hu
+
+  IH₀ = mergeAllDrain-nest-live c sl d W (Lv + r₀) G B U sf allNid κ id now lim
+          (if done then act else suc act) q sched₁ st₁
+          (B̂ , Ŝ
+             , ceil-sweep-step c d Lv B̂ (suc (length q + Ŝ)) r₀
+                 (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ)) ceilQ
+             , proj₂ (proj₂ tailΣ))
+          (≤-trans (drainW-tail sf allNid κ id now o q sched st) hw)
+          (≤-trans (m≤n⊔m _ _) hd)
+          (pathSz?-⊑ κ step″ hpk) (≤-trans hpl (proj₁ step″))
+          hu
+
+  S≤ = ≤-trans (m≤n⊔m (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
+                      (slotsNestSum sl))
+               (m≤m⊔n _ U)
+
+  U≤ = m≤n⊔m _ U
 
 -- THE COMPLETION FRAME'S DISPATCH, and it is CHECKED rather than
 -- asserted: a step that is not a `fin`, a `fin` whose inner is still
@@ -317,7 +407,8 @@ innerFinish-nest-live {s = s} c d W Lv G B U sf mergeAllᵒ allNid inst p id now
 ... | just (mergeAll-st {w} lim act q od) with w ≟ᵗ s
 ...   | no  _    = live-into sched U
 ...   | yes refl =
-        mergeAllDrain-nest-live c d W Lv G B U sf allNid p id now lim (pred act) q sched st
+        mergeAllDrain-nest-live c (Sched.slots sched) d W Lv G B U sf allNid p id now
+          lim (pred act) q sched st
           (hdr lim act q od refl) (hw lim act q od refl)
           (≤-trans (n≤1+n _) hdp) hpk hpl hu
 
