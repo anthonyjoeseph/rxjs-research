@@ -22,7 +22,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
   ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ)
 open import Data.Maybe using (Maybe; just; nothing)
@@ -43,11 +43,16 @@ open import Rx.Evaluator
   exhaust-st; takeDispatch; takeVals; lookupNode)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; thruWalk-nest; nodesMax; stepFrame-nodes-scan)
+  using (nestDᵛˢ; thruWalk-nest; nodesMax; stepFrame-nodes-scan;
+  stepFrame-nodes-inner; capsDrainOK; FaceOK)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
-open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all)
+open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all; pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; pathNestD; nest-inflate; dropSource-nest)
+  using (regsNestMax; pathNestD; nest-inflate; dropSource-nest; nestUnit)
+open import Verify-Budget-Sufficient.Caps using (Caps; frameStep; sizeCount)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
+open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
+open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (pathSz?; regsSz?; frameSz?)
@@ -88,19 +93,66 @@ valsΦ? {s = s} B U path vals =
 -- factors are the ones `stepFrame-nodes-scan` is proven at -- a power
 -- in the width rather than another summand, because one substitution
 -- is multiplicative and iterating it puts the factor in the exponent.
-FrameΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (B U : ℕ)
-  (f : Frame Γ s u) (path : Path Γ u t) (vals : List (Val Γ s))
+-- AND THE DRAIN ARM READS THE QUEUE, WHICH IS A SECOND TABLE.  What a
+-- `from-inner` hands on is what the inner run produced, and the inner
+-- run SUBSCRIBES the observables the merge node was holding -- so this
+-- arm too reaches past the values it was given, and for the same
+-- structural reason the scan arm does.  What it does NOT need is the
+-- scan arm's width: a queue does not thread, so draining k entries
+-- runs the step function once per entry rather than k times in
+-- sequence, and nothing accrues.  A FACTOR it does need, because a
+-- subscription substitutes into the term it takes, and one occurrence
+-- of the payload on each side of a sum doubles what leaves under a
+-- ceiling that does not move.
+--
+-- SO THE GRANT IS THE ITERATION FACE'S, DENOMINATED IN CAPS.  The
+-- factors are `nestFac` and `nestU` at a size cap the drain reports a
+-- LEVEL for rather than fixing in advance, which is why the numeric
+-- fit is quantified over every level within the descent's own count
+-- instead of being read at one: the level is an output of the walk,
+-- and a fit at a single level would be a fit at a number the caller
+-- cannot name.
+InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
+  (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) → Set
-FrameΦHyp B U (map-f _)           path vals sched st = ⊤
-FrameΦHyp B U (take-f _)          path vals sched st = ⊤
-FrameΦHyp B U (from-inner _ _ _)  path vals sched st = ⊤
-FrameΦHyp B U (scan-f fn nid)     path vals sched st =
+InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin sched st =
+  Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ W → Σ ℕ λ Lv → Σ ℕ λ G →
+    FaceOK c (Sched.slots sched)
+    × (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+         lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+         capsDrainOK c (Sched.slots sched) d Lv sf allNid path id now lim
+           (pred act) q sched st)
+    × (∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+         lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+         drainW sf allNid path id now q sched st ≤ W)
+    × (depthReact sf op allNid inst path id now vals sched st fin ≤ d)
+    × (pathSz? (Caps.cSize (frameStep Lv c)) path ≡ true)
+    × (suc (pathLen path) ≤ Caps.cSize (frameStep Lv c))
+    × (nodesMax st ⊔ nestDᵛˢ vals ≤ G)
+    × (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
+         pathΦF B path
+           * (nestFac (Caps.cSize (frameStep j c)) W
+                * (G + nestU (Caps.cSize (frameStep j c))
+                         (nestUnit e (Sched.slots sched)))
+              + pathNestD path) ≤ U)
+
+FrameΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
+  (f : Frame Γ s u) (path : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) → Set
+FrameΦHyp sf id now B U (map-f _)  path vals fin sched st = ⊤
+FrameΦHyp sf id now B U (take-f _) path vals fin sched st = ⊤
+FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st =
+  InnerΦFit sf id now B U op allNid inst path vals fin sched st
+FrameΦHyp sf id now B U (scan-f fn nid) path vals fin sched st =
   Σ ℕ λ G →
     (nodesMax st ⊔ nestDᵛˢ vals ≤ G)
     × (pathΦF B path
         * ((2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn)
            + pathNestD path) ≤ U)
-FrameΦHyp B U (thru-outer op nid) path vals sched st =
+FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st =
   Σ ℕ λ k → Σ ℕ λ G →
     ValsFit k (Sched.slots sched) G path vals
     × (pathΦF B path * (G + pathNestD path) ≤ U)
@@ -222,7 +274,7 @@ thruΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
   (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-  FrameΦHyp B U (thru-outer op nid) path vals sched st →
+  FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st →
   valsΦ? B U path
     (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin sched st))
     ≡ true
@@ -282,7 +334,7 @@ scanΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
   (nid : NodeId) (path : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-  FrameΦHyp B U (scan-f fn nid) path vals sched st →
+  FrameΦHyp sf id now B U (scan-f fn nid) path vals fin sched st →
   valsΦ? B U path
     (proj₁ (stepFrame sf id now (scan-f fn nid) path vals fin sched st))
     ≡ true
@@ -302,59 +354,66 @@ scanΦ sf id now fn nid path vals fin sched st B U (G , hst , hnum) =
         (*-monoʳ-≤ ((2 ^ sizeᵗ fn) ^ length vals)
           (+-monoˡ-≤ (length vals * nestDᵗ fn) hst)))
 
-postulate
-  -- THE INNER FRAME'S OUTPUT DOES NOT COME FROM THE FRAME AT ALL -- it
-  -- is what the inner run produced -- and the frame's factor is one, so
-  -- there is nothing here to pay a deepening with.  What has to hold is
-  -- that an inner run cannot hand out a value deeper than the potential
-  -- the outer walk was already carrying, AND IT DOES NOT HOLD.  This
-  -- statement is FALSE as written; what it is missing is an obligation
-  -- the family already has a place for.
-  --
-  -- WHY IT IS FALSE AND NOT MERELY HARD.  A completion walk carries no
-  -- value, so the premise reads `all _ []` -- true at EVERY `U`, however
-  -- generous the reader is willing to be.  The conclusion is then the
-  -- drained values' own depth read straight against that `U`, since
-  -- `pathΦF` reads this frame as one and `pathNestD` charges it nothing,
-  -- leaving no factor in front to absorb anything.  A queue holding a
-  -- payload `k` layers deep under a step function naming it twice drains
-  -- `2 * k`, and nothing in `vals`, `path` or `B` moves with `k`.  So the
-  -- gap is unbounded in a parameter of the PROGRAM, and no constant and
-  -- no term in those three closes it.
-  --
-  -- WHERE THE REPAIR GOES, AND IT IS NOT A HYPOTHESIS ON THIS SIGNATURE.
-  -- `FrameΦHyp` is the family's own per-frame obligation, and it is
-  -- already non-trivial at `thru-outer` for exactly this reason: that
-  -- frame does not forward, it SUBSCRIBES, so what comes back is bounded
-  -- by nothing the incoming values say.  The drain under this frame
-  -- subscribes too -- `innerFinish` reaches `subscribeInner` through
-  -- `mergeAllDrain` -- so the `⊤` at this arm is the oversight.  What the
-  -- arm owes is a grant over what the QUEUE may emit, which is a fact
-  -- about the state, and `PathΦHyp` already carries `st` at the point
-  -- the obligation is raised.
-  --
-  -- REFUTED: `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-absurd` at
-  --   double occurrence, and
-  --   `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-trip-absurd` at
-  --   triple -- the pair is what puts the gap in the occurrence count
-  --   rather than in a constant.
-  -- TWIN: `stepFrame-nodes-inner`, which is this arm proven, and it
-  --   says both halves of the repair.  Its subject is
-  --   `nodesMax st ⊔ nestDᵛˢ vals` on both sides, so the queue is
-  --   inside the quantity; and the grant it takes is over the node
-  --   looked up, quantified across the shapes the table may hold rather
-  --   than over the values in hand.  That is the obligation this arm is
-  --   missing, already written, at the iteration's factors instead of
-  --   the potential's.
-  stepFrame-nest-Φ-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
-    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-    valsΦ? B U (from-inner op allNid inst ↠ path) vals ≡ true →
-    valsΦ? B U path
-      (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals
-                        fin sched st))
-      ≡ true
+-- THE INNER FRAME'S OUTPUT DOES NOT COME FROM THE FRAME AT ALL -- it
+-- is what the inner run produced -- and the frame's factor is one, so
+-- there is nothing here to pay a deepening with.  The unconditional
+-- reading asks that an inner run cannot hand out a value deeper than
+-- the potential the outer walk was already carrying, and that is
+-- FALSE: a completion walk carries no value, so its premise reads
+-- `all _ []` -- true at EVERY budget -- while the drained values' own
+-- depth is read straight against that budget with no factor in front
+-- to absorb anything.  A queue holding a payload `k` layers deep under
+-- a step function naming it twice drains `2 * k`, and nothing in
+-- `vals`, `path` or `B` moves with `k`.
+--
+-- SO THE GRANT REPLACES A FALSE STATEMENT RATHER THAN WEAKENING A TRUE
+-- ONE, and it is the family's own per-frame obligation rather than a
+-- hypothesis on this signature -- the same place the `thru-outer` arm
+-- already carries its debt, and for the same structural reason: the
+-- drain under this frame subscribes too, reaching `subscribeInner`
+-- through `mergeAllDrain`, so what comes back is bounded by nothing
+-- the incoming values say.  What the walk face proves is a bound on
+-- `nodesMax` and the emitted depth TOGETHER, so projecting the second
+-- out of the join is the whole of the arithmetic here; the level the
+-- descent reports is an output, which is why the grant's numeric fit
+-- is quantified over the levels the descent's own count admits.
+--
+-- REFUTED: `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-absurd` at
+--   double occurrence, and
+--   `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-trip-absurd` at
+--   triple -- the pair is what puts the gap in the occurrence count
+--   rather than in a constant.
+innerΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+  (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+  FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st →
+  valsΦ? B U path
+    (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals
+                      fin sched st))
+    ≡ true
+innerΦ {e = e} sf id now op allNid inst path vals fin sched st B U
+       (c , d , W , Lv , G , face , hdr , hw , hdp , hpk , hpl , hst , hnum) =
+  Φ-of-bound B U (nestFac S′ W * (G + nestU S′ (nestUnit e (Sched.slots sched))))
+    path (proj₁ r) bound (hnum j (proj₁ (proj₂ INNER)))
+  where
+  r = stepFrame sf id now (from-inner op allNid inst) path vals fin sched st
+
+  INNER = stepFrame-nodes-inner c d (Sched.slots sched) W Lv sf id now op
+            allNid inst path vals fin sched st ⦃ face ⦄ refl hdr hw hdp hpk hpl
+
+  j = proj₁ INNER
+
+  S′ = Caps.cSize (frameStep j c)
+
+  bound : nestDᵛˢ (proj₁ r)
+        ≤ nestFac S′ W * (G + nestU S′ (nestUnit e (Sched.slots sched)))
+  bound =
+    ≤-trans
+      (m≤n⊔m (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r))))) (nestDᵛˢ (proj₁ r)))
+      (≤-trans (proj₂ (proj₂ INNER))
+        (*-monoʳ-≤ (nestFac S′ W)
+          (+-monoˡ-≤ (nestU S′ (nestUnit e (Sched.slots sched))) hst)))
 
 -- THE TAKE FRAME CARRIES A FACTOR OF ONE AND NO DEPTH, so its
 -- hypothesis and its conclusion are the SAME predicate read either
@@ -412,7 +471,7 @@ stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
   (B U : ℕ) →
   valsΦ? B U (f ↠ path) vals ≡ true →
-  FrameΦHyp B U f path vals sched st →
+  FrameΦHyp sf id now B U f path vals fin sched st →
   valsΦ? B U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st B U hΦ _ =
   mapΦ B U fn path vals hΦ
@@ -420,8 +479,8 @@ stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st B U _ hF =
   scanΦ sf id now fn nid path vals fin sched st B U hF
 stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st B U hΦ _ =
   stepFrame-nest-Φ-take sf id now nid path vals fin sched st B U hΦ
-stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ _ =
-  stepFrame-nest-Φ-inner sf id now op allNid inst path vals fin sched st B U hΦ
+stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B U _ hF =
+  innerΦ sf id now op allNid inst path vals fin sched st B U hF
 stepFrame-nest-Φ sf id now (thru-outer op nid) path vals fin sched st B U _ hF =
   thruΦ sf id now op nid path vals fin sched st B U hF
 
@@ -571,7 +630,7 @@ mutual
   PathΦHyp sf gas id now B U (share-sink i) vals fin sched st =
     DispatchΦHyp sf gas id now B U i vals fin sched st
   PathΦHyp sf gas id now B U (f ↠ p) vals fin sched st =
-    FrameΦHyp B U f p vals sched st
+    FrameΦHyp sf id now B U f p vals fin sched st
     × PathΦHyp sf gas id now B U p
         (proj₁ (stepFrame sf id now f p vals fin sched st))
         (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
