@@ -274,17 +274,16 @@ postulate
     FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
               (scan-f fn nid) p vals fin sched st
 
-  -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, ONLY ONE OF WHICH IS
-  -- THE SAME GAP.  A `from-inner` hands on what the inner run
+  -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, AND THE STORE HALF OF
+  -- IT IS THE FOLD'S.  A `from-inner` hands on what the inner run
   -- produced, so like the fold it reaches past its own values -- but
   -- the payload it reaches is the merge node's QUEUE, and what a
   -- subscription does to a queued term is substitute into it.  So the
   -- grant carries the iteration face's factors rather than a summand.
-  -- The store ceiling it also needs is NOT the fold's, though the two
-  -- read alike: the fold's is one accumulator, this one is still the
-  -- table's max, and the drain reaches two entries rather than one.
-  -- Whether it narrows the same way is a question about `drainW` and
-  -- `mergeAllDrain`, not about this signature.
+  -- Its store ceiling is read at the ONE entry `innerFinish` looks up:
+  -- the drain consumes that node's queue and reaches no other cell, so
+  -- a ⊔ over the table is a widening of this reading rather than a
+  -- second source, and the residue is the queued terms' own depth.
   --
   -- THE TWO THAT ARE NOT THE FOLD'S ARE DRAIN LEDGERS, and they are
   -- available on this face rather than absent from it: the queue's
@@ -292,9 +291,8 @@ postulate
   -- when it admits the entries, so the residue here is a routing
   -- question -- which statement hands them over -- and not a fact
   -- nothing in the development has.  What makes it a residue today is
-  -- that the entries are read out of the table by a lookup this
-  -- statement's premises do not constrain, which is the store gap
-  -- again in its second guise.
+  -- that both are quantified over whatever queue the lookup returns,
+  -- and no premise here constrains the table it is read from.
   --
   -- AND THE OBVIOUS ROUTE FOR THEM DOES NOT PAY, which is worth
   -- knowing before a leg is spent on it.  The walk face carries a
@@ -303,9 +301,9 @@ postulate
   -- of the two things wanted.  `capsOK?⇒nest` takes it to an `all` of
   -- `nodeWidᴺ?` over the entries, and that predicate is trivially
   -- true on four of the five node kinds and on the fifth reads the
-  -- queue's WIDTH.  The ceiling `scanΦ-fit` asks for is a ⊔-fold of
-  -- `nodeNest`, whose merge arm folds the queued terms' own DEPTHS,
-  -- and a bound on how many are queued gives no bound on what each
+  -- queue's WIDTH.  The ceiling asked for here is `nodeNest` at one
+  -- entry, whose merge arm folds the queued terms' own DEPTHS, and a
+  -- bound on how many are queued gives no bound on what each
   -- carries.  `drainW` is no better placed: it folds `innerW` while
   -- threading the state through each subscribe, so it prices what a
   -- queued term COSTS to subscribe rather than how many there are.

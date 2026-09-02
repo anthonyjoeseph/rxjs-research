@@ -43,7 +43,7 @@ open import Rx.Evaluator
   exhaust-st; takeDispatch; takeVals; lookupNode)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; thruWalk-nest; nodesMax; nodeNestAt; stepFrame-emit-scan;
+  using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
   stepFrame-nodes-inner; capsDrainOK; FaceOK)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all; pathLen)
@@ -130,7 +130,7 @@ InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin 
     × (depthReact sf op allNid inst path id now vals sched st fin ≤ d)
     × (pathSz? (Caps.cSize (frameStep Lv c)) path ≡ true)
     × (suc (pathLen path) ≤ Caps.cSize (frameStep Lv c))
-    × (nodesMax st ⊔ nestDᵛˢ vals ≤ G)
+    × (nodeNestAt allNid st ⊔ nestDᵛˢ vals ≤ G)
     × (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
          pathΦF B path
            * (nestFac (Caps.cSize (frameStep j c)) W
@@ -370,11 +370,12 @@ scanΦ sf id now fn nid path vals fin sched st B U (G , hst , hnum) =
 -- already carries its debt, and for the same structural reason: the
 -- drain under this frame subscribes too, reaching `subscribeInner`
 -- through `mergeAllDrain`, so what comes back is bounded by nothing
--- the incoming values say.  What the walk face proves is a bound on
--- `nodesMax` and the emitted depth TOGETHER, so projecting the second
--- out of the join is the whole of the arithmetic here; the level the
--- descent reports is an output, which is why the grant's numeric fit
--- is quantified over the levels the descent's own count admits.
+-- the incoming values say.  The walk face hands the emitted depth over
+-- on its own, read at the ONE entry `innerFinish` looks up rather than
+-- at the whole table, so there is no join to project out of and the
+-- store the grant names is this node's queue; the level the descent
+-- reports is an output, which is why the grant's numeric fit is
+-- quantified over the levels the descent's own count admits.
 --
 -- REFUTED: `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-absurd` at
 --   double occurrence, and
@@ -407,11 +408,9 @@ innerΦ {e = e} sf id now op allNid inst path vals fin sched st B U
   bound : nestDᵛˢ (proj₁ r)
         ≤ nestFac S′ W * (G + nestU S′ (nestUnit e (Sched.slots sched)))
   bound =
-    ≤-trans
-      (m≤n⊔m (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r))))) (nestDᵛˢ (proj₁ r)))
-      (≤-trans (proj₂ (proj₂ INNER))
-        (*-monoʳ-≤ (nestFac S′ W)
-          (+-monoˡ-≤ (nestU S′ (nestUnit e (Sched.slots sched))) hst)))
+    ≤-trans (proj₂ (proj₂ (proj₂ INNER)))
+      (*-monoʳ-≤ (nestFac S′ W)
+        (+-monoˡ-≤ (nestU S′ (nestUnit e (Sched.slots sched))) hst))
 
 -- THE TAKE FRAME CARRIES A FACTOR OF ONE AND NO DEPTH, so its
 -- hypothesis and its conclusion are the SAME predicate read either

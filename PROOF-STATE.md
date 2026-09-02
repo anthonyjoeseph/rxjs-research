@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE DRAIN ARM, WHICH THE FOLD'S REPAIR DID NOT REACH.** The
-  scan half landed: `FrameΦHyp` reads `nodeNestAt nid st`, and
-  `stepFrame-emit-scan` proves what LEAVES that frame is a function of
-  the one accumulator, so `scanΦ` spends the entry and never the
-  table. `InnerΦFit` still asks for `nodesMax st`, and it is not the
-  same ask — the drain reaches two entries, not one, so whether the
-  narrowing is even available is a question about `drainW` and
-  `mergeAllDrain` rather than about the signature. Read those two
-  first. If the pair is nameable at the arm, restate at their join; if
-  it is not, the whole-table read is the honest one and `innerΦ-fit`
-  is DIFFICULTY, not SHAPE.
-
 - **THEN THE EMPTY-HANDED WALK AT THE ARMS IT HAS NOT REACHED — BUT
   NOT WITH THE SAME WITNESS.** The registry arm fell to a completion
   walk, and the census in the two headers says the drain does not
@@ -249,6 +237,18 @@ does not fit is a finding about the shared statement, not about the head.
   that verdict is a stop condition only Anthony can rule on. Read the
   refutations and the header's dead route first, and let the verdict
   be the leg.
+
+- **THEN ROUTE THE TWO NARROWED ASKS, OR RESTATE THEM AGAIN.**
+  `scanΦ-fit` and `innerΦ-fit` now ask for `nodeNestAt` at the node
+  their own step names, and no premise either one carries reaches the
+  table it is read from. The producers are `frameΦ-fit`'s callers, so
+  the question is whether a walk arriving at a frame can name the
+  depth of the single entry that frame touches — `walk-ΦHyp-go`
+  threads a size, a register count and a path depth, and no store
+  reading at all. If a caller can supply it the two stop being SHAPE
+  and become routing; if none can, that entry's ceiling is a field the
+  invariant record is missing, which is a restatement of the RECORD
+  rather than of these two signatures.
 
 ### The ledger
 
@@ -289,12 +289,12 @@ does not fit is a finding about the shared statement, not about the head.
   family that refuted the fixed cap; whether ONE level pays is unread.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
   of the drain's new grant. Two of its three obligations are drain ledgers this
-  face has and must be routed; the third is the store ceiling `scanΦ-fit` also
-  asks for. Restate: a field on the invariant record, not a hypothesis here.
+  face has and must be routed; the third is the merge node's own queue depth,
+  read at the entry the finish looks up. No premise here reaches that table.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the fold's new grant, and every premise it has is about the schedule, the
-  path or the values. A ceiling on `EvalSt.nodes` is not derivable from them.
-  Restate: a field on the invariant record, not a hypothesis here.
+  of the fold's new grant. Its ask is now one accumulator's depth at the node
+  the step names, not the table's max; every premise it has is still about the
+  schedule, the path or the values, so the entry is owed by whoever calls it.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and
   at later arrivals either side of the crossover, the entry settling exactly;
