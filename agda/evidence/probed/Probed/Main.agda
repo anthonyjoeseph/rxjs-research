@@ -148,4 +148,4 @@ open import Probed.Frame-Drain-Live
          figures0; figures1; figures2; figures3; figures4)
 
 open import Probed.Fan-Regs-Registry
-  using (counts; heldS; marginK; marginK′; heldKs; lensK)
+  using (counts; regsS; marginK; marginK′; regsK; lensK)

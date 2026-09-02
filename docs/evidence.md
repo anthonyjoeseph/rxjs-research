@@ -47,7 +47,7 @@ make refuted              typecheck the refutations   (Refuted/Main.agda)
 make probed               typecheck the probes        (Probed/Main.agda)
 make wiring-refuted       reachability, rooted at Refuted/Main
 make wiring-probed        reachability, rooted at Probed/Main
-make evidence-check       E1 + E2 + E3 + E4 + E5 + E6
+make evidence-check       E1 + E2 + E3 + E4 + E5 + E6 + E7
 make evidence-selftest    proves every one of them still fires
 ```
 
@@ -219,3 +219,57 @@ roots every definition in the tree at `Probed.Main`, so a record nothing uses
 fails the gate. Until then E6's own branches are pinned by fixtures under
 `scripts/evidence-selftest/`, the same arrangement `wiring-selftest` uses for a
 rule that fires on nothing in the tree today.
+
+## E7 — the tie, and why the marker is not the check either
+
+A receipt's rows used to be written twice: once as the postulate in `src`,
+once as a hand-restated predicate in the probe, pinned by `refl`. The two were
+held together by nothing but the author's care, and E5's fingerprint could only
+say the *statement* had moved — not that the *rows* had ever matched it.
+
+```agda
+Confirms : {A : Set} → .(claim : A) → Set
+Confirms {A} _ = A
+```
+
+```agda
+regsS : (d : Fin 5) → Confirms (fan-regsNest slots (proj₂ (sub d)))
+regsS fzero        = refl
+regsS (fsuc fzero) = refl
+```
+
+The argument is the target **applied** at the probe's own inputs, so its type
+is the statement instantiated there, and `Confirms` returns exactly that type.
+The argument is irrelevant (the dot): it fixes the type and can never be used.
+What the row must then inhabit is the statement at the point, and the
+typechecker will not let the probe write anything else.
+
+What Agda cannot refuse is the **body** — the postulate handed back as its own
+proof typechecks — and the **head** — `Confirms (weaken (target …))` has
+whatever type `weaken` returns. So E7 reads both textually, with the same
+division as E6: the marker and the record select the law, Agda decides the
+claim, and the check holds the two places a human could still cheat. A
+`Confirms` body may contain only `refl`, `tt`, `_`, numerals, `_,_` and the
+stdlib converters `≤ᵇ⇒≤`, `<ᵇ⇒<`, `toWitness`; a `Confirms` head, after
+peeling `proj₁`/`proj₂`, dotted field accessors and parentheses, must be one
+of the file's `-- TARGET:` names — and every target must have at least one
+such row. `where` in a body is refused outright.
+
+Sub-claims are reached through the statement's own connectives, never through
+a function over it: `Confirms (proj₁ (t …))` for a conjunct,
+`Confirms (proj₂ (proj₂ (t …)) 3)` for a `∀` at a point,
+`Confirms (Fit.grant (t …))` for a field of a record conclusion, and a Σ
+conclusion is given its witness in the body, `2 , refl`.
+
+Two boundaries. A hypothesis is an ARGUMENT, so it is the probe's to supply
+and E7 does not read it: a decidable one is `refl`, anything else is a real
+proof, and a hypothesis the probe cannot discharge means the point is outside
+the statement's domain — the file is then not a receipt for that statement,
+whatever its conclusion computes to, and its header says so. And a row that
+reads an exact numeral (`marginK`, `counts`) is not a `Confirms` row and need
+not be: it says by how much, where the tied row says only that the claim held.
+
+`Probed.Apparatus` is the one module in the tree that states no rows, and
+`check-evidence.py` names it beside `Main.agda` as not a probe; `Separates`
+lands there too when the first fork needs it. E7's own branches are pinned by
+fixtures under `scripts/evidence-selftest/confirms-*`.

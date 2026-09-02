@@ -5,3 +5,5 @@
 module ForkMixed where
 nest-fork : Separates sum-d join-d
 nest-fork = record { at = prog ; apart = λ () }
+row : Confirms (live-one 3)
+row = refl

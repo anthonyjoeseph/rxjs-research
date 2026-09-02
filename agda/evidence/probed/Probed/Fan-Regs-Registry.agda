@@ -50,11 +50,10 @@
 -- `Refuted.Fan-Chain-Registry` already records.
 module Probed.Fan-Regs-Registry where
 
-open import Data.Bool using (Bool; true; _∧_)
-open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
+open import Data.Fin using (Fin; toℕ) renaming (zero to fzero; suc to fsuc)
 open import Data.List using ([]; _∷_; map; foldr; length)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -69,7 +68,8 @@ open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; nestUnit)
-open import Verify-Budget-Sufficient.Delivery-Walk using (regP?)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using (fan-regsNest)
+open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
 -- AXIS ONE: THE SHARE TELESCOPE
@@ -115,12 +115,6 @@ sub d = let r = subscribeE (gasPad (sucGS d) g0) (progS d) root 0 0
 regCount : ∀ (d : Fin 5) → EvalSt (progS d) → ℕ
 regCount d st = length (EvalSt.registry st)
 
-unitAt : Fin 5 → ℕ
-unitAt d = nestUnit (progS d) slots
-
-held : Fin 5 → Bool
-held d = regP? (λ p → pathNestD p ≤ᵇ unitAt d) (EvalSt.registry (proj₂ (sub d)))
-
 d₀ d₁ d₂ d₃ d₄ : Fin 5
 d₀ = fzero
 d₁ = fsuc fzero
@@ -141,9 +135,15 @@ counts = refl
 -- LOAD-BEARING, on the count axis: five distinct reachable registries,
 -- the largest holding five chains, every one of them under the unit.
 -- It fails the moment a crossing mints a chain the program's own
--- nesting does not bound.
-heldS : held d₀ ∧ held d₁ ∧ held d₂ ∧ held d₃ ∧ held d₄ ≡ true
-heldS = refl
+-- nesting does not bound.  The claim is the statement's own, at each
+-- rung -- `Confirms` returns the applied postulate's type, so this
+-- file chooses the point and nothing else.
+regsS : (d : Fin 5) → Confirms (fan-regsNest slots (proj₂ (sub d)))
+regsS fzero                             = refl
+regsS (fsuc fzero)                      = refl
+regsS (fsuc (fsuc fzero))               = refl
+regsS (fsuc (fsuc (fsuc fzero)))        = refl
+regsS (fsuc (fsuc (fsuc (fsuc fzero)))) = refl
 
 ----------------------------------------------------------------------
 -- AXIS TWO: NESTING ABOVE THE SHARE
@@ -183,9 +183,6 @@ maxLenK k st = foldr _⊔_ 0
 unitK : ℕ → ℕ
 unitK k = nestUnit (progK k) slots₂
 
-heldK : ℕ → Bool
-heldK k = regP? (λ p → pathNestD p ≤ᵇ unitK k) (EvalSt.registry (proj₂ (subK k)))
-
 -- LOAD-BEARING, AND THE MARGIN IS THE ROW.  Reading the two sides as
 -- exact numerals rather than as an inequality is what makes a closing
 -- margin visible: `heldK` alone would stay green all the way to the
@@ -205,8 +202,12 @@ marginK′ : maxNestK 3 (proj₂ (subK 3)) + 100 * unitK 3
 marginK′ = refl
 
 -- LOAD-BEARING, on the axis the two sides actually race on
-heldKs : heldK 0 ∧ heldK 1 ∧ heldK 2 ∧ heldK 3 ∧ heldK 4 ≡ true
-heldKs = refl
+regsK : (k : Fin 5) → Confirms (fan-regsNest slots₂ (proj₂ (subK (toℕ k))))
+regsK fzero                             = refl
+regsK (fsuc fzero)                      = refl
+regsK (fsuc (fsuc fzero))               = refl
+regsK (fsuc (fsuc (fsuc fzero)))        = refl
+regsK (fsuc (fsuc (fsuc (fsuc fzero)))) = refl
 
 -- THE SIZE SIDE, READ AND NOT CLAIMED.  Two frames per rung, against
 -- a unit that climbs by one -- so the length is the quantity a cap

@@ -109,6 +109,29 @@ FORK = re.compile(r"^\s*--\s*FORK:\s*(.+?)\s*$")
 # free and the obligation it creates is not.
 SEPARATES = re.compile(r"\bSeparates\b")
 
+# THE TIE BETWEEN A RECEIPT'S ROWS AND ITS TARGET'S TEXT.  A probe used to
+# restate its target's predicate by hand and pin THAT by `refl`, so the row
+# and the statement were held together by nothing: a mistyped or quietly
+# weaker predicate stayed green and earned a receipt.  `Confirms` (the tree's
+# apparatus module) takes the target postulate APPLIED at the probe's own
+# arguments and returns that application's type, so Agda generates the row's
+# type from the statement and the probe chooses only the point.  E7 then holds
+# the row to what Agda cannot: the HEAD under the eliminators must be a
+# declared target (an arbitrary function applied to the postulate returns any
+# type at all), and the BODY must be a computed proof rather than a lemma --
+# `refl`, `tt`, a numeral witness, or a stdlib converter fed one of those --
+# since handing any inhabitant back, the postulate itself included, would
+# typecheck.  Three findings: a target with no `Confirms` row, a row headed by
+# something other than a target, and a body that is not computed.
+CONFIRMS = re.compile(r"\bConfirms\b")
+# the statement's own connectives, which can only reach a SUB-claim: a
+# conjunct, a ∀ at a point, a field of a record conclusion (a dotted name)
+ELIMINATORS = {"proj₁", "proj₂"}
+FIELD = re.compile(r"^[^\s()]+\.[^\s().]+$")
+# what may inhabit a `Confirms` row: only terms whose truth is computation
+COMPUTED = {"refl", "tt", "_", "≤ᵇ⇒≤", "<ᵇ⇒<", "toWitness", ","}
+NUMERAL = re.compile(r"^[0-9]+$")
+
 
 def _dupcheck():
     """`check-duplicates` loaded by path: its module name is not an
@@ -212,13 +235,20 @@ def check_e1(src, namespaces):
     return bad
 
 
+# The two files in the tree that state no rows: the claim root, and the
+# apparatus module holding `Confirms` (and any other record every probe is
+# held to).  Named here because a support module has no target to declare and
+# E2 would otherwise read it as a probe with a missing one.
+NOT_PROBES = ("Main.agda", "Apparatus.agda")
+
+
 def probe_files(evidence):
-    """Every probe module, the claim root aside — it states no rows."""
+    """Every probe module, the claim root and the apparatus aside."""
     root = os.path.join(evidence, "probed")
     if not os.path.isdir(root):
         return
     for p in agda_files(root):
-        if os.path.basename(p) != "Main.agda":
+        if os.path.basename(p) not in NOT_PROBES:
             yield p
 
 
@@ -278,6 +308,99 @@ def check_e6(evidence):
         elif targets and sep:
             undeclared.append((p, sep[0][0], sep[0][1]))
     return mixed, unproven, undeclared
+
+
+def confirms_head(ty):
+    """The name under the eliminators in `Confirms (...)`, or None.
+
+    Reads the balanced argument after the first `Confirms`, then peels
+    projections, dotted field accessors and parentheses until a head that is
+    neither -- that is what the row's type is generated from."""
+    m = CONFIRMS.search(ty)
+    if not m:
+        return None
+    rest = ty[m.end():].lstrip()
+    if rest.startswith("("):
+        depth, j = 0, 0
+        for j, ch in enumerate(rest):
+            depth += (ch == "(") - (ch == ")")
+            if depth == 0:
+                break
+        arg = rest[1:j]
+    else:
+        arg = rest.split()[0] if rest.split() else ""
+    toks = arg.replace("(", " ").replace(")", " ").split()
+    for t in toks:
+        if t in ELIMINATORS or FIELD.match(t):
+            continue
+        return t
+    return None
+
+
+def clause_bodies(path, name):
+    """The text after `=` of every clause of `name`, continuations joined."""
+    lines = io.open(path, encoding="utf-8").read().split("\n")
+    head = re.compile(r"^" + re.escape(name) + r"(?=\s|=|$)")
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        if head.match(line) and not re.match(
+                r"^" + re.escape(name) + r"\s*:", line):
+            body = line.split("=", 1)[1] if "=" in line else ""
+            j = i + 1
+            while j < len(lines) and lines[j].strip() and \
+                    lines[j][0].isspace() and \
+                    not lines[j].strip().startswith("--"):
+                body += " " + lines[j].strip()
+                j += 1
+            out.append((i + 1, body.split("--")[0]))
+            i = j
+            continue
+        i += 1
+    return out
+
+
+def check_e7(evidence):
+    """Every receipt's rows are tied to its target's statement in a type.
+
+    Rule one is coverage: each declared target has a `Confirms` row headed
+    by it.  Rule two is the tie: a `Confirms` row's head is a declared
+    target.  Rule three is the proof: every clause of such a row is a
+    computed term, so the row can only be green because the claim evaluates
+    to true at the chosen point."""
+    uncovered, untied, unproven = [], [], []
+    mod = _dupcheck()
+    for p in probe_files(evidence):
+        targets, forks = declared(p)
+        if not targets:
+            continue
+        names = {t for _, t in targets}
+        heads = set()
+        for name, line, ty in mod.declarations(p):
+            if not CONFIRMS.search(ty):
+                continue
+            head = confirms_head(ty)
+            if head not in names:
+                untied.append((p, line, name, head))
+            else:
+                heads.add(head)
+            bodies = clause_bodies(p, name)
+            if not bodies:
+                unproven.append((p, line, name, "(no clause)"))
+            for bline, body in bodies:
+                if " where" in body or body.strip().startswith("where"):
+                    unproven.append((p, bline, name, "where"))
+                    continue
+                toks = body.replace("(", " ").replace(")", " ") \
+                           .replace(",", " , ").split()
+                bad = [t for t in toks
+                       if t not in COMPUTED and not NUMERAL.match(t)]
+                if bad or not toks:
+                    unproven.append((p, bline, name, bad[0] if bad else "(empty)"))
+        for line, t in targets:
+            if t not in heads:
+                uncovered.append((p, line, t))
+    return uncovered, untied, unproven
 
 
 # A RECEIPT, in the marker form CLAUDE.md specifies: the marker opens a comment
@@ -447,6 +570,7 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         if isinstance(evidence, str) else list(evidence),
         statements(src), harness)
     mixed, unproven, undeclared = check_e6(evidence)
+    uncovered, untied, uncomputed = check_e7(evidence)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -574,9 +698,40 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         print("    it `-- FORK:`, or move the separation to the probe that "
               "owns it.")
 
+    for p, i, t in uncovered:
+        print(f"{p}:{i}: E7 — target {t!r} has no `Confirms` row")
+        print("    A receipt's rows used to restate the target's predicate by "
+              "hand, and")
+        print("    nothing held that restatement to the statement.  Write "
+              "`row : Confirms")
+        print(f"    ({t} <args>)` with `row = refl`: the type is then "
+              "generated from the")
+        print("    statement as it reads, and this file chooses only the "
+              "point.")
+    for p, i, name, head in untied:
+        print(f"{p}:{i}: E7 — `Confirms` row {name!r} is headed by "
+              f"{head!r}, not a declared target")
+        print("    The tie holds only when the term under the eliminators IS "
+              "the target:")
+        print("    a function applied to the postulate returns whatever type "
+              "it likes.")
+        print("    Reach a sub-claim by projection, application at a point, "
+              "or a field.")
+    for p, i, name, tok in uncomputed:
+        print(f"{p}:{i}: E7 — `Confirms` row {name!r} is not a computed "
+              f"proof: {tok!r}")
+        print("    Any inhabitant typechecks here, the target itself "
+              "included, so the")
+        print("    body is held to computation: `refl`, `tt`, a numeral "
+              "witness, or a")
+        print("    stdlib converter fed one.  A lemma in the body is a claim "
+              "the probe")
+        print("    did not instantiate.")
+
     n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
          + len(smissing) + len(sdead) + len(unstamped) + len(stale)
-         + len(mixed) + len(unproven) + len(undeclared))
+         + len(mixed) + len(unproven) + len(undeclared)
+         + len(uncovered) + len(untied) + len(uncomputed))
     if n == 0:
         print(f"check-evidence: clean — {nprobes} probe(s), every one naming a "
               f"live postulate; {nreceipts} receipt(s), every one above its "
@@ -585,7 +740,8 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
               f"one naming a live postulate; {ntargets} target(s), every "
               f"one stamped with the statement its rows were taken against; "
               f"every probe a receipt or a fork and never both, every fork "
-              f"proving its separation in a type")
+              f"proving its separation in a type; every target tied to a "
+              f"`Confirms` row headed by it and proven by computation")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -640,6 +796,20 @@ def selftest():
     run(os.path.join(fx, "empty"), os.path.join(fx, "fork-good"),
         set(), "is not a live postulate",
         "E2 expires a FORK exactly as it expires a TARGET")
+
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-none"),
+        {"live-one"}, "has no `Confirms` row",
+        "E7 fires on a receipt whose rows restate the target by hand")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-untied"),
+        {"live-one"}, "not a declared target",
+        "E7 fires on a `Confirms` headed by a function over the target")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-lemma"),
+        {"live-one"}, "is not a computed proof: 'live-one'",
+        "E7 fires on a row that hands the postulate back as its own proof")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-good"),
+        {"live-one", "live-two"}, None,
+        "E7 quiet on rows tied by projection, a point and a field, "
+        "proven by refl, tt, a witness and a converter, over clauses")
 
     empty = os.path.join(fx, "empty")
     run(empty, empty, {"live-one"}, "E4 — series 'A —",
@@ -733,7 +903,11 @@ def selftest():
           "only CLAIMS to choose, on a probe that is both kinds at once, and "
           "on a separation wearing a receipt's marker; is quiet on a fork "
           "that proves its separation; and a FORK expires under E2 exactly "
-          "as a TARGET does)")
+          "as a TARGET does.  E7 fires on a target with no `Confirms` row, "
+          "on a row headed by something other than a declared target, and "
+          "on a row whose body is the postulate rather than a computation; "
+          "and is quiet on rows tied through the statement's own eliminators "
+          "and proven by computed terms across several clauses)")
     return 0
 
 

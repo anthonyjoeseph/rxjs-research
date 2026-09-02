@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NOW SUPPLY THE REGISTRATION'S DEPTH AT EVERY MINT.** The depth
-  fact is a conjunct of the caps receipt now, and `register-caps` asks
-  each mint for the chain's own nesting under the unit -- an ask that
-  is refuted unconditionally, so it is the true statement. What is left
-  is the ask's supply: the seven mints do not carry it yet, and the
-  subscribe face is red there. So the commit threads one coupled
-  premise, the caller's nesting plus the chain's under the unit, down
-  the `-caps` signatures to those mints, states the one leaf the
-  flatten arm owes -- an emitted inner's nesting under its emitter's --
-  at full strength, and discharges the registry's depth row from the
-  receipt's own conjunct, expiring its probe.
+- **NOW SUPPLY THE REGISTRATION'S DEPTH AT EVERY MINT.** `register-caps`
+  asks each mint for the chain's own nesting under the unit -- refuted
+  unconditionally, so the true statement -- and the seven mints do not
+  carry it, so the subscribe face is red. The commit threads one coupled
+  premise, the caller's nesting plus the chain's under the unit, down the
+  `-caps` signatures to those mints, states the flatten arm's one leaf --
+  an emitted inner's nesting under its emitter's -- at full strength, and
+  discharges the registry's depth row from the receipt's own conjunct.
+  With the face green the receipts RETIE: every probe the tower carries
+  gets its `Confirms` rows, which E7 holds red until they land.
 
 - **THEN DECIDE WHETHER THE FOLD'S COUNT IS REAL.** The fold arm is
   at the spiral stop: a depth fixed before an instant runs, against a

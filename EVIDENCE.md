@@ -101,6 +101,36 @@ E2.
   carries: it is the hand-built-state failure under PROBE BEFORE GRINDING,
   unchanged.
 
+- **E7 — A RECEIPT'S ROWS ARE TIED TO ITS TARGET'S STATEMENT IN A TYPE.** A
+  probe used to restate its target's predicate by hand — a local
+  `held d = regP? (λ p → …) …` — and pin THAT by `refl`, so nothing held the
+  row to the postulate: a mistyped or quietly weaker predicate stayed green
+  and earned a `PROBED:` receipt for a claim nobody had instantiated. Every
+  target now has at least one row of type `Confirms (<target> <args>)`, where
+  `Confirms` (in `Probed.Apparatus`) takes the postulate APPLIED at the
+  probe's own arguments and returns that application's type. Agda generates
+  the row's type from the statement as it reads; **the probe chooses only the
+  point.** A restated statement changes every row's type under it, which is
+  E5's fingerprint law arriving inside the typechecker.
+
+  **THE BODY IS HELD TO COMPUTATION, BECAUSE ANY INHABITANT WOULD TYPECHECK.**
+  The postulate itself, handed back as its own proof, inhabits the row — so
+  E7 refuses every clause body that is not `refl`, `tt`, `_`, a numeral
+  witness, `_,_`, or a stdlib converter (`≤ᵇ⇒≤`, `<ᵇ⇒<`, `toWitness`) fed
+  those. A lemma in the body is a claim the probe did not instantiate. And
+  **the head under `Confirms` must be a declared `-- TARGET:`**, reached only
+  through the statement's own eliminators — `proj₁`/`proj₂`, application at
+  a point, a record conclusion's field — since an arbitrary function applied
+  to the postulate returns whatever type it likes and the tie is gone.
+
+  **What E7 does not do.** It does not discharge a HYPOTHESIS: the arguments
+  handed to the target are the probe's, and a hypothesis it cannot compute
+  (`refl` on a decidable one, a real proof otherwise) means the point is
+  outside the statement's domain and the file is not a receipt for it — say
+  so in the header and cover what the conclusion alone can. Rows reading
+  exact numerals (a margin, a count, a non-vacuity pin) stay as they are: a
+  `Confirms` row says the claim held, and those rows say by how much.
+
 Plus, per tree, the wiring law with no exemptions:
 
 - **`make wiring-refuted`** and **`make wiring-probed`** run the reachability
