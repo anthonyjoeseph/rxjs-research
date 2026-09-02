@@ -115,17 +115,19 @@ pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
 -- The doubling in the charge is what lets the first piece sit beside
 -- the other two rather than competing with them.
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sl : Slots Γ) (id : ℕ) (op : AllOp) (nid : NodeId)
-  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ)
-  (st : EvalSt e) →
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (nid : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
   pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
          (thru-outer op nid ↠ p) vals ≡ true →
-  FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-            (thru-outer op nid) p vals sched st
-walk-thru-fit {n = n} {e = e} sl id op nid p vals sched st hsl hpz hnd hΦ =
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+            (thru-outer op nid) p vals fin sched st
+walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
+              hsl hpz hnd hΦ =
   n , G
   , subst (λ z → ValsFit n z G p vals) (sym hsl)
       (valsFit-of-max sl p vals M ≤-refl)
@@ -214,36 +216,71 @@ postulate
   -- of the gap: `length vals` is a parameter, and the factors are the
   -- ones the iteration face is already proven at.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
-    (p : Path Γ u t) (vals : List (Val Γ s)) (sched : Sched Γ)
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+    (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
     (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     pathSz? (Caps.cSize (capsAt e sl id)) (scan-f fn nid ↠ p) ≡ true →
     pathNestD (scan-f fn nid ↠ p) ≤ nestUnit e sl →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
            (scan-f fn nid ↠ p) vals ≡ true →
-    FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-              (scan-f fn nid) p vals sched st
+    FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+              (scan-f fn nid) p vals fin sched st
+
+  -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, ONLY ONE OF WHICH IS
+  -- THE SAME GAP.  A `from-inner` hands on what the inner run
+  -- produced, so like the fold it reaches past its own values -- but
+  -- the payload it reaches is the merge node's QUEUE, and what a
+  -- subscription does to a queued term is substitute into it.  So the
+  -- grant carries the iteration face's factors rather than a summand,
+  -- and the store ceiling it also needs is the same one the fold
+  -- asks for, at the same record with the same field missing.
+  --
+  -- THE TWO THAT ARE NOT THE FOLD'S ARE DRAIN LEDGERS, and they are
+  -- available on this face rather than absent from it: the queue's
+  -- caps receipt and its width are what a sink-side walk establishes
+  -- when it admits the entries, so the residue here is a routing
+  -- question -- which statement hands them over -- and not a fact
+  -- nothing in the development has.  What makes it a residue today is
+  -- that the entries are read out of the table by a lookup this
+  -- statement's premises do not constrain, which is the store gap
+  -- again in its second guise.
+  innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+    (op : AllOp) (allNid inst : NodeId)
+    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+    (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+    pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+           (from-inner op allNid inst ↠ p) vals ≡ true →
+    FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+              (from-inner op allNid inst) p vals fin sched st
 
 -- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
 -- which is the point of separating it from the walk below: the silent
 -- kinds are units, so the walk's recursion never mentions them.
 frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-  (sl : Slots Γ) (id : ℕ) (f : Frame Γ s u) (p : Path Γ u t)
-  (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (f : Frame Γ s u) (p : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
   pathNestD (f ↠ p) ≤ nestUnit e sl →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) (f ↠ p) vals ≡ true →
-  FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-            f p vals sched st
-frameΦ-fit sl id (map-f _)          p vals sched st _ _ _ _ = tt
-frameΦ-fit sl id (take-f _)         p vals sched st _ _ _ _ = tt
-frameΦ-fit sl id (from-inner _ _ _) p vals sched st _ _ _ _ = tt
-frameΦ-fit sl id (scan-f fn nid) p vals sched st hsl hpz hnd hΦ =
-  scanΦ-fit sl id fn nid p vals sched st hsl hpz hnd hΦ
-frameΦ-fit sl id (thru-outer op nid) p vals sched st hsl hpz hnd hΦ =
-  walk-thru-fit sl id op nid p vals sched st hsl hpz hnd hΦ
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+            f p vals fin sched st
+frameΦ-fit sl id sf eid now (map-f _)  p vals fin sched st _ _ _ _ = tt
+frameΦ-fit sl id sf eid now (take-f _) p vals fin sched st _ _ _ _ = tt
+frameΦ-fit sl id sf eid now (scan-f fn nid) p vals fin sched st hsl hpz hnd hΦ =
+  scanΦ-fit sl id sf eid now fn nid p vals fin sched st hsl hpz hnd hΦ
+frameΦ-fit sl id sf eid now (from-inner op allNid inst) p vals fin sched st
+           hsl hpz hnd hΦ =
+  innerΦ-fit sl id sf eid now op allNid inst p vals fin sched st hsl hpz hnd hΦ
+frameΦ-fit sl id sf eid now (thru-outer op nid) p vals fin sched st hsl hpz hnd hΦ =
+  walk-thru-fit sl id sf eid now op nid p vals fin sched st hsl hpz hnd hΦ
 
 -- THE WALK ITSELF, and it is the fold's own recursion with the grant
 -- hung off each frame.  Nothing here is arithmetic: the potential is
@@ -322,7 +359,7 @@ walk-ΦHyp-go {e = e} sl id sf gas nid now j (f ↠ p) vals fin sched st hsl hpz
         (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) hΦ hF)
   where
   step = stepFrame sf nid now f p vals fin sched st
-  hF = frameΦ-fit sl id f p vals sched st hsl hpz hnd hΦ
+  hF = frameΦ-fit sl id sf nid now f p vals fin sched st hsl hpz hnd hΦ
   B  = Caps.cSize (capsAt e sl id)
   1≤B : 1 ≤ B
   1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)

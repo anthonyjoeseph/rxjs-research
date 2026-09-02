@@ -215,19 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OTHER `⊤` ARM, AND THE INVARIANT THE FIRST ONE LOCATED.** The
-  scan arm is now a real body over a store-and-width grant, and the
-  gap moved rather than closing: `scanΦ-fit` asks for a ceiling on
-  `EvalSt.nodes` that none of its premises mention. The drain arm is
-  next: no width is owed there, since a queue does not thread, but a
-  FACTOR is — it substitutes into the term it subscribes, so a store
-  ceiling alone is refuted at double occurrence. That is the grant
-  `thru-outer` already carries. Then both arms share one gap: a
-  ceiling on the table is a fact every writer of a node must
-  establish, so it belongs on the invariant record — and the bundle
-  this face runs under has no `EvalSt` conjunct. Adding the field is
-  the risk: it obliges every producer.
-
 - **THEN THE ONE ROW WHOSE COVERAGE CLAIM IS NOT IN ITS LEDGER.**
   `stepFrame-nest-regs` reads as unprobed — the census scored it on
   `RECOVERY` alone — but its explanation describes readings at two
@@ -251,6 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   sibling already prices the program, so the cost is two cascades. A
   verdict there closes this leaf's measure-side axes; a red one says
   the grant answers the subscribe, not the run.
+
+- **THEN THE FIELD BOTH NEW RESIDUES ARE WAITING ON.** `scanΦ-fit` and
+  `innerΦ-fit` are one gap in two guises: each asks a producing side
+  for a ceiling on `EvalSt.nodes`, and neither has a premise that
+  mentions the table. The drain's other two residues — the queue's
+  caps receipt and its width — are NOT that gap; they exist on this
+  face and are a routing question, so take them first and see what is
+  left. What remains is the invariant: a store ceiling is a fact every
+  writer of a node establishes and every reader spends, which is a
+  field on the record, not a hypothesis. Adding it obliges every
+  producer, and that cascade is the risk this leg is measuring.
 
 ### The ledger
 
@@ -293,10 +291,10 @@ does not fit is a finding about the shared statement, not about the head.
   standing registry's `B ≥ S`. The doubling was refuted; the family that
   refuted it now fits either side of the crossover. Only a LATER arrival is
   unread.
-- **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — SHAPE, `REFUTED, TWIN`: the
-  drain under this frame SUBSCRIBES, so a completion walk's empty premise holds
-  at every `U` while the queue's own depth leaves through it. Restate: the
-  arm's `⊤` obligation must become the grant `thru-outer` already carries.
+- **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
+  of the drain's new grant. Two of its three obligations are drain ledgers this
+  face has and must be routed; the third is the store ceiling `scanΦ-fit` also
+  asks for. Restate: a field on the invariant record, not a hypothesis here.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
   of the fold's new grant, and every premise it has is about the schedule, the
   path or the values. A ceiling on `EvalSt.nodes` is not derivable from them.
