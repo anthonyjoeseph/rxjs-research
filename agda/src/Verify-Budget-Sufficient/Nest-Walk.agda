@@ -430,6 +430,41 @@ abstract
                     (⊔-mono-≤ (lookupNode-nodes nid (scan-st a) (EvalSt.nodes st) eq)
                               ≤-refl)))
 
+  -- THE SAME FOLD READ AT THE ONE ENTRY IT TOUCHES.  The bound above
+  -- is the honest one for the TABLE it leaves, and the table is why it
+  -- reads the table's max: a walk may write anywhere.  What LEAVES the
+  -- frame is not like that.  `scanVals` threads the accumulator this
+  -- `nid` was holding and nothing else in the map is ever consulted,
+  -- so the emitted depth is a function of one entry -- which is what
+  -- the sibling above spends its last step widening away, and the
+  -- widening is the only place the table enters at all.
+  --
+  -- AND THE STUCK BRANCHES ARE FREE HERE RATHER THAN ARITHMETIC.  The
+  -- sibling must still bound the table it returns untouched, so every
+  -- kind that is not a matching `scan-st` costs it an inflation; this
+  -- one returns no values in those branches, and nothing is under
+  -- everything.
+  stepFrame-emit-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (nid : NodeId) (p : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    length vals ≤ W →
+    nestDᵛˢ (proj₁ (stepFrame sf id now (scan-f fn nid) p vals fin sched st))
+      ≤ (2 ^ sizeᵗ fn) ^ W * ((nodeNestAt nid st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn)
+  stepFrame-emit-scan {u = u} W sf id now fn nid p vals fin sched st hlen
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing                    = z≤n
+  ... | just (take-st _)           = z≤n
+  ... | just (mergeAll-st _ _ _ _) = z≤n
+  ... | just (switch-st _ _)       = z≤n
+  ... | just (exhaust-st _ _)      = z≤n
+  ... | just (scan-st {w} a) with w ≟ᵗ u
+  ...   | no _     = z≤n
+  ...   | yes refl =
+    ≤-trans (m≤m⊔n (nestDᵛˢ (proj₁ (scanVals fn a vals)))
+                   (nestDᵛ u (proj₂ (scanVals fn a vals))))
+            (scanVals-nest W fn a vals hlen)
+
 -- A PREFIX CANNOT BE DEEPER THAN THE LIST, and `takeVals` returns a
 -- prefix.  The induction is on the budget rather than the list because
 -- that is what `takeVals` recurses on, and its `suc zero` clause drops

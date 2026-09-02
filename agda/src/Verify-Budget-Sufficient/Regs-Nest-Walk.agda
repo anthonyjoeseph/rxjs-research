@@ -43,7 +43,7 @@ open import Rx.Evaluator
   exhaust-st; takeDispatch; takeVals; lookupNode)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; thruWalk-nest; nodesMax; stepFrame-nodes-scan;
+  using (nestDᵛˢ; thruWalk-nest; nodesMax; nodeNestAt; stepFrame-emit-scan;
   stepFrame-nodes-inner; capsDrainOK; FaceOK)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all; pathLen)
@@ -148,7 +148,7 @@ FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st =
   InnerΦFit sf id now B U op allNid inst path vals fin sched st
 FrameΦHyp sf id now B U (scan-f fn nid) path vals fin sched st =
   Σ ℕ λ G →
-    (nodesMax st ⊔ nestDᵛˢ vals ≤ G)
+    (nodeNestAt nid st ⊔ nestDᵛˢ vals ≤ G)
     × (pathΦF B path
         * ((2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn)
            + pathNestD path) ≤ U)
@@ -347,12 +347,10 @@ scanΦ sf id now fn nid path vals fin sched st B U (G , hst , hnum) =
         ≤ (2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn)
   bound =
     ≤-trans
-      (m≤n⊔m (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r))))) (nestDᵛˢ (proj₁ r)))
-      (≤-trans
-        (stepFrame-nodes-scan (length vals) sf id now fn nid path vals fin
-          sched st ≤-refl)
-        (*-monoʳ-≤ ((2 ^ sizeᵗ fn) ^ length vals)
-          (+-monoˡ-≤ (length vals * nestDᵗ fn) hst)))
+      (stepFrame-emit-scan (length vals) sf id now fn nid path vals fin
+        sched st ≤-refl)
+      (*-monoʳ-≤ ((2 ^ sizeᵗ fn) ^ length vals)
+        (+-monoˡ-≤ (length vals * nestDᵗ fn) hst))
 
 -- THE INNER FRAME'S OUTPUT DOES NOT COME FROM THE FRAME AT ALL -- it
 -- is what the inner run produced -- and the frame's factor is one, so

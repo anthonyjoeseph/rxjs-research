@@ -215,18 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE FIELD BOTH NEW RESIDUES ARE WAITING ON.** `scanΦ-fit` and
-  `innerΦ-fit` are one gap in two guises: each asks a producing side
-  for a ceiling on `EvalSt.nodes`, and neither has a premise that
-  mentions the table. No invariant is owed: they are SHAPE rows and
-  the restatement is now named. The fourth arm, `walk-thru-fit`, is
-  proven from these same four premises and reads the store nowhere,
-  and the evaluator says why the other two need not either — the scan
-  clause touches one node and the drain two, so a ⊔ over the whole
-  table is strictly stronger than either step can spend. Restate both
-  at the entries the step names, `nodeNestAt` being vocabulary the
-  sighted face carries. The residue is then one accumulator's depth,
-  which the folded values pay for.
+- **THEN THE DRAIN ARM, WHICH THE FOLD'S REPAIR DID NOT REACH.** The
+  scan half landed: `FrameΦHyp` reads `nodeNestAt nid st`, and
+  `stepFrame-emit-scan` proves what LEAVES that frame is a function of
+  the one accumulator, so `scanΦ` spends the entry and never the
+  table. `InnerΦFit` still asks for `nodesMax st`, and it is not the
+  same ask — the drain reaches two entries, not one, so whether the
+  narrowing is even available is a question about `drainW` and
+  `mergeAllDrain` rather than about the signature. Read those two
+  first. If the pair is nameable at the arm, restate at their join; if
+  it is not, the whole-table read is the honest one and `innerΦ-fit`
+  is DIFFICULTY, not SHAPE.
 
 - **THEN THE EMPTY-HANDED WALK AT THE ARMS IT HAS NOT REACHED — BUT
   NOT WITH THE SAME WITNESS.** The registry arm fell to a completion

@@ -247,25 +247,20 @@ postulate
   -- and it decides the arm, since the burst's own exponent still has
   -- to fit inside whatever margin it leaves.
 
-  -- AND BEFORE ANY OF THAT: THE ARM READS THE WHOLE TABLE WHERE THE
-  -- STEP TOUCHES ONE NODE, which is why this row is SHAPE and not a
-  -- hard fit.  The fourth arm is already discharged from these very
-  -- four premises -- `walk-thru-fit` builds its grant out of the
-  -- path's depth, the depth in flight and the context's wrap, and
-  -- reads the store nowhere at all -- so the store summand is what
-  -- separates the open arms from a proven one rather than something
-  -- the shape demands.  And the evaluator says the summand is too
-  -- big: the scan clause does one lookup and one write at its own
-  -- `nid` and never sees another entry, and the drain's reaches two.
-  -- A ⊔ over every node in the table is therefore strictly stronger
-  -- than anything either step can spend, and the per-node reading is
-  -- already this development's vocabulary -- the sighted face states
-  -- both, carrying `nodeNestAt` beside the table's max.  Restate at
-  -- the entries the step names, and the ceiling owed is a scan
-  -- accumulator's own depth, which the values folded into it already
-  -- pay for.  Nothing downstream loses by it: a write at one `nid`
-  -- moves the table's max to the join of the old max and that one
-  -- entry, so the whole-table conclusions still follow.
+  -- AND THE STORE SUMMAND IS THE WHOLE SEPARATION FROM A PROVEN ARM,
+  -- which is what makes the residue small rather than structural.
+  -- The fourth arm closes from these very four premises --
+  -- `walk-thru-fit` builds its grant out of the path's depth, the
+  -- depth in flight and the context's wrap, and reads the store
+  -- nowhere at all -- so what stands between this arm and that one is
+  -- one term and not a shape.  That term is read at the entry the
+  -- step names: the scan clause does a single lookup and a single
+  -- write at its own `nid` and never consults another, and
+  -- `stepFrame-emit-scan` bounds what LEAVES the frame from that
+  -- accumulator alone.  The table's own max is the honest reading for
+  -- the table the step RETURNS and for nothing else.  So the ceiling
+  -- owed here is one accumulator's depth, and it is the values folded
+  -- into it that should pay for it.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -284,9 +279,12 @@ postulate
   -- produced, so like the fold it reaches past its own values -- but
   -- the payload it reaches is the merge node's QUEUE, and what a
   -- subscription does to a queued term is substitute into it.  So the
-  -- grant carries the iteration face's factors rather than a summand,
-  -- and the store ceiling it also needs is the same one the fold
-  -- asks for, at the same record with the same field missing.
+  -- grant carries the iteration face's factors rather than a summand.
+  -- The store ceiling it also needs is NOT the fold's, though the two
+  -- read alike: the fold's is one accumulator, this one is still the
+  -- table's max, and the drain reaches two entries rather than one.
+  -- Whether it narrows the same way is a question about `drainW` and
+  -- `mergeAllDrain`, not about this signature.
   --
   -- THE TWO THAT ARE NOT THE FOLD'S ARE DRAIN LEDGERS, and they are
   -- available on this face rather than absent from it: the queue's
