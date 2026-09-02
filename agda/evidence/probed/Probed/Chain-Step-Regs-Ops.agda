@@ -73,7 +73,7 @@
 -- here only through the held row, which says such a step cannot
 -- lengthen what is already standing.
 
--- TARGET: foldPath-regsLen @68fc23
+-- TARGET: foldPath-regsLen @d58775
 module Probed.Chain-Step-Regs-Ops where
 
 open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)

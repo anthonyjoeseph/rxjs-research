@@ -201,4 +201,5 @@ open import Refuted.Demand-Programs
 open import Refuted.Sight-Fit-Scan using (figs≡; ok₂; scan-fit-absurd)
 open import Refuted.Fold-Path-Regs-Len
   using (FoldPathRegsLen; reached; entryVals; entryPath; entryRegs;
-         figures; exitRow≡false; fold-path-regs-len-absurd)
+         figures; exitRow≡false; fold-path-regs-len-absurd;
+         repairFigs; repairFits)

@@ -215,27 +215,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PRICE THE FOLD'S REGISTRY PER FRAME, BECAUSE THE DOUBLING IS NOW
-  REFUTED.** The axis all seven sweeps held fixed was instantiated in
-  both its forms and they disagree. A DUPLICATING frame cannot break
-  the grant at all — its copies are siblings, and the charge is an
-  `all`, so width is free. A NESTING frame composes down one spine and
-  breaks it outright, and no constant repairs it — the grant is a
-  MAXIMUM of the frame syntax and the path length, the spine is their
-  PRODUCT. So
-  restate the leaf in the per-FRAME currency the size ledger already
-  charges in, and carry the level form above it through the same move.
+- **SEPARATE THE TWO CAPS, WHICH IS THE ONE THING NO ROW HAS DONE.**
+  The restated leaf prices the walked path at `S` and the standing
+  registry at `B ≥ S`, and every row taken so far collapses them: the
+  duplicator sweep searches ONE joint budget, and the nesting
+  witness's repair row is read at `S = B` too. But a caller standing
+  high up the iterate has `B` far above `S`, and that is where the
+  grant `S·(1+2B)` is thinnest against what a spine of `S` frames can
+  push. Build the program that stands a long registry beside a short
+  walked path, and read the step against it — a failing row says the
+  per-frame reading is wrong the way the doubling was, and a holding
+  one is the first evidence reaching the region the refutation
+  opened.
 
-- **THEN THE ROWS THAT RESTATEMENT DRAGS WITH IT.** A leaf restated in
-  a new currency is the expensive kind of move: the chain door is a
-  body over the level form, and the depth cascade that calls the door
-  reads in the old currency too — so the premise has to be DISCHARGED
-  at the call site, not merely stated. The caller already derives that
-  ledger for a proven walk-face sibling, which is evidence the
-  direction is right and not a licence to assume the indices line up.
-  Walk the door's cone, fix per site whether the frame ledger reaches
-  it, and move the sites that read the old grant in one commit, so
-  none is left premising a currency nothing supplies.
+- **THEN THE SPINE AT HEIGHT, AGAINST THE GRANT THAT REPLACED THE
+  DOUBLING.** The nesting family is the only shape known to make a
+  registration track the walk's PRODUCT, and it has been read at one
+  depth and one height. Sweep depth and height up together against the
+  frame step, as the refuting sweep did against the doubling, and take
+  the boundary the same way: the grant is quadratic in the caps while
+  the spine is a product of two quantities the caps dominate, so the
+  margin should widen rather than close. If it closes, the currency is
+  wrong and not merely the constant.
 
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to

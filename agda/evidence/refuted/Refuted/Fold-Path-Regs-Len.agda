@@ -33,11 +33,14 @@
 -- separate chains, and `regsSz?` is an `all` over entries -- so width
 -- is free however much of it there is.  Only depth composes.
 --
--- WHAT THE REPAIR HAS TO BE.  The value inflation this tree already
--- prices charges one step per FRAME, and the proven walk-face
--- siblings each carry a premise in that currency rather than in a
--- doubling.  So the fold's own conclusion belongs at the level the
--- frames it walked have reached, not at twice its entry.
+-- WHAT THE REPAIR HAS TO BE, AND IT IS TWO CAPS RATHER THAN A BIGGER
+-- ONE.  The single budget is what collapses the maximum and the
+-- product into one number, so the conclusion has to be denominated in
+-- BOTH: the walked path's cap, which bounds the spine's two factors,
+-- and the standing registry's, which the caller has taken up the
+-- iterate.  One step of the per-FRAME currency in those two covers
+-- the same witness with room, and the row below reads it rather than
+-- arguing it.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Fold-Path-Regs-Len where
 
@@ -58,7 +61,7 @@ open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; gasPad; g0;
 open import Rx.Exp using (Ctx; Closed; Val; Exp; Fn; natᵗ; obs; ofᵉ; mapᵉ;
   mergeAllᵉ; strmᵗ; varᵗ; input; syncSizeᵉ)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; Path; foldPath;
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; Path; foldPath; sizeStep;
   subscribeE; sched-init; st-init; root; sched-next; cascadeLatch;
   chainsOf; arrTy; arrVal; arrTick; arrSource; budgetAt)
 open import Rx.Hop-Depth using (hopDᵉ)
@@ -217,6 +220,22 @@ exitLongest  = longest after
 -- what the step registers does not sit inside twice it
 figures : entryLongest + 100 * pathLen chain + 10000 * exitLongest ≡ 311212
 figures = refl
+
+-- AND THE REPAIR, READ AT THE SAME WITNESS RATHER THAN ARGUED.  One
+-- step of the per-FRAME currency at this cap is `sizeStep 13 13`, and
+-- the thirty-one that outran the doubling sits inside it with room --
+-- which is the direction the restatement has to take, not merely a
+-- bigger constant in the old one.  The grant is quadratic in the cap
+-- while the spine is a product of two quantities the cap dominates,
+-- so the margin is structural.
+repairGrant : ℕ
+repairGrant = sizeStep B B
+
+repairFigs : repairGrant ≡ 351
+repairFigs = refl
+
+repairFits : regsSz? (sizeStep B B) (EvalSt.registry after) ≡ true
+repairFits = refl
 
 exitRow : Bool
 exitRow = regsSz? (B + B) (EvalSt.registry after)

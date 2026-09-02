@@ -61,7 +61,7 @@
 -- spine, and that shape breaks the doubling outright --
 -- `Refuted.Fold-Path-Regs-Len`.
 
--- TARGET: foldPath-regsLen @68fc23
+-- TARGET: foldPath-regsLen @d58775
 module Probed.Chain-Step-Regs-Read where
 
 open import Data.Bool using (Bool; true; if_then_else_; _∧_)
@@ -81,7 +81,7 @@ open import Rx.Prim using (gasPad; g0; cold; after_,_)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator using (Sched; EvalSt; subscribeE; sched-init;
   st-init; root; sched-next; cascade; cascadeLatch; chainStep; chainsOf;
-  arrVal)
+  arrVal; sizeStep)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?)
@@ -233,13 +233,19 @@ duplicates : countAfter p0 + 1000 * countAfter p1
            ≡ 129033009003
 duplicates = refl
 
--- THE SWEEP.  At four stack heights the exit budget sits under the
--- doubling the leaf grants -- with the whole of it to spare, since
--- the two columns are equal -- so a frame that reads its argument's
--- syntax does not make a registration track the size inflation
-fits : (exitB p0 ≤ᵇ entryB p0 + entryB p0)
-     ∧ (exitB p1 ≤ᵇ entryB p1 + entryB p1)
-     ∧ (exitB p2 ≤ᵇ entryB p2 + entryB p2)
-     ∧ (exitB p3 ≤ᵇ entryB p3 + entryB p3)
+-- THE SWEEP.  At four stack heights the exit budget sits under one
+-- FRAME STEP of the entry budget -- with the whole of it to spare,
+-- since the two columns are equal -- so a frame that reads its
+-- argument's syntax does not make a registration track the size
+-- inflation.  The step is taken at `S = B`, which is the joint search
+-- above read as the leaf's two caps at once: the same number prices
+-- the walked path and the standing registry, so the premises are the
+-- three the search already pinned and the pair is ordered by `refl`.
+-- Each column is at least two, so the positivity premise is met on
+-- every row rather than assumed.
+fits : (exitB p0 ≤ᵇ sizeStep (entryB p0) (entryB p0))
+     ∧ (exitB p1 ≤ᵇ sizeStep (entryB p1) (entryB p1))
+     ∧ (exitB p2 ≤ᵇ sizeStep (entryB p2) (entryB p2))
+     ∧ (exitB p3 ≤ᵇ sizeStep (entryB p3) (entryB p3))
      ≡ true
 fits = refl

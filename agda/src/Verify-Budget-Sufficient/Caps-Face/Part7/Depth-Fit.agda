@@ -558,12 +558,14 @@ chainsNest-all D U (c ∷ cs) h =
 -- what a chain does to the registry is what that call does, and the
 -- level it costs is the fold's one step.
 --
--- SO WHAT IS OWED HERE IS TWO TRANSPORTS AND NOTHING ELSE.  The
--- caller reads its path at the PROGRAM's cap while the fold reads it
--- at the level, and reads its arrival as a size while the fold reads
--- a list -- so the path widens across the level's inflation and the
--- arrival becomes the one-element values premise at the same reading.
--- Both are free at `j = 0`, where the iterate is the cap itself.
+-- SO WHAT IS OWED HERE IS ONE TRANSPORT AND NOTHING ELSE.  The path
+-- passes STRAIGHT THROUGH at the program's cap, because the fold's
+-- two caps are the same two this face already keeps apart -- the
+-- program's own and the level reached -- so nothing has to claim a
+-- chain grew with the level it is walked at.  What remains is the
+-- arrival, read here as a size and by the fold as a list, which
+-- becomes the one-element values premise at the level's reading and
+-- is free at `j = 0`, where the iterate is the cap itself.
 --
 -- SO THE LEVEL ACCUMULATES DOWN THE SELECTION RATHER THAN COLLAPSING
 -- AT THIS DOOR.  The consumer spends this once per chain, feeding each
@@ -583,7 +585,7 @@ chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≡ true
 chainStep-regsSz S j a nextId path sched st 1≤S hsz hp hreg =
   foldPath-regsSz _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st S j 1≤S
-    entrySz (pathSz?-widen path (iterSize-infl S 1≤S j S) hp) hreg
+    entrySz hp hreg
   where
   entrySz : valsSz? (iterSize S j S) (arrVal a ∷ []) ≡ true
   entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ

@@ -45,7 +45,7 @@
 -- in each arm, so a chain door met after several inner deliveries have
 -- already landed is unmeasured.
 
--- TARGET: foldPath-regsLen @68fc23
+-- TARGET: foldPath-regsLen @d58775
 module Probed.Chain-Step-Regs-Inner where
 
 open import Data.Bool using (true; _∧_)

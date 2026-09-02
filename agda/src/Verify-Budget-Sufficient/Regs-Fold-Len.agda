@@ -7,57 +7,44 @@
 -- for a `from-inner` and registers a NEW chain carrying one frame per
 -- operator of the inner it received.
 --
--- SO THE PRICE IS A DOUBLING, AND THAT IS WHY THE STEP IS COMFORTABLE
--- RATHER THAN TIGHT.  A registered chain is the walked path plus the
--- inner's own count.  The walked half is capped by `pathSz?`, whose
--- length conjunct is the only unbounded one; the inner half is capped
--- by the values' size premise, `sizeᵛ` at an observable being `sizeᵉ`.
--- Both sit under the entry budget, so the registration is bounded by
--- the budget twice over -- while one `sizeStep` buys `S·(1+2B)`, which
--- exceeds `B+B` at every `1 ≤ S`.  Stating the leaf in the LENGTH
--- currency is what makes that margin visible: the level form hides a
--- doubling inside an exponential and reads as though the two were the
--- same claim.
+-- SO THE PRICE IS ONE FRAME STEP, AND NOT A DOUBLING, BECAUSE THE TWO
+-- CAPS ARE DIFFERENT QUANTITIES.  A registered chain is the walked
+-- path plus the frames each subscribe along it pushes.  The path is
+-- capped by `pathSz?` at `S`, which bounds both its length and every
+-- frame's own syntax, so what a whole walk can push is a PRODUCT of
+-- two quantities `S` dominates -- while the standing registry and the
+-- arriving values are capped by `B`, which the caller has already
+-- taken up the iterate.  One `sizeStep S B` buys `S·(1+2B)`, which
+-- covers `S·S` and `B` together at every `1 ≤ S ≤ B`.  Reading a
+-- single budget for both caps is what makes the doubling look
+-- available, and it is exactly the collapse `Refuted.Fold-Path-Regs-
+-- Len` breaks: a maximum doubled cannot pay a spine's product.
 module Verify-Budget-Sufficient.Regs-Fold-Len where
 
 open import Data.Bool using (Bool; true)
 open import Data.List using (List)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _≤_)
-open import Data.Nat.Properties using (≤-trans; ≤-reflexive; n≤1+n;
-  +-identityʳ; *-identityˡ; *-monoˡ-≤)
+open import Data.Nat using (ℕ; suc; _≤_)
 open import Data.Product using (proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_; sym; cong; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; sym; subst)
 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent)
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Evaluator using (Sched; EvalSt; Path; foldPath; iterSize; sizeStep)
-open import Verify-Budget-Sufficient.Caps using (iterSize-suc)
+open import Verify-Budget-Sufficient.Caps using (iterSize-suc; iterSize-infl)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; regsSz?; regsSz?-widen)
+  using (pathSz?; regsSz?)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 
--- THE MARGIN, MADE CHECKED RATHER THAN ARGUED.  One step of the level
--- buys strictly more than the doubling the registration costs, and it
--- does so at the smallest base the caps invariant admits -- so nothing
--- about the arithmetic depends on the base being generous.
-dbl≤sizeStep : ∀ (S B : ℕ) → 1 ≤ S → B + B ≤ sizeStep S B
-dbl≤sizeStep S B 1≤S =
-  ≤-trans (≤-reflexive (sym (twice B)))
-    (≤-trans (n≤1+n (2 * B))
-      (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * B)))))
-               (*-monoˡ-≤ (suc (2 * B)) 1≤S)))
-  where
-  twice : ∀ (b : ℕ) → 2 * b ≡ b + b
-  twice b = cong (b +_) (+-identityʳ b)
-
 -- WHAT THE FOLD LEAVES REGISTERED, AT THE ONE CONJUNCT THAT CAN MOVE.
--- The count is DETERMINED -- one call, one doubling -- rather than a
+-- The step is DETERMINED -- one call, one frame step -- rather than a
 -- witness chosen after the fact, and nothing in it is denominated in
--- the path's length or in how deep a sink re-enters.  Both of the
--- fold's re-entries are inside this claim: rootward through the frames
--- and sideways at a share, where it and `dispatchShare` are mutually
--- recursive and every admitted chain re-enters with its own
--- continuation.
+-- how deep a sink re-enters.  The path's own cap IS denominated here,
+-- and that is the restatement: the walk's product is charged against
+-- `S`, the quantity that bounds it, instead of against the entry
+-- budget it is unrelated to.  Both of the fold's re-entries are inside
+-- this claim: rootward through the frames and sideways at a share,
+-- where it and `dispatchShare` are mutually recursive and every
+-- admitted chain re-enters with its own continuation.
 --
 -- REFUTED: `Refuted.Chain-Step-Regs-Cap` -- the fixed-cap form this
 --   replaces, at a five-node inner and a six-frame chain against a cap
@@ -88,8 +75,9 @@ dbl≤sizeStep S B 1≤S =
 --   cap, so sharpening the walk factor buys a constant and the two
 --   separate at every cap.
 -- DEAD ROUTE: and neither does carrying the values at the entry budget
---   through the frame arm, which is the repair the doubling above
---   invites.  A frame INFLATES the values it passes on -- the size
+--   through the frame arm, which is what proving this leaf by
+--   induction along the path would need.  A frame INFLATES the values
+--   it passes on -- the size
 --   ledger takes them a level per frame -- so a fold whose statement
 --   fixes one budget for the values cannot hand that budget to its own
 --   recursion.  What survives is the reading here, where the values
@@ -231,31 +219,40 @@ dbl≤sizeStep S B 1≤S =
 --   budgets are EQUAL at every height, both found by independent
 --   searches so an unsatisfiable premise would show as a wrong figure
 --   rather than as a green.  The copies are SIBLINGS and `regsSz?` is
---   an `all`, so exponential width costs what one entry costs.  NOT
---   COVERED: only the additive shape.  A frame that NESTS its
---   argument composes down one spine instead, and that is where the
---   doubling dies.
+--   an `all`, so exponential width costs what one entry costs.  The
+--   exit is read against one FRAME STEP of the entry budget, taken at
+--   `S = B` so the joint search pins all three premises at once.  NOT
+--   COVERED: only the additive shape, and only `S = B`.  A frame that
+--   NESTS its argument composes down one spine instead, which is
+--   where the doubling this replaced dies; and a walked path priced
+--   strictly below the standing registry is unreached, so the step's
+--   two caps are never separated by a row.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B : ℕ) →
+    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) →
+    1 ≤ S →
+    S ≤ B →
     valsSz? B vals ≡ true →
-    pathSz? B path ≡ true →
+    pathSz? S path ≡ true →
     regsSz? B (EvalSt.registry st) ≡ true →
-    regsSz? (B + B)
+    regsSz? (sizeStep S B)
       (EvalSt.registry (proj₂ (proj₂
         (foldPath sf gas id now envSrc path vals evs fin sched st))))
       ≡ true
 
--- AND THE LEVEL FORM IS THAT LENGTH READING SPENT, NOTHING MORE.  The
--- consumer wants one step of the iterate rather than a doubling,
--- because the level is what the depth cascade accumulates down its
--- selection and what the walk factor is denominated in.  So the whole
--- of this body is the margin above, applied at the level the caller
--- happens to be standing on, and the step's own equation is what
--- carries it across.
+-- AND THE LEVEL FORM IS THAT FRAME STEP SPENT, NOTHING MORE.  The
+-- consumer wants one step of the iterate, because the level is what
+-- the depth cascade accumulates down its selection and what the walk
+-- factor is denominated in.  The leaf's two caps are exactly the two
+-- the iterate already keeps apart -- the program's own `S` and the
+-- level reached -- so the step's equation is the whole of this body
+-- and no widening is spent in between.  The path is premised at `S`
+-- here rather than at the level, which is where the level form is
+-- STRONGER than the reading it replaced: a caller standing high up
+-- the iterate no longer has to claim its chains grew with it.
 foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
   (path : Path Γ u t) (vals : List (Val Γ u))
@@ -263,7 +260,7 @@ foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) (S j : ℕ) →
   1 ≤ S →
   valsSz? (iterSize S j S) vals ≡ true →
-  pathSz? (iterSize S j S) path ≡ true →
+  pathSz? S path ≡ true →
   regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
   regsSz? (iterSize S (suc j) S)
     (EvalSt.registry (proj₂ (proj₂
@@ -272,9 +269,8 @@ foldPath-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
 foldPath-regsSz sf gas id now envSrc path vals evs fin sched st S j 1≤S hv hp hreg =
   subst (λ z → regsSz? z out ≡ true)
         (sym (iterSize-suc S j S))
-        (regsSz?-widen out (dbl≤sizeStep S (iterSize S j S) 1≤S)
-          (foldPath-regsLen sf gas id now envSrc path vals evs fin sched st
-            (iterSize S j S) hv hp hreg))
+        (foldPath-regsLen sf gas id now envSrc path vals evs fin sched st
+          S (iterSize S j S) 1≤S (iterSize-infl S 1≤S j S) hv hp hreg)
   where
   out = EvalSt.registry (proj₂ (proj₂
           (foldPath sf gas id now envSrc path vals evs fin sched st)))
