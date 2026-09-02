@@ -283,22 +283,31 @@ postulate
   -- `(2 ^ sizeᵗ fn) ^ length vals`.  A budget affording one value is
   -- beaten by the same value repeated.
   --
-  -- AND THE LEDGER IS WHERE THE REPAIR GOES, NOT THE SIGNATURE.  The
-  -- caps face's own value ledger `valsCaps?` is a CONJUNCTION -- the
-  -- per-value predicate together with `length vs ≤ᵇ suc (Caps.cWid
-  -- c)` -- and `stepFrame-scan-caps`, the proven statement about this
-  -- very frame, takes the second conjunct as a premise and gets it
-  -- from `valsLen`.  `valsΦ?` carries only the first.  So the two
-  -- faces disagree about the LEDGER rather than about the
-  -- mathematics, and putting the width back into `valsΦ?` obliges
-  -- every producer and serves every consumer, which threading a
-  -- hypothesis into this one statement would not.
-  -- REFUTED: `Refuted.Scan-Phi-Width`, at the reachable size floor
-  --   with the frame at the root, so the path contributes neither
-  --   factor nor depth and the crossing is the fold's alone; the
-  --   budget is taken at exactly what one value costs and the burst
-  --   is that value twice, so neither a larger budget nor a bigger
-  --   ceiling is the repair.
+  -- AND THE LEDGER LOOKS LIKE THE REPAIR AND IS NOT, WHICH IS THE
+  -- FINDING.  The caps face's own value ledger `valsCaps?` is a
+  -- CONJUNCTION -- the per-value predicate together with a bound on
+  -- `length vs` -- and `stepFrame-scan-caps`, proven about this very
+  -- frame, takes that second conjunct as a premise.  `valsΦ?` carries
+  -- only the first, so the obvious move is to put the width back.  It
+  -- does not close anything: the crossing is at TWO values, and a
+  -- burst of two is admitted by every width the invariant allows.
+  --
+  -- WHAT SEPARATES THE TWO FACES IS THAT ONE CURRENCY STEPS.  The
+  -- mirror's conclusion is a receipt at a cap the fold has already
+  -- advanced, and the width axis EXPONENTIATES per step, so the caps
+  -- face never fits a burst's charge under a quantity fixed before
+  -- the walk began.  The potential does: `nestΦAt` is indexed by the
+  -- INSTANT and reads nothing of how far into a chain the frame sits.
+  -- So what has to move is where this arm's charge is denominated,
+  -- and no conjunct on the values reaches that.
+  -- REFUTED: `Refuted.Scan-Phi-Width`, twice.  Once as written, at the
+  --   reachable size floor with the frame at the ROOT -- so the path
+  --   contributes neither factor nor depth and the crossing is the
+  --   fold's alone -- and at a budget taken at exactly what one value
+  --   costs, the burst being that value twice.  Once again with the
+  --   width premise added and the width left under its binder, which
+  --   is what says the ledger is not the repair rather than that some
+  --   width is too small.
 
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)

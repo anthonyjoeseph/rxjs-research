@@ -225,4 +225,5 @@ open import Refuted.Cap-Walk-Cross
          FieldStepFits; field-step-absurd)
 open import Refuted.Scan-Phi-Width
   using (ScanΦFits; nestD≡; depth≡; rootFac≡; legal; unit-ok; premΦ;
-         bound; scan-phi-width-absurd)
+         bound; scan-phi-width-absurd;
+         ScanΦFitsWide; wide; scan-phi-wide-absurd)
