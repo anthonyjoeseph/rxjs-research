@@ -215,18 +215,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE BUDGET THE WHOLE TIER NOW RESTS ON.** `nestΦAt`
-  was minted to carry the two recurrences the walk's own budget crossed
-  with, and `Refuted.Cap-Walk-Cross` killed both readings in that
-  currency — the ceiling routed down at the READER, a fresh field
-  minted at the WRITER. Both its statements are taken against
-  `nestWalkAt` alone, so neither binds the cap summand added to answer
-  them, and nothing has been read at the new one. State both at
-  `nestΦAt`, at the same floors. The residue is one arithmetic —
-  whether the walk's whole budget fits inside the cap's INCREMENT,
-  `nestIncAt` — decidable over bare numbers in the file holding
-  both. Either the re-mechanisation is confirmed at its foundation,
-  or every open row is refuted before one is ground on it.
+- **PUT THE BURST'S WIDTH BACK IN THE Φ FACE'S VALUE LEDGER.** The
+  leg that stood here is DISCARDED: it asked whether the cap crossing
+  recurs at `nestΦAt`, and `nestCapAt≤nestΦAt` is already proven — the
+  new budget CONTAINS the cap as a summand, so nothing is left to
+  re-test. Reading the arm turned up a defect the currency change
+  never touched. `valsΦ?` is an `all`; its caps-face counterpart
+  `valsCaps?` is that same `all` conjoined with a length bound, and
+  the fold's charge is an exponential in `length vals` — so
+  `Refuted.Scan-Phi-Width` beats every budget with one value
+  repeated. The proven `stepFrame-scan-caps` takes that conjunct and
+  draws it from `valsLen`. Restate the LEDGER, not the signature: it
+  obliges every producer and serves every consumer, which a threaded
+  hypothesis does neither of.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -241,16 +242,17 @@ does not fit is a finding about the shared statement, not about the head.
   `U`, so nothing here compounds with the hop count the live arm died
   on.
 
-- **THEN THE FRAME'S BLIND WRITES, AT WHATEVER THE FIRST LEG LEAVES
-  STANDING.** `scanΦ-fit`, `innerΦ-fit` and the drain arm of
-  `stepFrame-nest-live` are ONE question — no premise of any names
-  `EvalSt.nodes`, and each was refuted for that and repaired by a
-  grant the state cannot carry. If the budget holds, the fact goes on
-  the invariant record the walk runs under and never into these
-  signatures, and the cascade through that record's producers is the
-  cost of the fact being true. If it does not, what moves is the
-  currency the fits are stated in, and all three move together rather
-  than being instantiated one at a time.
+- **THEN THE DRAIN'S ROUTING, ON ITS OWN.** `innerΦ-fit` does NOT
+  share the fold's defect, and binding the two was this leg's error:
+  its width is Σ-CHOSEN with `drainW` as a LOWER bound, so nothing
+  there is free the way a burst's count is. What remains is what its
+  header records — the queue's caps receipt and its width are what the
+  sink-side walk establishes as it admits the entries, and no premise
+  here constrains the table they are read from. So the question is which statement hands them over, a wire
+  rather than a fact the development lacks; and the obvious donor does
+  not pay, the walk's receipt bounding how many terms are queued and
+  never what each carries. The drain arm of `stepFrame-nest-live` is
+  the same lookup and moves with it.
 
 ### The ledger
 
@@ -288,13 +290,13 @@ does not fit is a finding about the shared statement, not about the head.
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
-  the drain's new grant. Two of its three obligations are drain ledgers this
-  face has and must be routed; the third is the merge node's own queue depth,
-  now under the budget and owed the same field the fold arm is.
+  the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
+  `drainW`, so nothing is free. Two obligations are drain ledgers this face
+  has and must route; the third is the merge node's own queue depth.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
-  the fold's new grant. Its ask is one accumulator's depth at the node the step
-  names, and `nestΦAt` carries the table's own ceiling with room. What is left
-  is that no premise names the table, so what it is owed is a field.
+  the fold's new grant. Its ceiling now fits under `nestΦAt`; its BURST does
+  not — the value premise is an `all` and the charge an exponential in the
+  count, so what is owed is the width conjunct `valsCaps?` already carries.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
