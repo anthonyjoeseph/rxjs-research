@@ -139,6 +139,19 @@ postulate
   -- past the gate, one unit per layer, and the frame grant is
   -- denominated in exactly that.
   --
+  -- AND AT THE DRAIN ARM THE STATE READING IS BLIND, SO ONLY THE
+  -- CAP-DERIVED SIDE CAN PAY.  The gate truncates the nesting measure,
+  -- so a parked `deferᵉ` reads as zero wherever the NODE is read --
+  -- which is the one state quantity the fit's own `G` is built above,
+  -- alongside the incoming values, and the drain carries none of those.
+  -- Draining subscribes the entry, and the mint puts the body itself
+  -- into the live list at observable type, where the truncation does
+  -- not apply and the fold reads its full depth.  So the increment this
+  -- arm has to cover is the queued body's own nesting against a `G` of
+  -- zero, and what covers it is the size the caps are built from, which
+  -- sees through the gate.  That is which conjunct is load-bearing here
+  -- and it is what a discharge spends.
+
   -- SO THE FRAME GRANT IS CARRIED, AND IT IS THE SAME ONE THE REGISTRY
   -- ARM TAKES.  That arm fell to the same emptiness at the same frame
   -- and was repaired this way, and its drain conjunct names the node
@@ -167,6 +180,21 @@ postulate
   --   frame in isolation, since the rows read the composite; and a
   --   fold already nonzero at entry, where the growth would compound
   --   rather than start from zero.
+  -- PROBED: `Probed.Frame-Drain-Live` reaches the COMPLETION ARM, which
+  --   the running family above cannot: an unlimited outer never refuses
+  --   room, so its queue is empty on every row, and bounding the limit
+  --   does not fix it either, since a queue fills only while an earlier
+  --   inner is still ACTIVE and every inner that family builds finishes
+  --   inside its own subscribe burst.  This statement quantifies over an
+  --   arbitrary state, so a parked queue is installed instead.  Covered:
+  --   a limit-one node whose single parked entry is a gated nest, at
+  --   depths zero through four, with the incoming live list empty, the
+  --   slot telescope scripted and the registry empty so the reaction
+  --   reaches the finish.  Not covered: the switch and exhaust ops,
+  --   whose finish arms drain nothing; a queue past one entry, where the
+  --   drain's own recursion is what is read; and the hypotheses, which
+  --   carry a quantified numeric conjunct and do not compute -- so a row
+  --   is evidence about the CONCLUSION, unconditional where green.
   stepFrame-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)

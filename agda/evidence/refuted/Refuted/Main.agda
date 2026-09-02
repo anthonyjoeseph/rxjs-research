@@ -139,9 +139,9 @@ open import Refuted.Share-Live-Level
   share-live-level-absurd)
 open import Refuted.Sink-Level-Range
   using (reading≡; range≡; len≡; 8≤S; j≤range; legal; sink-level-range-absurd)
-open import Refuted.Sink-Phi-Fan
-  using (factor≡; depth≡; legal; handed; 8≤B; sink-phi-fan-absurd;
-  recharged; sink-phi-recharge-absurd)
+open import Refuted.Sink-Phi-Leaf
+  using (escalates; deepens; leafFac≡; leafDep≡; legal; handed; 8≤B;
+  sink-phi-leaf-absurd)
 open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width

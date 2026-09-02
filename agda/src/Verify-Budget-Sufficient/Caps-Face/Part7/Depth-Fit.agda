@@ -2,16 +2,16 @@
 -- pathNestD-step … caps-tick
 module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 
-open import Data.Bool    using (Bool; true; false; _∧_)
-open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
+open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; *-distribˡ-+; +-suc)
+  +-mono-≤; *-distribˡ-+; +-suc; +-assoc)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; foldr)
-open import Data.Bool.ListAction using (all)
-open import Data.Fin     using (Fin)
+open import Data.Bool.ListAction using (all; any)
+open import Data.Fin     using (Fin; toℕ)
 import Data.Fin as Fin
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
@@ -20,23 +20,30 @@ open import Data.List.Relation.Unary.All.Properties
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
+open import Data.Maybe   using (Maybe; just; nothing)
+open import Data.Empty   using (⊥-elim)
+open import Relation.Nullary using (yes; no)
 open import Data.Unit    using (tt)
 open import Relation.Binary.PropositionalEquality
-  using (_≡_; refl; sym; trans; subst; cong)
+  using (_≡_; _≢_; refl; sym; trans; subst; cong)
 
-open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_)
-open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; sizeᵉ; sizeᵛ)
+open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_; close; exhausted)
+open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_; sizeᵉ; sizeᵛ)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (nestDᵛˢ)
+  (nestDᵛˢ; nodeNestAt; capsDrainOK; FaceOK)
+open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
 open import Verify-Budget-Sufficient.Deliver-Measure using
   (chainsLenSum)
-open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
+open import Verify-Budget-Sufficient.Walk-Factor using
+  (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
-  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; FrameΦHyp; valsΦ?; valsSz?;
+  (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
+   valsΦ?-mono; valsSz?-mono;
    stepFrame-nest-Φ; stepFrame-regsSz; stepFrame-sz; Φ-to-bound)
 open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsSz)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
@@ -50,12 +57,13 @@ open import Verify-Budget-Sufficient.Nest-Store using
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; cascadeLatch; chainsOf; cascadeGo; Path; arrTy; stepFrame;
   subscribeInner; innerFinish; cascade; share-sink; root; fLvlD; sLvlD; chainStep; budgetAt;
-  arrTick; iterSize)
+  arrTick; iterSize; shareAdmit; shareLatch; foldPath; NodeState; mergeAll-st; scan-st; take-st;
+  switch-st; exhaust-st)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 2≤capsAt-size; 8≤capsAt-size; B2-cReg≤cSize; Caps; capsAt; capsAt-base-size;
-  capsH; frameStep; iterSize-infl; frameStep-mono-j)
+  capsH; frameStep; sizeCount; iterSize-infl; frameStep-mono-j; iterSize-mono-count)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; ∧-true; 2X≡X+X)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -63,16 +71,16 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthInner; depthFin; depthCascade)
+  using (depthInner; depthFin; depthCascade; depthReact)
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?; pathSz?-widen; regsSz?;
   slotsCaps?; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?)
+  (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
-open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)
+open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH;
    nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
@@ -95,6 +103,38 @@ pathNestD-step (scan-f fn _)      p = m≤n+m (pathNestD p) (nestDᵗ fn)
 pathNestD-step (take-f _)         p = ≤-refl
 pathNestD-step (from-inner _ _ _) p = ≤-refl
 pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
+
+-- AND THE WALK'S DEPTH IS THE STORE'S PLUS ONE SQUARE, which is the
+-- whole difference between the two ledgers: they step identically at
+-- every frame and part company only at the leaf, where the walk's
+-- prices the chain a hand-over passes its values to and the store's
+-- prices nothing.  A path carries exactly one leaf, so the gap is a
+-- constant and not a recursion.
+pathΦD≤nestD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathΦD B p ≤ pathNestD p + B * B
+pathΦD≤nestD B root                   = z≤n
+pathΦD≤nestD B (share-sink _)         = ≤-refl
+pathΦD≤nestD B (map-f fn ↠ p)         =
+  ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) (B * B))))
+pathΦD≤nestD B (scan-f fn _ ↠ p)      =
+  ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) (B * B))))
+pathΦD≤nestD B (take-f _ ↠ p)         = pathΦD≤nestD B p
+pathΦD≤nestD B (from-inner _ _ _ ↠ p) = pathΦD≤nestD B p
+pathΦD≤nestD B (thru-outer _ _ ↠ p)   = s≤s (pathΦD≤nestD B p)
+
+-- AND IT DOMINATES IT, from the same reading: the leaf is the only
+-- clause where they differ and the walk's is the larger one there.
+nestD≤pathΦD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathNestD p ≤ pathΦD B p
+nestD≤pathΦD B root                   = z≤n
+nestD≤pathΦD B (share-sink _)         = z≤n
+nestD≤pathΦD B (map-f fn ↠ p)         = +-monoʳ-≤ (nestDᵗ fn) (nestD≤pathΦD B p)
+nestD≤pathΦD B (scan-f fn _ ↠ p)      = +-monoʳ-≤ (nestDᵗ fn) (nestD≤pathΦD B p)
+nestD≤pathΦD B (take-f _ ↠ p)         = nestD≤pathΦD B p
+nestD≤pathΦD B (from-inner _ _ _ ↠ p) = nestD≤pathΦD B p
+nestD≤pathΦD B (thru-outer _ _ ↠ p)   = s≤s (nestD≤pathΦD B p)
 
 -- THE GRANT AT ONE OUTER FRAME, which was the whole of what the walk
 -- still owed: the four other frame kinds owe nothing, so a path with
@@ -133,30 +173,38 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   , subst (λ z → ValsFit n z G p vals) (sym hsl)
       (valsFit-of-max sl p vals M ≤-refl)
   , *-cancelˡ-≤ 2
+      (≤-trans (*-monoʳ-≤ 2 (*-monoʳ-≤ (pathΦF S p)
+                 (+-monoˡ-≤ (pathΦD S p)
+                   (+-monoˡ-≤ (n * slotWrapSum sl)
+                     (+-monoˡ-≤ (nestDᵛˢ vals) (nestD≤pathΦD S p))))))
       (≤-trans (≤-reflexive spread)
         (≤-trans (+-mono-≤ hA2 hBC2)
-                 (≤-reflexive (sym (2X≡X+X (nestΦAt e sl id))))))
+                 (≤-reflexive (sym (2X≡X+X (nestΦAt e sl id)))))))
   where
   S    = Caps.cSize (capsAt e sl id)
   Q    = pathΦF S p
-  D    = pathNestD p
+  Dn   = pathNestD p
+  D    = pathΦD S p
   M    = nestDᵛˢ vals
   W    = slotWrapSum sl
-  X    = nestUnit e sl + S + S * W
-  G    = D + M + n * W
+  Y    = nestUnit e sl + (S * S + S * S) + S
+  X    = Y + S * W
+  G    = Dn + M + n * W
   hpp  : pathSz? S p ≡ true
   hpp  = ∧-trueʳ hpz
   2≤S  = 2≤capsAt-size e sl id
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
   EXP  : ℕ
-  EXP  = S * (suc S * S)
-  expEq : EXP ≡ S * (S * S) + S * S
-  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+  EXP  = (S + S) * (suc S * S)
+  expEq : EXP ≡ S * (S * S) + S * (S * S) + (S * S + S * S)
+  expEq = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
+                           := s :* (s :* s) :+ s :* (s :* s) :+ (s :* s :+ s :* s))
                 refl S
   Q≤   : Q ≤ 2 ^ EXP
   Q≤   = pathΦF-cap S p hpp
-  D≤   : D ≤ nestUnit e sl
-  D≤   = ≤-trans (n≤1+n D) hnd
+  D≤   : D ≤ nestUnit e sl + S * S
+  D≤   = ≤-trans (pathΦD≤nestD S p)
+                 (+-monoˡ-≤ (S * S) (≤-trans (n≤1+n (pathNestD p)) hnd))
   n≤S  : n ≤ S
   n≤S  = n≤capsAt-size e sl id
   2≤2^S : 2 ≤ 2 ^ S
@@ -172,17 +220,23 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
                         refl q d
   -- the path's own depth, and the wrap, against the charge's own half
+  yShape : (S + S * S) + (nestUnit e sl + S * S) ≡ Y
+  yShape = solve 2 (λ a u → (a :+ a :* a) :+ (u :+ a :* a)
+                              := u :+ (a :* a :+ a :* a) :+ a)
+                 refl S (nestUnit e sl)
+  2D≤Y : 2 * D ≤ Y
+  2D≤Y =
+    ≤-trans (*-monoʳ-≤ 2 D≤)
+    (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl + S * S)))
+    (≤-trans (+-monoˡ-≤ (nestUnit e sl + S * S)
+               (+-monoˡ-≤ (S * S) (nestUnit≤size e sl id)))
+             (≤-reflexive yShape)))
   hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ EXP * X
   hBC  =
     ≤-trans (+-mono-≤
-              (≤-trans (≤-reflexive (halfShape Q D))
-                       (*-mono-≤ Q≤ (≤-trans (*-monoʳ-≤ 2 D≤)
-                                       (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl)))
-                                                (+-monoʳ-≤ (nestUnit e sl)
-                                                  (nestUnit≤size e sl id))))))
+              (≤-trans (≤-reflexive (halfShape Q D)) (*-mono-≤ Q≤ 2D≤Y))
               (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
-            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP)
-                                (nestUnit e sl + S) (S * W))))
+            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP) Y (S * W))))
   hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
   hBC2 = ≤-trans
            (subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
@@ -192,7 +246,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
                            (*-monoˡ-≤ X (^-monoʳ-≤ 2
                              (s≤s (≤-reflexive expEq)))))))
            (nestWalkAt≤nestΦAt e sl id)
-  spread : 2 * (Q * (G + D))
+  spread : 2 * (Q * (D + M + n * W + D))
              ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
   spread =
     solve 4 (λ q d m w →
@@ -449,50 +503,88 @@ postulate
     FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
               (scan-f fn nid) p vals fin sched st
 
-  -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, AND THE STORE HALF OF
-  -- IT IS THE FOLD'S.  A `from-inner` hands on what the inner run
-  -- produced, so like the fold it reaches past its own values -- but
-  -- the payload it reaches is the merge node's QUEUE, and what a
-  -- subscription does to a queued term is substitute into it.  So the
-  -- grant carries the iteration face's factors rather than a summand.
-  -- Its store ceiling is read at the ONE entry `innerFinish` looks up:
-  -- the drain consumes that node's queue and reaches no other cell, so
-  -- a ⊔ over the table is a widening of this reading rather than a
-  -- second source, and the residue is the queued terms' own depth.
-  --
-  -- THE TWO THAT ARE NOT THE FOLD'S ARE DRAIN LEDGERS, and they are
-  -- available on this face rather than absent from it: the queue's
-  -- caps receipt and its width are what a sink-side walk establishes
-  -- when it admits the entries, so the residue here is a routing
-  -- question -- which statement hands them over -- and not a fact
-  -- nothing in the development has.  What makes it a residue today is
-  -- that both are quantified over whatever queue the lookup returns,
-  -- and no premise here constrains the table it is read from.
-  --
-  -- AND THE OBVIOUS ROUTE FOR THEM DOES NOT PAY, which is worth
-  -- knowing before a leg is spent on it.  The walk face carries a
-  -- caps receipt over the very table this statement cannot see, so it
-  -- reads as the thing to thread down -- but it does not say either
-  -- of the two things wanted.  `capsOK?⇒nest` takes it to an `all` of
-  -- `nodeWidᴺ?` over the entries, and that predicate is trivially
-  -- true on four of the five node kinds and on the fifth reads the
-  -- queue's WIDTH.  The ceiling asked for here is `nodeNest` at one
-  -- entry, whose merge arm folds the queued terms' own DEPTHS, and a
-  -- bound on how many are queued gives no bound on what each
-  -- carries.  `drainW` is no better placed: it folds `innerW` while
-  -- threading the state through each subscribe, so it prices what a
-  -- queued term COSTS to subscribe rather than how many there are.
-  -- Neither ledger follows from the receipt, so the routing question
-  -- is not answered by the fact already in hand.
+-- AND THE DRAIN'S GRANT IS OWED THREE THINGS, AND THE STORE HALF OF
+-- IT IS THE FOLD'S.  A `from-inner` hands on what the inner run
+-- produced, so like the fold it reaches past its own values -- but
+-- the payload it reaches is the merge node's QUEUE, and what a
+-- subscription does to a queued term is substitute into it.  So the
+-- grant carries the iteration face's factors rather than a summand.
+-- Its store ceiling is read at the ONE entry `innerFinish` looks up:
+-- the drain consumes that node's queue and reaches no other cell, so
+-- a ⊔ over the table is a widening of this reading rather than a
+-- second source, and the residue is the queued terms' own depth.
+InnerΦCore : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (eid : Id) (now : Tick) (B U W : ℕ)
+  (op : AllOp) (allNid inst : NodeId) (p : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (c : Caps) (d Lv G : ℕ) → Set
+InnerΦCore {e = e} sf eid now B U W op allNid inst p vals fin sched st c d Lv G =
+    FaceOK c (Sched.slots sched)
+  × (depthReact sf op allNid inst p eid now vals sched st fin ≤ d)
+  × (pathSz? (Caps.cSize (frameStep Lv c)) p ≡ true)
+  × (suc (pathLen p) ≤ Caps.cSize (frameStep Lv c))
+  × (nodeNestAt allNid st ⊔ nestDᵛˢ vals ≤ G)
+  × (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
+       pathΦF B p
+         * (nestFac (Caps.cSize (frameStep j c)) W
+              * (G + nestU (Caps.cSize (frameStep j c))
+                       (nestUnit e (Sched.slots sched)))
+            + pathΦD B p) ≤ U)
 
-  -- AND THE STORE CEILING NOW SITS UNDER THE BUDGET, so the fold
-  -- arm's settlement binds here too: this arm's own `G` is read at one
-  -- entry of that same table and spent against the same `nestΦAt`,
-  -- and nothing about a queue moves that ordering.  What the two arms
-  -- share is therefore the routing question and not the crossing that
-  -- used to sit under it.
-  -- REFUTED: `Refuted.Cap-Walk-Cross`.
-  innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+-- AND THE TABLE IS NOT A FREE PARAMETER, which is what dissolves the
+-- routing the two drain ledgers used to pose.  Both are quantified
+-- over whatever queue the lookup returns, and that reads as a fact
+-- some other statement has to hand over -- but `lookupNode allNid` is
+-- a determinate value of the state this statement is ALREADY given, so
+-- the two conjuncts are about ONE queue rather than about every queue
+-- a table might hold.  Reading it costs no hypothesis, and it is what
+-- the two arms below do.
+NotMergeAt : ∀ {n} {Γ : Ctx n} {s} → Maybe (NodeState Γ) → Set
+NotMergeAt {Γ = Γ} {s = s} ns =
+  ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+    ns ≢ just (mergeAll-st lim act q od)
+
+notMerge-none : ∀ {n} {Γ : Ctx n} {s} {ns : Maybe (NodeState Γ)} →
+  ns ≡ nothing → NotMergeAt {Γ = Γ} {s = s} ns
+notMerge-none refl _ _ _ _ ()
+
+notMerge-scan : ∀ {n} {Γ : Ctx n} {s u} {ns : Maybe (NodeState Γ)} (v : Val Γ u) →
+  ns ≡ just (scan-st v) → NotMergeAt {Γ = Γ} {s = s} ns
+notMerge-scan _ refl _ _ _ _ ()
+
+notMerge-take : ∀ {n} {Γ : Ctx n} {s} {ns : Maybe (NodeState Γ)} (k : ℕ) →
+  ns ≡ just (take-st k) → NotMergeAt {Γ = Γ} {s = s} ns
+notMerge-take _ refl _ _ _ _ ()
+
+notMerge-switch : ∀ {n} {Γ : Ctx n} {s} {ns : Maybe (NodeState Γ)}
+  (cur : Maybe NodeId) (od : Bool) →
+  ns ≡ just (switch-st cur od) → NotMergeAt {Γ = Γ} {s = s} ns
+notMerge-switch _ _ refl _ _ _ _ ()
+
+notMerge-exhaust : ∀ {n} {Γ : Ctx n} {s} {ns : Maybe (NodeState Γ)} (ia od : Bool) →
+  ns ≡ just (exhaust-st ia od) → NotMergeAt {Γ = Γ} {s = s} ns
+notMerge-exhaust _ _ refl _ _ _ _ ()
+
+-- AND A MERGE AT ANOTHER TYPE IS NOT ONE EITHER, which is the arm the
+-- constructor alone cannot refute: the queue carries its element type
+-- existentially, so a stored merge is a merge at SOME type and this
+-- frame reads one at its own.  The evaluator's every read of the cell
+-- pays the same decision, and this is that decision on the proof side.
+notMerge-other : ∀ {n} {Γ : Ctx n} {s w} {ns : Maybe (NodeState Γ)}
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ w)) (od : Bool) →
+  ns ≡ just (mergeAll-st lim act q od) → w ≢ s → NotMergeAt {Γ = Γ} {s = s} ns
+notMerge-other lim act q od refl ne _ _ _ _ refl = ne refl
+
+postulate
+  -- THE ARM WITH NO QUEUE TO DRAIN, and the width is zero there
+  -- because a drain that finds no cell subscribes nothing.  What is
+  -- left is the frame residue with both ledgers taken out: the face,
+  -- the descent's own count, the path's receipt at the level the
+  -- descent reports, and the charge.
+  -- REFUTED: `Refuted.Cap-Walk-Cross`, which settles the ordering the
+  --   charge is read under -- the store ceiling sits under the budget,
+  --   so the fold arm's settlement binds this one too.
+  innerΦ-fit-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)
     (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
@@ -502,8 +594,161 @@ postulate
     pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (from-inner op allNid inst ↠ p) vals ≡ true →
-    FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-              (from-inner op allNid inst) p vals fin sched st
+    Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ Lv → Σ ℕ λ G →
+      InnerΦCore sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) 0
+        op allNid inst p vals fin sched st c d Lv G
+
+  -- AND THE ARM THAT HAS ONE, at the queue the state names rather than
+  -- at any the table might hold.  The width is no longer chosen: it is
+  -- that queue's own `drainW`, so the charge is read against the
+  -- number the drain actually spends.  What stays a leaf is the
+  -- queue's caps receipt -- and it is now the exact conclusion the
+  -- caps face's own drain law delivers, at `capsAt` for the face and
+  -- `capsH` for the count, under a walk grant this face does not hold.
+  -- REFUTED: `Refuted.Cap-Walk-Cross`.
+  innerΦ-fit-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+    (op : AllOp) (allNid inst : NodeId)
+    (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+    (st : EvalSt e) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+    Sched.slots sched ≡ sl →
+    pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+    pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+           (from-inner op allNid inst ↠ p) vals ≡ true →
+    Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ Lv → Σ ℕ λ G →
+      capsDrainOK c (Sched.slots sched) d Lv sf allNid p eid now lim (pred act) q sched st
+      × InnerΦCore sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+          (drainW sf allNid p eid now q sched st)
+          op allNid inst p vals fin sched st c d Lv G
+
+-- THE QUIET ASSEMBLY, and the two ledgers are discharged rather than
+-- carried: a lookup that is not a merge at this type cannot satisfy
+-- either premise, so both are functions out of an impossibility.
+innerΦ-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (allNid inst : NodeId)
+  (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+  (st : EvalSt e) →
+  NotMergeAt {s = s} (lookupNode allNid (EvalSt.nodes st)) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+         (from-inner op allNid inst ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+            (from-inner op allNid inst) p vals fin sched st
+innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st ¬m hsl hpz hnd hΦ
+  with innerΦ-fit-quiet sl id sf eid now op allNid inst p vals fin sched st
+         hsl hpz hnd hΦ
+... | c , d , Lv , G , fok , hdr , hsz , hlen , hG , hnum =
+  c , d , 0 , Lv , G , fok
+  , (λ lim act q od h → ⊥-elim (¬m lim act q od h))
+  , (λ lim act q od h → ⊥-elim (¬m lim act q od h))
+  , hdr , hsz , hlen , hG , hnum
+
+-- AND THE DRAIN ASSEMBLY, where the two ledgers are read at the one
+-- queue and transported to any the premise names -- which is the same
+-- queue, since a lookup has one answer.
+innerΦ-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (allNid inst : NodeId)
+  (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+  (st : EvalSt e) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s)) (od : Bool) →
+  lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+         (from-inner op allNid inst ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+            (from-inner op allNid inst) p vals fin sched st
+innerΦ-drain sl id sf eid now op allNid inst p vals fin sched st lim act q od
+             eqn hsl hpz hnd hΦ
+  with innerΦ-fit-drain sl id sf eid now op allNid inst p vals fin sched st
+         lim act q od eqn hsl hpz hnd hΦ
+... | c , d , Lv , G , hdrain , fok , hdr , hsz , hlen , hG , hnum =
+  c , d , drainW sf allNid p eid now q sched st , Lv , G , fok
+  , (λ { _ _ _ _ h → transport h hdrain })
+  , (λ { _ _ _ _ h →
+          transport {P = λ _ _ q′ _ → drainW sf allNid p eid now q′ sched st
+                                        ≤ drainW sf allNid p eid now q sched st}
+            h ≤-refl })
+  , hdr , hsz , hlen , hG , hnum
+  where
+  transport : ∀ {ℓ} {lim′ : Maybe ℕ} {act′ : ℕ} {q′ : List (Closed _ _)}
+    {od′ : Bool} {P : Maybe ℕ → ℕ → List (Closed _ _) → Bool → Set ℓ} →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim′ act′ q′ od′) →
+    P lim act q od → P lim′ act′ q′ od′
+  transport h r with trans (sym eqn) h
+  ... | refl = r
+
+-- SO THE FIT READS THE TABLE, and every arm but one is quiet.  The
+-- five node shapes that are not a merge and the merge stored at
+-- another type all reach the same assembly, and only the cell this
+-- frame actually drains reaches the other.  The cell is passed as an
+-- ARGUMENT beside its own equation rather than abstracted out of the
+-- goal, because the goal names the lookup and a `with` would rewrite
+-- it out from under both assemblies.
+innerΦ-fit-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (allNid inst : NodeId)
+  (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+  (st : EvalSt e) (ns : Maybe (NodeState Γ)) →
+  lookupNode allNid (EvalSt.nodes st) ≡ ns →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+         (from-inner op allNid inst ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+            (from-inner op allNid inst) p vals fin sched st
+innerΦ-fit-go sl id sf eid now op allNid inst p vals fin sched st
+              nothing eqn hsl hpz hnd hΦ =
+  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
+    (notMerge-none eqn) hsl hpz hnd hΦ
+innerΦ-fit-go sl id sf eid now op allNid inst p vals fin sched st
+              (just (scan-st v)) eqn hsl hpz hnd hΦ =
+  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
+    (notMerge-scan v eqn) hsl hpz hnd hΦ
+innerΦ-fit-go sl id sf eid now op allNid inst p vals fin sched st
+              (just (take-st k)) eqn hsl hpz hnd hΦ =
+  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
+    (notMerge-take k eqn) hsl hpz hnd hΦ
+innerΦ-fit-go sl id sf eid now op allNid inst p vals fin sched st
+              (just (switch-st cur od)) eqn hsl hpz hnd hΦ =
+  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
+    (notMerge-switch cur od eqn) hsl hpz hnd hΦ
+innerΦ-fit-go sl id sf eid now op allNid inst p vals fin sched st
+              (just (exhaust-st ia od)) eqn hsl hpz hnd hΦ =
+  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
+    (notMerge-exhaust ia od eqn) hsl hpz hnd hΦ
+innerΦ-fit-go {s = s} sl id sf eid now op allNid inst p vals fin sched st
+              (just (mergeAll-st {w} lim act q od)) eqn hsl hpz hnd hΦ
+  with w ≟ᵗ s
+... | no ne =
+  innerΦ-quiet sl id sf eid now op allNid inst p vals fin sched st
+    (notMerge-other lim act q od eqn ne) hsl hpz hnd hΦ
+... | yes refl =
+  innerΦ-drain sl id sf eid now op allNid inst p vals fin sched st
+    lim act q od eqn hsl hpz hnd hΦ
+
+innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
+  (op : AllOp) (allNid inst : NodeId)
+  (p : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ)
+  (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+         (from-inner op allNid inst ↠ p) vals ≡ true →
+  FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+            (from-inner op allNid inst) p vals fin sched st
+innerΦ-fit sl id sf eid now op allNid inst p vals fin sched st hsl hpz hnd hΦ =
+  innerΦ-fit-go sl id sf eid now op allNid inst p vals fin sched st
+    (lookupNode allNid (EvalSt.nodes st)) refl hsl hpz hnd hΦ
 
 -- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
 -- which is the point of separating it from the walk below: the silent
@@ -550,83 +795,221 @@ frameΦ-fit sl id sf eid now (thru-outer op nid) p vals fin sched st hsl hpz hnd
 -- accumulated on the way in.  The witnesses that closed the level arm
 -- are therefore silent about this one, and it has to be read on its own.
 
--- AND READ ON ITS OWN THE DEFICIT IS BOUNDED, which no reading of the
--- live arm ever was.  A sink is a LEAF of the factor recursion, so the
--- receipt handed in is at factor one and depth zero: it says only that
--- the values are shallow.  An admitted chain is owed its own factor
--- times those same values' depth plus its own depth, and BOTH of those
--- are already bounded where this arm stands -- `pathΦF-cap` and
--- `pathNestD-len` deliver them from the registry's size legality, which
--- `shareAdmit-caps` carries off the premise this statement already
--- takes.  So nothing here is unbounded and nothing is missing from the
--- state.  What is missing is a RELATION between the receipt the walk
--- spends at a sink and the two the chains are charged at, and the
--- repair is therefore a restatement of what the walk HANDS a sink,
--- in the currency it already carries.
--- REFUTED: `Refuted.Sink-Phi-Fan`, stated over an abstract cap and
---   budget so that it binds this arm as written; and a second time
---   under a universally quantified factor at the sink, which kills the
---   obvious repair before it is tried -- a multiplicative charge meets
---   a depth-zero value, so the product is discharged at a budget of
---   nothing while the admitted chain still owes its own depth.
+-- AND READ ON ITS OWN THE DEFICIT SPLITS BY THE ADMITTED CHAIN'S
+-- TERMINAL, which is what pricing the leaf bought.  A sink now carries
+-- a factor and a depth of its own rather than one and zero, and a path
+-- holds exactly one leaf -- so a chain ending at `root` spends its
+-- whole factor on frames, legality caps that count by the size cap,
+-- and the leaf is priced at exactly that exponent.  Its depth is
+-- capped in the same currency by the same premise.  That half closes
+-- off `pathΦF-cap-root`, `pathΦD-cap-root` and monotonicity, with no
+-- new fact -- and this is the assembly that spends the three.
+sink-fan-root : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
+  (vals : List (Val Γ (lookup Γ i))) →
+  pathRoots p ≡ true →
+  pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+    (share-sink {t = t} i) vals ≡ true →
+  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
+sink-fan-root {e = e} sl id i p vals hr hz hΦ =
+  valsΦ?-mono B (nestΦAt e sl id) p (share-sink i) vals
+    (pathΦF-cap-root B p hr hz) (pathΦD-cap-root B p 1≤B hr hz) hΦ
+  where
+  B : ℕ
+  B = Caps.cSize (capsAt e sl id)
+  1≤B : 1 ≤ B
+  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+
+-- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
+-- factor is the leaf's own multiplied by its frames', so the leaf
+-- would have to dominate itself times a frame product -- which no
+-- function of the cap does, because the escalation is per sink hop and
+-- the hop count is bounded by nothing but the dispatch gas: the
+-- registry's admission filters on the source and the type and never on
+-- whether a chain has been delivered to.  An ordinary program puts a
+-- chain there, since a registration minted while a share's definition
+-- is being subscribed carries that share's sink as its continuation.
+-- So the residue is the sink-terminated arm and nothing else.
+-- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
+--   discharges from and at the budget the sink's own receipt exactly
+--   exhausts, so the crossing is not an artifact of a small budget.
 postulate
+  sink-fan-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)
+    (vals : List (Val Γ (lookup Γ i))) →
+    pathRoots p ≡ false →
+    pathSz? (Caps.cSize (capsAt e sl id)) p ≡ true →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+      (share-sink {t = t} i) vals ≡ true →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) p vals ≡ true
+
+-- AND WRITING THE BODY FOUND TWO MORE, BOTH ABOUT WHAT THE REGISTRY
+-- MAY HOLD RATHER THAN ABOUT THE POTENTIAL.  A chain the fan-out
+-- re-enters is walked FROM THE TOP, so it needs its size receipt at
+-- the program's own cap -- and the walk holds the registry at the
+-- LEVEL it has reached, `regsSz?` at an `iterSize` that only grows, so
+-- the reading it carries is the weaker one and cannot be narrowed back
+-- down.  The two are different readings of the same list, and only the
+-- registration side can supply this one.
+postulate
+  fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
+    all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp))
+        (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+
+-- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.  A
+-- registered chain's frames are the program's own, so its nesting is
+-- the program's -- but the premise the walk carries about the registry
+-- is a SIZE receipt and says nothing about depth at all, and the
+-- store's depth ledger bounds the registry by a RUNTIME maximum rather
+-- than by the unit, which is the wrong currency and the wrong
+-- direction.  So this too is owed by whatever mints a registration.
+postulate
+  fan-chain-nestD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
+    all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl)
+        (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+
+mutual
+  walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)
+    (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
+    pathNestD path ≤ nestUnit e sl →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path vals ≡ true →
+    PathΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+      path vals fin sched st
+
+  -- ONE LEVEL OF THE DISPATCH TELESCOPE, and the two arms it has are
+  -- the spent one, which owes nothing, and the latched one, which is
+  -- the fan-out fold over the admitted snapshot.  The latch writes the
+  -- completed and dying ledgers and never the registry, so the
+  -- registry receipt crosses it unchanged -- which is why `fin` is
+  -- split here rather than threaded.
   walk-share-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)
     (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
     regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
               (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
-    nestUnit e sl ≤ nestUnit e sl →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       (share-sink {t = t} i) vals ≡ true →
     DispatchΦHyp sf gas nid now (Caps.cSize (capsAt e sl id))
       (nestΦAt e sl id) i vals fin sched st
 
-walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)
-  (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
-  (sched : Sched Γ) (st : EvalSt e) →
-  Sched.slots sched ≡ sl →
-  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-  valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) vals ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
-  pathNestD path ≤ nestUnit e sl →
-  valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path vals ≡ true →
-  PathΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-    path vals fin sched st
-walk-ΦHyp-go sl id sf gas nid now j root vals fin sched st _ _ _ _ _ _ = tt
-walk-ΦHyp-go sl id sf gas nid now j (share-sink i) vals fin sched st hsl _ _ hreg hnd hΦ =
-  walk-share-ΦHyp sl id sf gas nid now j i vals fin sched st hsl hreg ≤-refl hΦ
-walk-ΦHyp-go {e = e} sl id sf gas nid now j (f ↠ p) vals fin sched st hsl hpz hsz hreg hnd hΦ =
-    hF
-  , walk-ΦHyp-go sl id sf gas nid now (suc j) p (proj₁ step)
-      (proj₁ (proj₂ (proj₂ step)))
-      (proj₁ (proj₂ (proj₂ (proj₂ step))))
-      (proj₂ (proj₂ (proj₂ (proj₂ step))))
-      (trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) hsl)
-      hpz′
-      (stepFrame-sz sf nid now f p vals fin sched st B j hfz hsz)
-      (stepFrame-regsSz sf nid now f p vals fin sched st B j hsz
-        (pathSz?-widen (f ↠ p) (iterSize-infl B 1≤B j B) hpz) hreg)
-      (≤-trans (pathNestD-step f p) hnd)
-      (stepFrame-nest-Φ sf nid now f p vals fin sched st
-        (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hΦ hF)
-  where
-  step = stepFrame sf nid now f p vals fin sched st
-  hF = frameΦ-fit sl id sf nid now f p vals fin sched st hsl hpz hnd hΦ
-  B  = Caps.cSize (capsAt e sl id)
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
-  hfz : frameSz? B f ≡ true
-  hfz = proj₁ (∧-true (frameSz? B f)
-                ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
-  hpz′ : pathSz? B p ≡ true
-  hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
-                 (proj₂ (∧-true (frameSz? B f)
-                          ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
+  -- THE FAN-OUT FOLD, ENTRY BY ENTRY AND AT THE STATE EACH LEAVES.  A
+  -- cancelled entry owes nothing and does not move the state; a
+  -- delivered one owes the potential at ITS path -- which is the
+  -- terminal split, and the only place the two leaves above are spent
+  -- -- and then the whole walk down it, at a level one higher, since
+  -- the fold's own registry receipt is the one a chain step reports.
+  walk-shareGo-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)
+    (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
+    all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl) ps ≡ true →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+      (share-sink {t = t} i) vals ≡ true →
+    ShareGoΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+      i vals fin ps sched st
+
+  walk-share-ΦHyp sl id sf zero nid now j i vals fin sched st _ _ _ _ = tt
+  walk-share-ΦHyp sl id sf (suc gas) nid now j i vals false sched st
+                  hsl hsz hreg hΦ =
+    walk-shareGo-ΦHyp sl id sf gas nid now j i vals false
+      (shareAdmit i (EvalSt.registry st)) sched st
+      hsl (fan-chain-sz sl id i st) (fan-chain-nestD sl id i st) hsz hreg hΦ
+  walk-share-ΦHyp sl id sf (suc gas) nid now j i vals true sched st
+                  hsl hsz hreg hΦ =
+    walk-shareGo-ΦHyp sl id sf gas nid now j i vals true
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
+      hsl (fan-chain-sz sl id i st) (fan-chain-nestD sl id i st) hsz hreg hΦ
+
+  walk-shareGo-ΦHyp sl id sf gas nid now j i vals fin [] sched st
+                    _ _ _ _ _ _ = tt
+  walk-shareGo-ΦHyp {e = e} sl id sf gas nid now j i vals fin
+                    ((rid , p) ∷ ps) sched st hsl hpz hnd hsz hreg hΦ
+    with any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ... | true  = walk-shareGo-ΦHyp sl id sf gas nid now j i vals fin ps sched st
+                  hsl (∧-trueʳ hpz) (∧-trueʳ hnd) hsz hreg hΦ
+  ... | false =
+      hΦp
+    , walk-ΦHyp-go sl id sf gas nid now j p vals fin sched st₀
+        hsl hp₀ hsz hreg hndp hΦp
+    , walk-shareGo-ΦHyp sl id sf gas nid now (suc j) i vals fin ps
+        (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
+        (trans (foldPath-slots sf gas nid now (toℕ i) p vals evs fin sched st₀) hsl)
+        (∧-trueʳ hpz) (∧-trueʳ hnd)
+        (valsSz?-mono (iterSize B j B) (iterSize B (suc j) B) vals
+          (iterSize-mono-count B B 1≤B (n≤1+n j)) hsz)
+        (foldPath-regsSz sf gas nid now (toℕ i) p vals evs fin sched st₀
+          B j 1≤B hsz hp₀ hreg)
+        hΦ
+    where
+    B : ℕ
+    B = Caps.cSize (capsAt e sl id)
+    1≤B : 1 ≤ B
+    1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+    hp₀ : pathSz? B p ≡ true
+    hp₀ = ∧-trueˡ hpz
+    hndp : pathNestD p ≤ nestUnit e sl
+    hndp = ≤ᵇ⇒≤ (pathNestD p) (nestUnit e sl) (T-to (∧-trueˡ hnd))
+    st₀ : EvalSt e
+    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+    evs = if fin then close (toℕ i) exhausted ∷ [] else []
+    FP = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
+    hΦp : valsΦ? B (nestΦAt e sl id) p vals ≡ true
+    hΦp with pathRoots p in eqr
+    ... | true  = sink-fan-root sl id i p vals eqr hp₀ hΦ
+    ... | false = sink-fan-sink sl id i p vals eqr hp₀ hΦ
+
+  walk-ΦHyp-go sl id sf gas nid now j root vals fin sched st _ _ _ _ _ _ = tt
+  walk-ΦHyp-go sl id sf gas nid now j (share-sink i) vals fin sched st hsl _ hsz hreg _ hΦ =
+    walk-share-ΦHyp sl id sf gas nid now j i vals fin sched st hsl hsz hreg hΦ
+  walk-ΦHyp-go {e = e} sl id sf gas nid now j (f ↠ p) vals fin sched st hsl hpz hsz hreg hnd hΦ =
+      hF
+    , walk-ΦHyp-go sl id sf gas nid now (suc j) p (proj₁ step)
+        (proj₁ (proj₂ (proj₂ step)))
+        (proj₁ (proj₂ (proj₂ (proj₂ step))))
+        (proj₂ (proj₂ (proj₂ (proj₂ step))))
+        (trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) hsl)
+        hpz′
+        (stepFrame-sz sf nid now f p vals fin sched st B j hfz hsz)
+        (stepFrame-regsSz sf nid now f p vals fin sched st B j hsz
+          (pathSz?-widen (f ↠ p) (iterSize-infl B 1≤B j B) hpz) hreg)
+        (≤-trans (pathNestD-step f p) hnd)
+        (stepFrame-nest-Φ sf nid now f p vals fin sched st
+          (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) hΦ hF)
+    where
+    step = stepFrame sf nid now f p vals fin sched st
+    hF = frameΦ-fit sl id sf nid now f p vals fin sched st hsl hpz hnd hΦ
+    B  = Caps.cSize (capsAt e sl id)
+    1≤B : 1 ≤ B
+    1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+    hfz : frameSz? B f ≡ true
+    hfz = proj₁ (∧-true (frameSz? B f)
+                  ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
+    hpz′ : pathSz? B p ≡ true
+    hpz′ = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p)
+                   (proj₂ (∧-true (frameSz? B f)
+                            ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)))
 
 -- THE ARRIVAL'S OWN POTENTIAL, which is the entry reading BOTH the
 -- walk's side-condition and the fold's own premise are spent at: one
@@ -641,19 +1024,30 @@ entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
-  expEq : Sz * (suc Sz * Sz) ≡ Sz * (Sz * Sz) + Sz * Sz
-  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+  expEq : (Sz + Sz) * (suc Sz * Sz)
+            ≡ Sz * (Sz * Sz) + Sz * (Sz * Sz) + (Sz * Sz + Sz * Sz)
+  expEq = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
+                           := s :* (s :* s) :+ s :* (s :* s) :+ (s :* s :+ s :* s))
                 refl Sz
-  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+  dΦ : nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path
+         ≤ nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz
+  dΦ =
+    ≤-trans (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)) (pathΦD≤nestD Sz path))
+    (≤-trans (≤-reflexive (sym (+-assoc (nestDᵛ (arrTy a) (arrVal a))
+                                        (pathNestD path) (Sz * Sz))))
+    (≤-trans (+-monoˡ-≤ (Sz * Sz) hΦ)
+    (≤-trans (+-monoʳ-≤ (nestUnit e sl) (m≤m+n (Sz * Sz) (Sz * Sz)))
+             (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz)) Sz))))
+  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path)
            ≤ nestΦAt e sl id
   Φfit = ≤-trans
-    (subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
+    (subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path) ≤_)
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
                               (^-monoʳ-≤ 2
                                 (≤-trans (≤-reflexive expEq) (n≤1+n _))))
-                     (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
-                              (m≤m+n (nestUnit e sl + Sz)
+                     (≤-trans dΦ
+                              (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz)
                                      (Sz * slotWrapSum sl)))))
     (nestWalkAt≤nestΦAt e sl id)
 

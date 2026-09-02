@@ -24,7 +24,7 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
-  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ)
+  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -48,12 +48,12 @@ open import Verify-Budget-Sufficient.Nest-Walk
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all; pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; pathNestD; nest-inflate; dropSource-nest; nestUnit)
+  using (regsNestMax; nest-inflate; dropSource-nest; nestUnit)
 open import Verify-Budget-Sufficient.Caps using (Caps; frameStep; sizeCount)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
-open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (pathSz?; regsSz?; frameSz?)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
@@ -67,7 +67,7 @@ open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 valsΦ? : ∀ {n} {Γ : Ctx n} {s t} (B U : ℕ) (path : Path Γ s t)
   (vals : List (Val Γ s)) → Bool
 valsΦ? {s = s} B U path vals =
-  all (λ v → pathΦF B path * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
+  all (λ v → pathΦF B path * (nestDᵛ s v + pathΦD B path) ≤ᵇ U) vals
 
 -- WHAT A FRAME OWES BEYOND THE POTENTIAL IT IS HANDED, which is
 -- nothing at three of the five: they forward or substitute, and the
@@ -136,7 +136,7 @@ InnerΦFit {Γ = Γ} {e = e} {s = s} sf id now B U op allNid inst path vals fin 
            * (nestFac (Caps.cSize (frameStep j c)) W
                 * (G + nestU (Caps.cSize (frameStep j c))
                          (nestUnit e (Sched.slots sched)))
-              + pathNestD path) ≤ U)
+              + pathΦD B path) ≤ U)
 
 FrameΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
@@ -151,11 +151,11 @@ FrameΦHyp sf id now B U (scan-f fn nid) path vals fin sched st =
     (nodeNestAt nid st ⊔ nestDᵛˢ vals ≤ G)
     × (pathΦF B path
         * ((2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn)
-           + pathNestD path) ≤ U)
+           + pathΦD B path) ≤ U)
 FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st =
   Σ ℕ λ k → Σ ℕ λ G →
     ValsFit k (Sched.slots sched) G path vals
-    × (pathΦF B path * (G + pathNestD path) ≤ U)
+    × (pathΦF B path * (G + pathΦD B path) ≤ U)
 
 postulate
   -- ONE FRAME'S REGISTRATIONS, under the potential it was handed.  The
@@ -203,19 +203,19 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
   where
   F = pathΦF B p
   E = 2 ^ sizeᵗ fn
-  hv : E * F * (nestDᵛ s v + (nestDᵗ fn + pathNestD p)) ≤ U
+  hv : E * F * (nestDᵛ s v + (nestDᵗ fn + pathΦD B p)) ≤ U
   hv = ≤ᵇ⇒≤ _ _ (T-to (∧-trueˡ h))
-  shape : F * (E * (nestDᵗ fn + nestDᵛ s v) + E * pathNestD p)
-            ≡ E * F * (nestDᵛ s v + (nestDᵗ fn + pathNestD p))
+  shape : F * (E * (nestDᵗ fn + nestDᵛ s v) + E * pathΦD B p)
+            ≡ E * F * (nestDᵛ s v + (nestDᵗ fn + pathΦD B p))
   shape = solve 5 (λ f e d nt np →
             f :* (e :* (nt :+ d) :+ e :* np)
               := e :* f :* (d :+ (nt :+ np)))
-          refl F E (nestDᵛ s v) (nestDᵗ fn) (pathNestD p)
-  step : F * (nestDᵛ u (applyFn fn v) + pathNestD p) ≤ U
+          refl F E (nestDᵛ s v) (nestDᵗ fn) (pathΦD B p)
+  step : F * (nestDᵛ u (applyFn fn v) + pathΦD B p) ≤ U
   step =
-    ≤-trans (*-monoʳ-≤ F (+-monoˡ-≤ (pathNestD p) (applyFn-nest fn v)))
+    ≤-trans (*-monoʳ-≤ F (+-monoˡ-≤ (pathΦD B p) (applyFn-nest fn v)))
     (≤-trans (*-monoʳ-≤ F (+-monoʳ-≤ (E * (nestDᵗ fn + nestDᵛ s v))
-                (nest-inflate E (pathNestD p) (m^n>0 2 (sizeᵗ fn)))))
+                (nest-inflate E (pathΦD B p) (m^n>0 2 (sizeᵗ fn)))))
     (≤-trans (≤-reflexive shape) hv))
 
 -- a UNIFORM bound over the emitted list becomes the pointwise
@@ -224,12 +224,12 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
 -- what the grant bounds.
 Φ-of-bound : ∀ {n} {Γ : Ctx n} {u t} (B U G : ℕ) (p : Path Γ u t)
   (vs : List (Val Γ u)) → nestDᵛˢ vs ≤ G →
-  pathΦF B p * (G + pathNestD p) ≤ U → valsΦ? B U p vs ≡ true
+  pathΦF B p * (G + pathΦD B p) ≤ U → valsΦ? B U p vs ≡ true
 Φ-of-bound B U G p []       hb hfit = refl
 Φ-of-bound {u = u} B U G p (v ∷ vs) hb hfit =
   ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
             (≤-trans (*-monoʳ-≤ (pathΦF B p)
-                       (+-monoˡ-≤ (pathNestD p)
+                       (+-monoˡ-≤ (pathΦD B p)
                          (≤-trans (m≤m⊔n (nestDᵛ u v) (nestDᵛˢ vs)) hb)))
                      hfit)))
           (Φ-of-bound B U G p vs
@@ -253,8 +253,25 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
   where
   head : pathΦF B p * nestDᵛ u v ≤ U
   head =
-    ≤-trans (*-monoʳ-≤ (pathΦF B p) (m≤m+n (nestDᵛ u v) (pathNestD p)))
+    ≤-trans (*-monoʳ-≤ (pathΦF B p) (m≤m+n (nestDᵛ u v) (pathΦD B p)))
             (≤ᵇ⇒≤ _ U (T-to (∧-trueˡ h)))
+
+-- AND A CHEAPER PATH INHERITS A DEARER ONE'S RECEIPT, which is the
+-- whole of what a hand-over spends at its fan-out.  The predicate is
+-- pointwise and its two path-denominated inputs occur monotonically in
+-- it, so a path under another in BOTH is under it at every value at
+-- once -- no reading of what the values carry, and no induction on the
+-- paths.
+valsΦ?-mono : ∀ {n} {Γ : Ctx n} {u t} (B U : ℕ) (p q : Path Γ u t)
+  (vs : List (Val Γ u)) →
+  pathΦF B p ≤ pathΦF B q → pathΦD B p ≤ pathΦD B q →
+  valsΦ? B U q vs ≡ true → valsΦ? B U p vs ≡ true
+valsΦ?-mono B U p q []       hF hD h = refl
+valsΦ?-mono {u = u} B U p q (v ∷ vs) hF hD h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
+            (≤-trans (*-mono-≤ hF (+-monoʳ-≤ (nestDᵛ u v) hD))
+                     (≤ᵇ⇒≤ _ U (T-to (∧-trueˡ h))))))
+          (valsΦ?-mono B U p q vs hF hD (∧-trueʳ h))
 
 -- THE OUTER FRAME, DISCHARGED FROM THE GRANT.  The frame's own arm
 -- says nothing about what a subscription returns, so the bound cannot
@@ -452,10 +469,10 @@ stepFrame-nest-Φ-take {Γ = Γ} {t = t} {e = e} {s = s}
     (lookupNode nid (EvalSt.nodes st)) hΦ′
   where
   p : Val Γ s → Bool
-  p v = pathΦF B path * (nestDᵛ s v + pathNestD path) ≤ᵇ U
+  p v = pathΦF B path * (nestDᵛ s v + pathΦD B path) ≤ᵇ U
 
   hΦ′ : all p vals ≡ true
-  hΦ′ = subst (λ F → all (λ v → F * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
+  hΦ′ = subst (λ F → all (λ v → F * (nestDᵛ s v + pathΦD B path) ≤ᵇ U) vals
                        ≡ true)
               (*-identityˡ (pathΦF B path)) hΦ
 
@@ -597,6 +614,28 @@ postulate
 -- REFUTED: `Refuted.Caps-Face` -- the same statement one level up was
 --   deleted as false and redundant against `subscribeE-caps`, which is
 --   ground because it reports at a level.
+-- PROBED: `Probed.Frame-Step-Regs-Level` covers the SUBSCRIBING frame,
+--   which is the only kind that can move the registry -- the other four
+--   return the state they were handed, so the conclusion is the premise
+--   there and no instantiation of them can fail.  Six load-bearing rows,
+--   each driving the two quantities the premises cap to the boundary
+--   they allow: the walked path at the longest length `pathSz?` admits,
+--   the inner at the largest syntax `valsSz?` admits, at counts one and
+--   two and levels one through fifteen, plus the many-values arm and a
+--   non-empty incoming registry.  Every row reads the REGISTERED
+--   chain's own length off the post-state rather than inferring it, so
+--   the covered boundary is measured.  What it does NOT cover: a
+--   `share-sink` terminal, an inner with a nested `mergeAllᵉ`, and any
+--   count above two.
+--   The margin is the finding rather than the verdict.  An operator
+--   costs at least two in `sizeᵉ` and pushes at most one frame, so an
+--   inner admitted at level `L` contributes at most half as many frames
+--   as the level, against a walked path that may reach `L` -- while one
+--   level buys `S * suc (2 * L)`.  Measured: ten against fifteen at
+--   `L = 7`, twenty-two against thirty-one at `L = 15`.  The slack
+--   GROWS with the level, so the rows rule out a crossing at larger
+--   sizes rather than merely failing to find one, which is what a
+--   constant margin would have left open.
 postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
@@ -616,12 +655,14 @@ postulate
 --
 -- AND THE SINK IS NOT A LEAF OF IT, WHICH IS WHAT THE UNIT CLAUSE USED
 -- TO SAY.  A `share-sink` hands the values to every chain the registry
--- admits, and each of those walks a path of its OWN -- so the potential
--- the sink was handed says nothing about what those chains carry, since
--- the sink's own factor is one and its own depth is zero while an
--- admitted path has both.  The debt is therefore per admitted entry, at
--- the state the fan-out fold reaches it in, and the predicate telescopes
--- through the fold exactly as it does through a chain.
+-- admits, and each of those walks a path of its OWN, so the debt is per
+-- admitted entry, at the state the fan-out fold reaches it in, and the
+-- predicate telescopes through the fold exactly as it does through a
+-- chain.  What the sink is charged is a price the walk's own ledger
+-- picks -- an exponent in the size cap and a square of it in depth --
+-- and that pays for an admitted chain whose own leaf is a `root` and
+-- for no other, since a chain ending at a second hand-over carries the
+-- sink's price multiplied by its frames'.
 mutual
   PathΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (B U : ℕ) (path : Path Γ u t)
