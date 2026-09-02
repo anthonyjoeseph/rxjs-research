@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WIDEN THE WALK'S CHARGE TO ITS FUEL CEILING, THEN MEASURE ONE
-  CASCADE.** Lifting onto the caps ledger is discarded: those caps
-  advance by a whole instant's folds, so reading them is the increment
-  the ceiling leaf already records dead. What is live is that the charge
-  carries a cap CUBED in its exponent while the fuel affords a cap's
-  EXPONENTIAL there — so the affordable level range is quadratic where
-  it could be exponential, and the refuted crossing was measured against
-  the narrow one. Widening is a redefinition costing only that leaf. It
-  cannot buy the tower a fan-out wants, so the leg ends at a number:
-  whether one cascade's own level count fits the widened range.
+- **DROP THE SIZE CEILING; PUT THE POTENTIAL FACE'S SHAPE ON THE LIVE
+  ARM.** Widening the walk's charge is discarded, not shrunk: the
+  measurement it ended at came out negative. A chain step moves the
+  registry's own pricing by a LEVEL — `Refuted.Chain-Step-Regs-Cap`
+  pins the repair as exactly that — so one cascade's levels tower with
+  the dispatch gas, and no exponent this instant's fuel affords is a
+  tower. What stands is the potential face's own sink hop: a proven
+  body carrying no level ledger at all, because its receipt SHRINKS
+  along the remaining path. The live arm's header rules out a DEPTH
+  potential there, never a size-based one. State the shrinking receipt
+  for the live list and check the walk preserves it.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an

@@ -112,6 +112,18 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 -- count fits that range.  Reading the next instant's size instead is
 -- not the way out: the caps advance by a whole instant's folds, so that
 -- reading is the increment the ceiling leaf below already records dead.
+--
+-- AND THE TOWER IS STRUCTURAL, SO THE MEASUREMENT COMES OUT NEGATIVE.
+-- What drives it is not slack anywhere: one chain step moves the
+-- registry's own pricing by a LEVEL, because a subscribing frame swaps
+-- its head for an inner and pushes that inner's operators on as frames,
+-- and `Refuted.Chain-Step-Regs-Cap` pins the repair as exactly that
+-- level rather than as a further hypothesis.  So a fan-out entered at
+-- one level meets chains priced a level up, and the count towers with
+-- the dispatch gas by construction.  No exponent this fuel affords is a
+-- tower, so what moves is the walked side's MECHANISM and not its
+-- number -- and the potential face, whose receipt shrinks along the
+-- path and carries no level ledger at all, is the one already standing.
 
 abstract
   nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
