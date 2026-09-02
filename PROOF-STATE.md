@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE SPINE AFTER A DELIVERY HAS CUT IT, THE ONE ARRIVAL EVERY
-  SWEEP OF `foldPath-regsLen` HAS TAKEN AT ITS EASIEST.** Every row on
-  that leaf reads the FIRST arrival, where the walked path is longest
-  and the registry emptiest — the two columns rise together there, so
-  no reading can tell a grant that answers the walk from one that
-  answers the program. A later arrival has the fold's own
-  registrations standing in `B` and a path the deliveries before it
-  have cut, which is where the separation comes from the RUN rather
-  than the shape, and where the step is spent against something it
-  produced itself. Read the nesting spine at its second and third.
-
 - **THEN THE OBLIGATION THE TWO STORE-READING ARMS OWE, WHICH THE
   REFUTATIONS HAVE ALREADY NAMED.** `FrameΦHyp` is `⊤` at `from-inner`
   and at `scan-f`, non-trivial only at `thru-outer` — and the reason it
@@ -239,17 +228,29 @@ does not fit is a finding about the shared statement, not about the head.
   side: every emit that parks an inner or writes an accumulator must
   then supply the grant, and nothing does today.
 
-- **THEN THE ONE ROW IN THAT MODULE STILL STANDING ON NOTHING.**
-  `stepFrame-nest-regs` is the last of the frame-step family with no
-  reading of its own statement at all — a `RECOVERY` pointer is a note
-  about deleted apparatus, not evidence — and the census says both its
-  sides reach a program: the premise is the potential the two refuted
-  arms read, the conclusion a `⊔` over the registry's paths, and each
-  computes at a numeral. The harness the refutations spend already
-  installs a node and runs one frame, so the cost is a state whose
-  registry is not empty. Expect the defect a third time, since the
-  arms that register are the arms that read the store; if it does not
-  appear, the row has earned a receipt instead of a class.
+- **THEN THE ONE ROW WHOSE COVERAGE CLAIM IS NOT IN ITS LEDGER.**
+  `stepFrame-nest-regs` reads as unprobed — the census scored it on
+  `RECOVERY` alone — but its explanation describes readings at two
+  stack depths, so what it lacks is the `PROBED:` section that would
+  make the claim resolve and expire. Convert it, then take the reading
+  those rows never took: they deepen a registration by STACKING
+  frames, and `register` is the sole site that lengthens the registry,
+  appending a path that carries the nesting of the value subscribed.
+  So a stored value `U` never measured reaches this conclusion by the
+  route it reached the two refuted arms, and that is the shape to
+  instantiate.
+
+- **THEN THE SAME DELIVERY ABOVE THE CROSSOVER, WHERE THE CAPS TRACK
+  THE SPINE.** The later-arrival rows just taken
+  sit below it, where both caps are pinned at the frame's own syntax,
+  so a delivery moves neither — the entry climbs once to the previous
+  exit and settles. Above the crossover the caps track the height, and
+  that is the one stretch where a cut can LOWER the column the grant
+  is quadratic in while the exit it must clear stays linear — the
+  direction no row has seen. The harness transfers whole and the
+  sibling already prices the program, so the cost is two cascades. A
+  verdict there closes this leaf's measure-side axes; a red one says
+  the grant answers the subscribe, not the run.
 
 ### The ledger
 
@@ -287,19 +288,20 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED×4`: one fold's
+- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED×5`: one fold's
   registry price as ONE FRAME STEP of two caps — the walked path's `S`, the
   standing registry's `B ≥ S`. The doubling was refuted; the family that
   refuted it now fits either side of the crossover. Only a LATER arrival is
   unread.
-- **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — SHAPE, `REFUTED`: the drain
-  under this frame SUBSCRIBES, so a completion walk's empty premise holds at
-  every `U` while the queue's own depth leaves through it. Restate: the arm's
-  `⊤` obligation must become the grant `thru-outer` already carries.
-- **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — SHAPE, `REFUTED, RECOVERY`:
-  the fold emits the ACCUMULATOR's image, and that lives in the node table, so
-  a numeral in hand discharges the premise at zero while the stored depth
-  leaves through. Restate: the same grant, over the node.
+- **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — SHAPE, `REFUTED, TWIN`: the
+  drain under this frame SUBSCRIBES, so a completion walk's empty premise holds
+  at every `U` while the queue's own depth leaves through it. Restate: the
+  arm's `⊤` obligation must become the grant `thru-outer` already carries.
+- **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — SHAPE,
+  `REFUTED, TWIN, RECOVERY`: the fold emits the ACCUMULATOR's image, and that
+  lives in the node table, so a numeral in hand discharges the premise at zero
+  while the stored depth leaves through. Restate: the same grant, over the
+  node.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

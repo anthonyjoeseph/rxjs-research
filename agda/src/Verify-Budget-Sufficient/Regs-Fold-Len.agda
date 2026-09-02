@@ -286,6 +286,21 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   widens from there rather than closing.  NOT COVERED: one depth,
 --   and one arrival -- the spine is read where it is longest, not
 --   where a second delivery has already cut it.
+-- PROBED: `Probed.Fold-Regs-Nest-Later` -- the arrival the whole
+--   family had been read at its easiest.  Every row above takes the
+--   door once, so the reading is made against the state the subscribe
+--   left: the registry at its shortest and no chain having run.  Read
+--   at the second and third arrivals instead, the path cap and the
+--   exit hold while the ENTRY cap climbs once -- from the value the
+--   first arrival was handed to the value that arrival left -- and
+--   then does not move again.  So the premise is standing on the
+--   fold's OWN registrations by the second delivery, which is a fixed
+--   point of the run rather than an artifact of the subscribe, and the
+--   exit does not follow the entry up: the step is spent against
+--   something the run produced and still clears with room.  NOT
+--   COVERED: one height, below the crossover -- a delivery cutting the
+--   longer of the two columns is where the caps track the spine, and
+--   that is the sibling's stretch, not this one's.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)

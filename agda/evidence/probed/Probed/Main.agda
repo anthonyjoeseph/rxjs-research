@@ -127,3 +127,6 @@ open import Probed.Fold-Regs-Nest-Grid
 
 open import Probed.Fold-Regs-Nest-Cross
   using (cross)
+
+open import Probed.Fold-Regs-Nest-Later
+  using (row-second; row-third)
