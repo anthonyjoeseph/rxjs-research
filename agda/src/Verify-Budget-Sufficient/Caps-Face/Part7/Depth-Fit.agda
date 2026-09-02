@@ -269,11 +269,12 @@ postulate
   -- fit inside one step of the budget.  So what has to move is the
   -- currency the fit is stated in, not the ceiling handed to it.
   -- REFUTED: `Refuted.Cap-Walk-Cross`, at every floor this
-  --   development proves at once -- the size cap at two, the burst
-  --   and the register width at one, the deletion size at the cap and
-  --   the wrap sum at its bound -- and no axis moves the gap the
-  --   other way.  Its second half is the writers' side, at the same
-  --   floors.
+  --   development proves at once -- the size cap at the REACHABLE one
+  --   the walk's own affordability is discharged from rather than at
+  --   the weakest one proven, the burst and the register width at one,
+  --   the deletion size at the cap and the wrap sum at its bound --
+  --   and no axis moves the gap the other way.  Its second half is the
+  --   writers' side, at the same floors.
 
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)

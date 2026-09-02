@@ -215,19 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-DENOMINATE THE TWO FRAME FITS.** Both branches are shut by
-  `Refuted.Cap-Walk-Cross`: the ceiling that exists outruns
-  `nestWalkAt` at the same instant, and a fresh field in the walk's
-  currency cannot be preserved either, since `store-growth` IS
-  `nestCapAt`'s recurrence — the node table grows in the caps
-  currency at the writer and at the reader alike. So what is
-  mis-denominated is `scanΦ-fit` and `innerΦ-fit`, not the ceiling
-  handed to them. `nestCap-inc-sight≤capsH` is the standing evidence
-  that the repair is affordable: `capsH` already covers the SUM of
-  both currencies at one instant, so a `G` priced against `nestCapAt`
-  is buyable where one priced against `nestWalkAt` is not. First job
-  is where the walk's `U` is fixed, and whether that site sees
-  `capsH`.
+- **RE-DENOMINATE THE TWO FRAME FITS — THE COST IS ARITHMETIC, NOT
+  ROUTING.** The swap is structurally free, which the first job
+  settled: `foldPath-nest-regs`, `foldPath-nest-nodes` and
+  `foldPath-nest-live` all take the budget abstractly and conclude
+  `⊔ U`, and `chainStep-store≤` takes the store ceiling abstractly
+  too, so `nestWalkAt` is named in `Depth-Fit` alone. What it costs
+  is that `scanΦ-fit` reads its `G` under `pathΦF` and a burst power,
+  so any `U` paying it carries `nestCapAt` times an exponential of
+  the size cap squared — while affordability spends one copy of
+  `2 ^ (2 ^ cSize)` through `capsAt-exp2≤capsH`. So the work is
+  strengthening the induction `nestCap≤exp` and `walk-sight≤exp`
+  already run, at a fatter constant.
 
 - **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
   level ledger is closed to `walk-share-LiveHyp` in both directions —

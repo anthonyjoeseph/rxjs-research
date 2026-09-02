@@ -26,14 +26,25 @@
 -- carries an exponential of the walk's whole exponent, while the walk
 -- has only its second factor to answer with, and that factor is
 -- linear in the size cap over a wrap sum the size cap itself bounds.
+-- ══════════════════════════════════════════════════════════════════
+
+-- ══════════════════════════════════════════════════════════════════
+-- THE WITNESS SITS AT A REACHABLE SIZE CAP, WHICH IS THE PART THAT
+-- TAKES CARE.  `2≤capsAt-size` is proven and is NOT the floor to
+-- instantiate at: the tree also proves `21≤capsAt-size`, and the
+-- walk's own affordability is discharged from that stronger reading
+-- rather than from two -- so a crossing exhibited at a size cap of two
+-- would be a fact about a cap the evaluator never presents, and would
+-- kill only a proof that argues from the weakest floor.  Twenty-one is
+-- the reachable one, and the gap is WIDER there, since the two
+-- exponents separate as the cap grows and the second factor answers
+-- with a linear term.
 --
--- THE FLOORS ARE THE DEVELOPMENT'S OWN, which is what makes the
--- crossing a fact about the route rather than about a choice of
--- numbers: `2≤capsAt-size` and `1≤capsAt-reg` for the size and the
+-- THE OTHER FLOORS ARE THE DEVELOPMENT'S OWN: `1≤capsAt-reg` for the
 -- register width, `1≤nestBurstAt` for the burst, `delSize-cap` for the
--- deletion size, and `slotWrapSum≤size` for the wrap sum at a slot
--- vocabulary the cap covers.  The witness below is every one of them
--- at equality.
+-- deletion size, `unit≤cap` for the previous instant's cap, and
+-- `slotWrapSum≤size` for the wrap sum at a slot vocabulary the cap
+-- covers.  The witness takes every one of them at equality.
 --
 -- AND NO AXIS RESCUES IT, WHICH IS WHY ONE ROW SETTLES IT.  Raising
 -- the deletion size, the burst, the register width or the previous
@@ -74,7 +85,7 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 ----------------------------------------------------------------------
 CapUnderWalk : Set
 CapUnderWalk = ∀ (C B W unit wrap prev dS : ℕ) →
-  2 ≤ C →
+  21 ≤ C →
   1 ≤ B →
   1 ≤ W →
   1 ≤ unit →
@@ -86,14 +97,14 @@ CapUnderWalk = ∀ (C B W unit wrap prev dS : ℕ) →
 
 ----------------------------------------------------------------------
 -- THE WITNESS, AT EVERY FLOOR AT ONCE.  The size cap is the smallest
--- the caps invariant admits, the burst and the register width are
--- theirs, the deletion size is the size cap itself, and the wrap sum
--- is the largest the slot bound allows at that cap -- so the right
--- side is taken at its most generous and the left at its least.
+-- the evaluator presents, the burst and the register width are theirs,
+-- the deletion size is the size cap itself, and the wrap sum is the
+-- largest the slot bound allows at that cap -- so the right side is
+-- taken at its most generous and the left at its least.
 ----------------------------------------------------------------------
 
-2≤C : 2 ≤ 2
-2≤C = ≤-refl
+21≤C : 21 ≤ 21
+21≤C = ≤-refl
 
 1≤B : 1 ≤ 1
 1≤B = ≤-refl
@@ -107,33 +118,43 @@ CapUnderWalk = ∀ (C B W unit wrap prev dS : ℕ) →
 unit≤prev : 1 ≤ 1
 unit≤prev = ≤-refl
 
-C≤dS : 2 ≤ 2
+C≤dS : 21 ≤ 21
 C≤dS = ≤-refl
 
-wrap≤bound : 16 ≤ 2 * (2 ^ 2 * 2)
+wrap≤bound : 924844032 ≤ 21 * (2 ^ 21 * 21)
 wrap≤bound = ≤-refl
 
 ----------------------------------------------------------------------
 -- THE TWO QUANTITIES THAT CROSS, pinned before the ordering is taken,
 -- so a repair moving either side fails here naming the number rather
--- than turning the crossing into an equality.
+-- than turning the crossing into an equality.  They are pinned at
+-- their EXPONENTS and at the walk's second factor: the sides
+-- themselves run to thousands of digits at a reachable cap, and a
+-- literal that long is a number nobody reads rather than a pin.
 ----------------------------------------------------------------------
 
-capSide : ℕ
-capSide = 2 ^ (suc 1 * suc 1 * (suc 2 * (1 * (2 * 2)))) * 1
+capExp : ℕ
+capExp = suc 1 * suc 1 * (suc 21 * (1 * (21 * 21)))
 
-walkSide : ℕ
-walkSide = 2 ^ suc (2 * (2 * 2) + 2 * 2) * (1 + 2 + 2 * 16)
+walkExp : ℕ
+walkExp = suc (21 * (21 * 21) + 21 * 21)
 
-capSide≡ : capSide ≡ 281474976710656
-capSide≡ = refl
+walkFac : ℕ
+walkFac = 1 + 21 + 21 * 924844032
 
-walkSide≡ : walkSide ≡ 286720
-walkSide≡ = refl
+capExp≡ : capExp ≡ 38808
+capExp≡ = refl
+
+walkExp≡ : walkExp ≡ 9703
+walkExp≡ = refl
+
+walkFac≡ : walkFac ≡ 19421724694
+walkFac≡ = refl
 
 cap-walk-cross-absurd : CapUnderWalk → ⊥
 cap-walk-cross-absurd pr =
-  ≤⇒≤ᵇ (pr 2 1 1 1 16 1 2 2≤C 1≤B 1≤W 1≤unit unit≤prev C≤dS wrap≤bound)
+  ≤⇒≤ᵇ (pr 21 1 1 1 924844032 1 21
+           21≤C 1≤B 1≤W 1≤unit unit≤prev C≤dS wrap≤bound)
 
 ----------------------------------------------------------------------
 -- AND THE SAME CROSSING KILLS THE FIELD BEFORE IT IS BUILT.  The
@@ -155,7 +176,7 @@ cap-walk-cross-absurd pr =
 ----------------------------------------------------------------------
 FieldStepFits : Set
 FieldStepFits = ∀ (C C′ B W unit wrap inc dS : ℕ) →
-  2 ≤ C →
+  21 ≤ C →
   1 ≤ B →
   1 ≤ W →
   1 ≤ unit →
@@ -170,9 +191,10 @@ FieldStepFits = ∀ (C C′ B W unit wrap inc dS : ℕ) →
 1≤inc : 1 ≤ 1
 1≤inc = ≤-refl
 
-C≤C′ : 2 ≤ 2
+C≤C′ : 21 ≤ 21
 C≤C′ = ≤-refl
 
 field-step-absurd : FieldStepFits → ⊥
 field-step-absurd pr =
-  ≤⇒≤ᵇ (pr 2 2 1 1 1 16 1 2 2≤C 1≤B 1≤W 1≤unit 1≤inc C≤C′ C≤dS wrap≤bound)
+  ≤⇒≤ᵇ (pr 21 21 1 1 1 924844032 1 21
+           21≤C 1≤B 1≤W 1≤unit 1≤inc C≤C′ C≤dS wrap≤bound)
