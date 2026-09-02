@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN OPEN THE DRAIN'S OWN RECURSION.** The completion frame is now
-  a checked dispatch — the four routes that hand their schedule back
-  are proven, and everything still asserted sits on the queue drain
-  itself, at the caps bundle the node lookup delivers. What that
-  bundle has not been spent ON is the single subscription: the drain
-  recurses over the queue and mints once per entry, so the fold it
-  returns is a join of one subscribe per parked term against a
-  pre-state offering zero. So the commit splits that recursion — a
-  real body over one subscribe leaf, the park receipt read at the
-  entry — and either closes the join against the cap or names the
-  clause where the recursion outruns it.
-
 - **THEN FOLLOW THE REGISTRY RECEIPT BACK TO THE MINT.** The fan-out
   pair turned out not to be the fan-out's at all: the admission filter
   never reads a path, both liftings across it are already proven, and
@@ -248,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   reads a queue, and either closes the arm's caps leaf with it or
   names the clause where the walk cannot preserve it.
 
+- **THEN SPLIT THE SUBSCRIBE AT ITS OWN HEADS.** The drain's recursion
+  is a real body now, stated over an abstract slot telescope so no
+  preservation fact is owed, and what it spends is one subscribe. That
+  leaf is still a monolith over the whole descent, and the nodes face
+  already shows the shape it wants: gas first, then one arm per source
+  head, with the three that cost nothing — an empty source, a dry
+  unfold, a gate whose node is an empty queue — proven rather than
+  assumed. So the commit splits it that way, and either closes the
+  gated head against the park receipt the entry carries or names the
+  head where the size cap cannot reach the depth.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
@@ -255,10 +254,10 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`mergeAllDrain-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
-  what draining a merge node's parked queue mints on the live list. Reached at
-  an installed queue: a gated entry reads zero at every state quantity the
-  consuming fit's residue is built from, so only the cap size pays.
+- **`subscribeInner-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+  what one subscribe out of a merge node's parked queue mints on the live list.
+  A gated entry reads zero at every state quantity the consuming fit's residue
+  is built from, so only the cap size pays.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
   the outer frame mints, subscribing the arrivals it is handed. The one kind
   whose side condition is a size bound on values rather than a unit.
