@@ -435,13 +435,6 @@ closSt? c sched st = all (closLive c (Sched.slots sched)) (Sched.live sched)
 -- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
 --   against a unit of one, minted by a map whose function carries
 --   syntax the program does not.
--- PROBED: `Probed.Fan-Regs-Registry` reaches the registry by RUNNING
---   rather than by constructing one, on both axes the reading has.
---   Covered: a share telescope one to five crossings deep, whose
---   largest reachable registry holds five chains; and a ladder of `k`
---   flatten layers standing above a share, `k ≤ 4`, where the chain's
---   depth and the unit climb together at `k+1` against `k+3` -- a
---   margin of two that neither closes nor opens across the sweep.
 regsNest? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
           → Sched Γ → EvalSt e → Bool
 regsNest? {e = e} sched st =

@@ -47,7 +47,7 @@ make refuted              typecheck the refutations   (Refuted/Main.agda)
 make probed               typecheck the probes        (Probed/Main.agda)
 make wiring-refuted       reachability, rooted at Refuted/Main
 make wiring-probed        reachability, rooted at Probed/Main
-make evidence-check       E1 + E2 + E3 + E4 + E5
+make evidence-check       E1 + E2 + E3 + E4 + E5 + E6
 make evidence-selftest    proves every one of them still fires
 ```
 
@@ -165,3 +165,57 @@ or delete the probe.
 It is deliberately **not** a make target: it writes the current fingerprint onto
 every unstamped target, which is exactly the move the paragraph above forbids
 doing by reflex.
+
+## E6 — the fork, and why the marker is not the check
+
+A probe has two possible products and they are not interchangeable. Most probes
+**instantiate one statement and report that it held** — a coverage receipt,
+bounded by the shapes it reached. The other kind stands at a **design choice**:
+two candidate mechanisms are on the table, and the probe's whole job is to show
+they disagree somewhere, so that instantiating them decides between them.
+
+Declare which with the marker:
+
+```
+-- TARGET: pushVals-merge-nest @c12ae2      a receipt
+-- FORK:   scanΦ-fit                        a choice between mechanisms
+```
+
+The marker is free, and a free marker enforces nothing on its own — that is the
+lesson of every convention in this repo that had to grow teeth. So the marker
+selects a law and the law is discharged in **Agda**:
+
+```agda
+record Separates {I V : Set} (f g : I → V) : Set where
+  field
+    at    : I
+    apart : f at ≢ g at
+```
+
+```agda
+nest-fork : Separates nestD-sum nestD-join
+nest-fork = record { at = prog₇ ; apart = λ () }
+```
+
+`apart` cannot be written when the two candidates agree, so a fork that decides
+nothing does not typecheck. A `-- FORK:` file carrying no `Separates`-typed
+declaration is E6's finding; so is a file declaring both markers, and so is a
+`-- TARGET:` file that carries a separation — that last one is a fork wearing a
+receipt's marker, and the `-- PROBED:` line written from it would claim coverage
+of a statement the separating rows were never about.
+
+Three things E6 deliberately does not do. It does not check that the two
+candidates are the ones that **matter** — no machine can, and that judgement is
+the reason a fork gets written down at all. It does not check that `at` is
+**reachable**: a witness built by hand rather than by running is the failure
+under PROBE BEFORE GRINDING, unchanged and still yours. And it says nothing
+about a fork between two **statements** — two candidate shapes for a lemma,
+two currencies for a potential. Those are settled by refuting one side, which
+is `refuted/`'s job, with its own root and its own gate target; there is no
+`Separates` to write, because the alternatives are types rather than functions.
+
+`Separates` itself lands with the first fork that needs it: `wiring-probed`
+roots every definition in the tree at `Probed.Main`, so a record nothing uses
+fails the gate. Until then E6's own branches are pinned by fixtures under
+`scripts/evidence-selftest/`, the same arrangement `wiring-selftest` uses for a
+rule that fires on nothing in the tree today.

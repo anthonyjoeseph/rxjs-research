@@ -93,6 +93,22 @@ TARGET = re.compile(r"^\s*--\s*TARGET:\s*(.+?)\s*$")
 # keeps reading a bare name and E5 owns the whole of the fingerprint law.
 STAMP = re.compile(r"^(\S+)\s*@\s*([0-9a-f]{6})$")
 
+# THE SECOND KIND OF PROBE, and the marker that says so.  A `-- TARGET:` probe
+# instantiates ONE statement and reports that it held: its product is a
+# coverage receipt.  A `-- FORK:` probe stands at a design choice between two
+# candidate MECHANISMS and its product is a separation -- these two disagree,
+# so instantiating decides between them.  Both expire the same way, so E2 reads
+# either marker as the declaration that a probe is about a live statement; E5
+# stamps only the first, since a fork's rows are taken against two candidate
+# DEFINITIONS rather than against the target's text.
+FORK = re.compile(r"^\s*--\s*FORK:\s*(.+?)\s*$")
+# A separation is proven, not declared: the value's type is `Separates f g`,
+# whose `apart` field is UNINHABITED when the two candidates agree.  So this
+# regex decides only which check applies, and Agda decides whether the claim
+# is true -- the same division of labour as `-- TARGET:`, where the marker is
+# free and the obligation it creates is not.
+SEPARATES = re.compile(r"\bSeparates\b")
+
 
 def _dupcheck():
     """`check-duplicates` loaded by path: its module name is not an
@@ -196,36 +212,72 @@ def check_e1(src, namespaces):
     return bad
 
 
-def check_e2(evidence, postulates):
-    """Every probe declares at least one target, and every target is live."""
-    missing, dead = [], []
+def probe_files(evidence):
+    """Every probe module, the claim root aside — it states no rows."""
     root = os.path.join(evidence, "probed")
     if not os.path.isdir(root):
-        return missing, dead, 0
-    n = 0
+        return
     for p in agda_files(root):
-        base = os.path.basename(p)
-        if base == "Main.agda":          # the claim root states no rows
-            continue
+        if os.path.basename(p) != "Main.agda":
+            yield p
+
+
+def declared(path):
+    """(line, name) per marker, split by kind: targets, then forks."""
+    targets, forks = [], []
+    for i, line in enumerate(open(path, encoding="utf-8"), 1):
+        for rx, out in ((TARGET, targets), (FORK, forks)):
+            m = rx.match(line)
+            if not m:
+                continue
+            for t in re.split(r"[,\s]+", m.group(1)):
+                # a STAMP is E5's business, and it is written beside the
+                # name rather than instead of it -- so drop it here rather
+                # than letting a fingerprint be read as a second target
+                t = t.split("@")[0].strip()
+                if t:
+                    out.append((i, t))
+    return targets, forks
+
+
+def check_e2(evidence, postulates):
+    """Every probe declares at least one target, and every target is live."""
+    missing, dead, n = [], [], 0
+    for p in probe_files(evidence):
         n += 1
-        targets = []
-        for i, line in enumerate(open(p, encoding="utf-8"), 1):
-            m = TARGET.match(line)
-            if m:
-                for t in re.split(r"[,\s]+", m.group(1)):
-                    # a STAMP is E5's business, and it is written beside the
-                    # name rather than instead of it -- so drop it here rather
-                    # than letting a fingerprint be read as a second target
-                    t = t.split("@")[0].strip()
-                    if t:
-                        targets.append((i, t))
-        if not targets:
+        targets, forks = declared(p)
+        # A FORK expires exactly as a TARGET does: it names the statement
+        # whose shape is in question, and once that statement is settled the
+        # choice it stands at has been made.
+        both = targets + forks
+        if not both:
             missing.append(p)
             continue
-        for i, t in targets:
+        for i, t in both:
             if t not in postulates:
                 dead.append((p, i, t))
     return missing, dead, n
+
+
+def check_e6(evidence):
+    """A probe is a receipt or a fork, never neither and never both.
+
+    Neither is E2's finding already.  What this adds is that the KIND a probe
+    declares creates an obligation Agda can refuse: a fork must carry a
+    `Separates`, and a receipt must not."""
+    mixed, unproven, undeclared = [], [], []
+    mod = _dupcheck()
+    for p in probe_files(evidence):
+        targets, forks = declared(p)
+        sep = [(line, name) for name, line, ty in mod.declarations(p)
+               if SEPARATES.search(ty)]
+        if targets and forks:
+            mixed.append((p, forks[0][0]))
+        elif forks and not sep:
+            unproven.append((p, forks[0][0], forks[0][1]))
+        elif targets and sep:
+            undeclared.append((p, sep[0][0], sep[0][1]))
+    return mixed, unproven, undeclared
 
 
 # A RECEIPT, in the marker form CLAUDE.md specifies: the marker opens a comment
@@ -394,6 +446,7 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         [os.path.join(evidence, d) for d in NAMESPACES]
         if isinstance(evidence, str) else list(evidence),
         statements(src), harness)
+    mixed, unproven, undeclared = check_e6(evidence)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -489,15 +542,50 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         print("    alone: that converts a false coverage claim into a "
               "certified one.")
 
+    for p, i in mixed:
+        print(f"{p}:{i}: E6 — probe declares BOTH a target and a fork")
+        print("    The two products are different and only one of them is "
+              "this file's.  A")
+        print("    receipt says a statement HELD at these shapes; a fork says "
+              "two candidate")
+        print("    mechanisms DISAGREE at this one.  Rows that do both let the "
+              "receipt claim")
+        print("    coverage the separating row never bought.  Split the "
+              "probe.")
+    for p, i, name in unproven:
+        print(f"{p}:{i}: E6 — fork on {name!r} carries no `Separates`")
+        print("    A fork's whole content is that the two candidates DIFFER, "
+              "and prose")
+        print("    saying so is a claim no machine reads.  State the "
+              "alternatives as two")
+        print("    definitions of one signature and inhabit `Separates f g`, "
+              "whose `apart`")
+        print("    field cannot be written when they agree.  If there is no "
+              "second")
+        print("    candidate, this is a receipt: say `-- TARGET:` instead.")
+    for p, i, name in undeclared:
+        print(f"{p}:{i}: E6 — receipt carries a separation, {name!r}")
+        print("    A probe holding a `Separates` is choosing between "
+              "mechanisms whatever")
+        print("    its marker says, and a `-- PROBED:` receipt written from it "
+              "reports")
+        print("    coverage of a statement the separating rows were never "
+              "about.  Declare")
+        print("    it `-- FORK:`, or move the separation to the probe that "
+              "owns it.")
+
     n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
-         + len(smissing) + len(sdead) + len(unstamped) + len(stale))
+         + len(smissing) + len(sdead) + len(unstamped) + len(stale)
+         + len(mixed) + len(unproven) + len(undeclared))
     if n == 0:
         print(f"check-evidence: clean — {nprobes} probe(s), every one naming a "
               f"live postulate; {nreceipts} receipt(s), every one above its "
               f"subject and marked for that subject's state; no src file "
               f"imports the evidence tree; {nseries} harness series, every "
               f"one naming a live postulate; {ntargets} target(s), every "
-              f"one stamped with the statement its rows were taken against")
+              f"one stamped with the statement its rows were taken against; "
+              f"every probe a receipt or a fork and never both, every fork "
+              f"proving its separation in a type")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -537,6 +625,21 @@ def selftest():
     run(os.path.join(fx, "empty"), os.path.join(fx, "live-target"),
         set(), "is not a live postulate",
         "E2 fires when the target is discharged out from under the probe")
+
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-good"),
+        {"live-one"}, None, "E6 quiet on a fork that proves its separation")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-unproven"),
+        {"live-one"}, "carries no `Separates`",
+        "E6 fires on a fork that only claims to choose")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-mixed"),
+        {"live-one"}, "declares BOTH a target and a fork",
+        "E6 fires on a probe that is both kinds at once")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "receipt-separates"),
+        {"live-one"}, "receipt carries a separation",
+        "E6 fires on a separation wearing a receipt's marker")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-good"),
+        set(), "is not a live postulate",
+        "E2 expires a FORK exactly as it expires a TARGET")
 
     empty = os.path.join(fx, "empty")
     run(empty, empty, {"live-one"}, "E4 — series 'A —",
@@ -626,7 +729,11 @@ def selftest():
           "printing the current one, so adopting it is a copy and not a "
           "computation -- and on a stamp whose statement has since been "
           "rewritten under the same name, naming BOTH fingerprints; and is "
-          "quiet on a stamp that still matches)")
+          "quiet on a stamp that still matches.  E6 fires on a fork that "
+          "only CLAIMS to choose, on a probe that is both kinds at once, and "
+          "on a separation wearing a receipt's marker; is quiet on a fork "
+          "that proves its separation; and a FORK expires under E2 exactly "
+          "as a TARGET does)")
     return 0
 
 

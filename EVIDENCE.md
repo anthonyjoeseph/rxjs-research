@@ -10,7 +10,7 @@ and nothing in `src` may depend on it.**
 
     make refuted        typecheck the refutations  (agda Refuted/Main.agda)
     make probed         typecheck the probes       (agda Probed/Main.agda)
-    make evidence-check E1 + E2, the two laws below
+    make evidence-check the laws below — the boundary, expiry, and a probe's kind
 
 A **refutation is conclusive negative evidence**; a **probe is inconclusive
 positive evidence**. Neither is a claim, which is why neither is in `src` and
@@ -47,7 +47,7 @@ tree.
 So a refutation needs no expiry machinery and a probe does. That asymmetry is
 E2.
 
-## The two laws — `make evidence-check`
+## The laws — `make evidence-check`
 
 - **E1 — THE ONE-WAY BOUNDARY. Nothing in `src` may import from an evidence
   tree.** Imports go `evidence/` → `src`, freely and deeply: a refutation must
@@ -73,6 +73,33 @@ E2.
   If what a probe actually pins is the **evaluator** rather than a statement,
   it is not a probe — it is a unit test, and its home is the bug cache
   (`Implementation/Unit-Test.agda`, `make bug-cache`).
+
+- **E6 — A PROBE IS A RECEIPT OR A FORK, NEVER NEITHER AND NEVER BOTH.** The
+  two products are different. A `-- TARGET:` probe instantiates ONE statement
+  and reports that it held: its product is a coverage receipt. A `-- FORK:`
+  probe stands at a design choice between two candidate MECHANISMS and its
+  product is a separation — these two disagree, so instantiating decides
+  between them. Neither marker is E2's finding already; both at once is E6's,
+  because a receipt written from a file that also separates claims coverage
+  the separating rows never bought.
+
+  **A FORK PROVES ITS SEPARATION IN A TYPE.** The alternatives are two real
+  definitions of one signature and the probe inhabits `Separates f g` — a
+  witness plus `f at ≢ g at`, whose `apart` field is UNINHABITED when the
+  candidates agree. So the marker decides only which law applies and **Agda
+  decides whether the claim is true**: the same division as `-- TARGET:`,
+  where the marker is free and the obligation it creates is not. This is what
+  a comment convention could never buy — a declared fork that decides nothing
+  is refused by the typechecker, not by a reviewer's memory.
+
+  A fork **expires exactly as a target does**: E2 reads either marker, so a
+  fork whose statement is settled fails the gate and is deleted. E5 stamps
+  only targets — a fork's rows are taken against two candidate definitions
+  rather than against the target's text.
+
+  **The witness must be REACHED, not constructed**, and that half no type
+  carries: it is the hand-built-state failure under PROBE BEFORE GRINDING,
+  unchanged.
 
 Plus, per tree, the wiring law with no exemptions:
 
