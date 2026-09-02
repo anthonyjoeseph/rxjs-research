@@ -215,18 +215,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **DENOMINATE THE FOLD ARM AT THE FOLD, NOT AT THE INSTANT.** The
-  ledger repair this leg was cut for is DEAD, and its own refutation
-  says so: `Refuted.Scan-Phi-Width` carries the width premise in its
-  second half, under the binder, and dies at the same witness — the
-  crossing is at TWO values, which every width admits. So the fold's
-  charge is an exponential in a count no conjunct on the values can
-  bring under an INSTANT-indexed budget. The caps face survives the
-  identical arm because its receipt is read at a cap the fold has
-  already advanced. Mint the potential's stepped reading, over
-  `frameStep j` of the instant's caps rather than the caps
-  themselves, and check it where the walk already threads that `j`
-  for its size and registry ledgers.
+- **THREAD THE BURST WIDTH THROUGH THE Φ WALK.** The stepped
+  denomination this leg used to name is discarded — the width axis
+  towers per fold, and `scanΦ-fit`'s header carries why. What
+  replaces it is a currency the store face already proves: `nestFac`
+  writes the burst power INTO the factor, `nestBurstAt` is the width
+  it is read at, `burst≤size′` bounds it, and `nestFac≤exp` with
+  `nestFacLog≤pow` take the power to a polynomial the caps recurrence
+  affords — while `scanVals-nest` and `stepFrame-emit-scan` prove this
+  very fold under `length vals ≤ W`. The potential is the one face
+  threading no width. Give the Φ ledger and the walk that parameter,
+  outside-in: restate `valsΦ?` and the walk's hypotheses at `W`,
+  postulate the leaves, and land the fold arm's local discharge, both
+  sides then reading one power.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -290,10 +291,10 @@ does not fit is a finding about the shared statement, not about the head.
   family that refuted the fixed cap; whether ONE level pays is unread.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
-  `drainW`, so nothing is free. Two obligations are drain ledgers this face
-  has and must route; the third is the merge node's own queue depth.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
-  the fold's new grant. Its ceiling now fits under `nestΦAt`; its BURST does
+  `drainW`, so nothing is free. Two obligations are drain ledgers this face has
+  and must route; the third is the merge node's own queue depth.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
+  of the fold's new grant. Its ceiling now fits under `nestΦAt`; its BURST does
   not, and the width conjunct `valsCaps?` carries does not repair it — the
   crossing is at two values. What moves is where the charge is denominated.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's

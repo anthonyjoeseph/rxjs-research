@@ -309,6 +309,27 @@ postulate
   --   is what says the ledger is not the repair rather than that some
   --   width is too small.
 
+  -- AND THE WIDTH IS A PARAMETER THE STORE FACE ALREADY CARRIES, which
+  -- is what this arm is short of rather than a fact the development
+  -- lacks.  `nestFac S W` is `((2 ^ S) ^ suc W) ^ S` -- the burst power
+  -- written INTO the factor instead of fitted under it -- `nestBurstAt`
+  -- is the width it is read at, `burst≤size′` bounds that width by the
+  -- size cap, and `nestFac≤exp` with `nestFacLog≤pow` take the whole
+  -- power down to a polynomial the caps recurrence affords.  The fold
+  -- itself is already proven in that currency: `scanVals-nest` and
+  -- `stepFrame-emit-scan` state this very step under `length vals ≤ W`
+  -- and conclude at `(2 ^ sizeᵗ fn) ^ W`.  So the potential is the one
+  -- face whose walk threads no width, and threading it restates what
+  -- the walk hands a frame rather than asking for a new bound.
+  -- DEAD ROUTE: denominating this arm at `frameStep j` of the instant's
+  --   caps instead, so the receipt is read at a cap the fold has
+  --   already advanced.  The width axis exponentiates per fold, so j
+  --   folds put it above `towerℕ j`, and a count that reads it gives up
+  --   the linear height `capsAt-tower` proves.  The next instant is
+  --   closed from the other side: `chainStep-store≤` records that its
+  --   consumer's fuel is the exponential at THIS instant, which the
+  --   caps recurrence pins to this instant's cap.
+
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
