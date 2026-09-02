@@ -39,7 +39,7 @@ open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (delSize; delSq; delSq-def; delSize-exp)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (nestCapAt; nestFacAt; nestFacAt-def; nest-inflate; realWidAt; realWidAt-def; nestIncAt;
+  (nestCapAt; nestFacAt; nestFacAt-def; realWidAt; realWidAt-def; nestIncAt;
   nestIncAt-def; nestBurstAt; nestUnit; slotsNestSum; nestCapAt-0; nestCap-mono₀; slotNest;
   nestBurstAt-def; nestCapAt-suc; slotWrap; slotWrapSum; fitG; slotWrapB; slotWrapBSum)
 open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
@@ -144,25 +144,6 @@ abstract
           * (nestUnit e sl + Caps.cSize (capsAt e sl id)
              + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
   nestWalkAt-def _ _ _ = refl
-
-  unit+size≤nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    nestUnit e sl + Caps.cSize (capsAt e sl id) ≤ nestWalkAt e sl id
-  unit+size≤nestWalkAt e sl id =
-    ≤-trans (m≤m+n (nestUnit e sl + Caps.cSize (capsAt e sl id))
-                   (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
-      (nest-inflate (2 ^ suc (Caps.cSize (capsAt e sl id)
-                                * (Caps.cSize (capsAt e sl id)
-                                   * Caps.cSize (capsAt e sl id))
-                              + Caps.cSize (capsAt e sl id)
-                                * Caps.cSize (capsAt e sl id)))
-                    (nestUnit e sl + Caps.cSize (capsAt e sl id)
-                     + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
-                    (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
-                                     * (Caps.cSize (capsAt e sl id)
-                                        * Caps.cSize (capsAt e sl id))
-                                   + Caps.cSize (capsAt e sl id)
-                                     * Caps.cSize (capsAt e sl id)))))
 
   capΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ

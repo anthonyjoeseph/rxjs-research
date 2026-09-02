@@ -215,42 +215,42 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **READ THE SINK ARM AGAINST THE CURRENCY THAT NOW STANDS.** The
-  level ledger is closed to `walk-share-LiveHyp` in both directions —
-  no ceiling is choosable at a caller, and the caps face's own top
-  towers past it — so what was owed is a different currency, not a
-  larger number. There is now one:
-  `walk-share-ΦHyp` reads at `nestΦAt`, whose cap summand is the first
-  budget on this face big enough to carry a fanned-into chain's outer
-  frames. So the crossing the refutations pinned was taken against a
-  number this arm no longer spends. Re-run it at the Φ charge: either
-  the arm restates onto the potential and the level counterexamples
-  retire with the mechanism they refuted, or the residue is the first
-  thing the live arm has needed that no face carries.
+- **INSTANTIATE THE BUDGET THE WHOLE TIER NOW RESTS ON.** `nestΦAt`
+  was minted to carry the two recurrences the walk's own budget crossed
+  with, and `Refuted.Cap-Walk-Cross` killed both readings in that
+  currency — the ceiling routed down at the READER, a fresh field
+  minted at the WRITER. Both its statements are taken against
+  `nestWalkAt` alone, so neither binds the cap summand added to answer
+  them, and nothing has been read at the new one. State both at
+  `nestΦAt`, at the same floors. The residue is one arithmetic —
+  whether the walk's whole budget fits inside the cap's INCREMENT,
+  `nestIncAt` — decidable over bare numbers in the file holding
+  both. Either the re-mechanisation is confirmed at its foundation,
+  or every open row is refuted before one is ground on it.
 
-- **THEN PUT THE STORE'S NEST CEILING ON THE RECORD, NOT IN A
-  SIGNATURE.** `scanΦ-fit` and `innerΦ-fit` now spend budgets that
-  carry `nestCapAt` with room, so the crossing that settled them is
-  gone and one thing is left: no premise of either names
-  `EvalSt.nodes`. `nestOK?` is exactly that fact, and
-  `cascadeGo-nest-nodes` already takes it, so the routing costs no
-  producer anything it does not owe — but threading it into these two
-  signatures is the laundering the ledger cannot see, and the fit test
-  that revealed the gap does not license it. The field goes on the
-  invariant record the walk runs under; the cost is the cascade
-  through that record's producers and consumers, and that cascade is
-  the fact being true rather than a reason to avoid it.
+- **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
+  refuted, and its residue is the first BOUNDED one this hop has
+  produced: the receipt is read at factor one and depth zero, while an
+  admitted chain is owed its own factor and its own depth — both
+  already delivered where the arm stands, by `pathΦF-cap` and
+  `pathNestD-len` off the size legality `shareAdmit-caps` carries. No
+  bigger factor at the sink repairs it, since a depth-zero value zeroes
+  the product while the chain still owes its depth. So what moves is
+  the RECEIPT, not a ledger, a level or a field — and the budget never
+  moves through the fan-out at all, both hypotheses recursing at one
+  `U`, so nothing here compounds with the hop count the live arm died
+  on.
 
-- **THEN INSTANTIATE THE REPAIRED DRAIN ARM.** `stepFrame-nest-live`
-  now carries `FrameΦHyp`, and nothing has run a row against the arm in
-  that shape. `Refuted.Drain-Live-Defer` built the crossing and the fit
-  is what its witness cannot supply, but a premise that rules a
-  counterexample out is not evidence the arm HOLDS; the probe beside it
-  runs the composite, whose rows never state the leaf's premises, so its
-  receipt is silent here. One program does both faces at once — the
-  registry arm spends the same `InnerΦFit` — so a queue the caps
-  invariant really bounds, drained at a live-minting gate, either pins
-  both arms or refutes both.
+- **THEN THE FRAME'S BLIND WRITES, AT WHATEVER THE FIRST LEG LEAVES
+  STANDING.** `scanΦ-fit`, `innerΦ-fit` and the drain arm of
+  `stepFrame-nest-live` are ONE question — no premise of any names
+  `EvalSt.nodes`, and each was refuted for that and repaired by a
+  grant the state cannot carry. If the budget holds, the fact goes on
+  the invariant record the walk runs under and never into these
+  signatures, and the cascade through that record's producers is the
+  cost of the fact being true. If it does not, what moves is the
+  currency the fits are stated in, and all three move together rather
+  than being instantiated one at a time.
 
 ### The ledger
 
@@ -279,11 +279,10 @@ does not fit is a finding about the shared statement, not about the head.
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
   queue, so the walk's values cannot reach it.
-- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
-  potential for the chains a sink fans into. A sink is a leaf of the factor
-  recursion, so the receipt handed in carries a factor of one against a chain
-  whose outer frames cost the cap's exponential — the live arm's crossing, a
-  level sooner.
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
+  for the chains a sink fans into. NOT the live arm's crossing: the potential
+  does not compound across hops. Read at factor one and depth zero, against two
+  facts already bounded where the arm stands — so the deficit is a relation.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the

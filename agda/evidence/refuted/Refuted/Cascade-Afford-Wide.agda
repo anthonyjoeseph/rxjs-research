@@ -46,7 +46,8 @@ open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; length)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
-  +-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤n+m; m≤m+n; m≤n*m; n≮n; +-comm; +-suc)
+  +-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤n+m; m≤m+n; m≤n*m; m^n>0; n≮n; +-comm;
+  +-suc)
 open import Data.Product using (_×_; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
@@ -61,7 +62,7 @@ open import Rx.Evaluator using (EvalSt; Arrival; Path; Chain; RegId; root;
 open import Verify-Budget-Sufficient.Deliver-Measure using (chainsLenSum)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt; 8≤capsAt-size)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
-  using (nestΦAt; nestWalkAt≤nestΦAt; unit+size≤nestWalkAt)
+  using (nestΦAt; nestWalkAt≤nestΦAt; walkFac≤nestWalkAt)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -142,7 +143,9 @@ N = nestΦAt e₁ sl₁ 0
 -- the charge dominates the cap, which is the one proven fact the
 -- witness needs about a family it never unfolds
 S≤N : S ≤ N
-S≤N = ≤-trans (≤-trans (m≤n+m S _) (unit+size≤nestWalkAt e₁ sl₁ 0))
+S≤N = ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ S)))
+                                (*-monoˡ-≤ S (m^n>0 2 (S * (S * S) + S * S))))
+                       (walkFac≤nestWalkAt e₁ sl₁ 0))
               (nestWalkAt≤nestΦAt e₁ sl₁ 0)
 
 K : ℕ

@@ -376,26 +376,37 @@ frameΦ-fit sl id sf eid now (thru-outer op nid) p vals fin sched st hsl hpz hnd
 -- the registry, and the potential is a statement about a PATH, so the
 -- one the walk carries says nothing about theirs.
 --
--- AND THE POTENTIAL IS NOT A SHELTER FROM THAT CROSSING -- IT MEETS IT
--- SOONER.  A sink is a LEAF of the factor recursion, so the receipt
--- handed in here has a factor of one and says only that the values are
--- shallow; the chain fanned into carries its own factor, and every
--- outer frame on it costs the cap's own exponential.  So the fanned-into
--- length enters the charge MULTIPLIED by the cap, where the live arm's
--- size ledger enters it added -- and the level reading the registry is
--- priced at is the same inflated one either way.  The affordable
--- reading is therefore a cap SQUARED here against a cap cubed there --
--- one level lower on the same axis, and the same crossing rather than a
--- second question.  Whatever repairs the live arm's ledger repairs this.
---
--- REFUTED: Refuted.Sink-Level-Range -- the crossing is stated there over
---   an abstract cap and an abstract entry level, so it binds this arm as
---   written and not merely the arm it was taken against.
--- DEAD ROUTE: instantiating this statement, in either denomination.  The
---   budget it reads at is `nestΦAt`, which is sealed, and the size it
---   reads at is `capsAt`'s, which does not return at the smallest
---   program the language admits -- the same pair that closes the drain
---   leaf, and the reason no probe here can ever lower the class.
+-- BUT IT IS NOT THE LIVE ARM'S CROSSING, AND THAT IS THE READING THIS
+-- HEADER USED TO CARRY.  The level ledger COMPOUNDS: a hop prices the
+-- registry at the level the walk has reached, the next hop at that plus
+-- the admitted path's own length, and the hop count is capped by nothing
+-- but the dispatch gas -- so no exponential this fuel affords pays for
+-- it, and that is why every reading of the live arm closed.  The
+-- potential does not compound at all.  `ShareGoΦHyp` and `PathΦHyp`
+-- recurse at the very SAME budget, so what a fanned-into chain owes is
+-- read against the number the sink was handed and against nothing
+-- accumulated on the way in.  The witnesses that closed the level arm
+-- are therefore silent about this one, and it has to be read on its own.
+
+-- AND READ ON ITS OWN THE DEFICIT IS BOUNDED, which no reading of the
+-- live arm ever was.  A sink is a LEAF of the factor recursion, so the
+-- receipt handed in is at factor one and depth zero: it says only that
+-- the values are shallow.  An admitted chain is owed its own factor
+-- times those same values' depth plus its own depth, and BOTH of those
+-- are already bounded where this arm stands -- `pathΦF-cap` and
+-- `pathNestD-len` deliver them from the registry's size legality, which
+-- `shareAdmit-caps` carries off the premise this statement already
+-- takes.  So nothing here is unbounded and nothing is missing from the
+-- state.  What is missing is a RELATION between the receipt the walk
+-- spends at a sink and the two the chains are charged at, and the
+-- repair is therefore a restatement of what the walk HANDS a sink,
+-- in the currency it already carries.
+-- REFUTED: `Refuted.Sink-Phi-Fan`, stated over an abstract cap and
+--   budget so that it binds this arm as written; and a second time
+--   under a universally quantified factor at the sink, which kills the
+--   obvious repair before it is tried -- a multiplicative charge meets
+--   a depth-zero value, so the product is discharged at a budget of
+--   nothing while the admitted chain still owes its own depth.
 postulate
   walk-share-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)
