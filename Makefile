@@ -1,4 +1,4 @@
-.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ts-check cli-build oracle qc-build quickcheck harness harness-build
+.PHONY: find-prose gate roadmap-moved roadmap-moved-selftest roadmap-evidence gate-heavy gate-cheap gate-light dev-changed dev-changed-selftest stripped strip-selftest unmap-selftest postulates dup-check dup-selftest imports-check imports-fix imports-selftest find all help agda-dev agda-dev-selftest bg bg-check bg-wait bug-cache unsafe-check wiring wiring-selftest comments-check comments-selftest refuted ev ts-check cli-build oracle qc-build quickcheck harness harness-build
 
 # UTF-8 locale for em-dashes and special characters in Agda output
 export LC_ALL := C.UTF-8
@@ -124,6 +124,11 @@ help:
 	@echo "                  automatically before every agda target (~50 ms)"
 	@echo "  strip-selftest  proves the stripper safe: the lexical traps (-->, x--y,"
 	@echo "                  {-# #-}) and comment-insert invariance"
+	@echo "  unmap-selftest  proves the position filter still MOVES a line, in both"
+	@echo "                  spellings Agda gives a position (dot and comma)"
+	@echo "  ev            typecheck ONE evidence file by mirror-relative path:"
+	@echo "                  make ev ARGS='refuted/Refuted/X.agda'.  Nothing claims"
+	@echo "                  it — for a witness still being written"
 	@echo "  refuted       typecheck agda/evidence/refuted/ — the machine-checked '-> bottom'"
 	@echo "                  witnesses.  Separate include root: the tower never"
 	@echo "                  pays for it and 'make wiring' never sees it.  ~5 s"
@@ -245,6 +250,15 @@ stripped:
 
 strip-selftest:
 	@scripts/strip-comments.py --selftest
+
+# THE OTHER HALF OF THE MIRROR, and the half that had no selftest.  The
+# stripper deletes lines; this filter is what puts the deleted lines back into
+# every position Agda prints.  Its failure mode is silent and worse than a
+# stale citation: the PATH half kept working while the LINE half matched only
+# one of the two separators Agda spells a position with, so a mirror line
+# number arrived attached to a source path and read as an ordinary position.
+unmap-selftest: stripped
+	@scripts/unmap-positions.py --selftest
 
 # OFF THE GATE PATH, deliberately -- docs/stub-proofs.md carries the numbers
 # that decided that.  The selftest runs anyway, because an instrument nobody
@@ -521,6 +535,16 @@ refuted: stripped
 # THE PROBES.  Same tree, same law, opposite decay: see EVIDENCE.md.
 probed: stripped
 	@$(call AGDA_RUN_EV,probed/Probed/Main.agda)
+
+# ONE EVIDENCE FILE, BY PATH -- the probe loop's fast path.  `make agda-dev`
+# resolves only src-relative names, so a probe under construction had no cheap
+# check at all and the only route was the whole claim root.  A file reached
+# this way is NOT claimed by anything; it is for a witness still being written,
+# and `make wiring-probed` remains what says it has a home.
+#   make ev ARGS='probed/Probed/Some-Probe.agda'
+ev: stripped
+	@test -n "$(ARGS)" || { echo "usage: make ev ARGS='probed/Probed/X.agda'" >&2; exit 2; }
+	@$(call AGDA_RUN_EV,$(ARGS))
 
 wiring-selftest:
 	@out=$$(scripts/check-wiring.py --src scripts/wiring-selftest 2>&1); \
@@ -885,7 +909,8 @@ GATE_CHEAP = wiring-selftest wiring-gate wiring-refuted wiring-probed \
              evidence-selftest evidence-check \
              roadmap-selftest roadmap-check \
              roadmap-moved-selftest roadmap-moved \
-             comments-selftest comments-check dev-changed-selftest
+             comments-selftest comments-check dev-changed-selftest \
+             unmap-selftest
 
 gate-cheap:
 	@for t in $(GATE_CHEAP); do \
