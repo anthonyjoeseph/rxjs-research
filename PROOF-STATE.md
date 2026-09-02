@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN RESTATE THE NODES ARM AT THE WIDTH IT ACTUALLY SPENDS.**
-  `stepFrame-nest-nodes` is refuted, and not where the last leg
-  looked: the enqueue routes are priced, and the crossing is the SCAN
-  arm's accumulator, which `valsΦ?` charges once per value while the
-  fold threads it. The iteration face already carries the currency —
-  `stepFrame-nodes-scan` is proven with a power in the burst width
-  under a `length vals ≤ W` premise — so the repair is a width premise
-  on this leaf, not a larger budget. The leg is whether
-  `foldPath-nest-nodes` and its callers can name that width;
-  `stepFrame-nest-regs` took a frame grant for the same reason, so
-  check whether one grant serves both before minting a second.
-
 - **THEN READ THE THRICE-REFUTED ROW AGAINST THE SPIRAL TEST.**
   `walk-share-LiveHyp` has been refuted at the price, then once
   priced, then at the range — three restatements of one side
@@ -238,6 +226,18 @@ does not fit is a finding about the shared statement, not about the head.
   that verdict is a stop condition only Anthony can rule on. Read the
   refutations and the header's dead route first, and let the verdict
   be the leg.
+
+- **THEN THE LAST UNREAD SIBLING, WITH THE WIDTH READING IN HAND.**
+  `stepFrame-nest-live` is the one arm of the frame triple nothing has
+  instantiated. It already carries a grant and an extra join against
+  the schedule's slot sum, so it is not the empty-handed statement its
+  two siblings were — but the grant is a SIZE condition and the
+  crossing that took both of them was a DEPTH one, threaded by a fold
+  the size cannot see. Read `FrameLiveHyp` against the scan witness
+  first: if the slot sum already prices what a subscribe mints, the
+  row is over-ranked and the evidence says so; if it does not, the
+  same burst crosses here and the repair is the width the nodes arm
+  just took.
 
 - **THEN ROUTE THE TWO NARROWED ASKS, OR RESTATE THEM AGAIN.**
   `scanΦ-fit` and `innerΦ-fit` now ask for `nodeNestAt` at the node
@@ -272,9 +272,9 @@ does not fit is a finding about the shared statement, not about the head.
   Refuted three ways: no frame reading, the frame read at the level, and the
   scan arm, which emits the node store that no premise here reads.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
-  what one frame stores at the nodes map, under the potential it was handed.
-  Refuted at the scan arm: the cell holds the accumulator, the fold threads it,
-  and the budget is a constant in the burst — sixty-five against sixty-four.
+  what one frame stores at the nodes map, under the potential AND the frame
+  grant it was handed. The premise alone was refuted at the scan arm: the cell
+  holds the accumulator, and the budget is a constant in the burst.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
