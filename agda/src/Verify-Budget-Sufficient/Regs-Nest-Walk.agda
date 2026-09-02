@@ -245,6 +245,16 @@ postulate
   -- of values rather than a bound.  So the arm must carry a WIDTH as
   -- well as a state.
   --
+  -- AND THE WIDTH IS ALREADY IN SCOPE, so the restatement does not have
+  -- to thread one: `vals` is a parameter of `FrameΦHyp`, so the
+  -- obligation may be raised over `length vals` where it is raised at
+  -- all.  What that obligation has to say is fixed by `applyFn-nest`,
+  -- which bounds one substitution MULTIPLICATIVELY -- the factor times
+  -- the step function's own nesting plus the value's.  Iterating it
+  -- puts the factor in the exponent and the charge under a coefficient,
+  -- both in the width -- so what is owed here is a power and not a
+  -- larger constant.
+  --
   -- REFUTED: `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-absurd` at a
   --   stored depth of forty, and
   --   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at

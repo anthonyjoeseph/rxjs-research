@@ -219,14 +219,13 @@ does not fit is a finding about the shared statement, not about the head.
   arms with a grant over what the NODE may hold is refuted at the
   potential's own currency: a fold THREADS, so its k-th emit is k
   substitutions deep while `valsΦ?` surrenders the step function's
-  factor once, and neither factor mentions the
-  burst. With the accumulator shallow the grant is discharged for
-  nothing and the arm is still false, so the factor buys a fixed
-  number of values rather than a bound. `FrameΦHyp` must therefore
-  carry a WIDTH as well as `st`, at the factors the proven iteration
-  face already uses. The risk moves to the producing side: `PathΦHyp`
-  recurses over a list it holds no bound on, so a width has to reach
-  the site before either arm can be stated.
+  factor once, and neither factor mentions the burst. With the
+  accumulator shallow the grant is discharged for nothing and the arm
+  is still false. `FrameΦHyp` must therefore carry a WIDTH as well as
+  `st`, at the factors the proven iteration face uses — and the width
+  costs nothing to reach, since `vals` is already a parameter there.
+  The risk is the producing side, and it is the whole leg: every emit
+  that writes an accumulator must supply the grant, and nothing does.
 
 - **THEN THE ONE ROW WHOSE COVERAGE CLAIM IS NOT IN ITS LEDGER.**
   `stepFrame-nest-regs` reads as unprobed — the census scored it on
