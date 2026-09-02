@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
-  WITH AN ANSWER.** The drain row turns out to be closed to
-  instantiation in BOTH its denominations at once, and nothing said so
-  until it was run — so its class sat where no amount of sweeping could
-  ever have moved it. That trap is not obviously local: every caps-face
-  row prices a measured quantity under a cap-derived one, and the cap
-  is the same non-returning family throughout. Walk the tier's rows and
-  record per row whether either side reaches a program. A row no
-  evidence can lower must not hold a class that claims evidence, so the
-  census re-ranks the tier rather than merely describing it.
-
 - **THEN THE SPINE AFTER A DELIVERY HAS CUT IT, THE ONE ARRIVAL EVERY
   SWEEP OF `foldPath-regsLen` HAS TAKEN AT ITS EASIEST.** Every row on
   that leaf reads the FIRST arrival, where the walked path is longest
@@ -237,16 +226,30 @@ does not fit is a finding about the shared statement, not about the head.
   than the shape, and where the step is spent against something it
   produced itself. Read the nesting spine at its second and third.
 
-- **THEN THE OBLIGATION THE INNER ARM OWES, WHICH THE REFUTATION HAS
-  ALREADY NAMED.** `FrameΦHyp` is `⊤` at `from-inner` and non-trivial
-  at `thru-outer`, and the reason it is non-trivial there — that frame
-  SUBSCRIBES rather than forwards — holds verbatim of the drain beneath
-  this one. So the restatement is not a search: give the arm the same
-  shape of grant, taken over what the QUEUE may emit rather than over
-  the values in hand. `PathΦHyp` already carries `st` at the point the
-  obligation is raised, so the change reaches one signature and two
-  arms. The risk is on the producing side: every emit that parks an
-  inner must then supply that grant, and nothing does today.
+- **THEN THE OBLIGATION THE TWO STORE-READING ARMS OWE, WHICH THE
+  REFUTATIONS HAVE ALREADY NAMED.** `FrameΦHyp` is `⊤` at `from-inner`
+  and at `scan-f`, non-trivial only at `thru-outer` — and the reason it
+  is non-trivial there, that the frame does not FORWARD its output,
+  holds of both. One reads a queue, the other a stored accumulator;
+  neither is a function of the values the walk handed over. So the
+  restatement is not a search: give both the grant the outer arm
+  carries, taken over what the NODE may hold. `PathΦHyp`
+  already carries `st` where the obligation is raised, so the change
+  reaches one signature and three arms. The risk is on the producing
+  side: every emit that parks an inner or writes an accumulator must
+  then supply the grant, and nothing does today.
+
+- **THEN THE ONE ROW IN THAT MODULE STILL STANDING ON NOTHING.**
+  `stepFrame-nest-regs` is the last of the frame-step family with no
+  reading of its own statement at all — a `RECOVERY` pointer is a note
+  about deleted apparatus, not evidence — and the census says both its
+  sides reach a program: the premise is the potential the two refuted
+  arms read, the conclusion a `⊔` over the registry's paths, and each
+  computes at a numeral. The harness the refutations spend already
+  installs a node and runs one frame, so the cost is a state whose
+  registry is not empty. Expect the defect a third time, since the
+  arms that register are the arms that read the store; if it does not
+  appear, the row has earned a receipt instead of a class.
 
 ### The ledger
 
@@ -275,13 +278,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
-  for the chains a sink fans into. A sink is a leaf of the factor recursion, so
-  the receipt handed in carries a factor of one against a chain whose outer
-  frames cost the cap's exponential — the live arm's crossing, a level sooner.
-- **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: the scan
-  frame substitutes by the same rule the map clause is now proven from, but
-  emits the accumulator's image rather than the payload's.
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+  potential for the chains a sink fans into. A sink is a leaf of the factor
+  recursion, so the receipt handed in carries a factor of one against a chain
+  whose outer frames cost the cap's exponential — the live arm's crossing, a
+  level sooner.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
@@ -295,6 +296,10 @@ does not fit is a finding about the shared statement, not about the head.
   under this frame SUBSCRIBES, so a completion walk's empty premise holds at
   every `U` while the queue's own depth leaves through it. Restate: the arm's
   `⊤` obligation must become the grant `thru-outer` already carries.
+- **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — SHAPE, `REFUTED, RECOVERY`:
+  the fold emits the ACCUMULATOR's image, and that lives in the node table, so
+  a numeral in hand discharges the premise at zero while the stored depth
+  leaves through. Restate: the same grant, over the node.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
@@ -362,10 +367,10 @@ does not fit is a finding about the shared statement, not about the head.
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY, `TWIN`: every
-  stage of every chain's walk under the width cap. The mirror carries the
-  identical conjunct across the feared `thru` hop, and what is left is the
-  flat-versus-moving bound — arithmetic, not a walk.
+- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY,
+  `DEAD ROUTE, TWIN`: every stage of every chain's walk under the width cap.
+  The mirror carries the identical conjunct across the feared `thru` hop, and
+  what is left is the flat-versus-moving bound — arithmetic, not a walk.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

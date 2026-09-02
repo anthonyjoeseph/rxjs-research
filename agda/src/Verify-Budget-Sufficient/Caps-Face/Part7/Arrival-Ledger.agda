@@ -244,6 +244,12 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 -- walk face carries a moving one, and it is a transcription rather than
 -- a discovery.
 --
+-- DEAD ROUTE: instantiating this statement, in either denomination.
+--   The width it reads is `nestBurstAt`, which is sealed, and the caps
+--   both sides are read at are `capsAt`'s, which does not return at the
+--   smallest program the language admits.  So the mirror below is not
+--   one kind of evidence among several here -- it is the only kind
+--   available, and no probe can be commissioned against this row.
 -- TWIN: `thruWalk-walk` propagates this conjunct ACROSS THE FEARED HOP
 --   and is proven -- taking it in at one level and handing it back at
 --   another, with that level's growth bounded in the same tuple.

@@ -216,11 +216,34 @@ thruΦ sf id now op nid path vals fin sched st B U (k , G , hfit , hnum) =
           hnum)
 
 postulate
-  -- THE SCAN FRAME SUBSTITUTES BY THE SAME RULE and pays the same
-  -- factor, but it also reads and writes a node, so its emitted value
-  -- is the accumulator's image rather than the payload's and the
-  -- substitution above cannot be pointed at it unchanged.
+  -- THE SCAN FRAME'S OUTPUT IS THE ACCUMULATOR'S IMAGE, AND THE
+  -- ACCUMULATOR IS IN THE NODE TABLE, so this arm reads a payload no
+  -- hypothesis here measures.  It pays the factor the map clause is
+  -- proven from, and that factor is spent against the value the walk
+  -- handed over -- which is not the value the fold emits.  This
+  -- statement is FALSE as written.
   --
+  -- WHY IT IS FALSE AND NOT MERELY HARD.  Let the step function be the
+  -- first projection.  Then it charges nothing and the emit IS the
+  -- stored value, so the premise reads one numeral -- depth zero,
+  -- under a charge of zero -- and holds at `U = 0`, the strongest
+  -- budget there is, while the emit leaves at whatever depth the table
+  -- was carrying.  Doubling the stored depth doubles what leaves and
+  -- moves the premise not at all, so the gap is a parameter of the
+  -- STATE and no constant and no term in `vals`, `path` or `B` closes
+  -- it.
+  --
+  -- WHERE THE REPAIR GOES IS WHERE THE DRAIN ARM'S DOES.  Both arms
+  -- read their output out of the store rather than forwarding it, and
+  -- `FrameΦHyp` is `⊤` at both; the grant that arm's block describes
+  -- is the one this arm needs too, taken over what the NODE may hold
+  -- rather than over what a queue may emit.
+  --
+  -- REFUTED: `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-absurd` at a
+  --   stored depth of forty, and
+  --   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at
+  --   eighty -- the pair is what puts the gap in the stored depth
+  --   rather than in a constant.
   -- RECOVERY: git show 8175756:agda/evidence/probed/Probed/Step-Frame-Nest-Phi.agda
   --   restores the harness that walked the refuting term through the
   --   map clause -- the same shape a scan clause has to be run at.
