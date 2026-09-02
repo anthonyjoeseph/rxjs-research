@@ -74,7 +74,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
-  (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestCap-inc-sight≤capsH;
+  (nestWalkAt; nestWalkAt-def; unit+size≤nestWalkAt; nestΦAt; nestΦ-sight≤capsH;
+   nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
    nestUnit≤size; iterSize≤walkFac; walkFac≤nestWalkAt)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeFinish-caps; cascadeGo-caps; cascadeLatch-caps; chainStep-slots; chainsOf-caps; chainsOf-length)
@@ -902,10 +903,10 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   depthCascade a nextId (chainsOf a st) sched (cascadeLatch a st)
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
-                (nestCapAt e sl id + (nestWalkAt e sl id))
+                (nestΦAt e sl id)
                 (nestUnit e sl)
 cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hsz =
-  cascade-depth-go sl id a nextId (nestCapAt e sl id + (nestWalkAt e sl id))
+  cascade-depth-go sl id a nextId (nestΦAt e sl id)
     (chainsLenSum (chainsOf a st) + length (chainsOf a st)) 0
     (chainsOf a st) sched (cascadeLatch a st) hsl
     (cascade-afford sl id a sched st hok) hsz
@@ -916,11 +917,10 @@ cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hsz =
     (latch-regsSz (Caps.cSize (capsAt e sl id)) a st
       (capsOK?-regs (capsAt e sl id) sched st hok))
     ≤-refl
-    (m≤n+m (nestWalkAt e sl id)
-           (nestCapAt e sl id))
+    (nestWalkAt≤nestΦAt e sl id)
     (≤-trans (nestOK?-store e sl id sched (cascadeLatch a st)
                (trans (nestOK?-latch e sl id a sched st) hn))
-             (m≤m+n (nestCapAt e sl id) (nestWalkAt e sl id)))
+             (nestCapAt≤nestΦAt e sl id))
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
 -- arrival's nesting is held under it by the caller's premise, the
@@ -988,12 +988,12 @@ cascade-depth-capsH : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz =
   ≤-trans (cascade-depth-sighted sl id a nextId sched st hsl hcaps hnest hsz)
           (sighted-nest≤capsH sl id a B B ≤-refl
-             (≤-trans hval (m≤m+n (nestCapAt e sl id) (nestWalkAt e sl id)))
+             (≤-trans hval (nestCapAt≤nestΦAt e sl id))
              (≤-trans (unit≤cap e sl id)
-               (m≤m+n (nestCapAt e sl id) (nestWalkAt e sl id)))
-             (nestCap-inc-sight≤capsH e sl id))
+               (nestCapAt≤nestΦAt e sl id))
+             (nestΦ-sight≤capsH e sl id))
   where
-  B = nestCapAt e sl id + (nestWalkAt e sl id)
+  B = nestΦAt e sl id
 
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}

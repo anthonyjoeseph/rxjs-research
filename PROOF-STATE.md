@@ -215,18 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-DENOMINATE THE TWO FRAME FITS — THE COST IS ARITHMETIC, NOT
-  ROUTING.** The swap is structurally free, which the first job
-  settled: `foldPath-nest-regs`, `foldPath-nest-nodes` and
-  `foldPath-nest-live` all take the budget abstractly and conclude
-  `⊔ U`, and `chainStep-store≤` takes the store ceiling abstractly
-  too, so `nestWalkAt` is named in `Depth-Fit` alone. What it costs
-  is that `scanΦ-fit` reads its `G` under `pathΦF` and a burst power,
-  so any `U` paying it carries `nestCapAt` times an exponential of
-  the size cap squared — while affordability spends one copy of
-  `2 ^ (2 ^ cSize)` through `capsAt-exp2≤capsH`. So the work is
-  strengthening the induction `nestCap≤exp` and `walk-sight≤exp`
-  already run, at a fatter constant.
+- **FINISH THE RE-DENOMINATION — THE CURRENCY STANDS, THE FITS DO
+  NOT.** `nestΦAt` is `capΦAt + nestWalkAt`, sealed beside the walk,
+  and its affordability is already paid: `nestCap≤exp` now runs at
+  leading coefficient `cSize * 2 ^ Ê`, so `nestΦ-sight≤capsH` splits
+  cap-first and spends `capsAt-exp2≤capsH`'s two copies with
+  `walk-sight≤exp` unmodified underneath — no third copy, so
+  `blowup-exp≤pool` is untouched. `cascade-depth-sighted` and
+  `cascade-depth-capsH` are swapped. What remains is `Depth-Fit`'s
+  own fits: `valsΦ?`, `FrameΦHyp` and `PathΦHyp` still name
+  `nestWalkAt` as the budget at some fifty sites, and each transports
+  through `nestWalkAt≤nestΦAt` by `≤-trans`, since every one of them
+  concludes `… ≤ U` and enlarging `U` only weakens.
 
 - **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
   level ledger is closed to `walk-share-LiveHyp` in both directions —

@@ -12,7 +12,7 @@ open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s�
 open import Data.Nat.Properties using (<⇒≤; *-identityˡ; ^-distribˡ-+-*; ≤ᵇ⇒≤; ^-monoʳ-≤; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans; ≤-refl;
   ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤;
   +-mono-≤; *-distribʳ-+; *-distribˡ-+; ^-*-assoc; *-comm; +-comm; ≤-pred; m^n>0; m≤n*m;
-  *-assoc)
+  *-assoc; *-cancelˡ-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Fin     using (Fin)
@@ -163,6 +163,48 @@ abstract
                                         * Caps.cSize (capsAt e sl id))
                                    + Caps.cSize (capsAt e sl id)
                                      * Caps.cSize (capsAt e sl id)))))
+
+  capΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → ℕ
+  capΦAt e sl id =
+    2 ^ suc (Caps.cSize (capsAt e sl id)
+               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+             + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+      * nestCapAt e sl id
+
+  capΦAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    capΦAt e sl id
+      ≡ 2 ^ suc (Caps.cSize (capsAt e sl id)
+                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+                 + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+          * nestCapAt e sl id
+  capΦAt-def _ _ _ = refl
+
+  nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → ℕ
+  nestΦAt e sl id = capΦAt e sl id + nestWalkAt e sl id
+
+  nestΦAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    nestΦAt e sl id ≡ capΦAt e sl id + nestWalkAt e sl id
+  nestΦAt-def _ _ _ = refl
+
+  nestWalkAt≤nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → nestWalkAt e sl id ≤ nestΦAt e sl id
+  nestWalkAt≤nestΦAt e sl id = m≤n+m (nestWalkAt e sl id) (capΦAt e sl id)
+
+  nestCapAt≤nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → nestCapAt e sl id ≤ nestΦAt e sl id
+  nestCapAt≤nestΦAt e sl id =
+    ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (nestCapAt e sl id))))
+                     (*-monoˡ-≤ (nestCapAt e sl id)
+                                (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
+                                                 * (Caps.cSize (capsAt e sl id)
+                                                    * Caps.cSize (capsAt e sl id))
+                                               + Caps.cSize (capsAt e sl id)
+                                                 * Caps.cSize (capsAt e sl id))))))
+            (m≤m+n (capΦAt e sl id) (nestWalkAt e sl id))
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
 -- scripted slot's own index makes its nesting zero, and a shared one's
@@ -349,23 +391,23 @@ walkFac≤nestWalkAt e sl id =
 -- the caps-indexed form sit on a recurrence that does not terminate
 -- natively, so the statement it came from could not be reached by any
 -- row.
-nest-step-ℕ : ∀ (S S′ C I C′ L M : ℕ) → 1 ≤ S →
+nest-step-ℕ : ∀ (S S′ Q Q′ q′ C I C′ L M : ℕ) → 1 ≤ Q → Q′ ≤ 2 ^ q′ →
   C′ ≤ 2 ^ L * (C + I) →
   I ≤ 2 ^ M →
-  S′ + 3 + (2 ^ S + M) + L ≤ 2 ^ S′ →
-  S * (4 * C) ≤ 2 ^ (2 ^ S) →
-  S′ * (4 * C′) ≤ 2 ^ (2 ^ S′)
-nest-step-ℕ S S′ C I C′ L M 1≤S hC′ hI hroom ih =
-  ≤-trans (*-mono-≤ (<⇒≤ (n<2^n S′)) (*-monoʳ-≤ 4 hC′E))
+  q′ + 3 + (2 ^ S + M) + L ≤ 2 ^ S′ →
+  Q * (4 * C) ≤ 2 ^ (2 ^ S) →
+  Q′ * (4 * C′) ≤ 2 ^ (2 ^ S′)
+nest-step-ℕ S S′ Q Q′ q′ C I C′ L M 1≤Q hQ′ hC′ hI hroom ih =
+  ≤-trans (*-mono-≤ hQ′ (*-monoʳ-≤ 4 hC′E))
           (≤-trans (≤-reflexive (sym collect)) (^-monoʳ-≤ 2 hroom′))
   where
   K = 2 ^ S + M
   C≤4C : C ≤ 4 * C
   C≤4C = ≤-trans (≤-reflexive (sym (*-identityˡ C)))
                  (*-monoˡ-≤ C {1} {4} (s≤s z≤n))
-  4C≤S4C : 4 * C ≤ S * (4 * C)
+  4C≤S4C : 4 * C ≤ Q * (4 * C)
   4C≤S4C = ≤-trans (≤-reflexive (sym (*-identityˡ (4 * C))))
-                   (*-monoˡ-≤ (4 * C) 1≤S)
+                   (*-monoˡ-≤ (4 * C) 1≤Q)
   C≤ : C ≤ 2 ^ K
   C≤ = ≤-trans (≤-trans C≤4C 4C≤S4C)
                (≤-trans ih (^-monoʳ-≤ 2 (m≤m+n (2 ^ S) M)))
@@ -375,16 +417,16 @@ nest-step-ℕ S S′ C I C′ L M 1≤S hC′ hI hroom ih =
   CI≤ = ≤-trans (+-mono-≤ C≤ I≤) (≤-reflexive (sym (2X≡X+X (2 ^ K))))
   hC′E : C′ ≤ 2 ^ L * 2 ^ suc K
   hC′E = ≤-trans hC′ (*-monoʳ-≤ (2 ^ L) CI≤)
-  collect : 2 ^ (S′ + (2 + (L + suc K))) ≡ 2 ^ S′ * (4 * (2 ^ L * 2 ^ suc K))
-  collect = trans (^-distribˡ-+-* 2 S′ (2 + (L + suc K)))
-                  (cong (2 ^ S′ *_)
+  collect : 2 ^ (q′ + (2 + (L + suc K))) ≡ 2 ^ q′ * (4 * (2 ^ L * 2 ^ suc K))
+  collect = trans (^-distribˡ-+-* 2 q′ (2 + (L + suc K)))
+                  (cong (2 ^ q′ *_)
                     (trans (^-distribˡ-+-* 2 2 (L + suc K))
                            (cong (4 *_) (^-distribˡ-+-* 2 L (suc K)))))
-  reshape : S′ + (2 + (L + suc K)) ≡ S′ + 3 + K + L
+  reshape : q′ + (2 + (L + suc K)) ≡ q′ + 3 + K + L
   reshape = solve 3 (λ s l k → s :+ (con 2 :+ (l :+ (con 1 :+ k)))
                                  := s :+ con 3 :+ k :+ l)
-                  refl S′ L K
-  hroom′ : S′ + (2 + (L + suc K)) ≤ 2 ^ S′
+                  refl q′ L K
+  hroom′ : q′ + (2 + (L + suc K)) ≤ 2 ^ S′
   hroom′ = ≤-trans (≤-reflexive reshape) hroom
 
 -- THE PROGRAM'S OWN VOCABULARY UNDER THE INSTANT'S SIZE.  The wrap
@@ -712,27 +754,6 @@ room-arith S J K 8≤S S≤J K≤ =
   46≤SS : 46 ≤ S * S
   46≤SS = ≤-trans (≤ᵇ⇒≤ 46 64 tt) (*-mono-≤ 8≤S 8≤S)
 
--- THE CONSTANT PART OF THE ROOM: twice a size and three more sits
--- under two to that size, once the size is at least six.  The square
--- lemma does it -- a successor squared is already above a linear term
--- with four to spare.
-lin≤2^ : ∀ (m : ℕ) → 6 ≤ m → 2 * suc m + 3 ≤ 2 ^ m
-lin≤2^ m 6≤m =
-  ≤-trans (≤-reflexive lhs)
-  (≤-trans (+-monoʳ-≤ (2 * m + 4) 1≤mm)
-  (≤-trans (≤-reflexive (sym rhs)) (sq≤2^ m 6≤m)))
-  where
-  lhs : 2 * suc m + 3 ≡ 2 * m + 4 + 1
-  lhs = solve 1 (λ x → con 2 :* (con 1 :+ x) :+ con 3
-                    := con 2 :* x :+ con 4 :+ con 1)
-              refl m
-  rhs : (2 + m) * (2 + m) ≡ 2 * m + 4 + m * (2 + m)
-  rhs = solve 1 (λ x → (con 2 :+ x) :* (con 2 :+ x)
-                    := con 2 :* x :+ con 4 :+ x :* (con 2 :+ x))
-              refl m
-  1≤mm : 1 ≤ m * (2 + m)
-  1≤mm = *-mono-≤ (≤-trans (≤ᵇ⇒≤ 1 6 tt) 6≤m) (s≤s z≤n)
-
 -- THE ROOM ITSELF, and it is three numbers now.  The budget is two to
 -- the next size; the next size and its bit length are named
 -- separately, because what has to be paid for is the exponent TIMES
@@ -740,21 +761,22 @@ lin≤2^ m 6≤m =
 -- four to spare.  The two halves are then each under half the budget:
 -- the constant part by the square lemma, the two powers because the
 -- length was bought.
-room-gen : ∀ (E S′ K b : ℕ) → 7 ≤ S′ → E ≤ S′ → suc S′ ≤ 2 ^ b →
-  K * b + 4 ≤ S′ →
-  S′ + 3 + (E + suc S′ ^ K) + suc S′ ^ K ≤ 2 ^ S′
-room-gen E (suc S″) K b (s≤s 6≤S″) hE hB hK =
-  ≤-trans (+-monoˡ-≤ P (+-monoʳ-≤ (suc S″ + 3) (+-monoˡ-≤ P hE)))
-  (≤-trans (≤-reflexive regroup)
-  (≤-trans (+-mono-≤ (lin≤2^ S″ 6≤S″) twoP)
-           (≤-reflexive (sym (2X≡X+X (2 ^ S″))))))
+room-gen : ∀ (A E S′ K b : ℕ) → 7 ≤ S′ → suc S′ ≤ 2 ^ b →
+  K * b + 4 ≤ S′ → 2 * (A + 3 + E) ≤ 2 ^ S′ →
+  A + 3 + (E + suc S′ ^ K) + suc S′ ^ K ≤ 2 ^ S′
+room-gen A E (suc S″) K b (s≤s 6≤S″) hB hK hA =
+  ≤-trans (≤-reflexive regroup)
+  (≤-trans (+-mono-≤ half twoP)
+           (≤-reflexive (sym (2X≡X+X (2 ^ S″)))))
   where
   P : ℕ
   P = suc (suc S″) ^ K
-  regroup : suc S″ + 3 + (suc S″ + P) + P ≡ 2 * suc S″ + 3 + (P + P)
-  regroup = solve 2 (λ x p → (con 1 :+ x) :+ con 3 :+ ((con 1 :+ x) :+ p) :+ p
-                          := con 2 :* (con 1 :+ x) :+ con 3 :+ (p :+ p))
-                  refl S″ P
+  regroup : A + 3 + (E + P) + P ≡ (A + 3 + E) + (P + P)
+  regroup = solve 3 (λ a e p → a :+ con 3 :+ (e :+ p) :+ p
+                            := (a :+ con 3 :+ e) :+ (p :+ p))
+                  refl A E P
+  half : A + 3 + E ≤ 2 ^ S″
+  half = *-cancelˡ-≤ 2 hA
   P≤ : P ≤ 2 ^ (b * K)
   P≤ = ≤-trans (^-monoˡ-≤ K hB) (≤-reflexive (^-*-assoc 2 b K))
   bK+1≤ : suc (b * K) ≤ S″
@@ -767,34 +789,33 @@ room-gen E (suc S″) K b (s≤s 6≤S″) hE hB hK =
                   (^-monoʳ-≤ 2 bK+1≤))
 
 nestFac-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) →
-  Caps.cSize (capsAt e sl (suc id)) + 3
+  (id A : ℕ) →
+  2 * (A + 3 + 2 ^ Caps.cSize (capsAt e sl id))
+    ≤ 2 ^ Caps.cSize (capsAt e sl (suc id)) →
+  A + 3
     + (2 ^ Caps.cSize (capsAt e sl id) + nestIncLog e sl id)
     + nestFacLog e sl id
     ≤ 2 ^ Caps.cSize (capsAt e sl (suc id))
-nestFac-room {n = n} e sl id =
-  ≤-trans (+-mono-≤ (+-monoʳ-≤ (Caps.cSize (capsAt e sl (suc id)) + 3)
+nestFac-room {n = n} e sl id A hA =
+  ≤-trans (+-mono-≤ (+-monoʳ-≤ (A + 3)
                       (+-monoʳ-≤ (2 ^ Caps.cSize (capsAt e sl id))
                                  (nestIncLog≤pow e sl id)))
                     (nestFacLog≤pow e sl id))
-          (room-gen (2 ^ Caps.cSize (capsAt e sl id))
+          (room-gen A
+                    (2 ^ Caps.cSize (capsAt e sl id))
                     (Caps.cSize (capsAt e sl (suc id)))
                     (6 * n + 9)
                     (Caps.cSize (capsAt e sl id) * J
                       + Caps.cSize (capsAt e sl id) + 1)
                     (≤-trans (≤ᵇ⇒≤ 7 8 tt) (8≤capsAt-size e sl (suc id)))
-                    (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ _)))
-                                      (*-monoʳ-≤ (2 ^ Caps.cSize (capsAt e sl id))
-                                                 (≤-trans (s≤s z≤n)
-                                                   (2≤capsAt-size e sl id))))
-                             (capsAt-exp-gain e sl id))
                     (capsAt-size-upper e sl id)
                     (≤-trans (room-arith (Caps.cSize (capsAt e sl id)) J (6 * n + 9)
                                 (8≤capsAt-size e sl id)
                                 (size≤sizeCount (capsAt e sl id) (capsH e sl id)
                                   (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id))
                                 (+-monoˡ-≤ 9 (*-monoʳ-≤ 6 (n≤capsAt-size e sl id))))
-                             (capsAt-size-lower e sl id)))
+                             (capsAt-size-lower e sl id))
+                    hA)
   where
   J : ℕ
   J = sizeCount (capsAt e sl id) (capsH e sl id)
@@ -812,21 +833,149 @@ nestFac-room {n = n} e sl id =
 -- hypothesis and the conclusion are read one instant apart and that is
 -- the whole of it -- the delivery the exponents read is the next
 -- instant's, which is what the room, not the cap, is charged for.
+-- THE RE-ASSOCIATION THE STEP IS APPLIED THROUGH.  The induction is
+-- carried at a LEADING COEFFICIENT rather than at the size, so the
+-- statement reads the sealed charge while the step reads a coefficient
+-- times a bare cap; the two are one product read two ways.
+mash4 : ∀ (s q c : ℕ) → s * (4 * (q * c)) ≡ s * q * (4 * c)
+mash4 s q c =
+  solve 3 (λ s′ q′ c′ → s′ :* (con 4 :* (q′ :* c′)) := s′ :* q′ :* (con 4 :* c′))
+        refl s q c
+
+-- THE ROOM THE FATTER COEFFICIENT ASKS FOR, over bare numbers.  The
+-- coefficient the walk's own charge carries is an exponential of a size
+-- CUBE, so the room premise gains that cube beside the size it already
+-- had -- and a cube with four to spare is exactly what the size cap's
+-- reachable floor buys, with the linear and constant parts absorbed
+-- into a square along the way.
+capΦ-room-ℕ : ∀ (S′ p : ℕ) → 21 ≤ S′ → p ≤ S′ →
+  2 * (S′ + suc (S′ * (S′ * S′) + S′ * S′) + 3 + p) ≤ 2 ^ S′
+capΦ-room-ℕ S′ p 21≤S′ hp =
+  ≤-trans (*-monoʳ-≤ 2 (+-monoʳ-≤ (S′ + suc (Cu + Sq) + 3) hp))
+  (≤-trans (≤-reflexive expand)
+  (≤-trans (+-monoʳ-≤ (2 * Cu) rest)
+  (≤-trans (≤-reflexive four) (cube4≤2^ S′ 14≤S′))))
+  where
+  Sq = S′ * S′
+  Cu = S′ * (S′ * S′)
+  1≤S′ : 1 ≤ S′
+  1≤S′ = ≤-trans (≤ᵇ⇒≤ 1 21 tt) 21≤S′
+  7≤S′ : 7 ≤ S′
+  7≤S′ = ≤-trans (≤ᵇ⇒≤ 7 21 tt) 21≤S′
+  14≤S′ : 14 ≤ S′
+  14≤S′ = ≤-trans (≤ᵇ⇒≤ 14 21 tt) 21≤S′
+  1≤Sq : 1 ≤ Sq
+  1≤Sq = *-mono-≤ 1≤S′ 1≤S′
+  S′≤Sq : S′ ≤ Sq
+  S′≤Sq = ≤-trans (≤-reflexive (sym (*-identityʳ S′))) (*-monoʳ-≤ S′ 1≤S′)
+  expand : 2 * (S′ + suc (Cu + Sq) + 3 + S′) ≡ 2 * Cu + (2 * Sq + 4 * S′ + 8)
+  expand = solve 3 (λ s c q → con 2 :* (s :+ (con 1 :+ (c :+ q)) :+ con 3 :+ s)
+                           := con 2 :* c :+ (con 2 :* q :+ con 4 :* s :+ con 8))
+                 refl S′ Cu Sq
+  collect14 : 2 * Sq + 4 * Sq + 8 * Sq ≡ 2 * (7 * Sq)
+  collect14 = solve 1 (λ q → con 2 :* q :+ con 4 :* q :+ con 8 :* q
+                          := con 2 :* (con 7 :* q))
+                    refl Sq
+  rest : 2 * Sq + 4 * S′ + 8 ≤ 2 * Cu
+  rest =
+    ≤-trans (+-mono-≤ (+-monoʳ-≤ (2 * Sq) (*-monoʳ-≤ 4 S′≤Sq))
+                      (*-monoʳ-≤ 8 1≤Sq))
+    (≤-trans (≤-reflexive collect14) (*-monoʳ-≤ 2 (*-monoˡ-≤ Sq 7≤S′)))
+  four : 2 * Cu + 2 * Cu ≡ 4 * Cu
+  four = solve 1 (λ c → con 2 :* c :+ con 2 :* c := con 4 :* c) refl Cu
+
+-- AND THE BASE, at the same coefficient.  The cap at instant zero is
+-- the program's nesting unit, which the size cap covers, so what is
+-- being fitted is a square times the coefficient -- and the square
+-- costs one size while the coefficient costs its own exponent, both of
+-- them under the cube the floor affords.
+capΦ-base-ℕ : ∀ (S u : ℕ) → 21 ≤ S → u ≤ S →
+  S * (4 * (2 ^ suc (S * (S * S) + S * S) * u)) ≤ 2 ^ (2 ^ S)
+capΦ-base-ℕ S u 21≤S hu =
+  ≤-trans (*-monoʳ-≤ S (*-monoʳ-≤ 4 (*-monoʳ-≤ (2 ^ Ê) hu)))
+  (≤-trans (≤-reflexive shape)
+  (≤-trans (*-monoˡ-≤ (2 ^ Ê) (sq4≤2^ S 8≤S))
+  (≤-trans (≤-reflexive (sym (^-distribˡ-+-* 2 S Ê)))
+           (^-monoʳ-≤ 2 fit))))
+  where
+  Sq = S * S
+  Cu = S * (S * S)
+  Ê  = suc (Cu + Sq)
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (≤ᵇ⇒≤ 1 21 tt) 21≤S
+  8≤S : 8 ≤ S
+  8≤S = ≤-trans (≤ᵇ⇒≤ 8 21 tt) 21≤S
+  14≤S : 14 ≤ S
+  14≤S = ≤-trans (≤ᵇ⇒≤ 14 21 tt) 21≤S
+  shape : S * (4 * (2 ^ Ê * S)) ≡ 4 * (S * S) * 2 ^ Ê
+  shape = solve 2 (λ s q → s :* (con 4 :* (q :* s)) := con 4 :* (s :* s) :* q)
+                refl S (2 ^ Ê)
+  S≤Sq : S ≤ Sq
+  S≤Sq = ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-monoʳ-≤ S 1≤S)
+  Sq≤Cu : Sq ≤ Cu
+  Sq≤Cu = ≤-trans (≤-reflexive (sym (*-identityʳ Sq)))
+                  (≤-trans (*-monoʳ-≤ Sq 1≤S)
+                           (≤-reflexive (solve 1 (λ s → s :* s :* s := s :* (s :* s))
+                                               refl S)))
+  S≤Cu : S ≤ Cu
+  S≤Cu = ≤-trans S≤Sq Sq≤Cu
+  1≤Cu : 1 ≤ Cu
+  1≤Cu = ≤-trans 1≤S S≤Cu
+  fshape : S + Ê ≡ Cu + (S + Sq + 1)
+  fshape = solve 3 (λ s c q → s :+ (con 1 :+ (c :+ q)) := c :+ (s :+ q :+ con 1))
+                 refl S Cu Sq
+  threeEq : Cu + Cu + Cu ≡ 3 * Cu
+  threeEq = solve 1 (λ c → c :+ c :+ c := con 3 :* c) refl Cu
+  fourEq : Cu + 3 * Cu ≡ 4 * Cu
+  fourEq = solve 1 (λ c → c :+ con 3 :* c := con 4 :* c) refl Cu
+  fit : S + Ê ≤ 2 ^ S
+  fit =
+    ≤-trans (≤-reflexive fshape)
+    (≤-trans (+-monoʳ-≤ Cu (≤-trans (+-mono-≤ (+-mono-≤ S≤Cu Sq≤Cu) 1≤Cu)
+                                    (≤-reflexive threeEq)))
+    (≤-trans (≤-reflexive fourEq) (cube4≤2^ S 14≤S)))
+
 nestCap≤exp-suc : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  Caps.cSize (capsAt e sl id) * (4 * nestCapAt e sl id)
+  Caps.cSize (capsAt e sl id) * (4 * capΦAt e sl id)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id)) →
-  Caps.cSize (capsAt e sl (suc id)) * (4 * nestCapAt e sl (suc id))
+  Caps.cSize (capsAt e sl (suc id)) * (4 * capΦAt e sl (suc id))
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl (suc id)))
 nestCap≤exp-suc e sl id ih =
-  nest-step-ℕ (Caps.cSize (capsAt e sl id))
-              (Caps.cSize (capsAt e sl (suc id)))
-              (nestCapAt e sl id) (nestIncAt e sl id)
-              (nestCapAt e sl (suc id))
-              (nestFacLog e sl id) (nestIncLog e sl id)
-              (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id))
-              hC′ (nestInc≤exp e sl id) (nestFac-room e sl id) ih
+  subst (_≤ 2 ^ (2 ^ S′)) (sym stepOut)
+    (nest-step-ℕ S S′ (S * P) (S′ * P′) (S′ + Ê′)
+                 (nestCapAt e sl id) (nestIncAt e sl id)
+                 (nestCapAt e sl (suc id))
+                 (nestFacLog e sl id) (nestIncLog e sl id)
+                 1≤Q hQ′ hC′ (nestInc≤exp e sl id)
+                 (nestFac-room e sl id (S′ + Ê′) hA)
+                 (subst (_≤ 2 ^ (2 ^ S)) stepIn ih))
   where
+  S  = Caps.cSize (capsAt e sl id)
+  S′ = Caps.cSize (capsAt e sl (suc id))
+  Ê  = suc (S * (S * S) + S * S)
+  Ê′ = suc (S′ * (S′ * S′) + S′ * S′)
+  P  = 2 ^ Ê
+  P′ = 2 ^ Ê′
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+  1≤Q : 1 ≤ S * P
+  1≤Q = *-mono-≤ 1≤S (m^n>0 2 Ê)
+  hQ′ : S′ * P′ ≤ 2 ^ (S′ + Ê′)
+  hQ′ = ≤-trans (*-monoˡ-≤ P′ (<⇒≤ (n<2^n S′)))
+                (≤-reflexive (sym (^-distribˡ-+-* 2 S′ Ê′)))
+  hA : 2 * (S′ + Ê′ + 3 + 2 ^ S) ≤ 2 ^ S′
+  hA = capΦ-room-ℕ S′ (2 ^ S) (21≤capsAt-size e sl (suc id))
+         (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
+                           (*-monoʳ-≤ (2 ^ S) 1≤S))
+                  (capsAt-exp-gain e sl id))
+  stepIn : S * (4 * capΦAt e sl id) ≡ S * P * (4 * nestCapAt e sl id)
+  stepIn = trans (cong (λ z → S * (4 * z)) (capΦAt-def e sl id))
+                 (mash4 S P (nestCapAt e sl id))
+  stepOut : S′ * (4 * capΦAt e sl (suc id))
+              ≡ S′ * P′ * (4 * nestCapAt e sl (suc id))
+  stepOut = trans (cong (λ z → S′ * (4 * z)) (capΦAt-def e sl (suc id)))
+                  (mash4 S′ P′ (nestCapAt e sl (suc id)))
   hC′ : nestCapAt e sl (suc id)
           ≤ 2 ^ nestFacLog e sl id
               * (nestCapAt e sl id + nestIncAt e sl id)
@@ -836,17 +985,13 @@ nestCap≤exp-suc e sl id ih =
 
 nestCap≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  Caps.cSize (capsAt e sl id) * (4 * nestCapAt e sl id)
+  Caps.cSize (capsAt e sl id) * (4 * capΦAt e sl id)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
 nestCap≤exp e sl zero =
-  ≤-trans (*-monoʳ-≤ S (*-monoʳ-≤ 4 C≤S))
-          (≤-trans (≤-reflexive shape)
-                   (≤-trans (sq4≤2^ S (8≤capsAt-size e sl 0))
-                            (^-monoʳ-≤ 2 (<⇒≤ (n<2^n S)))))
+  subst (_≤ 2 ^ (2 ^ S)) (sym (cong (λ z → S * (4 * z)) (capΦAt-def e sl 0)))
+    (capΦ-base-ℕ S (nestCapAt e sl 0) (21≤capsAt-size e sl 0) C≤S)
   where
   S = Caps.cSize (capsAt e sl 0)
-  shape : S * (4 * S) ≡ 4 * (S * S)
-  shape = solve 1 (λ s → s :* (con 4 :* s) := con 4 :* (s :* s)) refl S
   C≤S : nestCapAt e sl 0 ≤ S
   C≤S = ≤-trans (≤-reflexive (nestCapAt-0 e sl)) (nestUnit≤size e sl 0)
 nestCap≤exp e sl (suc id) =
@@ -861,15 +1006,22 @@ nestCap≤exp e sl (suc id) =
 -- unit at instant zero and nondecreasing after.
 nestCap-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  suc (sizeᵉ e) * suc (3 * nestCapAt e sl id)
+  suc (sizeᵉ e) * suc (3 * capΦAt e sl id)
     ≤ 2 ^ (2 ^ Caps.cSize (capsAt e sl id))
 nestCap-sight≤exp e sl id =
   ≤-trans (*-mono-≤ 1+z≤S h4) (nestCap≤exp e sl id)
   where
-  C = nestCapAt e sl id
+  C = capΦAt e sl id
   1≤C : 1 ≤ C
-  1≤C = ≤-trans (subst (1 ≤_) (sym (nestCapAt-0 e sl)) (s≤s z≤n))
-                (nestCap-mono₀ e sl id)
+  1≤C =
+    subst (1 ≤_) (sym (capΦAt-def e sl id))
+      (*-mono-≤ (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
+                                 * (Caps.cSize (capsAt e sl id)
+                                    * Caps.cSize (capsAt e sl id))
+                               + Caps.cSize (capsAt e sl id)
+                                 * Caps.cSize (capsAt e sl id))))
+                (≤-trans (subst (1 ≤_) (sym (nestCapAt-0 e sl)) (s≤s z≤n))
+                         (nestCap-mono₀ e sl id)))
   four : 4 * C ≡ C + 3 * C
   four = solve 1 (λ c → con 4 :* c := c :+ con 3 :* c) refl C
   h4 : suc (3 * C) ≤ 4 * C
@@ -1017,13 +1169,15 @@ sight-split z C I =
                   :+ (con 1 :+ z′) :* (con 3 :* i))
           refl z C I
 
-nestCap-inc-sight≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+nestΦ-sight≤capsH : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
-  suc (sizeᵉ e) * suc (3 * (nestCapAt e sl id + (nestWalkAt e sl id)))
-    ≤ capsH e sl id
-nestCap-inc-sight≤capsH e sl id =
-  ≤-trans (≤-reflexive (sight-split (sizeᵉ e) (nestCapAt e sl id)
-                                    (nestWalkAt e sl id)))
+  suc (sizeᵉ e) * suc (3 * nestΦAt e sl id) ≤ capsH e sl id
+nestΦ-sight≤capsH e sl id =
+  ≤-trans (≤-reflexive
+            (trans (cong (λ z → suc (sizeᵉ e) * suc (3 * z))
+                         (nestΦAt-def e sl id))
+                   (sight-split (sizeᵉ e) (capΦAt e sl id)
+                                (nestWalkAt e sl id))))
           (≤-trans (+-mono-≤ (nestCap-sight≤exp e sl id)
                              (walk-sight≤exp e sl id))
                    (capsAt-exp2≤capsH e sl id))
