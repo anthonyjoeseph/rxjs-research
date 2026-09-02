@@ -244,6 +244,13 @@ postulate
   --   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at
   --   eighty -- the pair is what puts the gap in the stored depth
   --   rather than in a constant.
+  -- TWIN: `stepFrame-nodes-scan`, which is this arm proven -- the same
+  --   frame and the same step, and it reads the store: its subject is
+  --   `nodesMax st ⊔ nestDᵛˢ vals` on both sides, so the accumulator is
+  --   inside the quantity rather than outside the hypotheses.  So the
+  --   restatement is not a search for a currency, it is this one
+  --   carried across: a `⊔` over the table, at the potential's factors
+  --   instead of the iteration's.
   -- RECOVERY: git show 8175756:agda/evidence/probed/Probed/Step-Frame-Nest-Phi.agda
   --   restores the harness that walked the refuting term through the
   --   map clause -- the same shape a scan clause has to be run at.
@@ -291,6 +298,14 @@ postulate
   --   `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-trip-absurd` at
   --   triple -- the pair is what puts the gap in the occurrence count
   --   rather than in a constant.
+  -- TWIN: `stepFrame-nodes-inner`, which is this arm proven, and it
+  --   says both halves of the repair.  Its subject is
+  --   `nodesMax st ⊔ nestDᵛˢ vals` on both sides, so the queue is
+  --   inside the quantity; and the grant it takes is over the node
+  --   looked up, quantified across the shapes the table may hold rather
+  --   than over the values in hand.  That is the obligation this arm is
+  --   missing, already written, at the iteration's factors instead of
+  --   the potential's.
   stepFrame-nest-Φ-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
