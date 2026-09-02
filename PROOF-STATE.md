@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **STATE THE SINK HOP AT THE LEVEL A FANNED-INTO CHAIN REACHES.** Both
-  refutations are one shape a step apart: the price alone, then the
-  price afforded only where the walk stands. A registry chain climbs
-  from there by its own length, and that length is bounded by the
-  registry reading, so the affordability the grant needs is over the
-  sum. The caller cannot offer it — it holds a ceiling for the path it
-  walks — so the widening does not stop here and reaches
-  `walk-LiveHyp-go`'s own callers. Decide the index up there first and
-  restate downward: a ceiling chosen at the leaf and repaired upstream
-  is the expensive order, and `walk-share-ΦHyp` is the same hop again.
+- **SPLIT THE REGISTRY'S LENGTH LEDGER OFF ITS SIZE LEDGER.** The level
+  ceiling is not choosable at any caller: the affordable range is a cap
+  squared plus a cap, and one fan-out consumes levels bounded only by
+  the size reading, an exponential of the level. `pathSz?` is what ties
+  them — it charges a chain's LENGTH against the same number it charges
+  the frames' syntax against — so the fan-out inherits the size ledger's
+  growth. The registry sweeps measure registered length flat across a
+  step while size grows, so the readings are separable; what a split
+  must survive is a subscribing frame turning an inner's syntax into a
+  chain's length. Restate the predicate at Part1 before consumers move.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
@@ -258,10 +258,11 @@ does not fit is a finding about the shared statement, not about the head.
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
-- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED`: the size side
-  condition for the registry chains a sink fans into. Refuted at the price,
-  then again once priced: affordability reaches only where the walk stands, and
-  a fanned-into chain climbs past it by its own length.
+- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE`:
+  the size side condition for the registry chains a sink fans into. Refuted at
+  the price, then once priced, then at the range: the levels one fan-out
+  consumes are exponential in the level and the affordable range is quadratic
+  in the cap.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the

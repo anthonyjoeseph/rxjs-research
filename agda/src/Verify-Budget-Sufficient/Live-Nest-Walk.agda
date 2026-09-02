@@ -194,7 +194,20 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- for on the walked side, arriving on the registry side, and it does
 -- not survive the hop to `walk-LiveHyp-go`'s own callers unchanged.
 --
+-- AND NO CALLER'S CEILING REACHES IT, WHICH CLOSES THE WALKED SIDE.
+-- The range affordability is provable over is a cap squared plus a
+-- cap; the levels one fanned-into chain consumes are bounded only by
+-- the SIZE reading at the level it is entered at, an exponential of
+-- that level.  The two cross at the smallest cap the invariant
+-- admits, so the ceiling is not choosable anywhere.  What is left is
+-- a charge towering with the dispatch gas, or a registry LENGTH
+-- ledger read off something other than the registry's size ledger.
+--
 -- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
+-- REFUTED: `Refuted.Sink-Level-Range`
+-- DEAD ROUTE: picking the level ceiling at a caller and restating
+--   this hop downward.  Every caller's ceiling is capped by what
+--   `iterSize≤walkFac` affords, and one hop asks past it at every cap.
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (i : Fin n)
