@@ -16,7 +16,7 @@
 module Refuted.Caps-Face where
 
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _≤_; _<_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤-trans; <-≤-trans; +-identityʳ; +-monoʳ-<; *-suc; m≤m+n; *-mono-≤; <-irrefl)
+open import Data.Nat.Properties using (≤⇒≤ᵇ; ≤-refl; ≤-trans; <-≤-trans; +-identityʳ; +-monoʳ-<; *-suc; m≤m+n; *-mono-≤; <-irrefl)
 open import Data.Empty   using (⊥)
 open import Data.Fin     using (Fin)
 import Data.Fin as Fin
@@ -27,7 +27,7 @@ open import Data.List.Relation.Unary.All.Properties
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Relation.Binary.PropositionalEquality
-  using (refl; sym; subst)
+  using (_≡_; refl; sym; subst)
 open import Rx.Prim      using (_at_from_as_)
 open import Rx.Evaluator using (sizeStep)
 open import Verify-Budget-Sufficient.Measures using
@@ -240,3 +240,35 @@ wid≤size-absurd :
   (∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c →
      Caps.cWid (frameStep j c) ≤ Caps.cSize (frameStep j c)) → ⊥
 wid≤size-absurd h = ≤⇒≤ᵇ (h (caps 2 0 1) 3 (s≤s (s≤s z≤n)))
+
+-- AND THE WIDTH IS NOT UNDER THE SIZE'S OWN EXPONENTIAL EITHER, which
+-- is the reading that survives the two above and is what the potential
+-- face's affordability actually asks.  A budget denominated at an
+-- instant may carry an exponent as large as two to the size cap and no
+-- larger -- `capsAt-exp≤capsH` is the whole of the room, the fuel
+-- sitting two exponentials above the size at the same instant -- so
+-- putting a burst's own count in that exponent needs the width under
+-- `2 ^ cSize`, not merely under `cSize`.  It is not: the width axis
+-- folds through `S ^ suc w` and the size axis through `S * suc (2 * s)`,
+-- so the width is a TOWER in the fold count where the size is a
+-- geometric series, and three folds already cross by three hundred
+-- doublings.
+--
+-- THE WITNESS STARTS AT THE FLOOR ON BOTH AXES, which is what separates
+-- it from the two above: the base triple has its width EQUAL to its
+-- size, so nothing is smuggled in by starting wide, and the crossing is
+-- the recurrence's own.
+wid≤exp-size-absurd :
+  (∀ (c : Caps) (j : ℕ) → 2 ≤ Caps.cSize c → Caps.cWid c ≤ Caps.cSize c →
+     Caps.cWid (frameStep j c) ≤ 2 ^ Caps.cSize (frameStep j c)) → ⊥
+wid≤exp-size-absurd h = ≤⇒≤ᵇ (h (caps 2 2 1) 3 (s≤s (s≤s z≤n)) ≤-refl)
+
+-- THE FIGURES, PINNED, so that a repair moving either recurrence fails
+-- here naming the number rather than turning the crossing into an
+-- equality: five hundred and thirteen doublings of width against a
+-- ceiling of one hundred and seventy.
+wid₃≡ : Caps.cWid (frameStep 3 (caps 2 2 1)) ≡ 2 ^ 513
+wid₃≡ = refl
+
+size₃≡ : Caps.cSize (frameStep 3 (caps 2 2 1)) ≡ 170
+size₃≡ = refl

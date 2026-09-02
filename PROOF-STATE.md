@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MOVE WHERE THE WALK'S FACTOR IS DENOMINATED, WHICH IS THE ONE
-  THING LEFT UNDECIDED.** A count premise at this instant's size cap
-  is refuted, not merely missing: the burst is bounded by the WIDTH,
-  and width and size of one triple are ordered the wrong way from the
-  first fold on. `burst≤size′` does bound a burst by a size cap, and
-  names the NEXT instant's — where the store face already lives,
-  `nestFacLog≤pow` leaving polynomial room. The route recorded dead
-  against that move rests on a ceiling nothing supplies: `nestΦAt` has
-  no affordability lemma and `chainStep-store≤` no consumer. State that
-  lemma first, and let it decide whether the factor moves up an instant
-  or the mechanism does.
+- **GIVE THE WALK'S BUDGET THE STORE FACE'S SHAPE — A RECURRENCE, NOT A
+  FORMULA.** Three denominations for the fold's count are now closed and
+  they exhaust what an instant offers, so the mechanism under them is
+  what is wrong. `nestΦAt` prices a fold by a FIXED power of the
+  instant's size cap, and its ceiling is proven — through
+  `nestΦ-sight≤capsH` the exponent reaches `2 ^ S` and no further —
+  while the count that must sit there towers past it. `nestCapAt`
+  escapes by being a recurrence: each instant multiplies by `nestFacAt`,
+  so the burst power rides as a factor and never enters an exponent. It
+  is affordable, proven, and already a summand of `nestΦAt` through
+  `capΦAt`. Restate the walk half in that shape, leaves postulated.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -291,10 +291,11 @@ does not fit is a finding about the shared statement, not about the head.
   the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
   `drainW`, so nothing is free. Two obligations are drain ledgers this face has
   and must route; the third is the merge node's own queue depth.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED, DEAD ROUTE`: the
-  producing side of the fold's new grant. Count and factor both exist proven —
-  `burstsOK` and `nestFac` — so what is wrong is where this arm reads them: its
-  factor is priced at a cap the count is refuted against.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
+  of the fold's new grant. Count and factor both exist proven — `burstsOK` and
+  `nestFac` — and all three denominations an instant offers for the count are
+  now closed, so what is wrong is the budget's SHAPE, not this arm's reading of
+  it.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only

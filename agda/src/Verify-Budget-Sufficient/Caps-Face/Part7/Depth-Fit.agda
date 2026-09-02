@@ -349,6 +349,39 @@ postulate
   --   folds put it above `towerℕ j`, and a count that reads it gives up
   --   the linear height `capsAt-tower` proves.
 
+  -- AND THE COUNT CANNOT BE CARRIED AS ITS OWN PARAMETER EITHER, WHICH
+  -- CLOSES THE LAST DENOMINATION ON OFFER.  Taking the burst's count as
+  -- a second parameter is what the store face does -- `nestFac S W`
+  -- takes both -- and it reads as what the two findings above point at,
+  -- since premise and conclusion would then move together and a free
+  -- count would finance itself.  What decides it is AFFORDABILITY, and
+  -- the ceiling is proven rather than open: `nestΦ-sight≤capsH` routes
+  -- through `capsAt-exp≤capsH`, so a budget denominated at an instant
+  -- may carry an exponent as large as two to that instant's size cap
+  -- and no larger.  A factor read at a count W costs the path's length
+  -- times `suc S * W`, so the exponent is quadratic in the cap and
+  -- LINEAR in the count, and affording it asks the count under `2 ^ S`.
+  -- The caps face's width is not under it: the width folds through
+  -- `S ^ suc w` against the size's `S * suc (2 * s)`, so it is a tower
+  -- in the fold count where the size is geometric.
+  -- REFUTED: `Refuted.Caps-Face.wid≤exp-size-absurd`, whose base triple
+  --   starts with its width EQUAL to its size -- so nothing is smuggled
+  --   in by starting wide -- and crosses at three folds, `wid₃≡` and
+  --   `size₃≡` pinning five hundred and thirteen doublings of width
+  --   against a ceiling of one hundred and seventy.
+
+  -- SO WHAT MOVES IS THE BUDGET'S SHAPE, AND THE STORE FACE HAS ALREADY
+  -- WALKED IT.  Three denominations for this arm's count are closed and
+  -- they exhaust the quantities an instant offers, which is the signal
+  -- that the mechanism under them is what is wrong: this budget prices
+  -- a fold by a FIXED power of the instant's size cap, and no fixed
+  -- power of that cap can hold a quantity that towers past it.
+  -- `nestCapAt` does not have the problem, because it is a RECURRENCE
+  -- rather than a formula -- each instant multiplies the previous cap
+  -- by `nestFacAt`, so the burst power is carried as a factor and never
+  -- has to fit inside an exponent.  That budget is affordable, proven,
+  -- and already a summand of this one through `capΦAt`.  The route to
+  -- try is therefore the walk half in the same shape.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
