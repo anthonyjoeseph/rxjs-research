@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN FOLLOW THE REGISTRY RECEIPT BACK TO THE MINT.** The fan-out
-  pair turned out not to be the fan-out's at all: the admission filter
-  never reads a path, both liftings across it are already proven, and
-  what was left refutes at one `register` onto the initial state.
-  Both residues now sit at the registry, and both are still stated
-  over an ARBITRARY state, which is the same defect one level down.
-  `register` is the only door into that list, so the commit is to
-  state what a registration carries -- its length at the program's cap
-  and its depth at the syntactic unit -- where it is minted, and
-  either walk it forward to the fan-out or refute it at whatever
-  registers a chain the program's own syntax does not bound.
+- **NOW PUT THE REGISTRATION'S DEPTH ON THE INVARIANT RECORD.** Running
+  the two registry residues rather than quantifying over states split
+  them apart. The depth one holds at every registry a run produced, on
+  both axes it has, with the chain climbing one per layer against a
+  unit climbing one alongside it -- a margin that never closes, so it
+  is a true statement missing an invariant and not a false one. The
+  size one cannot be stated at a numeral at all: the registered length
+  grows with the program's own syntax. So the commit adds the depth
+  fact as a field every producer owes and every consumer re-establishes,
+  and either discharges the row from it or names the mint that cannot.
 
 - **THEN CARRY THE CAPS RECEIPT DOWN THE POTENTIAL WALK.** The fork
   the drain faces posed was false, and `innerΦ-drain-caps`'s header
@@ -282,13 +281,13 @@ does not fit is a finding about the shared statement, not about the head.
   terminal split: its factor is the sink's own times its frames', and the hop
   count is bounded by nothing but the dispatch gas.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's own
-  size receipt at the PROGRAM's cap. The fan-out never needed it — the filter's
-  lift is proven — and stated over an arbitrary state it fails at one
-  registration longer than the cap, whatever the cap is.
-- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's own
-  depth against the syntactic unit. Refuted at a chain three deep against a
-  unit of one, minted by a map whose function carries syntax the program does
-  not.
+  size receipt at the PROGRAM's cap. Stated over an arbitrary state it fails at
+  one registration longer than the cap, whatever the cap is; and the reachable
+  length climbs with the syntax, so no numeral stands in for the cap either.
+- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED`: the
+  registry's own depth against the syntactic unit. Refuted over an arbitrary
+  state at a chain minted from syntax the program lacks — but it holds at every
+  reachable registry swept, with a margin that does not close.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
   the fold's new grant. Unaffordable, not mis-shaped: the count is under the
   exit width, which outruns two-to-two-to the size at every instant, so no

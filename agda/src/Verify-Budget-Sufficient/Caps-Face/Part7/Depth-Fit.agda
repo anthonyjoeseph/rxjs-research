@@ -1006,6 +1006,16 @@ postulate
 -- down.  The two are different readings of the same list, and only the
 -- registration side can supply this one.
 
+-- AND WHAT A SIZE RECEIPT HAS TO PRICE IS THE REGISTERED LENGTH, which
+-- does not sit at a constant.  Instantiated in `Probed.Fan-Regs-Registry`,
+-- the reachable maximum is two frames per flatten layer standing above
+-- a share -- so it climbs with the program's own syntax, and a receipt
+-- stated at any numeral is outrun by the fourth layer.  That is why the
+-- mint-side fact cannot be a bound chosen here: it has to read the
+-- program, which is what the cap does, and which is equally why this
+-- row admits no instantiation of its own -- the cap returns at no
+-- program, so only the conjunct underneath it is reachable.
+
 -- AND NEITHER IS THE ADMISSION FILTER'S TO CARRY, which is what the
 -- pair being stated over the fan-out was hiding.  `shareAdmit`
 -- selects on the source and the element type and never reads a path,
@@ -1045,6 +1055,16 @@ fan-chain-sz {e = e} sl id i st h =
 -- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
 --   against a unit of one, minted by a map whose function carries
 --   syntax the program does not.
+-- PROBED: `Probed.Fan-Regs-Registry` reaches the registry by RUNNING
+--   rather than by constructing one, on both axes the conclusion has.
+--   Covered: a share telescope one to five crossings deep, whose
+--   largest reachable registry holds five chains; and a ladder of `k`
+--   flatten layers standing above a share, `k ≤ 4`, where the chain's
+--   depth and the unit climb together at `k+1` against `k+3` -- a
+--   margin of two that neither closes nor opens across the sweep.
+--   Not covered: a share whose def nests more deeply than its
+--   consumer, which moves the unit's slot summand against a flat
+--   chain, and the arbitrary registries the refutation inhabits.
 postulate
   fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (st : EvalSt e) →
