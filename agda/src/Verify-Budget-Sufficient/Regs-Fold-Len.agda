@@ -301,6 +301,23 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   COVERED: one height, below the crossover -- a delivery cutting the
 --   longer of the two columns is where the caps track the spine, and
 --   that is the sibling's stretch, not this one's.
+-- PROBED: `Probed.Fold-Regs-Nest-Cross-Later` -- that stretch, which
+--   is the corner the three rows above are read at right angles to
+--   and none of them reaches: an arrival that is not the first, at a
+--   height ABOVE the crossover.  It is the only place a cut can LOWER
+--   the column the grant is quadratic in while the exit it has to
+--   clear stays linear in that same column and was produced by the
+--   longer spine, so it is the one direction the rows above could not
+--   have seen.  Covered: the second and third arrivals both, reading
+--   IDENTICAL in every digit.  The path cap holds at fifteen, the
+--   entry climbs once from fifteen to forty -- onto the fold's own
+--   registrations, exactly as it does below the crossover -- and the
+--   exit holds at forty rather than following it up.  So the fixed
+--   point above the crossover is exact rather than a trend still
+--   running, and cutting the spine does not break the fit.  NOT
+--   COVERED: one height above the crossover and one program family;
+--   and no arrival past the third, which the outer slot does not
+--   offer and the corner's price would not justify.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)

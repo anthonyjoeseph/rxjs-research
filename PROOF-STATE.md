@@ -215,40 +215,41 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FINISH THE CORNER, AND DECIDE WHAT IT MAY COST THE GATE.** The
-  delivery above the crossover is read and the leaf HOLDS there: the
-  path cap holds, the entry climbs onto the fold's own registrations
-  as it does below, and the exit does not follow it up. So the cut
-  that lowers the column the grant is quadratic in does not break the
-  fit. What is open is
-  the settling row, and it has become a COST question rather than a
-  risk one — this corner multiplies the crossover height by a second
-  cascade, and `probed` is a gate step, not a side loop. Land it if it
-  comes in near the family's worst; otherwise keep the reading that
-  answers the leg and record the settling row as a coverage boundary
-  priced in gate time.
-
 - **THEN THE FIELD BOTH NEW RESIDUES ARE WAITING ON.** `scanΦ-fit` and
   `innerΦ-fit` are one gap in two guises: each asks a producing side
   for a ceiling on `EvalSt.nodes`, and neither has a premise that
-  mentions the table. The drain's other two residues — the queue's
-  caps receipt and its width — are NOT that gap; they exist on this
-  face and are a routing question, so take them first and see what is
-  left. What remains is the invariant: a store ceiling is a fact every
-  writer of a node establishes and every reader spends, which is a
-  field on the record, not a hypothesis. Adding it obliges every
-  producer, and that cascade is the risk this leg is measuring.
+  mentions the table. No invariant is owed: they are SHAPE rows and
+  the restatement is now named. The fourth arm, `walk-thru-fit`, is
+  proven from these same four premises and reads the store nowhere,
+  and the evaluator says why the other two need not either — the scan
+  clause touches one node and the drain two, so a ⊔ over the whole
+  table is strictly stronger than either step can spend. Restate both
+  at the entries the step names, `nodeNestAt` being vocabulary the
+  sighted face carries. The residue is then one accumulator's depth,
+  which the folded values pay for.
 
-- **THEN THE SAME EMPTY-HANDED WALK, AT THE ARMS THAT HAVE NOT SEEN
-  IT.** The registry arm fell to a completion walk: `valsΦ?` is `all`
-  over the burst, so an empty one clears it at every budget while the
-  drain still subscribes a queued term the walk never held. Three
-  siblings take that same premise at that same frame — the nodes map,
-  the live list and the size step — and the drain installs a node and
-  mints a live entry on the very step that registers, so one witness
-  should cross all three. Instantiate them at it. Each that crosses
-  takes the frame grant the registry arm now carries; each that does
-  not is a coverage boundary, and worth its row.
+- **THEN THE EMPTY-HANDED WALK AT THE ARMS IT HAS NOT REACHED — BUT
+  NOT WITH THE SAME WITNESS.** The registry arm fell to a completion
+  walk, and the census in the two headers says the drain does not
+  transfer. On `stepFrame-nest-nodes` both of the drain's writes go
+  the wrong way, so a crossing has to come from what the subscribed
+  term ENQUEUES — build the witness around the enqueue, not around
+  the drain. On `stepFrame-nest-live` an extra join against the
+  schedule's slot sum already prices what a subscribe mints, so take
+  it last. `stepFrame-sz` is the fourth sibling and is unread. Each
+  arm that crosses takes the frame grant the registry arm carries.
+
+- **THEN READ THE THRICE-REFUTED ROW AGAINST THE SPIRAL TEST.**
+  `walk-share-LiveHyp` has been refuted at the price, then once
+  priced, then at the range — three restatements of one side
+  condition. The convergence test asks whether each new region was
+  strictly SMALLER than the one it replaced, or whether one region
+  keeps producing falsity; a fourth restatement made without
+  answering that is the move the test exists to stop. Converging says
+  restate again; spiralling says the mechanism under it is wrong, and
+  that verdict is a stop condition only Anthony can rule on. Read the
+  refutations and the header's dead route first, and let the verdict
+  be the leg.
 
 ### The ledger
 
@@ -287,11 +288,6 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED×5`: one fold's
-  registry price as ONE FRAME STEP of two caps — the walked path's `S`, the
-  standing registry's `B ≥ S`. The doubling was refuted; the family that
-  refuted it now fits either side of the crossover. Only a LATER arrival is
-  unread.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
   of the drain's new grant. Two of its three obligations are drain ledgers this
   face has and must be routed; the third is the store ceiling `scanΦ-fit` also
@@ -300,6 +296,10 @@ does not fit is a finding about the shared statement, not about the head.
   of the fold's new grant, and every premise it has is about the schedule, the
   path or the values. A ceiling on `EvalSt.nodes` is not derivable from them.
   Restate: a field on the invariant record, not a hypothesis here.
+- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
+  registry price as ONE FRAME STEP of two caps. Now read at both heights and
+  at later arrivals either side of the crossover, the entry settling exactly;
+  only the caps can refute and they cannot move. One family unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
