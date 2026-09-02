@@ -118,3 +118,6 @@ open import Probed.Chain-Step-Regs-Read
 
 open import Probed.Fold-Regs-Two-Caps
   using (reaches; figures; figures′; separates; fits)
+
+open import Probed.Fold-Regs-Reentrant
+  using (reaches; figures; figures′; separates; fits)

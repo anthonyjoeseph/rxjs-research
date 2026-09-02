@@ -215,26 +215,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE WALK THAT RE-ENTERS THE BRANCH PRICING `B`, WHICH IS THE HOLE
-  THE SEPARATION LEFT.** The caps are now genuinely apart — path at
-  three, registry at six, nine, fourteen — but only because the walk
-  is DISJOINT from the entries that set `B`, so the fold adds nothing
-  and the step is spare. The consumer's walk is not disjoint: it
-  re-enters the cone it is registered in, charging its own product
-  against a registry already at `B`. Build the separated program whose
-  light branch walks BACK into the heavy one. A margin that survives
-  covers what the consumer does; one that closes says the frame step
-  is right only where nothing overlaps.
+- **THE SPINE AT HEIGHT, WHICH IS NOW THE ONLY ROUTE LEFT TO A LONGER
+  WALK.** The separation holds both beside the structure pricing `B`
+  and inside it, and the second reading killed the duplicator route to
+  a longer walk: three walked frames read as one. The nesting family
+  is the only shape
+  known to make a registration track the walk's PRODUCT, and it has
+  been read at one depth and one height. Sweep both up together
+  against the frame step, as the refuting sweep did against the
+  doubling: the grant is quadratic in the caps while the spine is a
+  product of two quantities the caps dominate, so the margin should
+  widen. If it closes, the currency is wrong, not the constant.
 
-- **THEN THE SPINE AT HEIGHT, AGAINST THE GRANT THAT REPLACED THE
-  DOUBLING.** The nesting family is the only shape known to make a
-  registration track the walk's PRODUCT, and it has been read at one
-  depth and one height. Sweep depth and height up together against the
-  frame step, as the refuting sweep did against the doubling, and take
-  the boundary the same way: the grant is quadratic in the caps while
-  the spine is a product of two quantities the caps dominate, so the
-  margin should widen rather than close. If it closes, the currency is
-  wrong and not merely the constant.
+- **THEN THE TWO ROWS THAT CLAIM NOTHING, WHICH ARE THE CHEAPEST RISK
+  IN THE TIER.** `stepFrame-nest-Φ-take` and `stepFrame-nest-Φ-inner`
+  sit at FALSITY on nothing at all, and one is plainly instantiable:
+  the gate carries factor one and no depth, so what is owed is that
+  its outputs are among its inputs — a Boolean reading at concrete
+  programs. The other asks whether an inner run can outrun the
+  potential the outer walk was carrying, which is two computed
+  quantities compared. Run both. A row nothing has instantiated is
+  FALSITY by definition, so a receipt moves a class and a refutation
+  moves the design.
 
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to
@@ -293,11 +295,11 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED`: one fold's
+- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED×2`: one fold's
   registry price as ONE FRAME STEP of two caps — the walked path's `S`, the
   standing registry's `B ≥ S`. The doubling was refuted; the separated form
-  holds on a walk disjoint from the registry, margin widening. A re-entering
-  walk is unread.
+  holds both beside and inside the structure pricing `B`, margin widening. A
+  LONGER walk is unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

@@ -244,9 +244,22 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   charges the registry nothing the walk added, so the frame step is
 --   spare and the margin widens with the separation instead of
 --   closing.  NOT COVERED: the walk is disjoint from the standing
---   entries here, so a walk that RE-ENTERS the branch pricing `B` is
---   unreached, and the separation is only in the length conjunct --
+--   entries here, and the separation is only in the length conjunct --
 --   `S` is held at one program throughout rather than swept.
+-- PROBED: `Probed.Fold-Regs-Reentrant` -- the same separation with the
+--   walk INSIDE the structure that prices `B` rather than beside it.
+--   The walked branch carries duplicator frames of the same shape as
+--   the unwalked heavy one, so the entries the fold registers are cut
+--   from the syntax the standing entries are, and the reading is taken
+--   over EVERY chain the arrival matches instead of the head of the
+--   registry's list.  The caps stay apart -- path at six against a
+--   registry at seven and ten -- and the exit column equals the
+--   registry column at every row, so a walk of the standing shape adds
+--   nothing above what was already standing and the step stays spare.
+--   NOT COVERED, and it is a finding rather than a gap in the sweep:
+--   the walked DEPTH moved no column, three frames reading identically
+--   to one, so the construction does not lengthen the walked chain and
+--   a walk that is longer than the standing entries is still unread.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
