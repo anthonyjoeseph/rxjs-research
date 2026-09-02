@@ -39,7 +39,7 @@ module Probed.Chain-Step-Regs-Fan where
 
 open import Data.Bool using (true; _∧_)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
-open import Data.List using (List; []; _∷_; map; foldr; length; replicate)
+open import Data.List using ([]; _∷_; map; foldr; length; replicate)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)

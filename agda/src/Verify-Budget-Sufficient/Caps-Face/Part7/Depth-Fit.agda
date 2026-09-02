@@ -608,11 +608,24 @@ chainsNest-all D U (c ∷ cs) h =
 --   length is THREE before the step and three after it in every row,
 --   width one through four and compounded alike -- so a fan multiplies
 --   registry ENTRIES and the emit stream, and lengthens no entry.
---   NOT COVERED: the operator KIND at the frames of a sinking chain.
---   Every row of all three sweeps flattens with `mergeAllᵉ`, and it is
---   the subscribing arm of `stepFrame` that the `+ S` above is about,
---   so a chain whose frames CUT (`takeᵉ`, `switchAllᵉ`, `exhaustAllᵉ`)
---   is the axis still holding this row's class.
+--   NOT COVERED: the operator KIND at the frames of a sinking chain,
+--   which `Probed.Chain-Step-Regs-Cut` takes up.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Cut` -- the CUTTING arm, against a
+--   flatten control of the same shape.  A `takeᵉ` whose count expires
+--   on the stepped arrival, at the leaf and again on the def of a share
+--   so the cut sits BETWEEN two sinks; plus a mixed row where one
+--   branch of a width-two share cuts and the other survives, which is
+--   where `shareGo`'s ordering is observable.  No cut leaves a longer
+--   entry registered than the control does: the cut rows come back
+--   SHORTER, and the survivor of the mixed row sits at exactly the
+--   control's length.  NOT COVERED, and the rows say so themselves:
+--   `switchAllᵉ` and `exhaustAllᵉ` read identical to the control
+--   because a FIRST arrival gives neither anything to cut, so their
+--   real arm needs a second `chainStep`; and every row that does cut
+--   SHRINKS the registry, which satisfies a growth bound whatever the
+--   frames did -- those rows are evidence about the length conjunct
+--   alone, which is the only unbounded one but not the only one.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)

@@ -95,3 +95,7 @@ open import Probed.Chain-Step-Regs-Share
 open import Probed.Chain-Step-Regs-Fan
   using (reaches; figures₁; figures₂; figures₃; figures₄;
          figuresD₂; figuresD₃; flat-in-width)
+
+open import Probed.Chain-Step-Regs-Cut
+  using (reaches; figuresC; figuresSw; figuresEx; figuresTk;
+         figuresMx; figuresDp; no-longer-than-control)

@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CUTTING FRAME — THE LAST AXIS HOLDING THE CHAIN DOOR'S CLASS.**
-  Three sweeps now instantiate the door across depth, share telescope
-  and fan width, and the registered length never outruns one frame per
-  level. But every row of all three flattens with `mergeAllᵉ`, and the
-  arithmetic the statement rests on is about the SUBSCRIBING arm of
-  `stepFrame` — a frame that swaps its head and pushes the inner's
-  operators. A chain whose frames CUT instead (`takeᵉ`, `switchAllᵉ`,
-  `exhaustAllᵉ`) leaves the fold running on an empty value list, and
-  nothing says what the registry does there. Same three-slot family,
-  the flatten replaced by a cut.
+- **THE SECOND ARRIVAL, WHICH IS WHERE A SWITCH ACTUALLY CUTS.** Four
+  sweeps now instantiate the chain door and none refutes it. The cut
+  sweep left two gaps and named both: `switchAllᵉ` and `exhaustAllᵉ`
+  read identical to the flatten control, because a FIRST arrival gives
+  neither anything to abandon or refuse; and every row that does cut
+  shrinks the registry, so the size conjunct is satisfied vacuously
+  there. Both gaps close the same way — step the arrival TWICE, so an
+  inner is already live when the second one lands. That is a second
+  `chainStep` over the state the first returned, not a new family.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -290,7 +289,7 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×3`: the
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×4`: the
   whole chain's registry price, now stepping the level by one rather than
   collapsing to the entry cap. The fixed-cap form is refuted and depth, share
   telescope and fan width all instantiated; a frame that CUTS is not.
