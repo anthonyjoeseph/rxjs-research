@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE REGISTRY'S LENGTH LEDGER OFF ITS SIZE LEDGER.** Of the two
-  branches `Refuted.Sink-Level-Range` left, the first is now closed: the
-  walk's charge would have to tower with the dispatch gas, and no
-  exponent under this instant's fuel is a tower. The potential face is
-  not a shelter either — its sink resets the factor to one and meets the
-  same crossing a level sooner. So the standing branch is that one cap
-  prices a chain's LENGTH and its frames' SYNTAX together, which is why
-  admitting a subscribe's longer chain re-prices every entry and the
-  reading iterates. Price length per entry and a fan-out adds levels
-  additively. What it must survive is the syntax-to-length crossing
-  `Refuted.Chain-Step-Regs-Cap` pins.
+- **CARRY THE SINK'S RECEIPT ON THE REGISTRY ENTRY, NOT ON A CAP.** Both
+  repairs `Refuted.Sink-Level-Range` named are now closed — the walk's
+  charge would have to tower where the fuel affords an exponential, and
+  a separate length ledger tracks the size one because a subscribe
+  registers the DERIVED value's operators, not the arrival's. What every
+  bridge shared is a single cap covering both the walked path and paths
+  the walk never sees. So state the receipt where the chain is: each
+  registration records the grant it was admitted under, and a sink reads
+  its chain's own entry instead of a cap dominating all of them. State
+  it and the hop it has to close first; the entry's field and its
+  producers follow.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an

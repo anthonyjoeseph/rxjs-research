@@ -29,15 +29,24 @@
 -- factor, and the reading is an EXPONENTIAL of the level -- so the two
 -- separate at every cap and diverge as the cap grows.
 --
--- SO THE REPAIR IS NOT A NUMBER.  Either the walk's charge climbs to a
--- tower whose height is the dispatch gas -- which is what nesting the
--- hop costs -- or the registry's LENGTH ledger stops being read off
--- its size ledger, so that a fan-out adds levels additively rather
--- than exponentially.  The second is where the registry probes point:
--- they measure registered length FLAT across a step while the size
--- conjunct grows.  What forbids the cheap version of it is that a
--- subscribing frame turns an inner's SYNTAX into a chain's LENGTH,
--- which is the crossing `Refuted.Chain-Step-Regs-Cap` already pins.
+-- SO THE REPAIR IS NOT A NUMBER, AND IT IS NOT A LEDGER EITHER.  Two
+-- ways out were available.  The walk's charge could climb to a tower
+-- whose height is the dispatch gas, which is what nesting the hop
+-- costs -- but this instant's fuel affords an exponential of the cap
+-- and no exponent is a tower.  Or the registry's LENGTH ledger could
+-- stop being read off its size ledger, so a fan-out adds levels
+-- additively; the registry probes point that way, measuring registered
+-- length flat across a step while the size conjunct grows.  What
+-- closes it is which observable is registered: a subscribing frame
+-- registers the value flowing down the PATH, not the arrival, so the
+-- operator count it contributes is the derived value's -- and that is
+-- the quantity the size ledger has been inflating all along.  A second
+-- number tracks the first rather than escaping it.
+--
+-- WHAT IS OWED IS THEREFORE A MECHANISM.  The walk carries a receipt
+-- about the path it is on and a sink spends it on paths it is not on;
+-- every bridge tried has been one cap large enough to cover both, and
+-- the crossing is what that costs.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Sink-Level-Range where
 
