@@ -237,7 +237,37 @@ postulate
   -- is what the inner run produced -- and the frame's factor is one, so
   -- there is nothing here to pay a deepening with.  What has to hold is
   -- that an inner run cannot hand out a value deeper than the potential
-  -- the outer walk was already carrying.
+  -- the outer walk was already carrying, AND IT DOES NOT HOLD.  This
+  -- statement is FALSE as written; what it is missing is an obligation
+  -- the family already has a place for.
+  --
+  -- WHY IT IS FALSE AND NOT MERELY HARD.  A completion walk carries no
+  -- value, so the premise reads `all _ []` -- true at EVERY `U`, however
+  -- generous the reader is willing to be.  The conclusion is then the
+  -- drained values' own depth read straight against that `U`, since
+  -- `pathΦF` reads this frame as one and `pathNestD` charges it nothing,
+  -- leaving no factor in front to absorb anything.  A queue holding a
+  -- payload `k` layers deep under a step function naming it twice drains
+  -- `2 * k`, and nothing in `vals`, `path` or `B` moves with `k`.  So the
+  -- gap is unbounded in a parameter of the PROGRAM, and no constant and
+  -- no term in those three closes it.
+  --
+  -- WHERE THE REPAIR GOES, AND IT IS NOT A HYPOTHESIS ON THIS SIGNATURE.
+  -- `FrameΦHyp` is the family's own per-frame obligation, and it is
+  -- already non-trivial at `thru-outer` for exactly this reason: that
+  -- frame does not forward, it SUBSCRIBES, so what comes back is bounded
+  -- by nothing the incoming values say.  The drain under this frame
+  -- subscribes too -- `innerFinish` reaches `subscribeInner` through
+  -- `mergeAllDrain` -- so the `⊤` at this arm is the oversight.  What the
+  -- arm owes is a grant over what the QUEUE may emit, which is a fact
+  -- about the state, and `PathΦHyp` already carries `st` at the point
+  -- the obligation is raised.
+  --
+  -- REFUTED: `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-absurd` at
+  --   double occurrence, and
+  --   `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-trip-absurd` at
+  --   triple -- the pair is what puts the gap in the occurrence count
+  --   rather than in a constant.
   stepFrame-nest-Φ-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)

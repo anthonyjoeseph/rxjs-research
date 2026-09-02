@@ -101,6 +101,8 @@ open import Refuted.Inner-Drain-Share-Nest
 open import Refuted.Inner-Drain-Nest
   using (drained≡80; queued≡40; stepFrame-nodes-inner-absurd;
          parent≡40; stepFrame-nodes-at-inner-absurd;
+         drainedΦ≡80; Φ-hyp; stepFrame-nest-Φ-inner-absurd;
+         drainedΦ₃≡120; stepFrame-nest-Φ-inner-trip-absurd;
          drained₃≡120; queued₃≡40; unitCharge≡82;
          stepFrame-nodes-inner-unit-absurd)
 open import Refuted.Scan-Seed-Caps

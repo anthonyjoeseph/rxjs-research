@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE HALF OF THAT PAIR THAT DID NOT FALL TO READING.** The gate
-  wanted no probe: factor one and no depth make its hypothesis and its
-  conclusion one predicate, and what it emits is a PREFIX, so it was
-  proven outright rather than instantiated — the leg's cost was the
-  reading, not the rows. `stepFrame-nest-Φ-inner` does not go the same
-  way. Its mergeAll arm returns `vals ++ vs`, and `vs` is drained from
-  a subscribe the parent's hypotheses never saw, so the values are NEW
-  rather than filtered and no reading can bound them. Instantiate that
-  arm: an inner queued deeper than the walk it joins refutes, and the
-  repair is a field on the invariant record, never a hypothesis on the
-  parent.
-
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to
   instantiation in BOTH its denominations at once, and nothing said so
@@ -248,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   have cut, which is where the separation comes from the RUN rather
   than the shape, and where the step is spent against something it
   produced itself. Read the nesting spine at its second and third.
+
+- **THEN THE OBLIGATION THE INNER ARM OWES, WHICH THE REFUTATION HAS
+  ALREADY NAMED.** `FrameΦHyp` is `⊤` at `from-inner` and non-trivial
+  at `thru-outer`, and the reason it is non-trivial there — that frame
+  SUBSCRIBES rather than forwards — holds verbatim of the drain beneath
+  this one. So the restatement is not a search: give the arm the same
+  shape of grant, taken over what the QUEUE may emit rather than over
+  the values in hand. `PathΦHyp` already carries `st` at the point the
+  obligation is raised, so the change reaches one signature and two
+  arms. The risk is on the producing side: every emit that parks an
+  inner must then supply that grant, and nothing does today.
 
 ### The ledger
 
@@ -280,10 +279,6 @@ does not fit is a finding about the shared statement, not about the head.
   for the chains a sink fans into. A sink is a leaf of the factor recursion, so
   the receipt handed in carries a factor of one against a chain whose outer
   frames cost the cap's exponential — the live arm's crossing, a level sooner.
-- **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
-  inner frame, whose emitted value comes from the inner run and not from the
-  frame. Nothing yet says an inner run cannot outrun the potential the outer
-  walk was carrying.
 - **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: the scan
   frame substitutes by the same rule the map clause is now proven from, but
   emits the accumulator's image rather than the payload's.
@@ -296,6 +291,10 @@ does not fit is a finding about the shared statement, not about the head.
   standing registry's `B ≥ S`. The doubling was refuted; the family that
   refuted it now fits either side of the crossover. Only a LATER arrival is
   unread.
+- **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — SHAPE, `REFUTED`: the drain
+  under this frame SUBSCRIBES, so a completion walk's empty premise holds at
+  every `U` while the queue's own depth leaves through it. Restate: the arm's
+  `⊤` obligation must become the grant `thru-outer` already carries.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
