@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO ROWS THAT CLAIM NOTHING, WHICH ARE THE CHEAPEST RISK
-  IN THE TIER.** `stepFrame-nest-Φ-take` and `stepFrame-nest-Φ-inner`
-  sit at FALSITY on nothing at all, and one is plainly instantiable:
-  the gate carries factor one and no depth, so what is owed is that
-  its outputs are among its inputs — a Boolean reading at concrete
-  programs. The other asks whether an inner run can outrun the
-  potential the outer walk was carrying, which is two computed
-  quantities compared. Run both. A row nothing has instantiated is
-  FALSITY by definition, so a receipt moves a class and a refutation
-  moves the design.
+- **THE HALF OF THAT PAIR THAT DID NOT FALL TO READING.** The gate
+  wanted no probe: factor one and no depth make its hypothesis and its
+  conclusion one predicate, and what it emits is a PREFIX, so it was
+  proven outright rather than instantiated — the leg's cost was the
+  reading, not the rows. `stepFrame-nest-Φ-inner` does not go the same
+  way. Its mergeAll arm returns `vals ++ vs`, and `vs` is drained from
+  a subscribe the parent's hypotheses never saw, so the values are NEW
+  rather than filtered and no reading can bound them. Instantiate that
+  arm: an inner queued deeper than the walk it joins refutes, and the
+  repair is a field on the invariant record, never a hypothesis on the
+  parent.
 
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to
@@ -286,10 +287,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: the scan
   frame substitutes by the same rule the map clause is now proven from, but
   emits the accumulator's image rather than the payload's.
-- **`stepFrame-nest-Φ-take`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
-  gate, factor one and no depth, so hypothesis and conclusion are one statement
-  read either side of it. What is owed is that its output values are among its
-  inputs.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
