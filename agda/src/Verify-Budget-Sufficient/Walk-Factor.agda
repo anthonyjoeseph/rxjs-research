@@ -7,7 +7,7 @@
 -- repairs cheap.
 module Verify-Budget-Sufficient.Walk-Factor where
 
-open import Data.Bool using (true; _∧_)
+open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
@@ -201,3 +201,61 @@ pathΦD-len B (thru-outer _ _ ↠ p) 1B h
 ... | _ , hp =
       ≤-trans (+-mono-≤ 1B (pathΦD-len B p 1B hp))
               (≤-reflexive (sym (+-assoc B (pathLen p * B) (B * B))))
+
+-- AND A CHAIN THAT ENDS AT THE ROOT PAYS ONLY THE LENGTH HALF, which is
+-- what lets a hand-over's price cover it.  A path carries exactly one
+-- leaf, so this decides which of the two shares above is present -- and
+-- where it answers root, both caps shed the leaf's constant and land on
+-- exactly the two quantities a sink is charged.
+pathRoots : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → Bool
+pathRoots root           = true
+pathRoots (share-sink _) = false
+pathRoots (_ ↠ p)        = pathRoots p
+
+pathΦSz-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathRoots p ≡ true → pathSz? B p ≡ true →
+  pathΦSz B p ≤ pathLen p * (suc B * B)
+pathΦSz-root B root           _  _ = z≤n
+pathΦSz-root B (share-sink _) () _
+pathΦSz-root B (f ↠ p) hr h
+  with ∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
+... | hf , hrr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hrr
+...   | _ , hp = +-mono-≤ (frameΦSz≤ B f hf) (pathΦSz-root B p hr hp)
+
+pathΦF-cap-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathRoots p ≡ true → pathSz? B p ≡ true →
+  pathΦF B p ≤ 2 ^ (B * (suc B * B))
+pathΦF-cap-root B p hr h =
+  ≤-trans (≤-reflexive (pathΦF≡ B p))
+          (^-monoʳ-≤ 2 (≤-trans (pathΦSz-root B p hr h)
+                                (*-monoˡ-≤ (suc B * B) (pathSz?-len B p h))))
+
+pathΦD-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  1 ≤ B → pathRoots p ≡ true → pathSz? B p ≡ true →
+  pathΦD B p ≤ pathLen p * B
+pathΦD-root B root           _  _  _ = z≤n
+pathΦD-root B (share-sink _) _  () _
+pathΦD-root B (map-f fn ↠ p) 1B hr h
+  with ∧-true (frameSz? B (map-f fn)) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
+... | hf , hrr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hrr
+...   | _ , hp = +-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
+                          (pathΦD-root B p 1B hr hp)
+pathΦD-root B (scan-f fn z ↠ p) 1B hr h
+  with ∧-true (frameSz? B (scan-f fn z)) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) h
+... | hf , hrr with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) hrr
+...   | _ , hp = +-mono-≤ (≤-trans (nestDᵗ≤sizeᵗ fn) (≤ᵇ⇒≤ (sizeᵗ fn) B (T-to hf)))
+                          (pathΦD-root B p 1B hr hp)
+pathΦD-root B (take-f _ ↠ p) 1B hr h
+  with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) h
+... | _ , hp = ≤-trans (pathΦD-root B p 1B hr hp) (m≤n+m (pathLen p * B) B)
+pathΦD-root B (from-inner _ _ _ ↠ p) 1B hr h
+  with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) h
+... | _ , hp = ≤-trans (pathΦD-root B p 1B hr hp) (m≤n+m (pathLen p * B) B)
+pathΦD-root B (thru-outer _ _ ↠ p) 1B hr h
+  with ∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) h
+... | _ , hp = +-mono-≤ 1B (pathΦD-root B p 1B hr hp)
+
+pathΦD-cap-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  1 ≤ B → pathRoots p ≡ true → pathSz? B p ≡ true → pathΦD B p ≤ B * B
+pathΦD-cap-root B p 1B hr h =
+  ≤-trans (pathΦD-root B p 1B hr h) (*-monoˡ-≤ B (pathSz?-len B p h))

@@ -215,15 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN SPLIT THE FAN-OUT BY THE ADMITTED CHAIN'S TERMINAL.** The
-  receipt has moved: a sink now carries a factor and a depth of its
-  own, and the walk's depth ledger is B-indexed throughout. A path
-  holds exactly one leaf, so the chain ending at `root` closes off
-  `pathΦF-cap`, `pathΦD-len` and monotonicity, with no new fact. The
-  chain ending at a second hand-over does not, and is refuted. So the
-  commit is `walk-share-ΦHyp` as a real BODY case-splitting inside the
-  admitted list, over a leaf covering exactly that entry.
-
 - **THEN THE DRAIN'S ROUTING, ON ITS OWN.** `innerΦ-fit` does NOT
   share the fold's defect, and binding the two was this leg's error:
   its width is Σ-CHOSEN with `drainW` as a LOWER bound, so nothing
@@ -245,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   what moves either, and the level-currency harness is already built
   where the refutations that killed the fixed cap live — so this is one
   commit that buys two classes, and the cheapest evidence in the tier.
+
+- **THEN READ THE REGISTRY'S OWN PATHS, WHICH THE FAN-OUT BODY TURNED
+  UP.** Splitting the terminal closed the potential and exposed two
+  facts nothing carries: a re-entered chain is walked FROM THE TOP, so
+  it needs its size receipt at the program's cap while the walk holds
+  the registry at a level that only grows; and its depth is owed
+  against the syntactic unit while the store's ledger bounds the
+  registry by a runtime maximum. Both are properties of what a
+  registration MAY be rather than of the walk, so the commit is to find
+  where one is minted and either wire an invariant that already says
+  it or refute the pair at a program that registers past the cap.
 
 ### The ledger
 
@@ -273,18 +275,27 @@ does not fit is a finding about the shared statement, not about the head.
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
   queue, so the walk's values cannot reach it.
-- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
-  for the chains a sink fans into. NOT the live arm's crossing: the potential
-  does not compound across hops. The priced leaf pays a root-terminated chain;
-  a chain ending at a second hand-over is what is left, and it is refuted.
+- **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential at
+  an admitted chain that ends at a SECOND hand-over. The residue of the
+  terminal split: its factor is the sink's own times its frames', and the hop
+  count is bounded by nothing but the dispatch gas.
+- **`fan-chain-sz`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: an admitted
+  chain's size receipt at the PROGRAM's cap and not at the level. The walk
+  holds the registry at an `iterSize` that only grows, so the reading it
+  carries is the weaker one and cannot be narrowed back down.
+- **`fan-chain-nestD`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: an admitted
+  chain's depth against the syntactic unit. The walk's registry premise is a
+  size receipt carrying no depth at all, and the store's ledger bounds the
+  registry by a runtime maximum instead.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
-  the fold's new grant. Unaffordable, not mis-shaped: the count is under the exit
-  width, which outruns two-to-two-to the size at every instant, so no story buys
-  room. BLOCKED on whether this face prices a threading frame at all.
+  the fold's new grant. Unaffordable, not mis-shaped: the count is under the
+  exit width, which outruns two-to-two-to the size at every instant, so no
+  story buys room. BLOCKED on whether this face prices a threading frame at
+  all.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
   `drainW`, so nothing is free. Two obligations are drain ledgers this face has

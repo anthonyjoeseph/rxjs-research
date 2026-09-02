@@ -24,7 +24,7 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
-  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ)
+  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -255,6 +255,23 @@ mapΦ {s = s} {u = u} B U fn p (v ∷ vs) h =
   head =
     ≤-trans (*-monoʳ-≤ (pathΦF B p) (m≤m+n (nestDᵛ u v) (pathΦD B p)))
             (≤ᵇ⇒≤ _ U (T-to (∧-trueˡ h)))
+
+-- AND A CHEAPER PATH INHERITS A DEARER ONE'S RECEIPT, which is the
+-- whole of what a hand-over spends at its fan-out.  The predicate is
+-- pointwise and its two path-denominated inputs occur monotonically in
+-- it, so a path under another in BOTH is under it at every value at
+-- once -- no reading of what the values carry, and no induction on the
+-- paths.
+valsΦ?-mono : ∀ {n} {Γ : Ctx n} {u t} (B U : ℕ) (p q : Path Γ u t)
+  (vs : List (Val Γ u)) →
+  pathΦF B p ≤ pathΦF B q → pathΦD B p ≤ pathΦD B q →
+  valsΦ? B U q vs ≡ true → valsΦ? B U p vs ≡ true
+valsΦ?-mono B U p q []       hF hD h = refl
+valsΦ?-mono {u = u} B U p q (v ∷ vs) hF hD h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
+            (≤-trans (*-mono-≤ hF (+-monoʳ-≤ (nestDᵛ u v) hD))
+                     (≤ᵇ⇒≤ _ U (T-to (∧-trueˡ h))))))
+          (valsΦ?-mono B U p q vs hF hD (∧-trueʳ h))
 
 -- THE OUTER FRAME, DISCHARGED FROM THE GRANT.  The frame's own arm
 -- says nothing about what a subscription returns, so the bound cannot
