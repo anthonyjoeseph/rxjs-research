@@ -215,17 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE WIDTH A STORE GRANT DOES NOT BUY.** Repairing the two `⊤`
-  arms with a grant over what the NODE may hold is refuted at the
-  potential's own currency: a fold THREADS, so its k-th emit is k
-  substitutions deep while `valsΦ?` surrenders the step function's
-  factor once, and neither factor mentions the burst. With the
-  accumulator shallow the grant is discharged for nothing and the arm
-  is still false. `FrameΦHyp` must therefore carry a WIDTH as well as
-  `st`, at the factors the proven iteration face uses — and the width
-  costs nothing to reach, since `vals` is already a parameter there.
-  The risk is the producing side, and it is the whole leg: every emit
-  that writes an accumulator must supply the grant, and nothing does.
+- **THE OTHER `⊤` ARM, AND THE INVARIANT THE FIRST ONE LOCATED.** The
+  scan arm is now a real body over a store-and-width grant, and the
+  gap moved rather than closing: `scanΦ-fit` asks for a ceiling on
+  `EvalSt.nodes` that none of its premises mention. The drain arm is
+  next: no width is owed there, since a queue does not thread, but a
+  FACTOR is — it substitutes into the term it subscribes, so a store
+  ceiling alone is refuted at double occurrence. That is the grant
+  `thru-outer` already carries. Then both arms share one gap: a
+  ceiling on the table is a fact every writer of a node must
+  establish, so it belongs on the invariant record — and the bundle
+  this face runs under has no `EvalSt` conjunct. Adding the field is
+  the risk: it obliges every producer.
 
 - **THEN THE ONE ROW WHOSE COVERAGE CLAIM IS NOT IN ITS LEDGER.**
   `stepFrame-nest-regs` reads as unprobed — the census scored it on
@@ -296,11 +297,10 @@ does not fit is a finding about the shared statement, not about the head.
   drain under this frame SUBSCRIBES, so a completion walk's empty premise holds
   at every `U` while the queue's own depth leaves through it. Restate: the
   arm's `⊤` obligation must become the grant `thru-outer` already carries.
-- **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — SHAPE,
-  `REFUTED×2, TWIN, RECOVERY`: the fold emits the ACCUMULATOR's image, and that
-  lives in the node table, so a numeral in hand discharges the premise at zero
-  while the stored depth leaves through. Restate: the same grant, over the
-  node.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
+  of the fold's new grant, and every premise it has is about the schedule, the
+  path or the values. A ceiling on `EvalSt.nodes` is not derivable from them.
+  Restate: a field on the invariant record, not a hypothesis here.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

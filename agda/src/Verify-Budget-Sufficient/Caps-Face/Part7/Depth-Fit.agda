@@ -25,7 +25,7 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst; cong)
 
 open import Rx.Prim      using (Tick; Id; _at_from_as_; Gas; after_,_)
-open import Rx.Exp       using (obs; Ctx; Closed; Val; sizeᵉ; sizeᵛ)
+open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; sizeᵉ; sizeᵛ)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
@@ -116,15 +116,16 @@ pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
 -- the other two rather than competing with them.
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (op : AllOp) (nid : NodeId)
-  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ) →
+  (p : Path Γ u t) (vals : List (Val Γ (obs u))) (sched : Sched Γ)
+  (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
   pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
          (thru-outer op nid ↠ p) vals ≡ true →
   FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-            (thru-outer op nid) p vals sched
-walk-thru-fit {n = n} {e = e} sl id op nid p vals sched hsl hpz hnd hΦ =
+            (thru-outer op nid) p vals sched st
+walk-thru-fit {n = n} {e = e} sl id op nid p vals sched st hsl hpz hnd hΦ =
   n , G
   , subst (λ z → ValsFit n z G p vals) (sym hsl)
       (valsFit-of-max sl p vals M ≤-refl)
@@ -190,24 +191,59 @@ walk-thru-fit {n = n} {e = e} sl id op nid p vals sched hsl hpz hnd hΦ =
                     :+ con 2 :* (con 2 :* (q :* d) :+ q :* w))
           refl Q D M (n * W)
 
+postulate
+  -- THE FOLD'S GRANT HAS NOWHERE TO COME FROM ON THIS SIDE, and that
+  -- is the finding rather than the size of the proof.  The consuming
+  -- face now asks a scan frame for a ceiling on what its NODE holds --
+  -- it has to, since the value a fold emits is its accumulator and no
+  -- statement about the arriving values reaches it.  Every premise
+  -- here is about the schedule, the path or the values; not one of
+  -- them mentions `EvalSt.nodes`, so the store's depth is a free
+  -- parameter of this statement and its conclusion is not derivable
+  -- from its hypotheses.
+  --
+  -- SO WHAT IS OWED IS AN INVARIANT AND NOT A LEMMA.  A ceiling on the
+  -- table is a fact every writer of a node must establish and every
+  -- reader may spend, which is a field on the record the walk already
+  -- carries -- and the ambient bundle this face runs under is about
+  -- caps and slots alone, so there is no field to hang it on today.
+  -- Threading it in here instead would launder the debt out of the
+  -- ledger and into a signature that only today's one caller happens
+  -- to satisfy, so the statement is left at full strength and the gap
+  -- is left where a reader will meet it.  The width half is not part
+  -- of the gap: `length vals` is a parameter, and the factors are the
+  -- ones the iteration face is already proven at.
+  scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ s)) (sched : Sched Γ)
+    (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    pathSz? (Caps.cSize (capsAt e sl id)) (scan-f fn nid ↠ p) ≡ true →
+    pathNestD (scan-f fn nid ↠ p) ≤ nestUnit e sl →
+    valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+           (scan-f fn nid ↠ p) vals ≡ true →
+    FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
+              (scan-f fn nid) p vals sched st
+
 -- AND THE FRAME'S SIDE-CONDITION IS A CASE SPLIT AND NOTHING ELSE,
--- which is the point of separating it from the walk below: the four
--- silent kinds are units, so the walk's recursion never mentions them.
+-- which is the point of separating it from the walk below: the silent
+-- kinds are units, so the walk's recursion never mentions them.
 frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sl : Slots Γ) (id : ℕ) (f : Frame Γ s u) (p : Path Γ u t)
-  (vals : List (Val Γ s)) (sched : Sched Γ) →
+  (vals : List (Val Γ s)) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
   pathNestD (f ↠ p) ≤ nestUnit e sl →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) (f ↠ p) vals ≡ true →
   FrameΦHyp (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
-            f p vals sched
-frameΦ-fit sl id (map-f _)          p vals sched _ _ _ _ = tt
-frameΦ-fit sl id (scan-f _ _)       p vals sched _ _ _ _ = tt
-frameΦ-fit sl id (take-f _)         p vals sched _ _ _ _ = tt
-frameΦ-fit sl id (from-inner _ _ _) p vals sched _ _ _ _ = tt
-frameΦ-fit sl id (thru-outer op nid) p vals sched hsl hpz hnd hΦ =
-  walk-thru-fit sl id op nid p vals sched hsl hpz hnd hΦ
+            f p vals sched st
+frameΦ-fit sl id (map-f _)          p vals sched st _ _ _ _ = tt
+frameΦ-fit sl id (take-f _)         p vals sched st _ _ _ _ = tt
+frameΦ-fit sl id (from-inner _ _ _) p vals sched st _ _ _ _ = tt
+frameΦ-fit sl id (scan-f fn nid) p vals sched st hsl hpz hnd hΦ =
+  scanΦ-fit sl id fn nid p vals sched st hsl hpz hnd hΦ
+frameΦ-fit sl id (thru-outer op nid) p vals sched st hsl hpz hnd hΦ =
+  walk-thru-fit sl id op nid p vals sched st hsl hpz hnd hΦ
 
 -- THE WALK ITSELF, and it is the fold's own recursion with the grant
 -- hung off each frame.  Nothing here is arithmetic: the potential is
@@ -286,7 +322,7 @@ walk-ΦHyp-go {e = e} sl id sf gas nid now j (f ↠ p) vals fin sched st hsl hpz
         (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id) hΦ hF)
   where
   step = stepFrame sf nid now f p vals fin sched st
-  hF = frameΦ-fit sl id f p vals sched hsl hpz hnd hΦ
+  hF = frameΦ-fit sl id f p vals sched st hsl hpz hnd hΦ
   B  = Caps.cSize (capsAt e sl id)
   1≤B : 1 ≤ B
   1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
