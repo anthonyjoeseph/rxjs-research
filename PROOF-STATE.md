@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DRAIN LAW'S ONE FRAME THAT NAMES A NODE, WHOSE
-  OBLIGATION HAS OUTLIVED ITS THREE CARRIERS.** The `from-inner` head
-  is the tier's worst row and the only one whose per-entry ceiling has
-  been refuted at every cap it was stated against, so what is open is
-  not a proof but the obligation: nothing yet says what a frame naming
-  a node may cost that a frame naming none may not. Read the three
-  dead carriers for the shape they share before minting a fourth —
-  a carrier refuted at every cap is evidence about the QUANTITY, not
-  about the cap it was read at — and instantiate the candidate at the
-  frame the refutations bit before it is stated.
-
-- **THEN THE TWO SHARE-SINK HYPOTHESES THAT STAND ON NOTHING AT ALL.**
+- **THE TWO SHARE-SINK HYPOTHESES THAT STAND ON NOTHING AT ALL.**
   `walk-share-LiveHyp` and `walk-share-ΦHyp` are the size side
   condition and the potential for the chains a sink fans into, and
   neither carries a single marker. They are one subject read twice —
@@ -235,7 +224,8 @@ does not fit is a finding about the shared statement, not about the head.
   has reached. An unprobed FALSITY row is the cheapest unmanaged risk
   there is, and two of them sharing a subject is one probe's work, not
   two: reach a sink whose registry entries are the interesting ones and
-  read both quantities off the same run.
+  read both quantities off the same run. Check that the CAP side of
+  each reaches a program before writing rows against it.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
@@ -247,13 +237,24 @@ does not fit is a finding about the shared statement, not about the head.
   cut and left this unmeasured. It wants an inner due BETWEEN two
   outer values, which is one timing change and no new family.
 
+- **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
+  WITH AN ANSWER.** The drain row turns out to be closed to
+  instantiation in BOTH its denominations at once, and nothing said so
+  until it was run — so its class sat where no amount of sweeping could
+  ever have moved it. That trap is not obviously local: every caps-face
+  row prices a measured quantity under a cap-derived one, and the cap
+  is the same non-returning family throughout. Walk the tier's rows and
+  record per row whether either side reaches a program. A row no
+  evidence can lower must not hold a class that claims evidence, so the
+  census re-ranks the tier rather than merely describing it.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
-  `REFUTED×2, TWIN, PROBED×2`: the `from-inner` head of the drain law, the only
-  frame that names a node. Its per-entry ceiling has now outlived three
-  carriers, the last of them refuted at every cap, so the obligation itself is
-  what is open.
+  `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the `from-inner` head of the drain
+  law, the only frame that names a node. Both denominations are closed to
+  instantiation — the cap does not return, the climb bound is sealed — so
+  evidence can raise this class and never lower it.
 - **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `PROBED`: what one
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot

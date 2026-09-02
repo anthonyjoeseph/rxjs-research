@@ -365,6 +365,20 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   and `Refuted.Arr-Cap-Step.arr-cap-step-absurd` for the raise that
 --   also re-enters the arrival family one level up, which is the one
 --   route the two above leave standing
+-- DEAD ROUTE: instantiating this statement at all, in either
+--   denomination, which is the shape the four carriers above share and
+--   the reason not one of them is a probe.  Every conjunct is a
+--   measured quantity under a CAP-DERIVED one, and both denominations
+--   are closed at once: the cap the consumer names is `capsAt`, which
+--   does not return at the smallest program the language admits -- an
+--   empty context, no slots, one payload -- and the climb bound is
+--   `sLvlD`, sealed under the dead route its own family's header
+--   already carries.  A hand-picked cap reaches a REFUTATION and
+--   nothing else, since one instance kills a ∀ while no finite set of
+--   them confirms one, and `capsAt`'s own header rules such a cap out
+--   as evidence for the affirmative.  So this row's class can be
+--   RAISED by evidence and never lowered by it: what moves it down is
+--   a proof, or a restatement whose cap side some program can reach.
 -- TWIN: `subscribeE-caps` already threads a level exactly this way --
 --   invariant at the stepped cap, conclusion at the sum -- and is
 --   proven.
@@ -405,51 +419,12 @@ postulate
         lim (pred act) q sched st
 
 
--- AND THE DRAIN ONE IS NOW A FRAME-LOCAL STATEMENT, which is what it
--- had to become.  Its conjunct used to charge the walk's LEVEL against
--- the BASE size cap, because the proven consumer climbed the relative
--- ceiling one operator per level from the bottom and that climb is paid
--- for only while the level fits under that cap.  The walk's ladder is
--- denominated in the COUNT instead -- the Σ it hands its tail permits a
--- level anywhere up to `sizeCount c d ⊔ Caps.cSize c`, and the arrival
--- face confirms levels genuinely reach the count -- so at level zero the
--- conjunct was `capsOK?` read through `parkRoom` and the level was the
--- whole of what it asked for and the whole of what the bundle could not
--- give.
---
--- WHAT THE CONJUNCT SAYS NOW IS THE PARKED TERM UNDER THE BASE CAP,
--- with no level term in it, which is the refuted statement minus the
--- refuted part, TOGETHER WITH THE LEVEL BEING REACHED.  A level the
--- cascade's delivery walk actually lands on carries the gas it still
--- has there, and from that its room is derived rather than assumed:
--- the walk recurrence splits so that the budget read from a reached
--- level IS the walk read from the level before it, one gas down, and
--- the bottom is the two bodies.  So the queue asks for the reaching
--- and the arithmetic follows.
---
--- AND THE GAS IS WHY THE RELATION CARRIES ONE.  At the whole cascade's
--- gas a room receipt is false everywhere above the bottom -- the
--- budget read higher is the larger one and the ladder from there is
--- longer, so both sides move the wrong way at once -- while four plus
--- a term's operator count is syntactic and fixed before any level
--- exists.  A level bound cannot say which of the two it has; the
--- reaching relation can, because it is built by spending it.
---
--- AND THE REACHING IS A `≤`, WHICH IS THE ONLY SHAPE THAT COULD BE
--- SUPPLIED.  A chain advances its level by one frame charge at a time
--- while the cascade advances by whole restarts, so the levels a chain
--- visits sit BETWEEN two positions the walk lands on and are almost
--- never positions themselves.  Room survives that gap in the useful
--- direction: the ladder from a level and the budget read at it both
--- grow with the level, so the receipt at the position ABOVE covers
--- every level under it, and what the queue asks for is a position
--- above the walk's level rather than the walk's level itself.
---
 -- RECOVERY: git show b927a16 restores `Refuted.Walk-Frame-Drain-Level`,
---   which refuted the levelled conjunct at the empty context with the
---   level taken to be the base size cap, every other premise met by the
---   entry bounds and the proven node installer.  Whoever puts a level
---   back into this statement wants that witness back.
+--   which kills a drain conjunct whose level is PINNED TO THE BASE SIZE
+--   CAP, at the empty context, with every other premise met by the
+--   entry bounds and the proven node installer.  The level the
+--   conjunct carries today is a free one bounded by an offset, so the
+--   witness does not reach it; whoever pins one back wants it.
 
 -- AND FOUR OF THE FIVE HEADS OWE NOTHING, which the match says in
 -- code rather than in prose.  Only a `from-inner` names a node, so
