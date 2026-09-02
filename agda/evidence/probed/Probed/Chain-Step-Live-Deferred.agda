@@ -2,7 +2,7 @@
 -- THE LIVE ARM, AT THE ONLY SHAPE THAT CAN MOVE IT — AND REACHED BY
 -- RUNNING RATHER THAN BY BUILDING THE PATH.
 --
--- TARGET: stepFrame-nest-live @595de8
+-- TARGET: stepFrame-nest-live @7dad31
 --
 -- WHY THIS PROGRAM.  A live source's nesting is the nesting of its
 -- PENDING values, and the evaluator mints a live carrying a nested
@@ -23,7 +23,10 @@
 -- zero.  Both sides are pinned before the ordering is taken.  The
 -- charge is the syntactic surrogate the tree proves the arms' increment
 -- dominates, so green here implies the arm at this program and red here
--- does not refute it.  The REGISTRY rows beside it are pins rather than
+-- does not refute it.  The arm's FRAME GRANT is unread by every row:
+-- these run the composite, which never states the leaf's premises, so
+-- the rows say nothing about whether a walk can supply the fit the
+-- drain arm now asks for.  The REGISTRY rows beside it are pins rather than
 -- evidence: that fold's whole-chain statement is a definition now, and
 -- they hold the evaluator to the reading it was written from.
 -- ══════════════════════════════════════════════════════════════════

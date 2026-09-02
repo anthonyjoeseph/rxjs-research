@@ -50,7 +50,7 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; sweepLive-nest)
 open import Verify-Budget-Sufficient.Caps using (iterSize-infl; iterSize-mono-count)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsΦ?; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; valsSz?-mono;
+  using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; valsSz?-mono;
          stepFrame-nest-Φ; stepFrame-nest-regs; stepFrame-regsSz; stepFrame-sz;
          foldPath-nest-regs)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
@@ -122,24 +122,32 @@ postulate
   -- frame subscribes what it is handed, and a deferred body's depth is
   -- under its size, which is the bound the side condition supplies.
   --
-  -- AND A THIRD MINT SITE IS WHY THE STATEMENT IS FALSE AS WRITTEN.  A
-  -- completion frame subscribes out of the *All node's QUEUE, and a
-  -- queued gate mints a live carrying its body -- so the arm that
-  -- mints here is the arm the side condition reads as a unit, and the
-  -- walk reaching it is empty-handed by construction, which clears the
-  -- potential at every budget including the smallest.  The slot sum
-  -- does not move with a term the slots never held.
+  -- AND A THIRD MINT SITE IS WHY THE WALK'S OWN PREMISES DO NOT
+  -- SUFFICE.  A completion frame subscribes out of the *All node's
+  -- QUEUE, and a queued gate mints a live carrying its body -- so the
+  -- arm that mints there is the arm the side condition reads as a
+  -- unit, and the walk reaching it is empty-handed by construction,
+  -- which clears the potential at every budget including the smallest.
+  -- The slot sum does not move with a term the slots never held.
   --
-  -- AND NO LARGER NUMBER REPAIRS IT, WHICH IS THE PART THAT COSTS
-  -- SOMETHING.  The depth measure TRUNCATES at the gate -- that is
-  -- what makes a recursive body safe -- so a parked term reads zero in
-  -- the conclusion's own currency while the live it mints reads the
-  -- body.  A premise bounding the queue's nesting is therefore
-  -- satisfied by the witness as it stands.  What is owed is a grant
-  -- over the NODE the frame reads, denominated in something that sees
-  -- past the gate; the size measure is the one face that does, which
-  -- is why this leaf already runs on a size side condition at its
-  -- other arm.
+  -- AND NO LARGER NUMBER WOULD HAVE REPAIRED IT, WHICH IS WHAT FIXES
+  -- THE GRANT'S CURRENCY.  The depth measure TRUNCATES at the gate --
+  -- that is what makes a recursive body safe -- so a parked term reads
+  -- zero in the conclusion's own currency while the live it mints
+  -- reads the body.  A premise bounding the queue's NESTING is
+  -- therefore satisfied by the counterexample unchanged.  A SIZE sees
+  -- past the gate, one unit per layer, and the frame grant is
+  -- denominated in exactly that.
+  --
+  -- SO THE FRAME GRANT IS CARRIED, AND IT IS THE SAME ONE THE REGISTRY
+  -- ARM TAKES.  That arm fell to the same emptiness at the same frame
+  -- and was repaired this way, and its drain conjunct names the node
+  -- by a `lookupNode` equation, so the queued terms are under a
+  -- cap-derived size rather than under anything the walk holds.  Two
+  -- faces discharged from ONE fit is what makes the repair worth
+  -- taking over a grant minted here: a producer that can supply the
+  -- registry arm supplies this one with the same witness, and the
+  -- consumers already thread it alongside.
   --
   -- REFUTED: `Refuted.Drain-Live-Defer`, at the corner two earlier
   --   findings leave open: `Refuted.Chain-Step-Live-Nest` found the
@@ -164,6 +172,7 @@ postulate
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (B U : ℕ) →
     valsΦ? B U (f ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U f path vals fin sched st →
     FrameLiveHyp U f path vals →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live
@@ -361,7 +370,7 @@ mutual
                  (Sched.live (proj₁ (proj₂ (proj₂ (proj₂ step)))))
                  ≤ L ⊔ S ⊔ R ⊔ U
     liveStep =
-      ≤-trans (stepFrame-nest-live sf id now f p vals fin sched st B U hΦ hL)
+      ≤-trans (stepFrame-nest-live sf id now f p vals fin sched st B U hΦ hF hL)
               (⊔-lub (⊔-lub intoL intoS) intoU)
     slotStep : slotsNestSum (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂ step)))))
                  ≤ L ⊔ S ⊔ R ⊔ U
