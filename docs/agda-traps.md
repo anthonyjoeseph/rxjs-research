@@ -92,3 +92,14 @@ error message actively misdirects. Read the entry before reasoning from the erro
   obligation's own spellings so every comparison is syntactic; and take a `Σ` apart with
   `proj₁`/`proj₂` rather than `with`. Measured on one refutation: seven minutes and
   thirteen gigabytes down to thirteen seconds, with no change to what it proves.
+
+- **AN IMPLICIT USED INSIDE AN `all`-PREDICATE LAMBDA IS SOLVED PER ELEMENT, AND THE
+  ERROR LANDS ON THE LAMBDA.** A clause whose body is `all (λ v → P v) vs`, where `P`
+  takes an implicit the clause's own signature fixes (the program `e`, a context, a
+  slot type), leaves that implicit to the unifier at every application of the lambda —
+  and `all` over a list determines nothing about it, so each element is a fresh meta
+  and the report is `Unsolved metas` (or a yellow highlight) at the lambda, which reads
+  as the predicate being wrong. Nothing is wrong with the predicate. Bind the implicit
+  on the clause's left-hand side — `f {e = e} … = all (λ v → P {e = e} v) vs` — so the
+  lambda closes over a variable instead of asking for one; the same repair as the
+  eta-expansion rule for passing lemmas into an assembly, arriving inside a body.

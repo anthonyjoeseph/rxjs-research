@@ -492,14 +492,15 @@ postulate
   -- denomination tried -- size, level, count as parameter, the story
   -- above -- which is the convergence test's own stop condition, and it
   -- names the mechanism: a depth parameter chosen BEFORE the count it
-  -- must dominate.  The fuel is not shaped that way -- it is a TOWER
-  -- whose HEIGHT is the height ledger `blowH` keeps, one story per hop --
-  -- so a depth ledger that fits it counts STORIES rather than depth, and
-  -- a fold costs one story per scan hop, not a power in its width.  That
-  -- restates the potential's currency, not this arm; and it needs the
-  -- nesting measure to be linear in a fold, which is the `caseᵗ` clause
-  -- of `nestDᵗ` taking a join rather than a sum, since one branch runs.
-  -- Both are design decisions above this face and neither is taken here.
+  -- must dominate.  Two repairs suggest themselves and neither is one.
+  -- Counting STORIES instead of depth -- one per scan hop, since the
+  -- fuel is a tower whose height `blowH` keeps -- is the caps face's
+  -- own currency already, affordable there because it is read at the
+  -- EXIT index; what this face owes is the story-index NUMBER at the
+  -- ENTRY index, since the count axis instantiates its level function
+  -- at that nesting depth and every frame of the instant must nest
+  -- under it.  And a join rather than a sum in the `caseᵗ` clause of
+  -- `nestDᵗ` is what that clause already takes.
 
   -- SO THE ARM IS NOT MIS-SHAPED, IT IS UNAFFORDABLE, and that is a
   -- class and not a repair.  The count is under the exit cap's width and
@@ -507,14 +508,28 @@ postulate
   -- the fuel this instant runs at affords an exponent of two to its own
   -- size.  A count at least the size is all that is known, and that
   -- already leaves the room.  No ledger, no field and no recurrence
-  -- changes the two numbers being compared, so what has to move is the
-  -- depth face's decision to price a fold inside the instant that
-  -- performs it.
+  -- changes the two numbers being compared.  What is not yet known is
+  -- whether the second number is REAL: the count is what the recurrence
+  -- ADMITS at a level, and a canonical program's fan-out per hop is
+  -- under its size, so the widths admitted deep in an instant may be
+  -- reachable by no run at all.  That is the binary this arm waits on.
+  -- Unreachable, and a tighter width invariant carried as a FIELD of
+  -- the invariant record fits the entry read at every real level;
+  -- reachable, and a fold with a nesting-incrementing step over such a
+  -- burst nests past the story index, which is a FALSITY on the count
+  -- axis and on the budget at this recurrence, not on this arm.
   -- REFUTED: `Refuted.Walk-Phi-Room`, whose `walk-fold-room-absurd`
   --   states the affordability as the product it is and kills it at the
   --   floor of twenty-one, with `size₄` pinning that four folds already
   --   carry the next cap past two to that floor -- so the count it
   --   spends is one the recurrence admits rather than one invented.
+  -- DEAD ROUTE: re-reading the ceiling with the ENTRY width in the
+  --   exponent -- two to two to the entry size times the entry width is
+  --   under the story index at the same instant, by the pooled walk's
+  --   last-position slack -- affords only the levels whose width is
+  --   under that ceiling, about two to the previous instant's size
+  --   count of them, while the instant runs a level count that towers
+  --   in the story index.  Provable, and it buys a prefix.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

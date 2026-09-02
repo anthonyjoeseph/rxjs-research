@@ -227,6 +227,18 @@ does not fit is a finding about the shared statement, not about the head.
   at full strength, and discharges the registry's depth row from the
   receipt's own conjunct, expiring its probe.
 
+- **THEN DECIDE WHETHER THE FOLD'S COUNT IS REAL.** The fold arm is
+  at the spiral stop: a depth fixed before an instant runs, against a
+  count that towers in it, and no denomination moves the two numbers
+  -- stories are the caps face's currency at the exit index, the
+  branch join is already taken, and the entry width in the exponent
+  buys a prefix of the levels. What no refutation has asked is
+  whether the count is REACHABLE: it is what the recurrence admits
+  at a level, and a program fans out per hop by at most its size. So
+  the commit builds the widest burst a fixed-size program produces at
+  a hop, against `widAt`, and either threads a width field on the
+  invariant record or reports a FALSITY on the count axis.
+
 - **THEN CARRY THE CAPS RECEIPT DOWN THE POTENTIAL WALK.** The fork
   the drain faces posed was false, and `innerΦ-drain-caps`'s header
   says why: neither a restatement at these premises nor the walk's
@@ -235,17 +247,6 @@ does not fit is a finding about the shared statement, not about the head.
   that receipt from there through the potential walk to the arm that
   reads a queue, and either closes the arm's caps leaf with it or
   names the clause where the walk cannot preserve it.
-
-- **THEN SPLIT THE SUBSCRIBE AT ITS OWN HEADS.** The drain's recursion
-  is a real body now, stated over an abstract slot telescope so no
-  preservation fact is owed, and what it spends is one subscribe. That
-  leaf is still a monolith over the whole descent, and the nodes face
-  already shows the shape it wants: gas first, then one arm per source
-  head, with the three that cost nothing — an empty source, a dry
-  unfold, a gate whose node is an empty queue — proven rather than
-  assumed. So the commit splits it that way, and either closes the
-  gated head against the park receipt the entry carries or names the
-  head where the size cap cannot reach the depth.
 
 ### The ledger
 
@@ -289,10 +290,11 @@ does not fit is a finding about the shared statement, not about the head.
   registry's own depth against the syntactic unit. Refuted over an arbitrary
   state at a chain minted from syntax the program lacks — but it holds at every
   reachable registry swept, with a margin that does not close.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
-  the fold's new grant. AT THE SPIRAL STOP: four denominations refuted in one
-  region, since a depth fixed before the count must dominate a count towering
-  in it. Owed a ruling — count stories, fold linearly — not a fifth currency.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+  producing side of the fold's new grant. AT THE SPIRAL STOP: four
+  denominations refuted in one region, since a depth fixed before the count
+  must dominate a count towering in it. Owed a binary, not a currency: is
+  the admitted count reachable.
 - **`innerΦ-drain-caps`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
   queue's caps receipt, now at the face and count the arm REPORTS rather than
   at ones it chooses. Its own definition names the state's caps receipt in

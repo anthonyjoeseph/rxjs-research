@@ -406,6 +406,11 @@ first heavy gate has since made coherent.
 - **`setsid` and `timeout` DO NOT EXIST ON macOS.** Detach with the Bash tool's
   `run_in_background`. Pin the working directory in every build command and guard with
   `ls Makefile &&`; never pipe agda through `head`, which hides OOM kills.
+- **THE BASH TOOL'S WORKING DIRECTORY PERSISTS BETWEEN CALLS, SO PIN IT.** A `cd` in one
+  call is where the next call starts, and a `make` typed from the wrong directory finds
+  no Makefile or the wrong one; the harness resets the directory only at a turn boundary,
+  which is exactly when nobody is looking. Use absolute paths, and never rely on a
+  previous call's `cd`.
 - **`touch` does NOT dirty a module — invalidation is by CONTENT.** You cannot force a
   remeasurement without a real edit.
 - **A PROOF BODY ON THE `budget-sufficient` SPINE MUST BE SEALED (`abstract`), OR VWF
@@ -495,6 +500,11 @@ make agda-dev ARGS='<file>'            one module, every member
 make agda-dev ARGS='--list <file>'     free: which members are in which block
 ```
 
+**`ARGS=` TAKES AT MOST ONE FILE PLUS ONE FOCUS MEMBER.** Two files, or a file and a
+list of members, is not a batch — the loop reads the extra word as the focus member and
+reports that member absent, which reads as a proof failure. One module per call; a sweep
+over several is several calls.
+
 **Use it throughout development and `make gate` once at the end.** Three rules you must
 carry before opening the doc:
 
@@ -573,7 +583,10 @@ share a shape worth naming: **Agda reports these against the WRONG thing**, so t
 message actively misdirects. **Before reasoning from an Agda error, check whether it is
 one of them** — [docs/agda-traps.md](docs/agda-traps.md). The one that generalises
 furthest: when an error says "X is not a constructor of T" for something you meant as a
-variable, grep for `X :` before touching the proof.
+variable, grep for `X :` before touching the proof. The one that hides longest: an
+implicit used inside an `all`-predicate lambda is a fresh unsolved meta per element, so
+bind it on the clause's left-hand side (`{e = e}`) rather than expecting the lambda to
+see it — the shape and the error it produces are in the doc.
 
 ## Agda: work from the outside in
 
