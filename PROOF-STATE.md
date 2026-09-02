@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE REGISTRY'S LENGTH LEDGER OFF ITS SIZE LEDGER.** The level
-  ceiling is not choosable at any caller: the affordable range is a cap
-  squared plus a cap, and one fan-out consumes levels bounded only by
-  the size reading, an exponential of the level. `pathSz?` is what ties
-  them — it charges a chain's LENGTH against the same number it charges
-  the frames' syntax against — so the fan-out inherits the size ledger's
-  growth. The registry sweeps measure registered length flat across a
-  step while size grows, so the readings are separable; what a split
-  must survive is a subscribing frame turning an inner's syntax into a
-  chain's length. Restate the predicate at Part1 before consumers move.
+- **LIFT THE WALKED CEILING ONTO THE CAPS FACE'S LEVEL LEDGER.** The
+  split framing is discarded: a flat ceiling fails on its own reading,
+  the hop asking for the entry level plus the size reading there. What
+  absorbs an exponential climb is a ledger indexed by remaining nesting
+  depth, and the caps face carries one already — `chainStep-caps` proves
+  its climb survives a fan-out, and it is paid out of the instant's fuel
+  rather than out of the cap. Affordability is now ONE inequality and
+  not a family over a range, so what remains is nameable: whether the
+  walked ceiling dominates that top level. It is owed where the ceiling
+  is defined, so the nest face's constant is what has to move.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an

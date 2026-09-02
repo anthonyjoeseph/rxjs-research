@@ -398,9 +398,8 @@ chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (gas : ℕ) (Lv j : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  (∀ k → k ≤ Lv →
-     iterSize (Caps.cSize (capsAt e sl id)) k (Caps.cSize (capsAt e sl id))
-       ≤ nestWalkAt e sl id) →
+  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+    ≤ nestWalkAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
@@ -430,9 +429,8 @@ chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (Lv j : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  (∀ k → k ≤ Lv →
-     iterSize (Caps.cSize (capsAt e sl id)) k (Caps.cSize (capsAt e sl id))
-       ≤ nestWalkAt e sl id) →
+  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+    ≤ nestWalkAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
@@ -485,9 +483,8 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ) (Lv j : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  (∀ k → k ≤ Lv →
-     iterSize (Caps.cSize (capsAt e sl id)) k (Caps.cSize (capsAt e sl id))
-       ≤ nestWalkAt e sl id) →
+  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+    ≤ nestWalkAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
@@ -672,9 +669,8 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (chains : List (RegId × Path Γ (arrTy a) t))
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  (∀ k → k ≤ Lv →
-     iterSize (Caps.cSize (capsAt e sl id)) k (Caps.cSize (capsAt e sl id))
-       ≤ nestWalkAt e sl id) →
+  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+    ≤ nestWalkAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   all (λ rc → nestDᵛ (arrTy a) (arrVal a) + pathNestD (proj₂ rc)
@@ -772,13 +768,12 @@ latch-regsSz B a st h with Arrival.isLast a
 cascade-afford : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (capsAt e sl id) sched st ≡ true →
-  (k : ℕ) →
-  k ≤ chainsLenSum (chainsOf a st) + length (chainsOf a st) →
-  iterSize (Caps.cSize (capsAt e sl id)) k (Caps.cSize (capsAt e sl id))
+  iterSize (Caps.cSize (capsAt e sl id))
+    (chainsLenSum (chainsOf a st) + length (chainsOf a st))
+    (Caps.cSize (capsAt e sl id))
     ≤ nestWalkAt e sl id
-cascade-afford {e = e} sl id a sched st hok k hk =
-  ≤-trans (iterSize≤walkFac S k S (8≤capsAt-size e sl id)
-             (≤-trans hk ledger) ≤-refl)
+cascade-afford {e = e} sl id a sched st hok =
+  ≤-trans (iterSize≤walkFac S _ S (8≤capsAt-size e sl id) ledger ≤-refl)
           (walkFac≤nestWalkAt e sl id)
   where
   S = Caps.cSize (capsAt e sl id)
