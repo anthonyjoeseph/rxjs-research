@@ -626,6 +626,21 @@ chainsNest-all D U (c ∷ cs) h =
 --   SHRINKS the registry, which satisfies a growth bound whatever the
 --   frames did -- those rows are evidence about the length conjunct
 --   alone, which is the only unbounded one but not the only one.
+-- PROBED: `Probed.Chain-Step-Regs-Second` -- the SECOND arrival, which
+--   closes both gaps the cutting sweep named.  The inner is a scripted
+--   slot timed past the outer, so it is still live when the second
+--   arrival lands and the first arrival's full `cascade` supplies the
+--   state; then `switchAllᵉ` really abandons and `exhaustAllᵉ` really
+--   refuses.  Both now read STRICTLY BELOW the flatten control's
+--   registry rather than identical to it, which is what says the
+--   cutting arm was taken; and no row shrinks -- the control grows by
+--   the inner it registers, both cutting arms hold level -- so the SIZE
+--   conjunct is under test here for the first time, not merely the
+--   length one.  Registered length is flat at the control's on every
+--   row, the share-def cut included.  NOT COVERED: the inner never
+--   fires, so no arrival ever comes FROM one and what an abandoned
+--   inner's own delivery would do after its registration is dropped is
+--   unmeasured.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)
