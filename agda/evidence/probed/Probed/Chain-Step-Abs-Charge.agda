@@ -2,7 +2,7 @@
 -- WHAT ONE CHAIN ADDS, CHARGED TO THE PROGRAM AND NOT TO THE STORE IT
 -- STARTED FROM.
 --
--- TARGET: stepFrame-nest-nodes @367a68
+-- TARGET: stepFrame-nest-nodes @849fed
 --
 -- WHAT THE ROWS REACH, now that the whole-chain arm is a definition
 -- over a per-frame leaf.  A `chainStep` IS the fold of that leaf down
@@ -10,9 +10,13 @@
 -- `chainStep` bounds the leaf COMPOSED across every frame the chain
 -- has -- indirect coverage, and weaker than instantiating one frame,
 -- but coverage of the composite the walk actually spends.  What the
--- rows do NOT do is discharge the leaf's potential premise: they read
--- the inequality with that premise unasked, which makes each row a
--- stronger claim than the leaf instance rather than a weaker one.
+-- rows do NOT do is discharge either of the leaf's premises -- the
+-- potential, or the frame grant the scan arm's crossing put there.
+-- They read the inequality with both unasked, which makes each row a
+-- stronger claim than the leaf instance rather than a weaker one, and
+-- means the grant does no work anywhere in this corpus: whatever these
+-- rows say about the statement, they say about the version without
+-- it.
 --
 -- WHY A SURROGATE AND NOT THE STATEMENT.  The three arms charge the
 -- growth to `nestUnit` plus the instant's SIZE CAP, and a cap does not
@@ -32,7 +36,10 @@
 -- WHAT IS LOAD-BEARING, AND WHAT IS NOT.  The node rows can fail: the
 -- table moves under a real `chainStep` at one family or the other, and
 -- the charge names the program and the slot vocabulary alone -- no term
--- of it reads the state the chain produced.  The LIVE rows are
+-- of it reads the state the chain produced.  What is NOT reached is
+-- the arm the grant was added for: a fold deepening its own
+-- accumulator across a burst, where the crossing is linear in a length
+-- the charge cannot see.  The LIVE rows are
 -- DEGENERATE and are pinned as such: the fold reads zero before and
 -- after at both families, so no charge could have lost there and the
 -- live arm is UNREACHED by this corpus.  The REGISTRY rows are pins

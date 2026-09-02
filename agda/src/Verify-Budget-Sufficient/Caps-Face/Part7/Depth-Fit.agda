@@ -215,6 +215,52 @@ postulate
   -- is left where a reader will meet it.  The width half is not part
   -- of the gap: `length vals` is a parameter, and the factors are the
   -- ones the iteration face is already proven at.
+
+  -- AND THE FIELD IS NOT MERELY UN-THREADED -- THE CEILING THAT DOES
+  -- EXIST IS AT THE WRONG DENOMINATION, which is worth knowing before
+  -- a leg is spent relocating it.  The round above genuinely holds
+  -- the node table under a ceiling: `chainStep-store≤` takes
+  -- `storeNestMax sched st ≤ S` as a premise and `storeNest-nodes≤`
+  -- reads the fold straight out of it, so the instinct that the fact
+  -- is present and simply undelivered is half right.  But the ceiling
+  -- is `S`, and that same caller carries `nestWalkAt e sl id ≤ S`, so
+  -- the two run the wrong way past each other.  This arm has to fit
+  -- an EXPONENTIAL in `nodesMax st` under `nestWalkAt` itself: the
+  -- witness is pinned above the fold and then raised to the burst's
+  -- length, so a bound sitting ABOVE `nestWalkAt` is not a weak bound
+  -- here, it is no bound at all.
+
+  -- BUT THE CEILING AT THE RIGHT DENOMINATION DOES EXIST, AND IT IS
+  -- NOT NEW: `nestOK?` is `storeNestMax` under `nestCapAt`, and
+  -- `cascadeGo-nest-nodes` -- a sibling on this same face -- already
+  -- takes it as a premise, so no producer owes anything that is not
+  -- already owed.  What that changes is the shape of the work: this
+  -- is a routing job plus ONE arithmetic fit, not an invariant to
+  -- install and cascade.  And the fit is the whole residue, because
+  -- the two sides are separate recurrences in the instant index.
+  -- `nestCapAt` starts at `nestUnit e sl` and climbs by `nestFacAt`
+  -- per instant; `nestWalkAt` is a fixed exponential in the SIZE cap
+  -- times that same unit, and does not carry the nest tower at all.
+  -- Both grow with the index, since the size cap does too, and which
+  -- one outruns the other is not readable off either definition.
+  -- That comparison is what to settle before any clause is typed --
+  -- and it decides the arm, since the burst's own exponent still has
+  -- to fit inside whatever margin it leaves.
+
+  -- AND THE STORE SUMMAND IS THE WHOLE SEPARATION FROM A PROVEN ARM,
+  -- which is what makes the residue small rather than structural.
+  -- The fourth arm closes from these very four premises --
+  -- `walk-thru-fit` builds its grant out of the path's depth, the
+  -- depth in flight and the context's wrap, and reads the store
+  -- nowhere at all -- so what stands between this arm and that one is
+  -- one term and not a shape.  That term is read at the entry the
+  -- step names: the scan clause does a single lookup and a single
+  -- write at its own `nid` and never consults another, and
+  -- `stepFrame-emit-scan` bounds what LEAVES the frame from that
+  -- accumulator alone.  The table's own max is the honest reading for
+  -- the table the step RETURNS and for nothing else.  So the ceiling
+  -- owed here is one accumulator's depth, and it is the values folded
+  -- into it that should pay for it.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -228,14 +274,16 @@ postulate
     FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestWalkAt e sl id)
               (scan-f fn nid) p vals fin sched st
 
-  -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, ONLY ONE OF WHICH IS
-  -- THE SAME GAP.  A `from-inner` hands on what the inner run
+  -- AND THE DRAIN'S GRANT IS OWED THREE THINGS, AND THE STORE HALF OF
+  -- IT IS THE FOLD'S.  A `from-inner` hands on what the inner run
   -- produced, so like the fold it reaches past its own values -- but
   -- the payload it reaches is the merge node's QUEUE, and what a
   -- subscription does to a queued term is substitute into it.  So the
-  -- grant carries the iteration face's factors rather than a summand,
-  -- and the store ceiling it also needs is the same one the fold
-  -- asks for, at the same record with the same field missing.
+  -- grant carries the iteration face's factors rather than a summand.
+  -- Its store ceiling is read at the ONE entry `innerFinish` looks up:
+  -- the drain consumes that node's queue and reaches no other cell, so
+  -- a ⊔ over the table is a widening of this reading rather than a
+  -- second source, and the residue is the queued terms' own depth.
   --
   -- THE TWO THAT ARE NOT THE FOLD'S ARE DRAIN LEDGERS, and they are
   -- available on this face rather than absent from it: the queue's
@@ -243,9 +291,24 @@ postulate
   -- when it admits the entries, so the residue here is a routing
   -- question -- which statement hands them over -- and not a fact
   -- nothing in the development has.  What makes it a residue today is
-  -- that the entries are read out of the table by a lookup this
-  -- statement's premises do not constrain, which is the store gap
-  -- again in its second guise.
+  -- that both are quantified over whatever queue the lookup returns,
+  -- and no premise here constrains the table it is read from.
+  --
+  -- AND THE OBVIOUS ROUTE FOR THEM DOES NOT PAY, which is worth
+  -- knowing before a leg is spent on it.  The walk face carries a
+  -- caps receipt over the very table this statement cannot see, so it
+  -- reads as the thing to thread down -- but it does not say either
+  -- of the two things wanted.  `capsOK?⇒nest` takes it to an `all` of
+  -- `nodeWidᴺ?` over the entries, and that predicate is trivially
+  -- true on four of the five node kinds and on the fifth reads the
+  -- queue's WIDTH.  The ceiling asked for here is `nodeNest` at one
+  -- entry, whose merge arm folds the queued terms' own DEPTHS, and a
+  -- bound on how many are queued gives no bound on what each
+  -- carries.  `drainW` is no better placed: it folds `innerW` while
+  -- threading the state through each subscribe, so it prices what a
+  -- queued term COSTS to subscribe rather than how many there are.
+  -- Neither ledger follows from the receipt, so the routing question
+  -- is not answered by the fact already in hand.
   innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)

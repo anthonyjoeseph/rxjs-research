@@ -35,22 +35,57 @@ open import Relation.Binary.PropositionalEquality using (_≡_)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Rx.Exp using (Ctx; Closed; Val)
 open import Rx.Evaluator
-  using (Sched; EvalSt; Path; root; share-sink; _↠_; RegId;
+  using (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; RegId;
          foldPath; stepFrame; dispatchShare;
          shareGo; shareAdmit; shareLatch)
 open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; regsNestMax)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsΦ?; PathΦHyp; DispatchΦHyp; ShareGoΦHyp;
+  using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp;
          stepFrame-nest-Φ; stepFrame-nest-regs; foldPath-nest-regs)
 
 postulate
   -- ONE FRAME'S NODE STORES, under the potential it was handed.  Only
   -- three of the five kinds store at all -- a scan writes its
   -- accumulator, an inner frame writes its parent *All's queue, and an
-  -- outer frame mints the *All node the subscription hangs from -- and
-  -- what each writes is a value the potential already covers, since
-  -- the factor the frame surrenders is exactly the substitution it
-  -- performs.
+  -- outer frame mints the *All node the subscription hangs from.  At
+  -- two of the three the write is a value the potential already
+  -- covers, since the factor the frame surrenders is exactly the
+  -- substitution it performs.  THE SCAN IS THE ONE THAT IS NOT: the
+  -- cell holds the accumulator, and the accumulator is a thing the
+  -- fold has been building rather than a thing the walk handed over.
+
+  -- AND THE REGISTRY ARM'S COUNTEREXAMPLE DOES NOT TRANSFER BY
+  -- READING, which is worth saying because the two arms are otherwise
+  -- taken as one.  `Refuted.Drain-Regs-Nest` runs a completion walk --
+  -- `valsΦ?` is `all` over the burst, so an empty one clears the
+  -- premise at every budget -- and the drain then subscribes a queued term,
+  -- appending a registration whose PATH carries a fresh outer frame.
+  -- This fold reads NODE STATES instead, and the two writes the same
+  -- step makes both go the wrong way for a crossing: `allFresh-nest`
+  -- prices a head's own install at zero, and the drain takes the term
+  -- OUT of the parent's queue.  So the drain arm is not where this one
+  -- fails, and its repair -- a grant over what the completion may
+  -- subscribe -- does not reach the arm that does.
+
+  -- SO THE FRAME GRANT IS CARRIED, AND IT IS THE ONE THE REGISTRY ARM
+  -- ALREADY TAKES.  Its scan arm states the iteration face's own
+  -- reading -- a power in the burst WIDTH over a ceiling on the entry
+  -- the step names -- which is exactly the currency the potential is
+  -- missing, and `stepFrame-nodes-scan` is proven in it.  Taking the
+  -- same grant is what keeps the two faces discharged from a single
+  -- fit: the walk's frame clause already destructures it to feed the
+  -- registry leaf, so this leaf costs its caller nothing.
+  --
+  -- REFUTED: `Refuted.Scan-Nodes-Burst` -- a step function that
+  --   deepens its own accumulator, folded over a burst of naturals.
+  --   `valsΦ?` charges `2 ^ sizeᵗ fn` times the step's own nesting
+  --   once per value and takes the maximum, so the budget is a
+  --   CONSTANT in the burst length; the fold threads, so the stored
+  --   depth is linear in it.  Sixty-five values leave the cell at
+  --   sixty-five against a budget of sixty-four, from a table reading
+  --   zero, and every further value widens the gap -- so no larger `U`
+  --   repairs it.  The currency the iteration face already pays in is
+  --   a power in the burst WIDTH, which is what this leaf is missing.
   --
   -- PROBED: `Probed.Chain-Step-Abs-Charge` reaches this leaf by RUNNING
   --   a whole chain over it, at the second cascade of two reachable
@@ -64,10 +99,11 @@ postulate
   --   composite; and any family whose chain deepens the node table by
   --   more than one step.
   stepFrame-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : _) (path : Path Γ u t)
+    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (B U : ℕ) →
     valsΦ? B U (f ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U f path vals fin sched st →
     foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
       (EvalSt.nodes
         (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
@@ -106,7 +142,7 @@ mutual
                (proj₁ (proj₂ (proj₂ (proj₂ step))))
                (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
                (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
-            (⊔-lub (⊔-lub (≤-trans (stepFrame-nest-nodes sf id now f p vals fin sched st B U hΦ)
+            (⊔-lub (⊔-lub (≤-trans (stepFrame-nest-nodes sf id now f p vals fin sched st B U hΦ hF)
                                    (⊔-lub (≤-trans (m≤m⊔n N R) (m≤m⊔n _ U))
                                           (m≤n⊔m (N ⊔ R) U)))
                           (≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ hF)
