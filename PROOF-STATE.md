@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NOW PUT THE REGISTRATION'S DEPTH ON THE INVARIANT RECORD.** Running
-  the two registry residues rather than quantifying over states split
-  them apart. The depth one holds at every registry a run produced, on
-  both axes it has, with the chain climbing one per layer against a
-  unit climbing one alongside it -- a margin that never closes, so it
-  is a true statement missing an invariant and not a false one. The
-  size one cannot be stated at a numeral at all: the registered length
-  grows with the program's own syntax. So the commit adds the depth
-  fact as a field every producer owes and every consumer re-establishes,
-  and either discharges the row from it or names the mint that cannot.
+- **NOW SUPPLY THE REGISTRATION'S DEPTH AT EVERY MINT.** The depth
+  fact is a conjunct of the caps receipt now, and `register-caps` asks
+  each mint for the chain's own nesting under the unit -- an ask that
+  is refuted unconditionally, so it is the true statement. What is left
+  is the ask's supply: the seven mints do not carry it yet, and the
+  subscribe face is red there. So the commit threads one coupled
+  premise, the caller's nesting plus the chain's under the unit, down
+  the `-caps` signatures to those mints, states the one leaf the
+  flatten arm owes -- an emitted inner's nesting under its emitter's --
+  at full strength, and discharges the registry's depth row from the
+  receipt's own conjunct, expiring its probe.
 
 - **THEN CARRY THE CAPS RECEIPT DOWN THE POTENTIAL WALK.** The fork
   the drain faces posed was false, and `innerΦ-drain-caps`'s header

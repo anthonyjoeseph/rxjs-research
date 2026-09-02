@@ -160,6 +160,7 @@ open import Verify-Budget-Sufficient.Measures using
                                                       syncSize≤sizeᵉ;
                                                       parkRoom; parkRoom-widen;
                                                       stBounded-widen; stBounded?; ∧-true)
+open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; nestUnit)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
@@ -420,6 +421,34 @@ closSt? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
 closSt? c sched st = all (closLive c (Sched.slots sched)) (Sched.live sched)
 
+-- THE REGISTERED CHAINS' DEPTH, AGAINST THE PROGRAM'S OWN SYNTACTIC
+-- UNIT, and it is the one conjunct here that never reads the caps.
+-- That is not an oversight but the content: a registered chain's
+-- frames are the program's own, so what bounds their nesting is the
+-- syntax the program and its shared defs contain and nothing a cap
+-- could be chosen large enough to cover.  Stated over an arbitrary
+-- state it is FALSE -- a chain can be built carrying syntax the
+-- program does not -- so it is a fact about the states a run REACHES,
+-- which is what an invariant record is for and why it is a field here
+-- rather than a premise at whichever call happens to need it.
+--
+-- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
+--   against a unit of one, minted by a map whose function carries
+--   syntax the program does not.
+-- PROBED: `Probed.Fan-Regs-Registry` reaches the registry by RUNNING
+--   rather than by constructing one, on both axes the reading has.
+--   Covered: a share telescope one to five crossings deep, whose
+--   largest reachable registry holds five chains; and a ladder of `k`
+--   flatten layers standing above a share, `k ≤ 4`, where the chain's
+--   depth and the unit climb together at `k+1` against `k+3` -- a
+--   margin of two that neither closes nor opens across the sweep.
+regsNest? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+          → Sched Γ → EvalSt e → Bool
+regsNest? {e = e} sched st =
+  all (λ en → pathNestD (proj₂ (proj₂ (proj₂ en)))
+                ≤ᵇ nestUnit e (Sched.slots sched))
+      (EvalSt.registry st)
+
 capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
 capsOK? c sched st =
@@ -433,6 +462,7 @@ capsOK? c sched st =
                          (proj₂ kv))
         (EvalSt.nodes st)
   ∧ closSt? c sched st
+  ∧ regsNest? sched st
 
 ------------------------------------------------------------------
 -- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
@@ -626,7 +656,8 @@ capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
 ... | hWL , hRest3 with ∧-true _ _ hRest3
 ... | hWN , hRest4 with ∧-true _ _ hRest4
 ... | hLen , hRest5 with ∧-true _ _ hRest5
-... | hPk , hCL =
+... | hPk , hRest6 with ∧-true _ _ hRest6
+... | hCL , hRN =
   ∧-intro (stBounded-widen sz≤ sched st hSt)
   (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
   (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
@@ -636,8 +667,9 @@ capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
   (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen)
   (∧-intro (all-impl _ _ (λ kv → parkRoom-widen sz≤ (proj₂ kv))
                      (EvalSt.nodes st) hPk)
-           (all-impl _ _ (λ l → closLive-widen (Sched.slots sched) l le)
-                     (Sched.live sched) hCL))))))
+  (∧-intro (all-impl _ _ (λ l → closLive-widen (Sched.slots sched) l le)
+                     (Sched.live sched) hCL)
+           hRN))))))
 
 ------------------------------------------------------------------
 -- THE SYNTAX-LINEAR EVAL RECEIPT — ONE iterSize FOLD PER SYNTAX NODE.
