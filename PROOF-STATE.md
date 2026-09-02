@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN READ THE REGISTRY'S OWN PATHS, WHICH THE FAN-OUT BODY TURNED
-  UP.** Splitting the terminal closed the potential and exposed two
-  facts nothing carries: a re-entered chain is walked FROM THE TOP, so
-  it needs its size receipt at the program's cap while the walk holds
-  the registry at a level that only grows; and its depth is owed
-  against the syntactic unit while the store's ledger bounds the
-  registry by a runtime maximum. Both are properties of what a
-  registration MAY be rather than of the walk, so the commit is to find
-  where one is minted and either wire an invariant that already says
-  it or refute the pair at a program that registers past the cap.
-
 - **THEN JOIN THE TWO DRAIN FACES, WHICH THE TABLE READ MADE
   POSSIBLE.** Naming the queue left `innerΦ-fit-drain` owing ONE
   ledger, and it is now the caps face's own drain law verbatim — same
@@ -249,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   ledgers that need it or refute it at a program whose gated body
   outruns the size its caps are built from.
 
+- **THEN FOLLOW THE REGISTRY RECEIPT BACK TO THE MINT.** The fan-out
+  pair turned out not to be the fan-out's at all: the admission filter
+  never reads a path, both liftings across it are already proven, and
+  what was left refutes at one `register` onto the initial state.
+  Both residues now sit at the registry, and both are still stated
+  over an ARBITRARY state, which is the same defect one level down.
+  `register` is the only door into that list, so the commit is to
+  state what a registration carries -- its length at the program's cap
+  and its depth at the syntactic unit -- where it is minted, and
+  either walk it forward to the fan-out or refute it at whatever
+  registers a chain the program's own syntax does not bound.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
@@ -256,11 +257,11 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED×2`: what one frame mints on the live list. The completion
-  arm carries the registry face's drain fit, since a queued gate mints past
-  every depth the walk holds. Reached at an installed queue: only the cap
-  size pays, and the fit's state reading is blind.
+- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED×2`:
+  what one frame mints on the live list. The completion arm carries the
+  registry face's drain fit, since a queued gate mints past every depth the
+  walk holds. Reached at an installed queue: only the cap size pays, and the
+  fit's state reading is blind.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -281,14 +282,14 @@ does not fit is a finding about the shared statement, not about the head.
   an admitted chain that ends at a SECOND hand-over. The residue of the
   terminal split: its factor is the sink's own times its frames', and the hop
   count is bounded by nothing but the dispatch gas.
-- **`fan-chain-sz`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: an admitted
-  chain's size receipt at the PROGRAM's cap and not at the level. The walk
-  holds the registry at an `iterSize` that only grows, so the reading it
-  carries is the weaker one and cannot be narrowed back down.
-- **`fan-chain-nestD`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: an admitted
-  chain's depth against the syntactic unit. The walk's registry premise is a
-  size receipt carrying no depth at all, and the store's ledger bounds the
-  registry by a runtime maximum instead.
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the
+  registry's own size receipt at the PROGRAM's cap. The fan-out never needed it
+  — the filter's lift is proven — and stated over an arbitrary state it fails
+  at one registration longer than the cap, whatever the cap is.
+- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the
+  registry's own depth against the syntactic unit. Refuted at a chain three
+  deep against a unit of one, minted by a map whose function carries syntax the
+  program does not.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
   the fold's new grant. Unaffordable, not mis-shaped: the count is under the
   exit width, which outruns two-to-two-to the size at every instant, so no

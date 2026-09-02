@@ -77,7 +77,10 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?; pathSz?-widen; regsSz?;
   slotsCaps?; valCaps?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; foldPath-slots)
+  (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; foldPath-slots;
+   shareAdmit-caps)
+open import Verify-Budget-Sufficient.Delivery-Walk using
+  (regP?; shareAdmit-chP)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -852,11 +855,34 @@ postulate
 -- the reading it carries is the weaker one and cannot be narrowed back
 -- down.  The two are different readings of the same list, and only the
 -- registration side can supply this one.
+
+-- AND NEITHER IS THE ADMISSION FILTER'S TO CARRY, which is what the
+-- pair being stated over the fan-out was hiding.  `shareAdmit`
+-- selects on the source and the element type and never reads a path,
+-- so it can only pass a receipt along, never establish one -- and
+-- both passings are already proven, a size one and a generic one over
+-- an arbitrary path predicate.  So the residue is the REGISTRY read
+-- at the program's own cap, and it is owed at whatever mints a
+-- registration.
+--
+-- REFUTED: `Refuted.Fan-Chain-Registry`, which is what licenses the
+--   two premises below being premises rather than facts.  Stated over
+--   an arbitrary state each fails at a single `register` onto the
+--   initial one: a `take` chain one longer than the bound, at EVERY
+--   bound rather than at a chosen one, and a mapped ladder of `*All`
+--   layers against a unit of one.
 postulate
-  fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
-    all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp))
-        (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+  fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (st : EvalSt e) →
+    regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true
+
+fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
+  regsSz? (Caps.cSize (capsAt e sl id)) (EvalSt.registry st) ≡ true →
+  all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp))
+      (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+fan-chain-sz {e = e} sl id i st h =
+  shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
 
 -- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.  A
 -- registered chain's frames are the program's own, so its nesting is
@@ -865,11 +891,25 @@ postulate
 -- store's depth ledger bounds the registry by a RUNTIME maximum rather
 -- than by the unit, which is the wrong currency and the wrong
 -- direction.  So this too is owed by whatever mints a registration.
+--
+-- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
+--   against a unit of one, minted by a map whose function carries
+--   syntax the program does not.
 postulate
-  fan-chain-nestD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (i : Fin n) (st : EvalSt e) →
-    all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl)
-        (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+  fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (st : EvalSt e) →
+    regP? (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
+          (EvalSt.registry st) ≡ true
+
+fan-chain-nestD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (i : Fin n) (st : EvalSt e) →
+  regP? (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
+        (EvalSt.registry st) ≡ true →
+  all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl)
+      (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+fan-chain-nestD {Γ = Γ} {t = t} {e = e} sl i st h =
+  shareAdmit-chP (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
+                 i (EvalSt.registry st) h
 
 mutual
   walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -935,12 +975,14 @@ mutual
                   hsl hsz hreg hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now j i vals false
       (shareAdmit i (EvalSt.registry st)) sched st
-      hsl (fan-chain-sz sl id i st) (fan-chain-nestD sl id i st) hsz hreg hΦ
+      hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
+          (fan-chain-nestD sl i st (fan-regsNest sl st)) hsz hreg hΦ
   walk-share-ΦHyp sl id sf (suc gas) nid now j i vals true sched st
                   hsl hsz hreg hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now j i vals true
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
-      hsl (fan-chain-sz sl id i st) (fan-chain-nestD sl id i st) hsz hreg hΦ
+      hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
+          (fan-chain-nestD sl i st (fan-regsNest sl st)) hsz hreg hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now j i vals fin [] sched st
                     _ _ _ _ _ _ = tt
