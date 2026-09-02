@@ -107,6 +107,8 @@ open import Refuted.Inner-Drain-Nest
          drainedΦ₃≡120; stepFrame-nest-Φ-inner-trip-absurd;
          drained₃≡120; queued₃≡40; unitCharge≡82;
          stepFrame-nodes-inner-unit-absurd)
+open import Refuted.Drain-Regs-Nest
+  using (before≡0; after≡1; Φ-hyp-drain; stepFrame-nest-regs-drain-absurd)
 open import Refuted.Scan-Acc-Nest
   using (drainedΦˢ≡40; Φ-hyp-scan; stepFrame-nest-Φ-scan-absurd;
          drainedΦˢ≡80; stepFrame-nest-Φ-scan-wide-absurd)

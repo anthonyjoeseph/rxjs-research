@@ -335,7 +335,7 @@ mutual
     regStep : regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ step)))))
                 ≤ L ⊔ S ⊔ R ⊔ U
     regStep =
-      ≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
+      ≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ hF)
               (⊔-lub intoR intoU)
 
   -- THE SINK, and the live list is the one field two of its three arms

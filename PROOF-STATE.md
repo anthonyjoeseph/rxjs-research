@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE ONE ROW WHOSE COVERAGE CLAIM IS NOT IN ITS LEDGER.**
-  `stepFrame-nest-regs` reads as unprobed — the census scored it on
-  `RECOVERY` alone — but its explanation describes readings at two
-  stack depths, so what it lacks is the `PROBED:` section that would
-  make the claim resolve and expire. Convert it, then take the reading
-  those rows never took: they deepen a registration by STACKING
-  frames, and `register` is the sole site that lengthens the registry,
-  appending a path that carries the nesting of the value subscribed.
-  So a stored value `U` never measured reaches this conclusion by the
-  route it reached the two refuted arms, and that is the shape to
-  instantiate.
-
 - **THEN THE SAME DELIVERY ABOVE THE CROSSOVER, WHERE THE CAPS TRACK
   THE SPINE.** The later-arrival rows just taken
   sit below it, where both caps are pinned at the frame's own syntax,
@@ -249,6 +237,17 @@ does not fit is a finding about the shared statement, not about the head.
   writer of a node establishes and every reader spends, which is a
   field on the record, not a hypothesis. Adding it obliges every
   producer, and that cascade is the risk this leg is measuring.
+
+- **THEN THE SAME EMPTY-HANDED WALK, AT THE ARMS THAT HAVE NOT SEEN
+  IT.** The registry arm fell to a completion walk: `valsΦ?` is `all`
+  over the burst, so an empty one clears it at every budget while the
+  drain still subscribes a queued term the walk never held. Three
+  siblings take that same premise at that same frame — the nodes map,
+  the live list and the size step — and the drain installs a node and
+  mints a live entry on the very step that registers, so one witness
+  should cross all three. Instantiate them at it. Each that crosses
+  takes the frame grant the registry arm now carries; each that does
+  not is a coverage boundary, and worth its row.
 
 ### The ledger
 
@@ -274,9 +273,10 @@ does not fit is a finding about the shared statement, not about the head.
   frame stores at the nodes map, under the potential it was handed. Three of
   the five kinds store; the whole-chain surrogate covers the composite at two
   families and discharges none of the premise.
-- **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
-  frame registers, under the potential it was handed. Instantiation at the
-  rootward stack says the tie is exact, so there is no slack to spend.
+- **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
+  what one frame registers, under the potential AND the frame grant it was
+  handed. The premise alone was refuted by an empty burst: the drain reads the
+  queue, so the walk's values cannot reach it.
 - **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential for the chains a sink fans into. A sink is a leaf of the factor
   recursion, so the receipt handed in carries a factor of one against a chain
