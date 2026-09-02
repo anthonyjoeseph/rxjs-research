@@ -575,10 +575,24 @@ chainsNest-all D U (c ∷ cs) h =
 --   The registered length grows by exactly ONE per flatten level while
 --   the inner's own size grows by four, so the descent does not recurse
 --   and the one axis that could refute this form is closed along that
---   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, where
+--   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, which
+--   `Probed.Chain-Step-Regs-Share` takes up.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Share` -- the SIDEWAYS re-entry, where
 --   `foldPath` and `dispatchShare` are mutually recursive and the depth
---   is the share telescope rather than the syntax -- the programs there
---   reach the scripted slot only, so no row says anything about it.
+--   is the share telescope rather than the syntax.  One five-slot
+--   context, a scripted driver at slot zero and four `mergeAllᵉ` shares
+--   above it, rooted at each of the five slots in turn, so one arrival
+--   crosses zero to four share boundaries inside a single `chainStep`.
+--   Every row is pinned to the arm that measures a real step, and the
+--   step's emit count is read alongside the lengths: it is the crossing
+--   count plus one at every depth, so the telescope is entered and not
+--   merely built.  The maximum registered path length is TWO before the
+--   step and two after it at every one of the five depths -- the
+--   sideways route lengthens no registered path at all, while the
+--   registry count tracks the telescope and is unchanged across the
+--   step.  NOT COVERED: a share fanning out to MORE THAN ONE registered
+--   chain, and a telescope deeper than four.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)

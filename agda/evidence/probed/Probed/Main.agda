@@ -88,3 +88,6 @@ open import Probed.Burst-OutW using (readout≡)
 open import Probed.Chain-Step-Regs-Level
   using (reaches; figures₁; figures₂; figures₃; figures₄; figures₆; figures₈;
          one-per-level; under-inner)
+
+open import Probed.Chain-Step-Regs-Share
+  using (reaches; figures₀; figures₁; figures₂; figures₃; figures₄; one-per-hop)

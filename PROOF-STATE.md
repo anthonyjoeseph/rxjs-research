@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN DOOR'S SHARE-SINK RE-ENTRY — THE HALF THE ROOTWARD SWEEP
-  COULD NOT SEE.** `Probed.Chain-Step-Regs-Level` has landed and closes
-  the rootward stack — one frame per flatten level out to depth eight,
-  nothing compounding — so the row's class is now held by the other
-  route alone. `foldPath` re-enters SIDEWAYS at a `share-sink`, mutually
-  with `dispatchShare`, at a depth measured by the share telescope
-  rather than by the syntax, which is why it is the likelier of the two
-  to compound; and every program in hand reaches the scripted slot only.
-  So this leg is a second family putting a share-sink on a WALKED path,
-  swept over the telescope.
+- **THE DIAMOND — THE ONE SHARE SHAPE BOTH SWEEPS LEFT OUT, AND THE
+  ONLY ONE THAT CAN MULTIPLY.** Both re-entry routes are now
+  instantiated and neither compounds: rootward, one frame per flatten
+  level out to depth eight; sideways, four share boundaries crossed
+  inside one step with the maximum registered length flat at two.
+  But every share in both families fans out to exactly ONE registered
+  chain, and the diamond is where one arrival becomes many —
+  `shareGo` folds each registration in turn, each of which may sink
+  again. The width axis has no row at all, so this leg registers two
+  and three chains on one share and sweeps it. Cheap: the telescope
+  stands, only the slots change.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -290,10 +291,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED`: the
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×2`: the
   whole chain's registry price, now stepping the level by one rather than
-  collapsing to the entry cap. The fixed-cap form is refuted and the rootward
-  descent instantiated; the share-sink re-entry is not.
+  collapsing to the entry cap. The fixed-cap form is refuted and both re-entry
+  routes instantiated; a share fanning out to more than one chain is not.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
