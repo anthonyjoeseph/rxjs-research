@@ -238,16 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
 
-- **THEN THE FOLD'S THREE CLAUSES, NOW THAT THE DOOR IS ONE CALL.**
-  The chain door is a body over the fold's leaf, so the level question
-  has moved to where the recursion actually is. The root clause
-  registers nothing and closes outright; the frame clause is a step
-  and a recursion, and it is there that a level per frame would
-  reappear and ask for the range a refutation kills. Write the fold as
-  a real body over a frame arm and a sink arm, and let the typechecker
-  say which of the two the single level has to pay for — the arm that
-  cannot take it is the shape that still escapes, and it gets named
-  rather than suspected.
+- **THEN THE ONE AXIS ALL SEVEN SWEEPS HELD FIXED.** The fold's leaf
+  now prices a registry as a LENGTH — the walked path plus the inner
+  received — and both re-entries are swept flat against it. But every
+  operator in every one of those rows is an identity map, so no value
+  a frame passes on carries syntax of its own; and the size ledger
+  inflates a value a level per frame, while what a subscribe registers
+  is the DERIVED value's operators. So a frame whose function reads
+  its argument's syntax is the shape that would make a registration
+  track the inflation instead of the entry budget, and nothing has
+  instantiated it. Build that program and read the registered length
+  against the doubling.
 
 ### The ledger
 
@@ -295,10 +296,11 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`foldPath-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×7`: one
-  fold's registry price, a single step of the level rather than one per frame.
-  The chain door is a body over it now; the refuting axis is live in a run and
-  the level covers it, but a step registering several entries is unread.
+- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY,
+  `REFUTED, DEAD ROUTE×2, PROBED×7`: one fold's registry price as a LENGTH, the
+  walked path plus the inner it received. The door is a body over it and the
+  doubling is checked against one level's step; both re-entries sweep flat, but
+  every probed operator is an identity map.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

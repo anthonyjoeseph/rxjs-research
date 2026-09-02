@@ -34,7 +34,7 @@
 -- longest entry is the question, and a `w` that lengthens the maximum
 -- registered path is what a refutation looks like.
 
--- TARGET: foldPath-regsSz @1f0f79
+-- TARGET: foldPath-regsLen @68fc23
 module Probed.Chain-Step-Regs-Fan where
 
 open import Data.Bool using (true; _∧_)

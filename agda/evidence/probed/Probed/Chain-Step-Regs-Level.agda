@@ -73,7 +73,7 @@
 -- any of them fails naming a number, and no figure row can refute
 -- anything.
 
--- TARGET: foldPath-regsSz @1f0f79
+-- TARGET: foldPath-regsLen @68fc23
 module Probed.Chain-Step-Regs-Level where
 
 open import Data.Bool using (true; _∧_)

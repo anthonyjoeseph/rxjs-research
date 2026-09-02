@@ -52,7 +52,7 @@
 -- with a survivor: it drops one entry and keeps the other at exactly
 -- the control's length.
 
--- TARGET: foldPath-regsSz @1f0f79
+-- TARGET: foldPath-regsLen @68fc23
 module Probed.Chain-Step-Regs-Cut where
 
 open import Data.Bool using (true; _∧_)

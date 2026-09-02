@@ -37,7 +37,8 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; FrameΦHyp; valsΦ?; valsSz?;
-   stepFrame-nest-Φ; stepFrame-regsSz; stepFrame-sz; foldPath-regsSz; Φ-to-bound)
+   stepFrame-nest-Φ; stepFrame-regsSz; stepFrame-sz; Φ-to-bound)
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsSz)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Live-Nest-Walk using
   (foldPath-nest-live; PathLiveHyp; walk-LiveHyp-go)
