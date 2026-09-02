@@ -64,6 +64,19 @@ dbl≤sizeStep S B 1≤S =
 --   of six.  Both premises hold and the registered chain has length
 --   eight, so what broke was the length ledger rather than any size
 --   reading, and no further hypothesis repairs it.
+-- REFUTED: `Refuted.Fold-Path-Regs-Len` -- the DOUBLING itself, at a
+--   frame whose function NESTS its argument in flatten levels.  `B`
+--   must dominate two independent quantities, the frame's own syntax
+--   and the path's length, so it is their MAXIMUM -- while `k` such
+--   frames of depth `d` compose down ONE spine and register their
+--   PRODUCT.  Ten frames of depth two enter at a cap of thirteen,
+--   walked chain twelve and standing registry twelve, and leave a
+--   chain of thirty-one registered against a doubling that offers
+--   twenty-six.  No constant factor repairs it, and no further
+--   hypothesis: the two parameters move independently, so the repair
+--   is a conclusion stated in the per-FRAME currency the size ledger
+--   already charges in and the proven walk-face siblings already
+--   premise.
 -- DEAD ROUTE: composing a per-FRAME registry statement along the path,
 --   so that the fold needs no statement of its own.  Each frame costs a
 --   level, so a chain costs its own length in levels and a sink
@@ -207,6 +220,21 @@ dbl≤sizeStep S B 1≤S =
 --   reading its argument's syntax is unmeasured; and every row
 --   registers one new entry per step, so a step registering several
 --   is reached only through the held row.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Read` -- a frame that READS its
+--   argument's syntax, which is the axis all seven sweeps above hold
+--   fixed, taken here in its DUPLICATING form: a map function merging
+--   its argument with itself, stacked zero, two, four and six deep.
+--   The duplication is witnessed rather than assumed -- the chains
+--   standing after the step run three, nine, thirty-three, a hundred
+--   and twenty-nine -- and the charge does not see it: entry and exit
+--   budgets are EQUAL at every height, both found by independent
+--   searches so an unsatisfiable premise would show as a wrong figure
+--   rather than as a green.  The copies are SIBLINGS and `regsSz?` is
+--   an `all`, so exponential width costs what one entry costs.  NOT
+--   COVERED: only the additive shape.  A frame that NESTS its
+--   argument composes down one spine instead, and that is where the
+--   doubling dies.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)

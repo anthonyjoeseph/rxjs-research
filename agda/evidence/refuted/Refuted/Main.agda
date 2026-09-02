@@ -199,3 +199,6 @@ open import Refuted.Thru-Park-Free
 open import Refuted.Demand-Programs
   using (progC; sucGC; sucGW)
 open import Refuted.Sight-Fit-Scan using (figs≡; ok₂; scan-fit-absurd)
+open import Refuted.Fold-Path-Regs-Len
+  using (FoldPathRegsLen; reached; entryVals; entryPath; entryRegs;
+         figures; exitRow≡false; fold-path-regs-len-absurd)

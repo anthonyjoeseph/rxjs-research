@@ -215,17 +215,27 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRY THE SINK'S RECEIPT ON THE REGISTRY ENTRY, NOT ON A CAP.** Both
-  repairs `Refuted.Sink-Level-Range` named are now closed — the walk's
-  charge would have to tower where the fuel affords an exponential, and
-  a separate length ledger tracks the size one because a subscribe
-  registers the DERIVED value's operators, not the arrival's. What every
-  bridge shared is a single cap covering both the walked path and paths
-  the walk never sees. So state the receipt where the chain is: each
-  registration records the grant it was admitted under, and a sink reads
-  its chain's own entry instead of a cap dominating all of them. State
-  it and the hop it has to close first; the entry's field and its
-  producers follow.
+- **PRICE THE FOLD'S REGISTRY PER FRAME, BECAUSE THE DOUBLING IS NOW
+  REFUTED.** The axis all seven sweeps held fixed was instantiated in
+  both its forms and they disagree. A DUPLICATING frame cannot break
+  the grant at all — its copies are siblings, and the charge is an
+  `all`, so width is free. A NESTING frame composes down one spine and
+  breaks it outright, and no constant repairs it — the grant is a
+  MAXIMUM of the frame syntax and the path length, the spine is their
+  PRODUCT. So
+  restate the leaf in the per-FRAME currency the size ledger already
+  charges in, and carry the level form above it through the same move.
+
+- **THEN THE ROWS THAT RESTATEMENT DRAGS WITH IT.** A leaf restated in
+  a new currency is the expensive kind of move: the chain door is a
+  body over the level form, and the depth cascade that calls the door
+  reads in the old currency too — so the premise has to be DISCHARGED
+  at the call site, not merely stated. The caller already derives that
+  ledger for a proven walk-face sibling, which is evidence the
+  direction is right and not a licence to assume the indices line up.
+  Walk the door's cone, fix per site whether the frame ledger reaches
+  it, and move the sites that read the old grant in one commit, so
+  none is left premising a currency nothing supplies.
 
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to
@@ -237,18 +247,6 @@ does not fit is a finding about the shared statement, not about the head.
   record per row whether either side reaches a program. A row no
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
-
-- **THEN THE ONE AXIS ALL SEVEN SWEEPS HELD FIXED.** The fold's leaf
-  now prices a registry as a LENGTH — the walked path plus the inner
-  received — and both re-entries are swept flat against it. But every
-  operator in every one of those rows is an identity map, so no value
-  a frame passes on carries syntax of its own; and the size ledger
-  inflates a value a level per frame, while what a subscribe registers
-  is the DERIVED value's operators. So a frame whose function reads
-  its argument's syntax is the shape that would make a registration
-  track the inflation instead of the entry budget, and nothing has
-  instantiated it. Build that program and read the registered length
-  against the doubling.
 
 ### The ledger
 
@@ -297,10 +295,10 @@ does not fit is a finding about the shared statement, not about the head.
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY,
-  `REFUTED, DEAD ROUTE×2, PROBED×7`: one fold's registry price as a LENGTH, the
-  walked path plus the inner it received. The door is a body over it and the
-  doubling is checked against one level's step; both re-entries sweep flat, but
-  every probed operator is an identity map.
+  `REFUTED×2, DEAD ROUTE×2, PROBED×8`: one fold's registry price as a LENGTH,
+  the walked path plus the inner it received. The doubling is REFUTED — the
+  grant is a maximum, a nesting spine registers their product. Restate per
+  FRAME; the door is a body over it, so its cone moves too.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
