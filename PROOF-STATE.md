@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RESTATE THE SINK GRANT WITH THE BUDGET ITS CALLER ALREADY HAS.**
-  `walk-share-LiveHyp` is refuted, so the conditioned form replaces a
-  false statement rather than weakening a true one — which is the one
-  justification a new hypothesis gets. The caller holds the missing
-  relation: every iterate up to the level reached is under the value
-  budget. Threading it is not the whole repair, because a registry
-  chain climbs past that level by its own length, so the budget has to
-  widen to the level a fanned-into chain reaches. Land the restatement
-  and see which of the two the caller can still discharge; `walk-share-ΦHyp`
-  is the same hop and inherits whatever shape this settles.
+- **THE SINK GRANT NOW PRICES CORRECTLY AND MAY STILL BE FALSE AT THE
+  LEVEL.** Threading the caller's affordability closed the constant-map
+  escape, because such a value lands one under the `sizeᵗ` the chain's
+  own legality already pays for. What no evidence reaches is a chain
+  that grows its value once per hop: its length is bounded by the
+  registry reading and not by the affordability's ceiling, so it climbs
+  past the level the premise covers. Instantiate that — an embedding
+  frame repeated — and the answer either refutes the restated form or
+  is the first thing to lower this row's class. `walk-share-ΦHyp` is
+  the same hop and inherits whichever it is.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
@@ -259,9 +259,9 @@ does not fit is a finding about the shared statement, not about the head.
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED`: the size side
-  condition for the registry chains a sink fans into. FALSE as stated: its
-  value budget and its registry price are unrelated arguments, and one `map-f`
-  breaks the first while costing the second nothing.
+  condition for the registry chains a sink fans into. Pricing alone is refuted,
+  so it now carries the caller's affordability; nothing has reached the level a
+  registry chain climbs to, which is where it can still be false.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the

@@ -165,36 +165,41 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- owed at their own paths -- so what has to be supplied is a reading of
 -- the registry, not another reading of this path.
 --
--- AND AS STATED IT IS FALSE, because the two readings it carries are
--- unrelated numbers.  `U` prices the values ENTERING the sink and
--- `iterSize S j S` prices the registry's chains, with `S`, `U` and `j`
--- independent arguments -- while the conclusion demands `U` still bound
--- the values a `thru-outer` sees after those chains' own frames have
--- run.  The gap is one `map-f` wide: a nat is one unit however large,
--- an observable is its whole syntax, and a map to a constant observable
--- costs the registry reading nothing a large `S` does not cover.
--- Legality is a bound on a chain's SYNTAX and the conclusion is a bound
--- on the VALUES that syntax produces, so no arrangement of the
--- arithmetic repairs it: what is missing is a RELATION between the two
--- numbers, not a bigger one.
+-- IT CARRIES THE WALK'S OWN AFFORDABILITY BECAUSE THE PRICE-ONLY FORM
+-- IS FALSE.  Read at one number for the values entering the sink and
+-- another for the registry's chains, with nothing between them, the
+-- conclusion falls to a single `map-f`: a nat is one unit however
+-- large, an observable is its whole syntax, and a map to a constant
+-- observable costs a registry reading nothing a large budget does not
+-- cover while breaking the value budget outright.  Legality is a bound
+-- on a chain's SYNTAX and the conclusion is a bound on the VALUES that
+-- syntax produces, so no arrangement of the arithmetic repairs that:
+-- what was missing is a RELATION between the two numbers rather than a
+-- bigger one, and the relation is the affordability the caller already
+-- walks under.  It closes that witness for good, since a constant map
+-- lands at `sizeᵛ`, which is one LESS than the `sizeᵗ` the chain's own
+-- legality already pays for.
 --
--- THE MISSING RELATION IS THE CALLER'S OWN AFFORDABILITY PREMISE --
--- every iterate up to the level reached is under `U` -- dropped exactly
--- at the hop where the values leave the walked path.  Restating with it
--- is not free either: that premise reaches the caller's level budget,
--- and a registry chain climbs past it by that chain's length, so the
--- budget is the quantity the grant then has to name.  That is the same
--- widening the level-budget note below already argues for on the
+-- WHAT IS STILL OPEN IS THE LEVEL, NOT THE PRICE.  Affordability is
+-- granted up to `Lv` and the caller offers `j ≤ Lv`, but a registry
+-- chain climbs from `j` by its OWN length, and that length is bounded
+-- by the registry reading rather than by `Lv`.  A frame that embeds its
+-- input grows the value once per hop, so the budget the grant really
+-- wants reaches the level a fanned-into chain arrives at -- which is
+-- the same widening the level-budget note below argues for on the
 -- walked side, arriving on the registry side.
 --
 -- REFUTED: `Refuted.Share-Live-Afford`
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U j : ℕ) (i : Fin n)
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    valsSz? U vals ≡ true →
+    (∀ k → k ≤ Lv → iterSize S k S ≤ U) →
+    1 ≤ S →
+    valsSz? (iterSize S j S) vals ≡ true →
     regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    j ≤ Lv →
     DispatchLiveHyp sf gas id now U i vals fin sched st
 
 -- THE SIZE SIDE CONDITION, DISCHARGED BY THE SAME WALK IT GUARDS.  The
@@ -223,9 +228,9 @@ walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   j + pathLen path ≤ Lv →
   PathLiveHyp sf gas id now U path vals fin sched st
 walk-LiveHyp-go sf gas id now S U Lv j root vals fin sched st _ _ _ _ _ _ = tt
-walk-LiveHyp-go sf gas id now S U Lv j (share-sink i) vals fin sched st afford _ hsz _ hreg hj =
-  walk-share-LiveHyp sf gas id now S U j i vals fin sched st
-    (valsSz?-mono (iterSize S j S) U vals (afford j j≤Lv) hsz) hreg
+walk-LiveHyp-go sf gas id now S U Lv j (share-sink i) vals fin sched st afford 1≤S hsz _ hreg hj =
+  walk-share-LiveHyp sf gas id now S U Lv j i vals fin sched st
+    afford 1≤S hsz hreg j≤Lv
   where
   j≤Lv : j ≤ Lv
   j≤Lv = ≤-trans (m≤m+n j 0) hj

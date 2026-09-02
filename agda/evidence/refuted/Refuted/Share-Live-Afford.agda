@@ -1,35 +1,35 @@
 -- ══════════════════════════════════════════════════════════════════
--- THE VALUE BUDGET AND THE REGISTRY BUDGET ARE TWO FREE NUMBERS WITH
--- NOTHING BETWEEN THEM, so a sink can be handed a value budget its own
--- registry breaks on the first frame.  The grant prices the values
--- ENTERING the sink at `U` and the registry's chains at
--- `iterSize S j S`, and `S`, `U` and `j` are independent arguments of
--- the statement -- while the conclusion demands `U` still bound the
--- values a `thru-outer` sees AFTER the registry chain's own frames have
--- run.  One `map-f` to a constant observable is the whole gap: it costs
--- the registry reading nothing that a large `S` does not cover, and it
--- takes a value from size one to its own syntax.
+-- A VALUE BUDGET AND A REGISTRY BUDGET WITH NOTHING BETWEEN THEM LET A
+-- SINK BE HANDED A BUDGET ITS OWN REGISTRY BREAKS ON THE FIRST FRAME.
+-- Price the values ENTERING the sink at one number and the registry's
+-- chains at another, leaving the two free of each other, and the
+-- conclusion still demands the first bound the values a `thru-outer`
+-- sees AFTER those chains' own frames have run.  One `map-f` to a
+-- constant observable is the whole gap: it costs the registry reading
+-- nothing a large budget does not cover, and it takes a value from size
+-- one to its own syntax.
 --
 -- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE` notes.
 --
--- WHAT THE CALLER HAS AND THE GRANT DOES NOT.  The one call site walks
--- under an affordability premise -- every iterate up to the level
--- reached is under `U` -- and hands the grant only the two readings
--- above, so the link is dropped exactly at the hop where the values
--- leave the walked path for chains nobody walked.  That is the missing
--- hypothesis, and it is why no arrangement of the arithmetic repairs
--- this: the statement is not too weak in its numbers, it is missing a
--- relation between them.  Note the repair is not free either -- the
--- caller's premise reaches its own level budget, and a registry chain
--- climbs past it by that chain's length, which is the quantity the
--- grant would then have to name.
+-- SO THE HOP MAY NOT BE STATED ON PRICES ALONE, WHICH IS WHAT THIS
+-- WITNESS BUYS.  Legality is a bound on a chain's SYNTAX; the
+-- conclusion is a bound on the VALUES that syntax produces, and the
+-- data below is legal and unbounded at once -- so the two readings have
+-- to be RELATED, and no larger choice of either relates them.  The
+-- relation available is the one the sole call site walks under: every
+-- iterate up to the level reached is under the value budget, dropped
+-- exactly at the hop where the values leave the walked path for chains
+-- nobody walked.
 --
--- AND THE HEADER IT REFUTES SAYS THE OPPOSITE IN SO MANY WORDS: that
--- every admitted path being legal under the registry reading is "what
--- makes the grant statable at all".  Legality is a bound on the chain's
--- SYNTAX; the conclusion is a bound on the VALUES that syntax produces,
--- and the witness below is legal and unbounded at once.
+-- AND IT FIXES WHAT SUCH A PREMISE HAS TO DO, which is more than it
+-- rules out.  The escape here is a value landing at `sizeᵛ` under a
+-- frame whose `sizeᵗ` the registry reading already paid for, so any
+-- premise dominating the registry reading at the level the values sit
+-- at closes it.  What that leaves open is the LEVEL: a registry chain
+-- climbs from where the walk is by its own length, and its length is
+-- bounded by the registry reading rather than by the affordability's
+-- ceiling.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Share-Live-Afford where
 
