@@ -33,17 +33,19 @@ open import Data.List using (List; []; _∷_; _++_; foldr)
 open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; +-suc)
 open import Data.Vec using (lookup)
+open import Data.Maybe using (nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; cong; sym; subst)
+open import Relation.Nullary using (yes; no)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; sym; subst)
 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val)
+open import Rx.Exp using (Ctx; Closed; Val; obs; _≟ᵗ_)
 open import Rx.Evaluator
-  using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId;
-         map-f; scan-f; take-f; from-inner; thru-outer;
-         iterSize; foldPath; stepFrame; dispatchShare;
-         shareGo; shareAdmit; shareLatch)
+  using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; AllOp; NodeId; map-f; scan-f;
+  take-f; from-inner; thru-outer; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
+  lookupNode; takeVals; iterSize; foldPath; stepFrame; dispatchShare; shareGo; shareAdmit;
+  shareLatch)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store
@@ -117,50 +119,75 @@ mutual
             (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
             (record st { delivered = rid ∷ EvalSt.delivered st })))))
 
+-- THE TWO KINDS THAT CAN MINT, and the split is the finding rather
+-- than a filing choice.  Four frame kinds cannot touch the live list
+-- at all -- a map rewrites values, a scan writes its accumulator, a
+-- take writes its counter and may SWEEP, which only ever drops
+-- entries -- so their arms are proven below out of the schedule the
+-- step hands back unchanged.  What is left is the outer frame, which
+-- subscribes what it is handed, and the completion frame, which
+-- subscribes out of the *All node's QUEUE.  Those are the leaves.
 postulate
-  -- ONE FRAME'S MINTS.  Four kinds mint nothing at all; the outer
-  -- frame subscribes what it is handed, and a deferred body's depth is
-  -- under its size, which is the bound the side condition supplies.
+  -- THE OUTER FRAME'S MINTS.  It subscribes the arrivals it is handed,
+  -- so what it can put on the live list is read off THOSE values --
+  -- which is why the side condition at this kind is a size bound on
+  -- them and a unit at every other.
   --
-  -- AND A THIRD MINT SITE IS WHY THE WALK'S OWN PREMISES DO NOT
-  -- SUFFICE.  A completion frame subscribes out of the *All node's
-  -- QUEUE, and a queued gate mints a live carrying its body -- so the
-  -- arm that mints there is the arm the side condition reads as a
-  -- unit, and the walk reaching it is empty-handed by construction,
-  -- which clears the potential at every budget including the smallest.
-  -- The slot sum does not move with a term the slots never held.
+  -- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
+  --   RUNNING a whole chain over it, at the one program shape that can
+  --   move the fold: a `mapᵉ` over the async input handing the outer
+  --   *All a deferred nest per arrival, so the chain the evaluator
+  --   presents subscribes it here and the live it mints carries the
+  --   body.  Covered: the fold rising 0 to 1 and 0 to 3 as the nest
+  --   deepens, against a syntactic charge of eighteen and twenty-six
+  --   that the tree proves the size cap dominates -- so both sides move
+  --   and the ordering is load-bearing on the depth axis.  Not covered:
+  --   this frame in isolation, since the rows read the composite and so
+  --   never state this leaf's premises; and a fold already nonzero at
+  --   entry, where the growth would compound rather than start at zero.
+  stepFrame-nest-live-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st →
+    valsSz? U vals ≡ true →
+    foldr (λ l acc → liveNest l ⊔ acc) 0
+      (Sched.live
+        (proj₁ (proj₂ (proj₂ (proj₂
+          (stepFrame sf id now (thru-outer op nid) path vals fin sched st))))))
+      ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+          ⊔ slotsNestSum (Sched.slots sched) ⊔ U
+
+  -- THE COMPLETION FRAME'S MINTS, AND THIS IS WHERE THE GATE IS
+  -- PRICED.  A completion frame subscribes out of the *All node's
+  -- QUEUE, and the walk reaching it is empty-handed by construction --
+  -- the drain reads the queue rather than the burst, so the premise
+  -- above clears by computation at every budget including the
+  -- smallest, and the slot sum does not move with a term the slots
+  -- never held.
   --
   -- AND NO LARGER NUMBER WOULD HAVE REPAIRED IT, WHICH IS WHAT FIXES
-  -- THE GRANT'S CURRENCY.  The depth measure TRUNCATES at the gate --
-  -- that is what makes a recursive body safe -- so a parked term reads
-  -- zero in the conclusion's own currency while the live it mints
-  -- reads the body.  A premise bounding the queue's NESTING is
-  -- therefore satisfied by the counterexample unchanged.  A SIZE sees
-  -- past the gate, one unit per layer, and the frame grant is
-  -- denominated in exactly that.
+  -- THE CURRENCY.  The depth measure TRUNCATES at the gate -- that is
+  -- what makes a recursive body safe -- so a parked term reads zero
+  -- wherever the NODE is read, which is the one state quantity the
+  -- fit's own store residue is built above, alongside the incoming
+  -- values, and the drain carries neither.  Draining subscribes the
+  -- entry, and the mint puts the body itself on the live list at
+  -- observable type, where the truncation does not apply and the fold
+  -- reads its full depth.  So a premise bounding the queue's NESTING
+  -- is satisfied by the counterexample unchanged, and the increment
+  -- this arm has to cover is the queued body's own depth against a
+  -- residue of zero.
   --
-  -- AND AT THE DRAIN ARM THE STATE READING IS BLIND, SO ONLY THE
-  -- CAP-DERIVED SIDE CAN PAY.  The gate truncates the nesting measure,
-  -- so a parked `deferᵉ` reads as zero wherever the NODE is read --
-  -- which is the one state quantity the fit's own `G` is built above,
-  -- alongside the incoming values, and the drain carries none of those.
-  -- Draining subscribes the entry, and the mint puts the body itself
-  -- into the live list at observable type, where the truncation does
-  -- not apply and the fold reads its full depth.  So the increment this
-  -- arm has to cover is the queued body's own nesting against a `G` of
-  -- zero, and what covers it is the size the caps are built from, which
-  -- sees through the gate.  That is which conjunct is load-bearing here
-  -- and it is what a discharge spends.
-
-  -- SO THE FRAME GRANT IS CARRIED, AND IT IS THE SAME ONE THE REGISTRY
-  -- ARM TAKES.  That arm fell to the same emptiness at the same frame
-  -- and was repaired this way, and its drain conjunct names the node
-  -- by a `lookupNode` equation, so the queued terms are under a
-  -- cap-derived size rather than under anything the walk holds.  Two
-  -- faces discharged from ONE fit is what makes the repair worth
-  -- taking over a grant minted here: a producer that can supply the
-  -- registry arm supplies this one with the same witness, and the
-  -- consumers already thread it alongside.
+  -- SO ONLY THE CAP-DERIVED SIDE CAN PAY, and the fit already carries
+  -- it: the drain conjunct names the node by a `lookupNode` equation
+  -- and delivers the caps ledger at the level, whose park receipt
+  -- reads `sizeᵉ` -- one unit per gate layer, where the depth reads
+  -- none.  That is which conjunct is load-bearing here and it is what
+  -- a discharge spends.  The registry face's drain arm fell to the
+  -- same emptiness at the same frame and takes the same fit, so two
+  -- faces discharge from ONE producer.
   --
   -- REFUTED: `Refuted.Drain-Live-Defer`, at the corner two earlier
   --   findings leave open: `Refuted.Chain-Step-Live-Nest` found the
@@ -168,18 +195,6 @@ postulate
   --   now carries, `Refuted.Drain-Regs-Nest` found the drain arm
   --   reading a payload no walk handed it -- on the registry axis,
   --   where the same emptiness clears the same premise.
-  -- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this leaf by
-  --   RUNNING a whole chain over it, at the one program shape that can
-  --   move the fold: a `mapᵉ` over the async input handing the outer
-  --   *All a deferred nest per arrival, so the chain the evaluator
-  --   presents subscribes it and the live it mints carries the body.
-  --   Covered: the fold rising 0 to 1 and 0 to 3 as the nest deepens,
-  --   against a syntactic charge of eighteen and twenty-six that the
-  --   tree proves the size cap dominates -- so both sides move and the
-  --   ordering is load-bearing on the depth axis.  Not covered: one
-  --   frame in isolation, since the rows read the composite; and a
-  --   fold already nonzero at entry, where the growth would compound
-  --   rather than start from zero.
   -- PROBED: `Probed.Frame-Drain-Live` reaches the COMPLETION ARM, which
   --   the running family above cannot: an unlimited outer never refuses
   --   room, so its queue is empty on every row, and bounding the limit
@@ -195,18 +210,75 @@ postulate
   --   drain's own recursion is what is read; and the hypotheses, which
   --   carry a quantified numeric conjunct and do not compute -- so a row
   --   is evidence about the CONCLUSION, unconditional where green.
-  stepFrame-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (B U : ℕ) →
-    valsΦ? B U (f ↠ path) vals ≡ true →
-    FrameΦHyp sf id now B U f path vals fin sched st →
-    FrameLiveHyp U f path vals →
+  stepFrame-nest-live-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    valsΦ? B U (from-inner op allNid inst ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live
-        (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+        (proj₁ (proj₂ (proj₂ (proj₂
+          (stepFrame sf id now (from-inner op allNid inst) path vals fin sched st))))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ slotsNestSum (Sched.slots sched) ⊔ U
+
+-- WIDENING INTO THE CONCLUSION, which is all four of the arms that do
+-- not mint.  The conclusion joins the incoming fold with two terms a
+-- frame never writes, so a step that hands its own schedule back is
+-- discharged by the join's own left projections and by nothing about
+-- the frame.
+live-into : ∀ {n} {Γ : Ctx n} (sched : Sched Γ) (U : ℕ) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+        ⊔ slotsNestSum (Sched.slots sched) ⊔ U
+live-into sched U =
+  ≤-trans (m≤m⊔n _ (slotsNestSum (Sched.slots sched))) (m≤m⊔n _ U)
+
+-- ONE FRAME'S MINTS, assembled.  The three arms below are the ones the
+-- step hands back its own schedule from, so each is the incoming fold
+-- widened into the conclusion's join; the take arm is the only one
+-- that rewrites the list at all, and it does so by SWEEPING, whose
+-- monotonicity is already proven.
+stepFrame-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (B U : ℕ) →
+  valsΦ? B U (f ↠ path) vals ≡ true →
+  FrameΦHyp sf id now B U f path vals fin sched st →
+  FrameLiveHyp U f path vals →
+  foldr (λ l acc → liveNest l ⊔ acc) 0
+    (Sched.live
+      (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+        ⊔ slotsNestSum (Sched.slots sched) ⊔ U
+stepFrame-nest-live sf id now (map-f fn) path vals fin sched st B U _ _ _ =
+  live-into sched U
+stepFrame-nest-live {u = u} sf id now (scan-f fn nid) path vals fin sched st B U _ _ _
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                = live-into sched U
+... | just (take-st _)       = live-into sched U
+... | just (mergeAll-st _ _ _ _) = live-into sched U
+... | just (switch-st _ _)   = live-into sched U
+... | just (exhaust-st _ _)  = live-into sched U
+... | just (scan-st {w} _) with w ≟ᵗ u
+...   | yes refl = live-into sched U
+...   | no _     = live-into sched U
+stepFrame-nest-live sf id now (take-f nid) path vals fin sched st B U _ _ _
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                = live-into sched U
+... | just (scan-st _)       = live-into sched U
+... | just (mergeAll-st _ _ _ _) = live-into sched U
+... | just (switch-st _ _)   = live-into sched U
+... | just (exhaust-st _ _)  = live-into sched U
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | false = live-into sched U
+...   | true  =
+        ≤-trans (sweepLive-nest _ (Sched.live sched)) (live-into sched U)
+stepFrame-nest-live sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ hF _ =
+  stepFrame-nest-live-inner sf id now op allNid inst path vals fin sched st B U hΦ hF
+stepFrame-nest-live sf id now (thru-outer op nid) path vals fin sched st B U hΦ hF hL =
+  stepFrame-nest-live-outer sf id now op nid path vals fin sched st B U hΦ hF hL
 
 -- FOUR KINDS OWE NOTHING AND ONE OWES THE BOUND, which is the whole
 -- content of the side condition read at one frame.

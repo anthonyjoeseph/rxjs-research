@@ -2,7 +2,7 @@
 -- THE LIVE ARM, AT THE ONLY SHAPE THAT CAN MOVE IT — AND REACHED BY
 -- RUNNING RATHER THAN BY BUILDING THE PATH.
 --
--- TARGET: stepFrame-nest-live @7dad31
+-- TARGET: stepFrame-nest-live-outer @3c0c61
 --
 -- WHY THIS PROGRAM.  A live source's nesting is the nesting of its
 -- PENDING values, and the evaluator mints a live carrying a nested
