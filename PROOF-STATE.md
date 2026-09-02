@@ -215,31 +215,31 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FINISH THE RE-DENOMINATION — THE CURRENCY STANDS, THE FITS DO
-  NOT.** `nestΦAt` is `capΦAt + nestWalkAt`, sealed beside the walk,
-  and its affordability is already paid: `nestCap≤exp` now runs at
-  leading coefficient `cSize * 2 ^ Ê`, so `nestΦ-sight≤capsH` splits
-  cap-first and spends `capsAt-exp2≤capsH`'s two copies with
-  `walk-sight≤exp` unmodified underneath — no third copy, so
-  `blowup-exp≤pool` is untouched. `cascade-depth-sighted` and
-  `cascade-depth-capsH` are swapped. What remains is `Depth-Fit`'s
-  own fits: `valsΦ?`, `FrameΦHyp` and `PathΦHyp` still name
-  `nestWalkAt` as the budget at some fifty sites, and each transports
-  through `nestWalkAt≤nestΦAt` by `≤-trans`, since every one of them
-  concludes `… ≤ U` and enlarging `U` only weakens.
-
-- **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
+- **READ THE SINK ARM AGAINST THE CURRENCY THAT NOW STANDS.** The
   level ledger is closed to `walk-share-LiveHyp` in both directions —
   no ceiling is choosable at a caller, and the caps face's own top
-  towers past anything the walk affords — so what is owed is a
-  different currency, not a larger number. The potential face's
-  receipt shrinks along the path and names no level, which is why it
-  survives a fan-out the level reading cannot. Read `PathΦHyp`'s sink
-  arm against `DispatchLiveHyp`'s: if the potential already carries
-  what a fanned-into chain mints, this row restates onto it and the
-  level counterexamples retire with the mechanism they refuted; if it
-  does not, the residue is the first thing the live arm has needed
-  that no face carries.
+  towers past it — so what was owed is a different currency, not a
+  larger number. There is now one:
+  `walk-share-ΦHyp` reads at `nestΦAt`, whose cap summand is the first
+  budget on this face big enough to carry a fanned-into chain's outer
+  frames. So the crossing the refutations pinned was taken against a
+  number this arm no longer spends. Re-run it at the Φ charge: either
+  the arm restates onto the potential and the level counterexamples
+  retire with the mechanism they refuted, or the residue is the first
+  thing the live arm has needed that no face carries.
+
+- **THEN PUT THE STORE'S NEST CEILING ON THE RECORD, NOT IN A
+  SIGNATURE.** `scanΦ-fit` and `innerΦ-fit` now spend budgets that
+  carry `nestCapAt` with room, so the crossing that settled them is
+  gone and one thing is left: no premise of either names
+  `EvalSt.nodes`. `nestOK?` is exactly that fact, and
+  `cascadeGo-nest-nodes` already takes it, so the routing costs no
+  producer anything it does not owe — but threading it into these two
+  signatures is the laundering the ledger cannot see, and the fit test
+  that revealed the gap does not license it. The field goes on the
+  invariant record the walk runs under; the cost is the cascade
+  through that record's producers and consumers, and that cascade is
+  the fact being true rather than a reason to avoid it.
 
 - **THEN INSTANTIATE THE REPAIRED DRAIN ARM.** `stepFrame-nest-live`
   now carries `FrameΦHyp`, and nothing has run a row against the arm in
@@ -291,12 +291,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the drain's new grant. Two of its three obligations are drain ledgers this
   face has and must be routed; the third is the merge node's own queue depth,
-  and the one ceiling on that table sits above the budget it is spent against.
+  now under the budget and owed the same field the fold arm is.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the fold's new grant. Its ask is one accumulator's depth at the node the step
-  names, and both ways to pay it here are dead: the table's own ceiling outruns
-  `nestWalkAt`, and no field replacing it survives `store-growth`. The currency
-  has to move.
+  names, and `nestΦAt` carries the table's own ceiling with room. What is left
+  is that no premise names the table, so what it is owed is a field.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
