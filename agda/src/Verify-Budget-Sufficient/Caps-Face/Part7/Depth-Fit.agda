@@ -479,6 +479,28 @@ postulate
   -- restatement of this arm but a decision about whether the depth face
   -- prices a threading frame at all.
 
+  -- AND THE REASON NO STORY BUYS IT IS A CIRCLE, NOT A SHORTFALL.  The
+  -- depth an instant's arcs may spend is ONE NUMBER fixed before the
+  -- instant runs, and the delivery count the caps face affords is
+  -- computed FROM that number, towering in it.  A fold's width is under
+  -- that count; a fold with a step function of positive nesting builds
+  -- nesting that is at least linear in its width; and a nested value
+  -- subscribed at a hand-over spends depth per layer.  So the depth the
+  -- instant needs is at least the count taken at the depth it was given,
+  -- and a number that dominates a tower in itself does not exist.  That
+  -- is the same region producing the same refutation at every
+  -- denomination tried -- size, level, count as parameter, the story
+  -- above -- which is the convergence test's own stop condition, and it
+  -- names the mechanism: a depth parameter chosen BEFORE the count it
+  -- must dominate.  The fuel is not shaped that way -- it is a TOWER
+  -- whose HEIGHT is the height ledger `blowH` keeps, one story per hop --
+  -- so a depth ledger that fits it counts STORIES rather than depth, and
+  -- a fold costs one story per scan hop, not a power in its width.  That
+  -- restates the potential's currency, not this arm; and it needs the
+  -- nesting measure to be linear in a fold, which is the `caseᵗ` clause
+  -- of `nestDᵗ` taking a join rather than a sum, since one branch runs.
+  -- Both are design decisions above this face and neither is taken here.
+
   -- SO THE ARM IS NOT MIS-SHAPED, IT IS UNAFFORDABLE, and that is a
   -- class and not a repair.  The count is under the exit cap's width and
   -- under nothing smaller, the fold charges a power in the count, and

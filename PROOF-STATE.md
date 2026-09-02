@@ -289,10 +289,9 @@ does not fit is a finding about the shared statement, not about the head.
   state at a chain minted from syntax the program lacks — but it holds at every
   reachable registry swept, with a margin that does not close.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
-  the fold's new grant. Unaffordable, not mis-shaped: the count is under the
-  exit width, which outruns two-to-two-to the size at every instant, so no
-  story buys room. BLOCKED on whether this face prices a threading frame at
-  all.
+  the fold's new grant. AT THE SPIRAL STOP: four denominations refuted in one
+  region, since a depth fixed before the count must dominate a count towering
+  in it. Owed a ruling — count stories, fold linearly — not a fifth currency.
 - **`innerΦ-drain-caps`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
   queue's caps receipt, now at the face and count the arm REPORTS rather than
   at ones it chooses. Its own definition names the state's caps receipt in
