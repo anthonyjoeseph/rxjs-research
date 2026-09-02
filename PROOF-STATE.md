@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **GIVE THE WALK'S BUDGET THE STORE FACE'S SHAPE — A RECURRENCE, NOT A
-  FORMULA.** Three denominations for the fold's count are now closed and
-  they exhaust what an instant offers, so the mechanism under them is
-  what is wrong. `nestΦAt` prices a fold by a FIXED power of the
-  instant's size cap, and its ceiling is proven — through
-  `nestΦ-sight≤capsH` the exponent reaches `2 ^ S` and no further —
-  while the count that must sit there towers past it. `nestCapAt`
-  escapes by being a recurrence: each instant multiplies by `nestFacAt`,
-  so the burst power rides as a factor and never enters an exponent. It
-  is affordable, proven, and already a summand of `nestΦAt` through
-  `capΦAt`. Restate the walk half in that shape, leaves postulated.
+- **SAY WHAT BOUNDS A WALK'S BURST — NOTHING IN THE TREE DOES.**
+  `burstsOK` carries its bound as a free parameter along a whole path
+  and no consumer instantiates it, so how many values a frame is handed
+  mid-walk is an open choice. Every closed denomination for the fold's
+  count is conditional on it, and the recurrence route is closed too:
+  `nestCapAt` charges the PREVIOUS instant's width, which
+  `capsAt-wid<size` puts under this instant's size, while the depth
+  ledger is spent during its own instant by `cascade-depth-capsH` and so
+  charges a width only under the NEXT one. Pick the quantity, instantiate
+  it where the walk admits values, and the fold's arm is decided with it.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -293,9 +292,8 @@ does not fit is a finding about the shared statement, not about the head.
   and must route; the third is the merge node's own queue depth.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
   of the fold's new grant. Count and factor both exist proven — `burstsOK` and
-  `nestFac` — and all three denominations an instant offers for the count are
-  now closed, so what is wrong is the budget's SHAPE, not this arm's reading of
-  it.
+  `nestFac` — and every denomination is closed, the store face's recurrence
+  included, so what is undecided is the burst: nothing instantiates `burstsOK`.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only

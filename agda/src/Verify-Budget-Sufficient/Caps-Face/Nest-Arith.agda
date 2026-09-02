@@ -1027,6 +1027,19 @@ nestCap-sight≤exp e sl id =
 --   fuel, so no reading of it fits under the exponential the fuel
 --   supplies here.  That is the index constraint the cap's own step
 --   lemma states, arriving at the consumer rather than at the step.
+
+-- AND THIS IS THE WHOLE CEILING THE WALK'S SIDE GETS, WHICH IS WORTH
+-- SAYING AS A NUMBER RATHER THAN AS A SHAPE.  Whatever the walk's
+-- charge is written as, it is spent at the instant's own fuel, and the
+-- fuel supplies two to two-to-the-size -- so an exponent under it may
+-- reach two to the size and no further.  A threading frame's charge is
+-- a power in the COUNT of values it is handed, so what the exponent
+-- has to hold is that count times a size, and affording it asks the
+-- count under two to the size.  A width cap is not: the width folds
+-- through a power tower where the size steps geometrically, so the two
+-- cross a few folds in and never come back.  The consequence is that
+-- this ceiling, and not any statement about a frame, is what decides
+-- whether the fold's arm on the depth face can be stated at all.
 walk-sight≤exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) →
   suc (sizeᵉ e) * (3 * nestWalkAt e sl id)

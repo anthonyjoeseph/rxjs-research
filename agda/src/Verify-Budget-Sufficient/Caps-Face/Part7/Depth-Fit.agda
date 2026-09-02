@@ -370,18 +370,36 @@ postulate
   --   `size₃≡` pinning five hundred and thirteen doublings of width
   --   against a ceiling of one hundred and seventy.
 
-  -- SO WHAT MOVES IS THE BUDGET'S SHAPE, AND THE STORE FACE HAS ALREADY
-  -- WALKED IT.  Three denominations for this arm's count are closed and
-  -- they exhaust the quantities an instant offers, which is the signal
-  -- that the mechanism under them is what is wrong: this budget prices
-  -- a fold by a FIXED power of the instant's size cap, and no fixed
-  -- power of that cap can hold a quantity that towers past it.
-  -- `nestCapAt` does not have the problem, because it is a RECURRENCE
-  -- rather than a formula -- each instant multiplies the previous cap
-  -- by `nestFacAt`, so the burst power is carried as a factor and never
-  -- has to fit inside an exponent.  That budget is affordable, proven,
-  -- and already a summand of this one through `capΦAt`.  The route to
-  -- try is therefore the walk half in the same shape.
+  -- AND THE STORE FACE'S RECURRENCE DOES NOT TRANSFER, WHICH IS THE
+  -- FOURTH DENOMINATION AND THE ONE THAT SAYS WHERE TO LOOK NEXT.  It
+  -- is the obvious reading of the three findings above: `nestCapAt` is
+  -- a recurrence rather than a formula, each instant multiplying the
+  -- previous cap by `nestFacAt`, so a burst power rides as a factor
+  -- and never has to fit inside an exponent -- and that budget is
+  -- affordable, proven, and already a summand of this one through
+  -- `capΦAt`.  What the two faces do not share is WHICH instant's
+  -- burst each has to price.  `nestCapAt` at an instant charges the
+  -- PREVIOUS instant's folds, and `capsAt-wid<size` puts that width
+  -- under THIS instant's size, so the charge is polynomial against a
+  -- ceiling that is two to the size.  This ledger is spent DURING its
+  -- own instant -- `cascade-depth-capsH` is what spends it, against
+  -- the fuel that instant runs at -- so its folds' width is only under
+  -- the NEXT instant's size.  One index, and it is the whole
+  -- difference: the width folds through a power tower where the size
+  -- steps geometrically, so a width read one instant late is above
+  -- every exponential this instant's fuel affords.
+
+  -- SO WHAT IS ACTUALLY UNDECIDED IS THE BURST ITSELF, AND THE
+  -- DEVELOPMENT HAS NEVER SAID.  `burstsOK` carries its bound as a
+  -- free parameter along a whole path and no consumer anywhere
+  -- instantiates it, so what bounds how many values one frame is
+  -- handed mid-walk is an open choice rather than a fact this face may
+  -- read off.  Everything above is conditional on that choice: at a
+  -- width cap the four denominations are closed and the currency has
+  -- to move; at anything polynomial in this instant's size cap they
+  -- were closed against a quantity the walk never reaches, and the
+  -- formula standing here is already the right shape.  That is the
+  -- question to settle before another budget is drawn.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
