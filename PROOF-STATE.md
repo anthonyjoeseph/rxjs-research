@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE DRAIN'S ROUTING, ON ITS OWN.** `innerΦ-fit` does NOT
-  share the fold's defect, and binding the two was this leg's error:
-  its width is Σ-CHOSEN with `drainW` as a LOWER bound, so nothing
-  there is free the way a burst's count is. What remains is what its
-  header records — the queue's caps receipt and its width are what the
-  sink-side walk establishes as it admits the entries, and no premise
-  here constrains the table they are read from. So the question is which statement hands them over, a wire
-  rather than a fact the development lacks; and the obvious donor does
-  not pay, the walk's receipt bounding how many terms are queued and
-  never what each carries. The drain arm of `stepFrame-nest-live` is
-  the same lookup and moves with it.
-
 - **THEN INSTANTIATE WHAT IS MERELY UNREAD.** Two registry-face rows are
   FALSITY by the class's own rule rather than by a refutation — nothing
   has reached them. `stepFrame-regsSz` is now read at an accumulated
@@ -247,6 +235,18 @@ does not fit is a finding about the shared statement, not about the head.
   registration MAY be rather than of the walk, so the commit is to find
   where one is minted and either wire an invariant that already says
   it or refute the pair at a program that registers past the cap.
+
+- **THEN JOIN THE TWO DRAIN FACES, WHICH THE TABLE READ MADE
+  POSSIBLE.** Naming the queue left `innerΦ-fit-drain` owing ONE
+  ledger, and it is now the caps face's own drain law verbatim — same
+  predicate, same queue, at `capsAt` for the face, `capsH` for the
+  count and the walk's level for the descent. What separates them is
+  the GRANT: that law is stated under a walk hypothesis this face
+  never receives, while the potential face's premises are the path,
+  the schedule and the values. So the commit is to settle which of the
+  two moves — the caps law restated at premises the Φ face holds, or
+  the Φ walk carrying the walk grant — and it is a real fork, since
+  threading a grant is a restatement and the ledger prices that.
 
 ### The ledger
 
@@ -296,10 +296,15 @@ does not fit is a finding about the shared statement, not about the head.
   exit width, which outruns two-to-two-to the size at every instant, so no
   story buys room. BLOCKED on whether this face prices a threading frame at
   all.
-- **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
-  the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
-  `drainW`, so nothing is free. Two obligations are drain ledgers this face has
-  and must route; the third is the merge node's own queue depth.
+- **`innerΦ-fit-drain`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the drain's
+  grant at the queue the state names. The width is no longer chosen — it is
+  that queue's own `drainW` — so what is left beside the charge is one caps
+  receipt, which the caps face's drain law already delivers under a grant this
+  face lacks.
+- **`innerΦ-fit-quiet`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same grant
+  where the lookup finds no merge at this type. Both drain ledgers are proven
+  vacuous there and the width is zero, so the row is the frame residue and the
+  charge alone. Nothing has instantiated it.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
