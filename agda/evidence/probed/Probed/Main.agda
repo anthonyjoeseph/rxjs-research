@@ -146,3 +146,6 @@ open import Probed.Frame-Step-Regs-Level
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
          figures0; figures1; figures2; figures3; figures4)
+
+open import Probed.Fan-Regs-Registry
+  using (counts; heldS; marginK; marginK′; heldKs; lensK)
