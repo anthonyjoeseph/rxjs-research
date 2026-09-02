@@ -32,17 +32,26 @@
 -- disagree about the ARGUMENTS rather than about the mathematics, and
 -- the undischarged side is the one that has not been checked.
 --
--- AND THE WIDTH IS CARRIED WHERE THIS ARM STANDS, so asking for it is
--- not the laundering an added hypothesis usually is.  The walk face's
--- own statements already read the burst's length -- `thruWalk-nodry`
--- spends `length vals` inside `sIterD` -- so the caller has the fact,
--- and what is missing is that this statement never asked for it.
+-- BUT THE CONJUNCT DOES NOT REPAIR IT, AND THAT IS THE HALF WORTH
+-- HAVING.  The second statement below carries the missing premise and
+-- dies at the same witness, under a UNIVERSALLY quantified width and
+-- at every value of it the invariant admits: the crossing is at TWO
+-- values, and a burst of two is admitted by any width at all.
+--
+-- SO WHAT SEPARATES THE TWO FACES IS THAT ONE CURRENCY STEPS.  The
+-- mirror's conclusion is a receipt at `frameStep (j + j′) c`, whose
+-- width GROWS with the fold it just paid for, and `iterFold`
+-- exponentiates per step -- so the caps face never has to fit a
+-- burst's charge under a quantity fixed before the walk began.  The
+-- potential does: `nestΦAt e sl id` is indexed by the INSTANT and
+-- reads nothing of how far into a chain the frame sits.  A ledger
+-- cannot close that, whatever conjunct it carries.
 module Refuted.Scan-Phi-Width where
 
 open import Data.Bool using (true)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; length)
-open import Data.Nat using (ℕ; suc; _≤_; _+_; _*_; _^_; _⊔_)
+open import Data.Nat using (ℕ; suc; _≤_; s≤s; _+_; _*_; _^_; _⊔_)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≮n;
   ≤ᵇ⇒≤; *-identityˡ; *-monoʳ-≤; m≤n+m; m≤m+n)
 open import Data.Product using (Σ; _,_; _×_)
@@ -178,4 +187,41 @@ scan-phi-width-absurd pr
   with pr {Γ = Γ₂} {t = obs natᵗ} {e = prog} {s = natᵗ} {u = obs natᵗ}
           sl 21 U (pathNestD whole) 0 fn rt pair sd st₀
           refl legal unit-ok premΦ
+... | G , _ , fits = n≮n U (≤-trans (bound G) fits)
+
+----------------------------------------------------------------------
+-- THE SAME STATEMENT WITH THE MISSING PREMISE, so that the finding is
+-- about the conjunct and not about its absence.  Everything else is
+-- held fixed -- the same four premises, the same conclusion, the same
+-- witness below -- and the width is left UNIVERSALLY quantified, so
+-- no choice of it is what the refutation rests on.
+----------------------------------------------------------------------
+ScanΦFitsWide : Set
+ScanΦFitsWide = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (B U nu W : ℕ) (nid : NodeId)
+  (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+  (p : Path Γ u t) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  pathSz? B (scan-f fn nid ↠ p) ≡ true →
+  pathNestD (scan-f fn nid ↠ p) ≤ nu →
+  length vals ≤ suc W →
+  valsΦ? B U (scan-f fn nid ↠ p) vals ≡ true →
+  Σ ℕ λ G →
+    (nodeNestAt nid st ⊔ nestDᵛˢ vals ≤ G)
+    × (pathΦF B p * ((2 ^ sizeᵗ fn) ^ length vals
+                       * (G + length vals * nestDᵗ fn)
+                     + pathNestD p) ≤ U)
+
+-- the burst of two clears the conjunct at every width the invariant
+-- admits, which is what makes the row a fact about the ledger rather
+-- than about a number chosen for it
+wide : ∀ (W : ℕ) → 1 ≤ W → length pair ≤ suc W
+wide W 1≤W = s≤s 1≤W
+
+scan-phi-wide-absurd : ScanΦFitsWide → ∀ (W : ℕ) → 1 ≤ W → ⊥
+scan-phi-wide-absurd pr W 1≤W
+  with pr {Γ = Γ₂} {t = obs natᵗ} {e = prog} {s = natᵗ} {u = obs natᵗ}
+          sl 21 U (pathNestD whole) W 0 fn rt pair sd st₀
+          refl legal unit-ok (wide W 1≤W) premΦ
 ... | G , _ , fits = n≮n U (≤-trans (bound G) fits)

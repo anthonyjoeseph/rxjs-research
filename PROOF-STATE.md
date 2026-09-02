@@ -215,19 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PUT THE BURST'S WIDTH BACK IN THE Φ FACE'S VALUE LEDGER.** The
-  leg that stood here is DISCARDED: it asked whether the cap crossing
-  recurs at `nestΦAt`, and `nestCapAt≤nestΦAt` is already proven — the
-  new budget CONTAINS the cap as a summand, so nothing is left to
-  re-test. Reading the arm turned up a defect the currency change
-  never touched. `valsΦ?` is an `all`; its caps-face counterpart
-  `valsCaps?` is that same `all` conjoined with a length bound, and
-  the fold's charge is an exponential in `length vals` — so
-  `Refuted.Scan-Phi-Width` beats every budget with one value
-  repeated. The proven `stepFrame-scan-caps` takes that conjunct and
-  draws it from `valsLen`. Restate the LEDGER, not the signature: it
-  obliges every producer and serves every consumer, which a threaded
-  hypothesis does neither of.
+- **DENOMINATE THE FOLD ARM AT THE FOLD, NOT AT THE INSTANT.** The
+  ledger repair this leg was cut for is DEAD, and its own refutation
+  says so: `Refuted.Scan-Phi-Width` carries the width premise in its
+  second half, under the binder, and dies at the same witness — the
+  crossing is at TWO values, which every width admits. So the fold's
+  charge is an exponential in a count no conjunct on the values can
+  bring under an INSTANT-indexed budget. The caps face survives the
+  identical arm because its receipt is read at a cap the fold has
+  already advanced. Mint the potential's stepped reading, over
+  `frameStep j` of the instant's caps rather than the caps
+  themselves, and check it where the walk already threads that `j`
+  for its size and registry ledgers.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -295,8 +294,8 @@ does not fit is a finding about the shared statement, not about the head.
   has and must route; the third is the merge node's own queue depth.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the fold's new grant. Its ceiling now fits under `nestΦAt`; its BURST does
-  not — the value premise is an `all` and the charge an exponential in the
-  count, so what is owed is the width conjunct `valsCaps?` already carries.
+  not, and the width conjunct `valsCaps?` carries does not repair it — the
+  crossing is at two values. What moves is where the charge is denominated.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
