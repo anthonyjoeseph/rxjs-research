@@ -215,27 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO SHARE-SINK HYPOTHESES THAT STAND ON NOTHING AT ALL.**
-  `walk-share-LiveHyp` and `walk-share-ΦHyp` are the size side
-  condition and the potential for the chains a sink fans into, and
-  neither carries a single marker. They are one subject read twice —
-  those chains live in the REGISTRY rather than on the walked path, so
-  both price a quantity the walk never looks at, at the level the walk
-  has reached. An unprobed FALSITY row is the cheapest unmanaged risk
-  there is, and two of them sharing a subject is one probe's work, not
-  two: reach a sink whose registry entries are the interesting ones and
-  read both quantities off the same run. Check that the CAP side of
-  each reaches a program before writing rows against it.
-
-- **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
-  INSTANTIATED.** Every row of all five chain-door sweeps steps an
-  arrival from the OUTER source. An inner registered by a flatten is a
-  registry entry like any other, and an arrival from it re-enters
-  `foldPath` at a frame that is already mid-flight — with the sighted
-  path the outer built, not a fresh one. The second-arrival sweep had
-  to time its inner past the horizon to keep it live, so it bought the
-  cut and left this unmeasured. It wants an inner due BETWEEN two
-  outer values, which is one timing change and no new family.
+- **CARRY THE SINK'S RECEIPT ON THE REGISTRY ENTRY, NOT ON A CAP.** Both
+  repairs `Refuted.Sink-Level-Range` named are now closed — the walk's
+  charge would have to tower where the fuel affords an exponential, and
+  a separate length ledger tracks the size one because a subscribe
+  registers the DERIVED value's operators, not the arrival's. What every
+  bridge shared is a single cap covering both the walked path and paths
+  the walk never sees. So state the receipt where the chain is: each
+  registration records the grant it was admitted under, and a sink reads
+  its chain's own entry instead of a cap dominating all of them. State
+  it and the hop it has to close first; the entry's field and its
+  producers follow.
 
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to
@@ -248,6 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
 
+- **THEN WHETHER THE DOOR'S ROW IS STILL A FALSITY ROW.** The chain
+  door now has evidence on every re-entry it has, on the axis that
+  refuted its predecessor, and on the reading that charge is actually
+  made under — no standing entry lengthens, so a step's price is the
+  one new entry it adds. What has never been done is putting that
+  against the arithmetic: the walked path fits the base cap, the
+  inner's syntax fits it too, and one level multiplies rather than
+  adds. Write that comparison down and the row either drops a class
+  on evidence that reached its region, or names the shape that still
+  escapes it.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
@@ -259,10 +260,11 @@ does not fit is a finding about the shared statement, not about the head.
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
-- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: the size
-  side condition for the chains a sink fans into, which live in the registry
-  rather than on the walked path. It reads the registry's price at the level
-  the walk has reached, and nothing has read it.
+- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE`:
+  the size side condition for the registry chains a sink fans into. Refuted at
+  the price, then once priced, then at the range: the levels one fan-out
+  consumes are exponential in the level and the affordable range is quadratic
+  in the cap.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
@@ -274,10 +276,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
-  potential for the chains a sink fans into. Their factor and depth are the
-  registry's, priced at the level the walk has reached, and nothing has read
-  the claim that the cap's exponential covers them.
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
+  for the chains a sink fans into. A sink is a leaf of the factor recursion, so
+  the receipt handed in carries a factor of one against a chain whose outer
+  frames cost the cap's exponential — the live arm's crossing, a level sooner.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer
@@ -293,10 +295,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×5`: the
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×7`: the
   whole chain's registry price, now stepping the level by one rather than
-  collapsing to the entry cap. Depth, share telescope, fan width and both
-  cutting arms are instantiated; an arrival FROM an inner is not.
+  collapsing to the entry cap. The refuting axis is live in a run and the
+  level covers it; a step registering several entries is unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

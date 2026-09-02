@@ -92,6 +92,39 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 -- facts about it and both are proven here: it dominates the unscaled
 -- charge the other two arms are stated in, and the ceiling leaf below
 -- reads it back through its own equation.
+
+-- AND ITS EXPONENT IS A CHOICE RATHER THAN A FLOOR, WHICH IS WHAT
+-- DECIDES THE WALKED SINK HOP.  The charge carries a cap CUBED in its
+-- exponent while the fuel affords a cap's own EXPONENTIAL there, so the
+-- level range a caller can afford against it comes out QUADRATIC in the
+-- cap where it could be exponential.  That range is the one the sink
+-- hop's refutations measure against, and the registry's reading one
+-- level up is quadratic too -- which is why the two cross at all.
+-- Every level bought past that crossing is bought HERE, by a
+-- redefinition whose whole cost lands on the ceiling leaf below, which
+-- is where this instant's fuel headroom is spent.
+--
+-- WHAT WIDENING CANNOT BUY IS UNBOUNDED NESTING.  A fan-out enters at
+-- the size reading of the level it left, so the levels one cascade
+-- consumes are a TOWER whose height is the dispatch gas, while any
+-- exponent under this instant's fuel affords a range that is merely
+-- exponential.  So it settles the hop only if ONE cascade's own level
+-- count fits that range.  Reading the next instant's size instead is
+-- not the way out: the caps advance by a whole instant's folds, so that
+-- reading is the increment the ceiling leaf below already records dead.
+--
+-- AND THE TOWER IS STRUCTURAL, SO THE MEASUREMENT COMES OUT NEGATIVE.
+-- What drives it is not slack anywhere: one chain step moves the
+-- registry's own pricing by a LEVEL, because a subscribing frame swaps
+-- its head for an inner and pushes that inner's operators on as frames,
+-- and `Refuted.Chain-Step-Regs-Cap` pins the repair as exactly that
+-- level rather than as a further hypothesis.  So a fan-out entered at
+-- one level meets chains priced a level up, and the count towers with
+-- the dispatch gas by construction.  No exponent this fuel affords is a
+-- tower, so what moves is the walked side's MECHANISM and not its
+-- number -- and the potential face, whose receipt shrinks along the
+-- path and carries no level ledger at all, is the one already standing.
+
 abstract
   nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ

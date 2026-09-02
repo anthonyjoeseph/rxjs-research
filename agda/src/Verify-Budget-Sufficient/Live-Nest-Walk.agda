@@ -48,7 +48,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; sweepLive-nest)
-open import Verify-Budget-Sufficient.Caps using (iterSize-infl)
+open import Verify-Budget-Sufficient.Caps using (iterSize-infl; iterSize-mono-count)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsΦ?; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; valsSz?-mono;
          stepFrame-nest-Φ; stepFrame-nest-regs; stepFrame-regsSz; stepFrame-sz;
@@ -163,18 +163,48 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- from the path it is walking.  At a sink the values leave this chain
 -- for chains that live in the REGISTRY, and their side conditions are
 -- owed at their own paths -- so what has to be supplied is a reading of
--- the registry, not another reading of this path.  The registry is
--- priced by the size cap the walk runs under, READ AT THE LEVEL THE
--- WALK HAS REACHED, which is what makes the grant statable at all:
--- every admitted path is legal under that reading, so every admitted
--- walk starts at level zero of the same iterate the chain started at.
+-- the registry, not another reading of this path.
+--
+-- IT CARRIES THE WALK'S OWN AFFORDABILITY BECAUSE BOTH CHEAPER FORMS
+-- ARE FALSE.  Priced at one number for the values entering the sink
+-- and another for the registry's chains, with nothing between them, it
+-- falls to a single `map-f`: legality bounds a chain's SYNTAX and the
+-- conclusion bounds the VALUES that syntax produces, so what is
+-- missing is a RELATION between the two numbers rather than a bigger
+-- one.  Related, but read at the level the walk STANDS at, it falls
+-- again -- a fanned-into chain climbs from there by its own length,
+-- and that length is bounded by the registry's reading rather than by
+-- anything the caller can offer.  The two ranges then cross at the
+-- smallest cap the invariant admits, so no ceiling is choosable.
+--
+-- SO THE LEVEL LEDGER IS THE CAPS FACE'S RATHER THAN THIS ARM'S OWN,
+-- and that needs no further counterexample.  A FLAT ceiling fails on
+-- its own reading: the hop asks for the entry level plus the size
+-- reading there, so taking the entry level to BE the ceiling asks past
+-- it at once.  What absorbs an exponential climb is a ledger indexed
+-- by remaining nesting depth, and the caps face already carries one --
+-- `chainStep-caps` proves its climb survives a fan-out, and it is paid
+-- out of the instant's fuel rather than out of the cap.  So the
+-- affordability here is ONE reading and not a family over the range:
+-- what remains is a single inequality, whether the walked ceiling
+-- dominates the caps face's top level, and it is owed where that
+-- ceiling is defined rather than at the hop that spends it.
+--
+-- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
+-- REFUTED: `Refuted.Sink-Level-Range`
+-- DEAD ROUTE: picking the level ceiling at a caller and restating
+--   this hop downward.  Every caller's ceiling is capped by what
+--   `iterSize≤walkFac` affords, and one hop asks past it at every cap.
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U j : ℕ) (i : Fin n)
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    valsSz? U vals ≡ true →
+    iterSize S Lv S ≤ U →
+    1 ≤ S →
+    valsSz? (iterSize S j S) vals ≡ true →
     regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+    j ≤ Lv →
     DispatchLiveHyp sf gas id now U i vals fin sched st
 
 -- THE SIZE SIDE CONDITION, DISCHARGED BY THE SAME WALK IT GUARDS.  The
@@ -195,7 +225,7 @@ postulate
 walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (path : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  (∀ k → k ≤ Lv → iterSize S k S ≤ U) →
+  iterSize S Lv S ≤ U →
   1 ≤ S →
   valsSz? (iterSize S j S) vals ≡ true →
   pathSz? S path ≡ true →
@@ -203,9 +233,9 @@ walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   j + pathLen path ≤ Lv →
   PathLiveHyp sf gas id now U path vals fin sched st
 walk-LiveHyp-go sf gas id now S U Lv j root vals fin sched st _ _ _ _ _ _ = tt
-walk-LiveHyp-go sf gas id now S U Lv j (share-sink i) vals fin sched st afford _ hsz _ hreg hj =
-  walk-share-LiveHyp sf gas id now S U j i vals fin sched st
-    (valsSz?-mono (iterSize S j S) U vals (afford j j≤Lv) hsz) hreg
+walk-LiveHyp-go sf gas id now S U Lv j (share-sink i) vals fin sched st afford 1≤S hsz _ hreg hj =
+  walk-share-LiveHyp sf gas id now S U Lv j i vals fin sched st
+    afford 1≤S hsz hreg j≤Lv
   where
   j≤Lv : j ≤ Lv
   j≤Lv = ≤-trans (m≤m+n j 0) hj
@@ -228,7 +258,8 @@ walk-LiveHyp-go sf gas id now S U Lv j (f ↠ p) vals fin sched st afford 1≤S 
   j≤Lv : j ≤ Lv
   j≤Lv = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
   atU : valsSz? U vals ≡ true
-  atU = valsSz?-mono (iterSize S j S) U vals (afford j j≤Lv) hsz
+  atU = valsSz?-mono (iterSize S j S) U vals
+          (≤-trans (iterSize-mono-count S S 1≤S j≤Lv) afford) hsz
   hHead : FrameLiveHyp U f p vals
   hHead = frameLive-of-sz U f p vals atU
   hfz : frameSz? S f ≡ true

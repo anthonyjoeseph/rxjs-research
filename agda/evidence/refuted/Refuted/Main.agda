@@ -118,6 +118,13 @@ open import Refuted.Share-Go-Registry
   using (priced; slots-fixed; grown≡; charge≡; share-go-registry-absurd)
 open import Refuted.Share-Go-Stack
   using (priced; reg-priced; slots-fixed; grown≡; charge≡; share-go-stack-absurd)
+open import Refuted.Share-Live-Afford
+  using (entering≡; produced≡; hU; hR; share-live-afford-absurd)
+open import Refuted.Share-Live-Level
+  using (frame₁≡; frame₂≡; after₁≡; after₂≡; afford; 1≤S; hV; hR; j≤Lv;
+  share-live-level-absurd)
+open import Refuted.Sink-Level-Range
+  using (reading≡; range≡; len≡; 8≤S; j≤range; legal; sink-level-range-absurd)
 open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width

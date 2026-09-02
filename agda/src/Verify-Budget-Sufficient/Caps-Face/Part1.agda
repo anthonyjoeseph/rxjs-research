@@ -299,6 +299,27 @@ frameSz? B (thru-outer _ _)   = true
 -- walk face on this spine already reads it exactly that way; what
 -- does not is the cascade's own chain door, which is where the
 -- refuted fixed reading survived.
+
+-- AND THE TWO NUMBERS CANNOT BE MADE INDEPENDENT, WHICH CLOSES THE
+-- ONE REPAIR THE SINK HOP HAD LEFT.  The reading above invites a
+-- split: carry a LENGTH cap beside the syntax cap, let a subscribe
+-- add to the first alone, and a fan-out then costs levels additively
+-- rather than by a whole `sizeStep`.  What forbids it is WHICH
+-- observable gets registered.  `thruConsume` hands `subscribeInner`
+-- the value flowing down the path, not the arrival that entered the
+-- instant -- so the operator count pushed onto the registered chain is
+-- the DERIVED value's, and a derived value is exactly what the size
+-- ledger has been inflating frame by frame.  The length increment is
+-- therefore bounded by the size level and by nothing smaller, so a
+-- second number tracks the first instead of escaping it.
+--
+-- SO NEITHER OF THE TWO REPAIRS `Refuted.Sink-Level-Range` NAMED IS
+-- OPEN, and what is owed is a mechanism rather than a ledger: the walk
+-- carries a receipt about the path it is on, a sink spends it on paths
+-- it is not on, and every bridge tried so far has been a cap big
+-- enough to cover both.  That the higher-order case reaches this at
+-- all is not incidental -- a map producing observables under a
+-- flatten is the shape this campaign exists for.
 pathSz? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
 pathSz? B root           = true
 pathSz? B (share-sink i) = true
