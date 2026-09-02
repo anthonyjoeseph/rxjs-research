@@ -148,7 +148,12 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   hpp  = ∧-trueʳ hpz
   2≤S  = 2≤capsAt-size e sl id
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
-  Q≤   : Q ≤ 2 ^ (S * S)
+  EXP  : ℕ
+  EXP  = S * (suc S * S)
+  expEq : EXP ≡ S * (S * S) + S * S
+  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+                refl S
+  Q≤   : Q ≤ 2 ^ EXP
   Q≤   = pathΦF-cap S p hpp
   D≤   : D ≤ nestUnit e sl
   D≤   = ≤-trans (n≤1+n D) hnd
@@ -167,7 +172,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
                         refl q d
   -- the path's own depth, and the wrap, against the charge's own half
-  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ (S * S) * X
+  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ EXP * X
   hBC  =
     ≤-trans (+-mono-≤
               (≤-trans (≤-reflexive (halfShape Q D))
@@ -176,16 +181,16 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
                                                 (+-monoʳ-≤ (nestUnit e sl)
                                                   (nestUnit≤size e sl id))))))
               (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
-            (≤-reflexive (sym (*-distribˡ-+ (2 ^ (S * S))
+            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP)
                                 (nestUnit e sl + S) (S * W))))
   hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
   hBC2 = ≤-trans
            (subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
                   (sym (nestWalkAt-def e sl id))
                   (≤-trans (*-monoʳ-≤ 2 hBC)
-                  (≤-trans (≤-reflexive (sym (*-assoc 2 (2 ^ (S * S)) X)))
+                  (≤-trans (≤-reflexive (sym (*-assoc 2 (2 ^ EXP) X)))
                            (*-monoˡ-≤ X (^-monoʳ-≤ 2
-                             (s≤s (m≤n+m (S * S) (S * (S * S)))))))))
+                             (s≤s (≤-reflexive expEq)))))))
            (nestWalkAt≤nestΦAt e sl id)
   spread : 2 * (Q * (G + D))
              ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
@@ -288,9 +293,10 @@ postulate
   -- CONJUNCTION -- the per-value predicate together with a bound on
   -- `length vs` -- and `stepFrame-scan-caps`, proven about this very
   -- frame, takes that second conjunct as a premise.  `valsΦ?` carries
-  -- only the first, so the obvious move is to put the width back.  It
-  -- does not close anything: the crossing is at TWO values, and a
-  -- burst of two is admitted by every width the invariant allows.
+  -- only the first, so the obvious move is to put the width back.  A
+  -- width the ledger is free to choose closes nothing: the number that
+  -- has to bound the count is the instant's SIZE CAP, and a conjunct on
+  -- the values names no instant.
   --
   -- WHAT SEPARATES THE TWO FACES IS THAT ONE CURRENCY STEPS.  The
   -- mirror's conclusion is a receipt at a cap the fold has already
@@ -304,11 +310,96 @@ postulate
   --   reachable size floor with the frame at the ROOT -- so the path
   --   contributes neither factor nor depth and the crossing is the
   --   fold's alone -- and at a budget taken at exactly what one value
-  --   costs, the burst being that value twice.  Once again with the
-  --   width premise added and the width left under its binder, which
-  --   is what says the ledger is not the repair rather than that some
-  --   width is too small.
+  --   costs, the burst being the least count that crosses there.  Once
+  --   again with the width premise added and the width left under its
+  --   binder, which is what says the ledger is not the repair rather
+  --   than that some width is too small.
 
+  -- AND NEITHER THE COUNT NOR ITS FACTOR IS MISSING FROM THE
+  -- DEVELOPMENT, which is what narrows this to one question.  The
+  -- factor is the store face's `nestFac S W`, `((2 ^ S) ^ suc W) ^ S`
+  -- -- the burst power written INTO the factor instead of fitted under
+  -- it -- and `nestFac≤exp` with `nestFacLog≤pow` take the whole power
+  -- down to a polynomial in a size cap.  The fold is proven in that
+  -- currency: `scanVals-nest` and `stepFrame-emit-scan` state this very
+  -- step under `length vals ≤ W` and conclude at `(2 ^ sizeᵗ fn) ^ W`.
+  -- The count hypothesis is proven too, and walk-shaped: `burstsOK`
+  -- carries a bound along a path exactly as this walk carries its size
+  -- receipt, `burstsHead` projects the head, `burstsDrain` the frame's
+  -- own obligation, and `chainBurstOK` packages one chain's worth.  So
+  -- the residue is not a fact to prove but a place to read: WHERE this
+  -- arm's factor is denominated.
+
+  -- AND IT CANNOT BE READ AT THIS INSTANT'S SIZE CAP, WHICH IS WHAT
+  -- THIS ARM'S FACTOR IS PRICED AT.  The quantity bounding a burst is
+  -- the WIDTH -- `nestBurstAt` is `suc` of it -- and the width and the
+  -- size of one caps triple are ordered the wrong way from the first
+  -- fold on, a fold taking the width through `S ^ suc w` and the size
+  -- through `S * suc (2 * s)`.  `burst≤size′` does put the burst under
+  -- a size cap, and the cap it names is the NEXT instant's.  So a count
+  -- premise at this instant's cap is not one the development can
+  -- supply, however the ledger is shaped, and no conjunct on the values
+  -- reaches the difference.
+  -- REFUTED: `Refuted.Caps-Face`, whose `wid≤size-absurd` orders the two
+  --   axes at one triple and whose `scan-count-under-ceiling-absurd`
+  --   kills the squared form beside it.
+  -- DEAD ROUTE: denominating this arm at `frameStep j` of the instant's
+  --   caps instead, so the receipt is read at a cap the fold has
+  --   already advanced.  The width axis exponentiates per fold, so j
+  --   folds put it above `towerℕ j`, and a count that reads it gives up
+  --   the linear height `capsAt-tower` proves.
+
+  -- AND THE COUNT CANNOT BE CARRIED AS ITS OWN PARAMETER EITHER, WHICH
+  -- CLOSES THE LAST DENOMINATION ON OFFER.  Taking the burst's count as
+  -- a second parameter is what the store face does -- `nestFac S W`
+  -- takes both -- and it reads as what the two findings above point at,
+  -- since premise and conclusion would then move together and a free
+  -- count would finance itself.  What decides it is AFFORDABILITY, and
+  -- the ceiling is proven rather than open: `nestΦ-sight≤capsH` routes
+  -- through `capsAt-exp≤capsH`, so a budget denominated at an instant
+  -- may carry an exponent as large as two to that instant's size cap
+  -- and no larger.  A factor read at a count W costs the path's length
+  -- times `suc S * W`, so the exponent is quadratic in the cap and
+  -- LINEAR in the count, and affording it asks the count under `2 ^ S`.
+  -- The caps face's width is not under it: the width folds through
+  -- `S ^ suc w` against the size's `S * suc (2 * s)`, so it is a tower
+  -- in the fold count where the size is geometric.
+  -- REFUTED: `Refuted.Caps-Face.wid≤exp-size-absurd`, whose base triple
+  --   starts with its width EQUAL to its size -- so nothing is smuggled
+  --   in by starting wide -- and crosses at three folds, `wid₃≡` and
+  --   `size₃≡` pinning five hundred and thirteen doublings of width
+  --   against a ceiling of one hundred and seventy.
+
+  -- AND THE STORE FACE'S RECURRENCE DOES NOT TRANSFER, WHICH IS THE
+  -- FOURTH DENOMINATION AND THE ONE THAT SAYS WHERE TO LOOK NEXT.  It
+  -- is the obvious reading of the three findings above: `nestCapAt` is
+  -- a recurrence rather than a formula, each instant multiplying the
+  -- previous cap by `nestFacAt`, so a burst power rides as a factor
+  -- and never has to fit inside an exponent -- and that budget is
+  -- affordable, proven, and already a summand of this one through
+  -- `capΦAt`.  What the two faces do not share is WHICH instant's
+  -- burst each has to price.  `nestCapAt` at an instant charges the
+  -- PREVIOUS instant's folds, and `capsAt-wid<size` puts that width
+  -- under THIS instant's size, so the charge is polynomial against a
+  -- ceiling that is two to the size.  This ledger is spent DURING its
+  -- own instant -- `cascade-depth-capsH` is what spends it, against
+  -- the fuel that instant runs at -- so its folds' width is only under
+  -- the NEXT instant's size.  One index, and it is the whole
+  -- difference: the width folds through a power tower where the size
+  -- steps geometrically, so a width read one instant late is above
+  -- every exponential this instant's fuel affords.
+
+  -- SO WHAT IS ACTUALLY UNDECIDED IS THE BURST ITSELF, AND THE
+  -- DEVELOPMENT HAS NEVER SAID.  `burstsOK` carries its bound as a
+  -- free parameter along a whole path and no consumer anywhere
+  -- instantiates it, so what bounds how many values one frame is
+  -- handed mid-walk is an open choice rather than a fact this face may
+  -- read off.  Everything above is conditional on that choice: at a
+  -- width cap the four denominations are closed and the currency has
+  -- to move; at anything polynomial in this instant's size cap they
+  -- were closed against a quantity the walk never reaches, and the
+  -- formula standing here is already the right shape.  That is the
+  -- question to settle before another budget is drawn.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -514,6 +605,9 @@ entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
+  expEq : Sz * (suc Sz * Sz) ≡ Sz * (Sz * Sz) + Sz * Sz
+  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+                refl Sz
   Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
            ≤ nestΦAt e sl id
   Φfit = ≤-trans
@@ -521,9 +615,7 @@ entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φf
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
                               (^-monoʳ-≤ 2
-                                (≤-trans (n≤1+n (Sz * Sz))
-                                         (s≤s (m≤n+m (Sz * Sz)
-                                                 (Sz * (Sz * Sz)))))))
+                                (≤-trans (≤-reflexive expEq) (n≤1+n _))))
                      (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
                               (m≤m+n (nestUnit e sl + Sz)
                                      (Sz * slotWrapSum sl)))))

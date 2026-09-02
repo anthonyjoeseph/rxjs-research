@@ -8,7 +8,8 @@ module Refuted.Main where
 
 open import Refuted.Caps-Face
   using (caps-frame-boundary-absurd; reach-via-size-absurd;
-         scan-count-under-ceiling-absurd; wid≤size-absurd)
+         scan-count-under-ceiling-absurd; wid≤size-absurd;
+         wid≤exp-size-absurd; wid₃≡; size₃≡)
 open import Refuted.Anchor
   using (g0-hasAtLeast-absurd; walk-hyps-absurd; hop-anchor-absurd;
          round3b-ledger-reset-absurd; round3-old-ell-absurd;
@@ -75,7 +76,7 @@ open import Refuted.Thru-Scan-Burst-Nest
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
 open import Refuted.Scan-Phi-Burst
-  using (Φ-hyp-burst; scan-Φ-burst-absurd)
+  using (Φ-hyp-burst; scan-Φ-burst-absurd; live-factor; refuted-factor)
 open import Refuted.Scan-Nodes-Burst
   using (before≡0; after≡65; budget≡64; stepFrame-nest-nodes-burst-absurd)
 open import Refuted.Subscribe-Caps-Nest
@@ -224,6 +225,6 @@ open import Refuted.Cap-Walk-Cross
   using (CapUnderWalk; capExp≡; walkExp≡; walkFac≡; cap-walk-cross-absurd;
          FieldStepFits; field-step-absurd)
 open import Refuted.Scan-Phi-Width
-  using (ScanΦFits; nestD≡; depth≡; rootFac≡; legal; unit-ok; premΦ;
+  using (ScanΦFits; size≡; nestD≡; depth≡; rootFac≡; legal; unit-ok; premΦ;
          bound; scan-phi-width-absurd;
          ScanΦFitsWide; wide; scan-phi-wide-absurd)
