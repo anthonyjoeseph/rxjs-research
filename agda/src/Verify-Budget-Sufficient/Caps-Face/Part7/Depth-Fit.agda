@@ -204,12 +204,14 @@ postulate
   -- parameter of this statement and its conclusion is not derivable
   -- from its hypotheses.
   --
-  -- SO WHAT IS OWED IS AN INVARIANT AND NOT A LEMMA.  A ceiling on the
-  -- table is a fact every writer of a node must establish and every
-  -- reader may spend, which is a field on the record the walk already
-  -- carries -- and the ambient bundle this face runs under is about
-  -- caps and slots alone, so there is no field to hang it on today.
-  -- Threading it in here instead would launder the debt out of the
+  -- SO WHAT IS OWED IS AN INVARIANT AND NOT A LEMMA -- AND NOT ONE IN
+  -- THIS BUDGET'S CURRENCY EITHER.  A ceiling on the table is a fact
+  -- every writer of a node must establish and every reader may spend,
+  -- which is a field on the record the walk already carries; the
+  -- ambient bundle this face runs under is about caps and slots
+  -- alone, so there is no field to hang it on today, and the block
+  -- below says why minting one would not help.  Threading it in here
+  -- instead would launder the debt out of the
   -- ledger and into a signature that only today's one caller happens
   -- to satisfy, so the statement is left at full strength and the gap
   -- is left where a reader will meet it.  The width half is not part
@@ -230,6 +232,21 @@ postulate
   -- length, so a bound sitting ABOVE `nestWalkAt` is not a weak bound
   -- here, it is no bound at all.
 
+  -- AND THE STORE SUMMAND IS THE WHOLE SEPARATION FROM A PROVEN ARM,
+  -- which is what makes the residue small rather than structural.
+  -- The fourth arm closes from these very four premises --
+  -- `walk-thru-fit` builds its grant out of the path's depth, the
+  -- depth in flight and the context's wrap, and reads the store
+  -- nowhere at all -- so what stands between this arm and that one is
+  -- one term and not a shape.  That term is read at the entry the
+  -- step names: the scan clause does a single lookup and a single
+  -- write at its own `nid` and never consults another, and
+  -- `stepFrame-emit-scan` bounds what LEAVES the frame from that
+  -- accumulator alone.  The table's own max is the honest reading for
+  -- the table the step RETURNS and for nothing else.  So the ceiling
+  -- owed here is one accumulator's depth, and it is the values folded
+  -- into it that should pay for it.
+
   -- AND THE CEILING AT THE RIGHT DENOMINATION EXISTS BUT DOES NOT
   -- PAY, WHICH IS THE ROUTE SETTLED RATHER THAN NARROWED.  `nestOK?`
   -- is `storeNestMax` under `nestCapAt`, and `cascadeGo-nest-nodes`
@@ -245,26 +262,19 @@ postulate
   -- walk has one linear factor to answer with, over a wrap sum the
   -- cap itself bounds.  So the ceiling in hand sits ABOVE the budget,
   -- exactly as the `S` reading does, and threading it buys nothing.
+  -- AND MINTING A FRESH CEILING IN THE BUDGET'S OWN CURRENCY DOES NOT
+  -- ESCAPE IT, because the writers' law is the cap's recurrence:
+  -- `store-growth` takes the table's maximum to `nestFacAt` times
+  -- itself plus the increment in one instant, and that factor does not
+  -- fit inside one step of the budget.  So what has to move is the
+  -- currency the fit is stated in, not the ceiling handed to it.
   -- REFUTED: `Refuted.Cap-Walk-Cross`, at every floor this
   --   development proves at once -- the size cap at two, the burst
   --   and the register width at one, the deletion size at the cap and
   --   the wrap sum at its bound -- and no axis moves the gap the
-  --   other way.
+  --   other way.  Its second half is the writers' side, at the same
+  --   floors.
 
-  -- AND THE STORE SUMMAND IS THE WHOLE SEPARATION FROM A PROVEN ARM,
-  -- which is what makes the residue small rather than structural.
-  -- The fourth arm closes from these very four premises --
-  -- `walk-thru-fit` builds its grant out of the path's depth, the
-  -- depth in flight and the context's wrap, and reads the store
-  -- nowhere at all -- so what stands between this arm and that one is
-  -- one term and not a shape.  That term is read at the entry the
-  -- step names: the scan clause does a single lookup and a single
-  -- write at its own `nid` and never consults another, and
-  -- `stepFrame-emit-scan` bounds what LEAVES the frame from that
-  -- accumulator alone.  The table's own max is the honest reading for
-  -- the table the step RETURNS and for nothing else.  So the ceiling
-  -- owed here is one accumulator's depth, and it is the values folded
-  -- into it that should pay for it.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

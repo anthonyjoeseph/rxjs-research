@@ -43,15 +43,17 @@
 -- previous cap is at least the unit.  Every direction the route could
 -- be widened in widens the gap.
 --
--- WHAT IS OWED INSTEAD.  Not a bigger ceiling and not a routed one: a
--- number denominated in what the walk affords.  The fits ask for the
--- depth of the ONE entry a frame names, which is a per-node fact, and
--- a global maximum over the table was only ever the nearest thing to
--- hand.  So the residue is a field on the invariant record -- a
--- ceiling every writer of a node establishes and every reader spends
--- -- and it has to be stated in the walk's currency rather than in the
--- caps face's, since this is the second ceiling in that currency to
--- cross the same budget.
+-- WHAT IS OWED INSTEAD, AND IT IS NOT A FIELD.  The obvious repair
+-- for a ceiling that cannot be routed is one every writer of a node
+-- establishes and every reader spends, stated in the walk's currency
+-- rather than the caps face's.  The second half below refutes that
+-- too, from the writers' own law: `store-growth` takes the store's
+-- maximum to `nestFacAt` times itself plus the increment in one
+-- instant, and that factor does not fit inside one step of the
+-- budget.  So the store's growth is denominated in the caps
+-- recurrence at both ends -- at the reader and at the writer -- and
+-- what has to move is the currency the fits are stated in, not the
+-- ceiling handed to them.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Cap-Walk-Cross where
 
@@ -132,3 +134,45 @@ walkSide≡ = refl
 cap-walk-cross-absurd : CapUnderWalk → ⊥
 cap-walk-cross-absurd pr =
   ≤⇒≤ᵇ (pr 2 1 1 1 16 1 2 2≤C 1≤B 1≤W 1≤unit unit≤prev C≤dS wrap≤bound)
+
+----------------------------------------------------------------------
+-- AND THE SAME CROSSING KILLS THE FIELD BEFORE IT IS BUILT.  The
+-- reading above is about the ceiling that HAPPENS to exist; this one
+-- is about any ceiling in the walk's currency at all.  `store-growth`
+-- is the writers' own law -- one instant takes the store's maximum to
+-- `nestFacAt` times itself plus the increment -- so a field asserting
+-- the store sits under the walk's budget is preserved only if that
+-- factor fits inside one step of the budget.  It does not: the factor
+-- alone already carries four times the budget's whole exponent, and
+-- the step it has to fit inside multiplies by less than that.
+--
+-- SO THE ROUTE AND ITS REPAIR DIE TOGETHER.  A field no producer can
+-- establish is not a smaller version of a ceiling that cannot be
+-- routed -- it is the same fact read at the writer instead of at the
+-- reader, and what both say is that the store's growth is denominated
+-- in the caps recurrence while the fits are denominated in a fixed
+-- exponential of the size cap.
+----------------------------------------------------------------------
+FieldStepFits : Set
+FieldStepFits = ∀ (C C′ B W unit wrap inc dS : ℕ) →
+  2 ≤ C →
+  1 ≤ B →
+  1 ≤ W →
+  1 ≤ unit →
+  1 ≤ inc →
+  C ≤ C′ →
+  C′ ≤ dS →
+  wrap ≤ C′ * (2 ^ C′ * C′) →
+  2 ^ (suc B * suc B * (suc dS * (W * (dS * dS))))
+    * (2 ^ suc (C * (C * C) + C * C) * (unit + C + C * wrap) + inc)
+    ≤ 2 ^ suc (C′ * (C′ * C′) + C′ * C′) * (unit + C′ + C′ * wrap)
+
+1≤inc : 1 ≤ 1
+1≤inc = ≤-refl
+
+C≤C′ : 2 ≤ 2
+C≤C′ = ≤-refl
+
+field-step-absurd : FieldStepFits → ⊥
+field-step-absurd pr =
+  ≤⇒≤ᵇ (pr 2 2 1 1 1 16 1 2 2≤C 1≤B 1≤W 1≤unit 1≤inc C≤C′ C≤dS wrap≤bound)

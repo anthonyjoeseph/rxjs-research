@@ -215,18 +215,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PUT THE PER-NODE CEILING ON THE INVARIANT RECORD.** The routing
-  branch is closed: the one ceiling on `EvalSt.nodes` is `nestOK?`'s,
-  and `Refuted.Cap-Walk-Cross` puts it above `nestWalkAt` at the same
-  instant, so `scanΦ-fit` and `innerΦ-fit` cannot be paid by threading
-  what exists — and since the live leaf's drain arm now spends the same
-  fit the registry arm does, that is three faces waiting on one field.
-  What all of them ask for is ONE entry's depth, which a table-wide
-  maximum was standing in for. So the work is a field every writer of a
-  node establishes and every reader spends, in the walk's currency
-  rather than the caps face's. The first question is whether the
-  writers can: a field no producer can supply moves the same gap one
-  level down instead of closing it.
+- **RE-DENOMINATE THE TWO FRAME FITS.** Both branches are shut by
+  `Refuted.Cap-Walk-Cross`: the ceiling that exists outruns
+  `nestWalkAt` at the same instant, and a fresh field in the walk's
+  currency cannot be preserved either, since `store-growth` IS
+  `nestCapAt`'s recurrence — the node table grows in the caps
+  currency at the writer and at the reader alike. So what is
+  mis-denominated is `scanΦ-fit` and `innerΦ-fit`, not the ceiling
+  handed to them. `nestCap-inc-sight≤capsH` is the standing evidence
+  that the repair is affordable: `capsH` already covers the SUM of
+  both currencies at one instant, so a `G` priced against `nestCapAt`
+  is buyable where one priced against `nestWalkAt` is not. First job
+  is where the walk's `U` is fixed, and whether that site sees
+  `capsH`.
 
 - **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
   level ledger is closed to `walk-share-LiveHyp` in both directions —
@@ -292,10 +293,11 @@ does not fit is a finding about the shared statement, not about the head.
   the drain's new grant. Two of its three obligations are drain ledgers this
   face has and must be routed; the third is the merge node's own queue depth,
   and the one ceiling on that table sits above the budget it is spent against.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the fold's new grant. Its ask is one accumulator's depth at the node the
-  step names, and routing the table's own ceiling down is settled dead — that
-  ceiling outruns `nestWalkAt` at the same instant. A record field is owed.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
+  the fold's new grant. Its ask is one accumulator's depth at the node the step
+  names, and both ways to pay it here are dead: the table's own ceiling outruns
+  `nestWalkAt`, and no field replacing it survives `store-growth`. The currency
+  has to move.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
