@@ -74,3 +74,21 @@ error message actively misdirects. Read the entry before reasoning from the erro
   mangled your source. Since the tower runs `-W error`, the warning is a build failure.
   This bites specifically on the `budget-sufficient` spine, where the seal is mandatory
   and staging a bound through named steps is the natural way to write it.
+
+- **A CLOSED NUMERAL LARGE ENOUGH TO EXCEED WORD ARITHMETIC IS FINE UNTIL IT MEETS A
+  FREE VARIABLE, AND THEN THE CHECKER PEELS IT ONE SUCCESSOR AT A TIME.** `_+_` and
+  `_*_` on `ℕ` are GMP-backed only when BOTH operands close; with one operand stuck on a
+  bound variable, Agda falls back on the defining clauses, and `suc n * m = m + n * m`
+  turns a forty-five digit factor into a forty-five digit recursion. It surfaces three
+  ways, all of which read as "Agda hung on a two-line lemma": an implicit left for the
+  unifier to solve against `1 + U` where `U` is such a numeral, which inverts a builtin
+  addition; two DIFFERENT SPELLINGS of the same product compared under a stuck sum, which
+  defeats the syntactic-equality short circuit and reduces instead; and `with` on a `Σ`
+  whose type carries such a product, which reduces the abstracted type.
+  Three repairs, and all of them are about keeping the numeral away from the variable
+  rather than about making it smaller — shrinking it does not help, since the peel is
+  linear in the value: supply the implicits explicitly; state the step that introduces
+  the free variable **over variables**, in its own lemma, and apply it at the
+  obligation's own spellings so every comparison is syntactic; and take a `Σ` apart with
+  `proj₁`/`proj₂` rather than `with`. Measured on one refutation: seven minutes and
+  thirteen gigabytes down to thirteen seconds, with no change to what it proves.

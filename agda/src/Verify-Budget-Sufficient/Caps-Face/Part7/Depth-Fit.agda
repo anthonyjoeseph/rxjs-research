@@ -148,7 +148,12 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   hpp  = ∧-trueʳ hpz
   2≤S  = 2≤capsAt-size e sl id
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
-  Q≤   : Q ≤ 2 ^ (S * S)
+  EXP  : ℕ
+  EXP  = S * (suc S * S)
+  expEq : EXP ≡ S * (S * S) + S * S
+  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+                refl S
+  Q≤   : Q ≤ 2 ^ EXP
   Q≤   = pathΦF-cap S p hpp
   D≤   : D ≤ nestUnit e sl
   D≤   = ≤-trans (n≤1+n D) hnd
@@ -167,7 +172,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
                         refl q d
   -- the path's own depth, and the wrap, against the charge's own half
-  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ (S * S) * X
+  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ EXP * X
   hBC  =
     ≤-trans (+-mono-≤
               (≤-trans (≤-reflexive (halfShape Q D))
@@ -176,16 +181,16 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
                                                 (+-monoʳ-≤ (nestUnit e sl)
                                                   (nestUnit≤size e sl id))))))
               (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
-            (≤-reflexive (sym (*-distribˡ-+ (2 ^ (S * S))
+            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP)
                                 (nestUnit e sl + S) (S * W))))
   hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
   hBC2 = ≤-trans
            (subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
                   (sym (nestWalkAt-def e sl id))
                   (≤-trans (*-monoʳ-≤ 2 hBC)
-                  (≤-trans (≤-reflexive (sym (*-assoc 2 (2 ^ (S * S)) X)))
+                  (≤-trans (≤-reflexive (sym (*-assoc 2 (2 ^ EXP) X)))
                            (*-monoˡ-≤ X (^-monoʳ-≤ 2
-                             (s≤s (m≤n+m (S * S) (S * (S * S)))))))))
+                             (s≤s (≤-reflexive expEq)))))))
            (nestWalkAt≤nestΦAt e sl id)
   spread : 2 * (Q * (G + D))
              ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
@@ -288,9 +293,10 @@ postulate
   -- CONJUNCTION -- the per-value predicate together with a bound on
   -- `length vs` -- and `stepFrame-scan-caps`, proven about this very
   -- frame, takes that second conjunct as a premise.  `valsΦ?` carries
-  -- only the first, so the obvious move is to put the width back.  It
-  -- does not close anything: the crossing is at TWO values, and a
-  -- burst of two is admitted by every width the invariant allows.
+  -- only the first, so the obvious move is to put the width back.  A
+  -- width the ledger is free to choose closes nothing: the number that
+  -- has to bound the count is the instant's SIZE CAP, and a conjunct on
+  -- the values names no instant.
   --
   -- WHAT SEPARATES THE TWO FACES IS THAT ONE CURRENCY STEPS.  The
   -- mirror's conclusion is a receipt at a cap the fold has already
@@ -304,10 +310,10 @@ postulate
   --   reachable size floor with the frame at the ROOT -- so the path
   --   contributes neither factor nor depth and the crossing is the
   --   fold's alone -- and at a budget taken at exactly what one value
-  --   costs, the burst being that value twice.  Once again with the
-  --   width premise added and the width left under its binder, which
-  --   is what says the ledger is not the repair rather than that some
-  --   width is too small.
+  --   costs, the burst being the least count that crosses there.  Once
+  --   again with the width premise added and the width left under its
+  --   binder, which is what says the ledger is not the repair rather
+  --   than that some width is too small.
 
   -- AND THE WIDTH IS A PARAMETER THE STORE FACE ALREADY CARRIES, which
   -- is what this arm is short of rather than a fact the development
@@ -318,9 +324,12 @@ postulate
   -- power down to a polynomial the caps recurrence affords.  The fold
   -- itself is already proven in that currency: `scanVals-nest` and
   -- `stepFrame-emit-scan` state this very step under `length vals ≤ W`
-  -- and conclude at `(2 ^ sizeᵗ fn) ^ W`.  So the potential is the one
-  -- face whose walk threads no width, and threading it restates what
-  -- the walk hands a frame rather than asking for a new bound.
+  -- and conclude at `(2 ^ sizeᵗ fn) ^ W`.  The walk's own factor now
+  -- reads the same way -- the burst power written in, at the instant's
+  -- size cap, which is the one quantity bounding how wide a burst the
+  -- invariant admits -- so what is left is the premise that the count
+  -- is under that cap, and the walk is the one face threading no such
+  -- premise.
   -- DEAD ROUTE: denominating this arm at `frameStep j` of the instant's
   --   caps instead, so the receipt is read at a cap the fold has
   --   already advanced.  The width axis exponentiates per fold, so j
@@ -535,6 +544,9 @@ entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
+  expEq : Sz * (suc Sz * Sz) ≡ Sz * (Sz * Sz) + Sz * Sz
+  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+                refl Sz
   Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
            ≤ nestΦAt e sl id
   Φfit = ≤-trans
@@ -542,9 +554,7 @@ entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φf
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
                               (^-monoʳ-≤ 2
-                                (≤-trans (n≤1+n (Sz * Sz))
-                                         (s≤s (m≤n+m (Sz * Sz)
-                                                 (Sz * (Sz * Sz)))))))
+                                (≤-trans (≤-reflexive expEq) (n≤1+n _))))
                      (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
                               (m≤m+n (nestUnit e sl + Sz)
                                      (Sz * slotWrapSum sl)))))

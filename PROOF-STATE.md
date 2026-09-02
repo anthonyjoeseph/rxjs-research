@@ -215,19 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THREAD THE BURST WIDTH THROUGH THE Φ WALK.** The stepped
-  denomination this leg used to name is discarded — the width axis
-  towers per fold, and `scanΦ-fit`'s header carries why. What
-  replaces it is a currency the store face already proves: `nestFac`
-  writes the burst power INTO the factor, `nestBurstAt` is the width
-  it is read at, `burst≤size′` bounds it, and `nestFac≤exp` with
-  `nestFacLog≤pow` take the power to a polynomial the caps recurrence
-  affords — while `scanVals-nest` and `stepFrame-emit-scan` prove this
-  very fold under `length vals ≤ W`. The potential is the one face
-  threading no width. Give the Φ ledger and the walk that parameter,
-  outside-in: restate `valsΦ?` and the walk's hypotheses at `W`,
-  postulate the leaves, and land the fold arm's local discharge, both
-  sides then reading one power.
+- **BOUND THE BURST BY THE CAP THE WALK ALREADY CARRIES.** The
+  factor half is landed: a fold is priced per value in the burst, at
+  the instant's size cap, so `pathΦF-cap` is a cube and the sealed
+  exponent under `nestWalkAt` fits it with one to spare. The count is
+  what is left, and the parameter this leg used to name is refuted — a
+  width the ledger picks admits any burst, so the number has to be the
+  size cap `valsΦ?` already takes. Add that conjunct to the ledger and
+  thread it across a frame step the way the size side condition is
+  threaded, discharge it at the walk's singleton entry, and land the
+  fold arm's local discharge with both sides reading one power.
 
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
@@ -294,9 +291,9 @@ does not fit is a finding about the shared statement, not about the head.
   `drainW`, so nothing is free. Two obligations are drain ledgers this face has
   and must route; the third is the merge node's own queue depth.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
-  of the fold's new grant. Its ceiling now fits under `nestΦAt`; its BURST does
-  not, and the width conjunct `valsCaps?` carries does not repair it — the
-  crossing is at two values. What moves is where the charge is denominated.
+  of the fold's new grant. The factor now buys a burst up to the instant's size
+  cap, moving the crossing from the second value to the twenty-fourth; a width
+  the ledger picks still admits it, so the count premise is what is missing.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
