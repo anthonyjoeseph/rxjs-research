@@ -142,3 +142,7 @@ open import Probed.Frame-Step-Regs-Level
          premE₁; figuresE≡; rowE;
          premF; figuresF≡; rowF;
          figuresG≡; rowG; figuresH≡)
+
+open import Probed.Frame-Drain-Live
+  using (beforeLive; beforeSlots;
+         figures0; figures1; figures2; figures3; figures4)

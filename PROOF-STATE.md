@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN BUILD THE PROGRAM THAT REACHES THE DRAIN.** The registry half
-  of this leg landed and the live half did not, for a reason worth the
-  commit: `stepFrame-nest-live`'s completion arm subscribes out of the
-  *All node's QUEUE, and no family in the tree fills one. An unlimited
-  outer never refuses room, and bounding the limit is not the fix —
-  a queue fills only while an earlier inner is still ACTIVE, and every
-  inner these families build completes inside its own burst. So the
-  commit is a program whose map produces TWO KINDS of inner off the
-  arriving value: one outliving its burst to hold the slot, and the
-  deferred nest that queues behind it. That is the arm's only door, and
-  building it is the work.
-
 - **THEN READ THE REGISTRY'S OWN PATHS, WHICH THE FAN-OUT BODY TURNED
   UP.** Splitting the terminal closed the potential and exposed two
   facts nothing carries: a re-entered chain is walked FROM THE TOP, so
@@ -250,6 +238,17 @@ does not fit is a finding about the shared statement, not about the head.
   the Φ walk carrying the walk grant — and it is a real fork, since
   threading a grant is a restatement and the ledger prices that.
 
+- **THEN PRICE THE GATE ON THE SIDE THAT SEES THROUGH IT.** The drain
+  arm turned out to be paid by the CAP SIZE and by nothing the state
+  holds: the nesting measure truncates at the gate, so a parked inner
+  reads zero at the node while draining it mints a live entry at the
+  body's full depth. That asymmetry is now measured but unspent — no
+  statement in the tier names it, so every fit reaching this arm
+  re-derives it. So the commit is to state the gate's own inequality
+  where the two readings meet, and either wire it into the drain
+  ledgers that need it or refute it at a program whose gated body
+  outruns the size its caps are built from.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
@@ -257,10 +256,11 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what
-  one frame mints on the live list. The completion arm now carries the registry
-  face's own drain fit, since a queued gate mints past every depth the walk
-  holds. The repaired arm is unreached: nothing here fills the queue.
+- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY,
+  `REFUTED, PROBED×2`: what one frame mints on the live list. The completion
+  arm carries the registry face's drain fit, since a queued gate mints past
+  every depth the walk holds. Reached at an installed queue: only the cap
+  size pays, and the fit's state reading is blind.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
