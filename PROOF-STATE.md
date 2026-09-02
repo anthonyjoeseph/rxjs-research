@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN SPEND THE CAP RECEIPT AT THE ONE ARM THAT MINTS FROM A
-  QUEUE.** The gate's inequality was already proven; what the tier
-  lacked was a site to spend it, and the live arm was one postulate
-  wide. It is now four proven clauses over two leaves, and the split
-  localised the gate onto the completion leaf alone — whose fit
-  already names the node by a lookup equation and hands over the caps
-  ledger, whose park receipt reads a size seeing one unit per gate
-  layer where the depth reads none. So the commit walks that receipt
-  through the queue drain to the subscribe that mints, and either
-  closes the leaf or names the clause where the drain's own recursion
-  loses it.
+- **THEN OPEN THE DRAIN'S OWN RECURSION.** The completion frame is now
+  a checked dispatch — the four routes that hand their schedule back
+  are proven, and everything still asserted sits on the queue drain
+  itself, at the caps bundle the node lookup delivers. What that
+  bundle has not been spent ON is the single subscription: the drain
+  recurses over the queue and mints once per entry, so the fold it
+  returns is a join of one subscribe per parked term against a
+  pre-state offering zero. So the commit splits that recursion — a
+  real body over one subscribe leaf, the park receipt read at the
+  entry — and either closes the join against the cap or names the
+  clause where the recursion outruns it.
 
 - **THEN FOLLOW THE REGISTRY RECEIPT BACK TO THE MINT.** The fan-out
   pair turned out not to be the fan-out's at all: the admission filter
@@ -255,10 +255,10 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`stepFrame-nest-live-inner`** (Live-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED`: what the completion frame mints, draining the node's
-  queue. Reached at an installed queue: a gated entry reads zero at every state
-  quantity the fit's residue is built from, so only the cap size pays.
+- **`mergeAllDrain-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+  what draining a merge node's parked queue mints on the live list. Reached at
+  an installed queue: a gated entry reads zero at every state quantity the
+  consuming fit's residue is built from, so only the cap size pays.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
   the outer frame mints, subscribing the arrivals it is handed. The one kind
   whose side condition is a size bound on values rather than a unit.
