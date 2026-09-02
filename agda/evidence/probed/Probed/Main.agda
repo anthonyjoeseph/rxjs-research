@@ -115,3 +115,6 @@ open import Probed.Chain-Step-Regs-Ops
 
 open import Probed.Chain-Step-Regs-Read
   using (reaches; budgets; budgets′; duplicates; fits)
+
+open import Probed.Fold-Regs-Two-Caps
+  using (reaches; figures; figures′; separates; fits)

@@ -224,9 +224,29 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   `S = B` so the joint search pins all three premises at once.  NOT
 --   COVERED: only the additive shape, and only `S = B`.  A frame that
 --   NESTS its argument composes down one spine instead, which is
---   where the doubling this replaced dies; and a walked path priced
---   strictly below the standing registry is unreached, so the step's
---   two caps are never separated by a row.
+--   where the doubling this replaced dies.
+
+-- PROBED: `Probed.Fold-Regs-Two-Caps` -- the two caps SEPARATED,
+--   which every row above collapses.  Neither cap can refute by
+--   moving up: raising either enlarges the grant and weakens the
+--   premise it gates at once, so for a fixed door the binding
+--   instantiation is each cap at its own least, and separation is a
+--   property of the PROGRAM.  Two families that look like they
+--   provide it do not, and both were run: re-applying the fold
+--   saturates the registry at the first step, and on a duplicator
+--   `pathSz?` charges each frame's own syntax, so a value the walked
+--   frames built is priced by the cap that prices them.  What works
+--   is standing the syntax OFF the path -- a duplicator stack merged
+--   beside a single map, with the scheduler firing the map's source
+--   first.  The path column holds at three while the registry column
+--   climbs six, nine, fourteen with the branch nothing walks, and the
+--   exit column equals the registry column at every row: the fold
+--   charges the registry nothing the walk added, so the frame step is
+--   spare and the margin widens with the separation instead of
+--   closing.  NOT COVERED: the walk is disjoint from the standing
+--   entries here, so a walk that RE-ENTERS the branch pricing `B` is
+--   unreached, and the separation is only in the length conjunct --
+--   `S` is held at one program throughout rather than swept.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)

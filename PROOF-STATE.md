@@ -215,18 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SEPARATE THE TWO CAPS, WHICH IS THE ONE THING NO ROW HAS DONE.**
-  The restated leaf prices the walked path at `S` and the standing
-  registry at `B ≥ S`, and every row taken so far collapses them: the
-  duplicator sweep searches ONE joint budget, and the nesting
-  witness's repair row is read at `S = B` too. But a caller standing
-  high up the iterate has `B` far above `S`, and that is where the
-  grant `S·(1+2B)` is thinnest against what a spine of `S` frames can
-  push. Build the program that stands a long registry beside a short
-  walked path, and read the step against it — a failing row says the
-  per-frame reading is wrong the way the doubling was, and a holding
-  one is the first evidence reaching the region the refutation
-  opened.
+- **THE WALK THAT RE-ENTERS THE BRANCH PRICING `B`, WHICH IS THE HOLE
+  THE SEPARATION LEFT.** The caps are now genuinely apart — path at
+  three, registry at six, nine, fourteen — but only because the walk
+  is DISJOINT from the entries that set `B`, so the fold adds nothing
+  and the step is spare. The consumer's walk is not disjoint: it
+  re-enters the cone it is registered in, charging its own product
+  against a registry already at `B`. Build the separated program whose
+  light branch walks BACK into the heavy one. A margin that survives
+  covers what the consumer does; one that closes says the frame step
+  is right only where nothing overlaps.
 
 - **THEN THE SPINE AT HEIGHT, AGAINST THE GRANT THAT REPLACED THE
   DOUBLING.** The nesting family is the only shape known to make a
@@ -295,11 +293,11 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2, PROBED×8`: one fold's registry price as a LENGTH,
-  the walked path plus the inner it received. The doubling is REFUTED — the
-  grant is a maximum, a nesting spine registers their product. Restate per
-  FRAME; the door is a body over it, so its cone moves too.
+- **`foldPath-regsLen`** (Regs-Fold-Len) — FALSITY, `PROBED`: one fold's
+  registry price as ONE FRAME STEP of two caps — the walked path's `S`, the
+  standing registry's `B ≥ S`. The doubling was refuted; the separated form
+  holds on a walk disjoint from the registry, margin widening. A re-entering
+  walk is unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
