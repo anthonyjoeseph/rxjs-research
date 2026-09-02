@@ -216,10 +216,23 @@ frameΦ-fit sl id (thru-outer op nid) p vals sched hsl hpz hnd hΦ =
 -- THE REGISTRY-SIDE GRANT FOR THE POTENTIAL, and it is the same gap the
 -- live arm's is: a sink hands the values to chains whose paths are in
 -- the registry, and the potential is a statement about a PATH, so the
--- one the walk carries says nothing about theirs.  What makes it
--- statable is that the registry is priced by the same size cap: an
--- admitted path's factor is under the cap's exponential exactly as this
--- chain's is, and its depth is under the same unit.
+-- one the walk carries says nothing about theirs.
+--
+-- AND THE POTENTIAL IS NOT A SHELTER FROM THAT CROSSING -- IT MEETS IT
+-- SOONER.  A sink is a LEAF of the factor recursion, so the receipt
+-- handed in here has a factor of one and says only that the values are
+-- shallow; the chain fanned into carries its own factor, and every
+-- outer frame on it costs the cap's own exponential.  So the fanned-into
+-- length enters the charge MULTIPLIED by the cap, where the live arm's
+-- size ledger enters it added -- and the level reading the registry is
+-- priced at is the same inflated one either way.  The affordable
+-- reading is therefore a cap SQUARED here against a cap cubed there --
+-- one level lower on the same axis, and the same crossing rather than a
+-- second question.  Whatever repairs the live arm's ledger repairs this.
+--
+-- REFUTED: Refuted.Sink-Level-Range -- the crossing is stated there over
+--   an abstract cap and an abstract entry level, so it binds this arm as
+--   written and not merely the arm it was taken against.
 postulate
   walk-share-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)

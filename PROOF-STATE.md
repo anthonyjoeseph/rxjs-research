@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **DROP THE SIZE CEILING; PUT THE POTENTIAL FACE'S SHAPE ON THE LIVE
-  ARM.** Widening the walk's charge is discarded, not shrunk: the
-  measurement it ended at came out negative. A chain step moves the
-  registry's own pricing by a LEVEL — `Refuted.Chain-Step-Regs-Cap`
-  pins the repair as exactly that — so one cascade's levels tower with
-  the dispatch gas, and no exponent this instant's fuel affords is a
-  tower. What stands is the potential face's own sink hop: a proven
-  body carrying no level ledger at all, because its receipt SHRINKS
-  along the remaining path. The live arm's header rules out a DEPTH
-  potential there, never a size-based one. State the shrinking receipt
-  for the live list and check the walk preserves it.
+- **SPLIT THE REGISTRY'S LENGTH LEDGER OFF ITS SIZE LEDGER.** Of the two
+  branches `Refuted.Sink-Level-Range` left, the first is now closed: the
+  walk's charge would have to tower with the dispatch gas, and no
+  exponent under this instant's fuel is a tower. The potential face is
+  not a shelter either — its sink resets the factor to one and meets the
+  same crossing a level sooner. So the standing branch is that one cap
+  prices a chain's LENGTH and its frames' SYNTAX together, which is why
+  admitting a subscribe's longer chain re-prices every entry and the
+  reading iterates. Price length per entry and a fan-out adds levels
+  additively. What it must survive is the syntax-to-length crossing
+  `Refuted.Chain-Step-Regs-Cap` pins.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
@@ -275,10 +275,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `RECOVERY`: what one
   frame registers, under the potential it was handed. Instantiation at the
   rootward stack says the tie is exact, so there is no slack to spend.
-- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
-  potential for the chains a sink fans into. Their factor and depth are the
-  registry's, priced at the level the walk has reached, and nothing has read
-  the claim that the cap's exponential covers them.
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
+  for the chains a sink fans into. A sink is a leaf of the factor recursion, so
+  the receipt handed in carries a factor of one against a chain whose outer
+  frames cost the cap's exponential — the live arm's crossing, a level sooner.
 - **`stepFrame-nest-Φ-inner`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
   inner frame, whose emitted value comes from the inner run and not from the
   frame. Nothing yet says an inner run cannot outrun the potential the outer
