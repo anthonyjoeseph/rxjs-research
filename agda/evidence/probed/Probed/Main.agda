@@ -99,3 +99,7 @@ open import Probed.Chain-Step-Regs-Fan
 open import Probed.Chain-Step-Regs-Cut
   using (reaches; figuresC; figuresSw; figuresEx; figuresTk;
          figuresMx; figuresDp; no-longer-than-control)
+
+open import Probed.Chain-Step-Regs-Second
+  using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
+         no-longer-than-control; cut-happened; no-shrink)

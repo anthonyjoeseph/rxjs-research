@@ -215,25 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SECOND ARRIVAL, WHICH IS WHERE A SWITCH ACTUALLY CUTS.** Four
-  sweeps now instantiate the chain door and none refutes it. The cut
-  sweep left two gaps and named both: `switchAllᵉ` and `exhaustAllᵉ`
-  read identical to the flatten control, because a FIRST arrival gives
-  neither anything to abandon or refuse; and every row that does cut
-  shrinks the registry, so the size conjunct is satisfied vacuously
-  there. Both gaps close the same way — step the arrival TWICE, so an
-  inner is already live when the second one lands. That is a second
-  `chainStep` over the state the first returned, not a new family.
-
-- **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
-  cascade's ceiling feeds the caps receipt and the sighted collapse,
-  both of which are stated against a fixed cap today. Either they
-  transport along the cap ordering unchanged, in which case the leg
-  is mechanical, or the level reaches their conclusions and the
-  restatement cascades into the bridge — that is the risk worth
-  measuring before the fold above it is finished, not after.
-
-- **THEN THE DRAIN LAW'S ONE FRAME THAT NAMES A NODE, WHOSE
+- **THE DRAIN LAW'S ONE FRAME THAT NAMES A NODE, WHOSE
   OBLIGATION HAS OUTLIVED ITS THREE CARRIERS.** The `from-inner` head
   is the tier's worst row and the only one whose per-entry ceiling has
   been refuted at every cap it was stated against, so what is open is
@@ -243,6 +225,27 @@ does not fit is a finding about the shared statement, not about the head.
   a carrier refuted at every cap is evidence about the QUANTITY, not
   about the cap it was read at — and instantiate the candidate at the
   frame the refutations bit before it is stated.
+
+- **THEN THE TWO SHARE-SINK HYPOTHESES THAT STAND ON NOTHING AT ALL.**
+  `walk-share-LiveHyp` and `walk-share-ΦHyp` are the size side
+  condition and the potential for the chains a sink fans into, and
+  neither carries a single marker. They are one subject read twice —
+  those chains live in the REGISTRY rather than on the walked path, so
+  both price a quantity the walk never looks at, at the level the walk
+  has reached. An unprobed FALSITY row is the cheapest unmanaged risk
+  there is, and two of them sharing a subject is one probe's work, not
+  two: reach a sink whose registry entries are the interesting ones and
+  read both quantities off the same run.
+
+- **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
+  INSTANTIATED.** Every row of all five chain-door sweeps steps an
+  arrival from the OUTER source. An inner registered by a flatten is a
+  registry entry like any other, and an arrival from it re-enters
+  `foldPath` at a frame that is already mid-flight — with the sighted
+  path the outer built, not a fresh one. The second-arrival sweep had
+  to time its inner past the horizon to keep it live, so it bought the
+  cut and left this unmeasured. It wants an inner due BETWEEN two
+  outer values, which is one timing change and no new family.
 
 ### The ledger
 
@@ -289,10 +292,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×4`: the
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×5`: the
   whole chain's registry price, now stepping the level by one rather than
-  collapsing to the entry cap. The fixed-cap form is refuted and depth, share
-  telescope and fan width all instantiated; a frame that CUTS is not.
+  collapsing to the entry cap. Depth, share telescope, fan width and both
+  cutting arms are instantiated; an arrival FROM an inner is not.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
