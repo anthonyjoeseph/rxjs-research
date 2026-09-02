@@ -109,7 +109,7 @@ mutual
             (⊔-lub (⊔-lub (≤-trans (stepFrame-nest-nodes sf id now f p vals fin sched st B U hΦ)
                                    (⊔-lub (≤-trans (m≤m⊔n N R) (m≤m⊔n _ U))
                                           (m≤n⊔m (N ⊔ R) U)))
-                          (≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
+                          (≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ hF)
                                    (⊔-lub (≤-trans (m≤n⊔m N R) (m≤m⊔n _ U))
                                           (m≤n⊔m (N ⊔ R) U))))
                    (m≤n⊔m (N ⊔ R) U))

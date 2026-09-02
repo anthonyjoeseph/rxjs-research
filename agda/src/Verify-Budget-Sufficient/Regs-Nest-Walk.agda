@@ -163,24 +163,24 @@ postulate
   -- what a `thru-outer` mints is the subscribed value's frames over the
   -- rest of the path, which is the potential exactly.
   --
-  -- INSTANTIATION SAID THE TIE IS EXACT, at the one shape that can
-  -- deepen a registration at all: *All frames stacked ROOTWARD of the
-  -- leaf, over a `deferᵉ` at an iterated observable type, read at two
-  -- stack depths.  The fold moved with the stack and was EQUAL either
-  -- side of the chain at both -- a frame is charged the `thru-outer`
-  -- frames the observable it carries will push, and where that count
-  -- stops at a defer gate the defer's own registration adds back the
-  -- frame the gate dropped.  So this leaf has no slack to spend at the
-  -- shapes reached so far, and a frame kind that raised the fold by one
-  -- would refute it.
+  -- AND THE FRAME GRANT IS CARRIED, because `valsΦ?` alone is FALSE
+  -- here.  The drain frame takes its payload out of the *All node's
+  -- queue rather than out of the burst, so a completion walk clears the
+  -- premise by computation at every budget -- `all` over an empty list
+  -- -- and still subscribes a queued term, appending a registration
+  -- whose path carries the fresh `thru-outer` frame.  The grant is the
+  -- one the potential's own arm already takes, and taking the same one
+  -- is what keeps the two faces discharged from a single fit.
   --
+  -- REFUTED: Refuted.Drain-Regs-Nest
   -- RECOVERY: git show f38a902:agda/evidence/probed/Probed/Chain-Step-Regs-Rootward.agda
-  --   restores that program and its readings.
+  --   restores a rootward-stacking program and its readings.
   stepFrame-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (B U : ℕ) →
     valsΦ? B U (f ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U f path vals fin sched st →
     regsNestMax (EvalSt.registry
       (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
@@ -699,7 +699,7 @@ mutual
                (proj₁ (proj₂ (proj₂ (proj₂ step))))
                (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
                (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR)
-            (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ)
+            (⊔-lub (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ hF)
                    (m≤n⊔m (regsNestMax (EvalSt.registry st)) U))
     where
     step = stepFrame sf id now f p vals fin sched st
