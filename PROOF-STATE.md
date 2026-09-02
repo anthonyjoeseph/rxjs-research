@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO SHARE-SINK HYPOTHESES THAT STAND ON NOTHING AT ALL.**
-  `walk-share-LiveHyp` and `walk-share-ΦHyp` are the size side
-  condition and the potential for the chains a sink fans into, and
-  neither carries a single marker. They are one subject read twice —
-  those chains live in the REGISTRY rather than on the walked path, so
-  both price a quantity the walk never looks at, at the level the walk
-  has reached. An unprobed FALSITY row is the cheapest unmanaged risk
-  there is, and two of them sharing a subject is one probe's work, not
-  two: reach a sink whose registry entries are the interesting ones and
-  read both quantities off the same run. Check that the CAP side of
-  each reaches a program before writing rows against it.
+- **RESTATE THE SINK GRANT WITH THE BUDGET ITS CALLER ALREADY HAS.**
+  `walk-share-LiveHyp` is refuted, so the conditioned form replaces a
+  false statement rather than weakening a true one — which is the one
+  justification a new hypothesis gets. The caller holds the missing
+  relation: every iterate up to the level reached is under the value
+  budget. Threading it is not the whole repair, because a registry
+  chain climbs past that level by its own length, so the budget has to
+  widen to the level a fanned-into chain reaches. Land the restatement
+  and see which of the two the caller can still discharge; `walk-share-ΦHyp`
+  is the same hop and inherits whatever shape this settles.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
@@ -259,10 +258,10 @@ does not fit is a finding about the shared statement, not about the head.
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
-- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `NO EVIDENCE`: the size
-  side condition for the chains a sink fans into, which live in the registry
-  rather than on the walked path. It reads the registry's price at the level
-  the walk has reached, and nothing has read it.
+- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED`: the size side
+  condition for the registry chains a sink fans into. FALSE as stated: its
+  value budget and its registry price are unrelated arguments, and one `map-f`
+  breaks the first while costing the second nothing.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the

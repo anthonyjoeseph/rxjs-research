@@ -118,6 +118,8 @@ open import Refuted.Share-Go-Registry
   using (priced; slots-fixed; grown≡; charge≡; share-go-registry-absurd)
 open import Refuted.Share-Go-Stack
   using (priced; reg-priced; slots-fixed; grown≡; charge≡; share-go-stack-absurd)
+open import Refuted.Share-Live-Afford
+  using (entering≡; produced≡; hU; hR; share-live-afford-absurd)
 open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width

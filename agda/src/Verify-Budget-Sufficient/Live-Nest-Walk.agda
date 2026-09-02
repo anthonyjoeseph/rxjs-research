@@ -163,11 +163,31 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- from the path it is walking.  At a sink the values leave this chain
 -- for chains that live in the REGISTRY, and their side conditions are
 -- owed at their own paths -- so what has to be supplied is a reading of
--- the registry, not another reading of this path.  The registry is
--- priced by the size cap the walk runs under, READ AT THE LEVEL THE
--- WALK HAS REACHED, which is what makes the grant statable at all:
--- every admitted path is legal under that reading, so every admitted
--- walk starts at level zero of the same iterate the chain started at.
+-- the registry, not another reading of this path.
+--
+-- AND AS STATED IT IS FALSE, because the two readings it carries are
+-- unrelated numbers.  `U` prices the values ENTERING the sink and
+-- `iterSize S j S` prices the registry's chains, with `S`, `U` and `j`
+-- independent arguments -- while the conclusion demands `U` still bound
+-- the values a `thru-outer` sees after those chains' own frames have
+-- run.  The gap is one `map-f` wide: a nat is one unit however large,
+-- an observable is its whole syntax, and a map to a constant observable
+-- costs the registry reading nothing a large `S` does not cover.
+-- Legality is a bound on a chain's SYNTAX and the conclusion is a bound
+-- on the VALUES that syntax produces, so no arrangement of the
+-- arithmetic repairs it: what is missing is a RELATION between the two
+-- numbers, not a bigger one.
+--
+-- THE MISSING RELATION IS THE CALLER'S OWN AFFORDABILITY PREMISE --
+-- every iterate up to the level reached is under `U` -- dropped exactly
+-- at the hop where the values leave the walked path.  Restating with it
+-- is not free either: that premise reaches the caller's level budget,
+-- and a registry chain climbs past it by that chain's length, so the
+-- budget is the quantity the grant then has to name.  That is the same
+-- widening the level-budget note below already argues for on the
+-- walked side, arriving on the registry side.
+--
+-- REFUTED: `Refuted.Share-Live-Afford`
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U j : ℕ) (i : Fin n)
