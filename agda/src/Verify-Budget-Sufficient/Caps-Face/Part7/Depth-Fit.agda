@@ -38,6 +38,7 @@ open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; FrameΦHyp; valsΦ?; valsSz?;
    stepFrame-nest-Φ; stepFrame-regsSz; stepFrame-sz; Φ-to-bound)
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsSz)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Live-Nest-Walk using
   (foldPath-nest-live; PathLiveHyp; walk-LiveHyp-go)
@@ -550,20 +551,21 @@ chainsNest-all D U (c ∷ cs) h =
             (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
                                           (chainsNestD cs))) h))
 
--- THE REGISTRY ACROSS A WHOLE CHAIN, AT ONE LEVEL PER CHAIN.  The
--- walked path is priced at the program's cap and the registry at the
--- level, which is the reading the rest of this spine's walk already
--- uses; what this adds is that one chain moves the level by exactly
--- one, a DETERMINED count and not a witness chosen after the fact.
+-- THE REGISTRY ACROSS A WHOLE CHAIN, AT ONE LEVEL PER CHAIN, AND THE
+-- DOOR IS THE FOLD.  `chainStep` is one call to `foldPath` -- the
+-- arrival's value as the only value in flight, its tick and source as
+-- the fold's, and its lastness as the fold's fin -- so the whole of
+-- what a chain does to the registry is what that call does, and the
+-- level it costs is the fold's one step.
 --
--- AND ONE LEVEL IS WHAT A CHAIN COSTS BECAUSE OF WHAT A SUBSCRIBE
--- REGISTERS.  `chainStep` is `foldPath`, and a subscribing frame does
--- not register the path it was walking: it swaps its head for a
--- `from-inner` and pushes one frame per operator of the inner, so the
--- registered chain outruns the walked one by the inner's own count --
--- which the arrival's size premise caps, `sizeᵛ` at an observable
--- being `sizeᵉ`.  So the growth is `+ S` on the length and `S` on the
--- new frames, and `sizeStep S L` is `S·(1+2L)`, which dominates both.
+-- SO WHAT IS OWED HERE IS ONE TRANSPORT AND NOTHING ELSE.  The path
+-- passes STRAIGHT THROUGH at the program's cap, because the fold's
+-- two caps are the same two this face already keeps apart -- the
+-- program's own and the level reached -- so nothing has to claim a
+-- chain grew with the level it is walked at.  What remains is the
+-- arrival, read here as a size and by the fold as a list, which
+-- becomes the one-element values premise at the level's reading and
+-- is free at `j = 0`, where the iterate is the cap itself.
 --
 -- SO THE LEVEL ACCUMULATES DOWN THE SELECTION RATHER THAN COLLAPSING
 -- AT THIS DOOR.  The consumer spends this once per chain, feeding each
@@ -571,147 +573,23 @@ chainsNest-all D U (c ∷ cs) h =
 -- the run is `nestWalkAt` -- the way `iterSize≤walkFac` already makes a
 -- bounded run of levels affordable against the walk factor, which is
 -- why the store side now carries a `j + pathLen` premise beside it.
---
--- REFUTED: `Refuted.Chain-Step-Regs-Cap` -- the fixed-cap form this
---   replaces, at a five-node inner and a six-frame chain against a cap
---   of six.  Both premises hold and the registered chain has length
---   eight, so what broke was the length ledger rather than any size
---   reading, and no further hypothesis repairs it.
---
--- PROBED: `Probed.Chain-Step-Regs-Level` -- the ROOTWARD re-entry, over
---   a stack of one to eight `mergeAllᵉ` flattens whose sources are each
---   other, every figure read off a state the evaluator reached and
---   every depth pinned to the arm that measures a real `chainStep`.
---   The registered length grows by exactly ONE per flatten level while
---   the inner's own size grows by four, so the descent does not recurse
---   and the one axis that could refute this form is closed along that
---   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, which
---   `Probed.Chain-Step-Regs-Share` takes up.
---
--- PROBED: `Probed.Chain-Step-Regs-Share` -- the SIDEWAYS re-entry, where
---   `foldPath` and `dispatchShare` are mutually recursive and the depth
---   is the share telescope rather than the syntax.  One five-slot
---   context, a scripted driver at slot zero and four `mergeAllᵉ` shares
---   above it, rooted at each of the five slots in turn, so one arrival
---   crosses zero to four share boundaries inside a single `chainStep`.
---   Every row is pinned to the arm that measures a real step, and the
---   step's emit count is read alongside the lengths: it is the crossing
---   count plus one at every depth, so the telescope is entered and not
---   merely built.  The maximum registered path length is TWO before the
---   step and two after it at every one of the five depths -- the
---   sideways route lengthens no registered path at all, while the
---   registry count tracks the telescope and is unchanged across the
---   step.  NOT COVERED: a telescope deeper than four, and a share
---   fanning out to more than one chain, which
---   `Probed.Chain-Step-Regs-Fan` takes up.
---
--- PROBED: `Probed.Chain-Step-Regs-Fan` -- the DIAMOND, the share shape
---   both re-entry sweeps left out: each of them fans every share to
---   exactly one registered chain and so measures a share as a relay.
---   Width is varied in the PROGRAM rather than in the telescope, `w`
---   branches of the root reading one `input`, over three slots at
---   widths one to four; and two further rows put a width-`w` fan over
---   a share whose own def is a two-way fan, which is where width
---   compounds with depth.  The emit count separates a relay from a
---   fan outright and reads as the fan: the compounded rows deliver
---   twice their width, not their width.  The maximum registered path
---   length is THREE before the step and three after it in every row,
---   width one through four and compounded alike -- so a fan multiplies
---   registry ENTRIES and the emit stream, and lengthens no entry.
---   NOT COVERED: the operator KIND at the frames of a sinking chain,
---   which `Probed.Chain-Step-Regs-Cut` takes up.
---
--- PROBED: `Probed.Chain-Step-Regs-Cut` -- the CUTTING arm, against a
---   flatten control of the same shape.  A `takeᵉ` whose count expires
---   on the stepped arrival, at the leaf and again on the def of a share
---   so the cut sits BETWEEN two sinks; plus a mixed row where one
---   branch of a width-two share cuts and the other survives, which is
---   where `shareGo`'s ordering is observable.  No cut leaves a longer
---   entry registered than the control does: the cut rows come back
---   SHORTER, and the survivor of the mixed row sits at exactly the
---   control's length.  NOT COVERED, and the rows say so themselves:
---   `switchAllᵉ` and `exhaustAllᵉ` read identical to the control
---   because a FIRST arrival gives neither anything to cut, so their
---   real arm needs a second `chainStep`; and every row that does cut
---   SHRINKS the registry, which satisfies a growth bound whatever the
---   frames did -- those rows are evidence about the length conjunct
---   alone, which is the only unbounded one but not the only one.
--- PROBED: `Probed.Chain-Step-Regs-Second` -- the SECOND arrival, which
---   closes both gaps the cutting sweep named.  The inner is a scripted
---   slot timed past the outer, so it is still live when the second
---   arrival lands and the first arrival's full `cascade` supplies the
---   state; then `switchAllᵉ` really abandons and `exhaustAllᵉ` really
---   refuses.  Both now read STRICTLY BELOW the flatten control's
---   registry rather than identical to it, which is what says the
---   cutting arm was taken; and no row shrinks -- the control grows by
---   the inner it registers, both cutting arms hold level -- so the SIZE
---   conjunct is under test here for the first time, not merely the
---   length one.  Registered length is flat at the control's on every
---   row, the share-def cut included.  NOT COVERED: the inner never
---   fires, so no arrival ever comes FROM one -- which
---   `Probed.Chain-Step-Regs-Inner` takes up -- and what an abandoned
---   inner's own delivery would do after its registration is dropped is
---   unmeasured.
---
--- PROBED: `Probed.Chain-Step-Regs-Inner` -- the arrival that comes FROM
---   an inner, which is the re-entry every sweep above steps past: all
---   of them step an outer's arrival, and an inner registered by a
---   flatten re-enters `foldPath` mid-flight, carrying the sighted path
---   the outer built.  It is the second-arrival sweep's program with one
---   line of its script changed -- the inner is due BETWEEN two outer
---   values instead of past them all -- and the shift is pinned by a
---   provenance CONTRAST rather than by a bare number: the stepped
---   arrival's source differs from the first arrival's under the
---   retiming and equals it under the sibling's timing, so the two
---   readings together say the door was entered at an inner.  Registered
---   length comes back no longer than the same program's flatten control
---   at the same step, on every arm -- so the one unbounded conjunct is
---   not lengthened by the frames a mid-flight path arrives carrying.
---   NOT COVERED: one level of nesting, so an arrival from an inner OF
---   an inner is not reached; the inner is a bare slot read, so nothing
---   here carries operators of its own into the registered chain, which
---   is the quantity `Refuted.Chain-Step-Regs-Cap` moves; and the
---   stepped arrival is the SECOND overall, so a door met after several
---   inner deliveries have landed is unmeasured.
---
--- PROBED: `Probed.Chain-Step-Regs-Ops` -- an inner that CARRIES
---   OPERATORS, which is the axis `Refuted.Chain-Step-Regs-Cap` moves
---   to break the fixed-cap form and which every sweep above leaves
---   still: all of them register an inner that is a bare slot read, so
---   no registered chain in any of them gains a frame of the inner's
---   own.  Three operator counts over the second-arrival program, read
---   as a SUM of registered lengths because the entry a step adds is
---   shorter than the longest one already standing and a maximum is
---   therefore flat while the registry gains frames.  The merge arm
---   grows by exactly one more than the operator count at each count,
---   against a switch arm that grows by nothing at any of them -- so
---   the frames pushed are the inner's, and the axis is live in a RUN
---   and not only in a constructed state.  The growth sits under the
---   inner's own syntax, which is the quantity the arrival's size
---   premise bounds, so a level covers what the cap could not.  The
---   registry is then read ENTRY BY ENTRY, matched on the id each was
---   registered under, because the sum is a lens and not the charge:
---   `regsSz?` is an `all`, so many short entries cost what one costs
---   and only a single entry getting LONGER can move the price.  No
---   entry standing before a step is longer after it, on either arm at
---   any count, over a surviving set the rows count rather than assume
---   -- so every frame the total records arrives as a NEW entry and
---   the charge is untouched by the growth.  NOT COVERED: the
---   operators are identity maps and one nesting level, so a frame
---   reading its argument's syntax is unmeasured; and every row
---   registers one new entry per step, so a step registering several
---   is reached only through the held row.
-postulate
-  chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (S j : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    1 ≤ S →
-    sizeᵛ (arrTy a) (arrVal a) ≤ S →
-    pathSz? S path ≡ true →
-    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
-    regsSz? (iterSize S (suc j) S)
-      (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
-      ≡ true
+chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (S j : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  1 ≤ S →
+  sizeᵛ (arrTy a) (arrVal a) ≤ S →
+  pathSz? S path ≡ true →
+  regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
+  regsSz? (iterSize S (suc j) S)
+    (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
+    ≡ true
+chainStep-regsSz S j a nextId path sched st 1≤S hsz hp hreg =
+  foldPath-regsSz _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st S j 1≤S
+    entrySz hp hreg
+  where
+  entrySz : valsSz? (iterSize S j S) (arrVal a ∷ []) ≡ true
+  entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
+              (≤-trans hsz (iterSize-infl S 1≤S j S)))) refl
 
 -- AND THE SELECTION'S LEVEL BUDGET IS ONE NUMBER, PEELED THREE WAYS
 -- PER CHAIN.  The head chain walks at the level reached so far, so it

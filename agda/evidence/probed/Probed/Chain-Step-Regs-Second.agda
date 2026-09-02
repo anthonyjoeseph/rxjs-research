@@ -41,7 +41,7 @@
 -- sweep -- its cut shrinks the registry whichever arrival it lands on,
 -- so it says nothing the size conjunct can use.
 
--- TARGET: chainStep-regsSz @a3d8b7
+-- TARGET: foldPath-regsLen @d58775
 module Probed.Chain-Step-Regs-Second where
 
 open import Data.Bool using (true; _∧_)
