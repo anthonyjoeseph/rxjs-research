@@ -34,7 +34,7 @@
 -- could deliver it is the number of share hops -- the one axis this
 -- family moves and the rootward sweep held at zero.
 
--- TARGET: chainStep-regsSz @a3d8b7
+-- TARGET: foldPath-regsSz @1f0f79
 module Probed.Chain-Step-Regs-Share where
 
 open import Data.Bool using (true; _∧_)

@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
 
-- **THEN WHETHER THE DOOR'S ROW IS STILL A FALSITY ROW.** The chain
-  door now has evidence on every re-entry it has, on the axis that
-  refuted its predecessor, and on the reading that charge is actually
-  made under — no standing entry lengthens, so a step's price is the
-  one new entry it adds. What has never been done is putting that
-  against the arithmetic: the walked path fits the base cap, the
-  inner's syntax fits it too, and one level multiplies rather than
-  adds. Write that comparison down and the row either drops a class
-  on evidence that reached its region, or names the shape that still
-  escapes it.
+- **THEN THE FOLD'S THREE CLAUSES, NOW THAT THE DOOR IS ONE CALL.**
+  The chain door is a body over the fold's leaf, so the level question
+  has moved to where the recursion actually is. The root clause
+  registers nothing and closes outright; the frame clause is a step
+  and a recursion, and it is there that a level per frame would
+  reappear and ask for the range a refutation kills. Write the fold as
+  a real body over a frame arm and a sink arm, and let the typechecker
+  say which of the two the single level has to pay for — the arm that
+  cannot take it is the shape that still escapes, and it gets named
+  rather than suspected.
 
 ### The ledger
 
@@ -295,10 +295,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×7`: the
-  whole chain's registry price, now stepping the level by one rather than
-  collapsing to the entry cap. The refuting axis is live in a run and the
-  level covers it; a step registering several entries is unread.
+- **`foldPath-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×7`: one
+  fold's registry price, a single step of the level rather than one per frame.
+  The chain door is a body over it now; the refuting axis is live in a run and
+  the level covers it, but a step registering several entries is unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
