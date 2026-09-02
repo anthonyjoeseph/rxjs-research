@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN DOOR'S ONE LEVEL — THE HARNESS IS DRAFTED, THE ROWS ARE
-  NOT.** The door reports one `sizeStep` per chain, and that
-  `S·(1+2L)` dominates `L + S` is an argument, not a row. Both sides
-  compute at concrete programs, and a staged instantiation at the
-  shape the refutation bit — a subscribing frame whose inner is at
-  the cap — now exists in draft. What remains is the numbers, every
-  pin being a placeholder, plus the target's statement fingerprint
-  and the wire into `Probed.Main`. Expect a second inner that outruns
-  one level; absent one the receipt banks and the row drops a class.
+- **THE SECOND ARRIVAL, WHICH IS WHERE A SWITCH ACTUALLY CUTS.** Four
+  sweeps now instantiate the chain door and none refutes it. The cut
+  sweep left two gaps and named both: `switchAllᵉ` and `exhaustAllᵉ`
+  read identical to the flatten control, because a FIRST arrival gives
+  neither anything to abandon or refuse; and every row that does cut
+  shrinks the registry, so the size conjunct is satisfied vacuously
+  there. Both gaps close the same way — step the arrival TWICE, so an
+  inner is already live when the second one lands. That is a second
+  `chainStep` over the state the first returned, not a new family.
 
 - **THEN THE CEILING'S OWN CONSUMERS, WHERE THE COST IS PAID.** The
   cascade's ceiling feeds the caps receipt and the sighted collapse,
@@ -289,10 +289,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the whole
-  chain's registry price, now stepping the level by one rather than collapsing
-  to the entry cap. The fixed-cap form is refuted; that one `sizeStep` covers
-  what a subscribe registers is argued and uninstantiated.
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×4`: the
+  whole chain's registry price, now stepping the level by one rather than
+  collapsing to the entry cap. The fixed-cap form is refuted and depth, share
+  telescope and fan width all instantiated; a frame that CUTS is not.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
@@ -341,28 +341,28 @@ does not fit is a finding about the shared statement, not about the head.
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
   the floor assembles all four. The unit alone is refuted by a defer-headed
   program; a size bound makes it compute.
-- **`chainStep-nest-live`** (Part7/Cascade-Caps) — DIFFICULTY, `REFUTED, PROBED`:
-  one delivery's pending sources. The charge is the arrival's `sizeᵛ` per
-  chain, sighted where `nestDᵉ` is blind and bounded by `valCaps?` at the
-  cascade door — now instantiated at the family that killed the depth form, and
-  at the frames that mint past the arrival.
+- **`chainStep-nest-live`** (Part7/Cascade-Caps) — DIFFICULTY,
+  `REFUTED, PROBED`: one delivery's pending sources. The charge is the
+  arrival's `sizeᵛ` per chain, sighted where `nestDᵉ` is blind and bounded by
+  `valCaps?` at the cascade door — now instantiated at the family that killed
+  the depth form, and at the frames that mint past the arrival.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what
   remains is the fold arithmetic at the sync-keyed grant and the seed's
   `evalTm-nest-sync` spend.
-- **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY, `REFUTED, PROBED`:
-  the selection's paths and the arrival's payload land inside one unit — the
-  fact that ties the walk's charge back to the program. Free-list form refuted;
-  probeable.
+- **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY,
+  `REFUTED, PROBED`: the selection's paths and the arrival's payload land
+  inside one unit — the fact that ties the walk's charge back to the program.
+  Free-list form refuted; probeable.
 - **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for; the component reads zero after every
   cascade, so a walk leaving a deeper registration standing is the unreached
   region.
-- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY, `TWIN`: every stage
-  of every chain's walk under the width cap. The mirror carries the identical
-  conjunct across the feared `thru` hop, and what is left is the
+- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY, `TWIN`: every
+  stage of every chain's walk under the width cap. The mirror carries the
+  identical conjunct across the feared `thru` hop, and what is left is the
   flat-versus-moving bound — arithmetic, not a walk.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The

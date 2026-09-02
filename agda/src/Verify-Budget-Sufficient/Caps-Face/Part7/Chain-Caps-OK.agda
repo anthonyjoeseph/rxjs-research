@@ -28,7 +28,9 @@ open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Nest-Depth using (nestDᵛ)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (foldPath-nodes; nodesMax; burstsOK; capsWalkOK; FaceOK)
+  (nodesMax; burstsOK; capsWalkOK; FaceOK)
+open import Verify-Budget-Sufficient.Nest-Walk.Share-Fold using
+  (foldPath-nodes)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthChain)
 open import Verify-Budget-Sufficient.Deliver-Measure using

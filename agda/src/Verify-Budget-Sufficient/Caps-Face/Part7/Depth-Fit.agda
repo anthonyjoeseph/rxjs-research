@@ -567,6 +567,65 @@ chainsNest-all D U (c ∷ cs) h =
 --   of six.  Both premises hold and the registered chain has length
 --   eight, so what broke was the length ledger rather than any size
 --   reading, and no further hypothesis repairs it.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Level` -- the ROOTWARD re-entry, over
+--   a stack of one to eight `mergeAllᵉ` flattens whose sources are each
+--   other, every figure read off a state the evaluator reached and
+--   every depth pinned to the arm that measures a real `chainStep`.
+--   The registered length grows by exactly ONE per flatten level while
+--   the inner's own size grows by four, so the descent does not recurse
+--   and the one axis that could refute this form is closed along that
+--   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, which
+--   `Probed.Chain-Step-Regs-Share` takes up.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Share` -- the SIDEWAYS re-entry, where
+--   `foldPath` and `dispatchShare` are mutually recursive and the depth
+--   is the share telescope rather than the syntax.  One five-slot
+--   context, a scripted driver at slot zero and four `mergeAllᵉ` shares
+--   above it, rooted at each of the five slots in turn, so one arrival
+--   crosses zero to four share boundaries inside a single `chainStep`.
+--   Every row is pinned to the arm that measures a real step, and the
+--   step's emit count is read alongside the lengths: it is the crossing
+--   count plus one at every depth, so the telescope is entered and not
+--   merely built.  The maximum registered path length is TWO before the
+--   step and two after it at every one of the five depths -- the
+--   sideways route lengthens no registered path at all, while the
+--   registry count tracks the telescope and is unchanged across the
+--   step.  NOT COVERED: a telescope deeper than four, and a share
+--   fanning out to more than one chain, which
+--   `Probed.Chain-Step-Regs-Fan` takes up.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Fan` -- the DIAMOND, the share shape
+--   both re-entry sweeps left out: each of them fans every share to
+--   exactly one registered chain and so measures a share as a relay.
+--   Width is varied in the PROGRAM rather than in the telescope, `w`
+--   branches of the root reading one `input`, over three slots at
+--   widths one to four; and two further rows put a width-`w` fan over
+--   a share whose own def is a two-way fan, which is where width
+--   compounds with depth.  The emit count separates a relay from a
+--   fan outright and reads as the fan: the compounded rows deliver
+--   twice their width, not their width.  The maximum registered path
+--   length is THREE before the step and three after it in every row,
+--   width one through four and compounded alike -- so a fan multiplies
+--   registry ENTRIES and the emit stream, and lengthens no entry.
+--   NOT COVERED: the operator KIND at the frames of a sinking chain,
+--   which `Probed.Chain-Step-Regs-Cut` takes up.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Cut` -- the CUTTING arm, against a
+--   flatten control of the same shape.  A `takeᵉ` whose count expires
+--   on the stepped arrival, at the leaf and again on the def of a share
+--   so the cut sits BETWEEN two sinks; plus a mixed row where one
+--   branch of a width-two share cuts and the other survives, which is
+--   where `shareGo`'s ordering is observable.  No cut leaves a longer
+--   entry registered than the control does: the cut rows come back
+--   SHORTER, and the survivor of the mixed row sits at exactly the
+--   control's length.  NOT COVERED, and the rows say so themselves:
+--   `switchAllᵉ` and `exhaustAllᵉ` read identical to the control
+--   because a FIRST arrival gives neither anything to cut, so their
+--   real arm needs a second `chainStep`; and every row that does cut
+--   SHRINKS the registry, which satisfies a growth bound whatever the
+--   frames did -- those rows are evidence about the length conjunct
+--   alone, which is the only unbounded one but not the only one.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)
