@@ -74,6 +74,8 @@ open import Refuted.Thru-Scan-Burst-Nest
             delivered₁₃≡8191 to thruDelivered₁₃≡8191)
 open import Refuted.Scan-Fold-Burst
   using (fold≡65; charge≡64; scan-fold-burst-absurd)
+open import Refuted.Scan-Phi-Burst
+  using (Φ-hyp-burst; scan-Φ-burst-absurd)
 open import Refuted.Subscribe-Caps-Nest
   using (capsZero; capsZero₂; delivered≡16; charged≡6;
          delivered₂≡8; charged₂≡6;

@@ -233,17 +233,31 @@ postulate
   -- STATE and no constant and no term in `vals`, `path` or `B` closes
   -- it.
   --
-  -- WHERE THE REPAIR GOES IS WHERE THE DRAIN ARM'S DOES.  Both arms
-  -- read their output out of the store rather than forwarding it, and
-  -- `FrameΦHyp` is `⊤` at both; the grant that arm's block describes
-  -- is the one this arm needs too, taken over what the NODE may hold
-  -- rather than over what a queue may emit.
+  -- A GRANT OVER THE NODE IS NECESSARY AND IS NOT SUFFICIENT, which is
+  -- the half that decides the restatement's shape.  Both store-reading
+  -- arms are `⊤` in `FrameΦHyp` and both need what the NODE may hold
+  -- rather than what a queue may emit -- but a fold THREADS, so its
+  -- k-th output is the step function applied k times in sequence, and
+  -- the frame surrenders `2 ^ sizeᵗ fn` once and charges `nestDᵗ fn`
+  -- once.  Both are read off the step function alone and neither
+  -- mentions the burst, so the premise is constant in the value count
+  -- and the conclusion is linear in it; the factor buys a fixed number
+  -- of values rather than a bound.  So the arm must carry a WIDTH as
+  -- well as a state.
   --
   -- REFUTED: `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-absurd` at a
   --   stored depth of forty, and
   --   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at
   --   eighty -- the pair is what puts the gap in the stored depth
   --   rather than in a constant.
+  -- REFUTED: `Refuted.Scan-Phi-Burst.scan-Φ-burst-absurd` kills the
+  --   store-grant-only repair at this arm's OWN currency: the
+  --   accumulator is a bare `ofᵉ`, so every grant a state can carry is
+  --   discharged for nothing and the premise still holds at the budget
+  --   the frame surrenders, while sixty-five folds leave sixty-five
+  --   layers.  `Refuted.Scan-Fold-Burst` is the same witness read on
+  --   the iteration's quantity, which is what makes the two faces
+  --   comparable.
   -- TWIN: `stepFrame-nodes-scan`, which is this arm proven -- the same
   --   frame and the same step, and it reads the store: its subject is
   --   `nodesMax st ⊔ nestDᵛˢ vals` on both sides, so the accumulator is

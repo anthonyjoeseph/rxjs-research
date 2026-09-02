@@ -215,18 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE OBLIGATION THE TWO STORE-READING ARMS OWE, WHICH THE
-  REFUTATIONS HAVE ALREADY NAMED.** `FrameΦHyp` is `⊤` at `from-inner`
-  and at `scan-f`, non-trivial only at `thru-outer` — and the reason it
-  is non-trivial there, that the frame does not FORWARD its output,
-  holds of both. One reads a queue, the other a stored accumulator;
-  neither is a function of the values the walk handed over. So the
-  restatement is not a search: give both the grant the outer arm
-  carries, taken over what the NODE may hold. `PathΦHyp`
-  already carries `st` where the obligation is raised, so the change
-  reaches one signature and three arms. The risk is on the producing
-  side: every emit that parks an inner or writes an accumulator must
-  then supply the grant, and nothing does today.
+- **THEN THE WIDTH A STORE GRANT DOES NOT BUY.** Repairing the two `⊤`
+  arms with a grant over what the NODE may hold is refuted at the
+  potential's own currency: a fold THREADS, so its k-th emit is k
+  substitutions deep while `valsΦ?` surrenders the step function's
+  factor once, and neither factor mentions the
+  burst. With the accumulator shallow the grant is discharged for
+  nothing and the arm is still false, so the factor buys a fixed
+  number of values rather than a bound. `FrameΦHyp` must therefore
+  carry a WIDTH as well as `st`, at the factors the proven iteration
+  face already uses. The risk moves to the producing side: `PathΦHyp`
+  recurses over a list it holds no bound on, so a width has to reach
+  the site before either arm can be stated.
 
 - **THEN THE ONE ROW WHOSE COVERAGE CLAIM IS NOT IN ITS LEDGER.**
   `stepFrame-nest-regs` reads as unprobed — the census scored it on
@@ -298,7 +298,7 @@ does not fit is a finding about the shared statement, not about the head.
   at every `U` while the queue's own depth leaves through it. Restate: the
   arm's `⊤` obligation must become the grant `thru-outer` already carries.
 - **`stepFrame-nest-Φ-scan`** (Regs-Nest-Walk) — SHAPE,
-  `REFUTED, TWIN, RECOVERY`: the fold emits the ACCUMULATOR's image, and that
+  `REFUTED×2, TWIN, RECOVERY`: the fold emits the ACCUMULATOR's image, and that
   lives in the node table, so a numeral in hand discharges the premise at zero
   while the stored depth leaves through. Restate: the same grant, over the
   node.
