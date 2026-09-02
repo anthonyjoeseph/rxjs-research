@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **LIFT THE WALKED CEILING ONTO THE CAPS FACE'S LEVEL LEDGER.** The
-  split framing is discarded: a flat ceiling fails on its own reading,
-  the hop asking for the entry level plus the size reading there. What
-  absorbs an exponential climb is a ledger indexed by remaining nesting
-  depth, and the caps face carries one already — `chainStep-caps` proves
-  its climb survives a fan-out, and it is paid out of the instant's fuel
-  rather than out of the cap. Affordability is now ONE inequality and
-  not a family over a range, so what remains is nameable: whether the
-  walked ceiling dominates that top level. It is owed where the ceiling
-  is defined, so the nest face's constant is what has to move.
+- **WIDEN THE WALK'S CHARGE TO ITS FUEL CEILING, THEN MEASURE ONE
+  CASCADE.** Lifting onto the caps ledger is discarded: those caps
+  advance by a whole instant's folds, so reading them is the increment
+  the ceiling leaf already records dead. What is live is that the charge
+  carries a cap CUBED in its exponent while the fuel affords a cap's
+  EXPONENTIAL there — so the affordable level range is quadratic where
+  it could be exponential, and the refuted crossing was measured against
+  the narrow one. Widening is a redefinition costing only that leaf. It
+  cannot buy the tower a fan-out wants, so the leg ends at a number:
+  whether one cascade's own level count fits the widened range.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
