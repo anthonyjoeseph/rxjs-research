@@ -33,8 +33,7 @@ open import Rx.Evaluator using (iterSize; root)
 open import Rx.Frame-Width using (entryCeil)
 open import Rx.Slot-Clos using (slotsClos)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-def; nestB; nestB≤pow)
-open import Verify-Budget-Sufficient.Deliver-Measure using
-  (nestDᵉ≤sizeᵉ)
+open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵉ≤sizeᵉ)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (delSize; delSq; delSq-def; delSize-exp)
@@ -131,8 +130,14 @@ abstract
   nestWalkAt e sl id =
     2 ^ suc (Caps.cSize (capsAt e sl id)
                * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-             + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-      * (nestUnit e sl + Caps.cSize (capsAt e sl id)
+             + Caps.cSize (capsAt e sl id)
+               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+             + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+                + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+      * (nestUnit e sl
+         + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+            + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+         + Caps.cSize (capsAt e sl id)
          + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
 
   nestWalkAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
@@ -140,8 +145,14 @@ abstract
     nestWalkAt e sl id
       ≡ 2 ^ suc (Caps.cSize (capsAt e sl id)
                    * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-                 + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-          * (nestUnit e sl + Caps.cSize (capsAt e sl id)
+                 + Caps.cSize (capsAt e sl id)
+                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+                 + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+                    + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+          * (nestUnit e sl
+             + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+                + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+             + Caps.cSize (capsAt e sl id)
              + Caps.cSize (capsAt e sl id) * slotWrapSum sl)
   nestWalkAt-def _ _ _ = refl
 
@@ -357,9 +368,13 @@ walkFac≤nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ
     ≤ nestWalkAt e sl id
 walkFac≤nestWalkAt e sl id =
   subst (2 ^ (S * (S * S) + S * S) * S ≤_) (sym (nestWalkAt-def e sl id))
-    (*-mono-≤ (^-monoʳ-≤ 2 (n≤1+n (S * (S * S) + S * S)))
-              (≤-trans (m≤n+m S (nestUnit e sl))
-                       (m≤m+n (nestUnit e sl + S) (S * slotWrapSum sl))))
+    (*-mono-≤ (^-monoʳ-≤ 2
+                (≤-trans (+-mono-≤ (m≤m+n (S * (S * S)) (S * (S * S)))
+                                   (m≤m+n (S * S) (S * S)))
+                         (n≤1+n (S * (S * S) + S * (S * S) + (S * S + S * S)))))
+              (≤-trans (m≤n+m S (nestUnit e sl + (S * S + S * S)))
+                       (m≤m+n (nestUnit e sl + (S * S + S * S) + S)
+                              (S * slotWrapSum sl))))
   where
   S = Caps.cSize (capsAt e sl id)
 
@@ -1055,7 +1070,7 @@ walk-sight≤exp e sl id =
   -- the cube the walk's charge now carries, named once so the two
   -- collapse equations and the fit below read the same expression
   C = S * (S * S)
-  E = suc (C + S * S)
+  E = suc (C + C + (S * S + S * S))
   8≤S : 8 ≤ S
   8≤S = 8≤capsAt-size e sl id
   14≤S : 14 ≤ S
@@ -1084,12 +1099,19 @@ walk-sight≤exp e sl id =
   hz = ≤-trans 1+z≤S S≤2^S
   h3 : 3 ≤ 2 ^ S
   h3 = ≤-trans (≤-trans (≤ᵇ⇒≤ 3 8 tt) 8≤S) S≤2^S
-  unit2S : nestUnit e sl + S ≤ 2 * S
-  unit2S = ≤-trans (+-monoˡ-≤ S (nestUnit≤size e sl id))
-                   (≤-reflexive (solve 1 (λ s → s :+ s := con 2 :* s) refl S))
-  -- THE UNIT AND THE SIZE, one exponential
-  hA : nestUnit e sl + S ≤ 2 ^ S
-  hA = ≤-trans unit2S 2S≤2^S
+  -- THE UNIT, THE TWO SQUARES AND THE SIZE, four exponentials.  The
+  -- squares are what the walk's own leaf costs, so the trailing factor
+  -- carries them beside the unit rather than under it.
+  quadEq : 2 ^ S + (2 ^ S + 2 ^ S) + 2 ^ S ≡ 2 ^ (2 + S)
+  quadEq =
+    trans (solve 1 (λ q → q :+ (q :+ q) :+ q := con 4 :* q) refl (2 ^ S))
+          (sym (^-distribˡ-+-* 2 2 S))
+  hA : nestUnit e sl + (S * S + S * S) + S ≤ 2 ^ (2 + S)
+  hA =
+    ≤-trans (+-mono-≤ (+-mono-≤ (≤-trans (nestUnit≤size e sl id) S≤2^S)
+                                (+-mono-≤ SS≤2^S SS≤2^S))
+                      S≤2^S)
+            (≤-reflexive quadEq)
   -- AND THE TELESCOPE'S WRAP, three of them: the per-slot ceiling is one
   -- exponential times a size, the length is another size, and the
   -- summand outside is the third.
@@ -1111,8 +1133,13 @@ walk-sight≤exp e sl id =
              (≤-reflexive tripleEq)))
   dbl : 2 ^ (3 * S) + 2 ^ (3 * S) ≡ 2 ^ (1 + 3 * S)
   dbl = sym (2X≡X+X (2 ^ (3 * S)))
-  hM : nestUnit e sl + S + S * slotWrapSum sl ≤ 2 ^ (1 + 3 * S)
-  hM = ≤-trans (+-mono-≤ (≤-trans hA (^-monoʳ-≤ 2 (m≤n*m S 3))) hB)
+  2+S≤3S : 2 + S ≤ 3 * S
+  2+S≤3S =
+    ≤-trans (+-monoˡ-≤ S (≤-trans (≤ᵇ⇒≤ 2 8 tt) 8≤S))
+    (≤-trans (≤-reflexive (solve 1 (λ a → a :+ a := con 2 :* a) refl S))
+             (*-monoˡ-≤ S (≤ᵇ⇒≤ 2 3 tt)))
+  hM : nestUnit e sl + (S * S + S * S) + S + S * slotWrapSum sl ≤ 2 ^ (1 + 3 * S)
+  hM = ≤-trans (+-mono-≤ (≤-trans hA (^-monoʳ-≤ 2 2+S≤3S)) hB)
                (≤-reflexive dbl)
   collapse : 2 ^ S * (2 ^ S * (2 ^ E * 2 ^ (1 + 3 * S)))
                ≡ 2 ^ (S + (S + (E + (1 + 3 * S))))
@@ -1125,29 +1152,40 @@ walk-sight≤exp e sl id =
   -- THE EXPONENT SUM IS A CUBE PLUS A SQUARE PLUS A LINE, and the
   -- three summands are each paid by one cube, which is what the four
   -- on offer covers.
-  shapeL : S + (S + (E + (1 + 3 * S))) ≡ C + (S * S + (5 * S + 2))
-  shapeL = solve 1 (λ a → a :+ (a :+ ((con 1 :+ (a :* (a :* a) :+ a :* a))
+  shapeL : S + (S + (E + (1 + 3 * S))) ≡ C + (C + (S * S + S * S + (5 * S + 2)))
+  shapeL = solve 1 (λ a → a :+ (a :+ ((con 1 :+ (a :* (a :* a) :+ a :* (a :* a)
+                                                  :+ (a :* a :+ a :* a)))
                                        :+ (con 1 :+ con 3 :* a)))
                             := a :* (a :* a)
-                               :+ (a :* a :+ (con 5 :* a :+ con 2)))
+                               :+ (a :* (a :* a)
+                                   :+ (a :* a :+ a :* a :+ (con 5 :* a :+ con 2))))
                  refl S
-  S≤C : S * S ≤ C
-  S≤C = *-monoʳ-≤ S S≤SS
-  6≤SS : 6 ≤ S * S
-  6≤SS = ≤-trans (≤-trans (≤ᵇ⇒≤ 6 14 tt) 14≤S) S≤SS
+  -- THE SQUARES ARE PAID BY ONE CUBE BETWEEN THEM, which is what the
+  -- fourth on offer is for: two squares and the line all sit under a
+  -- single cube once the size is past its floor, so the doubled walk
+  -- exponent still lands inside the four this ceiling affords.
+  6≤S : 6 ≤ S
+  6≤S = ≤-trans (≤ᵇ⇒≤ 6 8 tt) 8≤S
+  3≤S : 3 ≤ S
+  3≤S = ≤-trans (≤ᵇ⇒≤ 3 8 tt) 8≤S
   sixEq : 5 * S + S ≡ 6 * S
   sixEq = solve 1 (λ a → con 5 :* a :+ a := con 6 :* a) refl S
-  lin≤C : 5 * S + 2 ≤ C
-  lin≤C =
+  lin≤SS : 5 * S + 2 ≤ S * S
+  lin≤SS =
     ≤-trans (+-monoʳ-≤ (5 * S) 2≤S)
-    (≤-trans (≤-reflexive sixEq)
-    (≤-trans (*-monoˡ-≤ S 6≤SS) (≤-reflexive (*-assoc S S S))))
+    (≤-trans (≤-reflexive sixEq) (*-monoˡ-≤ S 6≤S))
+  twoSq+lin≤C : S * S + S * S + (5 * S + 2) ≤ C
+  twoSq+lin≤C =
+    ≤-trans (+-monoʳ-≤ (S * S + S * S) lin≤SS)
+    (≤-trans (≤-reflexive (solve 1 (λ a → a :* a :+ a :* a :+ a :* a
+                                            := con 3 :* (a :* a)) refl S))
+             (*-monoˡ-≤ (S * S) 3≤S))
   threeC : C + (C + C) ≡ 3 * C
   threeC = solve 1 (λ c → c :+ (c :+ c) := con 3 :* c) refl C
   expfit : S + (S + (E + (1 + 3 * S))) ≤ 2 ^ S
   expfit =
     ≤-trans (≤-reflexive shapeL)
-    (≤-trans (+-monoʳ-≤ C (+-mono-≤ S≤C lin≤C))
+    (≤-trans (+-monoʳ-≤ C (+-monoʳ-≤ C twoSq+lin≤C))
     (≤-trans (≤-reflexive threeC)
     (≤-trans (*-monoˡ-≤ C (≤ᵇ⇒≤ 3 4 tt)) (cube4≤2^ S 14≤S))))
 

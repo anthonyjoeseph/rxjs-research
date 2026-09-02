@@ -215,18 +215,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
-  refuted, and its residue is the first BOUNDED one this hop has
-  produced: the receipt is read at factor one and depth zero, while an
-  admitted chain is owed its own factor and its own depth — both
-  already delivered where the arm stands, by `pathΦF-cap` and
-  `pathNestD-len` off the size legality `shareAdmit-caps` carries. No
-  bigger factor at the sink repairs it, since a depth-zero value zeroes
-  the product while the chain still owes its depth. So what moves is
-  the RECEIPT, not a ledger, a level or a field — and the budget never
-  moves through the fan-out at all, both hypotheses recursing at one
-  `U`, so nothing here compounds with the hop count the live arm died
-  on.
+- **THEN SPLIT THE FAN-OUT BY THE ADMITTED CHAIN'S TERMINAL.** The
+  receipt has moved: a sink now carries a factor and a depth of its
+  own, and the walk's depth ledger is B-indexed throughout. A path
+  holds exactly one leaf, so the chain ending at `root` closes off
+  `pathΦF-cap`, `pathΦD-len` and monotonicity, with no new fact. The
+  chain ending at a second hand-over does not, and is refuted. So the
+  commit is `walk-share-ΦHyp` as a real BODY case-splitting inside the
+  admitted list, over a leaf covering exactly that entry.
 
 - **THEN THE DRAIN'S ROUTING, ON ITS OWN.** `innerΦ-fit` does NOT
   share the fold's defect, and binding the two was this leg's error:
@@ -279,8 +275,8 @@ does not fit is a finding about the shared statement, not about the head.
   queue, so the walk's values cannot reach it.
 - **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
   for the chains a sink fans into. NOT the live arm's crossing: the potential
-  does not compound across hops. Read at factor one and depth zero, against two
-  facts already bounded where the arm stands — so the deficit is a relation.
+  does not compound across hops. The priced leaf pays a root-terminated chain;
+  a chain ending at a second hand-over is what is left, and it is refuted.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the

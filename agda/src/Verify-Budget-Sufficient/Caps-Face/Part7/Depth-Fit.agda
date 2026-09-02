@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; *-distribˡ-+; +-suc)
+  +-mono-≤; *-distribˡ-+; +-suc; +-assoc)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length; foldr)
@@ -34,7 +34,7 @@ open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
 open import Verify-Budget-Sufficient.Deliver-Measure using
   (chainsLenSum)
-open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦF-cap; pathΦD)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; FrameΦHyp; valsΦ?; valsSz?;
    stepFrame-nest-Φ; stepFrame-regsSz; stepFrame-sz; Φ-to-bound)
@@ -96,6 +96,38 @@ pathNestD-step (take-f _)         p = ≤-refl
 pathNestD-step (from-inner _ _ _) p = ≤-refl
 pathNestD-step (thru-outer _ _)   p = n≤1+n (pathNestD p)
 
+-- AND THE WALK'S DEPTH IS THE STORE'S PLUS ONE SQUARE, which is the
+-- whole difference between the two ledgers: they step identically at
+-- every frame and part company only at the leaf, where the walk's
+-- prices the chain a hand-over passes its values to and the store's
+-- prices nothing.  A path carries exactly one leaf, so the gap is a
+-- constant and not a recursion.
+pathΦD≤nestD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathΦD B p ≤ pathNestD p + B * B
+pathΦD≤nestD B root                   = z≤n
+pathΦD≤nestD B (share-sink _)         = ≤-refl
+pathΦD≤nestD B (map-f fn ↠ p)         =
+  ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) (B * B))))
+pathΦD≤nestD B (scan-f fn _ ↠ p)      =
+  ≤-trans (+-monoʳ-≤ (nestDᵗ fn) (pathΦD≤nestD B p))
+          (≤-reflexive (sym (+-assoc (nestDᵗ fn) (pathNestD p) (B * B))))
+pathΦD≤nestD B (take-f _ ↠ p)         = pathΦD≤nestD B p
+pathΦD≤nestD B (from-inner _ _ _ ↠ p) = pathΦD≤nestD B p
+pathΦD≤nestD B (thru-outer _ _ ↠ p)   = s≤s (pathΦD≤nestD B p)
+
+-- AND IT DOMINATES IT, from the same reading: the leaf is the only
+-- clause where they differ and the walk's is the larger one there.
+nestD≤pathΦD : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  pathNestD p ≤ pathΦD B p
+nestD≤pathΦD B root                   = z≤n
+nestD≤pathΦD B (share-sink _)         = z≤n
+nestD≤pathΦD B (map-f fn ↠ p)         = +-monoʳ-≤ (nestDᵗ fn) (nestD≤pathΦD B p)
+nestD≤pathΦD B (scan-f fn _ ↠ p)      = +-monoʳ-≤ (nestDᵗ fn) (nestD≤pathΦD B p)
+nestD≤pathΦD B (take-f _ ↠ p)         = nestD≤pathΦD B p
+nestD≤pathΦD B (from-inner _ _ _ ↠ p) = nestD≤pathΦD B p
+nestD≤pathΦD B (thru-outer _ _ ↠ p)   = s≤s (nestD≤pathΦD B p)
+
 -- THE GRANT AT ONE OUTER FRAME, which was the whole of what the walk
 -- still owed: the four other frame kinds owe nothing, so a path with
 -- no `thru-outer` in it needs none of this.  What is owed is a SIGHTED
@@ -133,30 +165,38 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   , subst (λ z → ValsFit n z G p vals) (sym hsl)
       (valsFit-of-max sl p vals M ≤-refl)
   , *-cancelˡ-≤ 2
+      (≤-trans (*-monoʳ-≤ 2 (*-monoʳ-≤ (pathΦF S p)
+                 (+-monoˡ-≤ (pathΦD S p)
+                   (+-monoˡ-≤ (n * slotWrapSum sl)
+                     (+-monoˡ-≤ (nestDᵛˢ vals) (nestD≤pathΦD S p))))))
       (≤-trans (≤-reflexive spread)
         (≤-trans (+-mono-≤ hA2 hBC2)
-                 (≤-reflexive (sym (2X≡X+X (nestΦAt e sl id))))))
+                 (≤-reflexive (sym (2X≡X+X (nestΦAt e sl id)))))))
   where
   S    = Caps.cSize (capsAt e sl id)
   Q    = pathΦF S p
-  D    = pathNestD p
+  Dn   = pathNestD p
+  D    = pathΦD S p
   M    = nestDᵛˢ vals
   W    = slotWrapSum sl
-  X    = nestUnit e sl + S + S * W
-  G    = D + M + n * W
+  Y    = nestUnit e sl + (S * S + S * S) + S
+  X    = Y + S * W
+  G    = Dn + M + n * W
   hpp  : pathSz? S p ≡ true
   hpp  = ∧-trueʳ hpz
   2≤S  = 2≤capsAt-size e sl id
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
   EXP  : ℕ
-  EXP  = S * (suc S * S)
-  expEq : EXP ≡ S * (S * S) + S * S
-  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+  EXP  = (S + S) * (suc S * S)
+  expEq : EXP ≡ S * (S * S) + S * (S * S) + (S * S + S * S)
+  expEq = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
+                           := s :* (s :* s) :+ s :* (s :* s) :+ (s :* s :+ s :* s))
                 refl S
   Q≤   : Q ≤ 2 ^ EXP
   Q≤   = pathΦF-cap S p hpp
-  D≤   : D ≤ nestUnit e sl
-  D≤   = ≤-trans (n≤1+n D) hnd
+  D≤   : D ≤ nestUnit e sl + S * S
+  D≤   = ≤-trans (pathΦD≤nestD S p)
+                 (+-monoˡ-≤ (S * S) (≤-trans (n≤1+n (pathNestD p)) hnd))
   n≤S  : n ≤ S
   n≤S  = n≤capsAt-size e sl id
   2≤2^S : 2 ≤ 2 ^ S
@@ -172,17 +212,23 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
                         refl q d
   -- the path's own depth, and the wrap, against the charge's own half
+  yShape : (S + S * S) + (nestUnit e sl + S * S) ≡ Y
+  yShape = solve 2 (λ a u → (a :+ a :* a) :+ (u :+ a :* a)
+                              := u :+ (a :* a :+ a :* a) :+ a)
+                 refl S (nestUnit e sl)
+  2D≤Y : 2 * D ≤ Y
+  2D≤Y =
+    ≤-trans (*-monoʳ-≤ 2 D≤)
+    (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl + S * S)))
+    (≤-trans (+-monoˡ-≤ (nestUnit e sl + S * S)
+               (+-monoˡ-≤ (S * S) (nestUnit≤size e sl id)))
+             (≤-reflexive yShape)))
   hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ EXP * X
   hBC  =
     ≤-trans (+-mono-≤
-              (≤-trans (≤-reflexive (halfShape Q D))
-                       (*-mono-≤ Q≤ (≤-trans (*-monoʳ-≤ 2 D≤)
-                                       (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl)))
-                                                (+-monoʳ-≤ (nestUnit e sl)
-                                                  (nestUnit≤size e sl id))))))
+              (≤-trans (≤-reflexive (halfShape Q D)) (*-mono-≤ Q≤ 2D≤Y))
               (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
-            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP)
-                                (nestUnit e sl + S) (S * W))))
+            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP) Y (S * W))))
   hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
   hBC2 = ≤-trans
            (subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
@@ -192,7 +238,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
                            (*-monoˡ-≤ X (^-monoʳ-≤ 2
                              (s≤s (≤-reflexive expEq)))))))
            (nestWalkAt≤nestΦAt e sl id)
-  spread : 2 * (Q * (G + D))
+  spread : 2 * (Q * (D + M + n * W + D))
              ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
   spread =
     solve 4 (λ q d m w →
@@ -550,25 +596,28 @@ frameΦ-fit sl id sf eid now (thru-outer op nid) p vals fin sched st hsl hpz hnd
 -- accumulated on the way in.  The witnesses that closed the level arm
 -- are therefore silent about this one, and it has to be read on its own.
 
--- AND READ ON ITS OWN THE DEFICIT IS BOUNDED, which no reading of the
--- live arm ever was.  A sink is a LEAF of the factor recursion, so the
--- receipt handed in is at factor one and depth zero: it says only that
--- the values are shallow.  An admitted chain is owed its own factor
--- times those same values' depth plus its own depth, and BOTH of those
--- are already bounded where this arm stands -- `pathΦF-cap` and
--- `pathNestD-len` deliver them from the registry's size legality, which
--- `shareAdmit-caps` carries off the premise this statement already
--- takes.  So nothing here is unbounded and nothing is missing from the
--- state.  What is missing is a RELATION between the receipt the walk
--- spends at a sink and the two the chains are charged at, and the
--- repair is therefore a restatement of what the walk HANDS a sink,
--- in the currency it already carries.
--- REFUTED: `Refuted.Sink-Phi-Fan`, stated over an abstract cap and
---   budget so that it binds this arm as written; and a second time
---   under a universally quantified factor at the sink, which kills the
---   obvious repair before it is tried -- a multiplicative charge meets
---   a depth-zero value, so the product is discharged at a budget of
---   nothing while the admitted chain still owes its own depth.
+-- AND READ ON ITS OWN THE DEFICIT SPLITS BY THE ADMITTED CHAIN'S
+-- TERMINAL, which is what pricing the leaf bought.  A sink now carries
+-- a factor and a depth of its own rather than one and zero, and a path
+-- holds exactly one leaf -- so a chain ending at `root` spends its
+-- whole factor on frames, legality caps that count by the size cap,
+-- and the leaf is priced at exactly that exponent.  Its depth is
+-- capped in the same currency by the same premise.  That half closes
+-- off `pathΦF-cap`, `pathΦD-len` and monotonicity, with no new fact.
+
+-- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
+-- factor is the leaf's own multiplied by its frames', so the leaf
+-- would have to dominate itself times a frame product -- which no
+-- function of the cap does, because the escalation is per sink hop and
+-- the hop count is bounded by nothing but the dispatch gas: the
+-- registry's admission filters on the source and the type and never on
+-- whether a chain has been delivered to.  An ordinary program puts a
+-- chain there, since a registration minted while a share's definition
+-- is being subscribed carries that share's sink as its continuation.
+-- So the residue is the sink-terminated arm and nothing else.
+-- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
+--   discharges from and at the budget the sink's own receipt exactly
+--   exhausts, so the crossing is not an artifact of a small budget.
 postulate
   walk-share-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)
@@ -641,19 +690,30 @@ entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
-  expEq : Sz * (suc Sz * Sz) ≡ Sz * (Sz * Sz) + Sz * Sz
-  expEq = solve 1 (λ s → s :* ((con 1 :+ s) :* s) := s :* (s :* s) :+ s :* s)
+  expEq : (Sz + Sz) * (suc Sz * Sz)
+            ≡ Sz * (Sz * Sz) + Sz * (Sz * Sz) + (Sz * Sz + Sz * Sz)
+  expEq = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
+                           := s :* (s :* s) :+ s :* (s :* s) :+ (s :* s :+ s :* s))
                 refl Sz
-  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path)
+  dΦ : nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path
+         ≤ nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz
+  dΦ =
+    ≤-trans (+-monoʳ-≤ (nestDᵛ (arrTy a) (arrVal a)) (pathΦD≤nestD Sz path))
+    (≤-trans (≤-reflexive (sym (+-assoc (nestDᵛ (arrTy a) (arrVal a))
+                                        (pathNestD path) (Sz * Sz))))
+    (≤-trans (+-monoˡ-≤ (Sz * Sz) hΦ)
+    (≤-trans (+-monoʳ-≤ (nestUnit e sl) (m≤m+n (Sz * Sz) (Sz * Sz)))
+             (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz)) Sz))))
+  Φfit : pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path)
            ≤ nestΦAt e sl id
   Φfit = ≤-trans
-    (subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathNestD path) ≤_)
+    (subst (pathΦF Sz path * (nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path) ≤_)
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
                               (^-monoʳ-≤ 2
                                 (≤-trans (≤-reflexive expEq) (n≤1+n _))))
-                     (≤-trans (≤-trans hΦ (m≤m+n (nestUnit e sl) Sz))
-                              (m≤m+n (nestUnit e sl + Sz)
+                     (≤-trans dΦ
+                              (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz)
                                      (Sz * slotWrapSum sl)))))
     (nestWalkAt≤nestΦAt e sl id)
 
