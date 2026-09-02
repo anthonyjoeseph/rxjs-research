@@ -217,3 +217,5 @@ open import Refuted.Fold-Path-Regs-Len
 open import Refuted.Drain-Live-Defer
   using (before≡0; after≡3; charge≡1; parkedNest≡0; Φ-hyp-drain;
          stepFrame-nest-live-drain-absurd)
+open import Refuted.Cap-Walk-Cross
+  using (CapUnderWalk; capSide≡; walkSide≡; cap-walk-cross-absurd)

@@ -230,22 +230,26 @@ postulate
   -- length, so a bound sitting ABOVE `nestWalkAt` is not a weak bound
   -- here, it is no bound at all.
 
-  -- BUT THE CEILING AT THE RIGHT DENOMINATION DOES EXIST, AND IT IS
-  -- NOT NEW: `nestOK?` is `storeNestMax` under `nestCapAt`, and
-  -- `cascadeGo-nest-nodes` -- a sibling on this same face -- already
-  -- takes it as a premise, so no producer owes anything that is not
-  -- already owed.  What that changes is the shape of the work: this
-  -- is a routing job plus ONE arithmetic fit, not an invariant to
-  -- install and cascade.  And the fit is the whole residue, because
-  -- the two sides are separate recurrences in the instant index.
-  -- `nestCapAt` starts at `nestUnit e sl` and climbs by `nestFacAt`
-  -- per instant; `nestWalkAt` is a fixed exponential in the SIZE cap
-  -- times that same unit, and does not carry the nest tower at all.
-  -- Both grow with the index, since the size cap does too, and which
-  -- one outruns the other is not readable off either definition.
-  -- That comparison is what to settle before any clause is typed --
-  -- and it decides the arm, since the burst's own exponent still has
-  -- to fit inside whatever margin it leaves.
+  -- AND THE CEILING AT THE RIGHT DENOMINATION EXISTS BUT DOES NOT
+  -- PAY, WHICH IS THE ROUTE SETTLED RATHER THAN NARROWED.  `nestOK?`
+  -- is `storeNestMax` under `nestCapAt`, and `cascadeGo-nest-nodes`
+  -- -- a sibling on this same face -- already takes it as a premise,
+  -- so the routing half was free: no producer owes anything that is
+  -- not owed already.  What is not free is the arithmetic.  The two
+  -- currencies are separate recurrences in the instant index, and the
+  -- cap is the faster one AT THE SAME INDEX: one instant multiplies
+  -- it by `nestFacAt`, whose exponent is a burst squared times a
+  -- register width times `delSq` at the instant after, and `delSize`
+  -- dominates the size cap -- so that exponent is at least four times
+  -- the walk's, which is the size cap cubed and nothing else.  The
+  -- walk has one linear factor to answer with, over a wrap sum the
+  -- cap itself bounds.  So the ceiling in hand sits ABOVE the budget,
+  -- exactly as the `S` reading does, and threading it buys nothing.
+  -- REFUTED: `Refuted.Cap-Walk-Cross`, at every floor this
+  --   development proves at once -- the size cap at two, the burst
+  --   and the register width at one, the deletion size at the cap and
+  --   the wrap sum at its bound -- and no axis moves the gap the
+  --   other way.
 
   -- AND THE STORE SUMMAND IS THE WHOLE SEPARATION FROM A PROVEN ARM,
   -- which is what makes the residue small rather than structural.
@@ -309,6 +313,13 @@ postulate
   -- queued term COSTS to subscribe rather than how many there are.
   -- Neither ledger follows from the receipt, so the routing question
   -- is not answered by the fact already in hand.
+
+  -- AND THE STORE CEILING THAT WOULD HAVE PAID FOR BOTH ASKS IS ABOVE
+  -- THE BUDGET, so the fold arm's settlement binds here too: this
+  -- arm's own `G` is read at one entry of that same table and spent
+  -- against the same `nestWalkAt`, and nothing about a queue moves
+  -- that ordering.
+  -- REFUTED: `Refuted.Cap-Walk-Cross`.
   innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)

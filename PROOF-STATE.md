@@ -215,18 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN ROUTE THE TWO NARROWED ASKS, OR RESTATE THEM AGAIN.**
-  `scanΦ-fit` and `innerΦ-fit` now ask for `nodeNestAt` at the node
-  their own step names, and no premise either carries reaches the
-  table it is read from. They just got heavier than their rows say:
-  the live leaf's drain arm now spends the SAME fit the registry arm
-  does, so `innerΦ-fit` is the producing side of two faces rather than
-  one and a restatement moves both. The producers are
-  `frameΦ-fit`'s callers, and `walk-ΦHyp-go` threads a size, a register
-  count and a path depth with no store reading. If a caller can
-  supply it the two stop being SHAPE and become routing; if none can,
-  that entry's ceiling is a field the invariant record is missing,
-  which is a restatement of the RECORD rather than of two signatures.
+- **PUT THE PER-NODE CEILING ON THE INVARIANT RECORD.** The routing
+  branch is closed: the one ceiling on `EvalSt.nodes` is `nestOK?`'s,
+  and `Refuted.Cap-Walk-Cross` puts it above `nestWalkAt` at the same
+  instant, so `scanΦ-fit` and `innerΦ-fit` cannot be paid by threading
+  what exists — and since the live leaf's drain arm now spends the same
+  fit the registry arm does, that is three faces waiting on one field.
+  What all of them ask for is ONE entry's depth, which a table-wide
+  maximum was standing in for. So the work is a field every writer of a
+  node establishes and every reader spends, in the walk's currency
+  rather than the caps face's. The first question is whether the
+  writers can: a field no producer can supply moves the same gap one
+  level down instead of closing it.
 
 - **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
   level ledger is closed to `walk-share-LiveHyp` in both directions —
@@ -288,14 +288,14 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the drain's new grant. Two of its three obligations are drain ledgers this
+- **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
+  the drain's new grant. Two of its three obligations are drain ledgers this
   face has and must be routed; the third is the merge node's own queue depth,
-  read at the entry the finish looks up. No premise here reaches that table.
+  and the one ceiling on that table sits above the budget it is spent against.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the fold's new grant. Its ask is now one accumulator's depth at the node
-  the step names, not the table's max; every premise it has is still about the
-  schedule, the path or the values, so the entry is owed by whoever calls it.
+  of the fold's new grant. Its ask is one accumulator's depth at the node the
+  step names, and routing the table's own ceiling down is settled dead — that
+  ceiling outruns `nestWalkAt` at the same instant. A record field is owed.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
