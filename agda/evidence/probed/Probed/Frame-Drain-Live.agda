@@ -1,5 +1,5 @@
 -- THE DRAIN ARM, REACHED AT LAST, AND BY A DOOR THE RUNNING FAMILIES
--- DO NOT HAVE.  `stepFrame-nest-live`'s completion arm subscribes out
+-- DO NOT HAVE.  `mergeAllDrain-nest-live` subscribes out
 -- of a *All node's QUEUE, and no program family in this tree fills
 -- one: an unlimited outer never refuses room, and every inner these
 -- families build completes inside its own subscribe burst, so the
@@ -8,7 +8,7 @@
 -- carrying a parked queue is an instance by construction -- which is
 -- the door, and it costs a node install rather than a new program.
 --
--- TARGET: stepFrame-nest-live @7dad31
+-- TARGET: mergeAllDrain-nest-live @ab1809
 
 -- WHAT THE ROWS MEASURE IS THE ASYMMETRY THE ARM TURNS ON.  The gate
 -- truncates: a queue entry `deferᵉ b` reads as nesting ZERO wherever

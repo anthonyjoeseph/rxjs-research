@@ -215,39 +215,38 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN READ THE REGISTRY'S OWN PATHS, WHICH THE FAN-OUT BODY TURNED
-  UP.** Splitting the terminal closed the potential and exposed two
-  facts nothing carries: a re-entered chain is walked FROM THE TOP, so
-  it needs its size receipt at the program's cap while the walk holds
-  the registry at a level that only grows; and its depth is owed
-  against the syntactic unit while the store's ledger bounds the
-  registry by a runtime maximum. Both are properties of what a
-  registration MAY be rather than of the walk, so the commit is to find
-  where one is minted and either wire an invariant that already says
-  it or refute the pair at a program that registers past the cap.
+- **THEN OPEN THE DRAIN'S OWN RECURSION.** The completion frame is now
+  a checked dispatch — the four routes that hand their schedule back
+  are proven, and everything still asserted sits on the queue drain
+  itself, at the caps bundle the node lookup delivers. What that
+  bundle has not been spent ON is the single subscription: the drain
+  recurses over the queue and mints once per entry, so the fold it
+  returns is a join of one subscribe per parked term against a
+  pre-state offering zero. So the commit splits that recursion — a
+  real body over one subscribe leaf, the park receipt read at the
+  entry — and either closes the join against the cap or names the
+  clause where the recursion outruns it.
 
-- **THEN JOIN THE TWO DRAIN FACES, WHICH THE TABLE READ MADE
-  POSSIBLE.** Naming the queue left `innerΦ-fit-drain` owing ONE
-  ledger, and it is now the caps face's own drain law verbatim — same
-  predicate, same queue, at `capsAt` for the face, `capsH` for the
-  count and the walk's level for the descent. What separates them is
-  the GRANT: that law is stated under a walk hypothesis this face
-  never receives, while the potential face's premises are the path,
-  the schedule and the values. So the commit is to settle which of the
-  two moves — the caps law restated at premises the Φ face holds, or
-  the Φ walk carrying the walk grant — and it is a real fork, since
-  threading a grant is a restatement and the ledger prices that.
+- **THEN FOLLOW THE REGISTRY RECEIPT BACK TO THE MINT.** The fan-out
+  pair turned out not to be the fan-out's at all: the admission filter
+  never reads a path, both liftings across it are already proven, and
+  what was left refutes at one `register` onto the initial state.
+  Both residues now sit at the registry, and both are still stated
+  over an ARBITRARY state, which is the same defect one level down.
+  `register` is the only door into that list, so the commit is to
+  state what a registration carries -- its length at the program's cap
+  and its depth at the syntactic unit -- where it is minted, and
+  either walk it forward to the fan-out or refute it at whatever
+  registers a chain the program's own syntax does not bound.
 
-- **THEN PRICE THE GATE ON THE SIDE THAT SEES THROUGH IT.** The drain
-  arm turned out to be paid by the CAP SIZE and by nothing the state
-  holds: the nesting measure truncates at the gate, so a parked inner
-  reads zero at the node while draining it mints a live entry at the
-  body's full depth. That asymmetry is now measured but unspent — no
-  statement in the tier names it, so every fit reaching this arm
-  re-derives it. So the commit is to state the gate's own inequality
-  where the two readings meet, and either wire it into the drain
-  ledgers that need it or refute it at a program whose gated body
-  outruns the size its caps are built from.
+- **THEN CARRY THE CAPS RECEIPT DOWN THE POTENTIAL WALK.** The fork
+  the drain faces posed was false, and `innerΦ-drain-caps`'s header
+  says why: neither a restatement at these premises nor the walk's
+  whole record is what the ledger asks for. One conjunct is, and the
+  tick this face sits under already holds it. So the commit threads
+  that receipt from there through the potential walk to the arm that
+  reads a queue, and either closes the arm's caps leaf with it or
+  names the clause where the walk cannot preserve it.
 
 ### The ledger
 
@@ -256,11 +255,13 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED×2`: what one frame mints on the live list. The completion
-  arm carries the registry face's drain fit, since a queued gate mints past
-  every depth the walk holds. Reached at an installed queue: only the cap
-  size pays, and the fit's state reading is blind.
+- **`mergeAllDrain-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+  what draining a merge node's parked queue mints on the live list. Reached at
+  an installed queue: a gated entry reads zero at every state quantity the
+  consuming fit's residue is built from, so only the cap size pays.
+- **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
+  the outer frame mints, subscribing the arrivals it is handed. The one kind
+  whose side condition is a size bound on values rather than a unit.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -281,28 +282,30 @@ does not fit is a finding about the shared statement, not about the head.
   an admitted chain that ends at a SECOND hand-over. The residue of the
   terminal split: its factor is the sink's own times its frames', and the hop
   count is bounded by nothing but the dispatch gas.
-- **`fan-chain-sz`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: an admitted
-  chain's size receipt at the PROGRAM's cap and not at the level. The walk
-  holds the registry at an `iterSize` that only grows, so the reading it
-  carries is the weaker one and cannot be narrowed back down.
-- **`fan-chain-nestD`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: an admitted
-  chain's depth against the syntactic unit. The walk's registry premise is a
-  size receipt carrying no depth at all, and the store's ledger bounds the
-  registry by a runtime maximum instead.
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's own
+  size receipt at the PROGRAM's cap. The fan-out never needed it — the filter's
+  lift is proven — and stated over an arbitrary state it fails at one
+  registration longer than the cap, whatever the cap is.
+- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's own
+  depth against the syntactic unit. Refuted at a chain three deep against a
+  unit of one, minted by a map whose function carries syntax the program does
+  not.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
   the fold's new grant. Unaffordable, not mis-shaped: the count is under the
   exit width, which outruns two-to-two-to the size at every instant, so no
   story buys room. BLOCKED on whether this face prices a threading frame at
   all.
-- **`innerΦ-fit-drain`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the drain's
-  grant at the queue the state names. The width is no longer chosen — it is
-  that queue's own `drainW` — so what is left beside the charge is one caps
-  receipt, which the caps face's drain law already delivers under a grant this
-  face lacks.
-- **`innerΦ-fit-quiet`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same grant
-  where the lookup finds no merge at this type. Both drain ledgers are proven
-  vacuous there and the width is zero, so the row is the frame residue and the
-  charge alone. Nothing has instantiated it.
+- **`innerΦ-drain-caps`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
+  queue's caps receipt, now at the face and count the arm REPORTS rather than
+  at ones it chooses. Its own definition names the state's caps receipt in
+  every arm, and this face carries one of that predicate's seven conjuncts.
+- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the charge, at
+  the queue's own `drainW` and at every level within the descent's count. All
+  the arm has left once the face, the count and the store residue are reported
+  off its own premises.
+- **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
+  charge at width zero, where the lookup finds no merge at this type. Nothing
+  has instantiated it.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the

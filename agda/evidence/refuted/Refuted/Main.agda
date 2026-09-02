@@ -230,3 +230,8 @@ open import Refuted.Scan-Phi-Width
   using (ScanΦFits; size≡; nestD≡; depth≡; rootFac≡; legal; unit-ok; premΦ;
          bound; scan-phi-width-absurd;
          ScanΦFitsWide; wide; scan-phi-wide-absurd)
+open import Refuted.Fan-Chain-Registry
+  using (FanChainSz; FanChainNestD; unit≡; takesLen; admitLong; crosses;
+         fan-chain-sz-absurd; FanRegsSz; fan-regsSz-absurd;
+         deepNest; nestD≡; admitDeep; fan-chain-nestD-absurd;
+         FanRegsNest; fan-regsNest-absurd)
