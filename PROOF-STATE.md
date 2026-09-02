@@ -215,17 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE SAME DELIVERY ABOVE THE CROSSOVER, WHERE THE CAPS TRACK
-  THE SPINE.** The later-arrival rows just taken
-  sit below it, where both caps are pinned at the frame's own syntax,
-  so a delivery moves neither — the entry climbs once to the previous
-  exit and settles. Above the crossover the caps track the height, and
-  that is the one stretch where a cut can LOWER the column the grant
-  is quadratic in while the exit it must clear stays linear — the
-  direction no row has seen. The harness transfers whole and the
-  sibling already prices the program, so the cost is two cascades. A
-  verdict there closes this leaf's measure-side axes; a red one says
-  the grant answers the subscribe, not the run.
+- **FINISH THE CORNER, AND DECIDE WHAT IT MAY COST THE GATE.** The
+  delivery above the crossover is read and the leaf HOLDS there: the
+  path cap holds, the entry climbs onto the fold's own registrations
+  as it does below, and the exit does not follow it up. So the cut
+  that lowers the column the grant is quadratic in does not break the
+  fit. What is open is
+  the settling row, and it has become a COST question rather than a
+  risk one — this corner multiplies the crossover height by a second
+  cascade, and `probed` is a gate step, not a side loop. Land it if it
+  comes in near the family's worst; otherwise keep the reading that
+  answers the leg and record the settling row as a coverage boundary
+  priced in gate time.
 
 - **THEN THE FIELD BOTH NEW RESIDUES ARE WAITING ON.** `scanΦ-fit` and
   `innerΦ-fit` are one gap in two guises: each asks a producing side

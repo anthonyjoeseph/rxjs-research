@@ -52,6 +52,21 @@ postulate
   -- the factor the frame surrenders is exactly the substitution it
   -- performs.
   --
+  -- AND THE REGISTRY ARM'S REFUTATION DOES NOT TRANSFER BY READING,
+  -- which is worth saying because the two arms are otherwise taken as
+  -- one.  `Refuted.Drain-Regs-Nest` runs a completion walk -- `valsΦ?`
+  -- is `all` over the burst, so an empty one clears the premise at
+  -- every budget -- and the drain then subscribes a queued term,
+  -- appending a registration whose PATH carries a fresh outer frame.
+  -- This fold reads NODE STATES instead, and the two writes the same
+  -- step makes both go the wrong way for a crossing: `allFresh-nest`
+  -- prices a head's own install at zero, and the drain takes the term
+  -- OUT of the parent's queue.  So a crossing here cannot come from
+  -- the install -- it has to come from what the subscribed term
+  -- ENQUEUES before the step's gas is spent, and that is the thing to
+  -- instantiate rather than the drain itself.  Read off the
+  -- definitions; no row has been taken.
+  --
   -- PROBED: `Probed.Chain-Step-Abs-Charge` reaches this leaf by RUNNING
   --   a whole chain over it, at the second cascade of two reachable
   --   families, taking the chain the evaluator itself presents rather

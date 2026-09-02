@@ -37,6 +37,18 @@ claimed by `Probed.Main` and held to this same law by `make wiring-probed`.
 `make wiring` reads Main's `using` clauses to get its seeds, so a filename never earns
 an exemption and a claim cannot self-certify.
 
+**BUT TWO OF THE ROOTS THAT REMAIN ARE TYPECHECKED BY NO GATE TARGET, AND THAT IS A
+LIVE GAP.** Being a seed here buys the reachability law over a cone, not a build:
+`gate-heavy` compiles Main's cone, then `refuted`, `probed` and `bug-cache` — which
+covers `Implementation.Unit-Test` and nothing else in this table. `CLI.Main` and
+`QuickCheck` are built only by `cli-build` / `qc-build`, which the gate does not run,
+so an impl or spec change can break the oracle and the all-Agda QuickCheck loop with
+nothing going red until someone reaches for them — which is exactly the moment they
+are needed and the worst moment to find them broken. `Harness.Main` is outside on
+purpose and CLAUDE.md prices it; these two are outside by omission. The repair is a
+gate target, and what it costs is two more heavy Agda builds on every run, which is
+why it is written down here rather than simply added.
+
 **Two kinds of line own their span under a synthetic PER-SITE name, and both are
 seeds.** An anonymous `_ : T` pin, and a column-0 `... | p = body` `with` arm. Neither
 can ever HAVE a consumer, but both are real bodies the typechecker checks, so whatever

@@ -161,17 +161,22 @@ here is one `make refuted` run, and it is paid outside the gate.
   green — a vacuous quantifier, a hand-built unreachable state, an assembly
   read backwards — are in CLAUDE.md under PROBE BEFORE GRINDING.
 - **The RECEIPT still goes in the postulate's own header, in `src`**, as
-  `-- PROBED <date>:` saying which shapes were covered. The probe is the
-  apparatus; the receipt is the finding, and the finding belongs next to the
-  statement it is about. This is the same locality rule as `-- DEAD ROUTE`.
+  `-- PROBED:` saying which shapes were covered — undated, since
+  `make comments-check` outlaws a date in a source comment and a coverage
+  statement is re-runnable, so its age says nothing a reader can act on. The
+  probe is the apparatus; the receipt is the finding, and the finding belongs
+  next to the statement it is about. This is the same locality rule as
+  `-- DEAD ROUTE`.
 - **AND THE RECEIPT IS CHECKED (E3), BECAUSE IT OUTLIVES EVERYTHING ELSE.** The
   probe expires and is deleted; the receipt stays, and for most of this
   campaign's probes it is the only surviving trace in the tree. So it carries
   the same discipline E2 puts on a probe's `-- TARGET:`. A receipt is
-  `-- PROBED <date>` when its subject is a LIVE postulate and
-  `-- PROBED-HISTORICAL <date>` once that statement is PROVEN, it must sit in
-  the header of a declaration (a receipt above nothing is evidence about
-  nothing), and an invented marker is a finding rather than a silent skip —
+  `-- PROBED:` — ONE spelling, with no dated and no historical variant — and it
+  must sit above a declaration whose statement is still a POSTULATE, so that
+  DISCHARGING one fails the gate until the receipt has been re-read and
+  DELETED (a receipt above nothing is evidence about nothing; a receipt above a
+  proven definition is a coverage claim the theorem has already superseded).
+  An invented marker is a finding rather than a silent skip —
   a spelling the check does not know is a receipt it cannot audit, which reads
   as evidence and is enforced as nothing.
   **The value is WHEN it fires: at the discharge.** Proving a statement turns
@@ -181,13 +186,14 @@ here is one `make refuted` run, and it is paid outside the gate.
   statement in front of them. The marker is mechanical; re-reading the PROSE
   under it is the actual obligation.
 - **AND WHEN A POSTULATE BECOMES AN ASSEMBLY, THE RECEIPT FOLLOWS THE OPEN
-  STATEMENT DOWNWARD.** E3 knows two tenses — `-- PROBED` over a live
-  postulate, `-- PROBED-HISTORICAL` over a proven one — and the repo's central
-  move produces a THIRD: a real body over leaves that are still open. Such a
-  statement is neither, and marking it HISTORICAL asserts it is settled, which
-  is the lying comment E3 exists to prevent arriving from the other side. **Do
-  not invent a marker** — a spelling the check does not know is a receipt it
-  cannot audit, which is the finding E3 already reports. Move the receipt into
+  STATEMENT DOWNWARD.** E3 admits a receipt over a live postulate and over
+  nothing else, and the repo's central move produces a statement that is
+  neither open nor settled: a real body over leaves that are still open. The
+  parent can carry no receipt at all, and a marker invented to let it says the
+  parent is settled — the lying comment E3 exists to prevent, arriving from the
+  other side. **Do not invent one** — a spelling the check does not know is a
+  receipt it cannot audit, which is the finding E3 already reports. Move the
+  receipt into
   the header of the LEAF, and say in it which instantiation the rows reached:
   rows that pin the parent's conclusion instantiate the leaf at whatever the
   assembly passes, and the leaf's generality is the part they do not touch. E3
@@ -196,14 +202,18 @@ here is one `make refuted` run, and it is paid outside the gate.
 
 - **A `-- PROBED` RECEIPT MAY OUTLIVE ITS PROBE, AND THAT IS FINE.** A receipt
   names the probe it came from; when the probe has been deleted, that name will
-  not be in `probed/`. It is not a dangling reference to repair — the receipt is
-  a historical note in the header of what is now a proven definition, and
-  `git log -S'<name>' --all` finds the probe that produced it — by the NAME it
+  not be in `probed/`. It is not a dangling reference to repair — the target is
+  still a live postulate, which is all E3 holds the receipt to, and the probe
+  was the apparatus while the receipt is the finding. **Then the receipt
+  CARRIES THE SHA**, because that is the whole recovery route:
+  `git show <sha>:<path>` reads the probe back, and
+  `git log -S'<name>' --all` finds it — by the NAME it
   tested, not by a path, since probes have not always lived in `probed/` and a
   path-scoped search over a moved directory answers ALL-CLEAR. CLAUDE.md carries
   the standing rule to run that search before probing any non-GRINDABLE row. What is
-  NOT fine is a receipt asserting a live RISK CLASS on a discharged statement;
-  that is a lying comment, and it is fixed by deleting the assertion.
+  NOT fine is a receipt left standing over a statement that has been DISCHARGED;
+  E3 fails there, and the repair is to re-read the prose and DELETE it, never to
+  restamp it into a tense the check does not have.
 - **A probe is DELETED when E2 fires.** Not parked, not commented out, not
   kept "in case the region reopens" — that licence belongs to refutations,
   which carry information across a reopening ("not that way"). A probe carries
