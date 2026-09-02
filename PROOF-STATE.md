@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN READ THE THRICE-REFUTED ROW AGAINST THE SPIRAL TEST.**
-  `walk-share-LiveHyp` has been refuted at the price, then once
-  priced, then at the range — three restatements of one side
-  condition. The convergence test asks whether each new region was
-  strictly SMALLER than the one it replaced, or whether one region
-  keeps producing falsity; a fourth restatement made without
-  answering that is the move the test exists to stop. Converging says
-  restate again; spiralling says the mechanism under it is wrong, and
-  that verdict is a stop condition only Anthony can rule on. Read the
-  refutations and the header's dead route first, and let the verdict
-  be the leg.
-
 - **THEN THE LAST UNREAD SIBLING, WITH THE WIDTH READING IN HAND.**
   `stepFrame-nest-live` is the one arm of the frame triple nothing has
   instantiated. It already carries a grant and an extra join against
@@ -251,6 +239,19 @@ does not fit is a finding about the shared statement, not about the head.
   invariant record is missing, which is a restatement of the RECORD
   rather than of these two signatures.
 
+- **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
+  level ledger is closed to `walk-share-LiveHyp` in both directions —
+  no ceiling is choosable at a caller, and the caps face's own top
+  towers past anything the walk affords — so what is owed is a
+  different currency, not a larger number. The potential face's
+  receipt shrinks along the path and names no level, which is why it
+  survives a fan-out the level reading cannot. Read `PathΦHyp`'s sink
+  arm against `DispatchLiveHyp`'s: if the potential already carries
+  what a fanned-into chain mints, this row restates onto it and the
+  level counterexamples retire with the mechanism they refuted; if it
+  does not, the residue is the first thing the live arm has needed
+  that no face carries.
+
 ### The ledger
 
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
@@ -262,11 +263,10 @@ does not fit is a finding about the shared statement, not about the head.
   frame mints on the live list. Four kinds mint nothing; the outer frame
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
-- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE`:
-  the size side condition for the registry chains a sink fans into. Refuted at
-  the price, then once priced, then at the range: the levels one fan-out
-  consumes are exponential in the level and the affordable range is quadratic
-  in the cap.
+- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
+  `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
+  sink fans into. Every reading in the level currency is closed: no ceiling is
+  choosable, and the caps face's top towers past the walk's exponential.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
@@ -297,9 +297,9 @@ does not fit is a finding about the shared statement, not about the head.
   the step names, not the table's max; every premise it has is still about the
   schedule, the path or the values, so the entry is owed by whoever calls it.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
-  registry price as ONE FRAME STEP of two caps. Now read at both heights and
-  at later arrivals either side of the crossover, the entry settling exactly;
-  only the caps can refute and they cannot move. One family unread.
+  registry price as ONE FRAME STEP of two caps. Now read at both heights and at
+  later arrivals either side of the crossover, the entry settling exactly; only
+  the caps can refute and they cannot move. One family unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

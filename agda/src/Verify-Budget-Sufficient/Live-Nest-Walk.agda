@@ -198,17 +198,32 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- it at once.  What absorbs an exponential climb is a ledger indexed
 -- by remaining nesting depth, and the caps face already carries one --
 -- `chainStep-caps` proves its climb survives a fan-out, and it is paid
--- out of the instant's fuel rather than out of the cap.  So the
--- affordability here is ONE reading and not a family over the range:
--- what remains is a single inequality, whether the walked ceiling
--- dominates the caps face's top level, and it is owed where that
--- ceiling is defined rather than at the hop that spends it.
+-- out of the instant's fuel rather than out of the cap.
+--
+-- AND THAT LEDGER IS UNAFFORDABLE HERE, SO WHAT MOVES IS THE MECHANISM
+-- AND NOT THE NUMBER.  Reading the affordability ONCE, at the top of
+-- that ledger, is the only form the counterexamples leave standing,
+-- and the walked ceiling does not reach it: a ladder that at least
+-- exponentiates per rung cannot be closed under a ceiling that is one
+-- exponential, however the arithmetic is arranged, and no hypothesis
+-- available at this hop changes which of the two towers.  What is left
+-- standing is a receipt that SHRINKS along the path and names no level
+-- at all -- the shape the potential face already carries -- so this arm
+-- is owed a different CURRENCY rather than a larger number in the one
+-- it has.
 --
 -- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
 -- REFUTED: `Refuted.Sink-Level-Range`
 -- DEAD ROUTE: picking the level ceiling at a caller and restating
 --   this hop downward.  Every caller's ceiling is capped by what
 --   `iterSize≤walkFac` affords, and one hop asks past it at every cap.
+-- DEAD ROUTE: reading the affordability once at the caps face's top
+--   level instead, which is what the three counterexamples leave.
+--   `sizeCount` iterates `lvls`, and `exp-lvls` puts each rung above
+--   two to the one below, so the count towers with the deliveries;
+--   `nestWalkAt` is a single exponential of a cap cubed, and
+--   `iterSize-2^` doubles per fold -- so the walked side is past the
+--   ceiling by the ladder's second rung.
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (i : Fin n)
