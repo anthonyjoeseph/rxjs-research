@@ -44,24 +44,44 @@
 -- DEGENERATE -- carried so an arm that changed shape shows up as a
 -- wrong total rather than silently.
 
+-- AND THE SUM IS A LENS, NOT THE CHARGE, which is worth saying
+-- because the reading above invites the other reading.  `regsSz?` is
+-- an `all` over the registry, so it charges each entry on its own and
+-- a registry of many short entries costs exactly what one of them
+-- costs.  A total that grows therefore says frames LANDED; it does
+-- not say the price moved.  What can move the price is a single entry
+-- getting longer, so the rows below take the registry ENTRY BY ENTRY,
+-- matched on the id it was registered under: for every entry standing
+-- before the step, its length after.  An entry the step drops reads
+-- as zero and passes, which is right -- a deregistration cannot break
+-- an `all`.
+
+-- WHICH ROWS BEAR WEIGHT.  The held row is LOAD-BEARING: no entry
+-- standing before a step is longer after it, on every arm and at
+-- every operator count, so all the growth the sum records arrives as
+-- NEW entries.  Its non-degeneracy is a row of its own -- an `all`
+-- over entries that all vanished would read green -- and it counts
+-- the ids that survive the step rather than the entries that enter
+-- it.
+
 -- WHAT THESE ROWS DO NOT BUY.  Three operator counts and one nesting
 -- level, and the operators are identity maps, so a frame that reads
 -- its argument's syntax rather than merely occupying a node is
--- unmeasured.  The step registers one entry in every row, so nothing
--- here says what several subscribes inside a single step do to the
--- total -- which is the shape the cascade fold spends this statement
--- at, and it is the one the sum would have to be read cumulatively
--- against.
+-- unmeasured.  Every row registers ONE new entry per step, so a step
+-- that registers several -- which is what a fan does, and what the
+-- cascade fold spends this statement at chain after chain -- is read
+-- here only through the held row, which says such a step cannot
+-- lengthen what is already standing.
 
 -- TARGET: chainStep-regsSz @a3d8b7
 module Probed.Chain-Step-Regs-Ops where
 
-open import Data.Bool using (true; _∧_)
+open import Data.Bool using (Bool; true; false; if_then_else_; _∧_)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
-open import Data.List using ([]; _∷_; map; foldr)
+open import Data.List using (List; []; _∷_; map; foldr)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _∸_; _⊔_; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _∸_; _⊔_; _≤ᵇ_; _≡ᵇ_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
@@ -130,6 +150,25 @@ maxLenOf e st = foldr _⊔_ 0
 sumLenOf e st = foldr _+_ 0
   (map (λ en → pathLen (proj₂ (proj₂ (proj₂ en)))) (EvalSt.registry st))
 
+-- the registry as (id, length) pairs, which is what lets the two
+-- readings be matched rather than merely compared
+idLens : (e : Closed Γ₃ natᵗ) → EvalSt e → List (ℕ × ℕ)
+idLens e st = map (λ en → proj₁ en , pathLen (proj₂ (proj₂ (proj₂ en))))
+                  (EvalSt.registry st)
+
+lookupLen : ℕ → List (ℕ × ℕ) → ℕ
+lookupLen i [] = 0
+lookupLen i ((j , l) ∷ xs) = if i ≡ᵇ j then l else lookupLen i xs
+
+heldFlatOf : List (ℕ × ℕ) → List (ℕ × ℕ) → Bool
+heldFlatOf bef aft =
+  foldr (λ pr acc → (lookupLen (proj₁ pr) aft ≤ᵇ proj₂ pr) ∧ acc) true bef
+
+survivedOf : List (ℕ × ℕ) → List (ℕ × ℕ) → ℕ
+survivedOf bef aft =
+  foldr (λ pr acc → if 1 ≤ᵇ lookupLen (proj₁ pr) aft
+                    then suc acc else acc) 0 bef
+
 row : (e : Closed Γ₃ natᵗ) → ℕ × ℕ × ℕ × ℕ
 row e with sched-next (proj₁ (sub e))
 ... | inj₁ _         = 0 , 0 , 0 , 0
@@ -143,6 +182,32 @@ row e with sched-next (proj₁ (sub e))
                 r   = chainStep 2 a₂ c s₃ st₀
             in maxLenOf e st₀ , maxLenOf e (proj₂ (proj₂ r))
              , sumLenOf e st₀ , sumLenOf e (proj₂ (proj₂ r))
+
+held : (e : Closed Γ₃ natᵗ) → Bool
+held e with sched-next (proj₁ (sub e))
+... | inj₁ _         = false
+... | inj₂ (a₁ , s₁) with cascade a₁ 1 s₁ (proj₂ (sub e))
+...   | (_ , s₂ , st₁) with sched-next s₂
+...     | inj₁ _         = false
+...     | inj₂ (a₂ , s₃) with chainsOf a₂ st₁
+...       | []            = false
+...       | (rid , c) ∷ _ =
+            let st₀ = record (cascadeLatch a₂ st₁) { delivered = rid ∷ [] }
+                r   = chainStep 2 a₂ c s₃ st₀
+            in heldFlatOf (idLens e st₀) (idLens e (proj₂ (proj₂ r)))
+
+survived : (e : Closed Γ₃ natᵗ) → ℕ
+survived e with sched-next (proj₁ (sub e))
+... | inj₁ _         = 0
+... | inj₂ (a₁ , s₁) with cascade a₁ 1 s₁ (proj₂ (sub e))
+...   | (_ , s₂ , st₁) with sched-next s₂
+...     | inj₁ _         = 0
+...     | inj₂ (a₂ , s₃) with chainsOf a₂ st₁
+...       | []            = 0
+...       | (rid , c) ∷ _ =
+            let st₀ = record (cascadeLatch a₂ st₁) { delivered = rid ∷ [] }
+                r   = chainStep 2 a₂ c s₃ st₀
+            in survivedOf (idLens e st₀) (idLens e (proj₂ (proj₂ r)))
 
 stage : Closed Γ₃ natᵗ → ℕ
 stage e with sched-next (proj₁ (sub e))
@@ -215,3 +280,16 @@ switchGrowth = refl
 fits : (grew m0 ≤ᵇ sizeᵉ i0) ∧ (grew m1 ≤ᵇ sizeᵉ i1)
      ∧ (grew m2 ≤ᵇ sizeᵉ i2) ≡ true
 fits = refl
+
+-- NOTHING STANDING IS LENGTHENED, on either arm at any of the three
+-- counts -- so every frame the sum records arrives as a NEW entry,
+-- and the charge `regsSz?` actually makes is untouched by the total
+held-flat : held s0 ∧ held s1 ∧ held s2 ∧ held m0 ∧ held m1 ∧ held m2 ≡ true
+held-flat = refl
+
+-- and the entries it is quantified over are not all gone: this is the
+-- row that stops the one above reading green over an empty set
+survivors : survived s0 + 100 * survived s1 + 10000 * survived s2
+          + 1000000 * survived m0 + 100000000 * survived m1
+          + 10000000000 * survived m2 ≡ 20202010101
+survivors = refl

@@ -688,12 +688,19 @@ chainsNest-all D U (c ∷ cs) h =
 --   the frames pushed are the inner's, and the axis is live in a RUN
 --   and not only in a constructed state.  The growth sits under the
 --   inner's own syntax, which is the quantity the arrival's size
---   premise bounds, so a level covers what the cap could not.  NOT
---   COVERED: the operators are identity maps and one nesting level,
---   so a frame reading its argument's syntax is unmeasured; and every
---   row registers ONE entry per step, so what several subscribes
---   inside a single step do to the total -- the shape the cascade
---   fold spends this statement at -- is unread.
+--   premise bounds, so a level covers what the cap could not.  The
+--   registry is then read ENTRY BY ENTRY, matched on the id each was
+--   registered under, because the sum is a lens and not the charge:
+--   `regsSz?` is an `all`, so many short entries cost what one costs
+--   and only a single entry getting LONGER can move the price.  No
+--   entry standing before a step is longer after it, on either arm at
+--   any count, over a surviving set the rows count rather than assume
+--   -- so every frame the total records arrives as a NEW entry and
+--   the charge is untouched by the growth.  NOT COVERED: the
+--   operators are identity maps and one nesting level, so a frame
+--   reading its argument's syntax is unmeasured; and every row
+--   registers one new entry per step, so a step registering several
+--   is reached only through the held row.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)

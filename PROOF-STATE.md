@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
 
-- **THEN SEVERAL SUBSCRIBES INSIDE ONE STEP, WHICH IS THE SHAPE THE
-  FOLD ACTUALLY SPENDS THIS AT.** Every chain-door row on record
-  registers exactly ONE entry per step, so the operator frames now
-  known to land there have only ever been read once. The cascade fold
-  spends this statement once per chain and feeds each output registry
-  in as the next chain's premise, so what the level has to pay for is
-  a total that accumulates — and a growth measured one subscribe at a
-  time says nothing about whether it does. A chain with two
-  subscribing frames, each over an operator-carrying inner, is the
-  reading; the sum is already the measurement that shows it.
+- **THEN WHETHER THE DOOR'S ROW IS STILL A FALSITY ROW.** The chain
+  door now has evidence on every re-entry it has, on the axis that
+  refuted its predecessor, and on the reading that charge is actually
+  made under — no standing entry lengthens, so a step's price is the
+  one new entry it adds. What has never been done is putting that
+  against the arithmetic: the walked path fits the base cap, the
+  inner's syntax fits it too, and one level multiplies rather than
+  adds. Write that comparison down and the row either drops a class
+  on evidence that reached its region, or names the shape that still
+  escapes it.
 
 ### The ledger
 
