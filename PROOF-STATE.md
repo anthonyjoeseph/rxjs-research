@@ -238,16 +238,16 @@ does not fit is a finding about the shared statement, not about the head.
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
 
-- **THEN AN INNER THAT CARRIES OPERATORS, THE ONE AXIS KNOWN TO
-  REFUTE.** Six chain-door sweeps now cover the door's re-entries, and
-  every one of them registers an inner that is a bare slot read — so
-  the registered chain never gains a frame of the inner's own, and the
-  length conjunct reads flat everywhere. That is exactly the quantity
-  `Refuted.Chain-Step-Regs-Cap` moves to break the cap: an inner with
-  its own operators lands the registration past the reading it was
-  admitted under. So the flatness on record is a property of the
-  programs swept, not of the door, and the sweep that would say which
-  puts a mapped or scanned inner under the same control.
+- **THEN SEVERAL SUBSCRIBES INSIDE ONE STEP, WHICH IS THE SHAPE THE
+  FOLD ACTUALLY SPENDS THIS AT.** Every chain-door row on record
+  registers exactly ONE entry per step, so the operator frames now
+  known to land there have only ever been read once. The cascade fold
+  spends this statement once per chain and feeds each output registry
+  in as the next chain's premise, so what the level has to pay for is
+  a total that accumulates — and a growth measured one subscribe at a
+  time says nothing about whether it does. A chain with two
+  subscribing frames, each over an operator-carrying inner, is the
+  reading; the sum is already the measurement that shows it.
 
 ### The ledger
 
@@ -295,10 +295,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×6`: the
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×7`: the
   whole chain's registry price, now stepping the level by one rather than
-  collapsing to the entry cap. Every re-entry the door has is instantiated
-  now; every inner swept is a bare slot, which is the refuting axis.
+  collapsing to the entry cap. The refuting axis is live in a run and the
+  level covers it; a step registering several entries is unread.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of

@@ -673,6 +673,27 @@ chainsNest-all D U (c ∷ cs) h =
 --   is the quantity `Refuted.Chain-Step-Regs-Cap` moves; and the
 --   stepped arrival is the SECOND overall, so a door met after several
 --   inner deliveries have landed is unmeasured.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Ops` -- an inner that CARRIES
+--   OPERATORS, which is the axis `Refuted.Chain-Step-Regs-Cap` moves
+--   to break the fixed-cap form and which every sweep above leaves
+--   still: all of them register an inner that is a bare slot read, so
+--   no registered chain in any of them gains a frame of the inner's
+--   own.  Three operator counts over the second-arrival program, read
+--   as a SUM of registered lengths because the entry a step adds is
+--   shorter than the longest one already standing and a maximum is
+--   therefore flat while the registry gains frames.  The merge arm
+--   grows by exactly one more than the operator count at each count,
+--   against a switch arm that grows by nothing at any of them -- so
+--   the frames pushed are the inner's, and the axis is live in a RUN
+--   and not only in a constructed state.  The growth sits under the
+--   inner's own syntax, which is the quantity the arrival's size
+--   premise bounds, so a level covers what the cap could not.  NOT
+--   COVERED: the operators are identity maps and one nesting level,
+--   so a frame reading its argument's syntax is unmeasured; and every
+--   row registers ONE entry per step, so what several subscribes
+--   inside a single step do to the total -- the shape the cascade
+--   fold spends this statement at -- is unread.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)
