@@ -234,6 +234,11 @@ frameΦ-fit sl id (thru-outer op nid) p vals sched hsl hpz hnd hΦ =
 -- REFUTED: Refuted.Sink-Level-Range -- the crossing is stated there over
 --   an abstract cap and an abstract entry level, so it binds this arm as
 --   written and not merely the arm it was taken against.
+-- DEAD ROUTE: instantiating this statement, in either denomination.  The
+--   budget it reads at is `nestWalkAt`, which is sealed, and the size it
+--   reads at is `capsAt`'s, which does not return at the smallest
+--   program the language admits -- the same pair that closes the drain
+--   leaf, and the reason no probe here can ever lower the class.
 postulate
   walk-share-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick) (j : ℕ)

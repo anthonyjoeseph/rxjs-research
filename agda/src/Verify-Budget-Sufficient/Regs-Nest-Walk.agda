@@ -216,11 +216,34 @@ thruΦ sf id now op nid path vals fin sched st B U (k , G , hfit , hnum) =
           hnum)
 
 postulate
-  -- THE SCAN FRAME SUBSTITUTES BY THE SAME RULE and pays the same
-  -- factor, but it also reads and writes a node, so its emitted value
-  -- is the accumulator's image rather than the payload's and the
-  -- substitution above cannot be pointed at it unchanged.
+  -- THE SCAN FRAME'S OUTPUT IS THE ACCUMULATOR'S IMAGE, AND THE
+  -- ACCUMULATOR IS IN THE NODE TABLE, so this arm reads a payload no
+  -- hypothesis here measures.  It pays the factor the map clause is
+  -- proven from, and that factor is spent against the value the walk
+  -- handed over -- which is not the value the fold emits.  This
+  -- statement is FALSE as written.
   --
+  -- WHY IT IS FALSE AND NOT MERELY HARD.  Let the step function be the
+  -- first projection.  Then it charges nothing and the emit IS the
+  -- stored value, so the premise reads one numeral -- depth zero,
+  -- under a charge of zero -- and holds at `U = 0`, the strongest
+  -- budget there is, while the emit leaves at whatever depth the table
+  -- was carrying.  Doubling the stored depth doubles what leaves and
+  -- moves the premise not at all, so the gap is a parameter of the
+  -- STATE and no constant and no term in `vals`, `path` or `B` closes
+  -- it.
+  --
+  -- WHERE THE REPAIR GOES IS WHERE THE DRAIN ARM'S DOES.  Both arms
+  -- read their output out of the store rather than forwarding it, and
+  -- `FrameΦHyp` is `⊤` at both; the grant that arm's block describes
+  -- is the one this arm needs too, taken over what the NODE may hold
+  -- rather than over what a queue may emit.
+  --
+  -- REFUTED: `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-absurd` at a
+  --   stored depth of forty, and
+  --   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at
+  --   eighty -- the pair is what puts the gap in the stored depth
+  --   rather than in a constant.
   -- RECOVERY: git show 8175756:agda/evidence/probed/Probed/Step-Frame-Nest-Phi.agda
   --   restores the harness that walked the refuting term through the
   --   map clause -- the same shape a scan clause has to be run at.
@@ -237,7 +260,37 @@ postulate
   -- is what the inner run produced -- and the frame's factor is one, so
   -- there is nothing here to pay a deepening with.  What has to hold is
   -- that an inner run cannot hand out a value deeper than the potential
-  -- the outer walk was already carrying.
+  -- the outer walk was already carrying, AND IT DOES NOT HOLD.  This
+  -- statement is FALSE as written; what it is missing is an obligation
+  -- the family already has a place for.
+  --
+  -- WHY IT IS FALSE AND NOT MERELY HARD.  A completion walk carries no
+  -- value, so the premise reads `all _ []` -- true at EVERY `U`, however
+  -- generous the reader is willing to be.  The conclusion is then the
+  -- drained values' own depth read straight against that `U`, since
+  -- `pathΦF` reads this frame as one and `pathNestD` charges it nothing,
+  -- leaving no factor in front to absorb anything.  A queue holding a
+  -- payload `k` layers deep under a step function naming it twice drains
+  -- `2 * k`, and nothing in `vals`, `path` or `B` moves with `k`.  So the
+  -- gap is unbounded in a parameter of the PROGRAM, and no constant and
+  -- no term in those three closes it.
+  --
+  -- WHERE THE REPAIR GOES, AND IT IS NOT A HYPOTHESIS ON THIS SIGNATURE.
+  -- `FrameΦHyp` is the family's own per-frame obligation, and it is
+  -- already non-trivial at `thru-outer` for exactly this reason: that
+  -- frame does not forward, it SUBSCRIBES, so what comes back is bounded
+  -- by nothing the incoming values say.  The drain under this frame
+  -- subscribes too -- `innerFinish` reaches `subscribeInner` through
+  -- `mergeAllDrain` -- so the `⊤` at this arm is the oversight.  What the
+  -- arm owes is a grant over what the QUEUE may emit, which is a fact
+  -- about the state, and `PathΦHyp` already carries `st` at the point
+  -- the obligation is raised.
+  --
+  -- REFUTED: `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-absurd` at
+  --   double occurrence, and
+  --   `Refuted.Inner-Drain-Nest.stepFrame-nest-Φ-inner-trip-absurd` at
+  --   triple -- the pair is what puts the gap in the occurrence count
+  --   rather than in a constant.
   stepFrame-nest-Φ-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)

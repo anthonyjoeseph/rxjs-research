@@ -58,11 +58,12 @@ open import Rx.Exp
          varᵗ; nat̂; strmᵗ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
-  using (Sched; EvalSt; mergeAll-st; Frame; from-inner; mergeAllᵒ; root; stepFrame; sched-init;
+  using (Sched; EvalSt; mergeAll-st; Frame; from-inner; mergeAllᵒ; root; _↠_; stepFrame; sched-init;
   st-init; installNode)
 open import Verify-Budget-Sufficient.Nest-Store using (frameNestF; nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nodesMax; nestDᵛˢ; frameNestD)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsΦ?)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 ----------------------------------------------------------------------
@@ -198,3 +199,54 @@ unitCharge≡82 = refl
 
 stepFrame-nodes-inner-unit-absurd : proj₁ row₃ ≤ unitCharge → ⊥
 stepFrame-nodes-inner-unit-absurd h = ≤⇒≤ᵇ h
+
+----------------------------------------------------------------------
+-- AND THE POTENTIAL FACE FALLS TO THE SAME WITNESS, which is what
+-- makes this refutation worth keeping rather than superseding.  The
+-- currency moved -- from a maximum of depths to a FACTOR times a depth
+-- -- and the drain is untouched by the move, because the move happens
+-- at the frames that substitute and this frame does not.  `pathΦF`
+-- reads a `from-inner` as one and `pathNestD` charges it nothing, so at
+-- the root the conclusion is the drained values' own depth read against
+-- `U`, with no factor in front of it to absorb anything.
+--
+-- WHAT MAKES IT UNBOUNDED RATHER THAN A CORNER.  The hypothesis is
+-- `all _ []`: the completion walk carries no value, so it holds at
+-- EVERY `U`, and the reader may pick `U` as generously as the queue is
+-- charged.  Then `deepV k` under the doubling step function drains
+-- `2 * k` against it.  Nothing in the statement -- not `vals`, not
+-- `path`, not `B` -- moves with `k`, so no constant and no term in
+-- these three closes the gap.  The repair is a fact about what the
+-- QUEUE may hold, which is a property of the state and belongs on the
+-- invariant record rather than in this signature.
+----------------------------------------------------------------------
+
+drainedΦ : ℕ
+drainedΦ = nestDᵛˢ (proj₁ (stepFrame gas 0 0 f root vals true sched₀ st₀))
+
+drainedΦ≡80 : drainedΦ ≡ 80
+drainedΦ≡80 = refl
+
+-- the walk arrives with nothing in hand, so the premise is discharged
+-- at a `U` twice what the whole queue is charged
+Φ-hyp : valsΦ? 3 40 (f ↠ root) vals ≡ true
+Φ-hyp = refl
+
+stepFrame-nest-Φ-inner-absurd :
+  valsΦ? 3 40 root
+    (proj₁ (stepFrame gas 0 0 f root vals true sched₀ st₀)) ≡ true → ⊥
+stepFrame-nest-Φ-inner-absurd ()
+
+-- and the third occurrence moves the drain again while the premise
+-- does not move at all, which is the gap being in `k` rather than in a
+-- constant
+drainedΦ₃ : ℕ
+drainedΦ₃ = nestDᵛˢ (proj₁ (stepFrame gas 0 0 f root vals true sched₀ st₃))
+
+drainedΦ₃≡120 : drainedΦ₃ ≡ 120
+drainedΦ₃≡120 = refl
+
+stepFrame-nest-Φ-inner-trip-absurd :
+  valsΦ? 3 80 root
+    (proj₁ (stepFrame gas 0 0 f root vals true sched₀ st₃)) ≡ true → ⊥
+stepFrame-nest-Φ-inner-trip-absurd ()
