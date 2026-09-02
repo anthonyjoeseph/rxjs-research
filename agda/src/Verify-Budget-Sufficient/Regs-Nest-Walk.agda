@@ -24,7 +24,8 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
 open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
-  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔)
+  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ)
+open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
@@ -38,11 +39,12 @@ open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×�
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
-  shareAdmit; shareLatch; iterSize)
+  shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
+  exhaust-st; takeDispatch; takeVals; lookupNode)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; thruWalk-nest)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
-open import Verify-Budget-Sufficient.Measures using (thruWrap-vals)
+open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; pathNestD; nest-inflate; dropSource-nest)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF)
@@ -231,19 +233,6 @@ postulate
       (proj₁ (stepFrame sf id now (scan-f fn nid) path vals fin sched st))
       ≡ true
 
-  -- THE TAKE FRAME CARRIES A FACTOR OF ONE AND NO DEPTH, so its
-  -- hypothesis and its conclusion are the same statement read either
-  -- side of the gate: what is owed is only that the values it lets
-  -- through are among the ones handed to it.
-  stepFrame-nest-Φ-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (path : Path Γ s t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (B U : ℕ) →
-    valsΦ? B U (take-f nid ↠ path) vals ≡ true →
-    valsΦ? B U path
-      (proj₁ (stepFrame sf id now (take-f nid) path vals fin sched st))
-      ≡ true
-
   -- THE INNER FRAME'S OUTPUT DOES NOT COME FROM THE FRAME AT ALL -- it
   -- is what the inner run produced -- and the frame's factor is one, so
   -- there is nothing here to pay a deepening with.  What has to hold is
@@ -258,6 +247,50 @@ postulate
       (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals
                         fin sched st))
       ≡ true
+
+-- THE TAKE FRAME CARRIES A FACTOR OF ONE AND NO DEPTH, so its
+-- hypothesis and its conclusion are the SAME predicate read either
+-- side of the gate, and the whole of what it owes is that the values
+-- it lets through are among the ones handed to it.  They are: the
+-- gate emits a PREFIX of its input on the arm that has a counter and
+-- nothing at all on the arms that do not, so the reading survives
+-- pointwise rather than being re-derived, and the factor of one is
+-- spent only against `1 * F ≡ F`.
+takeDispatchΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (p : Val Γ s → Bool) (nid : NodeId) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (m : Maybe (NodeState Γ)) →
+  all p vals ≡ true →
+  all p (proj₁ (takeDispatch {t = t} {e = e} nid vals fin sched st m)) ≡ true
+takeDispatchΦ p nid vals fin sched st (just (take-st k)) h
+  with proj₂ (proj₂ (takeVals k vals))
+... | true  = takeVals-all p k vals h
+... | false = takeVals-all p k vals h
+takeDispatchΦ p nid vals fin sched st nothing                     h = refl
+takeDispatchΦ p nid vals fin sched st (just (scan-st _))          h = refl
+takeDispatchΦ p nid vals fin sched st (just (mergeAll-st _ _ _ _)) h = refl
+takeDispatchΦ p nid vals fin sched st (just (switch-st _ _))      h = refl
+takeDispatchΦ p nid vals fin sched st (just (exhaust-st _ _))     h = refl
+
+stepFrame-nest-Φ-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (path : Path Γ s t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (B U : ℕ) →
+  valsΦ? B U (take-f nid ↠ path) vals ≡ true →
+  valsΦ? B U path
+    (proj₁ (stepFrame sf id now (take-f nid) path vals fin sched st))
+    ≡ true
+stepFrame-nest-Φ-take {Γ = Γ} {t = t} {e = e} {s = s}
+                      sf id now nid path vals fin sched st B U hΦ =
+  takeDispatchΦ {t = t} {e = e} p nid vals fin sched st
+    (lookupNode nid (EvalSt.nodes st)) hΦ′
+  where
+  p : Val Γ s → Bool
+  p v = pathΦF B path * (nestDᵛ s v + pathNestD path) ≤ᵇ U
+
+  hΦ′ : all p vals ≡ true
+  hΦ′ = subst (λ F → all (λ v → F * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
+                       ≡ true)
+              (*-identityˡ (pathΦF B path)) hΦ
 
 -- THE POTENTIAL ACROSS ONE FRAME, which is the induction's own
 -- hypothesis: every frame kind either hands its factor to the value it
