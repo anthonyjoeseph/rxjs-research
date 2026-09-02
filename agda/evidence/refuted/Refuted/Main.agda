@@ -214,3 +214,6 @@ open import Refuted.Fold-Path-Regs-Len
   using (FoldPathRegsLen; reached; entryVals; entryPath; entryRegs;
          figures; exitRow≡false; fold-path-regs-len-absurd;
          repairFigs; repairFits)
+open import Refuted.Drain-Live-Defer
+  using (before≡0; after≡3; charge≡1; parkedNest≡0; Φ-hyp-drain;
+         stepFrame-nest-live-drain-absurd)

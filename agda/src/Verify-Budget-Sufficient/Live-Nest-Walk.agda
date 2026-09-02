@@ -119,25 +119,34 @@ mutual
 
 postulate
   -- ONE FRAME'S MINTS.  Four kinds mint nothing at all; the outer
-  -- frame subscribes, and what a subscribe puts on the live list is
-  -- either a script's resolved tail -- charged to the slots -- or a
-  -- deferred body, whose depth is under its size and so under the
-  -- bound the side condition supplies.
+  -- frame subscribes what it is handed, and a deferred body's depth is
+  -- under its size, which is the bound the side condition supplies.
   --
-  -- AND OF THE THREE ARMS TAKING THE WALK'S PREMISE AT THIS FRAME THIS
-  -- IS THE HARDEST TO CROSS, which is worth saying before anyone
-  -- spends a program trying.  `Refuted.Drain-Regs-Nest` crossed the
-  -- registry arm with a completion walk -- `valsΦ?` is `all` over the
-  -- burst, so an empty one clears it at every budget while the drain
-  -- still subscribes a queued term.  The same witness has less to work
-  -- with here: the drain frame owes nothing to the side condition,
-  -- `frameLive-of-sz` reading it a unit, so the premise really is the
-  -- walk's alone -- but the right-hand side carries a whole extra join
-  -- against the schedule's own slot sum, and what a subscribe mints a
-  -- live entry for is slot-derived.  So a witness has to outrun a term
-  -- the join already prices, which the registry arm never had to do.
-  -- Read off the statement; no row has been taken.
+  -- AND A THIRD MINT SITE IS WHY THE STATEMENT IS FALSE AS WRITTEN.  A
+  -- completion frame subscribes out of the *All node's QUEUE, and a
+  -- queued gate mints a live carrying its body -- so the arm that
+  -- mints here is the arm the side condition reads as a unit, and the
+  -- walk reaching it is empty-handed by construction, which clears the
+  -- potential at every budget including the smallest.  The slot sum
+  -- does not move with a term the slots never held.
   --
+  -- AND NO LARGER NUMBER REPAIRS IT, WHICH IS THE PART THAT COSTS
+  -- SOMETHING.  The depth measure TRUNCATES at the gate -- that is
+  -- what makes a recursive body safe -- so a parked term reads zero in
+  -- the conclusion's own currency while the live it mints reads the
+  -- body.  A premise bounding the queue's nesting is therefore
+  -- satisfied by the witness as it stands.  What is owed is a grant
+  -- over the NODE the frame reads, denominated in something that sees
+  -- past the gate; the size measure is the one face that does, which
+  -- is why this leaf already runs on a size side condition at its
+  -- other arm.
+  --
+  -- REFUTED: `Refuted.Drain-Live-Defer`, at the corner two earlier
+  --   findings leave open: `Refuted.Chain-Step-Live-Nest` found the
+  --   gate's mint and its repair is the arrival grant this statement
+  --   now carries, `Refuted.Drain-Regs-Nest` found the drain arm
+  --   reading a payload no walk handed it -- on the registry axis,
+  --   where the same emptiness clears the same premise.
   -- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this leaf by
   --   RUNNING a whole chain over it, at the one program shape that can
   --   move the fold: a `mapᵉ` over the async input handing the outer

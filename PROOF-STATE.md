@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE LAST UNREAD SIBLING, WITH THE WIDTH READING IN HAND.**
-  `stepFrame-nest-live` is the one arm of the frame triple nothing has
-  instantiated. It already carries a grant and an extra join against
-  the schedule's slot sum, so it is not the empty-handed statement its
-  two siblings were — but the grant is a SIZE condition and the
-  crossing that took both of them was a DEPTH one, threaded by a fold
-  the size cannot see. Read `FrameLiveHyp` against the scan witness
-  first: if the slot sum already prices what a subscribe mints, the
-  row is over-ranked and the evidence says so; if it does not, the
-  same burst crosses here and the repair is the width the nodes arm
-  just took.
+- **RESTATE THE LIVE LEAF ONTO THE NODE IT READS.** The completion arm
+  mints out of the queue, so `FrameLiveHyp` reading `from-inner` as a
+  unit is the defect and the repair is a grant there, not a larger
+  join. Two things pin its shape. The depth currency the conclusion
+  uses is BLIND at the gate, so a queue premise stated in it is
+  satisfied by the counterexample unchanged — the grant has to be a
+  size, the face this leaf already runs on at its outer arm. And the
+  producers are `walk-LiveHyp-go`'s clauses, which thread a size over
+  the walk's values and read no store: if none can name the node, the
+  queue's ceiling is a field the invariant record is missing rather
+  than a hypothesis, and that is a restatement of the RECORD.
 
 - **THEN ROUTE THE TWO NARROWED ASKS, OR RESTATE THEM AGAIN.**
   `scanΦ-fit` and `innerΦ-fit` now ask for `nodeNestAt` at the node
@@ -259,10 +259,6 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `PROBED`: what one
-  frame mints on the live list. Four kinds mint nothing; the outer frame
-  subscribes, and a deferred body is the one payload the depth measures cannot
-  see, so this leaf runs on a SIZE side condition.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -288,6 +284,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
+- **`stepFrame-nest-live`** (Live-Nest-Walk) — SHAPE, `REFUTED, PROBED`: what
+  one frame mints on the live list. Refuted at the completion arm, which
+  subscribes out of the node's queue: no grant over the walk's values reaches
+  it, and the depth measure truncates at the gate the parked term is.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
   of the drain's new grant. Two of its three obligations are drain ledgers this
   face has and must be routed; the third is the merge node's own queue depth,
