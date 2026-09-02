@@ -215,15 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN INSTANTIATE WHAT IS MERELY UNREAD.** Two registry-face rows are
-  FALSITY by the class's own rule rather than by a refutation — nothing
-  has reached them. `stepFrame-regsSz` is now read at an accumulated
-  level and under the arriving values' size, and whether ONE level pays
-  is unread; `stepFrame-nest-live`'s repaired completion arm, carrying
-  the registry face's drain fit, is likewise uninstantiated. A probe is
-  what moves either, and the level-currency harness is already built
-  where the refutations that killed the fixed cap live — so this is one
-  commit that buys two classes, and the cheapest evidence in the tier.
+- **THEN BUILD THE PROGRAM THAT REACHES THE DRAIN.** The registry half
+  of this leg landed and the live half did not, for a reason worth the
+  commit: `stepFrame-nest-live`'s completion arm subscribes out of the
+  *All node's QUEUE, and no family in the tree fills one. An unlimited
+  outer never refuses room, and bounding the limit is not the fix —
+  a queue fills only while an earlier inner is still ACTIVE, and every
+  inner these families build completes inside its own burst. So the
+  commit is a program whose map produces TWO KINDS of inner off the
+  arriving value: one outliving its burst to hold the slot, and the
+  deferred nest that queues behind it. That is the arm's only door, and
+  building it is the work.
 
 - **THEN READ THE REGISTRY'S OWN PATHS, WHICH THE FAN-OUT BODY TURNED
   UP.** Splitting the terminal closed the potential and exposed two
@@ -258,7 +260,7 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what
   one frame mints on the live list. The completion arm now carries the registry
   face's own drain fit, since a queued gate mints past every depth the walk
-  holds. Nothing has instantiated the repaired arm.
+  holds. The repaired arm is unreached: nothing here fills the queue.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -287,10 +289,6 @@ does not fit is a finding about the shared statement, not about the head.
   chain's depth against the syntactic unit. The walk's registry premise is a
   size receipt carrying no depth at all, and the store's ledger bounds the
   registry by a runtime maximum instead.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
-  the registry stays priced across one frame, now at an accumulated level and
-  under the arriving values' size. The restatement kills every witness of the
-  family that refuted the fixed cap; whether ONE level pays is unread.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
   the fold's new grant. Unaffordable, not mis-shaped: the count is under the
   exit width, which outruns two-to-two-to the size at every instant, so no
@@ -305,6 +303,11 @@ does not fit is a finding about the shared statement, not about the head.
   where the lookup finds no merge at this type. Both drain ledgers are proven
   vacuous there and the width is zero, so the row is the frame residue and the
   charge alone. Nothing has instantiated it.
+- **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
+  `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
+  frame. Probed at the subscribing frame — the only kind that can grow the
+  registry — driven to the boundary its premises allow: one level pays with
+  slack that GROWS with the level. A shared-slot inner is unread.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only

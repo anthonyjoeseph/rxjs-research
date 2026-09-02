@@ -167,6 +167,18 @@ postulate
   --   frame in isolation, since the rows read the composite; and a
   --   fold already nonzero at entry, where the growth would compound
   --   rather than start from zero.
+  --   AND THE COMPLETION ARM IS NOT REACHED BY THAT PROGRAM AT ALL,
+  --   which is a bound on the harness rather than on the sweep: its
+  --   outer *All is unlimited, so room is never refused and the queue
+  --   the drain subscribes out of stays empty on every row.  Bounding
+  --   the limit is not enough to fix it either -- a queue fills only
+  --   while an earlier inner is still ACTIVE, and every inner this
+  --   family builds completes inside its own subscribe burst, so the
+  --   count is back at zero before the next arrival is read.  Reaching
+  --   the arm therefore needs a program whose map produces TWO KINDS of
+  --   inner off the arriving value: one that outlives its burst to hold
+  --   the slot, and the deferred nest that queues behind it.  That is a
+  --   new program family and not a parameter of this one.
   stepFrame-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)

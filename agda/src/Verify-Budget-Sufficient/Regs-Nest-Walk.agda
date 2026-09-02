@@ -614,6 +614,28 @@ postulate
 -- REFUTED: `Refuted.Caps-Face` -- the same statement one level up was
 --   deleted as false and redundant against `subscribeE-caps`, which is
 --   ground because it reports at a level.
+-- PROBED: `Probed.Frame-Step-Regs-Level` covers the SUBSCRIBING frame,
+--   which is the only kind that can move the registry -- the other four
+--   return the state they were handed, so the conclusion is the premise
+--   there and no instantiation of them can fail.  Six load-bearing rows,
+--   each driving the two quantities the premises cap to the boundary
+--   they allow: the walked path at the longest length `pathSz?` admits,
+--   the inner at the largest syntax `valsSz?` admits, at counts one and
+--   two and levels one through fifteen, plus the many-values arm and a
+--   non-empty incoming registry.  Every row reads the REGISTERED
+--   chain's own length off the post-state rather than inferring it, so
+--   the covered boundary is measured.  What it does NOT cover: a
+--   `share-sink` terminal, an inner with a nested `mergeAllᵉ`, and any
+--   count above two.
+--   The margin is the finding rather than the verdict.  An operator
+--   costs at least two in `sizeᵉ` and pushes at most one frame, so an
+--   inner admitted at level `L` contributes at most half as many frames
+--   as the level, against a walked path that may reach `L` -- while one
+--   level buys `S * suc (2 * L)`.  Measured: ten against fifteen at
+--   `L = 7`, twenty-two against thirty-one at `L = 15`.  The slack
+--   GROWS with the level, so the rows rule out a crossing at larger
+--   sizes rather than merely failing to find one, which is what a
+--   constant margin would have left open.
 postulate
   stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
