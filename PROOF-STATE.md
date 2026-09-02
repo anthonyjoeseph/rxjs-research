@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SINK GRANT NOW PRICES CORRECTLY AND MAY STILL BE FALSE AT THE
-  LEVEL.** Threading the caller's affordability closed the constant-map
-  escape, because such a value lands one under the `sizeᵗ` the chain's
-  own legality already pays for. What no evidence reaches is a chain
-  that grows its value once per hop: its length is bounded by the
-  registry reading and not by the affordability's ceiling, so it climbs
-  past the level the premise covers. Instantiate that — an embedding
-  frame repeated — and the answer either refutes the restated form or
-  is the first thing to lower this row's class. `walk-share-ΦHyp` is
-  the same hop and inherits whichever it is.
+- **STATE THE SINK HOP AT THE LEVEL A FANNED-INTO CHAIN REACHES.** Both
+  refutations are one shape a step apart: the price alone, then the
+  price afforded only where the walk stands. A registry chain climbs
+  from there by its own length, and that length is bounded by the
+  registry reading, so the affordability the grant needs is over the
+  sum. The caller cannot offer it — it holds a ceiling for the path it
+  walks — so the widening does not stop here and reaches
+  `walk-LiveHyp-go`'s own callers. Decide the index up there first and
+  restate downward: a ceiling chosen at the leaf and repaired upstream
+  is the expensive order, and `walk-share-ΦHyp` is the same hop again.
 
 - **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
   INSTANTIATED.** Every row of all five chain-door sweeps steps an
@@ -259,9 +259,9 @@ does not fit is a finding about the shared statement, not about the head.
   subscribes, and a deferred body is the one payload the depth measures cannot
   see, so this leaf runs on a SIZE side condition.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY, `REFUTED`: the size side
-  condition for the registry chains a sink fans into. Pricing alone is refuted,
-  so it now carries the caller's affordability; nothing has reached the level a
-  registry chain climbs to, which is where it can still be false.
+  condition for the registry chains a sink fans into. Refuted at the price,
+  then again once priced: affordability reaches only where the walk stands, and
+  a fanned-into chain climbs past it by its own length.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the

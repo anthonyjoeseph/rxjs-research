@@ -180,16 +180,21 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- lands at `sizeᵛ`, which is one LESS than the `sizeᵗ` the chain's own
 -- legality already pays for.
 --
--- WHAT IS STILL OPEN IS THE LEVEL, NOT THE PRICE.  Affordability is
--- granted up to `Lv` and the caller offers `j ≤ Lv`, but a registry
--- chain climbs from `j` by its OWN length, and that length is bounded
--- by the registry reading rather than by `Lv`.  A frame that embeds its
--- input grows the value once per hop, so the budget the grant really
--- wants reaches the level a fanned-into chain arrives at -- which is
--- the same widening the level-budget note below argues for on the
--- walked side, arriving on the registry side.
+-- AND IT IS STILL FALSE AT THE LEVEL, WHICH IS A SEPARATE FAILURE.
+-- Affordability is granted up to `Lv` and the caller offers only `j ≤
+-- Lv`, while a registry chain climbs from `j` by its OWN length -- and
+-- that length is bounded by the registry reading, which nothing ties to
+-- `Lv`.  One frame past the ceiling is enough: an embedding map
+-- substitutes what arrived into its own template, so it ADDS its
+-- template's cost rather than replacing the value, and legality prices
+-- that template once while the conclusion is read after the hop.  The
+-- statement the walk wants therefore affords the level a FANNED-INTO
+-- chain arrives at, not the level the walk is at when it hands the
+-- values over -- the same widening the level-budget note below argues
+-- for on the walked side, arriving on the registry side, and it does
+-- not survive the hop to `walk-LiveHyp-go`'s own callers unchanged.
 --
--- REFUTED: `Refuted.Share-Live-Afford`
+-- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (i : Fin n)
