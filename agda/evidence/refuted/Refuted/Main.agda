@@ -223,3 +223,6 @@ open import Refuted.Drain-Live-Defer
 open import Refuted.Cap-Walk-Cross
   using (CapUnderWalk; capExp≡; walkExp≡; walkFac≡; cap-walk-cross-absurd;
          FieldStepFits; field-step-absurd)
+open import Refuted.Scan-Phi-Width
+  using (ScanΦFits; nestD≡; depth≡; rootFac≡; legal; unit-ok; premΦ;
+         bound; scan-phi-width-absurd)

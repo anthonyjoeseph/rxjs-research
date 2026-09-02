@@ -274,6 +274,32 @@ postulate
   --   the walk-currency reading this statement used to be stated in,
   --   which is what the budget above it moved for.
 
+  -- AND THE BURST'S COUNT IS A FREE PARAMETER WHILE THE CHARGE IS AN
+  -- EXPONENTIAL IN IT, which is a second and independent defect: not
+  -- about what this arm cannot see, but about what its own premises
+  -- do not say.  Three of the four are about the PATH, and the
+  -- fourth, `valsΦ?`, is an `all` -- it constrains each value and
+  -- never how many there are -- while the conclusion charges
+  -- `(2 ^ sizeᵗ fn) ^ length vals`.  A budget affording one value is
+  -- beaten by the same value repeated.
+  --
+  -- AND THE LEDGER IS WHERE THE REPAIR GOES, NOT THE SIGNATURE.  The
+  -- caps face's own value ledger `valsCaps?` is a CONJUNCTION -- the
+  -- per-value predicate together with `length vs ≤ᵇ suc (Caps.cWid
+  -- c)` -- and `stepFrame-scan-caps`, the proven statement about this
+  -- very frame, takes the second conjunct as a premise and gets it
+  -- from `valsLen`.  `valsΦ?` carries only the first.  So the two
+  -- faces disagree about the LEDGER rather than about the
+  -- mathematics, and putting the width back into `valsΦ?` obliges
+  -- every producer and serves every consumer, which threading a
+  -- hypothesis into this one statement would not.
+  -- REFUTED: `Refuted.Scan-Phi-Width`, at the reachable size floor
+  --   with the frame at the root, so the path contributes neither
+  --   factor nor depth and the crossing is the fold's alone; the
+  --   budget is taken at exactly what one value costs and the burst
+  --   is that value twice, so neither a larger budget nor a bigger
+  --   ceiling is the repair.
+
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
