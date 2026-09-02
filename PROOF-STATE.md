@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **ASK WHETHER AN INSTANT CAN AFFORD ITS OWN FOLD AT ALL.** `scanΦ-fit`
-  is now unaffordable rather than mis-shaped, and the comparison saying
-  so is not about a frame. The store cap AFTER an instant carries that
-  instant's burst power and is checked against the fuel there; the depth
-  ledger is spent DURING the instant, by `cascade-depth-capsH`, against
-  the fuel here. So settle `nestCapAt e sl (suc id) ≤ capsH e sl id` —
-  prove it or refute it. A refutation moves the depth face's whole
-  granularity, every arm of it pricing a walk inside the instant that
-  performs it; a proof hands the fold its room and retires four closed
-  denominations at once.
-
 - **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
   refuted, and its residue is the first BOUNDED one this hop has
   produced: the receipt is read at factor one and depth zero, while an
@@ -250,6 +239,16 @@ does not fit is a finding about the shared statement, not about the head.
   not pay, the walk's receipt bounding how many terms are queued and
   never what each carries. The drain arm of `stepFrame-nest-live` is
   the same lookup and moves with it.
+
+- **THEN INSTANTIATE WHAT IS MERELY UNREAD.** Two registry-face rows are
+  FALSITY by the class's own rule rather than by a refutation — nothing
+  has reached them. `stepFrame-regsSz` is now read at an accumulated
+  level and under the arriving values' size, and whether ONE level pays
+  is unread; `stepFrame-nest-live`'s repaired completion arm, carrying
+  the registry face's drain fit, is likewise uninstantiated. A probe is
+  what moves either, and the level-currency harness is already built
+  where the refutations that killed the fixed cap live — so this is one
+  commit that buys two classes, and the cheapest evidence in the tier.
 
 ### The ledger
 
@@ -287,9 +286,9 @@ does not fit is a finding about the shared statement, not about the head.
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
-  the fold's new grant. Not mis-shaped but unaffordable — the count is under the
-  exit cap's width, the fold charges a power in it, and the instant's own fuel
-  affords an exponent of two to its size.
+  the fold's new grant. Unaffordable, not mis-shaped: the count is under the exit
+  width, which outruns two-to-two-to the size at every instant, so no story buys
+  room. BLOCKED on whether this face prices a threading frame at all.
 - **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
   the drain's new grant. NOT the fold's defect — its width is Σ-chosen above
   `drainW`, so nothing is free. Two obligations are drain ledgers this face has

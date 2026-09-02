@@ -400,6 +400,28 @@ postulate
   -- instant's exit cap by monotonicity in the hop count -- one number
   -- covering every hop, and the same one `nestBurstAt` takes.
 
+  -- AND NO STORY BUYS THE ROOM, WHICH IS WHAT MAKES THIS A MECHANISM
+  -- FINDING RATHER THAN AN INDEX ONE.  The instinct once the numbers are
+  -- side by side is that the charge is spent one story too low -- the gas
+  -- an instant runs under is denominated a `blowH` story above the index
+  -- the depth ledger reads, and the shortfall looks like exactly that
+  -- gap.  It is not.  Within an instant the size cap steps geometrically
+  -- per fold and the width cap steps through a power tower, so the width
+  -- at ANY instant is above two-to-two-to the size at that SAME instant,
+  -- and the ceiling a story supplies is that double exponential whichever
+  -- story is chosen.  Moving up one moves both sides.
+  --
+  -- WHAT DOMINATES A WIDTH IS THE NEXT INSTANT'S SIZE AND NOTHING
+  -- EARLIER, and the store face affords its own burst charge by being
+  -- checked exactly there: its factor is two to a square of the burst,
+  -- read against the ceiling at the instant AFTER the one that produced
+  -- it. The depth ledger is spent DURING its own instant, so the same
+  -- charge has no such ceiling to reach for.  That is the whole
+  -- asymmetry, and it is a property of where the two faces are checked
+  -- rather than of what either one charges -- so the repair is not a
+  -- restatement of this arm but a decision about whether the depth face
+  -- prices a threading frame at all.
+
   -- SO THE ARM IS NOT MIS-SHAPED, IT IS UNAFFORDABLE, and that is a
   -- class and not a repair.  The count is under the exit cap's width and
   -- under nothing smaller, the fold charges a power in the count, and
