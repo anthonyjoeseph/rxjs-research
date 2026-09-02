@@ -8,9 +8,9 @@
 --
 -- WHAT THE STATEMENT SAID.  Every level a whole cascade reaches is
 -- affordable against the walk's charge: the selection's own total
--- length plus its count bounds the level, and `nestWalkAt` pays.
+-- length plus its count bounds the level, and `nestΦAt` pays.
 --
--- WHERE IT BREAKS, AND IT IS NOT THE ARITHMETIC.  `nestWalkAt e sl id`
+-- WHERE IT BREAKS, AND IT IS NOT THE ARITHMETIC.  `nestΦAt e sl id`
 -- is a function of the PROGRAM, the slot vocabulary and the instant --
 -- it never reads the state.  The level ledger reads the state and
 -- NOTHING ELSE: `chainsLenSum (chainsOf a st) + length (chainsOf a st)`
@@ -46,7 +46,8 @@ open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; length)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
-  +-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤n+m; m≤m+n; m≤n*m; n≮n; +-comm; +-suc)
+  +-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤n+m; m≤m+n; m≤n*m; m^n>0; n≮n; +-comm;
+  +-suc)
 open import Data.Product using (_×_; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
@@ -61,7 +62,7 @@ open import Rx.Evaluator using (EvalSt; Arrival; Path; Chain; RegId; root;
 open import Verify-Budget-Sufficient.Deliver-Measure using (chainsLenSum)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt; 8≤capsAt-size)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
-  using (nestWalkAt; unit+size≤nestWalkAt)
+  using (nestΦAt; nestWalkAt≤nestΦAt; walkFac≤nestWalkAt)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -74,7 +75,7 @@ CascadeAffordWide = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   Caps.cSize (capsAt e sl id) ≤ k →
   k ≤ chainsLenSum (chainsOf a st) + length (chainsOf a st) →
   iterSize (Caps.cSize (capsAt e sl id)) k (Caps.cSize (capsAt e sl id))
-    ≤ nestWalkAt e sl id
+    ≤ nestΦAt e sl id
 
 ----------------------------------------------------------------------
 -- ONE `sizeStep` AT A POSITIVE CAP IS STRICTLY INFLATIONARY, so the
@@ -137,12 +138,15 @@ S = Caps.cSize (capsAt e₁ sl₁ 0)
 1≤S = ≤-trans (s≤s z≤n) (8≤capsAt-size e₁ sl₁ 0)
 
 N : ℕ
-N = nestWalkAt e₁ sl₁ 0
+N = nestΦAt e₁ sl₁ 0
 
 -- the charge dominates the cap, which is the one proven fact the
 -- witness needs about a family it never unfolds
 S≤N : S ≤ N
-S≤N = ≤-trans (m≤n+m S _) (unit+size≤nestWalkAt e₁ sl₁ 0)
+S≤N = ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ S)))
+                                (*-monoˡ-≤ S (m^n>0 2 (S * (S * S) + S * S))))
+                       (walkFac≤nestWalkAt e₁ sl₁ 0))
+              (nestWalkAt≤nestΦAt e₁ sl₁ 0)
 
 K : ℕ
 K = suc N

@@ -215,42 +215,42 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE LAST UNREAD SIBLING, WITH THE WIDTH READING IN HAND.**
-  `stepFrame-nest-live` is the one arm of the frame triple nothing has
-  instantiated. It already carries a grant and an extra join against
-  the schedule's slot sum, so it is not the empty-handed statement its
-  two siblings were — but the grant is a SIZE condition and the
-  crossing that took both of them was a DEPTH one, threaded by a fold
-  the size cannot see. Read `FrameLiveHyp` against the scan witness
-  first: if the slot sum already prices what a subscribe mints, the
-  row is over-ranked and the evidence says so; if it does not, the
-  same burst crosses here and the repair is the width the nodes arm
-  just took.
+- **INSTANTIATE THE BUDGET THE WHOLE TIER NOW RESTS ON.** `nestΦAt`
+  was minted to carry the two recurrences the walk's own budget crossed
+  with, and `Refuted.Cap-Walk-Cross` killed both readings in that
+  currency — the ceiling routed down at the READER, a fresh field
+  minted at the WRITER. Both its statements are taken against
+  `nestWalkAt` alone, so neither binds the cap summand added to answer
+  them, and nothing has been read at the new one. State both at
+  `nestΦAt`, at the same floors. The residue is one arithmetic —
+  whether the walk's whole budget fits inside the cap's INCREMENT,
+  `nestIncAt` — decidable over bare numbers in the file holding
+  both. Either the re-mechanisation is confirmed at its foundation,
+  or every open row is refuted before one is ground on it.
 
-- **THEN ROUTE THE TWO NARROWED ASKS, OR RESTATE THEM AGAIN.**
-  `scanΦ-fit` and `innerΦ-fit` now ask for `nodeNestAt` at the node
-  their own step names, and no premise either one carries reaches the
-  table it is read from. The producers are `frameΦ-fit`'s callers, so
-  the question is whether a walk arriving at a frame can name the
-  depth of the single entry that frame touches — `walk-ΦHyp-go`
-  threads a size, a register count and a path depth, and no store
-  reading at all. If a caller can supply it the two stop being SHAPE
-  and become routing; if none can, that entry's ceiling is a field the
-  invariant record is missing, which is a restatement of the RECORD
-  rather than of these two signatures.
+- **THEN RESTATE WHAT THE WALK HANDS A SINK.** The Φ fan-out is
+  refuted, and its residue is the first BOUNDED one this hop has
+  produced: the receipt is read at factor one and depth zero, while an
+  admitted chain is owed its own factor and its own depth — both
+  already delivered where the arm stands, by `pathΦF-cap` and
+  `pathNestD-len` off the size legality `shareAdmit-caps` carries. No
+  bigger factor at the sink repairs it, since a depth-zero value zeroes
+  the product while the chain still owes its depth. So what moves is
+  the RECEIPT, not a ledger, a level or a field — and the budget never
+  moves through the fan-out at all, both hypotheses recursing at one
+  `U`, so nothing here compounds with the hop count the live arm died
+  on.
 
-- **THEN PRICE THE SINK ARM IN THE CURRENCY THAT IS STANDING.** The
-  level ledger is closed to `walk-share-LiveHyp` in both directions —
-  no ceiling is choosable at a caller, and the caps face's own top
-  towers past anything the walk affords — so what is owed is a
-  different currency, not a larger number. The potential face's
-  receipt shrinks along the path and names no level, which is why it
-  survives a fan-out the level reading cannot. Read `PathΦHyp`'s sink
-  arm against `DispatchLiveHyp`'s: if the potential already carries
-  what a fanned-into chain mints, this row restates onto it and the
-  level counterexamples retire with the mechanism they refuted; if it
-  does not, the residue is the first thing the live arm has needed
-  that no face carries.
+- **THEN THE FRAME'S BLIND WRITES, AT WHATEVER THE FIRST LEG LEAVES
+  STANDING.** `scanΦ-fit`, `innerΦ-fit` and the drain arm of
+  `stepFrame-nest-live` are ONE question — no premise of any names
+  `EvalSt.nodes`, and each was refuted for that and repaired by a
+  grant the state cannot carry. If the budget holds, the fact goes on
+  the invariant record the walk runs under and never into these
+  signatures, and the cascade through that record's producers is the
+  cost of the fact being true. If it does not, what moves is the
+  currency the fits are stated in, and all three move together rather
+  than being instantiated one at a time.
 
 ### The ledger
 
@@ -259,10 +259,10 @@ does not fit is a finding about the shared statement, not about the head.
   law, the only frame that names a node. Both denominations are closed to
   instantiation — the cap does not return, the climb bound is sealed — so
   evidence can raise this class and never lower it.
-- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `PROBED`: what one
-  frame mints on the live list. Four kinds mint nothing; the outer frame
-  subscribes, and a deferred body is the one payload the depth measures cannot
-  see, so this leaf runs on a SIZE side condition.
+- **`stepFrame-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what
+  one frame mints on the live list. The completion arm now carries the registry
+  face's own drain fit, since a queued gate mints past every depth the walk
+  holds. Nothing has instantiated the repaired arm.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -279,23 +279,22 @@ does not fit is a finding about the shared statement, not about the head.
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
   queue, so the walk's values cannot reach it.
-- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
-  potential for the chains a sink fans into. A sink is a leaf of the factor
-  recursion, so the receipt handed in carries a factor of one against a chain
-  whose outer frames cost the cap's exponential — the live arm's crossing, a
-  level sooner.
+- **`walk-share-ΦHyp`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential
+  for the chains a sink fans into. NOT the live arm's crossing: the potential
+  does not compound across hops. Read at factor one and depth zero, against two
+  facts already bounded where the arm stands — so the deficit is a relation.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE×3`:
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the drain's new grant. Two of its three obligations are drain ledgers this
+- **`innerΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
+  the drain's new grant. Two of its three obligations are drain ledgers this
   face has and must be routed; the third is the merge node's own queue depth,
-  read at the entry the finish looks up. No premise here reaches that table.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `NO EVIDENCE`: the producing side
-  of the fold's new grant. Its ask is now one accumulator's depth at the node
-  the step names, not the table's max; every premise it has is still about the
-  schedule, the path or the values, so the entry is owed by whoever calls it.
+  now under the budget and owed the same field the fold arm is.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED`: the producing side of
+  the fold's new grant. Its ask is one accumulator's depth at the node the step
+  names, and `nestΦAt` carries the table's own ceiling with room. What is left
+  is that no premise names the table, so what it is owed is a field.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only

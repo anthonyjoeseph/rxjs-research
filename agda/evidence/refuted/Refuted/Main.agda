@@ -136,6 +136,9 @@ open import Refuted.Share-Live-Level
   share-live-level-absurd)
 open import Refuted.Sink-Level-Range
   using (reading≡; range≡; len≡; 8≤S; j≤range; legal; sink-level-range-absurd)
+open import Refuted.Sink-Phi-Fan
+  using (factor≡; depth≡; legal; handed; 8≤B; sink-phi-fan-absurd;
+  recharged; sink-phi-recharge-absurd)
 open import Refuted.Defer-Park-Size
   using (Stmt; prog; defer-park-size-absurd)
 open import Refuted.Defer-Park-Width
@@ -214,3 +217,9 @@ open import Refuted.Fold-Path-Regs-Len
   using (FoldPathRegsLen; reached; entryVals; entryPath; entryRegs;
          figures; exitRow≡false; fold-path-regs-len-absurd;
          repairFigs; repairFits)
+open import Refuted.Drain-Live-Defer
+  using (before≡0; after≡3; charge≡1; parkedNest≡0; Φ-hyp-drain;
+         stepFrame-nest-live-drain-absurd)
+open import Refuted.Cap-Walk-Cross
+  using (CapUnderWalk; capExp≡; walkExp≡; walkFac≡; cap-walk-cross-absurd;
+         FieldStepFits; field-step-absurd)
