@@ -27,10 +27,11 @@
 -- bounded.  It says the bound cannot come from the values in hand,
 -- because the frame is not a function of them -- which is the same
 -- finding `Refuted.Inner-Drain-Nest` records one arm over, and for the
--- same structural reason: `FrameΦHyp` is `⊤` at both arms while both
--- read a payload the walk did not hand them.  The repair is a grant
--- over what the NODE may hold, and the family raises that obligation
--- where the state is already in scope.
+-- same structural reason: each of those arms reads a payload the walk
+-- did not hand it, so a hypothesis about the walk's values cannot
+-- reach it.  A grant over what the NODE may hold is what this one
+-- demands, and it is not on its own enough -- `Refuted.Scan-Phi-Burst`
+-- says why, at the same potential and a shallower table.
 --
 -- WHAT IS HAND-BUILT, AND WHY IT DOES NOT SOFTEN THE FINDING.  The
 -- state is `st-init` plus ONE `installNode`, and the statement

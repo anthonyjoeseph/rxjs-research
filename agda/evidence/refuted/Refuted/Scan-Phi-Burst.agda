@@ -9,12 +9,12 @@
 -- WHY THIS IS NOT THE REFUTATION ALREADY ON THE ARM.
 -- `Refuted.Scan-Acc-Nest` kills the arm on the STORE axis: the emit is
 -- the accumulator, the accumulator is deep, and no premise reads the
--- table.  Its finding names the repair -- a grant over what the node
--- may hold -- and that repair is what the restatement was going to
--- build.  This file says the repair is not sufficient.  The
--- accumulator is a bare `ofᵉ`, so a grant bounding what the node holds
--- costs nothing to discharge and the premise is met at the SAME budget
--- with or without it; the gap that remains is the fold's own.
+-- table.  Its finding names a repair -- a grant over what the node may
+-- hold -- and this file says that repair is not sufficient on its own.
+-- The accumulator here is a bare `ofᵉ`, so a grant bounding what the
+-- node holds costs nothing to discharge and the premise is met at the
+-- SAME budget with or without it; the gap that remains is the fold's
+-- own, and it is a WIDTH.
 --
 -- WHERE IT BREAKS.  `scanVals` THREADS: each output is the step
 -- function applied to the previous output, so a burst of k values

@@ -21,9 +21,9 @@ module Verify-Budget-Sufficient.Regs-Nest-Walk where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; _++_; map)
+open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
   ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
@@ -42,7 +42,8 @@ open import Rx.Evaluator
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; takeDispatch; takeVals; lookupNode)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; thruWalk-nest)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (nestDᵛˢ; thruWalk-nest; nodesMax; stepFrame-nodes-scan)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all)
 open import Verify-Budget-Sufficient.Nest-Store
@@ -64,21 +65,42 @@ valsΦ? {s = s} B U path vals =
   all (λ v → pathΦF B path * (nestDᵛ s v + pathNestD path) ≤ᵇ U) vals
 
 -- WHAT A FRAME OWES BEYOND THE POTENTIAL IT IS HANDED, which is
--- nothing at four of the five: they forward or substitute, and the
+-- nothing at three of the five: they forward or substitute, and the
 -- factor the path surrenders pays for it.  The outer frame does not
 -- forward -- it SUBSCRIBES -- so what comes back is bounded by nothing
 -- the incoming values say, and the only thing that does bound it is
 -- the sighted grant the walk face already runs on.  Stating the debt
 -- per frame rather than per statement is what keeps the fold uniform:
--- four arms discharge it with `tt`, and only the arm that has a
--- subscription under it has to find a grant.
-FrameΦHyp : ∀ {n} {Γ : Ctx n} {s u t} (B U : ℕ) (f : Frame Γ s u)
-  (path : Path Γ u t) (vals : List (Val Γ s)) (sched : Sched Γ) → Set
-FrameΦHyp B U (map-f _)           path vals sched = ⊤
-FrameΦHyp B U (scan-f _ _)        path vals sched = ⊤
-FrameΦHyp B U (take-f _)          path vals sched = ⊤
-FrameΦHyp B U (from-inner _ _ _)  path vals sched = ⊤
-FrameΦHyp B U (thru-outer op nid) path vals sched =
+-- the forwarding arms discharge it with `tt`, and an arm that reaches
+-- past its own values has to find a grant.
+--
+-- AND THE SCAN ARM READS THE TABLE, WHICH IS WHY IT IS NOT A UNIT.
+-- The value a fold emits is its accumulator, and the accumulator was
+-- in the node before any of these values arrived -- so no premise
+-- about `vals` bounds it, at any budget.  What the grant has to carry
+-- besides the table is a WIDTH: a fold THREADS, so a burst of k values
+-- applies the step function k times in sequence, while the potential
+-- surrenders the frame's factor once and charges its nesting once.
+-- Both of those are read off the step function alone and neither
+-- mentions the burst, so a state grant on its own leaves the premise
+-- constant in the value count against a conclusion linear in it.  The
+-- width is `length vals`, which is already in scope here, and the
+-- factors are the ones `stepFrame-nodes-scan` is proven at -- a power
+-- in the width rather than another summand, because one substitution
+-- is multiplicative and iterating it puts the factor in the exponent.
+FrameΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u} (B U : ℕ)
+  (f : Frame Γ s u) (path : Path Γ u t) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+FrameΦHyp B U (map-f _)           path vals sched st = ⊤
+FrameΦHyp B U (take-f _)          path vals sched st = ⊤
+FrameΦHyp B U (from-inner _ _ _)  path vals sched st = ⊤
+FrameΦHyp B U (scan-f fn nid)     path vals sched st =
+  Σ ℕ λ G →
+    (nodesMax st ⊔ nestDᵛˢ vals ≤ G)
+    × (pathΦF B path
+        * ((2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn)
+           + pathNestD path) ≤ U)
+FrameΦHyp B U (thru-outer op nid) path vals sched st =
   Σ ℕ λ k → Σ ℕ λ G →
     ValsFit k (Sched.slots sched) G path vals
     × (pathΦF B path * (G + pathNestD path) ≤ U)
@@ -200,7 +222,7 @@ thruΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
   (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-  FrameΦHyp B U (thru-outer op nid) path vals sched →
+  FrameΦHyp B U (thru-outer op nid) path vals sched st →
   valsΦ? B U path
     (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin sched st))
     ≡ true
@@ -215,78 +237,72 @@ thruΦ sf id now op nid path vals fin sched st B U (k , G , hfit , hnum) =
                      vals sched st refl hfit)))
           hnum)
 
-postulate
-  -- THE SCAN FRAME'S OUTPUT IS THE ACCUMULATOR'S IMAGE, AND THE
-  -- ACCUMULATOR IS IN THE NODE TABLE, so this arm reads a payload no
-  -- hypothesis here measures.  It pays the factor the map clause is
-  -- proven from, and that factor is spent against the value the walk
-  -- handed over -- which is not the value the fold emits.  This
-  -- statement is FALSE as written.
-  --
-  -- WHY IT IS FALSE AND NOT MERELY HARD.  Let the step function be the
-  -- first projection.  Then it charges nothing and the emit IS the
-  -- stored value, so the premise reads one numeral -- depth zero,
-  -- under a charge of zero -- and holds at `U = 0`, the strongest
-  -- budget there is, while the emit leaves at whatever depth the table
-  -- was carrying.  Doubling the stored depth doubles what leaves and
-  -- moves the premise not at all, so the gap is a parameter of the
-  -- STATE and no constant and no term in `vals`, `path` or `B` closes
-  -- it.
-  --
-  -- A GRANT OVER THE NODE IS NECESSARY AND IS NOT SUFFICIENT, which is
-  -- the half that decides the restatement's shape.  Both store-reading
-  -- arms are `⊤` in `FrameΦHyp` and both need what the NODE may hold
-  -- rather than what a queue may emit -- but a fold THREADS, so its
-  -- k-th output is the step function applied k times in sequence, and
-  -- the frame surrenders `2 ^ sizeᵗ fn` once and charges `nestDᵗ fn`
-  -- once.  Both are read off the step function alone and neither
-  -- mentions the burst, so the premise is constant in the value count
-  -- and the conclusion is linear in it; the factor buys a fixed number
-  -- of values rather than a bound.  So the arm must carry a WIDTH as
-  -- well as a state.
-  --
-  -- AND THE WIDTH IS ALREADY IN SCOPE, so the restatement does not have
-  -- to thread one: `vals` is a parameter of `FrameΦHyp`, so the
-  -- obligation may be raised over `length vals` where it is raised at
-  -- all.  What that obligation has to say is fixed by `applyFn-nest`,
-  -- which bounds one substitution MULTIPLICATIVELY -- the factor times
-  -- the step function's own nesting plus the value's.  Iterating it
-  -- puts the factor in the exponent and the charge under a coefficient,
-  -- both in the width -- so what is owed here is a power and not a
-  -- larger constant.
-  --
-  -- REFUTED: `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-absurd` at a
-  --   stored depth of forty, and
-  --   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at
-  --   eighty -- the pair is what puts the gap in the stored depth
-  --   rather than in a constant.
-  -- REFUTED: `Refuted.Scan-Phi-Burst.scan-Φ-burst-absurd` kills the
-  --   store-grant-only repair at this arm's OWN currency: the
-  --   accumulator is a bare `ofᵉ`, so every grant a state can carry is
-  --   discharged for nothing and the premise still holds at the budget
-  --   the frame surrenders, while sixty-five folds leave sixty-five
-  --   layers.  `Refuted.Scan-Fold-Burst` is the same witness read on
-  --   the iteration's quantity, which is what makes the two faces
-  --   comparable.
-  -- TWIN: `stepFrame-nodes-scan`, which is this arm proven -- the same
-  --   frame and the same step, and it reads the store: its subject is
-  --   `nodesMax st ⊔ nestDᵛˢ vals` on both sides, so the accumulator is
-  --   inside the quantity rather than outside the hypotheses.  So the
-  --   restatement is not a search for a currency, it is this one
-  --   carried across: a `⊔` over the table, at the potential's factors
-  --   instead of the iteration's.
-  -- RECOVERY: git show 8175756:agda/evidence/probed/Probed/Step-Frame-Nest-Phi.agda
-  --   restores the harness that walked the refuting term through the
-  --   map clause -- the same shape a scan clause has to be run at.
-  stepFrame-nest-Φ-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
-    (nid : NodeId) (path : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
-    valsΦ? B U (scan-f fn nid ↠ path) vals ≡ true →
-    valsΦ? B U path
-      (proj₁ (stepFrame sf id now (scan-f fn nid) path vals fin sched st))
-      ≡ true
+-- THE SCAN FRAME'S OUTPUT IS THE ACCUMULATOR'S IMAGE, AND THE
+-- ACCUMULATOR IS IN THE NODE TABLE, so this arm reads a payload the
+-- values handed in do not measure.  The unconditional reading pays the
+-- factor the map clause is proven from, and that factor is spent
+-- against the value the walk handed over -- which is not the value the
+-- fold emits -- so it is FALSE, and the grant is what replaces it
+-- rather than a weakening of it.
+--
+-- WHY NO CONSTANT REPAIRS IT.  Let the step function be the first
+-- projection.  Then it charges nothing and the emit IS the stored
+-- value, so the premise reads one numeral -- depth zero, under a
+-- charge of zero -- and holds at `U = 0`, the strongest budget there
+-- is, while the emit leaves at whatever depth the table was carrying.
+-- Doubling the stored depth doubles what leaves and moves the premise
+-- not at all, so the gap is a parameter of the STATE and no constant
+-- and no term in `vals`, `path` or `B` closes it.
+--
+-- AND A GRANT OVER THE NODE ALONE DOES NOT EITHER, which is the half
+-- that fixed the arm's factors.  A fold THREADS, so its k-th output is
+-- the step function applied k times in sequence, while the potential
+-- surrenders `2 ^ sizeᵗ fn` once and charges `nestDᵗ fn` once -- both
+-- read off the step function alone, neither mentioning the burst.  So
+-- a state grant on its own leaves the premise constant in the value
+-- count against a conclusion linear in it, and the factor buys a fixed
+-- number of values rather than a bound.  What closes it is a width,
+-- and one substitution being MULTIPLICATIVE is what puts that width in
+-- the exponent rather than under another summand.
+--
+-- REFUTED: `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-absurd` at a
+--   stored depth of forty, and
+--   `Refuted.Scan-Acc-Nest.stepFrame-nest-Φ-scan-wide-absurd` at
+--   eighty -- the pair is what puts the gap in the stored depth
+--   rather than in a constant.
+-- REFUTED: `Refuted.Scan-Phi-Burst.scan-Φ-burst-absurd` kills the
+--   store-grant-only reading at this arm's OWN currency: the
+--   accumulator is a bare `ofᵉ`, so every grant a state can carry is
+--   discharged for nothing and the premise still holds at the budget
+--   the frame surrenders, while sixty-five folds leave sixty-five
+--   layers.  `Refuted.Scan-Fold-Burst` is the same witness read on
+--   the iteration's quantity, which is what makes the two faces
+--   comparable.
+scanΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+  (nid : NodeId) (path : Path Γ u t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+  FrameΦHyp B U (scan-f fn nid) path vals sched st →
+  valsΦ? B U path
+    (proj₁ (stepFrame sf id now (scan-f fn nid) path vals fin sched st))
+    ≡ true
+scanΦ sf id now fn nid path vals fin sched st B U (G , hst , hnum) =
+  Φ-of-bound B U ((2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn))
+    path (proj₁ r) bound hnum
+  where
+  r = stepFrame sf id now (scan-f fn nid) path vals fin sched st
+  bound : nestDᵛˢ (proj₁ r)
+        ≤ (2 ^ sizeᵗ fn) ^ length vals * (G + length vals * nestDᵗ fn)
+  bound =
+    ≤-trans
+      (m≤n⊔m (nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r))))) (nestDᵛˢ (proj₁ r)))
+      (≤-trans
+        (stepFrame-nodes-scan (length vals) sf id now fn nid path vals fin
+          sched st ≤-refl)
+        (*-monoʳ-≤ ((2 ^ sizeᵗ fn) ^ length vals)
+          (+-monoˡ-≤ (length vals * nestDᵗ fn) hst)))
 
+postulate
   -- THE INNER FRAME'S OUTPUT DOES NOT COME FROM THE FRAME AT ALL -- it
   -- is what the inner run produced -- and the frame's factor is one, so
   -- there is nothing here to pay a deepening with.  What has to hold is
@@ -396,12 +412,12 @@ stepFrame-nest-Φ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
   (B U : ℕ) →
   valsΦ? B U (f ↠ path) vals ≡ true →
-  FrameΦHyp B U f path vals sched →
+  FrameΦHyp B U f path vals sched st →
   valsΦ? B U path (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 stepFrame-nest-Φ sf id now (map-f fn) path vals fin sched st B U hΦ _ =
   mapΦ B U fn path vals hΦ
-stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st B U hΦ _ =
-  stepFrame-nest-Φ-scan sf id now fn nid path vals fin sched st B U hΦ
+stepFrame-nest-Φ sf id now (scan-f fn nid) path vals fin sched st B U _ hF =
+  scanΦ sf id now fn nid path vals fin sched st B U hF
 stepFrame-nest-Φ sf id now (take-f nid) path vals fin sched st B U hΦ _ =
   stepFrame-nest-Φ-take sf id now nid path vals fin sched st B U hΦ
 stepFrame-nest-Φ sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ _ =
@@ -555,7 +571,7 @@ mutual
   PathΦHyp sf gas id now B U (share-sink i) vals fin sched st =
     DispatchΦHyp sf gas id now B U i vals fin sched st
   PathΦHyp sf gas id now B U (f ↠ p) vals fin sched st =
-    FrameΦHyp B U f p vals sched
+    FrameΦHyp B U f p vals sched st
     × PathΦHyp sf gas id now B U p
         (proj₁ (stepFrame sf id now f p vals fin sched st))
         (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
