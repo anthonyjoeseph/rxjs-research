@@ -648,9 +648,31 @@ chainsNest-all D U (c ∷ cs) h =
 --   conjunct is under test here for the first time, not merely the
 --   length one.  Registered length is flat at the control's on every
 --   row, the share-def cut included.  NOT COVERED: the inner never
---   fires, so no arrival ever comes FROM one and what an abandoned
+--   fires, so no arrival ever comes FROM one -- which
+--   `Probed.Chain-Step-Regs-Inner` takes up -- and what an abandoned
 --   inner's own delivery would do after its registration is dropped is
 --   unmeasured.
+--
+-- PROBED: `Probed.Chain-Step-Regs-Inner` -- the arrival that comes FROM
+--   an inner, which is the re-entry every sweep above steps past: all
+--   of them step an outer's arrival, and an inner registered by a
+--   flatten re-enters `foldPath` mid-flight, carrying the sighted path
+--   the outer built.  It is the second-arrival sweep's program with one
+--   line of its script changed -- the inner is due BETWEEN two outer
+--   values instead of past them all -- and the shift is pinned by a
+--   provenance CONTRAST rather than by a bare number: the stepped
+--   arrival's source differs from the first arrival's under the
+--   retiming and equals it under the sibling's timing, so the two
+--   readings together say the door was entered at an inner.  Registered
+--   length comes back no longer than the same program's flatten control
+--   at the same step, on every arm -- so the one unbounded conjunct is
+--   not lengthened by the frames a mid-flight path arrives carrying.
+--   NOT COVERED: one level of nesting, so an arrival from an inner OF
+--   an inner is not reached; the inner is a bare slot read, so nothing
+--   here carries operators of its own into the registered chain, which
+--   is the quantity `Refuted.Chain-Step-Regs-Cap` moves; and the
+--   stepped arrival is the SECOND overall, so a door met after several
+--   inner deliveries have landed is unmeasured.
 postulate
   chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (S j : ℕ) (a : Arrival Γ) (nextId : Id)

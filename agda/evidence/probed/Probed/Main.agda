@@ -103,3 +103,8 @@ open import Probed.Chain-Step-Regs-Cut
 open import Probed.Chain-Step-Regs-Second
   using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
          no-longer-than-control; cut-happened; no-shrink)
+
+open import Probed.Chain-Step-Regs-Inner
+  using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
+         sources≡; sources₁≡; lateSources≡; lateSources₁≡;
+         no-longer-than-control)

@@ -227,16 +227,6 @@ does not fit is a finding about the shared statement, not about the head.
   it and the hop it has to close first; the entry's field and its
   producers follow.
 
-- **THEN THE INNER'S OWN ARRIVAL, THE LAST RE-ENTRY SHAPE NOTHING HAS
-  INSTANTIATED.** Every row of all five chain-door sweeps steps an
-  arrival from the OUTER source. An inner registered by a flatten is a
-  registry entry like any other, and an arrival from it re-enters
-  `foldPath` at a frame that is already mid-flight — with the sighted
-  path the outer built, not a fresh one. The second-arrival sweep had
-  to time its inner past the horizon to keep it live, so it bought the
-  cut and left this unmeasured. It wants an inner due BETWEEN two
-  outer values, which is one timing change and no new family.
-
 - **THEN WHICH ROWS EVIDENCE CAN STILL MOVE, WHICH IS NOW A QUESTION
   WITH AN ANSWER.** The drain row turns out to be closed to
   instantiation in BOTH its denominations at once, and nothing said so
@@ -247,6 +237,17 @@ does not fit is a finding about the shared statement, not about the head.
   record per row whether either side reaches a program. A row no
   evidence can lower must not hold a class that claims evidence, so the
   census re-ranks the tier rather than merely describing it.
+
+- **THEN AN INNER THAT CARRIES OPERATORS, THE ONE AXIS KNOWN TO
+  REFUTE.** Six chain-door sweeps now cover the door's re-entries, and
+  every one of them registers an inner that is a bare slot read — so
+  the registered chain never gains a frame of the inner's own, and the
+  length conjunct reads flat everywhere. That is exactly the quantity
+  `Refuted.Chain-Step-Regs-Cap` moves to break the cap: an inner with
+  its own operators lands the registration past the reading it was
+  admitted under. So the flatness on record is a property of the
+  programs swept, not of the door, and the sweep that would say which
+  puts a mapped or scanned inner under the same control.
 
 ### The ledger
 
@@ -294,10 +295,10 @@ does not fit is a finding about the shared statement, not about the head.
   the registry stays priced across one frame, now at an accumulated level and
   under the arriving values' size. The restatement kills every witness of the
   family that refuted the fixed cap; whether ONE level pays is unread.
-- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×5`: the
+- **`chainStep-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED×6`: the
   whole chain's registry price, now stepping the level by one rather than
-  collapsing to the entry cap. Depth, share telescope, fan width and both
-  cutting arms are instantiated; an arrival FROM an inner is not.
+  collapsing to the entry cap. Every re-entry the door has is instantiated
+  now; every inner swept is a bare slot, which is the refuting axis.
 - **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
   emits no more payloads than its term syntactically carries. The last semantic
   step under the descent's ceiling; nine rows hold at the root frame, three of
