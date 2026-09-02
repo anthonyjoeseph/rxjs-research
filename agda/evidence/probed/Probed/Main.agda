@@ -121,3 +121,9 @@ open import Probed.Fold-Regs-Two-Caps
 
 open import Probed.Fold-Regs-Reentrant
   using (reaches; figures; figures′; separates; fits)
+
+open import Probed.Fold-Regs-Nest-Grid
+  using (row0; row1)
+
+open import Probed.Fold-Regs-Nest-Cross
+  using (cross)
