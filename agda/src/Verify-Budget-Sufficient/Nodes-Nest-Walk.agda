@@ -47,25 +47,39 @@ postulate
   -- ONE FRAME'S NODE STORES, under the potential it was handed.  Only
   -- three of the five kinds store at all -- a scan writes its
   -- accumulator, an inner frame writes its parent *All's queue, and an
-  -- outer frame mints the *All node the subscription hangs from -- and
-  -- what each writes is a value the potential already covers, since
-  -- the factor the frame surrenders is exactly the substitution it
-  -- performs.
-  --
-  -- AND THE REGISTRY ARM'S REFUTATION DOES NOT TRANSFER BY READING,
-  -- which is worth saying because the two arms are otherwise taken as
-  -- one.  `Refuted.Drain-Regs-Nest` runs a completion walk -- `valsΦ?`
-  -- is `all` over the burst, so an empty one clears the premise at
-  -- every budget -- and the drain then subscribes a queued term,
+  -- outer frame mints the *All node the subscription hangs from.  At
+  -- two of the three the write is a value the potential already
+  -- covers, since the factor the frame surrenders is exactly the
+  -- substitution it performs.  THE SCAN IS THE ONE THAT IS NOT: the
+  -- cell holds the accumulator, and the accumulator is a thing the
+  -- fold has been building rather than a thing the walk handed over.
+
+  -- AND THE REGISTRY ARM'S COUNTEREXAMPLE DOES NOT TRANSFER BY
+  -- READING, which is worth saying because the two arms are otherwise
+  -- taken as one.  `Refuted.Drain-Regs-Nest` runs a completion walk --
+  -- `valsΦ?` is `all` over the burst, so an empty one clears the
+  -- premise at every budget -- and the drain then subscribes a queued term,
   -- appending a registration whose PATH carries a fresh outer frame.
   -- This fold reads NODE STATES instead, and the two writes the same
   -- step makes both go the wrong way for a crossing: `allFresh-nest`
   -- prices a head's own install at zero, and the drain takes the term
-  -- OUT of the parent's queue.  So a crossing here cannot come from
-  -- the install -- it has to come from what the subscribed term
-  -- ENQUEUES before the step's gas is spent, and that is the thing to
-  -- instantiate rather than the drain itself.  Read off the
-  -- definitions; no row has been taken.
+  -- OUT of the parent's queue.  So the drain arm is not where this one
+  -- fails, and its repair -- a grant over what the completion may
+  -- subscribe -- does not reach the arm that does.
+
+  -- WHAT THE POTENTIAL CANNOT SEE, at the one arm that stores
+  -- something it did not hand over.
+  --
+  -- REFUTED: `Refuted.Scan-Nodes-Burst` -- a step function that
+  --   deepens its own accumulator, folded over a burst of naturals.
+  --   `valsΦ?` charges `2 ^ sizeᵗ fn` times the step's own nesting
+  --   once per value and takes the maximum, so the budget is a
+  --   CONSTANT in the burst length; the fold threads, so the stored
+  --   depth is linear in it.  Sixty-five values leave the cell at
+  --   sixty-five against a budget of sixty-four, from a table reading
+  --   zero, and every further value widens the gap -- so no larger `U`
+  --   repairs it.  The currency the iteration face already pays in is
+  --   a power in the burst WIDTH, which is what this leaf is missing.
   --
   -- PROBED: `Probed.Chain-Step-Abs-Charge` reaches this leaf by RUNNING
   --   a whole chain over it, at the second cascade of two reachable

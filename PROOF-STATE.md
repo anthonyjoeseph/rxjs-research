@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE EMPTY-HANDED WALK AT THE ARMS IT HAS NOT REACHED — BUT
-  NOT WITH THE SAME WITNESS.** The registry arm fell to a completion
-  walk, and the census in the two headers says the drain does not
-  transfer. On `stepFrame-nest-nodes` both of the drain's writes go
-  the wrong way, so a crossing has to come from what the subscribed
-  term ENQUEUES — build the witness around the enqueue, not around
-  the drain. On `stepFrame-nest-live` an extra join against the
-  schedule's slot sum already prices what a subscribe mints, so take
-  it last. `stepFrame-sz` is the fourth sibling and is unread. Each
-  arm that crosses takes the frame grant the registry arm carries.
+- **THEN RESTATE THE NODES ARM AT THE WIDTH IT ACTUALLY SPENDS.**
+  `stepFrame-nest-nodes` is refuted, and not where the last leg
+  looked: the enqueue routes are priced, and the crossing is the SCAN
+  arm's accumulator, which `valsΦ?` charges once per value while the
+  fold threads it. The iteration face already carries the currency —
+  `stepFrame-nodes-scan` is proven with a power in the burst width
+  under a `length vals ≤ W` premise — so the repair is a width premise
+  on this leaf, not a larger budget. The leg is whether
+  `foldPath-nest-nodes` and its callers can name that width;
+  `stepFrame-nest-regs` took a frame grant for the same reason, so
+  check whether one grant serves both before minting a second.
 
 - **THEN READ THE THRICE-REFUTED ROW AGAINST THE SPIRAL TEST.**
   `walk-share-LiveHyp` has been refuted at the price, then once
@@ -270,10 +271,10 @@ does not fit is a finding about the shared statement, not about the head.
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
   scan arm, which emits the node store that no premise here reads.
-- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `PROBED`: what one
-  frame stores at the nodes map, under the potential it was handed. Three of
-  the five kinds store; the whole-chain surrogate covers the composite at two
-  families and discharges none of the premise.
+- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+  what one frame stores at the nodes map, under the potential it was handed.
+  Refuted at the scan arm: the cell holds the accumulator, the fold threads it,
+  and the budget is a constant in the burst — sixty-five against sixty-four.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
