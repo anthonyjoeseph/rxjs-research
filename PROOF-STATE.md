@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **ASK WHETHER THE REGISTRY CAN BE MEASURED WHERE IT IS READ.** Its
-  two receipts — the registry's depth against the syntactic unit and its
-  length against the program's cap — are both refuted, and neither by an
-  adversarial state alone: one fails at a state the evaluator REACHES,
-  and the other at one registration past whatever cap is chosen, while
-  the reachable length climbs with the syntax so no numeral stands in
-  either. That is a quantity the program's own syntax does not bound, so
-  a tighter reading is not the repair. The commit reads whether the
-  registry belongs to the invariant record as a CARRIED field rather than
-  a measured one, and names the producer that could not re-establish it.
-
-- **AND MOVE THE LIVE WALK'S SINK OFF ITS AFFORDABILITY.** The sink's
+- **MOVE THE LIVE WALK'S SINK OFF ITS AFFORDABILITY.** The sink's
   level ceiling is closed at every reading, and the potential face's own
   sink arm is PROVEN by the same induction off a dispatch ledger indexed
   by level, with no affordability premise anywhere in it — so the ledger
@@ -246,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   every ingredient the new one needs; what is genuinely new is the third
   callee, the tail at the state a cancelled chain's step would leave.
   The commit grinds it against the mirror, one arm at a time.
+
+- **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
+  ARE CARRIED AT.** The chains a sink fans into are walked at the
+  round's ENTRY cap, while every receipt the sink actually holds — the
+  invariant record's own registry conjunct, the sink predicate's over
+  the admitted sublist, the walk clause's at the stepped cap — is read
+  above it, and these receipts weaken upward. So a size postulate is
+  being spent to re-derive, at a smaller cap, a fact three carried
+  fields already state. The commit reads which of the three the fanned
+  walk can be restated at without re-denominating the share ring's own
+  fold budget, and names what the entry cap is still load-bearing for.
 
 ### The ledger
 
@@ -289,9 +289,9 @@ does not fit is a finding about the shared statement, not about the head.
   terminal split: its factor is the sink's own times its frames', and the hop
   count is bounded by nothing but the dispatch gas.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's own
-  size receipt at the PROGRAM's cap. Stated over an arbitrary state it fails at
-  one registration longer than the cap, whatever the cap is; and the reachable
-  length climbs with the syntax, so no numeral stands in for the cap either.
+  size receipt at the PROGRAM's cap. THE FIELD ALREADY EXISTS AND CANNOT BE
+  SPENT: three carried receipts are in hand, every one at a cap above the
+  fanned walk's, and the receipt weakens upward.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×3`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region, since a depth fixed before the count
