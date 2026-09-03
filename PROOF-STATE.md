@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MOVE THE LIVE WALK'S SINK OFF ITS AFFORDABILITY.** The sink's
-  level ceiling is closed at every reading, and the potential face's own
-  sink arm is PROVEN by the same induction off a dispatch ledger indexed
-  by level, with no affordability premise anywhere in it — so the ledger
-  absorbing the fan-out's climb is a fact rather than a plan, and the
-  live sink is a restatement away from it. The commit moves the live
-  walk to where that ledger is in scope, restates the sink off it, and
-  leaves the outer frame's size bound as the one debt the move does not
-  pay — which is where the round's ceiling is genuinely reached and
-  where a chain entering at level zero already discharges it.
-
-- **AND CLOSE THE CASCADE DOOR'S UNPROJECTED PACKAGE.** The round's caps
+- **CLOSE THE CASCADE DOOR'S UNPROJECTED PACKAGE.** The round's caps
   package is now stated at EVERY chain rather than at the surviving ones,
   because a consumer denominated in the round's DESCENT charges for the
   head chain whatever the cancellation test says — and the fold above it
@@ -246,6 +235,18 @@ does not fit is a finding about the shared statement, not about the head.
   fields already state. The commit reads which of the three the fanned
   walk can be restated at without re-denominating the share ring's own
   fold budget, and names what the entry cap is still load-bearing for.
+
+- **AND SETTLE WHETHER THE OUTER MINT'S CONCLUSION IS LEVEL-INDEXABLE
+  AT ALL.** Everything on the live face now routes through one binary.
+  The mint concludes at one ceiling and charges its size premise
+  against that same ceiling, and the sink's demand for it is in the
+  CONCLUSION — so no arm below repairs while the mint reads at one
+  level. But loosening the premise to its own number is not the free
+  generalisation it reads as: the grant is spent, so the ceiling is
+  reached THROUGH the potential premise. The commit instantiates the
+  loosened form where the grant is known spent, and reports whether the
+  two numbers separate or the conclusion is single-level by
+  construction.
 
 ### The ledger
 
@@ -270,7 +271,8 @@ does not fit is a finding about the shared statement, not about the head.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed, and the
-  currency is the outer mint's rather than this arm's.
+  demand is in the CONCLUSION, so no premise change here repairs it —
+  dropping the affordability only makes the statement stronger.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the

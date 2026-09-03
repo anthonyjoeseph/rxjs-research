@@ -528,6 +528,22 @@ frameLive-of-sz U (take-f _)         path vals _ = tt
 frameLive-of-sz U (from-inner _ _ _) path vals _ = tt
 frameLive-of-sz U (thru-outer _ _)   path vals h = h
 
+-- AND NO PREMISE CHANGE HERE CAN REPAIR IT, BECAUSE THE DEMAND IS IN
+-- THE CONCLUSION.  The obvious move -- restating this off the caps
+-- face's dispatch ledger, which carries a level with no affordability
+-- anywhere in it and which the potential face's own sink arm is proven
+-- against -- does not survive unfolding what is concluded.  The
+-- dispatch hypothesis expands to the fan-out fold, the fold to each
+-- admitted chain's walk, and every outer frame in those chains asks
+-- for the size bound at the round's ceiling again.  So dropping the
+-- affordability does not remove the demand, it removes the only thing
+-- that was paying it: the restated statement is STRICTLY STRONGER than
+-- the one three counterexamples already close, which is why the ledger
+-- transfers to the potential face and not to this one.  What the two
+-- faces do not share is the leaf: the potential's frame arms are
+-- discharged out of the path's own factor, and this face has one arm
+-- that reaches through the gate that factor stops at.
+
 -- THE REGISTRY-SIDE GRANT, and it is the one thing the walk cannot get
 -- from the path it is walking.  At a sink the values leave this chain
 -- for chains that live in the REGISTRY, and their side conditions are
@@ -569,6 +585,7 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- that cannot be afforded is the outer frame's size bound, charged
 -- against the round's single ceiling, and the header of that mint
 -- carries why no level-indexed form of it is a widening.
+--
 --
 -- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
 -- REFUTED: `Refuted.Sink-Level-Range`
