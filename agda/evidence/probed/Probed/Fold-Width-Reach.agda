@@ -36,35 +36,44 @@
 -- a width carried on the invariant record would be denominated in this
 -- measure, and there is no field to thread when the measure towers.
 
--- THE MEASURED SIDE IS BOUNDED AT ONE LAYER, and that is a finding
--- about what can be instantiated rather than a gap to be filled later.
--- A flatten emits nothing in the frame that SUBSCRIBES it, so a run of
--- a layered program delivers its widths in later frames; and the family
--- reaches its source through a single scripted slot, which a re-entering
--- inner finds drained.  `subscribeE` therefore reads a flat zero at
--- every `k ≥ 1` under both the subscribe-burst and widest-instant
--- readings, and the entry row is the only live one.  Reaching the later
--- frames wants the `stepFrame` door `Probed.Frame-Drain-Live` uses, at a
--- state built by hand -- which prices a run against a state no run
--- produced, so it is not taken here.
+-- THE MEASURED SIDE REACHES ONE LAYER, AND IT CROSSES THERE.  A
+-- flatten emits nothing in the frame that SUBSCRIBES it, so a layered
+-- program delivers its widths only in LATER frames and the entry burst
+-- reads a flat zero at every `k ≥ 1`.  `drain` drives those frames off
+-- the state the subscribe actually produced, so no hand-built state is
+-- priced, and the widest instant at one layer then outruns the linear
+-- reading at the program's own size -- the crossing is MEASURED and
+-- not merely syntactic.
+
+-- AND WHAT HELD THE FAMILY TO THE ENTRY WAS THE SEED, NOT THE SLOT.
+-- The drive does want TWO slots doing different jobs, since a cold
+-- script drains and a base sharing its slot with the refolds leaves
+-- them reading nothing.  But splitting the slots and driving both in
+-- later frames still read zero: every payload the flatten subscribes
+-- descends from the `emptyᵉ` seed, and an empty observable emits
+-- nothing however long it is driven.  Seeding the driven layer from a
+-- real source is what opens it, at sizes the row below pins equal to
+-- the syntactic family's -- so the two readings are compared at one
+-- program's measurements and not across two.
 module Probed.Fold-Width-Reach where
 
-open import Data.List using (List; []; _∷_; length; foldr)
+open import Data.List using (List; []; _∷_; _++_; length; foldr)
 open import Data.Bool using (true)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _<ᵇ_)
 open import Data.Maybe using (nothing)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
-open import Data.Product using (proj₁)
+open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Closed; Val; natᵗ; scanᵉ; mergeAllᵉ; emptyᵉ; input;
   strmᵗ; sizeᵉ)
-open import Rx.Prim using (InstEmit)
+open import Rx.Prim using (InstEmit; Timed; after_,_; cold)
+open import Rx.Slots using (Slots; scripted)
 open import Rx.Frame-Width using (outWⱽ)
-open import Rx.Evaluator using (subscribeE; splitEvents; Stream; root; sched-init;
-  st-init; widAt)
+open import Rx.Evaluator using (subscribeE; drain; splitEvents; Stream; root;
+  sched-init; st-init; widAt)
 open import Refuted.Demand-Programs using (Γ₂)
-open import Refuted.Scan-Burst-Nest using (deepen; slots; gas)
+open import Refuted.Scan-Burst-Nest using (deepen; slots; sync; gas)
 open import Probed.Apparatus using (Separates; separates-at)
 
 ----------------------------------------------------------------------
@@ -152,9 +161,8 @@ agrees : fanout 0 ≡ synW 0
 agrees = refl
 
 ----------------------------------------------------------------------
--- THE ENTRY ROW, RUN.  The only layer count `subscribeE` reaches; see
--- the header for why, and for why it is a coverage boundary rather
--- than a hole.
+-- THE ENTRY ROW, RUN -- the only layer count the subscribe BURST
+-- reaches on its own; the later frames are driven further down.
 ----------------------------------------------------------------------
 
 instW : ∀ {t} → Stream Γ₂ t → List ℕ
@@ -169,3 +177,70 @@ realW n k = foldr _⊔_ 0 (instW
 
 entry≡ : realW 2 0 ≡ 2
 entry≡ = refl
+
+----------------------------------------------------------------------
+-- THE LATER FRAMES, RUN.  Two slots doing two jobs, which is what the
+-- one-slot family could not do.
+----------------------------------------------------------------------
+
+-- THE HARNESS, and both departures from the family above are forced.
+-- Slot zero drives the base ASYNCHRONOUSLY, one value per frame, while
+-- slot one carries both the synchronous burst each refold reads at its
+-- own subscribe and later values for the refolds that re-enter.  And
+-- the layer seeds from a real source rather than from `emptyᵉ`, which
+-- is what makes the flattened payloads emit at all.
+layerD : Closed Γ₂ natᵗ → Closed Γ₂ natᵗ
+layerD e = mergeAllᵉ nothing (scanᵉ deepen (strmᵗ (input (fsuc fzero))) e)
+
+towerD : ℕ → Closed Γ₂ natᵗ
+towerD zero    = input fzero
+towerD (suc k) = layerD (towerD k)
+
+timed : ℕ → List (Timed ℕ)
+timed zero    = []
+timed (suc k) = (after 0 , k) ∷ timed k
+
+slotsD : ℕ → Slots Γ₂
+slotsD k fzero        = scripted (cold [] (timed k))
+slotsD k (fsuc fzero) = scripted (cold (sync k) (timed k))
+
+-- the whole run, subscribe burst and every later frame `drain` reaches
+runD : ℕ → ℕ → ℕ → Stream Γ₂ natᵗ
+runD vals fuel k =
+  let r = subscribeE gas (towerD k) root 0 0
+            (sched-init (towerD k) (slotsD vals)) (st-init (towerD k))
+  in proj₁ r ++ drain fuel 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+wideD : ℕ → ℕ → ℕ → ℕ
+wideD vals fuel k = foldr _⊔_ 0 (instW (runD vals fuel k))
+
+countD : ℕ → ℕ → ℕ → ℕ
+countD vals fuel k = length (instW (runD vals fuel k))
+
+-- LOAD-BEARING, and it is the sizes that let the run be compared with
+-- the syntactic rows above: the driven family measures the same at
+-- every layer, so `fanout` is the linear reading AT THIS PROGRAM.
+sizesAgree : sizeᵉ (towerD 1) ≡ sizeOf 1
+sizesAgree = refl
+
+-- the run, packed: widest instant and instant count at no layer and at
+-- one.  The entry width is LOAD-BEARING against the burst-only row
+-- above -- four instants rather than one, so the drive really did
+-- reach later frames -- and the one-layer width is load-bearing
+-- against the zero the burst-only reading gives there.
+driven : ℕ
+driven = wideD 3 6 0 + 10 * countD 3 6 0
+       + 100 * wideD 3 6 1 + 10000 * countD 3 6 1
+
+driven≡ : driven ≡ 72741
+driven≡ = refl
+
+-- LOAD-BEARING, and the row the leg was for: a RUN crosses the linear
+-- reading at the FIRST hop, where the syntactic row above needed two
+-- layers to cross.  A family whose width grew per hop by at most its
+-- size would put this at `false`.  NOT COVERED: two layers, which
+-- outran the evidence loop's budget outright rather than reporting a
+-- number -- so the measured side is bounded at one layer, and that
+-- bound is the loop's and not the evaluator's.
+crossesRun : (fanout 1 <ᵇ wideD 3 6 1) ≡ true
+crossesRun = refl

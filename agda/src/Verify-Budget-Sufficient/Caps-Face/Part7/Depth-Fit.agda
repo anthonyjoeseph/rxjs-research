@@ -538,7 +538,13 @@ postulate
   --   refold crosses the linear ceiling at the linear reading's own
   --   most generous setting, its own size at each level.  So there is
   --   no field to thread, and the arm sits on the other branch.  The
-  --   separation is proven in `Probed.Fold-Width-Reach`.
+  --   separation is proven in `Probed.Fold-Width-Reach`, where a RUN
+  --   of the same family -- driven through later frames off the state
+  --   its own subscribe produced -- crosses the linear reading at the
+  --   FIRST hop, so the field is refuted by a measurement and not only
+  --   by a measure.  What the run does NOT reach is the count the
+  --   recurrence ADMITS, which is the binary above and stands where it
+  --   stood: two layers outran the evidence loop outright.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

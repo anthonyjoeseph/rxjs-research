@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **REACH THE COUNT AXIS THROUGH THE `stepFrame` DOOR, AT PARAMETERS THE
-  LOOP CAN PAY.** The fork settles the arm's binary from the SYNTAX, so the
-  region a FALSITY needs is still unreached and no class moves on it. The
-  run is written and its blocker is known and is not the door: one script
-  cannot both drive the outer in later frames and feed each inner refold at
-  its own subscribe, so a single-slot harness leaves the inners reading
-  nothing and the drive comes back a flat zero. Split, the family is
-  affordable only small -- a six-value, twenty-frame drive outran the
-  evidence loop's budget outright. The commit lands the split harness at a
-  size the loop affords and reports the class the rows earn.
-
 - **THEN PRICE THE CHARGE, WHICH IS WHERE THE DEPTH OBLIGATION NOW SITS.** The
   census settled what the admitted chains' depth is FOR: every route reaches
   `frameΦ-fit`, whose one PROVEN arm spends it on a single widening of the
@@ -246,6 +235,15 @@ does not fit is a finding about the shared statement, not about the head.
   arms the dead route reaches move UP, and any arm that survives it is a
   genuinely separate gap and gets said so in its own header. The commit
   re-reads them and moves the classes that move.
+
+- **THEN INSTANTIATE THE TIER'S ONE UNPROBED ROW, AGAINST A STATE A RUN
+  REACHED.** One row here is FALSITY on nothing at all -- the class it is
+  born into, not a reading anyone took -- and it is a receipt ABOUT a
+  state, so what was missing was a reachable state rather than a route.
+  The drive the fork now carries supplies one: later frames off the state
+  the subscribe itself produced, no hand-built record priced. The commit
+  reads the row there and reports what the rows earn, receipt or
+  refutation, with the coverage boundary either way.
 
 ### The ledger
 
