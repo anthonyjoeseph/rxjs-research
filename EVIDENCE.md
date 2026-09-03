@@ -113,11 +113,20 @@ E2.
   point.** A restated statement changes every row's type under it, which is
   E5's fingerprint law arriving inside the typechecker.
 
-  **THE BODY IS HELD TO COMPUTATION, BECAUSE ANY INHABITANT WOULD TYPECHECK.**
-  The postulate itself, handed back as its own proof, inhabits the row — so
-  E7 refuses every clause body that is not `refl`, `tt`, `_`, a numeral
-  witness, `_,_`, or a stdlib converter (`≤ᵇ⇒≤`, `<ᵇ⇒<`, `toWitness`) fed
-  those. A lemma in the body is a claim the probe did not instantiate. And
+  **THE BODY MAY NAME NO POSTULATE, BECAUSE ANY INHABITANT WOULD TYPECHECK.**
+  The postulate itself, handed back as its own proof, inhabits the row, and a
+  row discharged out of some OTHER unproven statement is evidence for one
+  claim exactly as far as another is true. So the body is free to spend
+  anything this tower has PROVEN — `refl` where the claim reduces, a stdlib
+  inequality where it does not — and may name no postulate at all.
+
+  **IT IS A LAUNDERING TEST AND NOT A COMPUTATION TEST, AND THE DIFFERENCE IS
+  WHAT MAKES THE RULE SATISFIABLE.** Held to a numeral, the rule would ask for
+  a conclusion that REDUCES at the chosen point — and a conclusion denominated
+  in a family this tower SEALS for cost reduces at no point whatever, so a
+  probe whose target is stated in one could never write the row and the
+  finding could never be cleared. A weakening through a proven inequality is a
+  stronger receipt than a numeral, not a weaker one. And
   **the head under `Confirms` must be a declared `-- TARGET:`**, reached only
   through the statement's own eliminators — `proj₁`/`proj₂`, application at
   a point, a record conclusion's field — since an arbitrary function applied

@@ -62,16 +62,24 @@ open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin using (zero) renaming (suc to fsuc)
 open import Rx.Prim using (gasPad; g0; cold; hot)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
+open import Data.Nat.Properties using (≤-refl; ≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource)
+         cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource;
+         Arrival; Path)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 
 open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; insT; insF; sucGU; sucGF; asyncNats)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthCascade)
+open import Verify-Budget-Sufficient.Caps-Depth
+  using (depthE; depthCascade; depthChain)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
+  using (chain-depth-sighted)
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; nestUnit; sightCeil; pathNestD)
+
+open import Probed.Apparatus using (Confirms)
 
 
 -- THE CEILING WRITTEN OUT, because the grant it reads sits inside the
@@ -364,8 +372,116 @@ sizeFigs = sizeᵉ (progU 2 2) + 1000 * sizeᵉ (progU 8 2)
 
 sizeFigs≡ : sizeFigs ≡ 30100052028
 
+-- ── the tie, at the chain leaf rather than the round ────────────────
+
+-- Every reading above is taken at `depthCascade`, and the chain leaf
+-- speaks about `depthChain`.  The round's descent is the JOIN over its
+-- chains, so a green round is a green chain -- but that step is an
+-- ARGUMENT, and the whole point of a tie is that no argument stands
+-- between a row and the statement.  So the point below is the chain
+-- itself: the second instant's arrival, the FIRST chain the registry
+-- admits for it, and the state `depthCascade` hands that chain.
+--
+-- BOTH PREMISES ARE DISCHARGED, AT THE TIGHTEST VALUE EACH ADMITS.
+-- The slots equation is reflexivity by taking `sl` to be the schedule's
+-- own; the store bound is reflexivity by taking `S` to be the store's
+-- own maximum.  Nothing is weakened by either -- the ceiling is
+-- monotone in `S`, so the least admissible `S` is the strongest
+-- reading, and a row here holds at every larger one a caller supplies.
+--
+-- NON-VACUITY IS PINNED AND NOT ASSERTED.  A point taken from an
+-- exhausted schedule or an empty chain list falls to the default below,
+-- whose descent is nought and whose row could not fail; the equation
+-- pins the descent this point actually reaches, so the default is
+-- visible as a number rather than hidden behind a green.
+record Point (p : Closed Γ₂ natᵗ) : Set where
+  constructor pt
+  field
+    arr : Arrival Γ₂
+    pth : Path Γ₂ (arrTy arr) natᵗ
+    sc  : Sched Γ₂
+    stt : EvalSt p
+
+noPoint : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) → Point p
+noPoint p sl =
+  pt (record { tick = 0 ; ordinal = 0 ; source = 0
+             ; elemTy = natᵗ ; payload = 0 ; isLast = true })
+     root (sched-init p sl) (st-init p)
+
+point : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → Point p
+point p sl g with sched-next (proj₁ (after1 p sl g))
+... | inj₁ _        = noPoint p sl
+... | inj₂ (a , sd) with chainsOf a (proj₂ (after1 p sl g))
+...   | []            = noPoint p sl
+...   | (rid , c) ∷ _ = pt a c sd (cascadeLatch a (proj₂ (after1 p sl g)))
+
+uPt : Point (progU 8 2)
+uPt = point (progU 8 2) slotsF (sucGU 1 2 2 8 2)
+
+uArr : Arrival Γ₂
+uArr = Point.arr uPt
+
+uPth : Path Γ₂ (arrTy uArr) natᵗ
+uPth = Point.pth uPt
+
+uSc : Sched Γ₂
+uSc = Point.sc uPt
+
+uSt : EvalSt (progU 8 2)
+uSt = Point.stt uPt
+
+chainDesc : ℕ
+chainDesc = depthChain 2 uArr uPth uSc uSt
+
+chainDesc≡ : chainDesc ≡ 17
+
+chainRow : Confirms
+  (chain-depth-sighted (Sched.slots uSc) uArr 2 (storeNestMax uSc uSt)
+     uPth uSc uSt refl ≤-refl)
+chainRow = ≤ᵇ⇒≤ _ _ tt
+
+-- AND THE SAME TIE AT THE FAR END OF THE COUNT AXIS -- WHERE THE
+-- READING IS THAT THE CHAIN LEAF DOES NOT SEE THAT AXIS AT ALL, which
+-- is a coverage boundary the round's rows cannot show and this row
+-- reports as a number.  The round's descent moves with the delivered
+-- count, forty-nine to one hundred and ninety-three, and it is that
+-- movement the ceiling's shape was calibrated against.  The FIRST
+-- chain's descent does not move: seventeen at both counts, pinned
+-- either side.  So the growth lives wholly in the round's join over
+-- LATER chains and the states they leave, which is `depthCascade`'s
+-- territory and not this leaf's, and no row here -- at any count --
+-- constrains the chain leaf along that axis.  What the second point
+-- does reach is the ceiling and the store at the far count, both of
+-- which move; what it does not reach is a descent that does.
+fPt : Point (progU 8 20)
+fPt = point (progU 8 20) slotsF (sucGU 1 2 2 8 20)
+
+fArr : Arrival Γ₂
+fArr = Point.arr fPt
+
+fPth : Path Γ₂ (arrTy fArr) natᵗ
+fPth = Point.pth fPt
+
+fSc : Sched Γ₂
+fSc = Point.sc fPt
+
+fSt : EvalSt (progU 8 20)
+fSt = Point.stt fPt
+
+farDesc : ℕ
+farDesc = depthChain 2 fArr fPth fSc fSt
+
+farDesc≡ : farDesc ≡ 17
+
+farChainRow : Confirms
+  (chain-depth-sighted (Sched.slots fSc) fArr 2 (storeNestMax fSc fSt)
+     fPth fSc fSt refl ≤-refl)
+farChainRow = ≤ᵇ⇒≤ _ _ tt
+
 rootFigs≡ = refl
 rootRow≡ = refl
+chainDesc≡ = refl
+farDesc≡ = refl
 rootWideRow≡ = refl
 delivFigs≡ = refl
 axisFigs≡ = refl

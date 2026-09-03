@@ -55,7 +55,9 @@ open import Rx.Evaluator using (EvalSt; thru-outer; take-f; Path; root; _↠_; s
   mergeAllᵒ; mergeAll-st; scan-st; installNode; register; RegId; Chain)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?; stepFrame-regsSz)
+
+open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
 -- ONE SCRIPTED SLOT, live and unspent, so the inner's leaf registers
@@ -305,3 +307,31 @@ figuresH = length (EvalSt.registry (post 6 (inner 3 ∷ []) stH)) ∷ []
 
 figuresH≡ : figuresH ≡ 0 ∷ []
 figuresH≡ = refl
+
+----------------------------------------------------------------------
+-- AND THE TIE TO THE STATEMENT, at the two points that carry the
+-- reading.  The rows above are the READING -- a Boolean recomputed
+-- from the registry the step produced -- and nothing in them is held
+-- to `stepFrame-regsSz` as it reads.  The two rows below are: Agda
+-- generates each type from the statement itself, so the probe chooses
+-- the point and a restatement of the target breaks here rather than
+-- leaving a green reading about text that is gone.
+--
+-- WHY THESE TWO AND NOT ALL EIGHT.  Row A is the boundary row -- both
+-- measured quantities at the ceiling their premises admit -- and row F
+-- is the only one entering with a NON-EMPTY registry, which is the arm
+-- where the conclusion must widen entries it did not create.  The
+-- remaining load-bearing rows move the level, the count or the value
+-- list, and each of those axes is already tied through one of these
+-- two; the degenerate arms are tied by nothing deliberately, since a
+-- row whose conclusion is its own premise buys the statement nothing.
+----------------------------------------------------------------------
+regsRowA : Confirms
+  (stepFrame-regsSz {e = e₀} (gs (gs g0)) 0 0 (thru-outer mergeAllᵒ 0) (κ 6)
+     (inner 3 ∷ []) false (sched-init e₀ sl₁) st₀ 1 2 premA₁ premA₂ premA₃)
+regsRowA = refl
+
+regsRowF : Confirms
+  (stepFrame-regsSz {e = e₀} (gs (gs g0)) 0 0 (thru-outer mergeAllᵒ 0) (κ 6)
+     (inner 3 ∷ []) false (sched-init e₀ sl₁) stF 1 2 premA₁ premA₂ premF)
+regsRowF = refl

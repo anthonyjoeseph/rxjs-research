@@ -36,7 +36,8 @@ open import Probed.Sync-Factor
   using (dupSync≡6; dupOut≡2; dupA-holds;
          dupOut₃≡6; dupB-holds;
          hidSync≡4; hidSize≡9; hidOut≡0;
-         mixOut≡3; mixD-holds)
+         mixOut≡3; mixD-holds;
+         dupRowA; dupRowB; mixRowD)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
          capsX-1; capsX-2; heads≡; entry≡; entryFace≡; headsClos≡; left-starved≡; census≡;
@@ -51,7 +52,8 @@ open import Probed.Chain-Step-Abs-Charge
 open import Probed.Chain-Step-Live-Deferred
   using (figures≡; fits)
 open import Probed.Chain-Step-Live-Nest
-  using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
+  using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits;
+         liveRow; attackRow; twoRow; mapRow)
 open import Probed.Thru-Step-Indexed
   using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;
@@ -79,7 +81,8 @@ open import Probed.Sight-Thru-Val
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡;
-         rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡)
+         rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
+         chainDesc≡; chainRow; farDesc≡; farChainRow)
 open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)
 open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)
 open import Probed.Sight-Fit-Width using (figures≡; oldRow≡; newRow≡)
@@ -142,7 +145,8 @@ open import Probed.Frame-Step-Regs-Level
          premD₁; premD₂; figuresD≡; rowD;
          premE₁; figuresE≡; rowE;
          premF; figuresF≡; rowF;
-         figuresG≡; rowG; figuresH≡)
+         figuresG≡; rowG; figuresH≡;
+         regsRowA; regsRowF)
 
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;

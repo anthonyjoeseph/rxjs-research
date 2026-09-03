@@ -216,15 +216,16 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **FIRST TIE THE RECEIPTS, BECAUSE NOTHING MERGES WHILE THE GATE IS RED.**
-  The fold family is tied: fifteen files read `foldPath`'s registry at their
-  own programs and share one STATEMENT, so one paid-for point --
-  `Probed.Fold-Regs-Row`, at a state a run reached, both caps at their own
-  least, and a registry the fold itself grew -- is spent under a type each
-  satellite writes out of imported names, and a restatement breaks all
-  fifteen at once. Twenty-nine findings remain over fourteen targets, in
-  smaller clusters: three `thruFit-arr-*` heads across two files, two more
-  targets across two files each. So the commit takes the next cluster the
-  same way, and reports which targets admit no row at any point at all.
+  The four targets whose conclusions COMPUTE are tied, and the currency is
+  what made them cheap: two take `refl`, two take a stdlib decision
+  procedure, which is a stronger row than a numeral rather than a weaker
+  one. `chain-depth-sighted` paid a finding on the way, recorded in its own
+  header. Twenty-five findings remain over ten targets and the
+  classification is the schedule: two want a membership premise, five are
+  denominated in a family this tower SEALS for cost and reduce at no point
+  whatever, and the rest carry a big predicate a row must build. So the
+  commit takes the membership pair and the Σ-concluding target, whose
+  witness is ours to supply.
 
 - **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the
