@@ -570,6 +570,19 @@ postulate
   --   field is named HERE and nowhere else in the development, so
   --   killing it moved this arm alone -- no sibling was parked on it,
   --   and none of them can be reclassified off this route.
+  -- DEAD ROUTE: asking for the same field as a burst LENGTH rather
+  --   than as a width, on the reading that a COUNT and a MEASURE are
+  --   different currencies and only the second was killed above.  They
+  --   are not different, and the descent ceiling is what says so: the
+  --   only proven ceiling on the values a frame is handed is
+  --   `burst-out`, which puts that length under `outWⱽ` -- the frame
+  --   face's own measure, read at the entry form -- and nothing here
+  --   bounds it by anything smaller.  So a length field is the width
+  --   field wearing a count's name, and the separation above kills it
+  --   unchanged, since `outWⱽ` takes a source's payload count into an
+  --   exponent exactly when a flatten consumes it and so towers in the
+  --   layer count.  What that closes is the RETRY: both halves of the
+  --   binary stand where they stood, and this route reaches neither.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

@@ -215,19 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PUT THE BURST'S LENGTH WHERE A PRODUCER MUST SUPPLY IT.** The
-  charge side of the Φ arms is now known to be measurement-dead at every
-  instant, so what is left to work is the side that does compute -- and
-  it grows exponentially in a count these premises never bound. The
-  ledger conjunct that would bound it is an `all`, which constrains each
-  value and never how many, while the conclusion charges a power in the
-  length. This is NOT the width the fork killed: that was the frame
-  face's measure; this is a burst LENGTH. A hypothesis
-  here is the laundering the law forbids, so the commit states it as a
-  field obligation on the invariant record and reports which producer
-  cannot re-establish it.
-
-- **THEN CARRY THE CEILING INTO THE Φ FACE, WHERE THE ARM HAS NONE.**
+- **CARRY THE CEILING INTO THE Φ FACE, WHERE THE ARM HAS NONE.**
   The drain ledger the potential face is asked for opens with a
   level ceiling, and a census finds that object consumed at every site
   in the tree and produced at none — the walk lemmas relay one and
@@ -238,7 +226,7 @@ does not fit is a finding about the shared statement, not about the head.
   than a mint at the arm, which would trade a counted gap for an uncounted
   one. The commit threads the field or names the producer that cannot.
 
-- **AND BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
+- **THEN BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
   live list is minted at three places — one subscribe out of a parked
   queue, the outer frame subscribing its arrivals, and the share chain a
   sink fans into — and every consumer spends all three at one site. Their
@@ -247,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   each was refuted separately and why no repair transferred between them.
   The commit reads whether one denomination carries all three, and
   reports the mint that cannot be stated in it.
+
+- **AND ASK WHETHER THE REGISTRY CAN BE MEASURED WHERE IT IS READ.** Its
+  two receipts — the registry's depth against the syntactic unit and its
+  length against the program's cap — are both refuted, and neither by an
+  adversarial state alone: one fails at a state the evaluator REACHES,
+  and the other at one registration past whatever cap is chosen, while
+  the reachable length climbs with the syntax so no numeral stands in
+  either. That is a quantity the program's own syntax does not bound, so
+  a tighter reading is not the repair. The commit reads whether the
+  registry belongs to the invariant record as a CARRIED field rather than
+  a measured one, and names the producer that could not re-establish it.
 
 ### The ledger
 
@@ -293,7 +292,7 @@ does not fit is a finding about the shared statement, not about the head.
   size receipt at the PROGRAM's cap. Stated over an arbitrary state it fails at
   one registration longer than the cap, whatever the cap is; and the reachable
   length climbs with the syntax, so no numeral stands in for the cap either.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×2`: the
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×3`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region, since a depth fixed before the count
   must dominate a count towering in it. Owed a binary, not a currency: is the
