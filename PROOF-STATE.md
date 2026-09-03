@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
-  registered chain's nesting by the syntactic unit is DEAD -- false at the
-  states a run reaches, not merely at built ones -- so the field is back out
-  of `capsOK?` and no premise threaded to a mint can pay it. What is not yet
-  known is what the three `walk-ΦHyp` consumers need that depth FOR. The
-  currency to replace it in already exists: `chain-depth-sighted` takes a
-  store-denominated bound, and `store-growth` lets the store's depth grow
-  multiplicatively rather than pinning it to a fixed number. So the commit
-  censuses those three uses, restates `fan-regsNest` in the store reading
-  wherever it supports them, and reports the uses it does not.
-
-- **THEN DECIDE WHETHER THE FOLD'S COUNT IS REAL.** The fold arm is
+- **DECIDE WHETHER THE FOLD'S COUNT IS REAL.** The fold arm is
   at the spiral stop: a depth fixed before an instant runs, against a
   count that towers in it, and no denomination moves the two numbers
   -- stories are the caps face's currency at the exit index, the
@@ -237,6 +226,18 @@ does not fit is a finding about the shared statement, not about the head.
   the commit builds the widest burst a fixed-size program produces at
   a hop, against `widAt`, and either threads a width field on the
   invariant record or reports a FALSITY on the count axis.
+
+- **THEN PRICE THE CHARGE, WHICH IS WHERE THE DEPTH OBLIGATION NOW SITS.** The
+  census settled what the admitted chains' depth is FOR: every route reaches
+  `frameΦ-fit`, whose one PROVEN arm spends it on a single widening of the
+  path's Φ-depth, so the unit is a number the bound is routed through and not
+  a currency. Read as
+  the registry's place in the store measure the fan-out half is now a proven
+  fold; what the store reading cannot reach is `nestΦAt`, denominated in the
+  program's unit and its slot wrap. So the commit instantiates the charge
+  against the reached store on the families the registry refutations already
+  run, and either names the summand that has to move or reports a FALSITY on
+  the charge itself.
 
 - **THEN TIE THE REST OF THE BIG-PREDICATE GROUP, AND WRITE THE BOUNDARY WHERE
   THE CONCLUSION ITSELF IS SEALED.** The premises-standing shape carried both
@@ -254,8 +255,9 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
   `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
-  syntactic unit. REFUTED AT A REACHED STATE, not only an arbitrary one, so it
-  is replaced rather than discharged and no mint can be asked for it.
+  syntactic unit, read as the registry's own place in the store measure.
+  REFUTED AT A REACHED STATE, not only an arbitrary one, so it is replaced
+  rather than discharged and no mint can be asked for it.
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the `from-inner` head of the drain
   law, the only frame that names a node. Both denominations are closed to

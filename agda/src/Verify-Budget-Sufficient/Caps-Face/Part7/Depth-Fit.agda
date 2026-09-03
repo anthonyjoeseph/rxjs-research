@@ -52,7 +52,7 @@ open import Verify-Budget-Sufficient.Live-Nest-Walk using
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; storeNestMax; nestCapAt; nestOK?; realWidAt-def; nestUnit;
   slotsNestSum; liveNest; nodeNest; regsNestMax; sightCeil; slotWrapSum; nestCapAt-0;
-  nestCap-mono₀; nestOK?-latch; nestOK?-store; storeNestMax-lub; storeNest-slots≤;
+  nestCap-mono₀; nestOK?-latch; nestOK?-store; shareAdmit-nest; storeNestMax-lub; storeNest-slots≤;
   storeNest-live≤; storeNest-nodes≤; storeNest-regs≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; cascadeLatch; chainsOf; cascadeGo; Path; arrTy; stepFrame;
@@ -79,8 +79,6 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; foldPath-slots;
    shareAdmit-caps)
-open import Verify-Budget-Sufficient.Delivery-Walk using
-  (regP?; shareAdmit-chP)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -1081,6 +1079,41 @@ fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-chain-sz {e = e} sl id i st h =
   shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
 
+-- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
+-- reading is a ⊔-fold over the whole selection, and the walk spends it
+-- one chain at a time, so the fold has to be taken apart before the
+-- first `chainStep` sees it.
+chainsNest-all : ∀ {n} {Γ : Ctx n} {s t} (D U : ℕ)
+  (cs : List (RegId × Path Γ s t)) →
+  D + chainsNestD cs ≤ U →
+  all (λ rc → D + pathNestD (proj₂ rc) ≤ᵇ U) cs ≡ true
+chainsNest-all D U []       h = refl
+chainsNest-all D U (c ∷ cs) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (+-monoʳ-≤ D
+                       (m≤m⊔n (pathNestD (proj₂ c)) (chainsNestD cs))) h)))
+          (chainsNest-all D U cs
+            (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
+                                          (chainsNestD cs))) h))
+
+-- WHAT THE DEPTH IS FOR IS ONE BOUND ON `pathΦD`, and that is a fact
+-- about the consumers rather than about this statement.  Every route
+-- out of here reaches `frameΦ-fit`, whose three loud arms are the
+-- scan charge, the inner fit's pair and the outer frame's -- and the
+-- arm that is PROVEN spends the depth on exactly one step, widening
+-- the path's Φ-depth to the unit plus a square of the cap.  So the
+-- unit is the number the bound is routed THROUGH, not a currency
+-- anything downstream is stated in.
+--
+-- AND THE STORE DENOMINATION BUYS THE FAN-OUT HALF AND STOPS AT THE
+-- CHARGE.  Read as the registry's own place in the store measure this
+-- is a numeral inequality, so the selection's join is a proven fold
+-- and the per-chain receipt follows with no filter lemma between.
+-- What it cannot reach is `nestΦAt`, denominated in the program's
+-- unit and its slot wrap: a depth premise widened to the store has
+-- nothing there to be compared against, so replacing the unit
+-- outright moves the obligation onto the charge, which is where the
+-- remaining leaf is owed.
+
 -- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.
 -- IT IS FALSE, and not merely over arbitrary states: a RUN reaches a
 -- registry deeper than the unit, so the statement has to be replaced
@@ -1117,18 +1150,23 @@ fan-chain-sz {e = e} sl id i st h =
 postulate
   fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (st : EvalSt e) →
-    regP? (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
-          (EvalSt.registry st) ≡ true
+    regsNestMax (EvalSt.registry st) ≤ nestUnit e sl
 
+-- AND THE FAN-OUT HALF IS NOW A PROVEN FOLD RATHER THAN A FILTER
+-- LEMMA, which is the whole of what the store denomination bought.  A
+-- share's admitted selection is under the registry's own place in the
+-- store measure by an induction this tree already had, and the join is
+-- taken apart per chain by the one directly above -- so nothing
+-- between the postulate and the walk's premise is stated over a
+-- boolean predicate any more.
 fan-chain-nestD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (i : Fin n) (st : EvalSt e) →
-  regP? (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
-        (EvalSt.registry st) ≡ true →
+  regsNestMax (EvalSt.registry st) ≤ nestUnit e sl →
   all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl)
       (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
-fan-chain-nestD {Γ = Γ} {t = t} {e = e} sl i st h =
-  shareAdmit-chP (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
-                 i (EvalSt.registry st) h
+fan-chain-nestD {t = t} {e = e} sl i st h =
+  chainsNest-all 0 (nestUnit e sl) (shareAdmit {t = t} i (EvalSt.registry st))
+    (≤-trans (shareAdmit-nest i (EvalSt.registry st)) h)
 
 mutual
   walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1523,26 +1561,6 @@ chainStep-store≤ {e = e} sl id a nextId S Lv j path sched st hsl afford hsz hp
                               (chainStep-slots nextId a path sched st)))
                (≤-trans (storeNest-slots≤ sched st) hS)
 
--- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
--- the one `depthCascade` reports: the tail at the incoming state, the
--- live chain at the delivered-marked one, and the tail again at the
--- state that chain left.
--- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
--- reading is a ⊔-fold over the whole selection, and the walk spends it
--- one chain at a time, so the fold has to be taken apart before the
--- first `chainStep` sees it.
-chainsNest-all : ∀ {n} {Γ : Ctx n} {s t} (D U : ℕ)
-  (cs : List (RegId × Path Γ s t)) →
-  D + chainsNestD cs ≤ U →
-  all (λ rc → D + pathNestD (proj₂ rc) ≤ᵇ U) cs ≡ true
-chainsNest-all D U []       h = refl
-chainsNest-all D U (c ∷ cs) h =
-  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (+-monoʳ-≤ D
-                       (m≤m⊔n (pathNestD (proj₂ c)) (chainsNestD cs))) h)))
-          (chainsNest-all D U cs
-            (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
-                                          (chainsNestD cs))) h))
-
 -- THE REGISTRY ACROSS A WHOLE CHAIN, AT ONE LEVEL PER CHAIN, AND THE
 -- DOOR IS THE FOLD.  `chainStep` is one call to `foldPath` -- the
 -- arrival's value as the only value in flight, its tick and source as
@@ -1582,6 +1600,11 @@ chainStep-regsSz S j a nextId path sched st 1≤S hsz hp hreg =
   entrySz : valsSz? (iterSize S j S) (arrVal a ∷ []) ≡ true
   entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
               (≤-trans hsz (iterSize-infl S 1≤S j S)))) refl
+
+-- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
+-- the one `depthCascade` reports: the tail at the incoming state, the
+-- live chain at the delivered-marked one, and the tail again at the
+-- state that chain left.
 
 -- AND THE SELECTION'S LEVEL BUDGET IS ONE NUMBER, PEELED THREE WAYS
 -- PER CHAIN.  The head chain walks at the level reached so far, so it
