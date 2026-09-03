@@ -223,7 +223,8 @@ does not fit is a finding about the shared statement, not about the head.
   factor, sighted one instant later than the depth door can see. The
   commit states the restated face outside-in — the fold arms priced
   at the exit-index factor under the walk's count ledger, the door
-  concluding under the NEXT instant's fuel — with the gap between that
+  `cascade-depth-capsH` concluding under the NEXT instant's fuel — with
+  the gap between that
   sight and the evaluator's budget postulated BARE: whether the budget
   moves is a question, not an edit.
 

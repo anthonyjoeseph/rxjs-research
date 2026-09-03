@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
-   regsSz?; slotsCaps?; valCaps?; widLive; widNode; widNode-len;
+   regsSz?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
@@ -510,7 +510,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       hNodeFn = repQ-all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) (suc W) o hfn
       hLen : (length q ≤ᵇ W) ≡ false
       hLen = trans (cong (_≤ᵇ W) (repQ-len (suc W) o)) (sucW≰W W)
-      -- capsOK?'s seven conjuncts, NAMED.  ∧-true's Bool arguments must be
+      -- capsOK?'s eight conjuncts, NAMED.  ∧-true's Bool arguments must be
       -- given explicitly: `_` leaves them as metas that Agda will not
       -- solve, because decomposing `?a ∧ ?b = C ∧ REST` needs `_∧_` to be
       -- injective and it is a function.  Same lesson as the ∧-true sites
@@ -521,6 +521,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       A6 = all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv))
                (EvalSt.nodes st)
       A7 = all (closLive c sl) (Sched.live sched)
+      A8 = srcFloor? sched
       A2 = regsSz? B (EvalSt.registry st)
       A1 = stBounded? B sched st
       WD = widNode W sl (mergeAll-st nothing 0 q false)
@@ -528,12 +529,12 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
              (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
                       (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
    -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount ∧ park
-   -- ∧ closSt?.  Peel to the widNode conjunct, then to its queue-LENGTH
+   -- ∧ closSt? ∧ srcFloor?.  Peel to the widNode conjunct, then to its queue-LENGTH
    -- half, and read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
-   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ A7))))) hc)
-                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ A7)))) t2)
-                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ A7))) t3)
-                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ A7)) t4)
+   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8)))))) hc)
+                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8))))) t2)
+                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8)))) t3)
+                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ (A7 ∧ A8))) t4)
                 w  = proj₁ (∧-true WD true t5)
                 ln = widNode-len W sl nothing 0 q false w
             in f≡t-absurd (trans (sym hLen) ln)
