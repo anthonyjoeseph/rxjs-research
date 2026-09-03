@@ -64,7 +64,7 @@ open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 open import Verify-Budget-Sufficient.Measures using
   (_hasAtLeast_; all-impl; boundedLive; capᴱ; chainsB?-widen; dBound; finish-slots;
   fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; parkRoom;
-  pathB?; pathLen; pop-bounded; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
+  pathB?; pathLen; pop-bounded; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
   valB?-widen; V≤C; ΨAt; ∧-true; szB)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
@@ -84,7 +84,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using
   (innerFinish-caps; subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; burstCount?; capsOK?; capsOK?-mono; n≤capsAt-size; pathSz?;
-   regsSz?; slotsCaps?; valCaps?; widLive; widNode; widNode-len;
+   regsSz?; slotsCaps?; srcFloor?; valCaps?; widLive; widNode; widNode-len;
    nestClosOK?ᵛ; closLive; closSt?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
@@ -510,7 +510,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       hNodeFn = repQ-all (λ o′ → fnCapᵉ o′ ≤ᵇ Ψ) (suc W) o hfn
       hLen : (length q ≤ᵇ W) ≡ false
       hLen = trans (cong (_≤ᵇ W) (repQ-len (suc W) o)) (sucW≰W W)
-      -- capsOK?'s seven conjuncts, NAMED.  ∧-true's Bool arguments must be
+      -- capsOK?'s eight conjuncts, NAMED.  ∧-true's Bool arguments must be
       -- given explicitly: `_` leaves them as metas that Agda will not
       -- solve, because decomposing `?a ∧ ?b = C ∧ REST` needs `_∧_` to be
       -- injective and it is a function.  Same lesson as the ∧-true sites
@@ -521,6 +521,7 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
       A6 = all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv))
                (EvalSt.nodes st)
       A7 = all (closLive c sl) (Sched.live sched)
+      A8 = srcFloor? sched
       A2 = regsSz? B (EvalSt.registry st)
       A1 = stBounded? B sched st
       WD = widNode W sl (mergeAll-st nothing 0 q false)
@@ -528,12 +529,12 @@ _ = λ e id sched o hLive hFnLive hSS hSF hsz hfn →
              (∧-intro (∧-intro hFnLive (∧-intro hNodeFn refl))
                       (∧-intro refl (∧-intro refl (∧-intro hSS hSF))))
    -- capsOK? = stBounded? ∧ regsSz? ∧ widLive ∧ widNode ∧ regCount ∧ park
-   -- ∧ closSt?.  Peel to the widNode conjunct, then to its queue-LENGTH
+   -- ∧ closSt? ∧ srcFloor?.  Peel to the widNode conjunct, then to its queue-LENGTH
    -- half, and read `length q ≤ᵇ W ≡ true` off against hLen's `≡ false`.
-   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ A7))))) hc)
-                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ A7)))) t2)
-                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ A7))) t3)
-                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ A7)) t4)
+   , λ hc → let t2 = proj₂ (∧-true A1 (A2 ∧ (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8)))))) hc)
+                t3 = proj₂ (∧-true A2 (A3 ∧ (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8))))) t2)
+                t4 = proj₂ (∧-true A3 (A4 ∧ (A5 ∧ (A6 ∧ (A7 ∧ A8)))) t3)
+                t5 = proj₁ (∧-true A4 (A5 ∧ (A6 ∧ (A7 ∧ A8))) t4)
                 w  = proj₁ (∧-true WD true t5)
                 ln = widNode-len W sl nothing 0 q false w
             in f≡t-absurd (trans (sym hLen) ln)
@@ -1201,8 +1202,8 @@ pop-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {sched′ : Sched Γ} →
   sched-next sched ≡ inj₂ (a , sched′) →
   capsOK? c sched st ≡ true → capsOK? c sched′ st ≡ true
-pop-caps c sched st eq h with capsOK?-parts c sched st h
-... | sb , rg , wl , wn , rl , pk , cl =
+pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
+... | sb , rg , wl , wn , rl , pk , cl , fl =
   ∧-intro (pop-bounded (Caps.cSize c) sched st eq sb)
   (∧-intro rg
   (∧-intro (pop-widLive (Caps.cWid c) sched eq wl)
@@ -1211,7 +1212,8 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
   (∧-intro rl
   (∧-intro (subst (λ sl → all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv)) (EvalSt.nodes st) ≡ true)
                   (sym (pop-slots sched eq)) pk)
-           (pop-closSt c sched st eq cl))))))
+  (∧-intro (pop-closSt c sched st eq cl)
+           (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`

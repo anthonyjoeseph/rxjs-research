@@ -2,7 +2,7 @@
 -- chainBurstOK … chainsCapsAll
 module Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK where
 
-open import Data.Bool    using (true; if_then_else_)
+open import Data.Bool    using (true; false; if_then_else_)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-mono-≤;
   ⊔-identityʳ; m⊔n≤m+n; *-distribˡ-+)
@@ -19,7 +19,7 @@ open import Data.List.Relation.Unary.All.Properties
   renaming (++⁺ to all-++; ++⁻ˡ to all-++ˡ; ++⁻ʳ to all-++ʳ)
 open import Data.Vec     using (Vec; lookup) renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
-open import Data.Unit    using (⊤)
+open import Data.Unit    using (⊤; tt)
 open import Relation.Binary.PropositionalEquality
   using (_≡_; sym; cong)
 
@@ -181,6 +181,40 @@ chainsBurstOK W a nextId ((rid , c) ∷ chains) sched st =
                              (record st { delivered = rid ∷ EvalSt.delivered st }))))
             (proj₂ (proj₂ (chainStep nextId a c sched
                              (record st { delivered = rid ∷ EvalSt.delivered st })))))
+
+-- THE FOLD ITSELF, DISCHARGED, AND IT IS GENERIC IN THE STATE
+-- INVARIANT ON PURPOSE.  What the list level of this predicate asks is
+-- only bookkeeping -- a cancelled registration is stepped over, a
+-- delivered one owes its own walk and then the tail at the state its
+-- step left -- and none of that depends on WHICH invariant a caller
+-- carries across the step.  Taking the invariant as a parameter is
+-- what separates that bookkeeping from the two real obligations: one
+-- chain's walk is bounded, and the state its step leaves still carries
+-- whatever the next chain needs.  A caller supplies those as one leaf
+-- and gets the fold for free, and the leaf's SHAPE is then checked by
+-- this body rather than asserted alongside it.
+chains-burst-fold : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (W : ℕ) (P : Sched Γ → EvalSt e → Set)
+  (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t)) →
+  (∀ (rid : RegId) (c : Path Γ (arrTy a) t)
+     (sched′ : Sched Γ) (st′ : EvalSt e) → P sched′ st′ →
+     chainBurstOK W nextId a c sched′
+       (record st′ { delivered = rid ∷ EvalSt.delivered st′ })
+     × P (proj₁ (proj₂ (chainStep nextId a c sched′
+                         (record st′ { delivered = rid ∷ EvalSt.delivered st′ }))))
+         (proj₂ (proj₂ (chainStep nextId a c sched′
+                         (record st′ { delivered = rid ∷ EvalSt.delivered st′ }))))) →
+  (sched : Sched Γ) (st : EvalSt e) → P sched st →
+  chainsBurstOK W a nextId chains sched st
+chains-burst-fold W P a nextId []                    step sched st hP = tt
+chains-burst-fold W P a nextId ((rid , c) ∷ chains) step sched st hP
+  with any (_≡ᵇ rid) (EvalSt.cancelled st)
+... | true  = chains-burst-fold W P a nextId chains step sched st hP
+... | false =
+  proj₁ stepped ,
+  chains-burst-fold W P a nextId chains step _ _ (proj₂ stepped)
+  where stepped = step rid c sched st hP
 
 -- AND THE CAPS THE SAME FOLD SPENDS, arm for arm with the burst
 -- hypothesis above: a cancelled registration walks nothing, so it owes

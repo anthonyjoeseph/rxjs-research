@@ -15,6 +15,7 @@
 --   (5) length registry ≤ᵇ cReg     — refl, 0 ≤ᵇ suc _
 --   (6) all (parkRoom …) nodes      — refl, nodes is []
 --   (7) all (closLive caps slots) live — the closure key, same shape as (3)
+--   (8) srcFloor? sched             — sched-init sets nextSource = n, so n ≤ᵇ n
 --
 -- CONJUNCTS (3) AND (7) ARE THE TWO WITH CONTENT, and `scripted`'s own
 -- index closes both: `scripted` carries `{ok : T (isData t)}`, EVERY
@@ -33,7 +34,7 @@ module Verify-Budget-Sufficient.Init-Caps where
 
 open import Data.Bool    using (true; T)
 open import Data.Nat     using (ℕ; suc; _+_; _≤ᵇ_)
-open import Data.Nat.Properties using (≤-trans; m≤n+m)
+open import Data.Nat.Properties using (≤-refl; ≤-trans; m≤n+m)
 open import Data.List    using (List; []; _∷_)
 open import Data.Bool.ListAction using (all)
 open import Data.Fin     using (Fin)
@@ -61,7 +62,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part5 using
 
 -- Caps record type and constructor
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
-open import Decide using (∧-intro)
+open import Decide using (∧-intro; ≤ᵇ-true)
 
 -- baseCaps lives here now; Caps-Bridge imports it back.  (It used to
 -- be defined in Caps-Bridge, which is downstream of this module.)
@@ -168,7 +169,9 @@ init-capsOK?-base-go {n = n} e ins =
       (∧-intro C3                     -- (3) widLive live
         (∧-intro refl                 -- (4) widNode [] = refl
           (∧-intro refl               -- (5) 0 ≤ᵇ suc _ = refl
-            (∧-intro refl C7)))))     -- (6) parkRoom [] = refl; (7) closLive live
+            (∧-intro refl             -- (6) parkRoom [] = refl
+              (∧-intro C7             -- (7) closLive live
+                (≤ᵇ-true n n ≤-refl))))))) -- (8) sched-init sets nextSource = n
 
 abstract
   init-capsOK?-base : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)

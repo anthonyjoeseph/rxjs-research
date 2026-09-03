@@ -215,36 +215,36 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND CARRY THE TELESCOPE'S STRATIFICATION WHERE THE CHAIN IS READ.**
-  The sink leaf's escalation turned out to be program-bounded: hops
-  climb the slot telescope and none re-enters, so the count is capped
-  by the slot count and not by the dispatch gas the header claimed.
-  What blocks spending that is the same wall the registry rows are all
-  at — the walk reads its chain from an arbitrary state, where nothing
-  about the registry is true. So the commit puts stratification in the
-  invariant record as a carried conjunct rather than a hypothesis, and
-  the sink arm becomes its first consumer.
-- **AND RETIRE THE REGISTRY RECEIPT THE WALK NO LONGER READS.** The
-  level ledger pays for the fan-out now, so the size side condition is
-  re-derived at each state the fold leaves rather than threaded down
-  from the arrival — and the threaded receipt is spent by nothing but
-  itself. Three declarations hold one another up: the chain step's
-  reading feeds the next chain's, the fold's leaf feeds the chain
-  step's, and the fold's own price is a live row carrying five sweeps.
-  Dropping the premise from the cascade's two folds retires all three
-  at once, which is a face leaving the ledger rather than a postulate
-  being proven.
+- **THE BURST LEDGER IS ON HOLD FOR A RULING, AND NOTHING IN ITS
+  REGION IS PICKED UP UNTIL ONE LANDS (Anthony).** Four denominations
+  of one flat number have now died — the entry width by machine, the
+  exit width and both size readings by route — and the fifth shape was
+  written into this roadmap instead of the stop that was owed. The
+  joint reading is in the number's own header: what it must COVER and
+  what it may COST sit on the two axes of the caps recurrence, which
+  separates them by a tower at every level a cascade reaches, so no
+  index and no level closes it. The two legs
+  below are the candidate repairs the ruling picks between; this leg
+  is the write-up and the hold, and it does not grind.
 
-- **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
-  hop that climbs has strictly less telescope above it, and that is the
-  quantity the leaf's price does not read. The separation says why it
-  matters: a chain's factor is its leaf's times its frames', so a leaf
-  priced at the whole cap must dominate itself times a frame product,
-  while one priced at the REMAINING height need only dominate what a
-  shorter climb can spend. The commit restates the leaf's exponent in
-  that currency and re-reads the sink arm against it, which is where
-  the carried conjunct is finally spent.
+- **CANDIDATE, PENDING THE RULING: MOVE THE PAYMENT ONTO THE WIDTH
+  AXIS.** Re-derive the factor's exponent at the frame's OWN cap
+  rather than at the next instant's size, so permission climbs by the
+  same iteration the demand does and the comparison happens inside one
+  frame instead of across a cascade. The commit would state the
+  frame-local factor with its store-face bridge POSTULATED, so the
+  shape is checked before any of it is proven. The risk it carries is
+  that every exponent this face hands upward is denominated in the
+  size today, so the axis change reaches the affordability chain.
 
+- **CANDIDATE, PENDING THE RULING: STOP PRICING THE HANDOFF BY A
+  WIDTH.** A cap says how many values a frame COULD carry; the ledger
+  needs how many it DOES, and the width is the only handle on that
+  today, which is where the tower enters. The commit would state the
+  count the walk actually hands on as its own quantity, with the cap
+  kept as the thing that bounds it rather than the thing that prices
+  it. The risk it carries is a new quantity nothing yet bounds, which
+  is why it is stated before it is spent.
 
 ### The ledger
 
@@ -279,31 +279,32 @@ does not fit is a finding about the shared statement, not about the head.
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
   queue, so the walk's values cannot reach it.
-- **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential at
-  an admitted chain that ends at a SECOND hand-over. Its escalation is
-  PROGRAM-bounded after all — hops climb the stratified telescope — so the
-  residue is the arbitrary chain, owed as a carried invariant.
+- **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+  potential at an admitted chain that ends at a SECOND hand-over. Its
+  escalation is PROGRAM-bounded after all — hops climb the stratified telescope
+  — so the residue is the arbitrary chain, owed as a carried invariant.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   registry's own size receipt at the PROGRAM's cap. THE ENTRY CAP IS THE Φ
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
-  producing side of the fold's new grant. AT THE SPIRAL STOP: four
-  denominations refuted in one region. The binary is ANSWERED and neither
-  branch repairs it — a run's count is script-denominated, so this waits on a
-  ceiling that does not exist.
-- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the charge, at
-  the queue's own `drainW` and at every level within the descent's count. All
-  the arm has left once the face, the count and the store residue are reported
-  off its own premises.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×5`: one fold's
-  registry price as ONE FRAME STEP of two caps. Now read at both heights and at
-  later arrivals either side of the crossover, the entry settling exactly; only
-  the caps can refute and they cannot move. One family unread.
+- **`arr-chain-burst`** (Part7/Arrival-Ledger) — FALSITY,
+  `REFUTED, DEAD ROUTE×2, TWIN`: ONE chain's walk under ONE number, plus the
+  cap surviving that chain's step. The frame hands on a width and the row
+  grants that cap's size, which the width passes early; the size an instant
+  out inverts the room. No flat axis is left.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
+  of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
+  per-instant potential cannot dominate a count exponential in itself; the one
+  affording ceiling is the store's exit-index factor, priced in a refuted
+  width.
+- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the charge at
+  the queue's own `drainW`, at every level within the descent's count. The
+  width is walk-denominated, so it shares the scan arm's dead mechanism and is
+  restated with the face rather than alone.
 - **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
   no more payloads than its term syntactically carries. Seven tight rows tied,
   the scan head and the share chain among them; every region a row could refute
@@ -370,10 +371,6 @@ does not fit is a finding about the shared statement, not about the head.
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for; the component reads zero, so the tie is
   degenerate on the increment.
-- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY,
-  `DEAD ROUTE, TWIN`: every stage of every chain's walk under the width cap.
-  The mirror carries the identical conjunct across the feared `thru` hop, and
-  what is left is the flat-versus-moving bound — arithmetic, not a walk.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

@@ -1841,31 +1841,6 @@ wid≤sizeCount c d 2≤S 1≤R =
                          (Caps.cSize c) 0 1≤R)
                 (≤-reflexive (sym (cDel-body c d)))
 
--- AND THEN THE SIZE CARRIES IT PAST THE COUNT, because every size step
--- at least doubles: the count sits under two to itself, and the size
--- read after that many steps is above `2 ^ count` times the entry size.
--- So a width that was merely under the count comes out under the size,
--- with exponential room to spare -- which is what the nesting ceiling's
--- step has to spend.
-wid<frameBlowup-size : ∀ (c : Caps) (d : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ Caps.cReg c →
-  suc (Caps.cWid c) ≤ Caps.cSize (frameBlowup c d)
-wid<frameBlowup-size c d 2≤S 1≤R =
-  ≤-trans (≤-trans (s≤s (wid≤sizeCount c d 2≤S 1≤R)) (n<2^n J))
-          (≤-trans (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ J))))
-                            (*-monoʳ-≤ (2 ^ J) 1≤S))
-                   (iterSize-2^ S J S 1≤S))
-  where
-  S = Caps.cSize c
-  J = sizeCount c d
-  1≤S : 1 ≤ S
-  1≤S = ≤-trans (s≤s z≤n) 2≤S
-
-capsAt-wid<size : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  suc (Caps.cWid (capsAt e sl id)) ≤ Caps.cSize (capsAt e sl (suc id))
-capsAt-wid<size e sl id =
-  wid<frameBlowup-size (capsAt e sl id) (capsH e sl id)
-    (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
-
 capsAt-size-mono : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   Caps.cSize (capsAt e sl id) ≤ Caps.cSize (capsAt e sl (suc id))
 capsAt-size-mono e sl id =
