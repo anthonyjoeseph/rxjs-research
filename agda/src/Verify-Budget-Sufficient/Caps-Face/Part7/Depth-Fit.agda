@@ -1144,6 +1144,25 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 -- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
 --   discharges from and at the budget the sink's own receipt exactly
 --   exhausts, so the crossing is not an artifact of a small budget.
+-- DEAD ROUTE: asserting the stratification receipt AT THE READ, as its
+--   own postulate over the same arbitrary state `fan-regsSz` stands
+--   at, is structurally dead rather than merely unproven --
+--   `Refuted.Fan-Chain-Registry` kills that shape at a single
+--   `register` onto the initial state, and the stratification reading
+--   falls to the same witness family with a zero source handed a zero
+--   sink.  So the fact is owed at the MINT, and the mint is FOUR
+--   obligations rather than the one the carried conjunct reads as: a
+--   slot-sourced registration wants the telescope carried down the
+--   subscribe descent, since the continuation's terminal and the
+--   expression's inputs meet only at the enclosing share's own
+--   `inputsBelowᵉ` field; a minted-sourced one wants a FLOOR on the
+--   sched's next source, which starts at the slot count and only
+--   climbs and which nothing carries today, and gets the receipt for
+--   free once it has one; and an inner subscribe of a DELIVERED
+--   observable reaches the input arm under syntax the telescope never
+--   saw, so it registers a slot source against a continuation nothing
+--   local relates it to -- a conjunct on the values in flight, which
+--   is a different invariant from this one.
 postulate
   sink-fan-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (i : Fin n) (p : Path Γ (lookup Γ i) t)

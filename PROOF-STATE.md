@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND CARRY THE TELESCOPE'S STRATIFICATION WHERE THE CHAIN IS READ.**
-  The sink leaf's escalation turned out to be program-bounded: hops
-  climb the slot telescope and none re-enters, so the count is capped
-  by the slot count and not by the dispatch gas the header claimed.
-  What blocks spending that is the same wall the registry rows are all
-  at — the walk reads its chain from an arbitrary state, where nothing
-  about the registry is true. So the commit puts stratification in the
-  invariant record as a carried conjunct rather than a hypothesis, and
-  the sink arm becomes its first consumer.
+- **AND FLOOR THE SCHED'S MINTED SOURCE, WHICH IS WHERE THE CARRIED
+  CONJUNCT HAS TO START.** Writing the conjunct out found the mint is
+  FOUR obligations and not one, and only this one is self-contained: a
+  registration under a MINTED source is stratified for nothing, since
+  minting begins at the slot count and only climbs, so its source sits
+  above every slot index and the guard excuses the entry — and no
+  producer carries that floor today. So the commit puts it in the
+  invariant record and re-establishes it at each one, a mint raising
+  it and everything else leaving it alone. The three obligations left
+  are named where they are owed, in the sink leaf's own header.
 - **AND RETIRE THE REGISTRY RECEIPT THE WALK NO LONGER READS.** The
   level ledger pays for the fan-out now, so the size side condition is
   re-derived at each state the fold leaves rather than threaded down
@@ -279,10 +280,10 @@ does not fit is a finding about the shared statement, not about the head.
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
   queue, so the walk's values cannot reach it.
-- **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential at
-  an admitted chain that ends at a SECOND hand-over. Its escalation is
-  PROGRAM-bounded after all — hops climb the stratified telescope — so the
-  residue is the arbitrary chain, owed as a carried invariant.
+- **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+  potential at an admitted chain that ends at a SECOND hand-over. Its
+  escalation is PROGRAM-bounded after all — hops climb the stratified telescope
+  — so the residue is the arbitrary chain, owed as a carried invariant.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   registry's own size receipt at the PROGRAM's cap. THE ENTRY CAP IS THE Φ
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned

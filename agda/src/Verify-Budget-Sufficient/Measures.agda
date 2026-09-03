@@ -445,6 +445,25 @@ dropSource-all P src ((rid , s , c) ∷ r) h with sameSource src s
 ... | false = ∧-intro (proj₁ (∧-true _ _ h))
                       (dropSource-all P src r (proj₂ (∧-true _ _ h)))
 
+-- AND THE CUT IS A THIRD ONE, which reads as a different shape only
+-- because it returns two more components.  `cutThrough` keeps a
+-- survivor VERBATIM -- the entry it conses is the entry it was handed --
+-- so its first projection is a sublist of the registry exactly as the
+-- two above are, and the closes and the victim ids it also returns are
+-- read by nobody here.  Written out separately once per face for the
+-- same reason the two above were, and now the same induction
+cutThrough-all : ∀ {n} {Γ : Ctx n} {t}
+  (P : RegId × Source × Chain Γ t → Bool)
+  (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
+  (reg : List (RegId × Source × Chain Γ t)) →
+  all P reg ≡ true → all P (proj₁ (cutThrough nid d wm dy reg)) ≡ true
+cutThrough-all P nid d wm dy []                    h = refl
+cutThrough-all P nid d wm dy ((rid , s , c) ∷ r) h
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-all P nid d wm dy r (proj₂ (∧-true _ _ h))
+... | true  | _ | ih = ih
+... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
+
 
 -- AND take's EMISSION FILTER, same argument one more time.  `takeVals`
 -- hands on a PREFIX of what it was given (Rx.Evaluator), so every

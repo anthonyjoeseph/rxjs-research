@@ -61,7 +61,8 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Measures using
   (all-++-intro; all-impl; boundedLive; boundedNode; lookupNode-park;
-                                                      cutThrough-len; dropSource-all;
+                                                      cutThrough-all; cutThrough-len;
+                                                      dropSource-all;
                                                       dropSource-len; pathLen;
                                                       setNode-bounded; setNode-park; parkRoom; stBounded?;
                                                       sweepLive-all; takeVals-all; ∧-true)
@@ -1342,12 +1343,8 @@ cutThrough-regsSz : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (nid : NodeId)
   (d : List RegId) (wm : RegId) (dy : List Source)
   (reg : List (RegId × Source × Chain Γ t)) →
   regsSz? B reg ≡ true → regsSz? B (proj₁ (cutThrough nid d wm dy reg)) ≡ true
-cutThrough-regsSz B nid d wm dy []                    h = refl
-cutThrough-regsSz B nid d wm dy ((rid , src , c) ∷ r) h
-  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
-     | cutThrough-regsSz B nid d wm dy r (proj₂ (∧-true _ _ h))
-... | true  | _ | ih = ih
-... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
+cutThrough-regsSz B nid d wm dy reg h =
+  cutThrough-all (λ en → pathSz? B (proj₂ (proj₂ (proj₂ en)))) nid d wm dy reg h
 
 cutThrough-closes-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (sl : Slots Γ)
   (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
