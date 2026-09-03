@@ -1107,6 +1107,28 @@ postulate
 -- row admits no instantiation of its own -- the cap returns at no
 -- program, so only the conjunct underneath it is reachable.
 
+-- AND THE FIELD IT WANTS ALREADY EXISTS -- WHAT IS MISSING IS A
+-- DIRECTION, NOT AN INVARIANT.  Asking whether the registry belongs to
+-- the invariant record as a CARRIED field rather than a measured one
+-- answers itself: `capsOK?` carries the registry's size receipt as a
+-- conjunct already, the sink's own predicate carries the same receipt
+-- over the ADMITTED sublist, and the walk's sink clause holds a third
+-- at the stepped cap.  So there is no producer that fails to
+-- re-establish it, because there is nothing to add.
+--
+-- EVERY ONE OF THE THREE IS READ AT A CAP ABOVE THE ONE THE FANNED
+-- WALK DEMANDS, AND THE RECEIPT WEAKENS UPWARD.  The sink's conjunct
+-- is denominated in the round's EXIT cap and the walk's clause in the
+-- STEPPED one, while the chains a sink fans into are walked at the
+-- round's ENTRY cap -- and entry is under both, provably.  A receipt
+-- at a larger cap does not deliver one at a smaller, so all three are
+-- in hand and none can be spent.  That is why this row survived the
+-- field question: the residue is that the fanned chain's walk is
+-- denominated in the entry cap at all, which is a restatement of the
+-- walk rather than a fact about the registry -- and it is the same
+-- direction failure the sink predicate's own dead route records one
+-- face over, arriving from the registry's side.
+
 -- AND NEITHER IS THE ADMISSION FILTER'S TO CARRY, which is what the
 -- pair being stated over the fan-out was hiding.  `shareAdmit`
 -- selects on the source and the element type and never reads a path,
