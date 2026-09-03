@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **GRIND THE CASCADE DOOR'S THREE ARMS AGAINST THE MEASURE THEY
-  MIRROR.** The door is now a body over one induction, and that
-  induction's conses line up conjunct for conjunct with the descent
-  measure's three callees — the tail at the incoming state, the head at
-  the delivered one, the tail at the state the step left — so the
-  descent bound each arm needs projects out of the measure's own join.
-  Two of the three are the surviving fold's arms with the delivery
-  premise dropped. The third is what has never been walked: the
-  position ledger advancing across a step taken at a CANCELLED arm,
-  where the fold above it never advanced. The commit writes the two and
-  reports what the third costs.
+- **MERGE THE CASCADE DOOR WITH THE MEASURE THAT CONSUMES IT.** Two of
+  the door's three arms are writable from its own premises; the third
+  reports the tail at the state the step left, and needs the store
+  ceiling THERE. The one machine preserving that ceiling wants the
+  round's affordability package, and every piece of that sits on the
+  CONSUMER — which walks the same list through the same states while
+  taking the door's package as a hypothesis. So each walk holds what
+  the other's arm needs. The commit states them as one induction
+  returning both, rather than threading the consumer's package into a
+  statement whose shape would then be its caller's.
 
 - **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
   ARE CARRIED AT.** The chains a sink fans into are walked at the

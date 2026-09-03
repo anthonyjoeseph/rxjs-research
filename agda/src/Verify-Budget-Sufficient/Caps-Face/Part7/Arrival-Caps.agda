@@ -641,7 +641,7 @@ postulate
 -- a ceiling on the store the round enters at, and that ceiling's own
 -- fit under the fuel, which together price a chain's descent without
 -- pricing the round's.
---
+
 -- AND WHAT IT IS SHORT OF IS A LEDGER, NOT AN ARM.  Every cons here
 -- carries a level increment tied back to a ceiling that does NOT move
 -- with the level, so the increments the arms spend have to be funded.
@@ -665,6 +665,22 @@ postulate
 -- body hands it comes off this statement's own -- the caps receipt at
 -- the latch, the count of the round's positions, and the entry level
 -- at the zeroth.
+--
+-- AND TWO OF THE THREE ARMS ARE WRITABLE FROM THESE PREMISES, WHICH IS
+-- WHAT LOCATES THE THIRD.  The tail at the incoming state is the
+-- induction at a shorter list, and the head receipt is the chain leaf
+-- at this position -- each needing only the store ceiling at the state
+-- it is already handed, since the leaf pricing a chain's descent reads
+-- the ceiling and not the run.  The third callee reports the tail at
+-- the state the step LEFT, so it needs that ceiling THERE, and the one
+-- machine preserving it across a step wants the round's affordability
+-- package: an iterated size under the potential, a registry receipt,
+-- and a budget over the chain list.  None of those is on this
+-- statement, and all of them are on its consumer -- which walks this
+-- same list through these same states, taking this package as a
+-- hypothesis rather than producing it.  So the two walks each hold
+-- what the other's arm needs, and the shape that follows is one
+-- induction rather than two.
 --
 -- DEAD ROUTE: mirroring the surviving fold's induction arm for arm.
 --   That fold splits its ledger by SUBTRACTING the portion a chain
