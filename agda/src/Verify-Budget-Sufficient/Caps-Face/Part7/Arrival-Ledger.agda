@@ -34,7 +34,7 @@ open import Verify-Budget-Sufficient.Fan-Caps using
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsSzSum; nestOK?; nestFacAt; nestFacAt-def; realWidAt; nestBurstAt)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; RegId; Chain; cascadeLatch; arrSource; chainsOf; chainsGo; Path;
-  arrTy; sameSource)
+  arrTy; sameSource; chainStep)
 open import Rx.Slots using (Slots)
 
 open import Verify-Budget-Sufficient.Caps using
@@ -46,8 +46,12 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsOK?; pathSz?; regsSz?)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-regs; pathSz?-len)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using
+  (capsOK?-mono)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
+  (cascadeLatch-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using
-  (chainsBurstOK)
+  (chainsBurstOK; chainBurstOK; chains-burst-fold)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nodes using
   (chains-count-width)
 
@@ -225,7 +229,7 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
                      (*-monoˡ-≤ Xʹ sq))
 
 -- THE BURST BOUND A CASCADE'S WALKS RUN UNDER, and it is a caps fact
--- rather than a walk fact, which is why it is a leaf here and not a
+-- rather than a walk fact, which is why it is met here and not in a
 -- clause up there.  A chain starts from ONE value -- the arrival's --
 -- and only a `thru` frame can hand on more than it took, by however
 -- many its inners emit; what caps that is the width, and the width cap
@@ -233,19 +237,28 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 -- hypothesis shaped like its own recursion and this is where the
 -- hypothesis is met.
 --
--- AND WHAT IS STILL OPEN IS WHETHER ONE NUMBER CAN HOLD A WHOLE WALK,
--- WHICH IS A QUESTION ABOUT COMPOUNDING AND NOT ABOUT SIZE.  A `thru`
--- frame subscribes every value it takes, so two of them in a row hand
--- on the SQUARE of what came in and a walk's burst compounds once per
--- such frame; the number the ledger reads is fixed before the first
--- hop.  So the statement holds exactly when the compounding along a
--- path -- bounded by the frames a path may carry, which the size
--- receipt is what bounds -- stays under the number, and that is an
--- inequality between two faces of the same recurrence rather than a
--- fact about any one program.  The arrival is not what widens: a nat
--- arrival and a map built at exactly the cap's width already cross the
--- entry reading, so conditioning on the payload settles nothing
--- either way.
+-- AND THE OBSTACLE IS ONE FRAME, NOT THE COMPOUNDING THAT TWO OF THEM
+-- DO.  A `thru` frame hands on whatever the inners it subscribes emit,
+-- and that quantity is denominated in a cap's WIDTH; the number this
+-- row grants is the SAME cap's SIZE.  Those two axes cross early --
+-- the fold step is a power where the size step is linear -- and the
+-- cap this row reads sits at a fold count bounded below by the entry
+-- size, which is far past the crossing.  So the first hop of the first
+-- chain already asks for more than the row grants, and how a walk's
+-- later hops compound is a question standing behind that one rather
+-- than the one in front of it.  Conditioning on the payload reaches
+-- neither: the arrival may be a nat and the widening still happens to
+-- whatever the frame subscribes.
+--
+-- AND THE CAP IS READ AT THE NEXT INSTANT ON BOTH SIDES, WHICH IS WHAT
+-- LETS ONE STATEMENT SERVE A WHOLE FOLD.  A chain's step subscribes,
+-- so the caps it leaves are not the caps it was handed and the
+-- entering hypothesis cannot be the one the tail is run under.  The
+-- successor instant's cap is above every level one instant can climb,
+-- so it is the one cap a fold can carry unchanged -- and it is already
+-- the size the burst number itself is denominated in, so the
+-- preservation half and the bound half are read in one currency rather
+-- than related by a second argument.
 --
 -- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at the root of
 --   one chain against a width-two cap granting three, at the
@@ -253,6 +266,23 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 --   width, which is what `nestBurstAt` used to name; the number it
 --   names now dominates that width at every index and grants 256 at
 --   the refuting shape, so the witness no longer reaches this row.
+-- DEAD ROUTE: the flat SIZE denomination this row reads, which was the
+--   last flat one that had not been closed.  `countLen` prices a
+--   frame's handoff in the cap's width, the grant is that same cap's
+--   size, and `Refuted.Caps-Face`'s `wid≤size-absurd` orders the two
+--   the other way from the third fold level on -- one hundred and
+--   seventy against five hundred and twelve at the smallest cap it
+--   admits.  `capsAt e sl (suc id)` is a `frameStep` whose count is
+--   bounded below by the entry size field, which `21≤capsAt-size`
+--   puts at twenty-one, so the crossing is reached by ONE frame on ONE
+--   observable the hypothesis itself admits, `burstCount?` allowing a
+--   stream the full width.  A size read one instant FURTHER out does
+--   dominate that width -- `room-frameBlowup` gives it outright -- but
+--   it is not a repair: the room the factor's exponent is paid out of
+--   is `nestFac-room`, denominated in THIS instant's next size, and a
+--   burst named above that size does not cost a story there, it turns
+--   the inequality around.  So the flat reading is closed at both
+--   ends, and the finding is stated where the number is defined.
 -- DEAD ROUTE: instantiating this statement, in any denomination.
 --   The width it reads is `nestBurstAt`, which is sealed, and the caps
 --   both sides are read at are `capsAt`'s, which does not return at the
@@ -263,13 +293,47 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 --   and is proven -- taking it in at one level and handing it back at
 --   another, with that level's growth bounded in the same tuple.
 postulate
-  arr-chains-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  arr-chain-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+    (rid : RegId) (c : Path Γ (arrTy a) t)
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    chainsBurstOK (nestBurstAt e sl id) a nextId (chainsOf a st) sched
-      (cascadeLatch a st)
+    capsOK? (capsAt e sl (suc id)) sched st ≡ true →
+    chainBurstOK (nestBurstAt e sl id) nextId a c sched
+      (record st { delivered = rid ∷ EvalSt.delivered st })
+    × (Sched.slots (proj₁ (proj₂ (chainStep nextId a c sched
+         (record st { delivered = rid ∷ EvalSt.delivered st })))) ≡ sl
+       × capsOK? (capsAt e sl (suc id))
+           (proj₁ (proj₂ (chainStep nextId a c sched
+             (record st { delivered = rid ∷ EvalSt.delivered st }))))
+           (proj₂ (proj₂ (chainStep nextId a c sched
+             (record st { delivered = rid ∷ EvalSt.delivered st })))) ≡ true)
+
+-- AND THE LEDGER ROW ITSELF IS NOW THE FOLD SPENDING THAT LEAF, which
+-- is what checks that the leaf is the right shape rather than merely a
+-- plausible one.  The entering hypothesis is read at THIS instant's
+-- cap because that is what the cascade's caller carries, and the fold
+-- is run at the next instant's -- the two are related by the cap
+-- order and by nothing else, so the widening is one application and
+-- the leaf is left holding the whole of the compounding question.
+arr-chains-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  chainsBurstOK (nestBurstAt e sl id) a nextId (chainsOf a st) sched
+    (cascadeLatch a st)
+arr-chains-bursts {e = e} sl id a nextId sched st hsl hcaps =
+  chains-burst-fold (nestBurstAt e sl id)
+    (λ sched′ st′ → Sched.slots sched′ ≡ sl
+                  × capsOK? (capsAt e sl (suc id)) sched′ st′ ≡ true)
+    a nextId (chainsOf a st)
+    (λ rid c sched′ st′ hP →
+       arr-chain-burst sl id a nextId rid c sched′ st′ (proj₁ hP) (proj₂ hP))
+    sched (cascadeLatch a st)
+    (hsl , cascadeLatch-caps (capsAt e sl (suc id)) a sched st
+             (capsOK?-mono (capsAt e sl id) (capsAt e sl (suc id))
+                sched st (capsAt-⊑-suc e sl id) hcaps))
 
 -- AND THE SAME SELECTION CARRIES THE CAPS, which is a preservation
 -- statement and not a selection one: the predicate asserts the store

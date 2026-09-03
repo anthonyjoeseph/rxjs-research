@@ -743,16 +743,16 @@ abstract
   -- The count of values one instant can carry is the width cap, so the
   -- burst is that cap and not a quantity of this module's own.
   --
-  -- AND IT IS READ ON THE SIZE AXIS, NOT THE WIDTH ONE, WHICH IS WHAT
-  -- MAKES THE GRANT AND THE LEDGER MEET.  Every exponent this face
-  -- hands upward is already stated in the NEXT instant's size, and a
-  -- width only ever entered them by being bounded by that size -- so
-  -- naming the size directly costs the affordability chain nothing
-  -- (the bounding step is a reflexivity) while handing the ledger the
-  -- largest number the chain was always paying for.  A width read at
-  -- the instant's ENTRY spends a fraction of that, and one read at its
-  -- EXIT sits under the size an instant further out again, which is
-  -- where the two stop meeting.
+  -- AND IT IS READ ON THE SIZE AXIS BECAUSE THAT IS THE AXIS THE
+  -- GRANT IS DENOMINATED IN, WHICH IS NOT THE SAME AS THE LEDGER
+  -- BEING ABLE TO SPEND IT.  Every exponent this face hands upward is
+  -- stated in the NEXT instant's size, and a width only ever entered
+  -- them by being bounded by that size -- so naming the size directly
+  -- costs the affordability chain nothing (the bounding step is a
+  -- reflexivity) and hands the ledger the largest number that chain
+  -- can pay for.  That ceiling is the reason the axis is fixed here,
+  -- and the dead routes below are what happened when the ledger was
+  -- asked what it needs rather than what it can be given.
   --
   -- WHICH IS WHY THE WIDTH AXIS IS THE WRONG CURRENCY HERE AT ALL.
   -- Within one cap the width outruns the size by construction -- the
@@ -778,10 +778,21 @@ abstract
   --   `nestFacLog` and the room they are paid out of with it, and
   --   lands `nestCap-sight≤exp` one story above `capsAt-exp2≤capsH` --
   --   the grant `nestΦ-sight≤capsH` spends.
+  -- DEAD ROUTE: reading the size ONE INSTANT FURTHER OUT, which is the
+  --   only move left that keeps this number flat.  It does buy the
+  --   frame -- `room-frameBlowup` puts a cap's width under the next
+  --   instant's size outright, so `countLen`'s handoff would be paid.
+  --   What it cannot buy is the exponent: `nestFacLog` is a polynomial
+  --   in the size this reading would abandon, and `nestFac-room` pays
+  --   that polynomial out of two to that same size.  A burst named one
+  --   instant above it is above the room's own base, so the room does
+  --   not cost a story, it inverts.  Together with the entry reading
+  --   below, the size axis is closed at both ends and no flat number
+  --   serves this ledger.
   -- RECOVERY: git show b59648c restores `capsAt-wid<size` and
   --   `wid<frameBlowup-size`, the pair that bounded a cap's width by
-  --   the next instant's size; a consumer needing a walk's entry
-  --   values to fit this number is what would want them back.
+  --   the next instant's size; `room-frameBlowup` states that bound
+  --   today, so what these would add is the strict form.
   nestBurstAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestBurstAt e sl id = Caps.cSize (capsAt e sl (suc id))

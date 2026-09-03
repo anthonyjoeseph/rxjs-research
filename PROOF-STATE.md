@@ -215,38 +215,34 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SPLIT THE CASCADE'S BURST LEDGER INTO THE ONE THING IT ACTUALLY
-  ASKS, WHICH IS A COMPOUNDING BOUND.** The ledger now reads the size
-  axis and the refuting witness no longer reaches it, so what is left
-  is narrow: a walk's burst squares at each `thru` hop, and the claim
-  is that this compounding stays under the number. The commit makes
-  the bare postulate a real body over that leaf plus the path's size
-  receipt, so the assembly checks that the leaf suffices. This is the
-  fourth currency the ledger has been read in and the first no witness
-  reaches, so the leaf is PROBED first: a refutation
-  there is the spiral's third strike on one region, and the answer is
-  then one number per HOP, not a fifth number.
+- **CARRY THE BURST LEDGER ONTO THE LEVEL INDEX THE CAPS FACE ALREADY
+  USES.** No flat number serves this row: at the cap the hypothesis
+  gives, a frame's handoff is priced in the WIDTH and the grant is that
+  cap's SIZE, which the width passes a few fold levels in; one instant
+  further out the size does dominate the width, but it then stands
+  above the very size the factor's exponent is paid out of, so the room
+  inverts rather than costing a story. Both ends are now written down.
+  The proven counterpart over this identical fold climbs a level per
+  chain and reads its bound at the level reached, which is what lets it
+  price a widening the walk does — the commit restates the row and its
+  fold in that shape.
 
-- **THEN PRICE THAT LEAF AGAINST THE SIZE RECURRENCE, WHERE BOTH
-  SIDES LIVE.** The leaf compares a width compounded over the frames a
-  path may carry against the next instant's size, and both are faces
-  of the same recurrence — the fold step is a power, the size step is
-  linear, and the path length is itself held under a size. So the
-  obligation is arithmetic in the recurrence rather than anything
-  about a program, which is the shape the affordability chain is
-  already written in. The commit states it in that face and either
-  discharges it or refutes it there, which is what decides whether
-  the flat reading survives at all.
+- **THEN RE-PRICE THE STORE FACE'S FACTOR AT THE LEVEL, NOT THE
+  INSTANT.** The factor and the increment are both defined from the
+  burst, so a level-indexed burst moves them with it, and the exponent
+  they are paid out of is stated in one instant's size. The question is
+  whether the level a cascade actually reaches stays under that size —
+  which is the counting the caps face already does for its own bound,
+  in the same currency. The commit states the affordability side at the
+  level and either lands it or names the level it misses at.
 
-- **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
-  hop that climbs has strictly less telescope above it, and that is the
-  quantity the leaf's price does not read. The separation says why it
-  matters: a chain's factor is its leaf's times its frames', so a leaf
-  priced at the whole cap must dominate itself times a frame product,
-  while one priced at the REMAINING height need only dominate what a
-  shorter climb can spend. The commit restates the leaf's exponent in
-  that currency and re-reads the sink arm against it, which is where
-  the carried conjunct is finally spent.
+- **AND SPEND THE LEVEL AT THE TWO STORE-FACE CONSUMERS AND THE
+  BRIDGE.** The row is consumed at a flat type in three places, so the
+  level has to arrive there or the restatement buys nothing. Each is a
+  preservation step whose caps side already climbs, so the work is
+  threading one index through statements that carry its neighbour —
+  mechanical where the caps face is proven, and the place a design gap
+  would show up as a site that cannot name the level it needs.
 
 ### The ledger
 
@@ -293,11 +289,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — FALSITY,
-  `REFUTED, DEAD ROUTE, TWIN`: every stage of every chain's walk under ONE
-  number, now the next instant's size rather than the entry width the witness
-  killed. Two `thru` frames square a burst, so what is open is whether that
-  compounding stays under it. Nothing has instantiated it.
+- **`arr-chain-burst`** (Part7/Arrival-Ledger) — FALSITY,
+  `REFUTED, DEAD ROUTE×2, TWIN`: ONE chain's walk under ONE number, plus the
+  cap surviving that chain's step. The frame hands on a width and the row
+  grants that cap's size, which the width passes early; the size an instant
+  out inverts the room. No flat axis is left.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
