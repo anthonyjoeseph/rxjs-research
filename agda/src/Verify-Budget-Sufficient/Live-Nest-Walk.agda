@@ -31,7 +31,8 @@ open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; foldr; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; n≤1+n; ≤-reflexive; +-suc)
+open import Data.Nat.Properties
+  using (≤-trans; ⊔-lub; ⊔-monoˡ-≤; m≤m⊔n; m≤n⊔m; m≤m+n; n≤1+n; ≤-reflexive; +-suc)
 open import Data.Vec using (lookup)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -293,6 +294,13 @@ live-into : ∀ {n} {Γ : Ctx n} {S : ℕ} (sched : Sched Γ) (U : ℕ) →
     ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ⊔ S ⊔ U
 live-into {S = S} sched U = ≤-trans (m≤m⊔n _ S) (m≤m⊔n _ U)
 
+-- AND THE SAME AT TWO NUMBERS, which is what the frame step's
+-- conclusion joins once the size demand stops borrowing the ceiling.
+live-into₂ : ∀ {n} {Γ : Ctx n} {S : ℕ} (sched : Sched Γ) (U V : ℕ) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ⊔ S ⊔ U ⊔ V
+live-into₂ sched U V = ≤-trans (live-into sched U) (m≤m⊔n _ V)
+
 -- THE DRAIN'S OWN RECURSION, AND IT COSTS WHAT ONE SUBSCRIPTION COSTS.
 -- `mergeAllDrain` walks the parked inners and hands back the last
 -- schedule, and the conclusion's two readings are both `⊔`-folds -- so
@@ -481,45 +489,60 @@ stepFrame-nest-live-inner sf id now op allNid inst path vals true sched st B U _
 -- widened into the conclusion's join; the take arm is the only one
 -- that rewrites the list at all, and it does so by SWEEPING, whose
 -- monotonicity is already proven.
+
+-- AND THE CONCLUSION JOINS TWO NUMBERS, WHICH IS WHICH ARMS NEED
+-- WHICH.  Four kinds hand their own schedule back and read no number
+-- at all, so they widen into either.  What is left is the two that
+-- mint, and they are priced in currencies that do not convert: the
+-- completion frame subscribes out of a parked queue and takes its
+-- reading from the caps ledger, so the round's CEILING is the only
+-- thing paying for it, while the outer frame subscribes the values it
+-- was handed and is priced off their SIZE.  So the ceiling is
+-- load-bearing for exactly one arm, and it is not the arm that used to
+-- borrow it.
 stepFrame-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-  (B U : ℕ) →
+  (B U V : ℕ) →
   valsΦ? B U (f ↠ path) vals ≡ true →
   FrameΦHyp sf id now B U f path vals fin sched st →
-  FrameLiveHyp U f path vals →
+  FrameLiveHyp V f path vals →
   foldr (λ l acc → liveNest l ⊔ acc) 0
     (Sched.live
       (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
     ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-        ⊔ slotsNestSum (Sched.slots sched) ⊔ U
-stepFrame-nest-live sf id now (map-f fn) path vals fin sched st B U _ _ _ =
-  live-into sched U
-stepFrame-nest-live {u = u} sf id now (scan-f fn nid) path vals fin sched st B U _ _ _
+        ⊔ slotsNestSum (Sched.slots sched) ⊔ U ⊔ V
+stepFrame-nest-live sf id now (map-f fn) path vals fin sched st B U V _ _ _ =
+  live-into₂ sched U V
+stepFrame-nest-live {u = u} sf id now (scan-f fn nid) path vals fin sched st B U V _ _ _
   with lookupNode nid (EvalSt.nodes st)
-... | nothing                = live-into sched U
-... | just (take-st _)       = live-into sched U
-... | just (mergeAll-st _ _ _ _) = live-into sched U
-... | just (switch-st _ _)   = live-into sched U
-... | just (exhaust-st _ _)  = live-into sched U
+... | nothing                = live-into₂ sched U V
+... | just (take-st _)       = live-into₂ sched U V
+... | just (mergeAll-st _ _ _ _) = live-into₂ sched U V
+... | just (switch-st _ _)   = live-into₂ sched U V
+... | just (exhaust-st _ _)  = live-into₂ sched U V
 ... | just (scan-st {w} _) with w ≟ᵗ u
-...   | yes refl = live-into sched U
-...   | no _     = live-into sched U
-stepFrame-nest-live sf id now (take-f nid) path vals fin sched st B U _ _ _
+...   | yes refl = live-into₂ sched U V
+...   | no _     = live-into₂ sched U V
+stepFrame-nest-live sf id now (take-f nid) path vals fin sched st B U V _ _ _
   with lookupNode nid (EvalSt.nodes st)
-... | nothing                = live-into sched U
-... | just (scan-st _)       = live-into sched U
-... | just (mergeAll-st _ _ _ _) = live-into sched U
-... | just (switch-st _ _)   = live-into sched U
-... | just (exhaust-st _ _)  = live-into sched U
+... | nothing                = live-into₂ sched U V
+... | just (scan-st _)       = live-into₂ sched U V
+... | just (mergeAll-st _ _ _ _) = live-into₂ sched U V
+... | just (switch-st _ _)   = live-into₂ sched U V
+... | just (exhaust-st _ _)  = live-into₂ sched U V
 ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
-...   | false = live-into sched U
+...   | false = live-into₂ sched U V
 ...   | true  =
-        ≤-trans (sweepLive-nest _ (Sched.live sched)) (live-into sched U)
-stepFrame-nest-live sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ hF _ =
-  stepFrame-nest-live-inner sf id now op allNid inst path vals fin sched st B U hΦ hF
-stepFrame-nest-live sf id now (thru-outer op nid) path vals fin sched st B U hΦ hF hL =
-  stepFrame-nest-live-outer sf id now op nid path vals fin sched st B U U hΦ hF hL
+        ≤-trans (sweepLive-nest _ (Sched.live sched)) (live-into₂ sched U V)
+stepFrame-nest-live sf id now (from-inner op allNid inst) path vals fin sched st B U V hΦ hF _ =
+  ≤-trans (stepFrame-nest-live-inner sf id now op allNid inst path vals fin sched st
+             B U hΦ hF)
+          (m≤m⊔n _ V)
+stepFrame-nest-live sf id now (thru-outer op nid) path vals fin sched st B U V hΦ hF hL =
+  ≤-trans (stepFrame-nest-live-outer sf id now op nid path vals fin sched st
+             B U V hΦ hF hL)
+          (⊔-monoˡ-≤ V (m≤m⊔n _ U))
 
 -- FOUR KINDS OWE NOTHING AND ONE OWES THE BOUND, which is the whole
 -- content of the side condition read at one frame.
@@ -585,10 +608,19 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- standing is a receipt that SHRINKS along the path and names no level
 -- at all -- the shape the potential face already carries -- so this arm
 -- is owed a different CURRENCY rather than a larger number in the one
--- it has.  AND THE CURRENCY IS NOT THIS ARM'S TO CHANGE: the reading
--- that cannot be afforded is the outer frame's size bound, charged
--- against the round's single ceiling, and the header of that mint
--- carries why no level-indexed form of it is a widening.
+-- it has.
+--
+-- AND THE CURRENCY HAS NOW MOVED AND THIS HOP DID NOT COME WITH IT,
+-- which is the one thing the separation settles.  The size bound is no
+-- longer charged against the round's ceiling: the walk concludes at
+-- the ladder it climbs, and the ceiling is met once at the consumer
+-- rather than at every frame -- so the number here is a caller's to
+-- choose.  It buys nothing, because the counterexamples never read the
+-- ceiling.  The level witness meets every premise with the budget set
+-- to the CAP itself and still lands a value above it on the first
+-- fanned-into frame.  So what is owed is not a larger number nor a
+-- differently denominated one, but a premise RELATING the registry's
+-- reading to the values its chains produce.
 --
 --
 -- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
@@ -605,15 +637,15 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 --   ceiling by the ladder's second rung.
 postulate
   walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (i : Fin n)
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S V Lv j : ℕ) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    iterSize S Lv S ≤ U →
+    iterSize S Lv S ≤ V →
     1 ≤ S →
     valsSz? (iterSize S j S) vals ≡ true →
     regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
     j ≤ Lv →
-    DispatchLiveHyp sf gas id now U i vals fin sched st
+    DispatchLiveHyp sf gas id now V i vals fin sched st
 
 -- THE SIZE SIDE CONDITION, DISCHARGED BY THE SAME WALK IT GUARDS.  The
 -- values a frame sees are the ones the frames above it produced, so
@@ -631,25 +663,25 @@ postulate
 -- that has to widen with it.  Keeping the two apart is what lets one
 -- statement serve both: `Lv := S` recovers the single-chain reading.
 walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S U Lv j : ℕ) (path : Path Γ u t)
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S V Lv j : ℕ) (path : Path Γ u t)
   (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  iterSize S Lv S ≤ U →
+  iterSize S Lv S ≤ V →
   1 ≤ S →
   valsSz? (iterSize S j S) vals ≡ true →
   pathSz? S path ≡ true →
   regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
   j + pathLen path ≤ Lv →
-  PathLiveHyp sf gas id now U path vals fin sched st
-walk-LiveHyp-go sf gas id now S U Lv j root vals fin sched st _ _ _ _ _ _ = tt
-walk-LiveHyp-go sf gas id now S U Lv j (share-sink i) vals fin sched st afford 1≤S hsz _ hreg hj =
-  walk-share-LiveHyp sf gas id now S U Lv j i vals fin sched st
+  PathLiveHyp sf gas id now V path vals fin sched st
+walk-LiveHyp-go sf gas id now S V Lv j root vals fin sched st _ _ _ _ _ _ = tt
+walk-LiveHyp-go sf gas id now S V Lv j (share-sink i) vals fin sched st afford 1≤S hsz _ hreg hj =
+  walk-share-LiveHyp sf gas id now S V Lv j i vals fin sched st
     afford 1≤S hsz hreg j≤Lv
   where
   j≤Lv : j ≤ Lv
   j≤Lv = ≤-trans (m≤m+n j 0) hj
-walk-LiveHyp-go sf gas id now S U Lv j (f ↠ p) vals fin sched st afford 1≤S hsz hpz hreg hj =
+walk-LiveHyp-go sf gas id now S V Lv j (f ↠ p) vals fin sched st afford 1≤S hsz hpz hreg hj =
     hHead
-  , walk-LiveHyp-go sf gas id now S U Lv (suc j) p
+  , walk-LiveHyp-go sf gas id now S V Lv (suc j) p
       (proj₁ step)
       (proj₁ (proj₂ (proj₂ step)))
       (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -665,11 +697,11 @@ walk-LiveHyp-go sf gas id now S U Lv j (f ↠ p) vals fin sched st afford 1≤S 
   step = stepFrame sf id now f p vals fin sched st
   j≤Lv : j ≤ Lv
   j≤Lv = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
-  atU : valsSz? U vals ≡ true
-  atU = valsSz?-mono (iterSize S j S) U vals
+  atV : valsSz? V vals ≡ true
+  atV = valsSz?-mono (iterSize S j S) V vals
           (≤-trans (iterSize-mono-count S S 1≤S j≤Lv) afford) hsz
-  hHead : FrameLiveHyp U f p vals
-  hHead = frameLive-of-sz U f p vals atU
+  hHead : FrameLiveHyp V f p vals
+  hHead = frameLive-of-sz V f p vals atV
   hfz : frameSz? S f ≡ true
   hfz = proj₁ (∧-true (frameSz? S f)
                  ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)
@@ -690,58 +722,66 @@ mutual
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)
     (path : Path Γ u t) (vals : List (Val Γ u))
     (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    (sched : Sched Γ) (st : EvalSt e) (B U V : ℕ) →
     valsΦ? B U path vals ≡ true →
     PathΦHyp sf gas id now B U path vals fin sched st →
-    PathLiveHyp sf gas id now U path vals fin sched st →
+    PathLiveHyp sf gas id now V path vals fin sched st →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live (proj₁ (proj₂ (foldPath sf gas id now envSrc path vals evs fin sched st))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ slotsNestSum (Sched.slots sched)
-          ⊔ regsNestMax (EvalSt.registry st) ⊔ U
-  foldPath-nest-live sf gas id now envSrc root vals evs fin sched st B U hΦ _ _ =
-    ≤-trans (≤-trans (m≤m⊔n (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
-                            (slotsNestSum (Sched.slots sched)))
-                     (m≤m⊔n _ (regsNestMax (EvalSt.registry st))))
-            (m≤m⊔n _ U)
-  foldPath-nest-live sf gas id now envSrc (share-sink i) vals evs fin sched st B U hΦ hD hDL =
-    dispatchShare-nest-live sf gas id now i vals fin sched st B U hD hDL
-  foldPath-nest-live sf gas id now envSrc (f ↠ p) vals evs fin sched st B U hΦ (hF , hR) (hL , hLR) =
+          ⊔ regsNestMax (EvalSt.registry st) ⊔ U ⊔ V
+  foldPath-nest-live sf gas id now envSrc root vals evs fin sched st B U V hΦ _ _ =
+    ≤-trans (≤-trans (≤-trans (m≤m⊔n (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
+                                     (slotsNestSum (Sched.slots sched)))
+                              (m≤m⊔n _ (regsNestMax (EvalSt.registry st))))
+                     (m≤m⊔n _ U))
+            (m≤m⊔n _ V)
+  foldPath-nest-live sf gas id now envSrc (share-sink i) vals evs fin sched st B U V hΦ hD hDL =
+    dispatchShare-nest-live sf gas id now i vals fin sched st B U V hD hDL
+  foldPath-nest-live sf gas id now envSrc (f ↠ p) vals evs fin sched st B U V hΦ (hF , hR) (hL , hLR) =
     ≤-trans (foldPath-nest-live sf gas id now envSrc p
                (proj₁ step) (evs ++ proj₁ (proj₂ step))
                (proj₁ (proj₂ (proj₂ step)))
                (proj₁ (proj₂ (proj₂ (proj₂ step))))
-               (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U
+               (proj₂ (proj₂ (proj₂ (proj₂ step)))) B U V
                (stepFrame-nest-Φ sf id now f p vals fin sched st B U hΦ hF) hR hLR)
-            (⊔-lub (⊔-lub (⊔-lub liveStep slotStep) regStep) (m≤n⊔m (L ⊔ S ⊔ R) U))
+            (⊔-lub (⊔-lub (⊔-lub (⊔-lub liveStep slotStep) regStep) intoU) intoV)
     where
     step = stepFrame sf id now f p vals fin sched st
     L = foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
     S = slotsNestSum (Sched.slots sched)
     R = regsNestMax (EvalSt.registry st)
-    intoL : L ≤ L ⊔ S ⊔ R ⊔ U
-    intoL = ≤-trans (≤-trans (m≤m⊔n L S) (m≤m⊔n (L ⊔ S) R)) (m≤m⊔n (L ⊔ S ⊔ R) U)
-    intoS : S ≤ L ⊔ S ⊔ R ⊔ U
-    intoS = ≤-trans (≤-trans (m≤n⊔m L S) (m≤m⊔n (L ⊔ S) R)) (m≤m⊔n (L ⊔ S ⊔ R) U)
-    intoR : R ≤ L ⊔ S ⊔ R ⊔ U
-    intoR = ≤-trans (m≤n⊔m (L ⊔ S) R) (m≤m⊔n (L ⊔ S ⊔ R) U)
-    intoU : U ≤ L ⊔ S ⊔ R ⊔ U
-    intoU = m≤n⊔m (L ⊔ S ⊔ R) U
+    intoL : L ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoL = ≤-trans (≤-trans (≤-trans (m≤m⊔n L S) (m≤m⊔n (L ⊔ S) R))
+                             (m≤m⊔n (L ⊔ S ⊔ R) U))
+                    (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoS : S ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoS = ≤-trans (≤-trans (≤-trans (m≤n⊔m L S) (m≤m⊔n (L ⊔ S) R))
+                             (m≤m⊔n (L ⊔ S ⊔ R) U))
+                    (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoR : R ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoR = ≤-trans (≤-trans (m≤n⊔m (L ⊔ S) R) (m≤m⊔n (L ⊔ S ⊔ R) U))
+                    (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoU : U ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoU = ≤-trans (m≤n⊔m (L ⊔ S ⊔ R) U) (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoV : V ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoV = m≤n⊔m (L ⊔ S ⊔ R ⊔ U) V
     liveStep : foldr (λ l acc → liveNest l ⊔ acc) 0
                  (Sched.live (proj₁ (proj₂ (proj₂ (proj₂ step)))))
-                 ≤ L ⊔ S ⊔ R ⊔ U
+                 ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
     liveStep =
-      ≤-trans (stepFrame-nest-live sf id now f p vals fin sched st B U hΦ hF hL)
-              (⊔-lub (⊔-lub intoL intoS) intoU)
+      ≤-trans (stepFrame-nest-live sf id now f p vals fin sched st B U V hΦ hF hL)
+              (⊔-lub (⊔-lub (⊔-lub intoL intoS) intoU) intoV)
     slotStep : slotsNestSum (Sched.slots (proj₁ (proj₂ (proj₂ (proj₂ step)))))
-                 ≤ L ⊔ S ⊔ R ⊔ U
+                 ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
     slotStep =
-      subst (_≤ L ⊔ S ⊔ R ⊔ U)
+      subst (_≤ L ⊔ S ⊔ R ⊔ U ⊔ V)
             (cong slotsNestSum
               (sym (KeepsC.slotsEq (stepFrame-keeps sf id now f p vals fin sched st))))
             intoS
     regStep : regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ step)))))
-                ≤ L ⊔ S ⊔ R ⊔ U
+                ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
     regStep =
       ≤-trans (stepFrame-nest-regs sf id now f p vals fin sched st B U hΦ hF)
               (⊔-lub intoR intoU)
@@ -753,28 +793,29 @@ mutual
   dispatchShare-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    (sched : Sched Γ) (st : EvalSt e) (B U V : ℕ) →
     DispatchΦHyp sf gas id now B U i vals fin sched st →
-    DispatchLiveHyp sf gas id now U i vals fin sched st →
+    DispatchLiveHyp sf gas id now V i vals fin sched st →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live (proj₁ (proj₂ (dispatchShare {t = t} sf gas id now i vals fin sched st))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ slotsNestSum (Sched.slots sched)
-          ⊔ regsNestMax (EvalSt.registry st) ⊔ U
-  dispatchShare-nest-live sf zero id now i vals fin sched st B U _ _ =
-    ≤-trans (≤-trans (m≤m⊔n (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
-                            (slotsNestSum (Sched.slots sched)))
-                     (m≤m⊔n _ (regsNestMax (EvalSt.registry st))))
-            (m≤m⊔n _ U)
-  dispatchShare-nest-live sf (suc gas) id now i vals false sched st B U hS hSL =
+          ⊔ regsNestMax (EvalSt.registry st) ⊔ U ⊔ V
+  dispatchShare-nest-live sf zero id now i vals fin sched st B U V _ _ =
+    ≤-trans (≤-trans (≤-trans (m≤m⊔n (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
+                                     (slotsNestSum (Sched.slots sched)))
+                              (m≤m⊔n _ (regsNestMax (EvalSt.registry st))))
+                     (m≤m⊔n _ U))
+            (m≤m⊔n _ V)
+  dispatchShare-nest-live sf (suc gas) id now i vals false sched st B U V hS hSL =
     shareGo-nest-live sf gas id now i vals false
-      (shareAdmit i (EvalSt.registry st)) sched st B U hS hSL
-  dispatchShare-nest-live {t = t} sf (suc gas) id now i vals true sched st B U hS hSL =
+      (shareAdmit i (EvalSt.registry st)) sched st B U V hS hSL
+  dispatchShare-nest-live {t = t} sf (suc gas) id now i vals true sched st B U V hS hSL =
     ≤-trans (sweepLive-nest _
               (Sched.live (proj₁ (proj₂ (shareGo {t = t} sf gas id now i vals true
                 (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st))))))
             (shareGo-nest-live sf gas id now i vals true
-              (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B U hS hSL)
+              (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st) B U V hS hSL)
 
   -- ONE ADMITTED REGISTRATION AT A TIME, and all three components
   -- telescope: the live list under the one the chain entered on, the
@@ -784,28 +825,28 @@ mutual
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    (sched : Sched Γ) (st : EvalSt e) (B U V : ℕ) →
     ShareGoΦHyp sf gas id now B U i vals fin ps sched st →
-    ShareGoLiveHyp sf gas id now U i vals fin ps sched st →
+    ShareGoLiveHyp sf gas id now V i vals fin ps sched st →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live (proj₁ (proj₂ (shareGo sf gas id now i vals fin ps sched st))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
           ⊔ slotsNestSum (Sched.slots sched)
-          ⊔ regsNestMax (EvalSt.registry st) ⊔ U
-  shareGo-nest-live sf gas id now i vals fin [] sched st B U _ _ =
-    ≤-trans (≤-trans (m≤m⊔n (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
-                            (slotsNestSum (Sched.slots sched)))
-                     (m≤m⊔n _ (regsNestMax (EvalSt.registry st))))
-            (m≤m⊔n _ U)
-  shareGo-nest-live sf gas id now i vals fin ((rid , p) ∷ ps) sched st B U hS hSL
+          ⊔ regsNestMax (EvalSt.registry st) ⊔ U ⊔ V
+  shareGo-nest-live sf gas id now i vals fin [] sched st B U V _ _ =
+    ≤-trans (≤-trans (≤-trans (m≤m⊔n (foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched))
+                                     (slotsNestSum (Sched.slots sched)))
+                              (m≤m⊔n _ (regsNestMax (EvalSt.registry st))))
+                     (m≤m⊔n _ U))
+            (m≤m⊔n _ V)
+  shareGo-nest-live sf gas id now i vals fin ((rid , p) ∷ ps) sched st B U V hS hSL
     with any (_≡ᵇ rid) (EvalSt.cancelled st)
-  ... | true  = shareGo-nest-live sf gas id now i vals fin ps sched st B U hS hSL
+  ... | true  = shareGo-nest-live sf gas id now i vals fin ps sched st B U V hS hSL
   ... | false =
     ≤-trans (shareGo-nest-live sf gas id now i vals fin ps
-               (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B U
+               (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP)) B U V
                (proj₂ (proj₂ hS)) (proj₂ hSL))
-            (⊔-lub (⊔-lub (⊔-lub headLive headSlots) headRegs)
-                   (m≤n⊔m (L ⊔ S ⊔ R) U))
+            (⊔-lub (⊔-lub (⊔-lub (⊔-lub headLive headSlots) headRegs) intoU) intoV)
     where
     st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
     EVS = if fin then close (toℕ i) exhausted ∷ [] else []
@@ -813,23 +854,28 @@ mutual
     L = foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
     S = slotsNestSum (Sched.slots sched)
     R = regsNestMax (EvalSt.registry st)
-    intoS : S ≤ L ⊔ S ⊔ R ⊔ U
-    intoS = ≤-trans (≤-trans (m≤n⊔m L S) (m≤m⊔n (L ⊔ S) R)) (m≤m⊔n (L ⊔ S ⊔ R) U)
-    intoR : R ≤ L ⊔ S ⊔ R ⊔ U
-    intoR = ≤-trans (m≤n⊔m (L ⊔ S) R) (m≤m⊔n (L ⊔ S ⊔ R) U)
-    intoU : U ≤ L ⊔ S ⊔ R ⊔ U
-    intoU = m≤n⊔m (L ⊔ S ⊔ R) U
+    intoS : S ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoS = ≤-trans (≤-trans (≤-trans (m≤n⊔m L S) (m≤m⊔n (L ⊔ S) R))
+                             (m≤m⊔n (L ⊔ S ⊔ R) U))
+                    (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoR : R ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoR = ≤-trans (≤-trans (m≤n⊔m (L ⊔ S) R) (m≤m⊔n (L ⊔ S ⊔ R) U))
+                    (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoU : U ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoU = ≤-trans (m≤n⊔m (L ⊔ S ⊔ R) U) (m≤m⊔n (L ⊔ S ⊔ R ⊔ U) V)
+    intoV : V ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    intoV = m≤n⊔m (L ⊔ S ⊔ R ⊔ U) V
     headLive : foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ FP)))
-                 ≤ L ⊔ S ⊔ R ⊔ U
-    headLive = foldPath-nest-live sf gas id now (toℕ i) p vals EVS fin sched st₀ B U
+                 ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
+    headLive = foldPath-nest-live sf gas id now (toℕ i) p vals EVS fin sched st₀ B U V
                  (proj₁ hS) (proj₁ (proj₂ hS)) (proj₁ hSL)
-    headSlots : slotsNestSum (Sched.slots (proj₁ (proj₂ FP))) ≤ L ⊔ S ⊔ R ⊔ U
+    headSlots : slotsNestSum (Sched.slots (proj₁ (proj₂ FP))) ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
     headSlots =
-      subst (_≤ L ⊔ S ⊔ R ⊔ U)
+      subst (_≤ L ⊔ S ⊔ R ⊔ U ⊔ V)
             (cong slotsNestSum
               (sym (foldPath-slots sf gas id now (toℕ i) p vals EVS fin sched st₀)))
             intoS
-    headRegs : regsNestMax (EvalSt.registry (proj₂ (proj₂ FP))) ≤ L ⊔ S ⊔ R ⊔ U
+    headRegs : regsNestMax (EvalSt.registry (proj₂ (proj₂ FP))) ≤ L ⊔ S ⊔ R ⊔ U ⊔ V
     headRegs =
       ≤-trans (foldPath-nest-regs sf gas id now (toℕ i) p vals EVS fin sched st₀ B U
                  (proj₁ hS) (proj₁ (proj₂ hS)))
