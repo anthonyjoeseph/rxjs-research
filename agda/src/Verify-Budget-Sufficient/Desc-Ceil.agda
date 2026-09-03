@@ -23,7 +23,7 @@
 -- WHAT IS LEFT AS A LEAF IS THE ONE FRAME, and that is the design.
 -- Every clause here is bookkeeping over the join `descW` already is;
 -- the only thing this proof cannot see is how many payloads one
--- subscribe emits, which is `burst-outW` and is semantic to its core.
+-- subscribe emits, which is `burst-out` and is semantic to its core.
 -- REFUTED: `Refuted.Ceil-Unfold-Mu` -- the joined ceiling is NOT
 --   monotone across an unfold, and not by a constant either: the plug
 --   lands once per occurrence, so k mentions of the μ-var read k copies
@@ -33,7 +33,7 @@
 module Verify-Budget-Sufficient.Desc-Ceil where
 
 open import Data.Bool using (false)
-open import Data.List using ([]; _∷_)
+open import Data.List using ([]; _∷_; length)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (zero; suc; _≤_; _⊔_; z≤n)
 open import Data.Nat.Properties
@@ -46,7 +46,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim using (Tick; Id; Gas; g0; gs)
 open import Rx.Exp using
-  (Ctx; Closed; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
+  (Ctx; Closed; Val; input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ;
   varᵉ; deferᵉ; unfoldμ; evalTm)
 open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Frame-Width using (outWⱽ)
@@ -58,10 +58,11 @@ open import Rx.Width-Subst using (bCeil-unfoldμ)
 open import Rx.Evaluator using
   (Sched; EvalSt; Path; _↠_; map-f; scan-f; take-f; thru-outer;
    mergeAllᵒ; switchᵒ; exhaustᵒ; scan-st; take-st; mergeAll-st;
-   switch-st; exhaust-st; mintNode; installNode; share-sink; register)
+   switch-st; exhaust-st; mintNode; installNode; share-sink; register;
+   subscribeE; splitBurst)
 
 open import Verify-Budget-Sufficient.Nest-Burst using
-  (burstW; descW; slotW; descW-map-eq; descW-scan-eq; descW-merge-eq; descW-switch-eq;
+  (burstW; burstW-eq; descW; slotW; descW-map-eq; descW-scan-eq; descW-merge-eq; descW-switch-eq;
   descW-exhaust-eq; descW-mu-eq; descW-mu0-eq; descW-take0-eq; descW-takeS-eq; descW-input-eq;
   slotW-scripted-eq; slotW-shared-eq; connW-g0-eq; connW-gs-eq; descW-of-eq; descW-empty-eq;
   descW-defer-eq)
@@ -73,19 +74,42 @@ open import Verify-Budget-Sufficient.Nest-Burst using
 -- the evaluator's connect does.  The slots equation is what ties the
 -- two descents together, and it is the hypothesis every consumer of
 -- this face already holds.
+-- AND THE LEAF IS STATED OVER THE SPLIT AND NOT OVER THE MEASURE'S
+-- NAME, which is what makes it instantiable at all.  `burstW` is
+-- SEALED, so a statement carrying it on the SMALL side of a `≤`
+-- reduces at no point whatever and no row can be written against it --
+-- a claim nothing can instantiate is a claim nothing can refute, and
+-- that is a property of the statement rather than of the evidence
+-- against it.  The seal exists to keep the evaluator out of the
+-- PREMISES that name the measure, and it goes on doing that: the
+-- equation is spent once, here, in a body.
 -- PROBED: `Probed.Burst-OutW` -- nine rows at the root frame, three of
 --   them EQUALITIES and so load-bearing: `ofᵉ` at three, and the two
 --   `*All` heads at six, which is where the reading is a product and
 --   the only place it could be under-counted.  The defer reads zero
 --   against zero, which is the row the ceiling's right to stop there
---   rests on.  NOT covered: a frame below the root, a scan head, and a
---   shared slot whose definition itself reaches a share.
+--   rests on.  TIED at the three equality rows, which are the ones a
+--   tie can be load-bearing on at all.  NOT covered: a frame below the
+--   root, a scan head, and a shared slot whose definition itself
+--   reaches a share.
 postulate
-  burst-outW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  burst-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)
     (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    burstW g o κ id now sched st ≤ outWⱽ n [] sl o
+    length (proj₁ (splitBurst {A = Val Γ t}
+      (proj₁ (subscribeE g o κ id now sched st))))
+      ≤ outWⱽ n [] sl o
+
+burst-outW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  burstW g o κ id now sched st ≤ outWⱽ n [] sl o
+burst-outW {n = n} g sl o κ id now sched st eqs =
+  subst (_≤ outWⱽ n [] sl o)
+        (sym (burstW-eq g o κ id now sched st))
+        (burst-out g sl o κ id now sched st eqs)
 
 burst-ceil : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)

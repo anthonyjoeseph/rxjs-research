@@ -215,18 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SEALED GROUP SPLITS BY SIDE, AND WHAT REMAINS IS THE SMALL-SIDE
-  HALF.** The three `thruFit-arr-*` are tied, and not by the equations their
-  sealing blocks export: the sealed width sits on the LARGE side of the
-  grant, where monotonicity reaches it without it ever reducing. That is the
-  mirror of the earlier finding, so the question a sealed target owes is
-  which SIDE its seal is on — large is free, small needs a point where the
-  increment is zero. `burst-outW` and
-  `pushVals-caps-burstW` are the small-side remainder, and the commit either
-  finds each a zero point or writes the boundary where the statement is. A
-  second constraint, belonging to no seal, is written at `thruFit-arr-merge`:
-  a conjunct quantified over `NodeId` is writable only at an arrival that
-  mints no node.
+- **THE SEALED GROUP SPLITS BY SIDE, AND THE SMALL SIDE IS RESTATED RATHER
+  THAN REACHED.** A seal on the LARGE side of a grant is free — monotonicity
+  crosses it without it reducing — which is how the three `thruFit-arr-*`
+  tied. On the small side there is no such route, and `burst-out` is the
+  answer: the leaf is RESTATED over the split the seal hides, with the
+  equation spent once in a body. A claim nothing can instantiate is a claim
+  nothing can refute, so that is a defect in the statement, not a coverage
+  boundary. `pushVals-caps-burstW` is the remaining small-side row; its seal
+  is `innerW`, which exports no equation, so the commit either restates it
+  the same way or writes the boundary at the statement.
 
 - **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the
@@ -318,10 +316,10 @@ does not fit is a finding about the shared statement, not about the head.
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
   the caps can refute and they cannot move. One family unread.
-- **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
-  emits no more payloads than its term syntactically carries. The last semantic
-  step under the descent's ceiling; nine rows hold at the root frame, three of
-  them tight, and a frame below the root is the uncovered axis.
+- **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
+  emits no more payloads than its term syntactically carries. Stated over the
+  split, not the sealed measure, so it instantiates; three tight rows tied, a
+  frame below the root uncovered.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
