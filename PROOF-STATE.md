@@ -215,17 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
-  live list is minted at three places — one subscribe out of a parked
-  queue, the outer frame subscribing its arrivals, and the share chain a
-  sink fans into — and every consumer spends all three at one site. Their
-  side conditions are stated in three currencies: a unit, a size bound on
-  values, and a level whose every reading is closed. That spread is why
-  each was refuted separately and why no repair transferred between them.
-  The commit reads whether one denomination carries all three, and
-  reports the mint that cannot be stated in it.
-
-- **THEN ASK WHETHER THE REGISTRY CAN BE MEASURED WHERE IT IS READ.** Its
+- **ASK WHETHER THE REGISTRY CAN BE MEASURED WHERE IT IS READ.** Its
   two receipts — the registry's depth against the syntactic unit and its
   length against the program's cap — are both refuted, and neither by an
   adversarial state alone: one fails at a state the evaluator REACHES,
@@ -235,6 +225,17 @@ does not fit is a finding about the shared statement, not about the head.
   a tighter reading is not the repair. The commit reads whether the
   registry belongs to the invariant record as a CARRIED field rather than
   a measured one, and names the producer that could not re-establish it.
+
+- **AND MOVE THE LIVE WALK'S SINK OFF ITS AFFORDABILITY.** The sink's
+  level ceiling is closed at every reading, and the potential face's own
+  sink arm is PROVEN by the same induction off a dispatch ledger indexed
+  by level, with no affordability premise anywhere in it — so the ledger
+  absorbing the fan-out's climb is a fact rather than a plan, and the
+  live sink is a restatement away from it. The commit moves the live
+  walk to where that ledger is in scope, restates the sink off it, and
+  leaves the outer frame's size bound as the one debt the move does not
+  pay — which is where the round's ceiling is genuinely reached and
+  where a chain entering at level zero already discharges it.
 
 - **AND CLOSE THE CASCADE DOOR'S UNPROJECTED PACKAGE.** The round's caps
   package is now stated at EVERY chain rather than at the surviving ones,
@@ -263,13 +264,13 @@ does not fit is a finding about the shared statement, not about the head.
   A gated entry reads zero at every state quantity the consuming fit's residue
   is built from, so only the cap size pays.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
-  the outer frame mints, subscribing the arrivals it is handed. The one kind
-  whose side condition is a size bound on values rather than a unit, and the
-  grant is spent: the fold outruns the slot vocabulary from depth three.
+  the outer frame mints, subscribing the arrivals it is handed. THE MINT NO
+  ONE DENOMINATION REACHES: a size reading charged against the round's single
+  ceiling, so level-indexing it means indexing the conclusion.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
-  sink fans into. Every reading in the level currency is closed: no ceiling is
-  choosable, and the caps face's top towers past the walk's exponential.
+  sink fans into. Every reading in the level currency is closed, and the
+  currency is the outer mint's rather than this arm's.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
