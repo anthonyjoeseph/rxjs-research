@@ -463,7 +463,9 @@ postulate
   -- bounded by the width there and by nothing smaller.  The uniform
   -- reading `burstsOK` needs is the walk's endpoint, which is this
   -- instant's exit cap by monotonicity in the hop count -- one number
-  -- covering every hop, and the same one `nestBurstAt` takes.
+  -- covering every hop, and NOT the one `nestBurstAt` takes, which is
+  -- the entry width: the count between two `thru` frames is already
+  -- over it.
 
   -- AND NO STORY BUYS THE ROOM, WHICH IS WHAT MAKES THIS A MECHANISM
   -- FINDING RATHER THAN AN INDEX ONE.  The instinct once the numbers are
@@ -640,7 +642,11 @@ postulate
   -- this instant's cap times a factor towering in the burst
   -- (`nestFacAt`), discharged by no premise of any frame but by the
   -- walk's own count ledger -- `burstsOK` at every hop, closed at the
-  -- top by `arr-chains-bursts`.  This arm cannot read that ceiling,
+  -- top by `arr-chains-bursts` -- and that closure is FLAT, which
+  -- `Refuted.Chains-Burst-Flat` kills: two `thru` frames square a
+  -- burst, so the factor is itself priced in a refuted width and the
+  -- re-denomination it once promised is not available as it stands.
+  -- This arm cannot read that ceiling,
   -- because the depth door `cascade-depth-capsH` is sighted at THIS
   -- instant's fuel: it lands the potential under `capsH` at the entry
   -- index, and the caps recurrence puts the next instant's factor two

@@ -215,27 +215,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-DENOMINATE THE DEPTH FACE IN THE WALK'S COUNT, ASSEMBLY FIRST.**
-  The scan and drain arms of the potential hypothesis are dead as a
-  MECHANISM, not as denominations: a flat per-instant potential cannot
-  dominate a burst count exponential in the nesting it bounds,
-  and the one ceiling that affords the fold is the store's exit-index
-  factor, sighted one instant later than the depth door can see. The
-  commit states the restated face outside-in — the fold arms priced
-  at the exit-index factor under the walk's count ledger, the door
-  `cascade-depth-capsH` concluding under the NEXT instant's fuel — with
-  the gap between that
-  sight and the evaluator's budget postulated BARE: whether the budget
-  moves is a question, not an edit.
+- **RESTATE THE CASCADE'S BURST LEDGER AT A MOVING WIDTH, ASSEMBLY
+  FIRST.** The flat form is refuted: a `thru` frame subscribes every
+  value it takes, so two in a row hand on the square of what came in,
+  and the entry width is one number read once. The walk face's own
+  mirror carries the bound a level per frame, and its closing argument
+  lands at the EXIT width — a tower where the exit size is one
+  exponential — so the moving bound does not slot in where the flat one
+  stood. The commit restates the ledger and its top receipt at the
+  level-indexed width, outside-in: the restated leaf typechecking
+  against its consumer, the residue postulated BARE, no consumer
+  re-priced yet.
 
-- **AND THREAD THE COUNT LEDGER DOWN THE POTENTIAL WALK.** The store
-  walk carries a burst ceiling at every hop and closes it at the
-  arrival; the potential walk carries the values' caps and no length,
-  which is why its scan arm had nowhere to read a count. The commit
-  gives the potential walk the ledger the store walk threads,
-  discharged from the same arrival receipt, and spends it at the two
-  restated arms — the premise side of the re-denomination, which does
-  not wait on the budget question.
+- **THEN RE-PRICE THE STORE FACE IN THE WIDTH THE LEDGER NOW CLOSES
+  AT.** The store's nesting factor, the increment's log and the step
+  putting the burst under the exit SIZE are all denominated in the
+  entry width, which is the refuted number. The exit width is a tower
+  of height the size count while the exit size is exponential in it,
+  so the affordability question is real: whether a burst read a level
+  per frame still fits under the exit size, or the store face needs a
+  restatement of its own. The commit answers it by instantiation first
+  — the same two-`thru` witness at the store's own bound — and restates
+  only what the rows force, the residue BARE.
 
 - **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
   hop that climbs has strictly less telescope above it, and that is the
@@ -292,10 +293,16 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
+- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — FALSITY,
+  `REFUTED, DEAD ROUTE, TWIN`: every stage of every chain's walk under ONE
+  width, the entry's. Two `thru` frames square a burst, so the flat form is
+  dead; the mirror moves a level per frame, and the store face is priced in
+  the flat number.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
-  affording ceiling is the store's exit-index factor, unseen at this fuel.
+  affording ceiling is the store's exit-index factor, priced in a refuted
+  width.
 - **`innerΦ-drain-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the charge at
   the queue's own `drainW`, at every level within the descent's count. The
   width is walk-denominated, so it shares the scan arm's dead mechanism and is
@@ -366,10 +373,6 @@ does not fit is a finding about the shared statement, not about the head.
   walk's registry paths under the same width. Registration adds the one frame
   the path measure charges nothing for; the component reads zero, so the tie is
   degenerate on the increment.
-- **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY,
-  `DEAD ROUTE, TWIN`: every stage of every chain's walk under the width cap.
-  The mirror carries the identical conjunct across the feared `thru` hop, and
-  what is left is the flat-versus-moving bound — arithmetic, not a walk.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.

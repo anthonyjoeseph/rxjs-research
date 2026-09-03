@@ -233,17 +233,27 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 -- hypothesis shaped like its own recursion and this is where the
 -- hypothesis is met.
 --
--- AND THE CAPS FACE ALREADY CARRIES THIS CONJUNCT, WHICH IS WHAT MAKES
--- A FLAT CAP THE RIGHT CURRENCY RATHER THAN A HOPEFUL ONE.  `valsCaps?`
--- is `all valCaps?` conjoined with exactly this length bound.  The
--- remaining distance is arithmetic and not a walk: every level a
--- cascade reaches is under `sizeCount`, so `frameStep-mono-j` puts its
--- width under `frameStep sizeCount`, which `capsAt-suc-full` says IS
--- the cap at the next instant -- which is the one this burst is read
--- from.  The grind is the induction that carries a flat bound where the
--- walk face carries a moving one, and it is a transcription rather than
--- a discovery.
+-- AND IT IS FALSE AS STATED, BECAUSE THE WIDTH IT READS IS FLAT.  The
+-- ledger asks ONE number of every hop and reads it at the ENTRY cap;
+-- but a `thru` frame subscribes each value it takes, so two of them in
+-- a row hand on the SQUARE of what came in, and the square of the
+-- entry width is over it from two upward.  The arrival is not what
+-- widens -- a nat arrival and a map built at exactly the cap's width
+-- cross it -- so conditioning on the payload repairs nothing.  What
+-- the mirror actually carries is a MOVING bound, one level per frame,
+-- and the argument this header used to make -- every level a cascade
+-- reaches is under `sizeCount`, so the width lands under the cap at
+-- the NEXT instant -- lands at the EXIT width, not the entry width
+-- this statement reads.  So the restatement is forced and it is not
+-- local: every consumer denominated in `nestBurstAt` -- the store
+-- face's factor, and the step that puts the burst under the exit SIZE
+-- -- is priced in the number the square is over, and the exit width is a tower
+-- where the exit size is one exponential, so the moving bound does not
+-- slot in where the flat one stood.
 --
+-- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at the root of
+--   one chain against a width-two cap granting three, at the
+--   evaluator's own state, arrival and registry.
 -- DEAD ROUTE: instantiating this statement, in either denomination.
 --   The width it reads is `nestBurstAt`, which is sealed, and the caps
 --   both sides are read at are `capsAt`'s, which does not return at the
