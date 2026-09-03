@@ -144,7 +144,9 @@ N = nestΦAt e₁ sl₁ 0
 -- witness needs about a family it never unfolds
 S≤N : S ≤ N
 S≤N = ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ S)))
-                                (*-monoˡ-≤ S (m^n>0 2 (S * (S * S) + S * S))))
+                                (*-monoˡ-≤ S (m^n>0 2 (S * (S * S)
+                                                       + S * (S * S)
+                                                       + S * S))))
                        (walkFac≤nestWalkAt e₁ sl₁ 0))
               (nestWalkAt≤nestΦAt e₁ sl₁ 0)
 

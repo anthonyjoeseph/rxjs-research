@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; *-distribˡ-+; +-suc; +-assoc)
+  +-mono-≤; *-distribˡ-+; +-suc; +-assoc; +-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -45,13 +45,14 @@ open import Verify-Budget-Sufficient.Walk-Factor using
   (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
-  valsΦ?-mono; stepFrame-nest-Φ; Φ-to-bound)
+  valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; Φ-to-bound)
 open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsSz)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; base; walk; ent-step)
 open import Verify-Budget-Sufficient.Live-Nest-Walk using
-  (foldPath-nest-live; PathLiveHyp; walk-LiveHyp-go)
+  (foldPath-nest-live; PathLiveHyp; DispatchLiveHyp; ShareGoLiveHyp; FrameLiveHyp;
+  frameLive-of-sz)
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; storeNestMax; nestCapAt; nestOK?; realWidAt-def; nestUnit;
   slotsNestSum; liveNest; nodeNest; regsNestMax; sightCeil; slotWrapSum; nestCapAt-0;
@@ -66,7 +67,8 @@ open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 2≤capsAt-size; 8≤capsAt-size; B2-cReg≤cSize; Caps; capsAt; capsAt-base-size;
-  capsH; frameStep; frameStep-0; sizeCount; iterSize-infl; frameStep-mono-j; _⊑ᶜ_; lvls-mono)
+  capsH; frameStep; frameStep-0; sizeCount; iterSize-infl; iterSize-mono-count;
+  frameStep-mono-j; _⊑ᶜ_; lvls-mono)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; ∧-true; 2X≡X+X; all-impl)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -83,7 +85,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
-   foldPath-slots; shareAdmit-caps)
+   foldPath-slots; shareAdmit-caps; pathSz?-len)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -613,6 +615,17 @@ postulate
   --   measured, so it constrains none of the instants that carry the
   --   width.  The premise is undischargeable for the same reason the
   --   field was unthreadable, one frame further on.
+  -- DEAD ROUTE: taking the tie off the REGISTRY face instead, on the
+  --   reading that a fanned chain's price and this arm's are one
+  --   missing relation owed at two sites.  That face turned out to
+  --   need no new relation at all -- a chain legal at the cap climbs
+  --   at most a cap's worth of levels, and that is proven -- so what
+  --   closed there was a LEVEL ledger, a quantity that COMPOUNDS
+  --   along a walk and is paid for by a term per hop.  The potential
+  --   does not compound: a fanned chain owes what the sink was handed
+  --   and nothing accumulated on the way in.  There is no shared
+  --   statement to state once, so this arm is not waiting on that
+  --   face.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -1661,6 +1674,152 @@ chainStep-nest-nodesC {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ
     (entryΦ sl id a path hp hΦ)
     (chain-walk-ΦHyp sl id Lc a nextId path sched st hcc hdc hsl hp hΦ)
 
+-- THE LIVE WALK AND THE FAN-OUT IT RE-ENTERS, AS ONE MUTUAL BODY, and
+-- it stands here rather than beside its own statements because this is
+-- where the registry's reading is a FACT.  The monolithic form it
+-- replaces was owed a premise relating the registry's price to the
+-- values its chains produce; `fan-regsSz` is that reading, taken at
+-- the program's cap over an ARBITRARY state, so the fold re-derives
+-- chain legality at every state `foldPath` leaves instead of carrying
+-- a receipt that degrades as it goes.
+--
+-- AND THE RELATION IS THE LENGTH CONJUNCT, WHICH WAS ALREADY PROVEN.
+-- Legality prices a chain's syntax, the conclusion prices the values
+-- that syntax emits, and `pathSz?-len` is the bridge: a chain the
+-- registry admits at the cap climbs at most a cap's worth of levels,
+-- so a fanned-into chain entered at level `j` finishes under `j + S`.
+-- That is what the level ledger below buys with its `S` per hop, and
+-- the dispatch gas is what bounds the hops.
+--
+-- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
+-- REFUTED: `Refuted.Sink-Level-Range`
+mutual
+  walk-LiveHyp-goC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv j : ℕ) (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    j + pathLen path + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
+    PathLiveHyp sf gas nid now
+      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      path vals fin sched st
+
+  -- ONE LEVEL OF THE DISPATCH TELESCOPE.  The spent arm owes nothing;
+  -- the latched one is the fan-out fold over the admitted snapshot,
+  -- and the snapshot is read off the state BEFORE the latch, which is
+  -- the state `fan-regsSz` is spent at.
+  walk-share-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv j : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    j + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
+    DispatchLiveHyp sf gas nid now
+      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      i vals fin sched st
+
+  -- THE FAN-OUT FOLD, ENTRY BY ENTRY AND AT THE STATE EACH LEAVES.  A
+  -- cancelled entry owes nothing and does not move the state; a
+  -- delivered one is walked at the level its VALUES stand at -- the
+  -- same level, since the fan-out hands every chain what arrived --
+  -- and its own frames are paid for out of the hop's `S`.
+  walk-shareGo-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv j : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
+    j + Caps.cSize (capsAt e sl id) + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
+    ShareGoLiveHyp sf gas nid now
+      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      i vals fin ps sched st
+
+  walk-share-LiveHypC sl id sf zero nid now Lv j i vals fin sched st _ _ = tt
+  walk-share-LiveHypC {e = e} sl id sf (suc gas) nid now Lv j i vals fin sched st
+                      hsz hj =
+    walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
+      hsz (fan-chain-sz sl id i st (fan-regsSz sl id st)) hj′
+    where
+    S = Caps.cSize (capsAt e sl id)
+    hj′ : j + S + gas * S ≤ Lv
+    hj′ = ≤-trans (≤-reflexive (+-assoc j S (gas * S))) hj
+
+  walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin [] sched st
+                        _ _ _ = tt
+  walk-shareGo-LiveHypC {e = e} sl id sf gas nid now Lv j i vals fin
+                        ((rid , p) ∷ ps) sched st hsz hpz hj
+    with any (_≡ᵇ rid) (EvalSt.cancelled st)
+  ... | true  = walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin ps
+                  sched st hsz (∧-trueʳ hpz) hj
+  ... | false =
+      walk-LiveHyp-goC sl id sf gas nid now Lv j p vals fin sched st₀
+        hsz hp₀ hjHead
+    , walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin ps
+        (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
+        hsz (∧-trueʳ hpz) hj
+    where
+    S : ℕ
+    S = Caps.cSize (capsAt e sl id)
+    hp₀ : pathSz? S p ≡ true
+    hp₀ = ∧-trueˡ hpz
+    st₀ : EvalSt e
+    st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
+    evs = if fin then close (toℕ i) exhausted ∷ [] else []
+    FP  = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
+    hjHead : j + pathLen p + gas * S ≤ Lv
+    hjHead = ≤-trans (+-monoˡ-≤ (gas * S)
+                       (+-monoʳ-≤ j (pathSz?-len S p hp₀))) hj
+
+  walk-LiveHyp-goC sl id sf gas nid now Lv j root vals fin sched st _ _ _ = tt
+  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv j (share-sink i) vals fin
+                   sched st hsz _ hj =
+    walk-share-LiveHypC sl id sf gas nid now Lv j i vals fin sched st hsz hj′
+    where
+    S = Caps.cSize (capsAt e sl id)
+    hj′ : j + gas * S ≤ Lv
+    hj′ = ≤-trans (+-monoˡ-≤ (gas * S) (≤-reflexive (sym (+-identityʳ j)))) hj
+  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv j (f ↠ p) vals fin sched st
+                   hsz hpz hj =
+      hHead
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (suc j) p
+        (proj₁ step)
+        (proj₁ (proj₂ (proj₂ step)))
+        (proj₁ (proj₂ (proj₂ (proj₂ step))))
+        (proj₂ (proj₂ (proj₂ (proj₂ step))))
+        (stepFrame-sz sf nid now f p vals fin sched st S j hfz hsz)
+        hpTail
+        hjTail
+    where
+    S : ℕ
+    S = Caps.cSize (capsAt e sl id)
+    step = stepFrame sf nid now f p vals fin sched st
+    1≤S : 1 ≤ S
+    1≤S = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
+    j≤Lv : j ≤ Lv
+    j≤Lv = ≤-trans (m≤m+n j (pathLen (f ↠ p)))
+                   (≤-trans (m≤m+n (j + pathLen (f ↠ p)) (gas * S)) hj)
+    atV : valsSz? (iterSize S Lv S) vals ≡ true
+    atV = valsSz?-mono (iterSize S j S) (iterSize S Lv S) vals
+            (iterSize-mono-count S S 1≤S j≤Lv) hsz
+    hHead : FrameLiveHyp (iterSize S Lv S) f p vals
+    hHead = frameLive-of-sz (iterSize S Lv S) f p vals atV
+    hfz : frameSz? S f ≡ true
+    hfz = proj₁ (∧-true (frameSz? S f)
+                   ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)
+    hpTail : pathSz? S p ≡ true
+    hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
+                      (proj₂ (∧-true (frameSz? S f)
+                               ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
+    hjTail : suc j + pathLen p + gas * S ≤ Lv
+    hjTail = ≤-trans (≤-reflexive
+                       (cong (_+ gas * S) (sym (+-suc j (pathLen p))))) hj
+
 -- THE SIZE-SIDE SIDE CONDITION, DISCHARGED, AND IN THE LADDER'S OWN
 -- CURRENCY.  The walk reads the bound at the level it has reached and
 -- each frame moves the level by one, so what the caller owes is the
@@ -1676,21 +1835,27 @@ chainStep-nest-nodesC {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ
 -- whatever the first k-1 left, and that range is still a property of
 -- the SELECTION; what changed is that it is now the consumer's
 -- question and not a premise the walk carries through its own arms.
+--
+-- AND THE LEDGER NOW PAYS FOR THE FAN-OUT TOO, which is what the
+-- registry reading stopped being a premise in exchange for.  A chain
+-- reaching a sink leaves for the registry's own chains, each of which
+-- climbs by at most a cap; the dispatch gas bounds how many such hops
+-- follow, so the level the walk can reach is its own frames plus a cap
+-- per hop -- and that is one term rather than a receipt threaded
+-- through the arms.
 chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (gas : ℕ) (Lv j : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
-  j + pathLen path ≤ Lv →
+  j + pathLen path + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
   PathLiveHyp (budgetAt e (Sched.slots sched) nextId) gas nextId (arrTick a)
     (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
     path (arrVal a ∷ []) (Arrival.isLast a) sched st
-chain-walk-LiveHyp {e = e} sl id a nextId gas Lv j path sched st hsl hsz hp hreg hj =
-  walk-LiveHyp-go _ gas nextId (arrTick a) S (iterSize S Lv S) Lv j path
-    (arrVal a ∷ []) (Arrival.isLast a) sched st ≤-refl 1≤S entrySz hp hreg hj
+chain-walk-LiveHyp {e = e} sl id a nextId gas Lv j path sched st hsl hsz hp hj =
+  walk-LiveHyp-goC sl id _ gas nextId (arrTick a) Lv j path
+    (arrVal a ∷ []) (Arrival.isLast a) sched st entrySz hp hj
   where
   S = Caps.cSize (capsAt e sl id)
   1≤S : 1 ≤ S
@@ -1720,7 +1885,7 @@ chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
             (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
-  j + pathLen path ≤ Lv →
+  j + pathLen path + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   foldr (λ l acc → liveNest l ⊔ acc) 0
         (Sched.live (proj₁ (proj₂ (chainStep nextId a path sched st))))
     ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
@@ -1735,7 +1900,7 @@ chainStep-nest-liveC {e = e} sl id Lc a nextId Lv j path sched st
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       (entryΦ sl id a path hp hΦ)
       (chain-walk-ΦHyp sl id Lc a nextId path sched st hcc hdc hsl hp hΦ)
-      (chain-walk-LiveHyp sl id a nextId _ Lv j path sched st hsl hsz hp hreg hj))
+      (chain-walk-LiveHyp sl id a nextId _ Lv j path sched st hsl hsz hp hj))
     (⊔-lub ≤-refl (≤-trans afford (m≤n⊔m _ (nestΦAt e sl id))))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
@@ -1781,7 +1946,7 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
             (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
-  j + pathLen path ≤ Lv →
+  j + pathLen path + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   storeNestMax (proj₁ (proj₂ (chainStep nextId a path sched st)))
@@ -1895,14 +2060,15 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                 ≤ᵇ nestUnit e sl) chains ≡ true →
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
             (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
-  j + chainsLenSum chains + length chains ≤ Lv →
+  j + chainsLenSum chains + length chains
+    + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   depthCascade a nextId chains sched st
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
 cascade-depth-go sl id Lc a nextId S Lv j [] sched st
                  hca hsight hsl afford hsz hps hΦs hreg hbud hinc hS = z≤n
-cascade-depth-go {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sched st
+cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sched st
   hca hsight hsl afford hsz hps hΦs hreg hbud hinc hS =
   ⊔-lub (cascade-depth-go sl id Lc a nextId S Lv j cs sched st
            (proj₁ hca) hsight hsl afford hsz hpr hΦr hreg hbud-tail hinc hS)
@@ -1935,23 +2101,29 @@ cascade-depth-go {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sched st
                          ≤ᵇ nestUnit e sl) _ hΦs)
   hΦr = proj₂ (∧-true (nestDᵛ (arrTy a) (arrVal a) + pathNestD c
                          ≤ᵇ nestUnit e sl) _ hΦs)
-  hbud-head : j + pathLen c ≤ Lv
+  N   = n * Caps.cSize (capsAt e sl id)
+  hbud-head : j + pathLen c + N ≤ Lv
   hbud-head =
-    ≤-trans (≤-trans (+-monoʳ-≤ j (m≤m+n (pathLen c) (chainsLenSum cs)))
-                     (m≤m+n (j + (pathLen c + chainsLenSum cs)) (suc (length cs))))
+    ≤-trans (+-monoˡ-≤ N
+              (≤-trans (+-monoʳ-≤ j (m≤m+n (pathLen c) (chainsLenSum cs)))
+                       (m≤m+n (j + (pathLen c + chainsLenSum cs))
+                              (suc (length cs)))))
             hbud
-  hbud-tail : j + chainsLenSum cs + length cs ≤ Lv
+  hbud-tail : j + chainsLenSum cs + length cs + N ≤ Lv
   hbud-tail =
-    ≤-trans (+-mono-≤ (+-monoʳ-≤ j (m≤n+m (chainsLenSum cs) (pathLen c)))
-                      (n≤1+n (length cs)))
+    ≤-trans (+-monoˡ-≤ N
+              (+-mono-≤ (+-monoʳ-≤ j (m≤n+m (chainsLenSum cs) (pathLen c)))
+                        (n≤1+n (length cs))))
             hbud
-  hbud-next : suc j + chainsLenSum cs + length cs ≤ Lv
+  hbud-next : suc j + chainsLenSum cs + length cs + N ≤ Lv
   hbud-next =
-    ≤-trans (s≤s (+-monoˡ-≤ (length cs)
-                    (+-monoʳ-≤ j (m≤n+m (chainsLenSum cs) (pathLen c)))))
-            (≤-trans (≤-reflexive
-                       (sym (+-suc (j + (pathLen c + chainsLenSum cs)) (length cs))))
-                     hbud)
+    ≤-trans (+-monoˡ-≤ N
+              (≤-trans (s≤s (+-monoˡ-≤ (length cs)
+                              (+-monoʳ-≤ j (m≤n+m (chainsLenSum cs) (pathLen c)))))
+                       (≤-reflexive
+                         (sym (+-suc (j + (pathLen c + chainsLenSum cs))
+                                     (length cs))))))
+            hbud
 
 -- the cascade's opening ledger write is not a registry write, on
 -- either branch of the spent-source test
@@ -1993,10 +2165,11 @@ cascade-afford : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (capsAt e sl id) sched st ≡ true →
   iterSize (Caps.cSize (capsAt e sl id))
-    (chainsLenSum (chainsOf a st) + length (chainsOf a st))
+    (chainsLenSum (chainsOf a st) + length (chainsOf a st)
+      + n * Caps.cSize (capsAt e sl id))
     (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id
-cascade-afford {e = e} sl id a sched st hok =
+cascade-afford {n = n} {e = e} sl id a sched st hok =
   ≤-trans (iterSize≤walkFac S _ S (8≤capsAt-size e sl id) ledger ≤-refl)
           (≤-trans (walkFac≤nestWalkAt e sl id) (nestWalkAt≤nestΦAt e sl id))
   where
@@ -2005,13 +2178,15 @@ cascade-afford {e = e} sl id a sched st hok =
   wid = ≤-trans (chains-count-width sl id a sched st hok)
                 (≤-trans (≤-reflexive (realWidAt-def e sl id))
                          (B2-cReg≤cSize e sl id))
-  ledger : chainsLenSum (chainsOf a st) + length (chainsOf a st) ≤ S * S + S
+  ledger : chainsLenSum (chainsOf a st) + length (chainsOf a st) + n * S
+             ≤ S * S + S + S * S
   ledger =
-    +-mono-≤ (≤-trans (chainsLenSum-bound S (chainsOf a st)
-                         (chainsGo-sz S a (EvalSt.registry st)
-                           (capsOK?-regs (capsAt e sl id) sched st hok)))
-                      (*-monoˡ-≤ S wid))
-             wid
+    +-mono-≤ (+-mono-≤ (≤-trans (chainsLenSum-bound S (chainsOf a st)
+                                   (chainsGo-sz S a (EvalSt.registry st)
+                                     (capsOK?-regs (capsAt e sl id) sched st hok)))
+                                (*-monoˡ-≤ S wid))
+                       wid)
+             (*-monoˡ-≤ S (n≤capsAt-size e sl id))
 
 -- AND ALL THREE OF THE CEILING'S SUMMANDS ARE THE SAME CAP.  The
 -- arrival's nesting is held under it by the caller's premise, the
@@ -2102,7 +2277,8 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
             (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
-  j + chainsLenSum chains + length chains ≤ Lv →
+  j + chainsLenSum chains + length chains
+    + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
   storeNestMax sched st ≤ S →
   (J g i : ℕ) →
@@ -2188,25 +2364,30 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
                     (chain-deliv-cap sl id a nextId path sched st′ Lc J g i
                        sleq hgn cok (pathSz?-widen path (proj₁ c⊑) hpc)
                        HVC hdc hLc))
-  hbud-head : j + pathLen path ≤ Lv
+  N   = n * B
+  hbud-head : j + pathLen path + N ≤ Lv
   hbud-head =
-    ≤-trans (≤-trans (+-monoʳ-≤ j (m≤m+n (pathLen path) (chainsLenSum chains)))
-                     (m≤m+n (j + (pathLen path + chainsLenSum chains))
-                            (suc (length chains))))
+    ≤-trans (+-monoˡ-≤ N
+              (≤-trans (+-monoʳ-≤ j (m≤m+n (pathLen path) (chainsLenSum chains)))
+                       (m≤m+n (j + (pathLen path + chainsLenSum chains))
+                              (suc (length chains)))))
             hbud
-  hbud-tail : j + chainsLenSum chains + length chains ≤ Lv
+  hbud-tail : j + chainsLenSum chains + length chains + N ≤ Lv
   hbud-tail =
-    ≤-trans (+-mono-≤ (+-monoʳ-≤ j (m≤n+m (chainsLenSum chains) (pathLen path)))
-                      (n≤1+n (length chains)))
+    ≤-trans (+-monoˡ-≤ N
+              (+-mono-≤ (+-monoʳ-≤ j (m≤n+m (chainsLenSum chains) (pathLen path)))
+                        (n≤1+n (length chains))))
             hbud
-  hbud-next : suc j + chainsLenSum chains + length chains ≤ Lv
+  hbud-next : suc j + chainsLenSum chains + length chains + N ≤ Lv
   hbud-next =
-    ≤-trans (s≤s (+-monoˡ-≤ (length chains)
-                    (+-monoʳ-≤ j (m≤n+m (chainsLenSum chains) (pathLen path)))))
-            (≤-trans (≤-reflexive
-                       (sym (+-suc (j + (pathLen path + chainsLenSum chains))
-                                   (length chains))))
-                     hbud)
+    ≤-trans (+-monoˡ-≤ N
+              (≤-trans (s≤s (+-monoˡ-≤ (length chains)
+                              (+-monoʳ-≤ j (m≤n+m (chainsLenSum chains)
+                                                  (pathLen path)))))
+                       (≤-reflexive
+                         (sym (+-suc (j + (pathLen path + chainsLenSum chains))
+                                     (length chains))))))
+            hbud
 
 cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ) (Lv : ℕ)
@@ -2227,7 +2408,8 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) 0
             (Caps.cSize (capsAt e sl id)))
           (EvalSt.registry (cascadeLatch a st)) ≡ true →
-  chainsLenSum (chainsOf a st) + length (chainsOf a st) ≤ Lv →
+  chainsLenSum (chainsOf a st) + length (chainsOf a st)
+    + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
   storeNestMax sched (cascadeLatch a st) ≤ S →
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
@@ -2271,12 +2453,11 @@ cascade-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a))
                 (nestΦAt e sl id)
                 (nestUnit e sl)
-cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hval hsz valC closC =
-  cascade-depth-go sl id 0 a nextId (nestΦAt e sl id)
-    (chainsLenSum (chainsOf a st) + length (chainsOf a st)) 0
+cascade-depth-sighted {n = n} {e = e} sl id a nextId sched st
+                      hsl hok hn hval hsz valC closC =
+  cascade-depth-go sl id 0 a nextId (nestΦAt e sl id) LV 0
     (chainsOf a st) sched (cascadeLatch a st)
-    (cascade-caps-all sl id a nextId (nestΦAt e sl id)
-       (chainsLenSum (chainsOf a st) + length (chainsOf a st)) sched st hsl hok
+    (cascade-caps-all sl id a nextId (nestΦAt e sl id) LV sched st hsl hok
        SIGHT (cascade-afford sl id a sched st hok) hsz CHAINPZ CHAINΦ valC closC
        (latch-regsSz (Caps.cSize (capsAt e sl id)) a st
          (capsOK?-regs (capsAt e sl id) sched st hok))
@@ -2292,6 +2473,8 @@ cascade-depth-sighted {e = e} sl id a nextId sched st hsl hok hn hval hsz valC c
     ≤-refl
     STORE
   where
+  LV = chainsLenSum (chainsOf a st) + length (chainsOf a st)
+         + n * Caps.cSize (capsAt e sl id)
   CHAINPZ = chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
               (capsOK?-regs (capsAt e sl id) sched st hok)
   CHAINΦ = chainsNest-all (nestDᵛ (arrTy a) (arrVal a)) (nestUnit e sl)

@@ -84,6 +84,16 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   are premised once at entry and the registered length is bounded
 --   against that reading rather than against the values the walk
 --   later carries.
+-- DEAD ROUTE: and neither does deleting this face outright and reading
+--   the registry off the caps face's own levelled walk, which is the
+--   repair the two faces' near-identical clause structure invites.  The
+--   projector and the levelled walk predicate both exist and the walks
+--   do rewrite clause for clause, but the consumer does not: the depth
+--   cascade is what spends these walks, and its own ceiling is a
+--   PREMISE of the lemma that produces the caps receipt, so a cascade
+--   taking that receipt would be proving its ceiling from its ceiling.
+--   The caps face sits ABOVE the depth cascade, not beside it, and that
+--   ordering is what the redundancy reading misses.
 --
 -- PROBED: `Probed.Chain-Step-Regs-Level` -- the ROOTWARD re-entry, over
 --   a stack of one to eight `mergeAllᵉ` flattens whose sources are each

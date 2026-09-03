@@ -215,28 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND RELATE THE REGISTRY'S PRICE TO WHAT ITS CHAINS PRODUCE.** The
-  live sink is refuted at every budget, and the separation just landed
-  says why no number repairs it: not one of its witnesses reads the
-  ceiling, so freeing the currency changes nothing they rest on. What
-  all three exploit is one gap — legality prices a chain's SYNTAX, the
-  conclusion prices the VALUES that syntax emits, and nothing ties the
-  two. The commit states that relation as its own leaf, owed at the
-  registry rather than at the walk, and instantiates it at the
-  embedding map the level witness escapes through, which is the
-  smallest shape separating a chain's price from its output's.
-
-- **AND STATE THE CEILING A LATER FRAME'S VALUES ARE UNDER.** The fold
-  grant's binary came back saying the arm waits on a ceiling that does
-  not exist: a run's widest instant moves with the slot script's burst
-  and with nothing the program names, and the one proven tie from
-  syntax to a value count prices the SUBSCRIBE frame, which the family
-  that can tower a width leaves empty. That missing tie is also what
-  the leg above finds at the registry, one face over, so the commit
-  states it ONCE — a later frame's values under a reading its own
-  descent supplies — and wires the fold's grant to it, leaving the
-  registry relation a consumer rather than a sibling.
-
 - **AND CARRY THE TELESCOPE'S STRATIFICATION WHERE THE CHAIN IS READ.**
   The sink leaf's escalation turned out to be program-bounded: hops
   climb the slot telescope and none re-enters, so the count is capped
@@ -246,6 +224,27 @@ does not fit is a finding about the shared statement, not about the head.
   about the registry is true. So the commit puts stratification in the
   invariant record as a carried conjunct rather than a hypothesis, and
   the sink arm becomes its first consumer.
+- **AND RETIRE THE REGISTRY RECEIPT THE WALK NO LONGER READS.** The
+  level ledger pays for the fan-out now, so the size side condition is
+  re-derived at each state the fold leaves rather than threaded down
+  from the arrival — and the threaded receipt is spent by nothing but
+  itself. Three declarations hold one another up: the chain step's
+  reading feeds the next chain's, the fold's leaf feeds the chain
+  step's, and the fold's own price is a live row carrying five sweeps.
+  Dropping the premise from the cascade's two folds retires all three
+  at once, which is a face leaving the ledger rather than a postulate
+  being proven.
+
+- **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
+  hop that climbs has strictly less telescope above it, and that is the
+  quantity the leaf's price does not read. The separation says why it
+  matters: a chain's factor is its leaf's times its frames', so a leaf
+  priced at the whole cap must dominate itself times a frame product,
+  while one priced at the REMAINING height need only dominate what a
+  shorter climb can spend. The commit restates the leaf's exponent in
+  that currency and re-reads the sink arm against it, which is where
+  the carried conjunct is finally spent.
+
 
 ### The ledger
 
@@ -267,11 +266,6 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
-  sink fans into. Its budget is now its own number, met once at the consumer —
-  and no witness reads the ceiling, so what is owed is a RELATION between a
-  chain's price and its output's.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
@@ -294,7 +288,7 @@ does not fit is a finding about the shared statement, not about the head.
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region. The binary is ANSWERED and neither
   branch repairs it — a run's count is script-denominated, so this waits on a
@@ -306,11 +300,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
-  `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
-  frame. Probed at the subscribing frame — the only kind that can grow the
-  registry — driven to the boundary its premises allow: one level pays with
-  slack that GROWS with the level. A shared-slot inner is unread.
 - **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×5`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
