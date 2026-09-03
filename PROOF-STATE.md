@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
-  ARE CARRIED AT.** The chains a sink fans into are walked at the
-  round's ENTRY cap, while every receipt the sink actually holds — the
-  invariant record's own registry conjunct, the sink predicate's over
-  the admitted sublist, the walk clause's at the stepped cap — is read
-  above it, and these receipts weaken upward. So a size postulate is
-  being spent to re-derive, at a smaller cap, a fact three carried
-  fields already state. The commit reads which of the three the fanned
-  walk can be restated at without re-denominating the share ring's own
-  fold budget, and names what the entry cap is still load-bearing for.
-
 - **AND CARRY THE SEPARATION UP THE LIVE WALK.** The outer mint now
   concludes at its own size budget, because depth truncates at the
   defer this arm mints across and size counts through it — so the
@@ -246,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   run reaches is a premise the statement may simply carry, while a
   reachable one refutes the family rather than this denomination. The
   commit builds the run that decides it and reports which way it fell.
+
+- **AND PRICE THE SINK LEAF AGAINST THE HOP IT ESCALATES BY.** The
+  entry cap is load-bearing for the Φ pricing alone, and the pricing
+  is where the fan-out's own arm is refuted: a chain ending at a
+  second hand-over carries the leaf's price MULTIPLIED by its frames',
+  and the hop count is bounded by nothing but the dispatch gas. So the
+  walk's residue and the arm's refutation are one quantity read twice,
+  which is why neither moved while they were treated as two. The
+  commit asks whether the hop count is bounded by the PROGRAM instead
+  — admission never reads whether a chain has been delivered to, so a
+  chain re-entered through its own sink is the shape to instantiate.
 
 ### The ledger
 
@@ -269,9 +269,9 @@ does not fit is a finding about the shared statement, not about the head.
   was never paying. Uncovered: an entry fold already nonzero.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
-  sink fans into. Every reading in the level currency is closed, and the
-  demand is in the CONCLUSION, so no premise change here repairs it —
-  dropping the affordability only makes the statement stronger.
+  sink fans into. Every reading in the level currency is closed, and the demand
+  is in the CONCLUSION, so no premise change here repairs it — dropping the
+  affordability only makes the statement stronger.
 - **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
@@ -289,10 +289,11 @@ does not fit is a finding about the shared statement, not about the head.
   an admitted chain that ends at a SECOND hand-over. The residue of the
   terminal split: its factor is the sink's own times its frames', and the hop
   count is bounded by nothing but the dispatch gas.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the registry's own
-  size receipt at the PROGRAM's cap. THE FIELD ALREADY EXISTS AND CANNOT BE
-  SPENT: three carried receipts are in hand, every one at a cap above the
-  fanned walk's, and the receipt weakens upward.
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+  registry's own size receipt at the PROGRAM's cap. THE ENTRY CAP IS THE Φ
+  PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
+  walk's, and taking the walk up to one moves the leaf's exponent and its
+  budget.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×3`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region, since a depth fixed before the count
