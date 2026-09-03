@@ -92,57 +92,30 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   The registered length grows by exactly ONE per flatten level while
 --   the inner's own size grows by four, so the descent does not recurse
 --   and the one axis that could refute this form is closed along that
---   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, which
---   `Probed.Chain-Step-Regs-Share` takes up.
+--   route.  NOT COVERED: the SIDEWAYS re-entry at a `share-sink`, and
+--   the shapes the sweep below covers.
 --
--- PROBED: `Probed.Chain-Step-Regs-Share` -- the SIDEWAYS re-entry, where
---   `foldPath` and `dispatchShare` are mutually recursive and the depth
---   is the share telescope rather than the syntax.  One five-slot
---   context, a scripted driver at slot zero and four `mergeAllᵉ` shares
---   above it, rooted at each of the five slots in turn, so one arrival
---   crosses zero to four share boundaries inside a single `chainStep`.
---   Every row is pinned to the arm that measures a real step, and the
---   step's emit count is read alongside the lengths: it is the crossing
---   count plus one at every depth, so the telescope is entered and not
---   merely built.  The maximum registered path length is TWO before the
---   step and two after it at every one of the five depths -- the
---   sideways route lengthens no registered path at all, while the
---   registry count tracks the telescope and is unchanged across the
---   step.  NOT COVERED: a telescope deeper than four, and a share
---   fanning out to more than one chain, which
---   `Probed.Chain-Step-Regs-Fan` takes up.
---
--- PROBED: `Probed.Chain-Step-Regs-Fan` -- the DIAMOND, the share shape
---   both re-entry sweeps left out: each of them fans every share to
---   exactly one registered chain and so measures a share as a relay.
---   Width is varied in the PROGRAM rather than in the telescope, `w`
---   branches of the root reading one `input`, over three slots at
---   widths one to four; and two further rows put a width-`w` fan over
---   a share whose own def is a two-way fan, which is where width
---   compounds with depth.  The emit count separates a relay from a
---   fan outright and reads as the fan: the compounded rows deliver
---   twice their width, not their width.  The maximum registered path
---   length is THREE before the step and three after it in every row,
---   width one through four and compounded alike -- so a fan multiplies
---   registry ENTRIES and the emit stream, and lengthens no entry.
---   NOT COVERED: the operator KIND at the frames of a sinking chain,
---   which `Probed.Chain-Step-Regs-Cut` takes up.
---
--- PROBED: `Probed.Chain-Step-Regs-Cut` -- the CUTTING arm, against a
---   flatten control of the same shape.  A `takeᵉ` whose count expires
---   on the stepped arrival, at the leaf and again on the def of a share
---   so the cut sits BETWEEN two sinks; plus a mixed row where one
---   branch of a width-two share cuts and the other survives, which is
---   where `shareGo`'s ordering is observable.  No cut leaves a longer
---   entry registered than the control does: the cut rows come back
---   SHORTER, and the survivor of the mixed row sits at exactly the
---   control's length.  NOT COVERED, and the rows say so themselves:
---   `switchAllᵉ` and `exhaustAllᵉ` read identical to the control
---   because a FIRST arrival gives neither anything to cut, so their
---   real arm needs a second `chainStep`; and every row that does cut
---   SHRINKS the registry, which satisfies a growth bound whatever the
---   frames did -- those rows are evidence about the length conjunct
---   alone, which is the only unbounded one but not the only one.
+-- PROBED: `git show b066797` holds three re-entry sweeps whose reading
+--   is one sentence and whose programs are the expensive part -- the
+--   SIDEWAYS re-entry where `foldPath` and `dispatchShare` recur
+--   through a four-deep share telescope rooted at each of five slots;
+--   the DIAMOND, where a share fans to several registered chains at
+--   widths one to four and again compounded over a two-way def; and
+--   the CUTTING arm, a `takeᵉ` expiring at the leaf, on a share's def
+--   between two sinks, and on one branch of a width-two share where
+--   `shareGo`'s ordering is observable.  In all three the maximum
+--   registered path length is UNCHANGED across the step and equal to
+--   the flatten control's: the telescope holds at two, the fan at
+--   three at every width, and no cut leaves an entry longer than the
+--   control.  So a share is entered rather than merely built (the
+--   emit count is the crossing count plus one), a fan multiplies
+--   registry ENTRIES and lengthens none of them, and a cut only
+--   shrinks.  NOT COVERED: a telescope deeper than four; and the cut
+--   rows speak to the length conjunct alone, since a shrinking step
+--   satisfies a growth bound whatever the frames did -- and two of
+--   their arms did not cut at all, a FIRST arrival giving `switchAllᵉ`
+--   nothing to abandon and `exhaustAllᵉ` nothing to refuse, which is
+--   the gap the sweep below is read to close.
 -- PROBED: `Probed.Chain-Step-Regs-Second` -- the SECOND arrival, which
 --   closes both gaps the cutting sweep named.  The inner is a scripted
 --   slot timed past the outer, so it is still live when the second
@@ -154,32 +127,27 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   the inner it registers, both cutting arms hold level -- so the SIZE
 --   conjunct is under test here for the first time, not merely the
 --   length one.  Registered length is flat at the control's on every
---   row, the share-def cut included.  NOT COVERED: the inner never
---   fires, so no arrival ever comes FROM one -- which
---   `Probed.Chain-Step-Regs-Inner` takes up -- and what an abandoned
---   inner's own delivery would do after its registration is dropped is
---   unmeasured.
+--   row, the share-def cut included.  NOT COVERED: what an abandoned
+--   inner's own delivery would do after its registration is dropped.
 --
--- PROBED: `Probed.Chain-Step-Regs-Inner` -- the arrival that comes FROM
---   an inner, which is the re-entry every sweep above steps past: all
---   of them step an outer's arrival, and an inner registered by a
---   flatten re-enters `foldPath` mid-flight, carrying the sighted path
---   the outer built.  It is the second-arrival sweep's program with one
---   line of its script changed -- the inner is due BETWEEN two outer
---   values instead of past them all -- and the shift is pinned by a
---   provenance CONTRAST rather than by a bare number: the stepped
+-- PROBED: `git show b066797` holds the arrival that comes FROM an
+--   inner, which is the re-entry every sweep above steps past: all of
+--   them step an OUTER's arrival, and an inner registered by a flatten
+--   re-enters `foldPath` mid-flight carrying the sighted path the
+--   outer built.  It is the second-arrival program with one line of
+--   its script changed -- the inner due BETWEEN two outer values
+--   rather than past them all -- and the shift is pinned by a
+--   provenance CONTRAST rather than a bare number: the stepped
 --   arrival's source differs from the first arrival's under the
 --   retiming and equals it under the sibling's timing, so the two
---   readings together say the door was entered at an inner.  Registered
---   length comes back no longer than the same program's flatten control
---   at the same step, on every arm -- so the one unbounded conjunct is
---   not lengthened by the frames a mid-flight path arrives carrying.
---   NOT COVERED: one level of nesting, so an arrival from an inner OF
---   an inner is not reached; the inner is a bare slot read, so nothing
---   here carries operators of its own into the registered chain, which
---   is the quantity `Refuted.Chain-Step-Regs-Cap` moves; and the
---   stepped arrival is the SECOND overall, so a door met after several
---   inner deliveries have landed is unmeasured.
+--   readings together say the door was entered at an inner.
+--   Registered length comes back no longer than the same program's
+--   flatten control at the same step, on every arm -- so the one
+--   unbounded conjunct is not lengthened by the frames a mid-flight
+--   path arrives carrying.  NOT COVERED: one level of nesting, so an
+--   arrival from an inner OF an inner is unreached; and the stepped
+--   arrival is the SECOND overall, so a door met after several inner
+--   deliveries have landed is unmeasured.
 --
 -- PROBED: `Probed.Chain-Step-Regs-Ops` -- an inner that CARRIES
 --   OPERATORS, which is the axis `Refuted.Chain-Step-Regs-Cap` moves
@@ -210,7 +178,7 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   is reached only through the held row.
 --
 -- PROBED: `Probed.Chain-Step-Regs-Read` -- a frame that READS its
---   argument's syntax, which is the axis all seven sweeps above hold
+--   argument's syntax, which is the axis every sweep above holds
 --   fixed, taken here in its DUPLICATING form: a map function merging
 --   its argument with itself, stacked zero, two, four and six deep.
 --   The duplication is witnessed rather than assumed -- the chains
@@ -246,12 +214,12 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   closing.  NOT COVERED: the walk is disjoint from the standing
 --   entries here, and the separation is only in the length conjunct --
 --   `S` is held at one program throughout rather than swept.
--- PROBED: `Probed.Fold-Regs-Reentrant` -- the same separation with the
---   walk INSIDE the structure that prices `B` rather than beside it.
---   The walked branch carries duplicator frames of the same shape as
---   the unwalked heavy one, so the entries the fold registers are cut
---   from the syntax the standing entries are, and the reading is taken
---   over EVERY chain the arrival matches instead of the head of the
+-- PROBED: `git show b066797` holds the same separation with the walk
+--   INSIDE the structure that prices `B` rather than beside it.  The
+--   walked branch carries duplicator frames of the same shape as the
+--   unwalked heavy one, so the entries the fold registers are cut from
+--   the syntax the standing entries are, and the reading is taken over
+--   EVERY chain the arrival matches instead of the head of the
 --   registry's list.  The caps stay apart -- path at six against a
 --   registry at seven and ten -- and the exit column equals the
 --   registry column at every row, so a walk of the standing shape adds
@@ -260,21 +228,23 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   the walked DEPTH moved no column, three frames reading identically
 --   to one, so the construction does not lengthen the walked chain and
 --   a walk that is longer than the standing entries is still unread.
--- PROBED: `Probed.Fold-Regs-Nest-Grid` -- the NESTING spine, which is
---   the shape that refuted the doubling and the only one known to make
---   a registration track the walk's PRODUCT rather than its maximum:
---   `k` frames each wrapping `d` flatten levels compose down one
---   spine, so the exit rises with `k * d` while the walked path rises
---   with `k` alone.  Depth cannot refute -- it raises the frame's own
---   syntax, and the cap is a MAXIMUM over that syntax and the walked
---   length, so a deeper frame buys the room it costs -- which leaves
---   height as the one measure-side axis and one stretch worth
---   spending programs on: the heights at which the path is still
---   shorter than the syntax, where both caps sit PINNED and the grant
---   does not answer a taller spine.  Read at two such heights the caps
---   hold at thirteen while the exit climbs nineteen to thirty-one, so
---   the margin is shrinking there and the step still fits with room.
---   NOT COVERED here: whether that stretch ends, which is the sibling.
+-- PROBED: `git show b066797` also holds the NESTING spine below its
+--   crossover -- the shape that refuted the doubling and the only one
+--   known to make a registration track the walk's PRODUCT rather than
+--   its maximum: `k` frames each wrapping `d` flatten levels compose
+--   down one spine, so the exit rises with `k * d` while the walked
+--   path rises with `k` alone.  Depth cannot refute -- it raises the
+--   frame's own syntax, and the cap is a MAXIMUM over that syntax and
+--   the walked length, so a deeper frame buys the room it costs --
+--   which leaves height as the one measure-side axis and one stretch
+--   worth spending programs on: the heights at which the path is
+--   still shorter than the syntax, where both caps sit PINNED and the
+--   grant does not answer a taller spine.  Read at two such heights
+--   the caps hold at thirteen while the exit climbs nineteen to
+--   thirty-one, so the margin is shrinking there and the step still
+--   fits with room.  Whether that stretch ENDS is the live sibling
+--   below, and it is the reading that makes this one safe rather than
+--   a trend.
 -- PROBED: `Probed.Fold-Regs-Nest-Cross` -- that it does end, which is
 --   what makes the shrinking stretch above safe rather than a trend.
 --   Past the height at which the spine outgrows the frame the caps
@@ -286,38 +256,25 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 --   widens from there rather than closing.  NOT COVERED: one depth,
 --   and one arrival -- the spine is read where it is longest, not
 --   where a second delivery has already cut it.
--- PROBED: `Probed.Fold-Regs-Nest-Later` -- the arrival the whole
---   family had been read at its easiest.  Every row above takes the
---   door once, so the reading is made against the state the subscribe
---   left: the registry at its shortest and no chain having run.  Read
---   at the second and third arrivals instead, the path cap and the
---   exit hold while the ENTRY cap climbs once -- from the value the
---   first arrival was handed to the value that arrival left -- and
---   then does not move again.  So the premise is standing on the
---   fold's OWN registrations by the second delivery, which is a fixed
---   point of the run rather than an artifact of the subscribe, and the
---   exit does not follow the entry up: the step is spent against
---   something the run produced and still clears with room.  NOT
---   COVERED: one height, below the crossover -- a delivery cutting the
---   longer of the two columns is where the caps track the spine, and
---   that is the sibling's stretch, not this one's.
--- PROBED: `Probed.Fold-Regs-Nest-Cross-Later` -- that stretch, which
---   is the corner the three rows above are read at right angles to
---   and none of them reaches: an arrival that is not the first, at a
---   height ABOVE the crossover.  It is the only place a cut can LOWER
---   the column the grant is quadratic in while the exit it has to
---   clear stays linear in that same column and was produced by the
---   longer spine, so it is the one direction the rows above could not
---   have seen.  Covered: the second and third arrivals both, reading
---   IDENTICAL in every digit.  The path cap holds at fifteen, the
---   entry climbs once from fifteen to forty -- onto the fold's own
---   registrations, exactly as it does below the crossover -- and the
---   exit holds at forty rather than following it up.  So the fixed
---   point above the crossover is exact rather than a trend still
---   running, and cutting the spine does not break the fit.  NOT
---   COVERED: one height above the crossover and one program family;
---   and no arrival past the third, which the outer slot does not
---   offer and the corner's price would not justify.
+-- PROBED: `git show b066797` also holds the whole family read at an
+--   arrival that is NOT the first, which is the axis every row above
+--   takes at its easiest: they take the door once, so the reading is
+--   made against the state the subscribe left, the registry at its
+--   shortest and no chain having run.  Read at the second and third
+--   arrivals, below the crossover and again above it, the path cap
+--   and the exit hold while the ENTRY cap climbs exactly once -- from
+--   the value the first arrival was handed to the value that arrival
+--   left -- and then does not move.  So the premise stands on the
+--   fold's OWN registrations by the second delivery and that is a
+--   fixed point of the run rather than an artifact of the subscribe;
+--   and the exit does not follow the entry up.  Above the crossover
+--   that is the one place a delivery can LOWER the column the grant is
+--   quadratic in while the exit it must clear stays linear in that
+--   same column and was produced by the longer spine -- and the fit
+--   holds there too, so cutting the spine does not break it.  NOT
+--   COVERED: one height on each side of the crossover, one program
+--   family, and no arrival past the third, which the outer slot does
+--   not offer.
 postulate
   foldPath-regsLen : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (envSrc : Source)

@@ -36,10 +36,11 @@
 -- WHAT IS LOAD-BEARING, AND WHAT IS NOT.  The node rows can fail: the
 -- table moves under a real `chainStep` at one family or the other, and
 -- the charge names the program and the slot vocabulary alone -- no term
--- of it reads the state the chain produced.  What is NOT reached is
--- the arm the grant was added for: a fold deepening its own
--- accumulator across a burst, where the crossing is linear in a length
--- the charge cannot see.  The LIVE rows are
+-- of it reads the state the chain produced.  The arm the grant was
+-- added for is reached by the TIE at the foot of this file, which
+-- deepens the accumulator and reads the grant that costs; what is
+-- still NOT reached is that crossing across a BURST, where it would be
+-- linear in a length no row here varies.  The LIVE rows are
 -- DEGENERATE and are pinned as such: the fold reads zero before and
 -- after at both families, so no charge could have lost there and the
 -- live arm is UNREACHED by this corpus.  The REGISTRY rows are pins
@@ -49,22 +50,29 @@
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Chain-Step-Abs-Charge where
 
-open import Data.Bool using (true; _∧_)
+open import Data.Bool using (true; false; _∧_)
 open import Data.Nat using (ℕ; _≤ᵇ_; _⊔_; _+_; _*_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.List using ([]; _∷_; foldr)
+open import Data.List using (List; []; _∷_; foldr; length)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Closed; natᵗ; sizeᵉ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascade; cascadeLatch; chainStep; chainsOf)
+         cascade; cascadeLatch; chainStep; chainsOf; stepFrame; scan-f;
+         thru-outer; _↠_; mergeAllᵒ; NodeId; NodeState; scan-st; mergeAll-st)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; nodeNest; regsNestMax; nestUnit)
-open import Refuted.Demand-Programs using (Γ₂; progU; progF; insF; sucGU; sucGF)
+open import Refuted.Demand-Programs
+  using (Γ₂; progU; progF; insF; sucGU; sucGF; foldD)
+open import Verify-Budget-Sufficient.Nodes-Nest-Walk
+  using (stepFrame-nest-nodes)
+open import Probed.Apparatus using (Confirms)
 
 prog : Closed Γ₂ natᵗ
 prog = progU 8 6
@@ -195,3 +203,71 @@ fitsB : (proj₂ liveRowB  ≤ᵇ proj₁ liveRowB  ⊔ chargeB)
       ∧ (proj₂ nodesRowB ≤ᵇ proj₁ nodesRowB ⊔ chargeB)
       ∧ (proj₂ regsRowB  ≤ᵇ proj₁ regsRowB  ⊔ chargeB) ≡ true
 fitsB = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at the fold family's own chain shape: a scan frame under an
+-- outer *All, which is exactly what `progF` builds.  The type is
+-- generated from the statement, so the row reports the arm as it now
+-- reads rather than a component reading kept beside it by hand.
+--
+-- BOTH NODE IDS COME FROM THE RUN, and they have to: `stepFrame`
+-- dispatches on the table at each of them, and at an id the table does
+-- not hold every arm is the identity -- a row there would report
+-- preservation for free.
+--
+-- THE TWO PREMISES ARE LEFT STANDING, so what the row asserts is the
+-- arm with the potential and the value bound unasked, which is a
+-- stronger claim than the instance rather than a weaker one.
+--
+-- AND THE GRANT IS SPENT, EXACTLY AT THE ACCUMULATOR'S WRAP DEPTH,
+-- which is the finding the rows above could not reach because they
+-- read the whole chain against a syntactic charge.  The table the walk
+-- started from folds to five; one wrap takes it to six and three wraps
+-- to eight, so the increment IS the wrap depth and no grant-free
+-- reading exists at either.  Each row is stated at the smallest grant
+-- that admits it, and the figures pin both sides at both depths, so
+-- what the grant has to cover is a number rather than a claim.
+----------------------------------------------------------------------
+
+scanNid : List (NodeId × NodeState Γ₂) → NodeId
+scanNid []                    = 0
+scanNid ((k , scan-st _) ∷ _) = k
+scanNid (_ ∷ ns)              = scanNid ns
+
+outerNid : List (NodeId × NodeState Γ₂) → NodeId
+outerNid []                              = 0
+outerNid ((k , mergeAll-st _ _ _ _) ∷ _) = k
+outerNid (_ ∷ ns)                        = outerNid ns
+
+stepNodes : (d : ℕ) → ℕ
+stepNodes d =
+  nodesMaxB (proj₂ (proj₂ (proj₂ (proj₂
+    (stepFrame (gasPad (sucGF 1 2 2 1 1) g0) 2 0
+       (scan-f (foldD d) (scanNid (EvalSt.nodes (proj₂ afterB))))
+       (thru-outer mergeAllᵒ (outerNid (EvalSt.nodes (proj₂ afterB))) ↠ root)
+       (1 ∷ []) false (proj₁ afterB) (proj₂ afterB))))))
+
+tieFigs : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+tieFigs = length (EvalSt.nodes (proj₂ afterB))
+        , scanNid (EvalSt.nodes (proj₂ afterB))
+        , outerNid (EvalSt.nodes (proj₂ afterB))
+        , nodesMaxB (proj₂ afterB)
+        , stepNodes 1
+        , stepNodes 3
+
+tieFigs≡ : tieFigs ≡ (23 , 1 , 0 , 5 , 6 , 8)
+tieFigs≡ = refl
+
+tieNodes1 : Confirms
+  (stepFrame-nest-nodes (gasPad (sucGF 1 2 2 1 1) g0) 2 0
+     (scan-f (foldD 1) (scanNid (EvalSt.nodes (proj₂ afterB))))
+     (thru-outer mergeAllᵒ (outerNid (EvalSt.nodes (proj₂ afterB))) ↠ root)
+     (1 ∷ []) false (proj₁ afterB) (proj₂ afterB) 0 6)
+tieNodes1 = λ _ _ → ≤ᵇ⇒≤ _ _ tt
+
+tieNodes3 : Confirms
+  (stepFrame-nest-nodes (gasPad (sucGF 1 2 2 1 1) g0) 2 0
+     (scan-f (foldD 3) (scanNid (EvalSt.nodes (proj₂ afterB))))
+     (thru-outer mergeAllᵒ (outerNid (EvalSt.nodes (proj₂ afterB))) ↠ root)
+     (1 ∷ []) false (proj₁ afterB) (proj₂ afterB) 0 8)
+tieNodes3 = λ _ _ → ≤ᵇ⇒≤ _ _ tt

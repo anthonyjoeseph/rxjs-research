@@ -16,26 +16,31 @@
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 module Probed.Main where
 
-open import Probed.Root using ()
+open import Probed.Root
+  using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
 open import Probed.Cascade-Chain-Count
   using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
          Dup1-fits; Dup4-fits;
          S22-fits; S1-fits; SU-fits; SC-fits;
          SW-fits; ChW-fits; ChW2-fits; Adv-fits;
-         Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits)
+         Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits;
+         tieSyn)
 open import Probed.Scan-Burst-Nest
-  using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
+  using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails;
+         tie₁₃; tie₁₄)
 open import Probed.Burst-Nest-Unit
-  using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
+  using (figures≡; okM; okS; okX; liveM; nodesM; regsM; deferFigs≡; strongFigs≡; strongFits;
+         strongHeads; richFigs≡; richFits)
 open import Probed.Cascade-Store-Components
-  using (U-parts; C-parts; F-parts)
+  using (U-parts; C-parts; F-parts; tieRegs)
 open import Probed.Burst-Nest-Ladder
-  using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡)
+  using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡; flatFace; flatRow)
 open import Probed.Sync-Factor
   using (dupSync≡6; dupOut≡2; dupA-holds;
          dupOut₃≡6; dupB-holds;
          hidSync≡4; hidSize≡9; hidOut≡0;
-         mixOut≡3; mixD-holds)
+         mixOut≡3; mixD-holds;
+         dupRowA; dupRowB; mixRowD)
 open import Probed.PushVals-Caps
   using (burstLens≡; capsM-1; capsM-2; capsM-0; capsS-1; capsS-2;
          capsX-1; capsX-2; heads≡; entry≡; entryFace≡; headsClos≡; left-starved≡; census≡;
@@ -44,95 +49,74 @@ open import Probed.PushVals-Caps
          leavesX-1; leavesX-2; leavesSh; leavesShS; leavesShX;
          axesFlat≡; axesNest≡;
          burstsM≡; burstsS≡; burstsX≡; burstsSh≡; burstsShS≡; burstsShX≡;
-         burstsG≡; burstsA≡)
+         burstsG≡; burstsA≡;
+         tieM; tieS; tieX)
 open import Probed.Chain-Step-Abs-Charge
-  using (figures≡; fits; figuresB≡; fitsB)
+  using (figures≡; fits; figuresB≡; fitsB; tieFigs≡; tieNodes1; tieNodes3)
 open import Probed.Chain-Step-Live-Deferred
-  using (figures≡; fits)
+  using (figures≡; fits; tieFigs≡; tieLive1; tieLive3)
 open import Probed.Chain-Step-Live-Nest
-  using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits)
+  using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits;
+         liveRow; attackRow; twoRow; mapRow)
 open import Probed.Thru-Step-Indexed
   using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;
-         residueFigures≡; resN1; resN2; resN3)
+         residueFigures≡; resN1; resN2; resN3;
+         tsRowM; tsRowS; tsRowX)
 
 open import Probed.Scan-Arr-Clos-Key
-  using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14)
+  using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14; tie13; tie14)
 
 open import Probed.Scan-Arr-Margin
   using (delivered≡; deliveredHi≡; keys≡; widths≡; sizes≡; premises;
-         fit0; fit4; fit8)
+         fit0; fit4; fit8; tie8)
 
 
 open import Probed.Thru-Arr-Slot
-  using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡)
+  using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡;
+         tieArr≡; tieRowM; tieRowS; tieRowX)
 
 open import Probed.Sight-All-Stream
-  using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡)
+  using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡; tieDup; tieN₃)
 open import Probed.Sight-Thru-Val
   using (fitRef; sidesRef≡; grantRef₀≡; grantRef₁≡;
          grantFlat≡; delFlat≡; fitFlat; storeFlat; storeRef; storeFigs≡;
          fitOwn; grantHid≡; delHid≡; dupCols≡; dupDepth≡;
-         storeParkFigs≡; grantParkFigs≡; storePark; store2Figs≡; store2)
+         storeParkFigs≡; grantParkFigs≡; storePark; store2Figs≡; store2;
+         tieFlat; tiePark)
 
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡;
-         rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡)
-open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)
-open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)
-open import Probed.Sight-Fit-Width using (figures≡; oldRow≡; newRow≡)
+         rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
+         chainDesc≡; chainRow; farDesc≡; farChainRow;
+         walkFigs≡; walkRow≡; tieWalk1; tieWalk4)
+open import Probed.Sight-Fit-Width
+  using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 
-open import Probed.Burst-OutW using (readout≡)
+open import Probed.Burst-OutW
+  using (readout≡; tieOf; tieMerge; tieSwitch)
 
 open import Probed.Chain-Step-Regs-Level
   using (reaches; figures₁; figures₂; figures₃; figures₄; figures₆; figures₈;
-         one-per-level; under-inner)
-
-open import Probed.Chain-Step-Regs-Share
-  using (reaches; figures₀; figures₁; figures₂; figures₃; figures₄; one-per-hop)
-
-open import Probed.Chain-Step-Regs-Fan
-  using (reaches; figures₁; figures₂; figures₃; figures₄;
-         figuresD₂; figuresD₃; flat-in-width)
-
-open import Probed.Chain-Step-Regs-Cut
-  using (reaches; figuresC; figuresSw; figuresEx; figuresTk;
-         figuresMx; figuresDp; no-longer-than-control)
+         one-per-level; under-inner; foldTie)
 
 open import Probed.Chain-Step-Regs-Second
   using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
-         no-longer-than-control; cut-happened; no-shrink)
-
-open import Probed.Chain-Step-Regs-Inner
-  using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
-         sources≡; sources₁≡; lateSources≡; lateSources₁≡;
-         no-longer-than-control)
+         no-longer-than-control; cut-happened; no-shrink; foldTie)
 
 open import Probed.Chain-Step-Regs-Ops
   using (reaches; syntaxes; figS0; figS1; figS2; figM0; figM1; figM2;
-         mergeGrowth; switchGrowth; fits; held-flat; survivors)
+         mergeGrowth; switchGrowth; fits; held-flat; survivors; foldTie)
 
 open import Probed.Chain-Step-Regs-Read
-  using (reaches; budgets; budgets′; duplicates; fits)
+  using (reaches; budgets; budgets′; duplicates; fits; foldTie)
 
 open import Probed.Fold-Regs-Two-Caps
-  using (reaches; figures; figures′; separates; fits)
-
-open import Probed.Fold-Regs-Reentrant
-  using (reaches; figures; figures′; separates; fits)
-
-open import Probed.Fold-Regs-Nest-Grid
-  using (row0; row1)
+  using (reaches; figures; figures′; separates; fits; foldTie)
 
 open import Probed.Fold-Regs-Nest-Cross
-  using (cross)
-
-open import Probed.Fold-Regs-Nest-Later
-  using (row-second; row-third)
-
-open import Probed.Fold-Regs-Nest-Cross-Later
-  using (row-cross-second; row-cross-third)
+  using (cross; foldTie)
 
 open import Probed.Frame-Step-Regs-Level
   using (premA₁; premA₂; premA₃; figuresA≡; rowA;
@@ -141,11 +125,19 @@ open import Probed.Frame-Step-Regs-Level
          premD₁; premD₂; figuresD≡; rowD;
          premE₁; figuresE≡; rowE;
          premF; figuresF≡; rowF;
-         figuresG≡; rowG; figuresH≡)
+         figuresG≡; rowG; figuresH≡;
+         regsRowA; regsRowF)
 
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
-         figures0; figures1; figures2; figures3; figures4)
+         figures0; figures1; figures2; figures3; figures4;
+         tieLive1; tieLive4)
 
 open import Probed.Fan-Regs-Registry
-  using (counts; heldS; marginK; marginK′; heldKs; lensK)
+  using (counts; regsS; marginK; marginK′; regsK; lensK)
+
+open import Probed.Fold-Regs-Row using (censusIs; foldRow)
+
+open import Probed.Fold-Width-Reach
+  using (separates; admittedRow≡; census≡; widths≡; width2≡; outruns; agrees;
+         entry≡; sizesAgree; driven≡; crossesRun)

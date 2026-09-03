@@ -483,8 +483,8 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   one family at fold depths two and eight, and the ceiling holds
 --   there with room -- fifteen against three hundred and forty-eight,
 --   fifty-seven against one thousand five hundred and ninety.  Not
---   covered: the premises, which do not compute; any instant past the
---   third; and the count axis at the third, which is one family only.
+--   covered: any instant past the third, and the count axis at the
+--   third, which is one family only.
 --   The DOUBLING family is covered and is the one axis that turns out
 --   not to be one: a step naming its accumulator in both additive
 --   slots an inner `scanᵉ` offers -- the family that kills the entry
@@ -493,11 +493,22 @@ arr-chains-caps {e = e} sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   ceiling moves eighty-four to ninety-eight.  What that family grows
 --   is a SUM over an instant's emitted values and a descent is a JOIN
 --   over them, so it cannot reach this side.
---   Every row reads the whole ROUND rather than one chain, and the
---   round's descent is the JOIN over its chains, so a green row is a
---   green row for each chain it contains.  Every row is taken at the
---   entry store itself, which is the statement's own store slot
---   instantiated at the tightest value its hypothesis admits.
+--   The reading rows take the whole ROUND rather than one chain, and
+--   the round's descent is the join over its chains, so a green round
+--   is a green chain -- but that step is an ARGUMENT, so two further
+--   rows instantiate this statement at the chain itself, both premises
+--   discharged at the tightest value each admits: the slots equation
+--   at the schedule's own slots, the store bound at the store's own
+--   maximum, which is the strongest reading since the ceiling is
+--   monotone in it.  What those two report is that the chain leaf does
+--   not see the delivered COUNT.  The round's descent moves forty-nine
+--   to one hundred and ninety-three across that axis while the first
+--   chain's stays at seventeen either side, so the growth lives wholly
+--   in the join over LATER chains and the states they leave, and no
+--   row at any count constrains this leaf along it.
+--   Every row is taken at the entry store itself, which is the
+--   statement's own store slot instantiated at the tightest value its
+--   hypothesis admits.
 postulate
   chain-depth-sighted : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (S : ℕ)

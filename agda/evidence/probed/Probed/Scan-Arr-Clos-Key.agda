@@ -37,6 +37,8 @@ open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; _*_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ≤ᵇ⇒≤; m≤n⊔m)
+open import Data.Unit using (tt)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -50,12 +52,14 @@ open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Slot-Clos using (slotClos)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
-  using (subscribeE; splitBurst; root; sched-init; st-init)
+  using (subscribeE; splitBurst; root; sched-init; st-init; EvalSt)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; nestCapsOK?)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (nestDᵛˢ; nestCapsOK?; nodesMax; nodeNestAt; subscribeE-nest-arr-scan)
+open import Probed.Apparatus using (Confirms; nodeNestAt≤max)
 open import Refuted.Demand-Programs using (Γ₂)
 
 sync : ℕ → List ℕ
@@ -137,3 +141,55 @@ fit13 = refl
 
 fit14 : (proj₁ (row 14) ≤ᵇ proj₂ (row 14)) ≡ true
 fit14 = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at this file's own program and the two longest scripts it
+-- reaches.  The type is generated from the statement, so what the row
+-- asserts moves with any restatement of it rather than with a
+-- predicate copied down here.
+--
+-- WHAT THE ROW CHOOSES AND WHAT IT LEAVES STANDING.  It chooses the
+-- point -- program, script, entry state -- and the two free numbers,
+-- `B` at the program's own nesting and `W` at the burst length, which
+-- are the smallest each premise admits and therefore the strongest
+-- reading.  All six premises are left STANDING and the body reads
+-- none: two of them are the cap guards, and a row that discharged
+-- those would be reporting on the guard rather than on the descent.
+--
+-- AND THE GRANT COMPUTES HERE, unlike the walk face's: `arrD` is
+-- transparent, so the two bound conjuncts are the numeric comparisons
+-- the `fit` rows above already pin, read now through the statement's
+-- own eliminators rather than through a predicate written down beside
+-- it.  The third quantifies over every node id, which no row can
+-- enumerate; `nodeNestAt≤max` reads it back through the `nodesMax`
+-- figure the conjunct beside it computes.
+----------------------------------------------------------------------
+
+-- the state the descent leaves, named because the node-id conjunct
+-- reads it under an already-reduced `lookupNode` and the unifier has
+-- nothing left to solve it from
+resSt : ℕ → EvalSt prog
+resSt k = proj₂ (proj₂ (subscribeE gas prog root 0 0
+                         (sched-init prog (slots k)) (st-init prog)))
+
+tie13 : Confirms
+  (subscribeE-nest-arr-scan cap (slots 13) (nestDᵉ prog) (wid 13) gas
+     deepen (strmᵗ emptyᵉ) (input (fsuc fzero)) root 0 0
+     (sched-init prog (slots 13)) (st-init prog))
+tie13 _ _ _ _ _ _ =
+  ≤ᵇ⇒≤ _ _ tt
+  , ≤ᵇ⇒≤ _ _ tt
+  , (λ j → ≤-trans (nodeNestAt≤max j (resSt 13))
+             (≤-trans (≤ᵇ⇒≤ (nodesMax (resSt 13)) (proj₂ (row 13)) tt)
+                      (m≤n⊔m (nodeNestAt j (st-init prog)) (proj₂ (row 13)))))
+
+tie14 : Confirms
+  (subscribeE-nest-arr-scan cap (slots 14) (nestDᵉ prog) (wid 14) gas
+     deepen (strmᵗ emptyᵉ) (input (fsuc fzero)) root 0 0
+     (sched-init prog (slots 14)) (st-init prog))
+tie14 _ _ _ _ _ _ =
+  ≤ᵇ⇒≤ _ _ tt
+  , ≤ᵇ⇒≤ _ _ tt
+  , (λ j → ≤-trans (nodeNestAt≤max j (resSt 14))
+             (≤-trans (≤ᵇ⇒≤ (nodesMax (resSt 14)) (proj₂ (row 14)) tt)
+                      (m≤n⊔m (nodeNestAt j (st-init prog)) (proj₂ (row 14)))))

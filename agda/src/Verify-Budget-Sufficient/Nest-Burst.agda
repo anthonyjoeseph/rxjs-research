@@ -69,6 +69,21 @@ abstract
     length (proj₁ (splitBurst {A = Val Γ t}
               (proj₁ (subscribeE g o κ id now sched st))))
 
+  -- THE SEAL'S WHOLE CONTENT AT THIS NAME, exported for the one
+  -- consumer that cannot be served by a projection: a statement ABOUT
+  -- this reading rather than a bound carrying it.  The seal keeps the
+  -- evaluator out of every premise that names the measure; a leaf
+  -- asserting something about the measure is the one place the body has
+  -- to be visible, since a claim nothing can instantiate is a claim
+  -- nothing can refute.
+  burstW-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (o : Closed Γ u) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    burstW g o κ id now sched st
+      ≡ length (proj₁ (splitBurst {A = Val Γ t}
+                  (proj₁ (subscribeE g o κ id now sched st))))
+  burstW-eq g o κ id now sched st = refl
+
   connW : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     → Gas → (i : Fin n) → Closed Γ (lookup Γ i) → Path Γ (lookup Γ i) t
     → Id → Tick → Sched Γ → EvalSt e → ℕ

@@ -93,6 +93,55 @@ TARGET = re.compile(r"^\s*--\s*TARGET:\s*(.+?)\s*$")
 # keeps reading a bare name and E5 owns the whole of the fingerprint law.
 STAMP = re.compile(r"^(\S+)\s*@\s*([0-9a-f]{6})$")
 
+# THE SECOND KIND OF PROBE, and the marker that says so.  A `-- TARGET:` probe
+# instantiates ONE statement and reports that it held: its product is a
+# coverage receipt.  A `-- FORK:` probe stands at a design choice between two
+# candidate MECHANISMS and its product is a separation -- these two disagree,
+# so instantiating decides between them.  Both expire the same way, so E2 reads
+# either marker as the declaration that a probe is about a live statement; E5
+# stamps only the first, since a fork's rows are taken against two candidate
+# DEFINITIONS rather than against the target's text.
+FORK = re.compile(r"^\s*--\s*FORK:\s*(.+?)\s*$")
+# A separation is proven, not declared: the value's type is `Separates f g`,
+# whose `apart` field is UNINHABITED when the two candidates agree.  So this
+# regex decides only which check applies, and Agda decides whether the claim
+# is true -- the same division of labour as `-- TARGET:`, where the marker is
+# free and the obligation it creates is not.
+SEPARATES = re.compile(r"\bSeparates\b")
+
+# THE TIE BETWEEN A RECEIPT'S ROWS AND ITS TARGET'S TEXT.  A probe used to
+# restate its target's predicate by hand and pin THAT by `refl`, so the row
+# and the statement were held together by nothing: a mistyped or quietly
+# weaker predicate stayed green and earned a receipt.  `Confirms` (the tree's
+# apparatus module) takes the target postulate APPLIED at the probe's own
+# arguments and returns that application's type, so Agda generates the row's
+# type from the statement and the probe chooses only the point.  E7 then holds
+# the row to what Agda cannot: the HEAD under the eliminators must be a
+# declared target (an arbitrary function applied to the postulate returns any
+# type at all), and the BODY may claim nothing of its own -- since ANY
+# inhabitant typechecks here, the target handed back as its own proof
+# included.  Three findings: a target with no `Confirms` row, a row headed by
+# something other than a target, and a body that assumes rather than proves.
+#
+# AND WHAT THE BODY MAY NOT NAME IS A POSTULATE, WHICH IS NOT THE SAME AS
+# HOLDING IT TO A NUMERAL, AND THE DIFFERENCE IS WHAT MAKES THE RULE
+# SATISFIABLE AT ALL.  Held to computation, the rule asks for a conclusion
+# that REDUCES at the chosen point -- and a conclusion denominated in a family
+# this tower seals for cost does not reduce at any point whatever, so a probe
+# whose target is stated in one could never write the row and the finding
+# could never be cleared.  That is a coverage boundary and not a defect in the
+# probe.  What the original rule was really guarding is laundering: a row
+# discharged out of the target itself, or out of some OTHER unproven
+# statement, is evidence for nothing.  So the body is free to spend anything
+# this tower has PROVEN -- a weakening through a stdlib inequality is a
+# stronger receipt than a numeral, not a weaker one -- and may name no
+# postulate at all.
+CONFIRMS = re.compile(r"\bConfirms\b")
+# the statement's own connectives, which can only reach a SUB-claim: a
+# conjunct, a ∀ at a point, a field of a record conclusion (a dotted name)
+ELIMINATORS = {"proj₁", "proj₂"}
+FIELD = re.compile(r"^[^\s()]+\.[^\s().]+$")
+
 
 def _dupcheck():
     """`check-duplicates` loaded by path: its module name is not an
@@ -196,36 +245,194 @@ def check_e1(src, namespaces):
     return bad
 
 
-def check_e2(evidence, postulates):
-    """Every probe declares at least one target, and every target is live."""
-    missing, dead = [], []
+# The two files in the tree that state no rows: the claim root, and the
+# apparatus module holding `Confirms` (and any other record every probe is
+# held to).  Named here because a support module has no target to declare and
+# E2 would otherwise read it as a probe with a missing one.
+NOT_PROBES = ("Main.agda", "Apparatus.agda")
+
+
+def probe_files(evidence):
+    """Every probe module, the claim root and the apparatus aside."""
     root = os.path.join(evidence, "probed")
     if not os.path.isdir(root):
-        return missing, dead, 0
-    n = 0
+        return
     for p in agda_files(root):
-        base = os.path.basename(p)
-        if base == "Main.agda":          # the claim root states no rows
-            continue
+        if os.path.basename(p) not in NOT_PROBES:
+            yield p
+
+
+def declared(path):
+    """(line, name) per marker, split by kind: targets, then forks."""
+    targets, forks = [], []
+    for i, line in enumerate(open(path, encoding="utf-8"), 1):
+        for rx, out in ((TARGET, targets), (FORK, forks)):
+            m = rx.match(line)
+            if not m:
+                continue
+            for t in re.split(r"[,\s]+", m.group(1)):
+                # a STAMP is E5's business, and it is written beside the
+                # name rather than instead of it -- so drop it here rather
+                # than letting a fingerprint be read as a second target
+                t = t.split("@")[0].strip()
+                if t:
+                    out.append((i, t))
+    return targets, forks
+
+
+def check_e2(evidence, postulates):
+    """Every probe declares at least one target, and every target is live."""
+    missing, dead, n = [], [], 0
+    for p in probe_files(evidence):
         n += 1
-        targets = []
-        for i, line in enumerate(open(p, encoding="utf-8"), 1):
-            m = TARGET.match(line)
-            if m:
-                for t in re.split(r"[,\s]+", m.group(1)):
-                    # a STAMP is E5's business, and it is written beside the
-                    # name rather than instead of it -- so drop it here rather
-                    # than letting a fingerprint be read as a second target
-                    t = t.split("@")[0].strip()
-                    if t:
-                        targets.append((i, t))
-        if not targets:
+        targets, forks = declared(p)
+        # A FORK expires exactly as a TARGET does: it names the statement
+        # whose shape is in question, and once that statement is settled the
+        # choice it stands at has been made.
+        both = targets + forks
+        if not both:
             missing.append(p)
             continue
-        for i, t in targets:
+        for i, t in both:
             if t not in postulates:
                 dead.append((p, i, t))
     return missing, dead, n
+
+
+def check_e6(evidence):
+    """A probe is a receipt or a fork, never neither and never both.
+
+    Neither is E2's finding already.  What this adds is that the KIND a probe
+    declares creates an obligation Agda can refuse: a fork must carry a
+    `Separates`, and a receipt must not."""
+    mixed, unproven, undeclared = [], [], []
+    mod = _dupcheck()
+    for p in probe_files(evidence):
+        targets, forks = declared(p)
+        sep = [(line, name) for name, line, ty in mod.declarations(p)
+               if SEPARATES.search(ty)]
+        if targets and forks:
+            mixed.append((p, forks[0][0]))
+        elif forks and not sep:
+            unproven.append((p, forks[0][0], forks[0][1]))
+        elif targets and sep:
+            undeclared.append((p, sep[0][0], sep[0][1]))
+    return mixed, unproven, undeclared
+
+
+# THE CAP ON RECEIPTS PER STATEMENT.  A probe's job is to AIM a grind or to
+# REFUTE, and a seventh receipt on one target has not told anyone something
+# the sixth did not while the ledger row stays open.  Seven rather than three
+# because a coverage LATTICE is legitimate -- distinct program shapes reaching
+# distinct arms -- and rather than twelve because past seven the evidence has
+# stopped converting into proof.
+RECEIPT_CAP = 7
+
+
+def check_e8(evidence, postulates):
+    """No live postulate carries more than RECEIPT_CAP receipts.
+
+    The count is over `-- TARGET:` DECLARATIONS and not files, so a probe
+    carrying three targets pays for three -- otherwise the cap is dodged by
+    consolidation, which satisfies the count and changes nothing."""
+    per = {}
+    for p in probe_files(evidence):
+        targets, _ = declared(p)
+        for i, t in targets:
+            if t in postulates:
+                per.setdefault(t, []).append((p, i))
+    return sorted(((t, sites) for t, sites in per.items()
+                   if len(sites) > RECEIPT_CAP),
+                  key=lambda kv: (-len(kv[1]), kv[0]))
+
+
+def confirms_head(ty):
+    """The name under the eliminators in `Confirms (...)`, or None.
+
+    Reads the balanced argument after the first `Confirms`, then peels
+    projections, dotted field accessors and parentheses until a head that is
+    neither -- that is what the row's type is generated from."""
+    m = CONFIRMS.search(ty)
+    if not m:
+        return None
+    rest = ty[m.end():].lstrip()
+    if rest.startswith("("):
+        depth, j = 0, 0
+        for j, ch in enumerate(rest):
+            depth += (ch == "(") - (ch == ")")
+            if depth == 0:
+                break
+        arg = rest[1:j]
+    else:
+        arg = rest.split()[0] if rest.split() else ""
+    toks = arg.replace("(", " ").replace(")", " ").split()
+    for t in toks:
+        if t in ELIMINATORS or FIELD.match(t):
+            continue
+        return t
+    return None
+
+
+def clause_bodies(path, name):
+    """The text after `=` of every clause of `name`, continuations joined."""
+    lines = io.open(path, encoding="utf-8").read().split("\n")
+    head = re.compile(r"^" + re.escape(name) + r"(?=\s|=|$)")
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        if head.match(line) and not re.match(
+                r"^" + re.escape(name) + r"\s*:", line):
+            body = line.split("=", 1)[1] if "=" in line else ""
+            j = i + 1
+            while j < len(lines) and lines[j].strip() and \
+                    lines[j][0].isspace() and \
+                    not lines[j].strip().startswith("--"):
+                body += " " + lines[j].strip()
+                j += 1
+            out.append((i + 1, body.split("--")[0]))
+            i = j
+            continue
+        i += 1
+    return out
+
+
+def check_e7(evidence, postulates):
+    """Every receipt's rows are tied to its target's statement in a type.
+
+    Rule one is coverage: each declared target has a `Confirms` row headed
+    by it.  Rule two is the tie: a `Confirms` row's head is a declared
+    target.  Rule three is the proof: no clause of such a row names a
+    postulate, so the row stands on this tower's proven facts and the
+    statement it is evidence about cannot be its own witness."""
+    uncovered, untied, unproven = [], [], []
+    mod = _dupcheck()
+    for p in probe_files(evidence):
+        targets, forks = declared(p)
+        if not targets:
+            continue
+        names = {t for _, t in targets}
+        heads = set()
+        for name, line, ty in mod.declarations(p):
+            if not CONFIRMS.search(ty):
+                continue
+            head = confirms_head(ty)
+            if head not in names:
+                untied.append((p, line, name, head))
+            else:
+                heads.add(head)
+            bodies = clause_bodies(p, name)
+            if not bodies:
+                unproven.append((p, line, name, "(no clause)"))
+            for bline, body in bodies:
+                toks = body.replace("(", " ").replace(")", " ") \
+                           .replace(",", " , ").split()
+                bad = [t for t in toks if t in postulates]
+                if bad or not toks:
+                    unproven.append((p, bline, name, bad[0] if bad else "(empty)"))
+        for line, t in targets:
+            if t not in heads:
+                uncovered.append((p, line, t))
+    return uncovered, untied, unproven
 
 
 # A RECEIPT, in the marker form CLAUDE.md specifies: the marker opens a comment
@@ -394,6 +601,9 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         [os.path.join(evidence, d) for d in NAMESPACES]
         if isinstance(evidence, str) else list(evidence),
         statements(src), harness)
+    mixed, unproven, undeclared = check_e6(evidence)
+    uncovered, untied, uncomputed = check_e7(evidence, postulates)
+    over = check_e8(evidence, postulates)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -489,15 +699,107 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         print("    alone: that converts a false coverage claim into a "
               "certified one.")
 
+    for p, i in mixed:
+        print(f"{p}:{i}: E6 — probe declares BOTH a target and a fork")
+        print("    The two products are different and only one of them is "
+              "this file's.  A")
+        print("    receipt says a statement HELD at these shapes; a fork says "
+              "two candidate")
+        print("    mechanisms DISAGREE at this one.  Rows that do both let the "
+              "receipt claim")
+        print("    coverage the separating row never bought.  Split the "
+              "probe.")
+    for p, i, name in unproven:
+        print(f"{p}:{i}: E6 — fork on {name!r} carries no `Separates`")
+        print("    A fork's whole content is that the two candidates DIFFER, "
+              "and prose")
+        print("    saying so is a claim no machine reads.  State the "
+              "alternatives as two")
+        print("    definitions of one signature and inhabit `Separates f g`, "
+              "whose `apart`")
+        print("    field cannot be written when they agree.  If there is no "
+              "second")
+        print("    candidate, this is a receipt: say `-- TARGET:` instead.")
+    for p, i, name in undeclared:
+        print(f"{p}:{i}: E6 — receipt carries a separation, {name!r}")
+        print("    A probe holding a `Separates` is choosing between "
+              "mechanisms whatever")
+        print("    its marker says, and a `-- PROBED:` receipt written from it "
+              "reports")
+        print("    coverage of a statement the separating rows were never "
+              "about.  Declare")
+        print("    it `-- FORK:`, or move the separation to the probe that "
+              "owns it.")
+
+    for p, i, t in uncovered:
+        print(f"{p}:{i}: E7 — target {t!r} has no `Confirms` row")
+        print("    A receipt's rows used to restate the target's predicate by "
+              "hand, and")
+        print("    nothing held that restatement to the statement.  Write "
+              "`row : Confirms")
+        print(f"    ({t} <args>)`: the type is then generated from the "
+              "statement as it")
+        print("    reads, and this file chooses only the point.  The body may "
+              "spend")
+        print("    anything PROVEN — `refl` where the claim reduces, a stdlib "
+              "inequality")
+        print("    where it does not — and may name no postulate; a statement "
+              "over a")
+        print("    SEALED family reduces at no point, so a numeral is not "
+              "what is asked.")
+    for p, i, name, head in untied:
+        print(f"{p}:{i}: E7 — `Confirms` row {name!r} is headed by "
+              f"{head!r}, not a declared target")
+        print("    The tie holds only when the term under the eliminators IS "
+              "the target:")
+        print("    a function applied to the postulate returns whatever type "
+              "it likes.")
+        print("    Reach a sub-claim by projection, application at a point, "
+              "or a field.")
+    for p, i, name, tok in uncomputed:
+        print(f"{p}:{i}: E7 — `Confirms` row {name!r} stands on a "
+              f"postulate: {tok!r}")
+        print("    Any inhabitant typechecks here, the target handed back as "
+              "its own proof")
+        print("    included, so a row may spend only what this tower has "
+              "PROVEN.  `refl`")
+        print("    where the claim reduces, a proven lemma where it does not; "
+              "an unproven")
+        print("    statement in the body makes the row evidence for nothing.")
+
+    for t, sites in over:
+        print(f"{sites[0][0]}:{sites[0][1]}: E8 — {t!r} carries "
+              f"{len(sites)} receipts, over the cap of {RECEIPT_CAP}")
+        print("    A probe AIMS a grind or REFUTES a statement.  Past the cap "
+              "the receipts")
+        print("    have stopped deciding anything and the row is still open, "
+              "so what the")
+        print("    evidence is now buying is more evidence to delete when the "
+              "statement is")
+        print("    discharged.  DISCHARGE the postulate, or DELETE the "
+              "receipts that no")
+        print("    longer earn their place.  NEVER merge probe files: the "
+              "count is over")
+        print("    declarations, and consolidating them satisfies it while "
+              "changing nothing.")
+        for q, i in sites[1:]:
+            print(f"      also {q}:{i}")
+
     n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
-         + len(smissing) + len(sdead) + len(unstamped) + len(stale))
+         + len(smissing) + len(sdead) + len(unstamped) + len(stale)
+         + len(mixed) + len(unproven) + len(undeclared)
+         + len(uncovered) + len(untied) + len(uncomputed) + len(over))
     if n == 0:
         print(f"check-evidence: clean — {nprobes} probe(s), every one naming a "
               f"live postulate; {nreceipts} receipt(s), every one above its "
               f"subject and marked for that subject's state; no src file "
               f"imports the evidence tree; {nseries} harness series, every "
               f"one naming a live postulate; {ntargets} target(s), every "
-              f"one stamped with the statement its rows were taken against")
+              f"one stamped with the statement its rows were taken against; "
+              f"every probe a receipt or a fork and never both, every fork "
+              f"proving its separation in a type; every target tied to a "
+              f"`Confirms` row headed by it and standing on no postulate; "
+              f"no statement carrying more than {RECEIPT_CAP} receipts")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -537,6 +839,65 @@ def selftest():
     run(os.path.join(fx, "empty"), os.path.join(fx, "live-target"),
         set(), "is not a live postulate",
         "E2 fires when the target is discharged out from under the probe")
+
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-good"),
+        {"live-one"}, None, "E6 quiet on a fork that proves its separation")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-unproven"),
+        {"live-one"}, "carries no `Separates`",
+        "E6 fires on a fork that only claims to choose")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-mixed"),
+        {"live-one"}, "declares BOTH a target and a fork",
+        "E6 fires on a probe that is both kinds at once")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "receipt-separates"),
+        {"live-one"}, "receipt carries a separation",
+        "E6 fires on a separation wearing a receipt's marker")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "fork-good"),
+        set(), "is not a live postulate",
+        "E2 expires a FORK exactly as it expires a TARGET")
+
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-none"),
+        {"live-one"}, "has no `Confirms` row",
+        "E7 fires on a receipt whose rows restate the target by hand")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-untied"),
+        {"live-one"}, "not a declared target",
+        "E7 fires on a `Confirms` headed by a function over the target")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-lemma"),
+        {"live-one"}, "stands on a postulate: 'live-one'",
+        "E7 fires on a row that hands the postulate back as its own proof")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-other"),
+        {"live-one", "live-two"}, "stands on a postulate: 'live-two'",
+        "E7 fires on a row discharged out of a DIFFERENT unproven statement, "
+        "which is the laundering the target-name test alone would miss")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-proven"),
+        {"live-one", "live-two"}, None,
+        "E7 quiet on a row whose body spends PROVEN lemmas, `where` block "
+        "included -- a claim that does not reduce has no numeral to be held "
+        "to, and refusing the weakening is what left the rule unsatisfiable")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-good"),
+        {"live-one", "live-two"}, None,
+        "E7 quiet on rows tied by projection, a point and a field, "
+        "proven by refl, tt, a witness and a converter, over clauses")
+
+    run(os.path.join(fx, "empty"), os.path.join(fx, "cap-at"),
+        {"live-one"}, None,
+        "E8 quiet at the cap exactly -- a coverage lattice over one "
+        "statement is what the cap leaves room for")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "cap-over"),
+        {"live-one"}, "carries 8 receipts, over the cap of 7",
+        "E8 fires one past the cap")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "cap-consolidated"),
+        {"live-one"}, "carries 8 receipts, over the cap of 7",
+        "E8 counts DECLARATIONS and not files, so merging eight probes into "
+        "two does not duck it -- the repair a cap on files would reward")
+    # AND THE CAP IS ABOUT LIVE ROWS ONLY.  Once the target is discharged the
+    # receipts are E2's finding and deleting them is the repair, so counting
+    # them again here would report the same pile twice under two laws.
+    got8 = run(os.path.join(fx, "empty"), os.path.join(fx, "cap-over"),
+               set(), "is not a live postulate",
+               "E2 fires on a discharged target")
+    if "over the cap" in got8:
+        fails.append("E8 counted receipts on a DISCHARGED target, which is "
+                     "E2's finding and not a second one")
 
     empty = os.path.join(fx, "empty")
     run(empty, empty, {"live-one"}, "E4 — series 'A —",
@@ -626,7 +987,22 @@ def selftest():
           "printing the current one, so adopting it is a copy and not a "
           "computation -- and on a stamp whose statement has since been "
           "rewritten under the same name, naming BOTH fingerprints; and is "
-          "quiet on a stamp that still matches)")
+          "quiet on a stamp that still matches.  E6 fires on a fork that "
+          "only CLAIMS to choose, on a probe that is both kinds at once, and "
+          "on a separation wearing a receipt's marker; is quiet on a fork "
+          "that proves its separation; and a FORK expires under E2 exactly "
+          "as a TARGET does.  E7 fires on a target with no `Confirms` row, "
+          "on a row headed by something other than a declared target, on a "
+          "row that hands its own target back as its proof, and on one "
+          "discharged out of a DIFFERENT unproven statement; and is quiet on "
+          "rows tied through the statement's own eliminators, whether they "
+          "are pinned by computed terms across several clauses or reach a "
+          "claim that does not reduce through PROVEN lemmas and a `where`.  "
+          "E8 is quiet at the cap exactly and fires one past it; it counts "
+          "DECLARATIONS rather than files, so merging eight receipts into "
+          "two files does not duck it -- the repair a file count would "
+          "reward; and it stays off a DISCHARGED target, whose receipts are "
+          "E2's finding rather than a second one)")
     return 0
 
 

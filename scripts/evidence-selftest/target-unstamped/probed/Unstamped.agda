@@ -2,5 +2,5 @@
 -- the rows below were taken against.
 -- TARGET: live-one
 module Unstamped where
-_ : Set₁
-_ = Set
+row : Confirms (live-one 3)
+row = refl

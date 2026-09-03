@@ -2,21 +2,23 @@
 -- one leaf left under the descent's ceiling and the first leaf on that
 -- face either of whose sides could be instantiated at all.
 --
--- WHAT IS RESTATED AND WHY.  `burstW` is `abstract`, so no probe can
--- apply it; these rows compute its BODY -- the split of a real
--- subscribe's emission stream -- against `outWⱽ` at the same slots.
--- That is a restatement of the measure and not of the claim: the body
--- is the seal's whole content at this name.
+-- WHAT THE ROWS COMPUTE IS THE STATEMENT'S OWN LEFT SIDE.  The leaf is
+-- stated over the SPLIT of a real subscribe's emission stream rather
+-- than over `burstW`, which is `abstract` and reduces at no point; the
+-- assembly that gives the sealed name back is a body in `src`.  So
+-- `lhs` here is the claim's left side and not a restatement of it.
 --
 -- EVIDENCE, not a claim: `src` cannot import this file and nothing in
 -- the proof may rest on it.  Checked by `make probed`, claimed by
 -- `Probed.Main`.
--- TARGET: burst-outW @3c7e84
+-- TARGET: burst-out @08e9cd
 module Probed.Burst-OutW where
 
 open import Data.List using (List; []; _∷_; length)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Data.Product using (proj₁)
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 open import Data.List.Relation.Unary.Any using (here)
@@ -30,6 +32,8 @@ open import Rx.Frame-Width using (outWⱽ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (subscribeE; splitBurst; root; sched-init; st-init)
+open import Verify-Budget-Sufficient.Desc-Ceil using (burst-out)
+open import Probed.Apparatus using (Confirms)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -106,3 +110,21 @@ readout = lhs p-of ∷ rhs p-of
 readout≡ : readout ≡ 3 ∷ 3 ∷ 0 ∷ 0 ∷ 0 ∷ 3 ∷ 0 ∷ 0 ∷ 0 ∷ 1
                    ∷ 1 ∷ 2 ∷ 6 ∷ 6 ∷ 2 ∷ 4 ∷ 6 ∷ 6 ∷ []
 readout≡ = refl
+
+-- THE TIE, at the three rows above that are EQUALITIES and so are the
+-- ones a row here can be load-bearing on: the source at three and the
+-- two `*All` heads at six.  `≤ᵇ⇒≤` takes the goal's own terms, so what
+-- is compared is the statement as it reads and not a copy of it.
+tieOf : Confirms
+  (burst-out gasBig slots p-of root 0 0 (sched-init p-of slots) (st-init p-of) refl)
+tieOf = ≤ᵇ⇒≤ _ _ tt
+
+tieMerge : Confirms
+  (burst-out gasBig slots p-merge root 0 0
+     (sched-init p-merge slots) (st-init p-merge) refl)
+tieMerge = ≤ᵇ⇒≤ _ _ tt
+
+tieSwitch : Confirms
+  (burst-out gasBig slots p-switch root 0 0
+     (sched-init p-switch slots) (st-init p-switch) refl)
+tieSwitch = ≤ᵇ⇒≤ _ _ tt

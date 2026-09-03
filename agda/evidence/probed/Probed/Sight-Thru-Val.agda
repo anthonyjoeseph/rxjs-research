@@ -68,6 +68,7 @@ open import Data.List using ([]; _∷_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ≤ᵇ⇒≤; m≤n⊔m)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using ([]; _∷_)
@@ -84,6 +85,8 @@ open import Rx.Evaluator
          mergeAll-st; thruConsume; installNode; sched-init; st-init)
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; nodesMax; nodeNestAt)
+open import Verify-Budget-Sufficient.Depth-Sighted using (sight-thru-val)
+open import Probed.Apparatus using (Confirms; nodeNestAt≤max)
 
 Γₛ : Ctx 1
 Γₛ = obs natᵗ ∷ []
@@ -298,10 +301,18 @@ storePark = refl , refl , refl , refl
 -- shallow arrival landing on a deep queue reads the deep one, four
 -- against a grant of two, and the conjunct holds at EQUALITY off the
 -- `nodesMax st` side alone.  That is the tight row in this file.
+-- the state a consume leaves, off whatever it was entered at.  Named
+-- because the `∀ (j : NodeId)` conjunct reads it under an
+-- already-reduced `lookupNode`, where the unifier has nothing left to
+-- solve an underscore from
+outSt : (o : Val Γₛ (obs (obs natᵗ))) (d : Closed Γₛ (obs natᵗ)) →
+        T (inputsBelowᵉ 0 d) → EvalSt prog → EvalSt prog
+outSt o d ok s = proj₂ (proj₂ (proj₂
+  (thruConsume gas mergeAllᵒ 0 κ 0 0 o (sched d ok) s)))
+
 st2 : (o : Val Γₛ (obs (obs natᵗ))) (d : Closed Γₛ (obs natᵗ)) →
       T (inputsBelowᵉ 0 d) → EvalSt prog
-st2 o d ok = proj₂ (proj₂ (proj₂
-  (thruConsume gas mergeAllᵒ 0 κ 0 0 o (sched d ok) stP)))
+st2 o d ok = outSt o d ok stP
 
 mx2 : Val Γₛ (obs (obs natᵗ)) → Val Γₛ (obs (obs natᵗ)) →
       (d : Closed Γₛ (obs natᵗ)) → T (inputsBelowᵉ 0 d) → ℕ
@@ -321,3 +332,49 @@ store2 : ((mx2 (oN 3) (oN 0) flat tt
              ≤ᵇ nodesMax (st2 (oN 3) flat tt) ⊔ G (oN 3) flat tt) ≡ true)
 store2 = refl , refl , refl
 
+
+-- ── the ties ───────────────────────────────────────────────────────
+-- THE TWO POINTS THE ROWS ABOVE ALREADY CARRY, restated as the
+-- statement's own type rather than as a predicate written down here.
+-- Each takes the grant this file COMPUTES -- the same `G` the margins
+-- are measured against -- so the tie is load-bearing exactly where the
+-- row beside it is, and a restatement of the target moves both.
+--
+-- BOTH PREMISES ARE LEFT STANDING.  The slots equation holds by
+-- construction and would add nothing; the FIT is the arrival's own
+-- telescope reading, and a row that discharged it would be reporting
+-- on the predicate rather than on the consume.  Unasked, each row
+-- asserts the three conclusions with the fit not assumed.
+--
+-- AND THE NODE-ID CONJUNCT IS THE ONE NO ROW CAN ENUMERATE, so it
+-- goes through `nodeNestAt≤max`: the pointwise reading sits under the
+-- table's maximum, which is the figure the conjunct beside it already
+-- pins.  That route needs the maximum to fit the grant ALONE, which is
+-- why the two points chosen are the ones entered at an empty queue --
+-- at the second park the entry store is what carries the conjunct, and
+-- the maximum is no longer under `G`.
+
+-- the VALUE conjunct at the flat definition: the wrap vanishes and the
+-- grant is the path's own step, which is this file's tight row
+tieFlat : Confirms
+  (sight-thru-val 0 (sl flat tt) (G ref flat tt) gas mergeAllᵒ 0 κ 0 0 ref
+     (sched flat tt) stM)
+tieFlat _ _ =
+  ≤ᵇ⇒≤ _ _ tt
+  , ≤ᵇ⇒≤ _ _ tt
+  , (λ j → ≤-trans (nodeNestAt≤max j (outSt ref flat tt stM))
+             (≤-trans (≤ᵇ⇒≤ (nodesMax (outSt ref flat tt stM)) (G ref flat tt) tt)
+                      (m≤n⊔m (nodeNestAt j stM) (G ref flat tt))))
+
+-- and the STORE conjuncts at the branch that writes: a `mergeAll` with
+-- no lane free parks its arrival, so the node the result holds carries
+-- the term and the left side moves with the layer
+tiePark : Confirms
+  (sight-thru-val 0 (sl flat tt) (G (oN 3) flat tt) gas mergeAllᵒ 0 κ 0 0 (oN 3)
+     (sched flat tt) stP)
+tiePark _ _ =
+  ≤ᵇ⇒≤ _ _ tt
+  , ≤ᵇ⇒≤ _ _ tt
+  , (λ j → ≤-trans (nodeNestAt≤max j (outSt (oN 3) flat tt stP))
+             (≤-trans (≤ᵇ⇒≤ (nodesMax (outSt (oN 3) flat tt stP)) (G (oN 3) flat tt) tt)
+                      (m≤n⊔m (nodeNestAt j stP) (G (oN 3) flat tt))))

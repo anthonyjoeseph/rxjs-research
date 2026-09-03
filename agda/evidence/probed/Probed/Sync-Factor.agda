@@ -39,16 +39,23 @@
 module Probed.Sync-Factor where
 
 open import Data.List using ([]; _∷_)
+open import Data.List.Relation.Unary.All using () renaming ([] to []ᵃ; _∷_ to _∷ᵃ_)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; _+_; _*_; _^_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤-refl; ≤ᵇ⇒≤)
 open import Data.Bool using (true)
+open import Data.Product using (_,_)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp
   using (natᵗ; obs; Fn; Val; applyFn; syncSizeᵗ; sizeᵗ;
          ofᵉ; mapᵉ; takeᵉ; switchAllᵉ; deferᵉ; varᵗ; nat̂; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵗ; nestDᵛ)
+open import Verify-Budget-Sufficient.Nest-Subst using (EnvNest; evalWith-nest-sync)
 open import Refuted.Demand-Programs using (Γ₂)
+
+open import Probed.Apparatus using (Confirms)
 
 -- a payload k `*All` layers deep
 deepV : ℕ → Val Γ₂ (obs natᵗ)
@@ -118,3 +125,41 @@ mixOut≡3 = refl
 mixD-holds : (nestDᵛ (obs (obs natᵗ)) (applyFn fnMix (deepV 3))
                ≤ᵇ syncBound fnMix (deepV 3)) ≡ true
 mixD-holds = refl
+
+-- ── the tie: the statement's own inequality, at the same points ─────
+
+-- `syncBound` above is a HAND restatement of the target's right side,
+-- and `applyFn` of its left, so the rows are a reading of an
+-- arithmetic that resembles the statement rather than the statement.
+-- The rows below are the statement: Agda writes each type from
+-- `evalWith-nest-sync` as it reads, the environment is the one
+-- `applyFn` builds, and the grant is instantiated at the payload's own
+-- depth -- which is the tightest `N` the premise admits, so a row here
+-- cannot be passing on a slack the caller would not have.
+--
+-- The environment premise is `(nestDᵛ _ v ≤ N) × ⊤` at a one-entry
+-- environment, and at `N` the payload's own depth that first conjunct
+-- is reflexivity.  Rows A and B are the duplicator that refuted the
+-- additive form, at two payload depths; row D is the mixed function,
+-- where the hidden pair must not be priced.  Row C is not tied because
+-- its content is an EQUALITY at zero rather than the bound.
+envDup1 : EnvNest (nestDᵛ (obs natᵗ) (deepV 1)) (deepV 1 ∷ᵃ []ᵃ)
+envDup1 = ≤-refl , tt
+
+envDeep3 : EnvNest (nestDᵛ (obs natᵗ) (deepV 3)) (deepV 3 ∷ᵃ []ᵃ)
+envDeep3 = ≤-refl , tt
+
+dupRowA : Confirms
+  (evalWith-nest-sync (nestDᵛ (obs natᵗ) (deepV 1)) fnDup
+     (deepV 1 ∷ᵃ []ᵃ) envDup1)
+dupRowA = ≤ᵇ⇒≤ _ _ tt
+
+dupRowB : Confirms
+  (evalWith-nest-sync (nestDᵛ (obs natᵗ) (deepV 3)) fnDup
+     (deepV 3 ∷ᵃ []ᵃ) envDeep3)
+dupRowB = ≤ᵇ⇒≤ _ _ tt
+
+mixRowD : Confirms
+  (evalWith-nest-sync (nestDᵛ (obs natᵗ) (deepV 3)) fnMix
+     (deepV 3 ∷ᵃ []ᵃ) envDeep3)
+mixRowD = ≤ᵇ⇒≤ _ _ tt

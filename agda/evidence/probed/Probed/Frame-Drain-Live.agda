@@ -48,8 +48,10 @@ open import Data.List using (List; []; _∷_; foldr)
 open import Data.Nat using (ℕ; zero; suc; _⊔_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (g0; gs; hot)
 open import Rx.Exp using (Ctx; Closed; natᵗ; emptyᵉ; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
@@ -57,8 +59,11 @@ open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Evaluator using (EvalSt; Sched; from-inner; root; stepFrame; sched-init; st-init; mergeAllᵒ; mergeAll-st;
   installNode)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Store using (liveNest; slotsNestSum)
-open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt)
+open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; FaceOK; faceOK)
+open import Verify-Budget-Sufficient.Live-Nest-Walk using (subscribeInner-nest-live)
+open import Probed.Apparatus using (Confirms)
 
 Γ₁ : Ctx 1
 Γ₁ = natᵗ ∷ⱽ []ⱽ
@@ -125,3 +130,39 @@ figures3 = refl
 
 figures4 : figures 4 ≡ 4 ∷ 0 ∷ 4 ∷ []
 figures4 = refl
+
+----------------------------------------------------------------------
+-- THE TIE, AT THE SUBSCRIBE ITSELF RATHER THAN AT THE FRAME AROUND
+-- IT.  The rows above reach the mint through `stepFrame`, which is how
+-- a run gets there; the statement is about `subscribeInner` directly,
+-- so the tie applies it at the same parked body, the same empty live
+-- list and the same scripted telescope.
+--
+-- AND `U` IS TAKEN AT THE BODY'S OWN DEPTH, which is what makes the
+-- row falsifiable rather than a large number chosen to fit.  The two
+-- left summands of the conclusion's join are zero here -- an empty
+-- incoming live list and a telescope summing to zero, both pinned
+-- above -- so the row reduces to `after ≤ nestDᵉ o` exactly, and any
+-- mint reading one unit more than the body it subscribes fails it.
+-- That is the asymmetry this file exists for, stated in the statement.
+--
+-- NOT COVERED: the eleven premises, left standing and unread, and the
+-- cap, which enters only through them -- so the row is evidence about
+-- the CONCLUSION, unconditionally true where it is green.
+----------------------------------------------------------------------
+
+cQ : Caps
+cQ = caps 8 4 1
+
+faceQ : FaceOK cQ sl₁
+faceQ = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+tieLive1 : Confirms
+  (subscribeInner-nest-live cQ sl₁ 1 1 0 0 0 (nestDᵉ (deep 1))
+     (gs g0) mergeAllᵒ 0 root 0 0 (deep 1) sc₀ (stQ 1) ⦃ faceQ ⦄)
+tieLive1 _ _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+tieLive4 : Confirms
+  (subscribeInner-nest-live cQ sl₁ 4 4 0 0 0 (nestDᵉ (deep 4))
+     (gs g0) mergeAllᵒ 0 root 0 0 (deep 4) sc₀ (stQ 4) ⦃ faceQ ⦄)
+tieLive4 _ _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt

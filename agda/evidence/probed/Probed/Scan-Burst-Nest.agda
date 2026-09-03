@@ -56,9 +56,11 @@ open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤ᵇ_; z≤n)
+open import Data.Nat.Properties using (≤-trans; ≤ᵇ⇒≤; m≤n⊔m)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gasPad; cold)
@@ -68,12 +70,15 @@ open import Rx.Exp
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
-  using (subscribeE; splitBurst; root; sched-init; st-init)
-open import Verify-Budget-Sufficient.Caps using (Caps; caps)
+  using (subscribeE; splitBurst; root; sched-init; st-init; EvalSt)
+open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (capsOK?; nestValOK?)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestB-base)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
-open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax; nestDᵛˢ)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (nodesMax; nestDᵛˢ; subscribeE-nest-scan)
 open import Refuted.Demand-Programs using (Γ₂)
+open import Probed.Apparatus using (Confirms; nodeNestAt≤max)
 
 sync : ℕ → List ℕ
 sync zero    = []
@@ -109,6 +114,13 @@ delivered k =
   let r = subscribeE gas prog root 0 0 (sched-init prog (slots k)) (st-init prog)
   in nodesMax (proj₂ (proj₂ r))
        ⊔ nestDᵛˢ (proj₁ (splitBurst {A = Val Γ₂ (obs natᵗ)} (proj₁ r)))
+
+-- the state the descent leaves, named because the `∀ (k : NodeId)`
+-- conjunct reads it under an already-reduced `lookupNode` and the
+-- unifier has nothing left to solve it from
+resSt : (k : ℕ) → EvalSt prog
+resSt k = proj₂ (proj₂ (subscribeE gas prog root 0 0
+                         (sched-init prog (slots k)) (st-init prog)))
 
 -- the indexed grant, at the burst the row actually hands back
 charged : ℕ → ℕ
@@ -153,3 +165,56 @@ flat≡ = refl
 
 flat-fails : (delivered 14 ≤ᵇ flat 14) ≡ false
 flat-fails = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at this file's own program and script.  The type is
+-- generated from the statement, so what the row asserts moves with any
+-- restatement of it rather than with a predicate copied down here.
+--
+-- WHAT THE ROW CHOOSES AND WHAT IT LEAVES STANDING.  It chooses the
+-- point -- program, script, entry state, and the three free numbers
+-- `d`, `W` and `B` -- and reports the level at ZERO, which is the
+-- entry level, so both level conjuncts are `z≤n`.  Every premise is
+-- left STANDING and the body reads none: three of them name `capsAt`
+-- or `nestCapAt`, and a row that discharged those would report on the
+-- seal rather than on the descent.  Unasked, the claim is the
+-- conclusion with the caps invariant not assumed.
+--
+-- AND `B` IS WHAT MAKES THE SEALED CONCLUSION REACHABLE AT ALL.
+-- `nestB` is sealed for cost, so `G` reduces at no point and no
+-- numeral instantiates the right side.  But `B` is a parameter the row
+-- picks and `nestB-base` puts it under `G` unconditionally, so setting
+-- `B` to the run's own delivered figure turns all three bound
+-- conjuncts into one numeric comparison the evaluator settles.  The
+-- last of them quantifies over every node id, which no row can
+-- enumerate; `nodeNestAt≤max` reads it back through the `nodesMax`
+-- figure the conjunct beside it already computes.
+----------------------------------------------------------------------
+
+tie₁₃ : Confirms
+  (subscribeE-nest-scan cap 0 (slots 13) (delivered 13) 0 0 gas
+     deepen (strmᵗ emptyᵉ) (input (fsuc fzero)) root 0 0
+     (sched-init prog (slots 13)) (st-init prog))
+tie₁₃ _ _ _ _ _ _ _ _ _ _ _ _ =
+  0 , z≤n , z≤n
+  , ≤-trans (≤ᵇ⇒≤ _ _ tt) base
+  , ≤-trans (≤-trans (≤ᵇ⇒≤ _ _ tt) base) (m≤n⊔m _ _)
+  , (λ j → ≤-trans (nodeNestAt≤max j (resSt 13))
+             (≤-trans (≤-trans (≤ᵇ⇒≤ _ _ tt) base) (m≤n⊔m _ _)))
+  where
+  base = nestB-base (Caps.cSize (frameStep 0 cap)) 0
+                    (nestUnit prog (slots 13)) (delivered 13) (syncSizeᵉ prog)
+
+tie₁₄ : Confirms
+  (subscribeE-nest-scan cap 0 (slots 14) (delivered 14) 0 0 gas
+     deepen (strmᵗ emptyᵉ) (input (fsuc fzero)) root 0 0
+     (sched-init prog (slots 14)) (st-init prog))
+tie₁₄ _ _ _ _ _ _ _ _ _ _ _ _ =
+  0 , z≤n , z≤n
+  , ≤-trans (≤ᵇ⇒≤ _ _ tt) base
+  , ≤-trans (≤-trans (≤ᵇ⇒≤ _ _ tt) base) (m≤n⊔m _ _)
+  , (λ j → ≤-trans (nodeNestAt≤max j (resSt 14))
+             (≤-trans (≤-trans (≤ᵇ⇒≤ _ _ tt) base) (m≤n⊔m _ _)))
+  where
+  base = nestB-base (Caps.cSize (frameStep 0 cap)) 0
+                    (nestUnit prog (slots 14)) (delivered 14) (syncSizeᵉ prog)

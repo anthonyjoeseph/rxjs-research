@@ -34,20 +34,23 @@
 module Probed.Thru-Step-Indexed where
 
 open import Data.Bool using (Bool; true; false)
-open import Data.Bool using (Bool; true; false)
 open import Data.List using ([]; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; pred; _≤ᵇ_; _^_; _*_; _+_)
+open import Data.Nat using (ℕ; zero; suc; pred; _≤ᵇ_; _^_; _*_; _+_; _≤_)
+open import Data.Nat.Properties
+  using (≤-refl; ≤-trans; ≤ᵇ⇒≤; m≤m⊔n; ⊔-mono-≤)
+open import Data.Unit using (tt)
 open import Data.Product using (_×_; _,_; proj₁)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; syncSizeᵛ)
+  using (Closed; Val; Fn; natᵗ; obs; ofᵉ; mapᵉ; mergeAllᵉ; nat̂; strmᵗ; varᵗ; caseᵗ; inlᵗ; syncSizeᵛ;
+         switchAllᵉ; exhaustAllᵉ)
 open import Rx.Frame-Width using (pWᵛ)
 open import Rx.Slots using (Slots)
-open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 open import Rx.Evaluator
   using (root; sched-init; st-init; EvalSt; Sched; Path; _↠_; thru-outer;
          mergeAllᵒ; switchᵒ; exhaustᵒ; installNode; mergeAll-st; switch-st;
@@ -55,8 +58,14 @@ open import Rx.Evaluator
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
+open import Verify-Budget-Sufficient.Nest-Burst using (descW)
+open import Verify-Budget-Sufficient.Nest-Cap using (arrD; arrD-mono; arrDW-key)
 open import Verify-Budget-Sufficient.Nest-Walk
-  using (nestDᵛˢ; nestCapsOK?)
+  using (nestDᵛˢ; nestCapsOK?; thruFit-arr-merge; thruFit-arr-switch;
+         thruFit-arr-exhaust)
+open import Rx.Clos-Size using (closSizeᵉ)
+open import Rx.Slot-Clos using (slotClos)
+open import Probed.Apparatus using (Confirms)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -288,3 +297,98 @@ resN2 = refl
 
 resN3 : (delN 3 ≤ᵇ frameFit 3) ≡ true
 resN3 = refl
+
+-- ══════════════════════════════════════════════════════════════════
+-- AND THE TIE TO THE THREE STATEMENTS, AT THE SHALLOWEST ARRIVAL AND
+-- NOT AT THE NESTED ONE THE ROWS ABOVE READ.  Every row above is this
+-- file's own arithmetic run over figures the evaluator produced;
+-- nothing in it is held to the statements as they read.  The rows
+-- below are: Agda generates their types from the postulates, so this
+-- file supplies only the point.
+--
+-- WHY THE POINT IS THE SHALLOW ONE, and it is a coverage boundary
+-- rather than a shortfall of effort.  The third conjunct of the fit is
+-- quantified over a NODE ID, so it compares two table lookups at a
+-- variable.  Where the consumed arrival leaves the table
+-- definitionally untouched both sides are the same stuck term and the
+-- conjunct is `m ≤ m ⊔ G`; where the arrival SUBSCRIBES -- which every
+-- arrival carrying an operator does, and which is exactly what the
+-- nested duplicator is for -- the two lookups differ at a concrete id
+-- the quantifier cannot reach, and no row can be written at all.  So
+-- the deep readings above stay readings, and what is tied is the
+-- boundary they are measured from.
+--
+-- THE ROWS ARE LOAD-BEARING ON THE VALUE CONJUNCT AND DEGENERATE ON
+-- THE TWO STORE ONES.  The arrival delivers a nesting of one against a
+-- grant that is a power of two in the key, so the first conjunct is a
+-- comparison that computes and could have failed; the store pair is
+-- `m ≤ m ⊔ G` by construction of the point.  The sealed width factor
+-- is never read: `suc W * key` is at least `key` whatever `descW`
+-- says, so the computable grant transports by monotonicity.
+-- ══════════════════════════════════════════════════════════════════
+
+tsB : Closed Γ₂ (obs (obs natᵗ))
+tsB = ofᵉ (strmᵗ (Dn 0) ∷ [])
+
+tsC : Caps
+tsC = caps 999 999 999
+
+tsU : ℕ
+tsU = nestUnit prog slots
+
+tsBDm tsKeym tsWm : ℕ
+tsBDm  = nestDᵉ (mergeAllᵉ nothing tsB)
+tsKeym = closSizeᵉ (slotClos slots) (mergeAllᵉ nothing tsB)
+tsWm   = descW gasBig (mergeAllᵉ nothing tsB) κ 0 0 sched₀ (st-init prog)
+
+tsGrantM : arrD tsU tsBDm tsKeym ≤ arrD tsU tsBDm (suc tsWm * tsKeym)
+tsGrantM = arrD-mono tsU tsBDm tsKeym (suc tsWm * tsKeym)
+             (arrDW-key tsWm tsKeym)
+
+tsRowM : Confirms
+  (thruFit-arr-merge tsC slots tsBDm tsWm gasBig
+     nothing tsB κ 0 0 sched₀ (st-init prog)
+     refl refl refl refl ≤-refl ≤-refl)
+tsRowM =
+  ( ≤-trans (≤ᵇ⇒≤ _ _ tt) tsGrantM
+  , ≤-trans (≤ᵇ⇒≤ _ _ tt) (⊔-mono-≤ ≤-refl tsGrantM)
+  , (λ j → m≤m⊔n _ _)
+  , tt ) , tt
+
+tsBDs tsKeys tsWs : ℕ
+tsBDs  = nestDᵉ (switchAllᵉ tsB)
+tsKeys = closSizeᵉ (slotClos slots) (switchAllᵉ tsB)
+tsWs   = descW gasBig (switchAllᵉ tsB) κ 0 0 sched₀ (st-init prog)
+
+tsGrantS : arrD tsU tsBDs tsKeys ≤ arrD tsU tsBDs (suc tsWs * tsKeys)
+tsGrantS = arrD-mono tsU tsBDs tsKeys (suc tsWs * tsKeys)
+             (arrDW-key tsWs tsKeys)
+
+tsRowS : Confirms
+  (thruFit-arr-switch tsC slots tsBDs tsWs gasBig
+     tsB κ 0 0 sched₀ (st-init prog)
+     refl refl refl refl ≤-refl ≤-refl)
+tsRowS =
+  ( ≤-trans (≤ᵇ⇒≤ _ _ tt) tsGrantS
+  , ≤-trans (≤ᵇ⇒≤ _ _ tt) (⊔-mono-≤ ≤-refl tsGrantS)
+  , (λ j → m≤m⊔n _ _)
+  , tt ) , tt
+
+tsBDx tsKeyx tsWx : ℕ
+tsBDx  = nestDᵉ (exhaustAllᵉ tsB)
+tsKeyx = closSizeᵉ (slotClos slots) (exhaustAllᵉ tsB)
+tsWx   = descW gasBig (exhaustAllᵉ tsB) κ 0 0 sched₀ (st-init prog)
+
+tsGrantX : arrD tsU tsBDx tsKeyx ≤ arrD tsU tsBDx (suc tsWx * tsKeyx)
+tsGrantX = arrD-mono tsU tsBDx tsKeyx (suc tsWx * tsKeyx)
+             (arrDW-key tsWx tsKeyx)
+
+tsRowX : Confirms
+  (thruFit-arr-exhaust tsC slots tsBDx tsWx gasBig
+     tsB κ 0 0 sched₀ (st-init prog)
+     refl refl refl refl ≤-refl ≤-refl)
+tsRowX =
+  ( ≤-trans (≤ᵇ⇒≤ _ _ tt) tsGrantX
+  , ≤-trans (≤ᵇ⇒≤ _ _ tt) (⊔-mono-≤ ≤-refl tsGrantX)
+  , (λ j → m≤m⊔n _ _)
+  , tt ) , tt

@@ -94,10 +94,18 @@ postulate
   --   a charge of thirty-three, eight to sixteen at the demand family
   --   against seventy-one.  The charge read there is the SYNTACTIC one
   --   the size cap is proven to dominate, and the rows discharge no
-  --   premise, so each is a stronger claim than the leaf instance.  NOT
-  --   covered: one frame in isolation, since the rows read the
-  --   composite; and any family whose chain deepens the node table by
-  --   more than one step.
+  --   premise, so each is a stronger claim than the leaf instance.
+  --   TIED at ONE frame -- a scan under an outer *All, which is the
+  --   chain shape the fold family builds -- with both node ids taken
+  --   from the run, since a step at an id the table does not hold is
+  --   the identity, and with both premises LEFT STANDING.  AND THE
+  --   GRANT IS SPENT AT EXACTLY THE ACCUMULATOR'S WRAP DEPTH, which
+  --   the composite rows could not see: the table the walk started
+  --   from folds to five, one wrap takes it to six and three wraps to
+  --   eight, so no grant-free reading exists at either and each row is
+  --   stated at the smallest grant that admits it.  NOT covered: a
+  --   burst, where the crossing would be linear in a length the rows
+  --   here do not vary -- every row steps a single value.
   stepFrame-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)

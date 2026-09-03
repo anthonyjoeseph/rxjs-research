@@ -52,7 +52,7 @@ open import Verify-Budget-Sufficient.Live-Nest-Walk using
 open import Verify-Budget-Sufficient.Nest-Store using
   (chainsNestD; pathNestD; storeNestMax; nestCapAt; nestOK?; realWidAt-def; nestUnit;
   slotsNestSum; liveNest; nodeNest; regsNestMax; sightCeil; slotWrapSum; nestCapAt-0;
-  nestCap-mono₀; nestOK?-latch; nestOK?-store; storeNestMax-lub; storeNest-slots≤;
+  nestCap-mono₀; nestOK?-latch; nestOK?-store; shareAdmit-nest; storeNestMax-lub; storeNest-slots≤;
   storeNest-live≤; storeNest-nodes≤; storeNest-regs≤)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; cascadeLatch; chainsOf; cascadeGo; Path; arrTy; stepFrame;
@@ -79,8 +79,6 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; foldPath-slots;
    shareAdmit-caps)
-open import Verify-Budget-Sufficient.Delivery-Walk using
-  (regP?; shareAdmit-chP)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -479,20 +477,94 @@ postulate
   -- restatement of this arm but a decision about whether the depth face
   -- prices a threading frame at all.
 
+  -- AND THE REASON NO STORY BUYS IT IS A CIRCLE, NOT A SHORTFALL.  The
+  -- depth an instant's arcs may spend is ONE NUMBER fixed before the
+  -- instant runs, and the delivery count the caps face affords is
+  -- computed FROM that number, towering in it.  A fold's width is under
+  -- that count; a fold with a step function of positive nesting builds
+  -- nesting that is at least linear in its width; and a nested value
+  -- subscribed at a hand-over spends depth per layer.  So the depth the
+  -- instant needs is at least the count taken at the depth it was given,
+  -- and a number that dominates a tower in itself does not exist.  That
+  -- is the same region producing the same refutation at every
+  -- denomination tried -- size, level, count as parameter, the story
+  -- above -- which is the convergence test's own stop condition, and it
+  -- names the mechanism: a depth parameter chosen BEFORE the count it
+  -- must dominate.  Two repairs suggest themselves and neither is one.
+  -- Counting STORIES instead of depth -- one per scan hop, since the
+  -- fuel is a tower whose height `blowH` keeps -- is the caps face's
+  -- own currency already, affordable there because it is read at the
+  -- EXIT index; what this face owes is the story-index NUMBER at the
+  -- ENTRY index, since the count axis instantiates its level function
+  -- at that nesting depth and every frame of the instant must nest
+  -- under it.  And a join rather than a sum in the `caseᵗ` clause of
+  -- `nestDᵗ` is what that clause already takes.
+
+  -- AND THE RESIDUE CANNOT BE SETTLED BY INSTANTIATION, WHICH IS A
+  -- FACT ABOUT THE OBLIGATION AND NOT ABOUT ANY HARNESS.  What is left
+  -- here is that no premise names the node table, so the natural next
+  -- move is to read the two sides at a state a run reached and see
+  -- which one has room.  Only one of them can be read.  The store side
+  -- computes: driven through later frames off its own subscribe, the
+  -- table reads one less than two to the burst length and DOUBLES on
+  -- the first later value, so the side that CAN be measured grows
+  -- exponentially in a count these premises never bound -- the
+  -- `valsΦ?` defect above, arriving from the store rather than from
+  -- the charge.  The charge side computes nowhere: `nestΦAt` and both
+  -- its summands are sealed, the `-def` equations hand the body back
+  -- in terms of `capsAt`, and `capsAt` is stuck at its own ENTRY,
+  -- since even there it is `frameBlowup` of the sealed `sizeCount`.
+  -- Compiled, which ignores every seal, the entry size cap and both
+  -- Φ summands were each killed at 180 s with no value at the smallest
+  -- program reaching this arm, while `nestCapAt` at the entry returns
+  -- at once because it IS `nestUnit`.  The rows are `Harness.Main`'s,
+  -- and are measured-not-rechecked by construction.
+
   -- SO THE ARM IS NOT MIS-SHAPED, IT IS UNAFFORDABLE, and that is a
   -- class and not a repair.  The count is under the exit cap's width and
   -- under nothing smaller, the fold charges a power in the count, and
   -- the fuel this instant runs at affords an exponent of two to its own
   -- size.  A count at least the size is all that is known, and that
   -- already leaves the room.  No ledger, no field and no recurrence
-  -- changes the two numbers being compared, so what has to move is the
-  -- depth face's decision to price a fold inside the instant that
-  -- performs it.
+  -- changes the two numbers being compared.  What is not yet known is
+  -- whether the second number is REAL: the count is what the recurrence
+  -- ADMITS at a level, and a canonical program's fan-out per hop is
+  -- under its size, so the widths admitted deep in an instant may be
+  -- reachable by no run at all.  That is the binary this arm waits on.
+  -- Unreachable, and a tighter width invariant carried as a FIELD of
+  -- the invariant record fits the entry read at every real level;
+  -- reachable, and a fold with a nesting-incrementing step over such a
+  -- burst nests past the story index, which is a FALSITY on the count
+  -- axis and on the budget at this recurrence, not on this arm.
   -- REFUTED: `Refuted.Walk-Phi-Room`, whose `walk-fold-room-absurd`
   --   states the affordability as the product it is and kills it at the
   --   floor of twenty-one, with `size₄` pinning that four folds already
   --   carry the next cap past two to that floor -- so the count it
   --   spends is one the recurrence admits rather than one invented.
+  -- DEAD ROUTE: re-reading the ceiling with the ENTRY width in the
+  --   exponent -- two to two to the entry size times the entry width is
+  --   under the story index at the same instant, by the pooled walk's
+  --   last-position slack -- affords only the levels whose width is
+  --   under that ceiling, about two to the previous instant's size
+  --   count of them, while the instant runs a level count that towers
+  --   in the story index.  Provable, and it buys a prefix.
+  -- DEAD ROUTE: the WIDTH-FIELD half of the binary above -- carrying a
+  --   tighter width as a field of the invariant record on the reading
+  --   that a program fans out per hop by at most its size.  The field
+  --   would have to be denominated in the measure the frame face
+  --   already uses, and that measure carries the source's payload count
+  --   into an EXPONENT at its fold clause, so it towers in the layer
+  --   count with no cap anywhere in its definition: a three-layer
+  --   refold crosses the linear ceiling at the linear reading's own
+  --   most generous setting, its own size at each level.  So there is
+  --   no field to thread, and the arm sits on the other branch.  The
+  --   separation is proven in `Probed.Fold-Width-Reach`, where a RUN
+  --   of the same family -- driven through later frames off the state
+  --   its own subscribe produced -- crosses the linear reading at the
+  --   FIRST hop, so the field is refuted by a measurement and not only
+  --   by a measure.  What the run does NOT reach is the count the
+  --   recurrence ADMITS, which is the binary above and stands where it
+  --   stood: two layers outran the evidence loop outright.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -1044,14 +1116,59 @@ fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-chain-sz {e = e} sl id i st h =
   shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
 
--- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.  A
--- registered chain's frames are the program's own, so its nesting is
--- the program's -- but the premise the walk carries about the registry
--- is a SIZE receipt and says nothing about depth at all, and the
--- store's depth ledger bounds the registry by a RUNTIME maximum rather
--- than by the unit, which is the wrong currency and the wrong
--- direction.  So this too is owed by whatever mints a registration.
+-- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
+-- reading is a ⊔-fold over the whole selection, and the walk spends it
+-- one chain at a time, so the fold has to be taken apart before the
+-- first `chainStep` sees it.
+chainsNest-all : ∀ {n} {Γ : Ctx n} {s t} (D U : ℕ)
+  (cs : List (RegId × Path Γ s t)) →
+  D + chainsNestD cs ≤ U →
+  all (λ rc → D + pathNestD (proj₂ rc) ≤ᵇ U) cs ≡ true
+chainsNest-all D U []       h = refl
+chainsNest-all D U (c ∷ cs) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (+-monoʳ-≤ D
+                       (m≤m⊔n (pathNestD (proj₂ c)) (chainsNestD cs))) h)))
+          (chainsNest-all D U cs
+            (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
+                                          (chainsNestD cs))) h))
+
+-- WHAT THE DEPTH IS FOR IS ONE BOUND ON `pathΦD`, and that is a fact
+-- about the consumers rather than about this statement.  Every route
+-- out of here reaches `frameΦ-fit`, whose three loud arms are the
+-- scan charge, the inner fit's pair and the outer frame's -- and the
+-- arm that is PROVEN spends the depth on exactly one step, widening
+-- the path's Φ-depth to the unit plus a square of the cap.  So the
+-- unit is the number the bound is routed THROUGH, not a currency
+-- anything downstream is stated in.
 --
+-- AND THE STORE DENOMINATION BUYS THE FAN-OUT HALF AND STOPS AT THE
+-- CHARGE.  Read as the registry's own place in the store measure this
+-- is a numeral inequality, so the selection's join is a proven fold
+-- and the per-chain receipt follows with no filter lemma between.
+-- What it cannot reach is `nestΦAt`, denominated in the program's
+-- unit and its slot wrap: a depth premise widened to the store has
+-- nothing there to be compared against, so replacing the unit
+-- outright moves the obligation onto the charge, which is where the
+-- remaining leaf is owed.
+
+-- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.
+-- IT IS FALSE, and not merely over arbitrary states: a RUN reaches a
+-- registry deeper than the unit, so the statement has to be replaced
+-- rather than discharged, and the invariant field with it.  The
+-- mechanism is a `map-f` frame, which charges the path its function's
+-- nesting while the unit is read off the program once -- so an
+-- observable-typed scan accumulator folded back into its own map
+-- function climbs one layer per delivery against a fixed number.
+--
+-- DEAD ROUTE: owing this to whatever MINTS a registration, which is
+--   where the size analogue directly above sends its own obligation.
+--   A mint holds the path it is registering and the program, and the
+--   counterexample is legal in both: the depth is a fact about the
+--   accumulated STORE, which neither the path's frames nor the
+--   syntax can report, so no premise threaded to a mint can pay it.
+--
+-- REFUTED: `Refuted.Reg-Nest-Reached`, at a chain five deep against a
+--   unit of four, reached by running, and climbing one per fold.
 -- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
 --   against a unit of one, minted by a map whose function carries
 --   syntax the program does not.
@@ -1064,22 +1181,29 @@ fan-chain-sz {e = e} sl id i st h =
 --   margin of two that neither closes nor opens across the sweep.
 --   Not covered: a share whose def nests more deeply than its
 --   consumer, which moves the unit's slot summand against a flat
---   chain, and the arbitrary registries the refutation inhabits.
+--   chain; the arbitrary registries the refutations inhabit; and an
+--   observable-typed scan accumulator, whose layers are stored rather
+--   than written and which is where the sweep's margin is lost.
 postulate
   fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (st : EvalSt e) →
-    regP? (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
-          (EvalSt.registry st) ≡ true
+    regsNestMax (EvalSt.registry st) ≤ nestUnit e sl
 
+-- AND THE FAN-OUT HALF IS NOW A PROVEN FOLD RATHER THAN A FILTER
+-- LEMMA, which is the whole of what the store denomination bought.  A
+-- share's admitted selection is under the registry's own place in the
+-- store measure by an induction this tree already had, and the join is
+-- taken apart per chain by the one directly above -- so nothing
+-- between the postulate and the walk's premise is stated over a
+-- boolean predicate any more.
 fan-chain-nestD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (i : Fin n) (st : EvalSt e) →
-  regP? (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
-        (EvalSt.registry st) ≡ true →
+  regsNestMax (EvalSt.registry st) ≤ nestUnit e sl →
   all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl)
       (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
-fan-chain-nestD {Γ = Γ} {t = t} {e = e} sl i st h =
-  shareAdmit-chP (λ {u} (p : Path Γ u t) → pathNestD p ≤ᵇ nestUnit e sl)
-                 i (EvalSt.registry st) h
+fan-chain-nestD {t = t} {e = e} sl i st h =
+  chainsNest-all 0 (nestUnit e sl) (shareAdmit {t = t} i (EvalSt.registry st))
+    (≤-trans (shareAdmit-nest i (EvalSt.registry st)) h)
 
 mutual
   walk-ΦHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1474,26 +1598,6 @@ chainStep-store≤ {e = e} sl id a nextId S Lv j path sched st hsl afford hsz hp
                               (chainStep-slots nextId a path sched st)))
                (≤-trans (storeNest-slots≤ sched st) hS)
 
--- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
--- the one `depthCascade` reports: the tail at the incoming state, the
--- live chain at the delivered-marked one, and the tail again at the
--- state that chain left.
--- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
--- reading is a ⊔-fold over the whole selection, and the walk spends it
--- one chain at a time, so the fold has to be taken apart before the
--- first `chainStep` sees it.
-chainsNest-all : ∀ {n} {Γ : Ctx n} {s t} (D U : ℕ)
-  (cs : List (RegId × Path Γ s t)) →
-  D + chainsNestD cs ≤ U →
-  all (λ rc → D + pathNestD (proj₂ rc) ≤ᵇ U) cs ≡ true
-chainsNest-all D U []       h = refl
-chainsNest-all D U (c ∷ cs) h =
-  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (+-monoʳ-≤ D
-                       (m≤m⊔n (pathNestD (proj₂ c)) (chainsNestD cs))) h)))
-          (chainsNest-all D U cs
-            (≤-trans (+-monoʳ-≤ D (m≤n⊔m (pathNestD (proj₂ c))
-                                          (chainsNestD cs))) h))
-
 -- THE REGISTRY ACROSS A WHOLE CHAIN, AT ONE LEVEL PER CHAIN, AND THE
 -- DOOR IS THE FOLD.  `chainStep` is one call to `foldPath` -- the
 -- arrival's value as the only value in flight, its tick and source as
@@ -1533,6 +1637,11 @@ chainStep-regsSz S j a nextId path sched st 1≤S hsz hp hreg =
   entrySz : valsSz? (iterSize S j S) (arrVal a ∷ []) ≡ true
   entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
               (≤-trans hsz (iterSize-infl S 1≤S j S)))) refl
+
+-- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
+-- the one `depthCascade` reports: the tail at the incoming state, the
+-- live chain at the delivered-marked one, and the tail again at the
+-- state that chain left.
 
 -- AND THE SELECTION'S LEVEL BUDGET IS ONE NUMBER, PEELED THREE WAYS
 -- PER CHAIN.  The head chain walks at the level reached so far, so it

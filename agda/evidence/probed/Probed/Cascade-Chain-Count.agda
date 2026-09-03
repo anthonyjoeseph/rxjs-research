@@ -28,8 +28,10 @@ module Probed.Cascade-Chain-Count where
 open import Data.List using (List; []; _∷_; _++_; length; foldr)
 open import Data.Bool using (Bool; true; false)
 open import Data.Nat using (ℕ; suc; _≤ᵇ_; _⊔_; _*_; _+_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Closed; natᵗ; nat̂)
@@ -45,6 +47,9 @@ open import Verify-Budget-Sufficient.Nest-Store
 
 open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; progW; foldD; insF; sucGU; sucGF; progC; sucGC; sucGW)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nest
+  using (arr-chains-nest-syn)
+open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
 -- The walk, taken at the arrival the root subscribe leaves behind,
@@ -298,3 +303,35 @@ TieW-fits = refl
 -- together rather than one that is merely slack.
 TieC4-fits : proj₂ (proj₂ (tieRow (progC 4 2 2) sl₅ (sucGC 1 2 6 4 2 2) 3)) ≡ true
 TieC4-fits = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at READING FOUR's own point.  The type is generated from
+-- the statement, so what the row reports is the conclusion as it now
+-- reads rather than a copy of it kept in step by hand.
+--
+-- AND THE TWO CAP PREMISES ARE LEFT STANDING, which makes the row a
+-- STRONGER claim than the statement's instance and not a weaker one.
+-- Both name `capsAt`, which is sealed and so reduces at no input; a
+-- row that discharged them would be reporting on the seal rather than
+-- on the arrival.  Left as hypotheses the body never reads, what the
+-- row asserts is the conclusion with the caps invariant UNASKED --
+-- green here implies the instance, red here would refute it.
+----------------------------------------------------------------------
+
+tieE : Closed Γ₂ natᵗ
+tieE = progF 22 1
+
+tiePair : Sched Γ₂ × EvalSt tieE
+tiePair = entry tieE sl₁ (sucGF 1 2 2 22 1)
+
+-- the arrival the scheduler itself presents at that state; the
+-- adversarial one stands in where the script has run dry, and a row
+-- landing there would read its own `Tie22-fits` false
+tieArrival : Arrival Γ₂
+tieArrival with sched-next (proj₁ tiePair)
+... | inj₁ _       = advArr
+... | inj₂ (a , _) = a
+
+tieSyn : Confirms
+  (arr-chains-nest-syn sl₁ 0 tieArrival (proj₁ tiePair) (proj₂ tiePair) refl)
+tieSyn = λ _ _ → ≤ᵇ⇒≤ _ _ tt

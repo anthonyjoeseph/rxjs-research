@@ -43,7 +43,9 @@ open import Data.Bool using (Bool; true; if_then_else_)
 open import Data.List using ([]; _∷_; foldr)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _⊔_)
+open import Data.Nat using (ℕ; zero; suc; _⊔_; z≤n)
+open import Data.Nat.Properties using (≤-refl; ≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -54,12 +56,15 @@ open import Rx.Exp
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
   using (splitEvents; root; sched-init; st-init; subscribeE; mintNode; Stream;
-         _↠_; thru-outer; mergeAllᵒ; installNode)
+         _↠_; thru-outer; mergeAllᵒ; installNode; NodeId; Sched; EvalSt; Path)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
   using (nestValOK?; capsOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Store using (allFresh)
-open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; allWrap)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (burstNest?; allWrap; FaceOK; faceOK; subscribeE-burst-nestL)
+open import Verify-Budget-Sufficient.Nest-Burst using (descW)
+open import Probed.Apparatus using (Confirms)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -149,22 +154,39 @@ ladder3 = row 3
 oneFn : Fn Γ₂ [] [] [] (obs natᵗ) (obs natᵗ)
 oneFn = strmᵗ (mergeAllᵉ nothing (ofᵉ (varᵗ (here refl) ∷ [])))
 
+-- the control's pieces are NAMED rather than let-bound, because the
+-- tie at the end of this file instantiates the target at exactly them
+-- and a `let` cannot be pointed at from a type
+flatBd : Closed Γ₂ (obs natᵗ)
+flatBd = mapᵉ oneFn (ofᵉ (strmᵗ payload ∷ []))
+
+flatHd : Closed Γ₂ natᵗ
+flatHd = allWrap mergeAllᵒ nothing flatBd
+
+flatC : Caps
+flatC = caps (syncSizeᵛ (obs natᵗ) flatHd) 99 99
+
+flatNid : NodeId
+flatNid = proj₁ (mintNode (sched-init flatHd slots))
+
+flatSch : Sched Γ₂
+flatSch = proj₂ (mintNode (sched-init flatHd slots))
+
+flatSt : EvalSt flatHd
+flatSt = installNode flatNid (allFresh natᵗ mergeAllᵒ nothing) (st-init flatHd)
+
+flatκ : Path Γ₂ (obs natᵗ) natᵗ
+flatκ = thru-outer mergeAllᵒ flatNid ↠ root
+
 ladderFlat : LadderRow
 ladderFlat =
-  let bd    = mapᵉ oneFn (ofᵉ (strmᵗ payload ∷ []))
-      hd    = allWrap mergeAllᵒ nothing bd
-      c     = caps (syncSizeᵛ (obs natᵗ) hd) 99 99
-      sch₀  = sched-init hd slots
-      nid   = proj₁ (mintNode sch₀)
-      sch   = proj₂ (mintNode sch₀)
-      st    = installNode nid (allFresh natᵗ mergeAllᵒ nothing) (st-init hd)
-      res   = subscribeE gasBig bd (thru-outer mergeAllᵒ nid ↠ root) 0 0 sch st
-  in ( capsOK? c sch st
-     , nestValOK? c (obs (obs natᵗ)) bd
-     , nestClosOK? c slots bd )
-   , Caps.cSize c
-   , suc (sizeᵉ bd)
-   , leastL 8 c (proj₁ res) 0
+  let res = subscribeE gasBig flatBd flatκ 0 0 flatSch flatSt
+  in ( capsOK? flatC flatSch flatSt
+     , nestValOK? flatC (obs (obs natᵗ)) flatBd
+     , nestClosOK? flatC slots flatBd )
+   , Caps.cSize flatC
+   , suc (sizeᵉ flatBd)
+   , leastL 8 flatC (proj₁ res) 0
    , biggest (proj₁ res)
 
 ladder1≡ : ladder1 ≡ ((true , true , true) , 28 , 28 , 1 , 39)
@@ -178,3 +200,43 @@ ladder3≡ = refl
 
 ladderFlat≡ : ladderFlat ≡ ((true , true , true) , 16 , 16 , 0 , 10)
 ladderFlat≡ = refl
+
+----------------------------------------------------------------------
+-- AND THE TIE TO THE STATEMENT, AT THE CONTROL AND ONLY THERE.  Every
+-- row above is a READING — `leastL`, a search this file wrote, run
+-- over a stream the evaluator produced — and nothing in it is held to
+-- `subscribeE-burst-nestL` as it reads.  The row below is: Agda
+-- generates its type from the statement, so this file supplies only
+-- the point and the witness, and a restatement of the target breaks
+-- here rather than leaving a green search about text that is gone.
+--
+-- WHY THE CONTROL IS THE ONLY POINT, and this is the finding rather
+-- than a shortfall of effort.  The target's first conjunct is
+-- denominated in `opIterD`, which this tower SEALS for cost, so it
+-- reduces at no input whatever.  At the control the needed increment
+-- is ZERO — the row above measures exactly that — and the conjunct
+-- becomes `0 ≤ _`, which holds without reading the sealed family at
+-- all.  At every RUNG the increment is one, and `1 ≤ opIterD …` is a
+-- fact about the sealed arithmetic and cannot be written here.  So the
+-- ladder's whole reading — that the needed level does not grow with
+-- depth — stays a reading, and what is tied is the boundary case it is
+-- measured against.
+--
+-- THE ROW IS LOAD-BEARING ON ITS SECOND CONJUNCT AND DEGENERATE ON ITS
+-- FIRST.  `z≤n` could not have failed; `refl` could, and does at every
+-- rung above, which is the whole content of `leastL` returning one
+-- there.  The premises are discharged at the tightest value each
+-- admits: the slots equation at the schedule's own slots, the width
+-- premise at the descent's own `descW`.
+----------------------------------------------------------------------
+
+flatFace : FaceOK flatC slots
+flatFace = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+flatRow : Confirms
+  (subscribeE-burst-nestL flatC 0 slots
+     (descW gasBig flatBd flatκ 0 0 flatSch flatSt)
+     gasBig flatBd flatκ 0 0 flatSch flatSt ⦃ flatFace ⦄
+     refl refl refl refl (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+     ≤-refl)
+flatRow = 0 , z≤n , refl

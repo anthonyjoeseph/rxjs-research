@@ -215,39 +215,43 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NOW PUT THE REGISTRATION'S DEPTH ON THE INVARIANT RECORD.** Running
-  the two registry residues rather than quantifying over states split
-  them apart. The depth one holds at every registry a run produced, on
-  both axes it has, with the chain climbing one per layer against a
-  unit climbing one alongside it -- a margin that never closes, so it
-  is a true statement missing an invariant and not a false one. The
-  size one cannot be stated at a numeral at all: the registered length
-  grows with the program's own syntax. So the commit adds the depth
-  fact as a field every producer owes and every consumer re-establishes,
-  and either discharges the row from it or names the mint that cannot.
+- **RE-READ THE ARM'S SIBLINGS AGAINST THE DEAD FIELD.** The same
+  recurrence is read at the other Φ arms, and each was classed while the
+  width field was still an open repair -- so an arm parked as waiting on
+  that field is waiting on nothing, and its class is wrong in the direction
+  that reads safe. This is a reclassification pass and not a grind: the
+  arms the dead route reaches move UP, and any arm that survives it is a
+  genuinely separate gap and gets said so in its own header. The commit
+  re-reads them and moves the classes that move.
 
-- **THEN CARRY THE CAPS RECEIPT DOWN THE POTENTIAL WALK.** The fork
-  the drain faces posed was false, and `innerΦ-drain-caps`'s header
-  says why: neither a restatement at these premises nor the walk's
-  whole record is what the ledger asks for. One conjunct is, and the
-  tick this face sits under already holds it. So the commit threads
-  that receipt from there through the potential walk to the arm that
-  reads a queue, and either closes the arm's caps leaf with it or
-  names the clause where the walk cannot preserve it.
+- **THEN INSTANTIATE THE TIER'S ONE UNPROBED ROW, AGAINST A STATE A RUN
+  REACHED.** One row here is FALSITY on nothing at all -- the class it is
+  born into, not a reading anyone took -- and it is a receipt ABOUT a
+  state, so what was missing was a reachable state rather than a route.
+  The drive the fork now carries supplies one: later frames off the state
+  the subscribe itself produced, no hand-built record priced. The commit
+  reads the row there and reports what the rows earn, receipt or
+  refutation, with the coverage boundary either way.
 
-- **THEN SPLIT THE SUBSCRIBE AT ITS OWN HEADS.** The drain's recursion
-  is a real body now, stated over an abstract slot telescope so no
-  preservation fact is owed, and what it spends is one subscribe. That
-  leaf is still a monolith over the whole descent, and the nodes face
-  already shows the shape it wants: gas first, then one arm per source
-  head, with the three that cost nothing — an empty source, a dry
-  unfold, a gate whose node is an empty queue — proven rather than
-  assumed. So the commit splits it that way, and either closes the
-  gated head against the park receipt the entry carries or names the
-  head where the size cap cannot reach the depth.
+- **THEN PUT THE BURST'S LENGTH WHERE A PRODUCER MUST SUPPLY IT.** The
+  charge side of the Φ arms is now known to be measurement-dead at every
+  instant, so what is left to work is the side that does compute -- and
+  it grows exponentially in a count these premises never bound. The
+  ledger conjunct that would bound it is an `all`, which constrains each
+  value and never how many, while the conclusion charges a power in the
+  length. This is NOT the width the fork killed: that was the frame
+  face's measure; this is a burst LENGTH. A hypothesis
+  here is the laundering the law forbids, so the commit states it as a
+  field obligation on the invariant record and reports which producer
+  cannot re-establish it.
 
 ### The ledger
 
+- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
+  `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
+  syntactic unit, read as the registry's own place in the store measure.
+  REFUTED AT A REACHED STATE, not only an arbitrary one, so it is replaced
+  rather than discharged and no mint can be asked for it.
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the `from-inner` head of the drain
   law, the only frame that names a node. Both denominations are closed to
@@ -259,7 +263,8 @@ does not fit is a finding about the shared statement, not about the head.
   is built from, so only the cap size pays.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
   the outer frame mints, subscribing the arrivals it is handed. The one kind
-  whose side condition is a size bound on values rather than a unit.
+  whose side condition is a size bound on values rather than a unit, and the
+  grant is spent: the fold outruns the slot vocabulary from depth three.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -270,8 +275,9 @@ does not fit is a finding about the shared statement, not about the head.
   scan arm, which emits the node store that no premise here reads.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   what one frame stores at the nodes map, under the potential AND the frame
-  grant it was handed. The premise alone was refuted at the scan arm: the cell
-  holds the accumulator, and the budget is a constant in the burst.
+  grant. The premise alone was refuted at the scan arm: the cell holds the
+  accumulator against a budget constant in the burst. The grant is spent at the
+  wrap depth.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
@@ -284,15 +290,11 @@ does not fit is a finding about the shared statement, not about the head.
   size receipt at the PROGRAM's cap. Stated over an arbitrary state it fails at
   one registration longer than the cap, whatever the cap is; and the reachable
   length climbs with the syntax, so no numeral stands in for the cap either.
-- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED`: the
-  registry's own depth against the syntactic unit. Refuted over an arbitrary
-  state at a chain minted from syntax the program lacks — but it holds at every
-  reachable registry swept, with a margin that does not close.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the producing side of
-  the fold's new grant. Unaffordable, not mis-shaped: the count is under the
-  exit width, which outruns two-to-two-to the size at every instant, so no
-  story buys room. BLOCKED on whether this face prices a threading frame at
-  all.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×2`: the
+  producing side of the fold's new grant. AT THE SPIRAL STOP: four
+  denominations refuted in one region, since a depth fixed before the count
+  must dominate a count towering in it. Owed a binary, not a currency: is the
+  admitted count reachable.
 - **`innerΦ-drain-caps`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
   queue's caps receipt, now at the face and count the arm REPORTS rather than
   at ones it chooses. Its own definition names the state's caps receipt in
@@ -309,14 +311,14 @@ does not fit is a finding about the shared statement, not about the head.
   frame. Probed at the subscribing frame — the only kind that can grow the
   registry — driven to the boundary its premises allow: one level pays with
   slack that GROWS with the level. A shared-slot inner is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
+- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×5`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
   the caps can refute and they cannot move. One family unread.
-- **`burst-outW`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
-  emits no more payloads than its term syntactically carries. The last semantic
-  step under the descent's ceiling; nine rows hold at the root frame, three of
-  them tight, and a frame below the root is the uncovered axis.
+- **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
+  no more payloads than its term syntactically carries. Stated over the split,
+  not the sealed measure, so it instantiates; three tight rows tied, a frame
+  below the root uncovered.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
@@ -374,12 +376,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY,
   `REFUTED, PROBED`: the selection's paths and the arrival's payload land
   inside one unit — the fact that ties the walk's charge back to the program.
-  Free-list form refuted; probeable.
+  Free-list form refuted; tied at the entry arrival, cap premises unasked.
 - **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
-  the path measure charges nothing for; the component reads zero after every
-  cascade, so a walk leaving a deeper registration standing is the unreached
-  region.
+  the path measure charges nothing for; the component reads zero, so the tie is
+  degenerate on the increment.
 - **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY,
   `DEAD ROUTE, TWIN`: every stage of every chain's walk under the width cap.
   The mirror carries the identical conjunct across the feared `thru` hop, and

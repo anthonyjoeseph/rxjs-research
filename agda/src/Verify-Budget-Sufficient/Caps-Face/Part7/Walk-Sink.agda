@@ -382,7 +382,7 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- TWIN: `subscribeE-caps` already threads a level exactly this way --
 --   invariant at the stepped cap, conclusion at the sum -- and is
 --   proven.
--- PROBED: `Probed.Drain-Queue-Ladder` reads the two computable halves
+-- PROBED: the drain-ladder rows read the two computable halves
 --   at a `mergeAll` limited to one over parked inners, at queue
 --   lengths TWO and FOUR -- the queue read off the node the run
 --   installed, so the entries are the ones the evaluator parked.  Both
@@ -394,8 +394,12 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   subscribe actually takes; the ledger comparison the
 --   readings feed, symbolic-or-nothing by the descent family's own
 --   dead route; the two heads other than `mergeAllᵒ`; and a queue
---   whose entries differ from one another in size.
--- PROBED: `Probed.Drain-Queue-Length` reads the other half the fold
+--   whose entries differ from one another in size.  The rows never reached the
+--   conclusion -- the dead route above says why none could -- so the
+--   file carries no tie and is deleted; `git show
+--   303bbaa:agda/evidence/probed/Probed/Drain-Queue-Ladder.agda`
+--   recovers them.
+-- PROBED: the drain-length rows read the other half the fold
 --   names -- the queue's LENGTH, since one unit of the frame's
 --   measure is spent per entry.  A limit-one merge over a scripted
 --   input parks one short of the script at three lengths, against a
@@ -403,7 +407,10 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   own size can hold; the slot vocabulary dominates at all three.
 --   Not covered: a source that parks without a script, a limit other
 --   than one, a merge nested in another's drain, and the cap, which
---   is a tower and is not instantiated.
+--   is a tower and is not instantiated.  Deleted for the same
+--   reason as its sibling; `git show
+--   303bbaa:agda/evidence/probed/Probed/Drain-Queue-Length.agda`
+--   recovers them.
 postulate
   walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)

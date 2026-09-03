@@ -46,7 +46,8 @@
 -- TARGET: chain-depth-sighted @36ffe2
 module Probed.Depth-Sighted where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_; _≤_)
+open import Data.Nat.Properties using (≤-trans; m≤m+n)
 open import Data.List using (List; length; map)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -57,21 +58,31 @@ open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; ofᵉ; scanᵉ;
   strmᵗ; nat̂; emptyᵉ; Tm; syncSizeᵉ; Fn; _×ᵗ_)
 open import Data.Maybe using (nothing)
 open import Data.List using ([]; _∷_) renaming (map to mapL)
-open import Data.Bool using (Bool; true)
+open import Data.Bool using (Bool; true; false)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin using (zero) renaming (suc to fsuc)
 open import Rx.Prim using (gasPad; g0; cold; hot)
 open import Rx.Slots using (Slots; Slot; scripted; shared)
+open import Data.Nat.Properties using (≤-refl; ≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource)
+         cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource;
+         Arrival; Path; thru-outer; mergeAllᵒ; installNode; mergeAll-st)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 
 open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; insT; insF; sucGU; sucGF; asyncNats)
-open import Verify-Budget-Sufficient.Caps-Depth using (depthE; depthCascade)
+open import Verify-Budget-Sufficient.Caps-Depth
+  using (depthE; depthCascade; depthChain; depthFrame)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
+  using (chain-depth-sighted)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (storeNestMax; nestUnit; sightCeil; pathNestD)
+  using (storeNestMax; nestUnit; sightCeil; pathNestD; sightCeil-mono; fitB)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestB-base)
+open import Verify-Budget-Sufficient.Depth-Sighted using (sight-all-walk)
+
+open import Probed.Apparatus using (Confirms)
 
 
 -- THE CEILING WRITTEN OUT, because the grant it reads sits inside the
@@ -364,8 +375,116 @@ sizeFigs = sizeᵉ (progU 2 2) + 1000 * sizeᵉ (progU 8 2)
 
 sizeFigs≡ : sizeFigs ≡ 30100052028
 
+-- ── the tie, at the chain leaf rather than the round ────────────────
+
+-- Every reading above is taken at `depthCascade`, and the chain leaf
+-- speaks about `depthChain`.  The round's descent is the JOIN over its
+-- chains, so a green round is a green chain -- but that step is an
+-- ARGUMENT, and the whole point of a tie is that no argument stands
+-- between a row and the statement.  So the point below is the chain
+-- itself: the second instant's arrival, the FIRST chain the registry
+-- admits for it, and the state `depthCascade` hands that chain.
+--
+-- BOTH PREMISES ARE DISCHARGED, AT THE TIGHTEST VALUE EACH ADMITS.
+-- The slots equation is reflexivity by taking `sl` to be the schedule's
+-- own; the store bound is reflexivity by taking `S` to be the store's
+-- own maximum.  Nothing is weakened by either -- the ceiling is
+-- monotone in `S`, so the least admissible `S` is the strongest
+-- reading, and a row here holds at every larger one a caller supplies.
+--
+-- NON-VACUITY IS PINNED AND NOT ASSERTED.  A point taken from an
+-- exhausted schedule or an empty chain list falls to the default below,
+-- whose descent is nought and whose row could not fail; the equation
+-- pins the descent this point actually reaches, so the default is
+-- visible as a number rather than hidden behind a green.
+record Point (p : Closed Γ₂ natᵗ) : Set where
+  constructor pt
+  field
+    arr : Arrival Γ₂
+    pth : Path Γ₂ (arrTy arr) natᵗ
+    sc  : Sched Γ₂
+    stt : EvalSt p
+
+noPoint : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) → Point p
+noPoint p sl =
+  pt (record { tick = 0 ; ordinal = 0 ; source = 0
+             ; elemTy = natᵗ ; payload = 0 ; isLast = true })
+     root (sched-init p sl) (st-init p)
+
+point : (p : Closed Γ₂ natᵗ) (sl : Slots Γ₂) (g : ℕ) → Point p
+point p sl g with sched-next (proj₁ (after1 p sl g))
+... | inj₁ _        = noPoint p sl
+... | inj₂ (a , sd) with chainsOf a (proj₂ (after1 p sl g))
+...   | []            = noPoint p sl
+...   | (rid , c) ∷ _ = pt a c sd (cascadeLatch a (proj₂ (after1 p sl g)))
+
+uPt : Point (progU 8 2)
+uPt = point (progU 8 2) slotsF (sucGU 1 2 2 8 2)
+
+uArr : Arrival Γ₂
+uArr = Point.arr uPt
+
+uPth : Path Γ₂ (arrTy uArr) natᵗ
+uPth = Point.pth uPt
+
+uSc : Sched Γ₂
+uSc = Point.sc uPt
+
+uSt : EvalSt (progU 8 2)
+uSt = Point.stt uPt
+
+chainDesc : ℕ
+chainDesc = depthChain 2 uArr uPth uSc uSt
+
+chainDesc≡ : chainDesc ≡ 17
+
+chainRow : Confirms
+  (chain-depth-sighted (Sched.slots uSc) uArr 2 (storeNestMax uSc uSt)
+     uPth uSc uSt refl ≤-refl)
+chainRow = ≤ᵇ⇒≤ _ _ tt
+
+-- AND THE SAME TIE AT THE FAR END OF THE COUNT AXIS -- WHERE THE
+-- READING IS THAT THE CHAIN LEAF DOES NOT SEE THAT AXIS AT ALL, which
+-- is a coverage boundary the round's rows cannot show and this row
+-- reports as a number.  The round's descent moves with the delivered
+-- count, forty-nine to one hundred and ninety-three, and it is that
+-- movement the ceiling's shape was calibrated against.  The FIRST
+-- chain's descent does not move: seventeen at both counts, pinned
+-- either side.  So the growth lives wholly in the round's join over
+-- LATER chains and the states they leave, which is `depthCascade`'s
+-- territory and not this leaf's, and no row here -- at any count --
+-- constrains the chain leaf along that axis.  What the second point
+-- does reach is the ceiling and the store at the far count, both of
+-- which move; what it does not reach is a descent that does.
+fPt : Point (progU 8 20)
+fPt = point (progU 8 20) slotsF (sucGU 1 2 2 8 20)
+
+fArr : Arrival Γ₂
+fArr = Point.arr fPt
+
+fPth : Path Γ₂ (arrTy fArr) natᵗ
+fPth = Point.pth fPt
+
+fSc : Sched Γ₂
+fSc = Point.sc fPt
+
+fSt : EvalSt (progU 8 20)
+fSt = Point.stt fPt
+
+farDesc : ℕ
+farDesc = depthChain 2 fArr fPth fSc fSt
+
+farDesc≡ : farDesc ≡ 17
+
+farChainRow : Confirms
+  (chain-depth-sighted (Sched.slots fSc) fArr 2 (storeNestMax fSc fSt)
+     fPth fSc fSt refl ≤-refl)
+farChainRow = ≤ᵇ⇒≤ _ _ tt
+
 rootFigs≡ = refl
 rootRow≡ = refl
+chainDesc≡ = refl
+farDesc≡ = refl
 rootWideRow≡ = refl
 delivFigs≡ = refl
 axisFigs≡ = refl
@@ -499,3 +618,109 @@ dblLongFigs = proj₁ xRow3L + 1000000 * proj₂ xRow3L
 
 dblLongFigs≡ : dblLongFigs ≡ 98000002
 dblLongFigs≡ = refl
+
+
+-- ══════════════════════════════════════════════════════════════════
+-- THE WALK LEAF ITSELF, rather than the parent that lands on it.
+--
+-- Every reading above is taken at `depthE` from the root, where this
+-- leaf is one summand of a join; a green parent is a green leaf, but
+-- that step is an ARGUMENT and a tie is what leaves no argument
+-- standing between a row and the statement.  So the point below is the
+-- frame: a `mergeAll` outer with one inner arriving, walked at the
+-- empty path, with the entry pair and the current pair taken to be the
+-- same.
+--
+-- THE TWO FREE NUMBERS ARE READ AT NOUGHT, which is the strongest
+-- reading the statement admits: the grant is monotone in the width and
+-- the slot count is multiplied by them, so a row holding here holds at
+-- every larger pair a caller supplies.
+--
+-- AND THE CONCLUSION IS SEALED, so the row does not compare numerals.
+-- `fitB` is `nestB` plus a slot term, and `nestB` does not reduce at
+-- any point; `nestB-base` puts the grant's own depth argument under it
+-- unconditionally, and that argument -- the path's nesting plus the
+-- outer's, one `suc` up -- is computed off the term.  So the row reads
+-- the descent against the ceiling taken at THAT floor, which is a
+-- numeric comparison, and widens it into the sealed form by
+-- monotonicity.  A weakening through a proven inequality is what
+-- reaches a sealed statement at all.
+--
+-- LOAD-BEARING, and it fails exactly when the walk passes the ceiling
+-- read at the floor -- which is a strictly harder row than the sealed
+-- statement asks for, since the floor is below the grant.  The two
+-- points are the shallow inner and one four layers deep, so a pass
+-- that only survives at a flat arrival fails here.
+-- ══════════════════════════════════════════════════════════════════
+
+wSched : Sched Γ₂
+wSched = sched-init (progU 8 2) slotsT
+
+wSt : EvalSt (progU 8 2)
+wSt = installNode 7 (mergeAll-st {t = obs natᵗ} nothing 0 [] false)
+                  (st-init (progU 8 2))
+
+wB : ℕ → Closed Γ₂ (obs natᵗ)
+wB d = ofᵉ (strmᵗ (deep d) ∷ [])
+
+wDesc : ℕ → ℕ
+wDesc d = depthFrame (gasPad 400 g0) 0 0 (thru-outer mergeAllᵒ 7)
+                     (root {Γ = Γ₂} {t = natᵗ}) (deep d ∷ []) false wSched wSt
+
+-- the ceiling at the FLOOR of the sealed grant, which is what the row
+-- actually compares against
+wFloor : ℕ → ℕ
+wFloor d =
+  sightCeil (sizeᵉ (progU 8 2))
+            (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d)))
+            (storeNestMax wSched wSt)
+            (nestUnit (progU 8 2) slotsT)
+
+walkFigs : ℕ
+walkFigs = wDesc 1 + 1000 * wFloor 1 + 1000000 * wDesc 4 + 1000000000 * wFloor 4
+
+walkFigs≡ : walkFigs ≡ 1113005954002
+walkFigs≡ = refl
+
+walkRow : List Bool
+walkRow = (wDesc 1 ≤ᵇ wFloor 1) ∷ (wDesc 4 ≤ᵇ wFloor 4) ∷ []
+
+walkRow≡ : walkRow ≡ true ∷ true ∷ []
+walkRow≡ = refl
+
+walkTie : ∀ (d : ℕ) →
+  pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d))
+    ≤ fitB (progU 8 2) slotsT 0 0
+        (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d)))
+        (suc (syncSizeᵉ (wB d)))
+walkTie d =
+  ≤-trans (nestB-base (sizeᵉ (progU 8 2)) 0 (nestUnit (progU 8 2) slotsT)
+             (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d)))
+             (suc (syncSizeᵉ (wB d))))
+          (m≤m+n _ _)
+
+tieWalk1 : Confirms
+  (sight-all-walk (gasPad 400 g0) 0 0 mergeAllᵒ 7 (wB 1)
+     (root {Γ = Γ₂} {t = natᵗ}) 0 0 wSched wSt (deep 1 ∷ []) false wSched wSt)
+tieWalk1 _ _ =
+  ≤-trans (≤ᵇ⇒≤ (wDesc 1) (wFloor 1) tt)
+          (sightCeil-mono (sizeᵉ (progU 8 2))
+             {v = pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 1))}
+             {v′ = fitB (progU 8 2) slotsT 0 0
+                     (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 1)))
+                     (suc (syncSizeᵉ (wB 1)))}
+             {s = storeNestMax wSched wSt} {s′ = storeNestMax wSched wSt}
+             (nestUnit (progU 8 2) slotsT) (walkTie 1) ≤-refl)
+
+tieWalk4 : Confirms
+  (sight-all-walk (gasPad 400 g0) 0 0 mergeAllᵒ 7 (wB 4)
+     (root {Γ = Γ₂} {t = natᵗ}) 0 0 wSched wSt (deep 4 ∷ []) false wSched wSt)
+tieWalk4 _ _ =
+  ≤-trans (≤ᵇ⇒≤ (wDesc 4) (wFloor 4) tt)
+          (sightCeil-mono (sizeᵉ (progU 8 2))
+             {v = pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 4))}
+             {v′ = fitB (progU 8 2) slotsT 0 0
+                     (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 4)))
+                     (suc (syncSizeᵉ (wB 4)))}
+             {s = storeNestMax wSched wSt} {s′ = storeNestMax wSched wSt}
+             (nestUnit (progU 8 2) slotsT) (walkTie 4) ≤-refl)

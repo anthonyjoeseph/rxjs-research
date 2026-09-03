@@ -44,8 +44,8 @@ open import Data.List using ([]; _∷_)
 open import Data.Vec using () renaming ([] to []ᵛ; _∷_ to _∷ᵛ_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_)
-open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _≤_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; m≤m+n)
 open import Data.Product using (proj₁; proj₂; _,_)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -59,8 +59,11 @@ open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; root; _↠_; thru-outer; mergeAllᵒ;
          subscribeE; splitEvents; mintNode; installNode; sched-init; st-init)
-open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; allFresh; slotWrapSum; nestUnit)
-open import Verify-Budget-Sufficient.Sighted-Fit using (StreamFitG)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestB-base)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (pathNestD; allFresh; slotWrapSum; nestUnit; fitB)
+open import Verify-Budget-Sufficient.Sighted-Fit using (StreamFitG; subscribeE-fit)
+open import Probed.Apparatus using (Confirms)
 
 Γₛ : Ctx 1
 Γₛ = obs natᵗ ∷ᵛ []ᵛ
@@ -202,3 +205,50 @@ exps = syncSizeᵉ (bN 0) + 100 * syncSizeᵉ (bN 1)
 
 exps≡ : exps ≡ 37302316
 exps≡ = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at the same two families the rows above read.  Its type is
+-- the statement APPLIED at this file's own point rather than the grant
+-- written out by hand, so a restatement of the postulate changes what
+-- the row asserts instead of leaving a hand-copy of the old grant
+-- standing here green.
+--
+-- AND ITS BOUND IS TIGHTER THAN THE ONE ABOVE, which is what makes it
+-- worth having beside those rows rather than instead of them.  `nestB`
+-- is sealed, so the grant cannot be computed here; what CAN be
+-- computed is its FLOOR -- the depth argument it is built over -- and
+-- the rows below spend only that, widening to the real grant by the
+-- family's own base lemma.  So each row asks whether the emitted
+-- value's depth stays under the ARRIVAL's, with the wrap summand
+-- charged, and it fails the moment a step duplicates past it.  The
+-- rows above read the margin against the whole tower; these read it
+-- against the tower's first term.
+--
+-- THE WIDTH IS TAKEN AT NOUGHT, the smallest the grant admits, and
+-- both premises are left STANDING and unread -- the width premise is
+-- what would have to be discharged to pin `descW`, which is sealed, so
+-- reading it would be reporting on the seal rather than on the fit.
+----------------------------------------------------------------------
+
+-- the floor route, stated once: the grant's depth argument is a lower
+-- bound on the grant, so anything under the depth is under the grant
+fitFloor : ∀ (a : Closed Γₛ (obs (obs natᵗ))) (d : ℕ) →
+  d ≤ pathNestD κ′ + nestDᵉ a →
+  d ≤ fitB prog sl 1 0 (pathNestD κ′ + nestDᵉ a) (syncSizeᵉ a)
+fitFloor a d h =
+  ≤-trans h
+    (≤-trans (nestB-base (sizeᵉ prog) 0 (nestUnit prog sl)
+                (pathNestD κ′ + nestDᵉ a) (syncSizeᵉ a))
+             (m≤m+n _ _))
+
+tieDup : Confirms
+  (subscribeE-fit gas 1 0 (b 0) κ′ 0 0
+     (proj₂ (mintNode sched))
+     (installNode nid (allFresh (obs natᵗ) mergeAllᵒ nothing) st))
+tieDup _ _ = ((tt , fitFloor (b 0) _ (≤ᵇ⇒≤ _ _ tt)) , tt) , tt
+
+tieN₃ : Confirms
+  (subscribeE-fit gas 1 0 (bN 3) κ′ 0 0
+     (proj₂ (mintNode sched))
+     (installNode nid (allFresh (obs natᵗ) mergeAllᵒ nothing) st))
+tieN₃ _ _ = ((tt , fitFloor (bN 3) _ (≤ᵇ⇒≤ _ _ tt)) , tt) , tt

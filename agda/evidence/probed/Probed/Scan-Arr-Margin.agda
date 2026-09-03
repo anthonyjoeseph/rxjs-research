@@ -44,8 +44,10 @@ open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; _*_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤-trans; ≤ᵇ⇒≤; m≤n⊔m)
+open import Data.Unit using (tt)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
-open import Data.Product using (_×_; _,_; proj₁)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gasPad; cold)
@@ -57,13 +59,15 @@ open import Rx.Clos-Size using (closSizeᵉ)
 open import Rx.Slot-Clos using (slotClos)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Evaluator
-  using (subscribeE; splitBurst; root; sched-init; st-init)
+  using (subscribeE; splitBurst; root; sched-init; st-init; EvalSt)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (nestValOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Nest-Cap using (arrD)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit)
-open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ; nestCapsOK?)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (nestDᵛˢ; nestCapsOK?; nodesMax; nodeNestAt; subscribeE-nest-arr-scan)
 open import Refuted.Demand-Programs using (Γ₂)
+open import Probed.Apparatus using (Confirms; nodeNestAt≤max)
 
 -- both slots empty: the source is written into the program, so the
 -- telescope contributes a constant to every row
@@ -181,3 +185,44 @@ fit4 = refl
 
 fit8 : (delivered 8 ≤ᵇ grant 8) ≡ true
 fit8 = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at the widest row and only there.  The type is generated
+-- from the statement rather than restated here, so the row moves with
+-- any restatement of the predicate instead of quietly outliving it.
+--
+-- WHY ONE ROW AND NOT THREE.  The cap above is built from the WIDEST
+-- program's own closure size, so that is the single point at which
+-- every premise is pinned by a `refl` above.  A row at four values
+-- would be reading the same guard at a program smaller than the one
+-- it was sized for, and the premise pinning it is not on the page.
+--
+-- WHAT IT CHOOSES AND WHAT IT LEAVES STANDING.  It chooses the point
+-- and the two free numbers -- `B` at the program's own nesting and `W`
+-- at the burst length, the smallest each premise admits -- and leaves
+-- all six premises STANDING, reading none of them, which makes the row
+-- a stronger claim than the instance it is drawn from.  The grant
+-- computes here because the arrival key is transparent, so the two
+-- numeric conjuncts are the comparison the `fit` row already pins, now
+-- read through the statement's own eliminators.  The third quantifies
+-- over every node id and no row can enumerate it; `nodeNestAt≤max`
+-- reads it back through the `nodesMax` figure beside it.
+----------------------------------------------------------------------
+
+-- named rather than `_`, because the node-id conjunct reads the result
+-- under an already-reduced lookup and the unifier has nothing left to
+-- recover the state from
+resSt : (k : ℕ) → EvalSt (prog k)
+resSt k = proj₂ (proj₂ (subscribeE gas (prog k) root 0 0
+                         (sched-init (prog k) slots) (st-init (prog k))))
+
+tie8 : Confirms
+  (subscribeE-nest-arr-scan cap slots (nestDᵉ (prog 8)) (wid 8) gas
+     deepen4 (strmᵗ emptyᵉ) (ofᵉ (lits 8)) root 0 0
+     (sched-init (prog 8) slots) (st-init (prog 8)))
+tie8 _ _ _ _ _ _ =
+  ≤ᵇ⇒≤ _ _ tt
+  , ≤ᵇ⇒≤ _ _ tt
+  , (λ j → ≤-trans (nodeNestAt≤max j (resSt 8))
+             (≤-trans (≤ᵇ⇒≤ (nodesMax (resSt 8)) (grant 8) tt)
+                      (m≤n⊔m (nodeNestAt j (st-init (prog 8))) (grant 8))))

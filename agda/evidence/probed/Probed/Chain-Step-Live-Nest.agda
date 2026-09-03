@@ -38,7 +38,9 @@ open import Data.Bool using (false; true; _∧_)
 open import Data.Maybe using (just; nothing)
 open import Data.List using ([]; _∷_; foldr)
 open import Data.Nat using (ℕ; zero; suc; _≤ᵇ_; _⊔_; _*_; _+_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp
@@ -52,7 +54,11 @@ open import Rx.Evaluator
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; pathNestF; nodeNest)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps
+  using (chainStep-nest-live)
 open import Refuted.Demand-Programs using (Γ₂; insT)
+
+open import Probed.Apparatus using (Confirms)
 
 slots : Slots Γ₂
 slots = insT 0 0 0
@@ -224,3 +230,36 @@ mapped≡ = refl
 
 mapFits : (mGrown 2 ≤ᵇ mCharge 2) ∧ (mGrown 4 ≤ᵇ mCharge 4) ≡ true
 mapFits = refl
+
+-- ── the tie: the statement's own ordering, at one point per family ──
+
+-- The rows above are the READING -- both sides recomputed here out of
+-- `liveMax`, `slotsNestSum` and `pathNestF`, and compared by `≤ᵇ`.
+-- That comparison is a restatement, and a restatement is exactly what
+-- can drift weaker without anything going red.  The four rows below
+-- are the statement itself instantiated: Agda writes each type from
+-- `chainStep-nest-live` as it reads, so the probe supplies only the
+-- point, and the Boolean above is spent as the decision procedure that
+-- discharges it rather than as the claim.
+--
+-- ONE POINT PER FAMILY, at the depth each family's own reading calls
+-- its tight one -- the refuting arrival, the parked node the charge
+-- has no store term for, the second merge frame where the factor does
+-- not dilute, and the `map-f` that hands the step a value the arrival
+-- never carried.  The remaining depths move a quantity the tie already
+-- reaches, and each additional row is a whole run of the evaluator.
+liveRow : Confirms
+  (chainStep-nest-live {e = prog} 1 (arr 3) path (proj₁ sub) emptyNode)
+liveRow = ≤ᵇ⇒≤ _ _ tt
+
+attackRow : Confirms
+  (chainStep-nest-live {e = parked 2} 1 shallow path (parkedSc 2) (parkedSt 2))
+attackRow = ≤ᵇ⇒≤ _ _ tt
+
+twoRow : Confirms
+  (chainStep-nest-live {e = prog} 1 (arr2 3) path2 (proj₁ sub) twoNodes)
+twoRow = ≤ᵇ⇒≤ _ _ tt
+
+mapRow : Confirms
+  (chainStep-nest-live {e = prog} 1 shallow (path3 2) (proj₁ sub) emptyNode)
+mapRow = ≤ᵇ⇒≤ _ _ tt

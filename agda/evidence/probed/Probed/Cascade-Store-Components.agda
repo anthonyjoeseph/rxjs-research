@@ -25,17 +25,20 @@
 -- rows say whether the increment is NEEDED, never whether it suffices.
 module Probed.Cascade-Store-Components where
 
-open import Data.List using (length)
+open import Data.Bool using (false)
+open import Data.List using (List; length)
 open import Data.Nat using (ℕ)
+open import Data.Nat.Properties using (≤-trans; m≤m+n; ≤ᵇ⇒≤)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp using (Closed; natᵗ)
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
-         cascade; cascadeLatch; chainsOf)
+         cascade; cascadeLatch; chainsOf; Arrival; arrTy; RegId; Path)
 open import Rx.Slots using (Slots)
 
 open import Refuted.Demand-Programs
@@ -43,6 +46,9 @@ open import Refuted.Demand-Programs
 open import Verify-Budget-Sufficient.Nest-Store
   using (storeNestMax; regsNestMax)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nest
+  using (cascadeGo-nest-regs)
+open import Probed.Apparatus using (Confirms)
 
 entry : ∀ {t} (e : Closed Γ₂ t) → Slots Γ₂ → ℕ → Sched Γ₂ × EvalSt e
 entry e sl g =
@@ -102,3 +108,56 @@ C-parts = refl
 
 F-parts : rowF ≡ (2 , 5 , 0 , 7)
 F-parts = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at the demand family's own point above.  The type is
+-- generated from the statement, so the row reports the conclusion as
+-- it now reads rather than a component reading kept beside it by hand.
+--
+-- THE THREE CAP PREMISES ARE LEFT STANDING, which makes the row a
+-- STRONGER claim than the instance: all three name `capsAt` or
+-- `nestCapAt`, both sealed, so a row that discharged them would report
+-- on the seal.  Unasked, what the row asserts is the conclusion with
+-- the caps invariant not assumed.
+--
+-- AND THE ROW IS DEGENERATE ON THE INCREMENT, which is this file's own
+-- finding rather than a hole in it: the registry component reads ZERO
+-- at every family here, so the left side is under `storeNestMax`
+-- before the increment is added and `m≤m+n` carries the rest.  The row
+-- can still fail -- the walk registering one deep path would put a
+-- positive number there -- but nothing in this corpus makes it, which
+-- is exactly what the component readings above report.
+----------------------------------------------------------------------
+
+tie0 : Sched Γ₂ × EvalSt pU
+tie0 = let e₀ = entry pU sl₁ (sucGU 1 2 2 2 2)
+       in step1 (proj₁ e₀) (proj₂ e₀)
+
+-- the stand-in where the script has run dry; a row landing there reads
+-- against an empty selection and the component figures above say so
+dryArr : Arrival Γ₂
+dryArr = record { tick = 0 ; ordinal = 0 ; source = 1 ; elemTy = natᵗ
+                ; payload = 0 ; isLast = false }
+
+tieArr : Arrival Γ₂
+tieArr with sched-next (proj₁ tie0)
+... | inj₁ _       = dryArr
+... | inj₂ (a , _) = a
+
+tieSched : Sched Γ₂
+tieSched with sched-next (proj₁ tie0)
+... | inj₁ _        = proj₁ tie0
+... | inj₂ (_ , sd) = sd
+
+-- the walk's own entry state and its own selection, which is what
+-- `cascade` hands `cascadeGo`
+tieSt : EvalSt pU
+tieSt = cascadeLatch tieArr (proj₂ tie0)
+
+tieChains : List (RegId × Path Γ₂ (arrTy tieArr) natᵗ)
+tieChains = chainsOf tieArr (proj₂ tie0)
+
+tieRegs : Confirms
+  (cascadeGo-nest-regs sl₁ 0 tieArr 1 tieChains tieSched tieSt refl)
+tieRegs = λ _ _ _ →
+  ≤-trans (≤ᵇ⇒≤ _ (storeNestMax tieSched tieSt) tt) (m≤m+n _ _)

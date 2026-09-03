@@ -2,5 +2,5 @@
 -- under the same name -- which is the one shape E2 cannot see.
 -- TARGET: live-one @000000
 module Stale where
-_ : Set₁
-_ = Set
+row : Confirms (live-one 3)
+row = refl

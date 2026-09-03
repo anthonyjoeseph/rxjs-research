@@ -10,7 +10,7 @@ and nothing in `src` may depend on it.**
 
     make refuted        typecheck the refutations  (agda Refuted/Main.agda)
     make probed         typecheck the probes       (agda Probed/Main.agda)
-    make evidence-check E1 + E2, the two laws below
+    make evidence-check the laws below — the boundary, expiry, and a probe's kind
 
 A **refutation is conclusive negative evidence**; a **probe is inconclusive
 positive evidence**. Neither is a claim, which is why neither is in `src` and
@@ -47,7 +47,7 @@ tree.
 So a refutation needs no expiry machinery and a probe does. That asymmetry is
 E2.
 
-## The two laws — `make evidence-check`
+## The laws — `make evidence-check`
 
 - **E1 — THE ONE-WAY BOUNDARY. Nothing in `src` may import from an evidence
   tree.** Imports go `evidence/` → `src`, freely and deeply: a refutation must
@@ -73,6 +73,102 @@ E2.
   If what a probe actually pins is the **evaluator** rather than a statement,
   it is not a probe — it is a unit test, and its home is the bug cache
   (`Implementation/Unit-Test.agda`, `make bug-cache`).
+
+- **E6 — A PROBE IS A RECEIPT OR A FORK, NEVER NEITHER AND NEVER BOTH.** The
+  two products are different. A `-- TARGET:` probe instantiates ONE statement
+  and reports that it held: its product is a coverage receipt. A `-- FORK:`
+  probe stands at a design choice between two candidate MECHANISMS and its
+  product is a separation — these two disagree, so instantiating decides
+  between them. Neither marker is E2's finding already; both at once is E6's,
+  because a receipt written from a file that also separates claims coverage
+  the separating rows never bought.
+
+  **A FORK PROVES ITS SEPARATION IN A TYPE.** The alternatives are two real
+  definitions of one signature and the probe inhabits `Separates f g` — a
+  witness plus `f at ≢ g at`, whose `apart` field is UNINHABITED when the
+  candidates agree. So the marker decides only which law applies and **Agda
+  decides whether the claim is true**: the same division as `-- TARGET:`,
+  where the marker is free and the obligation it creates is not. This is what
+  a comment convention could never buy — a declared fork that decides nothing
+  is refused by the typechecker, not by a reviewer's memory.
+
+  A fork **expires exactly as a target does**: E2 reads either marker, so a
+  fork whose statement is settled fails the gate and is deleted. E5 stamps
+  only targets — a fork's rows are taken against two candidate definitions
+  rather than against the target's text.
+
+  **The witness must be REACHED, not constructed**, and that half no type
+  carries: it is the hand-built-state failure under PROBE BEFORE GRINDING,
+  unchanged.
+
+- **E7 — A RECEIPT'S ROWS ARE TIED TO ITS TARGET'S STATEMENT IN A TYPE.** A
+  probe used to restate its target's predicate by hand — a local
+  `held d = regP? (λ p → …) …` — and pin THAT by `refl`, so nothing held the
+  row to the postulate: a mistyped or quietly weaker predicate stayed green
+  and earned a `PROBED:` receipt for a claim nobody had instantiated. Every
+  target now has at least one row of type `Confirms (<target> <args>)`, where
+  `Confirms` (in `Probed.Apparatus`) takes the postulate APPLIED at the
+  probe's own arguments and returns that application's type. Agda generates
+  the row's type from the statement as it reads; **the probe chooses only the
+  point.** A restated statement changes every row's type under it, which is
+  E5's fingerprint law arriving inside the typechecker.
+
+  **THE BODY MAY NAME NO POSTULATE, BECAUSE ANY INHABITANT WOULD TYPECHECK.**
+  The postulate itself, handed back as its own proof, inhabits the row, and a
+  row discharged out of some OTHER unproven statement is evidence for one
+  claim exactly as far as another is true. So the body is free to spend
+  anything this tower has PROVEN — `refl` where the claim reduces, a stdlib
+  inequality where it does not — and may name no postulate at all.
+
+  **IT IS A LAUNDERING TEST AND NOT A COMPUTATION TEST, AND THE DIFFERENCE IS
+  WHAT MAKES THE RULE SATISFIABLE.** Held to a numeral, the rule would ask for
+  a conclusion that REDUCES at the chosen point — and a conclusion denominated
+  in a family this tower SEALS for cost reduces at no point whatever, so a
+  probe whose target is stated in one could never write the row and the
+  finding could never be cleared. A weakening through a proven inequality is a
+  stronger receipt than a numeral, not a weaker one. And
+  **the head under `Confirms` must be a declared `-- TARGET:`**, reached only
+  through the statement's own eliminators — `proj₁`/`proj₂`, application at
+  a point, a record conclusion's field — since an arbitrary function applied
+  to the postulate returns whatever type it likes and the tie is gone.
+
+  **What E7 does not do.** It does not discharge a HYPOTHESIS: the arguments
+  handed to the target are the probe's, and a hypothesis it cannot compute
+  (`refl` on a decidable one, a real proof otherwise) means the point is
+  outside the statement's domain and the file is not a receipt for it — say
+  so in the header and cover what the conclusion alone can. Rows reading
+  exact numerals (a margin, a count, a non-vacuity pin) stay as they are: a
+  `Confirms` row says the claim held, and those rows say by how much.
+
+- **E8 — A LIVE POSTULATE CARRIES AT MOST SEVEN RECEIPTS (Anthony).** A probe
+  AIMS a grind or REFUTES a statement. Past a handful of green receipts on one
+  target it is doing neither: the seventh has not told anyone what the sixth
+  did not, the ledger row is still open, and what the evidence is buying is
+  more evidence to DELETE on the day the statement is discharged. Seven rather
+  than three because a coverage LATTICE over genuinely separate axes is
+  legitimate and this tree has one; rather than twelve because past seven the
+  evidence has stopped converting into proof.
+
+  **THE COUNT IS OVER `-- TARGET:` DECLARATIONS, NOT FILES**, so a probe
+  carrying three targets pays three — and **the repair is to DISCHARGE the
+  postulate or to DELETE the receipts that no longer earn their place, NEVER
+  to merge probe modules.** Merging satisfies a file count and changes
+  nothing, which is the same laundering as trading a postulate for a
+  hypothesis; the selftest pins it by failing eight receipts consolidated into
+  two files.
+
+  **DELETING A RECEIPT DOES NOT DELETE ITS FINDING.** A coverage boundary, a
+  blocked verdict or a dead route belongs in the header of the statement it
+  constrains, and that is where it goes — with `git show <sha>` as the
+  recovery route, exactly as a spent probe's receipt already carries one.
+
+  **A REFUTATION IS UNCAPPED, and that is not leniency:** it kills a statement
+  that is then GONE, so it cannot accumulate against a live row, and `make
+  refuted` goes red the day `src` can no longer state it. **A FORK is uncapped
+  from the other side** — it declares no target, and deciding between two
+  mechanisms is the one job a single file does. And the cap is **off a
+  DISCHARGED target**, whose receipts are E2's finding rather than a second
+  one.
 
 Plus, per tree, the wiring law with no exemptions:
 

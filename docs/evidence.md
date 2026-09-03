@@ -47,7 +47,7 @@ make refuted              typecheck the refutations   (Refuted/Main.agda)
 make probed               typecheck the probes        (Probed/Main.agda)
 make wiring-refuted       reachability, rooted at Refuted/Main
 make wiring-probed        reachability, rooted at Probed/Main
-make evidence-check       E1 + E2 + E3 + E4 + E5
+make evidence-check       E1 + E2 + E3 + E4 + E5 + E6 + E7 + E8
 make evidence-selftest    proves every one of them still fires
 ```
 
@@ -165,3 +165,168 @@ or delete the probe.
 It is deliberately **not** a make target: it writes the current fingerprint onto
 every unstamped target, which is exactly the move the paragraph above forbids
 doing by reflex.
+
+## E6 — the fork, and why the marker is not the check
+
+A probe has two possible products and they are not interchangeable. Most probes
+**instantiate one statement and report that it held** — a coverage receipt,
+bounded by the shapes it reached. The other kind stands at a **design choice**:
+two candidate mechanisms are on the table, and the probe's whole job is to show
+they disagree somewhere, so that instantiating them decides between them.
+
+Declare which with the marker:
+
+```
+-- TARGET: pushVals-merge-nest @c12ae2      a receipt
+-- FORK:   scanΦ-fit                        a choice between mechanisms
+```
+
+The marker is free, and a free marker enforces nothing on its own — that is the
+lesson of every convention in this repo that had to grow teeth. So the marker
+selects a law and the law is discharged in **Agda**:
+
+```agda
+record Separates {I V : Set} (f g : I → V) : Set where
+  field
+    at    : I
+    apart : f at ≢ g at
+```
+
+```agda
+nest-fork : Separates nestD-sum nestD-join
+nest-fork = record { at = prog₇ ; apart = λ () }
+```
+
+`apart` cannot be written when the two candidates agree, so a fork that decides
+nothing does not typecheck. A `-- FORK:` file carrying no `Separates`-typed
+declaration is E6's finding; so is a file declaring both markers, and so is a
+`-- TARGET:` file that carries a separation — that last one is a fork wearing a
+receipt's marker, and the `-- PROBED:` line written from it would claim coverage
+of a statement the separating rows were never about.
+
+Three things E6 deliberately does not do. It does not check that the two
+candidates are the ones that **matter** — no machine can, and that judgement is
+the reason a fork gets written down at all. It does not check that `at` is
+**reachable**: a witness built by hand rather than by running is the failure
+under PROBE BEFORE GRINDING, unchanged and still yours. And it says nothing
+about a fork between two **statements** — two candidate shapes for a lemma,
+two currencies for a potential. Those are settled by refuting one side, which
+is `refuted/`'s job, with its own root and its own gate target; there is no
+`Separates` to write, because the alternatives are types rather than functions.
+
+`Separates` itself lands with the first fork that needs it: `wiring-probed`
+roots every definition in the tree at `Probed.Main`, so a record nothing uses
+fails the gate. Until then E6's own branches are pinned by fixtures under
+`scripts/evidence-selftest/`, the same arrangement `wiring-selftest` uses for a
+rule that fires on nothing in the tree today.
+
+## E7 — the tie, and why the marker is not the check either
+
+A receipt's rows used to be written twice: once as the postulate in `src`,
+once as a hand-restated predicate in the probe, pinned by `refl`. The two were
+held together by nothing but the author's care, and E5's fingerprint could only
+say the *statement* had moved — not that the *rows* had ever matched it.
+
+```agda
+Confirms : {A : Set} → .(claim : A) → Set
+Confirms {A} _ = A
+```
+
+```agda
+regsS : (d : Fin 5) → Confirms (fan-regsNest slots (proj₂ (sub d)))
+regsS fzero        = refl
+regsS (fsuc fzero) = refl
+```
+
+The argument is the target **applied** at the probe's own inputs, so its type
+is the statement instantiated there, and `Confirms` returns exactly that type.
+The argument is irrelevant (the dot): it fixes the type and can never be used.
+What the row must then inhabit is the statement at the point, and the
+typechecker will not let the probe write anything else.
+
+What Agda cannot refuse is the **body** — the postulate handed back as its own
+proof typechecks — and the **head** — `Confirms (weaken (target …))` has
+whatever type `weaken` returns. So E7 reads both textually, with the same
+division as E6: the marker and the record select the law, Agda decides the
+claim, and the check holds the two places a human could still cheat. A
+`Confirms` body may name **no postulate at all**; a `Confirms` head, after
+peeling `proj₁`/`proj₂`, dotted field accessors and parentheses, must be one
+of the file's `-- TARGET:` names — and every target must have at least one
+such row.
+
+The body rule is a **laundering** test and not a computation test, and the
+difference is what makes it satisfiable. Held to a whitelist of computed terms
+— `refl`, `tt`, a numeral, a stdlib converter — the rule silently demands a
+conclusion that REDUCES at the chosen point, and a conclusion denominated in a
+family this tower seals for cost does not reduce at any point whatever. Every
+probe whose target is stated in one would then carry a finding it could never
+clear, which is a coverage boundary being reported as a defect. What actually
+has to be refused is a row discharged out of the target itself, or out of some
+OTHER unproven statement — either makes the row evidence for one postulate
+exactly as far as another one is true. So the body may spend anything the
+tower has PROVEN, `where` blocks included, and a weakening through a proven
+inequality is a **stronger** receipt than a numeral rather than a weaker one:
+the type is still generated from the statement, and the row still holds only
+because the claim is true at the point.
+
+`Probed.Burst-Nest-Unit` is the worked instance. Its three targets conclude in
+`nestUnit e ins + nestIncAt e ins 0`, and `nestIncAt` is built over a sealed
+size, so no `≤ᵇ` can be taken against it. What the seal cannot hide is that
+the increment is a **summand**: the store's own reading computes, each
+component is under it by a proven converse (`storeNest-live≤` and its
+siblings), and `m≤m+n` puts the unit under the unit plus anything. The row
+reaches the statement as it reads.
+
+Sub-claims are reached through the statement's own connectives, never through
+a function over it: `Confirms (proj₁ (t …))` for a conjunct,
+`Confirms (proj₂ (proj₂ (t …)) 3)` for a `∀` at a point,
+`Confirms (Fit.grant (t …))` for a field of a record conclusion, and a Σ
+conclusion is given its witness in the body, `2 , refl`.
+
+Two boundaries. A hypothesis is an ARGUMENT, so it is the probe's to supply
+and E7 does not read it: a decidable one is `refl`, anything else is a real
+proof, and a hypothesis the probe cannot discharge means the point is outside
+the statement's domain — the file is then not a receipt for that statement,
+whatever its conclusion computes to, and its header says so. And a row that
+reads an exact numeral (`marginK`, `counts`) is not a `Confirms` row and need
+not be: it says by how much, where the tied row says only that the claim held.
+
+`Probed.Apparatus` is the one module in the tree that states no rows, and
+`check-evidence.py` names it beside `Main.agda` as not a probe; `Separates`
+lands there too when the first fork needs it. E7's own branches are pinned by
+fixtures under `scripts/evidence-selftest/confirms-*`.
+
+## E8 — the cap, and what it is measuring
+
+Seven receipts per live postulate. The number is arbitrary within a range and
+the range is not: the law is in CLAUDE.md and EVIDENCE.md, and what belongs
+here is the mechanics.
+
+`check_e8` walks every probe file, reads its `-- TARGET:` declarations, keeps
+the ones naming a name on `make postulates`' ledger, and groups by that name.
+Three consequences worth knowing before the check fires at you:
+
+- **It counts declarations.** A file carrying four targets contributes four
+  rows, to four different statements or to one. So consolidating eight probes
+  into two modules leaves the count at eight — which is the point, and the
+  fixture `cap-consolidated` is exactly that shape.
+- **A discharged target is invisible to it.** The ledger filter runs first, so
+  a postulate that has become a definition drops out of the grouping entirely
+  and its probes are E2's finding. Reporting both would name one repair twice.
+- **A `-- FORK:` file contributes nothing**, since it declares no target at
+  all. E6 already refuses a file that is both.
+
+The report names every site, file and line, sorted worst statement first, so
+the choice of which receipts to keep is made against the whole list rather
+than one at a time.
+
+**The migration is the expensive half, and it is prose work, not code.** The
+findings in the deleted probes' headers are the reason those probes cost what
+they did; they move into the target's own header, condensed, behind a
+`git show <sha>` that resolves to the commit still holding the modules.
+`make comments-check` accepts a sha in a `PROBED:` receipt for exactly this
+case, so a receipt naming a module that is gone must carry one or the gate
+goes red.
+
+The three fixture families are `cap-at` (seven, legal), `cap-over` (eight,
+fires) and `cap-consolidated` (eight declarations across two files, fires).

@@ -33,6 +33,7 @@ open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Decide using (T-to)
+open import Probed.Apparatus using (Confirms)
 
 open import Rx.Exp
   using (Closed; Val; natᵗ; obs; ofᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
@@ -43,7 +44,10 @@ open import Rx.Evaluator
 open import Rx.Nest-Depth using ()
 
 open import Verify-Budget-Sufficient.Nest-Store
-  using (storeNestMax; nestUnit; nestCapAt; nestCapAt-0; nestCap-mono; nestOK?; nestOK?-intro)
+  using (storeNestMax; nestUnit; nestCapAt; nestCapAt-0; nestCap-mono; nestOK?; nestOK?-intro;
+         storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; nestIncAt)
+open import Verify-Budget-Sufficient.Caps-Bridge
+  using (burst-nest-live; burst-nest-nodes; burst-nest-regs)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 slots : Slots Γ₂
@@ -134,6 +138,33 @@ okS = ok (pS 2) refl
 
 okX : nestOK? (pX 2) slots 1 (schedOf (pX 2)) (stOf (pX 2)) ≡ true
 okX = ok (pX 2) refl
+
+-- AND THE THREE TARGETS THEMSELVES, WHICH IS WHAT THE FLOOR WAS FOR.
+-- Each conclusion is denominated in `nestIncAt`, built over a size the
+-- tower seals -- so no side of it reduces and there is no numeral to
+-- pin.  What the seal cannot hide is that the increment is a SUMMAND:
+-- the store's own reading is computable, each component is under it by
+-- a proven converse, and the unit sits under the unit plus anything.
+-- So the rows reach the statements as they read, at this program, as
+-- proofs rather than readings -- which is the shape a sealed
+-- denomination leaves available and the only one it leaves.
+underInc : ∀ {t} (e : Closed Γ₂ t) → fit e →
+  storeOf e ≤ nestUnit e slots + nestIncAt e slots 0
+underInc e h =
+  ≤-trans (≤ᵇ⇒≤ (storeOf e) (nestUnit e slots) (T-to h))
+          (m≤m+n (nestUnit e slots) (nestIncAt e slots 0))
+
+liveM : Confirms (burst-nest-live (pM 2) slots)
+liveM = ≤-trans (storeNest-live≤ (schedOf (pM 2)) (stOf (pM 2)))
+                (underInc (pM 2) refl)
+
+nodesM : Confirms (burst-nest-nodes (pM 2) slots)
+nodesM = ≤-trans (storeNest-nodes≤ (schedOf (pM 2)) (stOf (pM 2)))
+                 (underInc (pM 2) refl)
+
+regsM : Confirms (burst-nest-regs (pM 2) slots)
+regsM = ≤-trans (storeNest-regs≤ (schedOf (pM 2)) (stOf (pM 2)))
+                (underInc (pM 2) refl)
 
 -- ── the region the floor cannot reach ──────────────────────────────
 
