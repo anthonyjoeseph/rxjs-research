@@ -58,7 +58,8 @@ open import Probed.Chain-Step-Live-Nest
 open import Probed.Thru-Step-Indexed
   using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;
-         residueFigures≡; resN1; resN2; resN3)
+         residueFigures≡; resN1; resN2; resN3;
+         tsRowM; tsRowS; tsRowX)
 
 open import Probed.Scan-Arr-Clos-Key
   using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14)
@@ -69,7 +70,8 @@ open import Probed.Scan-Arr-Margin
 
 
 open import Probed.Thru-Arr-Slot
-  using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡)
+  using (burst≡; keys≡; delivered≡; unit≡; fitM; fitS; fitX; margin₃≡;
+         tieArr≡; tieRowM; tieRowS; tieRowX)
 
 open import Probed.Sight-All-Stream
   using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡)

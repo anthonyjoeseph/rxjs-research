@@ -215,17 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NEXT TIE THE SEALED GROUP, WHICH THIS COMMIT LEARNED IS NOT ONE GROUP.**
-  `subscribeE-burst-nestL` was written off unreachable — its arithmetic
-  conjunct is denominated in a family this tower SEALS — and tied anyway,
-  because at the control the increment is ZERO and the conjunct then asks
-  only `0 ≤` it. So a seal blocks a row only where the sealed quantity is on
-  the small side, and the question each remaining target owes is whether it
-  has such a point. `root-entry-sunk` is the other outcome: its two premises
-  are jointly uninhabited over the corpus, so it is no longer a target and
-  the boundary is written where the statement is. The commit takes
-  `burst-outW` and the three `thruFit-arr-*`, each against the equations
-  their sealing blocks already export.
+- **THE SEALED GROUP SPLITS BY SIDE, AND WHAT REMAINS IS THE SMALL-SIDE
+  HALF.** The three `thruFit-arr-*` are tied, and not by the equations their
+  sealing blocks export: the sealed width sits on the LARGE side of the
+  grant, where monotonicity reaches it without it ever reducing. That is the
+  mirror of the earlier finding, so the question a sealed target owes is
+  which SIDE its seal is on — large is free, small needs a point where the
+  increment is zero. `burst-outW` and
+  `pushVals-caps-burstW` are the small-side remainder, and the commit either
+  finds each a zero point or writes the boundary where the statement is. A
+  second constraint, belonging to no seal, is written at `thruFit-arr-merge`:
+  a conjunct quantified over `NodeId` is writable only at an arrival that
+  mints no node.
 
 - **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the

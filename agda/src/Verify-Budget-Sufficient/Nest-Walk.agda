@@ -1969,7 +1969,9 @@ postulate
   --   charge for.  Covered LOAD-BEARING: the value conjunct at that
   --   family, read at a grant BELOW this one -- the rows take the key
   --   at one copy where the width premise buys `suc W` of them, so a
-  --   fit there is a fit here.
+  --   fit there is a fit here.  TIED at the SHALLOWEST arrival of that
+  --   family and not at the nested ones the rows above read, for the
+  --   reason the sibling receipt gives.
   -- PROBED: `Probed.Thru-Arr-Slot` takes the region that receipt names
   --   as open -- a SUBSTITUTING SLOT, where the key is read through the
   --   telescope rather than off the term -- at the very witness that
@@ -1981,6 +1983,18 @@ postulate
   --   eight here.  NOT covered: a telescope deepening without
   --   lengthening, which no head in this language writes, and the two
   --   STORE conjuncts, weaker than the value one at the same grant.
+  --   TIED at a plain `of` source, which is the only arrival at which
+  --   this statement can be instantiated at all: the third conjunct
+  --   quantifies over every `NodeId`, so it is writable only where the
+  --   consumed arrival leaves the node table definitionally unchanged,
+  --   and an arrival whose term carries an operator MINTS one -- both
+  --   lookups then go stuck at a concrete id the quantifier cannot
+  --   reach.  The value conjunct stays load-bearing there, since an
+  --   `of` whose emitted value is itself an observable delivers
+  --   positive nesting while touching no node.  The sealed width is
+  --   reached from the OTHER SIDE and never read: `descW` sits on the
+  --   LARGE side of the grant, so `arrD-mono` at `arrDW-key`
+  --   transports the computable bound whatever the seal hides.
   thruFit-arr-merge : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (sl : Slots Γ) (B W : ℕ) (g : Gas)
     (lim : Maybe ℕ)
