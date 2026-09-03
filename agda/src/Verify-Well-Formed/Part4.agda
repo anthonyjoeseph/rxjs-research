@@ -204,6 +204,21 @@ postulate
   -- one registry entry outliving a DONE root exit sinks to a share.  The
   -- `done` guard is load-bearing and measured so: `Probed.Root` reaches a state
   -- whose registry is live and where this is FALSE — with done ≡ false.
+  --
+  -- AND NOTHING HAS INSTANTIATED THIS STATEMENT, WHICH IS A STRONGER
+  -- GAP THAN AN UNPROBED CONCLUSION.  The conclusion computes, so the
+  -- obstacle is not decidability: it is that the two premises are
+  -- jointly UNINHABITED over every program `Probed.Root` runs.  Each
+  -- state it reaches with `done ≡ true` has a DRAINED registry, so the
+  -- membership premise has no inhabitant; the one state with a live
+  -- registry has `done ≡ false`, so the guard premise has none.  A
+  -- point satisfying both is what a receipt for this statement costs,
+  -- and until one exists the file is evidence about the GUARD rather
+  -- than about the claim, which is why it declares the merge leaf as
+  -- its target and not this one.  What would supply the point is a
+  -- program whose root completes while a share registration survives
+  -- to the root exit; the paragraph above asserts such states exist
+  -- and no construction tried so far produces one.
   root-entry-sunk : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ)
     (S : ProtocolSt) →
     runProtocol protocol-init
@@ -258,6 +273,16 @@ postulate
   --   edge a wrong cache would show at.
   --   COVERAGE BOUND: eight programs, no μ, no defer, no nesting past two
   --   levels, and a single slot context at most.
+  --   TIED at four of them — this statement applied at the program and
+  --   the cell, so the type is generated from it rather than restated:
+  --   the one-inner shape, the BOUNDED face carrying a limit, the
+  --   take-cut edge (whose merge node sits second behind the take, so
+  --   the cut leaves the node the count lives on in place), and the
+  --   only point whose registry is NON-EMPTY at the exit.  That last
+  --   is what the other three cannot buy: elsewhere the predicate is
+  --   asked about a count against a drained registry, and there it is
+  --   asked about a live count of two against two surviving
+  --   registrations.
   root-mergeAllCache : ∀ {n} {Γ : Ctx n} {t} {w} (e : Closed Γ t) (ins : Slots Γ)
     (nid : NodeId) (lim : Maybe ℕ) (k : ℕ) (q : List (Closed Γ w)) (od : Bool) →
     (nid , mergeAll-st lim k q od) ∈ EvalSt.nodes (rootExitSt e ins) →

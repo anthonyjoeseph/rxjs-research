@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FIRST TIE THE RECEIPTS, BECAUSE NOTHING MERGES WHILE THE GATE IS RED.**
-  The four targets whose conclusions COMPUTE are tied, and the currency is
-  what made them cheap: two take `refl`, two take a stdlib decision
-  procedure, which is a stronger row than a numeral rather than a weaker
-  one. `chain-depth-sighted` paid a finding on the way, recorded in its own
-  header. Twenty-five findings remain over ten targets and the
-  classification is the schedule: two want a membership premise, five are
-  denominated in a family this tower SEALS for cost and reduce at no point
-  whatever, and the rest carry a big predicate a row must build. So the
-  commit takes the membership pair and the Σ-concluding target, whose
-  witness is ours to supply.
+- **NEXT TIE THE SEALED GROUP, WHICH THIS COMMIT LEARNED IS NOT ONE GROUP.**
+  `subscribeE-burst-nestL` was written off unreachable — its arithmetic
+  conjunct is denominated in a family this tower SEALS — and tied anyway,
+  because at the control the increment is ZERO and the conjunct then asks
+  only `0 ≤` it. So a seal blocks a row only where the sealed quantity is on
+  the small side, and the question each remaining target owes is whether it
+  has such a point. `root-entry-sunk` is the other outcome: its two premises
+  are jointly uninhabited over the corpus, so it is no longer a target and
+  the boundary is written where the statement is. The commit takes
+  `burst-outW` and the three `thruFit-arr-*`, each against the equations
+  their sealing blocks already export.
 
 - **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the

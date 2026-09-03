@@ -710,10 +710,16 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
               "hand, and")
         print("    nothing held that restatement to the statement.  Write "
               "`row : Confirms")
-        print(f"    ({t} <args>)` with `row = refl`: the type is then "
-              "generated from the")
-        print("    statement as it reads, and this file chooses only the "
-              "point.")
+        print(f"    ({t} <args>)`: the type is then generated from the "
+              "statement as it")
+        print("    reads, and this file chooses only the point.  The body may "
+              "spend")
+        print("    anything PROVEN — `refl` where the claim reduces, a stdlib "
+              "inequality")
+        print("    where it does not — and may name no postulate; a statement "
+              "over a")
+        print("    SEALED family reduces at no point, so a numeral is not "
+              "what is asked.")
     for p, i, name, head in untied:
         print(f"{p}:{i}: E7 — `Confirms` row {name!r} is headed by "
               f"{head!r}, not a declared target")

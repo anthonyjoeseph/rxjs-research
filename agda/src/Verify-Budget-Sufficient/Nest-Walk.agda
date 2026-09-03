@@ -4576,6 +4576,16 @@ postulate
   --   the increment must fit inside and the ceiling that converts it,
   --   both SEALED and so uninstantiable at any input; and any head but
   --   `mergeAllᵒ`.
+  --   TIED at the CONTROL and nowhere else, and the asymmetry is a
+  --   reading in its own right.  This statement applied at the
+  --   control's own program, cap and schedule is inhabited outright:
+  --   every premise computes there, and the Σ's arithmetic conjunct
+  --   asks only `0 ≤ opIterD …`, which holds without the sealed family
+  --   reducing.  At a RUNG the increment is one, so the same conjunct
+  --   becomes a fact ABOUT that family and no row can write it.  So
+  --   the ladder's reading -- flat in the depth -- is not tied to this
+  --   statement anywhere the increment is positive, and the seal is
+  --   what stands between the two.
   -- RECOVERY: `git show 0e96e46` restores the one-step arrival cap
   --   with the node-width widening and its lift to the nest
   --   predicate, and `git show bfbf2b4` the constant-step form with

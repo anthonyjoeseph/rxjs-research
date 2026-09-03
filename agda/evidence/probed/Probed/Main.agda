@@ -16,7 +16,8 @@
 -- an omission: it says this module's content is its pins.  See EVIDENCE.md.
 module Probed.Main where
 
-open import Probed.Root using ()
+open import Probed.Root
+  using (cellP1; rowP1; cellP4; rowP4; cellP7; rowP7; cellS2; rowS2)
 open import Probed.Cascade-Chain-Count
   using (Ch22-fits; Ch1-fits; ChU-fits; ChC-fits;
          Dup1-fits; Dup4-fits;
@@ -31,7 +32,7 @@ open import Probed.Burst-Nest-Unit
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
 open import Probed.Burst-Nest-Ladder
-  using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡)
+  using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡; flatFace; flatRow)
 open import Probed.Sync-Factor
   using (dupSync≡6; dupOut≡2; dupA-holds;
          dupOut₃≡6; dupB-holds;

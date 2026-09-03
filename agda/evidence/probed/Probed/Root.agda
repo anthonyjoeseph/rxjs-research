@@ -4,14 +4,22 @@
 -- makes the name `Probed.Root` unresolvable from there) and nothing in the
 -- proof may rest on it.  Checked by `make probed`, claimed by `Probed.Main`.
 -- Receipts live in the headers of `root-caches` / `root-done-plumbed`
--- (.Part4), whose residues are the two leaves named below.
+-- (.Part4), whose residues are the two leaves this file runs over.
 -- TARGET: root-mergeAllCache @cd3c15
--- TARGET: root-entry-sunk @301cfb
 --
--- WHAT IS BEING TESTED, and why it is testable at all: both postulates'
--- CONCLUSIONS are decidable Bool functions of a run — `cachesValid` and
--- `allShareSunk` over the settled root-exit state — so instantiating at
--- concrete programs either refutes them or gives a real receipt.  Their
+-- ONE TARGET, TWO SUBJECTS, AND THE ASYMMETRY IS THE FINDING.  Both
+-- postulates' CONCLUSIONS are decidable Bool functions of a run —
+-- `cachesValid` and `allShareSunk` over the settled root-exit state —
+-- so instantiating either at a concrete program refutes it or gives a
+-- real receipt, and both are read below.  Only the merge one is
+-- DECLARED, because a target owes a row instantiating the statement,
+-- and `root-entry-sunk` has no such point here: it needs a live
+-- registration at a root exit the protocol drove to done, and the
+-- corpus below reaches no state satisfying both — the boundary is
+-- stated at the end of this file and in the postulate's own header.
+-- Its rows stay, since what they establish is that the `done` guard is
+-- load-bearing, which is a fact about the statement and not a receipt
+-- for it.  Their
 -- former shared mergeAll-cert HYPOTHESIS is decidable too (`mergeAllCertAt`), so
 -- it is pinned at the same states rather than assumed.  That postulate was
 -- retired when the two assemblies became real bodies (it does not
@@ -29,6 +37,8 @@ open import Data.Bool using (Bool; true; false; not)
 open import Data.Bool.ListAction using (any)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.List using ([]; _∷_; null)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat  using (zero; suc)
 open import Data.Product using (proj₁; proj₂; _×_; _,_)
 open import Data.Vec  using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
@@ -43,7 +53,9 @@ open import Rx.Evaluator using (subscribeE; sched-init; st-init; budgetAt; root;
   mergeAll-st; aliveThroughᶠ)
 open import Rx.Slots using (scripted; shared; Slots)
 open import Verify-Well-Formed.Part1 using (cachesValid; allShareSunk; innerInstsP)
+open import Verify-Well-Formed.Part4 using (rootExitSt; root-mergeAllCache)
 open import Rx.Protocol using (ProtocolSt; runProtocol; protocol-init)
+open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
 -- The runner: exactly the state both postulates speak about — the
@@ -329,7 +341,11 @@ _ = refl
 -- out as the hard case.  Row set A is a real receipt.
 --
 -- `root-done-plumbed`'s conclusion is NOT COVERED, and no row here
--- should be read as evidence for it.  Its load-bearing region is
+-- should be read as evidence for it — which is why `root-entry-sunk`,
+-- its per-entry residue, is not declared a target of this file: the
+-- two premises are jointly UNINHABITED over this corpus, so the point
+-- lies outside the statement's domain and no row can instantiate it.
+-- Its load-bearing region is
 -- `done ≡ true` WITH a live registry, and this probe set never reached
 -- it: every state with `done ≡ true` (P2, P4, S3) has a DRAINED
 -- registry, making allShareSunk true vacuously, and the one state with a
@@ -357,3 +373,59 @@ _ : mergeAllCertAt 0 (RUN P1) ∷ mergeAllCertAt 0 (RUN P2) ∷ mergeAllCertAt 1
   ∷ mergeAllCertAt 99 (RUN P1) ∷ []
   ≡ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ true ∷ []
 _ = refl
+
+----------------------------------------------------------------------
+-- AND THE TIE TO THE STATEMENT.  Every row above is a READING — a
+-- Boolean recomputed from the state a run produced — and nothing in
+-- them is held to `root-mergeAllCache` as it reads.  The four below
+-- are: Agda generates each type from the statement itself, so this
+-- file supplies only the program and the cell, and a restatement of
+-- the target breaks here rather than leaving a green reading about
+-- text that is gone.  `rootExitSt e ins` is the runner above with its
+-- arguments spelled out, so each membership is decided by the same
+-- computation row set A reads.
+--
+-- WHY THESE FOUR.  P1 is the one-inner shape at a settled count of
+-- zero; P4 is the BOUNDED face, whose node carries a limit and a queue
+-- the unbounded one has no field for; P7 is the take-cut edge the
+-- target's own header calls the hard case, and its merge node sits
+-- SECOND behind the take, so its cell is reached by `there` — which is
+-- itself the reading that the cut does not disturb the node the count
+-- lives on.  S2 is the only point in this file whose registry is
+-- NON-EMPTY at the exit, and it is the load-bearing one: everywhere
+-- else `nodeCacheOK` is asked about a count against a drained
+-- registry, and at S2 it is asked about a live count of two against
+-- two surviving registrations.
+----------------------------------------------------------------------
+
+cellP1 : (0 , mergeAll-st {t = natᵗ} nothing 0 [] true)
+           ∈ EvalSt.nodes (rootExitSt P1 ins₀)
+cellP1 = here refl
+
+rowP1 : Confirms
+  (root-mergeAllCache {w = natᵗ} P1 ins₀ 0 nothing 0 [] true cellP1)
+rowP1 = refl
+
+cellP4 : (0 , mergeAll-st {t = natᵗ} (just 1) 0 [] true)
+           ∈ EvalSt.nodes (rootExitSt P4 ins₀)
+cellP4 = here refl
+
+rowP4 : Confirms
+  (root-mergeAllCache {w = natᵗ} P4 ins₀ 0 (just 1) 0 [] true cellP4)
+rowP4 = refl
+
+cellP7 : (1 , mergeAll-st {t = natᵗ} nothing 0 [] true)
+           ∈ EvalSt.nodes (rootExitSt P7 ins₀)
+cellP7 = there (here refl)
+
+rowP7 : Confirms
+  (root-mergeAllCache {w = natᵗ} P7 ins₀ 1 nothing 0 [] true cellP7)
+rowP7 = refl
+
+cellS2 : (0 , mergeAll-st {t = natᵗ} nothing 2 [] true)
+           ∈ EvalSt.nodes (rootExitSt S2 sh₂)
+cellS2 = here refl
+
+rowS2 : Confirms
+  (root-mergeAllCache {w = natᵗ} S2 sh₂ 0 nothing 2 [] true cellS2)
+rowS2 = refl
