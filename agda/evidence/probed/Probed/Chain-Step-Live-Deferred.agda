@@ -23,22 +23,23 @@
 -- zero.  Both sides are pinned before the ordering is taken.  The
 -- charge is the syntactic surrogate the tree proves the arms' increment
 -- dominates, so green here implies the arm at this program and red here
--- does not refute it.  The arm's FRAME GRANT is unread by every row:
--- these run the composite, which never states the leaf's premises, so
--- the rows say nothing about whether a walk can supply the fit the
--- drain arm now asks for.  The REGISTRY rows beside it are pins rather than
+-- does not refute it.  The arm's FRAME GRANT is read by the TIE at the
+-- foot of this file and by nothing above it: the rows here run the
+-- composite, which never states the leaf's premises.  The REGISTRY rows beside it are pins rather than
 -- evidence: that fold's whole-chain statement is a definition now, and
 -- they hold the evaluator to the reading it was written from.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Chain-Step-Live-Deferred where
 
-open import Data.Bool using (true; _∧_)
+open import Data.Bool using (true; false; _∧_)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.Nat using (ℕ; suc; _≤ᵇ_; _⊔_; _+_; _*_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.List using ([]; _∷_; foldr)
+open import Data.List using (List; []; _∷_; foldr; length)
 open import Data.Maybe using (nothing)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp
@@ -47,13 +48,16 @@ open import Rx.Exp
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next; cascadeLatch; chainStep;
-  chainsOf)
+  chainsOf; NodeId; NodeState; mergeAll-st; mergeAllᵒ; stepFrame; thru-outer)
 open import Rx.Slots using (Slots)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (liveNest; nestUnit; regsNestMax)
+  using (liveNest; nestUnit; regsNestMax; slotsNestSum)
 open import Refuted.Demand-Programs using (Γ₂; insF)
+open import Verify-Budget-Sufficient.Live-Nest-Walk
+  using (stepFrame-nest-live-outer)
+open import Probed.Apparatus using (Confirms)
 
 slots : Slots Γ₂
 slots = insF 1 1 2
@@ -117,3 +121,72 @@ fits : (proj₂ (row 1) ≤ᵇ proj₁ (row 1) ⊔ charge 1)
      ∧ (proj₂ (regsRow 1) ≤ᵇ proj₁ (regsRow 1) ⊔ charge 1)
      ∧ (proj₂ (regsRow 3) ≤ᵇ proj₁ (regsRow 3) ⊔ charge 3) ≡ true
 fits = refl
+
+----------------------------------------------------------------------
+-- THE TIE, at the deferred family's own entry state.  The type is
+-- generated from the statement, so the row reports the arm as it now
+-- reads rather than a component reading kept beside it by hand.
+--
+-- THE NODE ID COMES FROM THE RUN, and it has to: `thruConsume` is the
+-- IDENTITY at a nid the table does not hold, so a row at an invented
+-- one would read the arm against a step that did nothing and report
+-- preservation for free.
+--
+-- THE THREE PREMISES ARE LEFT STANDING, so what each row asserts is
+-- the arm with the potential and the value bound unasked -- a stronger
+-- claim than the instance rather than a weaker one.
+--
+-- AND THE GRANT IS WHAT THE DEPTH AXIS BUYS, which is this file's own
+-- correction: the rows above read the arm's frame grant as unspent,
+-- and it is not.  At depth ONE the frame leaves a live fold of 1 and
+-- the slot vocabulary is 2, so the row holds at a grant of ZERO -- the
+-- strongest reading there is.  At depth THREE the fold is 3 against
+-- the same vocabulary of 2, so no grant-free reading exists and the
+-- row is stated at the grant it needs.  The figures pin both sides at
+-- both depths, so the crossing is a number rather than a claim: what
+-- the vocabulary covers does not grow with the nest and the fold does.
+----------------------------------------------------------------------
+
+mergeNid : List (NodeId × NodeState Γ₂) → NodeId
+mergeNid []                              = 0
+mergeNid ((k , mergeAll-st _ _ _ _) ∷ _) = k
+mergeNid (_ ∷ ns)                        = mergeNid ns
+
+tieNid : (m : ℕ) → NodeId
+tieNid m = mergeNid (EvalSt.nodes (proj₂ (sub m)))
+
+tieLive1 : Confirms
+  (stepFrame-nest-live-outer (gasPad (sucGL 1) g0) 1 0 mergeAllᵒ (tieNid 1)
+     root (deferᵉ (deepE 1) ∷ []) false (proj₁ (sub 1)) (proj₂ (sub 1)) 0 0)
+tieLive1 = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
+
+tieLive3 : Confirms
+  (stepFrame-nest-live-outer (gasPad (sucGL 3) g0) 1 0 mergeAllᵒ (tieNid 3)
+     root (deferᵉ (deepE 3) ∷ []) false (proj₁ (sub 3)) (proj₂ (sub 3)) 0 3)
+tieLive3 = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
+
+-- the nid the run allocated, the vocabulary the join offers, and the
+-- fold either side of the frame -- so a row carried by a no-op step
+-- or by an absent node is visible as one rather than green
+hasMerge : List (NodeId × NodeState Γ₂) → ℕ
+hasMerge []                              = 0
+hasMerge ((_ , mergeAll-st _ _ _ _) ∷ _) = 1
+hasMerge (_ ∷ ns)                        = hasMerge ns
+
+stepLive : (m : ℕ) → ℕ
+stepLive m =
+  liveMax (proj₁ (proj₂ (proj₂ (proj₂
+    (stepFrame (gasPad (sucGL m) g0) 1 0 (thru-outer mergeAllᵒ (tieNid m))
+       root (deferᵉ (deepE m) ∷ []) false (proj₁ (sub m)) (proj₂ (sub m)))))))
+
+tieFigs : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+tieFigs = length (EvalSt.nodes (proj₂ (sub 1)))
+        , hasMerge (EvalSt.nodes (proj₂ (sub 1)))
+        , tieNid 1
+        , slotsNestSum slots
+        , liveMax (proj₁ (sub 1))
+        , stepLive 1
+        , stepLive 3
+
+tieFigs≡ : tieFigs ≡ (1 , 1 , 0 , 2 , 0 , 1 , 3)
+tieFigs≡ = refl

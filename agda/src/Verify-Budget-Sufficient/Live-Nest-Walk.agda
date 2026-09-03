@@ -152,10 +152,18 @@ postulate
   --   body.  Covered: the fold rising 0 to 1 and 0 to 3 as the nest
   --   deepens, against a syntactic charge of eighteen and twenty-six
   --   that the tree proves the size cap dominates -- so both sides move
-  --   and the ordering is load-bearing on the depth axis.  Not covered:
-  --   this frame in isolation, since the rows read the composite and so
-  --   never state this leaf's premises; and a fold already nonzero at
-  --   entry, where the growth would compound rather than start at zero.
+  --   and the ordering is load-bearing on the depth axis.  TIED at this
+  --   frame ALONE -- the node id taken from the run, since a step at an
+  --   id the table does not hold is the identity, and the value the
+  --   program itself emits -- with the three premises LEFT STANDING, so
+  --   the row asserts the arm with the potential and the value bound
+  --   unasked.  AND THE GRANT IS SPENT, which the composite rows could
+  --   not see: at depth ONE the frame leaves a fold of 1 against a slot
+  --   vocabulary of 2 and the row holds at a grant of ZERO, while at
+  --   depth THREE the fold is 3 against the same 2, so no grant-free
+  --   reading exists and the row is stated at the grant it needs.  Not
+  --   covered: a fold already nonzero at entry, where the growth would
+  --   compound rather than start at zero.
   stepFrame-nest-live-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)

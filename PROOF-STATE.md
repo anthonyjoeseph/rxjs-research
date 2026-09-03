@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **IT IS THE PREMISES THAT BLOCK A TIE, NOT THE CONCLUSION — SO LEAVE THEM
-  STANDING.** Across the big-predicate group the conclusion computes off the
-  evaluator and it is the CAP premises that name sealed families, so a row
-  discharging them would report on the seal instead of on the run. Applied as
-  far as the computable arguments reach and taking the rest as hypotheses the
-  body never reads, the row is a STRONGER claim than the instance rather than
-  a weaker one. The two `Part7/Cascade-Nest` rows tie that way. The commit
-  carries the shape to the next pair and reports any target whose CONCLUSION
-  is sealed, which is the case it does not reach — `pushVals-caps-burstW` is
-  one, its width conjunct reading `innerW` on the small side.
-
-- **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
+- **FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the
   states a run reaches, not merely at built ones -- so the field is back out
   of `capsOK?` and no premise threaded to a mint can pay it. What is not yet
@@ -249,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   a hop, against `widAt`, and either threads a width field on the
   invariant record or reports a FALSITY on the count axis.
 
+- **THEN TIE THE REST OF THE BIG-PREDICATE GROUP, AND WRITE THE BOUNDARY WHERE
+  THE CONCLUSION ITSELF IS SEALED.** The premises-standing shape carried both
+  `stepFrame` arms and corrected two receipts on the way: each arm's frame
+  grant is SPENT, the nodes arm's increment being exactly the accumulator's
+  wrap depth and the live arm's fold outrunning the slot vocabulary from depth
+  three. Eight targets remain and the shape reaches every one whose conclusion
+  computes off the evaluator. Two it does not, which is the finding this commit
+  owes: `subscribeE-fit` reads `nestB` through `fitG` and
+  `pushVals-caps-burstW` reads `innerW` on the small side of `thruRoomW`, both
+  sealed, so no numeral instantiates either side and a tie there has to go
+  through a proven inequality instead.
+
 ### The ledger
 
 - **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
@@ -266,7 +267,8 @@ does not fit is a finding about the shared statement, not about the head.
   is built from, so only the cap size pays.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
   the outer frame mints, subscribing the arrivals it is handed. The one kind
-  whose side condition is a size bound on values rather than a unit.
+  whose side condition is a size bound on values rather than a unit, and the
+  grant is spent: the fold outruns the slot vocabulary from depth three.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed: no ceiling is
@@ -277,8 +279,9 @@ does not fit is a finding about the shared statement, not about the head.
   scan arm, which emits the node store that no premise here reads.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   what one frame stores at the nodes map, under the potential AND the frame
-  grant it was handed. The premise alone was refuted at the scan arm: the cell
-  holds the accumulator, and the budget is a constant in the burst.
+  grant. The premise alone was refuted at the scan arm: the cell holds the
+  accumulator against a budget constant in the burst. The grant is spent at
+  the wrap depth.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
