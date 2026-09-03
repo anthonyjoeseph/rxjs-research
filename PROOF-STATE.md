@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **ASSEMBLE THE CASCADE DOOR OVER THE LEDGER IT NOW READS IN.** Its
-  level is priced per chain off the step's own delivery count, so the Σ
-  is paid arm by arm by the chain leaf, which never reads the
-  cancellation test — and the descent bound projects at every arm too,
-  since the measure charging for it is unprojected in the same way. What
-  is left unpaid is the ENTRY package the chain receipt takes: a reached
-  level and a fuel, re-established at a level the previous arm climbed.
-  The commit writes the induction as a real body over that one leaf and
-  reports what the package costs to carry, which is the whole of what
-  the round's own ledger used to do for it.
+- **GRIND THE CASCADE DOOR'S THREE ARMS AGAINST THE MEASURE THEY
+  MIRROR.** The door is now a body over one induction, and that
+  induction's conses line up conjunct for conjunct with the descent
+  measure's three callees — the tail at the incoming state, the head at
+  the delivered one, the tail at the state the step left — so the
+  descent bound each arm needs projects out of the measure's own join.
+  Two of the three are the surviving fold's arms with the delivery
+  premise dropped. The third is what has never been walked: the
+  position ledger advancing across a step taken at a CANCELLED arm,
+  where the fold above it never advanced. The commit writes the two and
+  reports what the third costs.
 
 - **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
   ARE CARRIED AT.** The chains a sink fans into are walked at the
@@ -306,11 +307,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`arr-chains-caps-all`** (Part7/Arrival-Caps) — FALSITY, `DEAD ROUTE`: the
-  round's caps package at EVERY chain, its level now priced per chain off the
-  step's own delivery count rather than the round's ceiling. Nothing has
-  instantiated the restated form, and no body carries the entry package up
-  past a climbed level.
+- **`arr-chains-caps-all-go`** (Part7/Arrival-Caps) — FALSITY, `DEAD ROUTE`: the
+  round's caps package at EVERY chain, as an induction over the POSITION ledger
+  with no delivery bound. Nothing has instantiated it; its cancelled arm has to
+  climb the entry level on a step the surviving fold never takes.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the
