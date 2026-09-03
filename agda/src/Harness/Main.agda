@@ -50,9 +50,10 @@ open import Data.Bool using (Bool; false; if_then_else_)
 open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map; length; foldr)
   renaming (_++_ to _++ᴸ_)
-open import Data.Maybe using (nothing)
+open import Data.Maybe using (Maybe; nothing; just) renaming (maybe′ to maybeᴹ)
 open import Data.Sum using (inj₁; inj₂)
-open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
+open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc;
+  toℕ to finℕ)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _⊔_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -63,17 +64,18 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
-open import Rx.Prim using (towerℕ; cold; after_,_; gasPad; g0; Gas; Timed;
-  InstEmit)
+open import Rx.Prim using (towerℕ; cold; hot; after_,_; gasPad; g0; Gas; Timed;
+  InstEmit; Source)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_; scanᵉ;
-  mergeAllᵉ; emptyᵉ; varᵗ; fstᵗ; strmᵗ; input; syncSizeᵉ; sizeᵉ)
+  mergeAllᵉ; emptyᵉ; mapᵉ; ofᵉ; varᵗ; fstᵗ; strmᵗ; input; syncSizeᵉ; sizeᵉ)
 open import Rx.Frame-Width using (outWⱽ)
-open import Rx.Slots using (Slots; scripted)
+open import Rx.Slots using (Slots; scripted; shared)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
   capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
-  st-init; drain; splitEvents; splitBurst; Stream)
+  st-init; drain; splitEvents; splitBurst; Stream; Path; share-sink; _↠_;
+  shareAdmit; RegId; Chain)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
   nestCapAt)
@@ -346,6 +348,110 @@ smallRow k = "small layer " ++ show k
               ++ ": widest = "   ++ show (wideᴴ 1 1 2 k)
               ++ "  instants = " ++ show (countᴴ 1 1 2 k)
 
+------------------------------------------------------------------
+-- SERIES — WHERE A SINK HANDS ON TO, AND HOW FAR THAT CAN GO.
+--
+-- TARGET: sink-fan-sink @d156ce
+--
+-- WHAT IS OWED.  The arm's refutation and its header rest on one claim
+-- about the MACHINE rather than about the arithmetic: that the hop
+-- count is bounded by nothing but the dispatch gas, since `shareAdmit`
+-- filters on the source and the element type and never on whether a
+-- chain has already been delivered to.  If that is right, the leaf's
+-- price has to dominate itself times a frame product an unbounded
+-- number of times and no denomination survives.  What no row anywhere
+-- reaches is whether a RUN can put a second hand-over under a sink at
+-- all, and how deep hand-overs can nest, so the rows here read the
+-- registry a real subscribe leaves and walk it.
+--
+-- AND THE DECIDING COMPARISON IS ACROSS THE FUEL, NOT INSIDE ONE RUN.
+-- A hop walk needs a fuel to be total, so any single depth is
+-- uninformative: a count bounded by the dispatch gas rises with
+-- whatever fuel it is handed, and one bounded by the PROGRAM stands
+-- still.  The rows therefore take the SAME registry at four fuels, the
+-- last of them four times the slot count.
+--
+-- WHAT WOULD MAKE THEM FAIL.  A registry entry whose source is not
+-- strictly below the slot its chain ends at -- the self-re-entry the
+-- refutation's own witness uses, a chain from source zero terminating
+-- at `share-sink` zero -- or a hop depth that grows when only the fuel
+-- does.  Both are read off a run rather than constructed, and the
+-- program is built to PRODUCE hand-overs: two shared slots, each
+-- defined over the one below it, and a root that subscribes all three,
+-- so a registry with no sink terminal at all would be the degenerate
+-- reading and is visible in the census row.
+--
+-- ⚠ measured-not-rechecked, like every row in this module.
+------------------------------------------------------------------
+
+Γˢ : Ctx 3
+Γˢ = natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
+
+idˢ : Fn Γˢ [] [] [] natᵗ natᵗ
+idˢ = varᵗ (here refl)
+
+-- the telescope is STRATIFIED by construction -- slot k's def may name
+-- only inputs below k -- and each `ok` field here is discharged by
+-- unification, which is the whole of what a concrete program pays for
+-- it.  Slot zero is `hot` rather than `cold`: a cold with an async tail
+-- mints a fresh source per subscribe, and `shareAdmit` takes only slot
+-- indices, so a cold source is admitted by no sink and the census would
+-- read empty for a reason that has nothing to do with the question.
+slˢ : Slots Γˢ
+slˢ fzero               = scripted (hot ((after 0 , 1) ∷ (after 2 , 2) ∷ []))
+slˢ (fsuc fzero)        = shared (mapᵉ idˢ (input fzero))
+slˢ (fsuc (fsuc fzero)) = shared (mapᵉ idˢ (input (fsuc fzero)))
+
+eˢ : Closed Γˢ natᵗ
+eˢ = mergeAllᵉ nothing
+       (ofᵉ (strmᵗ (input (fsuc (fsuc fzero)))
+           ∷ strmᵗ (input (fsuc fzero))
+           ∷ strmᵗ (input fzero) ∷ []))
+
+regsˢ : List (RegId × Source × Chain Γˢ natᵗ)
+regsˢ = EvalSt.registry (proj₂ (proj₂
+          (subscribeE gasᴴ eˢ root 0 0 (sched-init eˢ slˢ) (st-init eˢ))))
+
+-- a path holds exactly one leaf, and it is the leaf that says whether
+-- the chain hands on
+pathSinkˢ : ∀ {s} → Path Γˢ s natᵗ → Maybe (Fin 3)
+pathSinkˢ root           = nothing
+pathSinkˢ (share-sink i) = just i
+pathSinkˢ (f ↠ p)        = pathSinkˢ p
+
+termˢ : Maybe (Fin 3) → String
+termˢ nothing  = "root"
+termˢ (just i) = "sink " ++ show (finℕ i)
+
+regRowˢ : RegId × Source × Chain Γˢ natᵗ → String
+regRowˢ (_ , src , (_ , p)) =
+  "  [src " ++ show src ++ " → " ++ termˢ (pathSinkˢ p) ++ "]"
+
+-- the hop walk: from a sink, every chain the registry admits from it,
+-- and from each chain that ends at another sink, the same again
+hopGoˢ : ℕ → Fin 3 → ℕ
+hopGoˢ zero    i = 0
+hopGoˢ (suc f) i =
+  foldr _⊔_ 0
+    (map (λ rp → maybeᴹ (λ j → suc (hopGoˢ f j)) 0 (pathSinkˢ (proj₂ rp)))
+         (shareAdmit i regsˢ))
+
+regsRow : String
+regsRow = "registry: " ++ show (length regsˢ) ++ " entries"
+            ++ foldr _++_ "" (map regRowˢ regsˢ)
+
+hopRow : ℕ → String
+hopRow f = "hop depth at fuel " ++ show f
+             ++ ": from sink 0 = " ++ show (hopGoˢ f fzero)
+             ++ "  from sink 1 = " ++ show (hopGoˢ f (fsuc fzero))
+             ++ "  from sink 2 = " ++ show (hopGoˢ f (fsuc (fsuc fzero)))
+
+fuelAtˢ : ℕ → ℕ
+fuelAtˢ 1 = 1
+fuelAtˢ 2 = 3
+fuelAtˢ 3 = 6
+fuelAtˢ _ = 12
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -416,13 +522,16 @@ rowAt 18 = "nodesMax@0..4 = " ++ show (nodesMax (proj₂ (driveH 0)))
              ++ " " ++ show (nodesMax (proj₂ (driveH 4)))
 -- the driven refold's rows, one per process: 19 is layer zero and the
 -- catch-all carries 20 to 22 as layers one to three, 23 to 29 as bursts
--- one to seven, and 30 to 33 as the small-dial layers zero to three --
+-- one to seven, 30 to 33 as the small-dial layers zero to three, 34 as
+-- the sink census and 35 to 38 as the hop walk's four fuels --
 -- dispatched by arithmetic because a numeric literal PATTERN at 20
 -- expands to twenty constructors
 rowAt 19 = wideRow 0
 rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           else if n ≤ᵇ 29 then burstRow (n ∸ 22)
-          else if n ≤ᵇ 33 then smallRow (n ∸ 30) else "(no such row)"
+          else if n ≤ᵇ 33 then smallRow (n ∸ 30)
+          else if n ≤ᵇ 34 then regsRow
+          else if n ≤ᵇ 38 then hopRow (fuelAtˢ (n ∸ 34)) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →

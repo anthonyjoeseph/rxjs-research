@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND PRICE THE SINK LEAF AGAINST THE HOP IT ESCALATES BY.** The
-  entry cap is load-bearing for the Φ pricing alone, and the pricing
-  is where the fan-out's own arm is refuted: a chain ending at a
-  second hand-over carries the leaf's price MULTIPLIED by its frames',
-  and the hop count is bounded by nothing but the dispatch gas. So the
-  walk's residue and the arm's refutation are one quantity read twice,
-  which is why neither moved while they were treated as two. The
-  commit asks whether the hop count is bounded by the PROGRAM instead
-  — admission never reads whether a chain has been delivered to, so a
-  chain re-entered through its own sink is the shape to instantiate.
-
 - **AND RELATE THE REGISTRY'S PRICE TO WHAT ITS CHAINS PRODUCE.** The
   live sink is refuted at every budget, and the separation just landed
   says why no number repairs it: not one of its witnesses reads the
@@ -247,6 +236,16 @@ does not fit is a finding about the shared statement, not about the head.
   states it ONCE — a later frame's values under a reading its own
   descent supplies — and wires the fold's grant to it, leaving the
   registry relation a consumer rather than a sibling.
+
+- **AND CARRY THE TELESCOPE'S STRATIFICATION WHERE THE CHAIN IS READ.**
+  The sink leaf's escalation turned out to be program-bounded: hops
+  climb the slot telescope and none re-enters, so the count is capped
+  by the slot count and not by the dispatch gas the header claimed.
+  What blocks spending that is the same wall the registry rows are all
+  at — the walk reads its chain from an arbitrary state, where nothing
+  about the registry is true. So the commit puts stratification in the
+  invariant record as a carried conjunct rather than a hypothesis, and
+  the sink arm becomes its first consumer.
 
 ### The ledger
 
@@ -287,9 +286,9 @@ does not fit is a finding about the shared statement, not about the head.
   handed. The premise alone was refuted by an empty burst: the drain reads the
   queue, so the walk's values cannot reach it.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the potential at
-  an admitted chain that ends at a SECOND hand-over. The residue of the
-  terminal split: its factor is the sink's own times its frames', and the hop
-  count is bounded by nothing but the dispatch gas.
+  an admitted chain that ends at a SECOND hand-over. Its escalation is
+  PROGRAM-bounded after all — hops climb the stratified telescope — so the
+  residue is the arbitrary chain, owed as a carried invariant.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   registry's own size receipt at the PROGRAM's cap. THE ENTRY CAP IS THE Φ
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
