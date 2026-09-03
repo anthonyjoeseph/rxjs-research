@@ -2,7 +2,7 @@
 -- THE LIVE ARM, AT THE ONLY SHAPE THAT CAN MOVE IT — AND REACHED BY
 -- RUNNING RATHER THAN BY BUILDING THE PATH.
 --
--- TARGET: stepFrame-nest-live-outer @3c0c61
+-- TARGET: stepFrame-nest-live-outer @2d49ae
 --
 -- WHY THIS PROGRAM.  A live source's nesting is the nesting of its
 -- PENDING values, and the evaluator mints a live carrying a nested
@@ -136,15 +136,18 @@ fits = refl
 -- the arm with the potential and the value bound unasked -- a stronger
 -- claim than the instance rather than a weaker one.
 --
--- AND THE GRANT IS WHAT THE DEPTH AXIS BUYS, which is this file's own
--- correction: the rows above read the arm's frame grant as unspent,
--- and it is not.  At depth ONE the frame leaves a live fold of 1 and
--- the slot vocabulary is 2, so the row holds at a grant of ZERO -- the
--- strongest reading there is.  At depth THREE the fold is 3 against
--- the same vocabulary of 2, so no grant-free reading exists and the
--- row is stated at the grant it needs.  The figures pin both sides at
--- both depths, so the crossing is a number rather than a claim: what
--- the vocabulary covers does not grow with the nest and the fold does.
+-- AND THE DEPTH AXIS SEPARATES THE TWO NUMBERS, which is what these
+-- rows are for.  At depth ONE the frame leaves a live fold of 1 under
+-- a slot vocabulary of 2, so nothing else is asked.  At depth THREE
+-- the fold is 3 against the same vocabulary, so the vocabulary no
+-- longer covers it and something must -- and BOTH rows stand at a
+-- potential grant of ZERO, with the size budget carrying the depth-3
+-- reading alone.  The budget is not a number chosen to clear the fold:
+-- it is the value's OWN size, which is why `valsV` computes it rather
+-- than stating it.  The figures pin the fold and the size at both
+-- depths, so the crossing is arithmetic: what the vocabulary covers
+-- does not grow with the nest, the fold does, and the size stays above
+-- it because depth truncates at the defer the size counts through.
 ----------------------------------------------------------------------
 
 mergeNid : List (NodeId × NodeState Γ₂) → NodeId
@@ -155,14 +158,24 @@ mergeNid (_ ∷ ns)                        = mergeNid ns
 tieNid : (m : ℕ) → NodeId
 tieNid m = mergeNid (EvalSt.nodes (proj₂ (sub m)))
 
+-- the smallest size budget the value admits, so the rows below are
+-- stated at the tightest V there is rather than at a number chosen to
+-- clear the fold
+valsV : (m : ℕ) → ℕ
+valsV m = sizeᵉ (defL m)
+  where defL : ℕ → Closed Γ₂ natᵗ
+        defL k = deferᵉ (deepE k)
+
 tieLive1 : Confirms
   (stepFrame-nest-live-outer (gasPad (sucGL 1) g0) 1 0 mergeAllᵒ (tieNid 1)
-     root (deferᵉ (deepE 1) ∷ []) false (proj₁ (sub 1)) (proj₂ (sub 1)) 0 0)
+     root (deferᵉ (deepE 1) ∷ []) false (proj₁ (sub 1)) (proj₂ (sub 1)) 0 0
+     (valsV 1))
 tieLive1 = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
 
 tieLive3 : Confirms
   (stepFrame-nest-live-outer (gasPad (sucGL 3) g0) 1 0 mergeAllᵒ (tieNid 3)
-     root (deferᵉ (deepE 3) ∷ []) false (proj₁ (sub 3)) (proj₂ (sub 3)) 0 3)
+     root (deferᵉ (deepE 3) ∷ []) false (proj₁ (sub 3)) (proj₂ (sub 3)) 0 0
+     (valsV 3))
 tieLive3 = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
 
 -- the nid the run allocated, the vocabulary the join offers, and the
@@ -179,7 +192,7 @@ stepLive m =
     (stepFrame (gasPad (sucGL m) g0) 1 0 (thru-outer mergeAllᵒ (tieNid m))
        root (deferᵉ (deepE m) ∷ []) false (proj₁ (sub m)) (proj₂ (sub m)))))))
 
-tieFigs : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
+tieFigs : ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ × ℕ
 tieFigs = length (EvalSt.nodes (proj₂ (sub 1)))
         , hasMerge (EvalSt.nodes (proj₂ (sub 1)))
         , tieNid 1
@@ -187,6 +200,8 @@ tieFigs = length (EvalSt.nodes (proj₂ (sub 1)))
         , liveMax (proj₁ (sub 1))
         , stepLive 1
         , stepLive 3
+        , valsV 1
+        , valsV 3
 
-tieFigs≡ : tieFigs ≡ (1 , 1 , 0 , 2 , 0 , 1 , 3)
+tieFigs≡ : tieFigs ≡ (1 , 1 , 0 , 2 , 0 , 1 , 3 , 8 , 16)
 tieFigs≡ = refl

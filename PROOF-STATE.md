@@ -236,17 +236,16 @@ does not fit is a finding about the shared statement, not about the head.
   walk can be restated at without re-denominating the share ring's own
   fold budget, and names what the entry cap is still load-bearing for.
 
-- **AND SETTLE WHETHER THE OUTER MINT'S CONCLUSION IS LEVEL-INDEXABLE
-  AT ALL.** Everything on the live face now routes through one binary.
-  The mint concludes at one ceiling and charges its size premise
-  against that same ceiling, and the sink's demand for it is in the
-  CONCLUSION — so no arm below repairs while the mint reads at one
-  level. But loosening the premise to its own number is not the free
-  generalisation it reads as: the grant is spent, so the ceiling is
-  reached THROUGH the potential premise. The commit instantiates the
-  loosened form where the grant is known spent, and reports whether the
-  two numbers separate or the conclusion is single-level by
-  construction.
+- **AND CARRY THE SEPARATION UP THE LIVE WALK.** The outer mint now
+  concludes at its own size budget, because depth truncates at the
+  defer this arm mints across and size counts through it — so the
+  ceiling was standing in for a reading the size premise delivers
+  outright. Its consumer still hands the ceiling in for that budget,
+  which keeps the whole walk denominated in the potential's number and
+  keeps the sink asking its size question in the currency three
+  refutations close. The commit pushes the budget up through the
+  walk's own hypothesis and conclusion, and reports which arms genuinely
+  need the ceiling once the size demand stops borrowing it.
 
 ### The ledger
 
@@ -265,9 +264,9 @@ does not fit is a finding about the shared statement, not about the head.
   A gated entry reads zero at every state quantity the consuming fit's residue
   is built from, so only the cap size pays.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
-  the outer frame mints, subscribing the arrivals it is handed. THE MINT NO
-  ONE DENOMINATION REACHES: a size reading charged against the round's single
-  ceiling, so level-indexing it means indexing the conclusion.
+  the outer frame mints. Restated at its OWN size budget: depth truncates at
+  the defer this arm mints across and size counts through it, so the ceiling
+  was never paying. Uncovered: an entry fold already nonzero.
 - **`walk-share-LiveHyp`** (Live-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: the size side condition for the registry chains a
   sink fans into. Every reading in the level currency is closed, and the
