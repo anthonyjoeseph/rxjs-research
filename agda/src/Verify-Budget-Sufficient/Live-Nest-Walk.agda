@@ -144,31 +144,34 @@ postulate
   -- which is why the side condition at this kind is a size bound on
   -- them and a unit at every other.
   --
-  -- AND IT IS THE ONE OF THE LIVE LIST'S THREE MINTS THAT NO SINGLE
-  -- DENOMINATION REACHES.  The other two read in the caps face's
-  -- LEVEL-INDEXED ledger: the subscribe out of a parked queue already
-  -- takes its caps at a stepped level, and the sink's arm restates off
-  -- the dispatch ledger at a level with no affordability premise at
-  -- all -- which is the shape the potential face's own sink arm is
-  -- PROVEN in, so the ledger absorbing the fan-out's climb is a fact
-  -- and not a plan.  This one cannot be moved there: its conclusion
-  -- joins ONE ceiling and its side condition is a size reading charged
-  -- against that same ceiling, so it is a statement at a single level
-  -- by construction.  Level-indexing it means indexing the CONCLUSION,
-  -- which is the round's live-list bound and is pinned by its consumer
-  -- -- so the sink's three refutations are this statement's currency
-  -- surfacing one hop downstream, not a defect of the arm that spends
-  -- it.
+  -- AND IT IS THE ONE OF THE LIVE LIST'S THREE MINTS THAT READS IN
+  -- NEITHER OF THE OTHER TWO'S DENOMINATIONS.  Those read in the caps
+  -- face's LEVEL-INDEXED ledger: the subscribe out of a parked queue
+  -- already takes its caps at a stepped level, and the sink's arm
+  -- restates off the dispatch ledger at a level with no affordability
+  -- premise at all -- which is the shape the potential face's own sink
+  -- arm is PROVEN in, so the ledger absorbing the fan-out's climb is a
+  -- fact and not a plan.  This one is not moved there, and for a
+  -- different reason than it looked: its conclusion never needed the
+  -- round's ceiling at all, so there is no level to index.  What read
+  -- as a statement pinned to one level was a size reading charged
+  -- against the potential's number, and the block below is why the two
+  -- separate.  Hence the sink's three refutations close a route this
+  -- arm does not take.
   --
-  -- AND SEPARATING THE SIZE BUDGET FROM THE CEILING IS NOT THE FREE
-  -- GENERALISATION IT READS AS.  Giving the size premise its own
-  -- number and concluding at that number looks like this statement
-  -- with a parameter loosened, and it is a different claim: the grant
-  -- is spent, so the ceiling is reached THROUGH the potential premise
-  -- rather than through the size premise alone, and a conclusion
-  -- denominated in the size budget is not covered by what the grant
-  -- delivers.  That is why the currency change is owed a restatement
-  -- and not a widening.
+  -- AND THE SIZE BUDGET IS THE CURRENCY THIS CONCLUSION WAS ALWAYS
+  -- OWED, because the two measures disagree at exactly the gate this
+  -- arm mints across.  What lands on the live list is a PENDING value,
+  -- and the only clause minting a nested one subscribes a `deferᵉ`,
+  -- whose pending entry is the BODY.  So the fold the conclusion
+  -- reads is the body's nesting -- while the potential's measure is
+  -- ZERO on the value it was handed, since depth truncates at a defer
+  -- and size crosses it (`suc` of the body's).  The ceiling was
+  -- therefore never paying for this arm's own mint: it was standing in
+  -- for a reading the size premise delivers outright, through the
+  -- proven `nestDᵉ≤sizeᵉ`, and it is the potential premise that is
+  -- silent here rather than the size one.  Hence the size budget is
+  -- its own number and the conclusion joins THAT.
   --
   -- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
   --   RUNNING a whole chain over it, at the one program shape that can
@@ -183,26 +186,27 @@ postulate
   --   id the table does not hold is the identity, and the value the
   --   program itself emits -- with the three premises LEFT STANDING, so
   --   the row asserts the arm with the potential and the value bound
-  --   unasked.  AND THE GRANT IS SPENT, which the composite rows could
-  --   not see: at depth ONE the frame leaves a fold of 1 against a slot
-  --   vocabulary of 2 and the row holds at a grant of ZERO, while at
-  --   depth THREE the fold is 3 against the same 2, so no grant-free
-  --   reading exists and the row is stated at the grant it needs.  Not
-  --   covered: a fold already nonzero at entry, where the growth would
-  --   compound rather than start at zero.
+  --   unasked.  AND THE GRANT IS UNSPENT AT BOTH DEPTHS: at depth ONE
+  --   the fold of 1 sits under a slot vocabulary of 2, and at depth
+  --   THREE the fold of 3 is over that vocabulary and is carried by
+  --   the size budget alone -- both rows standing at a potential grant
+  --   of ZERO, at a budget that is the value's own size rather than a
+  --   number chosen to clear the fold.  Not covered: a fold already
+  --   nonzero at entry, where the growth would compound rather than
+  --   start at zero.
   stepFrame-nest-live-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (B U : ℕ) →
+    (sched : Sched Γ) (st : EvalSt e) (B U V : ℕ) →
     valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
     FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st →
-    valsSz? U vals ≡ true →
+    valsSz? V vals ≡ true →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live
         (proj₁ (proj₂ (proj₂ (proj₂
           (stepFrame sf id now (thru-outer op nid) path vals fin sched st))))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-          ⊔ slotsNestSum (Sched.slots sched) ⊔ U
+          ⊔ slotsNestSum (Sched.slots sched) ⊔ V
 
   -- THE SINGLE SUBSCRIPTION, AND THIS IS WHERE THE GATE IS PRICED.
   -- The drain walks its queue and mints once per parked entry, and
@@ -515,7 +519,7 @@ stepFrame-nest-live sf id now (take-f nid) path vals fin sched st B U _ _ _
 stepFrame-nest-live sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ hF _ =
   stepFrame-nest-live-inner sf id now op allNid inst path vals fin sched st B U hΦ hF
 stepFrame-nest-live sf id now (thru-outer op nid) path vals fin sched st B U hΦ hF hL =
-  stepFrame-nest-live-outer sf id now op nid path vals fin sched st B U hΦ hF hL
+  stepFrame-nest-live-outer sf id now op nid path vals fin sched st B U U hΦ hF hL
 
 -- FOUR KINDS OWE NOTHING AND ONE OWES THE BOUND, which is the whole
 -- content of the side condition read at one frame.
