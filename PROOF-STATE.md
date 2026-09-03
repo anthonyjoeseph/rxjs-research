@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **DENOMINATE THE CASCADE DOOR'S PACKAGE IN A BUDGET THE CANCELLED
-  ARMS ARE INSIDE.** That package spends a level at every cons against a
-  ceiling that does not move, and it carries no level premise at all —
-  while the one machine minting such a level prices it in the round's
-  DELIVERY ledger, which steps over exactly the arms the package demands
-  receipts at. So the currency is wrong before any arm is ground: the
-  spend is over the chain LIST and the fund is over the run. The commit
-  finds what the tree already has denominated in the list — the descent
-  measure is the candidate, being what the consumer charges in — and
-  restates the budget there, reporting whether the consumer can pay it.
+- **ASSEMBLE THE CASCADE DOOR OVER THE LEDGER IT NOW READS IN.** Its
+  level is priced per chain off the step's own delivery count, so the Σ
+  is paid arm by arm by the chain leaf, which never reads the
+  cancellation test — and the descent bound projects at every arm too,
+  since the measure charging for it is unprojected in the same way. What
+  is left unpaid is the ENTRY package the chain receipt takes: a reached
+  level and a fuel, re-established at a level the previous arm climbed.
+  The commit writes the induction as a real body over that one leaf and
+  reports what the package costs to carry, which is the whole of what
+  the round's own ledger used to do for it.
 
 - **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
   ARE CARRIED AT.** The chains a sink fans into are walked at the
@@ -306,11 +306,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`arr-chains-caps-all`** (Part7/Arrival-Caps) — SHAPE, `DEAD ROUTE`: the
-  round's caps package at EVERY chain. Its conses spend levels against a fixed
-  ceiling and it takes no level premise; the only ledger funding such a spend
-  counts deliveries, which a cancelled arm makes none of. Wants a budget over
-  the chain list.
+- **`arr-chains-caps-all`** (Part7/Arrival-Caps) — FALSITY, `DEAD ROUTE`: the
+  round's caps package at EVERY chain, its level now priced per chain off the
+  step's own delivery count rather than the round's ceiling. Nothing has
+  instantiated the restated form, and no body carries the entry package up
+  past a climbed level.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the

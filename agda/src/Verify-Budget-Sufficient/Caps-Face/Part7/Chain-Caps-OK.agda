@@ -39,7 +39,8 @@ open import Verify-Budget-Sufficient.Fan-Caps using
   (delSq)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nest-inflate; nestUnit; nodeNest)
-open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; arrSource; Path; arrTy; chainStep; budgetAt; arrTick)
+open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; arrSource; Path; arrTy; chainStep; budgetAt; arrTick; lvls)
+open import Verify-Budget-Sufficient.Deliveries using (delivN)
 open import Rx.Slots using (Slots)
 
 open import Verify-Budget-Sufficient.Caps using
@@ -218,6 +219,20 @@ chainsCapsOK cp ac sl d Lv a nextId ((rid , c) ∷ chains) sched st =
 -- this asks for at that arm is about a walk the evaluator does not
 -- perform -- which is exactly what a bound over-approximating past the
 -- test has to be paid in.
+--
+-- AND THE LEVEL IS PRICED PER CHAIN, NOT AGAINST THE ROUND'S CEILING,
+-- which is the one place the two folds cannot share a currency.  A
+-- ceiling fixed in the round's caps is funded by the round's LEDGER,
+-- and that ledger counts deliveries the cascade makes -- so it raises
+-- nothing at an arm the cascade steps over, while this fold spends
+-- there.  The bound is therefore stated in the increment the chain
+-- leaf itself mints: the levels one step of THIS chain climbs, off the
+-- delivery count of that step alone.  It is available at a cancelled
+-- arm for the same reason the receipt is asked for there -- the step
+-- is a function of the state, and the leaf pricing it never reads the
+-- cancellation test.  The conjunct is still what keeps the Σ honest,
+-- since receipts weaken as the level grows and an unpinned witness
+-- would buy them all at once.
 chainsCapsAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (cp ac : Caps) (sl : Slots Γ) (d Lv : ℕ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -228,7 +243,10 @@ chainsCapsAll cp ac sl d Lv a nextId ((rid , c) ∷ chains) sched st =
   × chainCapsOK cp ac sl d Lv nextId a c sched
       (record st { delivered = rid ∷ EvalSt.delivered st })
   × (Σ ℕ λ L′ →
-      (Lv + L′ ≤ sizeCount cp d ⊔ Caps.cSize cp)
+      (Lv + L′ ≤ lvls (Caps.cSize cp) (Caps.cWid cp) d Lv
+                   (suc (delivN (record st { delivered = rid ∷ EvalSt.delivered st })
+                          (proj₂ (proj₂ (chainStep nextId a c sched
+                            (record st { delivered = rid ∷ EvalSt.delivered st })))))))
     × chainsCapsAll cp ac sl d (Lv + L′) a nextId chains
         (proj₁ (proj₂ (chainStep nextId a c sched
                          (record st { delivered = rid ∷ EvalSt.delivered st }))))
