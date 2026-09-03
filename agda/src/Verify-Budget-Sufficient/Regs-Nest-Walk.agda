@@ -124,11 +124,13 @@ valsΦ? {s = s} B U path vals =
 --
 -- WHICH IS WHY THE ARM UNDER IT IS SHAPE AND NOT A GRIND.  A
 -- conclusion needing information no hypothesis carries does not become
--- reachable by a better proof, and the repair is a re-denomination of
--- this face's level at the cascade door rather than a hypothesis
--- minted at the arm -- which would trade a counted gap for an
--- uncounted one.  The arm's own header holds the census, the deliverer
--- and the coverage boundary.
+-- reachable by a better proof, and what the ledger is short of is the
+-- caps invariant itself, projected down to its registry component one
+-- call above the fold both faces share.  The repair is to carry that
+-- receipt unprojected rather than to mint a ceiling at the arm, which
+-- would trade a counted gap for an uncounted one.  The arm's own
+-- header holds the census, the deliverer, the frame that drops the
+-- receipt and the coverage boundary.
 InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
   (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)

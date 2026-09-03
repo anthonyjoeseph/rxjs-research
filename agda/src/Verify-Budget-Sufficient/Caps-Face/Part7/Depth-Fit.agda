@@ -791,26 +791,32 @@ postulate
   -- its own position at the cascade's door and climbs it, `ring-room`
   -- turning that into the room bound in two rewrites.
   --
-  -- AND THE TWO FACES WALK ONE CASCADE IN TWO LEDGERS, WHICH IS WHY THE
-  -- CARRY IS NOT A FIELD.  Both cascades are stated over the same chain
-  -- list and the same fold, so there is a door.  But the caps side
-  -- counts its level as a RING POSITION -- reach witness, registration
-  -- index under the round's register count, level under the entry ladder
-  -- -- and this side counts a chain-length BUDGET, the path lengths plus
-  -- one per chain.  Neither number is a reading of the other, so
-  -- threading the ceiling means re-denominating this face's level at the
-  -- door and carrying the ring package down every frame between; adding
-  -- a conjunct at the arm would launder a tracked gap into an untracked
-  -- one and still not name a level the caller could meet.
+  -- AND WHAT THE LEDGER WANTS BACK IS `capsOK?` WITH EVERYTHING BUT THE
+  -- REGISTRY PROJECTED AWAY, WHICH NAMES THE FRAME AND THE REPAIR
+  -- TOGETHER.  The ledger asks for the caps receipt at a stepped level
+  -- for the queue's head and again at the state each entry's subscribe
+  -- leaves behind, so what is missing is the INVARIANT rather than a
+  -- number.  The cascade's sighted bound HOLDS that invariant and
+  -- spends it three ways -- affordability once, the registry projection
+  -- twice -- and hands the shared fold only the projection.  Everything
+  -- under that one call inherits the loss: the fold, the chain's two
+  -- store arms, the walk, the frame split, and this arm.  So a level
+  -- was never the missing thing; the walk carries one already, and the
+  -- fold's own caller carries a store ceiling and an affordability
+  -- besides.
   --
-  -- AND THE COUNT MOVES WITH IT, which is what makes this a family and
-  -- not a row.  The caps ledger is delivered at the instant's own
-  -- height; this one is stated at the reaction's depth.  Re-denominating
-  -- reaches the numeric leaf beside this one, whose range is read off
-  -- that same count, and brings a depth premise with it -- proven at the
-  -- cascade door and available nowhere below it.  A restatement is
-  -- guaranteed, its direction is now fixed, and grinding this row
-  -- reaches none of it.
+  -- AND THE CARRY IS A PRESERVATION OBLIGATION, WHICH IS WHERE THE COST
+  -- SITS.  Taking the receipt unprojected through the shared fold means
+  -- re-establishing it at the fold's two recursive states -- the
+  -- latched arrival and the chain step's output -- so this row is short
+  -- of one preservation fact at the fold, not of a ceiling at the arm.
+  -- The two faces do still count their level differently, a ring
+  -- position against a chain-length budget, but that difference is
+  -- DOWNSTREAM of the receipt: with the invariant in hand the walk
+  -- record's remaining halves are the ones the caps face already mints
+  -- at its own door, and the count this row is stated at is free -- the
+  -- record it belongs to bounds its depth from below and fixes nothing
+  -- above.
 
   -- DEAD ROUTE: instantiating the conclusion at concrete arguments, to
   --   read whether a level exists that satisfies it.  BOTH of the

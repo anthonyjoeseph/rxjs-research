@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-DENOMINATE THE Φ CASCADE'S LEVEL AT THE DOOR.** The deliverer of
-  the ceiling ledger is now named — the caps face hands back this exact
-  receipt off its walk record — so what remains is that the two faces
-  walk ONE cascade in two ledgers: a ring position on the caps side, a
-  chain-length budget on this one, and neither number reads the other.
-  The door is the shared fold, where both cascades are stated over the
-  same chain list, and the height premise the count needs is proven there
-  and nowhere below. So the commit takes the Φ cascade's level premise
-  and asks whether the ring package can stand in its place, reporting
-  the frame between door and arm that could not carry it.
+- **CARRY THE CAPS INVARIANT THROUGH THE SHARED FOLD UNPROJECTED.** The
+  level was not the missing thing: the Φ walk already carries one, and
+  what the queue's ledger asks for is the caps invariant itself, at a
+  stepped level and again after each entry's subscribe. That receipt is
+  held one call above the fold both faces walk and spent there three
+  ways — affordability once, its registry component twice — so the fold
+  and everything under it get the projection only. The commit adds the
+  unprojected receipt to the fold's premises and re-establishes it at
+  the fold's two recursive states, the latched arrival and the chain
+  step's output, postulating whichever the step does not give.
 
 - **THEN BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
   live list is minted at three places — one subscribe out of a parked
@@ -305,9 +305,9 @@ does not fit is a finding about the shared statement, not about the head.
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
 - **`innerΦ-drain-caps`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the queue's
-  caps receipt, asked of a face carrying no ceiling. The caps face already
-  delivers this ledger off a ring position, so what is owed is a
-  re-denomination at the cascade door, not a proof of this row.
+  caps receipt, asked of a face holding only its registry component. The
+  projection happens one call above the shared fold, so what is owed is
+  the unprojected carry, not a proof of this row.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the
