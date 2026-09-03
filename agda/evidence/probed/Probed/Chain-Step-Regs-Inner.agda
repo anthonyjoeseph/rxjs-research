@@ -69,6 +69,12 @@ open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
 
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsLen)
+
+open import Probed.Apparatus using (Confirms)
+open import Probed.Fold-Regs-Row using (e₀; gp; pth; vls; evs₀; fin₀; sd₀; st₀;
+  le1; le2; pv; pp; pr; foldRow)
+
 Γ₃ : Ctx 3
 Γ₃ = natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
@@ -238,3 +244,14 @@ no-longer-than-control : (lenAfter swiP ≤ᵇ lenAfter ctl)
                        ∧ (lenAfter exhP ≤ᵇ lenAfter ctl)
                        ∧ (lenAfter deepP ≤ᵇ lenAfter ctl) ≡ true
 no-longer-than-control = refl
+
+-- AND THE TIE TO THE STATEMENT, held at the point this family shares.
+-- The rows above are the READING; `foldTie` is what holds them to
+-- `foldPath-regsLen` as it now reads, so a restatement of the target
+-- breaks here rather than leaving the reading green about text that is
+-- gone.  What the point covers, and what it does not, is stated where
+-- it is paid for: `Probed.Fold-Regs-Row`.
+foldTie : Confirms
+  (foldPath-regsLen {e = e₀} gp 3 1 0 0 pth vls evs₀ fin₀ sd₀ st₀ 1 2
+     le1 le2 pv pp pr)
+foldTie = foldRow

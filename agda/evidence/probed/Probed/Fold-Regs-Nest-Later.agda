@@ -50,6 +50,12 @@ open import Rx.Exp using (Closed; natᵗ)
 open import Rx.Evaluator using (Sched; EvalSt; sched-next; cascade)
 open import Probed.Fold-Regs-Nest-Spine using (Γ₃; prog; sub; read; pack)
 
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsLen)
+
+open import Probed.Apparatus using (Confirms)
+open import Probed.Fold-Regs-Row using (e₀; gp; pth; vls; evs₀; fin₀; sd₀; st₀;
+  le1; le2; pv; pp; pr; foldRow)
+
 ----------------------------------------------------------------------
 -- ADVANCING THE DOOR.  One arrival consumed and its cascade run to
 -- completion, which is what distinguishes this from the harness's own
@@ -107,3 +113,14 @@ row-third = refl
 -- and it clears it at the arrival where the walked path has been cut
 -- by a delivery, which is the reading no row on this leaf had.
 ----------------------------------------------------------------------
+
+-- AND THE TIE TO THE STATEMENT, held at the point this family shares.
+-- The rows above are the READING; `foldTie` is what holds them to
+-- `foldPath-regsLen` as it now reads, so a restatement of the target
+-- breaks here rather than leaving the reading green about text that is
+-- gone.  What the point covers, and what it does not, is stated where
+-- it is paid for: `Probed.Fold-Regs-Row`.
+foldTie : Confirms
+  (foldPath-regsLen {e = e₀} gp 3 1 0 0 pth vls evs₀ fin₀ sd₀ st₀ 1 2
+     le1 le2 pv pp pr)
+foldTie = foldRow

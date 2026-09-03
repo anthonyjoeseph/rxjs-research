@@ -216,16 +216,15 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **FIRST TIE THE RECEIPTS, BECAUSE NOTHING MERGES WHILE THE GATE IS RED.**
-  `make evidence-check` holds every target to a row Agda generates from its
-  statement, and the tree's receipts predate it: 44 targets across 38 files
-  still restate their predicate by hand. It is not one backlog. Where the
-  conclusion computes, the row is the migration. Where the tower SEALS the
-  denomination, no row exists at any point: the probe either reaches the
-  statement through PROVEN lemmas -- what `Probed.Burst-Nest-Unit` now does
-  off `storeNest-*≤` and `m≤m+n` -- or it is not a receipt for that target,
-  and the product is a retarget plus a coverage boundary in the statement's
-  own header. So the commit takes
-  the files in batches and reports which of the three each target fell to.
+  The fold family is tied: fifteen files read `foldPath`'s registry at their
+  own programs and share one STATEMENT, so one paid-for point --
+  `Probed.Fold-Regs-Row`, at a state a run reached, both caps at their own
+  least, and a registry the fold itself grew -- is spent under a type each
+  satellite writes out of imported names, and a restatement breaks all
+  fifteen at once. Twenty-nine findings remain over fourteen targets, in
+  smaller clusters: three `thruFit-arr-*` heads across two files, two more
+  targets across two files each. So the commit takes the next cluster the
+  same way, and reports which targets admit no row at any point at all.
 
 - **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the

@@ -52,6 +52,15 @@
 -- with a survivor: it drops one entry and keeps the other at exactly
 -- the control's length.
 
+-- AND THE LEVEL THESE ROWS ARE TAKEN AT IS NOT THE STATEMENT'S, which
+-- is a coverage boundary rather than a defect.  What runs here is
+-- `chainStep`; what the target speaks about is `foldPath`, which the
+-- step reaches through `shareGo` once per registration.  So a reading
+-- of the registry across a cut constrains the fold's arithmetic only
+-- as far as that routing carries it, and the cut axis is reached at no
+-- other level in this tree.  The tie below is taken at the fold
+-- itself, and covers what the point it names covers and nothing here.
+
 -- TARGET: foldPath-regsLen @d58775
 module Probed.Chain-Step-Regs-Cut where
 
@@ -74,6 +83,12 @@ open import Rx.Evaluator using (Sched; EvalSt; subscribeE; sched-init;
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
+
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsLen)
+
+open import Probed.Apparatus using (Confirms)
+open import Probed.Fold-Regs-Row using (e₀; gp; pth; vls; evs₀; fin₀; sd₀; st₀;
+  le1; le2; pv; pp; pr; foldRow)
 
 Γ₃ : Ctx 3
 Γ₃ = natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
@@ -218,3 +233,14 @@ no-longer-than-control : (lenAfter swi ≤ᵇ lenAfter ctl)
                        ∧ (lenAfter mix ≤ᵇ lenAfter ctl)
                        ∧ (lenAfter deepCut ≤ᵇ suc (lenAfter ctl)) ≡ true
 no-longer-than-control = refl
+
+-- AND THE TIE TO THE STATEMENT, held at the point this family shares.
+-- The rows above are the READING; `foldTie` is what holds them to
+-- `foldPath-regsLen` as it now reads, so a restatement of the target
+-- breaks here rather than leaving the reading green about text that is
+-- gone.  What the point covers, and what it does not, is stated where
+-- it is paid for: `Probed.Fold-Regs-Row`.
+foldTie : Confirms
+  (foldPath-regsLen {e = e₀} gp 3 1 0 0 pth vls evs₀ fin₀ sd₀ st₀ 1 2
+     le1 le2 pv pp pr)
+foldTie = foldRow

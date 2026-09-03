@@ -88,52 +88,52 @@ open import Probed.Burst-OutW using (readout≡)
 
 open import Probed.Chain-Step-Regs-Level
   using (reaches; figures₁; figures₂; figures₃; figures₄; figures₆; figures₈;
-         one-per-level; under-inner)
+         one-per-level; under-inner; foldTie)
 
 open import Probed.Chain-Step-Regs-Share
-  using (reaches; figures₀; figures₁; figures₂; figures₃; figures₄; one-per-hop)
+  using (reaches; figures₀; figures₁; figures₂; figures₃; figures₄; one-per-hop; foldTie)
 
 open import Probed.Chain-Step-Regs-Fan
   using (reaches; figures₁; figures₂; figures₃; figures₄;
-         figuresD₂; figuresD₃; flat-in-width)
+         figuresD₂; figuresD₃; flat-in-width; foldTie)
 
 open import Probed.Chain-Step-Regs-Cut
   using (reaches; figuresC; figuresSw; figuresEx; figuresTk;
-         figuresMx; figuresDp; no-longer-than-control)
+         figuresMx; figuresDp; no-longer-than-control; foldTie)
 
 open import Probed.Chain-Step-Regs-Second
   using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
-         no-longer-than-control; cut-happened; no-shrink)
+         no-longer-than-control; cut-happened; no-shrink; foldTie)
 
 open import Probed.Chain-Step-Regs-Inner
   using (reaches; figuresC; figuresSw; figuresEx; figuresDp;
          sources≡; sources₁≡; lateSources≡; lateSources₁≡;
-         no-longer-than-control)
+         no-longer-than-control; foldTie)
 
 open import Probed.Chain-Step-Regs-Ops
   using (reaches; syntaxes; figS0; figS1; figS2; figM0; figM1; figM2;
-         mergeGrowth; switchGrowth; fits; held-flat; survivors)
+         mergeGrowth; switchGrowth; fits; held-flat; survivors; foldTie)
 
 open import Probed.Chain-Step-Regs-Read
-  using (reaches; budgets; budgets′; duplicates; fits)
+  using (reaches; budgets; budgets′; duplicates; fits; foldTie)
 
 open import Probed.Fold-Regs-Two-Caps
-  using (reaches; figures; figures′; separates; fits)
+  using (reaches; figures; figures′; separates; fits; foldTie)
 
 open import Probed.Fold-Regs-Reentrant
-  using (reaches; figures; figures′; separates; fits)
+  using (reaches; figures; figures′; separates; fits; foldTie)
 
 open import Probed.Fold-Regs-Nest-Grid
-  using (row0; row1)
+  using (row0; row1; foldTie)
 
 open import Probed.Fold-Regs-Nest-Cross
-  using (cross)
+  using (cross; foldTie)
 
 open import Probed.Fold-Regs-Nest-Later
-  using (row-second; row-third)
+  using (row-second; row-third; foldTie)
 
 open import Probed.Fold-Regs-Nest-Cross-Later
-  using (row-cross-second; row-cross-third)
+  using (row-cross-second; row-cross-third; foldTie)
 
 open import Probed.Frame-Step-Regs-Level
   using (premA₁; premA₂; premA₃; figuresA≡; rowA;
@@ -150,3 +150,6 @@ open import Probed.Frame-Drain-Live
 
 open import Probed.Fan-Regs-Registry
   using (counts; regsS; marginK; marginK′; regsK; lensK)
+
+open import Probed.Fold-Regs-Row using (censusIs; foldRow)
+open import Probed.Fold-Regs-Nest-Spine using (foldTie)

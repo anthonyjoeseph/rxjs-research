@@ -15,11 +15,17 @@
 -- The argument is IRRELEVANT (the dot): it exists to fix the type and
 -- can never be used, which is the point of passing the postulate at
 -- all.  What inhabits the row is then whatever inhabits the statement
--- at that point, and `make evidence-check` (E7) holds the body to a
--- COMPUTED proof -- `refl`, `tt`, or a stdlib converter fed one -- so
--- the row can only be green because the claim evaluates to true there.
--- Handing the postulate itself back as the body is a type error on the
--- one side and a gate failure on the other.
+-- at that point, and `make evidence-check` (E7) refuses a body that
+-- names a POSTULATE -- so the row stands on what this tower has proven,
+-- and the statement it is evidence about cannot be its own witness.
+--
+-- THAT IS A LAUNDERING TEST AND NOT A COMPUTATION TEST, and the
+-- difference is what makes the rule satisfiable at all.  A conclusion
+-- denominated in a family this tower SEALS for cost does not reduce at
+-- any point whatever, so a body held to a numeral could never be
+-- written against one and the coverage could never be claimed.  A
+-- weakening through a proven inequality does reach such a statement,
+-- and is a stronger receipt than a numeral rather than a weaker one.
 --
 -- A sub-claim is reachable by the statement's OWN eliminators: project
 -- a conjunct, apply a ∀ at a point, read a field of a record conclusion.

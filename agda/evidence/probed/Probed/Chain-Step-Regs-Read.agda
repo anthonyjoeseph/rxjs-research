@@ -87,6 +87,12 @@ open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (pathSz?; regsSz?)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsLen)
+
+open import Probed.Apparatus using (Confirms)
+open import Probed.Fold-Regs-Row using (e₀; gp; pth; vls; evs₀; fin₀; sd₀; st₀;
+  le1; le2; pv; pp; pr; foldRow)
+
 Γ₃ : Ctx 3
 Γ₃ = natᵗ ∷ⱽ natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
 
@@ -249,3 +255,14 @@ fits : (exitB p0 ≤ᵇ sizeStep (entryB p0) (entryB p0))
      ∧ (exitB p3 ≤ᵇ sizeStep (entryB p3) (entryB p3))
      ≡ true
 fits = refl
+
+-- AND THE TIE TO THE STATEMENT, held at the point this family shares.
+-- The rows above are the READING; `foldTie` is what holds them to
+-- `foldPath-regsLen` as it now reads, so a restatement of the target
+-- breaks here rather than leaving the reading green about text that is
+-- gone.  What the point covers, and what it does not, is stated where
+-- it is paid for: `Probed.Fold-Regs-Row`.
+foldTie : Confirms
+  (foldPath-regsLen {e = e₀} gp 3 1 0 0 pth vls evs₀ fin₀ sd₀ st₀ 1 2
+     le1 le2 pv pp pr)
+foldTie = foldRow

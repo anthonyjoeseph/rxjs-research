@@ -45,6 +45,12 @@ open import Rx.Exp using (Closed; natᵗ)
 open import Probed.Fold-Regs-Nest-Spine using (Γ₃; prog; sub; read; pack)
 open import Probed.Fold-Regs-Nest-Later using (step)
 
+open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsLen)
+
+open import Probed.Apparatus using (Confirms)
+open import Probed.Fold-Regs-Row using (e₀; gp; pth; vls; evs₀; fin₀; sd₀; st₀;
+  le1; le2; pv; pp; pr; foldRow)
+
 -- the sibling's height, so the arrival is the only axis that moves
 n3 : Closed Γ₃ natᵗ
 n3 = prog 2 13
@@ -67,3 +73,14 @@ crossThird = pack (read n3 (step (step (sub n3))))
 
 row-cross-third : crossThird ≡ 31404015
 row-cross-third = refl
+
+-- AND THE TIE TO THE STATEMENT, held at the point this family shares.
+-- The rows above are the READING; `foldTie` is what holds them to
+-- `foldPath-regsLen` as it now reads, so a restatement of the target
+-- breaks here rather than leaving the reading green about text that is
+-- gone.  What the point covers, and what it does not, is stated where
+-- it is paid for: `Probed.Fold-Regs-Row`.
+foldTie : Confirms
+  (foldPath-regsLen {e = e₀} gp 3 1 0 0 pth vls evs₀ fin₀ sd₀ st₀ 1 2
+     le1 le2 pv pp pr)
+foldTie = foldRow
