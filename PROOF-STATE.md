@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MERGE THE CASCADE DOOR WITH THE MEASURE THAT CONSUMES IT.** Two of
-  the door's three arms are writable from its own premises; the third
-  reports the tail at the state the step left, and needs the store
-  ceiling THERE. The one machine preserving that ceiling wants the
-  round's affordability package, and every piece of that sits on the
-  CONSUMER — which walks the same list through the same states while
-  taking the door's package as a hypothesis. So each walk holds what
-  the other's arm needs. The commit states them as one induction
-  returning both, rather than threading the consumer's package into a
-  statement whose shape would then be its caller's.
-
 - **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
   ARE CARRIED AT.** The chains a sink fans into are walked at the
   round's ENTRY cap, while every receipt the sink actually holds — the
@@ -247,6 +236,16 @@ does not fit is a finding about the shared statement, not about the head.
   refutations close. The commit pushes the budget up through the
   walk's own hypothesis and conclusion, and reports which arms genuinely
   need the ceiling once the size demand stops borrowing it.
+
+- **AND SETTLE THE FOLD GRANT'S BINARY BEFORE DENOMINATING IT AGAIN.**
+  The producing side of the fold's grant is at the spiral stop: four
+  denominations refuted in one region, each because a depth fixed
+  before the count has to dominate a count towering in it. A fifth
+  currency is the move the stop rules out. What is owed is a binary —
+  whether the admitted count is REACHABLE at all — since a count no
+  run reaches is a premise the statement may simply carry, while a
+  reachable one refutes the family rather than this denomination. The
+  commit builds the run that decides it and reports which way it fell.
 
 ### The ledger
 
@@ -306,10 +305,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`arr-chains-caps-all-go`** (Part7/Arrival-Caps) — FALSITY, `DEAD ROUTE`: the
-  round's caps package at EVERY chain, as an induction over the POSITION ledger
-  with no delivery bound. Nothing has instantiated it; its cancelled arm has to
-  climb the entry level on a step the surviving fold never takes.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the
