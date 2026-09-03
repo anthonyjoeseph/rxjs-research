@@ -25,11 +25,11 @@
 
 -- WHERE IT BREAKS IS THE OTHER TERMINAL.  A chain ending at a second
 -- hand-over carries the leaf's own price MULTIPLIED by its frames',
--- so the leaf would have to dominate itself times a frame product.
--- No function of the cap does that: the escalation is per sink hop
--- and the hop count is bounded by nothing but the dispatch gas, since
--- `shareAdmit` filters on the source and the type and never on
--- whether a chain has already been delivered to.
+-- so the leaf would have to dominate itself times a frame product,
+-- and no function of the cap does that at an arbitrary chain -- which
+-- is the only kind the obligation below is handed, since the path is
+-- universally quantified and `pathRoots p ≡ false` is all that is
+-- known of it.
 
 -- AND AN ORDINARY PROGRAM PUTS A CHAIN THERE, which is why this is a
 -- refutation rather than a caution.  A registration minted while a
@@ -38,6 +38,17 @@
 -- second is already the shape.  The witness below is the smallest of
 -- them: one map, one merge, and a hand-over where the previous
 -- generation of this statement had a root.
+
+-- WHAT THE WITNESS IS NOT IS A REACHABLE REGISTRY ENTRY, and that is
+-- worth stating here because the shape it takes -- a chain from source
+-- zero terminating at `share-sink` zero -- is precisely the one a run
+-- cannot produce.  The slot telescope is stratified, so a chain ending
+-- at a slot's sink was minted subscribing an input below that slot and
+-- its source is strictly under it; sink hops climb and the hop count
+-- is capped by the slot count.  The obligation is nonetheless refuted
+-- as stated, because it quantifies over the path: the finding is that
+-- the repair is to READ the chain from the registry and carry the
+-- stratification, not to find a number that survives an arbitrary one.
 module Refuted.Sink-Phi-Leaf where
 
 open import Data.Bool using (true)

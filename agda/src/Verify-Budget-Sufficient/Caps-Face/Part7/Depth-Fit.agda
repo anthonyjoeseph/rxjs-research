@@ -1094,13 +1094,40 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 -- WHAT IS LEFT IS THE CHAIN THAT ENDS AT A SECOND HAND-OVER.  Its
 -- factor is the leaf's own multiplied by its frames', so the leaf
 -- would have to dominate itself times a frame product -- which no
--- function of the cap does, because the escalation is per sink hop and
--- the hop count is bounded by nothing but the dispatch gas: the
--- registry's admission filters on the source and the type and never on
--- whether a chain has been delivered to.  An ordinary program puts a
--- chain there, since a registration minted while a share's definition
--- is being subscribed carries that share's sink as its continuation.
--- So the residue is the sink-terminated arm and nothing else.
+-- function of the cap does at an ARBITRARY chain, and arbitrary is
+-- what this statement gets: `pathRoots p ≡ false` is the whole of
+-- what it knows about the path it is handed.  An ordinary program
+-- does put a hand-over there, since a registration minted while a
+-- share's definition is being subscribed carries that share's sink as
+-- its continuation.  So the residue is the sink-terminated arm and
+-- nothing else.
+
+-- AND THE ESCALATION IS BOUNDED BY THE PROGRAM, WHICH IS WHAT THIS
+-- HEADER USED TO DENY.  The reading it carried -- that the hop count
+-- is capped by nothing but the dispatch gas, since admission filters
+-- on the source and the element type and never on whether a chain has
+-- been delivered to -- is a fact about ADMISSION, and admission is not
+-- what bounds it.  The slot telescope is STRATIFIED: a shared slot's
+-- def may name only inputs below its own index, so a registration
+-- whose continuation ends at some slot's sink was minted subscribing
+-- an input that slot's def contains, and its source is strictly below
+-- that slot.  Sink hops therefore climb the telescope, no chain can be
+-- re-entered through its own sink, and the count is capped by the slot
+-- count.  Instantiated in `Harness.Main` over a run of two shared
+-- slots stacked on a hot source: every registration carrying a sink
+-- terminal has its source strictly under that sink, none re-enters its
+-- own, and the hop depth saturates at the telescope's own bound while
+-- the walking fuel is taken to four times the slot count.  Those rows
+-- are measured-not-rechecked, as everything in that module is.
+
+-- SO THE RESIDUE IS THE ARBITRARY CHAIN, NOT A MISSING NUMBER, and
+-- that relocates the row rather than shrinking it.  A price
+-- denominated in the slot count is available the moment the chain is
+-- read out of the REGISTRY -- and the registry is what the walk holds
+-- at an arbitrary state, which is the wall `fan-regsSz` stands at one
+-- statement over.  Stratification is therefore owed as a CARRIED
+-- conjunct of the invariant, where every producer re-establishes it,
+-- and not as a hypothesis here, where only today's caller supplies it.
 -- REFUTED: `Refuted.Sink-Phi-Leaf`, at the size floor this arm
 --   discharges from and at the budget the sink's own receipt exactly
 --   exhausts, so the crossing is not an artifact of a small budget.
