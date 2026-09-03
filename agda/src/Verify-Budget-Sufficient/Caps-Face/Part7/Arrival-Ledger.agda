@@ -239,17 +239,18 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 -- a row hand on the SQUARE of what came in, and the square of the
 -- entry width is over it from two upward.  The arrival is not what
 -- widens -- a nat arrival and a map built at exactly the cap's width
--- cross it -- so conditioning on the payload repairs nothing.  What
--- the mirror actually carries is a MOVING bound, one level per frame,
--- and the argument this header used to make -- every level a cascade
--- reaches is under `sizeCount`, so the width lands under the cap at
--- the NEXT instant -- lands at the EXIT width, not the entry width
--- this statement reads.  So the restatement is forced and it is not
--- local: every consumer denominated in `nestBurstAt` -- the store
--- face's factor, and the step that puts the burst under the exit SIZE
--- -- is priced in the number the square is over, and the exit width is a tower
--- where the exit size is one exponential, so the moving bound does not
--- slot in where the flat one stood.
+-- cross it -- so conditioning on the payload repairs nothing.
+--
+-- AND THE OTHER FLAT READING IS CLOSED TOO, WHICH IS WHAT MAKES THE
+-- RESTATEMENT A MOVING ONE AND NOT A RE-INDEXING.  The single number a
+-- whole walk could honestly be held to is the EXIT width, and
+-- `nestBurstAt` cannot be re-denominated there: its only ceiling would
+-- then sit two instants out while the store face's grant affords one,
+-- which is settled in that definition's own header.  So what is left
+-- is the shape the mirror already carries -- a bound that MOVES,
+-- one level per frame -- and it does not slot in where the flat one
+-- stood: every consumer priced in `nestBurstAt` has to take a hop's
+-- own entry width per hop instead of one number for the walk.
 --
 -- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at the root of
 --   one chain against a width-two cap granting three, at the

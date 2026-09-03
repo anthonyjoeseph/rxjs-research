@@ -743,21 +743,38 @@ abstract
   -- The count of values one instant can carry is the width cap, so the
   -- burst is that cap and not a quantity of this module's own.
   --
-  -- AND IT IS THE WIDTH AT THE INSTANT'S EXIT, NOT AT ITS ENTRY, which
-  -- is the whole difference between a bound that survives a walk and
-  -- one that does not.  A `thru` frame hands on what its inners emit,
-  -- so it turns one value into as many as a burst can hold and the
-  -- entry width is crossed by a PRODUCT at the first such hop -- which
-  -- is why the caps face pays a square there.  `capsAt` at the next
-  -- index IS the full `frameStep` endpoint for this instant, so every
-  -- intermediate hop's width sits under it by monotonicity in the hop
-  -- count, and one number covers the whole walk.
+  -- AND IT IS THE WIDTH AT THE INSTANT'S ENTRY, WHICH IS AN
+  -- AFFORDABILITY RESULT AND NOT A CHOICE.  A width sits under a size
+  -- only at the instant AFTER the one that folded it, so an entry
+  -- width is priced against the next instant's size and an exit width
+  -- against the one after that.  This face is spent out of the health
+  -- of the instant it is read at, which carries two to two to THAT
+  -- instant's size and nothing taller, while the size gain per instant
+  -- is itself exponential in the size -- so the later reading asks for
+  -- a tower one story above the ledger it is charged to, at every
+  -- index.
+  --
+  -- SO THIS NUMBER IS NOT A WALK'S UNIFORM BOUND, and nothing on this
+  -- face makes it one.  A consumer wanting ONE number over a whole
+  -- walk wants the exit width; what it can have from here is a bound
+  -- that MOVES with the walk, a hop's own entry width per hop, which is
+  -- the shape the walk face's level ladder already carries.
   --
   -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free reading of
   --   the walk's per-frame charge, 65 against 64, at the smallest step
   --   function that deepens its own accumulator; the gap is unbounded
   --   in the burst, so no constant repairs it and the factor below is
   --   what the numbers point at.
+  -- REFUTED: `Refuted.Chains-Burst-Flat` is what rules this number out
+  --   as a cascade's flat bound, four values at a root against a
+  --   width-two cap granting three -- two `thru` frames in a row hand
+  --   on the SQUARE of what came in, so the crossing is the dynamics of
+  --   the layers and not an oversized payload.
+  -- DEAD ROUTE: re-denominating this at the exit width to repair that.
+  --   The burst's only ceiling then sits two instants out, which
+  --   carries `nestIncLog`, `nestFacLog` and the room they are paid
+  --   out of with it, and lands `nestCap-sight≤exp` one story above
+  --   `capsAt-exp2≤capsH` -- the grant `nestΦ-sight≤capsH` spends.
   nestBurstAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   nestBurstAt e sl id = suc (Caps.cWid (capsAt e sl id))

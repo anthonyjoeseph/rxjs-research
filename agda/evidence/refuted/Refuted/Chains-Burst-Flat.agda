@@ -120,7 +120,7 @@ reached = refl
 
 -- THE CHAIN IS THE REGISTRY'S: the map, the inner `mergeAll`, the outer
 path : Path Γ₂ natᵗ natᵗ
-path = map-f wide ↠ thru-outer mergeAllᵒ 1 ↠ thru-outer mergeAllᵒ 0 ↠ root
+path = map-f wide ↠ (thru-outer mergeAllᵒ 1 ↠ (thru-outer mergeAllᵒ 0 ↠ root))
 
 chain≡ : chainsOf a st₁ ≡ (0 , path) ∷ []
 chain≡ = refl
@@ -168,7 +168,7 @@ vals₀ : List (Val Γ₂ natᵗ)
 vals₀ = arrVal a ∷ []
 
 step₁ = stepFrame gas 1 (arrTick a) (map-f wide)
-          (thru-outer mergeAllᵒ 1 ↠ thru-outer mergeAllᵒ 0 ↠ root)
+          (thru-outer mergeAllᵒ 1 ↠ (thru-outer mergeAllᵒ 0 ↠ root))
           vals₀ (Arrival.isLast a) sched₁ st′
 
 step₂ = stepFrame gas 1 (arrTick a) (thru-outer mergeAllᵒ 1)

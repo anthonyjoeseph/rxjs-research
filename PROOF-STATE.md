@@ -216,27 +216,28 @@ does not fit is a finding about the shared statement, not about the head.
 ### Big picture tier roadmap
 
 - **RESTATE THE CASCADE'S BURST LEDGER AT A MOVING WIDTH, ASSEMBLY
-  FIRST.** The flat form is refuted: a `thru` frame subscribes every
-  value it takes, so two in a row hand on the square of what came in,
-  and the entry width is one number read once. The walk face's own
-  mirror carries the bound a level per frame, and its closing argument
-  lands at the EXIT width — a tower where the exit size is one
-  exponential — so the moving bound does not slot in where the flat one
-  stood. The commit restates the ledger and its top receipt at the
-  level-indexed width, outside-in: the restated leaf typechecking
-  against its consumer, the residue postulated BARE, no consumer
-  re-priced yet.
+  FIRST.** The flat form is refuted at the entry width and now closed
+  at the exit one too: the exit reading's only ceiling sits two
+  instants out while the face charging it is granted one, and the size
+  gain per instant is itself exponential. So no re-indexing repairs
+  the statement and the level-indexed form is the sole candidate left
+  — the shape the walk face's mirror already carries. The commit
+  restates the ledger and its top receipt at the moving width,
+  outside-in: the
+  restated leaf typechecking against its consumer, the residue
+  postulated BARE, no consumer re-priced yet.
 
-- **THEN RE-PRICE THE STORE FACE IN THE WIDTH THE LEDGER NOW CLOSES
-  AT.** The store's nesting factor, the increment's log and the step
-  putting the burst under the exit SIZE are all denominated in the
-  entry width, which is the refuted number. The exit width is a tower
-  of height the size count while the exit size is exponential in it,
-  so the affordability question is real: whether a burst read a level
-  per frame still fits under the exit size, or the store face needs a
-  restatement of its own. The commit answers it by instantiation first
-  — the same two-`thru` witness at the store's own bound — and restates
-  only what the rows force, the residue BARE.
+- **THEN GIVE THE MOVING BOUND SOMEWHERE TO PLUG IN, AT THE
+  CONSUMPTION SITE.** The cascade's node law takes the ledger as one
+  flat width and hands it straight down its own recursion, so a
+  level-indexed bound has no shape to arrive in and the restatement
+  above would land unclaimed. The repair is the postulate-to-assembly
+  one: convert that consumer into a real body over per-hop leaves, so
+  a hop is charged at the width it ENTERS at and the walk's growth is
+  carried frame by frame instead of assumed once for the whole chain.
+  The commit lands the assembly and the leaves it needs, which is what
+  makes the moving bound's fit checked by the typechecker rather than
+  asserted by a hypothesis list.
 
 - **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
   hop that climbs has strictly less telescope above it, and that is the
@@ -295,9 +296,9 @@ does not fit is a finding about the shared statement, not about the head.
   has instantiated it.
 - **`arr-chains-bursts`** (Part7/Arrival-Ledger) — FALSITY,
   `REFUTED, DEAD ROUTE, TWIN`: every stage of every chain's walk under ONE
-  width, the entry's. Two `thru` frames square a burst, so the flat form is
-  dead; the mirror moves a level per frame, and the store face is priced in
-  the flat number.
+  width, the entry's. Two `thru` frames square a burst; the exit width a walk
+  needs is two instants out and the charging face is granted one, so both flat
+  readings are closed and only a moving one is left.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
