@@ -1,5 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
--- arr-chain-caps … arr-chains-caps
+-- arr-chain-caps … arr-chains-caps-all
 module Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps where
 
 open import Data.Bool    using (true; false; if_then_else_)
@@ -61,7 +61,7 @@ open import Decide using (∧-intro)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeGo-deliveries; cascadeLatch-caps; chainStep-slots; chainsOf-length; walkH)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using
-  (chainCapsOK; chainsCapsOK)
+  (chainCapsOK; chainsCapsOK; chainsCapsAll)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nodes using
   (chains-count-width)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -625,3 +625,43 @@ postulate
 -- premise taken at the chain's entry be spent at every frame the walk
 -- reaches: four clauses add a term's depth or nothing, and the outer
 -- frame adds one.
+
+-- THE SAME ROUND'S PACKAGE, UNPROJECTED PAST THE CANCELLATION TEST.
+-- A consumer denominated in the round's DESCENT charges for the head
+-- chain whatever the test says, so it cannot be paid out of the fold
+-- above, which owes nothing on the cancelled arm.  This is the same
+-- selection walked at the same levels, reporting a receipt at every
+-- entry instead of at the surviving ones.
+--
+-- AND IT TAKES NO DESCENT PREMISE, WHICH IS THE WHOLE OF WHY IT IS
+-- STATED SEPARATELY RATHER THAN AS A STRONGER FOLD.  The fold above
+-- takes the round's descent bound, and the consumer that needs this
+-- package is the one PROVING that bound -- so the two cannot be the
+-- same statement.  What replaces it is the pair the chain leaf takes:
+-- a ceiling on the store the round enters at, and that ceiling's own
+-- fit under the fuel, which together price a chain's descent without
+-- pricing the round's.
+--
+-- TWIN: `arr-chains-caps-go`, whose induction is this one at every
+--   arm that survives.  Its cancelled arm already holds every
+--   ingredient this one needs -- the caps receipt at the entry state,
+--   the path receipt off the same conjunction, the value and closure
+--   receipts unchanged -- and declines to mint one only because its
+--   conclusion says nothing there.  What is genuinely new is the third
+--   callee: the tail must also be reported at the state a CANCELLED
+--   chain's step would leave, which the surviving fold never visits.
+postulate
+  arr-chains-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
+    (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    capsOK? (capsAt e sl id) sched st ≡ true →
+    all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc))
+        (chainsOf a st) ≡ true →
+    valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+    nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+    storeNestMax sched (cascadeLatch a st) ≤ S →
+    sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+      ≤ capsH e sl id →
+    chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
+      a nextId (chainsOf a st) sched (cascadeLatch a st)

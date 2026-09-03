@@ -574,8 +574,9 @@ dry-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
      nestOK? e sl id sched st ≡ true →
      nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
      valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+     nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
      hasDry (proj₁ (cascade a id sched st)) ≡ false
-dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC =
+dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC closC =
   cascadeGo-nodry subscribeInner-caps innerFinish-caps
     id a chains sched latched
     (slotsCaps?-capsAt e sl id)
@@ -592,7 +593,8 @@ dry-tick {n = n} {e = e} a id sched st inv val pre nok bnd valC =
     (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
     (cascade-depth-capsH sl id a id sched st refl pre nok bnd
       (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize (capsAt e sl id))
-            (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC))))
+            (T-to (valCaps?-size (capsAt e sl id) sl (arrTy a) (arrVal a) valC)))
+      valC closC)
   where
   sl      = Sched.slots sched
   Ψ       = ΨAt e sl
@@ -833,13 +835,13 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC
       (arr-chains-len-sum sl id a sched st hsl hcaps)
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
       hsz
-      (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz)
+      (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz valC closC)
       (arr-chains-bursts sl id a nextId sched st hsl hcaps)
       (arr-chains-caps sl id a nextId sched st hsl hcaps
         (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
           (capsOK?-regs (capsAt e sl id) sched st hcaps))
         valC closC
-        (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz))
+        (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz valC closC))
       (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
         (capsOK?-regs (capsAt e sl id) sched st hcaps))
 
@@ -904,7 +906,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC closC =
   Ŝ      = sizeCapAt e sl′ (suc id)
 
   dry : hasDry (proj₁ r) ≡ false
-  dry = dry-tick a id sched st inv val pre nok harr valC
+  dry = dry-tick a id sched st inv val pre nok harr valC closC
 
   -- S2, instantiated: the output's slots equal the entry's
   slEq : sl′ ≡ sl
@@ -929,7 +931,7 @@ cascade-wet-via-caps {e = e} a id sched st inv val pre nok harr valC closC =
                         subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
                      (λ {n′} {Γ′} {t′} {e′} {s′} →
                         innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
-                     sl id a id sched st refl pre nok harr valC)
+                     sl id a id sched st refl pre nok harr valC closC)
 
   nestOut : nestOK? e sl′ (suc id) sched′ st′ ≡ true
   nestOut =

@@ -1,5 +1,5 @@
 -- Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK
--- chainBurstOK … chainsCapsOK
+-- chainBurstOK … chainsCapsAll
 module Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK where
 
 open import Data.Bool    using (true; if_then_else_)
@@ -201,3 +201,36 @@ chainsCapsOK cp ac sl d Lv a nextId ((rid , c) ∷ chains) sched st =
                              (record st { delivered = rid ∷ EvalSt.delivered st }))))
             (proj₂ (proj₂ (chainStep nextId a c sched
                              (record st { delivered = rid ∷ EvalSt.delivered st })))))
+
+-- AND THE SAME PACKAGE READ PAST THE CANCELLATION TEST, which is what
+-- a consumer denominated in the round's DESCENT needs rather than in
+-- its deliveries.  That measure is collapsed the other way from this
+-- fold: it walks the head chain whatever the test says and reports the
+-- tail at BOTH states, so a package owing nothing on the cancelled arm
+-- cannot supply the head receipt the measure has already charged for.
+-- The three conjuncts here are that measure's three callees, in its
+-- order -- the tail at the incoming state, the head at the delivered
+-- state, and the tail at the state the head left.
+--
+-- AND IT IS NOT A WEAKENING OF THE FOLD ABOVE, IT IS A DIFFERENT
+-- STATEMENT.  A cancelled registration still has a path in the
+-- registry and still has a state the step would leave, so the receipt
+-- this asks for at that arm is about a walk the evaluator does not
+-- perform -- which is exactly what a bound over-approximating past the
+-- test has to be paid in.
+chainsCapsAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (cp ac : Caps) (sl : Slots Γ) (d Lv : ℕ) (a : Arrival Γ) (nextId : Id)
+  (chains : List (RegId × Path Γ (arrTy a) t))
+  (sched : Sched Γ) (st : EvalSt e) → Set
+chainsCapsAll cp ac sl d Lv a nextId []               sched st = ⊤
+chainsCapsAll cp ac sl d Lv a nextId ((rid , c) ∷ chains) sched st =
+  chainsCapsAll cp ac sl d Lv a nextId chains sched st
+  × chainCapsOK cp ac sl d Lv nextId a c sched
+      (record st { delivered = rid ∷ EvalSt.delivered st })
+  × (Σ ℕ λ L′ →
+      (Lv + L′ ≤ sizeCount cp d ⊔ Caps.cSize cp)
+    × chainsCapsAll cp ac sl d (Lv + L′) a nextId chains
+        (proj₁ (proj₂ (chainStep nextId a c sched
+                         (record st { delivered = rid ∷ EvalSt.delivered st }))))
+        (proj₂ (proj₂ (chainStep nextId a c sched
+                         (record st { delivered = rid ∷ EvalSt.delivered st })))))
