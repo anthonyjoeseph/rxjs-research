@@ -34,5 +34,146 @@
 -- could return any type at all and the tie would be gone.
 module Probed.Apparatus where
 
+open import Data.Bool using (Bool; true; false; _∧_; T)
+open import Data.List using (List; []; _∷_; foldr)
+open import Data.Maybe using (maybe)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _≤ᵇ_; _+_; _*_; _^_; _⊔_; _≡ᵇ_; z≤n)
+open import Data.Nat.Properties
+  using (≤-trans; ≤-refl; ≤-reflexive; ≤ᵇ⇒≤; m≤m⊔n; m≤n⊔m; m≤m+n;
+         +-mono-≤; *-assoc; *-comm; *-identityˡ; *-monoʳ-≤)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
+open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans)
+
+open import Rx.Prim using (InstEmit)
+open import Rx.Exp using (Ctx; Closed; Val; Ty; sizeᵉ)
+open import Rx.Nest-Depth using (nestDᵛ)
+open import Rx.Slots using (Slots)
+open import Rx.Evaluator using (EvalSt; NodeId; NodeState; lookupNode; Stream; splitEvents)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestB; nestB-base; nestB-frame-dbl)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (nodeNest; fitB; slotWrapSum; nestUnit)
+open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; nodesMax)
+open import Verify-Budget-Sufficient.Sighted-Fit
+  using (inputsBelowᵛ; ValsFitG; StreamFitG)
+
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
+
+-- AND THE POINTWISE READING SITS UNDER THE MAXIMUM.  This is the one
+-- fact a tie at a `∀ (k : NodeId)` conjunct cannot compute: the
+-- quantifier ranges over every id, so no row instantiates it, while
+-- `nodesMax` at a reached state is a numeral.  With it a row closes
+-- that conjunct out of the same figure the `nodesMax` conjunct beside
+-- it already reads, and the two stop being separate obligations.
+--
+-- IT IS PROVEN HERE AND NOT IN `src` BECAUSE ITS ONLY CONSUMER IS A
+-- ROW.  A definition `src` cannot route to Main is a wiring finding
+-- there and dead weight in the tower; out here it is claimed by
+-- `Probed.Main` through every file that spends it, so the same law
+-- holds over it in the tree it actually belongs to.
+lookup≤fold : ∀ {n} {Γ : Ctx n} (j : NodeId)
+  (ns : List (NodeId × NodeState Γ)) →
+  maybe nodeNest 0 (lookupNode j ns)
+    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 ns
+lookup≤fold j []            = z≤n
+lookup≤fold j ((k , s) ∷ r) with k ≡ᵇ j
+... | true  = m≤m⊔n _ _
+... | false = ≤-trans (lookup≤fold j r) (m≤n⊔m _ _)
+
+nodeNestAt≤max : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (j : NodeId) (st : EvalSt e) → nodeNestAt j st ≤ nodesMax st
+nodeNestAt≤max j st = lookup≤fold j (EvalSt.nodes st)
+
+-- A COMPUTABLE FLOOR UNDER THE SEALED GRANT.  The caps grant is sealed
+-- for cost, so no row can evaluate it and a tie against a statement
+-- denominated in it would have nothing to stand on.  What the family
+-- does export is a base -- the depth the grant was opened at sits
+-- under it -- and a per-level doubling that a unit of the descent's
+-- own size pays for.  Iterating the doubling from the base gives a
+-- floor that DOES compute: a tower over two to the chosen key, times
+-- the depth.  A row then reads its delivered figure against that
+-- numeral and widens once.
+--
+-- THE KEY IS THE ROW'S TO CHOOSE, up to the descent's size, and that
+-- is what makes the floor usable rather than merely definable: a floor
+-- fixed at one doubling per level is the very grant that the
+-- width-free reading was refuted at, so a row spending it could never
+-- reach past the crossing that refutation sits on.
+--
+-- IT IS STILL LOSSY, AND DELIBERATELY.  The real grant's per-level
+-- factor carries the burst WIDTH beside the size base; this floor
+-- drops the width entirely.  So a row holding here holds at the grant
+-- with room to spare, and a row that fails here has refuted nothing.
+nestB-tower : ∀ (S W U B m k : ℕ) → suc k ≤ S →
+  (2 ^ suc k) ^ m * B ≤ nestB S W U B m
+nestB-tower S W U B zero    k hk =
+  ≤-trans (≤-reflexive (*-identityˡ B)) (nestB-base S W U B 0)
+nestB-tower S W U B (suc m) k hk =
+  ≤-trans (≤-reflexive (trans (*-assoc (2 ^ suc k) ((2 ^ suc k) ^ m) B) (regroup _)))
+    (≤-trans (*-monoʳ-≤ (2 ^ k) (+-mono-≤ IH IH))
+             (nestB-frame-dbl S W U B m k (suc m) hk ≤-refl))
+  where
+  IH : (2 ^ suc k) ^ m * B ≤ nestB S W U B m
+  IH = nestB-tower S W U B m k hk
+
+  dbl : ∀ (z : ℕ) → 2 * z ≡ z + z
+  dbl z = cong (z +_) (*-identityˡ z)
+
+  regroup : ∀ (z : ℕ) → 2 ^ suc k * z ≡ 2 ^ k * (z + z)
+  regroup z = trans (cong (_* z) (*-comm 2 (2 ^ k)))
+                    (trans (*-assoc (2 ^ k) 2 z) (cong (2 ^ k *_) (dbl z)))
+
+fitB-tower : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (k W B m j : ℕ) → suc j ≤ sizeᵉ e →
+  (2 ^ suc j) ^ m * B ≤ fitB e sl k W B m
+fitB-tower e sl k W B m j hj =
+  ≤-trans (nestB-tower (sizeᵉ e) W (nestUnit e sl) B m j hj) (m≤m+n _ _)
+
+-- THE VALUE FOLD, BUILT IN BULK FROM ONE DECIDABLE SWEEP AND ONE
+-- WIDENING.  The fold is a nested tuple as long as the burst, so a row
+-- at a script of any length would otherwise be written out by hand --
+-- and a hand-written tuple is where a mistyped conjunct hides.  Here
+-- the sweep is a single boolean the typechecker evaluates, and the
+-- widening is the one place the sealed grant is touched.
+--
+-- THE INTERMEDIATE `F` IS WHAT MAKES THIS WORK AT A SEALED GRANT: the
+-- sweep compares each value against a number that computes, and
+-- `F ≤ G` carries the whole comparison up to the grant the statement
+-- names.
+allB : ∀ {A : Set} → (A → Bool) → List A → Bool
+allB p []       = true
+allB p (x ∷ xs) = p x ∧ allB p xs
+
+valFit? : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (F P : ℕ) (t : Ty)
+  → Val Γ t → Bool
+valFit? k sl F P t v =
+  inputsBelowᵛ k t v ∧ (P + nestDᵛ t v + k * slotWrapSum sl ≤ᵇ F)
+
+∧-split : ∀ {a b : Bool} → T (a ∧ b) → T a × T b
+∧-split {true}  h = tt , h
+∧-split {false} ()
+
+valsFitG-floor : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (F G P : ℕ) (t : Ty)
+  (os : List (Val Γ t)) → F ≤ G →
+  T (allB (valFit? k sl F P t) os) → ValsFitG k sl G P t os
+valsFitG-floor k sl F G P t []       hFG h = tt
+valsFitG-floor k sl F G P t (o ∷ os) hFG h =
+  (proj₁ hd , ≤-trans (≤ᵇ⇒≤ _ _ (proj₂ hd)) hFG)
+  , valsFitG-floor k sl F G P t os hFG (proj₂ hs)
+  where
+  hs = ∧-split h
+  hd = ∧-split (proj₁ hs)
+
+streamFitG-floor : ∀ {n} {Γ : Ctx n} (k : ℕ) (sl : Slots Γ) (F G P : ℕ) (t : Ty)
+  (ems : Stream Γ t) → F ≤ G →
+  T (allB (λ em → allB (valFit? k sl F P t)
+                    (proj₁ (splitEvents {Γ = Γ} {A = Val Γ t} (InstEmit.events em))))
+          ems) →
+  StreamFitG k sl G P t ems
+streamFitG-floor k sl F G P t []         hFG h = tt
+streamFitG-floor k sl F G P t (em ∷ ems) hFG h =
+  valsFitG-floor k sl F G P t _ hFG (proj₁ hs)
+  , streamFitG-floor k sl F G P t ems hFG (proj₂ hs)
+  where
+  hs = ∧-split h

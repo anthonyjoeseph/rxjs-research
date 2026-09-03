@@ -46,7 +46,8 @@
 -- TARGET: chain-depth-sighted @36ffe2
 module Probed.Depth-Sighted where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_; _≤_)
+open import Data.Nat.Properties using (≤-trans; m≤m+n)
 open import Data.List using (List; length; map)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -57,7 +58,7 @@ open import Rx.Exp using (Closed; natᵗ; obs; sizeᵛ; sizeᵉ; ofᵉ; scanᵉ;
   strmᵗ; nat̂; emptyᵉ; Tm; syncSizeᵉ; Fn; _×ᵗ_)
 open import Data.Maybe using (nothing)
 open import Data.List using ([]; _∷_) renaming (map to mapL)
-open import Data.Bool using (Bool; true)
+open import Data.Bool using (Bool; true; false)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Fin using (zero) renaming (suc to fsuc)
 open import Rx.Prim using (gasPad; g0; cold; hot)
@@ -67,17 +68,19 @@ open import Data.Unit using (tt)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next;
          cascade; cascadeLatch; chainsOf; arrTy; arrVal; budgetAt; LiveSource;
-         Arrival; Path)
+         Arrival; Path; thru-outer; mergeAllᵒ; installNode; mergeAll-st)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵉ)
 
 open import Refuted.Demand-Programs
   using (Γ₂; progU; progF; insT; insF; sucGU; sucGF; asyncNats)
 open import Verify-Budget-Sufficient.Caps-Depth
-  using (depthE; depthCascade; depthChain)
+  using (depthE; depthCascade; depthChain; depthFrame)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
   using (chain-depth-sighted)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (storeNestMax; nestUnit; sightCeil; pathNestD)
+  using (storeNestMax; nestUnit; sightCeil; pathNestD; sightCeil-mono; fitB)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestB-base)
+open import Verify-Budget-Sufficient.Depth-Sighted using (sight-all-walk)
 
 open import Probed.Apparatus using (Confirms)
 
@@ -615,3 +618,109 @@ dblLongFigs = proj₁ xRow3L + 1000000 * proj₂ xRow3L
 
 dblLongFigs≡ : dblLongFigs ≡ 98000002
 dblLongFigs≡ = refl
+
+
+-- ══════════════════════════════════════════════════════════════════
+-- THE WALK LEAF ITSELF, rather than the parent that lands on it.
+--
+-- Every reading above is taken at `depthE` from the root, where this
+-- leaf is one summand of a join; a green parent is a green leaf, but
+-- that step is an ARGUMENT and a tie is what leaves no argument
+-- standing between a row and the statement.  So the point below is the
+-- frame: a `mergeAll` outer with one inner arriving, walked at the
+-- empty path, with the entry pair and the current pair taken to be the
+-- same.
+--
+-- THE TWO FREE NUMBERS ARE READ AT NOUGHT, which is the strongest
+-- reading the statement admits: the grant is monotone in the width and
+-- the slot count is multiplied by them, so a row holding here holds at
+-- every larger pair a caller supplies.
+--
+-- AND THE CONCLUSION IS SEALED, so the row does not compare numerals.
+-- `fitB` is `nestB` plus a slot term, and `nestB` does not reduce at
+-- any point; `nestB-base` puts the grant's own depth argument under it
+-- unconditionally, and that argument -- the path's nesting plus the
+-- outer's, one `suc` up -- is computed off the term.  So the row reads
+-- the descent against the ceiling taken at THAT floor, which is a
+-- numeric comparison, and widens it into the sealed form by
+-- monotonicity.  A weakening through a proven inequality is what
+-- reaches a sealed statement at all.
+--
+-- LOAD-BEARING, and it fails exactly when the walk passes the ceiling
+-- read at the floor -- which is a strictly harder row than the sealed
+-- statement asks for, since the floor is below the grant.  The two
+-- points are the shallow inner and one four layers deep, so a pass
+-- that only survives at a flat arrival fails here.
+-- ══════════════════════════════════════════════════════════════════
+
+wSched : Sched Γ₂
+wSched = sched-init (progU 8 2) slotsT
+
+wSt : EvalSt (progU 8 2)
+wSt = installNode 7 (mergeAll-st {t = obs natᵗ} nothing 0 [] false)
+                  (st-init (progU 8 2))
+
+wB : ℕ → Closed Γ₂ (obs natᵗ)
+wB d = ofᵉ (strmᵗ (deep d) ∷ [])
+
+wDesc : ℕ → ℕ
+wDesc d = depthFrame (gasPad 400 g0) 0 0 (thru-outer mergeAllᵒ 7)
+                     (root {Γ = Γ₂} {t = natᵗ}) (deep d ∷ []) false wSched wSt
+
+-- the ceiling at the FLOOR of the sealed grant, which is what the row
+-- actually compares against
+wFloor : ℕ → ℕ
+wFloor d =
+  sightCeil (sizeᵉ (progU 8 2))
+            (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d)))
+            (storeNestMax wSched wSt)
+            (nestUnit (progU 8 2) slotsT)
+
+walkFigs : ℕ
+walkFigs = wDesc 1 + 1000 * wFloor 1 + 1000000 * wDesc 4 + 1000000000 * wFloor 4
+
+walkFigs≡ : walkFigs ≡ 1113005954002
+walkFigs≡ = refl
+
+walkRow : List Bool
+walkRow = (wDesc 1 ≤ᵇ wFloor 1) ∷ (wDesc 4 ≤ᵇ wFloor 4) ∷ []
+
+walkRow≡ : walkRow ≡ true ∷ true ∷ []
+walkRow≡ = refl
+
+walkTie : ∀ (d : ℕ) →
+  pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d))
+    ≤ fitB (progU 8 2) slotsT 0 0
+        (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d)))
+        (suc (syncSizeᵉ (wB d)))
+walkTie d =
+  ≤-trans (nestB-base (sizeᵉ (progU 8 2)) 0 (nestUnit (progU 8 2) slotsT)
+             (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB d)))
+             (suc (syncSizeᵉ (wB d))))
+          (m≤m+n _ _)
+
+tieWalk1 : Confirms
+  (sight-all-walk (gasPad 400 g0) 0 0 mergeAllᵒ 7 (wB 1)
+     (root {Γ = Γ₂} {t = natᵗ}) 0 0 wSched wSt (deep 1 ∷ []) false wSched wSt)
+tieWalk1 _ _ =
+  ≤-trans (≤ᵇ⇒≤ (wDesc 1) (wFloor 1) tt)
+          (sightCeil-mono (sizeᵉ (progU 8 2))
+             {v = pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 1))}
+             {v′ = fitB (progU 8 2) slotsT 0 0
+                     (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 1)))
+                     (suc (syncSizeᵉ (wB 1)))}
+             {s = storeNestMax wSched wSt} {s′ = storeNestMax wSched wSt}
+             (nestUnit (progU 8 2) slotsT) (walkTie 1) ≤-refl)
+
+tieWalk4 : Confirms
+  (sight-all-walk (gasPad 400 g0) 0 0 mergeAllᵒ 7 (wB 4)
+     (root {Γ = Γ₂} {t = natᵗ}) 0 0 wSched wSt (deep 4 ∷ []) false wSched wSt)
+tieWalk4 _ _ =
+  ≤-trans (≤ᵇ⇒≤ (wDesc 4) (wFloor 4) tt)
+          (sightCeil-mono (sizeᵉ (progU 8 2))
+             {v = pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 4))}
+             {v′ = fitB (progU 8 2) slotsT 0 0
+                     (pathNestD (root {Γ = Γ₂} {t = natᵗ}) + suc (nestDᵉ (wB 4)))
+                     (suc (syncSizeᵉ (wB 4)))}
+             {s = storeNestMax wSched wSt} {s′ = storeNestMax wSched wSt}
+             (nestUnit (progU 8 2) slotsT) (walkTie 4) ≤-refl)

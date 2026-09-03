@@ -27,7 +27,9 @@ module Probed.Sight-Fit-Width where
 open import Data.Bool using (Bool; true; false)
 open import Data.List using (List; []; _∷_; _++_; length)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Data.Product using (proj₁)
+open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (InstEmit)
@@ -37,8 +39,10 @@ open import Rx.Evaluator
   using (Stream; Path; splitEvents; splitBurst; subscribeE; root; sched-init; st-init)
 open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; slotWrapSum; slotWrapBSum; nestUnit)
 open import Verify-Budget-Sufficient.Nest-Walk using (nestDᵛˢ)
+open import Verify-Budget-Sufficient.Sighted-Fit using (subscribeE-fit)
 open import Refuted.Demand-Programs using (Γ₂)
 open import Refuted.Scan-Burst-Nest using (prog; slots; gas)
+open import Probed.Apparatus using (Confirms; fitB-tower; streamFitG-floor)
 
 burstVals : ∀ {t} → Stream Γ₂ t → List (Val Γ₂ t)
 burstVals []                       = []
@@ -101,3 +105,56 @@ newRow = (deliv 12 ≤ᵇ grantNew 12)
 
 newRow≡ : newRow ≡ true ∷ true ∷ true ∷ []
 newRow≡ = refl
+
+----------------------------------------------------------------------
+-- THE TIE, AT THE SAME THREE SCRIPT LENGTHS THE ROWS ABOVE READ.  Its
+-- type is the statement applied at this file's own point, so the
+-- columns above stop being a hand-written grant standing beside the
+-- postulate and become the margin reading of the grant actually spent.
+--
+-- WHAT IT STANDS ON, since the grant is sealed and cannot be a
+-- numeral.  The caps family exports a base and a per-level doubling
+-- bought by a unit of the descent's size; iterating them at a key of
+-- one gives a FLOOR that computes -- four to the arrival's sync size,
+-- times the depth the grant is opened at.  That floor is strictly
+-- above the width-free grant the refutation crosses, which is why the
+-- rows reach past the crossing rather than stopping at it.
+--
+-- LOAD-BEARING at exactly the axis this file exists for: the delivered
+-- side doubles per script value while the floor does not move, so a
+-- long enough script crosses even this floor.  What is NOT covered is
+-- the burst WIDTH, which the floor drops entirely and the real grant
+-- carries in its exponent -- so these rows say nothing about the axis
+-- the repair was made on, and the columns above are what read it.
+-- Both premises are left standing and unread.
+----------------------------------------------------------------------
+
+floorAt : ℕ
+floorAt = (2 ^ suc 1) ^ syncSizeᵉ prog * (pathNestD κ₀ + nestDᵉ prog)
+
+tie12 : Confirms
+  (subscribeE-fit gas 2 (wid 12) prog κ₀ 0 0
+     (sched-init prog (slots 12)) (st-init prog))
+tie12 _ _ =
+  streamFitG-floor 2 (slots 12) floorAt _ (pathNestD κ₀) (obs natᵗ) (runAt 12)
+    (fitB-tower prog (slots 12) 2 (wid 12)
+       (pathNestD κ₀ + nestDᵉ prog) (syncSizeᵉ prog) 1 (≤ᵇ⇒≤ _ _ tt))
+    tt
+
+tie13 : Confirms
+  (subscribeE-fit gas 2 (wid 13) prog κ₀ 0 0
+     (sched-init prog (slots 13)) (st-init prog))
+tie13 _ _ =
+  streamFitG-floor 2 (slots 13) floorAt _ (pathNestD κ₀) (obs natᵗ) (runAt 13)
+    (fitB-tower prog (slots 13) 2 (wid 13)
+       (pathNestD κ₀ + nestDᵉ prog) (syncSizeᵉ prog) 1 (≤ᵇ⇒≤ _ _ tt))
+    tt
+
+tie16 : Confirms
+  (subscribeE-fit gas 2 (wid 16) prog κ₀ 0 0
+     (sched-init prog (slots 16)) (st-init prog))
+tie16 _ _ =
+  streamFitG-floor 2 (slots 16) floorAt _ (pathNestD κ₀) (obs natᵗ) (runAt 16)
+    (fitB-tower prog (slots 16) 2 (wid 16)
+       (pathNestD κ₀ + nestDᵉ prog) (syncSizeᵉ prog) 1 (≤ᵇ⇒≤ _ _ tt))
+    tt

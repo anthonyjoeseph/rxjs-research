@@ -26,7 +26,8 @@ open import Probed.Cascade-Chain-Count
          Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits;
          tieSyn)
 open import Probed.Scan-Burst-Nest
-  using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
+  using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails;
+         tie₁₃; tie₁₄)
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; liveM; nodesM; regsM; deferFigs≡; strongFigs≡; strongFits;
          strongHeads; richFigs≡; richFits)
@@ -63,11 +64,11 @@ open import Probed.Thru-Step-Indexed
          tsRowM; tsRowS; tsRowX)
 
 open import Probed.Scan-Arr-Clos-Key
-  using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14)
+  using (premises; keys≡; widths≡; fit0; fit7; fit13; fit14; tie13; tie14)
 
 open import Probed.Scan-Arr-Margin
   using (delivered≡; deliveredHi≡; keys≡; widths≡; sizes≡; premises;
-         fit0; fit4; fit8)
+         fit0; fit4; fit8; tie8)
 
 
 open import Probed.Thru-Arr-Slot
@@ -75,21 +76,24 @@ open import Probed.Thru-Arr-Slot
          tieArr≡; tieRowM; tieRowS; tieRowX)
 
 open import Probed.Sight-All-Stream
-  using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡)
+  using (fitDup; sides≡; fitN₁; fitN₂; fitN₃; layers≡; exps≡; tieDup; tieN₃)
 open import Probed.Sight-Thru-Val
   using (fitRef; sidesRef≡; grantRef₀≡; grantRef₁≡;
          grantFlat≡; delFlat≡; fitFlat; storeFlat; storeRef; storeFigs≡;
          fitOwn; grantHid≡; delHid≡; dupCols≡; dupDepth≡;
-         storeParkFigs≡; grantParkFigs≡; storePark; store2Figs≡; store2)
+         storeParkFigs≡; grantParkFigs≡; storePark; store2Figs≡; store2;
+         tieFlat; tiePark)
 
 open import Probed.Depth-Sighted
   using (rootFigs≡; delivFigs≡; axisFigs≡; farFigs≡; partsFigs≡; sizeFigs≡; thirdFigs≡;
          third2Figs≡; cornerFigs≡; rootWideFigs≡; seedFigs≡;
          rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
-         chainDesc≡; chainRow; farDesc≡; farChainRow)
+         chainDesc≡; chainRow; farDesc≡; farChainRow;
+         walkFigs≡; walkRow≡; tieWalk1; tieWalk4)
 open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)
 open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)
-open import Probed.Sight-Fit-Width using (figures≡; oldRow≡; newRow≡)
+open import Probed.Sight-Fit-Width
+  using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 
 open import Probed.Burst-OutW
   using (readout≡; tieOf; tieMerge; tieSwitch)
@@ -155,7 +159,8 @@ open import Probed.Frame-Step-Regs-Level
 
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
-         figures0; figures1; figures2; figures3; figures4)
+         figures0; figures1; figures2; figures3; figures4;
+         tieLive1; tieLive4)
 
 open import Probed.Fan-Regs-Registry
   using (counts; regsS; marginK; marginK′; regsK; lensK)

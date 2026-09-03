@@ -7,11 +7,12 @@
 -- out of the program's own frames, while the refutation's witness was
 -- minted from a term the program does not contain.
 --
--- TARGET: fan-regsNest @232560
+-- TARGET: fan-regsNest @0a4af0
 
 -- TWO AXES, BECAUSE THE STATEMENT HAS TWO SIDES THAT COULD MOVE.  The
--- conclusion compares a registered chain's `pathNestD` against
--- `nestUnit e sl`, which reads the ROOT program's nesting and every
+-- conclusion compares the registry's own `regsNestMax` -- the deepest
+-- registered chain -- against `nestUnit e sl`, which reads the ROOT
+-- program's nesting and every
 -- slot's.  So a family that deepens the SHARES moves both sides at
 -- once and says little; a family that deepens the program ABOVE the
 -- share moves the chain's reading against a unit that grows for a
@@ -54,7 +55,9 @@ open import Data.Fin using (Fin; toℕ) renaming (zero to fzero; suc to fsuc)
 open import Data.List using ([]; _∷_; map; foldr; length)
 open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _⊔_)
+open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
+open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -67,7 +70,8 @@ open import Rx.Evaluator using (Sched; EvalSt; subscribeE; sched-init;
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Verify-Budget-Sufficient.Measures using (pathLen)
-open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; nestUnit)
+open import Verify-Budget-Sufficient.Nest-Store
+  using (nestUnit; regsNestMax)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using (fan-regsNest)
 open import Probed.Apparatus using (Confirms)
 
@@ -139,11 +143,11 @@ counts = refl
 -- rung -- `Confirms` returns the applied postulate's type, so this
 -- file chooses the point and nothing else.
 regsS : (d : Fin 5) → Confirms (fan-regsNest slots (proj₂ (sub d)))
-regsS fzero                             = refl
-regsS (fsuc fzero)                      = refl
-regsS (fsuc (fsuc fzero))               = refl
-regsS (fsuc (fsuc (fsuc fzero)))        = refl
-regsS (fsuc (fsuc (fsuc (fsuc fzero)))) = refl
+regsS fzero                             = ≤ᵇ⇒≤ _ _ tt
+regsS (fsuc fzero)                      = ≤ᵇ⇒≤ _ _ tt
+regsS (fsuc (fsuc fzero))               = ≤ᵇ⇒≤ _ _ tt
+regsS (fsuc (fsuc (fsuc fzero)))        = ≤ᵇ⇒≤ _ _ tt
+regsS (fsuc (fsuc (fsuc (fsuc fzero)))) = ≤ᵇ⇒≤ _ _ tt
 
 ----------------------------------------------------------------------
 -- AXIS TWO: NESTING ABOVE THE SHARE
@@ -172,9 +176,11 @@ subK k = let r = subscribeE (gasPad (sucGK k) g0) (progK k) root 0 0
                             (sched-init (progK k) slots₂) (st-init (progK k))
          in proj₁ (proj₂ r) , proj₂ (proj₂ r)
 
+-- the statement's OWN left side, read as a numeral: `regsNestMax` is
+-- what the conclusion folds, so a hand-rolled copy of the fold would
+-- be a second reading nothing holds to the first
 maxNestK : ∀ (k : ℕ) → EvalSt (progK k) → ℕ
-maxNestK k st = foldr _⊔_ 0
-  (map (λ en → pathNestD (proj₂ (proj₂ (proj₂ en)))) (EvalSt.registry st))
+maxNestK k st = regsNestMax (EvalSt.registry st)
 
 maxLenK : ∀ (k : ℕ) → EvalSt (progK k) → ℕ
 maxLenK k st = foldr _⊔_ 0
@@ -203,11 +209,11 @@ marginK′ = refl
 
 -- LOAD-BEARING, on the axis the two sides actually race on
 regsK : (k : Fin 5) → Confirms (fan-regsNest slots₂ (proj₂ (subK (toℕ k))))
-regsK fzero                             = refl
-regsK (fsuc fzero)                      = refl
-regsK (fsuc (fsuc fzero))               = refl
-regsK (fsuc (fsuc (fsuc fzero)))        = refl
-regsK (fsuc (fsuc (fsuc (fsuc fzero)))) = refl
+regsK fzero                             = ≤ᵇ⇒≤ _ _ tt
+regsK (fsuc fzero)                      = ≤ᵇ⇒≤ _ _ tt
+regsK (fsuc (fsuc fzero))               = ≤ᵇ⇒≤ _ _ tt
+regsK (fsuc (fsuc (fsuc fzero)))        = ≤ᵇ⇒≤ _ _ tt
+regsK (fsuc (fsuc (fsuc (fsuc fzero)))) = ≤ᵇ⇒≤ _ _ tt
 
 -- THE SIZE SIDE, READ AND NOT CLAIMED.  Two frames per rung, against
 -- a unit that climbs by one -- so the length is the quantity a cap
