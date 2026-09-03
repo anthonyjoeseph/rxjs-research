@@ -641,7 +641,7 @@ postulate
 -- a ceiling on the store the round enters at, and that ceiling's own
 -- fit under the fuel, which together price a chain's descent without
 -- pricing the round's.
---
+
 -- AND WHAT IT IS SHORT OF IS A LEDGER, NOT AN ARM.  Every cons here
 -- carries a level increment tied back to a ceiling that does NOT move
 -- with the level, so the increments the arms spend have to be funded.
@@ -655,6 +655,33 @@ postulate
 -- is why the gap reads as a missing arm until the increments are
 -- followed back to what pays them.
 --
+-- AND WHAT THE ROUND'S LEDGER WAS DOING HERE IS NOW ONE THING, NOT
+-- TWO.  It funded the Σ and it carried the chain receipt's ENTRY
+-- package, and only the first of those was ever denominated in the
+-- run: the package is a reached level and a fuel indexed by the
+-- POSITION a chain sits at in the registry, and the registry is what
+-- the chain list is a sublist of.  So the leaf below takes the
+-- position ledger and no delivery bound at all, and every premise the
+-- body hands it comes off this statement's own -- the caps receipt at
+-- the latch, the count of the round's positions, and the entry level
+-- at the zeroth.
+--
+-- AND TWO OF THE THREE ARMS ARE WRITABLE FROM THESE PREMISES, WHICH IS
+-- WHAT LOCATES THE THIRD.  The tail at the incoming state is the
+-- induction at a shorter list, and the head receipt is the chain leaf
+-- at this position -- each needing only the store ceiling at the state
+-- it is already handed, since the leaf pricing a chain's descent reads
+-- the ceiling and not the run.  The third callee reports the tail at
+-- the state the step LEFT, so it needs that ceiling THERE, and the one
+-- machine preserving it across a step wants the round's affordability
+-- package: an iterated size under the potential, a registry receipt,
+-- and a budget over the chain list.  None of those is on this
+-- statement, and all of them are on its consumer -- which walks this
+-- same list through these same states, taking this package as a
+-- hypothesis rather than producing it.  So the two walks each hold
+-- what the other's arm needs, and the shape that follows is one
+-- induction rather than two.
+--
 -- DEAD ROUTE: mirroring the surviving fold's induction arm for arm.
 --   That fold splits its ledger by SUBTRACTING the portion a chain
 --   consumed, and the subtraction is against a delivery count that
@@ -663,17 +690,55 @@ postulate
 --   the arm the two folds disagree on rather than at a clause -- which
 --   is what made the mirror read as one new callee.
 postulate
-  arr-chains-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
+  arr-chains-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lv : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
+    (chains : List (RegId × Path Γ (arrTy a) t))
     (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    capsOK? (capsAt e sl id) sched st ≡ true →
-    all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc))
-        (chainsOf a st) ≡ true →
+    capsOK? (frameStep Lv (capsAt e sl id)) sched st ≡ true →
+    all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
     valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
     nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
-    storeNestMax sched (cascadeLatch a st) ≤ S →
+    storeNestMax sched st ≤ S →
     sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
       ≤ capsH e sl id →
-    chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
-      a nextId (chainsOf a st) sched (cascadeLatch a st)
+    (J g i : ℕ) →
+    4 + (sizeᵉ e + slotsSize sl) + n + n ≤ g →
+    Reached (capsAt e sl id) (capsH e sl id) J (suc g) →
+    i + length chains
+      ≤ regAt (Caps.cSize (capsAt e sl id)) (Caps.cReg (capsAt e sl id)) J →
+    Lv ≤ Ent (capsAt e sl id) (capsH e sl id) J g i →
+    chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv
+      a nextId chains sched st
+
+arr-chains-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc))
+      (chainsOf a st) ≡ true →
+  valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  storeNestMax sched (cascadeLatch a st) ≤ S →
+  sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
+    ≤ capsH e sl id →
+  chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
+    a nextId (chainsOf a st) sched (cascadeLatch a st)
+arr-chains-caps-all {e = e} sl id a nextId S sched st sleq cok hpz hvc hcl hsn hsc =
+  arr-chains-caps-all-go sl id 0 a nextId S (chainsOf a st) sched
+    (cascadeLatch a st) sleq
+    (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
+           (sym (frameStep-0 (capsAt e sl id)))
+           (cascadeLatch-caps (capsAt e sl id) a sched st cok))
+    hpz hvc hcl hsn hsc
+    0 (Caps.cSize (capsAt e sl id)) 0
+    (capsAt-round-size e sl id) base REGLEN ≤-refl
+  where
+  c = capsAt e sl id
+  -- the round has as many positions as the registry has entries, and
+  -- the cascade walks a sublist of it
+  REGLEN : 0 + length (chainsOf a st) ≤ regAt (Caps.cSize c) (Caps.cReg c) 0
+  REGLEN = ≤-trans (≤-trans (chainsOf-length a st)
+                            (capsOK?-count c sched st cok))
+                   (≤-reflexive (sym (*-identityʳ (Caps.cReg c))))
