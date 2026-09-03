@@ -1613,34 +1613,36 @@ chainStep-nest-nodesC {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ
     (entryΦ sl id a path hp hΦ)
     (chain-walk-ΦHyp sl id Lc a nextId path sched st hcc hdc hsl hp hΦ)
 
--- THE SIZE-SIDE SIDE CONDITION, DISCHARGED.  The walk reads the bound
--- at the level it has reached and each frame moves the level by one,
--- so what the caller owes is the entry reading -- which is the size
--- premise it already carries -- and affordability at every level the
--- path can reach.
+-- THE SIZE-SIDE SIDE CONDITION, DISCHARGED, AND IN THE LADDER'S OWN
+-- CURRENCY.  The walk reads the bound at the level it has reached and
+-- each frame moves the level by one, so what the caller owes is the
+-- entry reading -- which is the size premise it already carries -- and
+-- the budget the walk concludes at is the top of the ladder it climbs
+-- rather than the round's ceiling.
 --
--- AND AFFORDABILITY IS THE CALLER'S, BECAUSE THE LEVEL A CHAIN ENTERS
--- AT IS THE CALLER'S.  `iterSize≤walkFac` discharges it outright for a
--- chain entered at level zero, which is why this used to carry no such
--- premise; a cascade enters its k-th chain at whatever the first k-1
--- left, so the range that has to be afforded is a property of the
--- SELECTION and cannot be recovered from anything in hand here.
+-- AND THAT IS WHY NO AFFORDABILITY IS ASKED FOR HERE.  With the walk's
+-- budget being the ladder's own top, every frame's reading is
+-- monotonicity of the ladder and nothing else, so the ceiling is met
+-- ONCE, at the consumer below, on one number -- instead of at every
+-- frame of every chain.  A cascade still enters its k-th chain at
+-- whatever the first k-1 left, and that range is still a property of
+-- the SELECTION; what changed is that it is now the consumer's
+-- question and not a premise the walk carries through its own arms.
 chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (gas : ℕ) (Lv j : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
-  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
-    ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
   regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
             (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   j + pathLen path ≤ Lv →
   PathLiveHyp (budgetAt e (Sched.slots sched) nextId) gas nextId (arrTick a)
-    (nestΦAt e sl id) path (arrVal a ∷ []) (Arrival.isLast a) sched st
-chain-walk-LiveHyp {e = e} sl id a nextId gas Lv j path sched st hsl afford hsz hp hreg hj =
-  walk-LiveHyp-go _ gas nextId (arrTick a) S (nestΦAt e sl id) Lv j path
-    (arrVal a ∷ []) (Arrival.isLast a) sched st afford 1≤S entrySz hp hreg hj
+    (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+    path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-LiveHyp {e = e} sl id a nextId gas Lv j path sched st hsl hsz hp hreg hj =
+  walk-LiveHyp-go _ gas nextId (arrTick a) S (iterSize S Lv S) Lv j path
+    (arrVal a ∷ []) (Arrival.isLast a) sched st ≤-refl 1≤S entrySz hp hreg hj
   where
   S = Caps.cSize (capsAt e sl id)
   1≤S : 1 ≤ S
@@ -1679,11 +1681,14 @@ chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         ⊔ (nestΦAt e sl id)
 chainStep-nest-liveC {e = e} sl id Lc a nextId Lv j path sched st
                      hcc hdc hsl afford hsz hp hreg hΦ hj =
-  foldPath-nest-live _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
-    (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-    (entryΦ sl id a path hp hΦ)
-    (chain-walk-ΦHyp sl id Lc a nextId path sched st hcc hdc hsl hp hΦ)
-    (chain-walk-LiveHyp sl id a nextId _ Lv j path sched st hsl afford hsz hp hreg hj)
+  ≤-trans
+    (foldPath-nest-live _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
+      (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
+      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      (entryΦ sl id a path hp hΦ)
+      (chain-walk-ΦHyp sl id Lc a nextId path sched st hcc hdc hsl hp hΦ)
+      (chain-walk-LiveHyp sl id a nextId _ Lv j path sched st hsl hsz hp hreg hj))
+    (⊔-lub ≤-refl (≤-trans afford (m≤n⊔m _ (nestΦAt e sl id))))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
 -- the recurrence nondecreasing after it.
