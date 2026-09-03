@@ -615,6 +615,17 @@ postulate
   --   measured, so it constrains none of the instants that carry the
   --   width.  The premise is undischargeable for the same reason the
   --   field was unthreadable, one frame further on.
+  -- DEAD ROUTE: taking the tie off the REGISTRY face instead, on the
+  --   reading that a fanned chain's price and this arm's are one
+  --   missing relation owed at two sites.  That face turned out to
+  --   need no new relation at all -- a chain legal at the cap climbs
+  --   at most a cap's worth of levels, and that is proven -- so what
+  --   closed there was a LEVEL ledger, a quantity that COMPOUNDS
+  --   along a walk and is paid for by a term per hop.  The potential
+  --   does not compound: a fanned chain owes what the sink was handed
+  --   and nothing accumulated on the way in.  There is no shared
+  --   statement to state once, so this arm is not waiting on that
+  --   face.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

@@ -215,17 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND STATE THE CEILING A LATER FRAME'S VALUES ARE UNDER.** The fold
-  grant's binary came back saying the arm waits on a ceiling that does
-  not exist: a run's widest instant moves with the slot script's burst
-  and with nothing the program names, and the one proven tie from
-  syntax to a value count prices the SUBSCRIBE frame, which the family
-  that can tower a width leaves empty. That missing tie is also what
-  the leg above finds at the registry, one face over, so the commit
-  states it ONCE — a later frame's values under a reading its own
-  descent supplies — and wires the fold's grant to it, leaving the
-  registry relation a consumer rather than a sibling.
-
+- **AND CARRY THE TELESCOPE'S STRATIFICATION WHERE THE CHAIN IS READ.**
+  The sink leaf's escalation turned out to be program-bounded: hops
+  climb the slot telescope and none re-enters, so the count is capped
+  by the slot count and not by the dispatch gas the header claimed.
+  What blocks spending that is the same wall the registry rows are all
+  at — the walk reads its chain from an arbitrary state, where nothing
+  about the registry is true. So the commit puts stratification in the
+  invariant record as a carried conjunct rather than a hypothesis, and
+  the sink arm becomes its first consumer.
 - **AND RETIRE THE REGISTRY RECEIPT THE WALK NO LONGER READS.** The
   level ledger pays for the fan-out now, so the size side condition is
   re-derived at each state the fold leaves rather than threaded down
@@ -237,15 +235,16 @@ does not fit is a finding about the shared statement, not about the head.
   at once, which is a face leaving the ledger rather than a postulate
   being proven.
 
-- **AND CARRY THE TELESCOPE'S STRATIFICATION WHERE THE CHAIN IS READ.**
-  The sink leaf's escalation turned out to be program-bounded: hops
-  climb the slot telescope and none re-enters, so the count is capped
-  by the slot count and not by the dispatch gas the header claimed.
-  What blocks spending that is the same wall the registry rows are all
-  at — the walk reads its chain from an arbitrary state, where nothing
-  about the registry is true. So the commit puts stratification in the
-  invariant record as a carried conjunct rather than a hypothesis, and
-  the sink arm becomes its first consumer.
+- **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
+  hop that climbs has strictly less telescope above it, and that is the
+  quantity the leaf's price does not read. The separation says why it
+  matters: a chain's factor is its leaf's times its frames', so a leaf
+  priced at the whole cap must dominate itself times a frame product,
+  while one priced at the REMAINING height need only dominate what a
+  shorter climb can spend. The commit restates the leaf's exponent in
+  that currency and re-reads the sink arm against it, which is where
+  the carried conjunct is finally spent.
+
 
 ### The ledger
 
@@ -289,7 +288,7 @@ does not fit is a finding about the shared statement, not about the head.
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region. The binary is ANSWERED and neither
   branch repairs it — a run's count is script-denominated, so this waits on a
