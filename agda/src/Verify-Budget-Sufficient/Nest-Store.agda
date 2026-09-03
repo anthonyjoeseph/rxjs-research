@@ -754,12 +754,27 @@ abstract
   -- and it is a statement about what the ledger can be GIVEN, which is
   -- a different question from what a walk's frames ask of it.
   --
-  -- WHICH IS WHY THE WIDTH AXIS IS THE WRONG CURRENCY HERE AT ALL.
-  -- Within one cap the width outruns the size by construction -- the
-  -- fold step is a power where the size step is linear -- so no
-  -- same-instant inequality relates them, and any number denominated
-  -- in a realised width has to be caught by a size one instant later
-  -- than the ledger charging it.  The size axis has no such offset.
+  -- AND THE TWO OBLIGATIONS ON THIS NUMBER SIT ON AXES THE CAPS
+  -- RECURRENCE SEPARATES BY A TOWER, WHICH IS WHY NO CHOICE OF INDEX
+  -- SERVES IT.  What the number must COVER is a frame's handoff, and
+  -- `countLen` prices that in the WIDTH of the frame's own cap; a
+  -- frame's cap is a `frameStep`, whose width field is `iterFold` --
+  -- exponentiation iterated once per level.  What the number may
+  -- COST is fixed by `nestFac≤exp`, which spends `burst≤size′` twice
+  -- and so pays only for a number under one `Caps.cSize`; the size
+  -- field is `iterSize`, and one step of that is a multiplication.
+  -- So the demand grows by a power per level where the permission
+  -- grows by a factor, and at any level a cascade actually reaches
+  -- the two are a tower apart.  That is a property of the
+  -- recurrence and not of the index the number is read at, so moving
+  -- the index moves neither side and carrying a level moves BOTH --
+  -- demand up a tower, permission up a product.  Closing it needs
+  -- one of the two axes to move: either the exponent is re-derived
+  -- at the frame's own cap, so permission climbs with demand instead
+  -- of standing fixed one instant out, or the handoff stops being
+  -- priced by a width at all -- a cap says how many values a frame
+  -- COULD carry, this ledger needs how many it DOES, and `countLen`
+  -- is the only handle on that today.
   --
   -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free reading of
   --   the walk's per-frame charge, 65 against 64, at the smallest step

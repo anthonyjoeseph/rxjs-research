@@ -215,35 +215,36 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRY THE BURST LEDGER ONTO THE LEVEL INDEX THE CAPS FACE ALREADY
-  USES.** No flat number serves this row: at the cap the hypothesis
-  gives, a frame's handoff is priced in the WIDTH and the grant is that
-  cap's SIZE, which the width passes a few fold levels in; one instant
-  further out the size does dominate the width, but it then stands
-  above the very size the factor's exponent is paid out of, so the room
-  inverts rather than costing a story. Both ends are now written down.
-  The proven counterpart over this identical fold climbs a level per
-  chain and reads its bound at the level reached, which is what lets it
-  price a widening the walk does — the commit restates the row and its
-  fold in that shape.
+- **THE BURST LEDGER IS ON HOLD FOR A RULING, AND NOTHING IN ITS
+  REGION IS PICKED UP UNTIL ONE LANDS (Anthony).** Four denominations
+  of one flat number have now died — the entry width by machine, the
+  exit width and both size readings by route — and the fifth shape was
+  written into this roadmap instead of the stop that was owed. The
+  joint reading is in the number's own header: what it must COVER and
+  what it may COST sit on the two axes of the caps recurrence, which
+  separates them by a tower at every level a cascade reaches, so no
+  index and no level closes it. The two legs
+  below are the candidate repairs the ruling picks between; this leg
+  is the write-up and the hold, and it does not grind.
 
-- **THEN CARRY THE LEVEL INTO THE FACTOR AND THE INCREMENT, ASSEMBLY
-  FIRST.** Both are defined from the burst, so a level-indexed burst
-  moves them, and the level cannot be discharged before they see it:
-  flattening at the top puts a tower of the reached level where the
-  room pays two to one size, which is written down. So the level runs
-  to the store face or the restatement buys nothing. The commit states
-  the level-indexed factor and increment with their store-face bridges
-  POSTULATED at the level, so the shape is checked before any of it is
-  proven — and a bridge that cannot be stated is the design gap.
+- **CANDIDATE, PENDING THE RULING: MOVE THE PAYMENT ONTO THE WIDTH
+  AXIS.** Re-derive the factor's exponent at the frame's OWN cap
+  rather than at the next instant's size, so permission climbs by the
+  same iteration the demand does and the comparison happens inside one
+  frame instead of across a cascade. The commit would state the
+  frame-local factor with its store-face bridge POSTULATED, so the
+  shape is checked before any of it is proven. The risk it carries is
+  that every exponent this face hands upward is denominated in the
+  size today, so the axis change reaches the affordability chain.
 
-- **AND DISCHARGE THOSE BRIDGES AT THE TWO CONSUMERS.** Each is a
-  preservation step whose caps side already climbs a level per chain,
-  so the obligation is threading one index through statements that
-  already carry its neighbour, against a face that is proven. The place
-  a gap would surface is a site that can name the cap it needs but not
-  the level, which is what the previous leg's assembly is built to make
-  visible before the grinding starts rather than after.
+- **CANDIDATE, PENDING THE RULING: STOP PRICING THE HANDOFF BY A
+  WIDTH.** A cap says how many values a frame COULD carry; the ledger
+  needs how many it DOES, and the width is the only handle on that
+  today, which is where the tower enters. The commit would state the
+  count the walk actually hands on as its own quantity, with the cap
+  kept as the thing that bounds it rather than the thing that prices
+  it. The risk it carries is a new quantity nothing yet bounds, which
+  is why it is stated before it is spent.
 
 ### The ledger
 
