@@ -341,6 +341,18 @@ pop-slots : ∀ {n} {Γ : Ctx n}
 pop-slots sched eq with schedGo (Sched.live sched) | eq
 ... | inj₂ (a″ , ls) | refl = refl
 
+-- and the same reading of the mint counter, which the pop leaves alone
+-- for the same reason: `schedFinish` rebuilds the record from `schedGo`'s
+-- residue and copies every field the queue is not.  Its consumer is the
+-- source floor, which is a conjunct rather than a derivation precisely
+-- because every producer has to hand it on
+pop-nextSource : ∀ {n} {Γ : Ctx n}
+  (sched : Sched Γ) {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  Sched.nextSource sched′ ≡ Sched.nextSource sched
+pop-nextSource sched eq with schedGo (Sched.live sched) | eq
+... | inj₂ (a″ , ls) | refl = refl
+
 pop-bounded : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (B : ℕ) (sched : Sched Γ) (st : EvalSt e)
   {a : Arrival Γ} {sched′ : Sched Γ} →

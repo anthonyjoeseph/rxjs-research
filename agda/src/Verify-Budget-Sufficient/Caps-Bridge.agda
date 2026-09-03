@@ -64,7 +64,7 @@ open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 open import Verify-Budget-Sufficient.Measures using
   (_hasAtLeast_; all-impl; boundedLive; capᴱ; chainsB?-widen; dBound; finish-slots;
   fnCapBounded?; fnCapLive; fnCapᵉ; fnCapᵛ; hasDry-append; hopR; INV-parts; INV?; parkRoom;
-  pathB?; pathLen; pop-bounded; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
+  pathB?; pathLen; pop-bounded; pop-nextSource; pop-slots; pow1; regsB?; slotsFnCap; stBounded?; unconn; valB?;
   valB?-widen; V≤C; ΨAt; ∧-true; szB)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (subscribeE-slots)
@@ -1201,8 +1201,8 @@ pop-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   {a : Arrival Γ} {sched′ : Sched Γ} →
   sched-next sched ≡ inj₂ (a , sched′) →
   capsOK? c sched st ≡ true → capsOK? c sched′ st ≡ true
-pop-caps c sched st eq h with capsOK?-parts c sched st h
-... | sb , rg , wl , wn , rl , pk , cl =
+pop-caps {n = n} c sched st eq h with capsOK?-parts c sched st h
+... | sb , rg , wl , wn , rl , pk , cl , fl =
   ∧-intro (pop-bounded (Caps.cSize c) sched st eq sb)
   (∧-intro rg
   (∧-intro (pop-widLive (Caps.cWid c) sched eq wl)
@@ -1211,7 +1211,8 @@ pop-caps c sched st eq h with capsOK?-parts c sched st h
   (∧-intro rl
   (∧-intro (subst (λ sl → all (λ kv → parkRoom (Caps.cSize c) (slotsSize sl) (proj₂ kv)) (EvalSt.nodes st) ≡ true)
                   (sym (pop-slots sched eq)) pk)
-           (pop-closSt c sched st eq cl))))))
+  (∧-intro (pop-closSt c sched st eq cl)
+           (subst (λ x → (n ≤ᵇ x) ≡ true) (sym (pop-nextSource sched eq)) fl)))))))
 
 ------------------------------------------------------------------
 -- § 3  THE ASSEMBLY.  The fuel loop and the theorem, with `capsOK?`

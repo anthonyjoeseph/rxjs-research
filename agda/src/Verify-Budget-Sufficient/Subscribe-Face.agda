@@ -125,7 +125,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part5 using
    innerFinish-zero; mapFrame-caps; resolve-caps; resolve-wid-data;
    scanVals-len; stepFrame-scan-caps; takeDispatch-len; valsCaps?-data)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (capsOK?-delivered; capsOK?-mergeAllBump; capsOK?-nextNode; capsOK?-nodeSz;
+  (capsOK?-delivered; capsOK?-mergeAllBump; capsOK?-mint; capsOK?-nextNode; capsOK?-nodeSz;
    capsOK?-nodeWid; capsOK?-regs; capsOK?-setNode; dropOnly-caps;
    foldPath-slots; frameBud; j+1; lookupNode-caps;
    capsOK?-nodePark; parkList-push; mList?; mList?-head;
@@ -1995,7 +1995,10 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
                      (proj₂ (oneShotBurst sync id sched)) st ≡ true)
             (sym (j+1 j))
             (capsOK?-mono (frameStep j c) (frameStep (suc j) c)
-               (proj₂ (oneShotBurst sync id sched)) st step⊑ inv)
+               (proj₂ (oneShotBurst sync id sched)) st step⊑
+               (capsOK?-mint (frameStep j c) (Sched.nextOrdinal sched)
+                  (suc (Sched.nextSource sched)) (Sched.nextNode sched)
+                  sched st (n≤1+n (Sched.nextSource sched)) inv))
     , subst (λ x → burstCaps? (frameStep x c) sl
                      (proj₁ (oneShotBurst sync id sched)) ≡ true)
             (sym (j+1 j))
@@ -2048,7 +2051,11 @@ subscribeE-input-caps {Γ = Γ} c dep bud j g i κ id now sl sched st
   1 , subst (λ x → capsOK? (frameStep x c) SCHED₃ (register SRC κ st) ≡ true)
             (sym (j+1 j))
             (capsOK?-addLive (frameStep (suc j) c) NEW SCHED₂ (register SRC κ st)
-               BL WL CL (register-caps c j SRC κ sched st 2≤S 1≤R inv pC))
+               BL WL CL (capsOK?-mint (frameStep (suc j) c)
+                           (suc (Sched.nextOrdinal sched)) (suc SRC)
+                           (Sched.nextNode sched) sched (register SRC κ st)
+                           (n≤1+n SRC)
+                           (register-caps c j SRC κ sched st 2≤S 1≤R inv pC)))
     , subst (λ x → burstCaps? (frameStep x c) sl
                      (((init SRC ∷ map value sync) at id from SRC as subscribe) ∷ [])
                        ≡ true)
@@ -2692,8 +2699,9 @@ subscribeE-caps c dep bud (suc ops′) j g (input i) κ bid now sl sched st
   lvl = +-suc j (proj₁ IN)
 
 -- LITERALS: one shot, and the payloads come off evalTms-caps.  The
--- state is untouched; only the source counter moves, which capsOK?
--- does not read
+-- state is untouched and only the source counter moves — but the FLOOR
+-- rides up with it, so the receipt is re-minted rather than spent
+-- verbatim
 -- and it SPLITS the index, like every clause with a positive witness:
 -- `op-step-entry` concludes at a successor, and at `ops = zero` the
 -- conjunct is false outright, so `hidx` is the absurdity that rules the
@@ -2702,8 +2710,12 @@ subscribeE-caps {n = n} {u = u} c dep bud zero j g (ofᵉ ts) κ bid now sl sche
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst () dpt
 subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (ofᵉ ts) κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt =
-  j₀ + 3 , capsOK?-mono (frameStep j c) (frameStep (j + (j₀ + 3)) c) sched st
-             (frameStep-⊑-+ c 2≤S j (j₀ + 3)) inv
+  j₀ + 3 , capsOK?-mono (frameStep j c) (frameStep (j + (j₀ + 3)) c)
+             (proj₂ (oneShotBurst (map (λ tm → evalTm tm) ts) bid sched)) st
+             (frameStep-⊑-+ c 2≤S j (j₀ + 3))
+             (capsOK?-mint (frameStep j c) (Sched.nextOrdinal sched)
+                  (suc (Sched.nextSource sched)) (Sched.nextNode sched)
+                  sched st (n≤1+n (Sched.nextSource sched)) inv)
          , ∧-intro (∧-intro refl
                       (all-++-intro (eventCaps? (frameStep (j + (j₀ + 3)) c) sl)
                          (map value (map (λ tm → evalTm tm) ts)) _
@@ -2754,8 +2766,12 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (ofᵉ ts) κ bid now
 
 subscribeE-caps {u = u} c dep bud ops j g emptyᵉ κ bid now sl sched st
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt =
-  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
-            (sym (+-identityʳ j)) inv
+  0 , subst (λ x → capsOK? (frameStep x c)
+                     (proj₂ (oneShotBurst {u = u} [] bid sched)) st ≡ true)
+            (sym (+-identityʳ j))
+            (capsOK?-mint (frameStep j c) (Sched.nextOrdinal sched)
+                  (suc (Sched.nextSource sched)) (Sched.nextNode sched)
+                  sched st (n≤1+n (Sched.nextSource sched)) inv)
     , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
                      (proj₁ (oneShotBurst {u = u} [] bid sched)) ≡ true)
             (sym (+-identityʳ j)) refl
@@ -2844,8 +2860,12 @@ subscribeE-caps {n = n} {u = u} c dep bud (suc ops′) j g (takeᵉ cnt b) κ bi
                 2≤S 1≤R slEq slC slSz inv szb wdb pC lC nst hidx dpt
   with evalTm cnt | dpt
 ... | zero | dpt′ =
-  0 , subst (λ x → capsOK? (frameStep x c) sched st ≡ true)
-            (sym (+-identityʳ j)) inv
+  0 , subst (λ x → capsOK? (frameStep x c)
+                     (proj₂ (oneShotBurst {u = u} [] bid sched)) st ≡ true)
+            (sym (+-identityʳ j))
+            (capsOK?-mint (frameStep j c) (Sched.nextOrdinal sched)
+                  (suc (Sched.nextSource sched)) (Sched.nextNode sched)
+                  sched st (n≤1+n (Sched.nextSource sched)) inv)
     , subst (λ x → burstCaps? {u = u} (frameStep x c) sl
                      (proj₁ (oneShotBurst {u = u} [] bid sched)) ≡ true)
             (sym (+-identityʳ j)) refl
@@ -3147,7 +3167,9 @@ subscribeE-caps {n = n} {Γ = Γ} {u = u} c dep bud (suc ops′) j g (deferᵉ b
           (∧-intro (T⇒≡true (suc (pathLen κ) ≤ᵇ B) (≤⇒≤ᵇ lC)) pC)
   inv₀ : capsOK? (frameStep j c) SCHED₃ st₀ ≡ true
   inv₀ = capsOK?-setNode (frameStep j c) nid (mergeAll-st {t = u} nothing 0 [] false) SCHED₃ st
-           refl refl refl inv
+           refl refl refl
+           (capsOK?-mint (frameStep j c) (suc (Sched.nextOrdinal sched)) (suc SRC)
+                         (suc nid) sched st (n≤1+n SRC) inv)
   REG : capsOK? (frameStep (suc j) c) SCHED₃
           (register SRC (thru-outer mergeAllᵒ nid ↠ κ) st₀) ≡ true
   REG = register-caps c j SRC (thru-outer mergeAllᵒ nid ↠ κ) SCHED₃ st₀

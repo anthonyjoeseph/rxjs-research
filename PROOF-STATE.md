@@ -215,16 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND FLOOR THE SCHED'S MINTED SOURCE, WHICH IS WHERE THE CARRIED
-  CONJUNCT HAS TO START.** Writing the conjunct out found the mint is
-  FOUR obligations and not one, and only this one is self-contained: a
-  registration under a MINTED source is stratified for nothing, since
-  minting begins at the slot count and only climbs, so its source sits
-  above every slot index and the guard excuses the entry — and no
-  producer carries that floor today. So the commit puts it in the
-  invariant record and re-establishes it at each one, a mint raising
-  it and everything else leaving it alone. The three obligations left
-  are named where they are owed, in the sink leaf's own header.
 - **AND RETIRE THE REGISTRY RECEIPT THE WALK NO LONGER READS.** The
   level ledger pays for the fan-out now, so the size side condition is
   re-derived at each state the fold leaves rather than threaded down
@@ -245,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   shorter climb can spend. The commit restates the leaf's exponent in
   that currency and re-reads the sink arm against it, which is where
   the carried conjunct is finally spent.
+
+- **AND THREAD THE SLOT'S OWN INDEX DOWN THE SUBSCRIBE DESCENT, WHICH
+  IS THE NEXT OF THE MINT'S FOUR.** The floor settles the source a mint
+  hands out; a SLOT-sourced registration is the one still owing a
+  receipt, and what it needs is not CARRIED but PASSED — the reading
+  relating it to the expression sits on the SLOT, where no conjunct of
+  the invariant record reaches. So the commit gives the caps descent a
+  premise relating the chain to the expression it is subscribed under,
+  discharges it at the input arm where the two readings are the same
+  test, and hands the share arm the slot's own index. Its repair is a
+  descent argument rather than a record field, so it is taken alone.
 
 
 ### The ledger

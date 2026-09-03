@@ -420,6 +420,34 @@ closSt? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
 closSt? c sched st = all (closLive c (Sched.slots sched)) (Sched.live sched)
 
+-- THE SOURCE FLOOR — every source the schedule can still mint sits at
+-- or above the slot count, so no dynamic source ever collides with a
+-- slot's own index.  `sched-init` starts the counter AT the slot count
+-- and `mintSource` is the only other writer, incrementing; every other
+-- producer copies the field.  The fact is therefore true of every
+-- reachable schedule and false of arbitrary ones, which is exactly the
+-- shape a carried conjunct exists for.
+--
+-- IT IS CARRIED RATHER THAN DERIVED, and the reason is the reason the
+-- registry rows are all stuck: the derivation is over the whole run
+-- from `st-init`, and every site that needs the fact holds a schedule
+-- it did not build.  A hypothesis in a signature obliges whoever
+-- happens to call today; a field obliges every producer, which is what
+-- makes the fact available at a site that only READS.
+--
+-- WHAT IT IS FOR is the stratification receipt on a registration under
+-- a MINTED source, which comes out free once the floor is in hand: the
+-- guard that would demand a source sit below its chain's sink applies
+-- only to sources the slot telescope reaches, and a minted one is above
+-- all of them.  The three obligations that are NOT free are named in
+-- the sink leaf's own header, where they are owed.
+--
+-- IT IS INDEPENDENT OF THE CAPS, which is why it is the one conjunct
+-- `capsOK?-mono` hands straight back: widening a cap cannot move a
+-- counter the caps do not appear in.
+srcFloor? : ∀ {n} {Γ : Ctx n} → Sched Γ → Bool
+srcFloor? {n = n} sched = n ≤ᵇ Sched.nextSource sched
+
 capsOK? : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         → Caps → Sched Γ → EvalSt e → Bool
 capsOK? c sched st =
@@ -433,6 +461,7 @@ capsOK? c sched st =
                          (proj₂ kv))
         (EvalSt.nodes st)
   ∧ closSt? c sched st
+  ∧ srcFloor? sched
 
 ------------------------------------------------------------------
 -- capsOK? IS MONOTONE IN THE CAPS.  The widening the induction performs
@@ -626,7 +655,8 @@ capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
 ... | hWL , hRest3 with ∧-true _ _ hRest3
 ... | hWN , hRest4 with ∧-true _ _ hRest4
 ... | hLen , hRest5 with ∧-true _ _ hRest5
-... | hPk , hCL =
+... | hPk , hRest6 with ∧-true _ _ hRest6
+... | hCL , hFl =
   ∧-intro (stBounded-widen sz≤ sched st hSt)
   (∧-intro (regsSz?-widen (EvalSt.registry st) sz≤ hRg)
   (∧-intro (all-impl _ _ (λ l → widLive-widen (Sched.slots sched) l wd≤)
@@ -636,8 +666,9 @@ capsOK?-mono c c′ sched st le@(sz≤ , wd≤ , rg≤) h
   (∧-intro (≤ᵇ-widen (length (EvalSt.registry st)) rg≤ hLen)
   (∧-intro (all-impl _ _ (λ kv → parkRoom-widen sz≤ (proj₂ kv))
                      (EvalSt.nodes st) hPk)
-           (all-impl _ _ (λ l → closLive-widen (Sched.slots sched) l le)
-                     (Sched.live sched) hCL))))))
+  (∧-intro (all-impl _ _ (λ l → closLive-widen (Sched.slots sched) l le)
+                     (Sched.live sched) hCL)
+           hFl))))))
 
 ------------------------------------------------------------------
 -- THE SYNTAX-LINEAR EVAL RECEIPT — ONE iterSize FOLD PER SYNTAX NODE.
