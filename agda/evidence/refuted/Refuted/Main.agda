@@ -235,3 +235,6 @@ open import Refuted.Fan-Chain-Registry
          fan-chain-sz-absurd; FanRegsSz; fan-regsSz-absurd;
          deepNest; nestD≡; admitDeep; fan-chain-nestD-absurd;
          FanRegsNest; fan-regsNest-absurd)
+open import Refuted.Reg-Nest-Reached
+  using (RegsNestReached; regs-nest-reached-absurd; unit≡4;
+         deepest₁≡1; deepest₃≡3; deepest₅≡5; regsLen₅≡5)

@@ -70,7 +70,6 @@ open import Verify-Budget-Sufficient.Measures using
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest-cons; nest-keeps; refresh-supplies-nest;
    refresh-supplies-nest-strict; three-level-supply)
-open import Verify-Budget-Sufficient.Nest-Store using (pathNestD; nestUnit)
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
 -- new hypothesis ranges over.  The rest of the family
 -- carries THE DEPTH PREMISE down the frame chain, and it threads by
@@ -86,7 +85,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (pathSz?-⊑; valCaps?-size; valsCaps?-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (burstCaps?; capsOK?; capsOK?-mono; eventCaps?; frameSz?; obsCaps?; pathSz?;
-   regsSz?; regsNest?; slotsCaps?; slotsCaps?-bound; valCaps?; valCountᵉ; widLive; widNode; closSt?; closLive)
+   regsSz?; slotsCaps?; slotsCaps?-bound; valCaps?; valCountᵉ; widLive; widNode; closSt?; closLive)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ≤ᵇ-widen)
 
 ------------------------------------------------------------------
@@ -768,22 +767,13 @@ capsOK?-parts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                           (proj₂ kv))
          (EvalSt.nodes st) ≡ true)
   × (closSt? c sched st ≡ true)
-  × (regsNest? sched st ≡ true)
 capsOK?-parts c sched st h with ∧-true _ _ h
 ... | h0 , r1 with ∧-true _ _ r1
 ... | h1 , r2 with ∧-true _ _ r2
 ... | h2 , r3 with ∧-true _ _ r3
 ... | h3 , r4 with ∧-true _ _ r4
 ... | h4 , r5 with ∧-true _ _ r5
-... | h5 , r6 with ∧-true _ _ r6
-... | h6 , h7 = h0 , h1 , h2 , h3 , h4 , h5 , h6 , h7
-
--- the depth field, read back out at the one face that owes it
-capsOK?-regNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
-  capsOK? c sched st ≡ true → regsNest? sched st ≡ true
-capsOK?-regNest c sched st h =
-  proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st h)))))))
+... | h5 , h6 = h0 , h1 , h2 , h3 , h4 , h5 , h6
 
 capsOK?-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
@@ -835,7 +825,7 @@ dropSweep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c (record sched { live = sweepLive (dropSource src (EvalSt.registry st))
                                              (Sched.live sched) })
             (record st { registry = dropSource src (EvalSt.registry st) }) ≡ true
-dropSweep-caps {e = e} c src sched st inv =
+dropSweep-caps c src sched st inv =
     ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
                         (Sched.live sched) (proj₁ (∧-true LL NN h0)))
                      (proj₂ (∧-true LL NN h0)))
@@ -847,7 +837,7 @@ dropSweep-caps {e = e} c src sched st inv =
     (∧-intro h3
     (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
                                        (≤ᵇ⇒≤ _ _ (T-to h4)))))
-    (∧-intro h5 (∧-intro CLOS RN))))))
+    (∧-intro h5 CLOS)))))
   where
   kept = dropSource src (EvalSt.registry st)
   P    = capsOK?-parts c sched st inv
@@ -859,14 +849,9 @@ dropSweep-caps {e = e} c src sched st inv =
   h3   = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
-  h6   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h6   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   CLOS = sweepLive-all (closLive c (Sched.slots sched)) kept
            (Sched.live sched) h6
-  RN   = dropSource-all
-           (λ en → pathNestD (proj₂ (proj₂ (proj₂ en)))
-                     ≤ᵇ nestUnit e (Sched.slots sched))
-           src (EvalSt.registry st) h7
 
 -- the admitted snapshot is a SUBLIST of the registry — its own filter
 -- rather than dropSource's, because it also has to match the chain's
@@ -1213,15 +1198,6 @@ splitBurst-bk-caps {Γ = Γ} {u = u} c sl (em ∷ ems) =
 -- delivery clique never registers, so it does not carry it.
 ------------------------------------------------------------------
 
--- AND THE DEPTH THE REGISTRATION CARRIES IS OWED HERE, WHICH IS THE
--- POINT OF ITS BEING A FIELD.  `register` is the tree's only mint, so
--- the record's depth conjunct can only be established at this clause
--- and only from the path being registered -- `pathSz?` prices the step
--- functions and the length and says nothing about nesting, so nothing
--- in hand supplies it.  A premise here is not a weakening: the
--- unconditional reading is refuted at a chain carrying syntax the
--- program does not, and every caller registers a path it built from
--- the program's own frames.
 register-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (c : Caps) (j : ℕ) (src : Source) (κ : Path Γ u t)
   (sched : Sched Γ) (st : EvalSt e) →
@@ -1229,16 +1205,15 @@ register-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   1 ≤ Caps.cReg c →
   capsOK? (frameStep j c) sched st ≡ true →
   pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
-  (pathNestD κ ≤ᵇ nestUnit e (Sched.slots sched)) ≡ true →
   capsOK? (frameStep (suc j) c) sched (register src κ st) ≡ true
-register-caps {e = e} {u = u} c j src κ sched st 2≤S 1≤R inv pC pN =
+register-caps {u = u} c j src κ sched st 2≤S 1≤R inv pC =
     ∧-intro h0
     (∧-intro (all-++-intro (λ en → pathSz? (Caps.cSize (frameStep (suc j) c))
                                      (proj₂ (proj₂ (proj₂ en))))
                 (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
                 h1 (∧-intro (pathSz?-⊑ κ (frameStep-mono-j c 2≤S (n≤1+n j)) pC) refl))
     (∧-intro h2
-    (∧-intro h3 (∧-intro COUNT (∧-intro h5 (∧-intro h6 REGN))))))
+    (∧-intro h3 (∧-intro COUNT (∧-intro h5 h6)))))
   where
   inv′ = capsOK?-mono (frameStep j c) (frameStep (suc j) c) sched st
            (frameStep-mono-j c 2≤S (n≤1+n j)) inv
@@ -1248,13 +1223,7 @@ register-caps {e = e} {u = u} c j src κ sched st 2≤S 1≤R inv pC pN =
   h2   = proj₁ (proj₂ (proj₂ P))
   h3   = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h5   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
-  h6   = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  REGN = all-++-intro
-           (λ en → pathNestD (proj₂ (proj₂ (proj₂ en)))
-                     ≤ᵇ nestUnit e (Sched.slots sched))
-           (EvalSt.registry st) ((EvalSt.nextReg st , src , u , κ) ∷ [])
-           h7 (∧-intro pN refl)
+  h6   = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
   1≤RS : 1 ≤ Caps.cReg c * Caps.cSize c
   1≤RS = ≤-trans (≤-reflexive refl) (*-mono-≤ 1≤R (≤-trans (s≤s z≤n) 2≤S))
   COUNT : (length (EvalSt.registry st ++ (EvalSt.nextReg st , src , u , κ) ∷ [])
@@ -1280,7 +1249,7 @@ dropOnly-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? c sched st ≡ true →
   capsOK? c sched (record st { registry = dropSource src (EvalSt.registry st) })
     ≡ true
-dropOnly-caps {e = e} c src sched st inv =
+dropOnly-caps c src sched st inv =
     ∧-intro h0
     (∧-intro (dropSource-all (λ en → pathSz? (Caps.cSize c)
                                        (proj₂ (proj₂ (proj₂ en))))
@@ -1289,10 +1258,7 @@ dropOnly-caps {e = e} c src sched st inv =
     (∧-intro h3
     (∧-intro (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (dropSource-len src (EvalSt.registry st))
                                        (≤ᵇ⇒≤ _ _ (T-to h4)))))
-    (∧-intro h5 (∧-intro h6
-      (dropSource-all (λ en → pathNestD (proj₂ (proj₂ (proj₂ en)))
-                                ≤ᵇ nestUnit e (Sched.slots sched))
-                      src (EvalSt.registry st) h7)))))))
+    (∧-intro h5 h6)))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -1301,8 +1267,7 @@ dropOnly-caps {e = e} c src sched st inv =
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
-  h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h6 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
 
 -- `j + 1` and `j + suc k` against the shapes register-caps and
 -- subscribeE-caps hand back
@@ -1356,7 +1321,7 @@ capsOK?-setNode {Γ = Γ} c nid ns sched st bn pk wn inv =
     (∧-intro h4
     (∧-intro (setNode-park (Caps.cSize c) (slotsSize (Sched.slots sched))
                 nid ns (EvalSt.nodes st) pk h5)
-             (∧-intro h6 h7))))))
+             h6)))))
   where
   P  = capsOK?-parts c sched st inv
   h0 = proj₁ P
@@ -1368,34 +1333,21 @@ capsOK?-setNode {Γ = Γ} c nid ns sched st bn pk wn inv =
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
-  h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h6 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
 
 -- take's cut is dropSweep's sibling: cutThrough is a filter on the
 -- registry (by node membership rather than by source), its closes carry
--- no payload, and the live set is swept against what it kept.  Stated
--- for a general path predicate deliberately -- the size reading, the
--- depth reading and the walk face's own all want the identical fact,
--- and this is the lowest module all three reach.
-cutThrough-keptP : ∀ {n} {Γ : Ctx n} {t} (P : ∀ {u} → Path Γ u t → Bool)
-  (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
-  (reg : List (RegId × Source × Chain Γ t)) →
-  all (λ en → P (proj₂ (proj₂ (proj₂ en)))) reg ≡ true →
-  all (λ en → P (proj₂ (proj₂ (proj₂ en))))
-      (proj₁ (cutThrough nid d wm dy reg)) ≡ true
-cutThrough-keptP P nid d wm dy []                    h = refl
-cutThrough-keptP P nid d wm dy ((rid , src , c) ∷ r) h
-  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
-     | cutThrough-keptP P nid d wm dy r (proj₂ (∧-true _ _ h))
-... | true  | _ | ih = ih
-... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
-
+-- no payload, and the live set is swept against what it kept
 cutThrough-regsSz : ∀ {n} {Γ : Ctx n} {t} (B : ℕ) (nid : NodeId)
   (d : List RegId) (wm : RegId) (dy : List Source)
   (reg : List (RegId × Source × Chain Γ t)) →
   regsSz? B reg ≡ true → regsSz? B (proj₁ (cutThrough nid d wm dy reg)) ≡ true
-cutThrough-regsSz B nid d wm dy reg h =
-  cutThrough-keptP (pathSz? B) nid d wm dy reg h
+cutThrough-regsSz B nid d wm dy []                    h = refl
+cutThrough-regsSz B nid d wm dy ((rid , src , c) ∷ r) h
+  with pathHasNode nid (proj₂ c) | cutThrough nid d wm dy r
+     | cutThrough-regsSz B nid d wm dy r (proj₂ (∧-true _ _ h))
+... | true  | _ | ih = ih
+... | false | _ | ih = ∧-intro (proj₁ (∧-true _ _ h)) ih
 
 cutThrough-closes-caps : ∀ {n} {Γ : Ctx n} {t} (c : Caps) (sl : Slots Γ)
   (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
@@ -1428,7 +1380,7 @@ cutSweep-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                                                        (EvalSt.registry st)))
                                         ++ EvalSt.cancelled st
                           ; nodes     = setNode nid ns (EvalSt.nodes st) }) ≡ true
-cutSweep-caps {Γ = Γ} {e = e} c nid ns sched st bn pk wn inv =
+cutSweep-caps {Γ = Γ} c nid ns sched st bn pk wn inv =
     ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
                         (Sched.live sched) (proj₁ hL))
                      (setNode-bounded (Caps.cSize c) nid ns (EvalSt.nodes st) bn
@@ -1445,12 +1397,8 @@ cutSweep-caps {Γ = Γ} {e = e} c nid ns sched st bn pk wn inv =
                                        (≤ᵇ⇒≤ _ _ (T-to h4)))))
     (∧-intro (setNode-park (Caps.cSize c) (slotsSize (Sched.slots sched))
                 nid ns (EvalSt.nodes st) pk h5)
-             (∧-intro (sweepLive-all (closLive c (Sched.slots sched)) kept
-                         (Sched.live sched) h6)
-                      (cutThrough-keptP
-                         (λ p → pathNestD p ≤ᵇ nestUnit e (Sched.slots sched))
-                         nid (EvalSt.delivered st) (EvalSt.regWatermark st)
-                         (EvalSt.dying st) (EvalSt.registry st) h7)))))))
+             (sweepLive-all (closLive c (Sched.slots sched)) kept
+                (Sched.live sched) h6))))))
   where
   kept = proj₁ (cutThrough nid (EvalSt.delivered st) (EvalSt.regWatermark st)
                            (EvalSt.dying st) (EvalSt.registry st))
@@ -1464,8 +1412,7 @@ cutSweep-caps {Γ = Γ} {e = e} c nid ns sched st bn pk wn inv =
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
-  h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h6 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
 
 -- take passes a PREFIX of what it was given, so its payload bound is
 -- inherited rather than paid for
@@ -1559,7 +1506,7 @@ capsOK?-clos : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? c sched st ≡ true → closSt? c sched st ≡ true
 capsOK?-clos c sched st h =
-  proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st h)))))))
+  proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (capsOK?-parts c sched st h))))))
 
 
 -- THE thru-outer WRAP: the walk has already run, and all this does is
@@ -1660,7 +1607,7 @@ switchKill-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   let r = switchKill {t = t} cur sched st
   in capsOK? c (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 switchKill-caps c nothing  sched st inv = inv
-switchKill-caps {Γ = Γ} {e = e} c (just v) sched st inv =
+switchKill-caps {Γ = Γ} c (just v) sched st inv =
     ∧-intro (∧-intro (sweepLive-all (boundedLive (Caps.cSize c)) kept
                         (Sched.live sched) (proj₁ hL))
                      (proj₂ hL))
@@ -1674,12 +1621,8 @@ switchKill-caps {Γ = Γ} {e = e} c (just v) sched st inv =
                                           (EvalSt.registry st))
                                        (≤ᵇ⇒≤ _ _ (T-to h4)))))
     (∧-intro h5
-             (∧-intro (sweepLive-all (closLive c (Sched.slots sched)) kept
-                         (Sched.live sched) h6)
-                      (cutThrough-keptP
-                         (λ p → pathNestD p ≤ᵇ nestUnit e (Sched.slots sched))
-                         v (EvalSt.delivered st) (EvalSt.regWatermark st)
-                         (EvalSt.dying st) (EvalSt.registry st) h7)))))))
+             (sweepLive-all (closLive c (Sched.slots sched)) kept
+                (Sched.live sched) h6))))))
   where
   kept = proj₁ (cutThrough v (EvalSt.delivered st) (EvalSt.regWatermark st)
                            (EvalSt.dying st) (EvalSt.registry st))
@@ -1693,8 +1636,7 @@ switchKill-caps {Γ = Γ} {e = e} c (just v) sched st inv =
   h3 = proj₁ (proj₂ (proj₂ (proj₂ P)))
   h4 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ P))))
   h5 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
-  h6 = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
-  h7 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P))))))
+  h6 = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ P)))))
 
 -- the cut's closes carry no payload
 switchKill-closes-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}

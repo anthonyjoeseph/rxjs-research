@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NOW SUPPLY THE REGISTRATION'S DEPTH AT EVERY MINT.** `register-caps`
-  asks each mint for the chain's own nesting under the unit -- refuted
-  unconditionally, so the true statement -- and the seven mints do not
-  carry it, so the subscribe face is red. The commit threads one coupled
-  premise, the caller's nesting plus the chain's under the unit, down the
-  `-caps` signatures to those mints, states the flatten arm's one leaf --
-  an emitted inner's nesting under its emitter's -- at full strength, and
-  discharges the registry's depth row from the receipt's own conjunct.
-  With the face green the receipts RETIE: every probe the tower carries
-  gets its `Confirms` rows, which E7 holds red until they land.
+- **NOW FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
+  registered chain's nesting by the syntactic unit is DEAD -- false at the
+  states a run reaches, not merely at built ones -- so the field is back out
+  of `capsOK?` and no premise threaded to a mint can pay it. What is not yet
+  known is what the three `walk-ΦHyp` consumers need that depth FOR. The
+  currency to replace it in already exists: `chain-depth-sighted` takes a
+  store-denominated bound, and `store-growth` lets the store's depth grow
+  multiplicatively rather than pinning it to a fixed number. So the commit
+  censuses those three uses, restates `fan-regsNest` in the store reading
+  wherever it supports them, and reports the uses it does not.
 
 - **THEN DECIDE WHETHER THE FOLD'S COUNT IS REAL.** The fold arm is
   at the spiral stop: a depth fixed before an instant runs, against a
@@ -249,6 +249,10 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
+- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
+  `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
+  syntactic unit. REFUTED AT A REACHED STATE, not only an arbitrary one, so it
+  is replaced rather than discharged and no mint can be asked for it.
 - **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the `from-inner` head of the drain
   law, the only frame that names a node. Both denominations are closed to
@@ -285,15 +289,11 @@ does not fit is a finding about the shared statement, not about the head.
   size receipt at the PROGRAM's cap. Stated over an arbitrary state it fails at
   one registration longer than the cap, whatever the cap is; and the reachable
   length climbs with the syntax, so no numeral stands in for the cap either.
-- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY, `REFUTED, PROBED`: the
-  registry's own depth against the syntactic unit. Refuted over an arbitrary
-  state at a chain minted from syntax the program lacks — but it holds at every
-  reachable registry swept, with a margin that does not close.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region, since a depth fixed before the count
-  must dominate a count towering in it. Owed a binary, not a currency: is
-  the admitted count reachable.
+  must dominate a count towering in it. Owed a binary, not a currency: is the
+  admitted count reachable.
 - **`innerΦ-drain-caps`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
   queue's caps receipt, now at the face and count the arm REPORTS rather than
   at ones it chooses. Its own definition names the state's caps receipt in

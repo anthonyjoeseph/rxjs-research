@@ -1081,14 +1081,24 @@ fan-chain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 fan-chain-sz {e = e} sl id i st h =
   shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
 
--- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.  A
--- registered chain's frames are the program's own, so its nesting is
--- the program's -- but the premise the walk carries about the registry
--- is a SIZE receipt and says nothing about depth at all, and the
--- store's depth ledger bounds the registry by a RUNTIME maximum rather
--- than by the unit, which is the wrong currency and the wrong
--- direction.  So this too is owed by whatever mints a registration.
+-- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.
+-- IT IS FALSE, and not merely over arbitrary states: a RUN reaches a
+-- registry deeper than the unit, so the statement has to be replaced
+-- rather than discharged, and the invariant field with it.  The
+-- mechanism is a `map-f` frame, which charges the path its function's
+-- nesting while the unit is read off the program once -- so an
+-- observable-typed scan accumulator folded back into its own map
+-- function climbs one layer per delivery against a fixed number.
 --
+-- DEAD ROUTE: owing this to whatever MINTS a registration, which is
+--   where the size analogue directly above sends its own obligation.
+--   A mint holds the path it is registering and the program, and the
+--   counterexample is legal in both: the depth is a fact about the
+--   accumulated STORE, which neither the path's frames nor the
+--   syntax can report, so no premise threaded to a mint can pay it.
+--
+-- REFUTED: `Refuted.Reg-Nest-Reached`, at a chain five deep against a
+--   unit of four, reached by running, and climbing one per fold.
 -- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
 --   against a unit of one, minted by a map whose function carries
 --   syntax the program does not.
@@ -1101,7 +1111,9 @@ fan-chain-sz {e = e} sl id i st h =
 --   margin of two that neither closes nor opens across the sweep.
 --   Not covered: a share whose def nests more deeply than its
 --   consumer, which moves the unit's slot summand against a flat
---   chain, and the arbitrary registries the refutation inhabits.
+--   chain; the arbitrary registries the refutations inhabit; and an
+--   observable-typed scan accumulator, whose layers are stored rather
+--   than written and which is where the sweep's margin is lost.
 postulate
   fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (st : EvalSt e) →
