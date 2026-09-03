@@ -625,6 +625,43 @@ postulate
   --   and nothing accumulated on the way in.  There is no shared
   --   statement to state once, so this arm is not waiting on that
   --   face.
+
+  -- AND THE MECHANISM UNDER ALL FIVE IS WHAT IS DEAD, NOT A SIXTH
+  -- DENOMINATION.  The routes above share one shape: a potential fixed
+  -- per instant and read at the entry cap is asked to dominate a term
+  -- carrying the burst count in an EXPONENT.  That count is not
+  -- independent of the potential -- a scan's burst is at most the
+  -- flattened width of what reaches it, which is exponential in the
+  -- nesting the potential bounds, and the fold's output nesting is
+  -- again exponential in the count -- so a flat potential is asked to
+  -- be a fixed point of a loop that has none.  The one ceiling in the
+  -- development that DOES afford this fold is the store face's, and it
+  -- is read at the EXIT index: the nesting cap at the next instant is
+  -- this instant's cap times a factor towering in the burst
+  -- (`nestFacAt`), discharged by no premise of any frame but by the
+  -- walk's own count ledger -- `burstsOK` at every hop, closed at the
+  -- top by `arr-chains-bursts`.  This arm cannot read that ceiling,
+  -- because the depth door `cascade-depth-capsH` is sighted at THIS
+  -- instant's fuel: it lands the potential under `capsH` at the entry
+  -- index, and the caps recurrence puts the next instant's factor two
+  -- exponentials above what that fuel can see.  So the repair is not
+  -- inside this statement, and the row is SHAPE rather than FALSITY:
+  -- either the depth face is re-denominated to carry the walk's count
+  -- ledger and be sighted one instant later -- which moves what the
+  -- evaluator's budget must afford, a question and not an edit -- or a
+  -- dynamics argument puts the same-instant burst under this instant's
+  -- fuel, and `Harness.Main`'s rows (measured-not-rechecked) say a
+  -- run's count is script-denominated, so no premise here carries it.
+  -- DEAD ROUTE: a sixth local denomination of the scan arm -- an
+  --   existential width in place of the burst count, threaded from
+  --   `burstsOK` the way the store face threads it.  The threading is
+  --   available, and the fit it lands is exactly the product
+  --   `Refuted.Walk-Phi-Room` kills: the width so threaded is the
+  --   walk's, which the store affords only through its exit-index
+  --   factor, and no potential sighted at `capsH` at this instant
+  --   carries that factor.  The three subdivisions that reached the
+  --   spiral stop were all inside this potential, so a fourth is the
+  --   same route under a new name.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -782,6 +819,22 @@ postulate
   -- the levels a drain can reach are the levels the ROUND affords, not
   -- the ones this one reaction descends through.
   -- REFUTED: `Refuted.Cap-Walk-Cross`.
+
+  -- AND ITS OBSTACLE IS THE SCAN ARM'S, ONE ARM OVER.  The charge here
+  -- multiplies a flat potential by a factor carrying the drain width in
+  -- an exponent, and that width is the same walk count the scan arm's
+  -- burst is: bounded by nothing at this instant's fuel and afforded
+  -- only by the store's exit-index factor.  The finding is one and its
+  -- argument sits in `scanΦ-fit`'s header; what it means for this
+  -- statement is that no repair inside the arm exists, so the row is
+  -- SHAPE and the restatement comes with the face's, not alone.
+  -- DEAD ROUTE: repairing the drain arm by itself, by reading its width
+  --   off the queue the state names rather than off the table.  That
+  --   is what the statement already does, and it moves the width from
+  --   chosen to actual without moving its CURRENCY: the actual drain
+  --   width is walk-denominated, so a potential sighted at this
+  --   instant's fuel cannot dominate the factor, for the reason the
+  --   scan arm's mechanism route records.
   innerΦ-drain-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)

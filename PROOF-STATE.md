@@ -215,6 +215,27 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
+- **RE-DENOMINATE THE DEPTH FACE IN THE WALK'S COUNT, ASSEMBLY FIRST.**
+  The scan and drain arms of the potential hypothesis are dead as a
+  MECHANISM, not as denominations: a flat per-instant potential cannot
+  dominate a burst count exponential in the nesting it bounds,
+  and the one ceiling that affords the fold is the store's exit-index
+  factor, sighted one instant later than the depth door can see. The
+  commit states the restated face outside-in — the fold arms priced
+  at the exit-index factor under the walk's count ledger, the door
+  concluding under the NEXT instant's fuel — with the gap between that
+  sight and the evaluator's budget postulated BARE: whether the budget
+  moves is a question, not an edit.
+
+- **AND THREAD THE COUNT LEDGER DOWN THE POTENTIAL WALK.** The store
+  walk carries a burst ceiling at every hop and closes it at the
+  arrival; the potential walk carries the values' caps and no length,
+  which is why its scan arm had nowhere to read a count. The commit
+  gives the potential walk the ledger the store walk threads,
+  discharged from the same arrival receipt, and spends it at the two
+  restated arms — the premise side of the re-denomination, which does
+  not wait on the budget question.
+
 - **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
   hop that climbs has strictly less telescope above it, and that is the
   quantity the leaf's price does not read. The separation says why it
@@ -224,30 +245,6 @@ does not fit is a finding about the shared statement, not about the head.
   shorter climb can spend. The commit restates the leaf's exponent in
   that currency and re-reads the sink arm against it, which is where
   the carried conjunct is finally spent.
-
-- **AND THREAD THE SLOT'S OWN INDEX DOWN THE SUBSCRIBE DESCENT, WHICH
-  IS THE NEXT OF THE MINT'S FOUR.** The floor settles the source a mint
-  hands out; a SLOT-sourced registration is the one still owing a
-  receipt, and what it needs is not CARRIED but PASSED — the reading
-  relating it to the expression sits on the SLOT, where no conjunct of
-  the invariant record reaches. So the commit gives the caps descent a
-  premise relating the chain to the expression it is subscribed under,
-  discharges it at the input arm where the two readings are the same
-  test, and hands the share arm the slot's own index. Its repair is a
-  descent argument rather than a record field, so it is taken alone.
-
-- **AND CARRY THE STRATIFICATION THE SINK LEAF READS, WHICH IS THE
-  FIRST OF THE MINT'S FOUR.** A registration's source sits BELOW the
-  expression its chain is walked under, and no producer says so — the
-  reading is a property of the registry that every registration site
-  establishes and the walk consumes, which is the shape a record field
-  has and a threaded hypothesis does not. So the commit puts the
-  conjunct in the invariant record beside the floor, re-establishes it
-  at each producer, and spends it where the sink leaf asks the admitted
-  sublist for a reading no local premise carries. The obligation it
-  leaves is the values in flight's, which reaches the input arm under
-  syntax the record never saw.
-
 
 ### The ledger
 
@@ -291,18 +288,17 @@ does not fit is a finding about the shared statement, not about the head.
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×5`: the
-  producing side of the fold's new grant. AT THE SPIRAL STOP: four
-  denominations refuted in one region. The binary is ANSWERED and neither
-  branch repairs it — a run's count is script-denominated, so this waits on a
-  ceiling that does not exist.
-- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the charge, at
-  the queue's own `drainW` and at every level within the descent's count. All
-  the arm has left once the face, the count and the store residue are reported
-  off its own premises.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
+- **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
+  of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
+  per-instant potential cannot dominate a count exponential in itself; the one
+  affording ceiling is the store's exit-index factor, unseen at this fuel.
+- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the charge at
+  the queue's own `drainW`, at every level within the descent's count. The
+  width is walk-denominated, so it shares the scan arm's dead mechanism and is
+  restated with the face rather than alone.
 - **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
   no more payloads than its term syntactically carries. Seven tight rows tied,
   the scan head and the share chain among them; every region a row could refute
