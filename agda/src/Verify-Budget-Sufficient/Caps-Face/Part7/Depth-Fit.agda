@@ -776,26 +776,41 @@ postulate
   -- currency every hypothesis is stated in.  It is not the whole of
   -- what is owed, and the block below is the rest.
 
-  -- AND THE SECOND THING OWED IS THE CEILING, WHICH NOTHING IN THIS
-  -- DEVELOPMENT PRODUCES.  The ledger opens with a `CeilD`, and a
-  -- census of that name over the proof tree finds it CONSUMED at every
-  -- site and produced at none: each walk lemma takes one and hands a
-  -- transformed one on, and the ceiling module's own lemmas are all
-  -- ceiling-to-ceiling.  The one proven route to its CONCLUSION is
-  -- `ring-room`, which wants a `Reached` witness and an entry-level
-  -- bound; the caps face's own drain arm has both, bundled in the walk
-  -- record it takes, and this row takes nothing in that currency.  Nor
-  -- does anything above it -- neither the frame fit that calls this arm
-  -- nor `InnerΦFit`, the obligation record the arm is discharging,
-  -- mentions a level ceiling at all.
+  -- AND THE SECOND THING OWED IS THE CEILING, WHOSE DELIVERER IS AT THE
+  -- SIBLING FACE AND WHOSE CURRENCY IS NOT.  The ledger opens with a
+  -- `CeilD`, and a census of that name finds it CONSUMED at every site
+  -- in proven code and produced at none -- each walk lemma takes one and
+  -- hands a transformed one on, and the ceiling module's own lemmas are
+  -- all ceiling-to-ceiling.  But the LEDGER is not owed a new proof:
+  -- `walk-frame-drain-inner` already hands back this exact
+  -- `capsDrainOK`, at the same queue, node and fold id, out of the walk
+  -- record.  So what this row is short of is the record, not the
+  -- mathematics; and the record's ceiling half is a reach witness, whose
+  -- relation has a CONSTRUCTOR at level zero carrying the round's whole
+  -- gas and one more per admitted registration, so the caps walk mints
+  -- its own position at the cascade's door and climbs it, `ring-room`
+  -- turning that into the room bound in two rewrites.
   --
-  -- SO THIS IS A CONCLUSION NEEDING INFORMATION NO HYPOTHESIS CARRIES,
-  -- which is the first of the two shapes that are almost always wrong,
-  -- and the row is SHAPE rather than a hard proof: a restatement is
-  -- guaranteed and grinding cannot reach it.  The repair is not a
-  -- hypothesis minted here -- that launders a tracked gap into an
-  -- untracked one -- but the same carry the receipt above already gets,
-  -- from the caps walk where the ceiling is the currency.
+  -- AND THE TWO FACES WALK ONE CASCADE IN TWO LEDGERS, WHICH IS WHY THE
+  -- CARRY IS NOT A FIELD.  Both cascades are stated over the same chain
+  -- list and the same fold, so there is a door.  But the caps side
+  -- counts its level as a RING POSITION -- reach witness, registration
+  -- index under the round's register count, level under the entry ladder
+  -- -- and this side counts a chain-length BUDGET, the path lengths plus
+  -- one per chain.  Neither number is a reading of the other, so
+  -- threading the ceiling means re-denominating this face's level at the
+  -- door and carrying the ring package down every frame between; adding
+  -- a conjunct at the arm would launder a tracked gap into an untracked
+  -- one and still not name a level the caller could meet.
+  --
+  -- AND THE COUNT MOVES WITH IT, which is what makes this a family and
+  -- not a row.  The caps ledger is delivered at the instant's own
+  -- height; this one is stated at the reaction's depth.  Re-denominating
+  -- reaches the numeric leaf beside this one, whose range is read off
+  -- that same count, and brings a depth premise with it -- proven at the
+  -- cascade door and available nowhere below it.  A restatement is
+  -- guaranteed, its direction is now fixed, and grinding this row
+  -- reaches none of it.
 
   -- DEAD ROUTE: instantiating the conclusion at concrete arguments, to
   --   read whether a level exists that satisfies it.  BOTH of the

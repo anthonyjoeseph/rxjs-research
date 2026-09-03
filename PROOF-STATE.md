@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRY THE CEILING INTO THE Φ FACE, WHERE THE ARM HAS NONE.**
-  The drain ledger the potential face is asked for opens with a
-  level ceiling, and a census finds that object consumed at every site
-  in the tree and produced at none — the walk lemmas relay one and
-  the ceiling module's own lemmas are ceiling-to-ceiling. The caps face is
-  where it is the currency: its drain arm takes a walk record carrying the
-  reach witness the one proven route to that conclusion wants, and the Φ
-  arm takes nothing in that denomination. So the repair is a carry rather
-  than a mint at the arm, which would trade a counted gap for an uncounted
-  one. The commit threads the field or names the producer that cannot.
+- **RE-DENOMINATE THE Φ CASCADE'S LEVEL AT THE DOOR.** The deliverer of
+  the ceiling ledger is now named — the caps face hands back this exact
+  receipt off its walk record — so what remains is that the two faces
+  walk ONE cascade in two ledgers: a ring position on the caps side, a
+  chain-length budget on this one, and neither number reads the other.
+  The door is the shared fold, where both cascades are stated over the
+  same chain list, and the height premise the count needs is proven there
+  and nowhere below. So the commit takes the Φ cascade's level premise
+  and asks whether the ring package can stand in its place, reporting
+  the frame between door and arm that could not carry it.
 
 - **THEN BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
   live list is minted at three places — one subscribe out of a parked
@@ -305,9 +305,9 @@ does not fit is a finding about the shared statement, not about the head.
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
 - **`innerΦ-drain-caps`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the queue's
-  caps receipt, asked of a face carrying no ceiling. Its ledger opens with one
-  and nothing in the tree produces one, so a restatement is guaranteed; the two
-  seals under it close instantiation and refutation together.
+  caps receipt, asked of a face carrying no ceiling. The caps face already
+  delivers this ledger off a ring position, so what is owed is a
+  re-denomination at the cascade door, not a proof of this row.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the
