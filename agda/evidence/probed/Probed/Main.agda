@@ -119,16 +119,6 @@ open import Probed.Fold-Regs-Two-Caps
 open import Probed.Fold-Regs-Nest-Cross
   using (cross; foldTie)
 
-open import Probed.Frame-Step-Regs-Level
-  using (premA₁; premA₂; premA₃; figuresA≡; rowA;
-         premB₁; premB₂; figuresB≡; rowB;
-         premC₁; premC₂; figuresC≡; rowC;
-         premD₁; premD₂; figuresD≡; rowD;
-         premE₁; figuresE≡; rowE;
-         premF; figuresF≡; rowF;
-         figuresG≡; rowG; figuresH≡;
-         regsRowA; regsRowF)
-
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
          figures0; figures1; figures2; figures3; figures4;

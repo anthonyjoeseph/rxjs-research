@@ -55,7 +55,7 @@ open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; regsSz?; frameSz?)
+  using (pathSz?; frameSz?)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -572,99 +572,6 @@ postulate
     valsSz? (iterSize S j S) vals ≡ true →
     valsSz? (iterSize S (suc j) S)
       (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
-
--- THE REGISTRY STAYS PRICED ACROSS A FRAME, AT AN ACCUMULATED LEVEL --
--- and the level is what makes the statement true, not how it is
--- phrased.  A subscribing frame registers the walked path with its head
--- swapped plus one frame per syntax node of the INNER OBSERVABLE it
--- received, and an inner is a runtime value, structurally unrelated to
--- the program a fixed cap is read from: that is the whole content of
--- both refutations below, each of which builds an inner FROM the cap
--- and beats it.
---
--- SO THE ARRIVING VALUES' SIZE IS A PREMISE, AND ONE FRAME COSTS ONE
--- LEVEL.  `sizeᵛ` at an observable IS `sizeᵉ`, so the size reading
--- bounds the inner's syntax outright and every witness of that family
--- dies against it; the registered length is then the walked length plus
--- the inner's, both under the level, and `sizeStep` pays for exactly
--- that sum, being `S + 2·X` at `X` the level in hand.  A fixed cap has
--- nothing to pay with, which is why no repair of the hypotheses alone
--- survives while this one does.
---
--- AND THE CURRENCY IS THE SIZE SIBLINGS', DELIBERATELY, SO A WALK
--- THREADING BOTH SPENDS ONE COUNT.  The registry costs exactly one
--- level per frame; the values cost one where the frame is read at the
--- base cap and one PLUS a reported growth index where it is not, so
--- the level a walk arrives at is always the values' and the registry
--- reading widens up to meet it.  At `j = 0` the iterate is the cap
--- itself, definitionally, so an entry reading transports for free.
-
--- DEAD ROUTE: reading the registered path as a TAIL of the walked one,
---   so that the cap transfers with no premise at all.  The share sink
---   registers a tail and the take frame filters, but a subscribing
---   frame descends into the value it received: the `mapᵉ` clause of the
---   subscribe recursion pushes one frame per operator of the body onto
---   the continuation before it reaches the leaf that registers, so what
---   lands in the registry is the walked path UNDER the body, not a
---   suffix of it.
--- DEAD ROUTE: and a ROOM LEDGER at a fixed ceiling does not repair it,
---   which is the more useful half because it says why the caps face
---   accumulates.  Carrying `pathLen p + L ≤ B` over the registry closes
---   the frame clause and closes the sink's ADMISSION, but not the sink's
---   RE-ENTRY: a chain fans into chains, so the level the ledger must
---   reserve is the cumulative depth of the fan-out rather than the depth
---   of the path in hand, and no ceiling fixed before the walk starts
---   bounds it.  That is why the level is existential downstream, and it
---   is a fact about the fan-out rather than about how the bound is
---   phrased.
--- DEAD ROUTE: and neither does deleting this face and reading the
---   registry off the caps face's own levelled walk, which is the repair
---   the redundancy note below invites.  The projector and the levelled
---   walk predicate both exist and the two walks do rewrite clause for
---   clause, but the consumer does not: the depth cascade is what spends
---   these walks, and its own ceiling is a PREMISE of the lemma that
---   produces the caps receipt, so a cascade taking that receipt would be
---   proving its ceiling from its ceiling.  The caps face sits ABOVE the
---   depth cascade, not beside it, and that ordering is what the
---   redundancy reading misses.
--- REFUTED: `Refuted.Subscribe-Inner-Regs-Base` -- the subscribe this
---   statement's two subscribing frames perform does not preserve a
---   fixed cap, symbolically and at every cap.
--- REFUTED: `Refuted.Caps-Face` -- the same statement one level up was
---   deleted as false and redundant against `subscribeE-caps`, which is
---   ground because it reports at a level.
--- PROBED: `Probed.Frame-Step-Regs-Level` covers the SUBSCRIBING frame,
---   which is the only kind that can move the registry -- the other four
---   return the state they were handed, so the conclusion is the premise
---   there and no instantiation of them can fail.  Six load-bearing rows,
---   each driving the two quantities the premises cap to the boundary
---   they allow: the walked path at the longest length `pathSz?` admits,
---   the inner at the largest syntax `valsSz?` admits, at counts one and
---   two and levels one through fifteen, plus the many-values arm and a
---   non-empty incoming registry.  Every row reads the REGISTERED
---   chain's own length off the post-state rather than inferring it, so
---   the covered boundary is measured.  What it does NOT cover: a
---   `share-sink` terminal, an inner with a nested `mergeAllᵉ`, and any
---   count above two.
---   The margin is the finding rather than the verdict.  An operator
---   costs at least two in `sizeᵉ` and pushes at most one frame, so an
---   inner admitted at level `L` contributes at most half as many frames
---   as the level, against a walked path that may reach `L` -- while one
---   level buys `S * suc (2 * L)`.  Measured: ten against fifteen at
---   `L = 7`, twenty-two against thirty-one at `L = 15`.  The slack
---   GROWS with the level, so the rows rule out a crossing at larger
---   sizes rather than merely failing to find one, which is what a
---   constant margin would have left open.
-postulate
-  stepFrame-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (S j : ℕ) →
-    valsSz? (iterSize S j S) vals ≡ true →
-    pathSz? (iterSize S j S) (f ↠ path) ≡ true →
-    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
-    regsSz? (iterSize S (suc j) S) (EvalSt.registry
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st)))))) ≡ true
 
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the

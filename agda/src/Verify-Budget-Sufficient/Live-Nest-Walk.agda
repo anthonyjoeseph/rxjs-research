@@ -26,13 +26,13 @@
 -- REFUTED: Refuted.Chain-Step-Live-Additive
 module Verify-Budget-Sufficient.Live-Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; foldr; length)
-open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _⊔_; _≤_; _≡ᵇ_)
 open import Data.Nat.Properties
-  using (≤-trans; ⊔-lub; ⊔-monoˡ-≤; m≤m⊔n; m≤n⊔m; m≤m+n; n≤1+n; ≤-reflexive; +-suc)
+  using (≤-trans; ⊔-lub; ⊔-monoˡ-≤; m≤m⊔n; m≤n⊔m; m≤m+n; n≤1+n)
 open import Data.Vec using (lookup)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -47,15 +47,15 @@ open import Rx.Frame-Width using (dWᵉ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; AllOp; NodeId; map-f; scan-f;
   take-f; from-inner; thru-outer; scan-st; take-st; mergeAll-st; switch-st; exhaust-st;
-  mergeAllᵒ; switchᵒ; exhaustᵒ; innerFinish; mergeAllDrain; aliveThroughᶠ;
-  lookupNode; takeVals; iterSize; foldPath; stepFrame; dispatchShare; shareGo; shareAdmit;
-  shareLatch; subscribeInner; hasRoom)
+  mergeAllᵒ; switchᵒ; exhaustᵒ; innerFinish; mergeAllDrain; aliveThroughᶠ; lookupNode;
+  takeVals; foldPath; stepFrame; dispatchShare; shareGo; shareAdmit; shareLatch;
+  subscribeInner; hasRoom)
 open import Verify-Budget-Sufficient.Keeps-Ring using (KeepsC; stepFrame-keeps)
-open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
+open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; nestUnit; sweepLive-nest)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; frameStep; sizeCount; iterSize-infl; iterSize-mono-count; frameStep-mono-j)
+  using (Caps; frameStep; sizeCount; frameStep-mono-j)
 open import Verify-Budget-Sufficient.Nest-Walk using (FaceOK; faceHere; capsDrainOK)
 open import Verify-Budget-Sufficient.Nest-Ceiling using (ceil-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
@@ -63,11 +63,10 @@ open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; drainW-he
 open import Verify-Budget-Sufficient.Caps-Depth using (depthFin; depthDrain; depthInner)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; valsSz?-mono;
-         stepFrame-nest-Φ; stepFrame-nest-regs; stepFrame-regsSz; stepFrame-sz;
-         foldPath-nest-regs)
+  using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; stepFrame-nest-Φ;
+  stepFrame-nest-regs; foldPath-nest-regs)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; regsSz?; frameSz?; pathSz?-widen; capsOK?; nestValOK?; nestClosOK?)
+  using (pathSz?; capsOK?; nestValOK?; nestClosOK?)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (pathSz?-⊑)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (foldPath-slots)
 
@@ -554,161 +553,6 @@ frameLive-of-sz U (scan-f _ _)       path vals _ = tt
 frameLive-of-sz U (take-f _)         path vals _ = tt
 frameLive-of-sz U (from-inner _ _ _) path vals _ = tt
 frameLive-of-sz U (thru-outer _ _)   path vals h = h
-
--- AND NO PREMISE CHANGE HERE CAN REPAIR IT, BECAUSE THE DEMAND IS IN
--- THE CONCLUSION.  The obvious move -- restating this off the caps
--- face's dispatch ledger, which carries a level with no affordability
--- anywhere in it and which the potential face's own sink arm is proven
--- against -- does not survive unfolding what is concluded.  The
--- dispatch hypothesis expands to the fan-out fold, the fold to each
--- admitted chain's walk, and every outer frame in those chains asks
--- for the size bound at the round's ceiling again.  So dropping the
--- affordability does not remove the demand, it removes the only thing
--- that was paying it: the restated statement is STRICTLY STRONGER than
--- the one three counterexamples already close, which is why the ledger
--- transfers to the potential face and not to this one.  What the two
--- faces do not share is the leaf: the potential's frame arms are
--- discharged out of the path's own factor, and this face has one arm
--- that reaches through the gate that factor stops at.
-
--- THE REGISTRY-SIDE GRANT, and it is the one thing the walk cannot get
--- from the path it is walking.  At a sink the values leave this chain
--- for chains that live in the REGISTRY, and their side conditions are
--- owed at their own paths -- so what has to be supplied is a reading of
--- the registry, not another reading of this path.
---
--- IT CARRIES THE WALK'S OWN AFFORDABILITY BECAUSE BOTH CHEAPER FORMS
--- ARE FALSE.  Priced at one number for the values entering the sink
--- and another for the registry's chains, with nothing between them, it
--- falls to a single `map-f`: legality bounds a chain's SYNTAX and the
--- conclusion bounds the VALUES that syntax produces, so what is
--- missing is a RELATION between the two numbers rather than a bigger
--- one.  Related, but read at the level the walk STANDS at, it falls
--- again -- a fanned-into chain climbs from there by its own length,
--- and that length is bounded by the registry's reading rather than by
--- anything the caller can offer.  The two ranges then cross at the
--- smallest cap the invariant admits, so no ceiling is choosable.
---
--- SO THE LEVEL LEDGER IS THE CAPS FACE'S RATHER THAN THIS ARM'S OWN,
--- and that needs no further counterexample.  A FLAT ceiling fails on
--- its own reading: the hop asks for the entry level plus the size
--- reading there, so taking the entry level to BE the ceiling asks past
--- it at once.  What absorbs an exponential climb is a ledger indexed
--- by remaining nesting depth, and the caps face already carries one --
--- `chainStep-caps` proves its climb survives a fan-out, and it is paid
--- out of the instant's fuel rather than out of the cap.
---
--- AND THAT LEDGER IS UNAFFORDABLE HERE, SO WHAT MOVES IS THE MECHANISM
--- AND NOT THE NUMBER.  Reading the affordability ONCE, at the top of
--- that ledger, is the only form the counterexamples leave standing,
--- and the walked ceiling does not reach it: a ladder that at least
--- exponentiates per rung cannot be closed under a ceiling that is one
--- exponential, however the arithmetic is arranged, and no hypothesis
--- available at this hop changes which of the two towers.  What is left
--- standing is a receipt that SHRINKS along the path and names no level
--- at all -- the shape the potential face already carries -- so this arm
--- is owed a different CURRENCY rather than a larger number in the one
--- it has.
---
--- AND THE CURRENCY HAS NOW MOVED AND THIS HOP DID NOT COME WITH IT,
--- which is the one thing the separation settles.  The size bound is no
--- longer charged against the round's ceiling: the walk concludes at
--- the ladder it climbs, and the ceiling is met once at the consumer
--- rather than at every frame -- so the number here is a caller's to
--- choose.  It buys nothing, because the counterexamples never read the
--- ceiling.  The level witness meets every premise with the budget set
--- to the CAP itself and still lands a value above it on the first
--- fanned-into frame.  So what is owed is not a larger number nor a
--- differently denominated one, but a premise RELATING the registry's
--- reading to the values its chains produce.
---
---
--- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
--- REFUTED: `Refuted.Sink-Level-Range`
--- DEAD ROUTE: picking the level ceiling at a caller and restating
---   this hop downward.  Every caller's ceiling is capped by what
---   `iterSize≤walkFac` affords, and one hop asks past it at every cap.
--- DEAD ROUTE: reading the affordability once at the caps face's top
---   level instead, which is what the three counterexamples leave.
---   `sizeCount` iterates `lvls`, and `exp-lvls` puts each rung above
---   two to the one below, so the count towers with the deliveries;
---   `nestWalkAt` is a single exponential of a cap cubed, and
---   `iterSize-2^` doubles per fold -- so the walked side is past the
---   ceiling by the ladder's second rung.
-postulate
-  walk-share-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S V Lv j : ℕ) (i : Fin n)
-    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    iterSize S Lv S ≤ V →
-    1 ≤ S →
-    valsSz? (iterSize S j S) vals ≡ true →
-    regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
-    j ≤ Lv →
-    DispatchLiveHyp sf gas id now V i vals fin sched st
-
--- THE SIZE SIDE CONDITION, DISCHARGED BY THE SAME WALK IT GUARDS.  The
--- values a frame sees are the ones the frames above it produced, so
--- the bound has to step: it is read at the LEVEL the walk has reached
--- rather than at one number, and each frame moves the level by one.
---
--- AND THE LEVEL BUDGET IS A PARAMETER, NOT THE SIZE CAP.  Reading it as
--- the cap is exactly right for ONE chain entered at level zero -- a
--- path legal under the cap has at most a cap's worth of frames -- and
--- it is wrong the moment a caller walks a second chain, because the
--- level it enters at is whatever the first chain left.  A selection of
--- `W` chains reaches a level on the order of `W` caps, so a budget
--- pinned to the cap is unsatisfiable there however the arithmetic is
--- arranged, and the affordability the caller owes is the one thing
--- that has to widen with it.  Keeping the two apart is what lets one
--- statement serve both: `Lv := S` recovers the single-chain reading.
-walk-LiveHyp-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (S V Lv j : ℕ) (path : Path Γ u t)
-  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-  iterSize S Lv S ≤ V →
-  1 ≤ S →
-  valsSz? (iterSize S j S) vals ≡ true →
-  pathSz? S path ≡ true →
-  regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
-  j + pathLen path ≤ Lv →
-  PathLiveHyp sf gas id now V path vals fin sched st
-walk-LiveHyp-go sf gas id now S V Lv j root vals fin sched st _ _ _ _ _ _ = tt
-walk-LiveHyp-go sf gas id now S V Lv j (share-sink i) vals fin sched st afford 1≤S hsz _ hreg hj =
-  walk-share-LiveHyp sf gas id now S V Lv j i vals fin sched st
-    afford 1≤S hsz hreg j≤Lv
-  where
-  j≤Lv : j ≤ Lv
-  j≤Lv = ≤-trans (m≤m+n j 0) hj
-walk-LiveHyp-go sf gas id now S V Lv j (f ↠ p) vals fin sched st afford 1≤S hsz hpz hreg hj =
-    hHead
-  , walk-LiveHyp-go sf gas id now S V Lv (suc j) p
-      (proj₁ step)
-      (proj₁ (proj₂ (proj₂ step)))
-      (proj₁ (proj₂ (proj₂ (proj₂ step))))
-      (proj₂ (proj₂ (proj₂ (proj₂ step))))
-      afford
-      1≤S
-      (stepFrame-sz sf id now f p vals fin sched st S j hfz hsz)
-      hpTail
-      (stepFrame-regsSz sf id now f p vals fin sched st S j hsz
-         (pathSz?-widen (f ↠ p) (iterSize-infl S 1≤S j S) hpz) hreg)
-      (≤-trans (≤-reflexive (sym (+-suc j (pathLen p)))) hj)
-  where
-  step = stepFrame sf id now f p vals fin sched st
-  j≤Lv : j ≤ Lv
-  j≤Lv = ≤-trans (m≤m+n j (pathLen (f ↠ p))) hj
-  atV : valsSz? V vals ≡ true
-  atV = valsSz?-mono (iterSize S j S) V vals
-          (≤-trans (iterSize-mono-count S S 1≤S j≤Lv) afford) hsz
-  hHead : FrameLiveHyp V f p vals
-  hHead = frameLive-of-sz V f p vals atV
-  hfz : frameSz? S f ≡ true
-  hfz = proj₁ (∧-true (frameSz? S f)
-                 ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)
-  hpTail : pathSz? S p ≡ true
-  hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
-                    (proj₂ (∧-true (frameSz? S f)
-                             ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
 
 -- THE WALK, AND THE FAN-OUT IT RE-ENTERS.  Four facts per frame and no
 -- more: the live leaf for what this frame minted, the slots' invariance
