@@ -528,6 +528,17 @@ postulate
   --   under that ceiling, about two to the previous instant's size
   --   count of them, while the instant runs a level count that towers
   --   in the story index.  Provable, and it buys a prefix.
+  -- DEAD ROUTE: the WIDTH-FIELD half of the binary above -- carrying a
+  --   tighter width as a field of the invariant record on the reading
+  --   that a program fans out per hop by at most its size.  The field
+  --   would have to be denominated in the measure the frame face
+  --   already uses, and that measure carries the source's payload count
+  --   into an EXPONENT at its fold clause, so it towers in the layer
+  --   count with no cap anywhere in its definition: a three-layer
+  --   refold crosses the linear ceiling at the linear reading's own
+  --   most generous setting, its own size at each level.  So there is
+  --   no field to thread, and the arm sits on the other branch.  The
+  --   separation is proven in `Probed.Fold-Width-Reach`.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

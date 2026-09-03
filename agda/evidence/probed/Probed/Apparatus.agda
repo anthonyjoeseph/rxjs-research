@@ -44,6 +44,7 @@ open import Data.Nat.Properties
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; cong; trans)
+open import Relation.Nullary using (¬_)
 
 open import Rx.Prim using (InstEmit)
 open import Rx.Exp using (Ctx; Closed; Val; Ty; sizeᵉ)
@@ -59,6 +60,24 @@ open import Verify-Budget-Sufficient.Sighted-Fit
 
 Confirms : {A : Set} → .(claim : A) → Set
 Confirms {A} _ = A
+
+-- THE FORK'S PRODUCT, AND IT IS A TYPE RATHER THAN A MARKER.  A
+-- `-- FORK:` probe stands between two candidate MECHANISMS, and what it
+-- earns is that they DISAGREE -- prose saying so is a claim no machine
+-- reads, and a `-- TARGET:` receipt written from such a file would
+-- report coverage the separating rows never bought.
+--
+-- The candidates are two definitions of ONE signature, so the
+-- disagreement is a value: `at` names the point and `apart` carries it
+-- there.  When the two agree, `apart` is uninhabited at every point and
+-- the record cannot be written at all -- which is what makes the marker
+-- decide only WHICH law applies and leaves Agda to decide whether the
+-- claim is true.
+record Separates {A : Set} {B : A → Set} (f g : (x : A) → B x) : Set where
+  constructor separates-at
+  field
+    at    : A
+    apart : ¬ (f at ≡ g at)
 
 -- AND THE POINTWISE READING SITS UNDER THE MAXIMUM.  This is the one
 -- fact a tie at a `∀ (k : NodeId)` conjunct cannot compute: the

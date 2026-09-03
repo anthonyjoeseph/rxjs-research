@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **DECIDE WHETHER THE FOLD'S COUNT IS REAL.** The fold arm is
-  at the spiral stop: a depth fixed before an instant runs, against a
-  count that towers in it, and no denomination moves the two numbers
-  -- stories are the caps face's currency at the exit index, the
-  branch join is already taken, and the entry width in the exponent
-  buys a prefix of the levels. What no refutation has asked is
-  whether the count is REACHABLE: it is what the recurrence admits
-  at a level, and a program fans out per hop by at most its size. So
-  the commit builds the widest burst a fixed-size program produces at
-  a hop, against `widAt`, and either threads a width field on the
-  invariant record or reports a FALSITY on the count axis.
+- **TAKE THE FOLD ARM'S OTHER BRANCH, THE ONE THE FORK LEFT STANDING.** The
+  binary is decided against the repair the arm proposed: the width field
+  cannot be threaded, because it would be denominated in the measure the
+  frame face already uses and that measure towers in the layer count. Its
+  own header says what follows -- a FALSITY on the count axis and on the
+  budget at this recurrence, not on this arm. The fork proves the
+  separation but reaches it through the syntax, so the region a FALSITY
+  needs is not yet reached. The commit builds the run that reaches it,
+  through the `stepFrame` door rather than the subscribe frame, and
+  reports the class the rows earn.
 
 - **THEN PRICE THE CHARGE, WHICH IS WHERE THE DEPTH OBLIGATION NOW SITS.** The
   census settled what the admitted chains' depth is FOR: every route reaches
@@ -239,17 +238,14 @@ does not fit is a finding about the shared statement, not about the head.
   run, and either names the summand that has to move or reports a FALSITY on
   the charge itself.
 
-- **THEN TIE THE REST OF THE BIG-PREDICATE GROUP, AND WRITE THE BOUNDARY WHERE
-  THE CONCLUSION ITSELF IS SEALED.** The premises-standing shape carried both
-  `stepFrame` arms and corrected two receipts on the way: each arm's frame
-  grant is SPENT, the nodes arm's increment being exactly the accumulator's
-  wrap depth and the live arm's fold outrunning the slot vocabulary from depth
-  three. Eight targets remain and the shape reaches every one whose conclusion
-  computes off the evaluator. Two it does not, which is the finding this commit
-  owes: `subscribeE-fit` reads `nestB` through `fitG` and
-  `pushVals-caps-burstW` reads `innerW` on the small side of `thruRoomW`, both
-  sealed, so no numeral instantiates either side and a tie there has to go
-  through a proven inequality instead.
+- **THEN RE-READ THE ARM'S SIBLINGS AGAINST THE DEAD FIELD.** The same
+  recurrence is read at the other Φ arms, and each was classed while the
+  width field was still an open repair -- so an arm parked as waiting on
+  that field is waiting on nothing, and its class is wrong in the direction
+  that reads safe. This is a reclassification pass and not a grind: the
+  arms the dead route reaches move UP, and any arm that survives it is a
+  genuinely separate gap and gets said so in its own header. The commit
+  re-reads them and moves the classes that move.
 
 ### The ledger
 
@@ -282,8 +278,8 @@ does not fit is a finding about the shared statement, not about the head.
 - **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   what one frame stores at the nodes map, under the potential AND the frame
   grant. The premise alone was refuted at the scan arm: the cell holds the
-  accumulator against a budget constant in the burst. The grant is spent at
-  the wrap depth.
+  accumulator against a budget constant in the burst. The grant is spent at the
+  wrap depth.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the
@@ -296,7 +292,7 @@ does not fit is a finding about the shared statement, not about the head.
   size receipt at the PROGRAM's cap. Stated over an arbitrary state it fails at
   one registration longer than the cap, whatever the cap is; and the reachable
   length climbs with the syntax, so no numeral stands in for the cap either.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×2`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
   denominations refuted in one region, since a depth fixed before the count
   must dominate a count towering in it. Owed a binary, not a currency: is the
@@ -321,10 +317,10 @@ does not fit is a finding about the shared statement, not about the head.
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
   the caps can refute and they cannot move. One family unread.
-- **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame
-  emits no more payloads than its term syntactically carries. Stated over the
-  split, not the sealed measure, so it instantiates; three tight rows tied, a
-  frame below the root uncovered.
+- **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
+  no more payloads than its term syntactically carries. Stated over the split,
+  not the sealed measure, so it instantiates; three tight rows tied, a frame
+  below the root uncovered.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to
@@ -385,8 +381,8 @@ does not fit is a finding about the shared statement, not about the head.
   Free-list form refuted; tied at the entry arrival, cap premises unasked.
 - **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
-  the path measure charges nothing for; the component reads zero, so the tie
-  is degenerate on the increment.
+  the path measure charges nothing for; the component reads zero, so the tie is
+  degenerate on the increment.
 - **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY,
   `DEAD ROUTE, TWIN`: every stage of every chain's walk under the width cap.
   The mirror carries the identical conjunct across the feared `thru` hop, and
