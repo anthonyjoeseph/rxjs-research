@@ -23,14 +23,15 @@ open import Probed.Cascade-Chain-Count
          Dup1-fits; Dup4-fits;
          S22-fits; S1-fits; SU-fits; SC-fits;
          SW-fits; ChW-fits; ChW2-fits; Adv-fits;
-         Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits)
+         Tie22-fits; Tie1-fits; TieU-fits; TieC-fits; TieW-fits; TieC4-fits;
+         tieSyn)
 open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
 open import Probed.Burst-Nest-Unit
   using (figures≡; okM; okS; okX; liveM; nodesM; regsM; deferFigs≡; strongFigs≡; strongFits;
          strongHeads; richFigs≡; richFits)
 open import Probed.Cascade-Store-Components
-  using (U-parts; C-parts; F-parts)
+  using (U-parts; C-parts; F-parts; tieRegs)
 open import Probed.Burst-Nest-Ladder
   using (ladder1≡; ladder2≡; ladder3≡; ladderFlat≡; flatFace; flatRow)
 open import Probed.Sync-Factor

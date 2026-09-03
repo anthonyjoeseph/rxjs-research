@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SEALED GROUP SPLITS BY SIDE, AND THE SMALL SIDE IS RESTATED RATHER
-  THAN REACHED.** A seal on the LARGE side of a grant is free — monotonicity
-  crosses it without it reducing — which is how the three `thruFit-arr-*`
-  tied. On the small side there is no such route, and `burst-out` is the
-  answer: the leaf is RESTATED over the split the seal hides, with the
-  equation spent once in a body. A claim nothing can instantiate is a claim
-  nothing can refute, so that is a defect in the statement, not a coverage
-  boundary. `pushVals-caps-burstW` is the remaining small-side row; its seal
-  is `innerW`, which exports no equation, so the commit either restates it
-  the same way or writes the boundary at the statement.
+- **IT IS THE PREMISES THAT BLOCK A TIE, NOT THE CONCLUSION — SO LEAVE THEM
+  STANDING.** Across the big-predicate group the conclusion computes off the
+  evaluator and it is the CAP premises that name sealed families, so a row
+  discharging them would report on the seal instead of on the run. Applied as
+  far as the computable arguments reach and taking the rest as hypotheses the
+  body never reads, the row is a STRONGER claim than the instance rather than
+  a weaker one. The two `Part7/Cascade-Nest` rows tie that way. The commit
+  carries the shape to the next pair and reports any target whose CONCLUSION
+  is sealed, which is the case it does not reach — `pushVals-caps-burstW` is
+  one, its width conjunct reading `innerW` on the small side.
 
 - **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the
@@ -377,12 +377,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`arr-chains-nest-syn`** (Part7/Cascade-Nest) — DIFFICULTY,
   `REFUTED, PROBED`: the selection's paths and the arrival's payload land
   inside one unit — the fact that ties the walk's charge back to the program.
-  Free-list form refuted; probeable.
+  Free-list form refuted; tied at the entry arrival, cap premises unasked.
 - **`cascadeGo-nest-regs`** (Part7/Cascade-Nest) — DIFFICULTY, `PROBED`: the
   walk's registry paths under the same width. Registration adds the one frame
-  the path measure charges nothing for; the component reads zero after every
-  cascade, so a walk leaving a deeper registration standing is the unreached
-  region.
+  the path measure charges nothing for; the component reads zero, so the tie
+  is degenerate on the increment.
 - **`arr-chains-bursts`** (Part7/Arrival-Ledger) — DIFFICULTY,
   `DEAD ROUTE, TWIN`: every stage of every chain's walk under the width cap.
   The mirror carries the identical conjunct across the feared `thru` hop, and

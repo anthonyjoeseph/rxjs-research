@@ -204,7 +204,13 @@ cascadeGo-nest-nodes {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hn
 --   leaves a registration STANDING whose path is deeper than any the
 --   store held, which is what the `nestUnit` factor of the increment
 --   would have to pay for.  No family reaches it, so the reading is a
---   receipt about retirement rather than about the bound.
+--   receipt about retirement rather than about the bound.  TIED at the
+--   demand family, with the three cap premises LEFT STANDING as the
+--   seal forces, so the row asserts the conclusion with the caps
+--   invariant unasked.  The tie is DEGENERATE on the increment for the
+--   same reason the readings are: the component is under the starting
+--   store before the increment is added, so `m≤m+n` carries the rest
+--   and nothing here spends it.
 postulate
   cascadeGo-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
@@ -399,7 +405,11 @@ cascadeGo-nest {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hnest hv
 --   at once -- the wrap is in the scan's own function, so it lands in
 --   `pathNestD` of every chain through that frame and in `nestDᵉ` of
 --   the program together.  COVERED is the conclusion; the premises
---   compute nowhere.  NOT covered: `Γ₂`, and the vocabulary runs dry
+--   compute nowhere.  TIED at the entry arrival with both cap premises
+--   LEFT STANDING, which the seal forces and which makes the row a
+--   stronger claim than this instance rather than a weaker one: what
+--   it asserts is the conclusion with the caps invariant unasked.  NOT
+--   covered: `Γ₂`, and the vocabulary runs dry
 --   after a handful of arrivals -- a row past the end announces itself,
 --   reading its verdict false rather than passing quietly.
 postulate
