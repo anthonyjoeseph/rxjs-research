@@ -227,22 +227,23 @@ does not fit is a finding about the shared statement, not about the head.
   price a widening the walk does — the commit restates the row and its
   fold in that shape.
 
-- **THEN RE-PRICE THE STORE FACE'S FACTOR AT THE LEVEL, NOT THE
-  INSTANT.** The factor and the increment are both defined from the
-  burst, so a level-indexed burst moves them with it, and the exponent
-  they are paid out of is stated in one instant's size. The question is
-  whether the level a cascade actually reaches stays under that size —
-  which is the counting the caps face already does for its own bound,
-  in the same currency. The commit states the affordability side at the
-  level and either lands it or names the level it misses at.
+- **THEN CARRY THE LEVEL INTO THE FACTOR AND THE INCREMENT, ASSEMBLY
+  FIRST.** Both are defined from the burst, so a level-indexed burst
+  moves them, and the level cannot be discharged before they see it:
+  flattening at the top puts a tower of the reached level where the
+  room pays two to one size, which is written down. So the level runs
+  to the store face or the restatement buys nothing. The commit states
+  the level-indexed factor and increment with their store-face bridges
+  POSTULATED at the level, so the shape is checked before any of it is
+  proven — and a bridge that cannot be stated is the design gap.
 
-- **AND SPEND THE LEVEL AT THE TWO STORE-FACE CONSUMERS AND THE
-  BRIDGE.** The row is consumed at a flat type in three places, so the
-  level has to arrive there or the restatement buys nothing. Each is a
-  preservation step whose caps side already climbs, so the work is
-  threading one index through statements that carry its neighbour —
-  mechanical where the caps face is proven, and the place a design gap
-  would show up as a site that cannot name the level it needs.
+- **AND DISCHARGE THOSE BRIDGES AT THE TWO CONSUMERS.** Each is a
+  preservation step whose caps side already climbs a level per chain,
+  so the obligation is threading one index through statements that
+  already carry its neighbour, against a face that is proven. The place
+  a gap would surface is a site that can name the cap it needs but not
+  the level, which is what the previous leg's assembly is built to make
+  visible before the grinding starts rather than after.
 
 ### The ledger
 

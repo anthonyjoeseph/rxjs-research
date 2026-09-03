@@ -751,8 +751,8 @@ abstract
   -- costs the affordability chain nothing (the bounding step is a
   -- reflexivity) and hands the ledger the largest number that chain
   -- can pay for.  That ceiling is the reason the axis is fixed here,
-  -- and the dead routes below are what happened when the ledger was
-  -- asked what it needs rather than what it can be given.
+  -- and it is a statement about what the ledger can be GIVEN, which is
+  -- a different question from what a walk's frames ask of it.
   --
   -- WHICH IS WHY THE WIDTH AXIS IS THE WRONG CURRENCY HERE AT ALL.
   -- Within one cap the width outruns the size by construction -- the
@@ -789,6 +789,18 @@ abstract
   --   not cost a story, it inverts.  Together with the entry reading
   --   below, the size axis is closed at both ends and no flat number
   --   serves this ledger.
+  -- DEAD ROUTE: going level-indexed and then FLATTENING at the top,
+  --   which is the cheap version of the repair and the one to reach
+  --   for first.  A level's cap is a `frameStep`, whose width field is
+  --   `iterFold` -- exponentiation iterated once per level, so a
+  --   tower in the level rather than a power of it.  The top level a
+  --   cascade reaches is bounded by `sizeCount` joined with the size,
+  --   which `21≤capsAt-size` puts past twenty, so the flattened
+  --   number is a tower of that height while `nestFac-room` still pays
+  --   out of two to one size.  The level cannot be discharged at the
+  --   ledger and handed on flat; it has to reach the store face,
+  --   which is why re-pricing the factor and spending the level at the
+  --   consumers are one piece of work and not two.
   -- RECOVERY: git show b59648c restores `capsAt-wid<size` and
   --   `wid<frameBlowup-size`, the pair that bounded a cap's width by
   --   the next instant's size; `room-frameBlowup` states that bound
