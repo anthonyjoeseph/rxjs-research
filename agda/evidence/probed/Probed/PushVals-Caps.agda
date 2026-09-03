@@ -36,7 +36,7 @@ open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (just; nothing)
 open import Data.Nat using (ℕ; zero; suc; _≤_)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Data.Nat.Properties using (_≤?_)
+open import Data.Nat.Properties using (_≤?_; ≤ᵇ⇒≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Relation.Nullary.Decidable using (True; toWitness)
 
@@ -53,9 +53,11 @@ open import Rx.Evaluator
   AllOp; NodeId; Path)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps; frameStep)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (burstCaps?; capsOK?; nestValOK?; slotsCaps?; nestClosOK?)
-open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; pushValsCapsOK; pushValsWidOK; pushValsWOK)
+open import Verify-Budget-Sufficient.Nest-Walk using (burstNest?; nestCapsOK?; pushValsCapsOK; pushValsWidOK; pushValsWOK;
+  FaceOK; faceOK; pushVals-caps-burstW)
 open import Verify-Budget-Sufficient.Nest-Burst using (innerW)
 open import Refuted.Demand-Programs using (Γ₂; insT)
+open import Probed.Apparatus using (Confirms)
 
 -- THE CAP-FORMER THESE ROWS ARE STATED OVER: the entry cap with its
 -- SIZE stepped and its width and register frozen.  `src` no longer
@@ -705,3 +707,58 @@ burstsA = burstCaps? (arrCapAt (Caps.cSize (tightA 1)) (tightA 1)) (slotsA 1) (p
 
 burstsA≡ : burstsA ≡ (true , true)
 burstsA≡ = refl
+
+----------------------------------------------------------------------
+-- THE TIE, AT THE THREE HEADS THE LEAF ROWS ABOVE ALREADY STAND ON.
+-- Those rows state the room walk by hand and pin it beside the
+-- statement; these state it AS the statement, applied at this file's
+-- own point, so a restatement of the burst claim changes them
+-- underneath rather than leaving them green.
+--
+-- THE WIDTH HALF IS STILL A PREMISE AND NOT A ROW, for the reason the
+-- leaf rows give: the measure is sealed and no point reduces it.  What
+-- the tie adds over them is that the SHAPE is now generated -- the
+-- burst's arity, the per-arrival room record and the tail are read off
+-- the statement, where before they were typed out and could drift from
+-- it silently.
+--
+-- LOAD-BEARING in the switch arm and in the arity, DEGENERATE in the
+-- width conjunct.  The merge and exhaust heads discharge their switch
+-- clause by absurdity -- the node the mint installs is not a switch
+-- node, and a run that wrote one there would fail these rows -- while
+-- the switch head has to spend the premise a second time at the killed
+-- schedule.  The width conjunct is `hw` at every position and could
+-- not have failed.
+--
+-- NOT COVERED: the cap, which enters only through the five premises
+-- and is taken here at a face wide enough to satisfy the ambient
+-- bundle rather than at the tight cap the leaf rows read; and the
+-- premises themselves, left standing and unread.
+----------------------------------------------------------------------
+
+faceC : Caps
+faceC = caps 64 16 1
+
+faceP : FaceOK faceC slots
+faceP = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+tieM : ∀ {W} → Widths W → Confirms
+  (pushVals-caps-burstW faceC slots W gasBig mergeAllᵒ (just 1) (wrapped 1)
+     root 0 0 (sched-init (rM 1 1) slots) (st-init (rM 1 1)) ⦃ faceP ⦄)
+tieM hw _ _ _ _ _ =
+  ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+  , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt
+
+tieS : ∀ {W} → Widths W → Confirms
+  (pushVals-caps-burstW faceC slots W gasBig switchᵒ nothing (wrapped 1)
+     root 0 0 (sched-init (qS 1) slots) (st-init (qS 1)) ⦃ faceP ⦄)
+tieS hw _ _ _ _ _ =
+  ((hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ })
+  , (hw _ _ _ _ _ _ _ _ _ , λ { cur od refl → hw _ _ _ _ _ _ _ _ _ }) , tt) , tt
+
+tieX : ∀ {W} → Widths W → Confirms
+  (pushVals-caps-burstW faceC slots W gasBig exhaustᵒ nothing (wrapped 1)
+     root 0 0 (sched-init (qX 1) slots) (st-init (qX 1)) ⦃ faceP ⦄)
+tieX hw _ _ _ _ _ =
+  ((hw _ _ _ _ _ _ _ _ _ , λ { cur od () })
+  , (hw _ _ _ _ _ _ _ _ _ , λ { cur od () }) , tt) , tt

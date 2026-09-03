@@ -49,7 +49,8 @@ open import Probed.PushVals-Caps
          leavesX-1; leavesX-2; leavesSh; leavesShS; leavesShX;
          axesFlat≡; axesNest≡;
          burstsM≡; burstsS≡; burstsX≡; burstsSh≡; burstsShS≡; burstsShX≡;
-         burstsG≡; burstsA≡)
+         burstsG≡; burstsA≡;
+         tieM; tieS; tieX)
 open import Probed.Chain-Step-Abs-Charge
   using (figures≡; fits; figuresB≡; fitsB; tieFigs≡; tieNodes1; tieNodes3)
 open import Probed.Chain-Step-Live-Deferred
@@ -90,8 +91,6 @@ open import Probed.Depth-Sighted
          rootRow≡; rootWideRow≡; seedRow≡; dblFigs≡; dblLongFigs≡;
          chainDesc≡; chainRow; farDesc≡; farChainRow;
          walkFigs≡; walkRow≡; tieWalk1; tieWalk4)
-open import Probed.Drain-Queue-Ladder using (qlen≡; measures≡; dom≡; dom5≡)
-open import Probed.Drain-Queue-Length using (sizes≡; vocab≡; lenRow≡)
 open import Probed.Sight-Fit-Width
   using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 
