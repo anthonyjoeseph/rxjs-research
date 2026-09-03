@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CLOSE THE CASCADE DOOR'S UNPROJECTED PACKAGE.** The round's caps
-  package is now stated at EVERY chain rather than at the surviving ones,
-  because a consumer denominated in the round's DESCENT charges for the
-  head chain whatever the cancellation test says — and the fold above it
-  owes nothing on the cancelled arm, so it can never pay. Its mirror is
-  this induction at every arm that survives, and that arm already holds
-  every ingredient the new one needs; what is genuinely new is the third
-  callee, the tail at the state a cancelled chain's step would leave.
-  The commit grinds it against the mirror, one arm at a time.
+- **DENOMINATE THE CASCADE DOOR'S PACKAGE IN A BUDGET THE CANCELLED
+  ARMS ARE INSIDE.** That package spends a level at every cons against a
+  ceiling that does not move, and it carries no level premise at all —
+  while the one machine minting such a level prices it in the round's
+  DELIVERY ledger, which steps over exactly the arms the package demands
+  receipts at. So the currency is wrong before any arm is ground: the
+  spend is over the chain LIST and the fund is over the run. The commit
+  finds what the tree already has denominated in the list — the descent
+  measure is the candidate, being what the consumer charges in — and
+  restates the budget there, reporting whether the consumer can pay it.
 
 - **AND RE-DENOMINATE THE FANNED CHAIN'S WALK AT THE CAP ITS RECEIPTS
   ARE CARRIED AT.** The chains a sink fans into are walked at the
@@ -305,6 +306,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
+- **`arr-chains-caps-all`** (Part7/Arrival-Caps) — SHAPE, `DEAD ROUTE`: the
+  round's caps package at EVERY chain. Its conses spend levels against a fixed
+  ceiling and it takes no level premise; the only ledger funding such a spend
+  counts deliveries, which a cancelled arm makes none of. Wants a budget over
+  the chain list.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the
@@ -387,10 +393,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
-- **`arr-chains-caps-all`** (Part7/Arrival-Caps) — GRINDABLE, `TWIN`: the
-  round's caps package at EVERY chain, which is what a consumer denominated in
-  the DESCENT charges for. The mirror is this induction at every surviving arm;
-  only the cancelled arm's third callee is new.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 

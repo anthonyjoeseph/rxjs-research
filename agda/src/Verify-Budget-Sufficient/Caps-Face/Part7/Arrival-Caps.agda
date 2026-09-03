@@ -642,14 +642,26 @@ postulate
 -- fit under the fuel, which together price a chain's descent without
 -- pricing the round's.
 --
--- TWIN: `arr-chains-caps-go`, whose induction is this one at every
---   arm that survives.  Its cancelled arm already holds every
---   ingredient this one needs -- the caps receipt at the entry state,
---   the path receipt off the same conjunction, the value and closure
---   receipts unchanged -- and declines to mint one only because its
---   conclusion says nothing there.  What is genuinely new is the third
---   callee: the tail must also be reported at the state a CANCELLED
---   chain's step would leave, which the surviving fold never visits.
+-- AND WHAT IT IS SHORT OF IS A LEDGER, NOT AN ARM.  Every cons here
+-- carries a level increment tied back to a ceiling that does NOT move
+-- with the level, so the increments the arms spend have to be funded.
+-- The only machine that produces one bounds it by the round's level
+-- ledger, and that ledger is indexed by the deliveries the cascade
+-- actually makes.  A cancelled registration is stepped over outright,
+-- so it funds nothing -- while the receipt asked for at that arm is
+-- about the step it WOULD have taken, whose deliveries the ledger
+-- never counted.  The fund is raised by the surviving arms and spent
+-- by all of them.  This statement takes no level premise at all, which
+-- is why the gap reads as a missing arm until the increments are
+-- followed back to what pays them.
+--
+-- DEAD ROUTE: mirroring the surviving fold's induction arm for arm.
+--   That fold splits its ledger by SUBTRACTING the portion a chain
+--   consumed, and the subtraction is against a delivery count that
+--   steps over the cancelled arms.  So the mirror reproduces every
+--   receipt asked for here except the Σ's own bound, and it fails at
+--   the arm the two folds disagree on rather than at a clause -- which
+--   is what made the mirror read as one new callee.
 postulate
   arr-chains-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
