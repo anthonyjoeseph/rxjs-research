@@ -46,7 +46,6 @@ open import Verify-Budget-Sufficient.Walk-Factor using
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
   valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; Φ-to-bound)
-open import Verify-Budget-Sufficient.Regs-Fold-Len using (foldPath-regsSz)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; base; walk; ent-step)
@@ -1176,11 +1175,10 @@ postulate
 -- AND WRITING THE BODY FOUND TWO MORE, BOTH ABOUT WHAT THE REGISTRY
 -- MAY HOLD RATHER THAN ABOUT THE POTENTIAL.  A chain the fan-out
 -- re-enters is walked FROM THE TOP, so it needs its size receipt at
--- the program's own cap -- and the walk holds the registry at the
--- LEVEL it has reached, `regsSz?` at an `iterSize` that only grows, so
--- the reading it carries is the weaker one and cannot be narrowed back
--- down.  The two are different readings of the same list, and only the
--- registration side can supply this one.
+-- the program's own cap -- and the walk carries no registry reading of
+-- its own to narrow down to it, the level ledger having turned out to
+-- pay for the fan-out on its own.  Only the registration side supplies
+-- this one.
 
 -- AND WHAT A SIZE RECEIPT HAS TO PRICE IS THE REGISTERED LENGTH, which
 -- does not sit at a constant.  Instantiated in `Probed.Fan-Regs-Registry`,
@@ -1901,8 +1899,6 @@ chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
   j + pathLen path + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   foldr (λ l acc → liveNest l ⊔ acc) 0
@@ -1912,7 +1908,7 @@ chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
         ⊔ regsNestMax (EvalSt.registry st)
         ⊔ (nestΦAt e sl id)
 chainStep-nest-liveC {e = e} sl id Lc a nextId Lv j path sched st
-                     hcc hdc hsl afford hsz hp hreg hΦ hj =
+                     hcc hdc hsl afford hsz hp hΦ hj =
   ≤-trans
     (foldPath-nest-live _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
       (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -1962,8 +1958,6 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   nestDᵛ (arrTy a) (arrVal a) + pathNestD path ≤ nestUnit e sl →
   j + pathLen path + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
@@ -1971,10 +1965,10 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   storeNestMax (proj₁ (proj₂ (chainStep nextId a path sched st)))
                (proj₂ (proj₂ (chainStep nextId a path sched st))) ≤ S
 chainStep-store≤ {e = e} sl id Lc a nextId S Lv j path sched st
-                 hcc hdc hsl afford hsz hp hreg hΦ hj hinc hS =
+                 hcc hdc hsl afford hsz hp hΦ hj hinc hS =
   storeNestMax-lub sd′ st′ S SL
     (≤-trans (chainStep-nest-liveC  sl id Lc a nextId Lv j path sched st
-                hcc hdc hsl afford hsz hp hreg hΦ hj)
+                hcc hdc hsl afford hsz hp hΦ hj)
              (⊔-lub (⊔-lub (⊔-lub (≤-trans (storeNest-live≤  sched st) hS)
                                   (≤-trans (storeNest-slots≤ sched st) hS))
                            (≤-trans (storeNest-regs≤ sched st) hS))
@@ -1994,46 +1988,6 @@ chainStep-store≤ {e = e} sl id Lc a nextId S Lv j path sched st
   SL = ≤-trans (≤-reflexive (cong slotsNestSum
                               (chainStep-slots nextId a path sched st)))
                (≤-trans (storeNest-slots≤ sched st) hS)
-
--- THE REGISTRY ACROSS A WHOLE CHAIN, AT ONE LEVEL PER CHAIN, AND THE
--- DOOR IS THE FOLD.  `chainStep` is one call to `foldPath` -- the
--- arrival's value as the only value in flight, its tick and source as
--- the fold's, and its lastness as the fold's fin -- so the whole of
--- what a chain does to the registry is what that call does, and the
--- level it costs is the fold's one step.
---
--- SO WHAT IS OWED HERE IS ONE TRANSPORT AND NOTHING ELSE.  The path
--- passes STRAIGHT THROUGH at the program's cap, because the fold's
--- two caps are the same two this face already keeps apart -- the
--- program's own and the level reached -- so nothing has to claim a
--- chain grew with the level it is walked at.  What remains is the
--- arrival, read here as a size and by the fold as a list, which
--- becomes the one-element values premise at the level's reading and
--- is free at `j = 0`, where the iterate is the cap itself.
---
--- SO THE LEVEL ACCUMULATES DOWN THE SELECTION RATHER THAN COLLAPSING
--- AT THIS DOOR.  The consumer spends this once per chain, feeding each
--- output registry in as the next chain's premise, and what must bound
--- the run is `nestΦAt` -- the way `iterSize≤walkFac` already makes a
--- bounded run of levels affordable against the walk factor, which is
--- why the store side now carries a `j + pathLen` premise beside it.
-chainStep-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (S j : ℕ) (a : Arrival Γ) (nextId : Id)
-  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-  1 ≤ S →
-  sizeᵛ (arrTy a) (arrVal a) ≤ S →
-  pathSz? S path ≡ true →
-  regsSz? (iterSize S j S) (EvalSt.registry st) ≡ true →
-  regsSz? (iterSize S (suc j) S)
-    (EvalSt.registry (proj₂ (proj₂ (chainStep nextId a path sched st))))
-    ≡ true
-chainStep-regsSz S j a nextId path sched st 1≤S hsz hp hreg =
-  foldPath-regsSz _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st S j 1≤S
-    entrySz hp hreg
-  where
-  entrySz : valsSz? (iterSize S j S) (arrVal a ∷ []) ≡ true
-  entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
-              (≤-trans hsz (iterSize-infl S 1≤S j S)))) refl
 
 -- THE ROUND IS A WALK OVER ITS CHAINS, and the three-callee clause is
 -- the one `depthCascade` reports: the tail at the incoming state, the
@@ -2077,8 +2031,6 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   all (λ rc → nestDᵛ (arrTy a) (arrVal a) + pathNestD (proj₂ rc)
                 ≤ᵇ nestUnit e sl) chains ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   j + chainsLenSum chains + length chains
     + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
@@ -2086,11 +2038,11 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   depthCascade a nextId chains sched st
     ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
 cascade-depth-go sl id Lc a nextId S Lv j [] sched st
-                 hca hsight hsl afford hsz hps hΦs hreg hbud hinc hS = z≤n
+                 hca hsight hsl afford hsz hps hΦs hbud hinc hS = z≤n
 cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sched st
-  hca hsight hsl afford hsz hps hΦs hreg hbud hinc hS =
+  hca hsight hsl afford hsz hps hΦs hbud hinc hS =
   ⊔-lub (cascade-depth-go sl id Lc a nextId S Lv j cs sched st
-           (proj₁ hca) hsight hsl afford hsz hpr hΦr hreg hbud-tail hinc hS)
+           (proj₁ hca) hsight hsl afford hsz hpr hΦr hbud-tail hinc hS)
         (⊔-lub (chain-depth-sighted sl a nextId S c sched st₀ hsl hS)
                (cascade-depth-go sl id (Lc + proj₁ (proj₂ (proj₂ hca)))
                   a nextId S Lv (suc j) cs
@@ -2098,12 +2050,11 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
                   (proj₂ (proj₂ (proj₂ (proj₂ hca)))) hsight
                   (trans (chainStep-slots nextId a c sched st₀) hsl)
                   afford hsz hpr hΦr
-                  (chainStep-regsSz B j a nextId c sched st₀ 1≤B hsz hpc hreg)
                   hbud-next
                   hinc
                   (chainStep-store≤ sl id Lc a nextId S Lv j c sched st₀
                      (proj₁ (proj₂ hca)) hdc
-                     hsl afford hsz hpc hreg
+                     hsl afford hsz hpc
                      (≤ᵇ⇒≤ (nestDᵛ (arrTy a) (arrVal a) + pathNestD c)
                            (nestUnit e sl) (T-to hΦc))
                      hbud-head hinc hS)))
@@ -2111,9 +2062,6 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
   st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
   hdc = ≤-trans (chain-depth-sighted sl a nextId S c sched st₀ hsl hS) hsight
   r   = chainStep nextId a c sched st₀
-  B   = Caps.cSize (capsAt e sl id)
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
   hpc = proj₁ (∧-true (pathSz? (Caps.cSize (capsAt e sl id)) c) _ hps)
   hpr = proj₂ (∧-true (pathSz? (Caps.cSize (capsAt e sl id)) c) _ hps)
   hΦc = proj₁ (∧-true (nestDᵛ (arrTy a) (arrVal a) + pathNestD c
@@ -2143,16 +2091,6 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
                          (sym (+-suc (j + (pathLen c + chainsLenSum cs))
                                      (length cs))))))
             hbud
-
--- the cascade's opening ledger write is not a registry write, on
--- either branch of the spent-source test
-latch-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (B : ℕ) (a : Arrival Γ) (st : EvalSt e) →
-  regsSz? B (EvalSt.registry st) ≡ true →
-  regsSz? B (EvalSt.registry (cascadeLatch a st)) ≡ true
-latch-regsSz B a st h with Arrival.isLast a
-... | true  = h
-... | false = h
 
 -- EVERY LEVEL A WHOLE CASCADE REACHES IS AFFORDABLE, and this is the
 -- one place the level ledger has to meet the walk's ceiling.  The
@@ -2294,8 +2232,6 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                 ≤ᵇ nestUnit e sl) chains ≡ true →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
-            (Caps.cSize (capsAt e sl id))) (EvalSt.registry st) ≡ true →
   j + chainsLenSum chains + length chains
     + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
@@ -2309,11 +2245,11 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
     a nextId chains sched st
 cascade-caps-all-go sl id Lc a nextId S Lv j [] sched st
-  sleq cok hsc afford hsz hpz hΦs hvc hcl hreg hbud hinc hS J g i hfl hR hlen hLc = tt
+  sleq cok hsc afford hsz hpz hΦs hvc hcl hbud hinc hS J g i hfl hR hlen hLc = tt
 cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ chains) sched st
-  sleq cok hsc afford hsz hpz hΦs hvc hcl hreg hbud hinc hS J g i hfl hR hlen hLc =
+  sleq cok hsc afford hsz hpz hΦs hvc hcl hbud hinc hS J g i hfl hR hlen hLc =
     cascade-caps-all-go sl id Lc a nextId S Lv j chains sched st
-      sleq cok hsc afford hsz hpr hΦr hvc hcl hreg hbud-tail hinc hS
+      sleq cok hsc afford hsz hpr hΦr hvc hcl hbud-tail hinc hS
       J g i hfl hR
       (≤-trans (+-monoʳ-≤ i (n≤1+n (length chains))) hlen) hLc
   , HEAD
@@ -2323,10 +2259,9 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
       (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
       (trans (chainStep-slots nextId a path sched st′) sleq)
       (proj₂ (proj₂ ST)) hsc afford hsz hpr hΦr hvc hcl
-      (chainStep-regsSz B j a nextId path sched st′ 1≤B hsz hpc hreg)
       hbud-next hinc
       (chainStep-store≤ sl id Lc a nextId S Lv j path sched st′
-         HEAD hdc sleq afford hsz hpc hreg hΦc hbud-head hinc hS)
+         HEAD hdc sleq afford hsz hpc hΦc hbud-head hinc hS)
       J g (suc i) hfl hR
       (subst (_≤ regAt B (Caps.cReg c) J) (+-suc i (length chains)) hlen)
       (≤-trans (proj₁ (proj₂ ST)) STEP)
@@ -2338,8 +2273,6 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
   W   = Caps.cWid c
   d   = capsH e sl id
   2≤S = 2≤capsAt-size e sl id
-  1≤B : 1 ≤ B
-  1≤B = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
   D   = delivN st′ (proj₂ (proj₂ r))
   hpc = proj₁ (∧-true (pathSz? B path) _ hpz)
   hpr = proj₂ (∧-true (pathSz? B path) _ hpz)
@@ -2424,9 +2357,6 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
                 ≤ᵇ nestUnit e sl) (chainsOf a st) ≡ true →
   valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
   nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
-  regsSz? (iterSize (Caps.cSize (capsAt e sl id)) 0
-            (Caps.cSize (capsAt e sl id)))
-          (EvalSt.registry (cascadeLatch a st)) ≡ true →
   chainsLenSum (chainsOf a st) + length (chainsOf a st)
     + n * Caps.cSize (capsAt e sl id) ≤ Lv →
   nestΦAt e sl id ≤ S →
@@ -2434,13 +2364,13 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   chainsCapsAll (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0
     a nextId (chainsOf a st) sched (cascadeLatch a st)
 cascade-caps-all {e = e} sl id a nextId S Lv sched st sleq cok hsc afford hsz
-                 hpz hΦs hvc hcl hreg hbud hinc hsn =
+                 hpz hΦs hvc hcl hbud hinc hsn =
   cascade-caps-all-go sl id 0 a nextId S Lv 0 (chainsOf a st) sched
     (cascadeLatch a st) sleq
     (subst (λ x → capsOK? x sched (cascadeLatch a st) ≡ true)
            (sym (frameStep-0 (capsAt e sl id)))
            (cascadeLatch-caps (capsAt e sl id) a sched st cok))
-    hsc afford hsz hpz hΦs hvc hcl hreg hbud hinc hsn
+    hsc afford hsz hpz hΦs hvc hcl hbud hinc hsn
     0 (Caps.cSize (capsAt e sl id)) 0
     (capsAt-round-size e sl id) base REGLEN ≤-refl
   where
@@ -2478,16 +2408,12 @@ cascade-depth-sighted {n = n} {e = e} sl id a nextId sched st
     (chainsOf a st) sched (cascadeLatch a st)
     (cascade-caps-all sl id a nextId (nestΦAt e sl id) LV sched st hsl hok
        SIGHT (cascade-afford sl id a sched st hok) hsz CHAINPZ CHAINΦ valC closC
-       (latch-regsSz (Caps.cSize (capsAt e sl id)) a st
-         (capsOK?-regs (capsAt e sl id) sched st hok))
        ≤-refl ≤-refl STORE)
     SIGHT
     hsl
     (cascade-afford sl id a sched st hok) hsz
     CHAINPZ
     CHAINΦ
-    (latch-regsSz (Caps.cSize (capsAt e sl id)) a st
-      (capsOK?-regs (capsAt e sl id) sched st hok))
     ≤-refl
     ≤-refl
     STORE

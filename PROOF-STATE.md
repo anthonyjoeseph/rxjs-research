@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND RETIRE THE REGISTRY RECEIPT THE WALK NO LONGER READS.** The
-  level ledger pays for the fan-out now, so the size side condition is
-  re-derived at each state the fold leaves rather than threaded down
-  from the arrival — and the threaded receipt is spent by nothing but
-  itself. Three declarations hold one another up: the chain step's
-  reading feeds the next chain's, the fold's leaf feeds the chain
-  step's, and the fold's own price is a live row carrying five sweeps.
-  Dropping the premise from the cascade's two folds retires all three
-  at once, which is a face leaving the ledger rather than a postulate
-  being proven.
-
 - **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
   hop that climbs has strictly less telescope above it, and that is the
   quantity the leaf's price does not read. The separation says why it
@@ -246,6 +235,18 @@ does not fit is a finding about the shared statement, not about the head.
   discharges it at the input arm where the two readings are the same
   test, and hands the share arm the slot's own index. Its repair is a
   descent argument rather than a record field, so it is taken alone.
+
+- **AND CARRY THE STRATIFICATION THE SINK LEAF READS, WHICH IS THE
+  FIRST OF THE MINT'S FOUR.** A registration's source sits BELOW the
+  expression its chain is walked under, and no producer says so — the
+  reading is a property of the registry that every registration site
+  establishes and the walk consumes, which is the shape a record field
+  has and a threaded hypothesis does not. So the commit puts the
+  conjunct in the invariant record beside the floor, re-establishes it
+  at each producer, and spends it where the sink leaf asks the admitted
+  sublist for a reading no local premise carries. The obligation it
+  leaves is the values in flight's, which reaches the input arm under
+  syntax the record never saw.
 
 
 ### The ledger
@@ -302,10 +303,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×5`: one fold's
-  registry price as ONE FRAME STEP of two caps. Now read at both heights and at
-  later arrivals either side of the crossover, the entry settling exactly; only
-  the caps can refute and they cannot move. One family unread.
 - **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
   no more payloads than its term syntactically carries. Seven tight rows tied,
   the scan head and the share chain among them; every region a row could refute
