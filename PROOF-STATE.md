@@ -215,29 +215,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RESTATE THE CASCADE'S BURST LEDGER AT A MOVING WIDTH, ASSEMBLY
-  FIRST.** The flat form is refuted at the entry width and now closed
-  at the exit one too: the exit reading's only ceiling sits two
-  instants out while the face charging it is granted one, and the size
-  gain per instant is itself exponential. So no re-indexing repairs
-  the statement and the level-indexed form is the sole candidate left
-  — the shape the walk face's mirror already carries. The commit
-  restates the ledger and its top receipt at the moving width,
-  outside-in: the
-  restated leaf typechecking against its consumer, the residue
-  postulated BARE, no consumer re-priced yet.
+- **SPLIT THE CASCADE'S BURST LEDGER INTO THE ONE THING IT ACTUALLY
+  ASKS, WHICH IS A COMPOUNDING BOUND.** The ledger now reads the size
+  axis and the refuting witness no longer reaches it, so what is left
+  is narrow: a walk's burst squares at each `thru` hop, and the claim
+  is that this compounding stays under the number. The commit makes
+  the bare postulate a real body over that leaf plus the path's size
+  receipt, so the assembly checks that the leaf suffices. This is the
+  fourth currency the ledger has been read in and the first no witness
+  reaches, so the leaf is PROBED first: a refutation
+  there is the spiral's third strike on one region, and the answer is
+  then one number per HOP, not a fifth number.
 
-- **THEN GIVE THE MOVING BOUND SOMEWHERE TO PLUG IN, AT THE
-  CONSUMPTION SITE.** The cascade's node law takes the ledger as one
-  flat width and hands it straight down its own recursion, so a
-  level-indexed bound has no shape to arrive in and the restatement
-  above would land unclaimed. The repair is the postulate-to-assembly
-  one: convert that consumer into a real body over per-hop leaves, so
-  a hop is charged at the width it ENTERS at and the walk's growth is
-  carried frame by frame instead of assumed once for the whole chain.
-  The commit lands the assembly and the leaves it needs, which is what
-  makes the moving bound's fit checked by the typechecker rather than
-  asserted by a hypothesis list.
+- **THEN PRICE THAT LEAF AGAINST THE SIZE RECURRENCE, WHERE BOTH
+  SIDES LIVE.** The leaf compares a width compounded over the frames a
+  path may carry against the next instant's size, and both are faces
+  of the same recurrence — the fold step is a power, the size step is
+  linear, and the path length is itself held under a size. So the
+  obligation is arithmetic in the recurrence rather than anything
+  about a program, which is the shape the affordability chain is
+  already written in. The commit states it in that face and either
+  discharges it or refutes it there, which is what decides whether
+  the flat reading survives at all.
 
 - **AND PRICE THE SINK LEAF BY WHAT IS LEFT OF THE TELESCOPE.** A
   hop that climbs has strictly less telescope above it, and that is the
@@ -296,9 +295,9 @@ does not fit is a finding about the shared statement, not about the head.
   has instantiated it.
 - **`arr-chains-bursts`** (Part7/Arrival-Ledger) — FALSITY,
   `REFUTED, DEAD ROUTE, TWIN`: every stage of every chain's walk under ONE
-  width, the entry's. Two `thru` frames square a burst; the exit width a walk
-  needs is two instants out and the charging face is granted one, so both flat
-  readings are closed and only a moving one is left.
+  number, now the next instant's size rather than the entry width the witness
+  killed. Two `thru` frames square a burst, so what is open is whether that
+  compounding stays under it. Nothing has instantiated it.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

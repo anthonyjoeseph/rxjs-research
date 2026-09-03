@@ -233,29 +233,27 @@ arr-chains-nest-fac {n = n} {e = e} sl id a sched st hsl hcaps hnest =
 -- hypothesis shaped like its own recursion and this is where the
 -- hypothesis is met.
 --
--- AND IT IS FALSE AS STATED, BECAUSE THE WIDTH IT READS IS FLAT.  The
--- ledger asks ONE number of every hop and reads it at the ENTRY cap;
--- but a `thru` frame subscribes each value it takes, so two of them in
--- a row hand on the SQUARE of what came in, and the square of the
--- entry width is over it from two upward.  The arrival is not what
--- widens -- a nat arrival and a map built at exactly the cap's width
--- cross it -- so conditioning on the payload repairs nothing.
---
--- AND THE OTHER FLAT READING IS CLOSED TOO, WHICH IS WHAT MAKES THE
--- RESTATEMENT A MOVING ONE AND NOT A RE-INDEXING.  The single number a
--- whole walk could honestly be held to is the EXIT width, and
--- `nestBurstAt` cannot be re-denominated there: its only ceiling would
--- then sit two instants out while the store face's grant affords one,
--- which is settled in that definition's own header.  So what is left
--- is the shape the mirror already carries -- a bound that MOVES,
--- one level per frame -- and it does not slot in where the flat one
--- stood: every consumer priced in `nestBurstAt` has to take a hop's
--- own entry width per hop instead of one number for the walk.
+-- AND WHAT IS STILL OPEN IS WHETHER ONE NUMBER CAN HOLD A WHOLE WALK,
+-- WHICH IS A QUESTION ABOUT COMPOUNDING AND NOT ABOUT SIZE.  A `thru`
+-- frame subscribes every value it takes, so two of them in a row hand
+-- on the SQUARE of what came in and a walk's burst compounds once per
+-- such frame; the number the ledger reads is fixed before the first
+-- hop.  So the statement holds exactly when the compounding along a
+-- path -- bounded by the frames a path may carry, which the size
+-- receipt is what bounds -- stays under the number, and that is an
+-- inequality between two faces of the same recurrence rather than a
+-- fact about any one program.  The arrival is not what widens: a nat
+-- arrival and a map built at exactly the cap's width already cross the
+-- entry reading, so conditioning on the payload settles nothing
+-- either way.
 --
 -- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at the root of
 --   one chain against a width-two cap granting three, at the
---   evaluator's own state, arrival and registry.
--- DEAD ROUTE: instantiating this statement, in either denomination.
+--   evaluator's own state, arrival and registry.  It kills the ENTRY
+--   width, which is what `nestBurstAt` used to name; the number it
+--   names now dominates that width at every index and grants 256 at
+--   the refuting shape, so the witness no longer reaches this row.
+-- DEAD ROUTE: instantiating this statement, in any denomination.
 --   The width it reads is `nestBurstAt`, which is sealed, and the caps
 --   both sides are read at are `capsAt`'s, which does not return at the
 --   smallest program the language admits.  So the mirror below is not

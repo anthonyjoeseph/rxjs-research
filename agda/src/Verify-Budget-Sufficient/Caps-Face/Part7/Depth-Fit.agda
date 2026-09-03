@@ -444,8 +444,8 @@ postulate
   -- affordable, proven, and already a summand of this one through
   -- `capΦAt`.  What the two faces do not share is WHICH instant's
   -- burst each has to price.  `nestCapAt` at an instant charges the
-  -- PREVIOUS instant's folds, and `capsAt-wid<size` puts that width
-  -- under THIS instant's size, so the charge is polynomial against a
+  -- PREVIOUS instant's folds, whose width sits under THIS instant's
+  -- size, so the charge is polynomial against a
   -- ceiling that is two to the size.  This ledger is spent DURING its
   -- own instant -- `cascade-depth-capsH` is what spends it, against
   -- the fuel that instant runs at -- so its folds' width is only under

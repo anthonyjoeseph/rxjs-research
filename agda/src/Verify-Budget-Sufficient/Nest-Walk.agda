@@ -6913,9 +6913,18 @@ abstract
 -- THRU frame can hand on more values than it took, and how many is what
 -- the inners it subscribes happen to emit.  So the walk takes the bound
 -- as a hypothesis shaped like its own recursion -- each stage's value
--- list under `W`, the next stage's list read off the frame that just
+-- list under a width, the next stage's list read off the frame that just
 -- ran -- and the consumer discharges it where the width face is, which
 -- is where a burst is capped at all.
+-- AND THE NUMBER IS FREE HERE, WHICH IS WHY THE COMPOUNDING IS NOT
+-- THIS PREDICATE'S PROBLEM.  A `thru` frame subscribes each value it
+-- takes and hands on what the inners emit, so two in a row hand on a
+-- PRODUCT and whether one number covers a whole walk is a question
+-- about how large that number is -- asked and answered where the walk
+-- is instantiated, on the caps face, against a size the instant's own
+-- grant already pays for.  Carrying the bound as a parameter is what
+-- keeps the question there instead of here, and it is why the frame
+-- lemmas underneath can fuse a chain's exponents at all.
 -- AND, AT A SINK, THE SAME OBLIGATIONS FOR EVERY WALK THE FAN-OUT
 -- RUNS: the dispatch admits a registration list and folds a walk per
 -- entry, so the hypothesis mirrors that fold — an entry the state has

@@ -62,7 +62,7 @@ open import Rx.Slots using (Slot; Slots; scripted; shared; slotSize; slotsSize)
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; 8≤capsAt-size; 21≤capsAt-size; B2-cReg≤cSize;
   Caps; capsAt;
-  capsAt-base-size; capsAt-size-mono; capsAt-wid<size; capsH; capsAt-exp-gain; size≤sizeCount;
+  capsAt-base-size; capsAt-size-mono; capsH; capsAt-exp-gain; size≤sizeCount;
   sizeCount; frameBlowup; iterSize-pow; size-lower; capsAt-exp2≤capsH)
 open import Verify-Budget-Sufficient.Measures using
   (n<2^n; sq≤2^; sum-tab-mono; sum-tab-const; fᵢ≤sum-tab; n≤slotsSize;
@@ -466,8 +466,7 @@ nestIncLog {n = n} e sl id =
 -- the burst and the registry at the next size, which both exponents want
 burst≤size′ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   nestBurstAt e sl id ≤ Caps.cSize (capsAt e sl (suc id))
-burst≤size′ e sl id =
-  ≤-trans (≤-reflexive (nestBurstAt-def e sl id)) (capsAt-wid<size e sl id)
+burst≤size′ e sl id = ≤-reflexive (nestBurstAt-def e sl id)
 
 reg≤size′ : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
   realWidAt e sl id ≤ Caps.cSize (capsAt e sl (suc id))

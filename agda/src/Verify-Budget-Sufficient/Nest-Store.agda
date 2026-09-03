@@ -50,10 +50,10 @@ open import Data.Bool using (Bool; true; false; T; _∨_)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_; _++_)
 open import Data.Bool.ListAction using (any)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s; >-nonZero)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
   m≤n⊔m; m≤m⊔n; m≤m+n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
-  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤; +-comm)
+  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤; +-comm; ^-identityʳ; ^-monoʳ-≤)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
@@ -73,7 +73,7 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true)
 open import Verify-Budget-Sufficient.Measures using (fᵢ≤sum-tab; sum-tab-mono; sizeᵉ-pos)
-open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; capsAt-⊑-suc)
+open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; capsAt-⊑-suc; 21≤capsAt-size)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base; nestB; nestB-mono; nestB-monoB; nestB-monoW; nestB-add)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; delSize-monoᶜ)
 
@@ -743,45 +743,52 @@ abstract
   -- The count of values one instant can carry is the width cap, so the
   -- burst is that cap and not a quantity of this module's own.
   --
-  -- AND IT IS THE WIDTH AT THE INSTANT'S ENTRY, WHICH IS AN
-  -- AFFORDABILITY RESULT AND NOT A CHOICE.  A width sits under a size
-  -- only at the instant AFTER the one that folded it, so an entry
-  -- width is priced against the next instant's size and an exit width
-  -- against the one after that.  This face is spent out of the health
-  -- of the instant it is read at, which carries two to two to THAT
-  -- instant's size and nothing taller, while the size gain per instant
-  -- is itself exponential in the size -- so the later reading asks for
-  -- a tower one story above the ledger it is charged to, at every
-  -- index.
+  -- AND IT IS READ ON THE SIZE AXIS, NOT THE WIDTH ONE, WHICH IS WHAT
+  -- MAKES THE GRANT AND THE LEDGER MEET.  Every exponent this face
+  -- hands upward is already stated in the NEXT instant's size, and a
+  -- width only ever entered them by being bounded by that size -- so
+  -- naming the size directly costs the affordability chain nothing
+  -- (the bounding step is a reflexivity) while handing the ledger the
+  -- largest number the chain was always paying for.  A width read at
+  -- the instant's ENTRY spends a fraction of that, and one read at its
+  -- EXIT sits under the size an instant further out again, which is
+  -- where the two stop meeting.
   --
-  -- SO THIS NUMBER IS NOT A WALK'S UNIFORM BOUND, and nothing on this
-  -- face makes it one.  A consumer wanting ONE number over a whole
-  -- walk wants the exit width; what it can have from here is a bound
-  -- that MOVES with the walk, a hop's own entry width per hop, which is
-  -- the shape the walk face's level ladder already carries.
+  -- WHICH IS WHY THE WIDTH AXIS IS THE WRONG CURRENCY HERE AT ALL.
+  -- Within one cap the width outruns the size by construction -- the
+  -- fold step is a power where the size step is linear -- so no
+  -- same-instant inequality relates them, and any number denominated
+  -- in a realised width has to be caught by a size one instant later
+  -- than the ledger charging it.  The size axis has no such offset.
   --
   -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free reading of
   --   the walk's per-frame charge, 65 against 64, at the smallest step
   --   function that deepens its own accumulator; the gap is unbounded
   --   in the burst, so no constant repairs it and the factor below is
   --   what the numbers point at.
-  -- REFUTED: `Refuted.Chains-Burst-Flat` is what rules this number out
-  --   as a cascade's flat bound, four values at a root against a
+  -- REFUTED: `Refuted.Chains-Burst-Flat` is what ruled the ENTRY width
+  --   out as a cascade's flat bound, four values at a root against a
   --   width-two cap granting three -- two `thru` frames in a row hand
   --   on the SQUARE of what came in, so the crossing is the dynamics of
-  --   the layers and not an oversized payload.
-  -- DEAD ROUTE: re-denominating this at the exit width to repair that.
-  --   The burst's only ceiling then sits two instants out, which
-  --   carries `nestIncLog`, `nestFacLog` and the room they are paid
-  --   out of with it, and lands `nestCap-sight≤exp` one story above
-  --   `capsAt-exp2≤capsH` -- the grant `nestΦ-sight≤capsH` spends.
+  --   the layers and not an oversized payload.  It says nothing about
+  --   the number below, which dominates that width at every index and
+  --   grants 256 where the witness needs four.
+  -- DEAD ROUTE: re-denominating at the EXIT width instead.  Its only
+  --   ceiling sits two instants out, which carries `nestIncLog`,
+  --   `nestFacLog` and the room they are paid out of with it, and
+  --   lands `nestCap-sight≤exp` one story above `capsAt-exp2≤capsH` --
+  --   the grant `nestΦ-sight≤capsH` spends.
+  -- RECOVERY: git show b59648c restores `capsAt-wid<size` and
+  --   `wid<frameBlowup-size`, the pair that bounded a cap's width by
+  --   the next instant's size; a consumer needing a walk's entry
+  --   values to fit this number is what would want them back.
   nestBurstAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
-  nestBurstAt e sl id = suc (Caps.cWid (capsAt e sl id))
+  nestBurstAt e sl id = Caps.cSize (capsAt e sl (suc id))
 
   1≤nestBurstAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → 1 ≤ nestBurstAt e sl id
-  1≤nestBurstAt e sl id = s≤s z≤n
+  1≤nestBurstAt e sl id = ≤-trans (s≤s z≤n) (21≤capsAt-size e sl (suc id))
 
   -- ONE CASCADE'S WHOLE FANOUT, AND THE EXPONENT HAS TWO TENANTS.  The
   -- burst copies are the walk's own: a chain spends its wrap factor
@@ -885,15 +892,15 @@ abstract
     b≤r = ≤-trans (≤-reflexive (sym (*-identityˡ _)))
                   (*-monoˡ-≤ _ (1≤capsAt-reg e sl id))
 
-  -- AND A BASE SITS UNDER ITS OWN BURST POWER, the burst being a
-  -- successor by construction.  A consumer holding a bound on the
+  -- AND A BASE SITS UNDER ITS OWN BURST POWER, the burst being
+  -- positive by construction.  A consumer holding a bound on the
   -- POWER needs this to spend it on the base, and cannot see that the
   -- exponent is nonzero from outside.
   m≤m^burst : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) (x : ℕ) → 1 ≤ x → x ≤ x ^ nestBurstAt e sl id
   m≤m^burst e sl id x hx =
-    ≤-trans (≤-reflexive (sym (*-identityʳ x)))
-            (*-monoʳ-≤ x (1≤pow≤ x (Caps.cWid (capsAt e sl id)) hx))
+    ≤-trans (≤-reflexive (sym (^-identityʳ x)))
+            (^-monoʳ-≤ x ⦃ >-nonZero hx ⦄ (1≤nestBurstAt e sl id))
 
   -- READ BACK OUT OF THE SEAL for the same reason the width is: a
   -- consumer proving the fanout bound has to say what it proved.
@@ -945,11 +952,13 @@ abstract
   realWidAt-def e sl id = refl
 
   -- AND THE BURST THE SAME WAY.  The factor's exponent is keyed on this,
-  -- so a consumer bounding the factor has to see the width the burst is
-  -- a `suc` of -- and the size recurrence is what bounds that width.
+  -- so a consumer bounding the factor has to see the size the burst IS,
+  -- and every exponent this face hands upward is stated in that same
+  -- size -- which is what makes the bounding step a reflexivity rather
+  -- than an appeal to the width recurrence.
   nestBurstAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
-    nestBurstAt e sl id ≡ suc (Caps.cWid (capsAt e sl id))
+    nestBurstAt e sl id ≡ Caps.cSize (capsAt e sl (suc id))
   nestBurstAt-def e sl id = refl
 
   nestOK?-latch : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
