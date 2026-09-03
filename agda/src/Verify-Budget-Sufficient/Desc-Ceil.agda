@@ -88,10 +88,26 @@ open import Verify-Budget-Sufficient.Nest-Burst using
 --   `*All` heads at six, which is where the reading is a product and
 --   the only place it could be under-counted.  The defer reads zero
 --   against zero, which is the row the ceiling's right to stop there
---   rests on.  TIED at the three equality rows, which are the ones a
---   tie can be load-bearing on at all.  NOT covered: a frame below the
---   root, a scan head, and a shared slot whose definition itself
---   reaches a share.
+--   rests on.  The SCAN head is a fourth equality and TIED at both the
+--   root and one frame below it, which is the tightest region this
+--   ceiling has: the reading walks straight through a `scanᵉ`, so a
+--   seed among the subscribe's payloads would put the left side over.
+--   Three tight heads repeated under a non-root continuation are
+--   UNMOVED, which is what says a continuation cannot reach this count.
+--   The refold -- that same scan under a flatten --
+--   reads six against eighteen and is DEGENERATE on the failure axis,
+--   since the flatten multiplies the two readings; so the family whose
+--   syntactic width towers is the one region of this leaf no row can
+--   refute in.  AND THE SHARE DESCENT IS READ, which is the only head
+--   whose reading descends on slot fuel rather than on syntax and so
+--   the only place the two descents could part: a slot sharing a def
+--   that itself reaches a share is an EQUALITY at three, spending two
+--   fuel units and marking both slots, and the one-hop share is tight
+--   at the same telescope.  A repeated share reads three against six
+--   and is degenerate, and the gap is the static measure entering both
+--   payloads where the second connect hands back the existing subject
+--   -- a construction rather than a region left unread.  TIED at seven
+--   rows.
 postulate
   burst-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (sl : Slots Γ) (o : Closed Γ u) (κ : Path Γ u t)

@@ -112,6 +112,25 @@ valsΦ? {s = s} B U path vals =
 -- instead of being read at one: the level is an output of the walk,
 -- and a fit at a single level would be a fit at a number the caller
 -- cannot name.
+
+-- AND THE CAPS CONJUNCT MINTS A CEILING OBLIGATION ON A FACE THAT HAS
+-- NO CEILING CURRENCY, which is a finding about this record rather
+-- than about whoever discharges it.  The drain ledger it names opens
+-- with a level ceiling, and that object is CONSUMED at every one of
+-- its sites in proven code and produced at none.  The caps face
+-- delivers the whole ledger anyway, off a walk record whose ceiling
+-- half is a ring POSITION; this record carries no such package, and
+-- neither does the frame fit above it nor the arm that discharges it.
+--
+-- WHICH IS WHY THE ARM UNDER IT IS SHAPE AND NOT A GRIND.  A
+-- conclusion needing information no hypothesis carries does not become
+-- reachable by a better proof, and what the ledger is short of is the
+-- caps invariant itself, projected down to its registry component one
+-- call above the fold both faces share.  The repair is to carry that
+-- receipt unprojected rather than to mint a ceiling at the arm, which
+-- would trade a counted gap for an uncounted one.  The arm's own
+-- header holds the census, the deliverer, the frame that drops the
+-- receipt and the coverage boundary.
 InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
   (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)

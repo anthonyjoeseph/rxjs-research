@@ -553,8 +553,10 @@ postulate
   --   that a program fans out per hop by at most its size.  The field
   --   would have to be denominated in the measure the frame face
   --   already uses, and that measure carries the source's payload count
-  --   into an EXPONENT at its fold clause, so it towers in the layer
-  --   count with no cap anywhere in its definition: a three-layer
+  --   into an EXPONENT -- on its INNER reading, which the outer one
+  --   multiplies by exactly when a FLATTEN consumes it, so a bare fold
+  --   is flat there and one refold is not.  It therefore towers in the
+  --   layer count with no cap anywhere in its definition: a three-layer
   --   refold crosses the linear ceiling at the linear reading's own
   --   most generous setting, its own size at each level.  So there is
   --   no field to thread, and the arm sits on the other branch.  The
@@ -564,7 +566,23 @@ postulate
   --   FIRST hop, so the field is refuted by a measurement and not only
   --   by a measure.  What the run does NOT reach is the count the
   --   recurrence ADMITS, which is the binary above and stands where it
-  --   stood: two layers outran the evidence loop outright.
+  --   stood: two layers outran the evidence loop outright.  And the
+  --   field is named HERE and nowhere else in the development, so
+  --   killing it moved this arm alone -- no sibling was parked on it,
+  --   and none of them can be reclassified off this route.
+  -- DEAD ROUTE: asking for the same field as a burst LENGTH rather
+  --   than as a width, on the reading that a COUNT and a MEASURE are
+  --   different currencies and only the second was killed above.  They
+  --   are not different, and the descent ceiling is what says so: the
+  --   only proven ceiling on the values a frame is handed is
+  --   `burst-out`, which puts that length under `outWⱽ` -- the frame
+  --   face's own measure, read at the entry form -- and nothing here
+  --   bounds it by anything smaller.  So a length field is the width
+  --   field wearing a count's name, and the separation above kills it
+  --   unchanged, since `outWⱽ` takes a source's payload count into an
+  --   exponent exactly when a flatten consumes it and so towers in the
+  --   layer count.  What that closes is the RETRY: both halves of the
+  --   binary stand where they stood, and this route reaches neither.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
@@ -753,9 +771,63 @@ postulate
   -- store cannot follow from hypotheses about the path, the values and
   -- the registry, which carry ONE of the seven.  Nor is the repair the
   -- walk's whole record, which bundles that receipt with five things
-  -- this ledger never mentions.  What is owed is the receipt alone,
-  -- carried down the potential walk from the tick above, where it is
-  -- already the currency every hypothesis is stated in.
+  -- this ledger never mentions.  The receipt is carried down the
+  -- potential walk from the tick above, where it is already the
+  -- currency every hypothesis is stated in.  It is not the whole of
+  -- what is owed, and the block below is the rest.
+
+  -- AND THE SECOND THING OWED IS THE CEILING, WHOSE DELIVERER IS AT THE
+  -- SIBLING FACE AND WHOSE CURRENCY IS NOT.  The ledger opens with a
+  -- `CeilD`, and a census of that name finds it CONSUMED at every site
+  -- in proven code and produced at none -- each walk lemma takes one and
+  -- hands a transformed one on, and the ceiling module's own lemmas are
+  -- all ceiling-to-ceiling.  But the LEDGER is not owed a new proof:
+  -- `walk-frame-drain-inner` already hands back this exact
+  -- `capsDrainOK`, at the same queue, node and fold id, out of the walk
+  -- record.  So what this row is short of is the record, not the
+  -- mathematics; and the record's ceiling half is a reach witness, whose
+  -- relation has a CONSTRUCTOR at level zero carrying the round's whole
+  -- gas and one more per admitted registration, so the caps walk mints
+  -- its own position at the cascade's door and climbs it, `ring-room`
+  -- turning that into the room bound in two rewrites.
+  --
+  -- AND WHAT THE LEDGER WANTS BACK IS `capsOK?` WITH EVERYTHING BUT THE
+  -- REGISTRY PROJECTED AWAY, WHICH NAMES THE FRAME AND THE REPAIR
+  -- TOGETHER.  The ledger asks for the caps receipt at a stepped level
+  -- for the queue's head and again at the state each entry's subscribe
+  -- leaves behind, so what is missing is the INVARIANT rather than a
+  -- number.  The cascade's sighted bound HOLDS that invariant and
+  -- spends it three ways -- affordability once, the registry projection
+  -- twice -- and hands the shared fold only the projection.  Everything
+  -- under that one call inherits the loss: the fold, the chain's two
+  -- store arms, the walk, the frame split, and this arm.  So a level
+  -- was never the missing thing; the walk carries one already, and the
+  -- fold's own caller carries a store ceiling and an affordability
+  -- besides.
+  --
+  -- AND THE CARRY IS A PRESERVATION OBLIGATION, WHICH IS WHERE THE COST
+  -- SITS.  Taking the receipt unprojected through the shared fold means
+  -- re-establishing it at the fold's two recursive states -- the
+  -- latched arrival and the chain step's output -- so this row is short
+  -- of one preservation fact at the fold, not of a ceiling at the arm.
+  -- The two faces do still count their level differently, a ring
+  -- position against a chain-length budget, but that difference is
+  -- DOWNSTREAM of the receipt: with the invariant in hand the walk
+  -- record's remaining halves are the ones the caps face already mints
+  -- at its own door, and the count this row is stated at is free -- the
+  -- record it belongs to bounds its depth from below and fixes nothing
+  -- above.
+
+  -- DEAD ROUTE: instantiating the conclusion at concrete arguments, to
+  --   read whether a level exists that satisfies it.  BOTH of the
+  --   ceiling's denominations are SEALED and neither side reduces at
+  --   any point whatever: its hypothesis and the queue's climb bound
+  --   are stated in the evaluator's descent ledger, sealed there for
+  --   normalisation cost, and its conclusion is stated in the caps
+  --   count, sealed in the caps module for the same reason.  So no row
+  --   can stand on a numeral here, and the Σ demands a proof rather
+  --   than a decision -- which closes instantiation and refutation
+  --   together, by one seal, in both directions.
   innerΦ-drain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)
