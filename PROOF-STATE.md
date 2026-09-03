@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CARRY THE CAPS INVARIANT THROUGH THE SHARED FOLD UNPROJECTED.** The
-  level was not the missing thing: the Φ walk already carries one, and
-  what the queue's ledger asks for is the caps invariant itself, at a
-  stepped level and again after each entry's subscribe. That receipt is
-  held one call above the fold both faces walk and spent there three
-  ways — affordability once, its registry component twice — so the fold
-  and everything under it get the projection only. The commit adds the
-  unprojected receipt to the fold's premises and re-establishes it at
-  the fold's two recursive states, the latched arrival and the chain
-  step's output, postulating whichever the step does not give.
-
-- **THEN BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
+- **BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
   live list is minted at three places — one subscribe out of a parked
   queue, the outer frame subscribing its arrivals, and the share chain a
   sink fans into — and every consumer spends all three at one site. Their
@@ -236,7 +225,7 @@ does not fit is a finding about the shared statement, not about the head.
   The commit reads whether one denomination carries all three, and
   reports the mint that cannot be stated in it.
 
-- **AND ASK WHETHER THE REGISTRY CAN BE MEASURED WHERE IT IS READ.** Its
+- **THEN ASK WHETHER THE REGISTRY CAN BE MEASURED WHERE IT IS READ.** Its
   two receipts — the registry's depth against the syntactic unit and its
   length against the program's cap — are both refuted, and neither by an
   adversarial state alone: one fails at a state the evaluator REACHES,
@@ -246,6 +235,16 @@ does not fit is a finding about the shared statement, not about the head.
   a tighter reading is not the repair. The commit reads whether the
   registry belongs to the invariant record as a CARRIED field rather than
   a measured one, and names the producer that could not re-establish it.
+
+- **AND CLOSE THE CASCADE DOOR'S UNPROJECTED PACKAGE.** The round's caps
+  package is now stated at EVERY chain rather than at the surviving ones,
+  because a consumer denominated in the round's DESCENT charges for the
+  head chain whatever the cancellation test says — and the fold above it
+  owes nothing on the cancelled arm, so it can never pay. Its mirror is
+  this induction at every arm that survives, and that arm already holds
+  every ingredient the new one needs; what is genuinely new is the third
+  callee, the tail at the state a cancelled chain's step would leave.
+  The commit grinds it against the mirror, one arm at a time.
 
 ### The ledger
 
@@ -304,10 +303,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`innerΦ-drain-caps`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the queue's
-  caps receipt, asked of a face holding only its registry component. The
-  projection happens one call above the shared fold, so what is owed is
-  the unprojected carry, not a proof of this row.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the
@@ -390,6 +385,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+- **`arr-chains-caps-all`** (Part7/Arrival-Caps) — GRINDABLE, `TWIN`: the
+  round's caps package at EVERY chain, which is what a consumer denominated in
+  the DESCENT charges for. The mirror is this induction at every surviving arm;
+  only the cancelled arm's third callee is new.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
