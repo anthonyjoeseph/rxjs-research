@@ -535,16 +535,25 @@ postulate
   -- the fuel this instant runs at affords an exponent of two to its own
   -- size.  A count at least the size is all that is known, and that
   -- already leaves the room.  No ledger, no field and no recurrence
-  -- changes the two numbers being compared.  What is not yet known is
-  -- whether the second number is REAL: the count is what the recurrence
-  -- ADMITS at a level, and a canonical program's fan-out per hop is
-  -- under its size, so the widths admitted deep in an instant may be
-  -- reachable by no run at all.  That is the binary this arm waits on.
-  -- Unreachable, and a tighter width invariant carried as a FIELD of
-  -- the invariant record fits the entry read at every real level;
-  -- reachable, and a fold with a nesting-incrementing step over such a
-  -- burst nests past the story index, which is a FALSITY on the count
-  -- axis and on the budget at this recurrence, not on this arm.
+  -- changes the two numbers being compared.
+
+  -- AND THE BINARY IS ANSWERED, IN NEITHER OF THE TWO WAYS IT WAS PUT.
+  -- What was asked is whether the count the recurrence ADMITS at a
+  -- level is reachable by a run at all, since a count no run reaches is
+  -- a premise this arm may simply carry.  It is not that count: driven
+  -- at one layer, the widest instant a run reaches is a CUBE of the
+  -- synchronous burst its slot script delivers, and at the smallest
+  -- dials the layer axis is flat where the recurrence towers.  But the
+  -- premise unreachability was to license cannot be carried either, and
+  -- the same rows say why: the burst length takes the widest instant
+  -- from one to three hundred and forty-three while every
+  -- program-denominated quantity beside it -- the size, the level, and
+  -- the proven entry ceiling -- stands still, and a slot script is
+  -- carried by no part of the program.  So the two numbers are not
+  -- merely far apart, they are in different CURRENCIES, and this arm
+  -- waits on a ceiling that does not exist rather than on a number that
+  -- is too big.  The rows are `Harness.Main`'s and are
+  -- measured-not-rechecked by construction.
   -- REFUTED: `Refuted.Walk-Phi-Room`, whose `walk-fold-room-absurd`
   --   states the affordability as the product it is and kills it at the
   --   floor of twenty-one, with `size₄` pinning that four folds already
@@ -592,6 +601,18 @@ postulate
   --   exponent exactly when a flatten consumes it and so towers in the
   --   layer count.  What that closes is the RETRY: both halves of the
   --   binary stand where they stood, and this route reaches neither.
+  -- DEAD ROUTE: carrying the delivery count as a PREMISE of this arm,
+  --   on the reading that a count no run reaches may be assumed away.
+  --   The count is reachable in the only sense a premise cares about --
+  --   it moves with the slot script and with nothing the program names
+  --   -- so the premise would have to be discharged at the call site
+  --   out of a ceiling on a LATER frame's values, and the development
+  --   has none.  `burst-out` is its only syntax-to-values tie and it
+  --   prices the SUBSCRIBE frame, which for the one family that can
+  --   tower a width emits nothing at all at every burst length
+  --   measured, so it constrains none of the instants that carry the
+  --   width.  The premise is undischargeable for the same reason the
+  --   field was unthreadable, one frame further on.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)
