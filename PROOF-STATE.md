@@ -215,16 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE TIER'S ONE UNPROBED ROW, AGAINST A STATE A RUN
-  REACHED.** One row here is FALSITY on nothing at all -- the class it is
-  born into, not a reading anyone took -- and it is a receipt ABOUT a
-  state, so what was missing was a reachable state rather than a route.
-  The drive the fork now carries supplies one: later frames off the state
-  the subscribe itself produced, no hand-built record priced. The commit
-  reads the row there and reports what the rows earn, receipt or
-  refutation, with the coverage boundary either way.
-
-- **THEN CLOSE THE DESCENT CEILING'S LAST UNCOVERED REGION.** The width
+- **CLOSE THE DESCENT CEILING'S LAST UNCOVERED REGION.** The width
   ceiling now has its tight heads instantiated at the root and one frame
   below it, and the one region left unread is a shared slot whose own
   definition reaches a share -- the only head whose reading descends on
@@ -244,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   here is the laundering the law forbids, so the commit states it as a
   field obligation on the invariant record and reports which producer
   cannot re-establish it.
+
+- **AND CARRY THE CEILING INTO THE Φ FACE, WHERE THE ARM ABOVE IT HAS
+  NONE.** The drain ledger the potential face is asked for opens with a
+  level ceiling, and a census finds that object consumed at every site
+  in the tree and produced at none — the walk lemmas relay one and
+  the ceiling module's own lemmas are ceiling-to-ceiling. The caps face is
+  where it is the currency: its drain arm takes a walk record carrying the
+  reach witness the one proven route to that conclusion wants, and the Φ
+  arm takes nothing in that denomination. So the repair is a carry rather
+  than a mint at the arm, which would trade a counted gap for an uncounted
+  one. The commit threads the field or names the producer that cannot.
 
 ### The ledger
 
@@ -295,10 +297,6 @@ does not fit is a finding about the shared statement, not about the head.
   denominations refuted in one region, since a depth fixed before the count
   must dominate a count towering in it. Owed a binary, not a currency: is the
   admitted count reachable.
-- **`innerΦ-drain-caps`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
-  queue's caps receipt, now at the face and count the arm REPORTS rather than
-  at ones it chooses. Its own definition names the state's caps receipt in
-  every arm, and this face carries one of that predicate's seven conjuncts.
 - **`innerΦ-drain-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the charge, at
   the queue's own `drainW` and at every level within the descent's count. All
   the arm has left once the face, the count and the store residue are reported
@@ -306,6 +304,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
+- **`innerΦ-drain-caps`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the queue's
+  caps receipt, asked of a face carrying no ceiling. Its ledger opens with one
+  and nothing in the tree produces one, so a restatement is guaranteed; the two
+  seals under it close instantiation and refutation together.
 - **`stepFrame-regsSz`** (Regs-Nest-Walk) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE×3, PROBED`: the registry stays priced across one
   frame. Probed at the subscribing frame — the only kind that can grow the

@@ -758,9 +758,42 @@ postulate
   -- store cannot follow from hypotheses about the path, the values and
   -- the registry, which carry ONE of the seven.  Nor is the repair the
   -- walk's whole record, which bundles that receipt with five things
-  -- this ledger never mentions.  What is owed is the receipt alone,
-  -- carried down the potential walk from the tick above, where it is
-  -- already the currency every hypothesis is stated in.
+  -- this ledger never mentions.  The receipt is carried down the
+  -- potential walk from the tick above, where it is already the
+  -- currency every hypothesis is stated in.  It is not the whole of
+  -- what is owed, and the block below is the rest.
+
+  -- AND THE SECOND THING OWED IS THE CEILING, WHICH NOTHING IN THIS
+  -- DEVELOPMENT PRODUCES.  The ledger opens with a `CeilD`, and a
+  -- census of that name over the proof tree finds it CONSUMED at every
+  -- site and produced at none: each walk lemma takes one and hands a
+  -- transformed one on, and the ceiling module's own lemmas are all
+  -- ceiling-to-ceiling.  The one proven route to its CONCLUSION is
+  -- `ring-room`, which wants a `Reached` witness and an entry-level
+  -- bound; the caps face's own drain arm has both, bundled in the walk
+  -- record it takes, and this row takes nothing in that currency.  Nor
+  -- does anything above it -- neither the frame fit that calls this arm
+  -- nor `InnerΦFit`, the obligation record the arm is discharging,
+  -- mentions a level ceiling at all.
+  --
+  -- SO THIS IS A CONCLUSION NEEDING INFORMATION NO HYPOTHESIS CARRIES,
+  -- which is the first of the two shapes that are almost always wrong,
+  -- and the row is SHAPE rather than a hard proof: a restatement is
+  -- guaranteed and grinding cannot reach it.  The repair is not a
+  -- hypothesis minted here -- that launders a tracked gap into an
+  -- untracked one -- but the same carry the receipt above already gets,
+  -- from the caps walk where the ceiling is the currency.
+
+  -- DEAD ROUTE: instantiating the conclusion at concrete arguments, to
+  --   read whether a level exists that satisfies it.  BOTH of the
+  --   ceiling's denominations are SEALED and neither side reduces at
+  --   any point whatever: its hypothesis and the queue's climb bound
+  --   are stated in the evaluator's descent ledger, sealed there for
+  --   normalisation cost, and its conclusion is stated in the caps
+  --   count, sealed in the caps module for the same reason.  So no row
+  --   can stand on a numeral here, and the Σ demands a proof rather
+  --   than a decision -- which closes instantiation and refutation
+  --   together, by one seal, in both directions.
   innerΦ-drain-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (op : AllOp) (allNid inst : NodeId)

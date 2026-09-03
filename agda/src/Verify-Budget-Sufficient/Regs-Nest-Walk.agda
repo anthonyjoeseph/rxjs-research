@@ -112,6 +112,24 @@ valsΦ? {s = s} B U path vals =
 -- instead of being read at one: the level is an output of the walk,
 -- and a fit at a single level would be a fit at a number the caller
 -- cannot name.
+
+-- AND THE CAPS CONJUNCT MINTS A CEILING OBLIGATION ON A FACE THAT HAS
+-- NO CEILING CURRENCY, which is a finding about this record rather
+-- than about whoever discharges it.  The drain ledger it names opens
+-- with a level ceiling, and that object is CONSUMED at every one of
+-- its sites in this development and produced at none -- the walk
+-- lemmas take one and pass a transformed one on, and the ceiling
+-- module's lemmas are all ceiling-to-ceiling.  So this conjunct asks
+-- the potential face to manufacture what the caps face only ever
+-- relays, and nothing in this record, in the frame fit above it, or
+-- in the arm that discharges it is stated at a level ceiling at all.
+--
+-- WHICH IS WHY THE ARM UNDER IT IS SHAPE AND NOT A GRIND.  A
+-- conclusion needing information no hypothesis carries does not become
+-- reachable by a better proof, and the repair is a carry from the caps
+-- walk rather than a hypothesis minted at the arm -- which would trade
+-- a counted gap for an uncounted one.  The arm's own header holds the
+-- census and the coverage boundary.
 InnerΦFit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (id : Id) (now : Tick) (B U : ℕ)
   (op : AllOp) (allNid inst : NodeId) (path : Path Γ s t)
