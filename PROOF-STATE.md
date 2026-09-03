@@ -215,16 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **CLOSE THE DESCENT CEILING'S LAST UNCOVERED REGION.** The width
-  ceiling now has its tight heads instantiated at the root and one frame
-  below it, and the one region left unread is a shared slot whose own
-  definition reaches a share -- the only head whose reading descends on
-  slot fuel rather than on syntax, so it is the only place the two
-  descents can part. That is a leaf the whole descent face rests on, and
-  it carries one receipt against a statement nothing else in the tier
-  can bound. The commit reads it there, or reports what blocks it.
-
-- **THEN PUT THE BURST'S LENGTH WHERE A PRODUCER MUST SUPPLY IT.** The
+- **PUT THE BURST'S LENGTH WHERE A PRODUCER MUST SUPPLY IT.** The
   charge side of the Φ arms is now known to be measurement-dead at every
   instant, so what is left to work is the side that does compute -- and
   it grows exponentially in a count these premises never bound. The
@@ -236,8 +227,8 @@ does not fit is a finding about the shared statement, not about the head.
   field obligation on the invariant record and reports which producer
   cannot re-establish it.
 
-- **AND CARRY THE CEILING INTO THE Φ FACE, WHERE THE ARM ABOVE IT HAS
-  NONE.** The drain ledger the potential face is asked for opens with a
+- **THEN CARRY THE CEILING INTO THE Φ FACE, WHERE THE ARM HAS NONE.**
+  The drain ledger the potential face is asked for opens with a
   level ceiling, and a census finds that object consumed at every site
   in the tree and produced at none — the walk lemmas relay one and
   the ceiling module's own lemmas are ceiling-to-ceiling. The caps face is
@@ -246,6 +237,16 @@ does not fit is a finding about the shared statement, not about the head.
   arm takes nothing in that denomination. So the repair is a carry rather
   than a mint at the arm, which would trade a counted gap for an uncounted
   one. The commit threads the field or names the producer that cannot.
+
+- **AND BRING THE LIVE LIST'S THREE MINTS TO ONE DENOMINATION.** The
+  live list is minted at three places — one subscribe out of a parked
+  queue, the outer frame subscribing its arrivals, and the share chain a
+  sink fans into — and every consumer spends all three at one site. Their
+  side conditions are stated in three currencies: a unit, a size bound on
+  values, and a level whose every reading is closed. That spread is why
+  each was refuted separately and why no repair transferred between them.
+  The commit reads whether one denomination carries all three, and
+  reports the mint that cannot be stated in it.
 
 ### The ledger
 
@@ -318,9 +319,9 @@ does not fit is a finding about the shared statement, not about the head.
   later arrivals either side of the crossover, the entry settling exactly; only
   the caps can refute and they cannot move. One family unread.
 - **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
-  no more payloads than its term syntactically carries. Five tight rows tied,
-  the scan head among them and repeated below the root; only a share reaching a
-  share is unread, and the refold region cannot refute.
+  no more payloads than its term syntactically carries. Seven tight rows tied,
+  the scan head and the share chain among them; every region a row could refute
+  in is now read, and the refold cannot.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to

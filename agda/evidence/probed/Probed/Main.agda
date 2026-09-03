@@ -95,7 +95,8 @@ open import Probed.Sight-Fit-Width
   using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 
 open import Probed.Burst-OutW
-  using (readout≡; tieOf; tieMerge; tieSwitch; deeper≡; tieScan; tieScanκ)
+  using (readout≡; tieOf; tieMerge; tieSwitch; deeper≡; tieScan; tieScanκ;
+  chained≡; tieChain; tieTwice)
 
 open import Probed.Chain-Step-Regs-Level
   using (reaches; figures₁; figures₂; figures₃; figures₄; figures₆; figures₈;

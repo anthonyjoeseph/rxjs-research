@@ -29,7 +29,7 @@ open import Rx.Exp
   using (Closed; Val; Fn; natᵗ; _×ᵗ_; ofᵉ; emptyᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; μᵉ; varᵉ;
   deferᵉ; input; nat̂; strmᵗ; primᵗ; pairᵗ; fstᵗ; sndᵗ; varᵗ; add)
 open import Rx.Frame-Width using (outWⱽ)
-open import Rx.Slots using (Slots)
+open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator
   using (subscribeE; splitBurst; root; sched-init; st-init; Path; map-f; _↠_)
 open import Verify-Budget-Sufficient.Desc-Ceil using (burst-out)
@@ -201,3 +201,77 @@ tieScanκ : Confirms
   (burst-out gasBig slots p-scan κ₁ 0 0
      (sched-init p-scan slots) (st-init p-scan) refl)
 tieScanκ = ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- THE REGION THE ROWS ABOVE NAMED AS UNREAD: a shared slot whose own
+-- definition reaches a share.
+----------------------------------------------------------------------
+
+-- THE CHAINED TELESCOPE, and its direction is forced.  A slot def may
+-- name only inputs strictly BELOW its own index, so the chain runs from
+-- slot one down into slot zero and never the other way -- which is also
+-- why no cyclic telescope has to be read here.  Entering slot one
+-- spends TWO of the descent's fuel units and marks both slots, and this
+-- is the only head whose reading descends on fuel rather than on
+-- syntax, so it is the only place the two descents can part.
+slChain : Slots Γ₂
+slChain fzero        = shared p-of
+slChain (fsuc fzero) = shared (input fzero)
+
+-- THE SAME CHAIN WITH THE SHARE NAMED TWICE, which is what puts the
+-- visited guard on the failure axis: the flatten enters both payloads,
+-- the second arrival at slot zero is a REVISIT, and the reading gives a
+-- revisit nothing.  A connect that replayed the burst would deliver two
+-- sources here against a reading that counts one.
+slTwice : Slots Γ₂
+slTwice fzero        = shared p-of
+slTwice (fsuc fzero) =
+  shared (mergeAllᵉ nothing
+           (ofᵉ (strmᵗ (input fzero) ∷ strmᵗ (input fzero) ∷ [])))
+
+-- the two sides again, at a telescope the row chooses
+lhsS : Slots Γ₂ → Closed Γ₂ natᵗ → ℕ
+lhsS sl e =
+  length (proj₁ (splitBurst {Γ = Γ₂} {u = natᵗ} {A = Val Γ₂ natᵗ}
+    (proj₁ (subscribeE {e = e} gasBig e root 0 0 (sched-init e sl) (st-init e)))))
+
+rhsS : Slots Γ₂ → Closed Γ₂ natᵗ → ℕ
+rhsS sl e = outWⱽ 2 [] sl e
+
+p-chain : Closed Γ₂ natᵗ
+p-chain = input (fsuc fzero)
+
+chained : List ℕ
+chained = lhsS slChain p-chain ∷ rhsS slChain p-chain
+        ∷ lhsS slTwice p-chain ∷ rhsS slTwice p-chain
+        ∷ lhsS slChain p-share ∷ rhsS slChain p-share
+        ∷ []
+
+-- THE ROWS, `lhsS` then `rhsS` at each program.  THE TWO CHAINED ROWS
+-- ARE EQUALITIES and they are this block's product: the two-hop share
+-- reads three against three, so a single payload the second connect
+-- delivered beyond the def's own count would put the left side over --
+-- and the one-hop share is tight here too, where the telescope the
+-- rows above use gave it slack and nothing it reported could fail.
+-- The DOUBLED row reads three against six and is DEGENERATE on the
+-- failure axis: a connect that replayed the burst would deliver six
+-- against the same six.  What it does say is where the slack comes
+-- from -- the reading enters both payloads of the flatten while the
+-- second arrival at the slot hands back the existing subject -- so the
+-- static measure over-counts a repeated share by construction and the
+-- gap is not a region left unread.
+chained≡ : chained ≡ 3 ∷ 3 ∷ 3 ∷ 6 ∷ 3 ∷ 3 ∷ []
+chained≡ = refl
+
+-- THE TIE AT THE CHAINED HEAD, and again where the same slot is named
+-- twice.  `≤ᵇ⇒≤` takes the goal's own terms, so what is compared is
+-- the statement as it reads.
+tieChain : Confirms
+  (burst-out gasBig slChain p-chain root 0 0
+     (sched-init p-chain slChain) (st-init p-chain) refl)
+tieChain = ≤ᵇ⇒≤ _ _ tt
+
+tieTwice : Confirms
+  (burst-out gasBig slTwice p-chain root 0 0
+     (sched-init p-chain slTwice) (st-init p-chain) refl)
+tieTwice = ≤ᵇ⇒≤ _ _ tt
