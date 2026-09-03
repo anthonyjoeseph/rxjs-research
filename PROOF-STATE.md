@@ -215,7 +215,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **NOW FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
+- **FIRST TIE THE RECEIPTS, BECAUSE NOTHING MERGES WHILE THE GATE IS RED.**
+  `make evidence-check` holds every target to a row Agda generates from its
+  statement, and the tree's receipts predate it: 44 targets across 38 files
+  still restate their predicate by hand. It is not one backlog. Where the
+  conclusion computes, the row is the migration. Where the tower SEALS the
+  denomination, no row exists at any point: the probe either reaches the
+  statement through PROVEN lemmas -- what `Probed.Burst-Nest-Unit` now does
+  off `storeNest-*≤` and `m≤m+n` -- or it is not a receipt for that target,
+  and the product is a retarget plus a coverage boundary in the statement's
+  own header. So the commit takes
+  the files in batches and reports which of the three each target fell to.
+
+- **THEN FIND WHAT THE ADMITTED CHAINS' DEPTH IS ACTUALLY FOR.** Bounding a
   registered chain's nesting by the syntactic unit is DEAD -- false at the
   states a run reaches, not merely at built ones -- so the field is back out
   of `capsOK?` and no premise threaded to a mint can pay it. What is not yet
@@ -237,15 +249,6 @@ does not fit is a finding about the shared statement, not about the head.
   the commit builds the widest burst a fixed-size program produces at
   a hop, against `widAt`, and either threads a width field on the
   invariant record or reports a FALSITY on the count axis.
-
-- **THEN CARRY THE CAPS RECEIPT DOWN THE POTENTIAL WALK.** The fork
-  the drain faces posed was false, and `innerΦ-drain-caps`'s header
-  says why: neither a restatement at these premises nor the walk's
-  whole record is what the ledger asks for. One conjunct is, and the
-  tick this face sits under already holds it. So the commit threads
-  that receipt from there through the potential walk to the arm that
-  reads a queue, and either closes the arm's caps leaf with it or
-  names the clause where the walk cannot preserve it.
 
 ### The ledger
 

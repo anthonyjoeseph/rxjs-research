@@ -118,19 +118,29 @@ SEPARATES = re.compile(r"\bSeparates\b")
 # type from the statement and the probe chooses only the point.  E7 then holds
 # the row to what Agda cannot: the HEAD under the eliminators must be a
 # declared target (an arbitrary function applied to the postulate returns any
-# type at all), and the BODY must be a computed proof rather than a lemma --
-# `refl`, `tt`, a numeral witness, or a stdlib converter fed one of those --
-# since handing any inhabitant back, the postulate itself included, would
-# typecheck.  Three findings: a target with no `Confirms` row, a row headed by
-# something other than a target, and a body that is not computed.
+# type at all), and the BODY may claim nothing of its own -- since ANY
+# inhabitant typechecks here, the target handed back as its own proof
+# included.  Three findings: a target with no `Confirms` row, a row headed by
+# something other than a target, and a body that assumes rather than proves.
+#
+# AND WHAT THE BODY MAY NOT NAME IS A POSTULATE, WHICH IS NOT THE SAME AS
+# HOLDING IT TO A NUMERAL, AND THE DIFFERENCE IS WHAT MAKES THE RULE
+# SATISFIABLE AT ALL.  Held to computation, the rule asks for a conclusion
+# that REDUCES at the chosen point -- and a conclusion denominated in a family
+# this tower seals for cost does not reduce at any point whatever, so a probe
+# whose target is stated in one could never write the row and the finding
+# could never be cleared.  That is a coverage boundary and not a defect in the
+# probe.  What the original rule was really guarding is laundering: a row
+# discharged out of the target itself, or out of some OTHER unproven
+# statement, is evidence for nothing.  So the body is free to spend anything
+# this tower has PROVEN -- a weakening through a stdlib inequality is a
+# stronger receipt than a numeral, not a weaker one -- and may name no
+# postulate at all.
 CONFIRMS = re.compile(r"\bConfirms\b")
 # the statement's own connectives, which can only reach a SUB-claim: a
 # conjunct, a ∀ at a point, a field of a record conclusion (a dotted name)
 ELIMINATORS = {"proj₁", "proj₂"}
 FIELD = re.compile(r"^[^\s()]+\.[^\s().]+$")
-# what may inhabit a `Confirms` row: only terms whose truth is computation
-COMPUTED = {"refl", "tt", "_", "≤ᵇ⇒≤", "<ᵇ⇒<", "toWitness", ","}
-NUMERAL = re.compile(r"^[0-9]+$")
 
 
 def _dupcheck():
@@ -360,14 +370,14 @@ def clause_bodies(path, name):
     return out
 
 
-def check_e7(evidence):
+def check_e7(evidence, postulates):
     """Every receipt's rows are tied to its target's statement in a type.
 
     Rule one is coverage: each declared target has a `Confirms` row headed
     by it.  Rule two is the tie: a `Confirms` row's head is a declared
-    target.  Rule three is the proof: every clause of such a row is a
-    computed term, so the row can only be green because the claim evaluates
-    to true at the chosen point."""
+    target.  Rule three is the proof: no clause of such a row names a
+    postulate, so the row stands on this tower's proven facts and the
+    statement it is evidence about cannot be its own witness."""
     uncovered, untied, unproven = [], [], []
     mod = _dupcheck()
     for p in probe_files(evidence):
@@ -388,13 +398,9 @@ def check_e7(evidence):
             if not bodies:
                 unproven.append((p, line, name, "(no clause)"))
             for bline, body in bodies:
-                if " where" in body or body.strip().startswith("where"):
-                    unproven.append((p, bline, name, "where"))
-                    continue
                 toks = body.replace("(", " ").replace(")", " ") \
                            .replace(",", " , ").split()
-                bad = [t for t in toks
-                       if t not in COMPUTED and not NUMERAL.match(t)]
+                bad = [t for t in toks if t in postulates]
                 if bad or not toks:
                     unproven.append((p, bline, name, bad[0] if bad else "(empty)"))
         for line, t in targets:
@@ -570,7 +576,7 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         if isinstance(evidence, str) else list(evidence),
         statements(src), harness)
     mixed, unproven, undeclared = check_e6(evidence)
-    uncovered, untied, uncomputed = check_e7(evidence)
+    uncovered, untied, uncomputed = check_e7(evidence, postulates)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -718,15 +724,15 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         print("    Reach a sub-claim by projection, application at a point, "
               "or a field.")
     for p, i, name, tok in uncomputed:
-        print(f"{p}:{i}: E7 — `Confirms` row {name!r} is not a computed "
-              f"proof: {tok!r}")
-        print("    Any inhabitant typechecks here, the target itself "
-              "included, so the")
-        print("    body is held to computation: `refl`, `tt`, a numeral "
-              "witness, or a")
-        print("    stdlib converter fed one.  A lemma in the body is a claim "
-              "the probe")
-        print("    did not instantiate.")
+        print(f"{p}:{i}: E7 — `Confirms` row {name!r} stands on a "
+              f"postulate: {tok!r}")
+        print("    Any inhabitant typechecks here, the target handed back as "
+              "its own proof")
+        print("    included, so a row may spend only what this tower has "
+              "PROVEN.  `refl`")
+        print("    where the claim reduces, a proven lemma where it does not; "
+              "an unproven")
+        print("    statement in the body makes the row evidence for nothing.")
 
     n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
          + len(smissing) + len(sdead) + len(unstamped) + len(stale)
@@ -741,7 +747,7 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
               f"one stamped with the statement its rows were taken against; "
               f"every probe a receipt or a fork and never both, every fork "
               f"proving its separation in a type; every target tied to a "
-              f"`Confirms` row headed by it and proven by computation")
+              f"`Confirms` row headed by it and standing on no postulate")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -804,8 +810,17 @@ def selftest():
         {"live-one"}, "not a declared target",
         "E7 fires on a `Confirms` headed by a function over the target")
     run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-lemma"),
-        {"live-one"}, "is not a computed proof: 'live-one'",
+        {"live-one"}, "stands on a postulate: 'live-one'",
         "E7 fires on a row that hands the postulate back as its own proof")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-other"),
+        {"live-one", "live-two"}, "stands on a postulate: 'live-two'",
+        "E7 fires on a row discharged out of a DIFFERENT unproven statement, "
+        "which is the laundering the target-name test alone would miss")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-proven"),
+        {"live-one", "live-two"}, None,
+        "E7 quiet on a row whose body spends PROVEN lemmas, `where` block "
+        "included -- a claim that does not reduce has no numeral to be held "
+        "to, and refusing the weakening is what left the rule unsatisfiable")
     run(os.path.join(fx, "empty"), os.path.join(fx, "confirms-good"),
         {"live-one", "live-two"}, None,
         "E7 quiet on rows tied by projection, a point and a field, "
@@ -904,10 +919,12 @@ def selftest():
           "on a separation wearing a receipt's marker; is quiet on a fork "
           "that proves its separation; and a FORK expires under E2 exactly "
           "as a TARGET does.  E7 fires on a target with no `Confirms` row, "
-          "on a row headed by something other than a declared target, and "
-          "on a row whose body is the postulate rather than a computation; "
-          "and is quiet on rows tied through the statement's own eliminators "
-          "and proven by computed terms across several clauses)")
+          "on a row headed by something other than a declared target, on a "
+          "row that hands its own target back as its proof, and on one "
+          "discharged out of a DIFFERENT unproven statement; and is quiet on "
+          "rows tied through the statement's own eliminators, whether they "
+          "are pinned by computed terms across several clauses or reach a "
+          "claim that does not reduce through PROVEN lemmas and a `where`)")
     return 0
 
 

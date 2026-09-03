@@ -249,11 +249,33 @@ proof typechecks — and the **head** — `Confirms (weaken (target …))` has
 whatever type `weaken` returns. So E7 reads both textually, with the same
 division as E6: the marker and the record select the law, Agda decides the
 claim, and the check holds the two places a human could still cheat. A
-`Confirms` body may contain only `refl`, `tt`, `_`, numerals, `_,_` and the
-stdlib converters `≤ᵇ⇒≤`, `<ᵇ⇒<`, `toWitness`; a `Confirms` head, after
+`Confirms` body may name **no postulate at all**; a `Confirms` head, after
 peeling `proj₁`/`proj₂`, dotted field accessors and parentheses, must be one
 of the file's `-- TARGET:` names — and every target must have at least one
-such row. `where` in a body is refused outright.
+such row.
+
+The body rule is a **laundering** test and not a computation test, and the
+difference is what makes it satisfiable. Held to a whitelist of computed terms
+— `refl`, `tt`, a numeral, a stdlib converter — the rule silently demands a
+conclusion that REDUCES at the chosen point, and a conclusion denominated in a
+family this tower seals for cost does not reduce at any point whatever. Every
+probe whose target is stated in one would then carry a finding it could never
+clear, which is a coverage boundary being reported as a defect. What actually
+has to be refused is a row discharged out of the target itself, or out of some
+OTHER unproven statement — either makes the row evidence for one postulate
+exactly as far as another one is true. So the body may spend anything the
+tower has PROVEN, `where` blocks included, and a weakening through a proven
+inequality is a **stronger** receipt than a numeral rather than a weaker one:
+the type is still generated from the statement, and the row still holds only
+because the claim is true at the point.
+
+`Probed.Burst-Nest-Unit` is the worked instance. Its three targets conclude in
+`nestUnit e ins + nestIncAt e ins 0`, and `nestIncAt` is built over a sealed
+size, so no `≤ᵇ` can be taken against it. What the seal cannot hide is that
+the increment is a **summand**: the store's own reading computes, each
+component is under it by a proven converse (`storeNest-live≤` and its
+siblings), and `m≤m+n` puts the unit under the unit plus anything. The row
+reaches the statement as it reads.
 
 Sub-claims are reached through the statement's own connectives, never through
 a function over it: `Confirms (proj₁ (t …))` for a conjunct,

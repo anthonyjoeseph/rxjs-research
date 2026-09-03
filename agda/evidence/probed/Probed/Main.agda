@@ -26,7 +26,8 @@ open import Probed.Cascade-Chain-Count
 open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails)
 open import Probed.Burst-Nest-Unit
-  using (figures≡; okM; okS; okX; deferFigs≡; strongFigs≡; strongFits; strongHeads; richFigs≡; richFits)
+  using (figures≡; okM; okS; okX; liveM; nodesM; regsM; deferFigs≡; strongFigs≡; strongFits;
+         strongHeads; richFigs≡; richFits)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts)
 open import Probed.Burst-Nest-Ladder
