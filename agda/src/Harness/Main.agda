@@ -7,12 +7,15 @@
 -- WHY IT EXISTS.  Two of this machine's number families do not normalise in
 -- the TYPECHECKER at all:
 --
---   * the `fLvlD`/`sizeAt`/`widAt`/`regAt` family is `abstract`
---     `abstract` in `Rx.Evaluator`, as is `blowH`, both for a
+--   * `fLvlD` and `blowH` are `abstract` in `Rx.Evaluator`, and
+--     `cDel`/`sizeCount` in `Verify-Budget-Sufficient.Caps`, all for a
 --     measured performance reason — with the bodies visible, one whnf
 --     unfolds the whole loop and the consuming module runs past an hour.
---     `poolCount` is NOT itself abstract, but it calls `fLvlD`, so
---     `poolCount 1 0` is STUCK at the smallest possible arguments;
+--     `sizeAt`/`widAt`/`regAt` and `poolCount` are NOT themselves
+--     abstract, but they call the sealed ones, so `poolCount 1 0` is
+--     STUCK at the smallest possible arguments — and so is the CAPS
+--     RECURRENCE at its own entry, since `capsAt e sl 0` is
+--     `frameBlowup` of `sizeCount`;
 --   * the deep rungs simply exceed the typechecker (one was killed at
 --     12.6 GB after 20 minutes).
 --
@@ -46,15 +49,34 @@ module Harness.Main where
 open import Data.Bool using (Bool; false; if_then_else_)
 open import Data.Char using (toℕ)
 open import Data.List using (List; []; _∷_; map)
-open import Data.Nat using (ℕ; _+_; _*_; _∸_; _≤ᵇ_)
+open import Data.Maybe using (nothing)
+open import Data.Sum using (inj₁; inj₂)
+open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String; _++_; toList)
+open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
-open import Rx.Prim using (towerℕ)
-open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL)
+open import Rx.Prim using (towerℕ; cold; after_,_; gasPad; g0)
+open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; scanᵉ; mergeAllᵉ;
+  emptyᵉ; varᵗ; fstᵗ; strmᵗ; input; syncSizeᵉ)
+open import Rx.Slots using (Slots; scripted)
+open import Rx.Hop-Depth using (hopDᵉ)
+open import Rx.Slot-Hop using (slotHop)
+open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
+  capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
+  st-init)
+open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
+open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
+  nestCapAt)
+open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax)
+open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestWalkAt;
+  capΦAt; nestΦAt)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -107,6 +129,87 @@ private
   skipToDigit []       = []
   skipToDigit (c ∷ cs) = if isDigit c then (c ∷ cs) else skipToDigit cs
 
+------------------------------------------------------------------
+-- SERIES — THE DEPTH CHARGE AT THE ENTRY INSTANT, PRICED.
+--
+-- TARGET: scanΦ-fit @ce80e6
+--
+-- WHY THIS CANNOT BE A PROBE.  The arm's residue is that no premise
+-- names the node table, and the fact that would is ambient — so the
+-- question is what the two sides actually MEASURE at a state a run
+-- reached.  The store side computes in the typechecker; the charge
+-- side does not, at any instant.  `nestΦAt` and its two summands are
+-- sealed in `Caps-Face.Nest-Arith`, and the `-def` equations only hand
+-- the body back in terms of `capsAt`, which is itself stuck at its own
+-- ENTRY: `capsAt e sl 0` is `frameBlowup` of the sealed `sizeCount`,
+-- so there is no instant at which a `refl` reaches these numbers.
+--
+-- AND THE CHARGE IS UNREACHABLE HERE TOO, WHICH IS WHAT THESE ROWS
+-- REPORT.  Rows 3, 5, 6 and 18 terminate at once; rows 4, 7, 8 and 9
+-- were each killed at 180 s with no value, native, at the smallest
+-- program that reaches this arm.  They are kept for the reason the
+-- quarantine's rows are kept — they are the expressions someone will
+-- want to retry — and the cause is the same one, reached by a
+-- different route: every one of them reads `Caps.cSize (capsAt e sl
+-- 0)`, and the entry caps are `frameBlowup` of `sizeCount`, which
+-- pools `cDel` through `lvls`.  `nestCapAt` is the one summand that
+-- escapes, and only at the entry, where it IS `nestUnit`.
+--
+-- SO THE TWO SIDES CANNOT BE COMPARED BY INSTANTIATION AT ALL, and
+-- that is a fact about the obligation rather than about this harness:
+-- the store side computes in the typechecker and the charge side
+-- computes nowhere.  A row above the walk would have been a FALSITY on
+-- the charge, and no row can be taken.
+--
+-- WHAT THE STORE SIDE DOES SAY, and row 18 is where it says it.  The
+-- table is read at the subscribe frame and after each arrival, and it
+-- reads one less than two to the burst length, then DOUBLES on the
+-- first later value and stands still after -- which is the doubling
+-- step under the burst, in the table, at the arm's own shape.  The
+-- side that can be measured therefore grows exponentially in a count
+-- the arm's premises never bound, which is the same defect its header
+-- records about `valsΦ?` arriving from the store rather than from the
+-- charge.
+
+Γᴴ : Ctx 2
+Γᴴ = natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
+
+-- THE ARM'S OWN SHAPE.  `scanΦ-fit` is the SCAN arm, and the step here
+-- names its accumulator twice -- in the inner scan's seed and in its
+-- step -- so one application doubles the stored nesting.  That is what
+-- puts a positive `nodeNest` in the table at all; a `mapᵉ` program
+-- leaves it flat at zero and its store row could not have failed.
+deepenᴴ : Fn Γᴴ [] [] [] (obs natᵗ ×ᵗ natᵗ) (obs natᵗ)
+deepenᴴ = strmᵗ (mergeAllᵉ nothing
+            (scanᵉ (fstᵗ (varᵗ (there (here refl))))
+                   (fstᵗ (varᵗ (here refl)))
+                   (input (fsuc fzero))))
+
+eᴴ : Closed Γᴴ (obs natᵗ)
+eᴴ = scanᵉ deepenᴴ (strmᵗ emptyᵉ) (input (fsuc fzero))
+
+slᴴ : Slots Γᴴ
+slᴴ fzero        = scripted (cold [] ((after 0 , 7) ∷ (after 2 , 8) ∷ []))
+slᴴ (fsuc fzero) = scripted (cold (4 ∷ 3 ∷ 2 ∷ 1 ∷ []) ((after 9 , 0) ∷ []))
+
+-- one arrival, state threaded; `drain` returns the stream alone, and
+-- what this series needs is the store the run LEFT
+stepH : Sched Γᴴ × EvalSt eᴴ → Sched Γᴴ × EvalSt eᴴ
+stepH (sd , st) with sched-next sd
+... | inj₁ _       = sd , st
+... | inj₂ (a , s) = let r = cascade a 1 s st in proj₁ (proj₂ r) , proj₂ (proj₂ r)
+
+driveH : ℕ → Sched Γᴴ × EvalSt eᴴ
+driveH n = go n (let r = subscribeE
+                           (gasPad (syncSizeᵉ eᴴ + hopDᵉ 0 (slotHop 0 slᴴ) eᴴ) g0)
+                           eᴴ root 0 0 (sched-init eᴴ slᴴ) (st-init eᴴ)
+                 in proj₁ (proj₂ r) , proj₂ (proj₂ r))
+  where
+  go : ℕ → Sched Γᴴ × EvalSt eᴴ → Sched Γᴴ × EvalSt eᴴ
+  go 0       x = x
+  go (suc k) x = go k (stepH x)
+
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -117,6 +220,15 @@ rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
 -- full.
 rowAt 1 = "towerℕ 3 = " ++ show (towerℕ 3)
 rowAt 2 = "towerℕ 4 = " ++ show (towerℕ 4)
+
+rowAt 3 = "capsBase = "   ++ show (capsBase eᴴ slᴴ)
+rowAt 4 = "cSize@0 = "    ++ show (Caps.cSize (capsAt eᴴ slᴴ 0))   -- NO VALUE (180s)
+rowAt 5 = "nestUnit = "   ++ show (nestUnit eᴴ slᴴ)
+            ++ "  slotWrapSum = " ++ show (slotWrapSum slᴴ)
+rowAt 6 = "nestCapAt@0 = " ++ show (nestCapAt eᴴ slᴴ 0)
+rowAt 7 = "nestWalkAt@0 = " ++ show (nestWalkAt eᴴ slᴴ 0)  -- NO VALUE (180s)
+rowAt 8 = "capΦAt@0 = "   ++ show (capΦAt eᴴ slᴴ 0)        -- NO VALUE (180s)
+rowAt 9 = "nestΦAt@0 = "  ++ show (nestΦAt eᴴ slᴴ 0)       -- NO VALUE (180s)
 
 
 ------------------------------------------------------------------
@@ -157,6 +269,15 @@ rowAt 14 = "blowH 1 = "       ++ show (blowH 1)         -- DIVERGENT
 rowAt 15 = "capsHgo 0 0 = "   ++ show (capsHgo 0 0)     -- DIVERGENT
 rowAt 16 = "lvls 1 1 0 0 1 = "  ++ show (lvls 1 1 0 0 1)
 rowAt 17 = "iterL 1 1 0 1 0 = " ++ show (iterL 1 1 0 1 0)
+
+-- the STORE side of the series above, kept out of the quarantine's
+-- range: the node table a RUN reaches, driven past the subscribe frame
+-- rather than read at `st-init`, whose `nodesMax` is zero by
+-- construction and would make the row degenerate
+rowAt 18 = "nodesMax@0..4 = " ++ show (nodesMax (proj₂ (driveH 0)))
+             ++ " " ++ show (nodesMax (proj₂ (driveH 1)))
+             ++ " " ++ show (nodesMax (proj₂ (driveH 2)))
+             ++ " " ++ show (nodesMax (proj₂ (driveH 4)))
 rowAt n = "(no such row)"
 
 main : IO Unit

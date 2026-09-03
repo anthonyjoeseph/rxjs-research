@@ -500,6 +500,26 @@ postulate
   -- under it.  And a join rather than a sum in the `caseᵗ` clause of
   -- `nestDᵗ` is what that clause already takes.
 
+  -- AND THE RESIDUE CANNOT BE SETTLED BY INSTANTIATION, WHICH IS A
+  -- FACT ABOUT THE OBLIGATION AND NOT ABOUT ANY HARNESS.  What is left
+  -- here is that no premise names the node table, so the natural next
+  -- move is to read the two sides at a state a run reached and see
+  -- which one has room.  Only one of them can be read.  The store side
+  -- computes: driven through later frames off its own subscribe, the
+  -- table reads one less than two to the burst length and DOUBLES on
+  -- the first later value, so the side that CAN be measured grows
+  -- exponentially in a count these premises never bound -- the
+  -- `valsΦ?` defect above, arriving from the store rather than from
+  -- the charge.  The charge side computes nowhere: `nestΦAt` and both
+  -- its summands are sealed, the `-def` equations hand the body back
+  -- in terms of `capsAt`, and `capsAt` is stuck at its own ENTRY,
+  -- since even there it is `frameBlowup` of the sealed `sizeCount`.
+  -- Compiled, which ignores every seal, the entry size cap and both
+  -- Φ summands were each killed at 180 s with no value at the smallest
+  -- program reaching this arm, while `nestCapAt` at the entry returns
+  -- at once because it IS `nestUnit`.  The rows are `Harness.Main`'s,
+  -- and are measured-not-rechecked by construction.
+
   -- SO THE ARM IS NOT MIS-SHAPED, IT IS UNAFFORDABLE, and that is a
   -- class and not a repair.  The count is under the exit cap's width and
   -- under nothing smaller, the fold charges a power in the count, and

@@ -215,19 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN PRICE THE CHARGE, WHICH IS WHERE THE DEPTH OBLIGATION NOW SITS.** The
-  census settled what the admitted chains' depth is FOR: every route reaches
-  `frameΦ-fit`, whose one PROVEN arm spends it on a single widening of the
-  path's Φ-depth, so the unit is a number the bound is routed through and not
-  a currency. Read as
-  the registry's place in the store measure the fan-out half is now a proven
-  fold; what the store reading cannot reach is `nestΦAt`, denominated in the
-  program's unit and its slot wrap. So the commit instantiates the charge
-  against the reached store on the families the registry refutations already
-  run, and either names the summand that has to move or reports a FALSITY on
-  the charge itself.
-
-- **THEN RE-READ THE ARM'S SIBLINGS AGAINST THE DEAD FIELD.** The same
+- **RE-READ THE ARM'S SIBLINGS AGAINST THE DEAD FIELD.** The same
   recurrence is read at the other Φ arms, and each was classed while the
   width field was still an open repair -- so an arm parked as waiting on
   that field is waiting on nothing, and its class is wrong in the direction
@@ -244,6 +232,18 @@ does not fit is a finding about the shared statement, not about the head.
   the subscribe itself produced, no hand-built record priced. The commit
   reads the row there and reports what the rows earn, receipt or
   refutation, with the coverage boundary either way.
+
+- **THEN PUT THE BURST'S LENGTH WHERE A PRODUCER MUST SUPPLY IT.** The
+  charge side of the Φ arms is now known to be measurement-dead at every
+  instant, so what is left to work is the side that does compute -- and
+  it grows exponentially in a count these premises never bound. The
+  ledger conjunct that would bound it is an `all`, which constrains each
+  value and never how many, while the conclusion charges a power in the
+  length. This is NOT the width the fork killed: that was the frame
+  face's measure; this is a burst LENGTH. A hypothesis
+  here is the laundering the law forbids, so the commit states it as a
+  field obligation on the invariant record and reports which producer
+  cannot re-establish it.
 
 ### The ledger
 
