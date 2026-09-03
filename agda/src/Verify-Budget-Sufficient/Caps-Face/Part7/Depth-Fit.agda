@@ -553,8 +553,10 @@ postulate
   --   that a program fans out per hop by at most its size.  The field
   --   would have to be denominated in the measure the frame face
   --   already uses, and that measure carries the source's payload count
-  --   into an EXPONENT at its fold clause, so it towers in the layer
-  --   count with no cap anywhere in its definition: a three-layer
+  --   into an EXPONENT -- on its INNER reading, which the outer one
+  --   multiplies by exactly when a FLATTEN consumes it, so a bare fold
+  --   is flat there and one refold is not.  It therefore towers in the
+  --   layer count with no cap anywhere in its definition: a three-layer
   --   refold crosses the linear ceiling at the linear reading's own
   --   most generous setting, its own size at each level.  So there is
   --   no field to thread, and the arm sits on the other branch.  The
@@ -564,7 +566,10 @@ postulate
   --   FIRST hop, so the field is refuted by a measurement and not only
   --   by a measure.  What the run does NOT reach is the count the
   --   recurrence ADMITS, which is the binary above and stands where it
-  --   stood: two layers outran the evidence loop outright.
+  --   stood: two layers outran the evidence loop outright.  And the
+  --   field is named HERE and nowhere else in the development, so
+  --   killing it moved this arm alone -- no sibling was parked on it,
+  --   and none of them can be reclassified off this route.
   scanΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
     (fn : Fn Γ [] [] [] (u ×ᵗ s) u) (nid : NodeId)

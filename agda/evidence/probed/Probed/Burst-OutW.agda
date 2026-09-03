@@ -26,12 +26,12 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (Gas; g0; gs)
 open import Rx.Exp
-  using (Closed; Val; natᵗ; ofᵉ; emptyᵉ; takeᵉ; mergeAllᵉ; switchAllᵉ; μᵉ; varᵉ; deferᵉ; input; nat̂;
-  strmᵗ)
+  using (Closed; Val; Fn; natᵗ; _×ᵗ_; ofᵉ; emptyᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; μᵉ; varᵉ;
+  deferᵉ; input; nat̂; strmᵗ; primᵗ; pairᵗ; fstᵗ; sndᵗ; varᵗ; add)
 open import Rx.Frame-Width using (outWⱽ)
 open import Rx.Slots using (Slots)
 open import Rx.Evaluator
-  using (subscribeE; splitBurst; root; sched-init; st-init)
+  using (subscribeE; splitBurst; root; sched-init; st-init; Path; map-f; _↠_)
 open import Verify-Budget-Sufficient.Desc-Ceil using (burst-out)
 open import Probed.Apparatus using (Confirms)
 open import Refuted.Demand-Programs using (Γ₂; insT)
@@ -128,3 +128,76 @@ tieSwitch : Confirms
   (burst-out gasBig slots p-switch root 0 0
      (sched-init p-switch slots) (st-init p-switch) refl)
 tieSwitch = ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- THE TWO REGIONS THE ROWS ABOVE NAMED AS UNCOVERED.
+----------------------------------------------------------------------
+
+-- THE SCAN HEAD, and it is where the reading is TIGHTEST rather than
+-- widest: `outWⱽ` walks straight through a `scanᵉ` and hands back the
+-- source's count, while the frame emits one value per arriving one.
+-- So the row is an EQUALITY and load-bearing on the failure axis --
+-- a scan emitting so much as one extra payload at its subscribe, a
+-- seed among them, would put the left side over.  The exponent this
+-- family is known for lives on the INNER reading and reaches the outer
+-- one only through a flatten, which is why a bare scan is tight and
+-- the refold below is not.
+stepFn : Fn Γ₂ [] [] [] (natᵗ ×ᵗ natᵗ) natᵗ
+stepFn = primᵗ add (pairᵗ (fstᵗ (varᵗ (here refl))) (sndᵗ (varᵗ (here refl))))
+
+p-scan : Closed Γ₂ natᵗ
+p-scan = scanᵉ stepFn (nat̂ 0) p-of
+
+-- THE REFOLD, which is the same scan under the flatten that turns its
+-- accumulator into emissions -- the one family whose syntactic reading
+-- towers in the layer count.  Read here for the CEILING's sake rather
+-- than the family's: it says what the slack looks like where the
+-- reading is a power, and so which region of this leaf cannot refute.
+p-refold : Closed Γ₂ natᵗ
+p-refold = mergeAllᵉ nothing
+             (scanᵉ (strmᵗ (ofᵉ (nat̂ 0 ∷ nat̂ 1 ∷ []))) (strmᵗ p-of) p-of)
+
+-- THE FRAME BELOW THE ROOT.  A non-root continuation cannot graft
+-- anything into the stream this leaf measures -- `subscribeE` returns
+-- the TERM's own burst and the caller applies its frame -- so what a
+-- deeper `κ` can move is the STATE the frame steps against, and only a
+-- term whose subscribe recurses passes `κ` down at all.  These rows
+-- are therefore read at the recursing heads and not at `ofᵉ`, where
+-- the clause ignores `κ` outright and the row could not have failed.
+κ₁ : Path Γ₂ natᵗ natᵗ
+κ₁ = map-f (varᵗ (here refl)) ↠ root
+
+lhsκ : (e : Closed Γ₂ natᵗ) → ℕ
+lhsκ e =
+  length (proj₁ (splitBurst {Γ = Γ₂} {u = natᵗ} {A = Val Γ₂ natᵗ}
+    (proj₁ (subscribeE {e = e} gasBig e κ₁ 0 0 (sched-init e slots) (st-init e)))))
+
+deeper : List ℕ
+deeper = lhs p-scan ∷ rhs p-scan
+       ∷ lhs p-refold ∷ rhs p-refold
+       ∷ lhsκ p-scan ∷ lhsκ p-merge ∷ lhsκ p-switch
+       ∷ []
+
+-- THE ROWS.  The scan head is an EQUALITY at three and LOAD-BEARING:
+-- one extra payload out of the fold's subscribe, its seed among them,
+-- puts the left side over a reading that walks straight through the
+-- `scanᵉ`.  The refold reads six against EIGHTEEN, and the slack is
+-- the finding rather than the fit -- the flatten multiplies the two
+-- readings, so this whole region is DEGENERATE on the failure axis and
+-- probing the ceiling at a refold buys nothing.  The three deeper-`κ`
+-- rows repeat the tight heads one frame below the root and are
+-- UNMOVED, which is what says a continuation does not reach this
+-- count.
+deeper≡ : deeper ≡ 3 ∷ 3 ∷ 6 ∷ 18 ∷ 3 ∷ 6 ∷ 6 ∷ []
+deeper≡ = refl
+
+-- THE TIE AT THE SCAN HEAD, at the root and again one frame below it.
+tieScan : Confirms
+  (burst-out gasBig slots p-scan root 0 0
+     (sched-init p-scan slots) (st-init p-scan) refl)
+tieScan = ≤ᵇ⇒≤ _ _ tt
+
+tieScanκ : Confirms
+  (burst-out gasBig slots p-scan κ₁ 0 0
+     (sched-init p-scan slots) (st-init p-scan) refl)
+tieScanκ = ≤ᵇ⇒≤ _ _ tt

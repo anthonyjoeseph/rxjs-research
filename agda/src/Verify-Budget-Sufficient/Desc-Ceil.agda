@@ -88,9 +88,17 @@ open import Verify-Budget-Sufficient.Nest-Burst using
 --   `*All` heads at six, which is where the reading is a product and
 --   the only place it could be under-counted.  The defer reads zero
 --   against zero, which is the row the ceiling's right to stop there
---   rests on.  TIED at the three equality rows, which are the ones a
---   tie can be load-bearing on at all.  NOT covered: a frame below the
---   root, a scan head, and a shared slot whose definition itself
+--   rests on.  The SCAN head is a fourth equality and TIED at both the
+--   root and one frame below it, which is the tightest region this
+--   ceiling has: the reading walks straight through a `scanᵉ`, so a
+--   seed among the subscribe's payloads would put the left side over.
+--   Three tight heads repeated under a non-root continuation are
+--   UNMOVED, which is what says a continuation cannot reach this count.
+--   TIED at five rows.  The refold -- that same scan under a flatten --
+--   reads six against eighteen and is DEGENERATE on the failure axis,
+--   since the flatten multiplies the two readings; so the family whose
+--   syntactic width towers is the one region of this leaf no row can
+--   refute in.  NOT covered: a shared slot whose definition itself
 --   reaches a share.
 postulate
   burst-out : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}

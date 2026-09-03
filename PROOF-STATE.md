@@ -215,16 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-READ THE ARM'S SIBLINGS AGAINST THE DEAD FIELD.** The same
-  recurrence is read at the other Φ arms, and each was classed while the
-  width field was still an open repair -- so an arm parked as waiting on
-  that field is waiting on nothing, and its class is wrong in the direction
-  that reads safe. This is a reclassification pass and not a grind: the
-  arms the dead route reaches move UP, and any arm that survives it is a
-  genuinely separate gap and gets said so in its own header. The commit
-  re-reads them and moves the classes that move.
-
-- **THEN INSTANTIATE THE TIER'S ONE UNPROBED ROW, AGAINST A STATE A RUN
+- **INSTANTIATE THE TIER'S ONE UNPROBED ROW, AGAINST A STATE A RUN
   REACHED.** One row here is FALSITY on nothing at all -- the class it is
   born into, not a reading anyone took -- and it is a receipt ABOUT a
   state, so what was missing was a reachable state rather than a route.
@@ -232,6 +223,15 @@ does not fit is a finding about the shared statement, not about the head.
   the subscribe itself produced, no hand-built record priced. The commit
   reads the row there and reports what the rows earn, receipt or
   refutation, with the coverage boundary either way.
+
+- **THEN CLOSE THE DESCENT CEILING'S LAST UNCOVERED REGION.** The width
+  ceiling now has its tight heads instantiated at the root and one frame
+  below it, and the one region left unread is a shared slot whose own
+  definition reaches a share -- the only head whose reading descends on
+  slot fuel rather than on syntax, so it is the only place the two
+  descents can part. That is a leaf the whole descent face rests on, and
+  it carries one receipt against a statement nothing else in the tier
+  can bound. The commit reads it there, or reports what blocks it.
 
 - **THEN PUT THE BURST'S LENGTH WHERE A PRODUCER MUST SUPPLY IT.** The
   charge side of the Φ arms is now known to be measurement-dead at every
@@ -316,9 +316,9 @@ does not fit is a finding about the shared statement, not about the head.
   later arrivals either side of the crossover, the entry settling exactly; only
   the caps can refute and they cannot move. One family unread.
 - **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
-  no more payloads than its term syntactically carries. Stated over the split,
-  not the sealed measure, so it instantiates; three tight rows tied, a frame
-  below the root uncovered.
+  no more payloads than its term syntactically carries. Five tight rows tied,
+  the scan head among them and repeated below the root; only a share reaching a
+  share is unread, and the refold region cannot refute.
 - **`sight-thru-val`** (Depth-Sighted) — DIFFICULTY, `REFUTED, PROBED`: what
   ONE emitted inner costs the outer frame to subscribe. All three conjuncts are
   now instantiated where they move — the store at the PARKING branch, tight to

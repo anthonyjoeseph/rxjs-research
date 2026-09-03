@@ -26,9 +26,11 @@
 --
 -- THE ANSWER THE ROWS GIVE IS `admitted`, AND IT IS NOT A CAP ARTEFACT.
 -- `outWⱽ` is the frame face's OWN width reading, defined over syntax
--- and slots with no cap anywhere in it, and its `scanᵉ` clause carries
--- the source's payload count into an EXPONENT.  So one layer takes a
--- width to a power of itself and the syntactic reading towers in the
+-- and slots with no cap anywhere in it, and a fold takes the source's
+-- payload count into an EXPONENT -- on the INNER reading, which the
+-- outer one multiplies by only when a FLATTEN consumes it.  So a bare
+-- scan is flat here and one LAYER, scan under flatten, takes a width
+-- to a power of itself; the syntactic reading then towers in the
 -- layer count exactly as the recurrence does.  The linear reading is
 -- therefore not a tightening the arm is waiting for -- it is refuted by
 -- a measure this tower already computes, at the smallest program that
