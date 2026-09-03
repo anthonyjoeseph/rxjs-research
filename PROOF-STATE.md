@@ -215,16 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AND SETTLE THE FOLD GRANT'S BINARY BEFORE DENOMINATING IT AGAIN.**
-  The producing side of the fold's grant is at the spiral stop: four
-  denominations refuted in one region, each because a depth fixed
-  before the count has to dominate a count towering in it. A fifth
-  currency is the move the stop rules out. What is owed is a binary —
-  whether the admitted count is REACHABLE at all — since a count no
-  run reaches is a premise the statement may simply carry, while a
-  reachable one refutes the family rather than this denomination. The
-  commit builds the run that decides it and reports which way it fell.
-
 - **AND PRICE THE SINK LEAF AGAINST THE HOP IT ESCALATES BY.** The
   entry cap is load-bearing for the Φ pricing alone, and the pricing
   is where the fan-out's own arm is refuted: a chain ending at a
@@ -246,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   registry rather than at the walk, and instantiates it at the
   embedding map the level witness escapes through, which is the
   smallest shape separating a chain's price from its output's.
+
+- **AND STATE THE CEILING A LATER FRAME'S VALUES ARE UNDER.** The fold
+  grant's binary came back saying the arm waits on a ceiling that does
+  not exist: a run's widest instant moves with the slot script's burst
+  and with nothing the program names, and the one proven tie from
+  syntax to a value count prices the SUBSCRIBE frame, which the family
+  that can tower a width leaves empty. That missing tie is also what
+  the leg above finds at the registry, one face over, so the commit
+  states it ONCE — a later frame's values under a reading its own
+  descent supplies — and wires the fold's grant to it, leaving the
+  registry relation a consumer rather than a sibling.
 
 ### The ledger
 
@@ -294,11 +295,11 @@ does not fit is a finding about the shared statement, not about the head.
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×3`: the
+- **`scanΦ-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
   producing side of the fold's new grant. AT THE SPIRAL STOP: four
-  denominations refuted in one region, since a depth fixed before the count
-  must dominate a count towering in it. Owed a binary, not a currency: is the
-  admitted count reachable.
+  denominations refuted in one region. The binary is ANSWERED and neither
+  branch repairs it — a run's count is script-denominated, so this waits on a
+  ceiling that does not exist.
 - **`innerΦ-drain-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the charge, at
   the queue's own `drainW` and at every level within the descent's count. All
   the arm has left once the face, the count and the store residue are reported

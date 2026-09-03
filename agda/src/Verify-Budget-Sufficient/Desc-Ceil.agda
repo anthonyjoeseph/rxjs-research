@@ -83,6 +83,21 @@ open import Verify-Budget-Sufficient.Nest-Burst using
 -- against it.  The seal exists to keep the evaluator out of the
 -- PREMISES that name the measure, and it goes on doing that: the
 -- equation is spent once, here, in a body.
+-- AND WHAT IT PRICES IS THE SUBSCRIBE FRAME, WHICH IS NOT WHERE THE
+-- WIDTH IS.  This is the development's only tie from a program's
+-- syntax to the number of values a frame hands on, and it is read at
+-- the frame that SUBSCRIBES.  Driven, the one family whose width can
+-- tower emits nothing there at any burst length -- a flatten delivers
+-- in LATER frames -- while those later instants run to a cube of the
+-- slot script's synchronous burst, a quantity this reading never
+-- consults: a scripted source is one payload per arrival however long
+-- its script.  So a consumer needing a bound on a later frame's values
+-- has no ceiling here, and no other either: every value-count statement
+-- in the tower is a TRANSPORT, an equation moving a count across a
+-- split or a concatenation, and the only two readings that put such a
+-- count under a syntactic width are this leaf and the one below it,
+-- both at the subscribe.  Rows in `Harness.Main`,
+-- measured-not-rechecked.
 -- PROBED: `Probed.Burst-OutW` -- nine rows at the root frame, three of
 --   them EQUALITIES and so load-bearing: `ofᵉ` at three, and the two
 --   `*All` heads at six, which is where the reading is a product and

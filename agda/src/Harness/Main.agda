@@ -48,11 +48,12 @@ module Harness.Main where
 
 open import Data.Bool using (Bool; false; if_then_else_)
 open import Data.Char using (toℕ)
-open import Data.List using (List; []; _∷_; map)
+open import Data.List using (List; []; _∷_; map; length; foldr)
+  renaming (_++_ to _++ᴸ_)
 open import Data.Maybe using (nothing)
 open import Data.Sum using (inj₁; inj₂)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _∸_; _≤ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_; _⊔_; _≤ᵇ_)
 open import Data.Nat.Show using (show)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Data.String using (String; _++_; toList)
@@ -62,15 +63,17 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Agda.Builtin.IO using (IO)
 open import CLI.IO using (_>>=_; getContents; putStr; Unit)
-open import Rx.Prim using (towerℕ; cold; after_,_; gasPad; g0)
-open import Rx.Exp using (Ctx; Closed; Fn; natᵗ; obs; _×ᵗ_; scanᵉ; mergeAllᵉ;
-  emptyᵉ; varᵗ; fstᵗ; strmᵗ; input; syncSizeᵉ)
+open import Rx.Prim using (towerℕ; cold; after_,_; gasPad; g0; Gas; Timed;
+  InstEmit)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_; scanᵉ;
+  mergeAllᵉ; emptyᵉ; varᵗ; fstᵗ; strmᵗ; input; syncSizeᵉ; sizeᵉ)
+open import Rx.Frame-Width using (outWⱽ)
 open import Rx.Slots using (Slots; scripted)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (poolCount; blowH; capsHgo; lvls; iterL;
   capsBase; subscribeE; sched-next; cascade; Sched; EvalSt; root; sched-init;
-  st-init)
+  st-init; drain; splitEvents; splitBurst; Stream)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt)
 open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
   nestCapAt)
@@ -210,6 +213,139 @@ driveH n = go n (let r = subscribeE
   go (suc k) x = go k (stepH x)
 
 
+------------------------------------------------------------------
+-- SERIES — THE DRIVEN REFOLD PAST THE LAYER THE PROBE TREE REACHES.
+--
+-- TARGET: scanΦ-fit @ce80e6
+--
+-- WHAT IS OWED.  `Probed.Fold-Width-Reach` decides the fork between
+-- the two width READINGS and stops one layer in: its run crosses the
+-- linear reading at the first hop, and two layers outran the evidence
+-- loop outright.  What no row there reaches is whether a RUN keeps up
+-- with the count the recurrence ADMITS, which grows by
+-- `foldStep S w = S ^ suc w` and so towers in the level.  Compiled,
+-- the same family runs further, and that is the only thing these rows
+-- add.
+--
+-- AND THE DECISIVE AXIS IS THE BURST, NOT THE LAYER COUNT, which is
+-- why the layer rows below stop where the probe's did.  `foldStep` is
+-- exponential in the INCOMING width and only polynomial in the size,
+-- and the width entering a refold is the synchronous burst its slot
+-- script delivers -- a script parameter, carried by no part of the
+-- program's size.  So the exponent is reachable at ONE layer if it is
+-- reachable at all, and the burst rows sweep it there at a fixed
+-- program while the later-arrival count is held still, so that the two
+-- ways a script can widen an instant are not read as one.
+--
+-- WHAT WOULD MAKE THEM FAIL.  A widest instant growing about linearly
+-- in the burst puts the admitted count out of reach of any run, and
+-- the arm may then carry a premise bounding the count it is charged
+-- for.  One growing like a power of the burst puts it IN reach, and
+-- then the falsity is on the count axis and on the budget at this
+-- recurrence rather than on this arm.
+--
+-- THE `outWⱽ` COLUMN IS THE PROVEN CEILING ON THE SUBSCRIBE BURST
+-- ALONE (`burst-out`), and is printed because it is what seeds the
+-- recurrence's own width -- not as a ceiling on the widest column,
+-- which maxes over every later instant the drive reaches and is free
+-- to exceed it.
+--
+-- ⚠ measured-not-rechecked, like every row in this file.  Layers 0 and
+-- 1 are also pinned by `refl` in that probe, so their agreement
+-- calibrates the backend ON THIS FAMILY rather than only on `towerℕ`.
+------------------------------------------------------------------
+
+gasᴴ : Gas
+gasᴴ = gasPad 400 g0
+
+-- k values delivered synchronously at subscribe, and k more arriving
+-- one per later frame -- the second is what drives the refolds that
+-- only re-enter after the flatten has subscribed them
+syncᴴ : ℕ → List ℕ
+syncᴴ zero    = []
+syncᴴ (suc k) = k ∷ syncᴴ k
+
+timedᴴ : ℕ → List (Timed ℕ)
+timedᴴ zero    = []
+timedᴴ (suc k) = (after 0 , k) ∷ timedᴴ k
+
+-- THE LAYER SEEDS FROM A REAL SOURCE, not from `emptyᵉ`: an empty
+-- observable emits nothing however long it is driven, which is what
+-- held the undriven family to its entry burst
+layerDᴴ : Closed Γᴴ natᵗ → Closed Γᴴ natᵗ
+layerDᴴ e = mergeAllᵉ nothing (scanᵉ deepenᴴ (strmᵗ (input (fsuc fzero))) e)
+
+towerDᴴ : ℕ → Closed Γᴴ natᵗ
+towerDᴴ zero    = input fzero
+towerDᴴ (suc k) = layerDᴴ (towerDᴴ k)
+
+-- slot zero drives the base one value per frame; slot one carries both
+-- the synchronous burst each refold reads at its own subscribe and the
+-- later values the refolds re-enter on.  THE TWO ARE SEPARATE DIALS
+-- here and were one in the probe: widening a burst and lengthening a
+-- run are the two ways a script can grow an instant count, and a sweep
+-- moving both at once cannot say which one the exponent reads.
+slotsBᴴ : ℕ → ℕ → Slots Γᴴ
+slotsBᴴ b l fzero        = scripted (cold [] (timedᴴ l))
+slotsBᴴ b l (fsuc fzero) = scripted (cold (syncᴴ b) (timedᴴ l))
+
+instWᴴ : ∀ {t} → Stream Γᴴ t → List ℕ
+instWᴴ         []         = []
+instWᴴ {t = t} (em ∷ ems) =
+  length (proj₁ (splitEvents {A = Val Γᴴ t} (InstEmit.events em))) ∷ instWᴴ ems
+
+-- the whole run: subscribe burst and every later frame `drain` reaches
+runᴴ : ℕ → ℕ → ℕ → ℕ → Stream Γᴴ natᵗ
+runᴴ b l fuel k =
+  let r = subscribeE gasᴴ (towerDᴴ k) root 0 0
+            (sched-init (towerDᴴ k) (slotsBᴴ b l)) (st-init (towerDᴴ k))
+  in proj₁ r ++ᴸ drain fuel 1 (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+
+wideᴴ : ℕ → ℕ → ℕ → ℕ → ℕ
+wideᴴ b l fuel k = foldr _⊔_ 0 (instWᴴ (runᴴ b l fuel k))
+
+countᴴ : ℕ → ℕ → ℕ → ℕ → ℕ
+countᴴ b l fuel k = length (instWᴴ (runᴴ b l fuel k))
+
+-- the SUBSCRIBE stream's total value count, which is the quantity
+-- `burst-out` proves to be under `outWⱽ` -- kept apart from the widest
+-- column so that a later frame outrunning that ceiling is not read as
+-- the entry breaching it
+entryTotᴴ : ℕ → ℕ → ℕ → ℕ
+entryTotᴴ b l k = length (proj₁ (splitBurst {Γ = Γᴴ} {u = natᵗ}
+                                            {A = Val Γᴴ natᵗ}
+  (proj₁ (subscribeE gasᴴ (towerDᴴ k) root 0 0
+    (sched-init (towerDᴴ k) (slotsBᴴ b l)) (st-init (towerDᴴ k))))))
+
+-- the layer sweep, at the probe's own dials so its two `refl` rows
+-- calibrate this binary: what the run DID, what the subscribe burst is
+-- proven to be under, and what a per-hop-by-its-own-size reading allows
+wideRow : ℕ → String
+wideRow k = "driven layer " ++ show k
+              ++ ": size = "     ++ show (sizeᵉ (towerDᴴ k))
+              ++ "  widest = "   ++ show (wideᴴ 3 3 6 k)
+              ++ "  instants = " ++ show (countᴴ 3 3 6 k)
+              ++ "  outWⱽ = "    ++ show (outWⱽ 2 [] (slotsBᴴ 3 3) (towerDᴴ k))
+              ++ "  fanout = "   ++ show (suc (k * sizeᵉ (towerDᴴ k)))
+
+-- the burst sweep, which is what decides the binary: one layer, the
+-- later-arrival count held at three, and only the synchronous burst
+-- the refold reads at its own subscribe moving
+burstRow : ℕ → String
+burstRow b = "layer 1, burst " ++ show b
+              ++ ": widest = "   ++ show (wideᴴ b 3 6 1)
+              ++ "  entry = "    ++ show (entryTotᴴ b 3 1)
+              ++ "  instants = " ++ show (countᴴ b 3 6 1)
+              ++ "  outWⱽ = "    ++ show (outWⱽ 2 [] (slotsBᴴ b 3) (towerDᴴ 1))
+
+-- the layer sweep again at the smallest dials the family admits, to
+-- tell a run that is merely LARGE at two layers from one the evaluator
+-- does not finish at all
+smallRow : ℕ → String
+smallRow k = "small layer " ++ show k
+              ++ ": widest = "   ++ show (wideᴴ 1 1 2 k)
+              ++ "  instants = " ++ show (countᴴ 1 1 2 k)
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -278,7 +414,15 @@ rowAt 18 = "nodesMax@0..4 = " ++ show (nodesMax (proj₂ (driveH 0)))
              ++ " " ++ show (nodesMax (proj₂ (driveH 1)))
              ++ " " ++ show (nodesMax (proj₂ (driveH 2)))
              ++ " " ++ show (nodesMax (proj₂ (driveH 4)))
-rowAt n = "(no such row)"
+-- the driven refold's rows, one per process: 19 is layer zero and the
+-- catch-all carries 20 to 22 as layers one to three, 23 to 29 as bursts
+-- one to seven, and 30 to 33 as the small-dial layers zero to three --
+-- dispatched by arithmetic because a numeric literal PATTERN at 20
+-- expands to twenty constructors
+rowAt 19 = wideRow 0
+rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
+          else if n ≤ᵇ 29 then burstRow (n ∸ 22)
+          else if n ≤ᵇ 33 then smallRow (n ∸ 30) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →
