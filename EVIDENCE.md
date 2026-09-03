@@ -140,6 +140,36 @@ E2.
   exact numerals (a margin, a count, a non-vacuity pin) stay as they are: a
   `Confirms` row says the claim held, and those rows say by how much.
 
+- **E8 — A LIVE POSTULATE CARRIES AT MOST SEVEN RECEIPTS (Anthony).** A probe
+  AIMS a grind or REFUTES a statement. Past a handful of green receipts on one
+  target it is doing neither: the seventh has not told anyone what the sixth
+  did not, the ledger row is still open, and what the evidence is buying is
+  more evidence to DELETE on the day the statement is discharged. Seven rather
+  than three because a coverage LATTICE over genuinely separate axes is
+  legitimate and this tree has one; rather than twelve because past seven the
+  evidence has stopped converting into proof.
+
+  **THE COUNT IS OVER `-- TARGET:` DECLARATIONS, NOT FILES**, so a probe
+  carrying three targets pays three — and **the repair is to DISCHARGE the
+  postulate or to DELETE the receipts that no longer earn their place, NEVER
+  to merge probe modules.** Merging satisfies a file count and changes
+  nothing, which is the same laundering as trading a postulate for a
+  hypothesis; the selftest pins it by failing eight receipts consolidated into
+  two files.
+
+  **DELETING A RECEIPT DOES NOT DELETE ITS FINDING.** A coverage boundary, a
+  blocked verdict or a dead route belongs in the header of the statement it
+  constrains, and that is where it goes — with `git show <sha>` as the
+  recovery route, exactly as a spent probe's receipt already carries one.
+
+  **A REFUTATION IS UNCAPPED, and that is not leniency:** it kills a statement
+  that is then GONE, so it cannot accumulate against a live row, and `make
+  refuted` goes red the day `src` can no longer state it. **A FORK is uncapped
+  from the other side** — it declares no target, and deciding between two
+  mechanisms is the one job a single file does. And the cap is **off a
+  DISCHARGED target**, whose receipts are E2's finding rather than a second
+  one.
+
 Plus, per tree, the wiring law with no exemptions:
 
 - **`make wiring-refuted`** and **`make wiring-probed`** run the reachability

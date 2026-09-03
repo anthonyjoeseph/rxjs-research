@@ -320,6 +320,32 @@ def check_e6(evidence):
     return mixed, unproven, undeclared
 
 
+# THE CAP ON RECEIPTS PER STATEMENT.  A probe's job is to AIM a grind or to
+# REFUTE, and a seventh receipt on one target has not told anyone something
+# the sixth did not while the ledger row stays open.  Seven rather than three
+# because a coverage LATTICE is legitimate -- distinct program shapes reaching
+# distinct arms -- and rather than twelve because past seven the evidence has
+# stopped converting into proof.
+RECEIPT_CAP = 7
+
+
+def check_e8(evidence, postulates):
+    """No live postulate carries more than RECEIPT_CAP receipts.
+
+    The count is over `-- TARGET:` DECLARATIONS and not files, so a probe
+    carrying three targets pays for three -- otherwise the cap is dodged by
+    consolidation, which satisfies the count and changes nothing."""
+    per = {}
+    for p in probe_files(evidence):
+        targets, _ = declared(p)
+        for i, t in targets:
+            if t in postulates:
+                per.setdefault(t, []).append((p, i))
+    return sorted(((t, sites) for t, sites in per.items()
+                   if len(sites) > RECEIPT_CAP),
+                  key=lambda kv: (-len(kv[1]), kv[0]))
+
+
 def confirms_head(ty):
     """The name under the eliminators in `Confirms (...)`, or None.
 
@@ -577,6 +603,7 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
         statements(src), harness)
     mixed, unproven, undeclared = check_e6(evidence)
     uncovered, untied, uncomputed = check_e7(evidence, postulates)
+    over = check_e8(evidence, postulates)
 
     for p, i, mod in e1:
         print(f"{p}:{i}: E1 — src imports the evidence tree: {mod}")
@@ -740,10 +767,28 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
               "an unproven")
         print("    statement in the body makes the row evidence for nothing.")
 
+    for t, sites in over:
+        print(f"{sites[0][0]}:{sites[0][1]}: E8 — {t!r} carries "
+              f"{len(sites)} receipts, over the cap of {RECEIPT_CAP}")
+        print("    A probe AIMS a grind or REFUTES a statement.  Past the cap "
+              "the receipts")
+        print("    have stopped deciding anything and the row is still open, "
+              "so what the")
+        print("    evidence is now buying is more evidence to delete when the "
+              "statement is")
+        print("    discharged.  DISCHARGE the postulate, or DELETE the "
+              "receipts that no")
+        print("    longer earn their place.  NEVER merge probe files: the "
+              "count is over")
+        print("    declarations, and consolidating them satisfies it while "
+              "changing nothing.")
+        for q, i in sites[1:]:
+            print(f"      also {q}:{i}")
+
     n = (len(e1) + len(missing) + len(dead) + len(orphaned) + len(mismarked)
          + len(smissing) + len(sdead) + len(unstamped) + len(stale)
          + len(mixed) + len(unproven) + len(undeclared)
-         + len(uncovered) + len(untied) + len(uncomputed))
+         + len(uncovered) + len(untied) + len(uncomputed) + len(over))
     if n == 0:
         print(f"check-evidence: clean — {nprobes} probe(s), every one naming a "
               f"live postulate; {nreceipts} receipt(s), every one above its "
@@ -753,7 +798,8 @@ def report(src, evidence, namespaces, postulates, gate, harness=HARNESS):
               f"one stamped with the statement its rows were taken against; "
               f"every probe a receipt or a fork and never both, every fork "
               f"proving its separation in a type; every target tied to a "
-              f"`Confirms` row headed by it and standing on no postulate")
+              f"`Confirms` row headed by it and standing on no postulate; "
+              f"no statement carrying more than {RECEIPT_CAP} receipts")
     if gate and n:
         print(f"check-evidence: {n} finding(s) — see above")
         return 1
@@ -831,6 +877,27 @@ def selftest():
         {"live-one", "live-two"}, None,
         "E7 quiet on rows tied by projection, a point and a field, "
         "proven by refl, tt, a witness and a converter, over clauses")
+
+    run(os.path.join(fx, "empty"), os.path.join(fx, "cap-at"),
+        {"live-one"}, None,
+        "E8 quiet at the cap exactly -- a coverage lattice over one "
+        "statement is what the cap leaves room for")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "cap-over"),
+        {"live-one"}, "carries 8 receipts, over the cap of 7",
+        "E8 fires one past the cap")
+    run(os.path.join(fx, "empty"), os.path.join(fx, "cap-consolidated"),
+        {"live-one"}, "carries 8 receipts, over the cap of 7",
+        "E8 counts DECLARATIONS and not files, so merging eight probes into "
+        "two does not duck it -- the repair a cap on files would reward")
+    # AND THE CAP IS ABOUT LIVE ROWS ONLY.  Once the target is discharged the
+    # receipts are E2's finding and deleting them is the repair, so counting
+    # them again here would report the same pile twice under two laws.
+    got8 = run(os.path.join(fx, "empty"), os.path.join(fx, "cap-over"),
+               set(), "is not a live postulate",
+               "E2 fires on a discharged target")
+    if "over the cap" in got8:
+        fails.append("E8 counted receipts on a DISCHARGED target, which is "
+                     "E2's finding and not a second one")
 
     empty = os.path.join(fx, "empty")
     run(empty, empty, {"live-one"}, "E4 — series 'A —",
@@ -930,7 +997,12 @@ def selftest():
           "discharged out of a DIFFERENT unproven statement; and is quiet on "
           "rows tied through the statement's own eliminators, whether they "
           "are pinned by computed terms across several clauses or reach a "
-          "claim that does not reduce through PROVEN lemmas and a `where`)")
+          "claim that does not reduce through PROVEN lemmas and a `where`.  "
+          "E8 is quiet at the cap exactly and fires one past it; it counts "
+          "DECLARATIONS rather than files, so merging eight receipts into "
+          "two files does not duck it -- the repair a file count would "
+          "reward; and it stays off a DISCHARGED target, whose receipts are "
+          "E2's finding rather than a second one)")
     return 0
 
 

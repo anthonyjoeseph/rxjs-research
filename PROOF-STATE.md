@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **TAKE THE FOLD ARM'S OTHER BRANCH, THE ONE THE FORK LEFT STANDING.** The
-  binary is decided against the repair the arm proposed: the width field
-  cannot be threaded, because it would be denominated in the measure the
-  frame face already uses and that measure towers in the layer count. Its
-  own header says what follows -- a FALSITY on the count axis and on the
-  budget at this recurrence, not on this arm. The fork proves the
-  separation but reaches it through the syntax, so the region a FALSITY
-  needs is not yet reached. The commit builds the run that reaches it,
-  through the `stepFrame` door rather than the subscribe frame, and
-  reports the class the rows earn.
+- **REACH THE COUNT AXIS THROUGH THE `stepFrame` DOOR, AT PARAMETERS THE
+  LOOP CAN PAY.** The fork settles the arm's binary from the SYNTAX, so the
+  region a FALSITY needs is still unreached and no class moves on it. The
+  run is written and its blocker is known and is not the door: one script
+  cannot both drive the outer in later frames and feed each inner refold at
+  its own subscribe, so a single-slot harness leaves the inners reading
+  nothing and the drive comes back a flat zero. Split, the family is
+  affordable only small -- a six-value, twenty-frame drive outran the
+  evidence loop's budget outright. The commit lands the split harness at a
+  size the loop affords and reports the class the rows earn.
 
 - **THEN PRICE THE CHARGE, WHICH IS WHERE THE DEPTH OBLIGATION NOW SITS.** The
   census settled what the admitted chains' depth is FOR: every route reaches
@@ -313,7 +313,7 @@ does not fit is a finding about the shared statement, not about the head.
   frame. Probed at the subscribing frame — the only kind that can grow the
   registry — driven to the boundary its premises allow: one level pays with
   slack that GROWS with the level. A shared-slot inner is unread.
-- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×6`: one fold's
+- **`foldPath-regsLen`** (Regs-Fold-Len) — DIFFICULTY, `PROBED×5`: one fold's
   registry price as ONE FRAME STEP of two caps. Now read at both heights and at
   later arrivals either side of the crossover, the entry settling exactly; only
   the caps can refute and they cannot move. One family unread.

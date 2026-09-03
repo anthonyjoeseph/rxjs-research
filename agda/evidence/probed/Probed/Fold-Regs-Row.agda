@@ -1,9 +1,9 @@
 -- THE FOLD FAMILY'S TIE TO ITS STATEMENT, HELD ONCE FOR THE WHOLE
--- FAMILY.  Fifteen probe modules read `foldPath`'s registry against one
--- frame step, each at its own program and its own axis; what they share
--- is the STATEMENT, and this module is the one place it is
+-- FAMILY.  Every probe module reading `foldPath`'s registry against one
+-- frame step does so at its own program and its own axis; what they
+-- share is the STATEMENT, and this module is the one place it is
 -- instantiated.  The satellites spend `foldRow` under a type they write
--- out themselves, so a restatement of the target breaks all fifteen at
+-- out themselves, so a restatement of the target breaks all of them at
 -- once, while the point is chosen and paid for here.  The harness is
 -- deliberately its own -- two slots and one lift -- so that every one
 -- of them can import it, the nesting spine included.
@@ -25,9 +25,10 @@
 -- exit is two.  `foldRow` is the tie, and it is LOAD-BEARING in that
 -- margin: a registration longer than five turns it red.  NOT
 -- COVERED: one path of length one, one arrival's worth of values, one
--- program.  The families -- height, width, cut, re-entrancy, the
--- nesting grid -- are read by the modules that import this one, and
--- their readings are what carry the coverage.
+-- program.  The families -- depth, the cut, the inner's operators, the
+-- duplicating frame, the separated caps, the nesting spine -- are read
+-- by the modules that import this one, and their readings carry the
+-- coverage.
 
 -- TARGET: foldPath-regsLen @d58775
 module Probed.Fold-Regs-Row where

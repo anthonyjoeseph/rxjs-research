@@ -47,7 +47,7 @@ make refuted              typecheck the refutations   (Refuted/Main.agda)
 make probed               typecheck the probes        (Probed/Main.agda)
 make wiring-refuted       reachability, rooted at Refuted/Main
 make wiring-probed        reachability, rooted at Probed/Main
-make evidence-check       E1 + E2 + E3 + E4 + E5 + E6 + E7
+make evidence-check       E1 + E2 + E3 + E4 + E5 + E6 + E7 + E8
 make evidence-selftest    proves every one of them still fires
 ```
 
@@ -295,3 +295,38 @@ not be: it says by how much, where the tied row says only that the claim held.
 `check-evidence.py` names it beside `Main.agda` as not a probe; `Separates`
 lands there too when the first fork needs it. E7's own branches are pinned by
 fixtures under `scripts/evidence-selftest/confirms-*`.
+
+## E8 — the cap, and what it is measuring
+
+Seven receipts per live postulate. The number is arbitrary within a range and
+the range is not: the law is in CLAUDE.md and EVIDENCE.md, and what belongs
+here is the mechanics.
+
+`check_e8` walks every probe file, reads its `-- TARGET:` declarations, keeps
+the ones naming a name on `make postulates`' ledger, and groups by that name.
+Three consequences worth knowing before the check fires at you:
+
+- **It counts declarations.** A file carrying four targets contributes four
+  rows, to four different statements or to one. So consolidating eight probes
+  into two modules leaves the count at eight — which is the point, and the
+  fixture `cap-consolidated` is exactly that shape.
+- **A discharged target is invisible to it.** The ledger filter runs first, so
+  a postulate that has become a definition drops out of the grouping entirely
+  and its probes are E2's finding. Reporting both would name one repair twice.
+- **A `-- FORK:` file contributes nothing**, since it declares no target at
+  all. E6 already refuses a file that is both.
+
+The report names every site, file and line, sorted worst statement first, so
+the choice of which receipts to keep is made against the whole list rather
+than one at a time.
+
+**The migration is the expensive half, and it is prose work, not code.** The
+findings in the deleted probes' headers are the reason those probes cost what
+they did; they move into the target's own header, condensed, behind a
+`git show <sha>` that resolves to the commit still holding the modules.
+`make comments-check` accepts a sha in a `PROBED:` receipt for exactly this
+case, so a receipt naming a module that is gone must carry one or the gate
+goes red.
+
+The three fixture families are `cap-at` (seven, legal), `cap-over` (eight,
+fires) and `cap-consolidated` (eight declarations across two files, fires).
