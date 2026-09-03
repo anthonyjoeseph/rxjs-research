@@ -144,6 +144,32 @@ postulate
   -- which is why the side condition at this kind is a size bound on
   -- them and a unit at every other.
   --
+  -- AND IT IS THE ONE OF THE LIVE LIST'S THREE MINTS THAT NO SINGLE
+  -- DENOMINATION REACHES.  The other two read in the caps face's
+  -- LEVEL-INDEXED ledger: the subscribe out of a parked queue already
+  -- takes its caps at a stepped level, and the sink's arm restates off
+  -- the dispatch ledger at a level with no affordability premise at
+  -- all -- which is the shape the potential face's own sink arm is
+  -- PROVEN in, so the ledger absorbing the fan-out's climb is a fact
+  -- and not a plan.  This one cannot be moved there: its conclusion
+  -- joins ONE ceiling and its side condition is a size reading charged
+  -- against that same ceiling, so it is a statement at a single level
+  -- by construction.  Level-indexing it means indexing the CONCLUSION,
+  -- which is the round's live-list bound and is pinned by its consumer
+  -- -- so the sink's three refutations are this statement's currency
+  -- surfacing one hop downstream, not a defect of the arm that spends
+  -- it.
+  --
+  -- AND SEPARATING THE SIZE BUDGET FROM THE CEILING IS NOT THE FREE
+  -- GENERALISATION IT READS AS.  Giving the size premise its own
+  -- number and concluding at that number looks like this statement
+  -- with a parameter loosened, and it is a different claim: the grant
+  -- is spent, so the ceiling is reached THROUGH the potential premise
+  -- rather than through the size premise alone, and a conclusion
+  -- denominated in the size budget is not covered by what the grant
+  -- delivers.  That is why the currency change is owed a restatement
+  -- and not a widening.
+  --
   -- PROBED: `Probed.Chain-Step-Live-Deferred` reaches this arm by
   --   RUNNING a whole chain over it, at the one program shape that can
   --   move the fold: a `mapᵉ` over the async input handing the outer
@@ -539,7 +565,10 @@ frameLive-of-sz U (thru-outer _ _)   path vals h = h
 -- standing is a receipt that SHRINKS along the path and names no level
 -- at all -- the shape the potential face already carries -- so this arm
 -- is owed a different CURRENCY rather than a larger number in the one
--- it has.
+-- it has.  AND THE CURRENCY IS NOT THIS ARM'S TO CHANGE: the reading
+-- that cannot be afforded is the outer frame's size bound, charged
+-- against the round's single ceiling, and the header of that mint
+-- carries why no level-indexed form of it is a widening.
 --
 -- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
 -- REFUTED: `Refuted.Sink-Level-Range`
