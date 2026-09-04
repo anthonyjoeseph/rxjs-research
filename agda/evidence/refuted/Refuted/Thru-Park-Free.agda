@@ -21,8 +21,10 @@
 -- level it is read at.  Read at its own upper endpoint the entry
 -- therefore asks for one more than the roof, and that is a
 -- contradiction in the naturals rather than a demand on the term: the
--- refutation below quantifies over every cap, every depth, every
--- telescope and every parked term, and spends none of them.
+-- refutation below quantifies over every cap, every telescope, every
+-- parked term and BOTH depths independently -- the ladder is climbed at
+-- one and the roof counted at the other -- and spends none of them, so
+-- splitting the two indices apart does not reach it.
 --
 -- SO THIS IS NOT A MISSING PRODUCER BUT A FALSE CONJUNCT, and any
 -- invariant carrying it discharges its consumers vacuously rather than
@@ -64,16 +66,17 @@ opIterD-strict S W d k m J =
 -- THE ENTRY AT ONE PARKED TERM, restated here rather than imported --
 -- the store's own per-term conjunct, which is what the arm that parks
 -- a term would have had to establish for the term it appends.
-ParkOne : ∀ {n} {Γ : Ctx n} {u} → Caps → ℕ → Slots Γ → List Source → Closed Γ u → Set
-ParkOne c d sl sh o =
-  ∀ (Lv : ℕ) → Lv ≤ sizeCount c d ⊔ Caps.cSize c →
-    CeilD c d Lv (nest o sl sh) (suc (suc (sizeᵉ o)))
+ParkOne : ∀ {n} {Γ : Ctx n} {u} → Caps → ℕ → ℕ → Slots Γ → List Source →
+  Closed Γ u → Set
+ParkOne c d D sl sh o =
+  ∀ (Lv : ℕ) → Lv ≤ sizeCount c D ⊔ Caps.cSize c →
+    CeilD c d D Lv (nest o sl sh) (suc (suc (sizeᵉ o)))
 
-park-absurd : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (d : ℕ) (sl : Slots Γ)
-  (sh : List Source) (o : Closed Γ u) → ParkOne c d sl sh o → ⊥
-park-absurd c d sl sh o H = n≮n TOP (subst (_≤ TOP) (+-comm TOP 1) over)
+park-absurd : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (d D : ℕ) (sl : Slots Γ)
+  (sh : List Source) (o : Closed Γ u) → ParkOne c d D sl sh o → ⊥
+park-absurd c d D sl sh o H = n≮n TOP (subst (_≤ TOP) (+-comm TOP 1) over)
   where
-  TOP = sizeCount c d ⊔ Caps.cSize c
+  TOP = sizeCount c D ⊔ Caps.cSize c
   over : TOP + 1 ≤ TOP
   over = H TOP ≤-refl 1
            (subst (_≤ opIterD (Caps.cSize c) (Caps.cWid c) d
@@ -89,17 +92,17 @@ park-absurd c d sl sh o H = n≮n TOP (subst (_≤ TOP) (+-comm TOP 1) over)
 -- levels a term's descent genuinely fits at, which is a fact about the
 -- TERM.  No range of levels can be quantified over for all terms, and
 -- the row above is one instance of this rather than a boundary case.
-ceil-absurd-at : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (d : ℕ) (sl : Slots Γ)
+ceil-absurd-at : ∀ {n} {Γ : Ctx n} {u} (c : Caps) (d D : ℕ) (sl : Slots Γ)
   (sh : List Source) (o : Closed Γ u) (Lv : ℕ) →
-  let TOP = sizeCount c d ⊔ Caps.cSize c in
+  let TOP = sizeCount c D ⊔ Caps.cSize c in
   Lv ≤ suc TOP →
   suc TOP ≤ opIterD (Caps.cSize c) (Caps.cWid c) d (nest o sl sh)
              (suc (suc (sizeᵉ o))) Lv →
-  CeilD c d Lv (nest o sl sh) (suc (suc (sizeᵉ o))) → ⊥
-ceil-absurd-at c d sl sh o Lv hLv hlad H =
+  CeilD c d D Lv (nest o sl sh) (suc (suc (sizeᵉ o))) → ⊥
+ceil-absurd-at c d D sl sh o Lv hLv hlad H =
   n≮n TOP (subst (_≤ TOP) (m+[n∸m]≡n hLv) (H (suc TOP ∸ Lv)
     (subst (_≤ opIterD (Caps.cSize c) (Caps.cWid c) d (nest o sl sh)
                 (suc (suc (sizeᵉ o))) Lv)
            (sym (m+[n∸m]≡n hLv)) hlad)))
   where
-  TOP = sizeCount c d ⊔ Caps.cSize c
+  TOP = sizeCount c D ⊔ Caps.cSize c

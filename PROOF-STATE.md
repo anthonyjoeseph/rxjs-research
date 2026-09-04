@@ -215,27 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CAPS SIDE OF THE SAME HEAD, AND WHAT IT STILL OWES IS THE ROOF.**
-  `walk-frame-drain-inner` is the `from-inner` frame's caps receipt, the only
-  frame that names a node. Its per-entry conjuncts are now all readable off
-  what the frame holds — the park and width fields at the frame's level, the
-  closure key one level up, where one frame step absorbs the telescope's
-  ratio — so what remains is what no field carries: the wrapper's `CeilD` at
-  the frame's level, which nothing mints from the walk's `Reached` relation,
-  and the per-entry climb witness in the sweep currency. The next commit is
-  the bridge from reached level to ceiling, stated as its own leaf under a
-  real body for this head, so the remaining gap is a ceiling statement.
-
 - **THE FRAME'S OWN MINT, WHERE THREE REFUTATIONS SAY ONE THING.**
   `stepFrame-nest-nodes`, `stepFrame-nest-regs` and `stepFrame-sz` are
   what a single frame stores, registers and grows by, each under the
   potential AND the frame grant, and each already refuted with its
   premise read ALONE. The refutations agree: the frame's own reading is
-  never the whole payer, and the arm that kills each is the one whose
-  emission the walk's values cannot reach — the scan accumulator, the
-  drained queue. So this is a restatement leg and not a grind, taken as
-  one commit because a denomination that repairs one of the three and not
-  its siblings has not been repaired.
+  never the whole payer — the arm that kills each is a scan accumulator
+  or a drained queue the walk's values cannot reach. So this is a
+  restatement leg, and the denomination is the ceiling's own split: room
+  is counted at the depth the frame was ARRIVED at while the traversal
+  under it climbs one down. One commit, because repairing one of the
+  three and not its siblings repairs nothing.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -249,6 +239,15 @@ does not fit is a finding about the shared statement, not about the head.
   leg because a frame grant repaired there is what both would be read
   against.
 
+- **THE REGISTRY'S OWN FAN, WHERE THREE ROWS SHARE ONE CAP.**
+  `fan-regsNest`, `fan-regsSz` and `sink-fan-sink` are what an admitted
+  chain's registry costs — its depth, its size, and its escalation past a
+  second hand-over — each read at the PROGRAM's cap and each refuted
+  there. They are one restatement and not three: the entry cap all three
+  are stated at is the Φ pricing's, and taking the walk up to it moves
+  every leaf's exponent at once. One commit, because a cap repaired for
+  one of the three and not for its siblings has repaired nothing.
+
 ### The ledger
 
 - **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
@@ -256,11 +255,11 @@ does not fit is a finding about the shared statement, not about the head.
   syntactic unit, read as the registry's own place in the store measure.
   REFUTED AT A REACHED STATE, not only an arbitrary one, so it is replaced
   rather than discharged and no mint can be asked for it.
-- **`walk-frame-drain-inner`** (Part7/Walk-Sink) — FALSITY,
-  `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the `from-inner` head of the drain
-  law, the only frame that names a node. Both denominations are closed to
-  instantiation — the cap does not return, the climb bound is sealed — so
-  evidence can raise this class and never lower it.
+- **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
+  `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
+  drain owes, the wrapper's ceiling now minted from the frame's own room. Both
+  denominations stay closed to instantiation — the cap does not return, the
+  climb bound is sealed — so evidence can raise this class, never lower it.
 - **`subscribeInner-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   what one subscribe out of a merge node's parked queue mints on the live list.
   A gated entry reads zero at every state quantity the consuming fit's residue

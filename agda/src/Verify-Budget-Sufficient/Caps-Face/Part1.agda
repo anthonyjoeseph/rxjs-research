@@ -90,9 +90,9 @@ module Verify-Budget-Sufficient.Caps-Face.Part1 where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_; T)
 open import Data.Maybe   using (Maybe)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _⊔_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-identityʳ; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤;
-  *-monoʳ-≤; m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ; <⇒≤;
-  ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub; *-identityˡ;
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-reflexive; +-suc; +-comm; +-assoc; +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤;
+  m≤m+n; m≤n+m; n≤1+n; +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; *-identityʳ; <⇒≤; ^-monoˡ-≤;
+  ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; m≤m⊔n; m≤n⊔m; ⊔-lub; *-identityˡ;
   *-distribˡ-+)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -151,7 +151,8 @@ open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; 2≤capsAt-size; caps; Caps; capsAt; capsAt-base-size; capsH;
    cSize≤frameBlowup; frameStep; frameStep-wid-suc;
    iterFold-infl; iterFold-mono-count; iterFold-suc; iterSize-2^; iterSize-infl;
-   iterSize-mono-count; iterSize-suc; size≤sizeCount; sizeCount; sizeStep-infl)
+   iterSize-mono-count; iterSize-suc; pair≤sizeStep; size≤sizeCount; sizeCount;
+   sizeStep-infl)
 open import Verify-Budget-Sufficient.Measures using
   (2X≡X+X; all-++-intro; all-impl;
                                                       EnvSize; envSize-lookup; envSize-widen;
@@ -744,16 +745,10 @@ k≤iterSize S k s hS 1≤s =
   (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ k))))
   (≤-trans (*-monoʳ-≤ (2 ^ k) 1≤s) (iterSize-2^ S k s hS)))
 
--- the three one-fold facts the clauses consume
+-- the one-fold fact the clauses consume
 one≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → 1 ≤ sizeStep S s
 one≤sizeStep S s hS =
   ≤-trans (m≤m*n 1 (suc (2 * s))) (*-monoˡ-≤ (suc (2 * s)) hS)
-
-pair≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → suc (s + s) ≤ sizeStep S s
-pair≤sizeStep S s hS =
-  ≤-trans (s≤s (≤-reflexive (cong (s +_) (sym (+-identityʳ s)))))
-          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
-                   (*-monoˡ-≤ (suc (2 * s)) hS))
 
 -- SPENDING THE NODE: a bound at `sizeStep S (iterSize S k s)` is a
 -- bound at `iterSize S (suc k) s`.  Every clause below ends here

@@ -55,10 +55,10 @@ open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; nestUnit; sweepLive-nest)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; frameStep; sizeCount; frameStep-mono-j)
+  using (Caps; frameStep; sizeCount; frameStep-mono-j; fuel-pred)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (FaceOK; faceHere; capsDrainOK; nestValOK?-widen)
-open import Verify-Budget-Sufficient.Nest-Ceiling using (ceil-sweep-step)
+open import Verify-Budget-Sufficient.Nest-Ceiling using (ceilS-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; drainW-here; drainW-tail)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthFin; depthDrain; depthInner)
@@ -270,7 +270,7 @@ postulate
     sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
     dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
     innerW sf op allNid κ id now o sched st ≤ W →
-    depthInner sf op allNid κ id now o sched st ≤ d →
+    depthInner sf op allNid κ id now o sched st ≤ pred d →
     pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
     (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
@@ -324,7 +324,7 @@ mergeAllDrain-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   ⦃ _ : FaceOK c sl ⦄ →
   capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st →
   drainW sf allNid κ id now q sched st ≤ W →
-  depthDrain sf allNid κ id now q sched st ≤ d →
+  depthDrain sf allNid κ id now q sched st ≤ pred d →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
@@ -346,16 +346,15 @@ mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
 ... | true  = ≤-trans IH₀ (⊔-lub (⊔-lub SUB₀ S≤) U≤)
   where
   B̂     = proj₁ hcd
-  Ŝ     = proj₁ (proj₂ hcd)
-  ceilQ = proj₁ (proj₂ (proj₂ hcd))
-  hcdA  = proj₂ (proj₂ (proj₂ hcd))
+  ceilQ = proj₁ (proj₂ hcd)
+  hcdA  = proj₂ (proj₂ hcd)
 
   r₁     = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
   done   = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
 
-  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
   r₀    = proj₁ tailΣ
   step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (m≤m+n Lv r₀)
 
@@ -380,8 +379,7 @@ mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
 
   IH₀ = mergeAllDrain-nest-live c sl d W (Lv + r₀) G B U sf allNid κ id now lim
           (if done then act else suc act) q sched₁ st₁
-          (B̂ , Ŝ
-             , ceil-sweep-step c d Lv B̂ (suc (length q + Ŝ)) r₀
+          (B̂ , ceilS-sweep-step c (pred d) d Lv (suc B̂) (length q) r₀
                  (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ)) ceilQ
              , proj₂ (proj₂ tailΣ))
           (≤-trans (drainW-tail sf allNid κ id now o q sched st) hw)
@@ -465,7 +463,7 @@ innerFinish-nest-live {s = s} c d W Lv G B U sf mergeAllᵒ allNid inst p id now
         mergeAllDrain-nest-live c (Sched.slots sched) d W Lv G B U sf allNid p id now
           lim (pred act) q sched st
           (hdr lim act q od refl) (hw lim act q od refl)
-          (≤-trans (n≤1+n _) hdp) hpk hpl hu
+          (fuel-pred hdp) hpk hpl hu
 
 -- THE COMPLETION FRAME'S MINTS.  A `from-inner` runs the finish only
 -- on a `fin` that no live registration absorbs, so both of the routes

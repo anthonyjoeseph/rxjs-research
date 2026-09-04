@@ -333,31 +333,6 @@ op-step-entry S W d k m j r j₁ 2≤S fits sub =
   J₀ = suc (j + suc B * suc B)
   X  = opIterD S W d k m (sLvlD S W d k J₀)
 
--- AND THE ROOM IS NOT ALWAYS QUADRATIC: A CLIMB MAY BE A WHOLE SWEEP,
--- which is what a queue drained entry by entry actually takes.  The
--- entry step above spends its `fits` premise only to lift a sweep read
--- at the arrival level up to one read at the quadratic room's top, so
--- the premise it really wants is that the climb lands under THAT
--- sweep -- and a climb reported in the sweep currency lands there
--- directly, with no quadratic in the way.  One unit of the operator
--- measure therefore buys one sweep, and the recursion nests them, so a
--- queue of entries each climbing within a sweep costs one unit each.
-op-step-sweep : ∀ (S W d k m j r j₁ : ℕ) → 2 ≤ S →
-  j + r ≤ sLvlD S W d k (suc (j + suc (sizeAt S j) * suc (sizeAt S j))) →
-  (j + r) + j₁ ≤ opIterD S W d k m (j + r) →
-  j + (r + j₁) ≤ opIterD S W d k (suc m) j
-op-step-sweep S W d k m j r j₁ 2≤S climb sub =
-  ≤-trans (≤-trans (≤-reflexive (sym (+-assoc j r j₁)))
-                   (≤-trans sub
-                     (≤-trans (opIterD-mono m m d d k k 2≤S ≤-refl ≤-refl climb
-                                 ≤-refl ≤-refl ≤-refl)
-                              (fIterD-infl S W d k (suc (widAt S W X)) X))))
-          (≤-reflexive (sym (opIterD-suc S W d k m j)))
-  where
-  B  = sizeAt S j
-  J₀ = suc (j + suc B * suc B)
-  X  = opIterD S W d k m (sLvlD S W d k J₀)
-
 -- THE μ OPERATOR: the unfolding receipt `m₀ + suc (m₀ * m₀)`, and then a
 -- FRESH subscribe on a LARGER term — which is why it is charged as one
 -- NESTING level rather than as a continuation of the same chain, and

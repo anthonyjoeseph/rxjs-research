@@ -45,12 +45,13 @@ open import Rx.Evaluator using
   subscribeInner; hasRoom; mergeAllBump; switchKill; subscribeE; splitBurst; Stream; mintNode;
   installNode; pushBurst; oneShotBurst; splitEvents; thruConsume; thruWalk; thruWrap;
   retagEvents; subscribeSharedSlot; memberSource; mintSource; sharedConnect; sharedPlumb;
-  burstCompleted; register; dropSource; opIterD; sLvlD; sizeAt)
+  burstCompleted; register; dropSource; opIterD; sLvlD)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; subscribeE-keeps; subscribeInner-keeps; stepFrame-keeps; thruConsume-keeps)
 open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; 1≤pow≤; Caps; frameStep; frameStep-0; frameStep-mono-j; iterFold-infl; iterSize-infl;
-  iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size; opIterD-mono; 1≤capsAt-reg)
+  iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size; opIterD-mono; 1≤capsAt-reg;
+  sizeAt-strict; fuel-pred)
 open import Verify-Budget-Sufficient.Caps using (sizeCount)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Chain using (leaf-lvl)
@@ -68,7 +69,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; ≤ᵇ-true; T-to; 
 open import Verify-Budget-Sufficient.Measures using (all-impl; all-++-intro; boundedNode; lookupNode-park; NodePark; parkRoom; ∧-true; syncSize-unfoldμ; fᵢ≤sum-tab; pathLen)
 open import Verify-Budget-Sufficient.Caps-Nest using (nest; mu-step)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
-  (CeilD; ceil-step; ceil-le; ceil-mu; ceil-here; ceil-sweep-step)
+  (CeilD; CeilS; ceil-step; ceil-le; ceil-mu; ceil-here; ceilS-head; ceilS-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nodeNest; allFresh; frameNestF; 1≤frameNestF; nest-telescope; nestUnit; nest-inflate; pow-grow¹;
   pow-distrib-*; slotNest; slotsNestSum)
@@ -923,9 +924,10 @@ pathSz?-lvl c Lv p 2≤S h =
 -- -- a ratio no single cap absorbs, and the level shift is what pays
 -- for it.  One frame step absorbs it exactly, so the entry states the
 -- key where it can be minted rather than where it would be convenient.
--- The head's size conjunct is `suc` for the same reason: the ceiling
--- the entry is admitted under has to survive one step, and a step
--- spends one unit of the ledger the queue's length is measured in.
+-- The head's own size conjunct stays at the entry's level, and the
+-- successor the ceiling is admitted under is bought where it is spent
+-- rather than stored: a level's size cap climbs strictly, so the entry
+-- read one level up has room for the successor its consumer charges.
 -- REFUTED: `Refuted.Nest-Clos-Stratified`, the key at the entry's own
 --   level against a capped telescope, and
 --   `Refuted.Step-Frame-Clos-Level` for the same reading one frame in.
@@ -942,45 +944,59 @@ pathSz?-lvl c Lv p 2≤S h =
 -- what a bare floor could not do: an offset with no roof lets the
 -- queue walk the level as far as it likes, and then one operator unit
 -- per entry does not pay for it.
+--
+-- AND THE CLIMB IS BOUNDED BY A SWEEP OFF THE ENTRY'S OWN LEVEL, at
+-- the depth the frame's room is spent one step BELOW.  The drain runs
+-- under a frame whose allowance is the frame level at the count depth,
+-- and one frame level is a whole sweep at the depth under it -- so the
+-- currency an entry's climb is reported in is a sweep at `pred d`,
+-- while the ceiling it buys is still denominated in the count at `d`.
+-- A climb bounded at `d` would be asking the frame for room it does
+-- not have; a climb bounded at `pred d` is exactly the room one frame
+-- step already paid for.
 capsDrainAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-  (c : Caps) (sl : Slots Γ) (d Lv B̂ Ŝ : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
+  (c : Caps) (sl : Slots Γ) (d Lv B̂ : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
-capsDrainAt c sl d Lv B̂ Ŝ sf allNid κ id now lim act [] sched st =
+capsDrainAt c sl d Lv B̂ sf allNid κ id now lim act [] sched st =
   (Sched.slots sched ≡ sl) × (capsOK? (frameStep Lv c) sched st ≡ true)
-capsDrainAt {n = n} {s = s} c sl d Lv B̂ Ŝ sf allNid κ id now lim act (o ∷ q) sched st =
+capsDrainAt {n = n} {s = s} c sl d Lv B̂ sf allNid κ id now lim act (o ∷ q) sched st =
   (Sched.slots sched ≡ sl) × (capsOK? (frameStep Lv c) sched st ≡ true)
   × (nestValOK? (frameStep Lv c) (obs s) o ≡ true)
   × (nestClosOK? (frameStep (suc Lv) c) sl o ≡ true)
   × (sizeᵉ o ≤ Caps.cSize (frameStep Lv c))
   × (dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c))
   × (nest o sl (EvalSt.connectedShares st) ≤ B̂)
-  × (suc (sizeᵉ o) ≤ Ŝ)
   × (Σ ℕ λ r₀ →
-      (Lv + r₀ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) d B̂
-         (suc (Lv + suc (sizeAt (Caps.cSize c) Lv)
-                 * suc (sizeAt (Caps.cSize c) Lv)))) ×
-      capsDrainAt c sl d (Lv + r₀) B̂ Ŝ sf allNid κ id now lim
+      (Lv + r₀ ≤ sLvlD (Caps.cSize c) (Caps.cWid c) (pred d) (suc B̂) (suc Lv)) ×
+      capsDrainAt c sl d (Lv + r₀) B̂ sf allNid κ id now lim
         (if proj₁ (proj₂ (proj₂ (proj₂ r))) then act else suc act) q
         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))))
   where r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
 
--- AND THE TWO BOUNDS ARE THE DRAIN'S OWN, NOT ITS CALLER'S, so they are
+-- AND THE NESTING BOUND IS THE DRAIN'S OWN, NOT ITS CALLER'S, so it is
 -- existential here and shared down the whole queue.  Sharing is what
 -- makes the ceiling chain: one frame-level receipt, one unit of it
 -- spent per entry, and an entry admitted by a bound its own successor
--- is also admitted by.  Neither bound is free -- enlarging either
--- widens the ledger the ceiling has to dominate -- so the pair is
--- pinned from both sides rather than upward-closed.
+-- is also admitted by.  The bound is not free -- enlarging it widens
+-- the ledger the ceiling has to dominate -- so it is pinned from both
+-- sides rather than upward-closed.
+--
+-- AND THE RECEIPT IS A SWEEP AND NOT A COUNT, which is what lets the
+-- frame mint it with nothing but its own allowance.  A count ceiling
+-- has to be handed down from somewhere; a sweep ceiling is what one
+-- frame level IS, so the fold's single receipt is exactly the room the
+-- frame already holds, spent one entry at a time and read off as a
+-- count ceiling only where an entry is actually subscribed.
 capsDrainOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (c : Caps) (sl : Slots Γ) (d Lv : ℕ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (lim : Maybe ℕ) (act : ℕ)
   (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) → Set
 capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st =
-  Σ ℕ λ B̂ → Σ ℕ λ Ŝ →
-    CeilD c d Lv B̂ (suc (length q + Ŝ))
-    × capsDrainAt c sl d Lv B̂ Ŝ sf allNid κ id now lim act q sched st
+  Σ ℕ λ B̂ →
+    CeilS c (pred d) d Lv (suc B̂) (length q)
+    × capsDrainAt c sl d Lv B̂ sf allNid κ id now lim act q sched st
 
 -- THE SUBSCRIPTION'S OWN DESCENT, AND IT IS NOW A CASE SPLIT.  What was
 -- one postulate over the whole of `subscribeE` is a real body over one
@@ -4275,7 +4291,7 @@ NestAt {n = n} {Γ = Γ} {t = t} {e = e} c d sl B W Lv g o κ id now sched st =
   -- positivity premise on every statement of this family; keeping it
   -- beside the count leaves that premise at the one consumer which
   -- finally collapses the existential, where it is already proven.
-  depthE g o κ id now sched st ≤ d →
+  depthE g o κ id now sched st ≤ pred d →
   -- THE CAPS FACE'S FOUR ENTRY KEYS, CARRIED RATHER THAN PRODUCED.
   -- A walk cannot derive them: the level they would have to sit at is
   -- bounded by the instant's ceiling, that ceiling is one number for a
@@ -4291,7 +4307,7 @@ NestAt {n = n} {Γ = Γ} {t = t} {e = e} c d sl B W Lv g o κ id now sched st =
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
-  CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
+  CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   let r = subscribeE g o κ id now sched st in
   Σ ℕ λ j →
   let G = nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ o) in
@@ -4703,8 +4719,8 @@ subscribeE-burst-capsAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
-  depthE g o κ id now sched st ≤ d →
-  CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
+  depthE g o κ id now sched st ≤ pred d →
+  CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   Σ ℕ λ L →
     (L ≤ sizeCount c d ⊔ Caps.cSize c)
     × (burstCaps? (frameStep L c) sl
@@ -4715,7 +4731,7 @@ subscribeE-burst-capsAt {n = n} c d sl Lv g o κ id now sched st ⦃ f ⦄
   , hceil (proj₁ R)
       (≤-trans (proj₁ (proj₂ R))
         (opIterD-mono (suc (sizeᵉ o)) (suc (sizeᵉ o))
-           (depthE g o κ id now sched st) d
+           (depthE g o κ id now sched st) (pred d)
            (nest o sl (EvalSt.connectedShares st))
            (nest o sl (EvalSt.connectedShares st))
            (FaceOK.fSize f) ≤-refl ≤-refl ≤-refl hd ≤-refl ≤-refl))
@@ -4742,8 +4758,8 @@ subscribeE-burst-nestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   descW g o κ id now sched st ≤ W →
-  depthE g o κ id now sched st ≤ d →
-  CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
+  depthE g o κ id now sched st ≤ pred d →
+  CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   Σ ℕ λ L →
     (L ≤ sizeCount c d ⊔ Caps.cSize c)
     × (burstNest? (frameStep L c) sl
@@ -4754,7 +4770,7 @@ subscribeE-burst-nestAt c d sl Lv W g o κ id now sched st ⦃ f ⦄
   , hceil (proj₁ R)
       (≤-trans (proj₁ (proj₂ R))
         (opIterD-mono (suc (sizeᵉ o)) (suc (sizeᵉ o))
-           (depthE g o κ id now sched st) d
+           (depthE g o κ id now sched st) (pred d)
            (nest o sl (EvalSt.connectedShares st))
            (nest o sl (EvalSt.connectedShares st))
            (FaceOK.fSize f) ≤-refl ≤-refl ≤-refl hd ≤-refl ≤-refl))
@@ -5544,7 +5560,7 @@ subscribeE-nest-slot : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   ⦃ _ : FaceOK c sl ⦄ →
   NestAt c d sl B W Lv g (input i) κ id now sched st
 subscribeE-nest-slot {e = e} c d sl B W Lv g i κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
-  Lv , ceil-here c d Lv _ _ hceil , ≤-refl
+  Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl
   , nestTriple-widen
         (arrD≤nestB (Caps.cSize (frameStep Lv c)) W (nestUnit e sl) B
            (slotClos sl i)
@@ -5566,7 +5582,7 @@ subscribeE-nest c d sl B W Lv g (input i) κ id now sched st =
   subscribeE-nest-slot c d sl B W Lv g i κ id now sched st
 subscribeE-nest {Γ = Γ} {t = t} {e = e} {u = u} c d sl B W Lv g (ofᵉ ts) κ id now sched st
   hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
-  Lv , ceil-here c d Lv _ _ hceil , ≤-refl ,
+  Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl ,
   ≤-trans (≤-reflexive (cong (nestDᵛˢ {u = u})
              (oneShot-vals {A = Val Γ t} (map (λ tm → evalTm tm) ts) id sched)))
     (≤-trans (≤-trans (ofVals-nest-sync ts) (*-monoʳ-≤ (2 ^ syncSizeᵗˢ ts) hn))
@@ -5577,7 +5593,7 @@ subscribeE-nest {Γ = Γ} {t = t} {e = e} {u = u} c d sl B W Lv g (ofᵉ ts) κ 
                   (nestValOK?-size (frameStep Lv c) (ofᵉ ts) hv) (s≤s z≤n))))
   , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest c d sl B W Lv g emptyᵉ κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
-  Lv , ceil-here c d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+  Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
   jIH
   , jB
@@ -5613,7 +5629,7 @@ subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc h
 
   hsz′ = ≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f)) szsum
   hdw′ = ≤-trans (≤-trans (m≤n⊔m _ (dWᵉ _ sl b)) hdw) (proj₁ (proj₂ step⊑))
-  hceil′ = ceil-step c d Lv
+  hceil′ = ceil-step c (pred d) d Lv
              (nest (mapᵉ f b) sl (EvalSt.connectedShares st))
              (nest b sl (EvalSt.connectedShares st))
              (suc (sizeᵉ (mapᵉ f b))) (suc (sizeᵉ b)) 2≤c
@@ -5666,7 +5682,7 @@ subscribeE-nest {e = e} c d sl B W Lv g (mapᵉ f b) κ id now sched st hsl hc h
            (≤-trans (n≤1+n (syncSizeᵉ b)) hm)
 subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil
   with evalTm cnt in eqc
-... | zero  = Lv , ceil-here c d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+... | zero  = Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 ... | suc k =
   jIH
   , jB
@@ -5700,7 +5716,7 @@ subscribeE-nest {e = e} c d sl B W Lv g (takeᵉ cnt b) κ id now sched st hsl h
                           (≤-trans (n≤1+n _) hsz))
                  (proj₁ step⊑)
   hdw′ = ≤-trans (≤-trans (m≤n⊔m _ (dWᵉ _ sl b)) hdw) (proj₁ (proj₂ step⊑))
-  hceil′ = ceil-step c d Lv
+  hceil′ = ceil-step c (pred d) d Lv
              (nest (takeᵉ cnt b) sl (EvalSt.connectedShares st))
              (nest b sl (EvalSt.connectedShares st))
              (suc (sizeᵉ (takeᵉ cnt b))) (suc (sizeᵉ b)) 2≤c
@@ -5771,7 +5787,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
 
   hsz′ = ≤-trans (≤-trans (n≤1+n (sizeᵉ b)) hsz) (proj₁ step⊑)
   hdw′ = ≤-trans hdw (proj₁ (proj₂ step⊑))
-  hceil′ = ceil-step c d Lv
+  hceil′ = ceil-step c (pred d) d Lv
              (nest (mergeAllᵉ lim b) sl (EvalSt.connectedShares st))
              (nest b sl (EvalSt.connectedShares st))
              (suc (sizeᵉ (mergeAllᵉ lim b))) (suc (sizeᵉ b)) 2≤c
@@ -5833,7 +5849,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
 
   Lv≤cnt : Lv ≤ sizeCount c d ⊔ Caps.cSize c
   Lv≤cnt = subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
-             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) d
+             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) (pred d)
                         (nest (mergeAllᵉ lim b) sl (EvalSt.connectedShares st))
                         (suc (sizeᵉ (mergeAllᵉ lim b))) Lv))
 
@@ -5912,7 +5928,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
 
   hsz′ = ≤-trans (≤-trans (n≤1+n (sizeᵉ b)) hsz) (proj₁ step⊑)
   hdw′ = ≤-trans hdw (proj₁ (proj₂ step⊑))
-  hceil′ = ceil-step c d Lv
+  hceil′ = ceil-step c (pred d) d Lv
              (nest (switchAllᵉ b) sl (EvalSt.connectedShares st))
              (nest b sl (EvalSt.connectedShares st))
              (suc (sizeᵉ (switchAllᵉ b))) (suc (sizeᵉ b)) 2≤c
@@ -5974,7 +5990,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
 
   Lv≤cnt : Lv ≤ sizeCount c d ⊔ Caps.cSize c
   Lv≤cnt = subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
-             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) d
+             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) (pred d)
                         (nest (switchAllᵉ b) sl (EvalSt.connectedShares st))
                         (suc (sizeᵉ (switchAllᵉ b))) Lv))
 
@@ -6050,7 +6066,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
 
   hsz′ = ≤-trans (≤-trans (n≤1+n (sizeᵉ b)) hsz) (proj₁ step⊑)
   hdw′ = ≤-trans hdw (proj₁ (proj₂ step⊑))
-  hceil′ = ceil-step c d Lv
+  hceil′ = ceil-step c (pred d) d Lv
              (nest (exhaustAllᵉ b) sl (EvalSt.connectedShares st))
              (nest b sl (EvalSt.connectedShares st))
              (suc (sizeᵉ (exhaustAllᵉ b))) (suc (sizeᵉ b)) 2≤c
@@ -6112,7 +6128,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
 
   Lv≤cnt : Lv ≤ sizeCount c d ⊔ Caps.cSize c
   Lv≤cnt = subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
-             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) d
+             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) (pred d)
                         (nest (exhaustAllᵉ b) sl (EvalSt.connectedShares st))
                         (suc (sizeᵉ (exhaustAllᵉ b))) Lv))
 
@@ -6159,7 +6175,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
            ≤ nestB S′ W (nestUnit e sl) B (syncSizeᵉ (exhaustAllᵉ b))
   grow = nestB-mono S′ W (nestUnit e sl) B (n≤1+n (syncSizeᵉ b))
 subscribeE-nest c d sl B W Lv g0 (μᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
-  Lv , ceil-here c d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+  Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
   jIH
   , jB
@@ -6182,11 +6198,12 @@ subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st 
 
   up⊑ = frameStep-mono-j c 2≤c (m≤m+n Lv (proj₁ US))
 
-  hceil′ = ceil-le c d (Lv + proj₁ US) _ (nest (unfoldμ body) sl (EvalSt.connectedShares st))
+  hceil′ = ceil-le c (pred d) d (Lv + proj₁ US) _
+             (nest (unfoldμ body) sl (EvalSt.connectedShares st))
              _ (suc (sizeᵉ (unfoldμ body))) 2≤c
              (mu-step body sl (EvalSt.connectedShares st) _ ≤-refl)
              (s≤s (proj₁ (proj₂ US)))
-             (ceil-mu c d Lv _ _ (sizeᵉ (μᵉ body)) 2≤c hsz hceil)
+             (ceil-mu c (pred d) d Lv _ _ (sizeᵉ (μᵉ body)) 2≤c hsz hceil)
 
   IH₀ = subscribeE-nest c d sl B W (Lv + proj₁ US) fuel (unfoldμ body) κ id now sched st hsl
          (capsOK?-mono (frameStep Lv c) (frameStep (Lv + proj₁ US) c) sched st up⊑ hc)
@@ -6220,7 +6237,7 @@ subscribeE-nest {e = e} c d sl B W Lv (gs fuel) (μᵉ body) κ id now sched st 
            (≤-trans (≤-reflexive (syncSize-unfoldμ body)) (n≤1+n _))
 subscribeE-nest c d sl B W Lv g (varᵉ ()) κ id now sched st
 subscribeE-nest c d sl B W Lv g (deferᵉ body) κ id now sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
-  Lv , ceil-here c d Lv _ _ hceil , ≤-refl , z≤n
+  Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n
   , ≤-trans (setNode-nodes _ _ (EvalSt.nodes st)) (⊔-lub z≤n (m≤m⊔n _ _))
   , (λ j → ≤-trans (nodeNestAt-set j _ _ st) (⊔-lub z≤n (m≤m⊔n _ _)))
 
@@ -6239,12 +6256,12 @@ subscribeInner-nest-tight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   nestClosOK? (frameStep Lv c) sl o ≡ true →
   nestDᵉ o ≤ B →
   innerW sf op allNid κ id now o sched st ≤ W →
-  depthInner sf op allNid κ id now o sched st ≤ d →
+  depthInner sf op allNid κ id now o sched st ≤ pred d →
   sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
-  CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o))) →
+  CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o))) →
   let r = subscribeInner sf op allNid κ id now o sched st in
   Σ ℕ λ j →
   let G = nestB (Caps.cSize (frameStep j c)) W (nestUnit e sl) B (syncSizeᵉ o) in
@@ -6255,7 +6272,7 @@ subscribeInner-nest-tight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   × (∀ (k : NodeId) →
        nodeNestAt k (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))) ≤ nodeNestAt k st ⊔ G)
 subscribeInner-nest-tight c d sl B W Lv g0 op allNid κ id now o sched st hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
-  Lv , ceil-here c d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
+  Lv , ceil-here c (pred d) d Lv _ _ hceil , ≤-refl , z≤n , m≤m⊔n _ _ , (λ j → m≤m⊔n _ _)
 subscribeInner-nest-tight {e = e} c d sl B W Lv (gs fuel) op allNid κ id now o sched st
                           hsl hc hv hcl hn hw hd hsz hdw hpk hpl hceil =
   proj₁ R , proj₁ (proj₂ R)
@@ -6281,7 +6298,7 @@ subscribeInner-nest-tight {e = e} c d sl B W Lv (gs fuel) op allNid κ id now o 
     (≤-trans (innerW-gs fuel op allNid κ id now o sched st) hw) hd
     (≤-trans hsz (proj₁ step⊑)) (≤-trans hdw (proj₁ (proj₂ step⊑)))
     (proj₁ KEY) (proj₂ KEY)
-    (ceil-step c d Lv _ _ _ _ 2≤c ≤-refl ≤-refl hceil)
+    (ceil-step c (pred d) d Lv _ _ _ _ 2≤c ≤-refl ≤-refl hceil)
 
 -- AND FLATTENED AT THE CAP, which is what the DRAIN wants and only the
 -- drain: an inner the caps premise admits is no larger than the cap, so
@@ -6302,12 +6319,12 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   nestClosOK? (frameStep Lv c) sl o ≡ true →
   nestDᵉ o ≤ B →
   innerW sf op allNid κ id now o sched st ≤ W →
-  depthInner sf op allNid κ id now o sched st ≤ d →
+  depthInner sf op allNid κ id now o sched st ≤ pred d →
   sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
-  CeilD c d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o))) →
+  CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o))) →
   let r = subscribeInner sf op allNid κ id now o sched st in
   Σ ℕ λ j →
   let S′ = Caps.cSize (frameStep j c)
@@ -6359,7 +6376,7 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st →
   queueNest q ≤ B →
   drainW sf allNid κ id now q sched st ≤ W →
-  depthDrain sf allNid κ id now q sched st ≤ d →
+  depthDrain sf allNid κ id now q sched st ≤ pred d →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   let r = mergeAllDrain sf allNid κ id now lim act q sched st in
@@ -6387,9 +6404,8 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   , ≤-trans IHn (⊔-lub SUBn (m≤n⊔m (nodesMax st) _))
   where
   B̂     = proj₁ hcd
-  Ŝ     = proj₁ (proj₂ hcd)
-  ceilQ = proj₁ (proj₂ (proj₂ hcd))
-  hcdA  = proj₂ (proj₂ (proj₂ hcd))
+  ceilQ = proj₁ (proj₂ hcd)
+  hcdA  = proj₂ (proj₂ hcd)
 
   r₁    = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
   vs    = proj₁ (proj₂ r₁)
@@ -6415,8 +6431,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   -- queue's later entries are read at a level at or above the head's,
   -- so the two path facts travel by the step's own widening
   hB̂    = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
-  hŜ    = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
-  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
   r₀    = proj₁ tailΣ
   Lv″   = Lv + r₀
   step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (m≤m+n Lv r₀)
@@ -6428,17 +6443,23 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
   -- and nothing else.
   stepʰ = frameStep-mono-j c (FaceOK.fSize faceHere) (n≤1+n Lv)
 
-  -- THE HEAD'S CEILING IS READ OFF THE FRAME'S, and the tail's is the
-  -- frame's with one unit spent on the climb the subscribe reports.
-  ceilHere : CeilD c d (suc Lv) (nest o sl (EvalSt.connectedShares st)) (suc (suc (sizeᵉ o)))
-  ceilHere = ceil-step c d Lv B̂ (nest o sl (EvalSt.connectedShares st))
-               (suc (length (o ∷ q) + Ŝ)) (suc (suc (sizeᵉ o)))
+  -- THE HEAD'S CEILING IS READ OFF THE FRAME'S SWEEP, one level up and
+  -- one entry in, and the tail's is the same sweep with one unit spent
+  -- on the climb the subscribe reports.  The successor the head is
+  -- charged for is bought from the size cap's own strict climb, which
+  -- is why the entry never had to store a roof for it.
+  ceilHere : CeilD c (pred d) d (suc Lv) (nest o sl (EvalSt.connectedShares st))
+               (suc (suc (sizeᵉ o)))
+  ceilHere = ceilS-head c (pred d) d Lv B̂ (length q)
+               (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o))
                (FaceOK.fSize faceHere) hB̂
-               (s≤s (s≤s (≤-trans hŜ (m≤n+m Ŝ (length q)))))
+               (≤-trans (s≤s (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
+                        (sizeAt-strict (Caps.cSize c) Lv
+                           (≤-trans (s≤s z≤n) (FaceOK.fSize faceHere))))
                ceilQ
 
-  ceilTail : CeilD c d Lv″ B̂ (suc (length q + Ŝ))
-  ceilTail = ceil-sweep-step c d Lv B̂ (suc (length q + Ŝ)) r₀
+  ceilTail : CeilS c (pred d) d Lv″ (suc B̂) (length q)
+  ceilTail = ceilS-sweep-step c (pred d) d Lv (suc B̂) (length q) r₀
                (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ)) ceilQ
 
   SUB₀ = subscribeInner-nest c d sl B W (suc Lv) sf mergeAllᵒ allNid κ id now o sched st
@@ -6457,7 +6478,7 @@ mergeAllDrain-nest {e = e} c d sl B W Lv sf allNid κ id now lim act (o ∷ q) s
 
   IH₀ = mergeAllDrain-nest c d sl B W Lv″ sf allNid κ id now lim
          (if done then act else suc act) q sched₁ st₁
-         (B̂ , Ŝ , ceilTail , proj₂ (proj₂ tailΣ))
+         (B̂ , ceilTail , proj₂ (proj₂ tailΣ))
          (≤-trans (m≤n⊔m (nestDᵉ o) (queueNest q)) hq)
          splitW′
          (≤-trans (m≤n⊔m _ _) hd)
@@ -6591,9 +6612,17 @@ innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now
   dw : drainW sf allNid p id now q sched st ≤ W
   dw = hw lim act q od refl
 
+  -- AND THE `suc` THE FINISH CARRIES IS SPENT HERE RATHER THAN THROWN
+  -- AWAY, which is what pays for the drain's ceiling.  `depthFinC` puts
+  -- the drain one depth UNDER the finishing frame, and the ladder drops
+  -- a rung at exactly one place -- a frame -- so the walk under this
+  -- one runs at `pred d` and its ceiling is a sweep at `pred d` too.
+  -- Weakening the `suc` to a `≤ d` costs nothing arithmetically and
+  -- everything at the ceiling: it hands the walk a climb allowance the
+  -- frame's own room cannot mint.
   DR = mergeAllDrain-nest c d sl (queueNest q) W Lv sf allNid p id now lim (pred act) q sched st
          (hdr lim act q od refl) ≤-refl dw
-         (≤-trans (n≤1+n _) hdp) hpk hpl
+         (fuel-pred hdp) hpk hpl
 
   S′ = Caps.cSize (frameStep (proj₁ DR) c)
 

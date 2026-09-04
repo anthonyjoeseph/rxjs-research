@@ -27,7 +27,7 @@
 -- ledger, and round3b-ledger-reset-absurd stays unavailable.
 module Verify-Budget-Sufficient.Caps where
 
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _≤_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; +-assoc; +-comm; *-suc; *-assoc; *-monoˡ-≤; *-monoʳ-≤;
   *-mono-≤; +-monoˡ-≤; +-monoʳ-≤; +-mono-≤; +-identityʳ; +-suc; m≤m+n; m≤n+m; n≤1+n; m≤m*n; m≤m⊔n;
   ^-monoʳ-≤; ^-monoˡ-≤; <⇒≤; ^-*-assoc; *-comm; *-distribˡ-+; *-identityʳ; *-identityˡ)
@@ -594,6 +594,24 @@ sizeAt-mono : ∀ {S S′ J J′} → 1 ≤ S → S ≤ S′ → J ≤ J′ → 
 sizeAt-mono {S} {S′} {J} 1≤S hS hJ =
   ≤-trans (iterSize-mono-base J hS hS) (iterSize-mono-count S′ S′ (≤-trans 1≤S hS) hJ)
 
+-- ONE FOLD HOLDS A PAIR, which is the one arithmetic fact every size
+-- clause that splits a node into two halves ends at.
+pair≤sizeStep : ∀ (S s : ℕ) → 1 ≤ S → suc (s + s) ≤ sizeStep S s
+pair≤sizeStep S s hS =
+  ≤-trans (s≤s (≤-reflexive (cong (s +_) (sym (+-identityʳ s)))))
+          (≤-trans (≤-reflexive (sym (*-identityˡ (suc (2 * s)))))
+                   (*-monoˡ-≤ (suc (2 * s)) hS))
+
+-- AND THE SIZE CAP CLIMBS STRICTLY, which the monotone reading above
+-- cannot say and several consumers need: a level's own cap plus one
+-- still fits the next level's, so a term written at a level and read
+-- one level up has room for the successor its consumer charges it.
+sizeAt-strict : ∀ (S J : ℕ) → 1 ≤ S → suc (sizeAt S J) ≤ sizeAt S (suc J)
+sizeAt-strict S J 1≤S =
+  ≤-trans (≤-trans (s≤s (m≤m+n (sizeAt S J) (sizeAt S J)))
+                   (pair≤sizeStep S (sizeAt S J) 1≤S))
+          (≤-reflexive (sym (iterSize-suc S J S)))
+
 widAt-mono : ∀ {S S′ W W′ J J′} → 2 ≤ S → S ≤ S′ → W ≤ W′ → J ≤ J′ →
   widAt S W J ≤ widAt S′ W′ J′
 widAt-mono {S} {S′} {W} {W′} {J} 2≤S hS hW hJ =
@@ -796,6 +814,39 @@ fLvl≤fLvlD S W zero    J =
 fLvl≤fLvlD S W (suc d) J =
   ≤-trans (sIterD-infl S W d (suc (sizeAt S (suc J))) (suc (widAt S W J)) (fLvl S W J))
           (≤-reflexive (sym (fLvlD-suc S W d J)))
+
+-- ONE FRAME'S ALLOWANCE, OPENED FOR THE TRAVERSAL INSIDE IT.  `fLvlD S W
+-- (suc d) j` unfolds to exactly an `sIterD` at `d`, over `suc (widAt S W j)`
+-- payloads, at `k = suc (sizeAt S (suc j))`, starting from `fLvl S W j` --
+-- so a traversal that fits those two counts fits inside the frame, and the
+-- `k` slot is `≤-refl` whenever the bud is pinned to the frame's own refresh.
+-- Both frame boundaries that open a payload traversal spend this: the
+-- thru-outer frame over a value list, and the from-inner frame over a
+-- mergeAll queue.  It sits here rather than beside either of them because
+-- the two boundaries are in different faces and neither imports the other.
+--
+-- THE FUEL IS TAKEN AS `pred d`, NOT BY SPLITTING `d`, and that is what
+-- makes it usable at both.  A frame charges itself one level before opening
+-- the traversal, so `1 ≤ d` is free at every such call site; matching on THAT
+-- rather than on `d` keeps a caller with a thirty-arm clause tree from
+-- having to split all of it just to name `d′`.
+frame-room : ∀ (S W d m j : ℕ) → 2 ≤ S → 1 ≤ d →
+  m ≤ suc (widAt S W j) →
+  sIterD S W (pred d) (suc (sizeAt S (suc j))) m j ≤ fLvlD S W d j
+frame-room S W zero     m j 2≤S ()      hm
+frame-room S W (suc d′) m j 2≤S (s≤s _) hm =
+  ≤-trans (sIterD-mono m (suc (widAt S W j)) d′ d′
+             (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j)))
+             2≤S ≤-refl ≤-refl (m≤m+n j _) ≤-refl ≤-refl hm)
+          (≤-reflexive (sym (fLvlD-suc S W d′ j)))
+
+-- THE FRAME'S OWN ARC, SPENT.  A frame clause that opens a traversal charges
+-- itself first, so the hypothesis in hand is `suc <inner> ≤ d`; this reads the
+-- inner charge back out at `pred d`, again without splitting `d` at the
+-- caller.  Matching `s≤s` is what forces the fuel to be a successor, so the
+-- two lemmas agree on `pred d` by construction rather than by convention.
+fuel-pred : ∀ {m d : ℕ} → suc m ≤ d → m ≤ pred d
+fuel-pred (s≤s h) = h
 
 iterL-infl : ∀ (S W d k J : ℕ) → J ≤ iterL S W d k J
 iterL-infl S W d zero    J = ≤-refl

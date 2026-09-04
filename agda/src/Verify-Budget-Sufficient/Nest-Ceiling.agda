@@ -6,17 +6,19 @@
 -- already the tower's most expensive.
 module Verify-Budget-Sufficient.Nest-Ceiling where
 
-open import Data.Nat using (ℕ; suc; _+_; _*_; _⊔_; _≤_; s≤s)
+open import Data.Nat using (ℕ; suc; pred; _+_; _*_; _⊔_; _≤_; s≤s)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; n≤1+n; +-assoc; +-suc; +-mono-≤; +-monoʳ-≤;
   *-mono-≤; m≤m⊔n; +-identityʳ)
 open import Relation.Binary.PropositionalEquality using (_≡_; sym; trans; cong; subst)
 
-open import Rx.Evaluator using (opIterD; sLvlD; sizeAt; sLvlD-suc; lvls; dLvl; dCapᶜ; dWalkᶜ; regAt)
+open import Rx.Evaluator using
+  (opIterD; sIterD; sLvlD; fLvlD; sizeAt; widAt; sIterD-suc; sLvlD-suc; lvls; dLvl;
+  dCapᶜ; dWalkᶜ; regAt)
 open import Verify-Budget-Sufficient.Caps using
-  (Caps; frameStep; opIterD-mono; opIterD-infl; sizeCount; sizeCount-body; cDel-body; lvls-add;
-  lvls-mono; dWalkᶜ-mono)
-open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; op-step-sweep; quad-arith)
+  (Caps; frameStep; opIterD-mono; opIterD-infl; sIterD-mono; sIterD-infl; frame-room;
+  sizeCount; sizeCount-body; cDel-body; lvls-add; lvls-mono; dWalkᶜ-mono)
+open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; quad-arith)
 
 -- THE CEILING, CARRIED RELATIVELY -- what the walk owes and cannot
 -- produce.  A level is only meaningful under a ceiling, and the
@@ -27,11 +29,20 @@ open import Verify-Budget-Sufficient.Caps-Chain using (op-desc; op-step-entry; o
 -- so the honest invariant is the REMAINING budget rather than the
 -- level.  That is one implication per node, and it composes: a child
 -- one frame down spends one operator of the parent's ledger.
-CeilD : (c : Caps) (d Lv k m : ℕ) → Set
-CeilD c d Lv k m =
+-- AND THE TWO DEPTHS ARE NOT ONE.  The ledger a receipt is measured in
+-- is the depth the traversal RUNS at, and the count it is dominated by
+-- is the depth the frame around it was ARRIVED at -- a frame charges
+-- itself one level before opening a payload traversal, so the ladder
+-- inside is read one fuel down while the room comes from the ladder
+-- outside.  Pinning both to one index makes the statement unproducible
+-- at the boundary that needs it: the outer ladder strictly contains the
+-- inner one, so a receipt in the inner currency cannot be asked to
+-- dominate the outer count read at the inner depth.
+CeilD : (c : Caps) (d D Lv k m : ℕ) → Set
+CeilD c d D Lv k m =
   ∀ (L′ : ℕ) →
     Lv + L′ ≤ opIterD (Caps.cSize c) (Caps.cWid c) d k m Lv →
-    Lv + L′ ≤ sizeCount c d ⊔ Caps.cSize c
+    Lv + L′ ≤ sizeCount c D ⊔ Caps.cSize c
 
 -- AND IT DESCENDS BY ONE OPERATOR, which is the whole reason the
 -- relative form is the one carried.  A child sits one frame down with
@@ -45,20 +56,20 @@ CeilD c d Lv k m =
 -- no further climb, and it is separate because the receipt is stated
 -- relatively -- `Lv + L'` -- so the nil case is an arithmetic step
 -- rather than an instance.
-ceil-here : ∀ (c : Caps) (d Lv k m : ℕ) →
-  CeilD c d Lv k m →
-  Lv ≤ sizeCount c d ⊔ Caps.cSize c
-ceil-here c d Lv k m hceil =
-  subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
+ceil-here : ∀ (c : Caps) (d D Lv k m : ℕ) →
+  CeilD c d D Lv k m →
+  Lv ≤ sizeCount c D ⊔ Caps.cSize c
+ceil-here c d D Lv k m hceil =
+  subst (_≤ sizeCount c D ⊔ Caps.cSize c) (+-identityʳ Lv)
    (hceil 0
     (subst (_≤ opIterD (Caps.cSize c) (Caps.cWid c) d k m Lv)
            (sym (+-identityʳ Lv))
            (opIterD-infl (Caps.cSize c) (Caps.cWid c) d k m Lv)))
 
-ceil-step : ∀ (c : Caps) (d Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
-  k′ ≤ k → suc m′ ≤ m → CeilD c d Lv k m → CeilD c d (suc Lv) k′ m′
-ceil-step c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
-  subst (λ x → x ≤ sizeCount c d ⊔ Caps.cSize c) (+-suc Lv L′)
+ceil-step : ∀ (c : Caps) (d D Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
+  k′ ≤ k → suc m′ ≤ m → CeilD c d D Lv k m → CeilD c d D (suc Lv) k′ m′
+ceil-step c d D Lv k k′ m m′ 2≤S hk hm H L′ hL =
+  subst (λ x → x ≤ sizeCount c D ⊔ Caps.cSize c) (+-suc Lv L′)
     (H (suc L′)
        (subst (λ x → x ≤ opIterD (Caps.cSize c) (Caps.cWid c) d k m Lv)
               (sym (+-suc Lv L′))
@@ -74,9 +85,9 @@ ceil-step c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
 -- chain makes the LEDGER bigger, so the implication's hypothesis gets
 -- weaker and the statement gets stronger.  Every arm therefore reads
 -- its child's ceiling off a coarser one.
-ceil-le : ∀ (c : Caps) (d Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
-  k′ ≤ k → m′ ≤ m → CeilD c d Lv k m → CeilD c d Lv k′ m′
-ceil-le c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
+ceil-le : ∀ (c : Caps) (d D Lv k k′ m m′ : ℕ) → 2 ≤ Caps.cSize c →
+  k′ ≤ k → m′ ≤ m → CeilD c d D Lv k m → CeilD c d D Lv k′ m′
+ceil-le c d D Lv k k′ m m′ 2≤S hk hm H L′ hL =
   H L′ (≤-trans hL (opIterD-mono m′ m d d k′ k 2≤S ≤-refl ≤-refl ≤-refl
                       ≤-refl hk hm))
 
@@ -89,13 +100,13 @@ ceil-le c d Lv k k′ m m′ 2≤S hk hm H L′ hL =
 -- quadratic room the level opens, which is what `op-step-entry` states;
 -- everything that jumps a level is an instance of this rather than a
 -- copy of its proof.
-ceil-entry-step : ∀ (c : Caps) (d Lv k m r : ℕ) → 2 ≤ Caps.cSize c →
+ceil-entry-step : ∀ (c : Caps) (d D Lv k m r : ℕ) → 2 ≤ Caps.cSize c →
   Lv + r ≤ suc (Lv + suc (Caps.cSize (frameStep Lv c))
                    * suc (Caps.cSize (frameStep Lv c))) →
-  CeilD c d Lv (suc k) (suc m) →
-  CeilD c d (Lv + r) k (suc (Caps.cSize (frameStep (Lv + r) c)))
-ceil-entry-step c d Lv k m r 2≤S fits H L′ hL =
-  subst (λ x → x ≤ sizeCount c d ⊔ Caps.cSize c)
+  CeilD c d D Lv (suc k) (suc m) →
+  CeilD c d D (Lv + r) k (suc (Caps.cSize (frameStep (Lv + r) c)))
+ceil-entry-step c d D Lv k m r 2≤S fits H L′ hL =
+  subst (λ x → x ≤ sizeCount c D ⊔ Caps.cSize c)
         (sym (+-assoc Lv r L′))
     (H (r + L′)
        (op-step-entry (Caps.cSize c) (Caps.cWid c) d (suc k) m Lv r L′ 2≤S fits
@@ -103,43 +114,106 @@ ceil-entry-step c d Lv k m r 2≤S fits H L′ hL =
              (≤-reflexive
                 (sym (sLvlD-suc (Caps.cSize c) (Caps.cWid c) d k (Lv + r)))))))
 
--- AND A CLIMB REPORTED IN THE SWEEP CURRENCY NEEDS NO ROOM AT ALL,
--- which is the form a drained queue takes.  A subscribe hands back the
--- level it climbed to bounded by a SWEEP from where it started, not by
--- the quadratic the step above asks for, so the two currencies do not
--- meet and the entry step cannot be applied to it.  What they do meet
--- at is the ledger itself: one unit of the operator measure already
--- contains a whole sweep, so a climb under that sweep is a climb the
--- unit pays for.  The recursion nests them, so a queue whose entries
--- each climb within a sweep spends one unit per entry and nothing more.
-ceil-sweep-step : ∀ (c : Caps) (d Lv k m r : ℕ) → 2 ≤ Caps.cSize c →
-  Lv + r ≤ sLvlD (Caps.cSize c) (Caps.cWid c) d k
-             (suc (Lv + suc (sizeAt (Caps.cSize c) Lv)
-                     * suc (sizeAt (Caps.cSize c) Lv))) →
-  CeilD c d Lv k (suc m) → CeilD c d (Lv + r) k m
-ceil-sweep-step c d Lv k m r 2≤S climb H L′ hL =
-  subst (λ x → x ≤ sizeCount c d ⊔ Caps.cSize c)
-        (sym (+-assoc Lv r L′))
-        (H (r + L′)
-           (op-step-sweep (Caps.cSize c) (Caps.cWid c) d k m Lv r L′ 2≤S
-              climb hL))
-
 -- AND A μ IS ONE OF THEM: it subscribes a LARGER term, so the receipt is
 -- the quadratic the unfolding costs and the room is exactly the room the
 -- step above opens.  Nothing here is about μ except the receipt.
-ceil-mu : ∀ (c : Caps) (d Lv k m m₀ : ℕ) → 2 ≤ Caps.cSize c →
+ceil-mu : ∀ (c : Caps) (d D Lv k m m₀ : ℕ) → 2 ≤ Caps.cSize c →
   m₀ ≤ Caps.cSize (frameStep Lv c) →
-  CeilD c d Lv (suc k) (suc m) →
-  CeilD c d (Lv + (m₀ + suc (m₀ * m₀))) k
+  CeilD c d D Lv (suc k) (suc m) →
+  CeilD c d D (Lv + (m₀ + suc (m₀ * m₀))) k
     (suc (Caps.cSize (frameStep (Lv + (m₀ + suc (m₀ * m₀))) c)))
-ceil-mu c d Lv k m m₀ 2≤S hm₀ H =
-  ceil-entry-step c d Lv k m (m₀ + suc (m₀ * m₀)) 2≤S
+ceil-mu c d D Lv k m m₀ 2≤S hm₀ H =
+  ceil-entry-step c d D Lv k m (m₀ + suc (m₀ * m₀)) 2≤S
     (≤-trans (+-monoʳ-≤ Lv
                 (≤-trans (+-mono-≤ hm₀ (s≤s (*-mono-≤ hm₀ hm₀))) (quad-arith B)))
              (n≤1+n (Lv + suc B * suc B)))
     H
   where
   B = Caps.cSize (frameStep Lv c)
+
+-- THE SAME RECEIPT IN THE SWEEP CURRENCY, which is the one a queue's
+-- ceiling can actually be minted in.  An operator unit is the ledger's
+-- coarse step and a SWEEP is what one unit contains; a frame opens its
+-- payload traversal as a sweep, so the room the frame has is a sweep
+-- bound and not an operator one.  Reading a queue's ceiling in operator
+-- units therefore asks the frame for something it never held -- the
+-- conversion runs the other way, and it is `ceilS-head` below.
+CeilS : (c : Caps) (d D Lv k m : ℕ) → Set
+CeilS c d D Lv k m =
+  ∀ (L′ : ℕ) →
+    Lv + L′ ≤ sIterD (Caps.cSize c) (Caps.cWid c) d k m Lv →
+    Lv + L′ ≤ sizeCount c D ⊔ Caps.cSize c
+
+-- AND ONE ENTRY OF THE SWEEP IS ONE UNIT OF IT, which is what makes the
+-- queue's ceiling chain along the queue rather than being re-minted per
+-- entry.  A sweep of `suc m` steps is one level step followed by a sweep
+-- of `m`, so an entry that climbs no further than that first step leaves
+-- the tail a sweep one shorter to spend, starting where the entry landed.
+ceilS-sweep-step : ∀ (c : Caps) (d D Lv k m r : ℕ) → 2 ≤ Caps.cSize c →
+  Lv + r ≤ sLvlD (Caps.cSize c) (Caps.cWid c) d k (suc Lv) →
+  CeilS c d D Lv k (suc m) → CeilS c d D (Lv + r) k m
+ceilS-sweep-step c d D Lv k m r 2≤S climb H L′ hL =
+  subst (λ x → x ≤ sizeCount c D ⊔ Caps.cSize c)
+        (sym (+-assoc Lv r L′))
+        (H (r + L′)
+           (subst (λ x → x ≤ sIterD S W d k (suc m) Lv)
+                  (+-assoc Lv r L′)
+                  (≤-trans hL
+                     (≤-trans (sIterD-mono m m d d k k 2≤S ≤-refl ≤-refl climb
+                                 ≤-refl ≤-refl ≤-refl)
+                              (≤-reflexive (sym (sIterD-suc S W d k m Lv)))))))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+
+-- AND THE HEAD OF THE SWEEP CONVERTS, which is the only place the two
+-- currencies meet.  The first step of a sweep is a LEVEL step, and a
+-- level step at a successor budget IS an operator run at the arrival
+-- level's own size cap -- so an entry subscribed one level up, whose
+-- operator count fits that cap, reads its ceiling off the sweep the
+-- queue holds.  The size premise is what the entry's own park receipt
+-- pays: a term written at a level is capped there, and one level's
+-- growth is what the cap gains by climbing.
+ceilS-head : ∀ (c : Caps) (d D Lv K m k m′ : ℕ) → 2 ≤ Caps.cSize c →
+  k ≤ K → m′ ≤ sizeAt (Caps.cSize c) (suc Lv) →
+  CeilS c d D Lv (suc K) (suc m) → CeilD c d D (suc Lv) k (suc m′)
+ceilS-head c d D Lv K m k m′ 2≤S hk hm′ H L′ hL =
+  subst (λ x → x ≤ sizeCount c D ⊔ Caps.cSize c) (+-suc Lv L′)
+    (H (suc L′)
+       (subst (λ x → x ≤ sIterD S W d (suc K) (suc m) Lv) (sym (+-suc Lv L′))
+          (≤-trans hL
+             (≤-trans (opIterD-mono (suc m′) (suc (sizeAt S (suc Lv))) d d k K
+                         2≤S ≤-refl ≤-refl ≤-refl ≤-refl hk (s≤s hm′))
+                (≤-trans (≤-reflexive (sym (sLvlD-suc S W d K (suc Lv))))
+                   (≤-trans (sIterD-infl S W d (suc K) m
+                               (sLvlD S W d (suc K) (suc Lv)))
+                            (≤-reflexive (sym (sIterD-suc S W d (suc K) m Lv)))))))))
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
+
+-- AND THE FRAME IS WHERE A SWEEP CEILING COMES FROM, which is the whole
+-- reason the two depths are separate.  A frame's own allowance IS a
+-- sweep, run one fuel down over its width and at its refreshed size cap;
+-- so a walk that knows its frame's level fits under the count holds a
+-- sweep ceiling for everything the frame opens, with no gas, no reached
+-- level and no per-entry room floor.  The two counts are the frame's
+-- own, so a caller supplies them from the receipts it already carries.
+ceilS-frame : ∀ (c : Caps) (d D Lv k m : ℕ) → 2 ≤ Caps.cSize c → 1 ≤ d →
+  k ≤ suc (sizeAt (Caps.cSize c) (suc Lv)) →
+  m ≤ suc (widAt (Caps.cSize c) (Caps.cWid c) Lv) →
+  fLvlD (Caps.cSize c) (Caps.cWid c) d Lv ≤ sizeCount c D ⊔ Caps.cSize c →
+  CeilS c (pred d) D Lv k m
+ceilS-frame c d D Lv k m 2≤S 1≤d hk hm room L′ hL =
+  ≤-trans hL
+    (≤-trans (≤-trans (sIterD-mono m m (pred d) (pred d) k
+                         (suc (sizeAt S (suc Lv)))
+                         2≤S ≤-refl ≤-refl ≤-refl ≤-refl hk ≤-refl)
+                      (frame-room S W d m Lv 2≤S 1≤d hm))
+             room)
+  where
+  S = Caps.cSize c
+  W = Caps.cWid c
 
 -- WHAT A LEVEL HAS LEFT, and it is the receipt the refuted drain
 -- conjunct was standing in for and failing to carry.  A term subscribed

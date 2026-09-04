@@ -28,11 +28,11 @@ open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; g0; gs; aft
   InstEvent)
 open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ; obs)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
-  (Ent; Reached; ent-step; reached-room)
+  (Ent; Reached; ent-step; reached-room; ceilS-frame)
 open import Verify-Budget-Sufficient.Subscribe-Face using (stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (burstsOK; capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainOK; shareCapsOK;
-   dispatchBurstsOK; shareBurstsOK; frameDrainW; thruRoomW; thruRoomWOK)
+  (burstsOK; capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainAt; capsDrainOK;
+   shareCapsOK; dispatchBurstsOK; shareBurstsOK; frameDrainW; thruRoomW; thruRoomWOK)
 open import Verify-Budget-Sufficient.Nest-Burst using
   (drainW; drainW-nil-eq; drainW-cons-eq; innerW; innerW-g0-eq; innerW-gs-eq)
 open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
@@ -45,7 +45,7 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
   (shareAdmit-len; shareAdmit-sz; admSz?)
 open import Rx.Evaluator using (Sched; EvalSt; RegId; mergeAll-st; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; Path; stepFrame; regAt; share-sink; root; dCapᶜ; fLvlD; lvls;
-  shareAdmit; shareLatch; thruConsume; switchKill; subscribeInner; mergeAllᵒ)
+  shareAdmit; shareLatch; thruConsume; switchKill; subscribeInner; mergeAllᵒ; sizeAt; widAt)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Deliveries using
@@ -53,7 +53,7 @@ open import Verify-Budget-Sufficient.Deliveries using
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 2≤capsAt-size; Caps; capsAt; capsAt-base-size; capsAt-suc-full; capsH;
   frameStep; frameStep-mono-j; frameStep-reg-mono; iterL-infl; sucJ≤fLvlD; regAt-mono;
-  lvls-infl; lvls-mono; size≤sizeCount; sizeCount)
+  lvls-infl; lvls-mono; size≤sizeCount; sizeCount; 3≤capsH)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; ∧-true; all-impl; NodePark; lookupNode-park)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -352,6 +352,34 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
                            (reached-room c d P (suc g₀) 2≤S hR))
                   (⊔-lub ≤-refl (size≤sizeCount c d 2≤S (1≤capsAt-reg e sl id))))
 
+-- THE ROOM A FRAME STANDS IN, WHICH IS THE ONE THING A DRAIN NEEDS
+-- FROM OUTSIDE ITS OWN QUEUE.  A walk at a frame arm holds a ladder
+-- premise stated at the path INCLUDING that frame, and a ladder at a
+-- `suc` is the same ladder entered one frame level up -- so the frame
+-- level the arm climbs to is already under the reached level, and a
+-- reached level's room is the count joined with the size.  Nothing
+-- about the queue enters, which is why this is stated apart from the
+-- drain and spent as its only import.
+walk-frame-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+  fLvlD (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) L
+    ≤ sizeCount (capsAt e sl id) (capsH e sl id) ⊔ Caps.cSize (capsAt e sl id)
+walk-frame-room {e = e} sl id L sf gas nid now src f p vals evs fin sched st
+  (_ , _ , _ , _ , _ , _ , (g , P , _ , hlvP , hR)) =
+  ≤-trans (≤-trans (iterL-infl S W d (pathLen p) (fLvlD S W d L)) hlvP)
+          (≤-trans (lvls-infl S W d P (dCapᶜ S W (Caps.cReg c) d g P))
+                   (reached-room c d P g 2≤S hR))
+  where
+  c   = capsAt e sl id
+  S   = Caps.cSize c
+  W   = Caps.cWid c
+  d   = capsH e sl id
+  2≤S = 2≤capsAt-size e sl id
+
 -- THE ONE HEAD THAT OWES, AND A CENSUS SAYS WHICH CONJUNCTS THOSE
 -- ARE.  The state and slot conjuncts are the frame's own hypotheses,
 -- and TWO of the per-entry readings are already recorded: the store
@@ -472,7 +500,7 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 --   303bbaa:agda/evidence/probed/Probed/Drain-Queue-Length.agda`
 --   recovers them.
 postulate
-  walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  walk-frame-drain-entries : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
     (src : Source) (op : AllOp) (allNid : NodeId) (inst : NodeId)
     (p : Path Γ u t) (vals : List (Val Γ u))
@@ -482,8 +510,55 @@ postulate
       vals evs fin sched st →
     ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
       lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
-      capsDrainOK (capsAt e sl id) sl (capsH e sl id) L sf allNid p nid now
-        lim (pred act) q sched st
+      Σ ℕ λ B̂ →
+        (B̂ ≤ sizeAt (Caps.cSize (capsAt e sl id)) (suc L))
+        × (length q
+             ≤ suc (widAt (Caps.cSize (capsAt e sl id))
+                          (Caps.cWid (capsAt e sl id)) L))
+        × capsDrainAt (capsAt e sl id) sl (capsH e sl id) L B̂ sf allNid p nid now
+            lim (pred act) q sched st
+
+-- AND THE CEILING IS NOT THE QUEUE'S TO SUPPLY -- IT IS THE FRAME'S
+-- OWN ROOM, MINTED IN THE SWEEP CURRENCY.  The drain's receipt asks
+-- for a sweep ceiling at the level the frame stands at, and a sweep
+-- off a level is exactly what one frame step of the ladder dominates:
+-- the frame charge already pays for a sweep at one over the level's
+-- size and one over the width at the level, which is the head count
+-- and the queue length respectively.  So the walk mints the ceiling
+-- from its own room, spending neither a gas floor nor a reached level
+-- nor a per-entry room floor, and what is left to owe is the
+-- per-entry tuple plus the two readings that say the queue fits
+-- inside one frame step.
+walk-frame-drain-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (op : AllOp) (allNid : NodeId) (inst : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (from-inner op allNid inst ↠ p)
+    vals evs fin sched st →
+  ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+    capsDrainOK (capsAt e sl id) sl (capsH e sl id) L sf allNid p nid now
+      lim (pred act) q sched st
+walk-frame-drain-inner {e = e} sl id L sf gas nid now src op allNid inst
+  p vals evs fin sched st H lim act q od hnode =
+    B̂
+  , ceilS-frame c d d L (suc B̂) (length q) 2≤S 1≤d (s≤s hB̂) hq
+      (walk-frame-room sl id L sf gas nid now src
+         (from-inner op allNid inst) p vals evs fin sched st H)
+  , proj₂ (proj₂ (proj₂ E))
+  where
+  c   = capsAt e sl id
+  d   = capsH e sl id
+  2≤S = 2≤capsAt-size e sl id
+  1≤d : 1 ≤ d
+  1≤d = ≤-trans (s≤s z≤n) (3≤capsH e sl id)
+  E   = walk-frame-drain-entries sl id L sf gas nid now src op allNid inst
+          p vals evs fin sched st H lim act q od hnode
+  B̂   = proj₁ E
+  hB̂  = proj₁ (proj₂ E)
+  hq  = proj₁ (proj₂ (proj₂ E))
 
 
 -- RECOVERY: git show b927a16 restores `Refuted.Walk-Frame-Drain-Level`,
