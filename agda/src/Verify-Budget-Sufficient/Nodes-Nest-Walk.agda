@@ -25,97 +25,147 @@ module Verify-Budget-Sufficient.Nodes-Nest-Walk where
 open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
-open import Data.List using (List; []; _∷_; _++_; foldr)
-open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_; _≡ᵇ_)
+open import Data.List using (List; []; _∷_; _++_; foldr; length)
+open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≡ᵇ_)
 open import Data.Vec using (lookup)
-open import Data.Nat.Properties using (≤-trans; ⊔-lub; m≤m⊔n; m≤n⊔m)
+open import Data.Nat.Properties using
+  (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; ⊔-mono-≤; m≤m⊔n; m≤n⊔m; m≤m+n;
+   *-identityˡ; *-monoˡ-≤; *-monoʳ-≤; +-monoˡ-≤)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
-open import Relation.Binary.PropositionalEquality using (_≡_)
+open import Relation.Binary.PropositionalEquality using (_≡_; sym)
 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val)
+open import Rx.Exp using (Ctx; Closed; Val; sizeᵗ; obs)
+open import Rx.Nest-Depth using (nestDᵗ)
 open import Rx.Evaluator
   using (Sched; EvalSt; Path; Frame; root; share-sink; _↠_; RegId;
+         NodeId; AllOp; map-f; scan-f; take-f; from-inner; thru-outer;
          foldPath; stepFrame; dispatchShare;
          shareGo; shareAdmit; shareLatch)
 open import Verify-Budget-Sufficient.Nest-Store using (nodeNest; regsNestMax)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (nodesMax; nestDᵛˢ; nodeNestAt;
+         stepFrame-nodes-cell-scan; stepFrame-nodes-cell-take)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD; pathΦF-pos)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp;
          stepFrame-nest-Φ; stepFrame-nest-regs; foldPath-nest-regs)
 
 postulate
-  -- ONE FRAME'S NODE STORES, under the potential it was handed.  Only
-  -- three of the five kinds store at all -- a scan writes its
-  -- accumulator, an inner frame writes its parent *All's queue, and an
-  -- outer frame mints the *All node the subscription hangs from.  At
-  -- two of the three the write is a value the potential already
-  -- covers, since the factor the frame surrenders is exactly the
-  -- substitution it performs.  THE SCAN IS THE ONE THAT IS NOT: the
-  -- cell holds the accumulator, and the accumulator is a thing the
-  -- fold has been building rather than a thing the walk handed over.
-
-  -- AND THE REGISTRY ARM'S COUNTEREXAMPLE DOES NOT TRANSFER BY
-  -- READING, which is worth saying because the two arms are otherwise
-  -- taken as one.  `Refuted.Drain-Regs-Nest` runs a completion walk --
-  -- `valsΦ?` is `all` over the burst, so an empty one clears the
-  -- premise at every budget -- and the drain then subscribes a queued term,
-  -- appending a registration whose PATH carries a fresh outer frame.
-  -- This fold reads NODE STATES instead, and the two writes the same
-  -- step makes both go the wrong way for a crossing: `allFresh-nest`
-  -- prices a head's own install at zero, and the drain takes the term
-  -- OUT of the parent's queue.  So the drain arm is not where this one
-  -- fails, and its repair -- a grant over what the completion may
-  -- subscribe -- does not reach the arm that does.
-
-  -- SO THE FRAME GRANT IS CARRIED, AND IT IS THE ONE THE REGISTRY ARM
-  -- ALREADY TAKES.  Its scan arm states the iteration face's own
-  -- reading -- a power in the burst WIDTH over a ceiling on the entry
-  -- the step names -- which is exactly the currency the potential is
-  -- missing, and `stepFrame-nodes-scan` is proven in it.  Taking the
-  -- same grant is what keeps the two faces discharged from a single
-  -- fit: the walk's frame clause already destructures it to feed the
-  -- registry leaf, so this leaf costs its caller nothing.
+  -- THE DRAIN FRAME'S OWN WRITE, which is the arm the burst reading
+  -- leaves open in the other direction.  A `from-inner` takes a term
+  -- OUT of its parent *All's queue and may install the head it
+  -- subscribes, so the cell it rewrites is the one the fit's ceiling
+  -- half is stated over rather than one the walk handed it -- and the
+  -- grant it carries is a whole drain ledger rather than a single
+  -- entry, so the arm is read off that ledger and not off the values.
   --
-  -- REFUTED: `Refuted.Scan-Nodes-Burst` -- a step function that
-  --   deepens its own accumulator, folded over a burst of naturals.
-  --   `valsΦ?` charges `2 ^ sizeᵗ fn` times the step's own nesting
-  --   once per value and takes the maximum, so the budget is a
-  --   CONSTANT in the burst length; the fold threads, so the stored
-  --   depth is linear in it.  Sixty-five values leave the cell at
-  --   sixty-five against a budget of sixty-four, from a table reading
-  --   zero, and every further value widens the gap -- so no larger `U`
-  --   repairs it.  The currency the iteration face already pays in is
-  --   a power in the burst WIDTH, which is what this leaf is missing.
-  --
-  -- PROBED: `Probed.Chain-Step-Abs-Charge` reaches this leaf by RUNNING
-  --   a whole chain over it, at the second cascade of two reachable
-  --   families, taking the chain the evaluator itself presents rather
-  --   than one built by hand -- five to six at the fold family against
-  --   a charge of thirty-three, eight to sixteen at the demand family
-  --   against seventy-one.  The charge read there is the SYNTACTIC one
-  --   the size cap is proven to dominate, and the rows discharge no
-  --   premise, so each is a stronger claim than the leaf instance.
-  --   TIED at ONE frame -- a scan under an outer *All, which is the
-  --   chain shape the fold family builds -- with both node ids taken
-  --   from the run, since a step at an id the table does not hold is
-  --   the identity, and with both premises LEFT STANDING.  AND THE
-  --   GRANT IS SPENT AT EXACTLY THE ACCUMULATOR'S WRAP DEPTH, which
-  --   the composite rows could not see: the table the walk started
-  --   from folds to five, one wrap takes it to six and three wraps to
-  --   eight, so no grant-free reading exists at either and each row is
-  --   stated at the smallest grant that admits it.  NOT covered: a
-  --   burst, where the crossing would be linear in a length the rows
-  --   here do not vary -- every row steps a single value.
-  stepFrame-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  -- RECOVERY: git show 6dcc8b1:agda/evidence/probed/Probed/Chain-Step-Abs-Charge.agda
+  --   restores a chain runner that reaches a real drain at the second
+  --   cascade of two families, with the node ids taken from the run.
+  stepFrame-nest-nodes-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (B U : ℕ) →
-    valsΦ? B U (f ↠ path) vals ≡ true →
-    FrameΦHyp sf id now B U f path vals fin sched st →
-    foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
-      (EvalSt.nodes
-        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
-      ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ⊔ U
+    valsΦ? B U (from-inner op allNid inst ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st →
+    nodesMax (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame sf id now (from-inner op allNid inst) path vals fin sched st)))))
+      ≤ nodesMax st ⊔ U
+
+  -- THE OUTER FRAME'S MINT.  A `thru-outer` receives an OBSERVABLE and
+  -- subscribes it, so what it leaves in the table is the *All node the
+  -- new subscription hangs from -- a cell that did not exist when the
+  -- walk started, and therefore one no reading of the entry table
+  -- bounds.  Its grant is a value fit rather than a ceiling, because
+  -- what the mint's depth is a function of is the subscribed value.
+  stepFrame-nest-nodes-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (B U : ℕ) →
+    valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st →
+    nodesMax (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame sf id now (thru-outer op nid) path vals fin sched st)))))
+      ≤ nodesMax st ⊔ U
+
+-- ONE FRAME'S NODE STORES, under the potential it was handed.  Only
+-- three of the five kinds store at all -- a scan writes its
+-- accumulator, an inner frame writes its parent *All's queue, and an
+-- outer frame mints the *All node the subscription hangs from.  A map
+-- leaves the table untouched and a take writes a COUNTER, which
+-- `nodeNest` prices at zero, so those two arms pay nothing at all.
+--
+-- THE SCAN IS THE ONE THE BURST READING KILLED, AND THE GRANT IS WHAT
+-- PAYS IT.  The cell holds the accumulator, which the fold has been
+-- building rather than a thing the walk handed over, so the potential
+-- alone buys a fixed number of values and not a bound.  What closes it
+-- is the frame grant the registry arm already takes: a ceiling `G` on
+-- the entry cell joined with the values in flight, under a power in
+-- the burst WIDTH -- which is the currency `stepFrame-nodes-cell-scan`
+-- is proven in.  The path's factor is at least one, so the frame's own
+-- arithmetic is readable against the potential the path is charged in,
+-- and the arm closes with no term left over.
+--
+-- AND THE `⊔` IS WHAT FORCED THE CELL READING.  The sibling that
+-- bounds the WHOLE table does so by a PRODUCT, so the table it found
+-- goes inside the factor and a conclusion of the form `what was there
+-- ⊔ a budget` cannot pay for it -- no budget mints the inflation of a
+-- quantity it does not read.  A scan writes exactly one cell, so the
+-- honest split is the untouched cells on the left of the join and the
+-- written one on the right.
+--
+-- REFUTED: `Refuted.Scan-Nodes-Burst` -- a step function that deepens
+--   its own accumulator, folded over a burst of naturals.  `valsΦ?`
+--   charges `2 ^ sizeᵗ fn` times the step's own nesting once per value
+--   and takes the maximum, so the budget is a CONSTANT in the burst
+--   length; the fold threads, so the stored depth is linear in it.
+--   Sixty-five values leave the cell at sixty-five against a budget of
+--   sixty-four, from a table reading zero, and every further value
+--   widens the gap -- so no larger `U` repairs it.  That is what the
+--   grant is here for, and it is why the premise may not be dropped.
+stepFrame-nest-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (B U : ℕ) →
+  valsΦ? B U (f ↠ path) vals ≡ true →
+  FrameΦHyp sf id now B U f path vals fin sched st →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+    (EvalSt.nodes
+      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    ≤ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ⊔ U
+stepFrame-nest-nodes sf id now (map-f fn) path vals fin sched st B U _ _ =
+  m≤m⊔n (nodesMax st) U
+stepFrame-nest-nodes sf id now (take-f nid) path vals fin sched st B U _ _ =
+  ≤-trans (stepFrame-nodes-cell-take sf id now nid path vals fin sched st)
+          (m≤m⊔n (nodesMax st) U)
+stepFrame-nest-nodes sf id now (scan-f fn nid) path vals fin sched st B U _ (G , hG , hU) =
+  ≤-trans (stepFrame-nodes-cell-scan (length vals) sf id now fn nid path vals
+             fin sched st ≤-refl)
+          (⊔-mono-≤ ≤-refl grant)
+  where
+  L = length vals
+  E = (2 ^ sizeᵗ fn) ^ L
+  X = E * (G + L * nestDᵗ fn)
+  -- the ceiling is spent here and nowhere else: it is what turns the
+  -- entry cell the step names into a quantity the potential can hold
+  shrink : E * ((nodeNestAt nid st ⊔ nestDᵛˢ vals) + L * nestDᵗ fn) ≤ X
+  shrink = *-monoʳ-≤ E (+-monoˡ-≤ (L * nestDᵗ fn) hG)
+  -- and the factor's positivity is what lets the frame's own
+  -- arithmetic be read against the potential the path is charged in
+  factor : X ≤ pathΦF B path * (X + pathΦD B path)
+  factor =
+    ≤-trans (m≤m+n X (pathΦD B path))
+            (≤-trans (≤-reflexive (sym (*-identityˡ (X + pathΦD B path))))
+                     (*-monoˡ-≤ (X + pathΦD B path) (pathΦF-pos B path)))
+  grant : E * ((nodeNestAt nid st ⊔ nestDᵛˢ vals) + L * nestDᵗ fn) ≤ U
+  grant = ≤-trans shrink (≤-trans factor hU)
+stepFrame-nest-nodes sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ hF =
+  stepFrame-nest-nodes-inner sf id now op allNid inst path vals fin sched st B U hΦ hF
+stepFrame-nest-nodes sf id now (thru-outer op nid) path vals fin sched st B U hΦ hF =
+  stepFrame-nest-nodes-outer sf id now op nid path vals fin sched st B U hΦ hF
 
 -- THE WALK, AND THE FAN-OUT IT RE-ENTERS.  The frame clause spends
 -- three facts and no more: the nodes leaf for what this frame stored,

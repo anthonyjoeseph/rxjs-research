@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FRAME'S OWN MINT, WHERE THREE REFUTATIONS SAY ONE THING.**
-  `stepFrame-nest-nodes`, `stepFrame-nest-regs` and `stepFrame-sz` are
-  what a single frame stores, registers and grows by, each under the
-  potential AND the frame grant, and each already refuted with its
-  premise read ALONE. The refutations agree: the frame's own reading is
-  never the whole payer — the arm that kills each is a scan accumulator
-  or a drained queue the walk's values cannot reach. So this is a
-  restatement leg, and the denomination is the ceiling's own split: room
-  is counted at the depth the frame was ARRIVED at while the traversal
-  under it climbs one down. One commit, because repairing one of the
-  three and not its siblings repairs nothing.
+- **THE FRAME'S OWN MINT, SPLIT BY FRAME KIND.** `stepFrame-nest-regs`
+  and `stepFrame-sz` are what a single frame registers and grows by,
+  each under the potential AND the frame grant, and each refuted with
+  its premise read ALONE. The nodes row went first, and the plan it was
+  taken under is DEAD: no restatement was needed and no denomination
+  moved. Split by KIND, four of the five arms pay nothing the walk
+  cannot already see, and the grant the registry arm was carrying
+  anyway covers the fifth — what survived is two leaves, at the two
+  frames that MINT a cell. Do the same to these two: assemble over the
+  kinds and keep only the arms the grant misses.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -272,11 +271,15 @@ does not fit is a finding about the shared statement, not about the head.
   step, the frame read at the program's cap and the values at the level.
   Refuted three ways: no frame reading, the frame read at the level, and the
   scan arm, which emits the node store that no premise here reads.
-- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
-  what one frame stores at the nodes map, under the potential AND the frame
-  grant. The premise alone was refuted at the scan arm: the cell holds the
-  accumulator against a budget constant in the burst. The grant is spent at the
-  wrap depth.
+- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
+  what the drain frame writes at the nodes map. It takes the term OUT of its
+  parent *All's queue, so the cell it rewrites is the one its ledger's ceiling
+  half is stated over rather than one the walk handed it. Nothing has
+  instantiated it.
+- **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`:
+  what the outer frame mints at the nodes map — the *All cell the new
+  subscription hangs from, which did not exist when the walk started, so no
+  reading of the entry table bounds it. Nothing has instantiated it.
 - **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
   what one frame registers, under the potential AND the frame grant it was
   handed. The premise alone was refuted by an empty burst: the drain reads the

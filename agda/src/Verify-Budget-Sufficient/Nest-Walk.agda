@@ -466,6 +466,42 @@ abstract
                    (nestDᵛ u (proj₂ (scanVals fn a vals))))
             (scanVals-nest W fn a vals hlen)
 
+  -- AND THE TABLE READ THE SAME WAY, WHICH IS THE READING A `⊔`
+  -- CONCLUSION NEEDS.  The sibling two above bounds the whole table by
+  -- a PRODUCT, so the table it found goes inside the factor; a
+  -- consumer whose conclusion is `what was there ⊔ a budget` cannot
+  -- pay for that, because no budget mints the inflation of a quantity
+  -- it does not read.  A scan writes exactly one cell, so the honest
+  -- split is the untouched cells on the left of the join and the
+  -- written one on the right -- and the written one is the fold off
+  -- THIS entry, which is the quantity a frame grant actually carries.
+  stepFrame-nodes-cell-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (W : ℕ) (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (nid : NodeId) (p : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    length vals ≤ W →
+    let r = stepFrame sf id now (scan-f fn nid) p vals fin sched st in
+    nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      ≤ nodesMax st
+        ⊔ ((2 ^ sizeᵗ fn) ^ W * ((nodeNestAt nid st ⊔ nestDᵛˢ vals) + W * nestDᵗ fn))
+  stepFrame-nodes-cell-scan {u = u} W sf id now fn nid p vals fin sched st hlen
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing                    = m≤m⊔n (nodesMax st) _
+  ... | just (take-st _)           = m≤m⊔n (nodesMax st) _
+  ... | just (mergeAll-st _ _ _ _) = m≤m⊔n (nodesMax st) _
+  ... | just (switch-st _ _)       = m≤m⊔n (nodesMax st) _
+  ... | just (exhaust-st _ _)      = m≤m⊔n (nodesMax st) _
+  ... | just (scan-st {w} a) with w ≟ᵗ u
+  ...   | no _     = m≤m⊔n (nodesMax st) _
+  ...   | yes refl =
+    ≤-trans (setNode-nodes nid (scan-st (proj₂ (scanVals fn a vals)))
+                           (EvalSt.nodes st))
+            (⊔-lub (≤-trans (≤-trans (m≤n⊔m (nestDᵛˢ (proj₁ (scanVals fn a vals)))
+                                            (nestDᵛ u (proj₂ (scanVals fn a vals))))
+                                     (scanVals-nest W fn a vals hlen))
+                            (m≤n⊔m (nodesMax st) _))
+                   (m≤m⊔n (nodesMax st) _))
+
 -- A PREFIX CANNOT BE DEEPER THAN THE LIST, and `takeVals` returns a
 -- prefix.  The induction is on the budget rather than the list because
 -- that is what `takeVals` recurses on, and its `suc zero` clause drops
@@ -487,6 +523,14 @@ abstract
 -- branch the cut flag takes.  The cutting branch also rewrites the
 -- registry and the live list, and neither is anything `nodesMax` reads.
 abstract
+  -- the counter is the whole reason both readings hold, so it is stated
+  -- once: whatever the cut writes back, `nodeNest` prices it at zero
+  setZero-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (nid : NodeId) (st : EvalSt e) (m : ℕ) →
+    nodesFold (setNode nid (take-st m) (EvalSt.nodes st)) ≤ nodesMax st
+  setZero-take nid st m =
+    ≤-trans (setNode-nodes nid (take-st m) (EvalSt.nodes st)) (⊔-lub z≤n ≤-refl)
+
   stepFrame-nodes-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
@@ -501,19 +545,32 @@ abstract
   ... | just (switch-st _ _)  = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
   ... | just (exhaust-st _ _) = ⊔-lub (m≤m⊔n (nodesMax st) (nestDᵛˢ vals)) z≤n
   ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
-  ... | true  = ⊔-mono-≤ (setZero zero) (takeVals-nest k vals)
-    where
-    setZero : ∀ (m : ℕ) →
-      nodesFold (setNode nid (take-st m) (EvalSt.nodes st)) ≤ nodesMax st
-    setZero m = ≤-trans (setNode-nodes nid (take-st m) (EvalSt.nodes st))
-                        (⊔-lub z≤n ≤-refl)
-  ... | false = ⊔-mono-≤ (setZero (proj₁ (proj₂ (takeVals k vals))))
+  ... | true  = ⊔-mono-≤ (setZero-take nid st zero) (takeVals-nest k vals)
+  ... | false = ⊔-mono-≤ (setZero-take nid st (proj₁ (proj₂ (takeVals k vals))))
                          (takeVals-nest k vals)
-    where
-    setZero : ∀ (m : ℕ) →
-      nodesFold (setNode nid (take-st m) (EvalSt.nodes st)) ≤ nodesMax st
-    setZero m = ≤-trans (setNode-nodes nid (take-st m) (EvalSt.nodes st))
-                        (⊔-lub z≤n ≤-refl)
+
+  -- AND THE TABLE ALONE, which is what a consumer reading only the
+  -- store wants: the join above pairs the table with the values in
+  -- flight because the walk telescopes the two together, and a
+  -- statement charging the store against a budget has no term for the
+  -- second half.  Nothing is lost by dropping it -- the counter this
+  -- arm writes reads zero either way -- so the cell reading is the
+  -- STRONGER of the two rather than a weakening of it.
+  stepFrame-nodes-cell-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (take-f nid) p vals fin sched st in
+    nodesMax (proj₂ (proj₂ (proj₂ (proj₂ r)))) ≤ nodesMax st
+  stepFrame-nodes-cell-take sf id now nid p vals fin sched st
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing               = ≤-refl
+  ... | just (scan-st _)      = ≤-refl
+  ... | just (mergeAll-st _ _ _ _) = ≤-refl
+  ... | just (switch-st _ _)  = ≤-refl
+  ... | just (exhaust-st _ _) = ≤-refl
+  ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+  ... | true  = setZero-take nid st zero
+  ... | false = setZero-take nid st (proj₁ (proj₂ (takeVals k vals)))
 
 -- THE SLOTS TERM IS PAID ONCE PER FRAME AND EVERY FRAME BUT ONE HAS NO
 -- USE FOR IT, so it enters as pure slack for four of the five arms.
