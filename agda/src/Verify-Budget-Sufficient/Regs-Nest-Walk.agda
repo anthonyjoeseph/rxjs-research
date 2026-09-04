@@ -22,40 +22,45 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
-open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n)
+open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
-  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤)
+  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-comm)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
-open import Data.Unit using (⊤)
+open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs)
+open import Relation.Nullary using (yes; no)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
-  exhaust-st; takeDispatch; takeVals; lookupNode)
+  exhaust-st; takeDispatch; takeVals; lookupNode; scanVals)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
   stepFrame-nodes-inner; capsDrainOK; FaceOK)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
-open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all; pathLen)
+open import Verify-Budget-Sufficient.Measures
+  using (thruWrap-vals; takeVals-all; pathLen; boundedNode; setNode-bounded;
+  boundedNode-widen; all-impl)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; nest-inflate; dropSource-nest; nestUnit)
-open import Verify-Budget-Sufficient.Caps using (Caps; frameStep; sizeCount)
+  using (regsNestMax; nest-inflate; dropSource-nest; nestUnit; cutThrough-nest)
+open import Verify-Budget-Sufficient.Caps
+  using (Caps; frameStep; sizeCount; iterSize-infl)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; frameSz?)
+  using (pathSz?; frameSz?; applyFn-iterSize)
+open import Verify-Budget-Sufficient.Caps-Face.Part5 using (scanVals-size)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
 -- the potential, read off the values still in flight and the path they
@@ -176,33 +181,116 @@ FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st =
     ValsFit k (Sched.slots sched) G path vals
     × (pathΦF B path * (G + pathΦD B path) ≤ U)
 
+-- THE THREE FRAMES THAT REGISTER NOTHING, each for its own reason and
+-- none of them the potential's.  A map returns the state it was
+-- handed; a scan rewrites the node table and nothing else, whichever
+-- branch the accumulator's type test takes; and a take either passes
+-- the prefix through or CUTS, and a cut keeps a sublist of the
+-- registry it was handed.  So the registry the walk leaves is under
+-- the one it entered on, with no budget spent at all -- which is what
+-- lets the three arms be read off the entry registry instead of off a
+-- premise the drain's counterexample shows they cannot have.
+abstract
+  stepFrame-regs-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (nid : NodeId) (p : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (scan-f fn nid) p vals fin sched st in
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+      ≤ regsNestMax (EvalSt.registry st)
+  stepFrame-regs-scan {u = u} sf id now fn nid p vals fin sched st
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing                    = ≤-refl
+  ... | just (take-st _)           = ≤-refl
+  ... | just (mergeAll-st _ _ _ _) = ≤-refl
+  ... | just (switch-st _ _)       = ≤-refl
+  ... | just (exhaust-st _ _)      = ≤-refl
+  ... | just (scan-st {w} a) with w ≟ᵗ u
+  ...   | no _     = ≤-refl
+  ...   | yes refl = ≤-refl
+
+  stepFrame-regs-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (take-f nid) p vals fin sched st in
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+      ≤ regsNestMax (EvalSt.registry st)
+  stepFrame-regs-take sf id now nid p vals fin sched st
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing                    = ≤-refl
+  ... | just (scan-st _)           = ≤-refl
+  ... | just (mergeAll-st _ _ _ _) = ≤-refl
+  ... | just (switch-st _ _)       = ≤-refl
+  ... | just (exhaust-st _ _)      = ≤-refl
+  ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+  ...   | true  = cutThrough-nest nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                  (EvalSt.dying st) (EvalSt.registry st)
+  ...   | false = ≤-refl
+
 postulate
-  -- ONE FRAME'S REGISTRATIONS, under the potential it was handed.  The
-  -- charge is the potential rather than the frame's own size because
-  -- what a `thru-outer` mints is the subscribed value's frames over the
-  -- rest of the path, which is the potential exactly.
-  --
-  -- AND THE FRAME GRANT IS CARRIED, because `valsΦ?` alone is FALSE
-  -- here.  The drain frame takes its payload out of the *All node's
-  -- queue rather than out of the burst, so a completion walk clears the
-  -- premise by computation at every budget -- `all` over an empty list
-  -- -- and still subscribes a queued term, appending a registration
-  -- whose path carries the fresh `thru-outer` frame.  The grant is the
-  -- one the potential's own arm already takes, and taking the same one
-  -- is what keeps the two faces discharged from a single fit.
+  -- THE DRAIN FRAME'S OWN REGISTRATIONS, and this is the arm the
+  -- counterexample lands at.  A `from-inner` takes its payload out of
+  -- the *All node's queue rather than out of the burst, so a completion
+  -- walk clears `valsΦ?` by computation at every budget -- `all` over
+  -- an empty list -- and still subscribes a queued term, appending a
+  -- registration whose path carries a fresh `thru-outer` frame.  The
+  -- grant is what has to pay, and it is the one the potential's own arm
+  -- already takes.
   --
   -- REFUTED: Refuted.Drain-Regs-Nest
   -- RECOVERY: git show f38a902:agda/evidence/probed/Probed/Chain-Step-Regs-Rootward.agda
   --   restores a rootward-stacking program and its readings.
-  stepFrame-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  stepFrame-nest-regs-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (B U : ℕ) →
-    valsΦ? B U (f ↠ path) vals ≡ true →
-    FrameΦHyp sf id now B U f path vals fin sched st →
-    regsNestMax (EvalSt.registry
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    valsΦ? B U (from-inner op allNid inst ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st →
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame sf id now (from-inner op allNid inst) path vals fin sched st))))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
+
+  -- THE OUTER FRAME'S OWN, which is where the potential is the right
+  -- charge rather than the frame's size: what a `thru-outer` registers
+  -- is the subscribed value's frames over the REST of the path, and
+  -- that is the potential exactly.
+  stepFrame-nest-regs-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (B U : ℕ) →
+    valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st →
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame sf id now (thru-outer op nid) path vals fin sched st))))))
+      ≤ regsNestMax (EvalSt.registry st) ⊔ U
+
+-- ONE FRAME'S REGISTRATIONS, under the potential it was handed and the
+-- frame grant beside it.  Only the two *All frames register at all, so
+-- the other three arms spend neither premise: they are read off the
+-- entry registry, which is the join's own left half.
+stepFrame-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (B U : ℕ) →
+  valsΦ? B U (f ↠ path) vals ≡ true →
+  FrameΦHyp sf id now B U f path vals fin sched st →
+  regsNestMax (EvalSt.registry
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    ≤ regsNestMax (EvalSt.registry st) ⊔ U
+stepFrame-nest-regs sf id now (map-f fn) path vals fin sched st B U _ _ =
+  m≤m⊔n (regsNestMax (EvalSt.registry st)) U
+stepFrame-nest-regs sf id now (scan-f fn nid) path vals fin sched st B U _ _ =
+  ≤-trans (stepFrame-regs-scan sf id now fn nid path vals fin sched st)
+          (m≤m⊔n (regsNestMax (EvalSt.registry st)) U)
+stepFrame-nest-regs sf id now (take-f nid) path vals fin sched st B U _ _ =
+  ≤-trans (stepFrame-regs-take sf id now nid path vals fin sched st)
+          (m≤m⊔n (regsNestMax (EvalSt.registry st)) U)
+stepFrame-nest-regs sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ hF =
+  stepFrame-nest-regs-inner sf id now op allNid inst path vals fin sched st B U hΦ hF
+stepFrame-nest-regs sf id now (thru-outer op nid) path vals fin sched st B U hΦ hF =
+  stepFrame-nest-regs-outer sf id now op nid path vals fin sched st B U hΦ hF
 
 -- ONE MAP FRAME, and it is the clause the additive reading died at.  A
 -- step function may name its payload on both sides of an additive
@@ -542,14 +630,45 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- `S·(1+2L)`, which covers `S + S·L` with room and nothing larger, so
 -- the frame's factor has to be the base cap `S` for one level to pay.
 --
--- AND THE FRAME READING IS STILL NOT ENOUGH, BECAUSE ONE ARM EMITS THE
--- NODE STORE.  A `scan-f` answers with its accumulator, fetched out of
--- `EvalSt.nodes`, and its own syntax may be a projection that hands
--- that accumulator straight back -- so the emitted size is the STORED
--- value's, which neither reading here sees.  What is owed is the store
--- reading `stBounded?` already makes at a `scan-st`, threaded through
--- the walk at the level, and the two walks that spend this leaf carry
--- no such premise today.
+-- WHAT DEFEATS IT IS THE RATE, AND `scanVals` FOLDS.  A `scan-f`
+-- answers with its accumulator, and each output is the step function
+-- applied to the PREVIOUS one, so a burst of k values applies it k
+-- times in sequence and whatever the function adds accrues k times
+-- while one level buys one factor.  No reading of the frame and no
+-- reading of the store at a fixed level survives that.
+--
+-- THE REPAIR IS PROVEN ONE FACE OVER, AND IT FIXES THE COUNT EXACTLY.
+-- `scanVals-size` already prices this arm in this very currency: from
+-- an accumulator and arriving values both read at `B`, every output AND
+-- the stored residue land at `iterSize S (length vals * suc (sizeᵗ fn))
+-- B` -- a rung per pairing and per node of the step function.  So the
+-- count owed is the burst's own LENGTH, and emphatically not the width
+-- cap: that count is separately unavailable, since `iterFold`
+-- exponentiates per fold and a count reading `cWid` would iterate the
+-- tower function once per instant, which is the finding carried at
+-- `sizeCount`.  A length is a structural quantity the walk already
+-- sums; a cap is a recurrence, and the two are not a widening apart.
+--
+-- AND THAT LEMMA LOCATES WHAT IS ACTUALLY OPEN.  It asks for the
+-- accumulator read at the SAME `B` as the values, and it PRESERVES that
+-- reading -- the residue lands where the outputs do -- so the obstacle
+-- is the walk's ENTRY reading of the store and not the step.  Which is
+-- the direction finding recorded below, now with the step half of it
+-- discharged one face over rather than merely conjectured.
+--
+-- AND THE COUNT IS NOT THE SCAN ARM'S ALONE, WHICH IS WHERE THE SPLIT
+-- BY FRAME KIND STOPS PAYING.  `scan-f` is the only arm that applies
+-- its function in SEQUENCE, and `map-f` applies it to each value
+-- independently, which is the reading the first paragraph prices.  But
+-- the two arms crossing into an inner subscription do not merely
+-- concatenate what someone else computed: `thruConsume` SUBSCRIBES the
+-- arriving observable and hands back its whole synchronous burst, and
+-- `innerFinish` at a mergeAll drains the node's queue by subscribing
+-- what is parked there.  What runs at those arms is a program that
+-- arrived as a VALUE, so the frame's own syntax says nothing about
+-- what it costs.  The count owed there is the arriving observables'
+-- OWN size -- the same move `map-f` already made, denominated in what
+-- runs rather than in what is written.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Store` -- the scan arm at the
 --   smallest frame there is, against a store the statement quantifies
@@ -563,15 +682,425 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 --   repair it: both factors are then capped at `L`, the emission is
 --   quadratic in `L` and one level is linear in it, and the crossing
 --   arrives at `j = 1` for every `S ≥ 2`.
+-- REFUTED: `Refuted.Frame-Step-Size-Fold` -- the store-conditioned
+--   repair, at the strongest store premise there is: every node bounded
+--   at the arriving values' own level.  All three premises hold and the
+--   conclusion still fails, because the fold adds a fixed amount per
+--   value while the ceiling is fixed in the burst.  The rows fire at a
+--   `scan-f` and at no other arm.
+-- REFUTED: `Refuted.Frame-Step-Size-Cross` -- the constant charge at
+--   BOTH crossing arms, which is what the split by frame kind left
+--   standing.  `sizeᵉ` at a map adds while `sizeᵛ` at a product
+--   doubles, so a duplication chain of syntax size `3 + 4k` emits at
+--   `2 ^ suc k - 1`; the outer arm dies on the arriving observable and
+--   the inner arm on the same program parked in the node's queue,
+--   where `boundedNode` is what supplies the premise.  The second row
+--   is the one that decides the repair: the cap is tied to the
+--   program's own size and the arm still fails, so no polynomial tie
+--   between `S` and `B` saves a constant count.  The STORE halves are
+--   untouched -- this witness leaves the queue empty and installs no
+--   node -- and neither is evidence for the other.
+-- DEAD ROUTE: conditioning this on a store reading at the level, and
+--   threading that through the walk that spends it, is STRUCTURALLY
+--   dead -- and what kills it is the DIRECTION, not the threading.  The
+--   scan arm emits a stored value into a conclusion capped at the
+--   values' ladder, so it needs the store's cap to sit BELOW that
+--   ladder.  The only levelled store reading this development has is
+--   the caps face's, whose walk advances the level by an EXISTENTIAL
+--   per frame and per fanned entry, budgeted by a step count rather
+--   than by one; that ladder therefore climbs at least as fast as this
+--   one and strictly faster at exactly the storing frames, so the store
+--   cap overtakes the value cap at a chain's second scan.  No premise
+--   fixes a direction.
+-- DEAD ROUTE: re-denominating the conclusion onto that existential
+--   ladder instead, so that the store is carried at the level and the
+--   consumer's own accounting moves with it.  The caps walk's ceiling
+--   is its fold COUNT, and `iterSize` taken at that count is by
+--   construction the NEXT instant's size cap; the walk that spends
+--   this conclusion has to land under the CURRENT instant's nesting
+--   cap, and the only lemma delivering that admits levels no larger
+--   than a small polynomial in the base cap.  So the two ladders are
+--   not a restatement apart -- one is elementary in the cap and the
+--   other is the caps recurrence itself -- and no widening crosses
+--   the gap in the direction the consumer needs.
+
+-- THE COUNT ONE FRAME CHARGES THE LADDER, AND IT IS A PROPERTY OF THE
+-- KIND.  A `map-f` substitutes into each arriving value independently,
+-- so it pays one rung per node of its own function and the burst does
+-- not enter.  A `scan-f` THREADS, so it pays those rungs ONCE PER
+-- arriving value, plus the pairing that precedes each step.  Every
+-- other kind computes no value of its own -- a take passes a prefix
+-- through, and the two crossing into an inner subscription deliver
+-- what they drained -- so one rung covers them.
+szCount : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List (Val Γ s) → ℕ
+szCount (map-f fn)         vals = sizeᵗ fn
+szCount (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
+szCount (take-f nid)       vals = 1
+szCount (from-inner _ _ _) vals = 1
+szCount (thru-outer _ _)   vals = 1
+
+-- WHAT A LOOKUP HANDS BACK when every stored node is bounded.  The
+-- receipt has to be abstracted by the SAME `with` that abstracts the
+-- evaluator's own dispatch, or the two are about different scrutinees;
+-- that is why it is a predicate over the `Maybe` rather than an
+-- equation.  The caps face pairs this with a width reading, which is
+-- the half nothing here can supply.
+NodeSz : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Set
+NodeSz B nothing   = ⊤
+NodeSz B (just ns) = boundedNode B ns ≡ true
+
+lookupNode-sz : ∀ {n} {Γ : Ctx n} (B : ℕ) (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode B (proj₂ kv)) nodes ≡ true →
+  NodeSz B (lookupNode nid nodes)
+lookupNode-sz B nid []            h = tt
+lookupNode-sz B nid ((k , s) ∷ r) h with k ≡ᵇ nid
+... | true  = ∧-trueˡ h
+... | false = lookupNode-sz B nid r (∧-trueʳ h)
+
+-- ONE SUBSTITUTION PER VALUE, INDEPENDENTLY, which is the whole of the
+-- map arm: `evalWith` prices a term's evaluation at one fold per syntax
+-- node and the values never meet, so the burst does not enter the
+-- count.
+mapSz : ∀ {n} {Γ : Ctx n} {s u} (S V : ℕ) → 1 ≤ S →
+  (fn : Fn Γ [] [] [] s u) (vals : List (Val Γ s)) →
+  valsSz? V vals ≡ true →
+  valsSz? (iterSize S (sizeᵗ fn) V) (map (applyFn fn) vals) ≡ true
+mapSz S V 1≤S fn []       h = refl
+mapSz S V 1≤S fn (v ∷ vs) h =
+  ∧-intro (T⇒≡true _ (≤⇒≤ᵇ (applyFn-iterSize S V 1≤S fn v
+                              (≤ᵇ⇒≤ _ V (T-to (∧-trueˡ h))))))
+          (mapSz S V 1≤S fn vs (∧-trueʳ h))
+
+-- A PREFIX IS NOT A COMPUTATION, so the take arm spends its rung on
+-- nothing and the reading only has to be widened.  It is hoisted out of
+-- the clause because both sides of the evaluator's own exhaustion test
+-- deliver the same prefix, and a `where` reaches only the last of them.
+takeSz : ∀ {n} {Γ : Ctx n} {s} (S B : ℕ) → 1 ≤ S →
+  (k : ℕ) (vals : List (Val Γ s)) →
+  valsSz? B vals ≡ true →
+  valsSz? (iterSize S 1 B) (proj₁ (takeVals k vals)) ≡ true
+takeSz {s = s} S B 1≤S k vals hv =
+  valsSz?-mono B (iterSize S 1 B) (proj₁ (takeVals k vals))
+    (iterSize-infl S 1≤S 1 B)
+    (takeVals-all (λ v → sizeᵛ s v ≤ᵇ B) k vals hv)
+
+-- ONE FRAME'S SIZE STEP, SPLIT BY KIND, over the store the frame reads.
+-- Three arms are bodies here and the two that cross into an inner
+-- subscription are leaves: a take passes a prefix of what arrived, a
+-- map substitutes independently, and the scan -- the arm every
+-- unconditional reading of this statement died at -- is `scanVals-size`
+-- read at the very bound the arriving values stand at, its accumulator
+-- premise met by the store reading.
+--
+-- THE STORE PREMISE IS A RESTATEMENT AND IT IS EARNED, not a hypothesis
+-- taken because a call site happens to offer one: the unconditional
+-- form is refuted below, so the conditioned form is the true statement
+-- replacing a false one rather than a weaker statement replacing a
+-- strong one.  And the frame's OWN size reading is not among the
+-- premises, which is what the count bought: once the ladder climbs by
+-- the function's node count rather than by one, nothing has to know
+-- that count is small.
+stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (S B : ℕ) → 2 ≤ S →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  valsSz? (iterSize S (szCount f vals) B)
+    (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+
 postulate
-  stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
-    (S j : ℕ) →
-    frameSz? S f ≡ true →
-    valsSz? (iterSize S j S) vals ≡ true →
-    valsSz? (iterSize S (suc j) S)
-      (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
+  -- THE TWO FRAMES THAT RUN A SUBSCRIPTION, and both statements are
+  -- FALSE as they stand: the program that runs arrives as a value, so
+  -- the count has to read it and a constant cannot.  They are left
+  -- standing only until the count moves, since raising it re-prices
+  -- every level the walk above them spends.
+  --
+  -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
+  --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
+  stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    valsSz? B vals ≡ true →
+    valsSz? (iterSize S 1 B)
+      (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals fin
+                sched st)) ≡ true
+
+  stepFrame-sz-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    valsSz? B vals ≡ true →
+    valsSz? (iterSize S 1 B)
+      (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin
+                sched st)) ≡ true
+
+stepFrame-sz sf id now (map-f fn) path vals fin sched st S B 2≤S hns hv =
+  mapSz S B (≤-trans (s≤s z≤n) 2≤S) fn vals hv
+
+stepFrame-sz {u = u} sf id now (scan-f fn nid) path vals fin sched st S B 2≤S hns hv
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-sz B nid (EvalSt.nodes st) hns
+... | nothing                   | _ = refl
+... | just (take-st _)          | _ = refl
+... | just (mergeAll-st _ _ _ _) | _ = refl
+... | just (switch-st _ _)      | _ = refl
+... | just (exhaust-st _ _)     | _ = refl
+... | just (scan-st {w} ac)     | hb with w ≟ᵗ u
+...   | no _    = refl
+...   | yes refl =
+  proj₁ (scanVals-size S B 2≤S fn ac vals (≤ᵇ⇒≤ _ B (T-to hb)) hv)
+
+stepFrame-sz sf id now (take-f nid) path vals fin sched st S B 2≤S hns hv
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                   = refl
+... | just (scan-st _)          = refl
+... | just (mergeAll-st _ _ _ _) = refl
+... | just (switch-st _ _)      = refl
+... | just (exhaust-st _ _)     = refl
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | true  = takeSz S B (≤-trans (s≤s z≤n) 2≤S) k vals hv
+...   | false = takeSz S B (≤-trans (s≤s z≤n) 2≤S) k vals hv
+
+stepFrame-sz sf id now (from-inner op allNid inst) path vals fin sched st S B 2≤S hns hv =
+  stepFrame-sz-inner sf id now op allNid inst path vals fin sched st S B
+    2≤S hns hv
+
+stepFrame-sz sf id now (thru-outer op nid) path vals fin sched st S B 2≤S hns hv =
+  stepFrame-sz-outer sf id now op nid path vals fin sched st S B
+    2≤S hns hv
+
+-- WIDENING A STORE READING IS FREE UPWARD, which is what lets one
+-- premise serve every level above the one it was taken at.
+nodesSz-widen : ∀ {n} {Γ : Ctx n} {B B′ : ℕ} → B ≤ B′ →
+  (ns : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode B (proj₂ kv)) ns ≡ true →
+  all (λ kv → boundedNode B′ (proj₂ kv)) ns ≡ true
+nodesSz-widen le ns h =
+  all-impl _ _ (λ kv → boundedNode-widen le (proj₂ kv)) ns h
+
+-- ONE CLIMB OF THE STORE READING, named because a `where` reaches only
+-- the last clause of a `with` block and every kind that leaves the table
+-- alone needs the same widening.
+stepWiden : ∀ {n} {Γ : Ctx n} (S B k : ℕ) → 2 ≤ S →
+  (ns : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode B (proj₂ kv)) ns ≡ true →
+  all (λ kv → boundedNode (iterSize S k B) (proj₂ kv)) ns ≡ true
+stepWiden S B k 2≤S ns h =
+  nodesSz-widen (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S) k B) ns h
+
+-- THE STORE SIDE OF THE SAME STEP, and the reason the walk can carry
+-- its own store premise rather than importing one: at the three arms
+-- that compute, a frame writes at most the entry it read, and the only
+-- entry whose content GREW is the scan's, which `scanVals-size` prices
+-- at the very level the outputs landed at.  Everything else either
+-- leaves the table alone or writes a take counter, which the reading is
+-- blind to.  The two crossing arms are NOT in that description: their
+-- subscription installs the inner program's own nodes, so the table
+-- the conclusion is about is not the table the premise read.
+stepFrame-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (S B : ℕ) → 2 ≤ S →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  all (λ kv → boundedNode (iterSize S (szCount f vals) B) (proj₂ kv))
+      (EvalSt.nodes
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    ≡ true
+
+postulate
+  -- THE STORE HALVES OF THE SAME TWO FRAMES, and both are FALSE for
+  -- the same reason their value halves are: a scan installed by the
+  -- subscription stores what the subscription emitted, and `reify`
+  -- carries a product value into a term of its own size.  So the
+  -- quantity that has to be charged is one, and it reaches the table
+  -- only by being written there.  Left standing only until the count
+  -- moves, since raising it re-prices every level the walk spends.
+  --
+  -- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-inner-absurd`
+  --   and `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-outer-absurd`.
+  stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    valsSz? B vals ≡ true →
+    all (λ kv → boundedNode (iterSize S 1 B) (proj₂ kv))
+        (EvalSt.nodes
+          (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
+                                         path vals fin sched st))))))
+      ≡ true
+
+  stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    valsSz? B vals ≡ true →
+    all (λ kv → boundedNode (iterSize S 1 B) (proj₂ kv))
+        (EvalSt.nodes
+          (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (thru-outer op nid)
+                                         path vals fin sched st))))))
+      ≡ true
+
+stepFrame-sz-store sf id now (map-f fn) path vals fin sched st S B 2≤S hns hv =
+  stepWiden S B (sizeᵗ fn) 2≤S (EvalSt.nodes st) hns
+
+stepFrame-sz-store {u = u} sf id now (scan-f fn nid) path vals fin sched st S B 2≤S hns hv
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-sz B nid (EvalSt.nodes st) hns
+... | nothing                    | _ =
+  stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns
+... | just (take-st _)           | _ =
+  stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns
+... | just (mergeAll-st _ _ _ _) | _ =
+  stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns
+... | just (switch-st _ _)       | _ =
+  stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns
+... | just (exhaust-st _ _)      | _ =
+  stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns
+... | just (scan-st {w} ac)      | hb with w ≟ᵗ u
+...   | no _ =
+  stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns
+...   | yes refl =
+  setNode-bounded _ nid (scan-st (proj₂ (scanVals fn ac vals))) (EvalSt.nodes st)
+    (T⇒≡true _ (≤⇒≤ᵇ (proj₂ (scanVals-size S B 2≤S fn ac vals
+                              (≤ᵇ⇒≤ _ B (T-to hb)) hv))))
+    (stepWiden S B (length vals * suc (sizeᵗ fn)) 2≤S (EvalSt.nodes st) hns)
+
+stepFrame-sz-store sf id now (take-f nid) path vals fin sched st S B 2≤S hns hv
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = stepWiden S B 1 2≤S (EvalSt.nodes st) hns
+... | just (scan-st _)           = stepWiden S B 1 2≤S (EvalSt.nodes st) hns
+... | just (mergeAll-st _ _ _ _) = stepWiden S B 1 2≤S (EvalSt.nodes st) hns
+... | just (switch-st _ _)       = stepWiden S B 1 2≤S (EvalSt.nodes st) hns
+... | just (exhaust-st _ _)      = stepWiden S B 1 2≤S (EvalSt.nodes st) hns
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | true  = setNode-bounded _ nid (take-st 0) (EvalSt.nodes st) refl
+                  (stepWiden S B 1 2≤S (EvalSt.nodes st) hns)
+...   | false = setNode-bounded _ nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                  (EvalSt.nodes st) refl
+                  (stepWiden S B 1 2≤S (EvalSt.nodes st) hns)
+
+stepFrame-sz-store sf id now (from-inner op allNid inst) path vals fin sched st S B
+                   2≤S hns hv =
+  stepFrame-sz-store-inner sf id now op allNid inst path vals fin sched st S B
+    2≤S hns hv
+
+stepFrame-sz-store sf id now (thru-outer op nid) path vals fin sched st S B
+                   2≤S hns hv =
+  stepFrame-sz-store-outer sf id now op nid path vals fin sched st S B
+    2≤S hns hv
+
+-- WHAT ONE FRAME CAN CHARGE, IN THE TWO QUANTITIES A ROUND ALREADY
+-- CAPS.  The scan is the only kind whose count reads the burst, so the
+-- uniform ceiling is a width times a size -- and the width is exactly
+-- what `burstsOK` carries along a path, frame by frame, in the shape
+-- this walk carries its size receipt.
+frameCh : ℕ → ℕ → ℕ
+frameCh S W = W * suc S
+
+szCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 1 ≤ W →
+  (f : Frame Γ s u) (vals : List (Val Γ s)) →
+  frameSz? S f ≡ true → length vals ≤ W →
+  szCount f vals ≤ frameCh S W
+szCount≤ch S W 1≤W (map-f fn) vals hf hw =
+  ≤-trans (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf))
+          (≤-trans (≤-trans (m≤m+n S 1) (≤-reflexive (+-comm S 1))) 1≤ch)
+  where
+  1≤ch : suc S ≤ frameCh S W
+  1≤ch = ≤-trans (≤-reflexive (sym (*-identityˡ (suc S)))) (*-mono-≤ 1≤W ≤-refl)
+szCount≤ch S W 1≤W (scan-f fn nid) vals hf hw =
+  *-mono-≤ hw (s≤s (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf)))
+szCount≤ch S W 1≤W (take-f nid) vals hf hw =
+  ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
+                             (*-mono-≤ 1≤W (s≤s z≤n)))
+szCount≤ch S W 1≤W (from-inner _ _ _) vals hf hw =
+  ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
+                             (*-mono-≤ 1≤W (s≤s z≤n)))
+szCount≤ch S W 1≤W (thru-outer _ _) vals hf hw =
+  ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
+                             (*-mono-≤ 1≤W (s≤s z≤n)))
+
+-- WHAT THE SIZE WALK CARRIES THAT NO FRAME CAN RE-ESTABLISH, and the
+-- shape is the one this face already uses for every walk-scoped
+-- hypothesis: a burst WIDTH at each step, because the scan's count
+-- reads it and nothing bounds it locally, and -- at a sink alone -- one
+-- store reading per admitted registration.  The frame clause is
+-- deliberately silent about the store: a frame's own table is proven
+-- to survive it, so hypothesising it there would ask the caller for
+-- what `stepFrame-sz-store` already delivers.  A fan-out is where the
+-- reading genuinely cannot be carried: each admitted chain reads a
+-- table the chains before it in the same fan have written, and no
+-- receipt taken at the sink survives that.
+--
+-- AND THE LEVEL RIDES ALONG BECAUSE THE CHARGE IS NOT ONE PER FRAME.
+-- A frame costs `szCount` rungs, so the reading a fan-out entry is
+-- owed sits at whatever the frames above it climbed to -- which is
+-- exactly the index the consumer threads.  The fold does NOT advance
+-- it entry by entry, and that is the reading's own weakness rather
+-- than an oversight: chains in one fan write a table their successors
+-- read, so a level fixed across the fold is a claim about the fan and
+-- not a consequence of the walk.
+--
+-- THE CONDITIONING IS EARNED AND NOT CONVENIENT.  The unconditioned
+-- step is refuted in this module's own header, twice, so what stands
+-- here is the true statement replacing a false one; the width is the
+-- axis those refutations move, and the store is the axis the first of
+-- them moves.
+mutual
+  walkSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
+    (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
+  walkSzOK S W k sf gas id now root           vals fin sched st = ⊤
+  walkSzOK S W k sf gas id now (share-sink i) vals fin sched st =
+    dispatchSzOK S W k sf gas id now i vals fin sched st
+  walkSzOK S W k sf gas id now (f ↠ p)        vals fin sched st =
+    (length vals ≤ W)
+    × walkSzOK S W (k + szCount f vals) sf gas id now p
+        (proj₁ (stepFrame sf id now f p vals fin sched st))
+        (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
+        (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))
+
+  -- one level of the dispatch telescope; the spent arm owes nothing
+  dispatchSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  dispatchSzOK {t = t} S W k sf zero      id now i vals fin sched st = ⊤
+  dispatchSzOK {t = t} S W k sf (suc gas) id now i vals fin sched st =
+    shareGoSzOK {t = t} S W k sf gas id now i vals fin
+      (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
+
+  -- the fold, entry by entry and at the state each leaves: a cancelled
+  -- registration owes nothing, a delivered one owes the table reading
+  -- its own walk enters at and that walk's own width receipts
+  shareGoSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (ps : List (RegId × Path Γ (lookup Γ i) t))
+    (sched : Sched Γ) (st : EvalSt e) → Set
+  shareGoSzOK S W k sf gas id now i vals fin [] sched st = ⊤
+  shareGoSzOK {t = t} S W k sf gas id now i vals fin ((rid , p) ∷ ps) sched st =
+    if any (_≡ᵇ rid) (EvalSt.cancelled st)
+    then shareGoSzOK {t = t} S W k sf gas id now i vals fin ps sched st
+    else ((all (λ kv → boundedNode (iterSize S k S) (proj₂ kv))
+                (EvalSt.nodes st) ≡ true)
+      × walkSzOK S W k sf gas id now p vals fin sched
+          (record st { delivered = rid ∷ EvalSt.delivered st })
+      × shareGoSzOK {t = t} S W k sf gas id now i vals fin ps
+          (proj₁ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st }))))
+          (proj₂ (proj₂ (foldPath sf gas id now (toℕ i) p vals
+            (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
+            (record st { delivered = rid ∷ EvalSt.delivered st })))))
 
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the

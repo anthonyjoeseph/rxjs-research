@@ -64,7 +64,7 @@ open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; F
   NodeId; setNode; installNode;
   NodeState; scan-st; take-st; mergeAll-st; switch-st; exhaust-st; LiveSource; Sched; EvalSt;
   Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive; register;
-  arrSource; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ)
+  arrSource; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cutThrough; pathHasNode)
 open import Data.Maybe using (Maybe; nothing)
 open import Rx.Prim using (Source)
 open import Data.Fin using (Fin; toℕ)
@@ -314,6 +314,25 @@ shareAdmit-nest {Γ = Γ} i ((rid , s , (u , p)) ∷ r)
 ... | false | _        = ≤-trans (shareAdmit-nest i r) (m≤n⊔m (pathNestD p) (regsNestMax r))
 ... | true  | no  _    = ≤-trans (shareAdmit-nest i r) (m≤n⊔m (pathNestD p) (regsNestMax r))
 ... | true  | yes refl = ⊔-mono-≤ ≤-refl (shareAdmit-nest i r)
+
+-- AND A CUT IS A SELECTION READ THE OTHER WAY.  A sever keeps every
+-- registration whose chain does NOT pass through the node, so what
+-- survives is a sublist of what it was handed and the fold over it is
+-- under the fold it started at.  The closes and the victims' ids are
+-- the cut's other two products and neither is anything this measure
+-- reads, so the same skip-or-keep induction closes it.
+--
+-- TWIN: `shareAdmit-nest`
+cutThrough-nest : ∀ {n} {Γ : Ctx n} {t}
+  (nid : NodeId) (d : List RegId) (wm : RegId) (dy : List Source)
+  (rs : List (RegId × Source × Chain Γ t)) →
+  regsNestMax (proj₁ (cutThrough nid d wm dy rs)) ≤ regsNestMax rs
+cutThrough-nest nid d wm dy [] = z≤n
+cutThrough-nest nid d wm dy ((rid , s , (u , p)) ∷ r)
+  with pathHasNode nid p
+... | true  = ≤-trans (cutThrough-nest nid d wm dy r)
+                      (m≤n⊔m (pathNestD p) (regsNestMax r))
+... | false = ⊔-mono-≤ ≤-refl (cutThrough-nest nid d wm dy r)
 
 storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
   Sched Γ → EvalSt e → ℕ

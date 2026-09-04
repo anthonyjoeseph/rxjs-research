@@ -51,8 +51,6 @@ open import Probed.PushVals-Caps
          burstsM≡; burstsS≡; burstsX≡; burstsSh≡; burstsShS≡; burstsShX≡;
          burstsG≡; burstsA≡;
          tieM; tieS; tieX)
-open import Probed.Chain-Step-Abs-Charge
-  using (figures≡; fits; figuresB≡; fitsB; tieFigs≡; tieNodes1; tieNodes3)
 open import Probed.Chain-Step-Live-Deferred
   using (figures≡; fits; tieFigs≡; tieLive1; tieLive3)
 open import Probed.Chain-Step-Live-Nest

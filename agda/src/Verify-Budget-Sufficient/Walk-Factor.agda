@@ -11,7 +11,8 @@ open import Data.Bool using (Bool; true; false; _∧_)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
-   *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; ^-distribˡ-+-*; ^-monoʳ-≤; ^-*-assoc)
+   *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤;
+   ^-*-assoc)
 open import Data.Product using (_,_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong)
 
@@ -117,6 +118,19 @@ pathΦF≡ B (from-inner _ _ _ ↠ p) = trans (*-identityˡ (pathΦF B p)) (path
 pathΦF≡ B (thru-outer _ _ ↠ p) =
   trans (cong (2 ^ B *_) (pathΦF≡ B p))
         (sym (^-distribˡ-+-* 2 B (pathΦSz B p)))
+
+-- AND THE FACTOR IS NEVER ZERO, which is what lets a bound stated at a
+-- frame's own arithmetic be read against the potential the path is
+-- charged in: the potential is that arithmetic TIMES this factor, so a
+-- consumer holding the unfactored quantity needs the factor to be at
+-- least one before it may spend the premise.  It is a corollary of the
+-- equation above rather than an induction of its own -- every clause is
+-- a power of two, and the root's `1` is the same reading at exponent
+-- zero.
+pathΦF-pos : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
+  1 ≤ pathΦF B p
+pathΦF-pos B p =
+  ≤-trans (m^n>0 2 (pathΦSz B p)) (≤-reflexive (sym (pathΦF≡ B p)))
 
 -- AND EVERY FRAME'S EXPONENT IS UNDER THE FOLD'S, which is what keeps
 -- the whole path under a single power: the burst factor is the largest

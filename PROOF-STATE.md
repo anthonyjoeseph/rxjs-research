@@ -215,38 +215,34 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FRAME'S OWN MINT, WHERE THREE REFUTATIONS SAY ONE THING.**
-  `stepFrame-nest-nodes`, `stepFrame-nest-regs` and `stepFrame-sz` are
-  what a single frame stores, registers and grows by, each under the
-  potential AND the frame grant, and each already refuted with its
-  premise read ALONE. The refutations agree: the frame's own reading is
-  never the whole payer — the arm that kills each is a scan accumulator
-  or a drained queue the walk's values cannot reach. So this is a
-  restatement leg, and the denomination is the ceiling's own split: room
-  is counted at the depth the frame was ARRIVED at while the traversal
-  under it climbs one down. One commit, because repairing one of the
-  three and not its siblings repairs nothing.
+- **MOVE THE COUNT AT THE CROSSING ARMS — the census is finished and
+  all four are false on ONE quantity.** `szCount` charges a constant
+  where a program that arrived as a VALUE runs; the emission is
+  exponential in that program's syntax and reaches the table only by
+  being stored there, so the same charge repairs both halves. Take the
+  move `map-f` already took: read what runs, here the arriving
+  observables' own `sizeᵉ`. It fits because `iterSize` dominates
+  `2 ^ j`. The leg is the cascade — every level the walk above spends
+  is re-priced by a count that is no longer one.
+
+- **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
+  INSTANTIATION and not a bound.** What the size walk may spend is
+  capped at a cubic in the cap by `walkFac-ch`, proven; what the caps
+  package delivers about a chain's climb is ladder-shaped in every
+  reading the walk supports. Nothing carries the one into the other.
+  Count the frames one chain's subscribe tree installs at concrete
+  programs — and the crossing refutation aims that count, since a
+  frame that subscribes is now known not to be a unit of cost.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
-  and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
-  queue, and the outer frame around it, put on the live list. They are
-  one statement in two positions rather than two statements: the queue
-  the first reads is the queue the burst face has just been proven to
-  bound, so the residue on each is a state quantity and not a width. The
-  first reads zero at every quantity its consumer's residue is built
-  from, so only the cap size pays; the second is already restated at its
-  own size budget with an uncovered region named. Taken after the mint
-  leg because a frame grant repaired there is what both would be read
-  against.
-
-- **THE REGISTRY'S OWN FAN, WHERE THREE ROWS SHARE ONE CAP.**
-  `fan-regsNest`, `fan-regsSz` and `sink-fan-sink` are what an admitted
-  chain's registry costs — its depth, its size, and its escalation past a
-  second hand-over — each read at the PROGRAM's cap and each refuted
-  there. They are one restatement and not three: the entry cap all three
-  are stated at is the Φ pricing's, and taking the walk up to it moves
-  every leaf's exponent at once. One commit, because a cap repaired for
-  one of the three and not for its siblings has repaired nothing.
+  and `stepFrame-nest-live-outer` are what one subscribe out of a
+  merge's queue, and the outer frame around it, put on the live list.
+  One statement in two positions rather than two: the queue the first
+  reads is the queue the burst face is proven to bound, so each
+  residue is a state quantity and not a width. The first reads zero at
+  every quantity its consumer's residue is built from, so only the cap
+  size pays; the second is restated at its own size budget with an
+  uncovered region named. Taken after the count, which re-prices both.
 
 ### The ledger
 
@@ -268,19 +264,32 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
-  step, the frame read at the program's cap and the values at the level.
-  Refuted three ways: no frame reading, the frame read at the level, and the
-  scan arm, which emits the node store that no premise here reads.
-- **`stepFrame-nest-nodes`** (Nodes-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
-  what one frame stores at the nodes map, under the potential AND the frame
-  grant. The premise alone was refuted at the scan arm: the cell holds the
-  accumulator against a budget constant in the burst. The grant is spent at the
-  wrap depth.
-- **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
-  what one frame registers, under the potential AND the frame grant it was
-  handed. The premise alone was refuted by an empty burst: the drain reads the
-  queue, so the walk's values cannot reach it.
+- **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED×2`: both are FALSE. A crossing arm SUBSCRIBES a program that arrived
+  as a value, and a duplication chain emits exponentially in its own syntax
+  against a constant charge — which no polynomial tie between cap and level
+  repairs. The count is what moves.
+- **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
+  FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
+  program's own nodes, and a scan among them stores what that program emitted —
+  `reify` carrying a product value into a term its own size — so the entry
+  table's reading bounds nothing about the residue.
+- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
+  what the drain frame writes at the nodes map. It takes the term OUT of its
+  parent *All's queue, so the cell it rewrites is the one its ledger's ceiling
+  half is stated over rather than one the walk handed it. Nothing has
+  instantiated it.
+- **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`:
+  what the outer frame mints at the nodes map — the *All cell the new
+  subscription hangs from, which did not exist when the walk started, so no
+  reading of the entry table bounds it. Nothing has instantiated it.
+- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED, RECOVERY`: what the drain frame registers. The premise alone was
+  refuted by an empty burst: the drain reads the queue, so the walk's values
+  cannot reach it, and the grant is what must pay.
+- **`stepFrame-nest-regs-outer`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`:
+  what the outer frame registers — the subscribed value's frames over the REST
+  of the path, which is the potential exactly. Nothing has instantiated it.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
@@ -293,6 +302,14 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
+- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: the size
+  walk holding along one chain's path, now asked at the level the caps walk has
+  itself reached rather than flat. The index no longer misses; what is left is
+  the fan-out's own reading, which nothing has instantiated.
+- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: one chain's
+  climb priced per FRAME, and no receipt on the walk funds it — the only
+  reading of an inner subscribe's climb is a LADDER rung, which nothing
+  polynomial in the cap reaches. Nothing has instantiated the climb.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
