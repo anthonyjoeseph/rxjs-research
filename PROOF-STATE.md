@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DRAIN'S FUEL, SPENT WHERE THE FINISH ALREADY CHARGED IT.**
-  `depthFinC` puts a drain one depth UNDER the frame that finishes it,
-  and the ladder drops a rung at exactly one place — a frame — so the
-  walk under a finish runs at `pred d` and the ceiling it carries is a
-  sweep at `pred d`. The `subscribeE-nest` clique read its descent at
-  `d` instead, weakening that `suc` away at the one site that held it,
-  which is why a ceiling the frame's own room can mint was not
-  spendable against it. One commit: the depth premise moves together
-  with the two burst widenings that consume it, or neither side
-  typechecks.
-
 - **THE FRAME'S OWN MINT, WHERE THREE REFUTATIONS SAY ONE THING.**
   `stepFrame-nest-nodes`, `stepFrame-nest-regs` and `stepFrame-sz` are
   what a single frame stores, registers and grows by, each under the
@@ -248,6 +237,15 @@ does not fit is a finding about the shared statement, not about the head.
   own size budget with an uncovered region named. Taken after the mint
   leg because a frame grant repaired there is what both would be read
   against.
+
+- **THE REGISTRY'S OWN FAN, WHERE THREE ROWS SHARE ONE CAP.**
+  `fan-regsNest`, `fan-regsSz` and `sink-fan-sink` are what an admitted
+  chain's registry costs — its depth, its size, and its escalation past a
+  second hand-over — each read at the PROGRAM's cap and each refuted
+  there. They are one restatement and not three: the entry cap all three
+  are stated at is the Φ pricing's, and taking the walk up to it moves
+  every leaf's exponent at once. One commit, because a cap repaired for
+  one of the three and not for its siblings has repaired nothing.
 
 ### The ledger
 
