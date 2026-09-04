@@ -728,10 +728,22 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- KIND.  A `map-f` substitutes into each arriving value independently,
 -- so it pays one rung per node of its own function and the burst does
 -- not enter.  A `scan-f` THREADS, so it pays those rungs ONCE PER
--- arriving value, plus the pairing that precedes each step.  Every
--- other kind computes no value of its own -- a take passes a prefix
--- through, and the two crossing into an inner subscription deliver
--- what they drained -- so one rung covers them.
+-- arriving value, plus the pairing that precedes each step.  A take
+-- computes no value of its own, passing a prefix through, so one rung
+-- covers it.
+--
+-- AND THE TWO CROSSING ARMS ARE WRONG AT ONE RUNG, WHICH IS WHAT THE
+-- CONSTANT HERE IS.  Neither delivers what it drained: each SUBSCRIBES
+-- a program that arrived at runtime, and running that program's own
+-- synchronous chain is a computation whose emission is exponential in
+-- the program's syntax.  What is owed is a reading of what RUNS, and
+-- the two arms differ on whether they can even take one -- an outer
+-- crossing has the program in its own argument list, an inner one
+-- reaches it only through the store.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross` and
+--   `Refuted.Frame-Step-Size-Cross-Store` -- the constant, at the
+--   value and the store halves respectively.
 szCount : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List (Val Γ s) → ℕ
 szCount (map-f fn)         vals = sizeᵗ fn
 szCount (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
@@ -815,10 +827,19 @@ postulate
   -- FALSE as they stand: the program that runs arrives as a value, so
   -- the count has to read it and a constant cannot.  They are left
   -- standing only until the count moves, since raising it re-prices
-  -- every level the walk above them spends.
+  -- every level the walk above them spends -- and the re-pricing is
+  -- the expensive half, since the ceiling the count is spent against
+  -- reads the program and the count would read the level.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
+  -- DEAD ROUTE: charging the inner arm the size of its own arriving
+  --   values is STRUCTURALLY dead, and not merely too weak.  What the
+  --   inner arm subscribes is what the `*All` node has PARKED, so it
+  --   is in the store and not in `vals` -- the drain runs a program
+  --   this statement's arguments do not mention, and no reading of
+  --   `vals` is a reading of it.  A count for this arm has to be a
+  --   function of the state, which the outer arm's repair is not.
   stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
@@ -1002,6 +1023,22 @@ stepFrame-sz-store sf id now (thru-outer op nid) path vals fin sched st S B
 -- uniform ceiling is a width times a size -- and the width is exactly
 -- what `burstsOK` carries along a path, frame by frame, in the shape
 -- this walk carries its size receipt.
+--
+-- AND THIS IS WHERE THE CROSSING ARMS' REPAIR HAS TO LAND, RATHER
+-- THAN AT THE FRAME.  Charging a crossing frame the size of what it
+-- subscribes is plausible one line up; it is impossible here.  Both
+-- quantities the ceiling is denominated in read the PROGRAM, the
+-- frame's own size test is `true` on a crossing arm and so ties
+-- nothing, and the arriving observable is a runtime value bounded
+-- only by the LEVEL.  The ceiling is quadratic in the cap while the
+-- level is the caps recurrence, so the gap widens with the cap
+-- instead of closing.  A count that reads what runs therefore forces
+-- the frame ceiling itself to move, and with it the level budget the
+-- consumer concludes at.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the size-reading
+--   count against this ceiling, at the level one rung above the cap
+--   and the width the consumer passes.
 frameCh : ℕ → ℕ → ℕ
 frameCh S W = W * suc S
 

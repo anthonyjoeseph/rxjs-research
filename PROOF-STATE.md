@@ -215,15 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MOVE THE COUNT AT THE CROSSING ARMS — the census is finished and
-  all four are false on ONE quantity.** `szCount` charges a constant
-  where a program that arrived as a VALUE runs; the emission is
-  exponential in that program's syntax and reaches the table only by
-  being stored there, so the same charge repairs both halves. Take the
-  move `map-f` already took: read what runs, here the arriving
-  observables' own `sizeᵉ`. It fits because `iterSize` dominates
-  `2 ^ j`. The leg is the cascade — every level the walk above spends
-  is re-priced by a count that is no longer one.
+- **SETTLE THE CURRENCY A CROSSING FRAME IS PRICED IN — the count move
+  is refuted at the CEILING, so the previous leg's plan is discarded
+  rather than shrunk.** Reading the arriving observables' own `sizeᵉ`
+  does not fit `frameCh`: both its quantities read the program while
+  the value is bounded only by the level, so the gap widens with the
+  cap. What is not yet known is whether that count makes the FRAME
+  statement true — instantiate `stepFrame-sz`'s outer arm under it at
+  the same duplication chains. Green displaces the whole cost onto the
+  ceiling and names the next leg; red says the level ladder cannot
+  price a nested subscription, a mechanism finding and not a
+  restatement.
 
 - **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
   INSTANTIATION and not a bound.** What the size walk may spend is
@@ -231,8 +233,9 @@ does not fit is a finding about the shared statement, not about the head.
   package delivers about a chain's climb is ladder-shaped in every
   reading the walk supports. Nothing carries the one into the other.
   Count the frames one chain's subscribe tree installs at concrete
-  programs — and the crossing refutation aims that count, since a
-  frame that subscribes is now known not to be a unit of cost.
+  programs. And the two legs have converged: `chAt` is `frameCh` at the
+  cap in both arguments, which is the very ceiling the crossing count
+  is now refuted against, so whatever re-denominates one re-prices both.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a
@@ -265,10 +268,10 @@ does not fit is a finding about the shared statement, not about the head.
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×2`: both are FALSE. A crossing arm SUBSCRIBES a program that arrived
-  as a value, and a duplication chain emits exponentially in its own syntax
-  against a constant charge — which no polynomial tie between cap and level
-  repairs. The count is what moves.
+  `REFUTED×2, DEAD ROUTE×2`: both are FALSE. A crossing arm SUBSCRIBES a
+  program that arrived as a value, and a duplication chain emits exponentially
+  against a constant charge. The size-reading count answering that is itself
+  refuted at the frame ceiling, so both move together.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
   program's own nodes, and a scan among them stores what that program emitted —

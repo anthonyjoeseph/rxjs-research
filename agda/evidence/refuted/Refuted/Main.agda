@@ -197,6 +197,8 @@ open import Refuted.Frame-Step-Size-Cross-Store
   using (StepFrameSzStoreOuter; StepFrameSzStoreInner; figures≡;
          nodes₀; prem₀; nodesQ; premQ;
          stepFrame-sz-store-outer-absurd; stepFrame-sz-store-inner-absurd)
+open import Refuted.Frame-Step-Size-Cross-Count
+  using (CrossCountCh; figures≡; prem; count≡; cross-count-ch-absurd)
 open import Refuted.Chain-Step-Regs-Cap
   using (ChainStepRegsSz; figures≡; regLens≡; premSz; premPath; premReg;
          row≡false; chain-step-regs-cap-absurd)
