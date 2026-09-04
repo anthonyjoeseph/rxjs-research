@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CAPS SIDE OF THE SAME HEAD.** `walk-frame-drain-inner` is the
-  `from-inner` frame's caps receipt, the only frame that names a node, and
-  both of its denominations are closed to instantiation — the cap does not
-  return and the climb bound is sealed. It is taken AFTER the ring
-  deliberately: the burst face at this head is now proven end to end, so
-  the queue fold and the per-inner room are both in hand, and a caps
-  receipt that can borrow either is a different row from one that cannot.
-  What it must not borrow is the SIZE: the park receipt prices an entry
-  against the frame's cap with the telescope already subtracted, and the
-  caps side is denominated in the cap itself.
+- **THE CAPS SIDE OF THE SAME HEAD, AND WHAT IT STILL OWES IS THE ROOF.**
+  `walk-frame-drain-inner` is the `from-inner` frame's caps receipt, the only
+  frame that names a node. Its per-entry conjuncts are now all readable off
+  what the frame holds — the park and width fields at the frame's level, the
+  closure key one level up, where one frame step absorbs the telescope's
+  ratio — so what remains is what no field carries: the wrapper's `CeilD` at
+  the frame's level, which nothing mints from the walk's `Reached` relation,
+  and the per-entry climb witness in the sweep currency. The next commit is
+  the bridge from reached level to ceiling, stated as its own leaf under a
+  real body for this head, so the remaining gap is a ceiling statement.
 
 - **THE FRAME'S OWN MINT, WHERE THREE REFUTATIONS SAY ONE THING.**
   `stepFrame-nest-nodes`, `stepFrame-nest-regs` and `stepFrame-sz` are

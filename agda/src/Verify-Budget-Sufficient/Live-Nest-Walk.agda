@@ -56,7 +56,8 @@ open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; nestUnit; sweepLive-nest)
 open import Verify-Budget-Sufficient.Caps
   using (Caps; frameStep; sizeCount; frameStep-mono-j)
-open import Verify-Budget-Sufficient.Nest-Walk using (FaceOK; faceHere; capsDrainOK)
+open import Verify-Budget-Sufficient.Nest-Walk
+  using (FaceOK; faceHere; capsDrainOK; nestValOK?-widen)
 open import Verify-Budget-Sufficient.Nest-Ceiling using (ceil-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; drainW-here; drainW-tail)
@@ -66,7 +67,7 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; stepFrame-nest-Φ;
   stepFrame-nest-regs; foldPath-nest-regs)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; capsOK?; nestValOK?; nestClosOK?)
+  using (pathSz?; capsOK?; nestValOK?; nestClosOK?; capsOK?-mono)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using (pathSz?-⊑)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (foldPath-slots)
 
@@ -358,15 +359,24 @@ mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
   r₀    = proj₁ tailΣ
   step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (m≤m+n Lv r₀)
 
-  SUB₀ = subscribeInner-nest-live c sl d W Lv G B U sf mergeAllᵒ allNid κ id now
+  -- the head is subscribed one level up, where its closure key is
+  -- stated; the other five premises widen onto that frame by the
+  -- step's own monotonicity
+  stepʰ = frameStep-mono-j c (FaceOK.fSize faceHere) (n≤1+n Lv)
+
+  SUB₀ = subscribeInner-nest-live c sl d W (suc Lv) G B U sf mergeAllᵒ allNid κ id now
            o sched st
-           (proj₁ hcdA) (proj₁ (proj₂ hcdA)) (proj₁ (proj₂ (proj₂ hcdA)))
+           (proj₁ hcdA)
+           (capsOK?-mono (frameStep Lv c) (frameStep (suc Lv) c) sched st stepʰ
+              (proj₁ (proj₂ hcdA)))
+           (nestValOK?-widen (obs _) o stepʰ (proj₁ (proj₂ (proj₂ hcdA))))
            (proj₁ (proj₂ (proj₂ (proj₂ hcdA))))
-           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))
-           (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
+           (≤-trans (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))) (proj₁ stepʰ))
+           (≤-trans (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
+                    (proj₁ (proj₂ stepʰ)))
            (≤-trans (drainW-here sf allNid κ id now o q sched st) hw)
            (≤-trans (m≤m⊔n _ _) hd)
-           hpk hpl hu
+           (pathSz?-⊑ κ stepʰ hpk) (≤-trans hpl (proj₁ stepʰ)) hu
 
   IH₀ = mergeAllDrain-nest-live c sl d W (Lv + r₀) G B U sf allNid κ id now lim
           (if done then act else suc act) q sched₁ st₁
