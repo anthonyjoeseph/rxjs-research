@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN DOOR'S LEDGER IS PINNED AT BOTH ENDS, so the next product
-  is a machine refutation and not a bound.** `subscribeInner-caps`
-  reports an inner subscribe's own climb at `sLvlD`, a ladder rung, and
-  one rung already puts a whole size cap under it — while `walkFac-ch`
-  under `nestΦAt` caps what the size walk may SPEND at a cubic in that
-  cap. Both sides are proven, so the contradiction is stateable in
-  `agda/evidence/refuted/` rather than argued in a header. Write it;
-  then the door's entry cap is redesigned to stop reading the caps
-  level at all, rather than to read it more cheaply.
+- **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so the next product is an
+  INSTANTIATION and not a bound.** What the size walk may spend is
+  capped at a cubic in the cap by `walkFac-ch`, proven; what the caps
+  package delivers about a chain's climb is ladder-shaped in every
+  reading the walk supports (`subscribeInner-caps` reports an inner
+  subscribe at `sLvlD`). Nothing carries the one into the other, and no
+  upper bound on either side decides which the climb IS. Count the
+  frames one chain's subscribe tree installs at concrete programs —
+  `chain-climb-ch` is the tier's top row and nothing has reached it.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -309,9 +309,9 @@ does not fit is a finding about the shared statement, not about the head.
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: one chain's
-  climb priced per FRAME, refuted by the walk's own receipt — an inner
-  subscribe climbs by a LADDER rung, which nothing polynomial in the cap
-  bounds. The repair is the door's entry cap, not a tighter price here.
+  climb priced per FRAME, and no receipt on the walk funds it — the only
+  reading of an inner subscribe's climb is a LADDER rung, which nothing
+  polynomial in the cap reaches. Nothing has instantiated the climb.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

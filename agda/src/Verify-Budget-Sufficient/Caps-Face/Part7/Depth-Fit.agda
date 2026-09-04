@@ -2058,25 +2058,29 @@ postulate
 -- absolute ceiling is not a per-chain increment, which is why this is
 -- stated rather than projected out of the package.
 --
--- AND THE POLYNOMIAL IS REFUTED BY THE WALK'S OWN RECEIPT, which is
--- what this row carries now in place of a route.  The climb is not the
--- outer chain's frames: a `thru-outer` frame SUBSCRIBES an inner per
--- payload, and `subscribeInner-caps` reports that subscribe's own climb
--- at `sLvlD` -- a LADDER rung, off the inner's depth and budget.  One
+-- AND NO RECEIPT ON THE WALK FUNDS THE POLYNOMIAL, which is what this
+-- row carries in place of a route.  The climb is not the outer chain's
+-- frames: a `thru-outer` frame SUBSCRIBES an inner per payload, and the
+-- only receipt on that subscribe's own climb, `subscribeInner-caps`,
+-- reports it at `sLvlD` -- a LADDER rung.  That refutes nothing, since
+-- an upper bound is not a lower one, and it funds nothing either: one
 -- rung already puts a whole size cap under it (`dLvl-gain-sizeAt`), so
--- nothing polynomial in the cap bounds a climb containing one, and
--- `suc (pathLen path) * chAt` counts one storey of a loop whose two
--- charges are mutually recursive -- measured in the `fCharge` block of
--- `Rx.Evaluator`, whose entry-cap reading is separately refuted by
--- `Refuted.Caps-Face.caps-frame-boundary-absurd`.
+-- weakening through it cannot land inside anything polynomial in the
+-- cap.  What the conclusion counts is a storey of the mutually
+-- recursive frame/subscribe loop the `fCharge` block of `Rx.Evaluator`
+-- measures, for which that block records no closed form -- while
+-- charging at the ENTRY cap, which is what `chAt` does, is separately
+-- refuted by `Refuted.Caps-Face.caps-frame-boundary-absurd`.
 --
--- SO BOTH ENDS OF THE DOOR'S LEDGER ARE PINNED, which is the finding
--- rather than this row alone.  The caps level a cascade reaches is a
--- ladder quantity in every reading the walk supports, while what the
--- size walk may SPEND is capped at a cubic in the cap by `walkFac-ch`
--- under `nestΦAt`.  No ledger denominated in `chAt` spans the two, so
--- the repair is not a tighter bound here but an entry cap for the size
--- walk that stops reading the caps level at all.
+-- SO THE DOOR'S LEDGER HAS NO SOURCE, which is the finding rather than
+-- this row alone.  What the size walk may SPEND is capped at a cubic in
+-- the cap by `walkFac-ch` under `nestΦAt`, and that half is proven;
+-- what the caps package DELIVERS about a chain's climb is ladder-shaped
+-- in every reading the walk supports.  Nothing carries the one into the
+-- other.  So the move owed is not a tighter bound but an
+-- instantiation: count the frames one chain's subscribe tree actually
+-- installs at a concrete program, and learn which of the two the climb
+-- is, before either side is grasped at again.
 --
 -- DEAD ROUTE: restating the increment as the ABSOLUTE ceiling the caps
 --   package hands back -- `sizeCount c d ⊔ cSize c`, which is what the
