@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FRAME'S OWN MINT, SPLIT BY FRAME KIND.** `stepFrame-nest-regs`
-  and `stepFrame-sz` are what a single frame registers and grows by,
-  each under the potential AND the frame grant, and each refuted with
-  its premise read ALONE. The nodes row went first, and the plan it was
-  taken under is DEAD: no restatement was needed and no denomination
-  moved. Split by KIND, four of the five arms pay nothing the walk
-  cannot already see, and the grant the registry arm was carrying
-  anyway covers the fifth — what survived is two leaves, at the two
-  frames that MINT a cell. Do the same to these two: assemble over the
-  kinds and keep only the arms the grant misses.
+- **THE SIZE STEP, WHERE THE KIND SPLIT STOPS.** `stepFrame-sz` is what
+  one frame grows by, and the split that retired the nodes and registry
+  rows to two *All leaves apiece does NOT reach it: its scan arm emits
+  the NODE STORE, and no premise in the statement reads a store at all,
+  so there is no arm to discharge and no grant to widen — the refutation
+  at that arm is a refutation of the SHAPE. What it owes is a store
+  premise at the `scan-st` the arm looks up, threaded from where the walk
+  can supply it, which restates the statement and every site consuming
+  it. State the conditioned form, then re-read all three refutations
+  against it — two of them are about the unconditioned reading.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -280,10 +280,13 @@ does not fit is a finding about the shared statement, not about the head.
   what the outer frame mints at the nodes map — the *All cell the new
   subscription hangs from, which did not exist when the walk started, so no
   reading of the entry table bounds it. Nothing has instantiated it.
-- **`stepFrame-nest-regs`** (Regs-Nest-Walk) — FALSITY, `REFUTED, RECOVERY`:
-  what one frame registers, under the potential AND the frame grant it was
-  handed. The premise alone was refuted by an empty burst: the drain reads the
-  queue, so the walk's values cannot reach it.
+- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED, RECOVERY`: what the drain frame registers. The premise alone was
+  refuted by an empty burst: the drain reads the queue, so the walk's values
+  cannot reach it, and the grant is what must pay.
+- **`stepFrame-nest-regs-outer`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`:
+  what the outer frame registers — the subscribed value's frames over the REST
+  of the path, which is the potential exactly. Nothing has instantiated it.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

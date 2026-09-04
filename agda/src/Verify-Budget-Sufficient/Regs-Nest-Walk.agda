@@ -35,7 +35,8 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs)
+open import Relation.Nullary using (yes; no)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
@@ -48,7 +49,7 @@ open import Verify-Budget-Sufficient.Nest-Walk
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures using (thruWrap-vals; takeVals-all; pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (regsNestMax; nest-inflate; dropSource-nest; nestUnit)
+  using (regsNestMax; nest-inflate; dropSource-nest; nestUnit; cutThrough-nest)
 open import Verify-Budget-Sufficient.Caps using (Caps; frameStep; sizeCount)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
@@ -176,33 +177,116 @@ FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st =
     ValsFit k (Sched.slots sched) G path vals
     × (pathΦF B path * (G + pathΦD B path) ≤ U)
 
+-- THE THREE FRAMES THAT REGISTER NOTHING, each for its own reason and
+-- none of them the potential's.  A map returns the state it was
+-- handed; a scan rewrites the node table and nothing else, whichever
+-- branch the accumulator's type test takes; and a take either passes
+-- the prefix through or CUTS, and a cut keeps a sublist of the
+-- registry it was handed.  So the registry the walk leaves is under
+-- the one it entered on, with no budget spent at all -- which is what
+-- lets the three arms be read off the entry registry instead of off a
+-- premise the drain's counterexample shows they cannot have.
+abstract
+  stepFrame-regs-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sf : Gas) (id : Id) (now : Tick) (fn : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (nid : NodeId) (p : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (scan-f fn nid) p vals fin sched st in
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+      ≤ regsNestMax (EvalSt.registry st)
+  stepFrame-regs-scan {u = u} sf id now fn nid p vals fin sched st
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing                    = ≤-refl
+  ... | just (take-st _)           = ≤-refl
+  ... | just (mergeAll-st _ _ _ _) = ≤-refl
+  ... | just (switch-st _ _)       = ≤-refl
+  ... | just (exhaust-st _ _)      = ≤-refl
+  ... | just (scan-st {w} a) with w ≟ᵗ u
+  ...   | no _     = ≤-refl
+  ...   | yes refl = ≤-refl
+
+  stepFrame-regs-take : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (nid : NodeId) (p : Path Γ s t)
+    (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    let r = stepFrame sf id now (take-f nid) p vals fin sched st in
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+      ≤ regsNestMax (EvalSt.registry st)
+  stepFrame-regs-take sf id now nid p vals fin sched st
+    with lookupNode nid (EvalSt.nodes st)
+  ... | nothing                    = ≤-refl
+  ... | just (scan-st _)           = ≤-refl
+  ... | just (mergeAll-st _ _ _ _) = ≤-refl
+  ... | just (switch-st _ _)       = ≤-refl
+  ... | just (exhaust-st _ _)      = ≤-refl
+  ... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+  ...   | true  = cutThrough-nest nid (EvalSt.delivered st) (EvalSt.regWatermark st)
+                                  (EvalSt.dying st) (EvalSt.registry st)
+  ...   | false = ≤-refl
+
 postulate
-  -- ONE FRAME'S REGISTRATIONS, under the potential it was handed.  The
-  -- charge is the potential rather than the frame's own size because
-  -- what a `thru-outer` mints is the subscribed value's frames over the
-  -- rest of the path, which is the potential exactly.
-  --
-  -- AND THE FRAME GRANT IS CARRIED, because `valsΦ?` alone is FALSE
-  -- here.  The drain frame takes its payload out of the *All node's
-  -- queue rather than out of the burst, so a completion walk clears the
-  -- premise by computation at every budget -- `all` over an empty list
-  -- -- and still subscribes a queued term, appending a registration
-  -- whose path carries the fresh `thru-outer` frame.  The grant is the
-  -- one the potential's own arm already takes, and taking the same one
-  -- is what keeps the two faces discharged from a single fit.
+  -- THE DRAIN FRAME'S OWN REGISTRATIONS, and this is the arm the
+  -- counterexample lands at.  A `from-inner` takes its payload out of
+  -- the *All node's queue rather than out of the burst, so a completion
+  -- walk clears `valsΦ?` by computation at every budget -- `all` over
+  -- an empty list -- and still subscribes a queued term, appending a
+  -- registration whose path carries a fresh `thru-outer` frame.  The
+  -- grant is what has to pay, and it is the one the potential's own arm
+  -- already takes.
   --
   -- REFUTED: Refuted.Drain-Regs-Nest
   -- RECOVERY: git show f38a902:agda/evidence/probed/Probed/Chain-Step-Regs-Rootward.agda
   --   restores a rootward-stacking program and its readings.
-  stepFrame-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  stepFrame-nest-regs-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+    (path : Path Γ s t)
     (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
     (B U : ℕ) →
-    valsΦ? B U (f ↠ path) vals ≡ true →
-    FrameΦHyp sf id now B U f path vals fin sched st →
-    regsNestMax (EvalSt.registry
-      (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    valsΦ? B U (from-inner op allNid inst ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (from-inner op allNid inst) path vals fin sched st →
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame sf id now (from-inner op allNid inst) path vals fin sched st))))))
       ≤ regsNestMax (EvalSt.registry st) ⊔ U
+
+  -- THE OUTER FRAME'S OWN, which is where the potential is the right
+  -- charge rather than the frame's size: what a `thru-outer` registers
+  -- is the subscribed value's frames over the REST of the path, and
+  -- that is the potential exactly.
+  stepFrame-nest-regs-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+    (path : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+    (B U : ℕ) →
+    valsΦ? B U (thru-outer op nid ↠ path) vals ≡ true →
+    FrameΦHyp sf id now B U (thru-outer op nid) path vals fin sched st →
+    regsNestMax (EvalSt.registry (proj₂ (proj₂ (proj₂ (proj₂
+      (stepFrame sf id now (thru-outer op nid) path vals fin sched st))))))
+      ≤ regsNestMax (EvalSt.registry st) ⊔ U
+
+-- ONE FRAME'S REGISTRATIONS, under the potential it was handed and the
+-- frame grant beside it.  Only the two *All frames register at all, so
+-- the other three arms spend neither premise: they are read off the
+-- entry registry, which is the join's own left half.
+stepFrame-nest-regs : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (B U : ℕ) →
+  valsΦ? B U (f ↠ path) vals ≡ true →
+  FrameΦHyp sf id now B U f path vals fin sched st →
+  regsNestMax (EvalSt.registry
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
+    ≤ regsNestMax (EvalSt.registry st) ⊔ U
+stepFrame-nest-regs sf id now (map-f fn) path vals fin sched st B U _ _ =
+  m≤m⊔n (regsNestMax (EvalSt.registry st)) U
+stepFrame-nest-regs sf id now (scan-f fn nid) path vals fin sched st B U _ _ =
+  ≤-trans (stepFrame-regs-scan sf id now fn nid path vals fin sched st)
+          (m≤m⊔n (regsNestMax (EvalSt.registry st)) U)
+stepFrame-nest-regs sf id now (take-f nid) path vals fin sched st B U _ _ =
+  ≤-trans (stepFrame-regs-take sf id now nid path vals fin sched st)
+          (m≤m⊔n (regsNestMax (EvalSt.registry st)) U)
+stepFrame-nest-regs sf id now (from-inner op allNid inst) path vals fin sched st B U hΦ hF =
+  stepFrame-nest-regs-inner sf id now op allNid inst path vals fin sched st B U hΦ hF
+stepFrame-nest-regs sf id now (thru-outer op nid) path vals fin sched st B U hΦ hF =
+  stepFrame-nest-regs-outer sf id now op nid path vals fin sched st B U hΦ hF
 
 -- ONE MAP FRAME, and it is the clause the additive reading died at.  A
 -- step function may name its payload on both sides of an additive
