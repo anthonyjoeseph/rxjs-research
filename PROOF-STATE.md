@@ -215,23 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **FINISH THE CENSUS OF THE CROSSING ARMS BEFORE THE COUNT MOVES.**
-  The two VALUE arms are now refuted; the two STORE siblings are not,
-  and they are the other half of one denominator. Instantiate them on
-  the apparatus that killed the value pair — a duplication chain
-  subscribed through a merge node — and learn whether a crossing arm
-  can grow the TABLE past its entry reading, or only the emission.
-  Taken first because the repair below moves one count for all four,
-  and a count decided on half the census is decided twice.
-
-- **MOVE THE COUNT AT THE CROSSING ARMS.** `szCount` charges a
-  constant where a program that arrived as a VALUE runs, which is why
-  the arms are false; the repair is the one `map-f` already took —
-  read what runs, here the arriving observables' own `sizeᵉ`. It fits
-  because `iterSize` dominates `2 ^ j`, so a count in the subscribed
-  program's size buys back a duplication blowup outright. The cost is
-  the cascade: every level the walk above spends is re-priced, and
-  that is the leg.
+- **MOVE THE COUNT AT THE CROSSING ARMS — the census is finished and
+  all four are false on ONE quantity.** `szCount` charges a constant
+  where a program that arrived as a VALUE runs; the emission is
+  exponential in that program's syntax and reaches the table only by
+  being stored there, so the same charge repairs both halves. Take the
+  move `map-f` already took: read what runs, here the arriving
+  observables' own `sizeᵉ`. It fits because `iterSize` dominates
+  `2 ^ j`. The leg is the cascade — every level the walk above spends
+  is re-priced by a count that is no longer one.
 
 - **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
   INSTANTIATION and not a bound.** What the size walk may spend is
@@ -241,6 +233,16 @@ does not fit is a finding about the shared statement, not about the head.
   Count the frames one chain's subscribe tree installs at concrete
   programs — and the crossing refutation aims that count, since a
   frame that subscribes is now known not to be a unit of cost.
+
+- **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
+  and `stepFrame-nest-live-outer` are what one subscribe out of a
+  merge's queue, and the outer frame around it, put on the live list.
+  One statement in two positions rather than two: the queue the first
+  reads is the queue the burst face is proven to bound, so each
+  residue is a state quantity and not a width. The first reads zero at
+  every quantity its consumer's residue is built from, so only the cap
+  size pays; the second is restated at its own size budget with an
+  uncovered region named. Taken after the count, which re-prices both.
 
 ### The ledger
 
@@ -268,9 +270,10 @@ does not fit is a finding about the shared statement, not about the head.
   against a constant charge — which no polynomial tie between cap and level
   repairs. The count is what moves.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `NO EVIDENCE`: the same two arms at the nodes map. A crossing
-  rewrites the parent *All's cell rather than one the walk handed it, so the
-  entry table's reading is not what bounds the residue.
+  FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
+  program's own nodes, and a scan among them stores what that program emitted —
+  `reify` carrying a product value into a term its own size — so the entry
+  table's reading bounds nothing about the residue.
 - **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
   what the drain frame writes at the nodes map. It takes the term OUT of its
   parent *All's queue, so the cell it rewrites is the one its ledger's ceiling

@@ -894,11 +894,14 @@ stepWiden S B k 2≤S ns h =
   nodesSz-widen (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S) k B) ns h
 
 -- THE STORE SIDE OF THE SAME STEP, and the reason the walk can carry
--- its own store premise rather than importing one: a frame writes at
--- most the entry it read, and the only entry whose content GREW is the
--- scan's, which `scanVals-size` prices at the very level the outputs
--- landed at.  Everything else either leaves the table alone or writes a
--- take counter, which the reading is blind to.
+-- its own store premise rather than importing one: at the three arms
+-- that compute, a frame writes at most the entry it read, and the only
+-- entry whose content GREW is the scan's, which `scanVals-size` prices
+-- at the very level the outputs landed at.  Everything else either
+-- leaves the table alone or writes a take counter, which the reading is
+-- blind to.  The two crossing arms are NOT in that description: their
+-- subscription installs the inner program's own nodes, so the table
+-- the conclusion is about is not the table the premise read.
 stepFrame-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
@@ -911,8 +914,16 @@ stepFrame-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     ≡ true
 
 postulate
-  -- the two frames whose step runs a whole inner subscription, so the
-  -- table they leave is not the one they read
+  -- THE STORE HALVES OF THE SAME TWO FRAMES, and both are FALSE for
+  -- the same reason their value halves are: a scan installed by the
+  -- subscription stores what the subscription emitted, and `reify`
+  -- carries a product value into a term of its own size.  So the
+  -- quantity that has to be charged is one, and it reaches the table
+  -- only by being written there.  Left standing only until the count
+  -- moves, since raising it re-prices every level the walk spends.
+  --
+  -- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-inner-absurd`
+  --   and `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-outer-absurd`.
   stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
