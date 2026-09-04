@@ -630,10 +630,14 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- NODE STORE.  A `scan-f` answers with its accumulator, fetched out of
 -- `EvalSt.nodes`, and its own syntax may be a projection that hands
 -- that accumulator straight back -- so the emitted size is the STORED
--- value's, which neither reading here sees.  What is owed is the store
--- reading `stBounded?` already makes at a `scan-st`, threaded through
--- the walk at the level, and the two walks that spend this leaf carry
--- no such premise today.
+-- value's, which neither reading here sees.
+--
+-- AND THE LADDER IS WHAT HAS TO MOVE, NOT THE HYPOTHESIS LIST.  This
+-- conclusion charges a frame exactly one `sizeStep`, which is right for
+-- every arm whose emission is the frame's own function applied to the
+-- walk's own values -- `applyFn` is the only thing that grows a value.
+-- The scan arm is not such an arm, and a store reading tight enough to
+-- pay for it is one nothing in this development can hand over.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Store` -- the scan arm at the
 --   smallest frame there is, against a store the statement quantifies
@@ -647,6 +651,20 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 --   repair it: both factors are then capped at `L`, the emission is
 --   quadratic in `L` and one level is linear in it, and the crossing
 --   arrives at `j = 1` for every `S ≥ 2`.
+-- DEAD ROUTE: conditioning this on a store reading at the level, and
+--   threading that through the walk that spends it, is STRUCTURALLY
+--   dead -- and what kills it is the DIRECTION, not the threading.  The
+--   scan arm emits a stored value into a conclusion capped at the
+--   values' ladder, so it needs the store's cap to sit BELOW that
+--   ladder.  The only levelled store reading this development has is
+--   the caps face's, whose walk advances the level by an EXISTENTIAL
+--   per frame and per fanned entry, budgeted by a step count rather
+--   than by one; that ladder therefore climbs at least as fast as this
+--   one and strictly faster at exactly the storing frames, so the store
+--   cap overtakes the value cap at a chain's second scan.  No premise
+--   fixes a direction, so the repair is to re-denominate the conclusion
+--   onto the existential ladder and let the consumer's own accounting
+--   move with it.
 postulate
   stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)

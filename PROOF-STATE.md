@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIZE STEP, WHERE THE KIND SPLIT STOPS.** `stepFrame-sz` is what
-  one frame grows by, and the split that retired the nodes and registry
-  rows to two *All leaves apiece does NOT reach it: its scan arm emits
-  the NODE STORE, and no premise in the statement reads a store at all,
-  so there is no arm to discharge and no grant to widen — the refutation
-  at that arm is a refutation of the SHAPE. What it owes is a store
-  premise at the `scan-st` the arm looks up, threaded from where the walk
-  can supply it, which restates the statement and every site consuming
-  it. State the conditioned form, then re-read all three refutations
-  against it — two of them are about the unconditioned reading.
+- **THE SIZE READING, ONTO A LADDER THAT CAN CARRY A STORE.**
+  `stepFrame-sz` charges a frame exactly one `sizeStep`, and the arm
+  emitting the node store cannot be paid at that rate. Conditioning it
+  is now a DEAD ROUTE and the route died on DIRECTION, not on threading:
+  the only levelled store reading here is the caps walk's, which climbs
+  by an existential per frame and per fanned entry, so the store's cap
+  overtakes the values' at a chain's second scan and no premise reverses
+  that. So the CONCLUSION moves. Restate it at that walk's own ladder,
+  where the store is already carried at the level, and follow the change
+  into the size-only walk that spends it — whose linear per-hop ledger is
+  the thing the tight rate was buying.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -267,10 +268,10 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: one frame's size
-  step, the frame read at the program's cap and the values at the level.
-  Refuted three ways: no frame reading, the frame read at the level, and the
-  scan arm, which emits the node store that no premise here reads.
+- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE`: one
+  frame's size step, the frame read at the program's cap and the values at the
+  level. Refuted three ways: no frame reading, the frame read at the level, and
+  the scan arm, which emits the node store that no premise here reads.
 - **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
   what the drain frame writes at the nodes map. It takes the term OUT of its
   parent *All's queue, so the cell it rewrites is the one its ledger's ceiling
