@@ -2056,17 +2056,27 @@ postulate
 -- per-frame charge.  The caps package bounds the climb ABSOLUTELY --
 -- a delivery-shaped ceiling every chain's step is held under -- and an
 -- absolute ceiling is not a per-chain increment, which is why this is
--- stated rather than projected out of the package.  Its route is the
--- walk's own recursion: a frame advances the level by its `szCount`,
--- and `szCount≤ch` already prices one of those at `frameCh`.
+-- stated rather than projected out of the package.
 --
--- AND IT IS STATED UNCONDITIONALLY, WHICH IS THE HONEST FORM RATHER
--- THAN A STRONGER ASK.  It carried the package's own ladder bound as a
--- second premise while that bound looked like the route to it; the
--- route below is refuted, and a hypothesis nothing can spend does not
--- make a statement better supported -- it makes it read as supported.
--- The residue is what the claim always was: a chain's climb is priced
--- by its FRAMES, and the frame charge is what prices them.
+-- AND THE POLYNOMIAL IS REFUTED BY THE WALK'S OWN RECEIPT, which is
+-- what this row carries now in place of a route.  The climb is not the
+-- outer chain's frames: a `thru-outer` frame SUBSCRIBES an inner per
+-- payload, and `subscribeInner-caps` reports that subscribe's own climb
+-- at `sLvlD` -- a LADDER rung, off the inner's depth and budget.  One
+-- rung already puts a whole size cap under it (`dLvl-gain-sizeAt`), so
+-- nothing polynomial in the cap bounds a climb containing one, and
+-- `suc (pathLen path) * chAt` counts one storey of a loop whose two
+-- charges are mutually recursive -- measured in the `fCharge` block of
+-- `Rx.Evaluator`, whose entry-cap reading is separately refuted by
+-- `Refuted.Caps-Face.caps-frame-boundary-absurd`.
+--
+-- SO BOTH ENDS OF THE DOOR'S LEDGER ARE PINNED, which is the finding
+-- rather than this row alone.  The caps level a cascade reaches is a
+-- ladder quantity in every reading the walk supports, while what the
+-- size walk may SPEND is capped at a cubic in the cap by `walkFac-ch`
+-- under `nestΦAt`.  No ledger denominated in `chAt` spans the two, so
+-- the repair is not a tighter bound here but an entry cap for the size
+-- walk that stops reading the caps level at all.
 --
 -- DEAD ROUTE: restating the increment as the ABSOLUTE ceiling the caps
 --   package hands back -- `sizeCount c d ⊔ cSize c`, which is what the
@@ -2080,10 +2090,12 @@ postulate
 --   in the caps ladder cannot be spent by the size walk at all.
 postulate
   chain-climb-ch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lc L′ : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sl : Slots Γ) (id : ℕ) (Lc L′ D : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
       nextId a path sched st →
+    Lc + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
+                   (capsH e sl id) Lc (suc D) →
     L′ ≤ suc (pathLen path) * chAt e sl id
 
 chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2345,8 +2357,10 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
   hLc-next : Lc + L′ ≤ (j + suc (pathLen c)) * chAt e sl id
   hLc-next =
     ≤-trans (+-mono-≤ hLc
-              (chain-climb-ch sl id Lc L′ a nextId c sched st₀
-                 (proj₁ (proj₂ hca))))
+              (chain-climb-ch sl id Lc L′ (delivN st₀ (proj₂ (proj₂ r)))
+                 a nextId c sched st₀
+                 (proj₁ (proj₂ hca))
+                 (proj₁ (proj₂ (proj₂ (proj₂ hca))))))
             (≤-reflexive
               (sym (*-distribʳ-+ (chAt e sl id) j (suc (pathLen c)))))
 
@@ -2689,7 +2703,8 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
   hLcCh-next : Lc + proj₁ ST ≤ (j + suc (pathLen path)) * chAt e sl id
   hLcCh-next =
     ≤-trans (+-mono-≤ hLcCh
-              (chain-climb-ch sl id Lc (proj₁ ST) a nextId path sched st′ HEAD))
+              (chain-climb-ch sl id Lc (proj₁ ST) D a nextId path sched st′
+                 HEAD (proj₁ (proj₂ ST))))
             (≤-reflexive
               (sym (*-distribʳ-+ (chAt e sl id) j (suc (pathLen path)))))
 
