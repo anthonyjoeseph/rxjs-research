@@ -17,18 +17,20 @@
 -- with the walk that spends it.
 module Verify-Budget-Sufficient.Fold-Room where
 
-open import Data.Nat using (ℕ; suc; _⊔_; _≤_; s≤s; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _⊔_; _≤_; s≤s; z≤n)
 open import Data.Nat.Properties using
-  (≤-trans; ≤-reflexive; ≤-refl; m≤n+m; n≤1+n; m≤m*n; ⊔-lub)
-open import Relation.Binary.PropositionalEquality using (sym)
+  (≤-trans; ≤-reflexive; ≤-refl; m≤n+m; m≤m+n; n≤1+n; m≤m*n; ⊔-lub; +-suc)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Rx.Exp using (Ctx; Closed)
 open import Rx.Slots using (Slots)
-open import Rx.Evaluator using (iterFold; dLvl; dCapᶜ; sizeAt; widAt; fLvlD; fCharge)
+open import Rx.Evaluator using
+  (iterFold; iterL; dLvl; dCapᶜ; sizeAt; widAt; fLvlD; fCharge)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; capsAt; capsH; sizeCount; fLvl≤fLvlD; iterL-infl; lvls-mono; dLvl-mono; 1≤dCapᶜ;
-   iterSize-infl; 2≤capsAt-size; 1≤capsAt-reg)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (k≤iterSize)
+   iterSize-infl; iterSize-suc; 2≤capsAt-size; 1≤capsAt-reg; iterL-mono; iterFold-mono-count;
+   J+n≤iterL)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (k≤iterSize; pair≤sizeStep)
 open import Verify-Budget-Sufficient.Nest-Ceiling using (Reached; reached-room)
 open import Verify-Budget-Sufficient.Nest-Store using (nestBurstAt; nestBurstAt-def)
 
@@ -95,3 +97,76 @@ reached-len e sl id L P g hR L≤P =
                    (room≤nestBurstAt e sl id))
   where
   c = capsAt e sl id
+
+-- A LADDER STEP COMES OFF THE TOP AS WELL AS THE BOTTOM.  `iterL`
+-- iterates by stepping the level it starts from, so a `suc` reads as
+-- one more step BELOW; the same count is one more step ABOVE, which is
+-- the reading a bound on the last step needs.
+iterL-suc-out : ∀ (S W d k J : ℕ) →
+  iterL S W d (suc k) J ≡ fLvlD S W d (iterL S W d k J)
+iterL-suc-out S W d zero    J = refl
+iterL-suc-out S W d (suc k) J = iterL-suc-out S W d k (fLvlD S W d J)
+
+-- SO A LADDER OF `suc k` STEPS CLEARS THE WIDTH AT `k`, whatever it
+-- starts from: the ladder climbs at least one level per step, so its
+-- first `k` steps already reach `k`, the width at a higher level is
+-- wider, and the last step is a frame charge over that width.
+fold≤iterL : ∀ (S W d k J : ℕ) → 2 ≤ S →
+  iterFold S k W ≤ iterL S W d (suc k) J
+fold≤iterL S W d k J 2≤S =
+  ≤-trans (iterFold-mono-count S W 2≤S
+             (≤-trans (m≤n+m k J) (J+n≤iterL S W d k J)))
+          (≤-trans (n≤1+n (widAt S W (iterL S W d k J)))
+                   (≤-trans (widAt<fLvlD S W d (iterL S W d k J))
+                            (≤-reflexive (sym (iterL-suc-out S W d k J)))))
+
+-- and a DELIVERY is such a ladder, at one over the size of the level
+-- it leaves from -- so it clears the width at every count the size
+-- reaches, which is what a value's own size cap gives at that level.
+fold≤dLvl : ∀ (S W d L k : ℕ) → 2 ≤ S → k ≤ sizeAt S L →
+  iterFold S k W ≤ dLvl S W d L
+fold≤dLvl S W d L k 2≤S hk =
+  ≤-trans (fold≤iterL S W d k L 2≤S)
+          (iterL-mono {d = d} (suc k) (suc (sizeAt S L)) 2≤S ≤-refl ≤-refl ≤-refl (s≤s hk))
+
+-- THE WIDTH AT A VALUE'S OWN SIZE CAP, UNDER THE BURST NUMBER.  This
+-- is `reached-len` read at a size rather than at a level: what a frame
+-- hands on is priced by the level, what it SUBSCRIBES is priced by the
+-- size the caps reading gives that value, and both are counts the
+-- delivery from the walk's level climbs past.
+size-room : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id L P g k : ℕ) →
+  Reached (capsAt e sl id) (capsH e sl id) P (suc g) → L ≤ P →
+  k ≤ sizeAt (Caps.cSize (capsAt e sl id)) L →
+  iterFold (Caps.cSize (capsAt e sl id)) k (Caps.cWid (capsAt e sl id))
+    ≤ nestBurstAt e sl id
+size-room e sl id L P g k hR L≤P hk =
+  ≤-trans (fold≤dLvl (Caps.cSize c) (Caps.cWid c) (capsH e sl id) L k
+             (2≤capsAt-size e sl id) hk)
+          (≤-trans (dLvl≤room c (capsH e sl id) L P g
+                      (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id) hR L≤P)
+                   (room≤nestBurstAt e sl id))
+  where
+  c = capsAt e sl id
+
+-- A LADDER OF AT LEAST ONE STEP CLEARS THE LEVEL IT LEAVES FROM,
+-- STRICTLY.  Every step adds at least one, so a count that is a `suc`
+-- puts the start strictly under the finish -- and at a FRAME arm the
+-- count is `suc (pathLen p)` by construction, so this is what turns a
+-- walk's reached premise into the one-level-up reading the seed bump
+-- below is paid for with.
+suc≤iterL : ∀ (S W d k J : ℕ) → suc J ≤ iterL S W d (suc k) J
+suc≤iterL S W d k J =
+  ≤-trans (≤-trans (s≤s (m≤m+n J k)) (≤-reflexive (sym (+-suc J k))))
+          (J+n≤iterL S W d (suc k) J)
+
+-- AND THE SIZE AT A LEVEL IS STRICTLY UNDER THE SIZE AT THE NEXT.  The
+-- size step at least doubles and adds one, so a count that fits the
+-- size at a level fits the next level's with a step to spare.  That
+-- spare step is exactly what a width read at a SEED one over the caps
+-- width costs: one count step off the top, paid at the level rather
+-- than at the seed.
+sizeAt-strict : ∀ (S J : ℕ) → 1 ≤ S → suc (sizeAt S J) ≤ sizeAt S (suc J)
+sizeAt-strict S J 1≤S =
+  ≤-trans (≤-trans (s≤s (m≤m+n (sizeAt S J) (sizeAt S J)))
+                   (pair≤sizeStep S (sizeAt S J) 1≤S))
+          (≤-reflexive (sym (iterSize-suc S J S)))
