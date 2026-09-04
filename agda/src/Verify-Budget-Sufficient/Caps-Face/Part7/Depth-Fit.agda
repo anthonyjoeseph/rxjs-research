@@ -2059,14 +2059,31 @@ postulate
 -- stated rather than projected out of the package.  Its route is the
 -- walk's own recursion: a frame advances the level by its `szCount`,
 -- and `szCount≤ch` already prices one of those at `frameCh`.
+--
+-- AND IT IS STATED UNCONDITIONALLY, WHICH IS THE HONEST FORM RATHER
+-- THAN A STRONGER ASK.  It carried the package's own ladder bound as a
+-- second premise while that bound looked like the route to it; the
+-- route below is refuted, and a hypothesis nothing can spend does not
+-- make a statement better supported -- it makes it read as supported.
+-- The residue is what the claim always was: a chain's climb is priced
+-- by its FRAMES, and the frame charge is what prices them.
+--
+-- DEAD ROUTE: restating the increment as the ABSOLUTE ceiling the caps
+--   package hands back -- `sizeCount c d ⊔ cSize c`, which is what the
+--   proven chains fold composes across a round.  It is dead on the
+--   AFFORDABILITY side rather than on the composition: the size walk's
+--   level is what `walkFac-ch` must afford under `nestΦAt`, and that
+--   caps the level at a CUBIC in the cap, while one rung of the caps
+--   ladder already exceeds every polynomial in it (`dLvl-gain-sizeAt`
+--   puts a size cap under a single `dLvl`).  So the two ledgers agree
+--   on dimension only in the INCREMENT form, and a ceiling denominated
+--   in the caps ladder cannot be spent by the size walk at all.
 postulate
   chain-climb-ch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lc L′ D : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sl : Slots Γ) (id : ℕ) (Lc L′ : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
       nextId a path sched st →
-    Lc + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
-                   (capsH e sl id) Lc (suc D) →
     L′ ≤ suc (pathLen path) * chAt e sl id
 
 chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2328,10 +2345,8 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
   hLc-next : Lc + L′ ≤ (j + suc (pathLen c)) * chAt e sl id
   hLc-next =
     ≤-trans (+-mono-≤ hLc
-              (chain-climb-ch sl id Lc L′ (delivN st₀ (proj₂ (proj₂ r)))
-                 a nextId c sched st₀
-                 (proj₁ (proj₂ hca))
-                 (proj₁ (proj₂ (proj₂ (proj₂ hca))))))
+              (chain-climb-ch sl id Lc L′ a nextId c sched st₀
+                 (proj₁ (proj₂ hca))))
             (≤-reflexive
               (sym (*-distribʳ-+ (chAt e sl id) j (suc (pathLen c)))))
 
@@ -2674,8 +2689,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
   hLcCh-next : Lc + proj₁ ST ≤ (j + suc (pathLen path)) * chAt e sl id
   hLcCh-next =
     ≤-trans (+-mono-≤ hLcCh
-              (chain-climb-ch sl id Lc (proj₁ ST) D a nextId path sched st′
-                 HEAD (proj₁ (proj₂ ST))))
+              (chain-climb-ch sl id Lc (proj₁ ST) a nextId path sched st′ HEAD))
             (≤-reflexive
               (sym (*-distribʳ-+ (chAt e sl id) j (suc (pathLen path)))))
 

@@ -215,18 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE PER-FRAME PRICE OF A CHAIN'S CLIMB, which is the whole residue
-  the door restatement left standing.** `chain-climb-ch` says one
-  chain's climb is at most a rung per frame plus one, at the per-frame
-  charge — and that is exactly what the cascade's ledger already sets
-  aside, since `chainsLenSum` and `length` together afford
-  `suc (pathLen c)` per chain. What the caps package hands back instead
-  is a delivery-shaped ABSOLUTE ceiling, and an absolute ceiling funds
-  no increment, which is why the row is stated rather than projected.
-  Its route is the walk's own recursion, where `szCount≤ch` already
-  prices a single frame at `frameCh`; the leg is carrying that price
-  across the recursion and instantiating the result before grinding it,
-  since nothing has yet.
+- **THE PER-FRAME PRICE OF A CHAIN'S CLIMB, and the INCREMENT form is
+  the only one left.** `chain-climb-ch` prices one chain's climb at a
+  rung per frame plus one, at the per-frame charge — what `chainsLenSum`
+  and `length` already set aside per chain. The CEILING form the caps
+  package hands back is dead on affordability, recorded in the row's own
+  header, so the row stays stated, and stated unconditionally now that
+  the ladder premise it carried cannot be spent. What remains is the
+  route: the walk's own recursion, where `szCount≤ch` prices one frame
+  at `frameCh`. Instantiate before grinding — the bound side is a blowup
+  cap and does not compute, so the climb is the reachable side, and
+  nothing has reached it.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -307,14 +306,14 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: the size walk
-  holding along one chain's path, now asked at the level the caps walk has
+- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: the size
+  walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
-- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: one chain's
-  climb priced per FRAME rather than against a delivery-shaped ceiling, which
-  is what the cascade's ledger actually sets aside. Nothing has instantiated
-  it, and the package it is projected beside bounds the climb only absolutely.
+- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: one chain's
+  climb priced per FRAME, which is the only currency the size walk can spend —
+  the caps ladder's own ceiling outruns every polynomial the nesting budget
+  affords. Stated unconditionally; nothing has instantiated it.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
