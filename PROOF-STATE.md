@@ -220,11 +220,12 @@ does not fit is a finding about the shared statement, not about the head.
   what a single frame stores, registers and grows by, each under the
   potential AND the frame grant, and each already refuted with its
   premise read ALONE. The refutations agree: the frame's own reading is
-  never the whole payer, and the arm that kills each is the one whose
-  emission the walk's values cannot reach — the scan accumulator, the
-  drained queue. So this is a restatement leg and not a grind, taken as
-  one commit because a denomination that repairs one of the three and not
-  its siblings has not been repaired.
+  never the whole payer — the arm that kills each is a scan accumulator
+  or a drained queue the walk's values cannot reach. So this is a
+  restatement leg, and the denomination is the ceiling's own split: room
+  is counted at the depth the frame was ARRIVED at while the traversal
+  under it climbs one down. One commit, because repairing one of the
+  three and not its siblings repairs nothing.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's

@@ -29,11 +29,11 @@
 -- `Refuted.Scan-Fold-Burst` and `Refuted.Scan-Phi-Burst` cross on what
 -- the frame HANDS ON; both readings can be repaired by a grant over
 -- the values in flight, because the emit is a value in flight.  This
--- one crosses on what the frame LEAVES BEHIND, at a statement carrying
--- no grant of any kind -- its sibling on the registry axis was
--- repaired with a `FrameΦHyp` and this one never was -- so the repair
--- the other two point at does not reach it and the gap is in the
--- signature rather than in the arithmetic.
+-- one crosses on what the frame LEAVES BEHIND, so the repair the other
+-- two point at does not reach it and the gap is in the signature rather
+-- than in the arithmetic.  What is refuted here is the leaf's own
+-- premise read ALONE: whatever grant the leaf carries beside it is what
+-- has to pay for the stored depth, because no reading of `U` can.
 --
 -- WHAT DIES AND WHAT DOES NOT.  The dynamics are untouched: the cell
 -- really does hold sixty-five layers after sixty-five folds, and one
