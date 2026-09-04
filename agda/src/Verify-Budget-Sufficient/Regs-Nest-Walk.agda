@@ -656,16 +656,19 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- the direction finding recorded below, now with the step half of it
 -- discharged one face over rather than merely conjectured.
 --
--- AND THE COUNT IS THE SCAN ARM'S ALONE, which is what keeps the
--- restatement from cascading through the ledger under it.  `scan-f` is
--- the only arm that applies its function in SEQUENCE; `map-f` applies
--- it to each value independently, which is the reading the first
--- paragraph already prices.  The two arms crossing into an inner
--- subscription compute no value at all -- `innerFinish` at a mergeAll
--- APPENDS what it drained, and a concatenation moves no size, only a
--- length.  So the charge owed is one level per arriving value at the
--- scan arm and one level at the others: a split BY FRAME KIND, of the
--- shape the nodes and registry steps beside it already carry.
+-- AND THE COUNT IS NOT THE SCAN ARM'S ALONE, WHICH IS WHERE THE SPLIT
+-- BY FRAME KIND STOPS PAYING.  `scan-f` is the only arm that applies
+-- its function in SEQUENCE, and `map-f` applies it to each value
+-- independently, which is the reading the first paragraph prices.  But
+-- the two arms crossing into an inner subscription do not merely
+-- concatenate what someone else computed: `thruConsume` SUBSCRIBES the
+-- arriving observable and hands back its whole synchronous burst, and
+-- `innerFinish` at a mergeAll drains the node's queue by subscribing
+-- what is parked there.  What runs at those arms is a program that
+-- arrived as a VALUE, so the frame's own syntax says nothing about
+-- what it costs.  The count owed there is the arriving observables'
+-- OWN size -- the same move `map-f` already made, denominated in what
+-- runs rather than in what is written.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Store` -- the scan arm at the
 --   smallest frame there is, against a store the statement quantifies
@@ -685,6 +688,18 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 --   conclusion still fails, because the fold adds a fixed amount per
 --   value while the ceiling is fixed in the burst.  The rows fire at a
 --   `scan-f` and at no other arm.
+-- REFUTED: `Refuted.Frame-Step-Size-Cross` -- the constant charge at
+--   BOTH crossing arms, which is what the split by frame kind left
+--   standing.  `sizeᵉ` at a map adds while `sizeᵛ` at a product
+--   doubles, so a duplication chain of syntax size `3 + 4k` emits at
+--   `2 ^ suc k - 1`; the outer arm dies on the arriving observable and
+--   the inner arm on the same program parked in the node's queue,
+--   where `boundedNode` is what supplies the premise.  The second row
+--   is the one that decides the repair: the cap is tied to the
+--   program's own size and the arm still fails, so no polynomial tie
+--   between `S` and `B` saves a constant count.  The STORE halves are
+--   untouched -- this witness leaves the queue empty and installs no
+--   node -- and neither is evidence for the other.
 -- DEAD ROUTE: conditioning this on a store reading at the level, and
 --   threading that through the walk that spends it, is STRUCTURALLY
 --   dead -- and what kills it is the DIRECTION, not the threading.  The
@@ -796,8 +811,14 @@ stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 
 postulate
-  -- the two frames that deliver what an inner subscription drained
-  -- rather than computing a value of their own
+  -- THE TWO FRAMES THAT RUN A SUBSCRIPTION, and both statements are
+  -- FALSE as they stand: the program that runs arrives as a value, so
+  -- the count has to read it and a constant cannot.  They are left
+  -- standing only until the count moves, since raising it re-prices
+  -- every level the walk above them spends.
+  --
+  -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
+  --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
   stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)

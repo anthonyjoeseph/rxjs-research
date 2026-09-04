@@ -189,6 +189,10 @@ open import Refuted.Frame-Step-Size-Store
 open import Refuted.Frame-Step-Size-Fold
   using (StepFrameSzFold; figuresFold≡; premFrameFold; premStoreFold;
          premValsFold; deliveredFold≡false; stepFrame-sz-fold-absurd)
+open import Refuted.Frame-Step-Size-Cross
+  using (StepFrameSzOuter; StepFrameSzInner; growth≡; figures₁≡; figures₂≡;
+         nodes₁; prem₁; row₁≡false; nodes₂; prem₂; nodesQ; premQ;
+         stepFrame-sz-outer-absurd; stepFrame-sz-inner-absurd)
 open import Refuted.Chain-Step-Regs-Cap
   using (ChainStepRegsSz; figures≡; regLens≡; premSz; premPath; premReg;
          row≡false; chain-step-regs-cap-absurd)

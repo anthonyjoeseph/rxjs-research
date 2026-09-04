@@ -215,37 +215,32 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so the next product is an
+- **FINISH THE CENSUS OF THE CROSSING ARMS BEFORE THE COUNT MOVES.**
+  The two VALUE arms are now refuted; the two STORE siblings are not,
+  and they are the other half of one denominator. Instantiate them on
+  the apparatus that killed the value pair — a duplication chain
+  subscribed through a merge node — and learn whether a crossing arm
+  can grow the TABLE past its entry reading, or only the emission.
+  Taken first because the repair below moves one count for all four,
+  and a count decided on half the census is decided twice.
+
+- **MOVE THE COUNT AT THE CROSSING ARMS.** `szCount` charges a
+  constant where a program that arrived as a VALUE runs, which is why
+  the arms are false; the repair is the one `map-f` already took —
+  read what runs, here the arriving observables' own `sizeᵉ`. It fits
+  because `iterSize` dominates `2 ^ j`, so a count in the subscribed
+  program's size buys back a duplication blowup outright. The cost is
+  the cascade: every level the walk above spends is re-priced, and
+  that is the leg.
+
+- **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
   INSTANTIATION and not a bound.** What the size walk may spend is
   capped at a cubic in the cap by `walkFac-ch`, proven; what the caps
   package delivers about a chain's climb is ladder-shaped in every
-  reading the walk supports (`subscribeInner-caps` reports an inner
-  subscribe at `sLvlD`). Nothing carries the one into the other, and no
-  upper bound on either side decides which the climb IS. Count the
-  frames one chain's subscribe tree installs at concrete programs —
-  `chain-climb-ch` is the tier's top row and nothing has reached it.
-
-- **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
-  and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
-  queue, and the outer frame around it, put on the live list. They are
-  one statement in two positions rather than two statements: the queue
-  the first reads is the queue the burst face has just been proven to
-  bound, so the residue on each is a state quantity and not a width. The
-  first reads zero at every quantity its consumer's residue is built
-  from, so only the cap size pays; the second is already restated at its
-  own size budget with an uncovered region named. Taken after the mint
-  leg because a frame grant repaired there is what both would be read
-  against.
-
-- **THE FOUR CROSSING ARMS, WHICH ARE THE TIER'S ONLY ROWS ON NO
-  EVIDENCE AT ALL.** `stepFrame-sz-inner`, `stepFrame-sz-outer` and the
-  two store-side siblings share one denominator, and nothing has ever
-  instantiated any of them — so they sit at FALSITY on nothing rather
-  than on a finding. Their residue is a state quantity a probe can
-  compute at a concrete program, which makes them the cheapest evidence
-  left in the tier. Probe the four together before grinding any: a wrong
-  denominator is a SHAPE finding on the set, not a clause failure on
-  one, and it is owed before the entry leg reads them.
+  reading the walk supports. Nothing carries the one into the other.
+  Count the frames one chain's subscribe tree installs at concrete
+  programs — and the crossing refutation aims that count, since a
+  frame that subscribes is now known not to be a unit of cost.
 
 ### The ledger
 
@@ -268,10 +263,10 @@ does not fit is a finding about the shared statement, not about the head.
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `NO EVIDENCE`: the two arms crossing into an inner subscription, which
-  compute no value of their own — a drain APPENDS and moves a length, not a
-  size — so one rung is the whole charge and the walk's own store reading is
-  what has to reach them.
+  `REFUTED×2`: both are FALSE. A crossing arm SUBSCRIBES a program that arrived
+  as a value, and a duplication chain emits exponentially in its own syntax
+  against a constant charge — which no polynomial tie between cap and level
+  repairs. The count is what moves.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `NO EVIDENCE`: the same two arms at the nodes map. A crossing
   rewrites the parent *All's cell rather than one the walk handed it, so the
