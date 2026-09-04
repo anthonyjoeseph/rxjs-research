@@ -192,6 +192,28 @@ abstract
       ≤ innerW (gs fuel) op allNid κ id now o sched st
   innerW-gs fuel op allNid κ id now o sched st = ≤-refl
 
+  -- AND THE SAME READING FROM ABOVE, AT BOTH CLAUSES.  The projection
+  -- directly above hands a consumer the descent as a LOWER bound,
+  -- which is what a statement SPENDING the measure needs; a statement
+  -- BOUNDING it needs the other direction, and the seal makes neither
+  -- half derivable from the other.  Exporting the equation rather than
+  -- the `≥` keeps the elimination on the consumer's side, as the
+  -- descent's own equations below already do.  The clauses are the
+  -- seal's whole content at this name, so both bodies are `refl`.
+  innerW-g0-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (op : AllOp) (allNid : NodeId) (κ : Path Γ s t) (id : Id)
+    (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    innerW g0 op allNid κ id now o sched st ≡ 0
+  innerW-g0-eq op allNid κ id now o sched st = refl
+
+  innerW-gs-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (fuel : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ s t) (id : Id)
+    (now : Tick) (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+    innerW (gs fuel) op allNid κ id now o sched st
+      ≡ descW fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+              (record sched { nextNode = suc (Sched.nextNode sched) }) st
+  innerW-gs-eq fuel op allNid κ id now o sched st = refl
+
   -- AND THE CHILD'S HALF AT THE SUBSTITUTING HEAD.  The clause already
   -- names the child's descent as one side of its own join, so the fact
   -- is a projection -- but the family is SEALED, so a consumer outside

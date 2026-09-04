@@ -215,31 +215,32 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PROBE THE PER-INNER ROOM ARITHMETIC, BEFORE EITHER DRAIN ARM IS
-  WRITTEN OVER IT.** The level half is now proven — `reached-len` puts one
-  over the width at any level a reached walk stands at under the number —
-  so what is left is the ceiling half: a runtime inner's `bCeilᵉ` under
-  `iterFold S (sizeᵉ o) M` at its own size, joined with `slotsBCeil`.
-  Both sides compute, so instantiate at nested shapes — two `*All` layers,
-  a template with several mentions, a merge inside a switch's drain —
-  before any grind. A refutation moves the denomination to the invariant
-  record; a receipt makes the room lemma the leaf both arms spend.
-
-- **THE `thru-outer` ARM AS A REAL BODY OVER THAT ROOM LEMMA.**
-  `walk-frame-thru-burst` is `thruRoomWOK` over the walk's arrivals, each
-  at the state the previous left, and each conjunct is `innerW` of one
-  handed inner — `descW-ceil` at the runtime term, the size conjunct out
-  of the closure reading the walk already carries, `wid-iterFold` per
-  burst-kids node joined by `iterFold-mono-count`, then the room lemma.
-  The switch half is the same reading at the kill state, which moves no
-  node the ceiling is read from.
-
-- **THE `from-inner` ARM, WHICH IS THAT ARM OVER A QUEUE.**
+- **THE `from-inner` ARM, WHICH IS THE THRU ARM OVER A QUEUE.**
   `walk-frame-inner-burst` reads `drainW`'s fold over the parked inners
-  off the node the run installed, so it is the thru arm one entry at a
-  time with the join in place of the pair. What it needs beyond the thru
-  arm is that a parked entry is sized by the invariant the same way a
-  handed one is, which is the merge node's own store conjunct.
+  off the node the run installed, so it is the arm just landed one entry
+  at a time with a join in place of the pair, and `inner-room` is already
+  the leaf it spends. Two things are new. The fold is SEALED and only its
+  lower bounds are exported, so the seal owes an equation at each clause
+  the way `innerW` now does. And a parked entry must be sized by the
+  invariant the way a handed one is, which is the merge node's own store
+  conjunct rather than the walk's value reading.
+
+- **THE SINK RING'S BURST HALF, WHICH IS A GRIND AND NOT A DESIGN.**
+  `walk-sink-burst` is `dispatchBurstsOK` over the admitted registry —
+  one entry per registration, each its own walk at the state the previous
+  left, the fold underneath one gas down. `walk-sink-caps` is the same
+  fold over the same registry, proven, entry for entry, so the route is
+  its clauses with the burst walk in place of the caps walk and the burst
+  floor in place of the caps floor. Nothing here is undecided; what it
+  costs is the transport at each entry.
+
+- **THE CAPS SIDE OF THE SAME HEAD.** `walk-frame-drain-inner` is the
+  `from-inner` frame's caps receipt, the only frame that names a node, and
+  both of its denominations are closed to instantiation — the cap does not
+  return and the climb bound is sealed. So it is taken LAST of the three
+  deliberately: the two above put a proven per-inner room in hand and a
+  proven queue fold beside it, and a caps receipt that can borrow either
+  is a different row from one that cannot.
 
 ### The ledger
 
@@ -286,15 +287,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`walk-frame-thru-burst`** (Part7/Walk-Sink) — FALSITY,
-  `REFUTED, DEAD ROUTE`: what ONE handed inner may burst at a `thru-outer`,
-  denominated in the next instant's size. The root's ceiling is refuted as the
-  denomination and every entry-read reading with it; the per-inner size route
-  is unprobed at its arithmetic.
 - **`walk-frame-inner-burst`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the
   same claim over a merge's parked queue, read off the node the run installed.
-  It inherits the thru leaf's dead entry-read denominations, since a queue is
-  more copies of the same substitution, and nothing has instantiated the fold.
+  Its sibling at `thru-outer` is now proven at the same denomination, which
+  aims the row without lowering it: nothing has instantiated the fold.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
