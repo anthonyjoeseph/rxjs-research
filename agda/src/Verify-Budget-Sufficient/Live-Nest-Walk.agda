@@ -55,7 +55,7 @@ open import Verify-Budget-Sufficient.Measures using (pathLen)
 open import Verify-Budget-Sufficient.Nest-Store
   using (liveNest; slotsNestSum; regsNestMax; nestUnit; sweepLive-nest)
 open import Verify-Budget-Sufficient.Caps
-  using (Caps; frameStep; sizeCount; frameStep-mono-j)
+  using (Caps; frameStep; sizeCount; frameStep-mono-j; fuel-pred)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (FaceOK; faceHere; capsDrainOK; nestValOK?-widen)
 open import Verify-Budget-Sufficient.Nest-Ceiling using (ceilS-sweep-step)
@@ -270,7 +270,7 @@ postulate
     sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
     dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
     innerW sf op allNid κ id now o sched st ≤ W →
-    depthInner sf op allNid κ id now o sched st ≤ d →
+    depthInner sf op allNid κ id now o sched st ≤ pred d →
     pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
     (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
@@ -324,7 +324,7 @@ mergeAllDrain-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   ⦃ _ : FaceOK c sl ⦄ →
   capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st →
   drainW sf allNid κ id now q sched st ≤ W →
-  depthDrain sf allNid κ id now q sched st ≤ d →
+  depthDrain sf allNid κ id now q sched st ≤ pred d →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
@@ -463,7 +463,7 @@ innerFinish-nest-live {s = s} c d W Lv G B U sf mergeAllᵒ allNid inst p id now
         mergeAllDrain-nest-live c (Sched.slots sched) d W Lv G B U sf allNid p id now
           lim (pred act) q sched st
           (hdr lim act q od refl) (hw lim act q od refl)
-          (≤-trans (n≤1+n _) hdp) hpk hpl hu
+          (fuel-pred hdp) hpk hpl hu
 
 -- THE COMPLETION FRAME'S MINTS.  A `from-inner` runs the finish only
 -- on a `fin` that no live registration absorbs, so both of the routes

@@ -51,7 +51,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring using
 open import Verify-Budget-Sufficient.Caps using
   (_⊑ᶜ_; 1≤pow≤; Caps; frameStep; frameStep-0; frameStep-mono-j; iterFold-infl; iterSize-infl;
   iterSize-mono-count; capsAt; capsAt-base-size; 2≤capsAt-size; opIterD-mono; 1≤capsAt-reg;
-  sizeAt-strict)
+  sizeAt-strict; fuel-pred)
 open import Verify-Budget-Sufficient.Caps using (sizeCount)
 open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeE-caps; subscribeInner-caps)
 open import Verify-Budget-Sufficient.Caps-Chain using (leaf-lvl)
@@ -4291,7 +4291,7 @@ NestAt {n = n} {Γ = Γ} {t = t} {e = e} c d sl B W Lv g o κ id now sched st =
   -- positivity premise on every statement of this family; keeping it
   -- beside the count leaves that premise at the one consumer which
   -- finally collapses the existential, where it is already proven.
-  depthE g o κ id now sched st ≤ d →
+  depthE g o κ id now sched st ≤ pred d →
   -- THE CAPS FACE'S FOUR ENTRY KEYS, CARRIED RATHER THAN PRODUCED.
   -- A walk cannot derive them: the level they would have to sit at is
   -- bounded by the instant's ceiling, that ceiling is one number for a
@@ -4719,7 +4719,7 @@ subscribeE-burst-capsAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
-  depthE g o κ id now sched st ≤ d →
+  depthE g o κ id now sched st ≤ pred d →
   CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   Σ ℕ λ L →
     (L ≤ sizeCount c d ⊔ Caps.cSize c)
@@ -4731,7 +4731,7 @@ subscribeE-burst-capsAt {n = n} c d sl Lv g o κ id now sched st ⦃ f ⦄
   , hceil (proj₁ R)
       (≤-trans (proj₁ (proj₂ R))
         (opIterD-mono (suc (sizeᵉ o)) (suc (sizeᵉ o))
-           (depthE g o κ id now sched st) d
+           (depthE g o κ id now sched st) (pred d)
            (nest o sl (EvalSt.connectedShares st))
            (nest o sl (EvalSt.connectedShares st))
            (FaceOK.fSize f) ≤-refl ≤-refl ≤-refl hd ≤-refl ≤-refl))
@@ -4758,7 +4758,7 @@ subscribeE-burst-nestAt : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   descW g o κ id now sched st ≤ W →
-  depthE g o κ id now sched st ≤ d →
+  depthE g o κ id now sched st ≤ pred d →
   CeilD c (pred d) d Lv (nest o sl (EvalSt.connectedShares st)) (suc (sizeᵉ o)) →
   Σ ℕ λ L →
     (L ≤ sizeCount c d ⊔ Caps.cSize c)
@@ -4770,7 +4770,7 @@ subscribeE-burst-nestAt c d sl Lv W g o κ id now sched st ⦃ f ⦄
   , hceil (proj₁ R)
       (≤-trans (proj₁ (proj₂ R))
         (opIterD-mono (suc (sizeᵉ o)) (suc (sizeᵉ o))
-           (depthE g o κ id now sched st) d
+           (depthE g o κ id now sched st) (pred d)
            (nest o sl (EvalSt.connectedShares st))
            (nest o sl (EvalSt.connectedShares st))
            (FaceOK.fSize f) ≤-refl ≤-refl ≤-refl hd ≤-refl ≤-refl))
@@ -5849,7 +5849,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (mergeAllᵉ lim b) κ id now sc
 
   Lv≤cnt : Lv ≤ sizeCount c d ⊔ Caps.cSize c
   Lv≤cnt = subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
-             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) d
+             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) (pred d)
                         (nest (mergeAllᵉ lim b) sl (EvalSt.connectedShares st))
                         (suc (sizeᵉ (mergeAllᵉ lim b))) Lv))
 
@@ -5990,7 +5990,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (switchAllᵉ b) κ id now sched
 
   Lv≤cnt : Lv ≤ sizeCount c d ⊔ Caps.cSize c
   Lv≤cnt = subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
-             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) d
+             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) (pred d)
                         (nest (switchAllᵉ b) sl (EvalSt.connectedShares st))
                         (suc (sizeᵉ (switchAllᵉ b))) Lv))
 
@@ -6128,7 +6128,7 @@ subscribeE-nest {e = e} {u = u} c d sl B W Lv g (exhaustAllᵉ b) κ id now sche
 
   Lv≤cnt : Lv ≤ sizeCount c d ⊔ Caps.cSize c
   Lv≤cnt = subst (_≤ sizeCount c d ⊔ Caps.cSize c) (+-identityʳ Lv)
-             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) d
+             (hceil 0 (leaf-lvl (Caps.cSize c) (Caps.cWid c) (pred d)
                         (nest (exhaustAllᵉ b) sl (EvalSt.connectedShares st))
                         (suc (sizeᵉ (exhaustAllᵉ b))) Lv))
 
@@ -6256,7 +6256,7 @@ subscribeInner-nest-tight : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   nestClosOK? (frameStep Lv c) sl o ≡ true →
   nestDᵉ o ≤ B →
   innerW sf op allNid κ id now o sched st ≤ W →
-  depthInner sf op allNid κ id now o sched st ≤ d →
+  depthInner sf op allNid κ id now o sched st ≤ pred d →
   sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
@@ -6319,7 +6319,7 @@ subscribeInner-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   nestClosOK? (frameStep Lv c) sl o ≡ true →
   nestDᵉ o ≤ B →
   innerW sf op allNid κ id now o sched st ≤ W →
-  depthInner sf op allNid κ id now o sched st ≤ d →
+  depthInner sf op allNid κ id now o sched st ≤ pred d →
   sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
   dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
@@ -6376,7 +6376,7 @@ mergeAllDrain-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   capsDrainOK c sl d Lv sf allNid κ id now lim act q sched st →
   queueNest q ≤ B →
   drainW sf allNid κ id now q sched st ≤ W →
-  depthDrain sf allNid κ id now q sched st ≤ d →
+  depthDrain sf allNid κ id now q sched st ≤ pred d →
   pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
   suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
   let r = mergeAllDrain sf allNid κ id now lim act q sched st in
@@ -6612,9 +6612,17 @@ innerFinish-nest {e = e} {s = s} c d sl W Lv sf mergeAllᵒ allNid inst p id now
   dw : drainW sf allNid p id now q sched st ≤ W
   dw = hw lim act q od refl
 
+  -- AND THE `suc` THE FINISH CARRIES IS SPENT HERE RATHER THAN THROWN
+  -- AWAY, which is what pays for the drain's ceiling.  `depthFinC` puts
+  -- the drain one depth UNDER the finishing frame, and the ladder drops
+  -- a rung at exactly one place -- a frame -- so the walk under this
+  -- one runs at `pred d` and its ceiling is a sweep at `pred d` too.
+  -- Weakening the `suc` to a `≤ d` costs nothing arithmetically and
+  -- everything at the ceiling: it hands the walk a climb allowance the
+  -- frame's own room cannot mint.
   DR = mergeAllDrain-nest c d sl (queueNest q) W Lv sf allNid p id now lim (pred act) q sched st
          (hdr lim act q od refl) ≤-refl dw
-         (≤-trans (n≤1+n _) hdp) hpk hpl
+         (fuel-pred hdp) hpk hpl
 
   S′ = Caps.cSize (frameStep (proj₁ DR) c)
 
