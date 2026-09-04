@@ -215,32 +215,39 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE `from-inner` ARM, WHICH IS THE THRU ARM OVER A QUEUE.**
-  `walk-frame-inner-burst` reads `drainW`'s fold over the parked inners
-  off the node the run installed, so it is the arm just landed one entry
-  at a time with a join in place of the pair, and `inner-room` is already
-  the leaf it spends. Two things are new. The fold is SEALED and only its
-  lower bounds are exported, so the seal owes an equation at each clause
-  the way `innerW` now does. And a parked entry must be sized by the
-  invariant the way a handed one is, which is the merge node's own store
-  conjunct rather than the walk's value reading.
-
-- **THE SINK RING'S BURST HALF, WHICH IS A GRIND AND NOT A DESIGN.**
-  `walk-sink-burst` is `dispatchBurstsOK` over the admitted registry —
-  one entry per registration, each its own walk at the state the previous
-  left, the fold underneath one gas down. `walk-sink-caps` is the same
-  fold over the same registry, proven, entry for entry, so the route is
-  its clauses with the burst walk in place of the caps walk and the burst
-  floor in place of the caps floor. Nothing here is undecided; what it
-  costs is the transport at each entry.
-
 - **THE CAPS SIDE OF THE SAME HEAD.** `walk-frame-drain-inner` is the
   `from-inner` frame's caps receipt, the only frame that names a node, and
   both of its denominations are closed to instantiation — the cap does not
-  return and the climb bound is sealed. So it is taken LAST of the three
-  deliberately: the two above put a proven per-inner room in hand and a
-  proven queue fold beside it, and a caps receipt that can borrow either
-  is a different row from one that cannot.
+  return and the climb bound is sealed. It is taken AFTER the ring
+  deliberately: the burst face at this head is now proven end to end, so
+  the queue fold and the per-inner room are both in hand, and a caps
+  receipt that can borrow either is a different row from one that cannot.
+  What it must not borrow is the SIZE: the park receipt prices an entry
+  against the frame's cap with the telescope already subtracted, and the
+  caps side is denominated in the cap itself.
+
+- **THE FRAME'S OWN MINT, WHERE THREE REFUTATIONS SAY ONE THING.**
+  `stepFrame-nest-nodes`, `stepFrame-nest-regs` and `stepFrame-sz` are
+  what a single frame stores, registers and grows by, each under the
+  potential AND the frame grant, and each already refuted with its
+  premise read ALONE. The refutations agree: the frame's own reading is
+  never the whole payer, and the arm that kills each is the one whose
+  emission the walk's values cannot reach — the scan accumulator, the
+  drained queue. So this is a restatement leg and not a grind, taken as
+  one commit because a denomination that repairs one of the three and not
+  its siblings has not been repaired.
+
+- **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
+  and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
+  queue, and the outer frame around it, put on the live list. They are
+  one statement in two positions rather than two statements: the queue
+  the first reads is the queue the burst face has just been proven to
+  bound, so the residue on each is a state quantity and not a width. The
+  first reads zero at every quantity its consumer's residue is built
+  from, so only the cap size pays; the second is already restated at its
+  own size budget with an uncovered region named. Taken after the mint
+  leg because a frame grant repaired there is what both would be read
+  against.
 
 ### The ledger
 
@@ -287,10 +294,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`walk-frame-inner-burst`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the
-  same claim over a merge's parked queue, read off the node the run installed.
-  Its sibling at `thru-outer` is now proven at the same denomination, which
-  aims the row without lowering it: nothing has instantiated the fold.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
@@ -369,10 +372,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
-- **`walk-sink-burst`** (Part7/Walk-Sink) — GRINDABLE, `TWIN`: the share sink's
-  dispatch under the burst number — one entry per admitted registration, each
-  at the state the previous left, the fold one gas down. The caps ring walks
-  the same fold under the same tuple, entry for entry.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
