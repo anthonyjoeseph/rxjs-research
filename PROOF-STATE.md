@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIZE READING, ONTO A LADDER THAT CAN CARRY A STORE.**
-  `stepFrame-sz` charges a frame exactly one `sizeStep`, and the arm
-  emitting the node store cannot be paid at that rate. Conditioning it
-  is now a DEAD ROUTE and the route died on DIRECTION, not on threading:
-  the only levelled store reading here is the caps walk's, which climbs
-  by an existential per frame and per fanned entry, so the store's cap
-  overtakes the values' at a chain's second scan and no premise reverses
-  that. So the CONCLUSION moves. Restate it at that walk's own ladder,
-  where the store is already carried at the level, and follow the change
-  into the size-only walk that spends it — whose linear per-hop ledger is
-  the thing the tight rate was buying.
+- **THE SIZE READING, SPLIT BY FRAME KIND, OVER A STORE IT CARRIES
+  ITSELF.** `stepFrame-sz` charges every frame one `sizeStep`, and every
+  repair short of moving the CHARGE is now refuted in its header. What
+  survives is that only `scan-f` folds, and `scanVals-size` prices that
+  arm outright: from an accumulator read at the values' own level, the
+  outputs AND the stored residue land `length vals * suc (sizeᵗ fn)`
+  rungs up. So the store premise is MINTED in this face rather than
+  imported from the caps walk, whose index runs ahead of this one —
+  `frameStep`'s size ladder is this ladder, so the two coincide at the
+  root and preservation is what the split itself proves. Split by kind,
+  seed at the root, then repair the per-hop ledger.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -268,7 +268,7 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2, DEAD ROUTE`: one
+- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE×2`: one
   frame's size step, the frame read at the program's cap and the values at the
   level. Refuted three ways: no frame reading, the frame read at the level, and
   the scan arm, which emits the node store that no premise here reads.

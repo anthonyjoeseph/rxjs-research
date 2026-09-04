@@ -626,18 +626,42 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- `S·(1+2L)`, which covers `S + S·L` with room and nothing larger, so
 -- the frame's factor has to be the base cap `S` for one level to pay.
 --
--- AND THE FRAME READING IS STILL NOT ENOUGH, BECAUSE ONE ARM EMITS THE
--- NODE STORE.  A `scan-f` answers with its accumulator, fetched out of
--- `EvalSt.nodes`, and its own syntax may be a projection that hands
--- that accumulator straight back -- so the emitted size is the STORED
--- value's, which neither reading here sees.
+-- WHAT DEFEATS IT IS THE RATE, AND `scanVals` FOLDS.  A `scan-f`
+-- answers with its accumulator, and each output is the step function
+-- applied to the PREVIOUS one, so a burst of k values applies it k
+-- times in sequence and whatever the function adds accrues k times
+-- while one level buys one factor.  No reading of the frame and no
+-- reading of the store at a fixed level survives that.
 --
--- AND THE LADDER IS WHAT HAS TO MOVE, NOT THE HYPOTHESIS LIST.  This
--- conclusion charges a frame exactly one `sizeStep`, which is right for
--- every arm whose emission is the frame's own function applied to the
--- walk's own values -- `applyFn` is the only thing that grows a value.
--- The scan arm is not such an arm, and a store reading tight enough to
--- pay for it is one nothing in this development can hand over.
+-- THE REPAIR IS PROVEN ONE FACE OVER, AND IT FIXES THE COUNT EXACTLY.
+-- `scanVals-size` already prices this arm in this very currency: from
+-- an accumulator and arriving values both read at `B`, every output AND
+-- the stored residue land at `iterSize S (length vals * suc (sizeᵗ fn))
+-- B` -- a rung per pairing and per node of the step function.  So the
+-- count owed is the burst's own LENGTH, and emphatically not the width
+-- cap: that count is separately unavailable, since `iterFold`
+-- exponentiates per fold and a count reading `cWid` would iterate the
+-- tower function once per instant, which is the finding carried at
+-- `sizeCount`.  A length is a structural quantity the walk already
+-- sums; a cap is a recurrence, and the two are not a widening apart.
+--
+-- AND THAT LEMMA LOCATES WHAT IS ACTUALLY OPEN.  It asks for the
+-- accumulator read at the SAME `B` as the values, and it PRESERVES that
+-- reading -- the residue lands where the outputs do -- so the obstacle
+-- is the walk's ENTRY reading of the store and not the step.  Which is
+-- the direction finding recorded below, now with the step half of it
+-- discharged one face over rather than merely conjectured.
+--
+-- AND THE COUNT IS THE SCAN ARM'S ALONE, which is what keeps the
+-- restatement from cascading through the ledger under it.  `scan-f` is
+-- the only arm that applies its function in SEQUENCE; `map-f` applies
+-- it to each value independently, which is the reading the first
+-- paragraph already prices.  The two arms crossing into an inner
+-- subscription compute no value at all -- `innerFinish` at a mergeAll
+-- APPENDS what it drained, and a concatenation moves no size, only a
+-- length.  So the charge owed is one level per arriving value at the
+-- scan arm and one level at the others: a split BY FRAME KIND, of the
+-- shape the nodes and registry steps beside it already carry.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Store` -- the scan arm at the
 --   smallest frame there is, against a store the statement quantifies
@@ -651,6 +675,12 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 --   repair it: both factors are then capped at `L`, the emission is
 --   quadratic in `L` and one level is linear in it, and the crossing
 --   arrives at `j = 1` for every `S ≥ 2`.
+-- REFUTED: `Refuted.Frame-Step-Size-Fold` -- the store-conditioned
+--   repair, at the strongest store premise there is: every node bounded
+--   at the arriving values' own level.  All three premises hold and the
+--   conclusion still fails, because the fold adds a fixed amount per
+--   value while the ceiling is fixed in the burst.  The rows fire at a
+--   `scan-f` and at no other arm.
 -- DEAD ROUTE: conditioning this on a store reading at the level, and
 --   threading that through the walk that spends it, is STRUCTURALLY
 --   dead -- and what kills it is the DIRECTION, not the threading.  The
@@ -662,9 +692,18 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 --   than by one; that ladder therefore climbs at least as fast as this
 --   one and strictly faster at exactly the storing frames, so the store
 --   cap overtakes the value cap at a chain's second scan.  No premise
---   fixes a direction, so the repair is to re-denominate the conclusion
---   onto the existential ladder and let the consumer's own accounting
---   move with it.
+--   fixes a direction.
+-- DEAD ROUTE: re-denominating the conclusion onto that existential
+--   ladder instead, so that the store is carried at the level and the
+--   consumer's own accounting moves with it.  The caps walk's ceiling
+--   is its fold COUNT, and `iterSize` taken at that count is by
+--   construction the NEXT instant's size cap; the walk that spends
+--   this conclusion has to land under the CURRENT instant's nesting
+--   cap, and the only lemma delivering that admits levels no larger
+--   than a small polynomial in the base cap.  So the two ladders are
+--   not a restatement apart -- one is elementary in the cap and the
+--   other is the caps recurrence itself -- and no widening crosses
+--   the gap in the direction the consumer needs.
 postulate
   stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (path : Path Γ u t)
