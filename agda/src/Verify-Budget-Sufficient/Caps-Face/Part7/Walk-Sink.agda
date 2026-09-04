@@ -88,16 +88,33 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 -- `thru-outer` and a `from-inner` frame the ledger asks that the
 -- inners the frame subscribes -- `innerW`, `drainW` -- burst under the
 -- number, and those are `descW` of a RUNTIME inner, one the evaluator
--- has substituted.  The tree bounds `descW` only syntactically at the
--- root, by `descW-ceil`, and every levelled consumer takes a
--- substituted inner's width as a hypothesis, so nothing yet relates
--- such an inner's burst to any cap.  That region is what an
--- instantiation has to reach before this row moves.
+-- has substituted.  `descW-ceil` puts any closed term's descent under
+-- that term's OWN burst ceiling, so the conjunct is a bound on a
+-- substituted inner's ceiling -- and the root's ceiling cannot supply
+-- it, since substitution rewrites the syntax a ceiling is read from.
+-- What the invariant carries per queued inner is its SIZE, and a
+-- ceiling is under a size-iterated width node for node: every node on
+-- the burst-kids spine is a subterm, `wid-iterFold` prices each and
+-- `iterFold-mono-count` joins them.  So the conjunct is arithmetic
+-- against the number -- the iterated width at the node's size cap,
+-- joined with the slots' collector, under `nestBurstAt` -- and that
+-- arithmetic is the region no evidence reaches.
 --
 -- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at one chain's
 --   root against a width-two cap granting three.  It kills the ENTRY
 --   width as the number; the number here is the next instant's size,
 --   which grants 256 at that shape.
+-- REFUTED: `Refuted.Drain-Root-Ceil` -- an inner the outer's own
+--   subscribe emits, at the states that subscribe returns, whose map
+--   hands back four values against a root ceiling of two, and six
+--   against three: a template mentioning its argument twice under a
+--   head the root's slope prices at zero.  It kills the ROOT's ceiling
+--   as the drain's denomination, not the ceiling as a measure.
+-- DEAD ROUTE: any drain denomination read ONCE at the entry, the
+--   root's syntactic ceiling included -- the copies a substitution
+--   makes are invisible to a slope that priced the template's mention
+--   count at zero, so the gap scales with that count and no constant
+--   closes it.
 -- TWIN: `chain-walk-caps` -- the same walk under the same tuple,
 --   proven; the burst conjuncts sit beside its size conjuncts frame
 --   for frame.
