@@ -26,13 +26,16 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted;
   InstEvent)
-open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ)
+open import Rx.Exp       using (Ctx; Closed; Val; sizeᵉ; obs)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Ent; ent-step; reached-room)
 open import Verify-Budget-Sufficient.Subscribe-Face using (stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (burstsOK; capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainOK; shareCapsOK)
+  (burstsOK; capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainOK; shareCapsOK;
+   dispatchBurstsOK; frameDrainW; thruRoomWOK)
+open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Nest-Store using (nestBurstAt)
+open import Verify-Budget-Sufficient.Fold-Room using (reached-len)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthFold; depthShareGo; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -67,65 +70,6 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (RingState; WalkHyps; ent-infl; floor-parts; frameStep-regAt; regs-exit; ring-room; ringFold; sink-deliv-cap; sink-entry-ladder; sink-step-caps; walk-frame-clos)
-
--- ONE WALK'S BURST LEDGER, STATED AT THE LEVEL THE WALK IS ENTERED AT
--- AND UNDER THE SAME TUPLE AS ITS CAPS LEDGER.  A frame hands on at
--- most the width of its OWN cap -- `valsCaps?` prices the handoff in
--- the width of the `frameStep` at the level the frame lands at -- and
--- a walk under these hypotheses only lands at levels whose NEXT charge
--- still fits under `sizeCount` joined with the size: that is what
--- `Reached` says through `reached-room`.  A level's width is under its
--- own charge, so every width the walk meets is under that top, and the
--- top is under the next instant's size, which is the number this
--- ledger is denominated in.  So the length conjuncts are arithmetic
--- over the caps walk's own receipt, and the statement is shaped after
--- that walk rather than read against a cap of its own -- the
--- flat readings died on a hypothesis read at the next instant's cap,
--- which admits widths no frame in the instant runs against, and not
--- on the number.
---
--- AND THE RISK IS THE DRAIN CONJUNCT, NOT THE LENGTHS.  At a
--- `thru-outer` and a `from-inner` frame the ledger asks that the
--- inners the frame subscribes -- `innerW`, `drainW` -- burst under the
--- number, and those are `descW` of a RUNTIME inner, one the evaluator
--- has substituted.  `descW-ceil` puts any closed term's descent under
--- that term's OWN burst ceiling, so the conjunct is a bound on a
--- substituted inner's ceiling -- and the root's ceiling cannot supply
--- it, since substitution rewrites the syntax a ceiling is read from.
--- What the invariant carries per queued inner is its SIZE, and a
--- ceiling is under a size-iterated width node for node: every node on
--- the burst-kids spine is a subterm, `wid-iterFold` prices each and
--- `iterFold-mono-count` joins them.  So the conjunct is arithmetic
--- against the number -- the iterated width at the node's size cap,
--- joined with the slots' collector, under `nestBurstAt` -- and that
--- arithmetic is the region no evidence reaches.
---
--- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at one chain's
---   root against a width-two cap granting three.  It kills the ENTRY
---   width as the number; the number here is the next instant's size,
---   which grants 256 at that shape.
--- REFUTED: `Refuted.Drain-Root-Ceil` -- an inner the outer's own
---   subscribe emits, at the states that subscribe returns, whose map
---   hands back four values against a root ceiling of two, and six
---   against three: a template mentioning its argument twice under a
---   head the root's slope prices at zero.  It kills the ROOT's ceiling
---   as the drain's denomination, not the ceiling as a measure.
--- DEAD ROUTE: any drain denomination read ONCE at the entry, the
---   root's syntactic ceiling included -- the copies a substitution
---   makes are invisible to a slope that priced the template's mention
---   count at zero, so the gap scales with that count and no constant
---   closes it.
--- TWIN: `chain-walk-caps` -- the same walk under the same tuple,
---   proven; the burst conjuncts sit beside its size conjuncts frame
---   for frame.
-postulate
-  chain-walk-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
-    burstsOK (nestBurstAt e sl id) sf gas nid now p vals fin sched st
 
 chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
@@ -514,6 +458,80 @@ walk-frame-drain sl id L sf gas nid now src (from-inner op allNid inst) p vals e
 
 
 
+-- THE TAIL'S HYPOTHESES OUT OF THE HEAD'S, ONE FRAME UP, which both
+-- walks spend and neither owns.  The frame face reports the level it
+-- climbed to and hands back the caps and the values at it; the tail
+-- is entered at the stepped level, which is over the climbed one, so
+-- every reading widens: `capsOK?` and the values' caps by
+-- `frameStep-mono-j`, the closure reading by the lift out of the size
+-- receipt, the path receipt by its own split, the depth by the join.
+-- The ladder premise reproduces itself for free, since `iterL` at a
+-- `suc` IS `iterL` at the stepped level.
+walk-hyps-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+  WalkHyps sl id
+    (fLvlD (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id)) (capsH e sl id) L)
+    sf gas nid now src p
+    (proj₁ (stepFrame sf nid now f p vals fin sched st))
+    (evs ++ proj₁ (proj₂ (stepFrame sf nid now f p vals fin sched st)))
+    (proj₁ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st))))
+    (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
+    (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf nid now f p vals fin sched st)))))
+walk-hyps-step {e = e} sl id L sf gas nid now src f p vals evs fin sched st
+  (sleq , cok , hvc , hcl , hpz , hdp , (g , P , hfl , hlvP , hR)) =
+    trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
+  , capsOK?-mono (frameStep (L + proj₁ ST) c) (frameStep Lt c)
+      (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      (frameStep-mono-j c 2≤S ST≤t) (proj₁ (proj₂ ST))
+  , valsCaps?-lvl _ _ sl (proj₁ r)
+      (frameStep-mono-j c 2≤S ST≤t) (proj₁ (proj₂ (proj₂ ST)))
+  , all-impl _ _
+      (λ v h → nestClosOK?ᵛ-widen sl _ v (frameStep-mono-j c 2≤S STs≤t) h)
+      (proj₁ r)
+      (clos-lift c (L + proj₁ ST) sl (proj₁ r) 2≤S (slotsCaps?-capsAt e sl id)
+        (all-impl _ _
+           (λ v → valCaps?-size (frameStep (L + proj₁ ST) c) sl _ v)
+           (proj₁ r)
+           (proj₁ (valsCaps?-parts (frameStep (L + proj₁ ST) c) sl (proj₁ r)
+                     (proj₁ (proj₂ (proj₂ ST)))))))
+  , pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S L≤t)) pz2
+  , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
+  , (g , P , hfl , hlvP , hR)
+  where
+  c   = capsAt e sl id
+  S   = Caps.cSize c
+  W   = Caps.cWid c
+  d   = capsH e sl id
+  2≤S = 2≤capsAt-size e sl id
+  slSz : slotsSize sl ≤ Caps.cSize c
+  slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
+  B   = Caps.cSize (frameStep L c)
+  pz1 : frameSz? B f ≡ true
+  pz1 = proj₁ (∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
+  pzr : ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) ≡ true
+  pzr = proj₂ (∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
+  pzl : (suc (pathLen p) ≤ᵇ B) ≡ true
+  pzl = proj₁ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) pzr)
+  pz2 : pathSz? B p ≡ true
+  pz2 = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) pzr)
+  r   = stepFrame sf nid now f p vals fin sched st
+  ST  = stepFrame-caps c d (frameBud c L) L sf nid now f p vals fin sl sched st
+          2≤S (1≤capsAt-reg e sl id) sleq (slotsCaps?-capsAt e sl id) slSz cok
+          pz1 pz2 (≤ᵇ⇒≤ (suc (pathLen p)) B (T-to pzl))
+          hvc ≤-refl
+          (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdp)
+  Lt  = fLvlD S W d L
+  STs≤t : suc (L + proj₁ ST) ≤ Lt
+  STs≤t = proj₂ (proj₂ (proj₂ (proj₂ ST)))
+  ST≤t : L + proj₁ ST ≤ Lt
+  ST≤t = ≤-trans (n≤1+n (L + proj₁ ST)) STs≤t
+  L≤t : L ≤ Lt
+  L≤t = ≤-trans (n≤1+n L) (sucJ≤fLvlD S W d L)
+
 -- THE WALK ITSELF, WHICH IS THE FRAME LAW ITERATED AND NOTHING ELSE.
 -- Each frame spends the proven step receipt, which reports its own
 -- increment and hands back the caps and the values one level up; the
@@ -546,24 +564,7 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
       (chain-walk-caps sl id Lt sf gas nid now src p
         (proj₁ r) (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r)))
         (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-        ( trans (KeepsC.slotsEq (stepFrame-keeps sf nid now f p vals fin sched st)) sleq
-        , capsOK?-mono (frameStep (L + proj₁ ST) c) (frameStep Lt c)
-            (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
-            (frameStep-mono-j c 2≤S ST≤t) (proj₁ (proj₂ ST))
-        , valsCaps?-lvl _ _ sl (proj₁ r)
-            (frameStep-mono-j c 2≤S ST≤t) (proj₁ (proj₂ (proj₂ ST)))
-        , all-impl _ _
-            (λ v h → nestClosOK?ᵛ-widen sl _ v (frameStep-mono-j c 2≤S STs≤t) h)
-            (proj₁ r)
-            (clos-lift c (L + proj₁ ST) sl (proj₁ r) 2≤S (slotsCaps?-capsAt e sl id)
-              (all-impl _ _
-                 (λ v → valCaps?-size (frameStep (L + proj₁ ST) c) sl _ v)
-                 (proj₁ r)
-                 (proj₁ (valsCaps?-parts (frameStep (L + proj₁ ST) c) sl (proj₁ r)
-                           (proj₁ (proj₂ (proj₂ ST)))))))
-        , pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S L≤t)) pz2
-        , ≤-trans (m≤n⊔m (depthFrame sf nid now f p vals fin sched st) _) hdp
-        , (g , P , hfl , hlvP , hR) ))
+        (walk-hyps-step sl id L sf gas nid now src f p vals evs fin sched st H))
   where
   c   = capsAt e sl id
   S   = Caps.cSize c
@@ -572,30 +573,10 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
   2≤S = 2≤capsAt-size e sl id
   slSz : slotsSize sl ≤ Caps.cSize c
   slSz = ≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e)) (capsAt-base-size e sl id)
-  B   = Caps.cSize (frameStep L c)
-  pz1 : frameSz? B f ≡ true
-  pz1 = proj₁ (∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
-  pzr : ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) ≡ true
-  pzr = proj₂ (∧-true (frameSz? B f) ((suc (pathLen p) ≤ᵇ B) ∧ pathSz? B p) hpz)
-  pzl : (suc (pathLen p) ≤ᵇ B) ≡ true
-  pzl = proj₁ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) pzr)
-  pz2 : pathSz? B p ≡ true
-  pz2 = proj₂ (∧-true (suc (pathLen p) ≤ᵇ B) (pathSz? B p) pzr)
   r   = stepFrame sf nid now f p vals fin sched st
-  ST  = stepFrame-caps c d (frameBud c L) L sf nid now f p vals fin sl sched st
-          2≤S (1≤capsAt-reg e sl id) sleq (slotsCaps?-capsAt e sl id) slSz cok
-          pz1 pz2 (≤ᵇ⇒≤ (suc (pathLen p)) B (T-to pzl))
-          hvc ≤-refl
-          (≤-trans (m≤m⊔n (depthFrame sf nid now f p vals fin sched st) _) hdp)
   Lt  = fLvlD S W d L
-  STs≤t : suc (L + proj₁ ST) ≤ Lt
-  STs≤t = proj₂ (proj₂ (proj₂ (proj₂ ST)))
-  ST≤t : L + proj₁ ST ≤ Lt
-  ST≤t = ≤-trans (n≤1+n (L + proj₁ ST)) STs≤t
-  sucL≤t : suc L ≤ Lt
-  sucL≤t = sucJ≤fLvlD S W d L
   L≤t : L ≤ Lt
-  L≤t = ≤-trans (n≤1+n L) sucL≤t
+  L≤t = ≤-trans (n≤1+n L) (sucJ≤fLvlD S W d L)
   hLt : L + (Lt ∸ L) ≡ Lt
   hLt = m+[n∸m]≡n L≤t
   P≤TOP : P ≤ sizeCount c d ⊔ S
@@ -604,24 +585,157 @@ chain-walk-caps {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched 
   Lt≤TOP : Lt ≤ sizeCount c d ⊔ S
   Lt≤TOP = ≤-trans (iterL-infl S W d (pathLen p) Lt) (≤-trans hlvP P≤TOP)
 
--- AND THE CHAIN'S OWN LEAF IS NOW THAT WALK AT ITS ENTRY, with the one
--- step of arithmetic between them real: the premise arrives as a
--- DELIVERY count, which is the currency the cascade fold's invariant is
--- kept in, and the walk wants a FRAME count, which is the currency the
--- level ladder climbs in.  `pathSz?` is the conversion -- a chain is at
--- most `suc (sizeAt S L)` frames, which is exactly one rung -- so the
--- two statements are the same bound read at the two granularities the
--- fold and the walk respectively speak, and neither has to know the
--- other's.
+-- THE LENGTH CONJUNCT, ONE LINE AT EVERY HEAD: `valsCaps?` prices a
+-- handoff by the width of the `frameStep` at the level the walk stands
+-- at, and one over that width is under the burst number at every level
+-- a reached walk stands at, by the delivery arithmetic in `Fold-Room`.
+-- The gas is positive under the tuple's own floor, which is what the
+-- reached level's room needs to have a delivery in it.
+walk-len : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
+  length vals ≤ nestBurstAt e sl id
+walk-len sl id L sf gas nid now src p vals evs fin sched st
+  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _))
+walk-len {e = e} sl id L sf gas nid now src p vals evs fin sched st
+  (_ , _ , hvc , _ , _ , _ , (suc g , P , _ , hlvP , hR)) =
+  ≤-trans (proj₂ (valsCaps?-parts (frameStep L c) sl vals hvc))
+          (reached-len e sl id L P g hR
+             (≤-trans (iterL-infl (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L)
+                      hlvP))
+  where
+  c = capsAt e sl id
+
+-- THE SINK'S DISPATCH UNDER THE BURST NUMBER, which is the ring: one
+-- entry per admitted registration, each its own walk at the state the
+-- previous one left, the fold underneath one gas down.  The caps ring
+-- walks exactly this fold under the same tuple, so the route is its
+-- clauses with the burst walk in place of the caps walk at each entry
+-- and the burst floor in place of the caps floor.
 --
--- AND THE REST OF THE HYPOTHESES ARE THE FRAME LAW'S OWN, WHICH IS THE
--- ONLY CLAIM MADE FOR THEM.  A walk is the iterate of one frame's
--- receipt, so it is stated over that receipt's data: the values' caps,
--- the path's size receipt, the depth bound.  Each is what the frame law
--- takes at every frame, each propagates down a path without further
--- hypothesis -- the path receipt splits into this frame's, the tail's
--- length and the tail's -- and the sole caller holds all three already,
--- since it hands the same three to the step face next door.  What is
--- NOT claimed is that a form without them is false: nothing has
--- instantiated that, and the argument here is the twin's shape rather
--- than a witness.
+-- TWIN: `walk-sink-caps` -- the same fold over the same registry,
+--   proven, entry for entry.
+postulate
+  walk-sink-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (i : Fin n) (vals : List (Val Γ (lookup Γ i)))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps {t = t} sl id L sf gas nid now src (share-sink i) vals evs fin sched st →
+    dispatchBurstsOK (nestBurstAt e sl id) sf gas nid now i vals fin sched st
+
+-- THE DRAIN AT A `thru-outer`, WHICH IS THE RISK.  The ledger asks
+-- that the inner the frame subscribes -- `innerW`, at the state the
+-- walk arrives in and at the state a switch's kill leaves -- bursts
+-- under the number, and `innerW` is `descW` of a RUNTIME inner, one
+-- the evaluator has substituted.  `descW-ceil` puts any closed term's
+-- descent under that term's OWN ceiling, so the conjunct is a bound on
+-- a substituted inner's ceiling, and what the invariant carries per
+-- inner is its SIZE: a ceiling is under the size-iterated width node
+-- for node -- `wid-iterFold` prices each and `iterFold-mono-count`
+-- joins them -- and the iterated width at the inner's size cap is
+-- under the number by the delivery arithmetic `reached-len` spends,
+-- read one level up.  That arithmetic against the number, joined with
+-- the slots' collector, is the region no evidence reaches.
+--
+-- REFUTED: `Refuted.Drain-Root-Ceil` -- an inner the outer's own
+--   subscribe emits, at the states that subscribe returns, whose map
+--   hands back four values against a root ceiling of two, and six
+--   against three: a template mentioning its argument twice under a
+--   head the root's slope prices at zero.  It kills the ROOT's ceiling
+--   as the drain's denomination, not the ceiling as a measure.
+-- DEAD ROUTE: any drain denomination read ONCE at the entry, the
+--   root's syntactic ceiling included -- the copies a substitution
+--   makes are invisible to a slope that priced the template's mention
+--   count at zero, so the gap scales with that count and no constant
+--   closes it.
+postulate
+  walk-frame-thru-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (op : AllOp) (tn : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ (obs u)))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps sl id L sf gas nid now src (thru-outer op tn ↠ p) vals evs fin sched st →
+    thruRoomWOK (nestBurstAt e sl id) sf op tn p nid now vals sched st
+
+-- THE DRAIN AT A `from-inner`, THE SAME CLAIM OVER A MERGE'S QUEUE:
+-- every parked inner's `innerW` under the number, the queue read off
+-- the node the run installed.  The route is the thru leaf's, one
+-- entry at a time -- each queued inner is a closed term the invariant
+-- sizes -- and the entry-read denominations `walk-frame-thru-burst`
+-- records as dead die here the same way, since a queue is more copies
+-- of the same substitution.
+postulate
+  walk-frame-inner-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (op : AllOp) (allNid : NodeId) (inst : NodeId)
+    (p : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps sl id L sf gas nid now src (from-inner op allNid inst ↠ p)
+      vals evs fin sched st →
+    ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
+      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+      drainW sf allNid p nid now q sched st ≤ nestBurstAt e sl id
+
+-- AND THREE OF THE FIVE HEADS OWE NOTHING, which the match says in
+-- code: only the two heads that subscribe an inner carry a drain.
+walk-frame-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (f ↠ p) vals evs fin sched st →
+  frameDrainW (nestBurstAt e sl id) sf nid now f p vals sched st
+walk-frame-burst sl id L sf gas nid now src (map-f _) p vals evs fin sched st H = tt
+walk-frame-burst sl id L sf gas nid now src (scan-f _ _) p vals evs fin sched st H = tt
+walk-frame-burst sl id L sf gas nid now src (take-f _) p vals evs fin sched st H = tt
+walk-frame-burst sl id L sf gas nid now src (thru-outer op tn) p vals evs fin sched st H =
+  walk-frame-thru-burst sl id L sf gas nid now src op tn p vals evs fin sched st H
+walk-frame-burst sl id L sf gas nid now src (from-inner op allNid inst) p vals evs fin sched st H =
+  walk-frame-inner-burst sl id L sf gas nid now src op allNid inst p vals evs fin sched st H
+
+-- ONE WALK'S BURST LEDGER, A REAL BODY OVER THE THREE LEAVES ABOVE,
+-- stated at the level the walk is entered at and under the same tuple
+-- as its caps ledger.  Every head pays its length by `walk-len`; a
+-- frame pays its drain by the frame match and its tail by the walk one
+-- level up, under the tail hypotheses the caps walk builds -- the
+-- statement is shaped after that walk rather than read against a cap
+-- of its own, since the flat readings died on a hypothesis read at
+-- the next instant's cap, which admits widths no frame in the instant
+-- runs against, and not on the number.
+--
+-- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at one chain's
+--   root against a width-two cap granting three.  It kills the ENTRY
+--   width as the number; the number here is the next instant's size,
+--   which grants 256 at that shape.
+-- TWIN: `chain-walk-caps` -- the same walk under the same tuple,
+--   proven; the burst conjuncts sit beside its size conjuncts frame
+--   for frame.
+chain-walk-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
+  burstsOK (nestBurstAt e sl id) sf gas nid now p vals fin sched st
+chain-walk-burst sl id L sf gas nid now src root vals evs fin sched st H =
+  walk-len sl id L sf gas nid now src root vals evs fin sched st H
+chain-walk-burst sl id L sf gas nid now src (share-sink i) vals evs fin sched st H =
+    walk-len sl id L sf gas nid now src (share-sink i) vals evs fin sched st H
+  , walk-sink-burst sl id L sf gas nid now src i vals evs fin sched st H
+chain-walk-burst {e = e} sl id L sf gas nid now src (f ↠ p) vals evs fin sched st H =
+    walk-len sl id L sf gas nid now src (f ↠ p) vals evs fin sched st H
+  , walk-frame-burst sl id L sf gas nid now src f p vals evs fin sched st H
+  , chain-walk-burst sl id (fLvlD (Caps.cSize c) (Caps.cWid c) (capsH e sl id) L)
+      sf gas nid now src p
+      (proj₁ r) (evs ++ proj₁ (proj₂ r)) (proj₁ (proj₂ (proj₂ r)))
+      (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+      (walk-hyps-step sl id L sf gas nid now src f p vals evs fin sched st H)
+  where
+  c = capsAt e sl id
+  r = stepFrame sf nid now f p vals fin sched st

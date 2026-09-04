@@ -215,33 +215,31 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DRAIN LEAF, DENOMINATED PER INNER, AND THE LENGTH CONJUNCTS OF
-  `chain-walk-burst` AS A REAL BODY OVER IT.** The root-ceiling reading
-  of the drain conjunct is refuted, so the conjunct becomes its own leaf
-  at full strength — a handed or queued inner's `descW` under the number,
-  hypothesised on the node's SIZE conjunct, the one thing the invariant
-  carries per inner — born FALSITY. The body then mirrors the caps walk's
-  path induction: root and share-sink arms need one length bound, frame
-  arms that bound plus the tail; `valsCaps?` bounds each handoff by the
-  width at its landing level, `reached-room` puts that level's next
-  charge under the top, and two arithmetic lemmas close it — `J ≤ sizeAt
-  S J` one below the size, the top under `nestBurstAt` by `iterSize-infl`.
+- **PROBE THE PER-INNER ROOM ARITHMETIC, BEFORE EITHER DRAIN ARM IS
+  WRITTEN OVER IT.** The level half is now proven — `reached-len` puts one
+  over the width at any level a reached walk stands at under the number —
+  so what is left is the ceiling half: a runtime inner's `bCeilᵉ` under
+  `iterFold S (sizeᵉ o) M` at its own size, joined with `slotsBCeil`.
+  Both sides compute, so instantiate at nested shapes — two `*All` layers,
+  a template with several mentions, a merge inside a switch's drain —
+  before any grind. A refutation moves the denomination to the invariant
+  record; a receipt makes the room lemma the leaf both arms spend.
 
-- **PROBE THE LEAF'S ARITHMETIC.** `descW-ceil` puts the inner's descent
-  under its OWN ceiling, and a ceiling is under `iterFold S (sizeᵉ o) W`
-  node for node, so the leaf reduces to `iterFold S S W ⊔ slotsBCeil ≤
-  nestBurstAt` at the node's caps. Both sides are floors the harness and
-  `nestB-tower` compute, so instantiate at nested shapes — two `*All`
-  layers, a template with several mentions — before grinding. A
-  refutation restates the leaf's number; a receipt moves it to
-  DIFFICULTY.
+- **THE `thru-outer` ARM AS A REAL BODY OVER THAT ROOM LEMMA.**
+  `walk-frame-thru-burst` is `thruRoomWOK` over the walk's arrivals, each
+  at the state the previous left, and each conjunct is `innerW` of one
+  handed inner — `descW-ceil` at the runtime term, the size conjunct out
+  of the closure reading the walk already carries, `wid-iterFold` per
+  burst-kids node joined by `iterFold-mono-count`, then the room lemma.
+  The switch half is the same reading at the kill state, which moves no
+  node the ceiling is read from.
 
-- **DISCHARGE THE LEAF BY THE PROBE'S VERDICT.** `descW-ceil` at the
-  runtime inner, `wid-iterFold` per burst-kids node joined by
-  `iterFold-mono-count`, the size conjunct out of `widNode`, and the
-  arithmetic lemma the receipt aimed. If the probe refuted instead, the
-  denomination moves to the invariant record — a per-inner ceiling field
-  — and the restatement cascades through the nodes, live and regs faces.
+- **THE `from-inner` ARM, WHICH IS THAT ARM OVER A QUEUE.**
+  `walk-frame-inner-burst` reads `drainW`'s fold over the parked inners
+  off the node the run installed, so it is the thru arm one entry at a
+  time with the join in place of the pair. What it needs beyond the thru
+  arm is that a parked entry is sized by the invariant the same way a
+  handed one is, which is the merge node's own store conjunct.
 
 ### The ledger
 
@@ -288,11 +286,15 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`chain-walk-burst`** (Part7/Walk-Sink) — FALSITY,
-  `REFUTED×2, DEAD ROUTE, TWIN`: ONE walk's burst ledger at the level it is
-  entered at. The length conjuncts follow the level route in the number's
-  header; the DRAIN conjunct — a substituted inner's burst — is refuted against
-  the root's ceiling and unprobed at its per-inner size.
+- **`walk-frame-thru-burst`** (Part7/Walk-Sink) — FALSITY,
+  `REFUTED, DEAD ROUTE`: what ONE handed inner may burst at a `thru-outer`,
+  denominated in the next instant's size. The root's ceiling is refuted as the
+  denomination and every entry-read reading with it; the per-inner size route
+  is unprobed at its arithmetic.
+- **`walk-frame-inner-burst`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the
+  same claim over a merge's parked queue, read off the node the run installed.
+  It inherits the thru leaf's dead entry-read denominations, since a queue is
+  more copies of the same substitution, and nothing has instantiated the fold.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
@@ -371,6 +373,10 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
+- **`walk-sink-burst`** (Part7/Walk-Sink) — GRINDABLE, `TWIN`: the share sink's
+  dispatch under the burst number — one entry per admitted registration, each
+  at the state the previous left, the fold one gas down. The caps ring walks
+  the same fold under the same tuple, entry for entry.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
