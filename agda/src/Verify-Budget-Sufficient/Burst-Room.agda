@@ -39,12 +39,12 @@ open import Rx.Evaluator using (iterFold; sizeAt)
 open import Verify-Budget-Sufficient.Measures using (slotDef-size)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; capsAt; capsH; frameStep; iterFold-mono-count; iterFold-mono-base;
-   iterSize-infl; 2≤capsAt-size; capsAt-base-size)
+   iterSize-infl; 2≤capsAt-size; capsAt-base-size; sizeAt-strict)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (SlotWid; suc≤foldStep)
 open import Verify-Budget-Sufficient.Caps-Face.Part2 using (wid-iterFold; slotsCaps?-slotWid)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (slotsCaps?-capsAt)
 open import Verify-Budget-Sufficient.Nest-Ceiling using (Reached)
-open import Verify-Budget-Sufficient.Fold-Room using (size-room; sizeAt-strict)
+open import Verify-Budget-Sufficient.Fold-Room using (size-room)
 open import Verify-Budget-Sufficient.Nest-Store using (nestBurstAt)
 
 -- THE BURST CEILING IS A WIDTH FOLD AT THE NODE'S OWN SIZE.  It is the

@@ -58,7 +58,7 @@ open import Verify-Budget-Sufficient.Caps
   using (Caps; frameStep; sizeCount; frameStep-mono-j)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (FaceOK; faceHere; capsDrainOK; nestValOK?-widen)
-open import Verify-Budget-Sufficient.Nest-Ceiling using (ceil-sweep-step)
+open import Verify-Budget-Sufficient.Nest-Ceiling using (ceilS-sweep-step)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; drainW-here; drainW-tail)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthFin; depthDrain; depthInner)
@@ -346,16 +346,15 @@ mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
 ... | true  = ≤-trans IH₀ (⊔-lub (⊔-lub SUB₀ S≤) U≤)
   where
   B̂     = proj₁ hcd
-  Ŝ     = proj₁ (proj₂ hcd)
-  ceilQ = proj₁ (proj₂ (proj₂ hcd))
-  hcdA  = proj₂ (proj₂ (proj₂ hcd))
+  ceilQ = proj₁ (proj₂ hcd)
+  hcdA  = proj₂ (proj₂ hcd)
 
   r₁     = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
   done   = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
   sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
   st₁    = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
 
-  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA)))))))
+  tailΣ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hcdA))))))
   r₀    = proj₁ tailΣ
   step″ = frameStep-mono-j c (FaceOK.fSize faceHere) (m≤m+n Lv r₀)
 
@@ -380,8 +379,7 @@ mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
 
   IH₀ = mergeAllDrain-nest-live c sl d W (Lv + r₀) G B U sf allNid κ id now lim
           (if done then act else suc act) q sched₁ st₁
-          (B̂ , Ŝ
-             , ceil-sweep-step c d Lv B̂ (suc (length q + Ŝ)) r₀
+          (B̂ , ceilS-sweep-step c (pred d) d Lv (suc B̂) (length q) r₀
                  (FaceOK.fSize faceHere) (proj₁ (proj₂ tailΣ)) ceilQ
              , proj₂ (proj₂ tailΣ))
           (≤-trans (drainW-tail sf allNid κ id now o q sched st) hw)

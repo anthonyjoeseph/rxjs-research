@@ -103,11 +103,11 @@ open import Rx.Evaluator
   using (Sched; EvalSt; Arrival; RegId; Chain; Path; Frame; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; Stream; stepFrame; cascadeGo; dropSource; shareLatch; shareFinish; hasDry;
   dryEvent; budgetAt; capsHgo; capsBase; arrTy; arrVal; fLvlD; opIterD; regAt; subscribeInner;
-  subscribeE; splitBurst; splitEvents; sLvlD; sIterD; sIterD-suc; sizeAt; fLvlD-suc; widAt;
-  AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals;
-  cutThrough; lookupNode; pathHasNode; memberSource; scanVals; innerFinish; mergeAllDrain;
-  aliveThroughᶠ; mergeAllBump; switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st;
-  hasRoom; mergeAll-st; switch-st; exhaust-st)
+  subscribeE; splitBurst; splitEvents; sLvlD; sIterD; sIterD-suc; sizeAt; AllOp; mergeAllᵒ;
+  switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals; cutThrough; lookupNode;
+  pathHasNode; memberSource; scanVals; innerFinish; mergeAllDrain; aliveThroughᶠ; mergeAllBump;
+  switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st; hasRoom; mergeAll-st;
+  switch-st; exhaust-st)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk
@@ -139,6 +139,7 @@ open import Verify-Budget-Sufficient.Keeps-Ring
 -- is what took the per-element ceiling off an unstated fLvlD inequality.
 open import Verify-Budget-Sufficient.Caps-Chain using (walk-desc; inner-desc)
 open import Verify-Budget-Sufficient.Caps using (sIterD-mono; sizeAt-mono;
+                                                 frame-room; fuel-pred;
                                                  1≤capsAt-reg; 2≤capsAt-size;
                                                  6≤capsAt-size; B2-cReg≤cSize;
                                                  Caps; capsAt;
@@ -346,37 +347,6 @@ thruWalk-nodry-dep : ∀ {n} {Γ : Ctx n} {u t} {e : Closed Γ t}
 thruWalk-nodry-dep dep sf op nid κ id now o os sched₀ st₀ h =
   ≤-trans (m≤n⊔m _ _) h
 
--- ONE FRAME'S ALLOWANCE, OPENED FOR THE TRAVERSAL INSIDE IT.  `fLvlD S W
--- (suc d) j` unfolds to exactly an `sIterD` at `d`, over `suc (widAt S W j)`
--- payloads, at `k = suc (sizeAt S (suc j))`, starting from `fLvl S W j` --
--- so a traversal that fits those two counts fits inside the frame, and the
--- `k` slot is `≤-refl` whenever the bud is pinned to the frame's own refresh.
--- Both frame boundaries that open a payload traversal spend this: the
--- thru-outer frame over a value list, and the from-inner frame over a
--- mergeAll queue.
---
--- THE FUEL IS TAKEN AS `pred d`, NOT BY SPLITTING `d`, and that is what
--- makes it usable at both.  A frame charges itself one level before opening
--- the traversal, so `1 ≤ d` is free at every such call site; matching on THAT
--- rather than on `d` keeps a caller with a thirty-arm clause tree from
--- having to split all of it just to name `d′`.
-frame-room : ∀ (S W d m j : ℕ) → 2 ≤ S → 1 ≤ d →
-  m ≤ suc (widAt S W j) →
-  sIterD S W (pred d) (suc (sizeAt S (suc j))) m j ≤ fLvlD S W d j
-frame-room S W zero     m j 2≤S ()      hm
-frame-room S W (suc d′) m j 2≤S (s≤s _) hm =
-  ≤-trans (sIterD-mono m (suc (widAt S W j)) d′ d′
-             (suc (sizeAt S (suc j))) (suc (sizeAt S (suc j)))
-             2≤S ≤-refl ≤-refl (m≤m+n j _) ≤-refl ≤-refl hm)
-          (≤-reflexive (sym (fLvlD-suc S W d′ j)))
-
--- THE FRAME'S OWN ARC, SPENT.  A frame clause that opens a traversal charges
--- itself first, so the hypothesis in hand is `suc <inner> ≤ d`; this reads the
--- inner charge back out at `pred d`, again without splitting `d` at the
--- caller.  Matching `s≤s` is what forces the fuel to be a successor, so the
--- two lemmas agree on `pred d` by construction rather than by convention.
-fuel-pred : ∀ {m d : ℕ} → suc m ≤ d → m ≤ pred d
-fuel-pred (s≤s h) = h
 
 -- `not x ≡ true` and `x ≡ false`, in both directions: the ledger
 -- carries the ∧-composable form, the dry lemmas speak the other

@@ -57,7 +57,7 @@ open import Verify-Budget-Sufficient.Measures using
   (all-impl; boundedLive; boundedNode; fnCapᵛ; ∧-true)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; frameStep; iterFold-infl; iterFold-mono-count; iterSize-infl;
-   iterSize-mono-count; iterSize-suc)
+   iterSize-mono-count; iterSize-suc; pair≤sizeStep)
 -- the nesting measure the subscribe budget descends on, and the frame
 -- row that supplies it.  Re-exported, so the clique names one module
 -- the depth mirror: `depthInner` is the fuel `thruOuter-face-core`'s
@@ -77,7 +77,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (applyFn-iterSize; capsOK?; capsOK?-mono; closLive; eventCaps?;
    closSizeᵛ; closSizeᵛ-OK; closSizeᵛ≤mul;
-   frameSz?; iterFold-+; iterSize-+; nestClosOK?ᵛ; pair≤sizeStep; pathSz?;
+   frameSz?; iterFold-+; iterSize-+; nestClosOK?ᵛ; pathSz?;
    slotsCaps?; slotsCaps?-clos; SlotWid; valCaps?; widLive; widNode)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (applyFn-iterFold; frameStep-⊑-+; valCaps?-size; valCaps?-wid; wid-lift)

@@ -28,9 +28,9 @@ open import Rx.Evaluator using
   (iterFold; iterL; dLvl; dCapᶜ; sizeAt; widAt; fLvlD; fCharge)
 open import Verify-Budget-Sufficient.Caps using
   (Caps; capsAt; capsH; sizeCount; fLvl≤fLvlD; iterL-infl; lvls-mono; dLvl-mono; 1≤dCapᶜ;
-   iterSize-infl; iterSize-suc; 2≤capsAt-size; 1≤capsAt-reg; iterL-mono; iterFold-mono-count;
+   iterSize-infl; 2≤capsAt-size; 1≤capsAt-reg; iterL-mono; iterFold-mono-count;
    J+n≤iterL)
-open import Verify-Budget-Sufficient.Caps-Face.Part1 using (k≤iterSize; pair≤sizeStep)
+open import Verify-Budget-Sufficient.Caps-Face.Part1 using (k≤iterSize)
 open import Verify-Budget-Sufficient.Nest-Ceiling using (Reached; reached-room)
 open import Verify-Budget-Sufficient.Nest-Store using (nestBurstAt; nestBurstAt-def)
 
@@ -159,14 +159,3 @@ suc≤iterL S W d k J =
   ≤-trans (≤-trans (s≤s (m≤m+n J k)) (≤-reflexive (sym (+-suc J k))))
           (J+n≤iterL S W d (suc k) J)
 
--- AND THE SIZE AT A LEVEL IS STRICTLY UNDER THE SIZE AT THE NEXT.  The
--- size step at least doubles and adds one, so a count that fits the
--- size at a level fits the next level's with a step to spare.  That
--- spare step is exactly what a width read at a SEED one over the caps
--- width costs: one count step off the top, paid at the level rather
--- than at the seed.
-sizeAt-strict : ∀ (S J : ℕ) → 1 ≤ S → suc (sizeAt S J) ≤ sizeAt S (suc J)
-sizeAt-strict S J 1≤S =
-  ≤-trans (≤-trans (s≤s (m≤m+n (sizeAt S J) (sizeAt S J)))
-                   (pair≤sizeStep S (sizeAt S J) 1≤S))
-          (≤-reflexive (sym (iterSize-suc S J S)))
