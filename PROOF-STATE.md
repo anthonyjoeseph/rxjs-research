@@ -215,35 +215,33 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PROBE THE DRAIN REGION OF THE BURST LEDGER, THE ONE PART OF IT NO
-  EVIDENCE REACHES.** Anthony declined to rule between the two candidate
-  repairs and delegated the choice; the choice made is neither. The
-  number stays flat and the leaf is restated at the walk's own level as
-  the caps walk's twin, so the flat readings died on the leaf's old
-  hypothesis and not on the number. What is unknown is whether `descW`
-  of an inner the evaluator has SUBSTITUTED can exceed the syntactic
-  ceiling that bounds the root's — `descW` computes and `burstW-eq` is
-  refl, so it is instantiable. A refutation restates the drain
-  conjunct; a receipt at nested shapes moves the row to DIFFICULTY.
+- **THE DRAIN LEAF, DENOMINATED PER INNER, AND THE LENGTH CONJUNCTS OF
+  `chain-walk-burst` AS A REAL BODY OVER IT.** The root-ceiling reading
+  of the drain conjunct is refuted, so the conjunct becomes its own leaf
+  at full strength — a handed or queued inner's `descW` under the number,
+  hypothesised on the node's SIZE conjunct, the one thing the invariant
+  carries per inner — born FALSITY. The body then mirrors the caps walk's
+  path induction: root and share-sink arms need one length bound, frame
+  arms that bound plus the tail; `valsCaps?` bounds each handoff by the
+  width at its landing level, `reached-room` puts that level's next
+  charge under the top, and two arithmetic lemmas close it — `J ≤ sizeAt
+  S J` one below the size, the top under `nestBurstAt` by `iterSize-infl`.
 
-- **THE LENGTH CONJUNCTS OF `chain-walk-burst`, AS A REAL BODY OVER A
-  DRAIN LEAF.** Mirror the caps walk's path induction: the root and
-  share-sink arms need one length bound, the frame arms that bound plus
-  the tail. Each frame's `valsCaps?` bounds its handoff by the width at
-  its landing level; `reached-room` puts that level's next charge under
-  the top; two arithmetic lemmas close it — `J ≤ sizeAt S J` at one
-  below the size, and the top under `nestBurstAt` by `iterSize-infl`.
-  The drain conjunct at `thru-outer` and `from-inner` is postulated at
-  full strength as its own leaf, born FALSITY.
+- **PROBE THE LEAF'S ARITHMETIC.** `descW-ceil` puts the inner's descent
+  under its OWN ceiling, and a ceiling is under `iterFold S (sizeᵉ o) W`
+  node for node, so the leaf reduces to `iterFold S S W ⊔ slotsBCeil ≤
+  nestBurstAt` at the node's caps. Both sides are floors the harness and
+  `nestB-tower` compute, so instantiate at nested shapes — two `*All`
+  layers, a template with several mentions — before grinding. A
+  refutation restates the leaf's number; a receipt moves it to
+  DIFFICULTY.
 
-- **THE DRAIN LEAF, BY THE PROBE'S VERDICT.** Refuted: the drain
-  conjunct needs a run invariant — a substituted inner's ceiling under
-  the root's — carried on the invariant record and not as a hypothesis,
-  and the restatement cascades through the nodes, live and regs faces
-  that assume the width today. Receipt: state the ceiling's invariance
-  under the evaluator's substitution, of which `bCeil-elimGᵉ` and
-  `bCeil-unfoldμ` are the syntactic halves, and derive the drain bound
-  from `descW-ceil` at the runtime inner.
+- **DISCHARGE THE LEAF BY THE PROBE'S VERDICT.** `descW-ceil` at the
+  runtime inner, `wid-iterFold` per burst-kids node joined by
+  `iterFold-mono-count`, the size conjunct out of `widNode`, and the
+  arithmetic lemma the receipt aimed. If the probe refuted instead, the
+  denomination moves to the invariant record — a per-inner ceiling field
+  — and the restatement cascades through the nodes, live and regs faces.
 
 ### The ledger
 
@@ -290,11 +288,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`chain-walk-burst`** (Part7/Walk-Sink) — FALSITY, `REFUTED, TWIN`: ONE
-  walk's burst ledger, stated at the level it is entered at. The length
-  conjuncts follow the level route in the number's header; the DRAIN
-  conjunct — a substituted inner's burst — is what nothing in the tree
-  bounds, and no evidence reaches it.
+- **`chain-walk-burst`** (Part7/Walk-Sink) — FALSITY,
+  `REFUTED×2, DEAD ROUTE, TWIN`: ONE walk's burst ledger at the level it is
+  entered at. The length conjuncts follow the level route in the number's
+  header; the DRAIN conjunct — a substituted inner's burst — is refuted against
+  the root's ceiling and unprobed at its per-inner size.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
