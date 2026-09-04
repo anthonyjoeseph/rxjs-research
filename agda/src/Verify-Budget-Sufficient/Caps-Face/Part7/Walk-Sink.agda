@@ -363,10 +363,9 @@ walk-sink-caps {n = n} {Γ = Γ} {t = t} {e = e} sl id L sf (suc gas) nid now sr
 -- WHAT IS ACTUALLY OWED IS THREE THINGS, and they fail for three
 -- different reasons.  The entry's CLOSURE key is recorded nowhere --
 -- the store predicate's closure half ranges over the live list and
--- never over the node table -- but it does not want a field, because
--- a key read through a CAPPED telescope is at most the cap times the
--- term's plain size, and the size is recorded; one level absorbs the
--- factor, which is the ratio `clos-lift` already spends.  The ROOM
+-- never over the node table -- and the entry now states it one level
+-- up, where the size the park field records buys it through the capped
+-- telescope at the ratio `clos-lift` spends.  The ROOM
 -- FLOOR comes off the store predicate's own park field, which is what
 -- fixes the cap it is read at: the field is re-established one level
 -- up at every park, so the floor is a statement about the walk's level
