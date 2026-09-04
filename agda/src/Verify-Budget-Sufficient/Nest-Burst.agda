@@ -366,6 +366,30 @@ abstract
       ≤ drainW sf allNid κ id now (o ∷ q) sched st
   drainW-tail sf allNid κ id now o q sched st = m≤n⊔m _ _
 
+  -- AND THE DRAIN'S OWN CLAUSES, for the reason the pair of projections
+  -- directly above cannot serve: they hand a consumer either side of the
+  -- join, which is what SPENDING the queue's measure needs, while a
+  -- statement BOUNDING it has to discharge both sides at once and the
+  -- seal makes neither equation derivable from the two `≤`s.  The
+  -- clauses are the seal's whole content at this name, so both bodies
+  -- are `refl`.
+  drainW-nil-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) →
+    drainW sf allNid κ id now [] sched st ≡ 0
+  drainW-nil-eq sf allNid κ id now sched st = refl
+
+  drainW-cons-eq : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (o : Closed Γ s) (q : List (Closed Γ s)) (sched : Sched Γ) (st : EvalSt e) →
+    let r = subscribeInner sf mergeAllᵒ allNid κ id now o sched st in
+    drainW sf allNid κ id now (o ∷ q) sched st
+      ≡ innerW sf mergeAllᵒ allNid κ id now o sched st
+          ⊔ drainW sf allNid κ id now q
+              (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+              (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+  drainW-cons-eq sf allNid κ id now o q sched st = refl
+
   -- AND THE JOIN ITSELF AT EVERY HEAD, which is what a proof ABOUT the
   -- whole descent needs and the projections above deliberately do not
   -- give.  A projection hands a consumer one side; an induction has to

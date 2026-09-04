@@ -33,7 +33,8 @@ open import Verify-Budget-Sufficient.Subscribe-Face using (stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (burstsOK; capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainOK; shareCapsOK;
    dispatchBurstsOK; frameDrainW; thruRoomW; thruRoomWOK)
-open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; innerW-g0-eq; innerW-gs-eq)
+open import Verify-Budget-Sufficient.Nest-Burst using
+  (drainW; drainW-nil-eq; drainW-cons-eq; innerW; innerW-g0-eq; innerW-gs-eq)
 open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
 open import Verify-Budget-Sufficient.Burst-Room using (inner-room)
 open import Verify-Budget-Sufficient.Nest-Store using (nestBurstAt)
@@ -44,7 +45,7 @@ open import Verify-Budget-Sufficient.Deliver-Measure using
   (shareAdmit-len; shareAdmit-sz; admSz?)
 open import Rx.Evaluator using (Sched; EvalSt; RegId; mergeAll-st; lookupNode; NodeId; _↠_; Frame; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; Path; stepFrame; regAt; share-sink; root; dCapᶜ; fLvlD; lvls;
-  shareAdmit; shareLatch; thruConsume; switchKill)
+  shareAdmit; shareLatch; thruConsume; switchKill; subscribeInner; mergeAllᵒ)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Deliveries using
@@ -54,9 +55,9 @@ open import Verify-Budget-Sufficient.Caps using
   frameStep; frameStep-mono-j; frameStep-reg-mono; iterL-infl; sucJ≤fLvlD; regAt-mono;
   lvls-infl; lvls-mono; size≤sizeCount; sizeCount)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; ∧-true; all-impl)
+  (pathLen; ∧-true; all-impl; NodePark; lookupNode-park)
 open import Verify-Budget-Sufficient.Keeps-Ring using
-  (KeepsC; stepFrame-keeps; thruConsume-keeps; switchKill-keeps)
+  (KeepsC; stepFrame-keeps; thruConsume-keeps; switchKill-keeps; subscribeInner-keeps)
 open import Verify-Budget-Sufficient.Caps-Depth
   using (depthFrame)
 
@@ -65,8 +66,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using
   (clos-lift; valsCaps?-parts)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
-  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-regs; frameBud; shareLatch-caps;
-  slotsCaps?-capsAt; valsCaps?-lvl)
+  (foldPath-slots; capsOK?-count; capsOK?-delivered; capsOK?-parts; capsOK?-regs; frameBud;
+  shareLatch-caps; slotsCaps?-capsAt; valsCaps?-lvl)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size)
 open import Decide using (T-to)
@@ -618,6 +619,13 @@ walk-len {e = e} sl id L sf gas nid now src p vals evs fin sched st
 -- clauses with the burst walk in place of the caps walk at each entry
 -- and the burst floor in place of the caps floor.
 --
+-- ITS MEASURE IS NOT DEV-CHECKABLE, AND THAT IS THE ONLY THING HERE
+-- THAT CAN FAIL.  The ring calls back into the walk that calls it, so
+-- discharging this joins the module's existing multi-member block --
+-- which `make agda-dev` STUBS.  Termination is then checked by the
+-- gate and by nothing cheaper, so the measure is settled against the
+-- caps ring's before a clause is typed rather than discovered after.
+--
 -- TWIN: `walk-sink-caps` -- the same fold over the same registry,
 --   proven, entry for entry.
 postulate
@@ -629,15 +637,37 @@ postulate
     WalkHyps {t = t} sl id L sf gas nid now src (share-sink i) vals evs fin sched st →
     dispatchBurstsOK (nestBurstAt e sl id) sf gas nid now i vals fin sched st
 
--- ONE ARRIVAL'S INNER DESCENT UNDER THE NUMBER, at the state it
--- arrives in and at the state a switch's kill leaves.  Out of gas the
--- descent is never made and the reading is zero.  With gas it is the
--- substituted inner's own descent, and `descW-ceil` puts that under
--- the inner's BURST ceiling joined with the telescope's -- a reading
--- of syntax, so a kill moves neither side and the two conjuncts are
--- one bound applied twice.  The level is read at the frame's own
--- `suc L`, which is what a frame arm has and what the seed trade
--- underneath costs.
+-- ONE INNER SUBSCRIPTION UNDER THE NUMBER, WHICH IS WHERE BOTH DRAINS
+-- MEET.  Out of gas the descent is never made and the reading is zero.
+-- With gas it is the substituted inner's own descent, and `descW-ceil`
+-- puts that under the inner's BURST ceiling joined with the
+-- telescope's.  The level is read at the frame's own `suc L`, which is
+-- what a frame arm has and what the seed trade underneath costs.  The
+-- premise is the inner's SIZE and nothing about where it came from,
+-- which is why an arrival the walk carries and an entry parked on a
+-- merge node spend the same statement -- the two differ only in which
+-- receipt supplies that size.
+inner-bound : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id L P g : ℕ) (sf : Gas) (op : AllOp) (tn : NodeId) (nid : Id)
+  (now : Tick) (p : Path Γ u t) (o : Closed Γ u)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  Reached (capsAt e sl id) (capsH e sl id) P (suc g) → suc L ≤ P →
+  sizeᵉ o ≤ Caps.cSize (frameStep L (capsAt e sl id)) →
+  innerW sf op tn p nid now o sched st ≤ nestBurstAt e sl id
+inner-bound sl id L P g g0 op tn nid now p o sched st eqs hR hLP hsz =
+  ≤-trans (≤-reflexive (innerW-g0-eq op tn p nid now o sched st)) z≤n
+inner-bound sl id L P g (gs fuel) op tn nid now p o sched st eqs hR hLP hsz =
+  ≤-trans (≤-reflexive (innerW-gs-eq fuel op tn p nid now o sched st))
+          (≤-trans (descW-ceil fuel sl o (from-inner op tn (Sched.nextNode sched) ↠ p) nid now
+                      (record sched { nextNode = suc (Sched.nextNode sched) }) st eqs)
+                   (inner-room sl id L P g o hR hLP hsz))
+
+-- AND ONE ARRIVAL'S, at the state it arrives in and at the state a
+-- switch's kill leaves.  The ceiling above is a reading of SYNTAX, so
+-- a kill moves neither side of it and the two conjuncts are one bound
+-- applied twice; only the telescope has to be carried across, which
+-- the kill preserves.
 thru-room-one : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id L P g : ℕ) (sf : Gas) (op : AllOp) (tn : NodeId) (nid : Id)
   (now : Tick) (p : Path Γ u t) (o : Val Γ (obs u))
@@ -646,30 +676,20 @@ thru-room-one : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   Reached (capsAt e sl id) (capsH e sl id) P (suc g) → suc L ≤ P →
   valCaps? (frameStep L (capsAt e sl id)) sl (obs u) o ≡ true →
   thruRoomW (nestBurstAt e sl id) sf op tn p nid now o sched st
-thru-room-one sl id L P g g0 op tn nid now p o sched st eqs hR hLP hv =
-    ≤-trans (≤-reflexive (innerW-g0-eq op tn p nid now o sched st)) z≤n
+thru-room-one {e = e} {u = u}
+  sl id L P g sf op tn nid now p o sched st eqs hR hLP hv =
+    inner-bound sl id L P g sf op tn nid now p o sched st eqs hR hLP hsz
   , λ cur od _ →
-      ≤-trans (≤-reflexive (innerW-g0-eq op tn p nid now o
-                             (proj₁ (proj₂ (switchKill cur sched st)))
-                             (proj₂ (proj₂ (switchKill cur sched st))))) z≤n
-thru-room-one {n = n} {Γ = Γ} {e = e} {u = u}
-  sl id L P g (gs fuel) op tn nid now p o sched st eqs hR hLP hv =
-    bound sched st eqs
-  , λ cur od _ → bound (proj₁ (proj₂ (switchKill cur sched st)))
-                      (proj₂ (proj₂ (switchKill cur sched st)))
-                      (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) eqs)
+      inner-bound sl id L P g sf op tn nid now p o
+        (proj₁ (proj₂ (switchKill cur sched st)))
+        (proj₂ (proj₂ (switchKill cur sched st)))
+        (trans (KeepsC.slotsEq (switchKill-keeps cur sched st)) eqs)
+        hR hLP hsz
   where
   c = capsAt e sl id
   hsz : sizeᵉ o ≤ Caps.cSize (frameStep L c)
   hsz = ≤ᵇ⇒≤ (sizeᵉ o) (Caps.cSize (frameStep L c))
           (T-to (valCaps?-size (frameStep L c) sl (obs u) o hv))
-  bound : (sc : Sched Γ) (s : EvalSt e) → Sched.slots sc ≡ sl →
-    innerW (gs fuel) op tn p nid now o sc s ≤ nestBurstAt e sl id
-  bound sc s eq =
-    ≤-trans (≤-reflexive (innerW-gs-eq fuel op tn p nid now o sc s))
-            (≤-trans (descW-ceil fuel sl o (from-inner op tn (Sched.nextNode sc) ↠ p) nid now
-                        (record sc { nextNode = suc (Sched.nextNode sc) }) s eq)
-                     (inner-room sl id L P g o hR hLP hsz))
 
 -- AND OVER A WALK'S ARRIVALS, each at the state the previous one left.
 -- Nothing the bound above reads moves with the state -- the ceiling is
@@ -731,25 +751,80 @@ walk-frame-thru-burst {e = e} sl id L sf gas nid now src op tn p vals evs fin sc
   where
   c = capsAt e sl id
 
+-- AND OVER A MERGE'S PARKED QUEUE, each entry at the state the
+-- previous entry's subscribe left.  The induction is the arrival
+-- list's with the join in place of the pair, and it carries the
+-- telescope for the same reason: a `subscribeInner` preserves it, and
+-- nothing else the bound reads moves with the state.  What differs is
+-- where an entry's size comes from -- the walk's value reading prices
+-- what it CARRIES, and a parked entry is not carried, so the size is
+-- the store's own park receipt, which prices an entry against the
+-- frame's cap with the telescope already subtracted.
+drain-room : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id L P g : ℕ) (sf : Gas) (allNid : NodeId) (nid : Id)
+  (now : Tick) (p : Path Γ u t) (q : List (Closed Γ u))
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  Reached (capsAt e sl id) (capsH e sl id) P (suc g) → suc L ≤ P →
+  all (λ o → 3 + (sizeᵉ o + slotsSize sl)
+               ≤ᵇ Caps.cSize (frameStep L (capsAt e sl id))) q ≡ true →
+  drainW sf allNid p nid now q sched st ≤ nestBurstAt e sl id
+drain-room sl id L P g sf allNid nid now p [] sched st eqs hR hLP hall =
+  ≤-trans (≤-reflexive (drainW-nil-eq sf allNid p nid now sched st)) z≤n
+drain-room {e = e} sl id L P g sf allNid nid now p (o ∷ q) sched st eqs hR hLP hall =
+  ≤-trans (≤-reflexive (drainW-cons-eq sf allNid p nid now o q sched st))
+    (⊔-lub
+      (inner-bound sl id L P g sf mergeAllᵒ allNid nid now p o sched st eqs hR hLP hsz)
+      (drain-room sl id L P g sf allNid nid now p q
+         (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+         (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r)))))
+         (trans (KeepsC.slotsEq
+                   (subscribeInner-keeps sf mergeAllᵒ allNid p nid now o sched st)) eqs)
+         hR hLP (proj₂ (∧-true _ _ hall))))
+  where
+  r = subscribeInner sf mergeAllᵒ allNid p nid now o sched st
+  c = capsAt e sl id
+  hsz : sizeᵉ o ≤ Caps.cSize (frameStep L c)
+  hsz = ≤-trans (≤-trans (m≤m+n (sizeᵉ o) (slotsSize sl))
+                         (m≤n+m (sizeᵉ o + slotsSize sl) 3))
+                (≤ᵇ⇒≤ (3 + (sizeᵉ o + slotsSize sl)) (Caps.cSize (frameStep L c))
+                   (T-to (proj₁ (∧-true _ _ hall))))
+
 -- THE DRAIN AT A `from-inner`, THE SAME CLAIM OVER A MERGE'S QUEUE:
 -- every parked inner's `innerW` under the number, the queue read off
 -- the node the run installed.  The route is the thru leaf's, one
--- entry at a time -- each queued inner is a closed term the invariant
--- sizes -- and the entry-read denominations `walk-frame-thru-burst`
--- records as dead die here the same way, since a queue is more copies
--- of the same substitution.
-postulate
-  walk-frame-inner-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (src : Source) (op : AllOp) (allNid : NodeId) (inst : NodeId)
-    (p : Path Γ u t) (vals : List (Val Γ u))
-    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    WalkHyps sl id L sf gas nid now src (from-inner op allNid inst ↠ p)
-      vals evs fin sched st →
-    ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
-      lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
-      drainW sf allNid p nid now q sched st ≤ nestBurstAt e sl id
+-- entry at a time, and the entry-read denominations
+-- `walk-frame-thru-burst` records as dead die here the same way, since
+-- a queue is more copies of the same substitution.
+walk-frame-inner-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+  (src : Source) (op : AllOp) (allNid : NodeId) (inst : NodeId)
+  (p : Path Γ u t) (vals : List (Val Γ u))
+  (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) →
+  WalkHyps sl id L sf gas nid now src (from-inner op allNid inst ↠ p)
+    vals evs fin sched st →
+  ∀ (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ u)) (od : Bool) →
+    lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
+    drainW sf allNid p nid now q sched st ≤ nestBurstAt e sl id
+walk-frame-inner-burst sl id L sf gas nid now src op allNid inst p vals evs fin sched st
+  (_ , _ , _ , _ , _ , _ , (zero , _ , () , _ , _)) lim act q od hnd
+walk-frame-inner-burst {e = e} sl id L sf gas nid now src op allNid inst p vals evs fin sched st
+  (heq , hok , _ , _ , _ , _ , (suc g , P , _ , hlvP , hR)) lim act q od hnd =
+  drain-room sl id L P g sf allNid nid now p q sched st heq hR
+    (≤-trans (suc≤iterL (Caps.cSize c) (Caps.cWid c) (capsH e sl id) (pathLen p) L) hlvP)
+    (subst (λ z → all (λ o → 3 + (sizeᵉ o + slotsSize z)
+                               ≤ᵇ Caps.cSize (frameStep L c)) q ≡ true)
+           heq
+           (subst (NodePark (Caps.cSize (frameStep L c))
+                            (slotsSize (Sched.slots sched)))
+                  hnd
+                  (lookupNode-park (Caps.cSize (frameStep L c))
+                     (slotsSize (Sched.slots sched)) allNid (EvalSt.nodes st)
+                     (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+                        (capsOK?-parts (frameStep L c) sched st hok))))))))))
+  where
+  c = capsAt e sl id
 
 -- AND THREE OF THE FIVE HEADS OWE NOTHING, which the match says in
 -- code: only the two heads that subscribe an inner carry a drain.
