@@ -2013,6 +2013,19 @@ mutual
 --   entry and the fan is as wide as the registry, so the level ledger
 --   becomes exponential in the dispatch gas and no exponent the walk
 --   factor can carry covers it.
+-- DEAD ROUTE: threading a flat `capsOK?` down to the door as a premise,
+--   which the cascade's own top genuinely carries -- `cascade-caps-all`
+--   and `cascade-depth-sighted` both take one at this instant's caps.
+--   It does not reach past the FIRST chain.  What the fold preserves is
+--   `chainStep-caps`, which takes the reading at `frameStep Lv` and
+--   returns it at `frameStep (Lv + L')`, so at chain k the premise
+--   would be about a state k steps stale and the only live reading has
+--   climbed.  The two ladders are the reason and they are different
+--   ladders: the producer speaks on the CAPS one, the consumer
+--   (`walk-LiveHyp-goC`) wants `boundedNode (iterSize S k S)` on the
+--   SIZE one, and this door is stated flat only because `k` is zero
+--   there and that is the single point where the two touch.  So no
+--   premise on the caps ladder descends to it, however it is threaded.
 postulate
   chain-entry-nodesSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)

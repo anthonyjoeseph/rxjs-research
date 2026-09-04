@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE WALK'S ENTRY READING, WHICH IS WHERE THE STORE PREMISE COMES
-  FROM.** `chain-entry-nodesSz` and `chain-walk-szOK` are the two things
-  a chain must be handed at its door: every node under the cap, and the
-  size walk holding along the path. Both are premised on `chainCapsOK`,
-  and the obvious discharge — projecting them out of the caps walk's own
-  frame clause — is dead, because that clause reads `capsOK?` at
-  `frameStep Lv c`, an index running AHEAD of this ladder, so
-  monotonicity runs the wrong way. `capsOK?-nodeSz` delivers the first
-  outright from a `capsOK?` the door does not carry; threading one there
-  is the commit.
+- **THE ENTRY READING, RESTATED AT AN INDEX A PREMISE CAN REACH.**
+  `chain-entry-nodesSz` and `chain-walk-szOK` ask for readings at THIS
+  instant's FLAT cap, and it is now recorded that no threading delivers
+  one: the producer speaks on the caps ladder, which `chainStep-caps`
+  climbs once per chain, and the consumer on the size ladder at
+  `iterSize S k S`, the door reading flat only because it instantiates
+  `k` at zero. So the rows are SHAPE and the commit is a restatement,
+  not a grind. Two indices survive and the leg is choosing between
+  them: the NEXT instant's cap, a whole `frameBlowup` above this one
+  and so wide enough to swallow a chain's climb, or the consumer's own
+  level, as the nodes face already states it.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -268,15 +269,6 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`chain-entry-nodesSz`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: every
-  node under the size cap at a chain's door, from the caps premise the door
-  carries. The caps walk's own store reading sits at `frameStep` of an
-  existential level, so monotonicity runs the wrong way. Nothing has
-  instantiated it.
-- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: the size
-  walk holding along one chain's path from the same door premise — the widths
-  per frame and the per-entry store readings the fan-out cannot re-establish.
-  Nothing has instantiated it.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
   `NO EVIDENCE`: the two arms crossing into an inner subscription, which
   compute no value of their own — a drain APPENDS and moves a length, not a
@@ -314,6 +306,14 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
+- **`chain-entry-nodesSz`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE×3`: every
+  node under the size cap at a chain's door, from the caps premise the door
+  carries. Its conclusion is FLAT and every premise available on the caps
+  ladder has climbed, so the index is what is wrong rather than the fact.
+- **`chain-walk-szOK`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE×3`: the size
+  walk holding along one chain's path from the same door premise, and it is
+  wrong at the same index for the same reason — the widths per frame and the
+  per-entry store readings are owed where the ladders meet, not below it.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
