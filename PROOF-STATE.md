@@ -215,17 +215,27 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIZE READING, SPLIT BY FRAME KIND, OVER A STORE IT CARRIES
-  ITSELF.** `stepFrame-sz` charges every frame one `sizeStep`, and every
-  repair short of moving the CHARGE is now refuted in its header. What
-  survives is that only `scan-f` folds, and `scanVals-size` prices that
-  arm outright: from an accumulator read at the values' own level, the
-  outputs AND the stored residue land `length vals * suc (sizeᵗ fn)`
-  rungs up. So the store premise is MINTED in this face rather than
-  imported from the caps walk, whose index runs ahead of this one —
-  `frameStep`'s size ladder is this ladder, so the two coincide at the
-  root and preservation is what the split itself proves. Split by kind,
-  seed at the root, then repair the per-hop ledger.
+- **THE CHARGE'S MISSING POWER, WHERE THE WHOLE RE-DENOMINATION NOW
+  RESTS.** The split by frame kind landed and the cascade's ledger rides
+  it unchanged, so the one open arithmetic is `walkFacCh≤nestΦAt`: the
+  ledger's `S*S + S + S*S` rungs at `chAt` each reach exponent ~`2S⁴`
+  while `nestWalkAt` carries `suc (2S³ + 2S²)`, a whole factor of `S`
+  short, and `walk-sight≤exp` below has only 4/3 of slack. The route is
+  a QUARTIC threshold lemma on the `cube4≤2^` pattern at 19, reachable
+  because `21≤capsAt-size` exists; two powers would want a floor near 26
+  and there is none. Grow the walk factor first, then re-read the
+  charge against it — the leaf's exponent is the only thing that moves.
+
+- **THE WALK'S ENTRY READING, WHICH IS WHERE THE STORE PREMISE COMES
+  FROM.** `chain-entry-nodesSz` and `chain-walk-szOK` are the two things
+  a chain must be handed at its door: every node under the cap, and the
+  size walk holding along the path. Both are premised on `chainCapsOK`,
+  and the obvious discharge — projecting them out of the caps walk's own
+  frame clause — is dead, because that clause reads `capsOK?` at
+  `frameStep Lv c`, an index running AHEAD of this ladder, so
+  monotonicity runs the wrong way. `capsOK?-nodeSz` delivers the first
+  outright from a `capsOK?` the door does not carry; threading one there
+  is the commit.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
@@ -238,15 +248,6 @@ does not fit is a finding about the shared statement, not about the head.
   own size budget with an uncovered region named. Taken after the mint
   leg because a frame grant repaired there is what both would be read
   against.
-
-- **THE REGISTRY'S OWN FAN, WHERE THREE ROWS SHARE ONE CAP.**
-  `fan-regsNest`, `fan-regsSz` and `sink-fan-sink` are what an admitted
-  chain's registry costs — its depth, its size, and its escalation past a
-  second hand-over — each read at the PROGRAM's cap and each refuted
-  there. They are one restatement and not three: the entry cap all three
-  are stated at is the Φ pricing's, and taking the walk up to it moves
-  every leaf's exponent at once. One commit, because a cap repaired for
-  one of the three and not for its siblings has repaired nothing.
 
 ### The ledger
 
@@ -268,10 +269,29 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`stepFrame-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED×3, DEAD ROUTE×2`: one
-  frame's size step, the frame read at the program's cap and the values at the
-  level. Refuted three ways: no frame reading, the frame read at the level, and
-  the scan arm, which emits the node store that no premise here reads.
+- **`chain-entry-nodesSz`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: every
+  node under the size cap at a chain's door, from the caps premise the door
+  carries. The caps walk's own store reading sits at `frameStep` of an
+  existential level, so monotonicity runs the wrong way. Nothing has
+  instantiated it.
+- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×2`: the size
+  walk holding along one chain's path from the same door premise — the widths
+  per frame and the per-entry store readings the fan-out cannot re-establish.
+  Nothing has instantiated it.
+- **`walkFacCh≤nestΦAt`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE, RECOVERY`:
+  whether the ledger's rungs at the per-frame charge fit the potential.
+  MEASURED SHORT BY ONE POWER OF THE CAP: exponent ~`2S⁴` against `suc (2S³ +
+  2S²)`, with 4/3 of slack downstream. Growing it wants a quartic threshold
+  lemma at 19.
+- **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
+  `NO EVIDENCE`: the two arms crossing into an inner subscription, which
+  compute no value of their own — a drain APPENDS and moves a length, not a
+  size — so one rung is the whole charge and the walk's own store reading is
+  what has to reach them.
+- **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
+  FALSITY, `NO EVIDENCE`: the same two arms at the nodes map. A crossing
+  rewrites the parent *All's cell rather than one the walk handed it, so the
+  entry table's reading is not what bounds the residue.
 - **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
   what the drain frame writes at the nodes map. It takes the term OUT of its
   parent *All's queue, so the cell it rewrites is the one its ledger's ceiling

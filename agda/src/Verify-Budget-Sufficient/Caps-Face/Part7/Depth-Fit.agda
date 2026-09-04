@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; *-distribˡ-+; +-suc; +-assoc; +-identityʳ)
+  +-mono-≤; *-distribˡ-+; *-distribʳ-+; +-suc; +-assoc; +-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -45,7 +45,8 @@ open import Verify-Budget-Sufficient.Walk-Factor using
   (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
-  valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; Φ-to-bound)
+  valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; stepFrame-sz-store;
+  szCount; szCount≤ch; frameCh; walkSzOK; dispatchSzOK; shareGoSzOK; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; base; walk; ent-step)
@@ -69,7 +70,7 @@ open import Verify-Budget-Sufficient.Caps using
   capsH; frameStep; frameStep-0; sizeCount; iterSize-infl; iterSize-mono-count;
   frameStep-mono-j; _⊑ᶜ_; lvls-mono)
 open import Verify-Budget-Sufficient.Measures using
-  (pathLen; ∧-true; 2X≡X+X; all-impl)
+  (pathLen; ∧-true; 2X≡X+X; all-impl; boundedNode)
 open import Verify-Budget-Sufficient.Keeps-Ring using
   (KeepsC; stepFrame-keeps)
 open import Verify-Budget-Sufficient.Caps-Nest using
@@ -81,7 +82,7 @@ open import Verify-Budget-Sufficient.Caps-Depth
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; capsOK?-mono; eventCaps?; frameSz?; n≤capsAt-size; pathSz?;
-  pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
+  pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; iterSize-+)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
    foldPath-slots; shareAdmit-caps; pathSz?-len)
@@ -89,9 +90,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
-  (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH;
-   nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
-   nestUnit≤size; iterSize≤walkFac; walkFac≤nestWalkAt)
+  (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH; nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
+  nestUnit≤size; iterSize≤2^)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeFinish-caps; cascadeGo-caps; cascadeLatch-caps; chainStep-slots; chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -1769,15 +1769,36 @@ chainStep-nest-nodesC {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ
 --
 -- REFUTED: `Refuted.Share-Live-Afford`, `Refuted.Share-Live-Level`
 -- REFUTED: `Refuted.Sink-Level-Range`
+
+-- WHAT ONE FRAME OF A LEGAL CHAIN CHARGES THE SIZE LADDER, at this
+-- instant's caps.  A frame applies its function once per arriving
+-- value and every application costs a rung, so the charge is a width's
+-- worth of a cap and not one -- which is the whole content of the two
+-- refutations `Verify-Budget-Sufficient.Regs-Nest-Walk` carries.  The
+-- width is read one above the cap so that the frame's own ceiling is
+-- free of a positivity floor nothing in this development states about
+-- the width; a chain wider than the cap is not admitted anyway, so
+-- nothing is lost by the slack.
+chAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
+chAt e sl id =
+  frameCh (Caps.cSize (capsAt e sl id)) (suc (Caps.cWid (capsAt e sl id)))
+
 mutual
   walk-LiveHyp-goC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv j : ℕ) (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
+    (Lv k : ℕ) (path : Path Γ u t) (vals : List (Val Γ u)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    all (λ kv → boundedNode (iterSize (Caps.cSize (capsAt e sl id)) k
+                              (Caps.cSize (capsAt e sl id))) (proj₂ kv))
+        (EvalSt.nodes st) ≡ true →
+    walkSzOK (Caps.cSize (capsAt e sl id))
+             (suc (Caps.cWid (capsAt e sl id))) k sf gas nid now
+             path vals fin sched st →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    j + pathLen path + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
+    k + pathLen path * chAt e sl id
+      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
     PathLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       path vals fin sched st
@@ -1788,11 +1809,14 @@ mutual
   -- the state `fan-regsSz` is spent at.
   walk-share-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv j : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (Lv k : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
-    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
-    j + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
+    dispatchSzOK (Caps.cSize (capsAt e sl id))
+                 (suc (Caps.cWid (capsAt e sl id))) k sf gas nid now
+                 i vals fin sched st →
+    k + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
     DispatchLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       i vals fin sched st
@@ -1804,85 +1828,100 @@ mutual
   -- and its own frames are paid for out of the hop's `S`.
   walk-shareGo-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv j : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (Lv k : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) →
-    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) j
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    shareGoSzOK (Caps.cSize (capsAt e sl id))
+                (suc (Caps.cWid (capsAt e sl id))) k sf gas nid now
+                i vals fin ps sched st →
     all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
-    j + Caps.cSize (capsAt e sl id) + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
+    k + Caps.cSize (capsAt e sl id) * chAt e sl id
+      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
     ShareGoLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       i vals fin ps sched st
 
-  walk-share-LiveHypC sl id sf zero nid now Lv j i vals fin sched st _ _ = tt
-  walk-share-LiveHypC {e = e} sl id sf (suc gas) nid now Lv j i vals fin sched st
-                      hsz hj =
-    walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin
+  walk-share-LiveHypC sl id sf zero nid now Lv k i vals fin sched st _ _ _ = tt
+  walk-share-LiveHypC {e = e} sl id sf (suc gas) nid now Lv k i vals fin sched st
+                      hsz hw hj =
+    walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
-      hsz (fan-chain-sz sl id i st (fan-regsSz sl id st)) hj′
+      hsz hw (fan-chain-sz sl id i st (fan-regsSz sl id st)) hj′
     where
     S = Caps.cSize (capsAt e sl id)
-    hj′ : j + S + gas * S ≤ Lv
-    hj′ = ≤-trans (≤-reflexive (+-assoc j S (gas * S))) hj
+    Ch = chAt e sl id
+    hj′ : k + S * Ch + gas * (S * Ch) ≤ Lv
+    hj′ = ≤-trans (≤-reflexive (+-assoc k (S * Ch) (gas * (S * Ch)))) hj
 
-  walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin [] sched st
-                        _ _ _ = tt
-  walk-shareGo-LiveHypC {e = e} sl id sf gas nid now Lv j i vals fin
-                        ((rid , p) ∷ ps) sched st hsz hpz hj
-    with any (_≡ᵇ rid) (EvalSt.cancelled st)
-  ... | true  = walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin ps
-                  sched st hsz (∧-trueʳ hpz) hj
-  ... | false =
-      walk-LiveHyp-goC sl id sf gas nid now Lv j p vals fin sched st₀
-        hsz hp₀ hjHead
-    , walk-shareGo-LiveHypC sl id sf gas nid now Lv j i vals fin ps
+  walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin [] sched st
+                        _ _ _ _ = tt
+  walk-shareGo-LiveHypC {e = e} sl id sf gas nid now Lv k i vals fin
+                        ((rid , p) ∷ ps) sched st hsz hsg hpz hj
+    with any (_≡ᵇ rid) (EvalSt.cancelled st) | hsg
+  ... | true  | h = walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin ps
+                      sched st hsz h (∧-trueʳ hpz) hj
+  ... | false | (hns , hwk , htl) =
+      walk-LiveHyp-goC sl id sf gas nid now Lv k p vals fin sched st₀
+        hsz hns hwk hp₀ hjHead
+    , walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin ps
         (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
-        hsz (∧-trueʳ hpz) hj
+        hsz htl (∧-trueʳ hpz) hj
     where
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
+    Ch : ℕ
+    Ch = chAt e sl id
     hp₀ : pathSz? S p ≡ true
     hp₀ = ∧-trueˡ hpz
     st₀ : EvalSt e
     st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
     evs = if fin then close (toℕ i) exhausted ∷ [] else []
     FP  = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
-    hjHead : j + pathLen p + gas * S ≤ Lv
-    hjHead = ≤-trans (+-monoˡ-≤ (gas * S)
-                       (+-monoʳ-≤ j (pathSz?-len S p hp₀))) hj
+    hjHead : k + pathLen p * Ch + gas * (S * Ch) ≤ Lv
+    hjHead = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
+                       (+-monoʳ-≤ k (*-monoˡ-≤ Ch (pathSz?-len S p hp₀)))) hj
 
-  walk-LiveHyp-goC sl id sf gas nid now Lv j root vals fin sched st _ _ _ = tt
-  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv j (share-sink i) vals fin
-                   sched st hsz _ hj =
-    walk-share-LiveHypC sl id sf gas nid now Lv j i vals fin sched st hsz hj′
+  walk-LiveHyp-goC sl id sf gas nid now Lv k root vals fin sched st
+                   _ _ _ _ _ = tt
+  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (share-sink i) vals fin
+                   sched st hsz _ hw _ hj =
+    walk-share-LiveHypC sl id sf gas nid now Lv k i vals fin sched st hsz hw hj′
     where
     S = Caps.cSize (capsAt e sl id)
-    hj′ : j + gas * S ≤ Lv
-    hj′ = ≤-trans (+-monoˡ-≤ (gas * S) (≤-reflexive (sym (+-identityʳ j)))) hj
-  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv j (f ↠ p) vals fin sched st
-                   hsz hpz hj =
+    Ch = chAt e sl id
+    hj′ : k + gas * (S * Ch) ≤ Lv
+    hj′ = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
+                    (≤-reflexive (sym (+-identityʳ k)))) hj
+  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (f ↠ p) vals fin sched st
+                   hsz hns hw hpz hj =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (suc j) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
         (proj₂ (proj₂ (proj₂ (proj₂ step))))
-        (stepFrame-sz sf nid now f p vals fin sched st S j hfz hsz)
-        hpTail
-        hjTail
+        hszTail hnsTail (proj₂ hw) hpTail hjTail
     where
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
+    Ch : ℕ
+    Ch = chAt e sl id
     step = stepFrame sf nid now f p vals fin sched st
+    2≤S : 2 ≤ S
+    2≤S = 2≤capsAt-size e sl id
     1≤S : 1 ≤ S
-    1≤S = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
-    j≤Lv : j ≤ Lv
-    j≤Lv = ≤-trans (m≤m+n j (pathLen (f ↠ p)))
-                   (≤-trans (m≤m+n (j + pathLen (f ↠ p)) (gas * S)) hj)
+    1≤S = ≤-trans (s≤s z≤n) 2≤S
+    A : ℕ
+    A = iterSize S k S
+    k≤Lv : k ≤ Lv
+    k≤Lv = ≤-trans (m≤m+n k (suc (pathLen p) * Ch))
+                   (≤-trans (m≤m+n (k + suc (pathLen p) * Ch) (gas * (S * Ch)))
+                            hj)
     atV : valsSz? (iterSize S Lv S) vals ≡ true
-    atV = valsSz?-mono (iterSize S j S) (iterSize S Lv S) vals
-            (iterSize-mono-count S S 1≤S j≤Lv) hsz
+    atV = valsSz?-mono (iterSize S k S) (iterSize S Lv S) vals
+            (iterSize-mono-count S S 1≤S k≤Lv) hsz
     hHead : FrameLiveHyp (iterSize S Lv S) f p vals
     hHead = frameLive-of-sz (iterSize S Lv S) f p vals atV
     hfz : frameSz? S f ≡ true
@@ -1892,9 +1931,31 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    hjTail : suc j + pathLen p + gas * S ≤ Lv
-    hjTail = ≤-trans (≤-reflexive
-                       (cong (_+ gas * S) (sym (+-suc j (pathLen p))))) hj
+    eqSplit : iterSize S (k + szCount f vals) S
+                ≡ iterSize S (szCount f vals) A
+    eqSplit = iterSize-+ S k (szCount f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount f vals) S) (proj₁ step) ≡ true
+    hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
+                (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount f vals) S)
+                            (proj₂ kv))
+                  (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
+    hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))
+                            (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step)))))
+                              ≡ true)
+                (sym eqSplit)
+                (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
+                   hns hsz)
+    cnt≤ : szCount f vals ≤ Ch
+    cnt≤ = szCount≤ch S (suc (Caps.cWid (capsAt e sl id))) (s≤s z≤n) f vals hfz
+             (proj₁ hw)
+    hjTail : k + szCount f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
+    hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
+                       (≤-trans (≤-reflexive
+                                  (+-assoc k (szCount f vals) (pathLen p * Ch)))
+                                (+-monoʳ-≤ k
+                                  (+-monoˡ-≤ (pathLen p * Ch) cnt≤))))
+                     hj
 
 -- THE SIZE-SIDE SIDE CONDITION, DISCHARGED, AND IN THE LADDER'S OWN
 -- CURRENCY.  The walk reads the bound at the level it has reached and
@@ -1919,26 +1980,87 @@ mutual
 -- follow, so the level the walk can reach is its own frames plus a cap
 -- per hop -- and that is one term rather than a receipt threaded
 -- through the arms.
+-- THE TWO READINGS A CHAIN ENTERS ON THAT THE SIZE LADDER CANNOT MINT
+-- FOR ITSELF, and they are the residue of the per-frame charge being a
+-- WIDTH times a cap rather than one.  A frame's own table survives the
+-- frame -- that is proven -- so what is owed at entry is the table as
+-- the round left it, and what is owed at every sink is a table the
+-- chains ahead of this one in the same fan have already written.
+--
+-- AND THE CAPS WALK CANNOT SUPPLY EITHER, WHICH IS WHY THESE ARE
+-- STATED RATHER THAN DERIVED.  The caps package does carry a reading
+-- at every state the walk reaches, but at ITS level -- an existential
+-- advanced by an amount bounded in the delivery currency -- and a
+-- reading at a HIGHER level is the weaker statement, so it cannot
+-- discharge the one the size step consumes.  The two currencies meet
+-- only at the root, which is where the entry reading is honest and the
+-- fan-out reading is not.
+--
+-- DEAD ROUTE: projecting the entry reading out of `capsWalkOK`'s own
+--   frame clause.  Its `capsOK?` sits at `frameStep Lv`, so what comes
+--   out is `boundedNode (iterSize S Lv S)` -- above the size walk's
+--   level rather than at it, and monotonicity runs the wrong way.
+-- DEAD ROUTE: advancing the size level once per fan-out entry so that
+--   the fold's readings are honest.  The advance is a cap's worth per
+--   entry and the fan is as wide as the registry, so the level ledger
+--   becomes exponential in the dispatch gas and no exponent the walk
+--   factor can carry covers it.
+postulate
+  chain-entry-nodesSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
+      nextId a path sched st →
+    all (λ kv → boundedNode (Caps.cSize (capsAt e sl id)) (proj₂ kv))
+        (EvalSt.nodes st) ≡ true
+
+  chain-walk-szOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
+      nextId a path sched st →
+    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    walkSzOK (Caps.cSize (capsAt e sl id))
+             (suc (Caps.cWid (capsAt e sl id))) 0
+             (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
+             path (arrVal a ∷ []) (Arrival.isLast a) sched st
+
 chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id) (gas : ℕ) (Lv j : ℕ)
+  (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id) (Lv j : ℕ)
   (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
+    nextId a path sched st →
   Sched.slots sched ≡ sl →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-  j + pathLen path + gas * Caps.cSize (capsAt e sl id) ≤ Lv →
-  PathLiveHyp (budgetAt e (Sched.slots sched) nextId) gas nextId (arrTick a)
-    (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+  j + pathLen path + n * Caps.cSize (capsAt e sl id) ≤ Lv →
+  PathLiveHyp (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
+    (iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+              (Caps.cSize (capsAt e sl id)))
     path (arrVal a ∷ []) (Arrival.isLast a) sched st
-chain-walk-LiveHyp {e = e} sl id a nextId gas Lv j path sched st hsl hsz hp hj =
-  walk-LiveHyp-goC sl id _ gas nextId (arrTick a) Lv j path
-    (arrVal a ∷ []) (Arrival.isLast a) sched st entrySz hp hj
+chain-walk-LiveHyp {n = n} {e = e} sl id Lc a nextId Lv j path sched st
+                   hcc hsl hsz hp hj =
+  walk-LiveHyp-goC sl id _ n nextId (arrTick a) (Lv * Ch) 0 path
+    (arrVal a ∷ []) (Arrival.isLast a) sched st entrySz entryNs entryW hp hj′
   where
   S = Caps.cSize (capsAt e sl id)
+  Ch = chAt e sl id
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) (8≤capsAt-size e sl id)
-  entrySz : valsSz? (iterSize S j S) (arrVal a ∷ []) ≡ true
+  entrySz : valsSz? (iterSize S 0 S) (arrVal a ∷ []) ≡ true
   entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
-              (≤-trans hsz (iterSize-infl S 1≤S j S)))) refl
+              (≤-trans hsz (iterSize-infl S 1≤S 0 S)))) refl
+  entryNs = chain-entry-nodesSz sl id Lc a nextId path sched st hsl hcc
+  entryW  = chain-walk-szOK sl id Lc a nextId path sched st hsl hcc hp
+  drop : pathLen path + n * S ≤ Lv
+  drop = ≤-trans (+-monoˡ-≤ (n * S) (m≤n+m (pathLen path) j)) hj
+  step≡ : pathLen path * Ch + n * (S * Ch) ≡ (pathLen path + n * S) * Ch
+  step≡ = trans (cong (pathLen path * Ch +_) (sym (*-assoc n S Ch)))
+                (sym (*-distribʳ-+ Ch (pathLen path) (n * S)))
+  hj′ : 0 + pathLen path * Ch + n * (S * Ch) ≤ Lv * Ch
+  hj′ = ≤-trans (≤-reflexive step≡) (*-monoˡ-≤ Ch drop)
 
 -- THE LIVE ARM, the third and last of the chain's arms to become the
 -- walk rather than an assertion about it.  Two extra terms over the
@@ -1954,7 +2076,8 @@ chainStep-nest-liveC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     nextId a path sched st →
   depthChain nextId a path sched st ≤ capsH e sl id →
   Sched.slots sched ≡ sl →
-  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+  iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+           (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
@@ -1971,10 +2094,12 @@ chainStep-nest-liveC {e = e} sl id Lc a nextId Lv j path sched st
   ≤-trans
     (foldPath-nest-live _ _ _ _ _ path (arrVal a ∷ []) _ _ sched st
       (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
-      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      (iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+                (Caps.cSize (capsAt e sl id)))
       (entryΦ sl id a path hp hΦ)
       (chain-walk-ΦHyp sl id Lc a nextId path sched st hcc hdc hsl hp hΦ)
-      (chain-walk-LiveHyp sl id a nextId _ Lv j path sched st hsl hsz hp hj))
+      (chain-walk-LiveHyp sl id Lc a nextId Lv j path sched st
+         hcc hsl hsz hp hj))
     (⊔-lub ≤-refl (≤-trans afford (m≤n⊔m _ (nestΦAt e sl id))))
 
 -- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
@@ -2013,7 +2138,8 @@ chainStep-store≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     nextId a path sched st →
   depthChain nextId a path sched st ≤ capsH e sl id →
   Sched.slots sched ≡ sl →
-  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+  iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+           (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
@@ -2084,7 +2210,8 @@ cascade-depth-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ capsH e sl id →
   Sched.slots sched ≡ sl →
-  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+  iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+           (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
@@ -2151,6 +2278,67 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
                                      (length cs))))))
             hbud
 
+-- THE LADDER IS CLIMBED A FRAME-CHARGE AT A TIME, which is what the
+-- per-frame count being a WIDTH times a cap costs this arithmetic.
+-- The cascade's ledger is unchanged -- a cap squared plus a cap plus a
+-- cap squared, which is what the selection can reach -- and every rung
+-- of it is now `chAt` rungs of the size ladder.
+--
+-- WHAT IS MISSING IS ONE POWER OF THE CAP IN THE CHARGE, and the
+-- measurement says so precisely.  `iterSize≤2^` carries a count `j`
+-- into exponent `S*j`, so the ledger's `S*S + S + S*S` rungs at a
+-- per-frame charge of `chAt` reach an exponent of about `2S⁴`, where
+-- the old one-rung-per-frame reading reached `2S³ + S²`;
+-- `nestWalkAt`'s own exponent is `suc (2S³ + 2S²)`, so the slack that
+-- used to be roughly `+S` is now a whole factor of `S` short.
+-- Downstream, `walk-sight≤exp` spends the whole `2^S` budget on
+-- `4S³ ≤ 2^S` at threshold 14, so the headroom there is a factor of
+-- 4/3 and not a factor of `S` either.  Growing the charge by one power
+-- needs a quartic threshold lemma -- the `cube4≤2^` pattern at
+-- threshold 19, reachable because `21≤capsAt-size` exists -- and
+-- growing it by two would need a size floor near 26, which this
+-- development does not have.
+--
+-- SO THE AFFORDABILITY IS THE LEAF AND THE GROWTH IS A BODY.  The
+-- statement splits cleanly: what a count does to the size ladder is
+-- bare arithmetic and is proven, and whether the resulting power fits
+-- the potential is the one thing the measurement says is open.  Only
+-- the second half is postulated, so a repair to the charge moves the
+-- leaf's exponent and nothing else.
+-- DEAD ROUTE: keeping the old count and charging one rung per frame.
+--   Refuted twice in `Verify-Budget-Sufficient.Regs-Nest-Walk`'s own
+--   header -- unconditionally, and again with the store premise added.
+-- RECOVERY: git show 218bf0c restores `walkFac≤nestWalkAt`, which
+--   discharged the old one-rung reading's affordability out of
+--   `nestWalkAt`'s two cube-exponentials and its trailing cap.
+postulate
+  walkFacCh≤nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) →
+    2 ^ (Caps.cSize (capsAt e sl id)
+           * ((Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+               + Caps.cSize (capsAt e sl id)
+               + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+              * chAt e sl id))
+      * Caps.cSize (capsAt e sl id)
+      ≤ nestΦAt e sl id
+
+walkFac-ch : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) (L : ℕ) →
+  L ≤ Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+      + Caps.cSize (capsAt e sl id)
+      + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id) →
+  iterSize (Caps.cSize (capsAt e sl id)) (L * chAt e sl id)
+           (Caps.cSize (capsAt e sl id))
+    ≤ nestΦAt e sl id
+walkFac-ch e sl id L hL =
+  ≤-trans (iterSize≤2^ S (L * Ch) S (8≤capsAt-size e sl id) ≤-refl)
+          (≤-trans (*-monoˡ-≤ S
+                      (^-monoʳ-≤ 2 (*-monoʳ-≤ S (*-monoˡ-≤ Ch hL))))
+                   (walkFacCh≤nestΦAt e sl id))
+  where
+  S  = Caps.cSize (capsAt e sl id)
+  Ch = chAt e sl id
+
 -- EVERY LEVEL A WHOLE CASCADE REACHES IS AFFORDABLE, and this is the
 -- one place the level ledger has to meet the walk's ceiling.  The
 -- selection enters its k-th chain at the level the first k-1 left and
@@ -2167,7 +2355,7 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
 -- charge satisfies every hypothesis and lands a level above the
 -- conclusion.  With it the registry is a width and each chain is legal
 -- at a cap's length, so the ledger is a cap SQUARED plus a cap, which
--- is the range the walk's charge is now read at a cap CUBED to cover.
+-- is the range the frame charge above is read over.
 --
 -- REFUTED: Refuted.Cascade-Afford-Wide
 -- TWIN: `arr-chains-len-sum`
@@ -2181,13 +2369,12 @@ cascade-afford : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
   capsOK? (capsAt e sl id) sched st ≡ true →
   iterSize (Caps.cSize (capsAt e sl id))
-    (chainsLenSum (chainsOf a st) + length (chainsOf a st)
-      + n * Caps.cSize (capsAt e sl id))
+    ((chainsLenSum (chainsOf a st) + length (chainsOf a st)
+      + n * Caps.cSize (capsAt e sl id)) * chAt e sl id)
     (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id
 cascade-afford {n = n} {e = e} sl id a sched st hok =
-  ≤-trans (iterSize≤walkFac S _ S (8≤capsAt-size e sl id) ledger ≤-refl)
-          (≤-trans (walkFac≤nestWalkAt e sl id) (nestWalkAt≤nestΦAt e sl id))
+  walkFac-ch e sl id _ ledger
   where
   S = Caps.cSize (capsAt e sl id)
   wid : length (chainsOf a st) ≤ S
@@ -2283,7 +2470,8 @@ cascade-caps-all-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (frameStep Lc (capsAt e sl id)) sched st ≡ true →
   sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ capsH e sl id →
-  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+  iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+           (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
@@ -2407,7 +2595,8 @@ cascade-caps-all : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   capsOK? (capsAt e sl id) sched st ≡ true →
   sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
     ≤ capsH e sl id →
-  iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id))
+  iterSize (Caps.cSize (capsAt e sl id)) (Lv * chAt e sl id)
+           (Caps.cSize (capsAt e sl id))
     ≤ nestΦAt e sl id →
   sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc))

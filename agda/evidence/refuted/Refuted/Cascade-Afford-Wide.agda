@@ -44,10 +44,10 @@ module Refuted.Cascade-Afford-Wide where
 open import Data.Bool using (false)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_; length)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; s≤s; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; _^_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive;
-  +-monoʳ-≤; *-monoˡ-≤; *-identityˡ; m≤n+m; m≤m+n; m≤n*m; m^n>0; n≮n; +-comm;
-  +-suc)
+  +-monoʳ-≤; *-monoˡ-≤; *-mono-≤; *-identityˡ; m≤n+m; m≤m+n; m≤n*m; m^n>0; n≮n;
+  +-comm; +-suc)
 open import Data.Product using (_×_; _,_)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
@@ -62,7 +62,8 @@ open import Rx.Evaluator using (EvalSt; Arrival; Path; Chain; RegId; root;
 open import Verify-Budget-Sufficient.Deliver-Measure using (chainsLenSum)
 open import Verify-Budget-Sufficient.Caps using (Caps; capsAt; 8≤capsAt-size)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith
-  using (nestΦAt; nestWalkAt≤nestΦAt; walkFac≤nestWalkAt)
+  using (nestΦAt; nestWalkAt; nestWalkAt≤nestΦAt; nestWalkAt-def)
+open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -141,14 +142,26 @@ N : ℕ
 N = nestΦAt e₁ sl₁ 0
 
 -- the charge dominates the cap, which is the one proven fact the
--- witness needs about a family it never unfolds
+-- witness needs about a family it never unfolds.  The charge's own
+-- definition carries the cap as a summand of its trailing factor, and
+-- its leading power is positive, so the domination is read straight
+-- off the shape rather than out of any bound on what a walk reaches.
 S≤N : S ≤ N
-S≤N = ≤-trans (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ S)))
-                                (*-monoˡ-≤ S (m^n>0 2 (S * (S * S)
-                                                       + S * (S * S)
-                                                       + S * S))))
-                       (walkFac≤nestWalkAt e₁ sl₁ 0))
-              (nestWalkAt≤nestΦAt e₁ sl₁ 0)
+S≤N = ≤-trans S≤walk (nestWalkAt≤nestΦAt e₁ sl₁ 0)
+  where
+  E : ℕ
+  E = suc (S * (S * S) + S * (S * S) + (S * S + S * S))
+  T : ℕ
+  T = nestUnit e₁ sl₁ + (S * S + S * S) + S + S * slotWrapSum sl₁
+  tail≥ : S ≤ T
+  tail≥ = ≤-trans (m≤n+m S (nestUnit e₁ sl₁ + (S * S + S * S)))
+                  (m≤m+n (nestUnit e₁ sl₁ + (S * S + S * S) + S)
+                         (S * slotWrapSum sl₁))
+  inner : S ≤ 2 ^ E * T
+  inner = ≤-trans (≤-reflexive (sym (*-identityˡ S)))
+                  (*-mono-≤ (m^n>0 2 E) tail≥)
+  S≤walk : S ≤ nestWalkAt e₁ sl₁ 0
+  S≤walk = subst (S ≤_) (sym (nestWalkAt-def e₁ sl₁ 0)) inner
 
 K : ℕ
 K = suc N

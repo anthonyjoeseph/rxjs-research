@@ -319,29 +319,25 @@ cube4≤2^ _
   (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s (s≤s _))))))))))))))
   = cube-exp _
 
--- THE INSTANT'S SIZE GROWTH, UNDER THE WALK'S OWN FACTOR.  A frame
--- multiplies the size by a fixed step, and the levels a whole cascade
--- reaches run to the selection's total length plus its count -- a
--- WIDTH times a cap plus a width, both of which the caps invariant
--- pins under the cap.  So what a selection can do to the size of the
--- values it carries is a power of a cap whose exponent is a couple of
--- cap-squares, and that sits under an exponential of the cap CUBED.
--- It is the range and not the base that decides the exponent here,
--- which is why widening the range from one chain's frames to a whole
--- selection's moved the charge by a whole factor of the cap.
+-- THE INSTANT'S SIZE GROWTH, OVER A BARE COUNT.  A frame multiplies
+-- the size by a fixed step, so `j` of them is a power whose base is a
+-- small multiple of the cap and whose exponent is the count itself;
+-- and the cap's own square sits under an exponential once the cap is
+-- past fourteen, so the whole power reduces to base two at an exponent
+-- LINEAR in the count.  That linearity is the content: the statement
+-- says nothing about which counts are reachable, which is what makes
+-- it reusable at a charge the caller chooses.
 --
--- AND THE RANGE CARRIES A SECOND CAP-SQUARE FOR THE FAN-OUT, which is
--- the one thing a selection's own ledger cannot see.  A chain reaching
--- a sink leaves for chains the REGISTRY holds, and those climb by
--- their own lengths; the dispatch gas bounds how many such hops a
--- chain takes and the context is under the cap, so the whole fan-out
--- is one further cap-square.  The exponent it costs is the cap CUBED
--- again, and `nestWalkAt` already carries two of those with a `suc` to
--- spare -- so the widening is paid out of slack that was already there
--- rather than by moving the charge.
-iterSize≤walkFac : ∀ (S j s : ℕ) → 8 ≤ S → j ≤ S * S + S + S * S → s ≤ S →
-  iterSize S j s ≤ 2 ^ (S * (S * S) + S * (S * S) + S * S) * S
-iterSize≤walkFac S j s h8 hj hs =
+-- AND THE COUNT BOUND IS THE CALLER'S, DELIBERATELY.  This used to
+-- carry a `j ≤ S * S + S + S * S` premise and conclude at the walk
+-- factor directly, which pinned the arithmetic to one reading of what
+-- a cascade's levels run to -- so the statement had to be restated
+-- every time the charge did, and it was.  The count now rides in the
+-- exponent, the affordability is the consumer's leaf, and a
+-- re-denomination of the charge moves neither.
+iterSize≤2^ : ∀ (S j s : ℕ) → 8 ≤ S → s ≤ S →
+  iterSize S j s ≤ 2 ^ (S * j) * S
+iterSize≤2^ S j s h8 hs =
   ≤-trans (iterSize-pow S S j s 1≤S ≤-refl hs) (*-monoˡ-≤ S powFit)
   where
   1≤S : 1 ≤ S
@@ -354,43 +350,9 @@ iterSize≤walkFac S j s h8 hj hs =
   3S≤2^S =
     ≤-trans (*-monoˡ-≤ S 3≤4S)
             (≤-trans (≤-reflexive (*-assoc 4 S S)) (sq4≤2^ S h8))
-  expShape : S * (S * S + S + S * S) ≡ S * (S * S) + S * (S * S) + S * S
-  expShape = solve 1 (λ a → a :* (a :* a :+ a :+ a :* a)
-                              := a :* (a :* a) :+ a :* (a :* a) :+ a :* a)
-                   refl S
-  powFit : (3 * S) ^ j ≤ 2 ^ (S * (S * S) + S * (S * S) + S * S)
+  powFit : (3 * S) ^ j ≤ 2 ^ (S * j)
   powFit =
-    ≤-trans (^-monoˡ-≤ j 3S≤2^S)
-            (≤-trans (≤-reflexive (^-*-assoc 2 S j))
-                     (^-monoʳ-≤ 2 (≤-trans (*-monoʳ-≤ S hj)
-                                           (≤-reflexive expShape))))
-
--- AND THAT GROWTH IS AFFORDABLE, which is the half a bare arithmetic
--- statement cannot say.  The charge carries two exponentials of the
--- cap cubed with a `suc` to spare and a sum with the cap in it, so the
--- power and its trailing factor each land on one half and nothing has
--- to be widened to make room.
-walkFac≤nestWalkAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-  (id : ℕ) →
-  2 ^ (Caps.cSize (capsAt e sl id)
-         * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-       + Caps.cSize (capsAt e sl id)
-         * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-       + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-    * Caps.cSize (capsAt e sl id)
-    ≤ nestWalkAt e sl id
-walkFac≤nestWalkAt e sl id =
-  subst (2 ^ (S * (S * S) + S * (S * S) + S * S) * S ≤_)
-    (sym (nestWalkAt-def e sl id))
-    (*-mono-≤ (^-monoʳ-≤ 2
-                (≤-trans (+-monoʳ-≤ (S * (S * S) + S * (S * S))
-                                    (m≤m+n (S * S) (S * S)))
-                         (n≤1+n (S * (S * S) + S * (S * S) + (S * S + S * S)))))
-              (≤-trans (m≤n+m S (nestUnit e sl + (S * S + S * S)))
-                       (m≤m+n (nestUnit e sl + (S * S + S * S) + S)
-                              (S * slotWrapSum sl))))
-  where
-  S = Caps.cSize (capsAt e sl id)
+    ≤-trans (^-monoˡ-≤ j 3S≤2^S) (≤-reflexive (^-*-assoc 2 S j))
 
 -- THE STEP'S ARITHMETIC, OVER BARE NUMBERS, and it is a body rather
 -- than a leaf.  Nothing about caps survives here: a cap that steps by
