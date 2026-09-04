@@ -1772,16 +1772,32 @@ chainStep-nest-nodesC {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ
 
 -- WHAT ONE FRAME OF A LEGAL CHAIN CHARGES THE SIZE LADDER, at this
 -- instant's caps.  A frame applies its function once per arriving
--- value and every application costs a rung, so the charge is a width's
--- worth of a cap and not one -- which is the whole content of the two
--- refutations `Verify-Budget-Sufficient.Regs-Nest-Walk` carries.  The
--- width is read one above the cap so that the frame's own ceiling is
--- free of a positivity floor nothing in this development states about
--- the width; a chain wider than the cap is not admitted anyway, so
--- nothing is lost by the slack.
+-- value and every application costs a rung, so the charge is a burst
+-- width's worth of a cap and not one -- which is the whole content of
+-- the two refutations `Verify-Budget-Sufficient.Regs-Nest-Walk`
+-- carries.
+--
+-- AND THE WIDTH IT IS READ AT IS THE SIZE CAP, WHICH IS THE ONLY
+-- CURRENCY THIS CHARGE CAN BE PAID IN.  The charge lands in an
+-- EXPONENT -- a count of rungs, and a rung multiplies -- so whatever
+-- number stands here is spent against `2^S` and nothing larger.  The
+-- cap-side WIDTH coordinate is not a candidate at any threshold: it
+-- steps by `foldStep S w = S ^ suc w` where the size steps by
+-- `sizeStep S s = S * suc (2 * s)`, so a width read at the same count
+-- is a tower where the size is geometric, and the two cross a few
+-- folds in and never come back.  The size cap is the ceiling this
+-- development already prices real burst widths against -- `nestBurstAt`
+-- is a size coordinate, not a width one -- so reading the walk's
+-- bursts there is the existing denomination rather than a new one.
+-- DEAD ROUTE: denominating the charge in `Caps.cWid` -- one above it,
+--   to dodge the width's missing positivity floor.  It buys the floor
+--   and loses the exponent: the ledger's rungs times a width put a
+--   power tower inside `2^S`, and no threshold on the size repairs
+--   that, since the gap grows with the fold count rather than shrinking.
+--   Recorded already at `walk-sight≤exp` and at `scanΦ-fit`.
 chAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) → ℕ
 chAt e sl id =
-  frameCh (Caps.cSize (capsAt e sl id)) (suc (Caps.cWid (capsAt e sl id)))
+  frameCh (Caps.cSize (capsAt e sl id)) (Caps.cSize (capsAt e sl id))
 
 mutual
   walk-LiveHyp-goC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1794,7 +1810,7 @@ mutual
                               (Caps.cSize (capsAt e sl id))) (proj₂ kv))
         (EvalSt.nodes st) ≡ true →
     walkSzOK (Caps.cSize (capsAt e sl id))
-             (suc (Caps.cWid (capsAt e sl id))) k sf gas nid now
+             (Caps.cSize (capsAt e sl id)) k sf gas nid now
              path vals fin sched st →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
     k + pathLen path * chAt e sl id
@@ -1814,7 +1830,7 @@ mutual
     valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
     dispatchSzOK (Caps.cSize (capsAt e sl id))
-                 (suc (Caps.cWid (capsAt e sl id))) k sf gas nid now
+                 (Caps.cSize (capsAt e sl id)) k sf gas nid now
                  i vals fin sched st →
     k + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
     DispatchLiveHyp sf gas nid now
@@ -1834,7 +1850,7 @@ mutual
     valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
     shareGoSzOK (Caps.cSize (capsAt e sl id))
-                (suc (Caps.cWid (capsAt e sl id))) k sf gas nid now
+                (Caps.cSize (capsAt e sl id)) k sf gas nid now
                 i vals fin ps sched st →
     all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
     k + Caps.cSize (capsAt e sl id) * chAt e sl id
@@ -1947,8 +1963,7 @@ mutual
                 (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
                    hns hsz)
     cnt≤ : szCount f vals ≤ Ch
-    cnt≤ = szCount≤ch S (suc (Caps.cWid (capsAt e sl id))) (s≤s z≤n) f vals hfz
-             (proj₁ hw)
+    cnt≤ = szCount≤ch S S 1≤S f vals hfz (proj₁ hw)
     hjTail : k + szCount f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
     hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
                        (≤-trans (≤-reflexive
@@ -2023,7 +2038,7 @@ postulate
       nextId a path sched st →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
     walkSzOK (Caps.cSize (capsAt e sl id))
-             (suc (Caps.cWid (capsAt e sl id))) 0
+             (Caps.cSize (capsAt e sl id)) 0
              (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
              path (arrVal a ∷ []) (Arrival.isLast a) sched st
 
@@ -2284,20 +2299,24 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
 -- cap squared, which is what the selection can reach -- and every rung
 -- of it is now `chAt` rungs of the size ladder.
 --
--- WHAT IS MISSING IS ONE POWER OF THE CAP IN THE CHARGE, and the
--- measurement says so precisely.  `iterSize≤2^` carries a count `j`
--- into exponent `S*j`, so the ledger's `S*S + S + S*S` rungs at a
--- per-frame charge of `chAt` reach an exponent of about `2S⁴`, where
--- the old one-rung-per-frame reading reached `2S³ + S²`;
--- `nestWalkAt`'s own exponent is `suc (2S³ + 2S²)`, so the slack that
--- used to be roughly `+S` is now a whole factor of `S` short.
--- Downstream, `walk-sight≤exp` spends the whole `2^S` budget on
--- `4S³ ≤ 2^S` at threshold 14, so the headroom there is a factor of
--- 4/3 and not a factor of `S` either.  Growing the charge by one power
--- needs a quartic threshold lemma -- the `cube4≤2^` pattern at
--- threshold 19, reachable because `21≤capsAt-size` exists -- and
--- growing it by two would need a size floor near 26, which this
--- development does not have.
+-- WHAT IS MISSING IS TWO POWERS OF THE CAP, and the measurement says
+-- so precisely.  `iterSize≤2^` carries a count `j` into exponent
+-- `S*j`, so the ledger's `S*S + S + S*S` rungs at a per-frame charge
+-- of `S * suc S` reach an exponent of `2S⁵ + 3S⁴ + S³`, where the old
+-- one-rung-per-frame reading reached `2S³ + S²`; `nestWalkAt`'s own
+-- exponent is `suc (2S³ + 2S²)`.  Downstream, `walk-sight≤exp` spends
+-- the whole `2^S` budget on `4S³ ≤ 2^S` at threshold 14, so the
+-- headroom there is a constant factor and not a power of `S`.
+--
+-- SO THE ROUTE IS A QUINTIC THRESHOLD AND A SIZE FLOOR TO MATCH, and
+-- both halves are reachable.  `4S⁵ ≤ 2^S` first holds at 26 -- at 25
+-- the power is 39062500 against 33554432 -- so the threshold lemma is
+-- the `cube4≤2^` pattern one degree up, and what it needs from the
+-- caps face is a floor above 26.  The floor is there to be read: the
+-- existing `21` comes from ONE `sizeStep` at the base floor `3`, and
+-- the blowup count is at least two, so a second step gives
+-- `3 * suc (2 * 21) = 129` off exactly the premises the first one
+-- already spends.
 --
 -- SO THE AFFORDABILITY IS THE LEAF AND THE GROWTH IS A BODY.  The
 -- statement splits cleanly: what a count does to the size ladder is

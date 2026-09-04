@@ -215,16 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CHARGE'S MISSING POWER, WHERE THE WHOLE RE-DENOMINATION NOW
-  RESTS.** The split by frame kind landed and the cascade's ledger rides
-  it unchanged, so the one open arithmetic is `walkFacCh≤nestΦAt`: the
-  ledger's `S*S + S + S*S` rungs at `chAt` each reach exponent ~`2S⁴`
-  while `nestWalkAt` carries `suc (2S³ + 2S²)`, a whole factor of `S`
-  short, and `walk-sight≤exp` below has only 4/3 of slack. The route is
-  a QUARTIC threshold lemma on the `cube4≤2^` pattern at 19, reachable
-  because `21≤capsAt-size` exists; two powers would want a floor near 26
-  and there is none. Grow the walk factor first, then re-read the
-  charge against it — the leaf's exponent is the only thing that moves.
+- **THE QUINTIC LADDER THE RE-DENOMINATED CHARGE NOW ASKS FOR.** The
+  charge reads its burst width at the SIZE cap — the width coordinate
+  towers where the size is geometric, so it was never spendable in an
+  exponent — and the cost of that reading is `walkFacCh≤nestΦAt` at
+  `2S⁵ + 3S⁴ + S³` against `nestWalkAt`'s `suc (2S³ + 2S²)`. Three
+  pieces, one commit: a two-step `frameBlowup` size floor (the existing
+  `21` is one `sizeStep` off the base `3`, the count is at least two, so
+  `3 * suc (2 * 21) = 129` comes off the same premises), a quintic
+  threshold `4S⁵ ≤ 2^S` at 26 on the `cube4≤2^` pattern, and the
+  exponent growth inside `nestWalkAt` with `walk-sight≤exp` re-proven
+  against it. The floor and the threshold cannot land alone — nothing
+  consumes them until the exponent moves.
 
 - **THE WALK'S ENTRY READING, WHICH IS WHERE THE STORE PREMISE COMES
   FROM.** `chain-entry-nodesSz` and `chain-walk-szOK` are the two things
