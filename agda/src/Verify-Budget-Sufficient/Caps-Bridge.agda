@@ -95,9 +95,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nodes using
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nest using
   (cascadeGo-nest; arr-chains-nest-syn)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Ledger using
-  (arr-chains-len-sum; arr-chains-nest-fac; arr-chains-bursts)
+  (arr-chains-len-sum; arr-chains-nest-fac)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps using
-  (arr-chains-caps)
+  (arr-chains-bursts; arr-chains-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
   (caps-tick; cascade-depth-capsH)
 open import Verify-Budget-Sufficient.Caps-Nest using
@@ -837,14 +837,13 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
       hsz
       (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz valC closC)
-      (arr-chains-bursts sl id a nextId sched st hsl hcaps)
-      (arr-chains-caps sl id a nextId sched st hsl hcaps
-        (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
-          (capsOK?-regs (capsAt e sl id) sched st hcaps))
-        valC closC
-        (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz valC closC))
-      (chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
-        (capsOK?-regs (capsAt e sl id) sched st hcaps))
+      (arr-chains-bursts sl id a nextId sched st hsl hcaps hch valC closC hdep)
+      (arr-chains-caps sl id a nextId sched st hsl hcaps hch valC closC hdep)
+      hch
+    where
+    hch  = chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
+             (capsOK?-regs (capsAt e sl id) sched st hcaps)
+    hdep = cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz valC closC
 
 nest-tick : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
