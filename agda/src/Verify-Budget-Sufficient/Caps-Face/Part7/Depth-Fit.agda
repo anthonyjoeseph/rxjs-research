@@ -5,7 +5,7 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
-  m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
+  m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
   +-mono-≤; *-distribˡ-+; *-distribʳ-+; +-suc; +-assoc; +-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -91,7 +91,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH; nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
-  nestUnit≤size; iterSize≤2^)
+  nestUnit≤size; iterSize≤2^; walkExp-widen)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeFinish-caps; cascadeGo-caps; cascadeLatch-caps; chainStep-slots; chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -207,10 +207,6 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   1≤S  = ≤-trans (s≤s z≤n) 2≤S
   EXP  : ℕ
   EXP  = (S + S) * (suc S * S)
-  expEq : EXP ≡ S * (S * S) + S * (S * S) + (S * S + S * S)
-  expEq = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
-                           := s :* (s :* s) :+ s :* (s :* s) :+ (s :* s :+ s :* s))
-                refl S
   Q≤   : Q ≤ 2 ^ EXP
   Q≤   = pathΦF-cap S p hpp
   D≤   : D ≤ nestUnit e sl + S * S
@@ -255,7 +251,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
                   (≤-trans (*-monoʳ-≤ 2 hBC)
                   (≤-trans (≤-reflexive (sym (*-assoc 2 (2 ^ EXP) X)))
                            (*-monoˡ-≤ X (^-monoʳ-≤ 2
-                             (s≤s (≤-reflexive expEq)))))))
+                             (s≤s (walkExp-widen S 1≤S)))))))
            (nestWalkAt≤nestΦAt e sl id)
   spread : 2 * (Q * (D + M + n * W + D))
              ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
@@ -1642,11 +1638,8 @@ entryΦ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φfit)) refl
   where
   Sz = Caps.cSize (capsAt e sl id)
-  expEq : (Sz + Sz) * (suc Sz * Sz)
-            ≡ Sz * (Sz * Sz) + Sz * (Sz * Sz) + (Sz * Sz + Sz * Sz)
-  expEq = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
-                           := s :* (s :* s) :+ s :* (s :* s) :+ (s :* s :+ s :* s))
-                refl Sz
+  1≤Sz : 1 ≤ Sz
+  1≤Sz = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
   dΦ : nestDᵛ (arrTy a) (arrVal a) + pathΦD Sz path
          ≤ nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz
   dΦ =
@@ -1663,7 +1656,7 @@ entryΦ {e = e} sl id a path hp hΦ = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ Φf
            (sym (nestWalkAt-def e sl id))
            (*-mono-≤ (≤-trans (pathΦF-cap Sz path hp)
                               (^-monoʳ-≤ 2
-                                (≤-trans (≤-reflexive expEq) (n≤1+n _))))
+                                (≤-trans (walkExp-widen Sz 1≤Sz) (n≤1+n _))))
                      (≤-trans dΦ
                               (m≤m+n (nestUnit e sl + (Sz * Sz + Sz * Sz) + Sz)
                                      (Sz * slotWrapSum sl)))))
@@ -2299,47 +2292,68 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
 -- cap squared, which is what the selection can reach -- and every rung
 -- of it is now `chAt` rungs of the size ladder.
 --
--- WHAT IS MISSING IS TWO POWERS OF THE CAP, and the measurement says
--- so precisely.  `iterSize≤2^` carries a count `j` into exponent
--- `S*j`, so the ledger's `S*S + S + S*S` rungs at a per-frame charge
--- of `S * suc S` reach an exponent of `2S⁵ + 3S⁴ + S³`, where the old
--- one-rung-per-frame reading reached `2S³ + S²`; `nestWalkAt`'s own
--- exponent is `suc (2S³ + 2S²)`.  Downstream, `walk-sight≤exp` spends
--- the whole `2^S` budget on `4S³ ≤ 2^S` at threshold 14, so the
--- headroom there is a constant factor and not a power of `S`.
---
--- SO THE ROUTE IS A QUINTIC THRESHOLD AND A SIZE FLOOR TO MATCH, and
--- both halves are reachable.  `4S⁵ ≤ 2^S` first holds at 26 -- at 25
--- the power is 39062500 against 33554432 -- so the threshold lemma is
--- the `cube4≤2^` pattern one degree up, and what it needs from the
--- caps face is a floor above 26.  The floor is there to be read: the
--- existing `21` comes from ONE `sizeStep` at the base floor `3`, and
--- the blowup count is at least two, so a second step gives
--- `3 * suc (2 * 21) = 129` off exactly the premises the first one
--- already spends.
---
--- SO THE AFFORDABILITY IS THE LEAF AND THE GROWTH IS A BODY.  The
--- statement splits cleanly: what a count does to the size ladder is
--- bare arithmetic and is proven, and whether the resulting power fits
--- the potential is the one thing the measurement says is open.  Only
--- the second half is postulated, so a repair to the charge moves the
--- leaf's exponent and nothing else.
+-- AND IT COSTS EXACTLY TWO POWERS OF THE CAP, which is what
+-- `nestWalkAt`'s exponent was grown by.  `iterSize≤2^` carries a count
+-- `j` into exponent `S*j`, so the ledger's `S*S + S + S*S` rungs at a
+-- per-frame charge of `S * suc S` reach `2S⁵ + 3S⁴ + S³`, where the old
+-- one-rung-per-frame reading reached `2S³ + S²`.  Three fifth powers
+-- cover that -- `3S⁴ + S³ ≤ 4S⁴ ≤ S⁵` off the cap's own floor -- and
+-- `walk-sight≤exp` pays for the grown exponent with the quintic
+-- threshold rather than the cubic one.
 -- DEAD ROUTE: keeping the old count and charging one rung per frame.
 --   Refuted twice in `Verify-Budget-Sufficient.Regs-Nest-Walk`'s own
 --   header -- unconditionally, and again with the store premise added.
--- RECOVERY: git show 218bf0c restores `walkFac≤nestWalkAt`, which
---   discharged the old one-rung reading's affordability out of
---   `nestWalkAt`'s two cube-exponentials and its trailing cap.
-postulate
-  walkFacCh≤nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) →
-    2 ^ (Caps.cSize (capsAt e sl id)
-           * ((Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-               + Caps.cSize (capsAt e sl id)
-               + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-              * chAt e sl id))
-      * Caps.cSize (capsAt e sl id)
-      ≤ nestΦAt e sl id
+walkFacCh≤nestΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  2 ^ (Caps.cSize (capsAt e sl id)
+         * ((Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+             + Caps.cSize (capsAt e sl id)
+             + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+            * chAt e sl id))
+    * Caps.cSize (capsAt e sl id)
+    ≤ nestΦAt e sl id
+walkFacCh≤nestΦAt e sl id =
+  ≤-trans (≤-trans (*-mono-≤ (^-monoʳ-≤ 2 expLE) tail≥)
+                   (≤-reflexive (sym (nestWalkAt-def e sl id))))
+          (nestWalkAt≤nestΦAt e sl id)
+  where
+  S  = Caps.cSize (capsAt e sl id)
+  P2 = S * S
+  P3 = S * P2
+  P4 = S * P3
+  Q  = S * P4
+  8≤S : 8 ≤ S
+  8≤S = 8≤capsAt-size e sl id
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (≤ᵇ⇒≤ 1 8 tt) 8≤S
+  4≤S : 4 ≤ S
+  4≤S = ≤-trans (≤ᵇ⇒≤ 4 8 tt) 8≤S
+  P3≤P4 : P3 ≤ P4
+  P3≤P4 = ≤-trans (≤-reflexive (sym (*-identityˡ P3))) (*-monoˡ-≤ P3 1≤S)
+  eq4 : 3 * P4 + P4 ≡ 4 * P4
+  eq4 = solve 1 (λ a → con 3 :* a :+ a := con 4 :* a) refl P4
+  -- THE QUARTIC RESIDUE FITS UNDER ONE MORE FACTOR OF THE CAP, which is
+  -- the whole reason three fifth powers suffice rather than four.
+  quartic≤Q : 3 * P4 + P3 ≤ Q
+  quartic≤Q =
+    ≤-trans (+-monoʳ-≤ (3 * P4) P3≤P4)
+            (≤-trans (≤-reflexive eq4) (*-monoˡ-≤ P4 4≤S))
+  shape : S * ((P2 + S + P2) * (S * suc S)) ≡ Q + Q + (3 * P4 + P3)
+  shape =
+    solve 1 (λ a → a :* ((a :* a :+ a :+ a :* a) :* (a :* (con 1 :+ a)))
+                   := a :* (a :* (a :* (a :* a)))
+                      :+ a :* (a :* (a :* (a :* a)))
+                      :+ (con 3 :* (a :* (a :* (a :* a))) :+ a :* (a :* a)))
+            refl S
+  expLE : S * ((P2 + S + P2) * (S * suc S)) ≤ suc (Q + Q + Q + (P2 + P2))
+  expLE =
+    ≤-trans (≤-reflexive shape)
+            (≤-trans (+-monoʳ-≤ (Q + Q) quartic≤Q)
+                     (≤-trans (m≤m+n (Q + Q + Q) (P2 + P2)) (n≤1+n _)))
+  tail≥ : S ≤ nestUnit e sl + (P2 + P2) + S + S * slotWrapSum sl
+  tail≥ =
+    ≤-trans (m≤n+m S (nestUnit e sl + (P2 + P2)))
+            (m≤m+n (nestUnit e sl + (P2 + P2) + S) (S * slotWrapSum sl))
 
 walkFac-ch : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
   (id : ℕ) (L : ℕ) →

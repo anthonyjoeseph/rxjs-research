@@ -215,19 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE QUINTIC LADDER THE RE-DENOMINATED CHARGE NOW ASKS FOR.** The
-  charge reads its burst width at the SIZE cap — the width coordinate
-  towers where the size is geometric, so it was never spendable in an
-  exponent — and the cost of that reading is `walkFacCh≤nestΦAt` at
-  `2S⁵ + 3S⁴ + S³` against `nestWalkAt`'s `suc (2S³ + 2S²)`. Three
-  pieces, one commit: a two-step `frameBlowup` size floor (the existing
-  `21` is one `sizeStep` off the base `3`, the count is at least two, so
-  `3 * suc (2 * 21) = 129` comes off the same premises), a quintic
-  threshold `4S⁵ ≤ 2^S` at 26 on the `cube4≤2^` pattern, and the
-  exponent growth inside `nestWalkAt` with `walk-sight≤exp` re-proven
-  against it. The floor and the threshold cannot land alone — nothing
-  consumes them until the exponent moves.
-
 - **THE WALK'S ENTRY READING, WHICH IS WHERE THE STORE PREMISE COMES
   FROM.** `chain-entry-nodesSz` and `chain-walk-szOK` are the two things
   a chain must be handed at its door: every node under the cap, and the
@@ -250,6 +237,16 @@ does not fit is a finding about the shared statement, not about the head.
   own size budget with an uncovered region named. Taken after the mint
   leg because a frame grant repaired there is what both would be read
   against.
+
+- **THE FOUR CROSSING ARMS, WHICH ARE THE TIER'S ONLY ROWS ON NO
+  EVIDENCE AT ALL.** `stepFrame-sz-inner`, `stepFrame-sz-outer` and the
+  two store-side siblings share one denominator, and nothing has ever
+  instantiated any of them — so they sit at FALSITY on nothing rather
+  than on a finding. Their residue is a state quantity a probe can
+  compute at a concrete program, which makes them the cheapest evidence
+  left in the tier. Probe the four together before grinding any: a wrong
+  denominator is a SHAPE finding on the set, not a clause failure on
+  one, and it is owed before the entry leg reads them.
 
 ### The ledger
 
@@ -280,11 +277,6 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path from the same door premise — the widths
   per frame and the per-entry store readings the fan-out cannot re-establish.
   Nothing has instantiated it.
-- **`walkFacCh≤nestΦAt`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE, RECOVERY`:
-  whether the ledger's rungs at the per-frame charge fit the potential.
-  MEASURED SHORT BY ONE POWER OF THE CAP: exponent ~`2S⁴` against `suc (2S³ +
-  2S²)`, with 4/3 of slack downstream. Growing it wants a quartic threshold
-  lemma at 19.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
   `NO EVIDENCE`: the two arms crossing into an inner subscription, which
   compute no value of their own — a drain APPENDS and moves a length, not a

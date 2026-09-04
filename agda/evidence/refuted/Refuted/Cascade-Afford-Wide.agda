@@ -149,8 +149,10 @@ N = nestΦAt e₁ sl₁ 0
 S≤N : S ≤ N
 S≤N = ≤-trans S≤walk (nestWalkAt≤nestΦAt e₁ sl₁ 0)
   where
+  Q : ℕ
+  Q = S * (S * (S * (S * S)))
   E : ℕ
-  E = suc (S * (S * S) + S * (S * S) + (S * S + S * S))
+  E = suc (Q + Q + Q + (S * S + S * S))
   T : ℕ
   T = nestUnit e₁ sl₁ + (S * S + S * S) + S + S * slotWrapSum sl₁
   tail≥ : S ≤ T

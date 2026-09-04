@@ -103,3 +103,18 @@ error message actively misdirects. Read the entry before reasoning from the erro
   on the clause's left-hand side — `f {e = e} … = all (λ v → P {e = e} v) vs` — so the
   lambda closes over a variable instead of asking for one; the same repair as the
   eta-expansion rule for passing lemmas into an assembly, arriving inside a body.
+
+- **A THRESHOLD WRITTEN ON THE LEFT OF ITS OFFSET IS A SUC-TOWER; ON THE RIGHT IT IS
+  NEUTRAL.** An induction over "every `S` at or above `k`" is normally indexed by the
+  offset, and the two spellings of the subject look interchangeable: `k + j` (or the
+  nested `suc (suc … j)` a helper like `from14` builds) against `j + k`. They are not.
+  `_+_` matches on its LEFT argument, so `k + j` reduces to a tower of `k` successors
+  over the variable, while `j + k` is STUCK — no clause applies to a free `j`, and every
+  power of it is stuck too. Then `_*_`, which also matches on its left, expands a
+  suc-tower subject into `k + 1` copies of its right argument at EVERY nesting, so a
+  degree-`d` subject costs `(k+1)^d` nodes: fifteen successors at degree three is tens of
+  thousands and survives, thirty-one at degree five is millions and does not. The
+  induction step is the same proof either way — one `suc` peel — and the premise `k ≤ S`
+  is spent with `subst` over `m∸n+n≡m` at `S ∸ k` rather than a `k`-deep wall of `s≤s`.
+  Measured on one fifth-power threshold in this tree: over a hundred and sixty seconds,
+  killed by the dev budget, down to twelve and a half.
