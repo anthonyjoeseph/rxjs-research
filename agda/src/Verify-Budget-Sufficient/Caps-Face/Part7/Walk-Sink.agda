@@ -31,7 +31,8 @@ open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Ent; ent-step; reached-room)
 open import Verify-Budget-Sufficient.Subscribe-Face using (stepFrame-caps)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainOK; shareCapsOK)
+  (burstsOK; capsWalkOK; dispatchCapsOK; frameDrainOK; capsDrainOK; shareCapsOK)
+open import Verify-Budget-Sufficient.Nest-Store using (nestBurstAt)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthFold; depthShareGo; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Deliver-Measure using
@@ -66,6 +67,48 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (RingState; WalkHyps; ent-infl; floor-parts; frameStep-regAt; regs-exit; ring-room; ringFold; sink-deliv-cap; sink-entry-ladder; sink-step-caps; walk-frame-clos)
+
+-- ONE WALK'S BURST LEDGER, STATED AT THE LEVEL THE WALK IS ENTERED AT
+-- AND UNDER THE SAME TUPLE AS ITS CAPS LEDGER.  A frame hands on at
+-- most the width of its OWN cap -- `valsCaps?` prices the handoff in
+-- the width of the `frameStep` at the level the frame lands at -- and
+-- a walk under these hypotheses only lands at levels whose NEXT charge
+-- still fits under `sizeCount` joined with the size: that is what
+-- `Reached` says through `reached-room`.  A level's width is under its
+-- own charge, so every width the walk meets is under that top, and the
+-- top is under the next instant's size, which is the number this
+-- ledger is denominated in.  So the length conjuncts are arithmetic
+-- over the caps walk's own receipt, and the statement is shaped after
+-- that walk rather than read against a cap of its own -- the
+-- flat readings died on a hypothesis read at the next instant's cap,
+-- which admits widths no frame in the instant runs against, and not
+-- on the number.
+--
+-- AND THE RISK IS THE DRAIN CONJUNCT, NOT THE LENGTHS.  At a
+-- `thru-outer` and a `from-inner` frame the ledger asks that the
+-- inners the frame subscribes -- `innerW`, `drainW` -- burst under the
+-- number, and those are `descW` of a RUNTIME inner, one the evaluator
+-- has substituted.  The tree bounds `descW` only syntactically at the
+-- root, by `descW-ceil`, and every levelled consumer takes a
+-- substituted inner's width as a hypothesis, so nothing yet relates
+-- such an inner's burst to any cap.  That region is what an
+-- instantiation has to reach before this row moves.
+--
+-- REFUTED: `Refuted.Chains-Burst-Flat` -- four values at one chain's
+--   root against a width-two cap granting three.  It kills the ENTRY
+--   width as the number; the number here is the next instant's size,
+--   which grants 256 at that shape.
+-- TWIN: `chain-walk-caps` -- the same walk under the same tuple,
+--   proven; the burst conjuncts sit beside its size conjuncts frame
+--   for frame.
+postulate
+  chain-walk-burst : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (src : Source) (p : Path Γ u t) (vals : List (Val Γ u))
+    (evs : List (InstEvent (Val Γ t))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    WalkHyps sl id L sf gas nid now src p vals evs fin sched st →
+    burstsOK (nestBurstAt e sl id) sf gas nid now p vals fin sched st
 
 chain-walk-caps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (L : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)

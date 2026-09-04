@@ -215,36 +215,35 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE BURST LEDGER IS ON HOLD FOR A RULING, AND NOTHING IN ITS
-  REGION IS PICKED UP UNTIL ONE LANDS (Anthony).** Four denominations
-  of one flat number have now died — the entry width by machine, the
-  exit width and both size readings by route — and the fifth shape was
-  written into this roadmap instead of the stop that was owed. The
-  joint reading is in the number's own header: what it must COVER and
-  what it may COST sit on the two axes of the caps recurrence, which
-  separates them by a tower at every level a cascade reaches, so no
-  index and no level closes it. The two legs
-  below are the candidate repairs the ruling picks between; this leg
-  is the write-up and the hold, and it does not grind.
+- **PROBE THE DRAIN REGION OF THE BURST LEDGER, THE ONE PART OF IT NO
+  EVIDENCE REACHES.** Anthony declined to rule between the two candidate
+  repairs and delegated the choice; the choice made is neither. The
+  number stays flat and the leaf is restated at the walk's own level as
+  the caps walk's twin, so the flat readings died on the leaf's old
+  hypothesis and not on the number. What is unknown is whether `descW`
+  of an inner the evaluator has SUBSTITUTED can exceed the syntactic
+  ceiling that bounds the root's — `descW` computes and `burstW-eq` is
+  refl, so it is instantiable. A refutation restates the drain
+  conjunct; a receipt at nested shapes moves the row to DIFFICULTY.
 
-- **CANDIDATE, PENDING THE RULING: MOVE THE PAYMENT ONTO THE WIDTH
-  AXIS.** Re-derive the factor's exponent at the frame's OWN cap
-  rather than at the next instant's size, so permission climbs by the
-  same iteration the demand does and the comparison happens inside one
-  frame instead of across a cascade. The commit would state the
-  frame-local factor with its store-face bridge POSTULATED, so the
-  shape is checked before any of it is proven. The risk it carries is
-  that every exponent this face hands upward is denominated in the
-  size today, so the axis change reaches the affordability chain.
+- **THE LENGTH CONJUNCTS OF `chain-walk-burst`, AS A REAL BODY OVER A
+  DRAIN LEAF.** Mirror the caps walk's path induction: the root and
+  share-sink arms need one length bound, the frame arms that bound plus
+  the tail. Each frame's `valsCaps?` bounds its handoff by the width at
+  its landing level; `reached-room` puts that level's next charge under
+  the top; two arithmetic lemmas close it — `J ≤ sizeAt S J` at one
+  below the size, and the top under `nestBurstAt` by `iterSize-infl`.
+  The drain conjunct at `thru-outer` and `from-inner` is postulated at
+  full strength as its own leaf, born FALSITY.
 
-- **CANDIDATE, PENDING THE RULING: STOP PRICING THE HANDOFF BY A
-  WIDTH.** A cap says how many values a frame COULD carry; the ledger
-  needs how many it DOES, and the width is the only handle on that
-  today, which is where the tower enters. The commit would state the
-  count the walk actually hands on as its own quantity, with the cap
-  kept as the thing that bounds it rather than the thing that prices
-  it. The risk it carries is a new quantity nothing yet bounds, which
-  is why it is stated before it is spent.
+- **THE DRAIN LEAF, BY THE PROBE'S VERDICT.** Refuted: the drain
+  conjunct needs a run invariant — a substituted inner's ceiling under
+  the root's — carried on the invariant record and not as a hypothesis,
+  and the restatement cascades through the nodes, live and regs faces
+  that assume the width today. Receipt: state the ceiling's invariance
+  under the evaluator's substitution, of which `bCeil-elimGᵉ` and
+  `bCeil-unfoldμ` are the syntactic halves, and derive the drain bound
+  from `descW-ceil` at the runtime inner.
 
 ### The ledger
 
@@ -291,11 +290,11 @@ does not fit is a finding about the shared statement, not about the head.
 - **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
   charge at width zero, where the lookup finds no merge at this type. Nothing
   has instantiated it.
-- **`arr-chain-burst`** (Part7/Arrival-Ledger) — FALSITY,
-  `REFUTED, DEAD ROUTE×2, TWIN`: ONE chain's walk under ONE number, plus the
-  cap surviving that chain's step. The frame hands on a width and the row
-  grants that cap's size, which the width passes early; the size an instant
-  out inverts the room. No flat axis is left.
+- **`chain-walk-burst`** (Part7/Walk-Sink) — FALSITY, `REFUTED, TWIN`: ONE
+  walk's burst ledger, stated at the level it is entered at. The length
+  conjuncts follow the level route in the number's header; the DRAIN
+  conjunct — a substituted inner's burst — is what nothing in the tree
+  bounds, and no evidence reaches it.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

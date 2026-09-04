@@ -754,27 +754,21 @@ abstract
   -- and it is a statement about what the ledger can be GIVEN, which is
   -- a different question from what a walk's frames ask of it.
   --
-  -- AND THE TWO OBLIGATIONS ON THIS NUMBER SIT ON AXES THE CAPS
-  -- RECURRENCE SEPARATES BY A TOWER, WHICH IS WHY NO CHOICE OF INDEX
-  -- SERVES IT.  What the number must COVER is a frame's handoff, and
-  -- `countLen` prices that in the WIDTH of the frame's own cap; a
-  -- frame's cap is a `frameStep`, whose width field is `iterFold` --
-  -- exponentiation iterated once per level.  What the number may
-  -- COST is fixed by `nestFac≤exp`, which spends `burst≤size′` twice
-  -- and so pays only for a number under one `Caps.cSize`; the size
-  -- field is `iterSize`, and one step of that is a multiplication.
-  -- So the demand grows by a power per level where the permission
-  -- grows by a factor, and at any level a cascade actually reaches
-  -- the two are a tower apart.  That is a property of the
-  -- recurrence and not of the index the number is read at, so moving
-  -- the index moves neither side and carrying a level moves BOTH --
-  -- demand up a tower, permission up a product.  Closing it needs
-  -- one of the two axes to move: either the exponent is re-derived
-  -- at the frame's own cap, so permission climbs with demand instead
-  -- of standing fixed one instant out, or the handoff stops being
-  -- priced by a width at all -- a cap says how many values a frame
-  -- COULD carry, this ledger needs how many it DOES, and `countLen`
-  -- is the only handle on that today.
+  -- AND THE LEDGER'S WALKS MEET IT AT THEIR OWN LEVELS, WHICH IS WHAT
+  -- LETS ONE FLAT NUMBER SERVE THEM.  A frame's handoff is priced in
+  -- the width of the frame's OWN cap -- a `frameStep` at the level the
+  -- walk lands at -- and a walk entered under the caps hypotheses only
+  -- lands at levels whose next charge still fits under `sizeCount`
+  -- joined with the size.  A level's width is under its own charge, so
+  -- every width such a walk meets is under that top, and the top is
+  -- under the next instant's size, which is this number.  What no flat
+  -- reading can do is take the width AT the top level, a tower; what
+  -- the ledger need not do is read its hypothesis at the next instant's
+  -- cap, whose widths no frame in the instant runs against.  The
+  -- obligation nothing here bounds is a `thru` frame's DRAIN -- the
+  -- burst of an inner the evaluator has substituted, which every
+  -- levelled consumer takes as given -- and that is the open region of
+  -- the row that spends this number.
   --
   -- REFUTED: `Refuted.Scan-Fold-Burst` kills the burst-free reading of
   --   the walk's per-frame charge, 65 against 64, at the smallest step
@@ -801,21 +795,7 @@ abstract
   --   in the size this reading would abandon, and `nestFac-room` pays
   --   that polynomial out of two to that same size.  A burst named one
   --   instant above it is above the room's own base, so the room does
-  --   not cost a story, it inverts.  Together with the entry reading
-  --   below, the size axis is closed at both ends and no flat number
-  --   serves this ledger.
-  -- DEAD ROUTE: going level-indexed and then FLATTENING at the top,
-  --   which is the cheap version of the repair and the one to reach
-  --   for first.  A level's cap is a `frameStep`, whose width field is
-  --   `iterFold` -- exponentiation iterated once per level, so a
-  --   tower in the level rather than a power of it.  The top level a
-  --   cascade reaches is bounded by `sizeCount` joined with the size,
-  --   which `21≤capsAt-size` puts past twenty, so the flattened
-  --   number is a tower of that height while `nestFac-room` still pays
-  --   out of two to one size.  The level cannot be discharged at the
-  --   ledger and handed on flat; it has to reach the store face,
-  --   which is why re-pricing the factor and spending the level at the
-  --   consumers are one piece of work and not two.
+  --   not cost a story, it inverts.
   -- RECOVERY: git show b59648c restores `capsAt-wid<size` and
   --   `wid<frameBlowup-size`, the pair that bounded a cap's width by
   --   the next instant's size; `room-frameBlowup` states that bound
