@@ -215,16 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SINK RING'S BURST HALF, WHICH IS A GRIND AND NOT A DESIGN.**
-  `walk-sink-burst` is `dispatchBurstsOK` over the admitted registry —
-  one entry per registration, each its own walk at the state the previous
-  left, the fold underneath one gas down. `walk-sink-caps` is the same
-  fold over the same registry, proven, entry for entry, so the route is
-  its clauses with the burst walk in place of the caps walk and the burst
-  floor in place of the caps floor. Nothing here is undecided; what it
-  costs is the transport at each entry, and the measure, which is decided
-  before a clause is typed because the dev loop cannot see it.
-
 - **THE CAPS SIDE OF THE SAME HEAD.** `walk-frame-drain-inner` is the
   `from-inner` frame's caps receipt, the only frame that names a node, and
   both of its denominations are closed to instantiation — the cap does not
@@ -246,6 +236,18 @@ does not fit is a finding about the shared statement, not about the head.
   drained queue. So this is a restatement leg and not a grind, taken as
   one commit because a denomination that repairs one of the three and not
   its siblings has not been repaired.
+
+- **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
+  and `stepFrame-nest-live-outer` are what one subscribe out of a merge's
+  queue, and the outer frame around it, put on the live list. They are
+  one statement in two positions rather than two statements: the queue
+  the first reads is the queue the burst face has just been proven to
+  bound, so the residue on each is a state quantity and not a width. The
+  first reads zero at every quantity its consumer's residue is built
+  from, so only the cap size pays; the second is already restated at its
+  own size budget with an uncovered region named. Taken after the mint
+  leg because a frame grant repaired there is what both would be read
+  against.
 
 ### The ledger
 
@@ -370,10 +372,6 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-Ψ`** (Burst-Walk) — DIFFICULTY, `TWIN`, large: the Ψ reading of
   the clique its header mirrors, clause for clause at a different measure. The
   cost is that the induction covers every clause; nothing in it is undecided.
-- **`walk-sink-burst`** (Part7/Walk-Sink) — GRINDABLE, `TWIN`: the share sink's
-  dispatch under the burst number — one entry per admitted registration, each
-  at the state the previous left, the fold one gas down. The caps ring walks
-  the same fold under the same tuple, entry for entry.
 
 ## Tier 2 — Verify-Well-Formed (parked behind tier 1)
 
