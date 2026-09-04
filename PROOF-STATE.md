@@ -215,17 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SETTLE THE CURRENCY A CROSSING FRAME IS PRICED IN — the count move
-  is refuted at the CEILING, so the previous leg's plan is discarded
-  rather than shrunk.** Reading the arriving observables' own `sizeᵉ`
-  does not fit `frameCh`: both its quantities read the program while
-  the value is bounded only by the level, so the gap widens with the
-  cap. What is not yet known is whether that count makes the FRAME
-  statement true — instantiate `stepFrame-sz`'s outer arm under it at
-  the same duplication chains. Green displaces the whole cost onto the
-  ceiling and names the next leg; red says the level ladder cannot
-  price a nested subscription, a mechanism finding and not a
-  restatement.
+- **RE-DENOMINATE THE FRAME CEILING — the whole crossing cost is now
+  known to sit there and nowhere else.** The fork settled the frame
+  half: the size-reading count holds at the chain that refutes the
+  constant AND at a reified arrival, so `stepFrame-sz`'s outer arm is
+  repairable. `frameCh`'s two quantities both read the program, so it
+  is not. The burst face already prices exactly this charge against
+  the LEVEL — `opIterD-dominated-at` asks only `m ≤ sizeAt S J` and
+  still lands the climb — so give `frameCh` the level index it lacks
+  and port that arithmetic, rather than inventing a per-kind ceiling.
 
 - **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
   INSTANTIATION and not a bound.** What the size walk may spend is

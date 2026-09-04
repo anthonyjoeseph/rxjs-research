@@ -831,6 +831,18 @@ postulate
   -- the expensive half, since the ceiling the count is spent against
   -- reads the program and the count would read the level.
   --
+  -- AND THE OUTER ARM'S REPAIR IS DECIDED, WHICH NARROWS WHAT IS LEFT
+  -- TO THE CEILING ALONE.  `Probed.Cross-Count-Fork` separates the
+  -- constant from a count reading the arriving observable's own
+  -- `sizeᵉ`, at the very chain the constant loses on, and the
+  -- second reading holds there -- `iterSize`'s doubling taken at the
+  -- syntax outruns the value's doubling taken at the rung.  It also
+  -- holds at a REIFIED arrival, where the syntax is the value's size
+  -- and the subscription computes nothing, so the reading does not
+  -- overshoot at the shape the constant happens to survive.  What
+  -- that buys is displacement rather than payment: the cost now sits
+  -- entirely at the ceiling, which `frameCh`'s own block prices.
+  --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
   -- DEAD ROUTE: charging the inner arm the size of its own arriving
@@ -1039,6 +1051,20 @@ stepFrame-sz-store sf id now (thru-outer op nid) path vals fin sched st S B
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the size-reading
 --   count against this ceiling, at the level one rung above the cap
 --   and the width the consumer passes.
+
+-- AND THE DENOMINATION THAT SURVIVES IS ALREADY PROVEN ONE FACE OVER,
+-- which is the difference between a design question and a port.  The
+-- burst face charges a subscription its own `sizeᵉ` -- literally
+-- `suc (sizeᵉ o)` as the ops count handed to `opIterD` -- and prices
+-- that against the LEVEL rather than the cap: `opIterD-dominated-at`
+-- asks only `m ≤ sizeAt S J` and still lands the climb inside
+-- `lvls S W d J (dCapᶜ S W R d (4 + k) J)`.  So a charge reading what
+-- ARRIVES is not the catastrophe the refutation makes it look; it is
+-- the arithmetic this development already spent on its subscription
+-- door.  What this face lacks is the level INDEX to state it at: the
+-- ceiling here reads two program quantities and carries no `J`, so
+-- there is nowhere to put `sizeAt S J` even though the consumer knows
+-- it.
 frameCh : ℕ → ℕ → ℕ
 frameCh S W = W * suc S
 
