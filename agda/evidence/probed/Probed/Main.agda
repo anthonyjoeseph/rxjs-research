@@ -149,6 +149,10 @@ open import Probed.Slot-Named-Twice
   using (diamondFigures≡; diamondDelivered≡; diamondCount≡;
          controlDelivered≡; diamondRows≡; tieDiamond)
 
+open import Probed.Slot-Two-Depths
+  using (latticeFigures≡; latticeDelivered≡; latticeCount≡;
+         latticeControl≡; latticeRows≡; tieLattice)
+
 open import Probed.Parked-Queue-Store
   using (parkFigures≡; drainNodes≡; innerRows≡; outerCharge≡; outerRows≡;
          parkedArrival≡; parkRow≡;

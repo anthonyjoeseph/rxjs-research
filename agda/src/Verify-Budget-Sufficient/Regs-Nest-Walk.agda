@@ -1021,8 +1021,18 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   the first reference and has already fired when the second
 --   registers, against a control with the same rungs written inline at
 --   both arms, which delivers twice.  One diamond over one shared slot
---   at one door; not an apex naming two slots that share a third, where
---   the multicast is reached at two depths rather than two references.
+--   at one door.
+--
+-- PROBED: `Probed.Slot-Two-Depths` at the shape the diamond is not: a
+--   LATTICE, where two DIFFERENT slots each name a third and the apex
+--   names those two, so the share is reached through each arm's own
+--   definition and the arms meet it three layers apart.  Depth buys
+--   the second arm nothing -- the share connects on whichever arm the
+--   walk reaches first and has already fired when the other registers,
+--   against a control with the same rungs inline in both arms, which
+--   delivers twice -- so the sum is not short there either.  Two arms
+--   over one share, every slot `shared`, and no arm reaching the share
+--   twice itself.
 --
 -- PROBED: `Probed.Subscribe-Inner-Doors` at the two doors every other
 --   row subscribed past, each entered where its rule bites -- a switch

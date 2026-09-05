@@ -28,8 +28,8 @@
 --
 -- WHAT THE ROWS DO NOT BUY.  One diamond, over one shared slot, at one
 -- door; nothing about an apex naming two DIFFERENT slots that share a
--- third, where the multicast is reached at two depths rather than two
--- references; and nothing about a `scripted` slot named twice, whose
+-- third, which `Probed.Slot-Two-Depths` reads; and nothing about a
+-- `scripted` slot named twice, whose
 -- definition a subscription does not run at all.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Slot-Named-Twice where
