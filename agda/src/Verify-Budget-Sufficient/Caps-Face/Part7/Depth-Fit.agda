@@ -2252,6 +2252,27 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- ahead of them in the same fan have written, and no frame of THIS
 -- path passed through those writes.
 --
+-- AND THAT IS NOT A RESIDUE, IT IS THE FALSITY.  The writes are not
+-- hypothetical: a chain reaching a drain door subscribes what the
+-- `*All` node parked, and the subscription installs a node of its
+-- own, so one parked duplication chain puts the table over the entry
+-- rung while the entry reading itself still holds.  A fan-wide
+-- hypothesis taken at one level therefore cannot deliver the fan's
+-- own readings, and the conclusion here is denominated in exactly
+-- such a hypothesis.
+--
+-- AND THE CAPS FACE ALREADY CARRIES THE MISSING TERM, which narrows
+-- the route below rather than reopening it.  That face's fan-out fold
+-- threads an increment per entry under an ABSOLUTE ceiling, so its
+-- level cannot accumulate however wide the fan is; the two folds are
+-- otherwise clause for clause identical.  What is priced below is the
+-- UNCAPPED advance, and a ceiling is the difference.
+--
+-- REFUTED: `Refuted.Fan-Store-Level`, at a two-entry fan whose first
+--   entry drains a parked chain: the table is under the entry rung
+--   when the fan is entered, over it when the second entry is
+--   charged, and under again at the level a per-entry advance
+--   reaches.
 -- DEAD ROUTE: advancing the size level once per fan-out entry so that
 --   the fold's readings are honest.  The advance is a cap's worth per
 --   entry and the fan is as wide as the registry, so the level ledger
