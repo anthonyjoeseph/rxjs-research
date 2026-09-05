@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEAF AT THE TWO DOORS THE ARMS NOW ROUTE THROUGH AND NO ROW
-  HAS OPENED.** Both crossing value halves are bodies over one claim
-  about a single subscription, and that claim is stated over an
-  arbitrary operator while every row standing at it subscribes through
-  a merge. The other two doors are not variants: a switch CUTS the
-  inner it holds before subscribing, so the leaf is read at a schedule
-  the cut returned rather than the one the frame was handed, and an
-  exhaust DROPS what arrives while busy, so the run the charge prices
-  is one the arm never performs. The commit instantiates the leaf at
-  both, at the program that killed the telescope-free reading.
-
-- **THEN THE PARKED QUEUE, WHICH EVERY TABLE ROW SO FAR HAS AVOIDED.**
+- **THE PARKED QUEUE, WHICH EVERY TABLE ROW SO FAR HAS AVOIDED.**
   A crossing's table reading is a max over entries, and every witness
   taken at it installs exactly ONE — a scan, read through the
   accumulator's `sizeᵛ`. A `*All` node under its limit parks what it
@@ -248,6 +237,17 @@ does not fit is a finding about the shared statement, not about the head.
   reads what one subscription of the apex delivers, and stands the
   charge beside it.
 
+- **THEN WHAT A BITING DOOR WRITES, WHICH IS THE HALF THE DOOR ROWS
+  LEFT OPEN.** A subscription's delivered burst is invariant in the
+  door — the operator enters only through the path and the burst is
+  never pushed through it — so the cut and the drop act on the TABLE
+  and on later emits, not on the list. Every store witness so far
+  enters its door IDLE, where all three admit alike and the reading is
+  the merge door's under another name. The commit reads both store
+  halves at a switch already holding an inner and an exhaust already
+  busy, which is where a written cell can carry what the arrival's own
+  layers never bought.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -255,11 +255,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×3`: what
-  ONE subscription delivers, in the program's own layers plus its telescope.
-  Both crossing value halves are now bodies over it. A max over the slots is
-  refuted at a chain of eleven; a slot named twice, and the other two doors,
-  stay unread.
+- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×4`: what
+  ONE subscription delivers, in its own layers plus its telescope. Both
+  crossing value halves are bodies over it. A max over the slots is refuted at
+  a chain of eleven, and the door is invisible to the burst; a slot named twice
+  stays unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Both halves now read

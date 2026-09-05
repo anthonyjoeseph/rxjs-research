@@ -1013,6 +1013,17 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   where a share's multicast is what stops the layers doubling with
 --   it, and no row can fail on the sum's other side -- it charges slots
 --   the run never names.
+--
+-- PROBED: `Probed.Subscribe-Inner-Doors` at the two doors every other
+--   row subscribed past, each entered where its rule bites -- a switch
+--   holding an inner it must cut, an exhaust already busy -- and both
+--   deliver the merge door's burst UNCHANGED, which the two equalities
+--   pin.  The door is invisible HERE by construction: an operator
+--   enters only by being built into the path, and a subscription does
+--   not push its own burst through that frame, so the cut and the drop
+--   act on later emits, which is the drain's statement.  Each door is
+--   read at the telescope-free rung and the repaired one, `false` then
+--   `true`, at one arrival shape with zero layers of its own.
 postulate
   subscribeInner-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t) (id : Id)
