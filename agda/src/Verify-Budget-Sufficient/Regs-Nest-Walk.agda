@@ -1579,6 +1579,16 @@ postulate
   --   the row is taken at rung ZERO: the premise's own bound climbed
   --   by nothing, which is the tightest reading the conclusion admits.
   --   One outgoing cell, and no door biting under a limit.
+  -- PROBED: `Probed.Partial-Drain-Store` at the drain a LIMIT stops
+  --   mid-queue, which is what separates the queue as ENTERED from the
+  --   queue as LEFT: one table then carries the cell an admitted entry
+  --   wrote beside the entries that never ran.  Read at exit the
+  --   survivors carry no layer and the charge collapses onto the rung
+  --   the refutation killed; read at entry it holds.  The premise's
+  --   own bound fails on that table and holds on the identical queue
+  --   admitted NOWHERE, so the climb is bought by the entry that ran
+  --   and a parked entry is priced by syntax the premise already
+  --   bounds.  One lane, and no survivor out-layering the admitted.
   stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)

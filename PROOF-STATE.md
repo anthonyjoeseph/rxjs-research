@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE PARTIAL DRAIN, WHERE BOTH KINDS OF TABLE ENTRY STAND AT
-  ONE RUNG.** The queue rows just taken split the two cleanly: a drain
-  to exhaustion leaves installed cells and no queue, and a park leaves
-  a queue and no cell, priced at rung zero. Under a LIMIT the drain
-  stops mid-queue, so one table carries the cells the admitted entries
-  wrote and the entries that never ran — and the charge that must
-  cover both is read off the queue as the frame ENTERED it, which the
-  survivors are a suffix of and the cells a run of the prefix. The
-  commit drains a queue under a limit that bites partway and reads the
-  inner half at the one rung.
-
-- **AND THEN THE SHARE REACHED AT TWO DEPTHS, WHICH IS WHERE THE SUM
+- **THE SHARE REACHED AT TWO DEPTHS, WHICH IS WHERE THE SUM
   COULD STILL BE SHORT.** The diamond just read names one slot twice
   from ONE apex, and the multicast answers it: the second reference
   finds the share already fired. Two DIFFERENT slots that both name a
@@ -247,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   shape where the two summands are not both doing work. The commit
   parks a reference to a deep slot, drains it, and reads the table.
 
+- **AND THEN A CHAIN OF INSTALLED CELLS, WHICH EVERY STORE ROW HAS SO
+  FAR DECLINED.** Each witness at either half subscribes a program
+  installing ONE node, and the refutation that set the denomination
+  says so in as many words — so the shape the conclusion is weakest at
+  is the one nothing has entered. A single climb has to cover a table
+  whose cells were written in SERIES: an inner program that is itself
+  a door over a reifying scan installs a cell, then a cell holding
+  what that one emitted, and the bound is a max over the whole chain
+  while the charge counts layers once. The commit builds such a chain
+  and stands the table's largest cell beside the rung.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -260,10 +260,10 @@ does not fit is a finding about the shared statement, not about the head.
   eleven, and a slot named twice is charged once for free; a share at two
   depths is unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED×6`: the same two denominations through the node
-  table, where a subscribed scan writes what it emitted. A drained queue of
-  three does not compound past its max, parking costs rung zero, and a biting
-  door reaches no table; a partial drain stays unread.
+  FALSITY, `REFUTED, PROBED×7`: the same two denominations through the node
+  table, where a subscribed scan writes its emission. A drained queue never
+  compounds past its max; parking and a bite cost rung zero; a stopped drain
+  reads the queue as entered. A cell chain is open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

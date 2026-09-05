@@ -36,9 +36,9 @@
 -- a queue to park in and the shape does not arise there.  Nothing
 -- about a queue whose entries name a SHARED slot each, where one
 -- definition would run once for the several entries reaching it.  And
--- the entries here are drained to exhaustion, so nothing about a
--- partial drain, where the surviving queue and the installed cells are
--- read at the same rung.
+-- the entries here are drained to exhaustion, so the queue as ENTERED
+-- and the queue as LEFT are not separated by any row here, which is
+-- what `Probed.Partial-Drain-Store` reads.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Parked-Queue-Store where
 
