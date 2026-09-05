@@ -215,25 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FAN-OUT FOLD THAT NEVER MOVES ITS LEVEL.** The size walk charges
-  every fan entry at the level the FIRST one entered at, and that is now
-  machine-dead: one entry draining a parked chain installs what the
-  subscription stores and puts the table over the entry rung, while the
-  same table holds at the level a per-entry advance reaches. The caps
-  face's fan fold already threads that advance under an ABSOLUTE
-  ceiling, so the missing term is located, not invented, and the route
-  the row calls exponential is the uncapped one. The commit gives the
-  size fold the same increment and pays its one consumer.
-
-- **THEN THE STORE PREDICATE THE WALK DOES NOT CARRY, WHICH IS NOW FOUR
-  SITES AND NOT THREE.** `walk-share-nestOK`, `fan-regsSz`,
-  `sink-fan-sink` and BOTH inner Φ arms are one shape in several
-  currencies: the walk reads the registry and the node table at a state
-  it has stepped to, and its carried bundle says nothing about depth,
-  size, or the stratification a re-entered chain wants. The inner arms
-  joined them by machine — each charges a table its premises never
-  mention. The commit decides whether one carried field answers all of
-  them, and pays the producer cascade for whichever it adds.
+- **THE STORE PREDICATE THE WALK DOES NOT CARRY, WHICH IS FOUR SITES
+  AND NOT THREE.** `walk-share-nestOK`, `fan-regsSz`, `sink-fan-sink`
+  and BOTH inner Φ arms are one shape in several currencies: the walk
+  reads the registry and the node table at a state it has stepped to,
+  and its carried bundle says nothing about depth, size, or the
+  stratification a re-entered chain wants. The inner arms joined them
+  by machine — each charges a table its premises never mention. The
+  size face just answered its own version of this by carrying a
+  CEILING rather than a per-entry ledger, and that is the shape to try
+  first. The commit decides whether one carried field answers all
+  four, and pays the producer cascade for whichever it adds.
 
 - **THEN THE PRODUCERS THAT CASCADE ANSWERS.** A field on the walk's
   bundle obliges every producer to re-establish it, and the frame arms
@@ -243,6 +235,16 @@ does not fit is a finding about the shared statement, not about the head.
   takes the arms one denomination at a time and reports which of them
   can re-establish an entry-cap reading at all.
 
+- **THEN THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
+  face's ledger into a ceiling put the crossing frame's climb and the
+  fan-out's advance under a single premise of `chain-walk-szOK`, which
+  is progress only if some ceiling exists that the walk factor can
+  afford AND the crossing frames fit under. The two halves are known
+  to pull opposite ways — one needs a ladder, the other affords a
+  polynomial — so the commit instantiates the premise at a real
+  crossing and reports which side breaks first, since a refutation
+  there kills the ceiling shape rather than the row.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -250,10 +252,6 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
-  BOTH crossing frames' tails, out of the walk: the ledger is a per-frame
-  product where the inner charge CLIMBS with the level. ONE MECHANISM WITH the
-  chain door; both owe a recursion, not a denomination.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED×4, DEAD ROUTE×2, PROBED×4`: both arms now charge rungs in a quantity
   that bounds what runs — the outer the arrivals plus their telescope, the
@@ -277,10 +275,11 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`chain-walk-szOK`** (Part7/Depth-Fit) — SHAPE, `REFUTED, DEAD ROUTE`: the
-  size walk along one chain, at the level the caps walk reached. Its fan fold
-  charges every entry at the level the first one entered at — refuted at a
-  two-entry fan; the caps fold's capped per-entry advance is the missing term.
+- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
+  `REFUTED, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling,
+  which retired the crossing frames' own row. Every frame's climb and every fan
+  entry's advance buy their room here, and a crossing frame's charge is what a
+  subscribed program costs to RUN.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the

@@ -270,6 +270,3 @@ open import Refuted.Inner-Phi-Store
   using (InnerΦQuiet; deepNest; nodeNest≡; legal; premΦ;
          inner-phi-store-absurd;
          InnerΦDrain; parked; nodeNestQ≡; inner-phi-drain-store-absurd)
-open import Refuted.Fan-Store-Level
-  using (ShareGoFixed; figures≡; entry; paths; vals₀; tailRow; advanced;
-         fan-store-level-absurd)
