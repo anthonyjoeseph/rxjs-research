@@ -22,7 +22,6 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
-open import Data.Nat.ListAction using (sum)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
   ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤)
@@ -38,7 +37,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
-open import Rx.Layer-Count using (layᵛ)
+open import Rx.Layer-Count using (layᵛˢ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
@@ -818,6 +817,20 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- smaller at the duplication chain and agrees exactly at the reified
 -- arrival (`Probed.Cross-Count-Spine`).
 --
+-- AND THE BURST JOINS BY MAX, WHICH IS A CLAIM ABOUT THE CONCLUSION
+-- AND NOT A CHOICE OF SLACK.  What this count buys is a bound stated
+-- PER DELIVERED VALUE, and every delivered value comes out of ONE
+-- arrival's run; the arrivals share only the sink node they drain
+-- into, whose table is read entry by entry.  So a sum would be honest
+-- only if a burst COMPOUNDED -- one arrival's emission feeding
+-- another's inside the same frame, or the shared node carrying a
+-- quantity neither arrival produced alone -- and it does not, at any
+-- of the three sinks, whose admission rules differ exactly where that
+-- would show (`Probed.Cross-Count-Burst`).  The sum is what put the
+-- charge outside the ledger's priceable set through the burst WIDTH,
+-- and the max removes that channel: what remains is an arrival's own
+-- layers, which the level reaches only through the size a rung admits.
+--
 -- AND WHAT IT LEAVES OWED IS A SCAN'S WIDTH.  An arriving scan emits
 -- per element while a layer count reads one layer for it, so the rungs
 -- this arm buys are a bound on the arrival's chain and not yet on what
@@ -835,7 +848,7 @@ szCount sl B (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
 szCount sl B (take-f nid)       vals = 1
 szCount sl B (from-inner _ _ _) vals = B
 szCount {s = s} sl B (thru-outer _ _) vals =
-  sum (map (layᵛ s) vals) + slotsSize sl
+  layᵛˢ s vals + slotsSize sl
 
 -- WHAT A LOOKUP HANDS BACK when every stored node is bounded.  The
 -- receipt has to be abstracted by the SAME `with` that abstracts the

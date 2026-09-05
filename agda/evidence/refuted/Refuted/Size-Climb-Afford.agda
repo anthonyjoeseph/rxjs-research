@@ -41,12 +41,12 @@
 
 -- AND THE CHARGE IS THE SMALLEST HONEST ONE, which is what makes this
 -- a finding about the SHAPE rather than about a generous reading.  A
--- crossing frame charges what it subscribes -- a burst's worth of
--- observables plus the telescope -- and this climb charges one level
--- per frame, with no width factor and no telescope.  That a single
--- frame genuinely outruns the ledger is not assumed here: it is
--- instantiated at numerals in `Refuted.Walk-Ceil-Ledger`, whose count
--- row carries a burst of arrivals the level admits exactly.
+-- crossing frame charges what it subscribes -- the deepest of its
+-- arrivals plus the telescope -- and this climb charges one level per
+-- frame, with no arrival in it and no telescope.  That a single frame
+-- genuinely outruns the ledger is not assumed here: it is instantiated
+-- at numerals in `Refuted.Walk-Ceil-Ledger`, whose count row carries
+-- one arrival the level admits.
 
 -- WHAT THIS DOES NOT SHOW.  It does not refute the depth-fuel shape
 -- itself, which is discharged one face over and is what prices the

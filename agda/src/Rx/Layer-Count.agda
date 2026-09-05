@@ -93,3 +93,14 @@ layᵛ (s ×ᵗ t) (a , b)  = layᵛ s a ⊔ layᵛ t b
 layᵛ (s +ᵗ t) (inj₁ a) = layᵛ s a
 layᵛ (s +ᵗ t) (inj₂ b) = layᵛ t b
 layᵛ (obs t)  e        = layᵉ e
+
+-- AND A BURST JOINS BY MAX FOR THE SAME REASON A PAIR DOES.  A frame
+-- handed several observables subscribes each of them, and what each
+-- one emits is a run of that arrival alone -- so a conclusion stated
+-- PER DELIVERED VALUE is bounded by the deepest arrival and not by
+-- their sum.  What the arrivals do share is the sink node they drain
+-- into, and its table is read entry by entry, so that half joins the
+-- same way (`Probed.Cross-Count-Burst`).
+layᵛˢ : ∀ {n} {Γ : Ctx n} (t : Ty) → List (Val Γ t) → ℕ
+layᵛˢ t []       = 0
+layᵛˢ t (v ∷ vs) = layᵛ t v ⊔ layᵛˢ t vs

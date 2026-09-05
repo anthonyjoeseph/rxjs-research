@@ -129,6 +129,9 @@ open import Probed.Cross-Count-Data
 open import Probed.Cross-Count-Spine
   using (separates; arrivalCounts≡; emitCounts≡; layChain≡; layRow₂; layBig≡)
 
+open import Probed.Cross-Count-Burst
+  using (separates; joins≡; valRows≡; storeRow; sinkRows≡)
+
 open import Probed.Cross-Count-Slot
   using (counts≡; tieSlot12; tieSlot13)
 

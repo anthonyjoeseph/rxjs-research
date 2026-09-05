@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE JOIN ACROSS THE BURST, WHICH IS WHAT NOW OVERRUNS THE LEDGER.**
-  The currency is settled: the outer arm charges LAYERS, so the level
-  reaches it only through an arrival's size. The walk-ceiling
-  refutation survived that restatement on a new axis — a burst as wide
-  as the length premise admits overruns every allowance the path has,
-  while one arrival alone fits. The arm SUMS across the burst and the
-  predicate it must establish is per value, so the question is whether
-  a MAX is honest here or whether one arrival's run can feed another's
-  inside the frame. The commit instantiates that at a burst the ledger
-  loses on, and restates the join or records why it cannot move.
+- **WHERE AN ARRIVAL'S LAYERS COME FROM, WHICH IS THE LAST CHANNEL THE
+  LEVEL HAS.** Currency and join are both settled and the ledger still
+  loses: a rung admits size geometrically and a layer costs fixed size,
+  so the level reaches the charge logarithmically, which suffices at
+  the third rung. Every remaining repair is on the other side. The
+  arrivals a walk meets are not arbitrary syntax — reification adds no
+  layer — so a delivered observable's layers should be bounded by the
+  PROGRAM's. The commit states that as a leaf over the run and reports
+  whether the walk carries what instantiating it needs.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s

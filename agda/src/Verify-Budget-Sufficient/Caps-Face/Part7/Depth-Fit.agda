@@ -2253,8 +2253,11 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- (`Probed.Cross-Count-Data`), and it is the only candidate the walk
 -- cannot grow, since a frame's own closed function reifies the arrival
 -- into the term and a count charging that function's syntax inflates
--- with it (`Probed.Cross-Count-Spine`).  What the currency does not
--- buy is a ceiling, since the charge is summed across the burst.
+-- with it (`Probed.Cross-Count-Spine`).  The burst joins by MAX, since
+-- each delivered value comes out of one arrival's run and the shared
+-- sink is read entry by entry (`Probed.Cross-Count-Burst`).  What the
+-- currency does not buy is a ceiling, since a rung admits size
+-- geometrically and layers cost a fixed amount of size apiece.
 -- The drain's repair is unrelated and it is a reading: what is
 -- actually parked, which is a state its count is not handed and its
 -- sibling arm already takes of the arrivals.
@@ -2275,11 +2278,10 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   WHOLE ledger this premise supplies, at the longest path the size
 --   predicate's own length conjunct admits and with the level in hand
 --   held under the ledger it has been spending.  It is what says which
---   side breaks: a burst as wide as that length conjunct admits, of
---   arrivals the level admits exactly, puts the charge past every
---   allowance the path has, so no reading of this premise fixes a
---   ceiling a crossing frame fits under -- and the gap opens with the
---   WIDTH, one such arrival alone still fitting.
+--   side breaks: a single arrival the level admits puts the charge
+--   past every allowance the path has, so no reading of this premise
+--   fixes a ceiling a crossing frame fits under -- and it opens at the
+--   third rung, the second still fitting.
 -- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
 --   a recursion on a depth fuel, the charge at each frame read at the
 --   level that frame stands at, against what `walkFac-ch` affords, and
