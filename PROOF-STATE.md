@@ -215,17 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE REGISTRY'S DEPTH, HONESTLY CAP-SIDE.** Every frame arm now
-  ACCEPTS a cap-denominated depth receipt; `fan-regsNest` is the one
-  producer still minting a unit-side one, and its consumers reach it
-  through a composition that throws the extra room away. A BARE cap-side
-  restatement is refuted before it is written — the cap AT INSTANT ZERO
-  IS the unit, and the reached chain already crosses it there — so the
-  statement that replaces it carries the walk's own admissibility, and
-  the commit is what says whether that hypothesis is available where the
-  fan reads the registry.
-
-- **THEN THE TWO SIZE-WALK ROWS NOTHING HAS EVER REACHED.**
+- **THE TWO SIZE-WALK ROWS NOTHING HAS EVER REACHED.**
   `innerΦ-quiet-fit` and `chain-walk-szOK` are FALSITY by ABSENCE: each
   says its own header carries no instantiation, and one of them is a
   charge at WIDTH ZERO, which is precisely where a bound routinely goes
@@ -234,14 +224,22 @@ does not fit is a finding about the shared statement, not about the head.
   than a grind. The commit instantiates them and takes whichever
   outcome falls out — a refutation restates, a receipt re-ranks.
 
-- **THEN THE FAN'S SIZE RECEIPT, AT WHOSE CAP.** `fan-regsSz` and
-  `sink-fan-sink` are the fanned walk's two remaining FALSITY rows, and
-  they share the producer question the leg above answers one
-  denomination over: the entry cap is the Φ pricing's, three carried
-  receipts sit above the fanned walk's own, and taking the walk up to
-  one moves the leaf's exponent and its budget. What the commit decides
-  is whether the admissibility the depth producer carries is the same
-  hypothesis the size producer needs, or a second one.
+- **THEN THE FAN'S THREE MISSING CONJUNCTS, AS ONE FIELD OR THREE.**
+  `walk-share-nestOK`, `fan-regsSz` and `sink-fan-sink` are the same
+  shape in three currencies: the walk reads the registry at a state it
+  has stepped to, and its carried bundle says nothing about the
+  registry's depth, its size, or the stratification a re-entered chain
+  wants. Each is owed as a carried conjunct rather than a hypothesis.
+  The commit decides whether one field answers all three, and pays the
+  producer cascade for whichever it adds.
+
+- **THEN THE PRODUCERS THAT CASCADE ANSWERS.** A field on the walk's
+  bundle obliges every producer to re-establish it, and the frame arms
+  state their own nest receipts at the NEXT instant's cap while the
+  fanned walk is priced at this one's. That gap is the cascade's real
+  cost, and it lands on the arms rather than on the field. The commit
+  takes the arms one denomination at a time and reports which of them
+  can re-establish an entry-cap reading at all.
 
 ### The ledger
 
@@ -280,11 +278,10 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
-- **`fan-regsNest`** (Part7/Depth-Fit) — SHAPE,
-  `REFUTED×2, DEAD ROUTE×2, PROBED`: the registry's own depth against the
-  syntactic unit. Every consumer now ACCEPTS a cap-side receipt, so what is
-  left is the producer; a bare cap-side form is refuted at instant zero, where
-  the cap IS the unit, so the replacement carries admissibility.
+- **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×3`: the
+  instant's nest predicate at the state the fan reads the registry. The door
+  has it and the walk carries no nest conjunct at all; threading it down is
+  refused by the store's own growth toward the NEXT cap.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the

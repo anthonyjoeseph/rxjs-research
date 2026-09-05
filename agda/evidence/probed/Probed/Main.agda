@@ -115,9 +115,6 @@ open import Probed.Frame-Drain-Store
          regsPacked≡; tieDrainRegs1; tieDrainRegs2; tieDrainRegs3;
          tieDrainRegsGated)
 
-open import Probed.Fan-Regs-Registry
-  using (counts; regsS; marginK; marginK′; regsK; lensK)
-
 open import Probed.Fold-Width-Reach
   using (separates; admittedRow≡; census≡; widths≡; width2≡; outruns; agrees;
          entry≡; sizesAgree; driven≡; crossesRun)

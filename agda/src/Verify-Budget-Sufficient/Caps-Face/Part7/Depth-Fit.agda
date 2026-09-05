@@ -1219,9 +1219,9 @@ postulate
 -- this one.
 
 -- AND WHAT A SIZE RECEIPT HAS TO PRICE IS THE REGISTERED LENGTH, which
--- does not sit at a constant.  Instantiated in `Probed.Fan-Regs-Registry`,
--- the reachable maximum is two frames per flatten layer standing above
--- a share -- so it climbs with the program's own syntax, and a receipt
+-- does not sit at a constant.  The reachable maximum is two frames per
+-- flatten layer standing above a share -- so it climbs with the
+-- program's own syntax, and a receipt
 -- stated at any numeral is outrun by the fourth layer.  That is why the
 -- mint-side fact cannot be a bound chosen here: it has to read the
 -- program, which is what the cap does, and which is equally why this
@@ -1316,79 +1316,99 @@ chainsNest-all D U (c ∷ cs) h =
 -- CHARGE.  Read as the registry's own place in the store measure this
 -- is a numeral inequality, so the selection's join is a proven fold
 -- and the per-chain receipt follows with no filter lemma between.
--- What it cannot reach is `nestΦAt`, denominated in the program's
--- unit and its slot wrap: a depth premise widened to the store has
--- nothing there to be compared against, so replacing the unit
--- outright moves the obligation onto the charge, which is where the
--- remaining leaf is owed.
+-- What it cannot reach is a receipt at the STORE's own maximum: the
+-- frame arms are stated at the instant's CAP, so a premise widened to
+-- the store has nothing there to be compared against.  The cap
+-- reading is the one that lands, the arms already take it, and the
+-- store measure delivers it -- which leaves the remaining leaf on
+-- where the cap reading's own side-condition comes from.
 
--- AND THEIR DEPTH AGAINST THE SYNTACTIC UNIT, which is the second.
--- IT IS FALSE, and not merely over arbitrary states: a RUN reaches a
--- registry deeper than the unit, so the statement has to be replaced
--- rather than discharged, and the invariant field with it.  The
--- mechanism is a `map-f` frame, which charges the path its function's
--- nesting while the unit is read off the program once -- so an
--- observable-typed scan accumulator folded back into its own map
--- function climbs one layer per delivery against a fixed number.
+-- AND THEIR DEPTH AGAINST THE INSTANT'S CAP, which is the second, and
+-- which is two proven steps rather than a gap.  The store measure's
+-- own decomposition puts `regsNestMax` under `storeNestMax`, and the
+-- instant's nest predicate reads that maximum against `nestCapAt`, so
+-- the registry's depth under the cap is a composition and no new
+-- mathematics.
 --
--- AND THE STATEMENT THAT REPLACES IT IS ALREADY PROVEN, WHICH MAKES
--- THIS A DENOMINATION RATHER THAN A GAP.  The store measure's own
--- decomposition puts `regsNestMax` under `storeNestMax`, and the
--- walk's nest predicate reads that maximum against the instant's
--- `nestCapAt` -- so the registry's depth under the CAP is two proven
--- steps and no new mathematics.  What is not available is the
--- direction this site asks for: the unit sits UNDER the cap, so the
--- bridge between them runs the wrong way and no arithmetic turns a
--- cap-side receipt into a unit-side one.
+-- AND THE PREMISE IS THE STATEMENT RATHER THAN A CONVENIENCE.  What it
+-- buys is the one thing that separates a true reading of this from a
+-- false one: the state is an instant's ENTRY state and not an
+-- arbitrary one.  Neither denomination survives without it -- the
+-- syntactic unit is outrun by a `map-f` frame, which charges the path
+-- its function's nesting while the unit is read off the program once,
+-- and the cap collapses onto the unit at instant zero -- so what is
+-- written here replaces a false statement rather than weakening a true
+-- one, and the residue is where the side-condition comes from.
 --
--- AND NO PREMISE SAVES THE UNIT-SIDE CONCLUSION, which is the move to
--- rule out before a restatement is spent on it.  The reached
--- counterexample above satisfies whatever the walk carries, since it
--- is what a run leaves; threading the nest predicate into this
--- signature would leave it standing and trade a tracked postulate for
--- an untracked hypothesis.  The CONCLUSION is what moves, and moving
--- it is the Φ face's nest currency rather than work owed here: the
--- potential is a SUM of two halves denominated differently, and the
--- cap-denominated half is what a cap-denominated premise is spent
--- against.
---
--- DEAD ROUTE: spending the moved conclusion in the potential's WALK
+-- DEAD ROUTE: spending the cap-side conclusion in the potential's WALK
 --   half, which is the half the frame arms visibly charge.  That half
 --   multiplies the syntactic UNIT, and it is affordable only because
 --   the unit sits under the size cap; `nestCapAt` steps by a factor
 --   whose logarithm is already a square of the landing instant's
 --   size, so no widening puts it under the same exponential.  The
---   CAP half is where the swap lands, and its coefficient carries the
---   path factor's own cap so that a frame arm can spend it there.
---
--- DEAD ROUTE: owing this to whatever MINTS a registration, which is
---   where the size analogue directly above sends its own obligation.
---   A mint holds the path it is registering and the program, and the
---   counterexample is legal in both: the depth is a fact about the
---   accumulated STORE, which neither the path's frames nor the
---   syntax can report, so no premise threaded to a mint can pay it.
---
+--   CAP half is where a cap-side receipt lands, and its coefficient
+--   carries the path factor's own cap so that a frame arm can spend
+--   it there.
 -- REFUTED: `Refuted.Reg-Nest-Reached`, at a chain five deep against a
 --   unit of four, reached by running, and climbing one per fold.
 -- REFUTED: `Refuted.Fan-Chain-Registry`, at a chain three deep
 --   against a unit of one, minted by a map whose function carries
 --   syntax the program does not.
--- PROBED: `Probed.Fan-Regs-Registry` reaches the registry by RUNNING
---   rather than by constructing one, on both axes the conclusion has.
---   Covered: a share telescope one to five crossings deep, whose
---   largest reachable registry holds five chains; and a ladder of `k`
---   flatten layers standing above a share, `k ≤ 4`, where the chain's
---   depth and the unit climb together at `k+1` against `k+3` -- a
---   margin of two that neither closes nor opens across the sweep.
---   Not covered: a share whose def nests more deeply than its
---   consumer, which moves the unit's slot summand against a flat
---   chain; the arbitrary registries the refutations inhabit; and an
---   observable-typed scan accumulator, whose layers are stored rather
---   than written and which is where the sweep's margin is lost.
+fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (sched : Sched Γ) (st : EvalSt e) →
+  nestOK? e sl id sched st ≡ true →
+  regsNestMax (EvalSt.registry st) ≤ nestCapAt e sl id
+fan-regsNest {e = e} sl id sched st h =
+  ≤-trans (storeNest-regs≤ sched st) (nestOK?-store e sl id sched st h)
+
+-- AND THE SIDE-CONDITION HAS TO COME FROM THE WALK, WHICH IS WHERE IT
+-- IS NOT.  The instant's nest predicate is the ambient invariant every
+-- cascade door already takes as a hypothesis, so at an instant's ENTRY
+-- it is in hand; the fan reads the registry deep inside the descent,
+-- at a state the walk has stepped to, and the walk's carried bundle
+-- has no nest conjunct of any kind -- only the admitted selection's
+-- size, its length against the registration cap, and the share tail.
+-- The fact exists one level up and is not carried down, and that gap
+-- is the whole of what is asserted here.
+--
+-- AND WHAT A RUN REGISTERS IS NOT BOUNDED BY A NUMERAL, which is why
+-- the missing conjunct cannot be traded for a constant.  A ladder of
+-- flatten layers standing above a share deepens the registered chain
+-- one rung at a time and lengthens it by two, so both readings climb
+-- with the program's own syntax and any bound chosen here is outrun by
+-- the fourth layer.
+--
+-- DEAD ROUTE: threading the predicate down the walk as a premise, so
+--   that the door's own hypothesis reaches the read.  It is not
+--   preserved: within one instant the store legitimately grows toward
+--   the NEXT cap, which is the denomination the frame arms' own nest
+--   receipts are stated in, so re-establishing an entry-cap predicate
+--   after a frame step asks the step to leave the store where it
+--   found it.
+-- DEAD ROUTE: deriving the fanned chain's depth receipt from the SIZE
+--   receipt the fan already holds, which would need no registry
+--   reading at all -- a size-legal path has depth under its length
+--   times the size cap and length under that cap, so the cap's square
+--   bounds it.  The charge affords the instant's cap plus one square
+--   and this asks for two, and the walk half's slack is the unit and
+--   the size rather than a square.  It is affordable wherever the cap
+--   dominates the square and fails at instant ZERO exactly, the cap
+--   being the unit there.
+-- DEAD ROUTE: owing this to whatever MINTS a registration, which is
+--   where the size analogue directly above sends its own obligation.
+--   A mint holds the path it is registering and the program, and the
+--   reached counterexample is legal in both: the depth is a fact about
+--   the accumulated STORE, which neither the path's frames nor the
+--   syntax can report, so no premise threaded to a mint can pay it.
 postulate
-  fan-regsNest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (st : EvalSt e) →
-    regsNestMax (EvalSt.registry st) ≤ nestUnit e sl
+  walk-share-nestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    dispatchCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lv
+      sf (suc gas) nid now i vals fin sched st →
+    Sched.slots sched ≡ sl →
+    nestOK? e sl id sched st ≡ true
 
 -- AND THE FAN-OUT HALF IS A PROVEN FOLD RATHER THAN A FILTER LEMMA,
 -- which is the whole of what the store denomination bought.  A
@@ -1579,7 +1599,9 @@ mutual
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
           (fan-chain-nestD (nestCapAt e sl id) i st
-             (≤-trans (fan-regsNest sl st) (unit≤cap e sl id))) hΦ
+             (fan-regsNest sl id sched st
+                (walk-share-nestOK sl id sf gas nid now Lv i vals false
+                   sched st hd hsl))) hΦ
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
                   hd hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
@@ -1587,7 +1609,9 @@ mutual
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
           (fan-chain-nestD (nestCapAt e sl id) i st
-             (≤-trans (fan-regsNest sl st) (unit≤cap e sl id))) hΦ
+             (fan-regsNest sl id sched st
+                (walk-share-nestOK sl id sf gas nid now Lv i vals true
+                   sched st hd hsl))) hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
                     _ _ _ _ _ _ = tt
