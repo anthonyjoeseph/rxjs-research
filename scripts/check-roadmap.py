@@ -176,6 +176,7 @@ legal on FALSITY, SHAPE and VACUITY, the classes that CLAIM nothing.
 """
 
 import argparse
+import importlib.util
 import textwrap
 import re
 import sys
@@ -537,6 +538,23 @@ DURABLE_MARK_RE = re.compile(
 )
 NO_EVIDENCE = "NO EVIDENCE"
 
+
+def receipt_cap():
+    """The receipt cap, read from the checker that owns it.
+
+    `make evidence-check` caps receipts on one POSTULATE.  What stays open is
+    a ROW, and a row naming both arms of one statement carries both names'
+    receipts — so a pair can gather fourteen while neither name ever reaches
+    the per-name cap, and the reading that says the row is over-evidenced is
+    the one nothing was holding.  Same number, second unit; importing it is
+    what stops the two from drifting apart.
+    """
+    path = pathlib.Path(__file__).with_name("check-evidence.py")
+    spec = importlib.util.spec_from_file_location("check_evidence", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.RECEIPT_CAP
+
 # The field as it appears in a row: a backticked span directly after the
 # risk class.  BACKTICKED IS LOAD-BEARING TWICE.  It makes the field free
 # under `prose_cost`, so a mandatory field on every row costs two charged
@@ -779,6 +797,30 @@ def unevidenced_difficulty(path, tiers, cen):
     return out
 
 
+def over_probed(path, tiers, cen, cap):
+    """-> [(tier, label, lineno, n)] — rows carrying more than `cap` receipts.
+
+    A probe AIMS a grind or REFUTES a statement, and past the cap the receipts
+    have stopped deciding anything while the row stays open — so what more
+    evidence buys is more evidence to delete on discharge.  The repair is to
+    DEFINE something, or to delete the receipts that no longer earn their
+    place; splitting the row in two satisfies the count and changes nothing,
+    which is the same laundering as merging probe files under the per-name cap.
+    Only PROBED is counted: a refutation KILLS a statement rather than
+    accumulating against a live one, and the other three markers name a route
+    rather than buy coverage.
+    """
+    out = []
+    for tier, rows, _pre, _legs in tiers:
+        for label, cls, lineno, _cost in rows:
+            if cls is None:
+                continue
+            n = row_evidence(label, cen).get("PROBED", 0)
+            if n > cap:
+                out.append((tier, label, lineno, n))
+    return out
+
+
 def fix_evidence(path, tiers, cen):
     """Rewrite every classed row's evidence field from the headers. -> n changed."""
     lines = path.read_text().splitlines()
@@ -986,7 +1028,22 @@ def main():
             print("if nothing is — that is CLAUDE.md's own rule, mechanised. Put")
             print("the evidence in the postulate's header as a durable marker and")
             print("run  make roadmap-evidence , or raise the class.")
-        if missing or bad or unearned or unev:
+        cap = receipt_cap()
+        fat = over_probed(path, tiers, cen, cap)
+        if fat:
+            print(f"\nROWS OVER THE RECEIPT CAP OF {cap} — {len(fat)}:")
+            for tier, label, lineno, n in fat:
+                print(f"  Tier {tier}  {path.name}:{lineno}  {label}")
+                print(f"    {n} receipts on one open row")
+            print("\nA probe AIMS a grind or REFUTES a statement. Past the cap the")
+            print("receipts have stopped deciding anything and the row is still")
+            print("open, so what more evidence buys is more evidence to delete when")
+            print("the statement is discharged. Take the leap: DEFINE something, or")
+            print("delete the receipts that no longer earn their place — and never")
+            print("split the row, which satisfies the count and changes nothing.")
+            print("evidence-check caps one POSTULATE; this caps the open ITEM, which")
+            print("is what a row naming two arms of one statement gets past.")
+        if missing or bad or unearned or unev or fat:
             failures.append(None)
 
     date_targets = [path]

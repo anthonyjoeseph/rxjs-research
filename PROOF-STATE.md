@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A CHAIN OF INSTALLED CELLS, WHICH EVERY STORE ROW HAS SO
-  FAR DECLINED.** Each witness at either half subscribes a program
-  installing ONE node, and the refutation that set the denomination
-  says so in as many words — so the shape the conclusion is weakest at
-  is the one nothing has entered. A single climb has to cover a table
-  whose cells were written in SERIES: an inner program that is itself
-  a door over a reifying scan installs a cell, then a cell holding
-  what that one emitted, and the bound is a max over the whole chain
-  while the charge counts layers once. The commit builds such a chain
-  and stands the table's largest cell beside the rung.
-
-- **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
+- **AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
   READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
   witness so far enters at a BARE REFERENCE, which carries zero
   layers, so the whole charge has been the telescope and the `+` has
@@ -250,6 +239,18 @@ does not fit is a finding about the shared statement, not about the head.
   series, a later subscription reading what an earlier one wrote. The
   commit parks both behind one door and reads the table.
 
+- **AND THEN A CHAIN WHOSE CELLS RESOLVE SLOTS, WHERE ONE
+  TELESCOPE SUMMAND IS SPENT SEVERAL TIMES.** The chain just read is
+  written OUT, so its layers carry the climb and the summand is a
+  rounding; and every telescope row resolves ONE slot. A chain each of
+  whose rungs names a DIFFERENT share is both at once — the run walks
+  from slot to slot, each cell holding what the one below it emitted
+  through a definition the arrival's syntax never spells, so the
+  layers stay flat while the work compounds. `slotsSize` is added once
+  over the whole vocabulary however many of them a single run
+  resolves, and whether one summand covers a walk that spends several
+  is unread. The commit scripts that chain and reads the table.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -263,11 +264,10 @@ does not fit is a finding about the shared statement, not about the head.
   eleven; a slot named twice and a share at two depths cost nothing. A layered
   arrival is unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED×8`: the same two denominations through the node
-  table. A drained queue never
-  compounds past its max; parking and a bite cost rung zero; a stopped drain
-  reads the queue as entered, and a parked reference the telescope. A cell
-  chain is open.
+  FALSITY, `REFUTED, PROBED×7`: both denominations at the node table. A drained
+  queue never compounds past its max; parking costs rung zero; a
+  stopped drain reads the queue as entered, a parked reference the telescope, a
+  chain one cell's rungs. Slots in series are open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
