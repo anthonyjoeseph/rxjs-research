@@ -215,19 +215,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHETHER THE CROSSING REALLY OWES A SECOND BLOCK, WHICH ONE
-  INSTANTIATION DECIDES.** The door's descent is checked now: both
-  premises transport into the source at the caller's own rung, and the
-  burst is all that is left. Its leaf says an arrival's SIZE is bounded
-  one rung block ABOVE the program's, so composing the two readings
-  would cost a block that `suc (layᵉ b)` does not carry — but a rung is
-  `S * suc (2 * s)` and a layer at most doubles, so the bound may
-  already hold that slack. The commit instantiates the leaf at a door
-  over a duplication chain and reads which it is, since a charge
-  restated against a gap that is not there moves every consumer of the
-  descent for nothing.
+- **THE SQUARING ARRIVAL, WHICH IS THE ONE SHAPE LEFT THAT CAN BREAK
+  THE CROSSING.** The door's burst was instantiated at a duplication
+  chain and the fold cost no rung of its own: a rung quadruples where a
+  layer doubles, and the charge outgrew the need at both lengths. So
+  what is left is the shape where a run does not double — an arrival
+  carrying a `μ`, whose unfolding SQUARES a size no layer charge grows
+  with, and squaring outruns a rung. That is the same mechanism the
+  unfolding leaf beside it is a leaf FOR, so one witness aims at both. The commit builds it and reads whether it refutes: a
+  refutation moves the descent's whole denomination, and a receipt
+  closes the last region the crossing has open.
 
-- **THEN THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
+- **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
   its ceiling is a fixed product, so what is left is what a frame
   cannot read off a path: the two crossings' charge, the fan's
@@ -260,10 +259,10 @@ does not fit is a finding about the shared statement, not about the head.
   subscription delivers, in its own layers plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
   twice and a share at two depths cost nothing. A layered arrival is unread.
-- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `PROBED`: the
   burst a crossing door pushes back through itself, keyed on the source program
-  since an arbitrary burst is unbounded. The descent under it is checked, so the
-  arrival's re-entry is the whole of what is open.
+  since an arbitrary burst is unbounded. The fold costs no rung a duplication
+  chain can buy; a `μ` arrival, which squares rather than doubles, is open.
 - **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
   ONE unfolding writes. The size premise does not survive the substitution —
   the proven bound SQUARES it — while the layer reading crosses untouched
