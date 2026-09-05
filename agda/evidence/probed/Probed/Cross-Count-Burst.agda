@@ -1,8 +1,9 @@
 -- ══════════════════════════════════════════════════════════════════
--- THE JOIN ACROSS A BURST, which is the axis the outer arm's charge is
--- now outside the walk's ledger on and the one no row had instantiated.
--- The currency is settled; what is not is whether a frame handed
--- several observables owes their SUM or their MAX.
+-- THE JOIN ACROSS A BURST: whether several observables reaching one
+-- node owe their SUM or their MAX.  The currency is settled and the
+-- CROSSING's own fold now carries the max by proof; where the join is
+-- still a mechanism choice is the queue a drain reads, which joins its
+-- parked entries the same way and against the same rung.
 
 -- WHY IT IS A REAL QUESTION AND NOT A CHOICE OF SLACK.  The conclusion
 -- the arm must establish is PER VALUE -- every delivered value under
@@ -12,7 +13,7 @@
 -- `*All` node the burst drains into carries a quantity neither arrival
 -- produced alone.
 
--- FORK: stepFrame-sz-store-outer
+-- FORK: stepFrame-sz-store-inner
 
 -- THE ROWS.  A `thru-outer` frame is run on a burst of three twelve-rung
 -- duplication chains -- the same arrival the single-value refutation is

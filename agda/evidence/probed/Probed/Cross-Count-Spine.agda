@@ -21,7 +21,7 @@
 -- that wrote it.  The rows are taken against that definition rather
 -- than a copy of it, so a restatement of the measure moves them.
 
--- FORK: stepFrame-sz-store-outer
+-- FORK: thruConsume-sz-store
 
 -- THE ROWS.  A `map-f` frame is run on a data arrival whose two counts
 -- are both nothing, and what it emits reads four thousand and

@@ -2,7 +2,7 @@
 -- A TABLE WHOSE CELLS WERE WRITTEN IN SERIES, WHICH IS THE SHAPE THE
 -- SINGLE CLIMB HAS NEVER BEEN ASKED ABOUT.
 --
--- TARGET: stepFrame-sz-store-outer @62e3c5
+-- TARGET: thruConsume-sz-store @8ba31b
 --
 -- WHAT EVERY STORE ROW SO FAR DECLINED.  Each witness at either half
 -- subscribes a program that installs ONE node, and the refutation
@@ -10,18 +10,21 @@
 -- conclusion has only ever been read where the table it bounds is one
 -- cell wide, and a climb that covered a chain by accident would look
 -- exactly the same there.  The chain is the shape where a per-cell
--- reading and a per-frame reading come apart: the charge counts the
--- arriving program's layers ONCE, while the cells are written one
+-- reading and a per-consumption reading come apart: the level counts
+-- the arriving program's layers ONCE, while the cells are written one
 -- after another and each holds what the one below it emitted.
 --
 -- THE ROWS.  A reifying scan, whose emission is fed to a `mergeAll`,
 -- whose emission is fed to a SECOND reifying scan -- arriving at a
 -- `thru-outer` frame as one value, so subscribing it writes the whole
--- chain into one table in one step.  Against it, a control that is
--- the same reifying scan alone, which writes one cell.  Both tables
--- are read at the SAME two rungs, at the smallest level the statement
--- admits, so what the rows compare is the number of climbs a table
--- needs and not the size of the program that wrote it.
+-- chain into one table in one step.  The frame is read rather than the
+-- consumption directly, and at ONE arrival with no close the two are
+-- the same table: the fold has a single step and the wrap moves
+-- nothing.  Against it, a control that is the same reifying scan
+-- alone, which writes one cell.  Both tables are read at the SAME two
+-- rungs, at the smallest level the statement admits, so what the rows
+-- compare is the number of climbs a table needs and not the size of
+-- the program that wrote it.
 --
 -- WHAT THEY FIND.  The chain is really built -- the table the frame
 -- leaves is three cells wider than the one it entered, against one
@@ -49,7 +52,7 @@ open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fz)
@@ -59,12 +62,12 @@ open import Rx.Prim using (g0; gasPad; hot)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
   emptyᵉ; ofᵉ; scanᵉ; mergeAllᵉ; varᵗ; sndᵗ; strmᵗ; sizeᵉ)
 open import Rx.Slots using (Slots; scripted; slotsSize)
-open import Rx.Layer-Count using (layᵛˢ)
+open import Rx.Layer-Count using (layᵛˢ; layᵉ)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; stepFrame-sz-store-outer)
+  using (valsSz?; thruConsume-sz-store)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -191,6 +194,7 @@ chainPrem≡ = refl
 -- LOAD-BEARING: read at the level the rows are, so a table the chain
 -- outran would fail it exactly as one climb does above.
 tieCellChain : Confirms
-  (stepFrame-sz-store-outer {e = eᶜ} (gasPad 64 g0) 0 0 mergeAllᵒ 0 root
-     valsChain false (sched-init eᶜ slᶜ) stᶜ 2 52)
-tieCellChain = λ _ _ _ → refl
+  (thruConsume-sz-store {e = eᶜ} slᶜ (gasPad 64 g0) mergeAllᵒ 0 root 0 0
+     topC (sched-init eᶜ slᶜ) stᶜ 2 52
+     (iterSize 2 (layᵉ topC + slotsSize slᶜ) 52))
+tieCellChain = λ _ _ _ _ _ → refl

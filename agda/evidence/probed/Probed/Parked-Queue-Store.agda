@@ -2,7 +2,7 @@
 -- THE PARKED QUEUE, WHICH NO ROW AT EITHER STORE HALF HAD REACHED.
 --
 -- TARGET: stepFrame-sz-store-inner @b7ce7a
--- TARGET: stepFrame-sz-store-outer @62e3c5
+-- TARGET: thruConsume-sz-store @8ba31b
 --
 -- WHAT WAS UNTESTED, AND WHY NO READING OF THE DELIVERED LIST COULD
 -- REACH IT.  A `*All` node holds programs it could not admit, and the
@@ -15,12 +15,14 @@
 -- THE TWO ARMS TREAT IT AS DIFFERENT OBJECTS, which is the finding.
 -- The inner arm RUNS the queue: the drain subscribes every entry in
 -- turn, threading one table through all of them, so the charge reads
--- the queue and joins its entries by max.  The outer arm never looks
--- at it: its count is the arrivals' layers and the telescope, and the
--- only thing it can do to a queue is APPEND an arrival the premise has
--- already bounded.  So parking costs the ladder nothing at all, which
--- is the one row here read at rung zero -- the very bound the premise
--- carried, with no climb whatever.
+-- the queue and joins its entries by max.  A crossing consumption
+-- never looks at it: the level it is held to is the arrival's own
+-- layers and the telescope, and the only thing it can do to a queue is
+-- APPEND an arrival the premise has already bounded.  So parking costs
+-- the ladder nothing at all, which is the one row here read at rung
+-- zero -- the very bound the premise carried, with no climb whatever.
+-- Those rows are read at the frame, which at ONE arrival and no close
+-- is the consumption itself.
 --
 -- WHERE THE MAX COULD HAVE FAILED AND DID NOT.  Three parked entries,
 -- of nought, fourteen and fifteen layers, drained through one door
@@ -62,7 +64,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner;
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (parkedLayAt; szCount; stepFrame-sz-store-inner;
-         stepFrame-sz-store-outer)
+         thruConsume-sz-store)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; e₀; vals₀)
 open import Probed.Apparatus using (Confirms)
@@ -227,17 +229,19 @@ tieParkedInner : Confirms
      true (sched-init e₀ sl₁) stQ3 65 65)
 tieParkedInner = λ _ _ _ → refl
 
--- LOAD-BEARING: same, at the arm whose count never reads the queue it
--- must nonetheless leave bounded.
+-- LOAD-BEARING: same, at the reading whose level never counts the
+-- queue it must nonetheless leave bounded.
 tieParkedOuterRun : Confirms
-  (stepFrame-sz-store-outer {e = e₀} (gasPad 8 g0) 0 0 mergeAllᵒ 0 root
-     vals₀ false (sched-init e₀ sl₁) stRun 65 65)
-tieParkedOuterRun = λ _ _ _ → refl
+  (thruConsume-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+     inner (sched-init e₀ sl₁) stRun 65 65
+     (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
+tieParkedOuterRun = λ _ _ _ _ _ → refl
 
 -- LOAD-BEARING: same, at the state where the arrival is parked rather
--- than run, so the conclusion is about a table the step only appended
--- to.
+-- than run, so the conclusion is about a table the consumption only
+-- appended to.
 tieParkedOuterPark : Confirms
-  (stepFrame-sz-store-outer {e = e₀} (gasPad 8 g0) 0 0 mergeAllᵒ 0 root
-     vals₀ false (sched-init e₀ sl₁) stPark 65 65)
-tieParkedOuterPark = λ _ _ _ → refl
+  (thruConsume-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+     inner (sched-init e₀ sl₁) stPark 65 65
+     (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
+tieParkedOuterPark = λ _ _ _ _ _ → refl

@@ -27,7 +27,7 @@
 -- `nestDᵛ` already carries for the depth face, charging a function's
 -- size where that measure charges its nesting.
 
--- FORK: stepFrame-sz-store-outer
+-- FORK: thruConsume-sz-store
 
 -- WHY THE ANSWER IS NOT KNOWN FROM THE FIRST FORK.  That file's second
 -- shape -- a reified arrival -- is recorded there as degenerate,

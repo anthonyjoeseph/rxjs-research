@@ -215,7 +215,30 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
+- **THE OTHER ARM, TAKEN THE SAME WAY THE OUTER ONE JUST WAS.**
+  `stepFrame-sz-store-inner` is still ONE postulate over a whole
+  drain, and the drain has the shape the crossing turned out to have:
+  a close that rewrites only the cell it read, over a fold that
+  subscribes the parked entries in turn through one table. So the same
+  decomposition is available — a wrap lemma that cannot move the
+  reading, and a fold that CARRIES a level rather than climbing one,
+  over a per-entry leaf. What it puts to the test is whether the max
+  the queue's own reading takes survives being stated one entry at a
+  time, which is the thing three entries through one table only
+  measured. The commit writes the body and states the residue.
+
+- **AND THEN THE LEAF ITSELF, DOOR BY DOOR.** `thruConsume-sz-store`
+  is what the outer arm now reduces to entirely, so it carries that
+  whole half's risk in one statement — and unlike the frame it
+  replaced it splits on something small: a merging door ADMITS or
+  PARKS, a switch cancels the inner it holds, an exhaust drops what
+  arrives while busy. Three of the four write nothing the premise does
+  not already bound, and a park only appends one. The commit grinds
+  the arms that install nothing and leaves the subscribing arm stated
+  at full strength, which localises the store risk to the one door
+  that reifies.
+
+- **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
   READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
   witness so far enters at a BARE REFERENCE, which carries zero
   layers, so the whole charge has been the telescope and the `+` has
@@ -226,30 +249,6 @@ does not fit is a finding about the shared statement, not about the head.
   top of what the named slot delivers, so the two are in series in
   one run and either taken alone falls short. The commit scripts that
   arrival and stands the sum beside what it delivers.
-
-- **AND THEN A QUEUE JOINING A REFERENCE AGAINST A WRITTEN-OUT
-  PROGRAM, WHERE THE MAX AND THE SUMMAND MEET.** The two entry shapes
-  are read APART: a written-out program carries the layers and
-  the telescope is a rounding; a bare reference carries none
-  and the telescope is the whole climb. The charge joins the queue's
-  layers by MAX and adds the telescope ONCE, so a queue holding both
-  is priced by whichever entry has the layers, plus a summand the
-  OTHER entry spends by itself — and nothing yet says those two costs
-  join rather than add, since the entries drain through one table in
-  series, a later subscription reading what an earlier one wrote. The
-  commit parks both behind one door and reads the table.
-
-- **AND THEN A CHAIN WHOSE CELLS RESOLVE SLOTS, WHERE ONE
-  TELESCOPE SUMMAND IS SPENT SEVERAL TIMES.** The chain just read is
-  written OUT, so its layers carry the climb and the summand is a
-  rounding; and every telescope row resolves ONE slot. A chain each of
-  whose rungs names a DIFFERENT share is both at once — the run walks
-  from slot to slot, each cell holding what the one below it emitted
-  through a definition the arrival's syntax never spells, so the
-  layers stay flat while the work compounds. `slotsSize` is added once
-  over the whole vocabulary however many of them a single run
-  resolves, and whether one summand covers a walk that spends several
-  is unread. The commit scripts that chain and reads the table.
 
 ### The ledger
 
@@ -263,11 +262,15 @@ does not fit is a finding about the shared statement, not about the head.
   crossing value halves are bodies over it. A max is refuted at a chain of
   eleven; a slot named twice and a share at two depths cost nothing. A layered
   arrival is unread.
-- **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED×7`: both denominations at the node table. A drained
-  queue never compounds past its max; parking costs rung zero; a
-  stopped drain reads the queue as entered, a parked reference the telescope, a
-  chain one cell's rungs. Slots in series are open.
+- **`thruConsume-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: what ONE
+  arriving subscription writes, at a level the arrival's own layers reach. The
+  outer arm's store half is a body over it. Chains do not compound and a park
+  costs rung zero; slots in series are open.
+- **`stepFrame-sz-store-inner`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED, PROBED×4`: the drained queue's denomination at the node table,
+  still one postulate over a whole drain. Its max survives three entries
+  through one table; a stopped drain reads the queue as entered, a parked
+  reference the telescope.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
