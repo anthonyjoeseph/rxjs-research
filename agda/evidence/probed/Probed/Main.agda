@@ -129,11 +129,8 @@ open import Probed.Cross-Count-Data
 open import Probed.Cross-Count-Spine
   using (separates; arrivalCounts≡; emitCounts≡; layChain≡; layRow₂; layBig≡)
 
-open import Probed.Cross-Count-Burst
-  using (separates; joins≡; valRows≡; storeRow; sinkRows≡)
-
 open import Probed.Cross-Count-Store
-  using (charges≡; valRows≡; storeRows≡; tieDrain; tieStore)
+  using (charges≡; valRows≡; tieDrain)
 
 open import Probed.Cross-Count-Outer-Store
   using (figures≡; storeRows≡; sinkRows≡; tieOuterStore)
@@ -154,12 +151,7 @@ open import Probed.Slot-Two-Depths
          latticeControl≡; latticeRows≡; tieLattice)
 
 open import Probed.Parked-Queue-Store
-  using (parkFigures≡; drainNodes≡; innerRows≡; outerCharge≡; outerRows≡;
-         tieParkedInner; tieParkedOuterRun)
-
-open import Probed.Partial-Drain-Store
-  using (drainFigures≡; partialNodes≡; partialRows≡; groundRow≡;
-         zeroLaneRow≡; zeroLaneHolds≡; tiePartial)
+  using (outerCharge≡; outerRows≡; tieParkedOuterRun)
 
 open import Probed.Parked-Slot-Store
   using (slotStoreFigures≡; slotStoreNodes≡; slotStoreRows≡;

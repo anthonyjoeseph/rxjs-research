@@ -100,7 +100,7 @@ layᵛ (obs t)  e        = layᵉ e
 -- PER DELIVERED VALUE is bounded by the deepest arrival and not by
 -- their sum.  What the arrivals do share is the sink node they drain
 -- into, and its table is read entry by entry, so that half joins the
--- same way (`Probed.Cross-Count-Burst`).
+-- same way (`mergeAllDrain-sz-store`).
 layᵛˢ : ∀ {n} {Γ : Ctx n} (t : Ty) → List (Val Γ t) → ℕ
 layᵛˢ t []       = 0
 layᵛˢ t (v ∷ vs) = layᵛ t v ⊔ layᵛˢ t vs

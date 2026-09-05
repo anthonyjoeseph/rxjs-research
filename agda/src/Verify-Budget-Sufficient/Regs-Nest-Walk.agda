@@ -869,7 +869,7 @@ parkedLayAt nid ((k , s) ∷ r) =
 -- another's inside the same frame, or the shared node carrying a
 -- quantity neither arrival produced alone -- and it does not, at any
 -- of the three sinks, whose admission rules differ exactly where that
--- would show (`Probed.Cross-Count-Burst`).  The sum is what put the
+-- would show.  The sum is what put the
 -- charge outside the ledger's priceable set through the burst WIDTH,
 -- and the max removes that channel: what remains is an arrival's own
 -- layers, which the level reaches only through the size a rung admits.
@@ -1614,6 +1614,14 @@ postulate
   --   once is not short.  One chain, of one length, with the telescope
   --   a single scripted slot -- so nothing about a chain whose cells
   --   resolve a SLOT, where the summand would do the work.
+  -- PROBED: `Probed.Parked-Slot-Store` at the arrival whose OWN layers
+  --   are nought -- a bare reference to a shared slot -- so the first
+  --   summand contributes nothing and the telescope carries the whole
+  --   climb.  Read at two depths behind the same reference, since one
+  --   more rung doubles the emission while moving the charge by four
+  --   units of slot syntax; the telescope-free reading fails at both.
+  --   So the summand REACHES the written table, never that its size is
+  --   right: one slot, one queue entry, and the merging door alone.
   subscribeInner-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
@@ -1836,6 +1844,242 @@ stepFrame-sz-store-outer {u = u} sf id now op nid path vals fin sched st S B
         2≤S (EvalSt.nodes st) hns)
       hv)
 
+-- WHAT A DRAIN LEAVES IN THE TABLE, WHICH IS AGAIN A FOLD CARRYING A
+-- LEVEL RATHER THAN CLIMBING ONE.  Each parked entry is subscribed at
+-- the state its predecessor left, so an induction handing the table a
+-- rung per entry would end at the queue's SUM -- and the reading this
+-- arm owes joins the entries by max.  What is carried instead is one
+-- level high enough for the whole queue: the head entry's own charge
+-- sits under the join, so the leaf leaves the level where it found it
+-- and the tail inherits it unchanged.
+--
+-- AND THE TELESCOPE SURVIVES THE FOLD for the reason it survives the
+-- crossing's: a subscription hands on the slots it was handed, so the
+-- level can be named once at the schedule the drain entered with.
+mergeAllDrain-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id)
+  (now : Tick) (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+  Sched.slots sched ≡ sl →
+  iterSize S (layᵛˢ (obs s) q + slotsSize sl) B ≤ M →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+        (mergeAllDrain sf allNid κ id now lim act q sched st)))))))
+    ≡ true
+mergeAllDrain-sz-store sl sf allNid κ id now lim act [] sched st S B M
+                       2≤S slEq le hns hq = hns
+mergeAllDrain-sz-store {s = s} sl sf allNid κ id now lim act (o ∷ q) sched st
+                       S B M 2≤S slEq le hns hq
+  with hasRoom lim act
+... | false = hns
+... | true =
+  mergeAllDrain-sz-store sl sf allNid κ id now lim
+    (if done then act else suc act) q sched₁ st₁ S B M 2≤S
+    (trans (subscribeInner-slots sf mergeAllᵒ allNid κ id now o sched st) slEq)
+    tailLe headBound (∧-trueʳ hq)
+  where
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+
+  r₁ = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+  st₁ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+
+  headBound : all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st₁) ≡ true
+  headBound =
+    subscribeInner-sz-store sl sf mergeAllᵒ allNid κ id now o sched st
+      S B M 2≤S slEq
+      (≤-trans (iterSize-mono-count S B 1≤S
+                 (+-monoˡ-≤ (slotsSize sl)
+                   (m≤m⊔n (layᵉ o) (layᵛˢ (obs s) q))))
+               le)
+      hns (∧-trueˡ hq)
+
+  tailLe : iterSize S (layᵛˢ (obs s) q + slotsSize sl) B ≤ M
+  tailLe =
+    ≤-trans (iterSize-mono-count S B 1≤S
+              (+-monoˡ-≤ (slotsSize sl)
+                (m≤n⊔m (layᵉ o) (layᵛˢ (obs s) q))))
+            le
+
+-- THE QUEUE A DRAIN HANDS BACK IS PRICED BY THE QUEUE IT ENTERED,
+-- which is the half the fold above does not say: that one is about the
+-- table, and the cell the finish writes back carries the entries the
+-- drain could not admit.  Nothing about those entries is a trace of
+-- anything the drain ran -- they are the syntax the value premise
+-- already bounds -- so the statement is generic in the bound and the
+-- widening happens once, at the site that needs the level.
+mergeAllDrain-queue : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (C : ℕ) →
+  all (λ o → sizeᵉ o ≤ᵇ C) q ≡ true →
+  all (λ o → sizeᵉ o ≤ᵇ C)
+      (proj₁ (proj₂ (proj₂ (proj₂
+        (mergeAllDrain sf allNid κ id now lim act q sched st)))))
+    ≡ true
+mergeAllDrain-queue sf allNid κ id now lim act [] sched st C hq = refl
+mergeAllDrain-queue sf allNid κ id now lim act (o ∷ q) sched st C hq
+  with hasRoom lim act
+... | false = hq
+... | true =
+  mergeAllDrain-queue sf allNid κ id now lim (if done then act else suc act)
+    q sched₁ st₁ C (∧-trueʳ hq)
+  where
+  r₁ = subscribeInner sf mergeAllᵒ allNid κ id now o sched st
+  done = proj₁ (proj₂ (proj₂ (proj₂ r₁)))
+  sched₁ = proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+  st₁ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r₁))))
+
+-- THE FINISH IS THE DISPATCH AND ONE DRAIN, READ AT THE TABLE.  Every
+-- arm but the merge leaves the table as it found it or writes a flag
+-- the reading does not price -- a switch releasing the inner it held,
+-- an exhaust clearing its busy bit -- so the whole arm's content is
+-- the drain, and the cell written back over it carries two things: the
+-- table the drain threaded and the entries it declined.
+--
+-- AND THE CELL IS SCRUTINISED BY THE CALLER, not here, which is what
+-- lets `L` be the cell's own parked depth while the level is that plus
+-- the telescope: the frame above reads the cell once and hands both
+-- readings of it down, and neither the cell nor the arrivals mention
+-- the slots.
+innerFinish-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sl : Slots Γ) (sf : Gas) (op : AllOp) (allNid inst : NodeId)
+  (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+  (sched : Sched Γ) (st : EvalSt e) (S B M L : ℕ) → 2 ≤ S →
+  Sched.slots sched ≡ sl →
+  iterSize S (L + slotsSize sl) B ≤ M →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  (mns : Maybe (NodeState Γ)) → NodeLay L mns → NodeSz B mns →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂
+        (innerFinish sf op allNid inst κ id now vals sched st mns))))))
+    ≡ true
+
+innerFinish-sz-store sl sf mergeAllᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns nothing hL hb = hns
+innerFinish-sz-store sl sf mergeAllᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (scan-st _)) hL hb = hns
+innerFinish-sz-store sl sf mergeAllᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (take-st _)) hL hb = hns
+innerFinish-sz-store sl sf mergeAllᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (switch-st _ _)) hL hb = hns
+innerFinish-sz-store sl sf mergeAllᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (exhaust-st _ _)) hL hb = hns
+innerFinish-sz-store {s = s} sl sf mergeAllᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (mergeAll-st {w} lim act q od)) hL hb
+  with w ≟ᵗ s
+... | no  _    = hns
+... | yes refl =
+  setNode-bounded M allNid (mergeAll-st lim act′ q′ od) (EvalSt.nodes st′)
+    qAtM drained
+  where
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+
+  B≤M : B ≤ M
+  B≤M = ≤-trans (iterSize-infl S 1≤S (L + slotsSize sl) B) le
+
+  r = mergeAllDrain sf allNid κ id now lim (pred act) q sched st
+  act′ = proj₁ (proj₂ (proj₂ r))
+  q′ = proj₁ (proj₂ (proj₂ (proj₂ r)))
+  st′ = proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r))))
+
+  drained : all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st′) ≡ true
+  drained =
+    mergeAllDrain-sz-store sl sf allNid κ id now lim (pred act) q sched st
+      S B M 2≤S slEq
+      (subst (λ z → iterSize S (z + slotsSize sl) B ≤ M) hL le)
+      hns hb
+
+  qAtM : boundedNode M (mergeAll-st lim act′ q′ od) ≡ true
+  qAtM =
+    all-impl (λ o → sizeᵉ o ≤ᵇ B) (λ o → sizeᵉ o ≤ᵇ M)
+      (λ o → ≤ᵇ-widen (sizeᵉ o) B≤M) q′
+      (mergeAllDrain-queue sf allNid κ id now lim (pred act) q sched st B hb)
+
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns nothing hL hb = hns
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (scan-st _)) hL hb = hns
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (take-st _)) hL hb = hns
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (mergeAll-st _ _ _ _)) hL hb = hns
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (exhaust-st _ _)) hL hb = hns
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (switch-st nothing _)) hL hb = hns
+innerFinish-sz-store sl sf switchᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (switch-st (just c₀) od)) hL hb
+  with c₀ ≡ᵇ inst
+... | true  =
+  setNode-bounded M allNid (switch-st nothing od) (EvalSt.nodes st) refl hns
+... | false = hns
+
+innerFinish-sz-store sl sf exhaustᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns nothing hL hb = hns
+innerFinish-sz-store sl sf exhaustᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (scan-st _)) hL hb = hns
+innerFinish-sz-store sl sf exhaustᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (take-st _)) hL hb = hns
+innerFinish-sz-store sl sf exhaustᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (mergeAll-st _ _ _ _)) hL hb = hns
+innerFinish-sz-store sl sf exhaustᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (switch-st _ _)) hL hb = hns
+innerFinish-sz-store sl sf exhaustᵒ allNid inst κ id now vals sched st
+  S B M L 2≤S slEq le hns (just (exhaust-st act od)) hL hb =
+  setNode-bounded M allNid (exhaust-st false od) (EvalSt.nodes st) refl hns
+
+-- THE INNER ARM'S STORE HALF, ASSEMBLED.  It is the dispatch above
+-- plus two gates: a frame that is not finishing, and one whose
+-- instance still has a live registration under it, leave the table
+-- untouched, so only the third gate reaches it at all.  The level the
+-- conclusion names is exactly the level the finish is asked to hold,
+-- and the cell is read ONCE and its two readings -- what it has parked
+-- and what it is bounded by -- handed down together.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-inner-absurd`
+--   -- one rung, which is the charge this reading replaces.
+stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+  (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  all (λ kv → boundedNode
+                (iterSize S (parkedLayAt allNid (EvalSt.nodes st)
+                              + slotsSize (Sched.slots sched)) B)
+                (proj₂ kv))
+      (EvalSt.nodes
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
+                                       path vals fin sched st))))))
+    ≡ true
+stepFrame-sz-store-inner sf id now op allNid inst path vals false sched st
+                         S B 2≤S hns hv =
+  stepWiden S B (parkedLayAt allNid (EvalSt.nodes st)
+                  + slotsSize (Sched.slots sched)) 2≤S (EvalSt.nodes st) hns
+stepFrame-sz-store-inner sf id now op allNid inst path vals true sched st
+                         S B 2≤S hns hv
+  with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  =
+  stepWiden S B (parkedLayAt allNid (EvalSt.nodes st)
+                  + slotsSize (Sched.slots sched)) 2≤S (EvalSt.nodes st) hns
+... | false =
+  innerFinish-sz-store (Sched.slots sched) sf op allNid inst path id now vals
+    sched st S B
+    (iterSize S (parkedLayAt allNid (EvalSt.nodes st)
+                  + slotsSize (Sched.slots sched)) B)
+    (parkedLayAt allNid (EvalSt.nodes st)) 2≤S refl ≤-refl
+    (stepWiden S B (parkedLayAt allNid (EvalSt.nodes st)
+                     + slotsSize (Sched.slots sched)) 2≤S (EvalSt.nodes st) hns)
+    (lookupNode allNid (EvalSt.nodes st))
+    (parkedLayAt-lookup allNid (EvalSt.nodes st))
+    (lookupNode-sz B allNid (EvalSt.nodes st) hns)
+
 -- THE STORE SIDE OF THE SAME STEP, and the reason the walk can carry
 -- its own store premise rather than importing one: at the three arms
 -- that compute, a frame writes at most the entry it read, and the only
@@ -1856,70 +2100,6 @@ stepFrame-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
       (EvalSt.nodes
         (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
     ≡ true
-
-postulate
-  -- THE STORE HALF OF THE CROSSING THAT DRAINS.  What a crossing
-  -- writes into the table is what its subscription emitted -- a scan
-  -- the subscription installs holds the emission REIFIED, and `reify`
-  -- at a product mirrors the value it came from -- so the quantity
-  -- owed here is the same one the inner value half owes, reaching the
-  -- table only by being written there: the parked queue's layers AND
-  -- the telescope beside them.
-  --
-  -- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-inner-absurd`
-  --   -- one rung, which is the charge this reading replaces.
-  -- PROBED: `Probed.Cross-Count-Store` -- the inner half at the very
-  --   witness that kills the constant: a scan whose accumulator is the
-  --   drained program's emission reified, charged at the layers the
-  --   parked queue reads.  One installed node, so nothing about a
-  --   chain of them.
-  -- PROBED: `Probed.Parked-Queue-Store` at a queue of THREE, of
-  --   nought, fourteen and fifteen layers, drained to exhaustion
-  --   through one door into one table.  A later subscription reads
-  --   what an earlier one left, so cells that compounded would need
-  --   the entries added rather than joined; the max holds, at a rung
-  --   two rival readings fail -- the queue as the step LEAVES it,
-  --   which a full drain empties, and the outer arm's count carried
-  --   across, which at an empty arrival list is the telescope alone.
-  --   One queue depth and one door; an entry naming a shared slot is
-  --   `Probed.Parked-Slot-Store`.
-  -- PROBED: `Probed.Partial-Drain-Store` at the drain a LIMIT stops
-  --   mid-queue, which is what separates the queue as ENTERED from the
-  --   queue as LEFT: one table then carries the cell an admitted entry
-  --   wrote beside the entries that never ran.  Read at exit the
-  --   survivors carry no layer and the charge collapses onto the rung
-  --   the refutation killed; read at entry it holds.  The premise's
-  --   own bound fails on that table and holds on the identical queue
-  --   admitted NOWHERE, so the climb is bought by the entry that ran
-  --   and a parked entry is priced by syntax the premise already
-  --   bounds.  One lane, and no survivor out-layering the admitted.
-  -- PROBED: `Probed.Parked-Slot-Store` at the one entry shape where
-  --   the first summand reads NOTHING: a bare slot reference, whose
-  --   layer count is nought however deep the definition behind it
-  --   goes, so the whole climb is the telescope.  Drained, the run
-  --   resolves the reference and the table it leaves carries a scan's
-  --   accumulator holding the emission reified -- which fails the
-  --   charge with the summand dropped, at both of two depths, and
-  --   holds with it.  So the telescope is legible from the schedule
-  --   for what the frame WRITES and not only for what it delivers.
-  --   The clearance is not tight and cannot be: slot syntax grows
-  --   linearly against a rung admitting size geometrically, so the
-  --   rows buy REACH and never size.  One slot, one entry, and no max
-  --   joining a reference against a written-out program.
-  stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
-    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
-    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
-    valsSz? B vals ≡ true →
-    all (λ kv → boundedNode
-                  (iterSize S (parkedLayAt allNid (EvalSt.nodes st)
-                                + slotsSize (Sched.slots sched)) B)
-                  (proj₂ kv))
-        (EvalSt.nodes
-          (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
-                                         path vals fin sched st))))))
-      ≡ true
 
 stepFrame-sz-store sf id now (map-f fn) path vals fin sched st S B 2≤S hns hv =
   stepWiden S B (sizeᵗ fn) 2≤S (EvalSt.nodes st) hns

@@ -2,7 +2,7 @@
 -- THE PARKED SLOT REFERENCE, WHERE THE INNER CHARGE'S FIRST SUMMAND
 -- READS NOTHING AND THE WHOLE CLIMB IS THE TELESCOPE.
 --
--- TARGET: stepFrame-sz-store-inner @b7ce7a
+-- TARGET: subscribeInner-sz-store @b27028
 --
 -- WHAT EVERY STORE ROW SO FAR LEFT OPEN.  This charge is the deepest
 -- parked program's LAYERS joined over the queue, plus the telescope.
@@ -18,9 +18,11 @@
 -- THE ROWS.  A single shared slot holding a duplication chain under a
 -- scan that reifies what it sees, and a door whose parked queue is
 -- the bare reference to it -- drained through the `from-inner` arm,
--- so the table read is the one the arm actually leaves.  Two depths,
--- because one more rung behind the reference doubles the emission
--- while moving the charge by four units of slot syntax.
+-- so the table read is the one the arm actually leaves rather than the
+-- one the leaf alone writes.  The queue holds ONE entry, so that drain
+-- is exactly one subscription and the two readings coincide here.  Two
+-- depths, because one more rung behind the reference doubles the
+-- emission while moving the charge by four units of slot syntax.
 --
 -- WHAT THEY FIND.  The parked layer count is nought at both depths
 -- and the charge moves with the slot alone.  The table the frame
@@ -59,11 +61,12 @@ open import Rx.Prim using (g0; gasPad)
 open import Rx.Exp using (Ctx; Closed; Fn; obs; _×ᵗ_;
   emptyᵉ; ofᵉ; scanᵉ; input; varᵗ; sndᵗ; strmᵗ; sizeᵉ)
 open import Rx.Slots using (Slots; shared; slotSize; slotsSize)
+open import Rx.Layer-Count using (layᵉ)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (parkedLayAt; stepFrame-sz-store-inner)
+  using (parkedLayAt; subscribeInner-sz-store)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -203,15 +206,18 @@ slotStoreRows≡ = refl
 
 -- LOAD-BEARING: read at the same rungs the rows are, so a charge the
 -- resolved slot outran would fail it exactly as the telescope-free
--- reading beside it does.
+-- reading beside it does.  The queue entry is passed as the arrival,
+-- which is what the singleton drain hands the subscription.
 tieParkedSlot12 : Confirms
-  (stepFrame-sz-store-inner {e = eᴾ} (gasPad 64 g0) 0 0 mergeAllᵒ 0 7 root []
-     true (sched-init eᴾ slᴾ) stᴾ 59 59)
-tieParkedSlot12 = λ _ _ _ → refl
+  (subscribeInner-sz-store {e = eᴾ} slᴾ (gasPad 64 g0) mergeAllᵒ 0 root 0 0
+     oᴾ (sched-init eᴾ slᴾ) stᴾ 59 59
+     (iterSize 59 (layᵉ oᴾ + slotsSize slᴾ) 59))
+tieParkedSlot12 = λ _ _ _ _ _ → refl
 
 -- LOAD-BEARING: the same statement one rung deeper behind the
 -- reference, which is the sweep's measure-side axis.
 tieParkedSlot13 : Confirms
-  (stepFrame-sz-store-inner {e = eᴿ} (gasPad 64 g0) 0 0 mergeAllᵒ 0 7 root []
-     true (sched-init eᴿ slᴿ) stᴿ 63 63)
-tieParkedSlot13 = λ _ _ _ → refl
+  (subscribeInner-sz-store {e = eᴿ} slᴿ (gasPad 64 g0) mergeAllᵒ 0 root 0 0
+     oᴿ (sched-init eᴿ slᴿ) stᴿ 63 63
+     (iterSize 63 (layᵉ oᴿ + slotsSize slᴿ) 63))
+tieParkedSlot13 = λ _ _ _ _ _ → refl
