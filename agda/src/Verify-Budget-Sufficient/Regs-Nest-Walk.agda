@@ -991,6 +991,18 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   join is the claim, nor about a queue whose entries differ in
 --   depth, nor about a parked program that itself crosses, nor about
 --   whether the telescope summand is enough where it is spent.
+-- PROBED: `Probed.Drain-Count-Slot` -- the summand where it IS the
+--   charge, at the queue parking a slot reference that refutes the
+--   telescope-free reading, twice with the bound tied to the slot's own
+--   definition.  Each depth reports the refuted rung and the repaired
+--   one side by side, and the charge moves with the slot where the
+--   predecessor's stayed at zero.  What that decides is REACH -- the
+--   drain can read the telescope off the schedule it is handed -- and
+--   not SIZE: this family buys four units of slot syntax per doubling
+--   of emission, so the summand dominates it by construction.  Nothing
+--   about a family that outgrows that ratio, about a telescope of
+--   several slots, or about a queue mixing a reference with a program
+--   written out.
 postulate
   mergeAllDrain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)

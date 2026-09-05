@@ -137,3 +137,6 @@ open import Probed.Cross-Count-Slot
 
 open import Probed.Cross-Count-Store
   using (charges≡; valRows≡; storeRows≡; tieDrain; tieStore)
+
+open import Probed.Drain-Count-Slot
+  using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)

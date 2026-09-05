@@ -45,23 +45,21 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_)
-open import Data.List.Relation.Unary.Any using (here)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _≤ᵇ_; s≤s; z≤n)
+open import Data.Nat using (ℕ; _≤_; _≤ᵇ_; s≤s; z≤n)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Product using (proj₁; proj₂)
-open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Gas; g0; gasPad; Tick; Id)
-open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
-  emptyᵉ; ofᵉ; mapᵉ; input; nat̂; varᵗ; pairᵗ; sizeᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; obs; input; sizeᵉ)
 open import Rx.Layer-Count using (layᵛˢ)
-open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; NodeId;
   mergeAll-st; installNode; mergeAllDrain; sched-init; st-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
+open import Refuted.Frame-Step-Size-Slot
+  using (Pw; chnG; f≡t; Γ₂; sl₂; e₂; Γ₃; sl₃; e₃)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -78,41 +76,14 @@ MergeAllDrainSz = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   valsSz? (iterSize S (layᵛˢ (obs s) q) B)
     (proj₁ (mergeAllDrain sf allNid κ id now lim act q sched st)) ≡ true
 
-f≡t : false ≡ true → ⊥
-f≡t ()
-
-----------------------------------------------------------------------
--- THE PROGRAM FAMILY.  `Pw k` is the balanced product of `2 ^ k`
--- naturals, `dupG` writes its payload into both arms, and `chnG k` is
--- `k` of them over a singleton source — syntax `3 + 4k`, emission
--- `2 ^ suc k - 1`.  It is written over an arbitrary context because
--- the two rows live in two telescopes.
-----------------------------------------------------------------------
-Pw : ℕ → Ty
-Pw zero    = natᵗ
-Pw (suc k) = Pw k ×ᵗ Pw k
-
-dupG : ∀ {n} {Γ : Ctx n} {k} → Fn Γ [] [] [] (Pw k) (Pw (suc k))
-dupG = pairᵗ (varᵗ (here refl)) (varᵗ (here refl))
-
-chnG : ∀ {n} {Γ : Ctx n} (k : ℕ) → Closed Γ (Pw k)
-chnG zero    = ofᵉ (nat̂ 0 ∷ [])
-chnG (suc k) = mapᵉ dupG (chnG k)
-
 ----------------------------------------------------------------------
 -- WITNESS ONE — twelve rungs behind the slot.  The definition measures
 -- `51`, the parked program's layers measure `0`, the bound is tied to
 -- the definition, and the drain emits `8191`-sized values against it.
+-- The telescope and the duplication family are the sibling
+-- refutation's, so the two doors are read against ONE program rather
+-- than against two that merely look alike.
 ----------------------------------------------------------------------
-Γ₂ : Ctx 1
-Γ₂ = Pw 12 ∷ⱽ []ⱽ
-
-sl₂ : Slots Γ₂
-sl₂ fzero = shared (chnG 12)
-
-e₂ : Closed Γ₂ (Pw 12)
-e₂ = emptyᵉ
-
 q₂ : List (Closed Γ₂ (Pw 12))
 q₂ = input fzero ∷ []
 
@@ -164,15 +135,6 @@ mergeAllDrain-sz-slot-absurd pr =
 -- The definition measures `55` and the emission doubles.  The charge
 -- is `0` here as well, which is the finding.
 ----------------------------------------------------------------------
-Γ₃ : Ctx 1
-Γ₃ = Pw 13 ∷ⱽ []ⱽ
-
-sl₃ : Slots Γ₃
-sl₃ fzero = shared (chnG 13)
-
-e₃ : Closed Γ₃ (Pw 13)
-e₃ = emptyᵉ
-
 q₃ : List (Closed Γ₃ (Pw 13))
 q₃ = input fzero ∷ []
 

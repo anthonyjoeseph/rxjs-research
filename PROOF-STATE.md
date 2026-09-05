@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TELESCOPE SUMMAND, AT THE SHAPE THAT FORCED IT AND NOWHERE
-  ELSE.** The drain's telescope-free reading is refuted, so the leaf
-  the inner frame's body spends now charges the queue's layers PLUS
-  the whole slot telescope — and no row stands at a queue that parks a
-  slot reference, which is the only shape where the summand is the
-  charge rather than a rounding. It is a linear number against an
-  emission that is exponential in the same quantity, so it clears or
-  it does not, and reading it at the refutation's own witness is what
-  decides. The commit instantiates the repaired leaf there and reports
-  which.
-
-- **THEN THE JOIN OVER A QUEUE OF SEVERAL, STILL UNINSTANTIATED.**
+- **THE JOIN OVER A QUEUE OF SEVERAL, STILL UNINSTANTIATED.**
   Every drain row parks exactly one program, so the leaf's MAX is a
   max over a singleton and its shape is untested. The drain subscribes
   each entry in turn and every delivered value comes out of one
@@ -245,6 +234,16 @@ does not fit is a finding about the shared statement, not about the head.
   single-subscription claim as the leaf both spend, and reports what
   the per-entry step of the drain still owes above it.
 
+- **THEN THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
+  Each crossing arm has two conclusions — what it delivers and what it
+  leaves in the node table — and only three of the four are
+  instantiated. The store half of the outer arm is the blank one, and
+  it is not a repeat of the inner half's: what a subscribed arrival
+  writes into the table is reified by whatever operator it lands
+  under, so the quantity is the run's, not the arrival's. The commit
+  builds the state where that difference shows and reads the repaired
+  denomination against it.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -253,10 +252,10 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`mergeAllDrain-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×3, TWIN, PROBED×2`: what a run delivers, in layers of what runs plus
+  `REFUTED×3, TWIN, PROBED×3`: what a run delivers, in layers of what runs plus
   the telescope behind it — the drain reading its node's queue, the outer arm
-  its arrivals. No row parks a slot reference; the join over several is
-  untested.
+  its arrivals. Both are read where a slot reference hides the run; the join
+  over a queue of several is untested.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the
