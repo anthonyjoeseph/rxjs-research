@@ -1815,9 +1815,41 @@ chAt e sl id =
 -- and of every consumer that spends it, not a proof, which is why the
 -- residue stands here at full strength rather than being ground.
 --
+-- AND THE CLIMB IS DEAD ON AFFORDABILITY, WHICH IS WHAT MAKES THIS A
+-- MECHANISM FINDING RATHER THAN A ROW.  Put the numbers beside each
+-- other.  What the walk may SPEND is a rung count polynomial in the
+-- cap: `walkFac-ch` affords `L * chAt` rungs for `L` under a quadratic,
+-- and it affords that because `nestWalkAt` is two to a polynomial in
+-- the cap, singly exponential and no more.  What a crossing frame
+-- NEEDS is a rung count linear in the size of the observable it
+-- subscribes, because bounding a subscribed program's output means
+-- climbing once per operator it can chain.  And the only bound the
+-- walk carries on that observable is its own level reading, which is
+-- ladder-shaped in the level.  So the need is two to a ladder where
+-- the ceiling is two to a polynomial, and the gap opens with the level
+-- rather than closing.  No ceiling and no ledger repairs that: both
+-- are ways of SPENDING a budget that is already too small by an
+-- exponential.
+--
+-- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
+-- move and the reason to say so here.  The potential face prices its
+-- own crossing frame outright and is discharged, so the shape looks
+-- portable.  It is not: that face is denominated in DEPTH, and depth
+-- TRUNCATES at the defer a crossing mints across while size counts
+-- straight through it.  The two faces agree at every other frame kind
+-- and part company exactly here, which is why the crossing arm is the
+-- one this face cannot borrow.
+--
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
 --   count against the cap-side ceiling, which is the assembly this
 --   postulate replaces.
+-- DEAD ROUTE: restating the walk's budget premise as a CLIMB -- a
+--   level-indexed ceiling iterated once per frame, in place of the
+--   product -- so that each frame is charged at the level it stands
+--   at.  It types and it is the honest shape of the charge; it is dead
+--   because its value is ladder-shaped in the frame count, so the
+--   consumer's affordability side cannot pay it at any cap.  This is
+--   the same wall `chain-climb-ch` records from the other end.
 postulate
   walk-cross-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)

@@ -215,14 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEDGER IS A PRODUCT WHERE THE CHARGE IS A CLIMB.** Giving
-  `frameCh` the level index pays every arm of the count outright, so
-  the ceiling was never the blocker; what cannot hold it is the budget
-  premise spending it, one level-free `chAt` per frame against a charge
-  that grows with the level. Restate that budget as an `opIterD`-shaped
-  climb — the subscription door's own arithmetic, whose dominance lemma
-  asks of an ops count exactly the size premise this walk carries — and
-  re-price its consumers. `walk-cross-LiveHypC` stands in meanwhile.
+- **THE SIZE FACE'S CROSSING FRAME IS A MECHANISM FINDING — REPORTED,
+  AND THE LEG IS THE MEASUREMENT THAT PINS IT.** Four subdivisions of
+  one region came back false, the last on affordability, upstream in
+  already-ground machinery: the walk may spend rungs polynomial in the
+  cap and a crossing frame needs rungs linear in a ladder-shaped size.
+  So stop subdividing and INSTANTIATE — count what one crossing
+  chain's subscribe tree installs at concrete programs, the
+  measurement `chain-climb-ch` has been owed all along, and let it say
+  which of the two the climb really is.
 
 - **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
   INSTANTIATION and not a bound.** What the size walk may spend is
@@ -264,9 +265,10 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
-- **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the whole
-  crossing frame's tail, out of the size walk because the ledger under it is a
-  product where its charge is a climb. Nothing has instantiated it.
+- **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
+  the whole crossing frame's tail, out of the size walk because the ledger
+  under it is a product where its charge is a climb. Nothing has instantiated
+  it.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: both are FALSE. A crossing arm SUBSCRIBES a
   program that arrived as a value, and a duplication chain emits exponentially
