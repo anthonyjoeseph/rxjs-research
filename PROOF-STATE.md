@@ -215,19 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OTHER ARM, ONTO THE LEAF THE CROSSING JUST LANDED ON.**
-  `stepFrame-sz-store-inner` is still ONE postulate over a whole
-  drain, and the drain now has a leaf waiting for it: its fold
-  subscribes the parked entries in turn through one table, which is
-  the same per-arrival statement the doors reduced to. So the
-  decomposition is a wrap lemma that cannot move the reading, over a
-  fold that CARRIES a level rather than climbing one, over
-  `subscribeInner-sz-store`. What it puts to the test is whether the
-  max the queue's own reading takes survives being stated one entry
-  at a time, which three entries through one table only measured. The
-  commit writes the body and states whatever residue is left.
-
-- **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
+- **AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
   READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
   witness so far enters at a BARE REFERENCE, which carries zero
   layers, so the whole charge has been the telescope and the `+` has
@@ -240,16 +228,28 @@ does not fit is a finding about the shared statement, not about the head.
   arrival and stands the sum beside what it delivers.
 
 - **AND THEN THE LEAF PAST ITS OWN DOOR, WHICH IS ONE STEP OF GAS.**
-  Once both arms are bodies the whole store side rests on
-  `subscribeInner-sz-store`, and that statement is not atomic either:
-  a subscription with no gas writes nothing, and one with gas is the
-  general descent entered at a decorated path. So the same
-  conversion applies once more — a two-clause body over a statement
-  about what the DESCENT installs, which is where the value side
-  already keeps its machinery and where a table's cells are actually
-  written. It is also the first store statement whose subject is not
-  a door, so what it puts to the test is whether the arrival's own
-  layers are the right currency below the operator that admitted it.
+  The whole store side now rests on `subscribeInner-sz-store`, and
+  that statement is not atomic either: a subscription with no gas
+  writes nothing, and one with gas is the general descent entered at
+  a decorated path. So the same conversion applies once more — a
+  two-clause body over a statement about what the DESCENT installs,
+  which is where the value side already keeps its machinery and where
+  a table's cells are actually written. It is also the first store
+  statement whose subject is not a door, so what it puts to the test
+  is whether the arrival's own layers are the right currency below
+  the operator that admitted it.
+
+- **AND THEN THE VALUE LEAF THROUGH THE SAME DOOR, WHICH IS WHERE THE
+  TWO HALVES WOULD FINALLY SHARE A STATEMENT.** `subscribeInner-sz`
+  carries the delivered half of exactly the reading its store sibling
+  carries, at the same arrival, the same telescope and the same gas
+  step, and the two have been ground apart the whole way down. Once
+  the store leaf is a body over the descent, the value leaf's own
+  descent is the same subject read at the other projection, so the
+  commit writes that body and puts the two side by side. What it puts
+  to the test is whether one descent statement can carry both — and a
+  residue that will not join is the finding, since two currencies at
+  one call are what a per-frame ceiling has to multiply.
 
 ### The ledger
 
@@ -263,15 +263,10 @@ does not fit is a finding about the shared statement, not about the head.
   crossing value halves are bodies over it. A max is refuted at a chain of
   eleven; a slot named twice and a share at two depths cost nothing. A layered
   arrival is unread.
-- **`subscribeInner-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: what ONE
-  arriving subscription writes, at a level the arrival's own layers reach. Every
-  outer store door is now a body over it. Cells written in series do not
-  compound; slots in series are open.
-- **`stepFrame-sz-store-inner`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED×4`: the drained queue's denomination at the node table,
-  still one postulate over a whole drain. Its max survives three entries
-  through one table; a stopped drain reads the queue as entered, a parked
-  reference the telescope.
+- **`subscribeInner-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×4`: what ONE
+  arriving subscription writes, at a level the arrival's own layers reach. The
+  WHOLE store side is now a body over it, both arms. Cells written in series do
+  not compound; a parked reference reads the telescope; slots in series are open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

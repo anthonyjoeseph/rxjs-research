@@ -2256,7 +2256,7 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- into the term and a count charging that function's syntax inflates
 -- with it (`Probed.Cross-Count-Spine`).  The burst joins by MAX, since
 -- each delivered value comes out of one arrival's run and the shared
--- sink is read entry by entry (`Probed.Cross-Count-Burst`).  What the
+-- sink is read entry by entry (`mergeAllDrain-sz-store`).  What the
 -- currency does not buy is a ceiling, since a rung admits size
 -- geometrically and layers cost a fixed amount of size apiece.
 -- The drain's repair is unrelated and it is a reading: what is
