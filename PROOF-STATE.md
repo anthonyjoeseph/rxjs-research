@@ -215,17 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
-  Each crossing arm has two conclusions — what it delivers and what it
-  leaves in the node table — and only three of the four are
-  instantiated. The store half of the outer arm is the blank one, and
-  it is not a repeat of the inner half's: what a subscribed arrival
-  writes into the table is reified by whatever operator it lands
-  under, so the quantity is the run's, not the arrival's. The commit
-  builds the state where that difference shows and reads the repaired
-  denomination against it.
-
-- **THEN THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, WHICH NO ROW HAS
+- **THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, WHICH NO ROW HAS
   CARRIED.** The charge names ONE number for the whole telescope, a sum
   over every slot in scope, and every row that has ever read it stands
   at a vocabulary of one — so what is untested is not the summand's
@@ -246,6 +236,17 @@ does not fit is a finding about the shared statement, not about the head.
   is one the arm never performs. The commit instantiates the leaf at
   both, at the program that killed the telescope-free reading.
 
+- **THEN THE PARKED QUEUE, WHICH EVERY TABLE ROW SO FAR HAS AVOIDED.**
+  A crossing's table reading is a max over entries, and every witness
+  taken at it installs exactly ONE — a scan, read through the
+  accumulator's `sizeᵛ`. A `*All` node under its limit parks what it
+  cannot admit, and those entries are read by `sizeᵉ` over programs
+  the run produced and never delivered, so they are the one part of
+  the table no reading of the delivered list can reach even in
+  principle. The commit builds an arrival that parks several, and
+  reads both store halves against a charge denominated in the
+  arrival's layers.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -258,10 +259,10 @@ does not fit is a finding about the shared statement, not about the head.
   Both crossing value halves are now bodies over it. Read at a hidden run and a
   written-out one, never at several slots and never past the merge door.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED`: the same two denominations through the node
-  table, where a subscribed scan writes what it emitted. Only the inner half is
-  instantiated; the outer's count is proven at the delivered list and untested
-  at the table; neither covers a queue past one.
+  FALSITY, `REFUTED, PROBED×2`: the same two denominations through the node
+  table, where a subscribed scan writes what it emitted. Both halves now read
+  at the state that killed the constant, the outer at all three doors; each
+  witness installs ONE node, so a parked queue is blank.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

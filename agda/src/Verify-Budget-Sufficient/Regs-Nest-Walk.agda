@@ -1556,8 +1556,13 @@ postulate
   -- the count's shape but whether a quantity settled against the
   -- delivered list also covers what the subscription WRITES, which is a
   -- different reading of the same run: a scan the subscription installs
-  -- holds the emission reified, and nothing has instantiated that at
-  -- this arm.
+  -- holds the emission reified.
+
+  -- PROBED: `Probed.Cross-Count-Outer-Store` -- at the very state that
+  --   killed the constant, a scan whose step stores the arriving datum
+  --   back as a one-shot observable, run through all three sinks.  One
+  --   installed node per witness, so nothing about a parked QUEUE at
+  --   this arm, whose entries are programs the run never delivered.
   stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
