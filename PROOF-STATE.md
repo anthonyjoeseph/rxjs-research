@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OPERATOR SPINE, WHICH IS WHERE THE OUTER ARM'S CHARGE SHOULD
-  HAVE BEEN.** The outer count is forked: a reading of the arrival's
-  operator layers, joining by MAX where a payload branches, sits at
-  NOTHING where the size reading sits at four thousand, and still
-  covers the emission with no rung bought. So the arm's climb is a
-  currency error — the walk inflates an arrival's DATA while a
-  subscription spends per LAYER — and the repair is level-free. What it
-  owes is that the walk cannot inflate the spine,
-  and the scan clause is where that is bought or lost, since a scan
-  grows per ELEMENT and the count would then carry a width. The commit
-  states that measure and its per-frame bound in `src`.
+- **THE LAYER COUNT AND ITS PER-FRAME BOUND, WHICH IS WHAT `src` STILL
+  LACKS.** The outer arm's climb is a currency error, and the repair is
+  a count of operator LAYERS rather than of an arrival's syntax: a
+  reading that charges a function's syntax is grown by the walk itself
+  — one `map-f` step carries it from nothing to the arrival's own size,
+  since a frame's closed function reifies the arrival into the term —
+  while a layer count cannot be grown that way and is smaller at the
+  duplication chain than either reading it replaces. The commit states
+  that count in `src` with the per-frame bound it needs, leaving a
+  scan's WIDTH as the residue.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s

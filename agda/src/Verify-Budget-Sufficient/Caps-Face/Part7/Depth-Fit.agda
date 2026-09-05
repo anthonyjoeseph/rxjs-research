@@ -2249,9 +2249,12 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- spend: rungs are bought per operator layer, a frame applies a closed
 -- function, so layers grow by the program's own syntax per frame while
 -- the data the ladder multiplies emits itself.  A count of the
--- operator spine is therefore level-free by construction, and it is
--- separated from the size one at a reified arrival and still covers
--- the emission there with no rung bought (`Probed.Cross-Count-Data`).
+-- operator spine is separated from the size one at a reified arrival
+-- and still covers the emission there with no rung bought
+-- (`Probed.Cross-Count-Data`), and it is level-free only when it
+-- charges LAYERS: a reading that charges a function's syntax is grown
+-- by the walk itself, since a frame's own closed function reifies the
+-- arrival into the term (`Probed.Cross-Count-Spine`).
 -- The drain's repair is unrelated and it is a reading: what is
 -- actually parked, which is a state its count is not handed and its
 -- sibling arm already takes of the arrivals.

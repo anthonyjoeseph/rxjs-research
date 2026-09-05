@@ -806,17 +806,24 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- other shape.
 --
 -- AND THE SPLIT IS MACHINE-SEPARATED RATHER THAN ARGUED.  A count
--- charging the operator spine, joining by MAX wherever a payload
--- branches -- the clause shape `nestDᵛ` already carries, charging a
--- function's size where that measure charges its nesting -- reads a
--- reified arrival at NOTHING where this one reads four thousand, and
--- the emission still fits with no rung bought, at a margin of two
--- nodes.  At the duplication chain it stays above one rung and below
--- this count.  So the arm's repair is a currency and not an
--- arithmetic, and what it then owes is that the walk cannot inflate the
--- spine -- which no row instantiates and which the scan clause, growing
--- per ELEMENT, is where it would be bought or lost
--- (`Probed.Cross-Count-Data`).
+-- reading the operator spine, joining by MAX wherever a payload
+-- branches, sits at NOTHING on a reified arrival where this one sits at
+-- four thousand, and the emission still fits with no rung bought, at a
+-- margin of two nodes; at the duplication chain it stays above one rung
+-- and below this count (`Probed.Cross-Count-Data`).
+--
+-- AND THE SPINE MUST BE COUNTED IN LAYERS, NOT IN SYNTAX, which is a
+-- second separation rather than a refinement of the first.  A count
+-- pricing a map or a scan at its FUNCTION'S size is grown by the walk
+-- itself: applying a frame's closed function REIFIES the arrival into
+-- the term, so a single `map-f` step carries such a count from nothing
+-- to the arrival's own size and it then climbs with the level exactly
+-- as `sizeᵛ` does.  A count of operator LAYERS -- one per map, take,
+-- scan or `*All` -- cannot be grown that way, since a reified datum
+-- contributes no layer however large, and it is SMALLER at the
+-- duplication chain than the syntax reading while still covering the
+-- emission.  What that leaves owed is a scan's WIDTH, since a scan
+-- grows per element (`Probed.Cross-Count-Spine`).
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Cross` and
 --   `Refuted.Frame-Step-Size-Cross-Store` -- one rung, at the
