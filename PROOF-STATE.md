@@ -215,19 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OUTER ARM READ THROUGH THE LEAF THE DRAIN NOW SPENDS.** The
-  two crossing arms charge the identical shape — a max over what runs,
-  plus the telescope — and differ only in WHERE the programs sit,
-  parked in a node or arriving as values. The drain is now a real body:
-  an induction over its queue whose every entry bottoms out in one
-  claim about a SINGLE subscription, with the telescope surviving the
-  fold because a subscription hands on the schedule it was handed. The
-  arm reading arrivals is still one postulate over the whole list. The
-  commit writes it as the same fold over the same leaf, and reports
-  what that arm's own finish and limit handling owe that the queue's
-  did not.
-
-- **THEN THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
+- **THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
   Each crossing arm has two conclusions — what it delivers and what it
   leaves in the node table — and only three of the four are
   instantiated. The store half of the outer arm is the blank one, and
@@ -247,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   program naming a different one at each entry, and reads the charge
   where a sum and a max come apart.
 
+- **THEN THE LEAF AT THE TWO DOORS THE ARMS NOW ROUTE THROUGH AND NO
+  ROW HAS OPENED.** Both crossing value halves are bodies over one
+  claim about a single subscription, and that claim is stated over an
+  arbitrary operator while every row standing at it subscribes through
+  a merge. The other two doors are not variants: a switch CUTS the
+  inner it holds before subscribing, so the leaf is read at a schedule
+  the cut returned rather than the one the frame was handed, and an
+  exhaust DROPS what arrives while busy, so the run the charge prices
+  is one the arm never performs. The commit instantiates the leaf at
+  both, at the program that killed the telescope-free reading.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -254,16 +253,15 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×3, PROBED×3`: what ONE subscription delivers, in the program's own
-  layers plus its telescope, and the arm reading it over a list of arrivals.
-  The drain is a body over the leaf; the arm is not. Read at a hidden run and
-  a written-out one, never at several slots.
+- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×2`: what
+  ONE subscription delivers, in the program's own layers plus its telescope.
+  Both crossing value halves are now bodies over it. Read at a hidden run and a
+  written-out one, never at several slots and never past the merge door.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
-  table, where a subscribed scan writes what it emitted. Instantiated at the
-  inner half only; the outer half's table reading is not, and neither covers a
-  queue holding more than one parked program.
+  FALSITY, `REFUTED, PROBED`: the same two denominations through the node
+  table, where a subscribed scan writes what it emitted. Only the inner half is
+  instantiated; the outer's count is proven at the delivered list and untested
+  at the table; neither covers a queue past one.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
