@@ -2169,7 +2169,7 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- ledger charging a cap per entry recurs through the dispatch gas and
 -- is exponential in it, while a ceiling is not a sum and has no such
 -- recurrence.  Which is why the walk takes one.
---
+
 -- THE CROSSING FRAME IS THE OTHER, AND IT IS DEAD ON AFFORDABILITY.
 -- Put the numbers beside each other.  What the walk may SPEND is a
 -- rung count polynomial in the cap: `walkFac-ch` affords `L * chAt`
@@ -2185,6 +2185,20 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- and a ledger are both ways of SPENDING a budget already too small
 -- by an exponential.
 --
+-- AND THE EVALUATOR ALREADY SAYS NO CLOSED FORM CAN CLOSE IT, which is
+-- why the two spendings fail together rather than one being the
+-- repair for the other.  A crossing emits inside the instant it runs
+-- in -- it subscribes one inner per payload and the source's burst is
+-- pushed straight back through the frame -- so a frame's cost and a
+-- subscribe's cost are MUTUALLY RECURSIVE: a frame runs a width's
+-- worth of subscribes, a subscribe installs a size's worth of frames.
+-- `fCharge`'s own header records that no closed form in the cap, the
+-- width and the level closes that loop, and a ceiling and a ledger are
+-- both closed forms in exactly those three.  What answers the shape one
+-- stratum up is a recursion on a DEPTH FUEL with every quantity read at
+-- the level the walk has CLIMBED to, which is what `dCapᶜ` is; whether
+-- the size walk's own factor can afford that shape is the open half.
+
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
 -- own crossing frame outright and is discharged, so the shape looks
@@ -2197,6 +2211,15 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
 --   count against the cap-side ceiling, which is what a per-frame
 --   discharge of the ceiling conjunct would have to beat.
+-- REFUTED: `Refuted.Walk-Ceil-Ledger` -- the same crossing against the
+--   WHOLE ledger this premise supplies, at the longest path the size
+--   predicate's own length conjunct admits and with the level in hand
+--   held under the ledger it has been spending.  It is what says which
+--   side breaks: TWO rungs of the walk put the level past every
+--   allowance the path has, so no reading of this premise fixes a
+--   ceiling a crossing frame fits under, and one rung lower the
+--   crossing is affordable -- the gap opens with the walk rather than
+--   with the program.
 -- DEAD ROUTE: a fan-out fold that does not advance at all, reading
 --   every admitted entry's node table at the level the fan was
 --   ENTERED at.  Killed at a two-entry fan whose first entry is a

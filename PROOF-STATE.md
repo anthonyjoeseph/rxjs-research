@@ -215,24 +215,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
-  face's ledger into a ceiling put the crossing frame's climb and the
-  fan-out's advance under a single premise of `chain-walk-szOK`, which
-  is progress only if some ceiling exists that the walk factor can
-  afford AND the crossing frames fit under. The two halves are known
-  to pull opposite ways — one needs a ladder, the other affords a
-  polynomial — so the commit instantiates the premise at a real
-  crossing and reports which side breaks first, since a refutation
-  there kills the ceiling shape rather than the row.
+- **THE CROSSING'S CHARGE HAS NO CLOSED FORM, AND A CEILING IS ONE.**
+  The ceiling side is settled the wrong way — the crossing outruns the
+  whole ledger two rungs into the walk — and the reason is now the
+  evaluator's own: a crossing emits inside its instant, so a frame's
+  cost and a subscribe's cost are mutually recursive and `fCharge`'s
+  header records that no closed form in the cap, the width and the
+  level closes that loop. A ceiling and a ledger are both closed forms
+  in those three, which is why they fail together. The caps face
+  answered this shape with a recursion on a DEPTH FUEL. The commit
+  states the size walk's ceiling in that shape and reports whether the
+  walk factor affords it.
 
-- **THEN THE CROSSING FRAME AS ONE OBJECT, SINCE BOTH LEGS ABOVE LAND
-  ON IT.** A crossing is the only frame that subscribes, so it is what
-  advances the store inside an instant — which is what makes a flat
-  field unavailable — and it is what charges a run rather than a
-  count, which is what the size ceiling may not afford. Those are the
-  same mechanism read in two currencies, and nothing states them
-  together. The commit prices one crossing against both readings at
-  once and reports whether a single index serves both.
+- **THEN THE CROSSING FRAME AS ONE OBJECT, IF THE CHARGE SURVIVES.** A
+  crossing is the only frame that subscribes, so it is what advances
+  the store inside an instant — which is what makes a flat field
+  unavailable — and it is what charges a run rather than a count,
+  which is what the size ceiling may not afford. Those are the same
+  mechanism read in two currencies, and nothing states them together.
+  The commit prices one crossing against both readings at once and
+  reports whether a single index serves both.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
@@ -275,10 +277,10 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling,
-  which retired the crossing frames' own row. Every frame's climb and every fan
-  entry's advance buy their room here, and a crossing frame's charge is what a
-  subscribed program costs to RUN.
+  `REFUTED×2, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
+  THE CROSSING SIDE IS THE ONE THAT BREAKS: two rungs of the walk put the level
+  past every allowance this premise's ledger has, so no reading of it fixes a
+  ceiling a crossing frame fits under.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the
