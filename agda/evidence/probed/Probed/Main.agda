@@ -160,5 +160,9 @@ open import Probed.Biting-Door-Store
          tieBiteOuterSwitch; tieBiteOuterExhaust;
          tieBiteInnerSwitch; tieBiteInnerExhaust)
 
+open import Probed.Partial-Drain-Store
+  using (drainFigures≡; partialNodes≡; partialRows≡; groundRow≡;
+         zeroLaneRow≡; zeroLaneHolds≡; tiePartial)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
