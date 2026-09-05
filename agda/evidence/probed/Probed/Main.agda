@@ -145,6 +145,10 @@ open import Probed.Subscribe-Inner-Doors
 open import Probed.Slot-Telescope-Sum
   using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
 
+open import Probed.Slot-Named-Twice
+  using (diamondFigures≡; diamondDelivered≡; diamondCount≡;
+         controlDelivered≡; diamondRows≡; tieDiamond)
+
 open import Probed.Parked-Queue-Store
   using (parkFigures≡; drainNodes≡; innerRows≡; outerCharge≡; outerRows≡;
          parkedArrival≡; parkRow≡;

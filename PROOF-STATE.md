@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SLOT NAMED TWICE, WHICH THE TELESCOPE ROWS LEFT OPEN AND
-  WHICH DECIDES WHETHER THE SUM IS SOUND RATHER THAN GENEROUS.** A
-  chained telescope runs each definition once, so its layers add and
-  the sum covers them. A telescope whose upper definitions BOTH name
-  one lower slot runs that slot once only — a share's multicast is the
-  whole point of the binding — but a reading that resolved the
-  reference instead of the binding would charge it twice and a run
-  that re-entered it would emit twice. The commit scripts a diamond,
-  reads what one subscription of the apex delivers, and stands the
-  charge beside it.
-
-- **THEN WHAT A BITING DOOR WRITES, WHICH IS THE HALF THE DOOR ROWS
+- **WHAT A BITING DOOR WRITES, WHICH IS THE HALF THE DOOR ROWS
   LEFT OPEN.** A subscription's delivered burst is invariant in the
   door — the operator enters only through the path and the burst is
   never pushed through it — so the cut and the drop act on the TABLE
@@ -237,7 +226,7 @@ does not fit is a finding about the shared statement, not about the head.
   busy, which is where a written cell can carry what the arrival's own
   layers never bought.
 
-- **THEN THE PARTIAL DRAIN, WHERE BOTH KINDS OF TABLE ENTRY STAND AT
+- **AND THEN THE PARTIAL DRAIN, WHERE BOTH KINDS OF TABLE ENTRY STAND AT
   ONE RUNG.** The queue rows just taken split the two cleanly: a drain
   to exhaustion leaves installed cells and no queue, and a park leaves
   a queue and no cell, priced at rung zero. Under a LIMIT the drain
@@ -248,6 +237,17 @@ does not fit is a finding about the shared statement, not about the head.
   commit drains a queue under a limit that bites partway and reads the
   inner half at the one rung.
 
+- **AND THEN THE SHARE REACHED AT TWO DEPTHS, WHICH IS WHERE THE SUM
+  COULD STILL BE SHORT.** The diamond just read names one slot twice
+  from ONE apex, and the multicast answers it: the second reference
+  finds the share already fired. Two DIFFERENT slots that both name a
+  third are not that shape — the two paths are subscribed at different
+  points of the same run, so the second reaches the share through its
+  own definition rather than beside the first, and whether the share
+  is connected by then is a fact about the ORDER a telescope is
+  walked. The sum charges it once regardless. The commit scripts that
+  lattice and stands the charge beside what it delivers.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -255,11 +255,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×4`: what
+- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×5`: what
   ONE subscription delivers, in its own layers plus its telescope. Both
-  crossing value halves are bodies over it. A max over the slots is refuted at
-  a chain of eleven, and the door is invisible to the burst; a slot named twice
-  stays unread.
+  crossing value halves are bodies over it. A max is refuted at a chain of
+  eleven, and a slot named twice is charged once for free; a share at two
+  depths is unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED, PROBED×4`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. A drained queue of
