@@ -2211,9 +2211,36 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- shape: the caps ceiling is DEFINED by reading its own climb and is
 -- affordable by construction, while this level must fit under a
 -- nesting budget that is a fixed exponential in a polynomial and reads
--- nothing.  What is owed here is a ceiling that READS the size walk,
--- on the pattern `blowH` already sets one stratum up, and the open
--- question is whether the stratification admits one.
+-- nothing.
+
+-- AND NO ADVANCE RULE REPAIRS IT, WHICH CLOSES THE LEVEL SIDE
+-- ENTIRELY.  The one thing the climb leaves free is HOW the rung count
+-- moves when a frame's charge arrives, and every reading of that sits
+-- between a JOIN and a SUM -- an advance may fall below neither the
+-- count in hand, which is monotone, nor the charge, which is owed, and
+-- need not exceed their sum.  The whole bracket is refuted at once,
+-- with both endpoints exhibited rather than assumed.  A join buys
+-- nothing over a sum because the two quantities it chooses between are
+-- of the SAME ORDER: a frame's charge is read at the level its rung
+-- stands at, so what a max discards is the lower-order term.
+
+-- SO THE CHARGE MAY NOT READ THE WALK'S OWN LEVEL, AND THAT IS THE
+-- MECHANISM RATHER THAN A NUMBER.  Moving the ceiling instead is the
+-- remaining direction and it is closed one stratum up: affording a
+-- rung count of the level's own order means affording the size ladder
+-- iterated at itself, and the nesting budget's header records that no
+-- exponent this instant's fuel affords is a tower.
+
+-- AND ONE ARM IS THE WHOLE OF IT, WHICH IS WHAT MAKES THAT ACTIONABLE.
+-- The rung count a frame adds is level-free at four of the five frame
+-- kinds -- three read the program's own syntax and the crossing reads
+-- the arrivals plus the telescope -- and the drain arm charges the
+-- LEVEL ITSELF, flatly, with no value in it.  That single clause is
+-- what turns the count into a ladder: it is the one place where what a
+-- rung costs is what the rungs so far bought.  So the restatement owed
+-- is per-arm rather than to the walk, and the shape to state it in is
+-- the one the live face's outer arm is PROVEN in, where the conclusion
+-- joins a budget passed in and there is no level to index at all.
 
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
@@ -2238,9 +2265,11 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   with the program.
 -- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
 --   a recursion on a depth fuel, the charge at each frame read at the
---   level that frame stands at, against what `walkFac-ch` affords.
---   Two crossing frames of that climb outrun the factor's whole ledger
---   at every admissible cap, and one crossing frame does not.
+--   level that frame stands at, against what `walkFac-ch` affords, and
+--   quantified over every ADVANCE RULE between a join and a sum with
+--   both endpoints exhibited.  Two crossing frames of that climb outrun
+--   the factor's whole ledger at every admissible cap under every rule
+--   in the bracket, and one crossing frame does not.
 -- DEAD ROUTE: a fan-out fold that does not advance at all, reading
 --   every admitted entry's node table at the level the fan was
 --   ENTERED at.  Killed at a two-entry fan whose first entry is a

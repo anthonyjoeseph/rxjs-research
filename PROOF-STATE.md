@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A CEILING THAT READS ITS OWN CLIMB, OR THE FACTOR IS THE WRONG
-  ONE.** Every spending of the size walk's level is now refuted against
-  `walkFac-ch`: a ceiling, the whole ledger, and — as of this leg — the
-  depth-fuel climb the caps face answers this shape with, which passes
-  the factor at its second crossing frame and is affordable at its
-  first. What makes that shape work one face over is not the shape: the
-  caps ceiling is DEFINED by reading its own climb. So the commit
-  states the size walk's budget as one that reads the walk, on `blowH`'s
-  pattern, and reports whether the stratification admits it or the
-  cycle closes.
+- **THE ONE ARM WHOSE CHARGE IS THE LEVEL.** The level side is now
+  closed: every advance rule between a JOIN and a SUM outruns
+  `walkFac-ch` at the second crossing frame, both endpoints exhibited,
+  and moving the ceiling instead would mean affording the size ladder
+  iterated at itself — a tower `nestΦAt`'s own header rules out. So the
+  charge moves, and `szCount` says which: four arms are level-free and
+  the DRAIN arm charges the level flatly, with no value in it, which is
+  the one place a rung costs what the rungs so far bought. The commit
+  restates that arm against what the drain actually mints per parked
+  entry and reports whether the count is then polynomial.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
@@ -278,8 +278,8 @@ does not fit is a finding about the shared statement, not about the head.
   refused by the store's own growth toward the NEXT cap.
 - **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
   `REFUTED×3, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
-  EVERY SPENDING OF THE LEVEL IS NOW REFUTED against the walk factor — ceiling,
-  whole ledger and depth-fuel climb alike — so what moves is the factor.
+  THE LEVEL SIDE IS CLOSED — ceiling, whole ledger, and every advance rule from
+  a join to a sum — and the ceiling side would need a tower, so the CHARGE moves.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the

@@ -215,8 +215,9 @@ open import Refuted.Chain-Step-Regs-Cap
 open import Refuted.Walk-Ceil-Ledger
   using (WalkCeilLedger; figures≡; premLvl; count≡; walk-ceil-ledger-absurd)
 open import Refuted.Size-Climb-Afford
-  using (szCh; szClimb; walkAfford; SizeClimbAfford; climb-outruns-afford;
-         one-frame-affordable; size-climb-afford-absurd)
+  using (szCh; AdvRule; JoinToSum; sum-in-bracket; join-in-bracket; advClimb;
+         walkAfford; AdvClimbAfford; 1≤cap; 3≤cap; lvl₁; cap≤lvl₁; lvl₁≤cap;
+         climb-outruns-afford; one-frame-affordable; adv-climb-afford-absurd)
 open import Refuted.Cascade-Afford-Wide
   using (CascadeAffordWide; suc≤sizeStep; iterSize-lb; selLen; S≤N; hK;
          cascade-afford-wide-absurd)

@@ -1,63 +1,73 @@
 -- ══════════════════════════════════════════════════════════════════
--- AND THE CLIMB IS NOT THE REPAIR EITHER: the shape that answers the
--- closed form one stratum up is unaffordable at the second crossing
--- frame, at every cap this development admits.
+-- AND NO ADVANCE RULE IS THE REPAIR: every reading of the size walk's
+-- level between a JOIN and a SUM is unaffordable at the second
+-- crossing frame, at every cap this development admits.
 --
 -- REFUTATIONS: machine-checked `… → ⊥`.  See EVIDENCE.md for why this
 -- tree is outside `agda/src` and how it relates to `-- DEAD ROUTE`
 -- notes.
---
+-- ══════════════════════════════════════════════════════════════════
+
 -- WHAT THE STATEMENT SAYS.  A ceiling and a ledger are both closed
 -- forms in the cap, the width and the level, and the evaluator's own
 -- charge header records that no closed form in those three closes the
 -- loop a crossing frame opens.  What answers that shape one stratum up
 -- is a RECURSION ON A DEPTH FUEL with every quantity read at the level
--- the walk has CLIMBED to, and this row writes the size walk's ceiling
--- in exactly that shape: fuel outside, rungs threaded, and the charge
--- at each rung read at the level that rung stands at.  The question a
--- discharge then turns on is not whether the shape is statable -- it
--- is, and it is written here -- but whether the walk factor can afford
--- what it climbs to.
---
+-- the walk has CLIMBED to, so this row writes the size walk's ceiling
+-- in that shape -- fuel outside, rungs threaded, the charge at each
+-- rung read at the level that rung stands at -- and then quantifies
+-- over the one thing left free in it: HOW the rung count advances when
+-- a frame's charge arrives.
+
+-- THE BRACKET IS THE WHOLE MECHANISM SPACE, and that is what makes
+-- this a finding about the walked side rather than about one reading.
+-- An advance may not fall below the count in hand, which is monotone,
+-- nor below the charge, which is owed; and it need never exceed their
+-- sum.  So every rule sits between a JOIN and a SUM, and both endpoints
+-- are exhibited here rather than assumed -- the sum being the reading
+-- the walk carries and the join the one the live face's outer arm is
+-- proven in, whose receipts combine by max and do not stack.
+
 -- WHERE IT BREAKS.  The walk factor affords a rung count POLYNOMIAL in
 -- the cap: a cap squared plus a cap plus a cap squared, each spent at
--- one frame charge, which is what carries the level under the nesting
--- budget.  The climb passes that at its SECOND crossing frame, and by
--- the whole ladder rather than by a factor: THREE rungs of the size
--- ladder already exceed the entire polynomial the factor allows, and
--- the second frame charges its level after a cap's worth of rungs
--- rather than three.  So the gap is a ladder against a polynomial, and
--- widening the polynomial buys one rung of the ladder at most.
---
+-- one frame charge.  Every rule in the bracket passes that at its
+-- SECOND crossing frame, and by the whole ladder rather than by a
+-- factor: THREE rungs of the size ladder already exceed the entire
+-- polynomial the factor allows, and the second frame charges after a
+-- cap's worth of rungs rather than three.  The join endpoint gains
+-- nothing over the sum because the two quantities it chooses between
+-- are of the SAME ORDER -- a frame's charge is read at the level its
+-- rung stands at -- so what a max discards is the lower-order term.
+
 -- AND THE CHARGE IS THE SMALLEST HONEST ONE, which is what makes this
 -- a finding about the SHAPE rather than about a generous reading.  A
 -- crossing frame charges what it subscribes -- a burst's worth of
--- observables plus the telescope -- and this climb charges ONE level
+-- observables plus the telescope -- and this climb charges one level
 -- per frame, with no width factor and no telescope.  That a single
 -- frame genuinely reaches the level is not assumed here: it is
 -- instantiated at numerals in `Refuted.Walk-Ceil-Ledger`, whose count
 -- row lands one payload exactly on the level the walk climbed to.
---
+
 -- WHAT THIS DOES NOT SHOW.  It does not refute the depth-fuel shape
 -- itself, which is discharged one face over and is what prices the
 -- caps ladder.  What it refutes is that shape spent against THIS
 -- factor: the caps face's own ceiling is defined by READING its climb,
--- so the climb is affordable there by construction, while the size
--- walk's level must fit under a nesting budget that is a fixed
--- exponential in a polynomial and reads nothing.  Nor does it reach a
--- climb charging less than a level per crossing frame -- but no such
--- reading is honest, since the observable a crossing subscribes is
--- bounded by nothing smaller.
--- ══════════════════════════════════════════════════════════════════
+-- so the climb is affordable there by construction, while this rung
+-- count must fit under a nesting budget that is a fixed exponential in
+-- a polynomial and reads nothing.  Nor does it reach a rule advancing
+-- by LESS than the charge -- but such a rule does not pay a frame's
+-- debt, so what it prices is not this walk.
+
 module Refuted.Size-Climb-Afford where
 
 open import Data.Empty using (⊥)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; s≤s; z≤n)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; _⊔_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤-refl; ≤-trans; ≤-reflexive; 1+n≰n;
   +-comm; +-mono-≤; +-monoʳ-≤; *-mono-≤; *-monoˡ-≤; *-monoʳ-≤;
-  *-identityˡ; *-identityʳ; m≤m+n; m≤n+m)
+  *-identityˡ; *-identityʳ; m≤m+n; m≤n+m; m≤m⊔n; m≤n⊔m; ⊔-lub)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
+open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym)
 
 open import Rx.Evaluator using (iterSize)
@@ -74,9 +84,32 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (frameCh)
 szCh : ℕ → ℕ → ℕ                     -- cap, rungs climbed so far
 szCh S k = iterSize S k S
 
-szClimb : ℕ → ℕ → ℕ → ℕ              -- cap, depth fuel, rungs so far
-szClimb S zero    k = k
-szClimb S (suc d) k = szClimb S d (k + szCh S k)
+----------------------------------------------------------------------
+-- AND THE ADVANCE LEFT FREE.  A rule takes the level in hand and the
+-- charge that arrived; it may not fall below either, and it need not
+-- exceed their sum.
+----------------------------------------------------------------------
+AdvRule : Set
+AdvRule = ℕ → ℕ → ℕ
+
+JoinToSum : AdvRule → Set
+JoinToSum adv = ∀ (k c : ℕ) →
+  (k ≤ adv k c) × ((c ≤ adv k c) × (adv k c ≤ k + c))
+
+-- LOAD-BEARING: the bracket is inhabited at both ends, so the family
+-- below is not a claim about rules that do not exist.  The sum is what
+-- the walk carries; the join is what the live face's outer arm is
+-- stated in.
+sum-in-bracket : JoinToSum _+_
+sum-in-bracket k c = m≤m+n k c , (m≤n+m c k , ≤-refl)
+
+join-in-bracket : JoinToSum _⊔_
+join-in-bracket k c =
+  m≤m⊔n k c , (m≤n⊔m k c , ⊔-lub (m≤m+n k c) (m≤n+m c k))
+
+advClimb : AdvRule → ℕ → ℕ → ℕ → ℕ   -- rule, cap, depth fuel, rungs
+advClimb adv S zero    k = k
+advClimb adv S (suc d) k = advClimb adv S d (adv k (szCh S k))
 
 ----------------------------------------------------------------------
 -- WHAT THE WALK FACTOR AFFORDS, in the factor's own two pieces: the
@@ -86,41 +119,56 @@ szClimb S (suc d) k = szClimb S d (k + szCh S k)
 walkAfford : ℕ → ℕ
 walkAfford S = (S * S + S + S * S) * frameCh S S
 
-SizeClimbAfford : Set
-SizeClimbAfford = ∀ (S : ℕ) → 8 ≤ S → szClimb S 2 0 ≤ walkAfford S
+AdvClimbAfford : Set
+AdvClimbAfford = ∀ (adv : AdvRule) → JoinToSum adv →
+  ∀ (S : ℕ) → 8 ≤ S → advClimb adv S 2 0 ≤ walkAfford S
 
-module _ (S : ℕ) (8≤S : 8 ≤ S) where
+module _ (adv : AdvRule) (jts : JoinToSum adv) (S : ℕ) (8≤S : 8 ≤ S) where
+
+  1≤cap : 1 ≤ S
+  1≤cap = ≤-trans (s≤s z≤n) 8≤S
+
+  3≤cap : 3 ≤ S
+  3≤cap = ≤-trans (s≤s (s≤s (s≤s z≤n))) 8≤S
+
+  -- THE LEVEL AFTER ONE CROSSING FRAME, whatever the rule: the bracket
+  -- pins it from both sides, since the level in hand is zero there.
+  lvl₁ : ℕ
+  lvl₁ = adv 0 S
+
+  cap≤lvl₁ : S ≤ lvl₁
+  cap≤lvl₁ = proj₁ (proj₂ (jts 0 S))
+
+  lvl₁≤cap : lvl₁ ≤ S
+  lvl₁≤cap = proj₂ (proj₂ (jts 0 S))
 
   -- LOAD-BEARING: the whole ledger the factor affords sits below three
   -- rungs of the size ladder, and three rungs are what the second
-  -- crossing frame's own entry level has already passed.
-  climb-outruns-afford : suc (walkAfford S) ≤ szClimb S 2 0
+  -- crossing frame's own entry level has already passed -- under every
+  -- rule in the bracket, since each keeps at least the charge.
+  climb-outruns-afford : suc (walkAfford S) ≤ advClimb adv S 2 0
   climb-outruns-afford =
     ≤-trans (s≤s afford≤6)
             (≤-trans 6<8 (≤-trans 8E4≤iter3
                                   (≤-trans iter3≤iterS
-                                           (m≤n+m (iterSize S S S) S))))
+                                           (≤-trans iterCap≤iterLvl₁ charge≤adv))))
     where
-    1≤S : 1 ≤ S
-    1≤S = ≤-trans (s≤s z≤n) 8≤S
-    3≤S : 3 ≤ S
-    3≤S = ≤-trans (s≤s (s≤s (s≤s z≤n))) 8≤S
     E2 E3 E4 : ℕ
     E2 = S * S
     E3 = S * E2
     E4 = S * E3
     1≤E2 : 1 ≤ E2
-    1≤E2 = ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤S 1≤S)
+    1≤E2 = ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤cap 1≤cap)
     1≤E3 : 1 ≤ E3
-    1≤E3 = ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤S 1≤E2)
+    1≤E3 = ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤cap 1≤E2)
     1≤E4 : 1 ≤ E4
-    1≤E4 = ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤S 1≤E3)
+    1≤E4 = ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤cap 1≤E3)
     E3≤E4 : E3 ≤ E4
-    E3≤E4 = ≤-trans (≤-reflexive (sym (*-identityˡ E3))) (*-monoˡ-≤ E3 1≤S)
+    E3≤E4 = ≤-trans (≤-reflexive (sym (*-identityˡ E3))) (*-monoˡ-≤ E3 1≤cap)
     E2≤E4 : E2 ≤ E4
     E2≤E4 =
       ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ E2)))
-                       (*-monoˡ-≤ E2 1≤S))
+                       (*-monoˡ-≤ E2 1≤cap))
               E3≤E4
     -- the factor's premise, multiplied out against its frame charge
     afford-shape : walkAfford S ≡ 2 * E4 + (3 * E3 + E2)
@@ -158,25 +206,33 @@ module _ (S : ℕ) (8≤S : 8 ≤ S) where
       ≤-trans (m≤n+m (8 * E4) (S + 2 * E2 + 4 * E3))
               (≤-reflexive (sym iter3-shape))
     iter3≤iterS : iterSize S 3 S ≤ iterSize S S S
-    iter3≤iterS = iterSize-mono-count S S 1≤S 3≤S
+    iter3≤iterS = iterSize-mono-count S S 1≤cap 3≤cap
+    -- and the second frame stands no lower than a cap's worth of rungs
+    iterCap≤iterLvl₁ : iterSize S S S ≤ iterSize S lvl₁ S
+    iterCap≤iterLvl₁ = iterSize-mono-count S S 1≤cap cap≤lvl₁
+    -- whatever the rule does with them, it keeps the charge
+    charge≤adv : szCh S lvl₁ ≤ adv lvl₁ (szCh S lvl₁)
+    charge≤adv = proj₁ (proj₂ (jts lvl₁ (szCh S lvl₁)))
 
   -- LOAD-BEARING, AND THE OTHER DIRECTION: one crossing frame IS
-  -- affordable, so what the row above reports is the second frame and
-  -- not an arithmetic that was never satisfiable.
-  one-frame-affordable : szClimb S 1 0 ≤ walkAfford S
+  -- affordable under every rule in the bracket, so what the row above
+  -- reports is the second frame and not an arithmetic that was never
+  -- satisfiable.
+  one-frame-affordable : advClimb adv S 1 0 ≤ walkAfford S
   one-frame-affordable =
-    ≤-trans (≤-reflexive (sym (*-identityʳ S))) (*-mono-≤ ledger 1≤frame)
+    ≤-trans lvl₁≤cap
+            (≤-trans (≤-reflexive (sym (*-identityʳ S)))
+                     (*-mono-≤ ledger 1≤frame))
     where
-    1≤S : 1 ≤ S
-    1≤S = ≤-trans (s≤s z≤n) 8≤S
     ledger : S ≤ S * S + S + S * S
     ledger = ≤-trans (m≤n+m S (S * S)) (m≤m+n (S * S + S) (S * S))
     1≤frame : 1 ≤ frameCh S S
     1≤frame =
-      ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤S (s≤s z≤n))
+      ≤-trans (≤-reflexive (sym (*-identityˡ 1))) (*-mono-≤ 1≤cap (s≤s z≤n))
 
-size-climb-afford-absurd : SizeClimbAfford → ⊥
-size-climb-afford-absurd pr = go 8 ≤-refl
+adv-climb-afford-absurd : AdvClimbAfford → ⊥
+adv-climb-afford-absurd pr = go _+_ sum-in-bracket 8 ≤-refl
   where
-  go : ∀ (S : ℕ) → 8 ≤ S → ⊥
-  go S h = 1+n≰n (≤-trans (climb-outruns-afford S h) (pr S h))
+  go : ∀ (adv : AdvRule) → JoinToSum adv → ∀ (S : ℕ) → 8 ≤ S → ⊥
+  go adv jts S h =
+    1+n≰n (≤-trans (climb-outruns-afford adv jts S h) (pr adv jts S h))
