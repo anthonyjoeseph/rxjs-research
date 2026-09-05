@@ -1551,6 +1551,15 @@ postulate
   --   drained program's emission reified, charged at the layers the
   --   parked queue reads.  One installed node, so nothing about a
   --   chain of them.
+  -- PROBED: `Probed.Parked-Queue-Store` at a queue of THREE, of
+  --   nought, fourteen and fifteen layers, drained to exhaustion
+  --   through one door into one table.  A later subscription reads
+  --   what an earlier one left, so cells that compounded would need
+  --   the entries added rather than joined; the max holds, at a rung
+  --   two rival readings fail -- the queue as the step LEAVES it,
+  --   which a full drain empties, and the outer arm's count carried
+  --   across, which at an empty arrival list is the telescope alone.
+  --   One queue depth, one door, and no entry naming a shared slot.
   stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
@@ -1585,6 +1594,14 @@ postulate
   --   back as a one-shot observable, run through all three sinks.  One
   --   installed node per witness, so nothing about a parked QUEUE at
   --   this arm, whose entries are programs the run never delivered.
+  -- PROBED: `Probed.Parked-Queue-Store` at that queue, both ways the
+  --   door can take an arrival.  Admitting one beside a queue of two
+  --   leaves the count where an empty queue leaves it, since the count
+  --   reads the arrival; and PARKING one costs the ladder nothing at
+  --   all -- the row is read at rung ZERO, the premise's own bound
+  --   climbed by nothing, because a park only appends what the premise
+  --   already bounded.  One queue depth and the merging door alone,
+  --   which is the only shape that parks.
   stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)

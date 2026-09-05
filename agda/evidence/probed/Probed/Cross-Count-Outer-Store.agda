@@ -31,11 +31,9 @@
 -- under admission rules that differ across the pair.
 --
 -- WHAT THE ROWS DO NOT BUY.  One installed node per witness, so
--- nothing about a table whose entries accumulate across frames;
--- nothing about a parked QUEUE at this arm, where the entries are
--- programs the run never delivered and the reading is `sizeᵉ` rather
--- than a scan's `sizeᵛ`; and nothing about a telescope of more than
--- one slot, which is the summand's own gap and not this arm's.
+-- nothing about a table whose entries accumulate across frames; and
+-- nothing about a telescope of more than one slot, which is the
+-- summand's own gap and not this arm's.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Cross-Count-Outer-Store where
 
