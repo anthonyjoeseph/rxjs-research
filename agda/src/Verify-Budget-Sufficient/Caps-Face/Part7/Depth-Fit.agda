@@ -2169,7 +2169,7 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- ledger charging a cap per entry recurs through the dispatch gas and
 -- is exponential in it, while a ceiling is not a sum and has no such
 -- recurrence.  Which is why the walk takes one.
---
+
 -- THE CROSSING FRAME IS THE OTHER, AND IT IS DEAD ON AFFORDABILITY.
 -- Put the numbers beside each other.  What the walk may SPEND is a
 -- rung count polynomial in the cap: `walkFac-ch` affords `L * chAt`
@@ -2185,6 +2185,73 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- and a ledger are both ways of SPENDING a budget already too small
 -- by an exponential.
 --
+-- AND THE EVALUATOR ALREADY SAYS NO CLOSED FORM CAN CLOSE IT, which is
+-- why the two spendings fail together rather than one being the
+-- repair for the other.  A crossing emits inside the instant it runs
+-- in -- it subscribes one inner per payload and the source's burst is
+-- pushed straight back through the frame -- so a frame's cost and a
+-- subscribe's cost are MUTUALLY RECURSIVE: a frame runs a width's
+-- worth of subscribes, a subscribe installs a size's worth of frames.
+-- `fCharge`'s own header records that no closed form in the cap, the
+-- width and the level closes that loop, and a ceiling and a ledger are
+-- both closed forms in exactly those three.  What answers the shape one
+-- stratum up is a recursion on a DEPTH FUEL with every quantity read at
+-- the level the walk has CLIMBED to, which is what `dCapᶜ` is.
+
+-- AND THE FACTOR DOES NOT AFFORD THAT SHAPE, WHICH SETTLES THE OTHER
+-- SIDE THE SAME WAY.  Written out -- fuel outside, rungs threaded, the
+-- charge at each frame read at the level that frame stands at -- the
+-- climb passes what `walkFac-ch` allows at its SECOND crossing frame,
+-- at every cap this development admits.  The factor's whole ledger
+-- sits below THREE rungs of the size ladder while one crossing frame
+-- climbs a cap's worth of them, and the row is two-sided: one frame is
+-- affordable and two are not.  So the gap is a ladder against a
+-- polynomial, and widening the polynomial buys a rung of the ladder.
+-- What makes the same shape work one face over is therefore not the
+-- shape: the caps ceiling is DEFINED by reading its own climb and is
+-- affordable by construction, while this level must fit under a
+-- nesting budget that is a fixed exponential in a polynomial and reads
+-- nothing.
+
+-- AND NO ADVANCE RULE REPAIRS IT, WHICH CLOSES THE LEVEL SIDE
+-- ENTIRELY.  The one thing the climb leaves free is HOW the rung count
+-- moves when a frame's charge arrives, and every reading of that sits
+-- between a JOIN and a SUM -- an advance may fall below neither the
+-- count in hand, which is monotone, nor the charge, which is owed, and
+-- need not exceed their sum.  The whole bracket is refuted at once,
+-- with both endpoints exhibited rather than assumed.  A join buys
+-- nothing over a sum because the two quantities it chooses between are
+-- of the SAME ORDER: a frame's charge is read at the level its rung
+-- stands at, so what a max discards is the lower-order term.
+
+-- SO THE CHARGE MAY NOT READ THE WALK'S OWN LEVEL, AND THAT IS THE
+-- MECHANISM RATHER THAN A NUMBER.  Moving the ceiling instead is the
+-- remaining direction and it is closed one stratum up: affording a
+-- rung count of the level's own order means affording the size ladder
+-- iterated at itself, and the nesting budget's header records that no
+-- exponent this instant's fuel affords is a tower.
+
+-- AND IT IS THE TWO CROSSING ARMS THAT DO IT, IN TWO DIFFERENT WAYS,
+-- which is what makes the restatement per-arm rather than to the walk.
+-- The rung count a frame adds is genuinely level-free at the three
+-- kinds that read the program's own syntax; the drain arm charges the
+-- LEVEL ITSELF, flatly and with no value in it, because the parked
+-- program is in the store and the count cannot reach the node table;
+-- and the outer arm reads its ARRIVALS, whose only bound is the size
+-- premise the walk carries -- which is that same climbing level, so
+-- the charge climbs with it even though the clause names no level.
+-- The second is the one a reader walks past, and it is the one the
+-- ledger refutation is instantiated at.
+
+-- SO THE TWO REPAIRS ARE DIFFERENT AND ONLY ONE IS ARITHMETIC.  The
+-- drain wants a reading of what is actually parked, which is a state
+-- reading its count is not handed and its sibling arm already takes of
+-- the arrivals.  The outer wants the arrivals bounded by the INSTANT's
+-- own value cap rather than by the walk's rung ladder -- a fixed
+-- number per instant against a quantity that climbs per frame -- and
+-- that is a claim about where the size premise is denominated, not
+-- about what the clause counts.
+
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
 -- own crossing frame outright and is discharged, so the shape looks
@@ -2197,6 +2264,22 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
 --   count against the cap-side ceiling, which is what a per-frame
 --   discharge of the ceiling conjunct would have to beat.
+-- REFUTED: `Refuted.Walk-Ceil-Ledger` -- the same crossing against the
+--   WHOLE ledger this premise supplies, at the longest path the size
+--   predicate's own length conjunct admits and with the level in hand
+--   held under the ledger it has been spending.  It is what says which
+--   side breaks: TWO rungs of the walk put the level past every
+--   allowance the path has, so no reading of this premise fixes a
+--   ceiling a crossing frame fits under, and one rung lower the
+--   crossing is affordable -- the gap opens with the walk rather than
+--   with the program.
+-- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
+--   a recursion on a depth fuel, the charge at each frame read at the
+--   level that frame stands at, against what `walkFac-ch` affords, and
+--   quantified over every ADVANCE RULE between a join and a sum with
+--   both endpoints exhibited.  Two crossing frames of that climb outrun
+--   the factor's whole ledger at every admissible cap under every rule
+--   in the bracket, and one crossing frame does not.
 -- DEAD ROUTE: a fan-out fold that does not advance at all, reading
 --   every admitted entry's node table at the level the fan was
 --   ENTERED at.  Killed at a two-entry fan whose first entry is a

@@ -215,24 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
-  face's ledger into a ceiling put the crossing frame's climb and the
-  fan-out's advance under a single premise of `chain-walk-szOK`, which
-  is progress only if some ceiling exists that the walk factor can
-  afford AND the crossing frames fit under. The two halves are known
-  to pull opposite ways — one needs a ladder, the other affords a
-  polynomial — so the commit instantiates the premise at a real
-  crossing and reports which side breaks first, since a refutation
-  there kills the ceiling shape rather than the row.
-
-- **THEN THE CROSSING FRAME AS ONE OBJECT, SINCE BOTH LEGS ABOVE LAND
-  ON IT.** A crossing is the only frame that subscribes, so it is what
-  advances the store inside an instant — which is what makes a flat
-  field unavailable — and it is what charges a run rather than a
-  count, which is what the size ceiling may not afford. Those are the
-  same mechanism read in two currencies, and nothing states them
-  together. The commit prices one crossing against both readings at
-  once and reports whether a single index serves both.
+- **THE TWO CROSSING ARMS, WHICH CLIMB FOR DIFFERENT REASONS.** The
+  level side is closed: every advance rule between a JOIN and a SUM
+  outruns `walkFac-ch` at the second crossing frame, both endpoints
+  exhibited, and moving the ceiling instead means affording the size
+  ladder iterated at itself — a tower `nestΦAt`'s header rules out. So
+  the charge moves, and `szCount` says where: three arms read the
+  program's own syntax and are level-free, the drain charges the LEVEL
+  flatly, and the outer charges its ARRIVALS, whose only bound is the
+  walk's climbing size premise. The commit takes the outer — the arm
+  `Walk-Ceil-Ledger` is instantiated at — and asks whether the arrivals
+  can be denominated at the instant's own value cap instead.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
@@ -243,6 +236,16 @@ does not fit is a finding about the shared statement, not about the head.
   sink leaf's charge against what the REGISTRY carries — a per-entry
   reading rather than a cap — and reports whether the walk's own
   budget can spend it.
+
+- **THEN THE STORE ADVANCE AT A CROSSING, WHICH THE CHARGE DOES NOT
+  DECIDE.** A crossing is the only frame that subscribes, so it is what
+  advances the node table inside an instant — which is what makes a
+  flat store field unavailable and what a fan-out entry inherits from
+  the entries before it. That half is independent of the affordability
+  the leg above turns on: it is a claim about WHEN the table moves, not
+  about what the move costs. The commit states the advance at one
+  crossing and reports whether one index serves the frame and the
+  fan-out entry alike.
 
 ### The ledger
 
@@ -275,10 +278,9 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling,
-  which retired the crossing frames' own row. Every frame's climb and every fan
-  entry's advance buy their room here, and a crossing frame's charge is what a
-  subscribed program costs to RUN.
+  `REFUTED×3, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
+  THE LEVEL SIDE IS CLOSED — ceiling, whole ledger, and every advance rule from
+  a join to a sum — and the ceiling side would need a tower, so the CHARGE moves.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the
