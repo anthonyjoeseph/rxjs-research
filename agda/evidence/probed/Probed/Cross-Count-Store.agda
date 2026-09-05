@@ -35,9 +35,9 @@
 -- program's own layers already dominate what running it can emit.
 --
 -- NOT COVERED: a parked SLOT REFERENCE, whose layers are zero and
--- whose whole charge is the summand -- `Probed.Drain-Count-Slot` reads
--- the value half there, and nothing reads the store half at that
--- shape; and the ledger tie,
+-- whose whole charge is the summand -- `Probed.Drain-Count-Slot`
+-- reads the value half there and `Probed.Parked-Slot-Store` the
+-- store half; and the ledger tie,
 -- which these rows say nothing about -- a
 -- parked program is bounded only by the level the store premise
 -- carries, so the charge still reaches the level and a per-frame
