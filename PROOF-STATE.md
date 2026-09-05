@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **IS AN ADMITTED CHAIN SHORTER THAN THE INSTANT'S ENTRY CAP?** That
-  one number is what the four sites reduce to. No cap-side repair
-  survives — flat field, indexed field and premise-only weakening are
-  all dead in `fan-regsSz`'s header, and by ONE step of the recurrence
-  rather than at a threshold, because what a size receipt buys the Φ
-  pricing is a LENGTH and the length sits in an EXPONENT. So the
-  question stops being which denomination and becomes whether the
-  registry can hold a chain longer than the cap the conclusion names.
-  Lengths COMPUTE where caps do not, so the commit instantiates it at
-  a run that subscribes reified syntax mid-instant.
-
-- **THEN THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
+- **THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
   face's ledger into a ceiling put the crossing frame's climb and the
   fan-out's advance under a single premise of `chain-walk-szOK`, which
   is progress only if some ceiling exists that the walk factor can
@@ -244,6 +233,16 @@ does not fit is a finding about the shared statement, not about the head.
   same mechanism read in two currencies, and nothing states them
   together. The commit prices one crossing against both readings at
   once and reports whether a single index serves both.
+
+- **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
+  cap-side repair at the four sites is now dead in `fan-regsSz`'s
+  header, and the last of them dies on the caps recurrence itself: the
+  stepped cap the registry's receipt names is a blowup of the very
+  depth budget any Φ pricing must fit under, so the potential is a
+  per-instant quantity and the registry is not. The commit states the
+  sink leaf's charge against what the REGISTRY carries — a per-entry
+  reading rather than a cap — and reports whether the walk's own
+  budget can spend it.
 
 ### The ledger
 
@@ -266,11 +265,11 @@ does not fit is a finding about the shared statement, not about the head.
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
   — so the residue is the arbitrary chain, owed as a carried invariant.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×3`: the
-  registry's own size receipt at the PROGRAM's cap. WHAT IT BUYS IS A LENGTH
-  AND THE LENGTH SITS IN AN EXPONENT, so every raise dies by one step of the
-  recurrence and the residue is whether an admitted chain is shorter than the
-  entry cap at all.
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
+  registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
+  CHAIN: the stepped cap the receipt names is a blowup of the depth budget any
+  Φ pricing must fit under, so the residue is a mechanism rather than a
+  denomination.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
