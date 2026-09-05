@@ -52,7 +52,9 @@ open import Probed.PushVals-Caps
          burstsG≡; burstsA≡;
          tieM; tieS; tieX)
 open import Probed.Chain-Step-Live-Deferred
-  using (figures≡; fits; tieFigs≡; tieLive1; tieLive3)
+  using (figures≡; fits; tieFigs≡; tieLive1; tieLive3;
+         twicePacked≡; tieLiveOn3; tieLiveOn1;
+         widePacked≡; tieLiveOuterSwitch; tieLiveOuterPair)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits;
          liveRow; attackRow; twoRow; mapRow)

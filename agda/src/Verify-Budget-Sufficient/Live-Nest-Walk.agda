@@ -195,9 +195,17 @@ postulate
   --   THREE the fold of 3 is over that vocabulary and is carried by
   --   the size budget alone -- both rows standing at a potential grant
   --   of ZERO, at a budget that is the value's own size rather than a
-  --   number chosen to clear the fold.  Not covered: a fold already
-  --   nonzero at entry, where the growth would compound rather than
-  --   start at zero.
+  --   number chosen to clear the fold.  AND THE COMPOUNDING REGION IS
+  --   COVERED, on a state reached by RUNNING the first frame and
+  --   handing the second its output: a standing fold and an arriving
+  --   mint combine by MAX in both crossing directions, so nothing here
+  --   stacks.  The OPERATOR is live at a frame in a way it is not at a
+  --   subscribe -- an arrival takes its arm, switch killing and
+  --   exhaust dropping -- and both read the standing fold rather than
+  --   past it; so does a PAIR of arrivals stepped together against the
+  --   single value budget the premise bounds each of them by.  Not
+  --   covered: a nonempty path under the frame, `root` being what
+  --   holds the potential at its floor.
   stepFrame-nest-live-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
