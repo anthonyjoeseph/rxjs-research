@@ -2,8 +2,8 @@
 -- THE INNER CROSSING'S TWO HALVES, INSTANTIATED AT THE VERY WITNESSES
 -- THAT KILLED THE CONSTANT THEY REPLACE.
 --
--- TARGET: mergeAllDrain-sz @db8471
--- TARGET: stepFrame-sz-store-inner @7f2f2b
+-- TARGET: mergeAllDrain-sz @7c7e56
+-- TARGET: stepFrame-sz-store-inner @b7ce7a
 --
 -- WHY THESE POINTS AND NOT OTHERS.  The inner arm subscribes what the
 -- `*All` node has PARKED, so the program it runs is in the node table
@@ -19,7 +19,9 @@
 --
 -- WHAT THE PAIRED FIGURES BUY.  Each half reads the same delivered
 -- quantity against two rungs -- the constant one and the parked
--- program's own -- and reports `false` then `true`.  That is the
+-- program's own plus the telescope -- and reports `false` then `true`.
+-- Both telescopes here are a single scripted slot, so what the second
+-- rung is bought by is the queue and not the summand.  That is the
 -- finding stated as a row rather than as a claim: the quantity did not
 -- move, the charge did, and it moved far enough to clear the very
 -- reading that refuted its predecessor.  A restatement that had merely
@@ -35,7 +37,9 @@
 -- NOT COVERED: a queue holding MORE THAN ONE parked program, where the
 -- drain runs several and a MAX join is asked to cover a sequence of
 -- runs; a queue whose entries differ in depth, where the join is the
--- claim; a chain of installed nodes, since each witness installs one;
+-- claim; a queue parking a SLOT REFERENCE, which is what the summand
+-- was added for and which neither row reaches; a chain of installed
+-- nodes, since each witness installs one;
 -- the outer arm and its store half, whose count reads the arrival and
 -- the slot telescope instead and which `Probed.Cross-Count-Slot`
 -- reads; and the ledger tie, which these rows say nothing about -- a
@@ -49,11 +53,12 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
+open import Rx.Slots using (slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
@@ -72,13 +77,13 @@ open import Probed.Apparatus using (Confirms)
 ----------------------------------------------------------------------
 
 -- THE TWO CHARGES, READ OFF THE STATES THE ROWS STAND AT.  They are
--- the parked programs' layer counts and nothing else: a twelve-rung
--- chain, and a scan over a thirteen-rung one.
+-- the parked programs' layer counts plus a one-slot telescope: a
+-- twelve-rung chain, and a scan over a thirteen-rung one.
 charges : List ℕ
-charges = parkedLayAt 0 (EvalSt.nodes stV)
-        ∷ parkedLayAt 0 (EvalSt.nodes stS) ∷ []
+charges = parkedLayAt 0 (EvalSt.nodes stV) + slotsSize slV
+        ∷ parkedLayAt 0 (EvalSt.nodes stS) + slotsSize slS ∷ []
 
-charges≡ : charges ≡ 12 ∷ 14 ∷ []
+charges≡ : charges ≡ 13 ∷ 15 ∷ []
 charges≡ = refl
 
 -- LOAD-BEARING: the first entry is the refutation's own row, so a
@@ -86,7 +91,8 @@ charges≡ = refl
 valRows : List Bool
 valRows = valsSz? {Γ = ΓV} {s = PowV 12} (iterSize 51 1 51) outV
         ∷ valsSz? {Γ = ΓV} {s = PowV 12}
-            (iterSize 51 (parkedLayAt 0 (EvalSt.nodes stV)) 51) outV
+            (iterSize 51 (parkedLayAt 0 (EvalSt.nodes stV) + slotsSize slV) 51)
+            outV
         ∷ []
 
 valRows≡ : valRows ≡ false ∷ true ∷ []
@@ -105,7 +111,8 @@ storeRows : List Bool
 storeRows = all (λ kv → boundedNode (iterSize 63 1 63) (proj₂ kv))
                 (EvalSt.nodes postS)
           ∷ all (λ kv → boundedNode
-                          (iterSize 63 (parkedLayAt 0 (EvalSt.nodes stS)) 63)
+                          (iterSize 63 (parkedLayAt 0 (EvalSt.nodes stS)
+                                         + slotsSize slS) 63)
                           (proj₂ kv))
                 (EvalSt.nodes postS)
           ∷ []

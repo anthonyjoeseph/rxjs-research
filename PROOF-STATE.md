@@ -215,36 +215,35 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE JOIN OVER A QUEUE OF SEVERAL, WHICH NOTHING HAS INSTANTIATED
-  AND WHICH THE DRAIN LEAF NOW RESTS ON.** Every drain row parks
-  exactly one program, so the leaf's MAX is a max over a singleton and
-  its shape is untested — and the inner frame is now a real body over
-  that leaf, so a wrong join is retroactive rather than merely open.
-  The drain subscribes each entry in turn and every delivered value
-  comes out of one entry's run, which is the argument for a max rather
-  than a sum; a queue whose entries differ in depth is where that
-  argument is bought or refuted. The commit instantiates the leaf at
-  such a queue and reports which of the two it is.
+- **THE TELESCOPE SUMMAND, AT THE SHAPE THAT FORCED IT AND NOWHERE
+  ELSE.** The drain's telescope-free reading is refuted, so the leaf
+  the inner frame's body spends now charges the queue's layers PLUS
+  the whole slot telescope — and no row stands at a queue that parks a
+  slot reference, which is the only shape where the summand is the
+  charge rather than a rounding. It is a linear number against an
+  emission that is exponential in the same quantity, so it clears or
+  it does not, and reading it at the refutation's own witness is what
+  decides. The commit instantiates the repaired leaf there and reports
+  which.
+
+- **THEN THE JOIN OVER A QUEUE OF SEVERAL, STILL UNINSTANTIATED.**
+  Every drain row parks exactly one program, so the leaf's MAX is a
+  max over a singleton and its shape is untested. The drain subscribes
+  each entry in turn and every delivered value comes out of one
+  entry's run, which is the argument for a max rather than a sum; a
+  queue whose entries differ in depth is where that argument is bought
+  or refuted, and the state threaded into the second entry is what
+  could break it. The commit instantiates the leaf at such a queue.
 
 - **THEN WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
   ARMS ARE NOW WAITING ON.** The drain leaf and the outer arm differ
   only in WHERE the program sits — parked in a node, or arriving as a
-  value — and both are denominated in its layers. Underneath each is
+  value — and now agree in denomination as well. Underneath each is
   one claim: subscribing a program of bounded size delivers within the
-  rungs its LAYERS buy, because reification adds no layer while a
-  substitution multiplies. The commit states that single-subscription
-  claim as the leaf both spend, and reports what the per-entry step of
-  the drain still owes above it.
-
-- **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
-  cap-side repair at the four sites is now dead in `fan-regsSz`'s
-  header, and the last of them dies on the caps recurrence itself: the
-  stepped cap the registry's receipt names is a blowup of the very
-  depth budget any Φ pricing must fit under, so the potential is a
-  per-instant quantity and the registry is not. The commit states the
-  sink leaf's charge against what the REGISTRY carries — a per-entry
-  reading rather than a cap — and reports whether the walk's own
-  budget can spend it.
+  rungs its layers and its telescope buy, because reification adds no
+  layer while a substitution multiplies. The commit states that
+  single-subscription claim as the leaf both spend, and reports what
+  the per-entry step of the drain still owes above it.
 
 ### The ledger
 
@@ -254,10 +253,10 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`mergeAllDrain-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×2, TWIN, PROBED×2`: what a run delivers, in layers of what runs —
-  the drain the queue its node parked, the outer arm its arrivals plus their
-  telescope. The inner frame is a body over the drain leaf now; the join over a
-  queue of several is untested.
+  `REFUTED×3, TWIN, PROBED×2`: what a run delivers, in layers of what runs plus
+  the telescope behind it — the drain reading its node's queue, the outer arm
+  its arrivals. No row parks a slot reference; the join over several is
+  untested.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the

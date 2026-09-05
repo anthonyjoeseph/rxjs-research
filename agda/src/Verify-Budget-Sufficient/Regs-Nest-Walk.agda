@@ -880,12 +880,15 @@ parkedLayAt nid ((k , s) ∷ r) =
 --   value and the store halves respectively.
 -- REFUTED: `Refuted.Frame-Step-Size-Slot` -- the outer arm read at the
 --   arriving values alone, with no telescope summand.
+-- REFUTED: `Refuted.Drain-Queue-Slot` -- the inner arm read at the
+--   parked queue alone, which is the same hole one door over: a parked
+--   `input i` carries no layer and runs a whole shared definition.
 szCount : ∀ {n} {Γ : Ctx n} {s u} → Slots Γ →
   List (NodeId × NodeState Γ) → Frame Γ s u → List (Val Γ s) → ℕ
 szCount sl ns (map-f fn)              vals = sizeᵗ fn
 szCount sl ns (scan-f fn nid)         vals = length vals * suc (sizeᵗ fn)
 szCount sl ns (take-f nid)            vals = 1
-szCount sl ns (from-inner _ allNid _) vals = parkedLayAt allNid ns
+szCount sl ns (from-inner _ allNid _) vals = parkedLayAt allNid ns + slotsSize sl
 szCount {s = s} sl ns (thru-outer _ _) vals =
   layᵛˢ s vals + slotsSize sl
 
@@ -962,6 +965,20 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 -- reading at the cell the frame looked up, so nothing here is a
 -- hypothesis a call site happens to supply.
 --
+-- AND THE TELESCOPE IS A SUMMAND BECAUSE THE PARKED SYNTAX IS NOT THE
+-- PROGRAM.  A queue entry may NAME a shared slot, and then its layers
+-- and its size both read the reference while the run reads the
+-- definition; no premise over the queue or the table can see the
+-- difference, so the only reading of "what this drain runs" available
+-- to the statement is the queue's own depth plus the whole telescope
+-- standing behind whatever it names.  That is the same summand the
+-- outer arm carries, arrived at from the store side rather than the
+-- arrival side, which is why the two arms of the count now agree in
+-- shape.
+--
+-- REFUTED: `Refuted.Drain-Queue-Slot` -- the telescope-free reading, at
+--   a queue parking one slot reference, twice with the bound tied to
+--   the slot's own definition.
 -- TWIN: `mergeAllDrain-nest` is this walk on the nesting face, proven,
 --   with the same shape of premise -- a ceiling on the QUEUE rather
 --   than on the table -- and the same reason for it: the drain reaches
@@ -969,10 +986,11 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 -- PROBED: `Probed.Cross-Count-Store` -- one drain of a queue holding a
 --   twelve-rung duplication chain, the witness that kills a constant
 --   charge, read against the rung the constant bought and then against
---   the rung the queue's own layers buy.  One queue entry: nothing
---   about a queue of several, where the MAX join is the claim, nor
---   about a queue whose entries differ in depth, nor about a parked
---   program that itself crosses.
+--   the rung this charge buys.  One queue entry, and a telescope that
+--   is empty at it: nothing about a queue of several, where the MAX
+--   join is the claim, nor about a queue whose entries differ in
+--   depth, nor about a parked program that itself crosses, nor about
+--   whether the telescope summand is enough where it is spent.
 postulate
   mergeAllDrain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
@@ -980,7 +998,7 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
     all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true →
-    valsSz? (iterSize S (layᵛˢ (obs s) q) B)
+    valsSz? (iterSize S (layᵛˢ (obs s) q + slotsSize (Sched.slots sched)) B)
       (proj₁ (mergeAllDrain sf allNid κ id now lim act q sched st)) ≡ true
 
 -- ONE WIDENING, SPENT BY EVERY ARM THAT PASSES ITS ARRIVALS THROUGH.
@@ -997,6 +1015,13 @@ valsSz?-rung S B L 2≤S vals hv =
 -- is the only place the charge is spent.  Stating it over an abstract
 -- `Maybe` rather than over the table is what lets the frame above
 -- scrutinise the cell once and hand both readings of it down.
+--
+-- AND `L` IS THE CELL'S OWN DEPTH WHILE THE CHARGE IS THAT PLUS THE
+-- TELESCOPE, which keeps the abstraction honest: the cell reading is
+-- what the frame above can hand down, and the telescope is what
+-- neither the cell nor the arrivals mention.  Adding it in the
+-- conclusion rather than asking the caller for a combined number is
+-- what lets the `NodeLay` receipt stay a statement about the cell.
 innerFinish-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
   (id : Id) (now : Tick) (vals : List (Val Γ s)) (sched : Sched Γ)
@@ -1004,26 +1029,26 @@ innerFinish-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (mns : Maybe (NodeState Γ)) → NodeLay L mns → NodeSz B mns →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   valsSz? B vals ≡ true →
-  valsSz? (iterSize S L B)
+  valsSz? (iterSize S (L + slotsSize (Sched.slots sched)) B)
     (proj₁ (innerFinish sf op allNid inst κ id now vals sched st mns)) ≡ true
 
 innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
-  nothing hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  nothing hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (take-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (take-st _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (switch-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (switch-st _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz {s = s} sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
   (just (mergeAll-st {w} lim act q od)) hL hb hns hv with w ≟ᵗ s
-... | no  _    = valsSz?-rung S B L 2≤S vals hv
+... | no  _    = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 ... | yes refl =
-  all-++-intro (λ v → sizeᵛ s v ≤ᵇ iterSize S L B) vals _
-    (valsSz?-rung S B L 2≤S vals hv)
-    (subst (λ z → valsSz? (iterSize S z B)
+  all-++-intro (λ v → sizeᵛ s v ≤ᵇ iterSize S (L + slotsSize (Sched.slots sched)) B) vals _
+    (valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv)
+    (subst (λ z → valsSz? (iterSize S (z + slotsSize (Sched.slots sched)) B)
                     (proj₁ (mergeAllDrain sf allNid κ id now lim (pred act) q
                               sched st)) ≡ true)
            (sym hL)
@@ -1031,34 +1056,34 @@ innerFinish-sz {s = s} sf mergeAllᵒ allNid inst κ id now vals sched st S B L 
               S B 2≤S hns hb))
 
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
-  nothing hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  nothing hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (take-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (take-st _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (mergeAll-st _ _ _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (mergeAll-st _ _ _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (switch-st nothing _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (switch-st nothing _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
   (just (switch-st (just c₀) od)) hL hb hns hv with c₀ ≡ᵇ inst
-... | true  = valsSz?-rung S B L 2≤S vals hv
-... | false = valsSz?-rung S B L 2≤S vals hv
+... | true  = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
+... | false = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 
 innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
-  nothing hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  nothing hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (take-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (take-st _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (mergeAll-st _ _ _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (mergeAll-st _ _ _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (switch-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (switch-st _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
-  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B (L + slotsSize (Sched.slots sched)) 2≤S vals hv
 
 -- THE INNER CROSSING, WHICH IS THE DISPATCH ABOVE PLUS TWO GATES.  A
 -- frame that is not finishing, and one whose instance still has a live
@@ -1078,22 +1103,28 @@ innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
 --   rather than to the arrivals.
 -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
 --   -- one rung, which is the charge this reading replaces.
+-- REFUTED: `Refuted.Drain-Queue-Slot` -- the same reading with the
+--   telescope summand dropped, which is where the drain leaf under
+--   this body died.
 stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
   (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
   (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   valsSz? B vals ≡ true →
-  valsSz? (iterSize S (parkedLayAt allNid (EvalSt.nodes st)) B)
+  valsSz? (iterSize S (parkedLayAt allNid (EvalSt.nodes st)
+                        + slotsSize (Sched.slots sched)) B)
     (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals fin
               sched st)) ≡ true
 stepFrame-sz-inner sf id now op allNid inst path vals false sched st S B
   2≤S hns hv =
-  valsSz?-rung S B (parkedLayAt allNid (EvalSt.nodes st)) 2≤S vals hv
+  valsSz?-rung S B (parkedLayAt allNid (EvalSt.nodes st)
+                     + slotsSize (Sched.slots sched)) 2≤S vals hv
 stepFrame-sz-inner sf id now op allNid inst path vals true sched st S B
   2≤S hns hv with any (aliveThroughᶠ inst st) (EvalSt.registry st)
 ... | true  =
-  valsSz?-rung S B (parkedLayAt allNid (EvalSt.nodes st)) 2≤S vals hv
+  valsSz?-rung S B (parkedLayAt allNid (EvalSt.nodes st)
+                     + slotsSize (Sched.slots sched)) 2≤S vals hv
 ... | false =
   innerFinish-sz sf op allNid inst path id now vals sched st S B
     (parkedLayAt allNid (EvalSt.nodes st)) 2≤S
@@ -1239,8 +1270,9 @@ postulate
   -- product mirrors the value it came from -- so the quantity owed
   -- here is the same one the value halves owe, reaching the table only
   -- by being written there.  The inner half therefore follows the
-  -- inner value half onto the parked queue; the outer half reads the
-  -- arrivals and the telescope, as its own value half does.
+  -- inner value half onto the parked queue AND the telescope beside
+  -- it; the outer half reads the arrivals and the telescope, as its
+  -- own value half does.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-outer-absurd`
@@ -1257,7 +1289,8 @@ postulate
     all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     valsSz? B vals ≡ true →
     all (λ kv → boundedNode
-                  (iterSize S (parkedLayAt allNid (EvalSt.nodes st)) B)
+                  (iterSize S (parkedLayAt allNid (EvalSt.nodes st)
+                                + slotsSize (Sched.slots sched)) B)
                   (proj₂ kv))
         (EvalSt.nodes
           (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (from-inner op allNid inst)

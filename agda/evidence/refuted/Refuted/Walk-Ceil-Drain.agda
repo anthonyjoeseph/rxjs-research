@@ -30,7 +30,7 @@
 -- Priced at the store BOUND this row fired at the second rung with one
 -- nat arriving; priced at what is parked it cannot fire there at all,
 -- because the deepest chain that rung's store reading admits is
--- sixty-three layers and sixty-five is under the ledger.  So the two
+-- sixty-three layers and sixty-six is under the ledger.  So the two
 -- crossing arms now break at the same rung and through the same
 -- channel, and one statement about where a delivered observable's
 -- layers come from is what both are waiting on.
@@ -147,7 +147,7 @@ premLvl = refl
 -- LOAD-BEARING: and the count genuinely overruns the whole ledger.
 -- Both sides are numerals, so nothing here rests on a normal form.
 count≡ : 3 + szCount sl₁ (EvalSt.nodes (parked 70))
-           (from-inner {Γ = Γ₁} {s = natᵗ} mergeAllᵒ 0 1) vals₁ ≡ 73
+           (from-inner {Γ = Γ₁} {s = natᵗ} mergeAllᵒ 0 1) vals₁ ≡ 74
 count≡ = refl
 
 -- LOAD-BEARING, AND IT IS WHAT SAYS THE ARM LOST ITS HEAD START: at

@@ -279,3 +279,7 @@ open import Refuted.Inner-Phi-Store
   using (InnerΦQuiet; deepNest; nodeNest≡; legal; premΦ;
          inner-phi-store-absurd;
          InnerΦDrain; parked; nodeNestQ≡; inner-phi-drain-store-absurd)
+open import Refuted.Drain-Queue-Slot
+  using (MergeAllDrainSz; figures₂≡; nodes₂; prem₂; row₂≡false;
+         figures₃≡; nodes₃; prem₃; row₃≡false;
+         mergeAllDrain-sz-slot-absurd; mergeAllDrain-sz-slot-absurd′)
