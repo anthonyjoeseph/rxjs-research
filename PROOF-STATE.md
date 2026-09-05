@@ -215,25 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE STORE PREDICATE THE WALK DOES NOT CARRY, WHICH IS FOUR SITES
-  AND NOT THREE.** `walk-share-nestOK`, `fan-regsSz`, `sink-fan-sink`
-  and BOTH inner Φ arms are one shape in several currencies: the walk
-  reads the registry and the node table at a state it has stepped to,
-  and its carried bundle says nothing about depth, size, or the
-  stratification a re-entered chain wants. The inner arms joined them
-  by machine — each charges a table its premises never mention. The
-  size face just answered its own version of this by carrying a
-  CEILING rather than a per-entry ledger, and that is the shape to try
-  first. The commit decides whether one carried field answers all
-  four, and pays the producer cascade for whichever it adds.
-
-- **THEN THE PRODUCERS THAT CASCADE ANSWERS.** A field on the walk's
-  bundle obliges every producer to re-establish it, and the frame arms
-  state their own nest receipts at the NEXT instant's cap while the
-  fanned walk is priced at this one's. That gap is the cascade's real
-  cost, and it lands on the arms rather than on the field. The commit
-  takes the arms one denomination at a time and reports which of them
-  can re-establish an entry-cap reading at all.
+- **THE Φ FOLD TAKES A PER-ENTRY CAP, OR THE FOUR SITES HAVE NO
+  REPAIR.** A FLAT field is dead at all four — `fan-regsSz` now
+  carries the elimination: the descent reads a state the instant has
+  stepped, every receipt in hand sits at or above the cap it stepped
+  to, and all four predicates weaken UPWARD, so one cap for the fold
+  is unavailable at the read or useless at the consumer. What that
+  leaves is the INDEXED form, and it is the shape both neighbouring
+  faces already run — the size walk's fold under a ceiling, and a
+  per-frame advance proven under exactly such a ceiling. The commit
+  gives the Φ fan-out fold that index and reports what the leaf
+  exponent costs when it is read at a stepped cap.
 
 - **THEN THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
   face's ledger into a ceiling put the crossing frame's climb and the
@@ -244,6 +236,15 @@ does not fit is a finding about the shared statement, not about the head.
   polynomial — so the commit instantiates the premise at a real
   crossing and reports which side breaks first, since a refutation
   there kills the ceiling shape rather than the row.
+
+- **THEN THE CROSSING FRAME AS ONE OBJECT, SINCE BOTH LEGS ABOVE LAND
+  ON IT.** A crossing is the only frame that subscribes, so it is what
+  advances the store inside an instant — which is what makes a flat
+  field unavailable — and it is what charges a run rather than a
+  count, which is what the size ceiling may not afford. Those are the
+  same mechanism read in two currencies, and nothing states them
+  together. The commit prices one crossing against both readings at
+  once and reports whether a single index serves both.
 
 ### The ledger
 
@@ -266,12 +267,12 @@ does not fit is a finding about the shared statement, not about the head.
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
   — so the residue is the arbitrary chain, owed as a carried invariant.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×2`: the
   registry's own size receipt at the PROGRAM's cap. THE ENTRY CAP IS THE Φ
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×3`: the
+- **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.

@@ -1303,6 +1303,23 @@ postulate
 --   from the registry's side rather than the caps face's.  Nothing
 --   else in the walk reads the cap, the size and registry receipts it
 --   used to thread having reached no obligation at all.
+-- DEAD ROUTE: a FLAT carried field -- one predicate at one cap, added
+--   to the walk's bundle -- answering this row together with
+--   `walk-share-nestOK`, `sink-fan-sink` and the two inner Φ arms,
+--   which is what those four sharing an obstacle invites.  Each
+--   currency kills it separately and for the same reason: the descent
+--   reads a state the instant has STEPPED, every receipt in hand is
+--   denominated at or above the cap it stepped to, and each of these
+--   predicates WEAKENS as its cap grows -- so a field fixed at one cap
+--   is either unavailable at the read or useless at the consumer, and
+--   no producer cascade repairs a direction.  What the elimination
+--   leaves standing is the INDEXED form, a per-entry cap under an
+--   absolute ceiling rather than one cap for the whole fold; and that
+--   is not a new mechanism, `stepFrame-nodes` already proving a
+--   per-frame advance under exactly such a ceiling.  The residue is
+--   whether the Φ pricing affords a leaf exponent read at a stepped
+--   cap, which the route directly above prices at a FLAT raise and
+--   therefore does not answer for an indexed one.
 postulate
   fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (st : EvalSt e) →
@@ -1429,6 +1446,10 @@ fan-regsNest {e = e} sl id sched st h =
 --   reached counterexample is legal in both: the depth is a fact about
 --   the accumulated STORE, which neither the path's frames nor the
 --   syntax can report, so no premise threaded to a mint can pay it.
+-- DEAD ROUTE: a flat carried field answering this row, the size half
+--   and the two inner Φ arms at once, which is where those arms send
+--   their own obligation.  `fan-regsSz` carries the elimination across
+--   all four currencies, and the indexed shape it leaves standing.
 postulate
   walk-share-nestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
