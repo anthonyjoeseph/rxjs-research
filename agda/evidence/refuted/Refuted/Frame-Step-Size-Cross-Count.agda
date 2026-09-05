@@ -65,8 +65,9 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?; frameCh)
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED -- and it stands
 -- nowhere in `src`, because what is refuted is the REPAIR the
 -- crossing refutations propose rather than a statement standing there
--- today.  It is `szCount≤ch`'s crossing arm with the constant
--- replaced by the size, carrying every premise that arm has, plus the
+-- today.  It is the crossing arm of a per-frame `frameCh` discharge
+-- with the constant replaced by the size, carrying every premise such
+-- an arm has, plus the
 -- level reading the walk supplies and a tie putting the level at or
 -- above the cap.
 ----------------------------------------------------------------------

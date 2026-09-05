@@ -38,7 +38,8 @@
 -- slot telescope instead and which `Probed.Cross-Count-Slot` reads; and
 -- the ledger tie, which these rows say nothing about -- the charge here
 -- CLIMBS with the walk's level while a per-frame ceiling is a fixed
--- product, and that gap is what leaves both arms outside `szCount≤ch`.
+-- product, and that gap is what leaves both arms outside any discharge
+-- of the walk's ceiling conjunct denominated in `frameCh`.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Cross-Count-Store where
 

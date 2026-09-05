@@ -6,7 +6,7 @@ open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub;
-  m≤m⊔n; m≤n⊔m; +-mono-≤; *-distribʳ-+; +-suc; +-assoc; +-identityʳ)
+  m≤m⊔n; m≤n⊔m; +-mono-≤; *-distribʳ-+; +-suc; +-assoc)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -45,8 +45,8 @@ open import Verify-Budget-Sufficient.Walk-Factor using
   (pathΦF; pathΦF-cap; pathΦD; pathRoots; pathΦF-cap-root; pathΦD-cap-root)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
-  valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; stepFrame-sz-store;
-  szCount; szCount≤ch; crossFrame?; frameCh; walkSzOK; dispatchSzOK; shareGoSzOK; Φ-to-bound)
+  valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; stepFrame-sz-store; szCount;
+  frameCh; walkSzOK; dispatchSzOK; shareGoSzOK; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; base; walk; ent-step)
@@ -85,7 +85,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   pathSz?-widen; regsSz?; slotsCaps?; valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen; iterSize-+)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-nodeSz; capsOK?-regs; frameBud; slotsCaps?-capsAt; valsCaps?;
-   valsCaps?-lvl; foldPath-slots; shareAdmit-caps; pathSz?-len)
+  valsCaps?-lvl; foldPath-slots; shareAdmit-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-size; valCaps?-widen)
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
@@ -1882,88 +1882,17 @@ chAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
 chAt e sl id =
   frameCh (Caps.cSize (capsAt e sl id)) (Caps.cSize (capsAt e sl id))
 
--- THE FRAME KINDS THIS LEDGER CANNOT PRICE, TAKEN WHOLE.  Three of
--- the five charge the ladder a count the ceiling above dominates, and
--- the two crossings charge what the program they subscribe would cost
--- to RUN -- the outer reading its arriving observables, the inner the
--- store bound that is the only reading of a parked one available where
--- the count is taken.  That count is bounded -- by the burst width
--- times the level's own size reading, which is the denomination the
--- subscription door already prices its climbs in -- but not by any
--- multiple of a level-free quantity, and the premise below spends
--- exactly such a multiple, one `chAt` per frame of the path.  So the
--- gap is not the frame's charge and not the ceiling: it is that this
--- ledger is a PRODUCT where the charge is a CLIMB, and no
--- reparameterisation of `chAt` repairs that.  Reading `chAt` at the
--- concluding level makes the premise unsatisfiable outright, since the
--- ceiling would then dominate `iterSize S Lv S` while the premise asks
--- it to fit under `Lv`.
---
--- WHAT WOULD DISCHARGE IT is the subscription door's own arithmetic:
--- a nested climb in place of the product, `opIterD`-shaped, whose
--- dominance lemma asks of an ops count only that it sit under the
--- level's size reading -- which is precisely the premise this walk
--- already carries at every frame.  That is a restatement of the ledger
--- and of every consumer that spends it, not a proof, which is why the
--- residue stands here at full strength rather than being ground.
---
--- AND THE CLIMB IS DEAD ON AFFORDABILITY, WHICH IS WHAT MAKES THIS A
--- MECHANISM FINDING RATHER THAN A ROW.  Put the numbers beside each
--- other.  What the walk may SPEND is a rung count polynomial in the
--- cap: `walkFac-ch` affords `L * chAt` rungs for `L` under a quadratic,
--- and it affords that because `nestWalkAt` is two to a polynomial in
--- the cap, singly exponential and no more.  What a crossing frame
--- NEEDS is a rung count linear in the size of the observable it
--- subscribes, because bounding a subscribed program's output means
--- climbing once per operator it can chain.  And the only bound the
--- walk carries on that observable is its own level reading, which is
--- ladder-shaped in the level.  So the need is two to a ladder where
--- the ceiling is two to a polynomial, and the gap opens with the level
--- rather than closing.  No ceiling and no ledger repairs that: both
--- are ways of SPENDING a budget that is already too small by an
--- exponential.
---
--- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
--- move and the reason to say so here.  The potential face prices its
--- own crossing frame outright and is discharged, so the shape looks
--- portable.  It is not: that face is denominated in DEPTH, and depth
--- TRUNCATES at the defer a crossing mints across while size counts
--- straight through it.  The two faces agree at every other frame kind
--- and part company exactly here, which is why the crossing arms are
--- the ones this face cannot borrow.
---
--- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
---   count against the cap-side ceiling, which is the assembly this
---   postulate replaces.
--- DEAD ROUTE: restating the walk's budget premise as a CLIMB -- a
---   level-indexed ceiling iterated once per frame, in place of the
---   product -- so that each frame is charged at the level it stands
---   at.  It types and it is the honest shape of the charge; it is dead
---   because its value is ladder-shaped in the frame count, so the
---   consumer's affordability side cannot pay it at any cap.  This is
---   the same wall `chain-climb-ch` records from the other end.
-postulate
-  walk-cross-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv k : ℕ) (f : Frame Γ s u) (p : Path Γ u t)
-    (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) →
-    crossFrame? f ≡ true →
-    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
-              (Caps.cSize (capsAt e sl id))) vals ≡ true →
-    all (λ kv → boundedNode (iterSize (Caps.cSize (capsAt e sl id)) k
-                              (Caps.cSize (capsAt e sl id))) (proj₂ kv))
-        (EvalSt.nodes st) ≡ true →
-    walkSzOK (Caps.cSize (capsAt e sl id))
-             (Caps.cSize (capsAt e sl id)) k sf gas nid now
-             (f ↠ p) vals fin sched st →
-    pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
-    k + pathLen (f ↠ p) * chAt e sl id
-      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
-    PathLiveHyp sf gas nid now
-      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
-      (f ↠ p) vals fin sched st
-
+-- THE WALK IS UNIFORM IN THE FRAME KIND, AND THE CEILING IS WHAT
+-- BOUGHT THAT.  Every clause below reads the head at the concluding
+-- level and recurses at the level the frame climbed to, so the only
+-- thing a frame contributes is that its climb stays under the ceiling
+-- -- which the walk predicate now ASSERTS at each frame rather than
+-- leaving to a consumer's arithmetic.  Three of the five frame kinds
+-- charge a count a per-frame product dominates and the two crossings
+-- charge what the program they subscribe would cost to RUN, but that
+-- distinction is no longer visible here: it is a fact about whether
+-- the ceiling conjunct can be SUPPLIED, and it is owed where the walk
+-- is produced.
 mutual
   walk-LiveHyp-goC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
@@ -1975,40 +1904,13 @@ mutual
                               (Caps.cSize (capsAt e sl id))) (proj₂ kv))
         (EvalSt.nodes st) ≡ true →
     walkSzOK (Caps.cSize (capsAt e sl id))
-             (Caps.cSize (capsAt e sl id)) k sf gas nid now
+             (Caps.cSize (capsAt e sl id)) Lv k sf gas nid now
              path vals fin sched st →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    k + pathLen path * chAt e sl id
-      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
+    k ≤ Lv →
     PathLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       path vals fin sched st
-
-  -- THE FRAME STEP, SHARED BY THE THREE KINDS THE LEDGER CAN PRICE.  The
-  -- head reading and the tail recursion are one body for all of them;
-  -- what differs is only the count each charges, and the ceiling
-  -- dominates every one of those uniformly, so the frame kind enters
-  -- here exactly once -- as the premise saying it is not the crossing
-  -- one.
-  walk-frame-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
-    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv k : ℕ) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
-    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
-    crossFrame? f ≡ false →
-    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
-              (Caps.cSize (capsAt e sl id))) vals ≡ true →
-    all (λ kv → boundedNode (iterSize (Caps.cSize (capsAt e sl id)) k
-                              (Caps.cSize (capsAt e sl id))) (proj₂ kv))
-        (EvalSt.nodes st) ≡ true →
-    walkSzOK (Caps.cSize (capsAt e sl id))
-             (Caps.cSize (capsAt e sl id)) k sf gas nid now
-             (f ↠ p) vals fin sched st →
-    pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
-    k + pathLen (f ↠ p) * chAt e sl id
-      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
-    PathLiveHyp sf gas nid now
-      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
-      (f ↠ p) vals fin sched st
 
   -- ONE LEVEL OF THE DISPATCH TELESCOPE.  The spent arm owes nothing;
   -- the latched one is the fan-out fold over the admitted snapshot,
@@ -2021,18 +1923,20 @@ mutual
     valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
     dispatchSzOK (Caps.cSize (capsAt e sl id))
-                 (Caps.cSize (capsAt e sl id)) k sf gas nid now
+                 (Caps.cSize (capsAt e sl id)) Lv k sf gas nid now
                  i vals fin sched st →
-    k + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
+    k ≤ Lv →
     DispatchLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       i vals fin sched st
 
   -- THE FAN-OUT FOLD, ENTRY BY ENTRY AND AT THE STATE EACH LEAVES.  A
-  -- cancelled entry owes nothing and does not move the state; a
-  -- delivered one is walked at the level its VALUES stand at -- the
-  -- same level, since the fan-out hands every chain what arrived --
-  -- and its own frames are paid for out of the hop's `S`.
+  -- cancelled entry owes nothing and moves neither state nor level; a
+  -- delivered one is walked at the level the fold has reached, and the
+  -- fold then advances by what that entry's own run left behind.  The
+  -- values are re-read at the advanced level rather than re-derived,
+  -- since the fan hands every chain the same arrivals and the ladder
+  -- only grows.
   walk-shareGo-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
     (Lv k : ℕ) (i : Fin n) (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
@@ -2041,101 +1945,66 @@ mutual
     valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
     shareGoSzOK (Caps.cSize (capsAt e sl id))
-                (Caps.cSize (capsAt e sl id)) k sf gas nid now
+                (Caps.cSize (capsAt e sl id)) Lv k sf gas nid now
                 i vals fin ps sched st →
     all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
-    k + Caps.cSize (capsAt e sl id) * chAt e sl id
-      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
+    k ≤ Lv →
     ShareGoLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       i vals fin ps sched st
 
   walk-share-LiveHypC sl id sf zero nid now Lv k i vals fin sched st _ _ _ = tt
-  walk-share-LiveHypC {e = e} sl id sf (suc gas) nid now Lv k i vals fin sched st
-                      hsz hw hj =
+  walk-share-LiveHypC sl id sf (suc gas) nid now Lv k i vals fin sched st
+                      hsz hw hk =
     walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
-      hsz hw (fan-chain-sz sl id i st (fan-regsSz sl id st)) hj′
-    where
-    S = Caps.cSize (capsAt e sl id)
-    Ch = chAt e sl id
-    hj′ : k + S * Ch + gas * (S * Ch) ≤ Lv
-    hj′ = ≤-trans (≤-reflexive (+-assoc k (S * Ch) (gas * (S * Ch)))) hj
+      hsz hw (fan-chain-sz sl id i st (fan-regsSz sl id st)) hk
 
   walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin [] sched st
                         _ _ _ _ = tt
   walk-shareGo-LiveHypC {e = e} sl id sf gas nid now Lv k i vals fin
-                        ((rid , p) ∷ ps) sched st hsz hsg hpz hj
+                        ((rid , p) ∷ ps) sched st hsz hsg hpz hk
     with any (_≡ᵇ rid) (EvalSt.cancelled st) | hsg
   ... | true  | h = walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin ps
-                      sched st hsz h (∧-trueʳ hpz) hj
-  ... | false | (hns , hwk , htl) =
+                      sched st hsz h (∧-trueʳ hpz) hk
+  ... | false | (hns , hwk , k′ , hk′ , htl) =
       walk-LiveHyp-goC sl id sf gas nid now Lv k p vals fin sched st₀
-        hsz hns hwk hp₀ hjHead
-    , walk-shareGo-LiveHypC sl id sf gas nid now Lv k i vals fin ps
+        hsz hns hwk hp₀ hk
+    , walk-shareGo-LiveHypC sl id sf gas nid now Lv (k + k′) i vals fin ps
         (proj₁ (proj₂ FP)) (proj₂ (proj₂ FP))
-        hsz htl (∧-trueʳ hpz) hj
+        hszTail htl (∧-trueʳ hpz) hk′
     where
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
-    Ch : ℕ
-    Ch = chAt e sl id
+    1≤S : 1 ≤ S
+    1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
     hp₀ : pathSz? S p ≡ true
     hp₀ = ∧-trueˡ hpz
     st₀ : EvalSt e
     st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
     evs = if fin then close (toℕ i) exhausted ∷ [] else []
     FP  = foldPath sf gas nid now (toℕ i) p vals evs fin sched st₀
-    hjHead : k + pathLen p * Ch + gas * (S * Ch) ≤ Lv
-    hjHead = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
-                       (+-monoʳ-≤ k (*-monoˡ-≤ Ch (pathSz?-len S p hp₀)))) hj
+    hszTail : valsSz? (iterSize S (k + k′) S) vals ≡ true
+    hszTail = valsSz?-mono (iterSize S k S) (iterSize S (k + k′) S) vals
+                (iterSize-mono-count S S 1≤S (m≤m+n k k′)) hsz
 
   walk-LiveHyp-goC sl id sf gas nid now Lv k root vals fin sched st
                    _ _ _ _ _ = tt
-  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (share-sink i) vals fin
-                   sched st hsz _ hw _ hj =
-    walk-share-LiveHypC sl id sf gas nid now Lv k i vals fin sched st hsz hw hj′
-    where
-    S = Caps.cSize (capsAt e sl id)
-    Ch = chAt e sl id
-    hj′ : k + gas * (S * Ch) ≤ Lv
-    hj′ = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
-                    (≤-reflexive (sym (+-identityʳ k)))) hj
-  walk-LiveHyp-goC sl id sf gas nid now Lv k (map-f fn ↠ p) vals fin sched st
-                   hsz hns hw hpz hj =
-    walk-frame-LiveHypC sl id sf gas nid now Lv k (map-f fn) p vals fin sched st
-      refl hsz hns hw hpz hj
-  walk-LiveHyp-goC sl id sf gas nid now Lv k (scan-f fn fid ↠ p) vals fin sched st
-                   hsz hns hw hpz hj =
-    walk-frame-LiveHypC sl id sf gas nid now Lv k (scan-f fn fid) p vals fin sched st
-      refl hsz hns hw hpz hj
-  walk-LiveHyp-goC sl id sf gas nid now Lv k (take-f fid ↠ p) vals fin sched st
-                   hsz hns hw hpz hj =
-    walk-frame-LiveHypC sl id sf gas nid now Lv k (take-f fid) p vals fin sched st
-      refl hsz hns hw hpz hj
-  walk-LiveHyp-goC sl id sf gas nid now Lv k (from-inner op an ii ↠ p) vals fin
-                   sched st hsz hns hw hpz hj =
-    walk-cross-LiveHypC sl id sf gas nid now Lv k (from-inner op an ii) p vals fin
-      sched st refl hsz hns hw hpz hj
-  walk-LiveHyp-goC sl id sf gas nid now Lv k (thru-outer op fid ↠ p) vals fin
-                   sched st hsz hns hw hpz hj =
-    walk-cross-LiveHypC sl id sf gas nid now Lv k (thru-outer op fid) p vals fin
-      sched st refl hsz hns hw hpz hj
-
-  walk-frame-LiveHypC {e = e} sl id sf gas nid now Lv k f p vals fin sched st
-                      hx hsz hns hw hpz hj =
+  walk-LiveHyp-goC sl id sf gas nid now Lv k (share-sink i) vals fin
+                   sched st hsz _ hw _ hk =
+    walk-share-LiveHypC sl id sf gas nid now Lv k i vals fin sched st hsz hw hk
+  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (f ↠ p) vals fin sched st
+                   hsz hns hw hpz hk =
       hHead
     , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls A f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
         (proj₂ (proj₂ (proj₂ (proj₂ step))))
-        hszTail hnsTail (proj₂ hw) hpTail hjTail
+        hszTail hnsTail (proj₂ (proj₂ hw)) hpTail (proj₁ (proj₂ hw))
     where
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
-    Ch : ℕ
-    Ch = chAt e sl id
     sls = Sched.slots sched
     step = stepFrame sf nid now f p vals fin sched st
     2≤S : 2 ≤ S
@@ -2144,18 +2013,11 @@ mutual
     1≤S = ≤-trans (s≤s z≤n) 2≤S
     A : ℕ
     A = iterSize S k S
-    k≤Lv : k ≤ Lv
-    k≤Lv = ≤-trans (m≤m+n k (suc (pathLen p) * Ch))
-                   (≤-trans (m≤m+n (k + suc (pathLen p) * Ch) (gas * (S * Ch)))
-                            hj)
     atV : valsSz? (iterSize S Lv S) vals ≡ true
     atV = valsSz?-mono (iterSize S k S) (iterSize S Lv S) vals
-            (iterSize-mono-count S S 1≤S k≤Lv) hsz
+            (iterSize-mono-count S S 1≤S hk) hsz
     hHead : FrameLiveHyp (iterSize S Lv S) f p vals
     hHead = frameLive-of-sz (iterSize S Lv S) f p vals atV
-    hfz : frameSz? S f ≡ true
-    hfz = proj₁ (∧-true (frameSz? S f)
-                   ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)
     hpTail : pathSz? S p ≡ true
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
@@ -2175,15 +2037,6 @@ mutual
                 (sym eqSplit)
                 (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
                    hns hsz)
-    cnt≤ : szCount sls A f vals ≤ Ch
-    cnt≤ = szCount≤ch S S A 1≤S sls f vals hx hfz (proj₁ hw)
-    hjTail : k + szCount sls A f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
-    hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
-                       (≤-trans (≤-reflexive
-                                  (+-assoc k (szCount sls A f vals) (pathLen p * Ch)))
-                                (+-monoʳ-≤ k
-                                  (+-monoˡ-≤ (pathLen p * Ch) cnt≤))))
-                     hj
 
 -- THE SIZE-SIDE SIDE CONDITION, DISCHARGED, AND IN THE LADDER'S OWN
 -- CURRENCY.  The walk reads the bound at the level it has reached and
@@ -2245,49 +2098,93 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
        (capsH e sl id) Lc _ _ nextId (arrTick a) path
        (arrVal a ∷ []) (Arrival.isLast a) sched st hcc)
 
--- THE FAN-OUT'S READING, WHICH IS THE HALF THAT STAYS STATED, and it
--- is the residue of the per-frame charge being a WIDTH times a cap
--- rather than one.  A frame's own table survives the frame -- that is
--- proven -- but a sink hands its admitted chains a table the chains
--- ahead of them in the same fan have written, and no frame of THIS
--- path passed through those writes.
+-- THE WHOLE SIZE WALK ALONG ONE CHAIN, CEILING INCLUDED, and the
+-- ceiling is what this row now owes over and above the readings.  The
+-- walk asserts at every frame that its climb stays under `C` and at
+-- every fan-out entry that the advance that entry's run left behind
+-- does too; the premise is the cascade's own per-chain ledger, which
+-- is what the consumer can actually supply.  So the arithmetic that
+-- used to sit in a consumer's hypothesis is stated here instead --
+-- tracked, at full strength, and against the two obligations below
+-- rather than spread across the walk's arms.
 --
--- AND THAT IS NOT A RESIDUE, IT IS THE FALSITY.  The writes are not
--- hypothetical: a chain reaching a drain door subscribes what the
--- `*All` node parked, and the subscription installs a node of its
--- own, so one parked duplication chain puts the table over the entry
--- rung while the entry reading itself still holds.  A fan-wide
--- hypothesis taken at one level therefore cannot deliver the fan's
--- own readings, and the conclusion here is denominated in exactly
--- such a hypothesis.
+-- THE FAN-OUT ADVANCE IS ONE OF THE TWO, and it is where a LEDGER
+-- cannot be what is owed.  A sink hands its admitted chains a table
+-- the chains ahead of them in the same fan have written -- a chain
+-- reaching a drain door subscribes what the `*All` node parked, and
+-- the subscription installs a node of its own, so one parked
+-- duplication chain puts the table over the level the fan was entered
+-- at.  The advance is therefore real and per entry.  What it may not
+-- be is SUMMED: an entry's own walk reaches a sink of its own, so a
+-- ledger charging a cap per entry recurs through the dispatch gas and
+-- is exponential in it, while a ceiling is not a sum and has no such
+-- recurrence.  Which is why the walk takes one.
 --
--- AND THE CAPS FACE ALREADY CARRIES THE MISSING TERM, which narrows
--- the route below rather than reopening it.  That face's fan-out fold
--- threads an increment per entry under an ABSOLUTE ceiling, so its
--- level cannot accumulate however wide the fan is; the two folds are
--- otherwise clause for clause identical.  What is priced below is the
--- UNCAPPED advance, and a ceiling is the difference.
+-- THE CROSSING FRAME IS THE OTHER, AND IT IS DEAD ON AFFORDABILITY.
+-- Put the numbers beside each other.  What the walk may SPEND is a
+-- rung count polynomial in the cap: `walkFac-ch` affords `L * chAt`
+-- rungs for `L` under a quadratic, and it affords that because
+-- `nestWalkAt` is two to a polynomial in the cap, singly exponential
+-- and no more.  What a crossing frame NEEDS is a rung count linear in
+-- the size of the observable it subscribes, because bounding a
+-- subscribed program's output means climbing once per operator it can
+-- chain.  And the only bound the walk carries on that observable is
+-- its own level reading, which is ladder-shaped in the level.  So the
+-- need is two to a ladder where the ceiling is two to a polynomial,
+-- and the gap opens with the level rather than closing.  A ceiling
+-- and a ledger are both ways of SPENDING a budget already too small
+-- by an exponential.
 --
--- REFUTED: `Refuted.Fan-Store-Level`, at a two-entry fan whose first
---   entry drains a parked chain: the table is under the entry rung
---   when the fan is entered, over it when the second entry is
---   charged, and under again at the level a per-entry advance
---   reaches.
--- DEAD ROUTE: advancing the size level once per fan-out entry so that
---   the fold's readings are honest.  The advance is a cap's worth per
---   entry and the fan is as wide as the registry, so the level ledger
---   becomes exponential in the dispatch gas and no exponent the walk
---   factor can carry covers it.
+-- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
+-- move and the reason to say so here.  The potential face prices its
+-- own crossing frame outright and is discharged, so the shape looks
+-- portable.  It is not: that face is denominated in DEPTH, and depth
+-- TRUNCATES at the defer a crossing mints across while size counts
+-- straight through it.  The two faces agree at every other frame kind
+-- and part company exactly here, which is why the crossing arms are
+-- the ones this face cannot borrow.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
+--   count against the cap-side ceiling, which is what a per-frame
+--   discharge of the ceiling conjunct would have to beat.
+-- DEAD ROUTE: a fan-out fold that does not advance at all, reading
+--   every admitted entry's node table at the level the fan was
+--   ENTERED at.  Killed at a two-entry fan whose first entry is a
+--   drain door over a parked duplication chain: the subscription
+--   stores an accumulator exponential in a program of size sixty-three
+--   against the rung one level of the ladder buys, so the table is
+--   under the rung when the fan is entered and over it at the state
+--   that entry's own run leaves.  No longer machine-stateable, the
+--   predicate it concluded in having taken the advance.
+-- DEAD ROUTE: charging the fan-out advance to a per-entry LEDGER
+--   instead of holding it under the ceiling.  The advance is a cap's
+--   worth per entry, the fan is as wide as the registry, and an
+--   entry's own walk fans again, so the ledger is exponential in the
+--   dispatch gas and no exponent the walk factor can carry covers it.
+-- DEAD ROUTE: instantiating the ceiling with the caps face's own --
+--   `sizeCount c d ⊔ cSize c`, which its fan-out fold uses.  Dead on
+--   AFFORDABILITY rather than on the shape: the size walk's level is
+--   what `walkFac-ch` must afford under `nestΦAt`, which caps it at a
+--   cubic in the cap, while one rung of the caps ladder already
+--   exceeds every polynomial in it.  Recorded at `chain-climb-ch`
+--   from the other end.
+-- RECOVERY: git show 216332b:agda/src/Verify-Budget-Sufficient/Regs-Nest-Walk.agda
+--   restores `szCount≤ch` and the `crossFrame?` predicate it excluded
+--   the two crossings by -- a per-frame discharge of the three
+--   program-reading arms against `frameCh`, which is the shelf a
+--   `pathLen path * chAt` reading of the premise above would spend.
 postulate
   chain-walk-szOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
+    (sl : Slots Γ) (id : ℕ) (Lc C : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
       nextId a path sched st →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+    Lc + pathLen path * chAt e sl id
+      + n * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ C →
     walkSzOK (Caps.cSize (capsAt e sl id))
-             (Caps.cSize (capsAt e sl id)) Lc
+             (Caps.cSize (capsAt e sl id)) C Lc
              (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
              path (arrVal a ∷ []) (Arrival.isLast a) sched st
 
@@ -2394,7 +2291,7 @@ chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
 chain-walk-LiveHyp {n = n} {e = e} sl id Lc a nextId Lv j path sched st
                    hcc hsl hsz hp hj hLc =
   walk-LiveHyp-goC sl id _ n nextId (arrTick a) (Lv * Ch) Lc path
-    (arrVal a ∷ []) (Arrival.isLast a) sched st entrySz entryNs entryW hp hj′
+    (arrVal a ∷ []) (Arrival.isLast a) sched st entrySz entryNs entryW hp Lc≤
   where
   S = Caps.cSize (capsAt e sl id)
   Ch = chAt e sl id
@@ -2404,7 +2301,6 @@ chain-walk-LiveHyp {n = n} {e = e} sl id Lc a nextId Lv j path sched st
   entrySz = ∧-intro (T⇒≡true _ (≤⇒≤ᵇ
               (≤-trans hsz (iterSize-infl S 1≤S Lc S)))) refl
   entryNs = chain-entry-nodesSz sl id Lc a nextId path sched st hcc
-  entryW  = chain-walk-szOK sl id Lc a nextId path sched st hsl hcc hp
   step≡ : (j + pathLen path + n * S) * Ch
             ≡ j * Ch + pathLen path * Ch + n * (S * Ch)
   step≡ = trans (*-distribʳ-+ Ch (j + pathLen path) (n * S))
@@ -2414,6 +2310,10 @@ chain-walk-LiveHyp {n = n} {e = e} sl id Lc a nextId Lv j path sched st
   hj′ = ≤-trans (+-monoˡ-≤ (n * (S * Ch))
                   (+-monoˡ-≤ (pathLen path * Ch) hLc))
                 (≤-trans (≤-reflexive (sym step≡)) (*-monoˡ-≤ Ch hj))
+  entryW  = chain-walk-szOK sl id Lc (Lv * Ch) a nextId path sched st hsl hcc hp hj′
+  Lc≤ : Lc ≤ Lv * Ch
+  Lc≤ = ≤-trans (m≤m+n Lc (pathLen path * Ch))
+                (≤-trans (m≤m+n (Lc + pathLen path * Ch) (n * (S * Ch))) hj′)
 
 -- THE LIVE ARM, the third and last of the chain's arms to become the
 -- walk rather than an assertion about it.  Two extra terms over the

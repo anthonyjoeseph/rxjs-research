@@ -24,8 +24,8 @@ open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat.ListAction using (sum)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
-open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
-  ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-comm)
+open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
+  ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -61,7 +61,7 @@ open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; frameSz?; applyFn-iterSize)
+  using (pathSz?; applyFn-iterSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using (scanVals-size)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
@@ -894,7 +894,8 @@ postulate
   -- CLIMBS frame by frame while the consumer's budget premise is a
   -- fixed ceiling per frame.  The arm therefore joins the outer
   -- crossing on the ledger's excluded side, where the wall is the one
-  -- `walk-cross-LiveHypC` records, and it is the same wall for both.
+  -- `chain-walk-szOK`'s ceiling premise records, and it is the same
+  -- wall for both.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`
@@ -1154,38 +1155,6 @@ stepFrame-sz-store sf id now (thru-outer op nid) path vals fin sched st S B
 frameCh : ℕ → ℕ → ℕ
 frameCh S W = W * suc S
 
--- WHICH ARMS THE CEILING CANNOT ADMIT.  Both crossings charge a count
--- that reads what RUNS -- the outer its arrivals, the inner the store
--- bound -- while the other three read the program, and both quantities
--- this ceiling is denominated in are program quantities.
-crossFrame? : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Bool
-crossFrame? (thru-outer _ _)   = true
-crossFrame? (from-inner _ _ _) = true
-crossFrame? _                  = false
-
--- AND THE EXCLUSION IS A REFUTATION'S REPAIR RATHER THAN A WEAKENING:
--- the unconditional statement is machine-false at the crossing arm, so
--- the conditioned one replaces a false statement instead of shrinking a
--- true one.
-szCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W B : ℕ) → 1 ≤ W →
-  (sl : Slots Γ) (f : Frame Γ s u) (vals : List (Val Γ s)) →
-  crossFrame? f ≡ false →
-  frameSz? S f ≡ true → length vals ≤ W →
-  szCount sl B f vals ≤ frameCh S W
-szCount≤ch S W B 1≤W sl (map-f fn) vals _ hf hw =
-  ≤-trans (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf))
-          (≤-trans (≤-trans (m≤m+n S 1) (≤-reflexive (+-comm S 1))) 1≤ch)
-  where
-  1≤ch : suc S ≤ frameCh S W
-  1≤ch = ≤-trans (≤-reflexive (sym (*-identityˡ (suc S)))) (*-mono-≤ 1≤W ≤-refl)
-szCount≤ch S W B 1≤W sl (scan-f fn nid) vals _ hf hw =
-  *-mono-≤ hw (s≤s (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf)))
-szCount≤ch S W B 1≤W sl (take-f nid) vals _ hf hw =
-  ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
-                             (*-mono-≤ 1≤W (s≤s z≤n)))
-szCount≤ch S W B 1≤W sl (from-inner _ _ _) vals () hf hw
-szCount≤ch S W B 1≤W sl (thru-outer _ _)   vals () hf hw
-
 -- WHAT THE SIZE WALK CARRIES THAT NO FRAME CAN RE-ESTABLISH, and the
 -- shape is the one this face already uses for every walk-scoped
 -- hypothesis: a burst WIDTH at each step, because the scan's count
@@ -1207,35 +1176,42 @@ szCount≤ch S W B 1≤W sl (thru-outer _ _)   vals () hf hw
 --
 -- AND THE LEVEL RIDES ALONG BECAUSE THE CHARGE IS NOT ONE PER FRAME.
 -- A frame costs `szCount` rungs, so the reading a fan-out entry is
--- owed sits at whatever the frames above it climbed to -- which is
--- exactly the index the consumer threads.  The fold does NOT advance
--- it entry by entry, so what a fan-out entry is charged is the level
--- the fan was ENTERED at, while the chains ahead of it in that same
--- fan have already written the table it reads.
+-- owed sits at whatever the frames above it climbed to.  A fan-out
+-- entry reads a table the entries BEFORE it in the same fan have
+-- already written, so its level is not the fan's entry level either;
+-- the fold advances by an increment it does not compute, since what
+-- one entry's whole run adds to the table is a `foldPath` and not a
+-- frame count.
+--
+-- SO THE LEVEL IS BOUNDED RATHER THAN LEDGERED, WHICH IS WHERE THE
+-- CEILING COMES FROM.  Every advance -- the frame's computed one and
+-- the fold's existential one alike -- is held under one ABSOLUTE
+-- number the predicate takes as a parameter, so a consumer meets the
+-- ceiling ONCE, on one comparison, instead of paying a term per frame
+-- and a term per entry.  A per-entry LEDGER is what cannot work: an
+-- entry's own walk reaches a sink of its own, so a ledger accumulating
+-- a cap per entry is exponential in the dispatch gas, and no exponent
+-- a walk factor carries covers that.  A ceiling has no such recurrence
+-- because it is not a sum.  The obligation does not vanish -- whoever
+-- PRODUCES this predicate owes the ceiling at every advance -- it
+-- moves from a consumer's arithmetic into the producer's statement.
 --
 -- THE CONDITIONING IS EARNED AND NOT CONVENIENT.  The unconditioned
 -- step does not survive this module's own header, twice over, so what
 -- stands here is the true statement replacing a false one; the width
 -- is the axis those witnesses move, and the store is the axis the
 -- first of them moves.
---
--- REFUTED: `Refuted.Fan-Store-Level` -- the fan-out fold's fixed level
---   cannot be supplied, at a two-entry fan whose first entry drains a
---   parked chain and installs what the subscription stores.  The caps
---   face's own fan-out fold threads an increment per entry under an
---   absolute ceiling; this one is that recursion with the increment
---   missing, and the rows report the same table failing at the entry
---   rung and holding at the level the increment reaches.
 mutual
   walkSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
+    (S W C k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
     (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) → Set
-  walkSzOK S W k sf gas id now root           vals fin sched st = ⊤
-  walkSzOK S W k sf gas id now (share-sink i) vals fin sched st =
-    dispatchSzOK S W k sf gas id now i vals fin sched st
-  walkSzOK S W k sf gas id now (f ↠ p)        vals fin sched st =
+  walkSzOK S W C k sf gas id now root           vals fin sched st = ⊤
+  walkSzOK S W C k sf gas id now (share-sink i) vals fin sched st =
+    dispatchSzOK S W C k sf gas id now i vals fin sched st
+  walkSzOK S W C k sf gas id now (f ↠ p)        vals fin sched st =
     (length vals ≤ W)
-    × walkSzOK S W (k + szCount (Sched.slots sched) (iterSize S k S) f vals)
+    × (k + szCount (Sched.slots sched) (iterSize S k S) f vals ≤ C)
+    × walkSzOK S W C (k + szCount (Sched.slots sched) (iterSize S k S) f vals)
         sf gas id now p
         (proj₁ (stepFrame sf id now f p vals fin sched st))
         (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
@@ -1244,31 +1220,35 @@ mutual
 
   -- one level of the dispatch telescope; the spent arm owes nothing
   dispatchSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (S W C k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) → Set
-  dispatchSzOK {t = t} S W k sf zero      id now i vals fin sched st = ⊤
-  dispatchSzOK {t = t} S W k sf (suc gas) id now i vals fin sched st =
-    shareGoSzOK {t = t} S W k sf gas id now i vals fin
+  dispatchSzOK {t = t} S W C k sf zero      id now i vals fin sched st = ⊤
+  dispatchSzOK {t = t} S W C k sf (suc gas) id now i vals fin sched st =
+    shareGoSzOK {t = t} S W C k sf gas id now i vals fin
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i fin st)
 
   -- the fold, entry by entry and at the state each leaves: a cancelled
-  -- registration owes nothing, a delivered one owes the table reading
-  -- its own walk enters at and that walk's own width receipts
+  -- registration owes nothing and moves neither state nor level, a
+  -- delivered one owes the table reading its own walk enters at, that
+  -- walk's own receipts, and an advance under the ceiling for what its
+  -- run left behind
   shareGoSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (S W C k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
     (ps : List (RegId × Path Γ (lookup Γ i) t))
     (sched : Sched Γ) (st : EvalSt e) → Set
-  shareGoSzOK S W k sf gas id now i vals fin [] sched st = ⊤
-  shareGoSzOK {t = t} S W k sf gas id now i vals fin ((rid , p) ∷ ps) sched st =
+  shareGoSzOK S W C k sf gas id now i vals fin [] sched st = ⊤
+  shareGoSzOK {t = t} S W C k sf gas id now i vals fin ((rid , p) ∷ ps) sched st =
     if any (_≡ᵇ rid) (EvalSt.cancelled st)
-    then shareGoSzOK {t = t} S W k sf gas id now i vals fin ps sched st
+    then shareGoSzOK {t = t} S W C k sf gas id now i vals fin ps sched st
     else ((all (λ kv → boundedNode (iterSize S k S) (proj₂ kv))
                 (EvalSt.nodes st) ≡ true)
-      × walkSzOK S W k sf gas id now p vals fin sched
+      × walkSzOK S W C k sf gas id now p vals fin sched
           (record st { delivered = rid ∷ EvalSt.delivered st })
-      × shareGoSzOK {t = t} S W k sf gas id now i vals fin ps
+      × Σ ℕ λ k′ →
+        (k + k′ ≤ C)
+      × shareGoSzOK {t = t} S W C (k + k′) sf gas id now i vals fin ps
           (proj₁ (proj₂ (foldPath sf gas id now (toℕ i) p vals
             (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
             (record st { delivered = rid ∷ EvalSt.delivered st }))))

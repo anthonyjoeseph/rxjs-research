@@ -109,5 +109,5 @@ frame-charge-wide-absurd pr d =
 -- outright that no closed form in the cap, the width and the level
 -- closes the loop between a frame and the subscribes it runs.  So the
 -- residue this row leaves is not a gap in the arithmetic but the
--- mechanism question recorded at `walk-cross-LiveHypC`.
+-- mechanism question recorded at `chain-walk-szOK`.
 ----------------------------------------------------------------------
