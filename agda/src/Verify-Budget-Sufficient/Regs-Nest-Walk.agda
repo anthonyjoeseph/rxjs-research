@@ -38,6 +38,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
+open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
@@ -763,24 +764,39 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- computes no value of its own, passing a prefix through, so one rung
 -- covers it.
 --
--- AND THE TWO CROSSING ARMS ARE WRONG AT ONE RUNG, WHICH IS WHAT THE
--- CONSTANT HERE IS.  Neither delivers what it drained: each SUBSCRIBES
+-- THE TWO CROSSING ARMS DELIVER NOTHING THEY DRAINED: each SUBSCRIBES
 -- a program that arrived at runtime, and running that program's own
 -- synchronous chain is a computation whose emission is exponential in
--- the program's syntax.  What is owed is a reading of what RUNS, and
--- the two arms differ on whether they can even take one -- an outer
--- crossing has the program in its own argument list, an inner one
--- reaches it only through the store.
+-- the program's syntax.  So a count for either is a reading of what
+-- RUNS, and the arms differ on whether one can be taken at all -- an
+-- outer crossing has the program in its own argument list, an inner
+-- one reaches it only through the store, which is why one arm reads
+-- and the other is still a rung.
+--
+-- AND THE TELESCOPE IS PART OF THE OUTER READING, because arriving
+-- syntax is not what runs whenever it NAMES a slot: a variable prices
+-- at one node and connecting it runs the whole of that slot's shared
+-- definition.  The telescope is charged WHOLE rather than resolved,
+-- which over-charges a frame naming no slot and is the same
+-- displacement the width ceiling takes -- there a slot head reads zero
+-- at the node and the telescope's own ceiling pays for it separately.
+-- A resolving count would chase slot references transitively, and what
+-- terminates that chase is the telescope's stratification, a property
+-- of the telescope and not of this frame.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Cross` and
---   `Refuted.Frame-Step-Size-Cross-Store` -- the constant, at the
+--   `Refuted.Frame-Step-Size-Cross-Store` -- one rung, at the
 --   value and the store halves respectively.
-szCount : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List (Val Γ s) → ℕ
-szCount (map-f fn)         vals = sizeᵗ fn
-szCount (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
-szCount (take-f nid)       vals = 1
-szCount (from-inner _ _ _) vals = 1
-szCount {s = s} (thru-outer _ _) vals = sum (map (sizeᵛ s) vals)
+-- REFUTED: `Refuted.Frame-Step-Size-Slot` -- the outer arm read at the
+--   arriving values alone, with no telescope summand.
+szCount : ∀ {n} {Γ : Ctx n} {s u} → Slots Γ → Frame Γ s u →
+  List (Val Γ s) → ℕ
+szCount sl (map-f fn)         vals = sizeᵗ fn
+szCount sl (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
+szCount sl (take-f nid)       vals = 1
+szCount sl (from-inner _ _ _) vals = 1
+szCount {s = s} sl (thru-outer _ _) vals =
+  sum (map (sizeᵛ s) vals) + slotsSize sl
 
 -- WHAT A LOOKUP HANDS BACK when every stored node is bounded.  The
 -- receipt has to be abstracted by the SAME `with` that abstracts the
@@ -850,43 +866,34 @@ stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (S B : ℕ) → 2 ≤ S →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   valsSz? B vals ≡ true →
-  valsSz? (iterSize S (szCount f vals) B)
+  valsSz? (iterSize S (szCount (Sched.slots sched) f vals) B)
     (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 
 postulate
-  -- THE TWO FRAMES THAT RUN A SUBSCRIPTION, and both statements are
-  -- FALSE as they stand: the program that runs arrives as a value, so
-  -- the count has to read it and a constant cannot.  They are left
-  -- standing only until the count moves, since raising it re-prices
-  -- every level the walk above them spends -- and the re-pricing is
-  -- the expensive half, since the ceiling the count is spent against
-  -- reads the program and the count would read the level.
+  -- THE TWO FRAMES THAT RUN A SUBSCRIPTION, AND THEY STAND AT
+  -- DIFFERENT STAGES.  The inner arm is still charged one rung and is
+  -- FALSE at that charge: the program it runs arrives at runtime, and
+  -- a constant reads nothing.  The outer arm's count does read -- the
+  -- arriving values, and the telescope standing behind whatever they
+  -- name -- so what is open there is whether that reading SUFFICES, at
+  -- every shape rather than at the two where its predecessors died.
   --
-  -- AND THE OUTER ARM'S SIZE-READING COUNT IS FALSE TOO, at a shape
-  -- neither the constant's witness nor the fork that chose the reading
-  -- reached.  `sizeᵉ (input i)` is ONE, by the clause that
-  -- prices a variable, so an arriving observable naming a SHARED SLOT
-  -- reads as the smallest program there is while the subscription runs
-  -- the whole of that slot's definition.  Neither premise sees the
-  -- telescope: one reads the node table and the other the arriving
-  -- syntax.  `Probed.Cross-Count-Fork` still says what it said -- the
-  -- size beats the constant, at a chain and at a reified value -- and
-  -- that is a statement about arrivals whose syntax IS what runs.
-  --
-  -- SO WHAT THE ARM OWES IS A READING OF THE RUN, and the candidates
-  -- part on where the telescope enters.  A count resolving the slot
-  -- needs the telescope, which the frame is not handed; a premise
-  -- bounding `slotsSize` hands it over once and puts every slot on the
-  -- ladder at every frame, whether or not that frame names one.
+  -- AND THE RE-PRICING IS WHAT LEAVES THE INNER ARM WHERE IT IS.
+  -- Raising a count re-prices every level the walk above spends, and
+  -- the ceiling a count is spent against reads the PROGRAM while a
+  -- count for this arm would have to read the STATE.  The two are not
+  -- denominated in one currency, so nothing the outer arm bought
+  -- carries across, and the arm waits on a ledger that climbs rather
+  -- than on a bigger number.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
   -- REFUTED: `Refuted.Frame-Step-Size-Slot.stepFrame-sz-outer-own-absurd`
-  --   -- the outer arm's count AS IT NOW READS, at an arriving
+  --   -- the outer arm charged the arriving values ALONE, at an
   --   observable that names a shared slot.  The second row puts one
   --   more rung behind the slot and moves the cap with it: the
   --   emission doubles, the rung it is measured against grows
-  --   quadratically, and the count does not move at all.
+  --   quadratically, and that count does not move at all.
   -- DEAD ROUTE: charging the inner arm the size of its own arriving
   --   values is STRUCTURALLY dead, and not merely too weak.  What the
   --   inner arm subscribes is what the `*All` node has PARKED, so it
@@ -894,6 +901,12 @@ postulate
   --   this statement's arguments do not mention, and no reading of
   --   `vals` is a reading of it.  A count for this arm has to be a
   --   function of the state, which the outer arm's repair is not.
+  -- PROBED: `Probed.Cross-Count-Slot` -- the outer arm at an arriving
+  --   observable naming a shared slot, twelve rungs behind it and
+  --   then thirteen with the cap moved, which is the region both
+  --   readings above die in.  Nothing about a scripted slot, a
+  --   telescope of more than one, or an arrival whose syntax is
+  --   itself what runs.
   stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
@@ -910,7 +923,8 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
     all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     valsSz? B vals ≡ true →
-    valsSz? (iterSize S (szCount (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
+    valsSz? (iterSize S (szCount (Sched.slots sched)
+                          (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
       (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin
                 sched st)) ≡ true
 
@@ -983,7 +997,8 @@ stepFrame-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (S B : ℕ) → 2 ≤ S →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   valsSz? B vals ≡ true →
-  all (λ kv → boundedNode (iterSize S (szCount f vals) B) (proj₂ kv))
+  all (λ kv → boundedNode (iterSize S (szCount (Sched.slots sched) f vals) B)
+                (proj₂ kv))
       (EvalSt.nodes
         (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f path vals fin sched st))))))
     ≡ true
@@ -1018,7 +1033,8 @@ postulate
     all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     valsSz? B vals ≡ true →
     all (λ kv → boundedNode
-                  (iterSize S (szCount (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
+                  (iterSize S (szCount (Sched.slots sched)
+                                (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
                   (proj₂ kv))
         (EvalSt.nodes
           (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (thru-outer op nid)
@@ -1126,25 +1142,25 @@ crossFrame? _                = false
 -- the conditioned one replaces a false statement instead of shrinking a
 -- true one.
 szCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 1 ≤ W →
-  (f : Frame Γ s u) (vals : List (Val Γ s)) →
+  (sl : Slots Γ) (f : Frame Γ s u) (vals : List (Val Γ s)) →
   crossFrame? f ≡ false →
   frameSz? S f ≡ true → length vals ≤ W →
-  szCount f vals ≤ frameCh S W
-szCount≤ch S W 1≤W (map-f fn) vals _ hf hw =
+  szCount sl f vals ≤ frameCh S W
+szCount≤ch S W 1≤W sl (map-f fn) vals _ hf hw =
   ≤-trans (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf))
           (≤-trans (≤-trans (m≤m+n S 1) (≤-reflexive (+-comm S 1))) 1≤ch)
   where
   1≤ch : suc S ≤ frameCh S W
   1≤ch = ≤-trans (≤-reflexive (sym (*-identityˡ (suc S)))) (*-mono-≤ 1≤W ≤-refl)
-szCount≤ch S W 1≤W (scan-f fn nid) vals _ hf hw =
+szCount≤ch S W 1≤W sl (scan-f fn nid) vals _ hf hw =
   *-mono-≤ hw (s≤s (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf)))
-szCount≤ch S W 1≤W (take-f nid) vals _ hf hw =
+szCount≤ch S W 1≤W sl (take-f nid) vals _ hf hw =
   ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
                              (*-mono-≤ 1≤W (s≤s z≤n)))
-szCount≤ch S W 1≤W (from-inner _ _ _) vals _ hf hw =
+szCount≤ch S W 1≤W sl (from-inner _ _ _) vals _ hf hw =
   ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
                              (*-mono-≤ 1≤W (s≤s z≤n)))
-szCount≤ch S W 1≤W (thru-outer _ _) vals () hf hw
+szCount≤ch S W 1≤W sl (thru-outer _ _) vals () hf hw
 
 -- WHAT THE SIZE WALK CARRIES THAT NO FRAME CAN RE-ESTABLISH, and the
 -- shape is the one this face already uses for every walk-scoped
@@ -1181,7 +1197,7 @@ mutual
     dispatchSzOK S W k sf gas id now i vals fin sched st
   walkSzOK S W k sf gas id now (f ↠ p)        vals fin sched st =
     (length vals ≤ W)
-    × walkSzOK S W (k + szCount f vals) sf gas id now p
+    × walkSzOK S W (k + szCount (Sched.slots sched) f vals) sf gas id now p
         (proj₁ (stepFrame sf id now f p vals fin sched st))
         (proj₁ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st))))
         (proj₁ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f p vals fin sched st)))))

@@ -215,25 +215,24 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE DENOMINATION BOTH CROSSING ARMS OWE, WHICH IS THE
-  TELESCOPE.** `stepFrame-sz-outer`'s count reads the arriving
-  observable's own `sizeᵉ`, and that reading is dead: `sizeᵉ` at an
-  `input i` is ONE while the subscription runs the whole of that slot's
-  shared definition. `stepFrame-sz-inner` inherits it through the store,
-  since a parked term may name a slot exactly as an arriving one may. So
-  neither arm can be restated until a reading of the RUN is chosen, and
-  the candidates part on where the telescope enters. The commit is the
-  fork that separates them, at the slot witness and at the chain.
+- **THE CEILING THE NEW OUTER COUNT IS SPENT AGAINST.** `szCount≤ch`
+  admits the crossing arm only by absurd pattern, and the count it would
+  now have to dominate carries `slotsSize` — a telescope quantity
+  `frameCh` is not denominated in, being a product of a width and a
+  program size. The burst walk beside it already maintains
+  `slotsSize sl ≤ cSize c` as an invariant, so the material exists and
+  what has to be decided is whether the telescope enters the ceiling or
+  the size walk's own premise. Until one of them carries it,
+  `walk-cross-LiveHypC` has no ledger and the crossing frame stays
+  outside the walk entirely.
 
-- **THEN BOTH CROSSING ARMS RESTATED IN IT, AND EVERY REFUTATION RE-RUN.**
-  Once the denomination is fixed, `stepFrame-sz-inner` and
-  `stepFrame-sz-outer` are rewritten against it and the three refutations
-  standing over them — the constant at both arms, and the size reading at
-  the slot — are re-run against the new statements, since a refutation
-  that still fires is a restatement that moved rather than landed. The
-  ceiling `szCount≤ch` prices moves in the same commit: its `thru-outer`
-  arm is an absurd pattern today, which is the displacement the old count
-  bought and the new one has to pay for.
+- **THEN THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
+  `stepFrame-sz-inner` is still charged one rung and still FALSE at it.
+  Its program is not in `vals` at all — it is what the `*All` node
+  PARKED — so its count is a function of the entry table and the outer
+  arm's telescope summand transfers nothing to it. The commit states
+  that count and re-runs the constant's refutation against it, which is
+  what says the restatement moved rather than landed.
 
 - **THEN THE SIZE FACE'S OTHER REFUTED PAIR, THE STORE HALVES.**
   `stepFrame-sz-store-inner` and `stepFrame-sz-store-outer` are FALSE
@@ -263,10 +262,9 @@ does not fit is a finding about the shared statement, not about the head.
   under it is a product where its charge is a climb. ONE MECHANISM WITH the
   chain door, and what both owe is a recursion rather than a denomination.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×2`: both are FALSE, and the count answering the first
-  refutation is refuted in turn — `sizeᵉ` at an `input i` is ONE while the run
-  is the slot's whole definition. What both owe is a reading of the RUN, and
-  the telescope is the only place it is written down.
+  `REFUTED×4, DEAD ROUTE×2, PROBED×2`: the outer arm now charges the arrivals
+  PLUS the telescope behind them, instantiated at the slot shape. The inner arm
+  is still one rung and still FALSE, its program parked in the store.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
   program's own nodes, and a scan among them stores what that program emitted —

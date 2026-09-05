@@ -35,20 +35,24 @@
 --
 -- WHAT SURVIVES.  The frame does run the program, so a count reading
 -- what runs is still the shape of the repair -- what these rows kill
--- is the identification of "what runs" with "what arrived".  A reading
--- that resolved the slot would need the telescope, which `szCount` is
--- not handed; a premise bounding `slotsSize` would put the whole
--- telescope on the ladder at every frame.  These rows say nothing
--- about the `from-inner` arm, whose program arrives through the store
--- and is refuted separately, and nothing about either store half.
+-- is the identification of "what runs" with "what arrived".  Any
+-- repair therefore reaches the telescope somehow: by resolving the
+-- named slot, or by charging the telescope whole as a summand of its
+-- own.  The count is written out below rather than imported for that
+-- reason -- these rows are evidence about a READING, which is a
+-- function and not whichever function the tower spells today.  They
+-- say nothing about the `from-inner` arm, whose program arrives
+-- through the store and is refuted separately, and nothing about
+-- either store half.
 module Refuted.Frame-Step-Size-Slot where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥)
-open import Data.List using (List; []; _∷_)
+open import Data.List using (List; []; _∷_; map)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Nat using (ℕ; zero; suc; _≤_; s≤s; z≤n)
+open import Data.Nat.ListAction using (sum)
 open import Data.Maybe using (nothing)
 open import Data.Product using (proj₁; proj₂)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
@@ -57,13 +61,21 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim using (Gas; g0; gasPad; Tick; Id)
 open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
-  emptyᵉ; ofᵉ; mapᵉ; input; nat̂; varᵗ; pairᵗ; sizeᵉ)
+  emptyᵉ; ofᵉ; mapᵉ; input; nat̂; varᵗ; pairᵗ; sizeᵉ; sizeᵛ)
 open import Rx.Slots using (Slots; shared)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; NodeId; AllOp;
   thru-outer; mergeAllᵒ; mergeAll-st; installNode;
   stepFrame; sched-init; st-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?; szCount)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
+
+----------------------------------------------------------------------
+-- THE COUNT UNDER TEST, WRITTEN OUT.  It is the arriving values' own
+-- `sizeᵛ`, summed -- which at an observable-typed value is that
+-- program's `sizeᵉ` and nothing besides.
+----------------------------------------------------------------------
+ownCount : ∀ {n} {Γ : Ctx n} {s} → List (Val Γ s) → ℕ
+ownCount {s = s} vals = sum (map (sizeᵛ s) vals)
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -77,7 +89,7 @@ StepFrameSzOuterOwn = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   valsSz? B vals ≡ true →
-  valsSz? (iterSize S (szCount (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
+  valsSz? (iterSize S (ownCount vals) B)
     (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin
               sched st)) ≡ true
 
@@ -132,7 +144,7 @@ out₂ = proj₁ (stepFrame {e = e₂} (gasPad 64 g0) 0 0
 -- syntax the count is allowed to see.
 figures₂ : List ℕ
 figures₂ = sizeᵉ (chnG {Γ = Γ₂} 12)
-         ∷ szCount (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
+         ∷ ownCount vals₂
          ∷ iterSize 51 1 51 ∷ []
 
 figures₂≡ : figures₂ ≡ 51 ∷ 1 ∷ 5253 ∷ []
@@ -148,8 +160,7 @@ prem₂ = refl
 
 row₂ : Bool
 row₂ = valsSz? {Γ = Γ₂} {s = Pw 12}
-         (iterSize 51 (szCount (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0)
-                        vals₂) 51)
+         (iterSize 51 (ownCount vals₂) 51)
          out₂
 
 row₂≡false : row₂ ≡ false
@@ -189,7 +200,7 @@ out₃ = proj₁ (stepFrame {e = e₃} (gasPad 64 g0) 0 0
 
 figures₃ : List ℕ
 figures₃ = sizeᵉ (chnG {Γ = Γ₃} 13)
-         ∷ szCount (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
+         ∷ ownCount vals₃
          ∷ iterSize 55 1 55 ∷ []
 
 figures₃≡ : figures₃ ≡ 55 ∷ 1 ∷ 6105 ∷ []
@@ -203,8 +214,7 @@ prem₃ = refl
 
 row₃ : Bool
 row₃ = valsSz? {Γ = Γ₃} {s = Pw 13}
-         (iterSize 55 (szCount (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0)
-                        vals₃) 55)
+         (iterSize 55 (ownCount vals₃) 55)
          out₃
 
 row₃≡false : row₃ ≡ false

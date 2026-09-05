@@ -2032,7 +2032,7 @@ mutual
   walk-frame-LiveHypC {e = e} sl id sf gas nid now Lv k f p vals fin sched st
                       hx hsz hns hw hpz hj =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount f vals) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -2043,6 +2043,7 @@ mutual
     S = Caps.cSize (capsAt e sl id)
     Ch : ℕ
     Ch = chAt e sl id
+    sls = Sched.slots sched
     step = stepFrame sf nid now f p vals fin sched st
     2≤S : 2 ≤ S
     2≤S = 2≤capsAt-size e sl id
@@ -2066,13 +2067,13 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    eqSplit : iterSize S (k + szCount f vals) S
-                ≡ iterSize S (szCount f vals) A
-    eqSplit = iterSize-+ S k (szCount f vals) S
-    hszTail : valsSz? (iterSize S (k + szCount f vals) S) (proj₁ step) ≡ true
+    eqSplit : iterSize S (k + szCount sls f vals) S
+                ≡ iterSize S (szCount sls f vals) A
+    eqSplit = iterSize-+ S k (szCount sls f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount sls f vals) S) (proj₁ step) ≡ true
     hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
                 (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
-    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount f vals) S)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls f vals) S)
                             (proj₂ kv))
                   (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
     hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))
@@ -2081,12 +2082,12 @@ mutual
                 (sym eqSplit)
                 (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
                    hns hsz)
-    cnt≤ : szCount f vals ≤ Ch
-    cnt≤ = szCount≤ch S S 1≤S f vals hx hfz (proj₁ hw)
-    hjTail : k + szCount f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
+    cnt≤ : szCount sls f vals ≤ Ch
+    cnt≤ = szCount≤ch S S 1≤S sls f vals hx hfz (proj₁ hw)
+    hjTail : k + szCount sls f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
     hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
                        (≤-trans (≤-reflexive
-                                  (+-assoc k (szCount f vals) (pathLen p * Ch)))
+                                  (+-assoc k (szCount sls f vals) (pathLen p * Ch)))
                                 (+-monoʳ-≤ k
                                   (+-monoˡ-≤ (pathLen p * Ch) cnt≤))))
                      hj

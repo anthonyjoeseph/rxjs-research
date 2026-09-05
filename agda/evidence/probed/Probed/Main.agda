@@ -125,3 +125,6 @@ open import Probed.Fold-Width-Reach
 open import Probed.Cross-Count-Fork
   using (separates; arrival₂≡; nodes₂; prem₂; cnstRow₂; ownRow₂;
          arrival₃≡; nodes₃; prem₃; ownRow₃)
+
+open import Probed.Cross-Count-Slot
+  using (counts≡; tieSlot12; tieSlot13)
