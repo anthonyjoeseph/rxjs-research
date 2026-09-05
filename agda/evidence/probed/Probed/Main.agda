@@ -154,5 +154,11 @@ open import Probed.Parked-Queue-Store
          parkedArrival≡; parkRow≡;
          tieParkedInner; tieParkedOuterRun; tieParkedOuterPark)
 
+open import Probed.Biting-Door-Store
+  using (biteFigures≡; biteNodes≡; switchRows≡; exhaustRow≡;
+         finishCharge≡; finishRows≡;
+         tieBiteOuterSwitch; tieBiteOuterExhaust;
+         tieBiteInnerSwitch; tieBiteInnerExhaust)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
