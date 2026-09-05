@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, AND WHY IT IS A SUM.
 --
--- TARGET: subscribeE-sz @c1fd3b
+-- TARGET: subscribeE-sz @8d93e9
 --
 -- WHAT WAS UNTESTED.  Every reading of this leaf so far stands at a
 -- telescope of ONE, so the summand's shape was never asked a question:

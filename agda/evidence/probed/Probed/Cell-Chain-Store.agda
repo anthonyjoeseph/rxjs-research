@@ -2,7 +2,7 @@
 -- A TABLE WHOSE CELLS WERE WRITTEN IN SERIES, WHICH IS THE SHAPE THE
 -- SINGLE CLIMB HAS NEVER BEEN ASKED ABOUT.
 --
--- TARGET: subscribeE-sz-store-scan @64de6d
+-- TARGET: subscribeE-sz-store-scan @8ed5af
 --
 -- WHAT EVERY STORE ROW SO FAR DECLINED.  Each witness at either half
 -- subscribes a program that installs ONE node, and the refutation
@@ -63,13 +63,13 @@ open import Rx.Prim using (g0; gasPad; hot)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
   emptyᵉ; ofᵉ; scanᵉ; mergeAllᵉ; varᵗ; sndᵗ; strmᵗ; sizeᵉ)
 open import Rx.Slots using (Slots; scripted; slotsSize)
-open import Rx.Layer-Count using (layᵛˢ; layᵉ)
+open import Rx.Layer-Count using (layᵉ)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer;
   from-inner; _↠_;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeE-sz-store-scan)
+  using (valsSz?; descChgˢ; subscribeE-sz-store-scan)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -135,8 +135,8 @@ postFlat = proj₂ (proj₂ (proj₂ (proj₂
 -- have to say so here; and the telescope is one scripted slot, so
 -- what the rungs below are bought by is the arrival.
 chainFigures : List ℕ
-chainFigures = layᵛˢ {Γ = Γᶜ} (obs (obs (Pw 8))) valsChain
-             ∷ layᵛˢ {Γ = Γᶜ} (obs (obs (Pw 8))) valsFlat
+chainFigures = descChgˢ {Γ = Γᶜ} (obs (obs (Pw 8))) 52 valsChain
+             ∷ descChgˢ {Γ = Γᶜ} (obs (obs (Pw 8))) 52 valsFlat
              ∷ slotsSize slᶜ
              ∷ sizeᵉ topC
              ∷ sizeᵉ lowC

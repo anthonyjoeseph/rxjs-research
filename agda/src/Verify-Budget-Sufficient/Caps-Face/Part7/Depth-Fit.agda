@@ -2046,7 +2046,7 @@ mutual
   walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (f ↠ p) vals fin sched st
                    hsz hns hw hpz hk =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls nsSt f vals) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount A sls nsSt f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -2073,13 +2073,13 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    eqSplit : iterSize S (k + szCount sls nsSt f vals) S
-                ≡ iterSize S (szCount sls nsSt f vals) A
-    eqSplit = iterSize-+ S k (szCount sls nsSt f vals) S
-    hszTail : valsSz? (iterSize S (k + szCount sls nsSt f vals) S) (proj₁ step) ≡ true
+    eqSplit : iterSize S (k + szCount A sls nsSt f vals) S
+                ≡ iterSize S (szCount A sls nsSt f vals) A
+    eqSplit = iterSize-+ S k (szCount A sls nsSt f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount A sls nsSt f vals) S) (proj₁ step) ≡ true
     hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
                 (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
-    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls nsSt f vals) S)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount A sls nsSt f vals) S)
                             (proj₂ kv))
                   (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
     hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))

@@ -2,7 +2,7 @@
 -- WHETHER A CROSSING'S BURST REALLY OUTRUNS THE RUNGS ITS DOOR WAS
 -- CHARGED, WHICH IS AN ARITHMETIC QUESTION AND NOT A STRUCTURAL ONE.
 --
--- TARGET: pushBurst-sz-store-outer @2e9e3f
+-- TARGET: pushBurst-sz-store-outer @911df7
 --
 -- WHAT IS AT STAKE, AND IT IS THE DENOMINATION RATHER THAN THIS LEAF.
 -- The obvious route through the fold spends the delivered bound on the

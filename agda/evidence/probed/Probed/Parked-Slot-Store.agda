@@ -66,7 +66,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner; _↠_;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (parkedLayAt; subscribeSharedSlot-sz-store)
+  using (parkedChgAt; subscribeSharedSlot-sz-store)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -146,10 +146,10 @@ postᴿ = proj₂ (proj₂ (proj₂ (proj₂
 -- two rows moves with the slot alone -- which is what makes the sweep
 -- measure-side rather than an axis that cannot fail.
 slotStoreFigures : List ℕ
-slotStoreFigures = parkedLayAt 0 (EvalSt.nodes stᴾ)
+slotStoreFigures = parkedChgAt 59 0 (EvalSt.nodes stᴾ)
                  ∷ slotSize (slᴾ fz)
                  ∷ sizeᵉ oᴾ
-                 ∷ parkedLayAt 0 (EvalSt.nodes stᴿ)
+                 ∷ parkedChgAt 63 0 (EvalSt.nodes stᴿ)
                  ∷ slotSize (slᴿ fz)
                  ∷ []
 
@@ -176,19 +176,19 @@ slotStoreNodes≡ = refl
 -- report `false` four times.
 slotStoreRows : List Bool
 slotStoreRows =
-    all (λ kv → boundedNode (iterSize 59 (parkedLayAt 0 (EvalSt.nodes stᴾ)) 59)
+    all (λ kv → boundedNode (iterSize 59 (parkedChgAt 59 0 (EvalSt.nodes stᴾ)) 59)
                   (proj₂ kv))
         (EvalSt.nodes postᴾ)
   ∷ all (λ kv → boundedNode
-                  (iterSize 59 (parkedLayAt 0 (EvalSt.nodes stᴾ)
+                  (iterSize 59 (parkedChgAt 59 0 (EvalSt.nodes stᴾ)
                                  + slotsSize slᴾ) 59)
                   (proj₂ kv))
         (EvalSt.nodes postᴾ)
-  ∷ all (λ kv → boundedNode (iterSize 63 (parkedLayAt 0 (EvalSt.nodes stᴿ)) 63)
+  ∷ all (λ kv → boundedNode (iterSize 63 (parkedChgAt 63 0 (EvalSt.nodes stᴿ)) 63)
                   (proj₂ kv))
         (EvalSt.nodes postᴿ)
   ∷ all (λ kv → boundedNode
-                  (iterSize 63 (parkedLayAt 0 (EvalSt.nodes stᴿ)
+                  (iterSize 63 (parkedChgAt 63 0 (EvalSt.nodes stᴿ)
                                  + slotsSize slᴿ) 63)
                   (proj₂ kv))
         (EvalSt.nodes postᴿ)

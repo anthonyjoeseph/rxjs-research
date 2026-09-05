@@ -215,27 +215,27 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEVEL THAT GROWS WITH THE BOUND, WHICH IS THE ONE RESTATEMENT
-  BOTH HALVES NOW NEED.** The value side fell to the same family as the
-  store side, with no table anywhere in reach, so what is refuted is the
-  DENOMINATION and not either reading of it. A rung is affine in the
-  bound, so a count fixed by the SYNTAX buys a fixed factor and cannot
-  cover a multiplicity. The caps face prices this substitution and is
-  the shape to mirror: it charges an unfold in an EXISTENTIAL number of
-  frame steps, quadratic in the `μ`'s own size. No closed function of
-  the entry program serves instead — an unfold squares the bound the
-  next is charged against. The commit restates both descents at an
-  existential level.
+- **THE `μ` REGION THE NEW DENOMINATION HAS NEVER BEEN READ AT.** The
+  charge is now a block of rungs per level of `μ` plus the operators,
+  and the rate — one block at the bound reached so far, paying for one
+  squaring — is a DESIGN choice nothing has instantiated. Every row
+  standing over the two descents is at a `μ`-free program, where the
+  block count is nought and the reading is the predecessor's, which
+  those refutations killed and this rate is not. The commit runs the
+  two refuting families at the new
+  charge — the squaring family at four mentions, the duplication chain
+  at the door — which either kills the rate or is the first evidence
+  reaching the region the restatement was for.
 
-- **THE JOIN UNDER THE WRAP, WHICH IS WHAT AN EXISTENTIAL LEVEL COSTS.**
-  Every consumer reads the two descents at a level fixed before the
-  fold runs, and a max over the burst is what makes one rung cover one
-  operator. With each entry returning a level of its own the join is
-  over levels rather than under one, and the fold's own charge has to
-  absorb the spread. The commit carries the restated conclusion out
-  through the walk's crossings and the frame step to the depth fit, and
-  reports which consumers take a per-entry level as it stands and which
-  need the spread bounded first.
+- **THE LEDGER THAT MUST BECOME A CLIMB, WHICH IS WHAT THE CHARGE
+  COSTS.** The count now reads the LEVEL the frame stands at as well as
+  the state, since a block is bought at the bound in hand; the walk
+  pays for its frames out of a fixed PRODUCT of a per-frame ceiling,
+  and a charge that grows with the level cannot fit under one. Both
+  halves of that ledger are refuted outright as stated. The commit
+  turns the walk's premise, the dispatch's, and the depth fit's `chAt`
+  apparatus into a climb in the level, so the ceiling a frame is held
+  to is read where the frame is.
 
 - **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
@@ -255,18 +255,14 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
-  subscription delivers, in its own layers plus its telescope. The WHOLE value
+  subscription delivers, in its own charge plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice costs nothing. A `μ` refutes the conclusion itself, with no table in
-  reach.
+  twice costs nothing; every row stands away from the `μ` the charge was
+  restated for.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   the burst a crossing door pushes back through itself, keyed on the source
   program since an arbitrary burst is unbounded. A duplication chain buys no
-  rung; a `μ` arrival refutes it, the copies being a free parameter.
-- **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
-  unfolding writes. Refuted at sixteen mentions and holding at fifteen: the
-  substitution SQUARES the size premise while the level it is held to is the
-  layer count, which the substitution leaves alone.
+  rung; the arrival's own unfoldings are charged and no row has reached one.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: the
   reified seed and the cell each arrival rewrites, in a currency the layer
   premise is not stated in. Cells in series do not compound; a parked queue

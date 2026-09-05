@@ -33,9 +33,12 @@
 module Rx.Layer-Count where
 
 open import Data.List using (List; []; _∷_)
+open import Data.List.Membership.Propositional using (_∈_)
+open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Nat using (ℕ; suc; _⊔_)
 open import Data.Product using (_,_)
 open import Data.Sum using (inj₁; inj₂)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; cong; cong₂)
 
 open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val;
                           unitᵗ; boolᵗ; natᵗ; obs; _×ᵗ_; _+ᵗ_;
@@ -43,7 +46,8 @@ open import Rx.Exp using (Ty; Ctx; Exp; Tm; Val;
                           mergeAllᵉ; switchAllᵉ; exhaustAllᵉ;
                           μᵉ; varᵉ; deferᵉ;
                           varᵗ; unit̂; bool̂; nat̂; pairᵗ; fstᵗ; sndᵗ;
-                          inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ)
+                          inlᵗ; inrᵗ; caseᵗ; ifᵗ; primᵗ; strmᵗ;
+                          elimGExp; elimGTm; elimGTms; unfoldμ)
 
 mutual
   -- `deferᵉ` counts nothing: its body is subscribed at a LATER tick, so
@@ -94,13 +98,131 @@ layᵛ (s +ᵗ t) (inj₁ a) = layᵛ s a
 layᵛ (s +ᵗ t) (inj₂ b) = layᵛ t b
 layᵛ (obs t)  e        = layᵉ e
 
--- AND A BURST JOINS BY MAX FOR THE SAME REASON A PAIR DOES.  A frame
--- handed several observables subscribes each of them, and what each
--- one emits is a run of that arrival alone -- so a conclusion stated
--- PER DELIVERED VALUE is bounded by the deepest arrival and not by
--- their sum.  What the arrivals do share is the sink node they drain
--- into, and its table is read entry by entry, so that half joins the
--- same way (`mergeAllDrain-sz-store`).
-layᵛˢ : ∀ {n} {Γ : Ctx n} (t : Ty) → List (Val Γ t) → ℕ
-layᵛˢ t []       = 0
-layᵛˢ t (v ∷ vs) = layᵛ t v ⊔ layᵛˢ t vs
+-- A RECURSIVE-OCCURRENCE SUBSTITUTION MOVES NO LAYER, which is the one
+-- fact about `μ` this count carries.  The occurrence is a Δᵍ variable,
+-- and a Δᵍ variable becomes substitutable only by crossing into Δ at a
+-- `deferᵉ` -- so every position the closure can land at sits under a
+-- defer, and a defer is charged nothing.  The count therefore reads the
+-- unfolding and the `μ` alike, however many times the body mentions
+-- itself, which is exactly what makes the layer count blind to the
+-- multiplicity the SIZE side is squared by.
+mutual
+  lay-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    layᵉ (elimGExp x cl b) ≡ layᵉ b
+  lay-elimGᵉ x cl (input i)         = refl
+  lay-elimGᵉ x cl (ofᵉ ts)          = lay-elimGᵗˢ x cl ts
+  lay-elimGᵉ x cl emptyᵉ            = refl
+  lay-elimGᵉ x cl (mapᵉ f b)        =
+    cong suc (cong₂ _⊔_ (lay-elimGᵗ x cl f) (lay-elimGᵉ x cl b))
+  lay-elimGᵉ x cl (takeᵉ c b)       =
+    cong suc (cong₂ _⊔_ (lay-elimGᵗ x cl c) (lay-elimGᵉ x cl b))
+  lay-elimGᵉ x cl (scanᵉ f z b)     =
+    cong suc (cong₂ _⊔_ (cong₂ _⊔_ (lay-elimGᵗ x cl f) (lay-elimGᵗ x cl z))
+                        (lay-elimGᵉ x cl b))
+  lay-elimGᵉ x cl (mergeAllᵉ lim b) = cong suc (lay-elimGᵉ x cl b)
+  lay-elimGᵉ x cl (switchAllᵉ b)    = cong suc (lay-elimGᵉ x cl b)
+  lay-elimGᵉ x cl (exhaustAllᵉ b)   = cong suc (lay-elimGᵉ x cl b)
+  lay-elimGᵉ x cl (μᵉ b)            = lay-elimGᵉ (there x) cl b
+  lay-elimGᵉ x cl (varᵉ y)          = refl
+  lay-elimGᵉ x cl (deferᵉ b)        = refl
+
+  lay-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (f : Tm Γ Δᵍ Δ Θ u) →
+    layᵗ (elimGTm x cl f) ≡ layᵗ f
+  lay-elimGᵗ x cl (varᵗ y)      = refl
+  lay-elimGᵗ x cl unit̂          = refl
+  lay-elimGᵗ x cl (bool̂ b)      = refl
+  lay-elimGᵗ x cl (nat̂ m)       = refl
+  lay-elimGᵗ x cl (pairᵗ a b)   = cong₂ _⊔_ (lay-elimGᵗ x cl a) (lay-elimGᵗ x cl b)
+  lay-elimGᵗ x cl (fstᵗ p)      = lay-elimGᵗ x cl p
+  lay-elimGᵗ x cl (sndᵗ p)      = lay-elimGᵗ x cl p
+  lay-elimGᵗ x cl (inlᵗ a)      = lay-elimGᵗ x cl a
+  lay-elimGᵗ x cl (inrᵗ a)      = lay-elimGᵗ x cl a
+  lay-elimGᵗ x cl (caseᵗ s l r) =
+    cong₂ _⊔_ (lay-elimGᵗ x cl s)
+              (cong₂ _⊔_ (lay-elimGᵗ x cl l) (lay-elimGᵗ x cl r))
+  lay-elimGᵗ x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (cong₂ _⊔_ (lay-elimGᵗ x cl c) (lay-elimGᵗ x cl a))
+              (lay-elimGᵗ x cl b)
+  lay-elimGᵗ x cl (primᵗ op a)  = lay-elimGᵗ x cl a
+  lay-elimGᵗ x cl (strmᵗ b)     = lay-elimGᵉ x cl b
+
+  lay-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    layᵗˢ (elimGTms x cl ts) ≡ layᵗˢ ts
+  lay-elimGᵗˢ x cl []       = refl
+  lay-elimGᵗˢ x cl (y ∷ ys) =
+    cong₂ _⊔_ (lay-elimGᵗ x cl y) (lay-elimGᵗˢ x cl ys)
+
+lay-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  layᵉ (unfoldμ body) ≡ layᵉ (μᵉ body)
+lay-unfoldμ body = lay-elimGᵉ (here refl) (μᵉ body) body
+
+-- THE MU DEPTH: how many times a descent can UNFOLD, and nothing about
+-- what an unfolding contains.
+--
+-- WHY IT IS A SECOND COUNT AND NOT PART OF THE FIRST.  A `μ` costs the
+-- layer count nothing, and the block above says why: the substitution
+-- lands only under defers, and a defer runs no operator.  What it does
+-- cost is SYNTAX -- an unfolding plants a copy of the whole program at
+-- every recursive occurrence, so a body mentioning itself `k` times is
+-- squared however few layers it has.  The quantity a descent's size
+-- bound is squared by is therefore the μ NESTING, and it is a separate
+-- count for exactly the reason the layer count cannot see it.
+--
+-- WHERE IT STOPS, AND IT STOPS ONE POSITION WIDER THAN THE LAYER COUNT.
+-- It reads only what a subscription DESCENDS INTO: an operator's source
+-- and a `μ`'s own body.  An `ofᵉ` list is handed out rather than
+-- entered, and a `deferᵉ` is entered at a later tick, so both count
+-- zero -- and an embedded observable inside a term is charged where it
+-- is subscribed, which is the door that receives it and not the
+-- descent that emits it.
+muDepthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+muDepthᵉ (input i)         = 0
+muDepthᵉ (ofᵉ ts)          = 0
+muDepthᵉ emptyᵉ            = 0
+muDepthᵉ (mapᵉ f e)        = muDepthᵉ e
+muDepthᵉ (takeᵉ c e)       = muDepthᵉ e
+muDepthᵉ (scanᵉ f z e)     = muDepthᵉ e
+muDepthᵉ (mergeAllᵉ lim e) = muDepthᵉ e
+muDepthᵉ (switchAllᵉ e)    = muDepthᵉ e
+muDepthᵉ (exhaustAllᵉ e)   = muDepthᵉ e
+muDepthᵉ (μᵉ e)            = suc (muDepthᵉ e)
+muDepthᵉ (varᵉ x)          = 0
+muDepthᵉ (deferᵉ e)        = 0
+
+muDepthᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
+muDepthᵛ unitᵗ    _        = 0
+muDepthᵛ boolᵗ    _        = 0
+muDepthᵛ natᵗ     _        = 0
+muDepthᵛ (s ×ᵗ t) (a , b)  = muDepthᵛ s a ⊔ muDepthᵛ t b
+muDepthᵛ (s +ᵗ t) (inj₁ a) = muDepthᵛ s a
+muDepthᵛ (s +ᵗ t) (inj₂ b) = muDepthᵛ t b
+muDepthᵛ (obs t)  e        = muDepthᵉ e
+
+-- AND A RECURSIVE-OCCURRENCE SUBSTITUTION MOVES NO NESTING EITHER, for
+-- a reason the layer count's version does not have available: this one
+-- needs no companion over terms at all, because an `ofᵉ` is already
+-- zero on both sides.  The `μ` arm is where the two differ -- the count
+-- is `suc` there rather than a pass-through, so the arm carries a
+-- `cong suc` the layer version does not need.
+muDepth-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+  (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+  muDepthᵉ (elimGExp x cl b) ≡ muDepthᵉ b
+muDepth-elimGᵉ x cl (input i)         = refl
+muDepth-elimGᵉ x cl (ofᵉ ts)          = refl
+muDepth-elimGᵉ x cl emptyᵉ            = refl
+muDepth-elimGᵉ x cl (mapᵉ f b)        = muDepth-elimGᵉ x cl b
+muDepth-elimGᵉ x cl (takeᵉ c b)       = muDepth-elimGᵉ x cl b
+muDepth-elimGᵉ x cl (scanᵉ f z b)     = muDepth-elimGᵉ x cl b
+muDepth-elimGᵉ x cl (mergeAllᵉ lim b) = muDepth-elimGᵉ x cl b
+muDepth-elimGᵉ x cl (switchAllᵉ b)    = muDepth-elimGᵉ x cl b
+muDepth-elimGᵉ x cl (exhaustAllᵉ b)   = muDepth-elimGᵉ x cl b
+muDepth-elimGᵉ x cl (μᵉ b)            = cong suc (muDepth-elimGᵉ (there x) cl b)
+muDepth-elimGᵉ x cl (varᵉ y)          = refl
+muDepth-elimGᵉ x cl (deferᵉ b)        = refl
+
+muDepth-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
+  muDepthᵉ (unfoldμ body) ≡ muDepthᵉ body
+muDepth-unfoldμ body = muDepth-elimGᵉ (here refl) (μᵉ body) body

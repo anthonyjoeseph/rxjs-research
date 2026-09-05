@@ -2,7 +2,7 @@
 -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, WHICH IS THE READING NOTHING
 -- HAD EVER STOOD AT.
 --
--- TARGET: subscribeE-sz-store-scan @64de6d
+-- TARGET: subscribeE-sz-store-scan @8ed5af
 --
 -- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The level this leaf is
 -- held to is the arrival's own layers plus the telescope, and every
@@ -70,7 +70,7 @@ open import Probed.Apparatus using (Confirms)
 -- moves the rows rather than leaving a copy of it here.
 ----------------------------------------------------------------------
 charge : ℕ
-charge = szCount sl₁ (EvalSt.nodes st₀)
+charge = szCount 63 sl₁ (EvalSt.nodes st₀)
            (thru-outer {Γ = Γ₁} {u = obs (Pow K)} mergeAllᵒ 0) vals₀
 
 -- LOAD-BEARING: it is what says the charge is the PROGRAM's and not

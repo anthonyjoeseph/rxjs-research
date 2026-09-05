@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE PARKED QUEUE A SUBSCRIPTION STANDS BESIDE AND NEVER READS.
 --
--- TARGET: subscribeE-sz-store-scan @64de6d
+-- TARGET: subscribeE-sz-store-scan @8ed5af
 --
 -- WHAT WAS UNTESTED, AND WHY NO READING OF THE DELIVERED LIST COULD
 -- REACH IT.  A `*All` node holds programs it could not admit, and the
@@ -84,7 +84,7 @@ postRun = proj₂ (proj₂ (proj₂ (proj₂ (stepFrame {e = e₀} (gasPad 8 g0)
             (thru-outer mergeAllᵒ 0) root vals₀ false (sched-init e₀ sl₁) stRun))))
 
 outerCharge : ℕ
-outerCharge = szCount sl₁ (EvalSt.nodes stRun)
+outerCharge = szCount 63 sl₁ (EvalSt.nodes stRun)
                 (thru-outer {Γ = Γ₁} {u = obs (Pow K)} mergeAllᵒ 0) vals₀
 
 -- LOAD-BEARING: the charge is the ARRIVAL's, so it does not move when

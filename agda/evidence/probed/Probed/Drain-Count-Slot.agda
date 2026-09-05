@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE TELESCOPE SUMMAND, READ AT THE ONE SHAPE THAT FORCED IT.
 --
--- TARGET: subscribeE-sz @c1fd3b
+-- TARGET: subscribeE-sz @8d93e9
 --
 -- WHY THIS POINT AND NOT ANOTHER.  Every other reading of this leaf is
 -- taken at a program written out, where the summand is a rounding and
