@@ -267,14 +267,23 @@ postulate
   --   INERT: two frames read what the root reads, since a subscribe
   --   installs rather than delivers, and a merge outer under the entry
   --   -- the one frame that would mint on its own account -- never
-  --   fires at a subscribe at all.  The LEVEL takes no rows and needs
-  --   none: it occurs only in the premises and in the bound's own cap
-  --   size, which climbs with it, so the ladder already stands at the
-  --   tightest level there is.  Not covered: the switch and exhaust
-  --   ops, whose finish arms drain nothing; a NONEMPTY REGISTRY, which
-  --   is the one axis left that can still move the mint; and the
-  --   hypotheses, left standing -- so a row is evidence about the
-  --   CONCLUSION, unconditional where green.
+  --   fires at a subscribe at all.  The OPERATOR goes the same way and
+  --   is measured so: all three read the entry's own depth at both
+  --   rungs, because what an operator decides is the arm an ARRIVAL
+  --   takes and a subscribe is not one, and the switch arm is tied as
+  --   well.  The LEVEL takes no rows and needs none: it occurs only in
+  --   the premises and in the bound's own cap size, which climbs with
+  --   it, so the ladder already stands at the tightest level there is.
+  --   The REGISTRY is covered from the only side that can move a mint
+  --   -- a share CONNECTING here, a chain already standing being a
+  --   consumer -- and it lands on a DIFFERENT premise than the parked
+  --   queue does: the entry's own closure reading stays flat while the
+  --   mint climbs, so what covers it is the FACE bundle's flat slot
+  --   size, which forces a cap above the mint before this statement is
+  --   applied at all.  Not covered: a DRAIN reached with a chain
+  --   already standing, where the reaction is absorbed before the
+  --   finish is read; and the hypotheses, left standing -- so a row is
+  --   evidence about the CONCLUSION, unconditional where green.
   subscribeInner-live-size : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (c : Caps) (sl : Slots Γ) (d W Lv : ℕ) (sf : Gas) (op : AllOp)
     (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)

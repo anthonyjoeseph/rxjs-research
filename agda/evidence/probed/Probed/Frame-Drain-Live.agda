@@ -34,12 +34,13 @@
 -- which premise is load-bearing at this arm, and it is what a
 -- discharge has to spend.
 
--- NOT COVERED: the switch and exhaust ops, whose finish arms write a
--- node and drain nothing; a non-empty registry, which routes the reaction to its absorbing arm
--- before the finish is reached at all; and the hypotheses, left
--- standing on every tie -- so a row here is evidence about the
--- CONCLUSION, unconditionally true where it is green and a lead rather
--- than a refutation where it is not.
+-- NOT COVERED: a DRAIN reached with a chain already standing, which
+-- routes the reaction to its absorbing arm before the finish is read
+-- at all -- the registry family below WRITES the registry rather than
+-- arriving with it written; and the hypotheses, left standing on every
+-- tie -- so a row here is evidence about the CONCLUSION,
+-- unconditionally true where it is green and a lead rather than a
+-- refutation where it is not.
 module Probed.Frame-Drain-Live where
 
 open import Data.Bool using (true; false)
@@ -50,14 +51,17 @@ open import Data.Product using (proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
+open import Rx.Slot-Clos using (slotClos)
+open import Rx.Clos-Size using (closSizeᵉ)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 open import Rx.Prim using (Gas; g0; gs; hot)
-open import Rx.Exp using (Ctx; Closed; obs; natᵗ; emptyᵉ; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
+open import Rx.Exp using (Ctx; Closed; obs; natᵗ; emptyᵉ; input; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵉ)
-open import Rx.Slots using (Slots; scripted)
+open import Rx.Slots using (Slots; scripted; shared; slotsSize)
 open import Rx.Evaluator using (EvalSt; Sched; Path; _↠_; from-inner; thru-outer; root; stepFrame;
-  subscribeInner; sched-init; st-init; mergeAllᵒ; mergeAll-st; installNode; NodeId; take-f)
+  subscribeInner; sched-init; st-init; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st;
+  installNode; NodeId; take-f)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Store using (liveNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; FaceOK; faceOK)
@@ -248,3 +252,109 @@ tieLivePath : Confirms
   (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
      (gasOf 10) mergeAllᵒ 0 κT 0 0 (deferᵉ (deep 4)) sc₀ stO ⦃ faceQ4 ⦄)
 tieLivePath _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+-- AND THE OPERATOR IS INERT FOR THE SAME REASON THE PATH IS.  `op` is
+-- measure-side -- it is passed straight into the subscribe -- but all
+-- it decides is the frame the new subscription's own later values will
+-- be routed through, and that frame is INSTALLED here rather than run.
+-- The kill and drop arms that separate the three operators are reached
+-- by an ARRIVAL, and a subscribe is not one.
+opMint : AllOp → ℕ → ℕ
+opMint op k = liveMax (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+  (subscribeInner (gasOf (k + 6)) op 0 root 0 0
+                  (deferᵉ (deep k)) sc₀ stO))))))
+
+opFigures : ℕ → List ℕ
+opFigures k = opMint mergeAllᵒ k ∷ opMint switchᵒ k ∷ opMint exhaustᵒ k ∷ []
+
+opFigures1 : opFigures 1 ≡ 1 ∷ 1 ∷ 1 ∷ []
+opFigures1 = refl
+
+opFigures4 : opFigures 4 ≡ 4 ∷ 4 ∷ 4 ∷ []
+opFigures4 = refl
+
+tieLiveSwitch : Confirms
+  (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
+     (gasOf 10) switchᵒ 0 root 0 0 (deferᵉ (deep 4)) sc₀ stO ⦃ faceQ4 ⦄)
+tieLiveSwitch _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- AND THE REGISTRY AXIS, WHICH IS A SHARE THAT HAS NOT CONNECTED YET.
+-- A registration already standing cannot move a mint -- a subscribe
+-- installs and does not deliver, so an existing chain is a consumer
+-- and not a producer.  What DOES write the registry at a subscribe is
+-- the connect: the entry names a shared slot, the slot has never been
+-- live, so the def is subscribed here and its own live source is
+-- minted on this call.
+--
+-- AND THE DEF IS GATED, WHICH PUTS THE BOUND'S SLOT TERM AT ZERO.
+-- `slotsNestSum` reads the telescope with the same depth measure the
+-- node reading uses, so a `deferᵉ` def contributes nothing to it,
+-- while connecting subscribes THROUGH the gate and mints the body at
+-- its full depth.  So this family reaches the same asymmetry the
+-- parked queue does, by a different door.
+--
+-- BUT THE CONJUNCT THAT PAYS IS NOT THE ONE THE PARKED QUEUE SPENDS,
+-- and that is what this family is worth.  The ENTRY's closure reading
+-- -- what the statement's own closure premise charges -- is a one-word
+-- `input`, and it reads TWO at both rungs: the telescope is consulted
+-- for the slot's type and not for the def's body, so that reading does
+-- not climb with the def and could not cover a mint that does.  What
+-- covers it is the FACE bundle's flat slot size, which reads the def
+-- straight rather than through the entry, climbs six to eighteen
+-- across the two rungs, and so forces a cap above the mint before the
+-- statement is applied at all.  The tie therefore stands at the
+-- smallest cap that bundle admits rather than at the mint's own
+-- height, and the margin there is the face's to explain, not a slack
+-- chosen here.
+----------------------------------------------------------------------
+
+entryS : Closed Γ₁ natᵗ
+entryS = input fzero
+
+slS1 : Slots Γ₁
+slS1 fzero = shared (deferᵉ (deep 1))
+
+slS4 : Slots Γ₁
+slS4 fzero = shared (deferᵉ (deep 4))
+
+connected : Slots Γ₁ → ℕ → ℕ
+connected sl k = liveMax (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+  (subscribeInner (gasOf (k + 6)) mergeAllᵒ 0 root 0 0
+                  entryS (sched-init e₀ sl) (st-init e₀)))))))
+
+-- (mint at the connect , the bound's slot term , the entry's own
+--  closure reading)
+shareFigures : Slots Γ₁ → ℕ → List ℕ
+shareFigures sl k = connected sl k ∷ slotsNestSum sl
+                  ∷ closSizeᵉ (slotClos sl) entryS ∷ []
+
+-- LOAD-BEARING, and the rows this family exists for: the middle number
+-- is the term the conclusion carries for the telescope and it stays at
+-- zero while the first climbs, so nothing on the bound's own side can
+-- pay -- and the third is the entry reading, which stays flat too, so
+-- it is not what pays either.
+shareFigures1 : shareFigures slS1 1 ≡ 1 ∷ 0 ∷ 2 ∷ []
+shareFigures1 = refl
+
+shareFigures4 : shareFigures slS4 4 ≡ 4 ∷ 0 ∷ 2 ∷ []
+shareFigures4 = refl
+
+-- and the reading that DOES climb, which is the face bundle's and not
+-- the statement's: a row that read flat here would leave the mint with
+-- nothing covering it and the family would be a refutation candidate.
+shareSizes : slotsSize slS1 ∷ slotsSize slS4 ∷ [] ≡ 6 ∷ 18 ∷ []
+shareSizes = refl
+
+-- the smallest cap the face bundle admits at the top rung
+cS : Caps
+cS = caps 18 4 1
+
+faceS4 : FaceOK cS slS4
+faceS4 = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+tieLiveShare : Confirms
+  (subscribeInner-live-size cS slS4 4 4 0
+     (gasOf 10) mergeAllᵒ 0 root 0 0 entryS (sched-init e₀ slS4) (st-init e₀)
+     ⦃ faceS4 ⦄)
+tieLiveShare _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt

@@ -103,7 +103,9 @@ open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
          figures0; figures1; figures2; figures3; figures4;
          tieLive2; tieLive4;
-         pathFigures1; pathFigures4; outerIdle; tieLivePath)
+         pathFigures1; pathFigures4; outerIdle; tieLivePath;
+         opFigures1; opFigures4; tieLiveSwitch;
+         shareFigures1; shareFigures4; shareSizes; tieLiveShare)
 
 open import Probed.Fan-Regs-Registry
   using (counts; regsS; marginK; marginK′; regsK; lensK)
