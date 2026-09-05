@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE PARKED QUEUE A SUBSCRIPTION STANDS BESIDE AND NEVER READS.
 --
--- TARGET: subscribeInner-sz-store @b27028
+-- TARGET: subscribeE-sz-store @f8b804
 --
 -- WHAT WAS UNTESTED, AND WHY NO READING OF THE DELIVERED LIST COULD
 -- REACH IT.  A `*All` node holds programs it could not admit, and the
@@ -40,12 +40,12 @@ open import Rx.Exp using (Closed; Fn; obs; emptyᵉ; ofᵉ; mapᵉ;
   varᵗ; strmᵗ)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (slotsSize)
-open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ;
+open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner; _↠_;
   thru-outer; mergeAll-st; installNode; st-init; stepFrame; sched-init;
   iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; subscribeInner-sz-store)
+  using (szCount; subscribeE-sz-store)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; e₀; vals₀)
 open import Probed.Apparatus using (Confirms)
@@ -115,9 +115,13 @@ outerRows≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: the reading whose level never counts the queue it must
--- nonetheless leave bounded.
+-- nonetheless leave bounded.  The point is the one the merging door
+-- hands the descent -- the caller's path under a `from-inner`
+-- decoration, one gas spent, the minted instance counted -- so the row
+-- computes what a crossing at this state computes.
 tieParkedOuterRun : Confirms
-  (subscribeInner-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
-     inner (sched-init e₀ sl₁) stRun 65 65
+  (subscribeE-sz-store {e = e₀} sl₁ (gasPad 7 g0) inner
+     (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init e₀ sl₁) { nextNode = 1 }) stRun 65 65
      (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
 tieParkedOuterRun = λ _ _ _ _ _ → refl
