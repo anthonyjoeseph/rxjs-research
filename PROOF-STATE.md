@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE JOIN OVER A QUEUE OF SEVERAL, STILL UNINSTANTIATED.**
-  Every drain row parks exactly one program, so the leaf's MAX is a
-  max over a singleton and its shape is untested. The drain subscribes
-  each entry in turn and every delivered value comes out of one
-  entry's run, which is the argument for a max rather than a sum; the
-  state threaded into a later entry is what could break it. The
-  witness both receipts leave open is one queue MIXING the kinds at
-  three depths — a slot reference, a reference under one operator, a
-  written-out chain — since only a mixed queue asks the max to cover
-  a hidden run and a visible one at once.
-
-- **THEN WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
+- **WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
   ARMS ARE NOW WAITING ON.** The drain leaf and the outer arm differ
   only in WHERE the program sits — parked in a node, or arriving as a
   value — and now agree in denomination as well. Underneath each is
@@ -246,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   builds the state where that difference shows and reads the repaired
   denomination against it.
 
+- **THEN TWO HIDDEN RUNS IN ONE QUEUE, WHICH ONE SLOT CANNOT STAGE.**
+  The join's remaining risk is the state a later entry inherits, and
+  the queue that shows it needs two entries whose runs are both
+  behind the telescope. One shared slot connects once, so two
+  references to it deliver a single value between them and the second
+  entry runs nothing at all. The commit scripts a telescope of
+  SEVERAL slots, one per entry — which is also the shape the summand
+  has never been read at, being one number standing for several
+  definitions, with nothing yet saying that a max over the entries
+  and a sum over the slots are the right pair of joins.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -254,10 +254,10 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`mergeAllDrain-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×3, TWIN, PROBED×3`: what a run delivers, in layers of what runs plus
-  the telescope behind it — the drain reading its node's queue, the outer arm
-  its arrivals. Both are read where a slot reference hides the run; the join
-  over a queue of several is untested.
+  `REFUTED×3, TWIN, PROBED×4`: what a run delivers, in layers of what runs plus
+  its telescope — the drain reading its node's queue, the outer arm its
+  arrivals. Both read where a slot reference hides the run, the drain's join
+  at a queue of several; two hidden runs are not.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the

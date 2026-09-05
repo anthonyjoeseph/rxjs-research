@@ -140,3 +140,6 @@ open import Probed.Cross-Count-Store
 
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)
+
+open import Probed.Drain-Count-Join
+  using (joinFigures≡; joinRowsM≡; joinRowsJ≡; tieJoinM; tieJoinJ)
