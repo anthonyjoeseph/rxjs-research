@@ -219,10 +219,12 @@ does not fit is a finding about the shared statement, not about the head.
   Every drain row parks exactly one program, so the leaf's MAX is a
   max over a singleton and its shape is untested. The drain subscribes
   each entry in turn and every delivered value comes out of one
-  entry's run, which is the argument for a max rather than a sum; a
-  queue whose entries differ in depth is where that argument is bought
-  or refuted, and the state threaded into the second entry is what
-  could break it. The commit instantiates the leaf at such a queue.
+  entry's run, which is the argument for a max rather than a sum; the
+  state threaded into a later entry is what could break it. The
+  witness both receipts leave open is one queue MIXING the kinds at
+  three depths — a slot reference, a reference under one operator, a
+  written-out chain — since only a mixed queue asks the max to cover
+  a hidden run and a visible one at once.
 
 - **THEN WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
   ARMS ARE NOW WAITING ON.** The drain leaf and the outer arm differ

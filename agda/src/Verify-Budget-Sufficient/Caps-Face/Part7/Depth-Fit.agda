@@ -2318,7 +2318,7 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   cubic in the cap, while one rung of the caps ladder already
 --   exceeds every polynomial in it.  Recorded at `chain-climb-ch`
 --   from the other end.
--- RECOVERY: git show 216332b:agda/src/Verify-Budget-Sufficient/Regs-Nest-Walk.agda
+-- RECOVERY: git show 157a852:agda/src/Verify-Budget-Sufficient/Regs-Nest-Walk.agda
 --   restores `szCount≤ch` and the `crossFrame?` predicate it excluded
 --   the two crossings by -- a per-frame discharge of the three
 --   program-reading arms against `frameCh`, which is the shelf a

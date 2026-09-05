@@ -4689,11 +4689,11 @@ postulate
   --   the ladder's reading -- flat in the depth -- is not tied to this
   --   statement anywhere the increment is positive, and the seal is
   --   what stands between the two.
-  -- RECOVERY: `git show 0e96e46` restores the one-step arrival cap
-  --   with the node-width widening and its lift to the nest
-  --   predicate, and `git show bfbf2b4` the constant-step form with
-  --   all fifty-four sites swapped; both are wanted again only if the
-  --   arrivals are ever re-read at a cap that is not this report.
+  -- RECOVERY: `git show 70740ce` restores the stepped arrival cap
+  --   `arrCapAt`, the lemma placing it under one frame step, and the
+  --   nest predicate read at it -- the whole reading, as the face last
+  --   carried it.  Wanted again only if the arrivals are ever re-read
+  --   at a cap that is not this report.
   -- RECOVERY: `git show e55d850` restores the level-lifting machinery
   --   these four used to need -- `arrCapAt-size`, `nestValOK?-cap`,
   --   `allWrap-1≤`.  It went out with the nest half, which stopped
