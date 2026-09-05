@@ -1009,10 +1009,20 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   what decides the JOIN rather than the summand's reach: a max over
 --   the telescope is FALSE here, prices one rung of a chain of ten, and
 --   fails the conclusion at seventeen hundred against a delivered two
---   thousand, where the stated sum holds.  Not a slot named twice,
---   where a share's multicast is what stops the layers doubling with
---   it, and no row can fail on the sum's other side -- it charges slots
---   the run never names.
+--   thousand, where the stated sum holds.  No row can fail on the
+--   sum's other side -- it charges slots the run never names.
+--
+-- PROBED: `Probed.Slot-Named-Twice` at the join a chain cannot reach: a
+--   DIAMOND, whose apex names ONE eight-rung shared slot twice, so the
+--   sum charges once what two references reach.  It costs nothing on
+--   either axis.  Not the size -- the single value delivered is the
+--   size one reference delivers, so what is entered is the binding and
+--   not the definition.  And not the length -- the share connects on
+--   the first reference and has already fired when the second
+--   registers, against a control with the same rungs written inline at
+--   both arms, which delivers twice.  One diamond over one shared slot
+--   at one door; not an apex naming two slots that share a third, where
+--   the multicast is reached at two depths rather than two references.
 --
 -- PROBED: `Probed.Subscribe-Inner-Doors` at the two doors every other
 --   row subscribed past, each entered where its rule bites -- a switch

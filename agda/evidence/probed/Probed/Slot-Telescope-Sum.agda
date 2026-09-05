@@ -29,8 +29,8 @@
 -- WHAT THE ROWS DO NOT BUY.  Every slot here is `shared`, so nothing
 -- about a `scripted` slot, whose definition a subscription does not
 -- run and whose size the sum charges anyway; the telescope is a CHAIN,
--- so nothing about a slot named twice, where a share's multicast is
--- what stops the layers doubling with it; the door is `mergeAllᵒ`; and
+-- so nothing about the JOIN a diamond asks for, which
+-- `Probed.Slot-Named-Twice` reads; the door is `mergeAllᵒ`; and
 -- the sum's generosity is untested from the other side -- it charges
 -- slots the run never names, which no row here can fail on.
 -- ══════════════════════════════════════════════════════════════════
