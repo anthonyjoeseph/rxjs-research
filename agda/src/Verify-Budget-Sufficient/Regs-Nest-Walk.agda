@@ -36,14 +36,15 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Relation.Nullary using (yes; no)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵉ; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
 open import Rx.Layer-Count using (layᵛˢ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
-  exhaust-st; takeDispatch; takeVals; lookupNode; scanVals)
+  exhaust-st; takeDispatch; takeVals; lookupNode; scanVals; mergeAllᵒ; switchᵒ; exhaustᵒ;
+  mergeAllDrain; innerFinish; aliveThroughᶠ)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
@@ -51,7 +52,7 @@ open import Verify-Budget-Sufficient.Nest-Walk
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures
   using (thruWrap-vals; takeVals-all; pathLen; boundedNode; setNode-bounded;
-  boundedNode-widen; all-impl)
+  boundedNode-widen; all-impl; all-++-intro)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; nest-inflate; dropSource-nest; nestUnit; cutThrough-nest)
 open import Verify-Budget-Sufficient.Caps
@@ -934,6 +935,172 @@ takeSz {s = s} S B 1≤S k vals hv =
     (iterSize-infl S 1≤S 1 B)
     (takeVals-all (λ v → sizeᵛ s v ≤ᵇ B) k vals hv)
 
+-- WHAT THE COUNT READS AT A LOOKUP, abstracted by the same `with` that
+-- abstracts the evaluator's dispatch for the reason the store reading
+-- beside it is: the count spells its own recursion, so a clause that
+-- has scrutinised the table still has to be told the two walks agreed.
+-- A cell the table does not hold parks nothing, which is the `nothing`
+-- arm rather than an omission.
+NodeLay : ∀ {n} {Γ : Ctx n} → ℕ → Maybe (NodeState Γ) → Set
+NodeLay L nothing   = L ≡ 0
+NodeLay L (just ns) = L ≡ parkedLay ns
+
+parkedLayAt-lookup : ∀ {n} {Γ : Ctx n} (nid : NodeId)
+  (nodes : List (NodeId × NodeState Γ)) →
+  NodeLay (parkedLayAt nid nodes) (lookupNode nid nodes)
+parkedLayAt-lookup nid []            = refl
+parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
+... | true  = refl
+... | false = parkedLayAt-lookup nid r
+
+-- WHAT A RUN DELIVERS, WHICH IS THE ONE THING THE INNER ARM CANNOT
+-- READ OFF ITS ARGUMENTS.  The drain subscribes the programs its node
+-- has parked, so what comes back is bounded by what RUNNING them
+-- emits -- and the charge is the queue's LAYERS, joined by max because
+-- each entry is subscribed separately and every delivered value comes
+-- out of one entry's run.  The queue's own size premise is the store
+-- reading at the cell the frame looked up, so nothing here is a
+-- hypothesis a call site happens to supply.
+--
+-- TWIN: `mergeAllDrain-nest` is this walk on the nesting face, proven,
+--   with the same shape of premise -- a ceiling on the QUEUE rather
+--   than on the table -- and the same reason for it: the drain reaches
+--   no cell but the one it was handed.
+-- PROBED: `Probed.Cross-Count-Store` -- one drain of a queue holding a
+--   twelve-rung duplication chain, the witness that kills a constant
+--   charge, read against the rung the constant bought and then against
+--   the rung the queue's own layers buy.  One queue entry: nothing
+--   about a queue of several, where the MAX join is the claim, nor
+--   about a queue whose entries differ in depth, nor about a parked
+--   program that itself crosses.
+postulate
+  mergeAllDrain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+    (lim : Maybe ℕ) (act : ℕ) (q : List (Closed Γ s))
+    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true →
+    valsSz? (iterSize S (layᵛˢ (obs s) q) B)
+      (proj₁ (mergeAllDrain sf allNid κ id now lim act q sched st)) ≡ true
+
+-- ONE WIDENING, SPENT BY EVERY ARM THAT PASSES ITS ARRIVALS THROUGH.
+valsSz?-rung : ∀ {n} {Γ : Ctx n} {s} (S B L : ℕ) → 2 ≤ S →
+  (vals : List (Val Γ s)) → valsSz? B vals ≡ true →
+  valsSz? (iterSize S L B) vals ≡ true
+valsSz?-rung S B L 2≤S vals hv =
+  valsSz?-mono B (iterSize S L B) vals
+    (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S) L B) hv
+
+-- THE FINISH IS THE DISPATCH AND ONE DRAIN.  Every arm but the merge
+-- hands its arrivals straight back, so it is the incoming reading
+-- widened; the merge arm concatenates what the drain emitted, and that
+-- is the only place the charge is spent.  Stating it over an abstract
+-- `Maybe` rather than over the table is what lets the frame above
+-- scrutinise the cell once and hand both readings of it down.
+innerFinish-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (op : AllOp) (allNid inst : NodeId) (κ : Path Γ s t)
+  (id : Id) (now : Tick) (vals : List (Val Γ s)) (sched : Sched Γ)
+  (st : EvalSt e) (S B L : ℕ) → 2 ≤ S →
+  (mns : Maybe (NodeState Γ)) → NodeLay L mns → NodeSz B mns →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  valsSz? (iterSize S L B)
+    (proj₁ (innerFinish sf op allNid inst κ id now vals sched st mns)) ≡ true
+
+innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
+  nothing hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (take-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (switch-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz {s = s} sf mergeAllᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (mergeAll-st {w} lim act q od)) hL hb hns hv with w ≟ᵗ s
+... | no  _    = valsSz?-rung S B L 2≤S vals hv
+... | yes refl =
+  all-++-intro (λ v → sizeᵛ s v ≤ᵇ iterSize S L B) vals _
+    (valsSz?-rung S B L 2≤S vals hv)
+    (subst (λ z → valsSz? (iterSize S z B)
+                    (proj₁ (mergeAllDrain sf allNid κ id now lim (pred act) q
+                              sched st)) ≡ true)
+           (sym hL)
+           (mergeAllDrain-sz sf allNid κ id now lim (pred act) q sched st
+              S B 2≤S hns hb))
+
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  nothing hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (take-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (mergeAll-st _ _ _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (switch-st nothing _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf switchᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (switch-st (just c₀) od)) hL hb hns hv with c₀ ≡ᵇ inst
+... | true  = valsSz?-rung S B L 2≤S vals hv
+... | false = valsSz?-rung S B L 2≤S vals hv
+
+innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
+  nothing hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (scan-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (take-st _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (mergeAll-st _ _ _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (switch-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+innerFinish-sz sf exhaustᵒ allNid inst κ id now vals sched st S B L 2≤S
+  (just (exhaust-st _ _)) hL hb hns hv = valsSz?-rung S B L 2≤S vals hv
+
+-- THE INNER CROSSING, WHICH IS THE DISPATCH ABOVE PLUS TWO GATES.  A
+-- frame that is not finishing, and one whose instance still has a live
+-- registration under it, deliver their arrivals unchanged; only the
+-- third gate reaches the node table at all, and there the cell is
+-- scrutinised ONCE and its two readings -- what it has parked and what
+-- it is bounded by -- are handed down together.  So the whole arm
+-- reduces to one statement about what a drain delivers, and that is
+-- the leaf.
+--
+-- DEAD ROUTE: charging this arm the size of its own arriving values is
+--   STRUCTURALLY dead, and not merely too weak.  What the arm
+--   subscribes is what the `*All` node has PARKED, so it is in the
+--   store and not in `vals` -- the drain runs a program this
+--   statement's arguments do not mention, and no reading of `vals` is
+--   a reading of it.  That is what sends the charge to the node table
+--   rather than to the arrivals.
+-- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
+--   -- one rung, which is the charge this reading replaces.
+stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
+  (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  valsSz? (iterSize S (parkedLayAt allNid (EvalSt.nodes st)) B)
+    (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals fin
+              sched st)) ≡ true
+stepFrame-sz-inner sf id now op allNid inst path vals false sched st S B
+  2≤S hns hv =
+  valsSz?-rung S B (parkedLayAt allNid (EvalSt.nodes st)) 2≤S vals hv
+stepFrame-sz-inner sf id now op allNid inst path vals true sched st S B
+  2≤S hns hv with any (aliveThroughᶠ inst st) (EvalSt.registry st)
+... | true  =
+  valsSz?-rung S B (parkedLayAt allNid (EvalSt.nodes st)) 2≤S vals hv
+... | false =
+  innerFinish-sz sf op allNid inst path id now vals sched st S B
+    (parkedLayAt allNid (EvalSt.nodes st)) 2≤S
+    (lookupNode allNid (EvalSt.nodes st))
+    (parkedLayAt-lookup allNid (EvalSt.nodes st))
+    (lookupNode-sz B allNid (EvalSt.nodes st) hns) hns hv
+
 -- ONE FRAME'S SIZE STEP, SPLIT BY KIND, over the store the frame reads.
 -- Three arms are bodies here and the two that cross into an inner
 -- subscription are leaves: a take passes a prefix of what arrived, a
@@ -960,63 +1127,25 @@ stepFrame-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (proj₁ (stepFrame sf id now f path vals fin sched st)) ≡ true
 
 postulate
-  -- THE TWO FRAMES THAT RUN A SUBSCRIPTION, AND BOTH NOW READ THE
-  -- PROGRAM THAT RUNS.  The outer arm reads its own argument list and
-  -- the telescope standing behind whatever the arrivals name; the
-  -- inner arm reads the queue its `*All` node holds, which is where
-  -- the program a drain subscribes actually is.  What is open at each
-  -- is whether the reading SUFFICES, at every shape rather than at the
-  -- ones where the constants died.
+  -- THE FRAME THAT RUNS AN ARRIVING SUBSCRIPTION, READ AT WHAT ARRIVES.
+  -- Its program is in its own argument list, so the count takes the
+  -- arrivals' layers plus the telescope standing behind whatever they
+  -- name.  What is open is whether that reading SUFFICES, at every
+  -- shape rather than at the ones where the constant died.
   --
-  -- AND WHAT THE INNER ARM OWES IS NOW THE SIBLING'S OBLIGATION AND
-  -- NOT ONE OF ITS OWN.  Charging the store BOUND made the arm climb
-  -- with the walk whatever was parked; charging the parked program
-  -- makes it climb only as far as what a rung admits, which is the
-  -- one channel the outer arm has as well.  So a single statement
-  -- about where a delivered observable's layers come from settles
-  -- both, and until it lands both arms sit on the ledger's excluded
-  -- side for the same reason.
-  --
-  -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
-  --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`
-  --   -- one rung at each arm, which is the charge both readings
-  --   replace.
+  -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`
+  --   -- one rung, which is the charge this reading replaces.
   -- REFUTED: `Refuted.Frame-Step-Size-Slot.stepFrame-sz-outer-own-absurd`
-  --   -- the outer arm charged the arriving values ALONE, at an
-  --   observable that names a shared slot.  The second row puts one
-  --   more rung behind the slot and moves the cap with it: the
-  --   emission doubles, the rung it is measured against grows
-  --   quadratically, and that count does not move at all.
-  -- DEAD ROUTE: charging the inner arm the size of its own arriving
-  --   values is STRUCTURALLY dead, and not merely too weak.  What the
-  --   inner arm subscribes is what the `*All` node has PARKED, so it
-  --   is in the store and not in `vals` -- the drain runs a program
-  --   this statement's arguments do not mention, and no reading of
-  --   `vals` is a reading of it.  That is what sends the charge to the
-  --   node table rather than to the arrivals.
-  -- PROBED: `Probed.Cross-Count-Slot` -- the outer arm at an arriving
-  --   observable naming a shared slot, twelve rungs behind it and
-  --   then thirteen with the cap moved, which is the region both
-  --   readings above die in.  Nothing about a scripted slot, a
-  --   telescope of more than one, or an arrival whose syntax is
-  --   itself what runs.
-  -- PROBED: `Probed.Cross-Count-Store` -- the inner arm at the very
-  --   witness that kills the constant, a twelve-rung duplication chain
-  --   parked in the drained queue and charged at the twelve layers the
-  --   queue reads rather than at the cap.  One queue entry, one drain,
-  --   and no nesting: nothing about a queue of several, a parked
-  --   program that itself crosses, or a queue holding entries of
-  --   different depths.
-  stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
-    (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
-    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
-    valsSz? B vals ≡ true →
-    valsSz? (iterSize S (parkedLayAt allNid (EvalSt.nodes st)) B)
-      (proj₁ (stepFrame sf id now (from-inner op allNid inst) path vals fin
-                sched st)) ≡ true
-
+  --   -- the arm charged the arriving values ALONE, at an observable
+  --   that names a shared slot.  The second row puts one more rung
+  --   behind the slot and moves the cap with it: the emission doubles,
+  --   the rung it is measured against grows quadratically, and that
+  --   count does not move at all.
+  -- PROBED: `Probed.Cross-Count-Slot` -- an arriving observable naming
+  --   a shared slot, twelve rungs behind it and then thirteen with the
+  --   cap moved, which is the region both readings above die in.
+  --   Nothing about a scripted slot, a telescope of more than one, or
+  --   an arrival whose syntax is itself what runs.
   stepFrame-sz-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)

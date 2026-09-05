@@ -215,15 +215,26 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHERE A DELIVERED OBSERVABLE'S LAYERS COME FROM, WHICH BOTH
-  CROSSING ARMS NOW WAIT ON.** Both arms are denominated in layers and
-  both break at the same rung through one channel: a rung admits size
-  geometrically and a layer costs fixed size, so the level reaches
-  either charge logarithmically. The arrivals a walk meets are not
-  arbitrary syntax — reification adds no layer — so what a run
-  delivers, and what it parks, are bounded in layers by the PROGRAM.
-  The commit states that as a leaf over the run and reports whether
-  the walk carries what instantiating it needs.
+- **THE JOIN OVER A QUEUE OF SEVERAL, WHICH NOTHING HAS INSTANTIATED
+  AND WHICH THE DRAIN LEAF NOW RESTS ON.** Every drain row parks
+  exactly one program, so the leaf's MAX is a max over a singleton and
+  its shape is untested — and the inner frame is now a real body over
+  that leaf, so a wrong join is retroactive rather than merely open.
+  The drain subscribes each entry in turn and every delivered value
+  comes out of one entry's run, which is the argument for a max rather
+  than a sum; a queue whose entries differ in depth is where that
+  argument is bought or refuted. The commit instantiates the leaf at
+  such a queue and reports which of the two it is.
+
+- **THEN WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
+  ARMS ARE NOW WAITING ON.** The drain leaf and the outer arm differ
+  only in WHERE the program sits — parked in a node, or arriving as a
+  value — and both are denominated in its layers. Underneath each is
+  one claim: subscribing a program of bounded size delivers within the
+  rungs its LAYERS buy, because reification adds no layer while a
+  substitution multiplies. The commit states that single-subscription
+  claim as the leaf both spend, and reports what the per-entry step of
+  the drain still owes above it.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
@@ -235,15 +246,6 @@ does not fit is a finding about the shared statement, not about the head.
   reading rather than a cap — and reports whether the walk's own
   budget can spend it.
 
-- **THEN THE JOIN OVER A QUEUE OF SEVERAL, WHICH NOTHING HAS
-  INSTANTIATED.** Every drain row so far parks exactly one program, so
-  the arm's MAX is a max over a singleton and its shape is untested.
-  The drain subscribes each entry in turn and every delivered value
-  comes out of one entry's run, which is the argument for a max rather
-  than a sum — but a queue whose entries differ in depth is where that
-  argument is either bought or refuted. The commit instantiates the
-  arm at such a queue and reports which of the two it is.
-
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -251,11 +253,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×2, PROBED×4`: both arms charge rungs in layers of what
-  runs — the outer the arrivals plus their telescope, the inner the queue at its
-  own node. Both break at the same rung through the level, so one leaf about a
-  delivered observable settles both.
+- **`mergeAllDrain-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED×2, TWIN, PROBED×2`: what a run delivers, in layers of what runs —
+  the drain the queue its node parked, the outer arm its arrivals plus their
+  telescope. The inner frame is a body over the drain leaf now; the join over a
+  queue of several is untested.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the

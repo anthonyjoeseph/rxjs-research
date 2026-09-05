@@ -2,15 +2,16 @@
 -- THE INNER CROSSING'S TWO HALVES, INSTANTIATED AT THE VERY WITNESSES
 -- THAT KILLED THE CONSTANT THEY REPLACE.
 --
--- TARGET: stepFrame-sz-inner @3f0f90
+-- TARGET: mergeAllDrain-sz @db8471
 -- TARGET: stepFrame-sz-store-inner @7f2f2b
 --
 -- WHY THESE POINTS AND NOT OTHERS.  The inner arm subscribes what the
 -- `*All` node has PARKED, so the program it runs is in the node table
 -- and not among the arriving values -- which is why the charge reads
--- the queue at the frame's own node.  A receipt for that reading is
--- worth having only where the predecessor reading FAILED, since
--- anywhere else a green row is bought by the program being small
+-- the queue at the frame's own node, and why the whole arm now reduces
+-- to what one DRAIN of that queue delivers.  A receipt for that
+-- reading is worth having only where the predecessor reading FAILED,
+-- since anywhere else a green row is bought by the program being small
 -- rather than by the denomination being right.  So both rows are taken
 -- at the refutations' own states: the drain door with a twelve-rung
 -- duplication chain parked behind it, and the same door with a scan
@@ -47,6 +48,7 @@ module Probed.Cross-Count-Store where
 open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_)
+open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ)
 open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -55,9 +57,9 @@ open import Rx.Prim using (g0; gasPad)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; parkedLayAt; stepFrame-sz-inner; stepFrame-sz-store-inner)
+  using (valsSz?; parkedLayAt; mergeAllDrain-sz; stepFrame-sz-store-inner)
 open import Refuted.Frame-Step-Size-Cross
-  using () renaming (Γ₁ to ΓV; Pow to PowV;
+  using () renaming (Γ₁ to ΓV; Pow to PowV; chain to chainV;
                      e₂ to eV; sl₁ to slV; stQ to stV; outQ to outV)
 open import Refuted.Frame-Step-Size-Cross-Store
   using () renaming (e₀ to eS; sl₁ to slS; stQ to stS; postQ to postS)
@@ -119,11 +121,13 @@ storeRows≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: it fails for any charge the parked chain's emission
--- outruns, which the constant it replaces did.
-tieInner : Confirms
-  (stepFrame-sz-inner {e = eV} (gasPad 8 g0) 0 0 mergeAllᵒ 0 7 root [] true
-     (sched-init eV slV) stV 51 51)
-tieInner = λ _ _ _ → refl
+-- outruns, which the constant it replaces did.  The queue, the limit
+-- and the active count are the ones the exit hands the drain at this
+-- door, so the row stands where the arm actually reaches it.
+tieDrain : Confirms
+  (mergeAllDrain-sz {e = eV} (gasPad 8 g0) 0 root 0 0 nothing 0
+     (chainV 12 ∷ []) (sched-init eV slV) stV 51 51)
+tieDrain = λ _ _ _ → refl
 
 -- LOAD-BEARING: same, through the conclusion about the node table.
 tieStore : Confirms
