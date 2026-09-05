@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LAYER COUNT AND ITS PER-FRAME BOUND, WHICH IS WHAT `src` STILL
-  LACKS.** The outer arm's climb is a currency error, and the repair is
-  a count of operator LAYERS rather than of an arrival's syntax: a
-  reading that charges a function's syntax is grown by the walk itself
-  — one `map-f` step carries it from nothing to the arrival's own size,
-  since a frame's closed function reifies the arrival into the term —
-  while a layer count cannot be grown that way and is smaller at the
-  duplication chain than either reading it replaces. The commit states
-  that count in `src` with the per-frame bound it needs, leaving a
-  scan's WIDTH as the residue.
+- **THE JOIN ACROSS THE BURST, WHICH IS WHAT NOW OVERRUNS THE LEDGER.**
+  The currency is settled: the outer arm charges LAYERS, so the level
+  reaches it only through an arrival's size. The walk-ceiling
+  refutation survived that restatement on a new axis — a burst as wide
+  as the length premise admits overruns every allowance the path has,
+  while one arrival alone fits. The arm SUMS across the burst and the
+  predicate it must establish is per value, so the question is whether
+  a MAX is honest here or whether one arrival's run can feed another's
+  inside the frame. The commit instantiates that at a burst the ledger
+  loses on, and restates the join or records why it cannot move.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s

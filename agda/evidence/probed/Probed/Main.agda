@@ -127,7 +127,7 @@ open import Probed.Cross-Count-Data
   using (separates; charges₃≡; opsRow₃; opsChain≡; opsRow₂)
 
 open import Probed.Cross-Count-Spine
-  using (separates; arrivalCounts≡; emitCounts≡; nodChain≡; nodRow₂; nodBig≡)
+  using (separates; arrivalCounts≡; emitCounts≡; layChain≡; layRow₂; layBig≡)
 
 open import Probed.Cross-Count-Slot
   using (counts≡; tieSlot12; tieSlot13)

@@ -44,9 +44,9 @@
 -- crossing frame charges what it subscribes -- a burst's worth of
 -- observables plus the telescope -- and this climb charges one level
 -- per frame, with no width factor and no telescope.  That a single
--- frame genuinely reaches the level is not assumed here: it is
+-- frame genuinely outruns the ledger is not assumed here: it is
 -- instantiated at numerals in `Refuted.Walk-Ceil-Ledger`, whose count
--- row lands one payload exactly on the level the walk climbed to.
+-- row carries a burst of arrivals the level admits exactly.
 
 -- WHAT THIS DOES NOT SHOW.  It does not refute the depth-fuel shape
 -- itself, which is discharged one face over and is what prices the

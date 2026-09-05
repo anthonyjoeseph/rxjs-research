@@ -2237,24 +2237,24 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- kinds that read the program's own syntax; the drain arm charges the
 -- LEVEL ITSELF, flatly and with no value in it, because the parked
 -- program is in the store and the count cannot reach the node table;
--- and the outer arm reads its ARRIVALS, whose only bound is the size
--- premise the walk carries -- which is that same climbing level, so
--- the charge climbs with it even though the clause names no level.
--- The second is the one a reader walks past, and it is the one the
--- ledger refutation is instantiated at.
+-- and the outer arm reads its ARRIVALS, so what bounds its charge is
+-- whatever the size premise bounds about them, and the clause names no
+-- level either way.  The second is the one a reader walks past, and it
+-- is the one the ledger refutation is instantiated at.
 
 -- SO THE TWO REPAIRS ARE DIFFERENT, AND THE OUTER ONE IS A CURRENCY.
--- Its charge climbs because it reads the arrival's SIZE, and the walk
--- inflates exactly the part of an arrival a subscription does not
--- spend: rungs are bought per operator layer, a frame applies a closed
--- function, so layers grow by the program's own syntax per frame while
--- the data the ladder multiplies emits itself.  A count of the
--- operator spine is separated from the size one at a reified arrival
--- and still covers the emission there with no rung bought
--- (`Probed.Cross-Count-Data`), and it is level-free only when it
--- charges LAYERS: a reading that charges a function's syntax is grown
--- by the walk itself, since a frame's own closed function reifies the
--- arrival into the term (`Probed.Cross-Count-Spine`).
+-- Rungs are bought per operator LAYER, and a frame applies a CLOSED
+-- function, so an arrival's layers grow by the program's own syntax
+-- per frame; what the ladder multiplies besides that is DATA, and data
+-- emits itself, so a reading of an arrival's SIZE prices what a
+-- subscription does not spend and climbs with the level.  A layer
+-- reading is separated from the size one at a reified arrival and
+-- still covers the emission there with no rung bought
+-- (`Probed.Cross-Count-Data`), and it is the only candidate the walk
+-- cannot grow, since a frame's own closed function reifies the arrival
+-- into the term and a count charging that function's syntax inflates
+-- with it (`Probed.Cross-Count-Spine`).  What the currency does not
+-- buy is a ceiling, since the charge is summed across the burst.
 -- The drain's repair is unrelated and it is a reading: what is
 -- actually parked, which is a state its count is not handed and its
 -- sibling arm already takes of the arrivals.
@@ -2275,11 +2275,11 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   WHOLE ledger this premise supplies, at the longest path the size
 --   predicate's own length conjunct admits and with the level in hand
 --   held under the ledger it has been spending.  It is what says which
---   side breaks: TWO rungs of the walk put the level past every
+--   side breaks: a burst as wide as that length conjunct admits, of
+--   arrivals the level admits exactly, puts the charge past every
 --   allowance the path has, so no reading of this premise fixes a
---   ceiling a crossing frame fits under, and one rung lower the
---   crossing is affordable -- the gap opens with the walk rather than
---   with the program.
+--   ceiling a crossing frame fits under -- and the gap opens with the
+--   WIDTH, one such arrival alone still fitting.
 -- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
 --   a recursion on a depth fuel, the charge at each frame read at the
 --   level that frame stands at, against what `walkFac-ch` affords, and

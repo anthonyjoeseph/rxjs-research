@@ -38,6 +38,7 @@ open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; 
 open import Rx.Prim using (Gas; Id; Tick; Source; InstEvent; close; exhausted)
 open import Relation.Nullary using (yes; no)
 open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
+open import Rx.Layer-Count using (layᵛ)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
@@ -794,36 +795,33 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- terminates that chase is the telescope's stratification, a property
 -- of the telescope and not of this frame.
 
--- AND THE OUTER ARM READS THE ONE PART OF AN ARRIVAL THE WALK
--- INFLATES, which is why its charge climbs and the three syntactic
--- arms' do not.  What a subscription spends is per OPERATOR LAYER --
--- each substitution multiplies, so a k-layer chain emits at two to the
--- k and k rungs pay for it -- and a frame applies a CLOSED function, so
--- a crossing arrival's layers grow by the program's own syntax per
--- frame and no faster.  What the ladder multiplies is the arrival's
--- DATA, and data emits itself.  So `sizeᵛ` is a reading of the run only
--- where the arrival's syntax IS the run, and the walk manufactures the
--- other shape.
+-- AND THE OUTER ARM READS THE ARRIVAL'S OPERATOR LAYERS, which is what
+-- a subscription actually spends and is why its charge does not climb
+-- with the walk's level.  Each substitution multiplies, so a k-layer
+-- chain emits at two to the k and k rungs pay for it.  What the ladder
+-- multiplies besides that is the arrival's DATA, and data emits itself,
+-- so a reading of the arrival's SIZE prices the run only where the
+-- arrival's syntax IS the run -- and the walk manufactures the other
+-- shape.
 --
--- AND THE SPLIT IS MACHINE-SEPARATED RATHER THAN ARGUED.  A count
--- reading the operator spine, joining by MAX wherever a payload
--- branches, sits at NOTHING on a reified arrival where this one sits at
--- four thousand, and the emission still fits with no rung bought, at a
--- margin of two nodes; at the duplication chain it stays above one rung
--- and below this count (`Probed.Cross-Count-Data`).
+-- AND A LAYER COUNT IS THE ONLY CANDIDATE THE WALK CANNOT GROW.  A
+-- frame applies a CLOSED function, and applying one REIFIES the arrival
+-- into the term: a count charging a function's SYNTAX therefore goes
+-- from nothing to the arrival's own size in a single `map-f` step and
+-- then climbs with the level exactly as `sizeᵛ` does, while a reified
+-- datum contributes no layer however large.  Both separations are
+-- machine-exhibited rather than argued.  The size reading parts from a
+-- spine reading at a reified arrival, where the spine still covers the
+-- emission with no rung bought, at a margin of two nodes
+-- (`Probed.Cross-Count-Data`); the syntax and layer readings part on a
+-- value one frame manufactured, and there the layer count is also
+-- smaller at the duplication chain and agrees exactly at the reified
+-- arrival (`Probed.Cross-Count-Spine`).
 --
--- AND THE SPINE MUST BE COUNTED IN LAYERS, NOT IN SYNTAX, which is a
--- second separation rather than a refinement of the first.  A count
--- pricing a map or a scan at its FUNCTION'S size is grown by the walk
--- itself: applying a frame's closed function REIFIES the arrival into
--- the term, so a single `map-f` step carries such a count from nothing
--- to the arrival's own size and it then climbs with the level exactly
--- as `sizeᵛ` does.  A count of operator LAYERS -- one per map, take,
--- scan or `*All` -- cannot be grown that way, since a reified datum
--- contributes no layer however large, and it is SMALLER at the
--- duplication chain than the syntax reading while still covering the
--- emission.  What that leaves owed is a scan's WIDTH, since a scan
--- grows per element (`Probed.Cross-Count-Spine`).
+-- AND WHAT IT LEAVES OWED IS A SCAN'S WIDTH.  An arriving scan emits
+-- per element while a layer count reads one layer for it, so the rungs
+-- this arm buys are a bound on the arrival's chain and not yet on what
+-- a threading operator inside that chain multiplies.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Cross` and
 --   `Refuted.Frame-Step-Size-Cross-Store` -- one rung, at the
@@ -837,7 +835,7 @@ szCount sl B (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
 szCount sl B (take-f nid)       vals = 1
 szCount sl B (from-inner _ _ _) vals = B
 szCount {s = s} sl B (thru-outer _ _) vals =
-  sum (map (sizeᵛ s) vals) + slotsSize sl
+  sum (map (layᵛ s) vals) + slotsSize sl
 
 -- WHAT A LOOKUP HANDS BACK when every stored node is bounded.  The
 -- receipt has to be abstracted by the SAME `with` that abstracts the
