@@ -1793,14 +1793,18 @@ postulate
   -- arrival's layers and the telescope a SECOND time, which
   -- `suc (layᵉ b)` does not carry and which no caller could supply
   -- either, since a crossing arm holds exactly the ceiling its parent
-  -- was handed.  The STATEMENT is not short in that way: a rung at
-  -- least quadruples where a layer of payload at most doubles, so the
-  -- door's charge outgrows what the crossing spends, and the level side
-  -- crosses verbatim because an arrival's layers ARE bounded by the
-  -- layers of the program that wrote it.  What that reading does not
-  -- cover is an arrival carrying a `μ`, whose unfolding SQUARES a size
-  -- no layer charge grows with -- squaring outruns a rung, which
-  -- multiplies -- and that is where this statement breaks if it breaks.
+  -- was handed.  Where the arrival is an ordinary payload the
+  -- statement is not short in that way -- a rung at least quadruples
+  -- where a layer of payload at most doubles, and an arrival's layers
+  -- ARE bounded by the layers of the program that wrote it.  Where the
+  -- arrival carries a `μ` it is FALSE: unfolding copies the program
+  -- once per mention of its own recursive occurrence, the layer count
+  -- charges nothing for the `μ` or for the `defer` those mentions must
+  -- stand under, and the mentions are a free parameter of the program,
+  -- so no syntactic count of rungs closes it.
+  -- REFUTED: `Refuted.Burst-Mu-Square`, which kills this statement, the
+  --   unfolding leaf beside it and the descent's own conclusion with
+  --   one program family.
   -- PROBED: `Probed.Cross-Burst-Slack` at a merging door over a
   --   reifying scan fed a duplication chain, whose emission is
   --   exponential in the layers the scan is charged for and whose
@@ -1843,6 +1847,15 @@ postulate
   -- charges nothing.  So the leaf is about the size side alone, and
   -- what it owes is a bound on what ONE unfolding writes rather than a
   -- transport of the caller's.
+  --
+  -- AND THAT IS WHY IT IS FALSE AS STATED.  The level it is held to is
+  -- the layer count, which the substitution leaves alone, while what
+  -- the unfolding writes grows with the number of mentions of the
+  -- recursive occurrence -- a free parameter of the program.  A rung is
+  -- affine in the bound, so a fixed count of them buys a fixed factor,
+  -- and a factor cannot cover a multiplicity.
+  -- REFUTED: `Refuted.Burst-Mu-Square`, at sixteen mentions, bracketed
+  --   by fifteen where the same claim holds at the same rungs.
   subscribeE-sz-store-μ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (g : Gas) (body : Exp Γ (u ∷ []) [] [] u)
     (κ : Path Γ u t) (id : Id) (now : Tick)
@@ -1929,6 +1942,21 @@ crossSz a B hb = sz-sub a (suc a) B (n≤1+n a) hb
 --   produce sits far below both.  What the sum COSTS is paid by the
 --   consumers that must supply the premise, so it is decided at the
 --   call sites and not by any state this statement can be entered at.
+
+-- AND THE CONCLUSION IS FALSE AS STATED, which is a finding about this
+-- reading's DENOMINATION and not about the one leaf it arrives at.  A
+-- rung is affine in the bound, so a rung count fixed by the SYNTAX buys
+-- a fixed factor; one μ unfold copies the whole program once per
+-- mention of its own recursive occurrence, and the layer count charges
+-- nothing for the `μ` or for the `defer` those mentions must stand
+-- under.  The mentions are a free parameter, so no syntactic count of
+-- rungs closes it and the repair is not a bigger one: the level has to
+-- grow with the BOUND, the way the caps face already charges an unfold
+-- in an existential number of frame steps.
+-- REFUTED: `Refuted.Burst-Mu-Square`, at a plain merging door over a
+--   one-shot source whose single emission is a `μ` -- entered at an
+--   empty table, with the crossing bracketed on both sides so what
+--   fails is the multiplicity and not the door or the arithmetic.
 subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick)
