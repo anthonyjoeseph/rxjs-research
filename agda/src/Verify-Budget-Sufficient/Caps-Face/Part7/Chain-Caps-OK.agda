@@ -48,6 +48,10 @@ open import Verify-Budget-Sufficient.Caps using
 
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (pathSz?)
+open import Verify-Budget-Sufficient.Measures using
+  (pathLen)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using
+  (frameCh)
 
 chainBurstOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (W : ℕ) (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
@@ -233,6 +237,18 @@ chainsCapsOK cp ac sl d Lv a nextId ((rid , c) ∷ chains) sched st =
 -- cancellation test.  The conjunct is still what keeps the Σ honest,
 -- since receipts weaken as the level grows and an unpinned witness
 -- would buy them all at once.
+--
+-- AND THE SAME INCREMENT IS PRICED A SECOND WAY, IN THE CURRENCY THE
+-- CASCADE'S DESCENT ACTUALLY SPENDS.  The ladder conjunct is a ceiling
+-- in the caps currency, and a consumer denominated in the size walk
+-- cannot spend a caps rung at all -- one rung of that ladder already
+-- exceeds every polynomial in the cap, so a number under it is under
+-- nothing the descent can afford.  So the Σ carries the climb against
+-- the per-frame charge as well: a rung for the chain and one per frame
+-- of it, at `frameCh` read in the entry cap on both arguments, which
+-- is the unit the round's position ledger counts in.  Two bounds in
+-- different currencies on ONE witness is what lets the descent read
+-- the increment without either ladder being converted into the other.
 chainsCapsAll : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (cp ac : Caps) (sl : Slots Γ) (d Lv : ℕ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -247,6 +263,7 @@ chainsCapsAll cp ac sl d Lv a nextId ((rid , c) ∷ chains) sched st =
                    (suc (delivN (record st { delivered = rid ∷ EvalSt.delivered st })
                           (proj₂ (proj₂ (chainStep nextId a c sched
                             (record st { delivered = rid ∷ EvalSt.delivered st })))))))
+    × (L′ ≤ suc (pathLen c) * frameCh (Caps.cSize cp) (Caps.cSize cp))
     × chainsCapsAll cp ac sl d (Lv + L′) a nextId chains
         (proj₁ (proj₂ (chainStep nextId a c sched
                          (record st { delivered = rid ∷ EvalSt.delivered st }))))

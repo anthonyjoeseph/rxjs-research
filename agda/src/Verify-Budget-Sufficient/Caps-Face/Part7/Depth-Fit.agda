@@ -2179,29 +2179,23 @@ postulate
 -- THE LEVEL ONE CHAIN CLIMBS, IN THE WALK'S OWN CURRENCY, and it is
 -- exactly what the cascade's ledger already sets aside per chain: a
 -- rung for the chain itself and one per frame of it, each at the
--- per-frame charge.  The caps package bounds the climb ABSOLUTELY --
--- a delivery-shaped ceiling every chain's step is held under -- and an
--- absolute ceiling is not a per-chain increment, which is why this is
--- stated rather than projected out of the package.
+-- per-frame charge.  What the caps package reports instead is a
+-- delivery-shaped ceiling every chain's step is held under, and an
+-- absolute ceiling is not a per-chain increment.
 --
--- AND THE CLIMB IS DETACHED FROM ITS OWN WITNESS, WHICH IS WHY THE ROW
--- IS FALSE RATHER THAN MERELY UNFUNDED.  `L′` stands here as a free
--- number bounded ABOVE by the caps ladder and bounded above again by
--- the conclusion, and the state predicate beside them does not mention
--- it at all.  Two upper bounds in the same direction derive nothing
--- from one another, so the row holds only if the ladder's ceiling is
--- already under the per-frame product -- and a PROVEN lower bound on
--- that ceiling puts it past, at the floor of every parameter the
--- package can pin.  A fold storey squares; the charge is quadratic in
--- the cap and linear in the path.
---
--- SO THE RESTATEMENT IS THE WORK, AND BOTH CALLERS ALREADY SHOW ITS
--- SHAPE: each passes a PROJECTION of the caps package's own Σ, so the
--- quantity they need bounded is determined exactly where this row
--- makes it free.  The statement belongs over that Σ rather than over a
--- number extracted from it, so that whatever else the Σ says about its
--- witness stays in scope -- the same law a Σ-receipt obeys, arriving
--- at a component detached from its record.
+-- AND IT IS STATED AT THE CLIMB THE STEP ACTUALLY MINTS, NOT AT A FREE
+-- NUMBER STANDING FOR IT.  The caps package hands its increment back
+-- inside a Σ, and a row taking that component as an unconstrained `L′`
+-- has only the package's own upper bound to work from -- two ceilings
+-- in the same direction, which derive nothing from one another and
+-- leave the row true exactly when the caps ladder is already under the
+-- per-frame product.  It is not: a PROVEN lower bound on that ladder
+-- puts one rung past the product at the floor of every parameter the
+-- package can pin, since a fold storey squares while the charge is
+-- quadratic in the cap and linear in the path.  So the subject here is
+-- the value `chainStep-caps` returns, under the hypotheses that
+-- determine it -- the same law a Σ-receipt obeys, arriving at a
+-- component detached from its record.
 --
 -- AND THE RECEIPT THAT READS LIKE A ROUTE IS NOT ONE.  The climb is
 -- not the outer chain's frames: a `thru-outer` frame SUBSCRIBES an
@@ -2209,11 +2203,12 @@ postulate
 -- climb, `subscribeInner-caps`, reports it at `sLvlD` -- a LADDER
 -- rung, which is an upper bound and so funds nothing.
 --
--- REFUTED: `Refuted.Chain-Climb-Arith` -- this row with the state
---   predicate dropped and the path replaced by its length, at the
---   floor of the cap, the width, the depth fuel and the delivery
---   count.  What it leaves open is only whether that predicate forces
---   a path with more frames than the ceiling has units.
+-- REFUTED: `Refuted.Chain-Climb-Arith` -- the free-number form of this
+--   row, with the state predicate dropped and the path replaced by its
+--   length, at the floor of the cap, the width, the depth fuel and the
+--   delivery count.  It is what forces the subject to be the step's
+--   own witness, and it stands as long as the detached shape is a
+--   shape anyone could reach for.
 -- REFUTED: `Refuted.Caps-Face.caps-frame-boundary-absurd` -- charging
 --   the climb at the ENTRY cap, which is what `chAt` reads.
 -- DEAD ROUTE: restating the increment as the ABSOLUTE ceiling the caps
@@ -2228,13 +2223,15 @@ postulate
 --   in the caps ladder cannot be spent by the size walk at all.
 postulate
   chain-climb-ch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lc L′ D : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
-      nextId a path sched st →
-    Lc + L′ ≤ lvls (Caps.cSize (capsAt e sl id)) (Caps.cWid (capsAt e sl id))
-                   (capsH e sl id) Lc (suc D) →
-    L′ ≤ suc (pathLen path) * chAt e sl id
+    (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e)
+    (sleq : Sched.slots sched ≡ sl)
+    (cok : capsOK? (frameStep Lc (capsAt e sl id)) sched st ≡ true)
+    (hpz : pathSz? (Caps.cSize (frameStep Lc (capsAt e sl id))) path ≡ true)
+    (hvc : valCaps? (frameStep Lc (capsAt e sl id)) sl (arrTy a) (arrVal a) ≡ true)
+    (hdp : depthChain nextId a path sched st ≤ capsH e sl id) →
+    proj₁ (chainStep-caps sl id Lc a nextId path sched st sleq cok hpz hvc hdp)
+      ≤ suc (pathLen path) * chAt e sl id
 
 chain-walk-LiveHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id) (Lv j : ℕ)
@@ -2448,7 +2445,7 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
                (cascade-depth-go sl id (Lc + L′)
                   a nextId S Lv (j + suc (pathLen c)) cs
                   (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
-                  (proj₂ (proj₂ (proj₂ (proj₂ hca)))) hsight
+                  (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ hca))))) hsight
                   (trans (chainStep-slots nextId a c sched st₀) hsl)
                   afford hsz hpr hΦr
                   hbud-next
@@ -2492,13 +2489,12 @@ cascade-depth-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , c) ∷ cs) sch
                      refl j (pathLen c) (chainsLenSum cs) (length cs))))
             hbud
   L′ = proj₁ (proj₂ (proj₂ hca))
+  -- the package's own second conjunct IS this ledger's rung: the
+  -- descent never converts a caps ceiling, it reads the increment in
+  -- the per-frame charge the position ledger counts in
   hLc-next : Lc + L′ ≤ (j + suc (pathLen c)) * chAt e sl id
   hLc-next =
-    ≤-trans (+-mono-≤ hLc
-              (chain-climb-ch sl id Lc L′ (delivN st₀ (proj₂ (proj₂ r)))
-                 a nextId c sched st₀
-                 (proj₁ (proj₂ hca))
-                 (proj₁ (proj₂ (proj₂ (proj₂ hca))))))
+    ≤-trans (+-mono-≤ hLc (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ hca))))))
             (≤-reflexive
               (sym (*-distribʳ-+ (chAt e sl id) j (suc (pathLen c)))))
 
@@ -2752,6 +2748,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
   , HEAD
   , proj₁ ST
   , proj₁ (proj₂ ST)
+  , CLIMB
   , cascade-caps-all-go sl id (Lc + proj₁ ST) a nextId S Lv
       (j + suc (pathLen path)) chains
       (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
@@ -2806,6 +2803,10 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
   ST  = chainStep-caps sl id Lc a nextId path sched st′ sleq cok
           (pathSz?-widen path (proj₁ c⊑) hpc)
           (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc) hdc
+  CLIMB : proj₁ ST ≤ suc (pathLen path) * chAt e sl id
+  CLIMB = chain-climb-ch sl id Lc a nextId path sched st′ sleq cok
+            (pathSz?-widen path (proj₁ c⊑) hpc)
+            (valCaps?-widen sl (arrTy a) (arrVal a) c⊑ hvc) hdc
   -- and the fold's own climb lands on the NEXT position exactly when
   -- this chain's deliveries fit the budget read at this one
   STEP : lvls B W d Lc (suc D) ≤ Ent c d J g (suc i)
@@ -2840,9 +2841,7 @@ cascade-caps-all-go {n = n} {e = e} sl id Lc a nextId S Lv j ((rid , path) ∷ c
   -- one for the chain and one per frame of it, at the per-frame charge
   hLcCh-next : Lc + proj₁ ST ≤ (j + suc (pathLen path)) * chAt e sl id
   hLcCh-next =
-    ≤-trans (+-mono-≤ hLcCh
-              (chain-climb-ch sl id Lc (proj₁ ST) D a nextId path sched st′
-                 HEAD (proj₁ (proj₂ ST))))
+    ≤-trans (+-mono-≤ hLcCh CLIMB)
             (≤-reflexive
               (sym (*-distribʳ-+ (chAt e sl id) j (suc (pathLen path)))))
 
