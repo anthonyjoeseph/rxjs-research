@@ -215,28 +215,19 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DESCENT'S OWN CLAUSES, WHERE ONE RUNG HAS TO PAY FOR
-  ONE OPERATOR.** Both leaves are stated over `subscribeE`, whose cases
-  are the program's constructors, and `layᵉ` charges one rung apiece —
-  the first statements here attackable STRUCTURALLY rather than through
-  another door. A map or a take writes nothing, a scan writes the cell
-  its own emission fills, a `*All` mints a node and hands its arrivals
-  to a crossing already bodied. The commit takes the arms that write
-  nothing and the one that writes its own cell, leaving the crossings
-  postulated, and asks whether one rung covers one operator.
+- **THE CROSSING ARM, WHERE THE DESCENT RE-ENTERS THE DOOR IT IS
+  ALREADY UNDER.** One rung DOES cover one operator: the store descent
+  is a body now, and six of its ten arms carry the caller's own level
+  through unchanged. The `*All` arm is the one that could not, and its
+  leaf says why — a `thru-outer` frame SUBSCRIBES what it is handed, so
+  the burst re-enters at the ARRIVING VALUE's level and not at the one
+  the outer was subscribed at. The arrival is a runtime value,
+  structurally unrelated to the program, and gas is what the evaluator
+  decrements there. The commit takes that leaf and asks what decreases,
+  since a rung that pays for the mint buys nothing if the arrival's own
+  layers are unbounded by the program's.
 
-- **THEN THE CROSSING ARMS, WHERE THE DESCENT RE-ENTERS THE DOORS
-  IT IS ALREADY UNDER.** A `*All` constructor is where the two leaves
-  stop being about syntax: it mints a node, parks what it cannot admit,
-  and hands an arrival back to the very crossing that is a body over
-  these leaves. So the recursion closes on itself and the measure is
-  the question — the arrival is a runtime VALUE, structurally unrelated
-  to the program, and gas is what the evaluator decrements there. The
-  commit states the crossing arms at the descent and asks what
-  decreases, since a rung that pays for the mint buys nothing if the
-  arrival's own layers are unbounded by the program's.
-
-- **AND THEN THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
+- **THEN THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
   its ceiling is a fixed product, so what is left is what a frame
   cannot read off a path: the two crossings' charge, the fan's
@@ -245,6 +236,18 @@ does not fit is a finding about the shared statement, not about the head.
   the size cap ONE INSTANT UP, so the whole question is a rung. The
   commit puts that gap beside the store side's own climb, which
   crosses the same one.
+
+- **AND THEN THE VALUE SIDE THROUGH THE DOOR THE STORE SIDE JUST
+  OPENED.** `subscribeE-sz` is the last monolith on this descent and it
+  is the store half's twin: same constructors, same two transports.
+  What the store half established is WHICH arms are leaves and why — a
+  definition behind a reference, a cell in a currency the premise is
+  not stated in, an arrival re-entering at its own level, a
+  substitution that squares the size — and not one of those reasons is
+  about the table. The commit walks the value side over the same
+  clauses and asks which of the four survive the change of reading,
+  since an arm that is a leaf for the store and a body for the value
+  says the two halves are not one descent after all.
 
 ### The ledger
 
@@ -257,10 +260,22 @@ does not fit is a finding about the shared statement, not about the head.
   subscription delivers, in its own layers plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
   twice and a share at two depths cost nothing. A layered arrival is unread.
-- **`subscribeE-sz-store`** (Regs-Nest-Walk) — FALSITY, `DEAD ROUTE, PROBED×4`:
-  what ONE subscription writes, at the same descent and the same charge its
-  value sibling reads, plus a table it did not build. Cells in series do not
-  compound; a parked reference reads the telescope; slots in series are open.
+- **`subscribeAll-sz-store`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: what a
+  crossing DOOR writes — its minted cell, then a burst re-entering at the
+  arriving value's level rather than the outer's. All three operators share it
+  and the cell is a parameter, so the re-entry is the whole of what is open.
+- **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
+  ONE unfolding writes. The size premise does not survive the substitution —
+  the proven bound SQUARES it — while the layer reading crosses untouched
+  behind the defer, so the leaf is the size side alone.
+- **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: the
+  reified seed and the cell each arrival rewrites, in a currency the layer
+  premise is not stated in. Cells in series do not compound; a parked queue
+  reads the program's own run; slots in series are open.
+- **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED`: the
+  definition behind a reference, whose entire climb is the telescope summand —
+  `input` charges nought, so no reading of the program term reaches it. Read at
+  two depths behind one reference; a telescope of more than one slot is open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

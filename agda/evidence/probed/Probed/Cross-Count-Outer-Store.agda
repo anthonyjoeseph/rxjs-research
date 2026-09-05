@@ -2,7 +2,7 @@
 -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, WHICH IS THE READING NOTHING
 -- HAD EVER STOOD AT.
 --
--- TARGET: subscribeE-sz-store @f8b804
+-- TARGET: subscribeE-sz-store-scan @64de6d
 --
 -- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The level this leaf is
 -- held to is the arrival's own layers plus the telescope, and every
@@ -50,7 +50,7 @@ open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
-open import Rx.Exp using (obs)
+open import Rx.Exp using (obs; emptyᵉ; strmᵗ)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ;
@@ -59,9 +59,9 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ
   sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; subscribeE-sz-store)
+  using (szCount; subscribeE-sz-store-scan)
 open import Refuted.Frame-Step-Size-Cross-Store
-  using (Γ₁; sl₁; Pow; K; inner; e₀; st₀; vals₀; post₀)
+  using (Γ₁; sl₁; Pow; K; inner; keep; chain; e₀; st₀; vals₀; post₀)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -144,7 +144,8 @@ sinkRows≡ = refl
 -- decoration, one gas spent, the minted instance counted -- so the row
 -- computes what a crossing at this state computes.
 tieOuterStore : Confirms
-  (subscribeE-sz-store {e = e₀} sl₁ (gasPad 7 g0) inner
+  (subscribeE-sz-store-scan {e = e₀} sl₁ (gasPad 7 g0)
+     keep (strmᵗ emptyᵉ) (chain K)
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      (record (sched-init e₀ sl₁) { nextNode = 1 }) st₀ 63 63
      (iterSize 63 (layᵉ inner + slotsSize sl₁) 63))

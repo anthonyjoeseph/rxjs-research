@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE PARKED QUEUE A SUBSCRIPTION STANDS BESIDE AND NEVER READS.
 --
--- TARGET: subscribeE-sz-store @f8b804
+-- TARGET: subscribeE-sz-store-scan @64de6d
 --
 -- WHAT WAS UNTESTED, AND WHY NO READING OF THE DELIVERED LIST COULD
 -- REACH IT.  A `*All` node holds programs it could not admit, and the
@@ -45,9 +45,9 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner; _↠_;
   iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; subscribeE-sz-store)
+  using (szCount; subscribeE-sz-store-scan)
 open import Refuted.Frame-Step-Size-Cross-Store
-  using (Γ₁; sl₁; Pow; K; inner; e₀; vals₀)
+  using (Γ₁; sl₁; Pow; K; inner; keep; chain; e₀; vals₀)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -120,7 +120,8 @@ outerRows≡ = refl
 -- decoration, one gas spent, the minted instance counted -- so the row
 -- computes what a crossing at this state computes.
 tieParkedOuterRun : Confirms
-  (subscribeE-sz-store {e = e₀} sl₁ (gasPad 7 g0) inner
+  (subscribeE-sz-store-scan {e = e₀} sl₁ (gasPad 7 g0)
+     keep (strmᵗ emptyᵉ) (chain K)
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      (record (sched-init e₀ sl₁) { nextNode = 1 }) stRun 65 65
      (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))

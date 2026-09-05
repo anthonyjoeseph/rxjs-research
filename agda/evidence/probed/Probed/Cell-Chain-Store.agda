@@ -2,7 +2,7 @@
 -- A TABLE WHOSE CELLS WERE WRITTEN IN SERIES, WHICH IS THE SHAPE THE
 -- SINGLE CLIMB HAS NEVER BEEN ASKED ABOUT.
 --
--- TARGET: subscribeE-sz-store @f8b804
+-- TARGET: subscribeE-sz-store-scan @64de6d
 --
 -- WHAT EVERY STORE ROW SO FAR DECLINED.  Each witness at either half
 -- subscribes a program that installs ONE node, and the refutation
@@ -69,7 +69,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeE-sz-store)
+  using (valsSz?; subscribeE-sz-store-scan)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -200,7 +200,8 @@ chainPrem≡ = refl
 -- counted -- so the row computes what a crossing at this state
 -- computes.
 tieCellChain : Confirms
-  (subscribeE-sz-store {e = eᶜ} slᶜ (gasPad 63 g0) topC
+  (subscribeE-sz-store-scan {e = eᶜ} slᶜ (gasPad 63 g0)
+     keepG (strmᵗ emptyᵉ) midC
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      (record (sched-init eᶜ slᶜ) { nextNode = 1 }) stᶜ 2 52
      (iterSize 2 (layᵉ topC + slotsSize slᶜ) 52))
