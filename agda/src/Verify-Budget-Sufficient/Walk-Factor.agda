@@ -76,6 +76,34 @@ frameΦSz B (thru-outer _ _)   = B
 -- below and its depth by the size legality the registry carries -- so
 -- the leaf is priced at those bounds rather than at nothing, and the
 -- fan-out becomes a monotonicity step instead of a missing relation.
+
+-- AND THE BOUNDS IT IS PRICED AT ARE THE WALK'S, NEVER THE REGISTRY'S,
+-- WHICH IS WHAT MAKES A FAN-OUT'S RECEIPT UNSPENDABLE RATHER THAN
+-- MISSING.  A registered chain does not fit the cap the walk carries:
+-- a subscribing frame swaps its head for a `from-inner` and pushes one
+-- frame per operator of the inner, so what lands in the registry is
+-- LONGER than what was walked and no fixed cap prices it --
+-- `Refuted.Chain-Step-Regs-Cap` kills that reading outright.  What the
+-- registry does carry instead is a receipt at the STEPPED cap, and
+-- reading this leaf there is unavailable in both directions the
+-- pricing can move.
+
+-- MOVING THE WHOLE FACE to the stepped instant trades the depth budget
+-- for one nothing supplies: every frame arm spends the tie between the
+-- potential and `capsH` at the instant being WALKED, and the descent's
+-- depth readings are that instant's.  MOVING THE LEAF ALONE asks this
+-- charge -- two to a cube of what it reads -- to fit under a budget
+-- that same tie holds beneath that instant's own `capsH`, while the
+-- stepped cap is `frameBlowup` OF that very `capsH`.  So the caps
+-- recurrence forbids it by construction rather than by a margin: the
+-- quantity the leaf would read is built by iterating on the quantity
+-- it must fit under, and no program makes that ordering the other way.
+
+-- SO THIS LEAF'S CAP IS A WALK QUANTITY PERMANENTLY, and a chain the
+-- fan-out hands values to is priced by this clause or by a mechanism
+-- that does not price it at a cap at all.  That is the obligation
+-- `pathSz?`'s own header states over its two callers, arriving at the
+-- potential rather than at the size predicate.
 pathΦF : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) → Path Γ s t → ℕ
 pathΦF B root           = 1
 pathΦF B (share-sink _) = 2 ^ (B * (suc B * B))

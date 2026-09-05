@@ -1303,6 +1303,52 @@ postulate
 --   from the registry's side rather than the caps face's.  Nothing
 --   else in the walk reads the cap, the size and registry receipts it
 --   used to thread having reached no obligation at all.
+-- DEAD ROUTE: a FLAT carried field -- one predicate at one cap, added
+--   to the walk's bundle -- answering this row together with
+--   `walk-share-nestOK`, `sink-fan-sink` and the two inner Φ arms,
+--   which is what those four sharing an obstacle invites.  Each
+--   currency kills it separately and for the same reason: the descent
+--   reads a state the instant has STEPPED, every receipt in hand is
+--   denominated at or above the cap it stepped to, and each of these
+--   predicates WEAKENS as its cap grows -- so a field fixed at one cap
+--   is either unavailable at the read or useless at the consumer, and
+--   no producer cascade repairs a direction.  What the elimination
+--   leaves standing is the INDEXED form, a per-entry cap under an
+--   absolute ceiling rather than one cap for the whole fold; and that
+--   is not a new mechanism, `stepFrame-nodes` already proving a
+--   per-frame advance under exactly such a ceiling.  The residue is
+--   whether the Φ pricing affords a leaf exponent read at a stepped
+--   cap, which the route directly above prices at a FLAT raise and
+--   therefore does not answer for an indexed one.
+-- DEAD ROUTE: that INDEXED form itself, and it dies on the same
+--   arithmetic as the flat raise -- by ONE step of the recurrence
+--   rather than at some threshold, so no ceiling is small enough.
+--   What a size receipt actually buys the Φ pricing is a LENGTH, via
+--   `pathSz?-len`, and the length lands in an EXPONENT: a sink's own
+--   factor is two to the cap times a square of it, and a fanned chain
+--   is affordable exactly while its length is under the cap the
+--   CONCLUSION is stated at.  A receipt at any larger cap bounds the
+--   length by that cap instead and multiplies the exponent by the
+--   ratio, which one step already makes a square.  Nor does weakening
+--   only the PREMISE escape it, which is how the caps face repaired
+--   its own version: there the conclusions already named the larger
+--   cap, and here they cannot, so the premise's cap reaches the
+--   conclusion through the factor lemmas either way.
+-- DEAD ROUTE: moving the Φ face's DENOMINATION rather than any
+--   receipt, which is the one shape the routes above leave standing --
+--   the receipt in hand names the stepped cap and the conclusion names
+--   the entry one, so the remaining question is which instant's
+--   numbers the whole pricing is stated at.  Both answers die on the
+--   pricing rather than on the registry, and `pathΦF`'s sink clause
+--   carries the arithmetic: the face cannot follow the cap to the
+--   stepped instant, because every frame arm spends a tie between the
+--   potential and the depth budget of the instant being WALKED and the
+--   descent carries no reading of the next; and the leaf alone cannot
+--   follow it either, because the stepped cap is a blowup OF that same
+--   depth budget.  What that leaves is not a further denomination but
+--   the obligation `pathSz?`'s header already states over its two
+--   callers: a chain the fan-out hands values to has to be priced by
+--   something that is not a cap.
 postulate
   fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (st : EvalSt e) →
@@ -1429,6 +1475,10 @@ fan-regsNest {e = e} sl id sched st h =
 --   reached counterexample is legal in both: the depth is a fact about
 --   the accumulated STORE, which neither the path's frames nor the
 --   syntax can report, so no premise threaded to a mint can pay it.
+-- DEAD ROUTE: a flat carried field answering this row, the size half
+--   and the two inner Φ arms at once, which is where those arms send
+--   their own obligation.  `fan-regsSz` carries the elimination across
+--   all four currencies, and the indexed shape it leaves standing.
 postulate
   walk-share-nestOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
