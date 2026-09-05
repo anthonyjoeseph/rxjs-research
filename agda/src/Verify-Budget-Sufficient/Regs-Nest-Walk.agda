@@ -25,7 +25,7 @@ open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
   ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-comm;
-  +-assoc; +-identityʳ)
+  +-assoc; +-identityʳ; n≤1+n; m≤n+m)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -34,12 +34,15 @@ open import Data.Vec using (lookup)
 open import Data.Unit using (⊤; tt)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
-open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
-open import Rx.Prim using (Gas; g0; gs; Id; Tick; Source; InstEvent; close; exhausted)
+open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen; ≤ᵇ-true)
+open import Rx.Prim using (Gas; g0; gs; Id; Tick; Source; InstEvent; close; exhausted;
+  InstEmit; hot; cold)
 open import Relation.Nullary using (yes; no)
-open import Rx.Exp using (Ctx; Closed; Val; Fn; applyFn; sizeᵉ; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_)
-open import Rx.Layer-Count using (layᵉ; layᵛˢ)
-open import Rx.Slots using (Slots; slotsSize)
+open import Rx.Exp using (Ctx; Closed; Val; Fn; Tm; applyFn; sizeᵉ; sizeᵗ; sizeᵛ; _×ᵗ_; obs; _≟ᵗ_;
+  input; ofᵉ; emptyᵉ; mapᵉ; takeᵉ; scanᵉ; mergeAllᵉ; switchAllᵉ; exhaustAllᵉ; μᵉ; varᵉ; deferᵉ;
+  evalTm; Exp; unfoldμ)
+open import Rx.Layer-Count using (layᵉ; layᵛˢ; layᵗ)
+open import Rx.Slots using (Slots; slotsSize; shared; scripted)
 open import Rx.Evaluator
   using (Sched; EvalSt; Frame; Path; root; share-sink; _↠_; RegId; NodeId; AllOp; map-f; scan-f;
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
@@ -47,7 +50,8 @@ open import Rx.Evaluator
   exhaust-st; takeDispatch; takeVals; lookupNode; scanVals; mergeAllᵒ; switchᵒ; exhaustᵒ;
   mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; subscribeE;
   splitBurst; hasRoom;
-  thruConsume; thruWrap; switchKill; mergeAllBump)
+  thruConsume; thruWrap; switchKill; mergeAllBump; Stream; pushBurst; splitEvents;
+  subscribeAll; subscribeSharedSlot; installNode; memberSource)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
@@ -1616,43 +1620,120 @@ thruWrap-sz-store exhaustᵒ nid true M (vs , bs , sched , st) h
 ... | just (switch-st _ _)       = h
 ... | nothing                    = h
 
+-- THE TWO FRAME KINDS THE READING CANNOT SEE.  A map hands its values
+-- on and touches no cell at all; a take rewrites its own counter, and a
+-- counter is not among the quantities the bound prices.  So both cross
+-- a store bound VERBATIM where the general step widens by a rung -- and
+-- the difference is load-bearing exactly where the widening is
+-- unaffordable, at a subscription's own burst, whose level is fixed by
+-- the program's layers before the burst is walked.
+flatFrame? : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Bool
+flatFrame? (map-f _)  = true
+flatFrame? (take-f _) = true
+flatFrame? _          = false
+
+-- ONE FLAT FRAME AT A FIXED BOUND.  The map arm hands the table back
+-- untouched, and every take arm writes a counter the reading admits at
+-- any bound whatever -- the cut's included, which moves the registry
+-- and the schedule and no cell but that one.
+stepFrame-sz-store-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+  (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e)
+  (M : ℕ) →
+  flatFrame? f ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now f κ vals fin sched st))))))
+    ≡ true
+stepFrame-sz-store-flat sf id now (map-f fn) κ vals fin sched st M hf h = h
+stepFrame-sz-store-flat sf id now (take-f nid) κ vals fin sched st M hf h
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = h
+... | just (scan-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (switch-st _ _)       = h
+... | just (exhaust-st _ _)      = h
+... | just (take-st k) with proj₂ (proj₂ (takeVals k vals))
+...   | true  = setNode-bounded M nid (take-st 0) (EvalSt.nodes st) refl h
+...   | false = setNode-bounded M nid (take-st (proj₁ (proj₂ (takeVals k vals))))
+                  (EvalSt.nodes st) refl h
+stepFrame-sz-store-flat sf id now (scan-f _ _)      κ vals fin sched st M () h
+stepFrame-sz-store-flat sf id now (from-inner _ _ _) κ vals fin sched st M () h
+stepFrame-sz-store-flat sf id now (thru-outer _ _)  κ vals fin sched st M () h
+
+-- A WHOLE BURST THROUGH ONE FLAT FRAME, which is the induction the
+-- fixed bound survives: every emit is stepped at the bound the emit
+-- before it left, and a frame that never raises it leaves the fold
+-- where it started.
+pushBurst-sz-store-flat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+  (sf : Gas) (id : Id) (now : Tick) (f : Frame Γ s u) (κ : Path Γ u t)
+  (bs : Stream Γ s) (sched : Sched Γ) (st : EvalSt e) (M : ℕ) →
+  flatFrame? f ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (pushBurst sf id now f κ bs sched st))))
+    ≡ true
+pushBurst-sz-store-flat sf id now f κ []         sched st M hf h = h
+pushBurst-sz-store-flat sf id now f κ (em ∷ ems) sched st M hf h =
+  pushBurst-sz-store-flat sf id now f κ ems
+    (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r)))) M hf
+    (stepFrame-sz-store-flat sf id now f κ
+      (proj₁ (splitEvents (InstEmit.events em)))
+      (proj₂ (proj₂ (splitEvents (InstEmit.events em))))
+      sched st M hf h)
+  where
+  r = stepFrame sf id now f κ (proj₁ (splitEvents (InstEmit.events em)))
+        (proj₂ (proj₂ (splitEvents (InstEmit.events em)))) sched st
+
 postulate
-  -- WHAT ONE SUBSCRIPTION WRITES INTO THE TABLE, which is what every
-  -- store arm reduces to once its own door and its own gas are taken
-  -- off it.  The cells the subscription installs hold that run's
-  -- emission -- reified, so priced by the program's LAYERS -- with the
-  -- telescope beside them for the slots the run connects.
+  -- A SHARED SLOT'S DEFINITION, WHICH THE REFERENCE ITSELF DOES NOT
+  -- PRICE.  `input` charges no layers whatever, so nothing in the
+  -- program term bounds what the slot holds and the entire climb a
+  -- connect may spend is bought by the TELESCOPE summand -- which is
+  -- why the premise here carries no program reading beside it.  That is
+  -- the statement's content and not a gap in it: the definition behind
+  -- the reference is counted once, where the telescope counts it, and a
+  -- reading keyed on the reference would be reading nought.
   --
-  -- AND IT IS STATED AT A LEVEL THE PROGRAM ALREADY REACHES, NOT AS A
-  -- CLIMB FROM THE PREMISE'S OWN.  That is what makes it composable
-  -- across a burst the count joins by MAX: a statement handing back
-  -- one rung per subscription would compound over the fold, and the
-  -- join says the subscriptions do not compound.  So the level is
-  -- carried as a parameter with the program's charge under it, and
-  -- every consumer's job is to show the level is never raised rather
-  -- than to add rungs up.
+  -- AND THREE OF THE FOUR DOORS WRITE NOTHING.  A join at a live share
+  -- registers, a spent one answers out of the completed list, and only
+  -- the FIRST arrival walks the definition -- so what the leaf owes is
+  -- that one walk, at a level the telescope has already paid for.
+  -- PROBED: `Probed.Parked-Slot-Store` at the program whose OWN layers
+  --   are nought -- a bare reference to a shared slot -- so the whole
+  --   climb rests on the telescope.  Read at two depths behind the same
+  --   reference, since one more rung doubles the emission while moving
+  --   the charge by four units of slot syntax; the telescope-free
+  --   reading fails at both.  So the summand REACHES the written table,
+  --   never that its size is right: one slot, one queue entry, and the
+  --   merging door alone.
+  subscribeSharedSlot-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (g : Gas) (i : Fin n) (d : Closed Γ (lookup Γ i))
+    (κ : Path Γ (lookup Γ i) t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+    Sched.slots sched ≡ sl →
+    iterSize S (slotsSize sl) B ≤ M →
+    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    (1 ≤ᵇ B) ≡ true →
+    all (λ kv → boundedNode M (proj₂ kv))
+        (EvalSt.nodes
+          (proj₂ (proj₂ (subscribeSharedSlot g i d κ id now sched st))))
+      ≡ true
+
+  -- THE SEED AND THE CELL A SCAN WRITES, the one arm whose own charge
+  -- is not the descent's.  The node is minted before the source is
+  -- subscribed and its cell holds the REIFIED seed, so what has to fit
+  -- is a term's evaluation rather than a program's layers -- and the
+  -- two are denominated differently: the proven bound on an evaluated
+  -- term is a rung count in that term's SYNTAX, where the premise buys
+  -- one rung for the whole operator.  The burst then rewrites the same
+  -- cell once per arriving value at the step function's own draw, which
+  -- is a second charge in the same currency.
   --
-  -- AND NOTHING IS CHARGED FOR THE PATH, which is sound rather than an
-  -- omission: `κ` is a CONTINUATION and not something this call walks.
-  -- What the subscription emits is handed back UP to whoever asked for
-  -- it, and the path is spent only as the decoration a later crossing
-  -- subscribes its own arrival under -- where that arrival's layers
-  -- pay for what it writes.  No node state holds a path either, so
-  -- nothing the reading prices can grow with one.  What it does cost is
-  -- that a `κ` no ancestor ever built is admitted at the same level,
-  -- since the charge is bought by the subscribed program alone.
-  --
-  -- DEAD ROUTE: telling the `+` apart from a `⊔` by INSTANTIATION.
-  --   Both summands sit inside a PREMISE, so enlarging the charge
-  --   strengthens that premise and WEAKENS the statement -- no witness
-  --   can refute the sum on either axis, however much it delivers, and
-  --   a row at the joined reading that comes out true says the sum
-  --   bought slack rather than that it was wrong.  The gap is
-  --   unreachable besides: a rung multiplies, so the two readings are a
-  --   geometric factor apart and every emission a slot telescope can
-  --   produce sits far below both.  What the sum COSTS is paid by the
-  --   consumers that must supply the premise, so it is decided at the
-  --   call sites and not by any state this statement can be entered at.
+  -- SO THE ARM IS A LEAF FOR AN ARITHMETIC REASON AND NOT A STRUCTURAL
+  -- ONE.  The recursion into the source is available and every one of
+  -- its premises transports; what does not transport is the cell.
   -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
   --   killed the constant, a scan whose step stores the arriving datum
   --   back as a one-shot observable, subscribed at all three doors.
@@ -1675,25 +1756,213 @@ postulate
   --   short.  One chain, of one length, with the telescope a single
   --   scripted slot -- so nothing about a chain whose cells resolve a
   --   SLOT, where the summand would do the work.
-  -- PROBED: `Probed.Parked-Slot-Store` at the program whose OWN layers
-  --   are nought -- a bare reference to a shared slot -- so the first
-  --   summand contributes nothing and the telescope carries the whole
-  --   climb.  Read at two depths behind the same reference, since one
-  --   more rung doubles the emission while moving the charge by four
-  --   units of slot syntax; the telescope-free reading fails at both.
-  --   So the summand REACHES the written table, never that its size is
-  --   right: one slot, one queue entry, and the merging door alone.
-  subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+  subscribeE-sz-store-scan : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u s}
+    (sl : Slots Γ) (g : Gas) (f : Fn Γ [] [] [] (u ×ᵗ s) u)
+    (z : Tm Γ [] [] [] u) (b : Closed Γ s) (κ : Path Γ u t)
     (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
     Sched.slots sched ≡ sl →
-    iterSize S (layᵉ o + slotsSize sl) B ≤ M →
+    iterSize S (layᵉ (scanᵉ f z b) + slotsSize sl) B ≤ M →
     all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
-    (sizeᵉ o ≤ᵇ B) ≡ true →
+    (sizeᵉ (scanᵉ f z b) ≤ᵇ B) ≡ true →
     all (λ kv → boundedNode M (proj₂ kv))
-        (EvalSt.nodes (proj₂ (proj₂ (subscribeE g o κ id now sched st))))
+        (EvalSt.nodes
+          (proj₂ (proj₂ (subscribeE g (scanᵉ f z b) κ id now sched st))))
       ≡ true
+
+  -- A CROSSING DOOR'S OWN NODE, minted with the operator's initial cell
+  -- and handed the outer's arrivals under a `thru-outer`.  The cell is
+  -- a PARAMETER here rather than read off the door, so the three
+  -- operators share one statement and none of them has a case to offer:
+  -- what each installs must be admitted at the caller's own bound,
+  -- which the last premise asks for and every door answers by `refl`.
+  --
+  -- AND THE BURST IS THE PART THAT IS NOT THE DESCENT'S.  A
+  -- `thru-outer` frame SUBSCRIBES what it is handed, so an emit
+  -- crossing it re-enters at a level the ARRIVING VALUE fixes and not
+  -- at the one the outer was subscribed at.  That is exactly the gap
+  -- the two flat frames do not have, and it is why this door cannot be
+  -- assembled out of the shelf that serves them.
+  subscribeAll-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+    (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+    Sched.slots sched ≡ sl →
+    iterSize S (suc (layᵉ b) + slotsSize sl) B ≤ M →
+    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    (sizeᵉ b ≤ᵇ B) ≡ true →
+    boundedNode M ns ≡ true →
+    all (λ kv → boundedNode M (proj₂ kv))
+        (EvalSt.nodes
+          (proj₂ (proj₂ (subscribeAll g op ns b κ id now sched st))))
+      ≡ true
+
+  -- THE UNFOLDING, WHOSE SIZE PREMISE DOES NOT SURVIVE IT.  A `μ` is
+  -- subscribed by substituting its own body for the recursive
+  -- occurrence, and `size-unfoldμ` bounds the result by the SQUARE of
+  -- the program's size -- so a hypothesis buying one copy cannot pay
+  -- for the unfolded one, and the recursion this arm would otherwise
+  -- take is unavailable at the premise its caller supplies.
+  --
+  -- THE LAYER SIDE IS UNTOUCHED BY THE SAME SUBSTITUTION, since the
+  -- recursive occurrence is reachable only past a `defer` and a defer
+  -- charges nothing.  So the leaf is about the size side alone, and
+  -- what it owes is a bound on what ONE unfolding writes rather than a
+  -- transport of the caller's.
+  subscribeE-sz-store-μ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (g : Gas) (body : Exp Γ (u ∷ []) [] [] u)
+    (κ : Path Γ u t) (id : Id) (now : Tick)
+    (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+    Sched.slots sched ≡ sl →
+    iterSize S (layᵉ (μᵉ body) + slotsSize sl) B ≤ M →
+    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    (sizeᵉ (μᵉ body) ≤ᵇ B) ≡ true →
+    all (λ kv → boundedNode M (proj₂ kv))
+        (EvalSt.nodes
+          (proj₂ (proj₂ (subscribeE g (unfoldμ body) κ id now sched st))))
+      ≡ true
+
+-- THE SIZE PREMISE THROUGH ONE CONSTRUCTOR, which every arm needs and
+-- none needs differently: a subterm is smaller, so the bound the caller
+-- supplied for the whole program already pays for it.
+sz-sub : ∀ (a o B : ℕ) → a ≤ o → (o ≤ᵇ B) ≡ true → (a ≤ᵇ B) ≡ true
+sz-sub a o B h hb = ≤ᵇ-true a B (≤-trans h (≤ᵇ⇒≤ o B (T-to hb)))
+
+-- AND THE LEVEL PREMISE THE SAME WAY.  A rung is monotone in the count
+-- it is taken at, so a subterm charging fewer layers than its parent
+-- meets whatever ceiling the parent met -- at the SAME rung, which is
+-- the whole point: the descent may not climb one per operator.
+lay-sub : ∀ (S B M j j′ : ℕ) → 2 ≤ S → j ≤ j′ →
+  iterSize S j′ B ≤ M → iterSize S j B ≤ M
+lay-sub S B M j j′ 2≤S h le =
+  ≤-trans (iterSize-mono-count S B (≤-trans (s≤s z≤n) 2≤S) h) le
+
+-- WHAT ONE SUBSCRIPTION WRITES INTO THE TABLE, which is what every
+-- store arm reduces to once its own door and its own gas are taken
+-- off it.  The cells the subscription installs hold that run's
+-- emission -- reified, so priced by the program's LAYERS -- with the
+-- telescope beside them for the slots the run connects.
+--
+-- AND IT IS STATED AT A LEVEL THE PROGRAM ALREADY REACHES, NOT AS A
+-- CLIMB FROM THE PREMISE'S OWN.  That is what makes it composable
+-- across a burst the count joins by MAX: a statement handing back one
+-- rung per subscription would compound over the fold, and the join
+-- says the subscriptions do not compound.  So the level is carried as
+-- a parameter with the program's charge under it, and every
+-- consumer's job is to show the level is never raised rather than to
+-- add rungs up.
+--
+-- AND THE BODY IS WHAT SAYS ONE RUNG COVERS ONE OPERATOR.  Four arms
+-- descend at the caller's own level with the premises transported by
+-- the two subterm lemmas above; two frame kinds cross a burst without
+-- moving the table at all; and what is left over is the four leaves,
+-- each owing something the descent cannot hand it -- a definition
+-- behind a reference, a cell in a currency the premise is not stated
+-- in, an arrival that re-enters at its own level, and a substitution
+-- that squares the size.
+--
+-- AND NOTHING IS CHARGED FOR THE PATH, which is sound rather than an
+-- omission: `κ` is a CONTINUATION and not something this call walks.
+-- What the subscription emits is handed back UP to whoever asked for
+-- it, and the path is spent only as the decoration a later crossing
+-- subscribes its own arrival under -- where that arrival's layers pay
+-- for what it writes.  No node state holds a path either, so nothing
+-- the reading prices can grow with one.  What it does cost is that a
+-- `κ` no ancestor ever built is admitted at the same level, since the
+-- charge is bought by the subscribed program alone.
+--
+-- DEAD ROUTE: telling the `+` apart from a `⊔` by INSTANTIATION.
+--   Both summands sit inside a PREMISE, so enlarging the charge
+--   strengthens that premise and WEAKENS the statement -- no witness
+--   can refute the sum on either axis, however much it delivers, and
+--   a row at the joined reading that comes out true says the sum
+--   bought slack rather than that it was wrong.  The gap is
+--   unreachable besides: a rung multiplies, so the two readings are a
+--   geometric factor apart and every emission a slot telescope can
+--   produce sits far below both.  What the sum COSTS is paid by the
+--   consumers that must supply the premise, so it is decided at the
+--   call sites and not by any state this statement can be entered at.
+subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+  (id : Id) (now : Tick)
+  (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+  Sched.slots sched ≡ sl →
+  iterSize S (layᵉ o + slotsSize sl) B ≤ M →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  (sizeᵉ o ≤ᵇ B) ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (subscribeE g o κ id now sched st))))
+    ≡ true
+subscribeE-sz-store sl g (input i) κ id now sched st S B M 2≤S slEq le hns hb
+  with Sched.slots sched i
+... | shared d =
+      subscribeSharedSlot-sz-store sl g i d κ id now sched st S B M
+        2≤S slEq le hns hb
+... | scripted (hot _) with memberSource (toℕ i) (EvalSt.completedSources st)
+...   | true  = hns
+...   | false = hns
+subscribeE-sz-store sl g (input i) κ id now sched st S B M 2≤S slEq le hns hb
+  | scripted (cold sync [])       = hns
+subscribeE-sz-store sl g (input i) κ id now sched st S B M 2≤S slEq le hns hb
+  | scripted (cold sync (d ∷ ds)) = hns
+subscribeE-sz-store sl g (ofᵉ ts) κ id now sched st S B M 2≤S slEq le hns hb = hns
+subscribeE-sz-store sl g emptyᵉ   κ id now sched st S B M 2≤S slEq le hns hb = hns
+subscribeE-sz-store sl g (mapᵉ f b) κ id now sched st S B M 2≤S slEq le hns hb =
+  pushBurst-sz-store-flat g id now (map-f f) κ
+    (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)) M refl
+    (subscribeE-sz-store sl g b (map-f f ↠ κ) id now sched st S B M 2≤S slEq
+      (lay-sub S B M (layᵉ b + slotsSize sl)
+        (suc (layᵗ f ⊔ layᵉ b) + slotsSize sl) 2≤S
+        (+-monoˡ-≤ (slotsSize sl)
+          (≤-trans (m≤n⊔m (layᵗ f) (layᵉ b)) (n≤1+n _))) le)
+      hns
+      (sz-sub (sizeᵉ b) (suc (sizeᵗ f + sizeᵉ b)) B
+        (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ f)) (n≤1+n _)) hb))
+  where SE = subscribeE g b (map-f f ↠ κ) id now sched st
+subscribeE-sz-store sl g (takeᵉ c b) κ id now sched st S B M 2≤S slEq le hns hb
+  with evalTm c
+... | zero  = hns
+... | suc k =
+      pushBurst-sz-store-flat g id now (take-f nid) κ
+        (proj₁ SE) (proj₁ (proj₂ SE)) (proj₂ (proj₂ SE)) M refl
+        (subscribeE-sz-store sl g b (take-f nid ↠ κ) id now sched₁ st₀ S B M
+          2≤S slEq
+          (lay-sub S B M (layᵉ b + slotsSize sl)
+            (suc (layᵗ c ⊔ layᵉ b) + slotsSize sl) 2≤S
+            (+-monoˡ-≤ (slotsSize sl)
+              (≤-trans (m≤n⊔m (layᵗ c) (layᵉ b)) (n≤1+n _))) le)
+          (setNode-bounded M nid (take-st (suc k)) (EvalSt.nodes st) refl hns)
+          (sz-sub (sizeᵉ b) (suc (sizeᵗ c + sizeᵉ b)) B
+            (≤-trans (m≤n+m (sizeᵉ b) (sizeᵗ c)) (n≤1+n _)) hb))
+      where
+      nid    = Sched.nextNode sched
+      sched₁ = record sched { nextNode = suc (Sched.nextNode sched) }
+      st₀    = installNode nid (take-st (suc k)) st
+      SE     = subscribeE g b (take-f nid ↠ κ) id now sched₁ st₀
+subscribeE-sz-store sl g (scanᵉ f z b) κ id now sched st S B M 2≤S slEq le hns hb =
+  subscribeE-sz-store-scan sl g f z b κ id now sched st S B M 2≤S slEq le hns hb
+subscribeE-sz-store {u = u} sl g (mergeAllᵉ lim b) κ id now sched st S B M
+                    2≤S slEq le hns hb =
+  subscribeAll-sz-store sl g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
+    b κ id now sched st S B M 2≤S slEq le hns
+    (sz-sub (sizeᵉ b) (suc (sizeᵉ b)) B (n≤1+n _) hb) refl
+subscribeE-sz-store sl g (switchAllᵉ b) κ id now sched st S B M 2≤S slEq le hns hb =
+  subscribeAll-sz-store sl g switchᵒ (switch-st nothing false)
+    b κ id now sched st S B M 2≤S slEq le hns
+    (sz-sub (sizeᵉ b) (suc (sizeᵉ b)) B (n≤1+n _) hb) refl
+subscribeE-sz-store sl g (exhaustAllᵉ b) κ id now sched st S B M 2≤S slEq le hns hb =
+  subscribeAll-sz-store sl g exhaustᵒ (exhaust-st false false)
+    b κ id now sched st S B M 2≤S slEq le hns
+    (sz-sub (sizeᵉ b) (suc (sizeᵉ b)) B (n≤1+n _) hb) refl
+subscribeE-sz-store sl g0 (μᵉ body) κ id now sched st S B M 2≤S slEq le hns hb = hns
+subscribeE-sz-store sl (gs fuel) (μᵉ body) κ id now sched st S B M
+                    2≤S slEq le hns hb =
+  subscribeE-sz-store-μ sl fuel body κ id now sched st S B M 2≤S slEq le hns hb
+subscribeE-sz-store sl g (varᵉ ()) κ id now sched st S B M 2≤S slEq le hns hb
+subscribeE-sz-store {u = u} sl g (deferᵉ body) κ id now sched st S B M
+                    2≤S slEq le hns hb =
+  setNode-bounded M (Sched.nextNode sched)
+    (mergeAll-st {t = u} nothing 0 [] false) (EvalSt.nodes st) refl hns
 
 -- ONE ARRIVAL SUBSCRIBED, WHICH IS THE STORE SIDE'S LAST DOOR.  A
 -- crossing frame mints the inner's exit-frame instance and then does

@@ -2,7 +2,7 @@
 -- THE PARKED SLOT REFERENCE, WHERE THE INNER CHARGE'S FIRST SUMMAND
 -- READS NOTHING AND THE WHOLE CLIMB IS THE TELESCOPE.
 --
--- TARGET: subscribeE-sz-store @f8b804
+-- TARGET: subscribeSharedSlot-sz-store @048f7d
 --
 -- WHAT EVERY STORE ROW SO FAR LEFT OPEN.  This charge is the deepest
 -- parked program's LAYERS joined over the queue, plus the telescope.
@@ -66,7 +66,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner; _↠_;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (parkedLayAt; subscribeE-sz-store)
+  using (parkedLayAt; subscribeSharedSlot-sz-store)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -209,7 +209,7 @@ slotStoreRows≡ = refl
 -- reading beside it does.  The queue entry is passed as the arrival,
 -- which is what the singleton drain hands the subscription.
 tieParkedSlot12 : Confirms
-  (subscribeE-sz-store {e = eᴾ} slᴾ (gasPad 63 g0) oᴾ
+  (subscribeSharedSlot-sz-store {e = eᴾ} slᴾ (gasPad 63 g0) fz (reifyG 12)
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      (record (sched-init eᴾ slᴾ) { nextNode = 1 }) stᴾ 59 59
      (iterSize 59 (layᵉ oᴾ + slotsSize slᴾ) 59))
@@ -218,7 +218,7 @@ tieParkedSlot12 = λ _ _ _ _ _ → refl
 -- LOAD-BEARING: the same statement one rung deeper behind the
 -- reference, which is the sweep's measure-side axis.
 tieParkedSlot13 : Confirms
-  (subscribeE-sz-store {e = eᴿ} slᴿ (gasPad 63 g0) oᴿ
+  (subscribeSharedSlot-sz-store {e = eᴿ} slᴿ (gasPad 63 g0) fz (reifyG 13)
      (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
      (record (sched-init eᴿ slᴿ) { nextNode = 1 }) stᴿ 63 63
      (iterSize 63 (layᵉ oᴿ + slotsSize slᴿ) 63))
