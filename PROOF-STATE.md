@@ -215,17 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE FRAME ARMS' NEST PREMISES, RESTATED AT THE CAP.** The
-  potential is a sum of two halves denominated differently: the walk
-  half multiplies the program's UNIT and is affordable only because the
-  unit sits under the size cap, so no cap-denominated premise can be
-  spent there. The CAP half is where the swap lands, and its
-  coefficient now carries the path factor's own cap, so the room is
-  proven rather than argued. The commit moves `pathNestD`'s bound from
-  `nestUnit` to the instant's `nestCapAt` at every frame arm, and
-  re-fits the arms that spent the unit-side widening.
-
-- **THEN THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
+- **THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
   `stepFrame-sz-inner` is still charged one rung and still FALSE at it.
   Its program is not in `vals` at all — it is what the `*All` node
   PARKED — so its count is a function of the entry table and the outer
@@ -242,7 +232,17 @@ does not fit is a finding about the shared statement, not about the head.
   the residue. They come after the frame pair because a frame charge
   that reads the arrived program is what a store charge would be stated
   over, and stating the store half first would price it against a
-  denomination the leg before this one is about to replace.
+  denomination the leg before this one has only just replaced.
+
+- **THEN THE REGISTRY'S DEPTH, HONESTLY CAP-SIDE.** Every frame arm now
+  ACCEPTS a cap-denominated depth receipt; `fan-regsNest` is the one
+  producer still minting a unit-side one, and its consumers reach it
+  through a composition that throws the extra room away. A BARE cap-side
+  restatement is refuted before it is written — the cap AT INSTANT ZERO
+  IS the unit, and the reached chain already crosses it there — so the
+  statement that replaces it carries the walk's own admissibility, and
+  the commit is what says whether that hypothesis is available where the
+  fan reads the registry.
 
 ### The ledger
 
@@ -282,9 +282,9 @@ does not fit is a finding about the shared statement, not about the head.
   the fan-out's own reading, which nothing has instantiated.
 - **`fan-regsNest`** (Part7/Depth-Fit) — SHAPE,
   `REFUTED×2, DEAD ROUTE×2, PROBED`: the registry's own depth against the
-  syntactic unit. The cap-denominated statement is two proven steps, the unit
-  sits under the cap, and the reached counterexample survives every premise —
-  so the conclusion moves and the Φ face's currency with it.
+  syntactic unit. Every consumer now ACCEPTS a cap-side receipt, so what is
+  left is the producer; a bare cap-side form is refuted at instant zero, where
+  the cap IS the unit, so the replacement carries admissibility.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the

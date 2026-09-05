@@ -137,7 +137,7 @@ private
 ------------------------------------------------------------------
 -- SERIES — THE DEPTH CHARGE AT THE ENTRY INSTANT, PRICED.
 --
--- TARGET: scanΦ-fit @ce80e6
+-- TARGET: scanΦ-fit @f61ffa
 --
 -- WHY THIS CANNOT BE A PROBE.  The arm's residue is that no premise
 -- names the node table, and the fact that would is ambient — so the
@@ -218,7 +218,7 @@ driveH n = go n (let r = subscribeE
 ------------------------------------------------------------------
 -- SERIES — THE DRIVEN REFOLD PAST THE LAYER THE PROBE TREE REACHES.
 --
--- TARGET: scanΦ-fit @ce80e6
+-- TARGET: scanΦ-fit @f61ffa
 --
 -- WHAT IS OWED.  `Probed.Fold-Width-Reach` decides the fork between
 -- the two width READINGS and stops one layer in: its run crosses the
@@ -245,6 +245,16 @@ driveH n = go n (let r = subscribeE
 -- for.  One growing like a power of the burst puts it IN reach, and
 -- then the falsity is on the count axis and on the budget at this
 -- recurrence rather than on this arm.
+--
+-- AND THE BURST ROWS ANSWER THAT BINARY: A CUBE, NOT A LINE.  One
+-- layer, the later arrivals held at three, bursts one through seven
+-- read 1, 16, 27, 64, 125, 216, 343 -- b³ from three on, and above it
+-- at two.  The proven entry ceiling stands still at 10 across the
+-- whole sweep while the widest instant cubes, so the count a run
+-- reaches is script-denominated AND a power of the script's own
+-- burst.  That is the side of the binary on which the falsity sits at
+-- the count axis and at this recurrence's budget rather than on the
+-- arm, and it is what the arm's premise-carrying dead route rests on.
 --
 -- THE `outWⱽ` COLUMN IS THE PROVEN CEILING ON THE SUBSCRIBE BURST
 -- ALONE (`burst-out`), and is printed because it is what seeds the

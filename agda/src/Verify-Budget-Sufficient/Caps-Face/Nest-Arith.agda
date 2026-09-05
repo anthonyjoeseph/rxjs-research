@@ -183,30 +183,35 @@ abstract
   -- still apply, and that factor is capped at two to `(S + S) *
   -- (suc S * S)` -- so a charge whose exponent is smaller than that
   -- can only be spent against a multiplicand the size cap covers,
-  -- which is the UNIT and not the cap.  The exponent here IS that
-  -- factor's cap, written out as the two cubes and two squares it
-  -- expands to, so the cap-denominated half of the potential is the
-  -- half a cap-denominated premise is spent against.
+  -- which is the UNIT and not the cap.  The exponent here is that
+  -- factor's cap -- the two cubes and two squares it expands to --
+  -- and TWO beside it, since the arm doubles its own charge before
+  -- splitting it and each half is doubled again by the frame's own
+  -- factor.  So the cap-denominated half of the potential is the half
+  -- a cap-denominated premise is spent against.
   capΦAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) → ℕ
   capΦAt e sl id =
-    2 ^ suc (Caps.cSize (capsAt e sl id)
-               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-             + Caps.cSize (capsAt e sl id)
-               * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-             + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-                + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+    2 ^ suc (suc (Caps.cSize (capsAt e sl id)
+                    * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+                  + Caps.cSize (capsAt e sl id)
+                    * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
+                  + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+                     + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))))
       * nestCapAt e sl id
 
   capΦAt-def : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
     (id : ℕ) →
     capΦAt e sl id
-      ≡ 2 ^ suc (Caps.cSize (capsAt e sl id)
-                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-                 + Caps.cSize (capsAt e sl id)
-                   * (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id))
-                 + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
-                    + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+      ≡ 2 ^ suc (suc (Caps.cSize (capsAt e sl id)
+                        * (Caps.cSize (capsAt e sl id)
+                           * Caps.cSize (capsAt e sl id))
+                      + Caps.cSize (capsAt e sl id)
+                        * (Caps.cSize (capsAt e sl id)
+                           * Caps.cSize (capsAt e sl id))
+                      + (Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)
+                         + Caps.cSize (capsAt e sl id)
+                           * Caps.cSize (capsAt e sl id))))
           * nestCapAt e sl id
   capΦAt-def _ _ _ = refl
 
@@ -228,7 +233,7 @@ abstract
   nestCapAt≤nestΦAt e sl id =
     ≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ (nestCapAt e sl id))))
                      (*-monoˡ-≤ (nestCapAt e sl id)
-                                (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
+                                (m^n>0 2 (suc (suc (Caps.cSize (capsAt e sl id)
                                                  * (Caps.cSize (capsAt e sl id)
                                                     * Caps.cSize (capsAt e sl id))
                                                + Caps.cSize (capsAt e sl id)
@@ -237,7 +242,7 @@ abstract
                                                + (Caps.cSize (capsAt e sl id)
                                                     * Caps.cSize (capsAt e sl id)
                                                   + Caps.cSize (capsAt e sl id)
-                                                    * Caps.cSize (capsAt e sl id)))))))
+                                                    * Caps.cSize (capsAt e sl id))))))))
             (m≤m+n (capΦAt e sl id) (nestWalkAt e sl id))
 
 -- THE SLOT VOCABULARY'S NESTING UNDER ITS SIZE, slot by slot: a
@@ -395,6 +400,17 @@ quint4≤2^ S 31≤S =
         (m∸n+n≡m 31≤S)
         (quint-exp (S ∸ 31))
 
+-- THE PATH FACTOR'S EXPONENT, EXPANDED.  The factor's own ceiling is
+-- stated in the form the path's recursion produces, and both readings
+-- of it below need the polynomial: the cap's charge is denominated at
+-- exactly this exponent, and the walk's is widened from it.
+pathExp≡ : ∀ (S : ℕ) →
+  (S + S) * (suc S * S) ≡ S * (S * S) + S * (S * S) + (S * S + S * S)
+pathExp≡ S = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
+                              := s :* (s :* s) :+ s :* (s :* s)
+                                 :+ (s :* s :+ s :* s))
+                   refl S
+
 -- THE EXPONENT THE PATH FACTOR IS CAPPED AT, READ INTO THE WALK'S OWN.
 -- A path's factor is capped at two to `(S + S) * (suc S * S)`, which
 -- expands to two cubes and two squares, while the walk's exponent is
@@ -405,7 +421,7 @@ walkExp-widen : ∀ (S : ℕ) → 1 ≤ S →
     ≤ S * (S * (S * (S * S))) + S * (S * (S * (S * S)))
       + S * (S * (S * (S * S))) + (S * S + S * S)
 walkExp-widen S 1≤S =
-  ≤-trans (≤-reflexive cubeShape)
+  ≤-trans (≤-reflexive (pathExp≡ S))
           (+-monoˡ-≤ (S * S + S * S)
             (≤-trans (+-mono-≤ C3≤C5 C3≤C5) (m≤m+n (C5 + C5) C5)))
   where
@@ -415,11 +431,68 @@ walkExp-widen S 1≤S =
   ≤mul x = ≤-trans (≤-reflexive (sym (*-identityˡ x))) (*-monoˡ-≤ x 1≤S)
   C3≤C5 : C3 ≤ C5
   C3≤C5 = ≤-trans (≤mul C3) (≤mul (S * C3))
-  cubeShape : (S + S) * (suc S * S) ≡ C3 + C3 + (S * S + S * S)
-  cubeShape = solve 1 (λ s → (s :+ s) :* ((con 1 :+ s) :* s)
-                               := s :* (s :* s) :+ s :* (s :* s)
-                                  :+ (s :* s :+ s :* s))
-                    refl S
+
+-- WHAT ONE FRAME ARM MAY SPEND, AND IT IS THE WHOLE OF WHY THE
+-- POTENTIAL IS A SUM.  An outer frame charges its remaining path
+-- depth and the context's wrap through the factor the path can still
+-- apply, and doubles the result twice over -- once splitting its own
+-- charge and once for the frame's own factor.  The depth splits into
+-- the instant's CAP and one square, and the two pieces land on
+-- DIFFERENT halves: the cap piece is exactly the cap's charge, since
+-- that charge is denominated at the path factor's own ceiling with
+-- the two doublings beside it; the square and the wrap land inside
+-- the walk's multiplicand, whose exponent the same ceiling widens
+-- into.  Neither piece could be paid by the other half -- the walk's
+-- multiplicand names no cap, and the cap's charge is below the walk's
+-- exponent -- so the sum is what a frame arm needs and neither
+-- summand alone is.
+nestΦ-frame-charge : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+  (id : ℕ) →
+  4 * (2 ^ ((Caps.cSize (capsAt e sl id) + Caps.cSize (capsAt e sl id))
+              * (suc (Caps.cSize (capsAt e sl id))
+                 * Caps.cSize (capsAt e sl id)))
+       * (nestCapAt e sl id
+          + Caps.cSize (capsAt e sl id) * Caps.cSize (capsAt e sl id)))
+    + 2 * (2 ^ ((Caps.cSize (capsAt e sl id) + Caps.cSize (capsAt e sl id))
+                  * (suc (Caps.cSize (capsAt e sl id))
+                     * Caps.cSize (capsAt e sl id)))
+           * (Caps.cSize (capsAt e sl id) * slotWrapSum sl))
+    ≤ nestΦAt e sl id
+nestΦ-frame-charge e sl id =
+  ≤-trans (≤-reflexive split)
+  (≤-trans (+-mono-≤ (≤-reflexive capHalf) walkHalf)
+           (≤-reflexive (sym (nestΦAt-def e sl id))))
+  where
+  S  = Caps.cSize (capsAt e sl id)
+  Sq = S * S
+  Cu = S * (S * S)
+  E  = Cu + Cu + (Sq + Sq)
+  Z  = 2 ^ ((S + S) * (suc S * S))
+  C  = nestCapAt e sl id
+  U  = nestUnit e sl
+  W  = slotWrapSum sl
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+  split : 4 * (Z * (C + Sq)) + 2 * (Z * (S * W))
+            ≡ 4 * (Z * C) + 2 * (Z * (Sq + Sq + S * W))
+  split = solve 4 (λ z c q v →
+                     con 4 :* (z :* (c :+ q)) :+ con 2 :* (z :* v)
+                       := con 4 :* (z :* c)
+                          :+ con 2 :* (z :* (q :+ q :+ v)))
+                refl Z C Sq (S * W)
+  coeff : 4 * Z ≡ 2 ^ suc (suc E)
+  coeff = trans (cong (λ z → 4 * 2 ^ z) (pathExp≡ S)) (*-assoc 2 2 (2 ^ E))
+  capHalf : 4 * (Z * C) ≡ capΦAt e sl id
+  capHalf = trans (sym (*-assoc 4 Z C))
+                  (trans (cong (_* C) coeff) (sym (capΦAt-def e sl id)))
+  xwFit : Sq + Sq + S * W ≤ U + (Sq + Sq) + S + S * W
+  xwFit = +-monoˡ-≤ (S * W)
+            (≤-trans (m≤n+m (Sq + Sq) U) (m≤m+n (U + (Sq + Sq)) S))
+  walkHalf : 2 * (Z * (Sq + Sq + S * W)) ≤ nestWalkAt e sl id
+  walkHalf =
+    ≤-trans (≤-reflexive (sym (*-assoc 2 Z (Sq + Sq + S * W))))
+    (≤-trans (*-mono-≤ (^-monoʳ-≤ 2 (s≤s (walkExp-widen S 1≤S))) xwFit)
+             (≤-reflexive (sym (nestWalkAt-def e sl id))))
 
 -- THE INSTANT'S SIZE GROWTH, OVER A BARE COUNT.  A frame multiplies
 -- the size by a fixed step, so `j` of them is a power whose base is a
@@ -923,21 +996,22 @@ mash4 s q c =
 -- with four to spare, which the size cap's reachable floor buys at the
 -- same threshold the walk's charge is already fitted at.
 capΦ-room-ℕ : ∀ (S′ p : ℕ) → 31 ≤ S′ → p ≤ S′ →
-  2 * (S′ + suc (S′ * (S′ * S′) + S′ * (S′ * S′)
-                 + (S′ * S′ + S′ * S′)) + 3 + p)
+  2 * (S′ + suc (suc (S′ * (S′ * S′) + S′ * (S′ * S′)
+                      + (S′ * S′ + S′ * S′))) + 3 + p)
     ≤ 2 ^ S′
 capΦ-room-ℕ S′ p 31≤S′ hp =
-  ≤-trans (*-monoʳ-≤ 2 (+-monoʳ-≤ (S′ + suc (Cu + Cu + (Sq + Sq)) + 3) hp))
+  ≤-trans (*-monoʳ-≤ 2 (+-monoʳ-≤ (S′ + suc (suc (Cu + Cu + (Sq + Sq))) + 3) hp))
   (≤-trans (≤-reflexive expand)
-  (≤-trans (*-monoʳ-≤ 4 rest) (quint4≤2^ S′ 31≤S′)))
+  (≤-trans wide
+  (≤-trans (*-monoʳ-≤ 4 rest) (quint4≤2^ S′ 31≤S′))))
   where
   Sq = S′ * S′
   Cu = S′ * (S′ * S′)
   Qu = S′ * (S′ * (S′ * (S′ * S′)))
   1≤S′ : 1 ≤ S′
   1≤S′ = ≤-trans (≤ᵇ⇒≤ 1 31 tt) 31≤S′
-  2≤S′ : 2 ≤ S′
-  2≤S′ = ≤-trans (≤ᵇ⇒≤ 2 31 tt) 31≤S′
+  3≤S′ : 3 ≤ S′
+  3≤S′ = ≤-trans (≤ᵇ⇒≤ 3 31 tt) 31≤S′
   4≤S′ : 4 ≤ S′
   4≤S′ = ≤-trans (≤ᵇ⇒≤ 4 31 tt) 31≤S′
   S′≤Sq : S′ ≤ Sq
@@ -946,26 +1020,33 @@ capΦ-room-ℕ S′ p 31≤S′ hp =
   Sq≤Cu = *-monoʳ-≤ S′ S′≤Sq
   S′≤Cu : S′ ≤ Cu
   S′≤Cu = ≤-trans S′≤Sq Sq≤Cu
-  2≤Cu : 2 ≤ Cu
-  2≤Cu = ≤-trans 2≤S′ S′≤Cu
+  3≤Cu : 3 ≤ Cu
+  3≤Cu = ≤-trans 3≤S′ S′≤Cu
   4≤Sq : 4 ≤ Sq
   4≤Sq = ≤-trans 4≤S′ S′≤Sq
-  expand : 2 * (S′ + suc (Cu + Cu + (Sq + Sq)) + 3 + S′)
-             ≡ 4 * (Cu + Sq + S′ + 2)
+  expand : 2 * (S′ + suc (suc (Cu + Cu + (Sq + Sq))) + 3 + S′)
+             ≡ 4 * (Cu + Sq + S′) + 10
   expand = solve 3 (λ s c q →
-                      con 2 :* (s :+ (con 1 :+ (c :+ c :+ (q :+ q)))
+                      con 2 :* (s :+ (con 2 :+ (c :+ c :+ (q :+ q)))
                                 :+ con 3 :+ s)
-                        := con 4 :* (c :+ q :+ s :+ con 2))
+                        := con 4 :* (c :+ q :+ s) :+ con 10)
                  refl S′ Cu Sq
+  wideEq : 4 * (Cu + Sq + S′ + 3) ≡ 4 * (Cu + Sq + S′) + 12
+  wideEq = solve 3 (λ s c q → con 4 :* (c :+ q :+ s :+ con 3)
+                                := con 4 :* (c :+ q :+ s) :+ con 12)
+                 refl S′ Cu Sq
+  wide : 4 * (Cu + Sq + S′) + 10 ≤ 4 * (Cu + Sq + S′ + 3)
+  wide = ≤-trans (+-monoʳ-≤ (4 * (Cu + Sq + S′)) (≤ᵇ⇒≤ 10 12 tt))
+                 (≤-reflexive (sym wideEq))
   fourCu : Cu + Cu + Cu + Cu ≡ 4 * Cu
   fourCu = solve 1 (λ c → c :+ c :+ c :+ c := con 4 :* c) refl Cu
   quEq : Sq * Cu ≡ Qu
   quEq = solve 1 (λ s → s :* s :* (s :* (s :* s))
                           := s :* (s :* (s :* (s :* s))))
                refl S′
-  rest : Cu + Sq + S′ + 2 ≤ Qu
+  rest : Cu + Sq + S′ + 3 ≤ Qu
   rest =
-    ≤-trans (+-mono-≤ (+-mono-≤ (+-monoʳ-≤ Cu Sq≤Cu) S′≤Cu) 2≤Cu)
+    ≤-trans (+-mono-≤ (+-mono-≤ (+-monoʳ-≤ Cu Sq≤Cu) S′≤Cu) 3≤Cu)
     (≤-trans (≤-reflexive fourCu)
     (≤-trans (*-monoˡ-≤ Cu 4≤Sq) (≤-reflexive quEq)))
 
@@ -975,7 +1056,7 @@ capΦ-room-ℕ S′ p 31≤S′ hp =
 -- costs one size while the coefficient costs its own exponent, both of
 -- them under the fifth power the floor affords.
 capΦ-base-ℕ : ∀ (S u : ℕ) → 31 ≤ S → u ≤ S →
-  S * (4 * (2 ^ suc (S * (S * S) + S * (S * S) + (S * S + S * S)) * u))
+  S * (4 * (2 ^ suc (suc (S * (S * S) + S * (S * S) + (S * S + S * S))) * u))
     ≤ 2 ^ (2 ^ S)
 capΦ-base-ℕ S u 31≤S hu =
   ≤-trans (*-monoʳ-≤ S (*-monoʳ-≤ 4 (*-monoʳ-≤ (2 ^ Ê) hu)))
@@ -987,7 +1068,7 @@ capΦ-base-ℕ S u 31≤S hu =
   Sq = S * S
   Cu = S * (S * S)
   Qu = S * (S * (S * (S * S)))
-  Ê  = suc (Cu + Cu + (Sq + Sq))
+  Ê  = suc (suc (Cu + Cu + (Sq + Sq)))
   1≤S : 1 ≤ S
   1≤S = ≤-trans (≤ᵇ⇒≤ 1 31 tt) 31≤S
   2≤S : 2 ≤ S
@@ -1011,20 +1092,20 @@ capΦ-base-ℕ S u 31≤S hu =
   twoS = solve 1 (λ s → s :+ s := con 2 :* s) refl S
   SqSq≤Cu : Sq + Sq ≤ Cu
   SqSq≤Cu = ≤-trans (≤-reflexive twoSq) (*-monoˡ-≤ Sq 2≤S)
-  S1≤Cu : S + 1 ≤ Cu
-  S1≤Cu =
-    ≤-trans (+-monoʳ-≤ S 1≤S)
+  S2≤Cu : S + 2 ≤ Cu
+  S2≤Cu =
+    ≤-trans (+-monoʳ-≤ S 2≤S)
     (≤-trans (≤-reflexive twoS) (≤-trans (*-monoˡ-≤ S 2≤S) Sq≤Cu))
-  fshape : S + Ê ≡ Cu + Cu + (Sq + Sq) + (S + 1)
-  fshape = solve 3 (λ s c q → s :+ (con 1 :+ (c :+ c :+ (q :+ q)))
-                                := c :+ c :+ (q :+ q) :+ (s :+ con 1))
+  fshape : S + Ê ≡ Cu + Cu + (Sq + Sq) + (S + 2)
+  fshape = solve 3 (λ s c q → s :+ (con 2 :+ (c :+ c :+ (q :+ q)))
+                                := c :+ c :+ (q :+ q) :+ (s :+ con 2))
                  refl S Cu Sq
   fourEq : Cu + Cu + Cu + Cu ≡ 4 * Cu
   fourEq = solve 1 (λ c → c :+ c :+ c :+ c := con 4 :* c) refl Cu
   fit : S + Ê ≤ 2 ^ S
   fit =
     ≤-trans (≤-reflexive fshape)
-    (≤-trans (+-mono-≤ (+-monoʳ-≤ (Cu + Cu) SqSq≤Cu) S1≤Cu)
+    (≤-trans (+-mono-≤ (+-monoʳ-≤ (Cu + Cu) SqSq≤Cu) S2≤Cu)
     (≤-trans (≤-reflexive fourEq)
     (≤-trans (*-monoʳ-≤ 4 Cu≤Qu) (quint4≤2^ S 31≤S))))
 
@@ -1046,8 +1127,8 @@ nestCap≤exp-suc e sl id ih =
   where
   S  = Caps.cSize (capsAt e sl id)
   S′ = Caps.cSize (capsAt e sl (suc id))
-  Ê  = suc (S * (S * S) + S * (S * S) + (S * S + S * S))
-  Ê′ = suc (S′ * (S′ * S′) + S′ * (S′ * S′) + (S′ * S′ + S′ * S′))
+  Ê  = suc (suc (S * (S * S) + S * (S * S) + (S * S + S * S)))
+  Ê′ = suc (suc (S′ * (S′ * S′) + S′ * (S′ * S′) + (S′ * S′ + S′ * S′)))
   P  = 2 ^ Ê
   P′ = 2 ^ Ê′
   1≤S : 1 ≤ S
@@ -1110,7 +1191,7 @@ nestCap-sight≤exp e sl id =
   1≤C : 1 ≤ C
   1≤C =
     subst (1 ≤_) (sym (capΦAt-def e sl id))
-      (*-mono-≤ (m^n>0 2 (suc (Caps.cSize (capsAt e sl id)
+      (*-mono-≤ (m^n>0 2 (suc (suc (Caps.cSize (capsAt e sl id)
                                  * (Caps.cSize (capsAt e sl id)
                                     * Caps.cSize (capsAt e sl id))
                                + Caps.cSize (capsAt e sl id)
@@ -1119,7 +1200,7 @@ nestCap-sight≤exp e sl id =
                                + (Caps.cSize (capsAt e sl id)
                                     * Caps.cSize (capsAt e sl id)
                                   + Caps.cSize (capsAt e sl id)
-                                    * Caps.cSize (capsAt e sl id)))))
+                                    * Caps.cSize (capsAt e sl id))))))
                 (≤-trans (subst (1 ≤_) (sym (nestCapAt-0 e sl)) (s≤s z≤n))
                          (nestCap-mono₀ e sl id)))
   four : 4 * C ≡ C + 3 * C
