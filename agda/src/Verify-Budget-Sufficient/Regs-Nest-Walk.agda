@@ -1901,6 +1901,17 @@ postulate
   --   about a `μ` under the door, and nothing about an emission the
   --   TELESCOPE manufactures, where the layer count is 0 and the rungs
   --   are bought by `slotsSize` alone.
+  -- PROBED: `Probed.Burst-Mu-Door` at the `μ` a source hands OUT rather
+  --   than runs, which is where this leaf is charged or nowhere -- the
+  --   refutation's own family, folded back through a merging door with
+  --   no room at the table that subscription left.  Against it the same
+  --   reading with the block count forced to nought: that fails at the
+  --   refutation's mention count and holds one mention below it, so the
+  --   bracket is the multiplicity, while the count as it stands clears
+  --   the same table and clears again at three times the mentions.  One
+  --   nesting level, one door, one scripted slot -- so nothing about a
+  --   `μ` handed out from inside another, where the levels compose, and
+  --   nothing about the rate, which is asymptotic.
   pushBurst-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (g : Gas) (op : AllOp) (nid : NodeId)
     (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)

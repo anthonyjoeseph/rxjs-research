@@ -171,26 +171,58 @@ lay-unfoldμ body = lay-elimGᵉ (here refl) (μᵉ body) body
 -- bound is squared by is therefore the μ NESTING, and it is a separate
 -- count for exactly the reason the layer count cannot see it.
 --
--- WHERE IT STOPS, AND IT STOPS ONE POSITION WIDER THAN THE LAYER COUNT.
--- It reads only what a subscription DESCENDS INTO: an operator's source
--- and a `μ`'s own body.  An `ofᵉ` list is handed out rather than
--- entered, and a `deferᵉ` is entered at a later tick, so both count
--- zero -- and an embedded observable inside a term is charged where it
--- is subscribed, which is the door that receives it and not the
--- descent that emits it.
-muDepthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
-muDepthᵉ (input i)         = 0
-muDepthᵉ (ofᵉ ts)          = 0
-muDepthᵉ emptyᵉ            = 0
-muDepthᵉ (mapᵉ f e)        = muDepthᵉ e
-muDepthᵉ (takeᵉ c e)       = muDepthᵉ e
-muDepthᵉ (scanᵉ f z e)     = muDepthᵉ e
-muDepthᵉ (mergeAllᵉ lim e) = muDepthᵉ e
-muDepthᵉ (switchAllᵉ e)    = muDepthᵉ e
-muDepthᵉ (exhaustAllᵉ e)   = muDepthᵉ e
-muDepthᵉ (μᵉ e)            = suc (muDepthᵉ e)
-muDepthᵉ (varᵉ x)          = 0
-muDepthᵉ (deferᵉ e)        = 0
+-- WHERE IT STOPS, AND IT IS NOT WHERE THE LAYER COUNT STOPS.  It reads
+-- what a subscription can REACH without a later tick: an operator's
+-- source, a `μ`'s own body, and the terms an `ofᵉ` hands out.  A
+-- `deferᵉ` is the one cut, and it is the cut the guard already
+-- guarantees is there, since a recursive occurrence may stand nowhere
+-- else -- so an unfolding plants its copies under defers and the count
+-- is unmoved by substituting one.
+--
+-- AND THE `ofᵉ` ARM DESCENDS, WHICH THE LAYER COUNT'S ARGUMENT DOES NOT
+-- SETTLE BY ITSELF.  The tempting reading is that a handed-out
+-- observable is charged where it is SUBSCRIBED -- at the door that
+-- receives it, not at the descent that emits it -- and that reading is
+-- refuted: a crossing door's own charge is denominated in the program
+-- it FOLDS, so a `μ` reached only through that program's emissions is
+-- charged by nobody, and its unfolding squares a bound the count fixed
+-- before the multiplicity was chosen.  Joining by `⊔` is the layer
+-- count's rule for the same position and for the same reason: two
+-- emissions abreast are entered separately and neither unfolds the
+-- other.
+mutual
+  muDepthᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Exp Γ Δᵍ Δ Θ t → ℕ
+  muDepthᵉ (input i)         = 0
+  muDepthᵉ (ofᵉ ts)          = muDepthᵗˢ ts
+  muDepthᵉ emptyᵉ            = 0
+  muDepthᵉ (mapᵉ f e)        = muDepthᵉ e
+  muDepthᵉ (takeᵉ c e)       = muDepthᵉ e
+  muDepthᵉ (scanᵉ f z e)     = muDepthᵉ e
+  muDepthᵉ (mergeAllᵉ lim e) = muDepthᵉ e
+  muDepthᵉ (switchAllᵉ e)    = muDepthᵉ e
+  muDepthᵉ (exhaustAllᵉ e)   = muDepthᵉ e
+  muDepthᵉ (μᵉ e)            = suc (muDepthᵉ e)
+  muDepthᵉ (varᵉ x)          = 0
+  muDepthᵉ (deferᵉ e)        = 0
+
+  muDepthᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → Tm Γ Δᵍ Δ Θ t → ℕ
+  muDepthᵗ (varᵗ x)      = 0
+  muDepthᵗ unit̂          = 0
+  muDepthᵗ (bool̂ _)      = 0
+  muDepthᵗ (nat̂ _)       = 0
+  muDepthᵗ (pairᵗ a b)   = muDepthᵗ a ⊔ muDepthᵗ b
+  muDepthᵗ (fstᵗ p)      = muDepthᵗ p
+  muDepthᵗ (sndᵗ p)      = muDepthᵗ p
+  muDepthᵗ (inlᵗ a)      = muDepthᵗ a
+  muDepthᵗ (inrᵗ a)      = muDepthᵗ a
+  muDepthᵗ (caseᵗ s l r) = muDepthᵗ s ⊔ (muDepthᵗ l ⊔ muDepthᵗ r)
+  muDepthᵗ (ifᵗ c a b)   = muDepthᵗ c ⊔ muDepthᵗ a ⊔ muDepthᵗ b
+  muDepthᵗ (primᵗ _ a)   = muDepthᵗ a
+  muDepthᵗ (strmᵗ e)     = muDepthᵉ e
+
+  muDepthᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ t} → List (Tm Γ Δᵍ Δ Θ t) → ℕ
+  muDepthᵗˢ []       = 0
+  muDepthᵗˢ (t ∷ ts) = muDepthᵗ t ⊔ muDepthᵗˢ ts
 
 muDepthᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) → Val Γ t → ℕ
 muDepthᵛ unitᵗ    _        = 0
@@ -201,27 +233,58 @@ muDepthᵛ (s +ᵗ t) (inj₁ a) = muDepthᵛ s a
 muDepthᵛ (s +ᵗ t) (inj₂ b) = muDepthᵛ t b
 muDepthᵛ (obs t)  e        = muDepthᵉ e
 
--- AND A RECURSIVE-OCCURRENCE SUBSTITUTION MOVES NO NESTING EITHER, for
--- a reason the layer count's version does not have available: this one
--- needs no companion over terms at all, because an `ofᵉ` is already
--- zero on both sides.  The `μ` arm is where the two differ -- the count
--- is `suc` there rather than a pass-through, so the arm carries a
--- `cong suc` the layer version does not need.
-muDepth-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
-  (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
-  muDepthᵉ (elimGExp x cl b) ≡ muDepthᵉ b
-muDepth-elimGᵉ x cl (input i)         = refl
-muDepth-elimGᵉ x cl (ofᵉ ts)          = refl
-muDepth-elimGᵉ x cl emptyᵉ            = refl
-muDepth-elimGᵉ x cl (mapᵉ f b)        = muDepth-elimGᵉ x cl b
-muDepth-elimGᵉ x cl (takeᵉ c b)       = muDepth-elimGᵉ x cl b
-muDepth-elimGᵉ x cl (scanᵉ f z b)     = muDepth-elimGᵉ x cl b
-muDepth-elimGᵉ x cl (mergeAllᵉ lim b) = muDepth-elimGᵉ x cl b
-muDepth-elimGᵉ x cl (switchAllᵉ b)    = muDepth-elimGᵉ x cl b
-muDepth-elimGᵉ x cl (exhaustAllᵉ b)   = muDepth-elimGᵉ x cl b
-muDepth-elimGᵉ x cl (μᵉ b)            = cong suc (muDepth-elimGᵉ (there x) cl b)
-muDepth-elimGᵉ x cl (varᵉ y)          = refl
-muDepth-elimGᵉ x cl (deferᵉ b)        = refl
+-- AND A RECURSIVE-OCCURRENCE SUBSTITUTION MOVES NO NESTING EITHER,
+-- which is what lets the unfolding arm charge the block it bought at
+-- the level it read.  The substitution lands only under a `deferᵉ`,
+-- where both counts are zero whatever was put there; every other arm is
+-- a congruence.  The `μ` arm is where this differs from the layer
+-- count's version -- the count is `suc` there rather than a
+-- pass-through, so the arm carries a `cong suc`.
+mutual
+  muDepth-elimGᵉ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Exp Γ Δᵍ Δ Θ u) →
+    muDepthᵉ (elimGExp x cl b) ≡ muDepthᵉ b
+  muDepth-elimGᵉ x cl (input i)         = refl
+  muDepth-elimGᵉ x cl (ofᵉ ts)          = muDepth-elimGᵗˢ x cl ts
+  muDepth-elimGᵉ x cl emptyᵉ            = refl
+  muDepth-elimGᵉ x cl (mapᵉ f b)        = muDepth-elimGᵉ x cl b
+  muDepth-elimGᵉ x cl (takeᵉ c b)       = muDepth-elimGᵉ x cl b
+  muDepth-elimGᵉ x cl (scanᵉ f z b)     = muDepth-elimGᵉ x cl b
+  muDepth-elimGᵉ x cl (mergeAllᵉ lim b) = muDepth-elimGᵉ x cl b
+  muDepth-elimGᵉ x cl (switchAllᵉ b)    = muDepth-elimGᵉ x cl b
+  muDepth-elimGᵉ x cl (exhaustAllᵉ b)   = muDepth-elimGᵉ x cl b
+  muDepth-elimGᵉ x cl (μᵉ b)            = cong suc (muDepth-elimGᵉ (there x) cl b)
+  muDepth-elimGᵉ x cl (varᵉ y)          = refl
+  muDepth-elimGᵉ x cl (deferᵉ b)        = refl
+
+  muDepth-elimGᵗ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (b : Tm Γ Δᵍ Δ Θ u) →
+    muDepthᵗ (elimGTm x cl b) ≡ muDepthᵗ b
+  muDepth-elimGᵗ x cl (varᵗ y)      = refl
+  muDepth-elimGᵗ x cl unit̂          = refl
+  muDepth-elimGᵗ x cl (bool̂ b)      = refl
+  muDepth-elimGᵗ x cl (nat̂ m)       = refl
+  muDepth-elimGᵗ x cl (pairᵗ a b)   =
+    cong₂ _⊔_ (muDepth-elimGᵗ x cl a) (muDepth-elimGᵗ x cl b)
+  muDepth-elimGᵗ x cl (fstᵗ p)      = muDepth-elimGᵗ x cl p
+  muDepth-elimGᵗ x cl (sndᵗ p)      = muDepth-elimGᵗ x cl p
+  muDepth-elimGᵗ x cl (inlᵗ a)      = muDepth-elimGᵗ x cl a
+  muDepth-elimGᵗ x cl (inrᵗ a)      = muDepth-elimGᵗ x cl a
+  muDepth-elimGᵗ x cl (caseᵗ s l r) =
+    cong₂ _⊔_ (muDepth-elimGᵗ x cl s)
+              (cong₂ _⊔_ (muDepth-elimGᵗ x cl l) (muDepth-elimGᵗ x cl r))
+  muDepth-elimGᵗ x cl (ifᵗ c a b)   =
+    cong₂ _⊔_ (cong₂ _⊔_ (muDepth-elimGᵗ x cl c) (muDepth-elimGᵗ x cl a))
+              (muDepth-elimGᵗ x cl b)
+  muDepth-elimGᵗ x cl (primᵗ op a)  = muDepth-elimGᵗ x cl a
+  muDepth-elimGᵗ x cl (strmᵗ b)     = muDepth-elimGᵉ x cl b
+
+  muDepth-elimGᵗˢ : ∀ {n} {Γ : Ctx n} {Δᵍ Δ Θ u t} (x : t ∈ Δᵍ)
+    (cl : Exp Γ [] [] [] t) (ts : List (Tm Γ Δᵍ Δ Θ u)) →
+    muDepthᵗˢ (elimGTms x cl ts) ≡ muDepthᵗˢ ts
+  muDepth-elimGᵗˢ x cl []       = refl
+  muDepth-elimGᵗˢ x cl (y ∷ ys) =
+    cong₂ _⊔_ (muDepth-elimGᵗ x cl y) (muDepth-elimGᵗˢ x cl ys)
 
 muDepth-unfoldμ : ∀ {n} {Γ : Ctx n} {t} (body : Exp Γ (t ∷ []) [] [] t) →
   muDepthᵉ (unfoldμ body) ≡ muDepthᵉ body
