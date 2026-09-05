@@ -1000,9 +1000,22 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   drain can read the telescope off the schedule it is handed -- and
 --   not SIZE: this family buys four units of slot syntax per doubling
 --   of emission, so the summand dominates it by construction.  Nothing
---   about a family that outgrows that ratio, about a telescope of
---   several slots, or about a queue mixing a reference with a program
---   written out.
+--   about a family that outgrows that ratio, and nothing about a
+--   telescope of several slots.
+-- PROBED: `Probed.Drain-Count-Join` -- the JOIN, at the two queues
+--   where it is not a join over a singleton.  Two references to one
+--   shared slot carry layer counts zero and one, so the max returns a
+--   number the layers can see and the bare bound, that max, and the
+--   max plus the telescope report `false`, `false`, `true`.  A third
+--   entry writing the chain out puts two entries' runs in one
+--   delivered list, which the same charge covers.  Not the state a
+--   later entry inherits: the two references deliver ONE value
+--   between them, a shared slot being connected once, so no queue here
+--   makes two HIDDEN runs both deliver.  Nor a max against a SUM --
+--   the two agree at the first queue and stand one apart at the
+--   second, and the entries with large layer counts are the visible
+--   ones, whose rung outruns anything this family emits, so the row
+--   that would separate the readings cannot fail.
 postulate
   mergeAllDrain-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
