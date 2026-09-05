@@ -215,16 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DRAIN FRAME'S OWN TWO STORES, THE LAST PAIR NOTHING HAS
-  INSTANTIATED.** `stepFrame-nest-nodes-inner` and
-  `stepFrame-nest-regs-inner` are the outer pair's mirror in the other
-  frame position, and both carry a `RECOVERY:` pointer to a probe that
-  was deleted with its target — so the harness is recovered rather than
-  rebuilt, which is most of the cost. The regs half's premise is
-  already refuted by an empty burst, so what the pair is worth is the
-  nodes half's reading and a restatement of the regs half from the
-  grant rather than from the walk's values.
-
 - **THEN THE SIZE FACE'S REFUTED FRAME PAIR, WHICH NEEDS A RESTATEMENT
   AND NOT A GRIND.** `stepFrame-sz-inner` and `stepFrame-sz-outer` are both
   machine-FALSE — a crossing arm subscribes a program that arrived as a
@@ -247,6 +237,18 @@ does not fit is a finding about the shared statement, not about the head.
   that reads the arrived program is what a store charge would be stated
   over, and stating the store half first would price it against a
   denomination the leg before this one is about to replace.
+
+- **THEN THE FAN-OUT'S TWO REGISTRY READINGS, WHICH SHARE ONE DEAD
+  DENOMINATION.** `fan-regsNest` and `fan-regsSz` are the registry's own
+  depth and its own size at a share's fanned walk, and both are
+  refuted for the same reason: the reading is taken at a cap the Φ
+  pricing owns, so a receipt carried above the fanned walk moves the
+  leaf's exponent when the walk is taken up to it. One of the two is
+  refuted AT A REACHED STATE rather than an arbitrary one, which is
+  what says the pair is replaced rather than discharged. Find the
+  denomination both can be restated in before writing either, since a
+  replacement that fits one and not the other splits a fact that the
+  store measure keeps in one place.
 
 ### The ledger
 
@@ -274,15 +276,6 @@ does not fit is a finding about the shared statement, not about the head.
   program's own nodes, and a scan among them stores what that program emitted —
   `reify` carrying a product value into a term its own size — so the entry
   table's reading bounds nothing about the residue.
-- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
-  what the drain frame writes at the nodes map. It takes the term OUT of its
-  parent *All's queue, so the cell it rewrites is the one its ledger's ceiling
-  half is stated over rather than one the walk handed it. Nothing has
-  instantiated it.
-- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, RECOVERY`: what the drain frame registers. The premise alone was
-  refuted by an empty burst: the drain reads the queue, so the walk's values
-  cannot reach it, and the grant is what must pay.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
@@ -321,6 +314,14 @@ does not fit is a finding about the shared statement, not about the head.
   mints. Every measure-side axis is read and the cap covers each — depth at
   margin zero, path, all three ops, a share connecting. Left: a drain arriving
   with a chain already standing.
+- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — DIFFICULTY,
+  `PROBED, RECOVERY`: what the drain writes at the nodes map. The pop shrinks,
+  and the park its subscribe makes lands one layer under the term popped — so
+  the entry table covers it with the budget unspent, gate honoured.
+- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — DIFFICULTY,
+  `REFUTED, PROBED, RECOVERY`: what the drain registers. The premise alone was
+  refuted by an empty burst; the grant pays EXACTLY, the mint being the node's
+  own reading, at margin zero on three rungs.
 - **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — DIFFICULTY, `PROBED`:
   what the outer frame mints at the nodes map. NOT the fresh `*All` cell, which
   the install is proven to price at zero — the write is a full merge PARKING an

@@ -238,7 +238,26 @@ postulate
   -- grant is what has to pay, and it is the one the potential's own arm
   -- already takes.
   --
+  -- AND THE GRANT PAYS EXACTLY, WHICH IS WHAT THE INSTANTIATION SAYS.
+  -- What the drain appends is a chain carrying the popped term's own
+  -- flatten layers, and the popped term sat in the queue the grant's
+  -- `G` is read off -- so the mint is the node's reading and not one
+  -- layer more.  The rows below therefore stand at the node reading
+  -- itself, a number the grant's own conjuncts put a floor under, and
+  -- clear by ZERO at every rung.  A charge one layer above the queue
+  -- would show as a constant margin; a charge that grew with anything
+  -- else would cross.
+  --
   -- REFUTED: Refuted.Drain-Regs-Nest
+  -- PROBED: `Probed.Frame-Drain-Store` -- the same drain the nodes face
+  --   is instantiated at, read on this axis: a queue reached by running
+  --   an outer frame of three arrivals into a capacity-one merge, so
+  --   two park and the drain pops the deeper one.  Covered: the mint at
+  --   three rungs of a flatten ladder against an entry registry that
+  --   stands still, each at the node reading and each at margin zero;
+  --   and the gated term, which registers without unfolding.  NOT
+  --   covered: the switch and exhaust arms, which keep no queue; an
+  --   empty parent queue; and a nonempty path under the frame.
   -- RECOVERY: git show f38a902:agda/evidence/probed/Probed/Chain-Step-Regs-Rootward.agda
   --   restores a rootward-stacking program and its readings.
   stepFrame-nest-regs-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}

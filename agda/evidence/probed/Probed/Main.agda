@@ -109,6 +109,12 @@ open import Probed.Frame-Drain-Live
          opFigures1; opFigures4; tieLiveSwitch;
          shareFigures1; shareFigures4; shareSizes; tieLiveShare)
 
+open import Probed.Frame-Drain-Store
+  using (packed≡; gated≡; tieDrain1; tieDrain2; tieDrain3;
+         tieDrainPark; tieDrainGated;
+         regsPacked≡; tieDrainRegs1; tieDrainRegs2; tieDrainRegs3;
+         tieDrainRegsGated)
+
 open import Probed.Fan-Regs-Registry
   using (counts; regsS; marginK; marginK′; regsK; lensK)
 

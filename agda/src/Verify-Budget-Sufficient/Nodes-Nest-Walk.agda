@@ -60,6 +60,31 @@ postulate
   -- grant it carries is a whole drain ledger rather than a single
   -- entry, so the arm is read off that ledger and not off the values.
   --
+  -- AND WHAT COVERS IT IS THE `suc` A LAYER COSTS, not the grant.  The
+  -- frame pops a term the entry table was already reading and
+  -- subscribes it, and that subscription DOES write: a synchronous
+  -- source delivers inside the very frame that made it, so a full
+  -- *All parks and a cell appears that did not exist on entry.  What
+  -- it parks is what sat UNDER the popped term's own outermost layer,
+  -- and the measure charges that layer one `suc` -- so the fresh cell
+  -- is strictly shallower than the term the pop removed, and the entry
+  -- reading covers the exit reading with the budget unspent.  Behind
+  -- the gate the same arm is covered the other way round: a deferred
+  -- term is priced at zero however deep it is, and the drain unfolds
+  -- none of it.
+  --
+  -- PROBED: `Probed.Frame-Drain-Store` -- a queue reached by running,
+  --   the parent merge filled at capacity one by an outer frame of
+  --   three arrivals so that two park.  Covered: the pop, at three
+  --   rungs of a flatten ladder, standing at margin ZERO where the
+  --   queue's two terms coincide; the subscribe that parks, where the
+  --   fresh cell lands one layer under the term that was popped; and
+  --   the gated term, unmoved at two rungs whose ungated twin parks
+  --   three layers.  Every row stands at a budget of zero, which is
+  --   what the empty burst licenses.  NOT covered: the switch and
+  --   exhaust arms, which keep no queue; an empty parent queue; and a
+  --   nonempty path under the frame.
+  --
   -- RECOVERY: git show 6dcc8b1:agda/evidence/probed/Probed/Chain-Step-Abs-Charge.agda
   --   restores a chain runner that reaches a real drain at the second
   --   cascade of two families, with the node ids taken from the run.
