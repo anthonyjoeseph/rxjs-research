@@ -215,36 +215,38 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
-  Each crossing arm has two conclusions — what it delivers and what it
-  leaves in the node table — and only three of the four are
-  instantiated. The store half of the outer arm is the blank one, and
-  it is not a repeat of the inner half's: what a subscribed arrival
-  writes into the table is reified by whatever operator it lands
-  under, so the quantity is the run's, not the arrival's. The commit
-  builds the state where that difference shows and reads the repaired
-  denomination against it.
+- **THE PARKED QUEUE, WHICH EVERY TABLE ROW SO FAR HAS AVOIDED.**
+  A crossing's table reading is a max over entries, and every witness
+  taken at it installs exactly ONE — a scan, read through the
+  accumulator's `sizeᵛ`. A `*All` node under its limit parks what it
+  cannot admit, and those entries are read by `sizeᵉ` over programs
+  the run produced and never delivered, so they are the one part of
+  the table no reading of the delivered list can reach even in
+  principle. The commit builds an arrival that parks several, and
+  reads both store halves against a charge denominated in the
+  arrival's layers.
 
-- **THEN THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, WHICH NO ROW HAS
-  CARRIED.** The charge names ONE number for the whole telescope, a sum
-  over every slot in scope, and every row that has ever read it stands
-  at a vocabulary of one — so what is untested is not the summand's
-  reach, which the reference rows buy, but the JOIN: nothing yet says a
-  sum over the slots is the right partner for a max over what runs. The
-  commit scripts a telescope of several definitions, subscribes a
-  program naming a different one at each entry, and reads the charge
-  where a sum and a max come apart.
+- **THEN THE SLOT NAMED TWICE, WHICH THE TELESCOPE ROWS LEFT OPEN AND
+  WHICH DECIDES WHETHER THE SUM IS SOUND RATHER THAN GENEROUS.** A
+  chained telescope runs each definition once, so its layers add and
+  the sum covers them. A telescope whose upper definitions BOTH name
+  one lower slot runs that slot once only — a share's multicast is the
+  whole point of the binding — but a reading that resolved the
+  reference instead of the binding would charge it twice and a run
+  that re-entered it would emit twice. The commit scripts a diamond,
+  reads what one subscription of the apex delivers, and stands the
+  charge beside it.
 
-- **THEN THE LEAF AT THE TWO DOORS THE ARMS NOW ROUTE THROUGH AND NO
-  ROW HAS OPENED.** Both crossing value halves are bodies over one
-  claim about a single subscription, and that claim is stated over an
-  arbitrary operator while every row standing at it subscribes through
-  a merge. The other two doors are not variants: a switch CUTS the
-  inner it holds before subscribing, so the leaf is read at a schedule
-  the cut returned rather than the one the frame was handed, and an
-  exhaust DROPS what arrives while busy, so the run the charge prices
-  is one the arm never performs. The commit instantiates the leaf at
-  both, at the program that killed the telescope-free reading.
+- **THEN WHAT A BITING DOOR WRITES, WHICH IS THE HALF THE DOOR ROWS
+  LEFT OPEN.** A subscription's delivered burst is invariant in the
+  door — the operator enters only through the path and the burst is
+  never pushed through it — so the cut and the drop act on the TABLE
+  and on later emits, not on the list. Every store witness so far
+  enters its door IDLE, where all three admit alike and the reading is
+  the merge door's under another name. The commit reads both store
+  halves at a switch already holding an inner and an exhaust already
+  busy, which is where a written cell can carry what the arrival's own
+  layers never bought.
 
 ### The ledger
 
@@ -253,15 +255,16 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×2`: what
-  ONE subscription delivers, in the program's own layers plus its telescope.
-  Both crossing value halves are now bodies over it. Read at a hidden run and a
-  written-out one, never at several slots and never past the merge door.
+- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×4`: what
+  ONE subscription delivers, in its own layers plus its telescope. Both
+  crossing value halves are bodies over it. A max over the slots is refuted at
+  a chain of eleven, and the door is invisible to the burst; a slot named twice
+  stays unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED`: the same two denominations through the node
-  table, where a subscribed scan writes what it emitted. Only the inner half is
-  instantiated; the outer's count is proven at the delivered list and untested
-  at the table; neither covers a queue past one.
+  FALSITY, `REFUTED, PROBED×2`: the same two denominations through the node
+  table, where a subscribed scan writes what it emitted. Both halves now read
+  at the state that killed the constant, the outer at all three doors; each
+  witness installs ONE node, so a parked queue is blank.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

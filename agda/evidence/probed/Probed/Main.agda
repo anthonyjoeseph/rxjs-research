@@ -135,5 +135,15 @@ open import Probed.Cross-Count-Burst
 open import Probed.Cross-Count-Store
   using (charges≡; valRows≡; storeRows≡; tieDrain; tieStore)
 
+open import Probed.Cross-Count-Outer-Store
+  using (figures≡; storeRows≡; sinkRows≡; tieOuterStore)
+
+open import Probed.Subscribe-Inner-Doors
+  using (mergeDelivered≡; switchAgrees; exhaustAgrees; doorRows≡;
+         tieDoorSwitch; tieDoorExhaust)
+
+open import Probed.Slot-Telescope-Sum
+  using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)

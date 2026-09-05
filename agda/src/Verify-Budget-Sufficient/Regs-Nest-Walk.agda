@@ -998,10 +998,32 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   twelve-rung duplication chain written out, where the layers are the
 --   charge and the telescope is the rounding: `false` against the
 --   constant the crossing used to carry, `true` against thirteen.
---   Neither probe reaches a telescope of SEVERAL slots, a `scripted`
---   slot whose definition a subscription does not run, an operator
---   other than `mergeAllᵒ` at the path's inner end, or a program family
---   whose emission outruns four units of slot syntax per doubling.
+--   Neither probe reaches a `scripted` slot whose definition a
+--   subscription does not run, an operator other than `mergeAllᵒ` at
+--   the path's inner end, or a program family whose emission outruns
+--   four units of slot syntax per doubling.
+--
+-- PROBED: `Probed.Slot-Telescope-Sum` at a telescope of ELEVEN shared
+--   slots, each naming the one below and doubling it, entered at the
+--   top reference so one subscription runs the whole chain.  This is
+--   what decides the JOIN rather than the summand's reach: a max over
+--   the telescope is FALSE here, prices one rung of a chain of ten, and
+--   fails the conclusion at seventeen hundred against a delivered two
+--   thousand, where the stated sum holds.  Not a slot named twice,
+--   where a share's multicast is what stops the layers doubling with
+--   it, and no row can fail on the sum's other side -- it charges slots
+--   the run never names.
+--
+-- PROBED: `Probed.Subscribe-Inner-Doors` at the two doors every other
+--   row subscribed past, each entered where its rule bites -- a switch
+--   holding an inner it must cut, an exhaust already busy -- and both
+--   deliver the merge door's burst UNCHANGED, which the two equalities
+--   pin.  The door is invisible HERE by construction: an operator
+--   enters only by being built into the path, and a subscription does
+--   not push its own burst through that frame, so the cut and the drop
+--   act on later emits, which is the drain's statement.  Each door is
+--   read at the telescope-free rung and the repaired one, `false` then
+--   `true`, at one arrival shape with zero layers of its own.
 postulate
   subscribeInner-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t) (id : Id)
@@ -1556,8 +1578,13 @@ postulate
   -- the count's shape but whether a quantity settled against the
   -- delivered list also covers what the subscription WRITES, which is a
   -- different reading of the same run: a scan the subscription installs
-  -- holds the emission reified, and nothing has instantiated that at
-  -- this arm.
+  -- holds the emission reified.
+
+  -- PROBED: `Probed.Cross-Count-Outer-Store` -- at the very state that
+  --   killed the constant, a scan whose step stores the arriving datum
+  --   back as a one-shot observable, run through all three sinks.  One
+  --   installed node per witness, so nothing about a parked QUEUE at
+  --   this arm, whose entries are programs the run never delivered.
   stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
