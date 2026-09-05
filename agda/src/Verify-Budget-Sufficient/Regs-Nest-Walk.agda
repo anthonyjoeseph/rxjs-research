@@ -1570,6 +1570,15 @@ postulate
   --   which a full drain empties, and the outer arm's count carried
   --   across, which at an empty arrival list is the telescope alone.
   --   One queue depth, one door, and no entry naming a shared slot.
+  -- PROBED: `Probed.Biting-Door-Store` at the two doors that are not
+  --   the drain, each reached where its rule BITES -- a switch whose
+  --   held inner is the one finishing, an exhaust busy with it -- and
+  --   the outgoing inner's own cell standing in the table beside the
+  --   door.  A finishing inner rewrites only that door's own bit, a
+  --   node id and two flags, which this predicate does not read, so
+  --   the row is taken at rung ZERO: the premise's own bound climbed
+  --   by nothing, which is the tightest reading the conclusion admits.
+  --   One outgoing cell, and no door biting under a limit.
   stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
@@ -1612,6 +1621,15 @@ postulate
   --   climbed by nothing, because a park only appends what the premise
   --   already bounded.  One queue depth and the merging door alone,
   --   which is the only shape that parks.
+  -- PROBED: `Probed.Biting-Door-Store` at the other two doors taking
+  --   an ARRIVAL where their rules bite.  A CUT reaches the registry
+  --   and the schedule's live set and no table at all, so the outgoing
+  --   inner's cell is left standing and what the frame leaves is the
+  --   idle reading beside a cell the premise already bounds: the
+  --   refuted constant still fails there and the stated count holds.
+  --   A busy exhaust writes nothing whatever, and is read at rung
+  --   ZERO.  The cut is taken at an EMPTY registry, so nothing about
+  --   the severing itself, which reaches no table either way.
   stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
