@@ -862,20 +862,31 @@ postulate
   -- the expensive half, since the ceiling the count is spent against
   -- reads the program and the count would read the level.
   --
-  -- AND THE OUTER ARM'S REPAIR IS DECIDED, WHICH NARROWS WHAT IS LEFT
-  -- TO THE CEILING ALONE.  `Probed.Cross-Count-Fork` separates the
-  -- constant from a count reading the arriving observable's own
-  -- `sizeᵉ`, at the very chain the constant loses on, and the
-  -- second reading holds there -- `iterSize`'s doubling taken at the
-  -- syntax outruns the value's doubling taken at the rung.  It also
-  -- holds at a REIFIED arrival, where the syntax is the value's size
-  -- and the subscription computes nothing, so the reading does not
-  -- overshoot at the shape the constant happens to survive.  What
-  -- that buys is displacement rather than payment: the cost now sits
-  -- entirely at the ceiling, which `frameCh`'s own block prices.
+  -- AND THE OUTER ARM'S SIZE-READING COUNT IS FALSE TOO, at a shape
+  -- neither the constant's witness nor the fork that chose the reading
+  -- reached.  `sizeᵉ (input i)` is ONE, by the clause that
+  -- prices a variable, so an arriving observable naming a SHARED SLOT
+  -- reads as the smallest program there is while the subscription runs
+  -- the whole of that slot's definition.  Neither premise sees the
+  -- telescope: one reads the node table and the other the arriving
+  -- syntax.  `Probed.Cross-Count-Fork` still says what it said -- the
+  -- size beats the constant, at a chain and at a reified value -- and
+  -- that is a statement about arrivals whose syntax IS what runs.
+  --
+  -- SO WHAT THE ARM OWES IS A READING OF THE RUN, and the candidates
+  -- part on where the telescope enters.  A count resolving the slot
+  -- needs the telescope, which the frame is not handed; a premise
+  -- bounding `slotsSize` hands it over once and puts every slot on the
+  -- ladder at every frame, whether or not that frame names one.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
+  -- REFUTED: `Refuted.Frame-Step-Size-Slot.stepFrame-sz-outer-own-absurd`
+  --   -- the outer arm's count AS IT NOW READS, at an arriving
+  --   observable that names a shared slot.  The second row puts one
+  --   more rung behind the slot and moves the cap with it: the
+  --   emission doubles, the rung it is measured against grows
+  --   quadratically, and the count does not move at all.
   -- DEAD ROUTE: charging the inner arm the size of its own arriving
   --   values is STRUCTURALLY dead, and not merely too weak.  What the
   --   inner arm subscribes is what the `*All` node has PARKED, so it

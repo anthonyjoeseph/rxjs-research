@@ -199,6 +199,10 @@ open import Refuted.Frame-Step-Size-Cross
   using (StepFrameSzOuter; StepFrameSzInner; growth≡; figures₁≡; figures₂≡;
          nodes₁; prem₁; row₁≡false; nodes₂; prem₂; nodesQ; premQ;
          stepFrame-sz-outer-absurd; stepFrame-sz-inner-absurd)
+open import Refuted.Frame-Step-Size-Slot
+  using (StepFrameSzOuterOwn; figures₂≡; figures₃≡;
+         nodes₂; prem₂; row₂≡false; nodes₃; prem₃; row₃≡false;
+         stepFrame-sz-outer-own-absurd; stepFrame-sz-outer-own-absurd′)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (StepFrameSzStoreOuter; StepFrameSzStoreInner; figures≡;
          nodes₀; prem₀; nodesQ; premQ;

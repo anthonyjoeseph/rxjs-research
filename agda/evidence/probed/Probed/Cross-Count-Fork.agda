@@ -8,10 +8,12 @@
 -- counts DISAGREE on the arm's verdict, not that the arm held.
 --
 -- THE TWO CANDIDATES.  `cnst` is the count as it stands -- one rung,
--- whatever arrives.  `own` is the reading the refutations point at: the
--- arriving observable's own `sizeᵉ`, which is what the subscription
--- actually runs.  They are two functions of one argument, so the
--- disagreement is a value rather than a paragraph.
+-- whatever arrives.  `own` is the reading the constant's refutation
+-- points at: the arriving observable's own `sizeᵉ`, which is what the
+-- subscription runs exactly when the arrival's syntax is what runs --
+-- the boundary the coverage note below draws.  They are two functions
+-- of one argument, so the disagreement is a value rather than a
+-- paragraph.
 --
 -- FORK: stepFrame-sz-outer
 --
@@ -35,9 +37,14 @@
 --
 -- WHAT THE ROWS DO NOT BUY.  They say nothing about the `from-inner`
 -- arm, whose program arrives through the store; nothing about either
--- store half; and nothing about the ceiling, which is refuted against
--- this very count.  A green here DISPLACES the cost onto the ceiling
--- rather than paying it.
+-- store half; nothing about the ceiling, which is refuted against
+-- this very count; and nothing about an arrival whose syntax is not
+-- what runs.  Both shapes here are read by running exactly what
+-- arrived, and an `input i` naming a shared slot is neither: it reads
+-- as one whatever stands behind it, which is where the reading these
+-- rows prefer is itself refuted (`Refuted.Frame-Step-Size-Slot`).  A
+-- green here DISPLACES the cost onto the ceiling rather than paying
+-- it.
 module Probed.Cross-Count-Fork where
 
 open import Data.Bool using (true; false)

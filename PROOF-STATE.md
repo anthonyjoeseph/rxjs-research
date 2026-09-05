@@ -215,17 +215,25 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THEN THE SIZE FACE'S REFUTED FRAME PAIR, WHICH NEEDS A RESTATEMENT
-  AND NOT A GRIND.** `stepFrame-sz-inner` and `stepFrame-sz-outer` are both
-  machine-FALSE — a crossing arm subscribes a program that arrived as a
-  value, and a duplication chain emits exponentially against a constant
-  charge — so nothing above them can be ground until they say something
-  true, and no probe can lower them further. They sit in the module the
-  leg before this one already opens, and their refutations name what
-  the replacement must read: the arrived program, rather than the
-  frame's own count. Write the replacements and re-run both refutations
-  against them, since a refutation that still fires is a restatement
-  that moved rather than landed.
+- **THEN THE DENOMINATION BOTH CROSSING ARMS OWE, WHICH IS THE
+  TELESCOPE.** `stepFrame-sz-outer`'s count reads the arriving
+  observable's own `sizeᵉ`, and that reading is dead: `sizeᵉ` at an
+  `input i` is ONE while the subscription runs the whole of that slot's
+  shared definition. `stepFrame-sz-inner` inherits it through the store,
+  since a parked term may name a slot exactly as an arriving one may. So
+  neither arm can be restated until a reading of the RUN is chosen, and
+  the candidates part on where the telescope enters. The commit is the
+  fork that separates them, at the slot witness and at the chain.
+
+- **THEN BOTH CROSSING ARMS RESTATED IN IT, AND EVERY REFUTATION RE-RUN.**
+  Once the denomination is fixed, `stepFrame-sz-inner` and
+  `stepFrame-sz-outer` are rewritten against it and the three refutations
+  standing over them — the constant at both arms, and the size reading at
+  the slot — are re-run against the new statements, since a refutation
+  that still fires is a restatement that moved rather than landed. The
+  ceiling `szCount≤ch` prices moves in the same commit: its `thru-outer`
+  arm is an absurd pattern today, which is the displacement the old count
+  bought and the new one has to pay for.
 
 - **THEN THE SIZE FACE'S OTHER REFUTED PAIR, THE STORE HALVES.**
   `stepFrame-sz-store-inner` and `stepFrame-sz-store-outer` are FALSE
@@ -237,18 +245,6 @@ does not fit is a finding about the shared statement, not about the head.
   that reads the arrived program is what a store charge would be stated
   over, and stating the store half first would price it against a
   denomination the leg before this one is about to replace.
-
-- **THEN THE FAN-OUT'S TWO REGISTRY READINGS, WHICH SHARE ONE DEAD
-  DENOMINATION.** `fan-regsNest` and `fan-regsSz` are the registry's own
-  depth and its own size at a share's fanned walk, and both are
-  refuted for the same reason: the reading is taken at a cap the Φ
-  pricing owns, so a receipt carried above the fanned walk moves the
-  leaf's exponent when the walk is taken up to it. One of the two is
-  refuted AT A REACHED STATE rather than an arbitrary one, which is
-  what says the pair is replaced rather than discharged. Find the
-  denomination both can be restated in before writing either, since a
-  replacement that fits one and not the other splits a fact that the
-  store measure keeps in one place.
 
 ### The ledger
 
@@ -267,10 +263,10 @@ does not fit is a finding about the shared statement, not about the head.
   under it is a product where its charge is a climb. ONE MECHANISM WITH the
   chain door, and what both owe is a recursion rather than a denomination.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2`: both are FALSE. A crossing arm SUBSCRIBES a
-  program that arrived as a value, and a duplication chain emits exponentially
-  against a constant charge. The size-reading count answering that is itself
-  refuted at the frame ceiling, so both move together.
+  `REFUTED×4, DEAD ROUTE×2`: both are FALSE, and the count answering the first
+  refutation is refuted in turn — `sizeᵉ` at an `input i` is ONE while the run
+  is the slot's whole definition. What both owe is a reading of the RUN, and
+  the telescope is the only place it is written down.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
   program's own nodes, and a scan among them stores what that program emitted —
