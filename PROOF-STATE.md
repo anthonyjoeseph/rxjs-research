@@ -215,16 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE Φ FACE'S NEST PREMISES, OFF THE PROGRAM'S UNIT.** Every frame
-  arm of the walk takes its nest premise as `pathNestD` under
-  `nestUnit`, and the registry receipt that supplies the share fan-out's
-  copy cannot be had at that bound: what the store maintains is
-  `storeNestMax` under the instant's `nestCapAt`, and the unit sits
-  UNDER the cap, so the bridge runs the wrong way. The junction between
-  the two is already off the unit — its bound is a parameter — so the
-  swap is the walk's own premises and the sight ceiling, which is a
-  function OF the unit. The commit takes the frame arms to the cap and
-  finds out whether the ceiling follows or is where the swap stops.
+- **THE FRAME ARMS' NEST PREMISES, RESTATED AT THE CAP.** The
+  potential is a sum of two halves denominated differently: the walk
+  half multiplies the program's UNIT and is affordable only because the
+  unit sits under the size cap, so no cap-denominated premise can be
+  spent there. The CAP half is where the swap lands, and its
+  coefficient now carries the path factor's own cap, so the room is
+  proven rather than argued. The commit moves `pathNestD`'s bound from
+  `nestUnit` to the instant's `nestCapAt` at every frame arm, and
+  re-fits the arms that spent the unit-side widening.
 
 - **THEN THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
   `stepFrame-sz-inner` is still charged one rung and still FALSE at it.
@@ -282,7 +281,7 @@ does not fit is a finding about the shared statement, not about the head.
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
 - **`fan-regsNest`** (Part7/Depth-Fit) — SHAPE,
-  `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
+  `REFUTED×2, DEAD ROUTE×2, PROBED`: the registry's own depth against the
   syntactic unit. The cap-denominated statement is two proven steps, the unit
   sits under the cap, and the reached counterexample survives every premise —
   so the conclusion moves and the Φ face's currency with it.

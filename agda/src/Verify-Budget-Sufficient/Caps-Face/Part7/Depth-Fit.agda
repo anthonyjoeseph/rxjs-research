@@ -1364,9 +1364,19 @@ chainsNest-all D U (c ∷ cs) h =
 -- is what a run leaves; threading the nest predicate into this
 -- signature would leave it standing and trade a tracked postulate for
 -- an untracked hypothesis.  The CONCLUSION is what moves, and moving
--- it is the Φ face's nest currency rather than work owed here: every
--- frame arm of the walk takes its nest premise in the unit, and the
--- sight ceiling is a function OF the unit.
+-- it is the Φ face's nest currency rather than work owed here: the
+-- potential is a SUM of two halves denominated differently, and the
+-- cap-denominated half is what a cap-denominated premise is spent
+-- against.
+--
+-- DEAD ROUTE: spending the moved conclusion in the potential's WALK
+--   half, which is the half the frame arms visibly charge.  That half
+--   multiplies the syntactic UNIT, and it is affordable only because
+--   the unit sits under the size cap; `nestCapAt` steps by a factor
+--   whose logarithm is already a square of the landing instant's
+--   size, so no widening puts it under the same exponential.  The
+--   CAP half is where the swap lands, and its coefficient carries the
+--   path factor's own cap so that a frame arm can spend it there.
 --
 -- DEAD ROUTE: owing this to whatever MINTS a registration, which is
 --   where the size analogue directly above sends its own obligation.
