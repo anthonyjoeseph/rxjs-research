@@ -1209,16 +1209,23 @@ szCount≤ch S W B 1≤W sl (thru-outer _ _)   vals () hf hw
 -- A frame costs `szCount` rungs, so the reading a fan-out entry is
 -- owed sits at whatever the frames above it climbed to -- which is
 -- exactly the index the consumer threads.  The fold does NOT advance
--- it entry by entry, and that is the reading's own weakness rather
--- than an oversight: chains in one fan write a table their successors
--- read, so a level fixed across the fold is a claim about the fan and
--- not a consequence of the walk.
+-- it entry by entry, so what a fan-out entry is charged is the level
+-- the fan was ENTERED at, while the chains ahead of it in that same
+-- fan have already written the table it reads.
 --
 -- THE CONDITIONING IS EARNED AND NOT CONVENIENT.  The unconditioned
--- step is refuted in this module's own header, twice, so what stands
--- here is the true statement replacing a false one; the width is the
--- axis those refutations move, and the store is the axis the first of
--- them moves.
+-- step does not survive this module's own header, twice over, so what
+-- stands here is the true statement replacing a false one; the width
+-- is the axis those witnesses move, and the store is the axis the
+-- first of them moves.
+--
+-- REFUTED: `Refuted.Fan-Store-Level` -- the fan-out fold's fixed level
+--   cannot be supplied, at a two-entry fan whose first entry drains a
+--   parked chain and installs what the subscription stores.  The caps
+--   face's own fan-out fold threads an increment per entry under an
+--   absolute ceiling; this one is that recursion with the increment
+--   missing, and the rows report the same table failing at the entry
+--   rung and holding at the level the increment reaches.
 mutual
   walkSzOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (S W k : ℕ) (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)

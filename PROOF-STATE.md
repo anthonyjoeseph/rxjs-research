@@ -215,15 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIZE WALK NOTHING HAS EVER REACHED.** `chain-walk-szOK` is
-  FALSITY by ABSENCE: its header carries no instantiation of any kind.
-  Its conclusion is a `Set` assembled from `≤` and `≡ true` over the
-  evaluator and is NOT sealed, so it is reachable by INHABITATION rather
-  than by `refl` — which is what the sibling row beside it turned out not
-  to be, its potential being sealed on both sides and needing a
-  parametric refutation instead. The commit instantiates it along one
-  admitted chain and takes whichever outcome falls out — a refutation
-  restates, a receipt re-ranks.
+- **THE FAN-OUT FOLD THAT NEVER MOVES ITS LEVEL.** The size walk charges
+  every fan entry at the level the FIRST one entered at, and that is now
+  machine-dead: one entry draining a parked chain installs what the
+  subscription stores and puts the table over the entry rung, while the
+  same table holds at the level a per-entry advance reaches. The caps
+  face's fan fold already threads that advance under an ABSOLUTE
+  ceiling, so the missing term is located, not invented, and the route
+  the row calls exponential is the uncapped one. The commit gives the
+  size fold the same increment and pays its one consumer.
 
 - **THEN THE STORE PREDICATE THE WALK DOES NOT CARRY, WHICH IS NOW FOUR
   SITES AND NOT THREE.** `walk-share-nestOK`, `fan-regsSz`,
@@ -273,14 +273,14 @@ does not fit is a finding about the shared statement, not about the head.
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: the size
-  walk holding along one chain's path, now asked at the level the caps walk has
-  itself reached rather than flat. The index no longer misses; what is left is
-  the fan-out's own reading, which nothing has instantiated.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×3`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
+- **`chain-walk-szOK`** (Part7/Depth-Fit) — SHAPE, `REFUTED, DEAD ROUTE`: the
+  size walk along one chain, at the level the caps walk reached. Its fan fold
+  charges every entry at the level the first one entered at — refuted at a
+  two-entry fan; the caps fold's capped per-entry advance is the missing term.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the
