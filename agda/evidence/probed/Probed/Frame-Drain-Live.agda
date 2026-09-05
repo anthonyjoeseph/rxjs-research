@@ -8,7 +8,7 @@
 -- carrying a parked queue is an instance by construction -- which is
 -- the door, and it costs a node install rather than a new program.
 --
--- TARGET: subscribeInner-nest-live @bd7cf0
+-- TARGET: subscribeInner-live-size @2242ea
 
 -- WHAT THE ROWS MEASURE IS THE ASYMMETRY THE ARM TURNS ON.  The gate
 -- truncates: a queue entry `deferᵉ b` reads as nesting ZERO wherever
@@ -24,45 +24,48 @@
 -- tracks the body one for one while all three before-readings stay
 -- flat.
 
--- THE CONSEQUENCE FOR THE FIT, AND IT IS THE FINDING: `U` IS THE ONLY
--- THING THAT CAN PAY HERE, AND IT CANNOT REACH THE DEPTH THROUGH `G`.
--- `InnerΦFit` bounds `U` through a `G` above `nodeNestAt allNid st ⊔
--- nestDᵛˢ vals`, and at this arm both summands are zero -- the queue is
--- gated and the drain carries no incoming values.  The depth therefore
--- has to arrive through the cap-size route, whose base reads a size
--- that sees THROUGH the gate, and not through any nesting reading of
--- the state.  That is a claim about which conjunct is load-bearing at
--- this arm, and it is what a discharge has to spend.
+-- THE CONSEQUENCE, AND IT IS THE FINDING: NOTHING BUILT FROM A
+-- NESTING READING OF THE STATE CAN PAY HERE.  The two state quantities
+-- a grant at this arm is assembled over -- the node's own reading and
+-- the incoming values' -- are BOTH zero here, the first because the
+-- queue is gated and the second because a drain carries no arrivals.
+-- The depth therefore has to arrive by the cap-size route, whose base
+-- reads a size that sees THROUGH the gate.  That is a claim about
+-- which premise is load-bearing at this arm, and it is what a
+-- discharge has to spend.
 
--- NOT COVERED: the switch and exhaust ops, whose finish arms write a
--- node and drain nothing; a non-empty registry, which routes the reaction to its absorbing arm
--- before the finish is reached at all; and the hypotheses, which are a
--- Σ carrying a universally quantified numeric conjunct and are not
--- dischargeable by computation -- so a row here is evidence about the
--- CONCLUSION, unconditionally true where it is green and a lead rather
--- than a refutation where it is not.
+-- NOT COVERED: a DRAIN reached with a chain already standing, which
+-- routes the reaction to its absorbing arm before the finish is read
+-- at all -- the registry family below WRITES the registry rather than
+-- arriving with it written; and the hypotheses, left standing on every
+-- tie -- so a row here is evidence about the CONCLUSION,
+-- unconditionally true where it is green and a lead rather than a
+-- refutation where it is not.
 module Probed.Frame-Drain-Live where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; foldr)
-open import Data.Nat using (ℕ; zero; suc; _⊔_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (proj₁; proj₂)
 open import Data.Unit using (tt)
 open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
+open import Rx.Slot-Clos using (slotClos)
+open import Rx.Clos-Size using (closSizeᵉ)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Rx.Prim using (g0; gs; hot)
-open import Rx.Exp using (Ctx; Closed; natᵗ; emptyᵉ; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
+open import Rx.Prim using (Gas; g0; gs; hot)
+open import Rx.Exp using (Ctx; Closed; obs; natᵗ; emptyᵉ; input; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵉ)
-open import Rx.Slots using (Slots; scripted)
-open import Rx.Evaluator using (EvalSt; Sched; from-inner; root; stepFrame; sched-init; st-init; mergeAllᵒ; mergeAll-st;
-  installNode)
+open import Rx.Slots using (Slots; scripted; shared; slotsSize)
+open import Rx.Evaluator using (EvalSt; Sched; Path; _↠_; from-inner; thru-outer; root; stepFrame;
+  subscribeInner; sched-init; st-init; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; mergeAll-st;
+  installNode; NodeId; take-f)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Store using (liveNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; FaceOK; faceOK)
-open import Verify-Budget-Sufficient.Live-Nest-Walk using (subscribeInner-nest-live)
+open import Verify-Budget-Sufficient.Live-Nest-Walk using (subscribeInner-live-size)
 open import Probed.Apparatus using (Confirms)
 
 Γ₁ : Ctx 1
@@ -138,31 +141,220 @@ figures4 = refl
 -- so the tie applies it at the same parked body, the same empty live
 -- list and the same scripted telescope.
 --
--- AND `U` IS TAKEN AT THE BODY'S OWN DEPTH, which is what makes the
--- row falsifiable rather than a large number chosen to fit.  The two
--- left summands of the conclusion's join are zero here -- an empty
+-- AND THE CAP IS TAKEN AT THE LADDER'S OWN DEPTH, which is what makes
+-- the row falsifiable rather than a large number chosen to fit.  The
+-- two left summands of the conclusion's join are zero here -- an empty
 -- incoming live list and a telescope summing to zero, both pinned
--- above -- so the row reduces to `after ≤ nestDᵉ o` exactly, and any
--- mint reading one unit more than the body it subscribes fails it.
--- That is the asymmetry this file exists for, stated in the statement.
+-- above -- so the row reduces to `after ≤ k` exactly at a cap of `k`,
+-- and any mint reading one unit more than the body it subscribes fails
+-- it.  That is the asymmetry this file exists for, and stating the
+-- bound in the cap rather than in a budget is what the statement now
+-- says: it is the size side that has to reach through the gate.
 --
--- NOT COVERED: the eleven premises, left standing and unread, and the
--- cap, which enters only through them -- so the row is evidence about
--- the CONCLUSION, unconditionally true where it is green.
+-- NOT COVERED: the ten premises, left standing and unread -- so the
+-- row is evidence about the CONCLUSION, unconditionally true where it
+-- is green.  The rungs are two rather than five because the face
+-- bundle needs a cap of at least two and the ladder's own depth is the
+-- cap, so depths zero and one have no legal instance here.
 ----------------------------------------------------------------------
 
-cQ : Caps
-cQ = caps 8 4 1
+cQ : ℕ → Caps
+cQ k = caps k 4 1
 
-faceQ : FaceOK cQ sl₁
-faceQ = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+faceQ2 : FaceOK (cQ 2) sl₁
+faceQ2 = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
 
-tieLive1 : Confirms
-  (subscribeInner-nest-live cQ sl₁ 1 1 0 0 0 (nestDᵉ (deep 1))
-     (gs g0) mergeAllᵒ 0 root 0 0 (deep 1) sc₀ (stQ 1) ⦃ faceQ ⦄)
-tieLive1 _ _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+faceQ4 : FaceOK (cQ 4) sl₁
+faceQ4 = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+tieLive2 : Confirms
+  (subscribeInner-live-size (cQ 2) sl₁ 2 2 0
+     (gs g0) mergeAllᵒ 0 root 0 0 (deep 2) sc₀ (stQ 2) ⦃ faceQ2 ⦄)
+tieLive2 _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
 
 tieLive4 : Confirms
-  (subscribeInner-nest-live cQ sl₁ 4 4 0 0 0 (nestDᵉ (deep 4))
-     (gs g0) mergeAllᵒ 0 root 0 0 (deep 4) sc₀ (stQ 4) ⦃ faceQ ⦄)
-tieLive4 _ _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+  (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
+     (gs g0) mergeAllᵒ 0 root 0 0 (deep 4) sc₀ (stQ 4) ⦃ faceQ4 ⦄)
+tieLive4 _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- THE TWO AXES THE LADDER LEAVES AT THEIR FLOOR, and both turn out to
+-- be answerable rather than uncovered.
+--
+-- THE LEVEL IS BOUND-SIDE AND MONOTONE, so `Lv = 0` is the TIGHTEST
+-- point rather than the cheapest.  It does not occur under the
+-- subscribe at all: its occurrences are in the premises and in the
+-- bound's own cap size, which climbs with the level by
+-- `frameStep-mono-j`.  A sweep over it could not have failed, so no
+-- row is spent on it.
+--
+-- AND THE PATH IS MEASURED INERT, which is the half no type decides.
+-- `κ` IS measure-side -- it occurs under the subscribe and nowhere in
+-- the bound -- so a row over it genuinely could fail.  It does not: a
+-- two-frame path reads exactly what `root` reads at both rungs,
+-- because a subscribe INSTALLS and does not deliver.  The mint is the
+-- entry's own body, and the frames only record where its later values
+-- will go.
+----------------------------------------------------------------------
+
+gasOf : ℕ → Gas
+gasOf zero    = g0
+gasOf (suc k) = gs (gasOf k)
+
+κT : Path Γ₁ natᵗ natᵗ
+κT = take-f 9 ↠ (take-f 8 ↠ root)
+
+-- the path's own merge outer, installed with room
+outerNid : NodeId
+outerNid = 3
+
+stO : EvalSt e₀
+stO = installNode outerNid
+  (mergeAll-st {Γ = Γ₁} {t = natᵗ} nothing 0 [] false)
+  (st-init e₀)
+
+mintAt : ∀ {u} → ℕ → Path Γ₁ u natᵗ → Closed Γ₁ u → ℕ
+mintAt k κ o = liveMax (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+  (subscribeInner (gasOf (k + 6)) mergeAllᵒ 0 κ 0 0 o sc₀ stO))))))
+
+-- (root , two frames) at one rung, then at another
+pathFigures : ℕ → List ℕ
+pathFigures k = mintAt k root (deferᵉ (deep k))
+              ∷ mintAt k κT   (deferᵉ (deep k)) ∷ []
+
+-- LOAD-BEARING: the frames are between the subscribed entry and the
+-- root, so a mint that read anything of the path would move the second
+-- number off the first.
+pathFigures1 : pathFigures 1 ≡ 1 ∷ 1 ∷ []
+pathFigures1 = refl
+
+pathFigures4 : pathFigures 4 ≡ 4 ∷ 4 ∷ []
+pathFigures4 = refl
+
+-- AND A PATH FRAME THAT WOULD MINT ON ITS OWN ACCOUNT NEVER FIRES
+-- HERE, which is why the rows above are not merely a statement about
+-- `take-f`.  The entry is a stream of STREAMS and the frame under it
+-- is a merge outer with room, so a DELIVERY through this path would
+-- subscribe the emitted observable and mint its depth.  Subscribing
+-- reads zero at both rungs instead.
+oo : ℕ → Closed Γ₁ (obs natᵗ)
+oo k = ofᵉ (strmᵗ (deferᵉ (deep k)) ∷ [])
+
+κO : Path Γ₁ (obs natᵗ) natᵗ
+κO = thru-outer mergeAllᵒ outerNid ↠ root
+
+outerIdle : mintAt 1 κO (oo 1) ⊔ mintAt 4 κO (oo 4) ≡ 0
+outerIdle = refl
+
+-- and the statement itself at a non-root path, at the rung whose cap
+-- is the ladder's own depth, so the margin here is zero too
+tieLivePath : Confirms
+  (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
+     (gasOf 10) mergeAllᵒ 0 κT 0 0 (deferᵉ (deep 4)) sc₀ stO ⦃ faceQ4 ⦄)
+tieLivePath _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+-- AND THE OPERATOR IS INERT FOR THE SAME REASON THE PATH IS.  `op` is
+-- measure-side -- it is passed straight into the subscribe -- but all
+-- it decides is the frame the new subscription's own later values will
+-- be routed through, and that frame is INSTALLED here rather than run.
+-- The kill and drop arms that separate the three operators are reached
+-- by an ARRIVAL, and a subscribe is not one.
+opMint : AllOp → ℕ → ℕ
+opMint op k = liveMax (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+  (subscribeInner (gasOf (k + 6)) op 0 root 0 0
+                  (deferᵉ (deep k)) sc₀ stO))))))
+
+opFigures : ℕ → List ℕ
+opFigures k = opMint mergeAllᵒ k ∷ opMint switchᵒ k ∷ opMint exhaustᵒ k ∷ []
+
+opFigures1 : opFigures 1 ≡ 1 ∷ 1 ∷ 1 ∷ []
+opFigures1 = refl
+
+opFigures4 : opFigures 4 ≡ 4 ∷ 4 ∷ 4 ∷ []
+opFigures4 = refl
+
+tieLiveSwitch : Confirms
+  (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
+     (gasOf 10) switchᵒ 0 root 0 0 (deferᵉ (deep 4)) sc₀ stO ⦃ faceQ4 ⦄)
+tieLiveSwitch _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- AND THE REGISTRY AXIS, WHICH IS A SHARE THAT HAS NOT CONNECTED YET.
+-- A registration already standing cannot move a mint -- a subscribe
+-- installs and does not deliver, so an existing chain is a consumer
+-- and not a producer.  What DOES write the registry at a subscribe is
+-- the connect: the entry names a shared slot, the slot has never been
+-- live, so the def is subscribed here and its own live source is
+-- minted on this call.
+--
+-- AND THE DEF IS GATED, WHICH PUTS THE BOUND'S SLOT TERM AT ZERO.
+-- `slotsNestSum` reads the telescope with the same depth measure the
+-- node reading uses, so a `deferᵉ` def contributes nothing to it,
+-- while connecting subscribes THROUGH the gate and mints the body at
+-- its full depth.  So this family reaches the same asymmetry the
+-- parked queue does, by a different door.
+--
+-- BUT THE CONJUNCT THAT PAYS IS NOT THE ONE THE PARKED QUEUE SPENDS,
+-- and that is what this family is worth.  The ENTRY's closure reading
+-- -- what the statement's own closure premise charges -- is a one-word
+-- `input`, and it reads TWO at both rungs: the telescope is consulted
+-- for the slot's type and not for the def's body, so that reading does
+-- not climb with the def and could not cover a mint that does.  What
+-- covers it is the FACE bundle's flat slot size, which reads the def
+-- straight rather than through the entry, climbs six to eighteen
+-- across the two rungs, and so forces a cap above the mint before the
+-- statement is applied at all.  The tie therefore stands at the
+-- smallest cap that bundle admits rather than at the mint's own
+-- height, and the margin there is the face's to explain, not a slack
+-- chosen here.
+----------------------------------------------------------------------
+
+entryS : Closed Γ₁ natᵗ
+entryS = input fzero
+
+slS1 : Slots Γ₁
+slS1 fzero = shared (deferᵉ (deep 1))
+
+slS4 : Slots Γ₁
+slS4 fzero = shared (deferᵉ (deep 4))
+
+connected : Slots Γ₁ → ℕ → ℕ
+connected sl k = liveMax (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+  (subscribeInner (gasOf (k + 6)) mergeAllᵒ 0 root 0 0
+                  entryS (sched-init e₀ sl) (st-init e₀)))))))
+
+-- (mint at the connect , the bound's slot term , the entry's own
+--  closure reading)
+shareFigures : Slots Γ₁ → ℕ → List ℕ
+shareFigures sl k = connected sl k ∷ slotsNestSum sl
+                  ∷ closSizeᵉ (slotClos sl) entryS ∷ []
+
+-- LOAD-BEARING, and the rows this family exists for: the middle number
+-- is the term the conclusion carries for the telescope and it stays at
+-- zero while the first climbs, so nothing on the bound's own side can
+-- pay -- and the third is the entry reading, which stays flat too, so
+-- it is not what pays either.
+shareFigures1 : shareFigures slS1 1 ≡ 1 ∷ 0 ∷ 2 ∷ []
+shareFigures1 = refl
+
+shareFigures4 : shareFigures slS4 4 ≡ 4 ∷ 0 ∷ 2 ∷ []
+shareFigures4 = refl
+
+-- and the reading that DOES climb, which is the face bundle's and not
+-- the statement's: a row that read flat here would leave the mint with
+-- nothing covering it and the family would be a refutation candidate.
+shareSizes : slotsSize slS1 ∷ slotsSize slS4 ∷ [] ≡ 6 ∷ 18 ∷ []
+shareSizes = refl
+
+-- the smallest cap the face bundle admits at the top rung
+cS : Caps
+cS = caps 18 4 1
+
+faceS4 : FaceOK cS slS4
+faceS4 = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+tieLiveShare : Confirms
+  (subscribeInner-live-size cS slS4 4 4 0
+     (gasOf 10) mergeAllᵒ 0 root 0 0 entryS (sched-init e₀ slS4) (st-init e₀)
+     ⦃ faceS4 ⦄)
+tieLiveShare _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt

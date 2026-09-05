@@ -30,9 +30,10 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; foldr; length)
-open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _⊔_; _≤_; _≡ᵇ_)
+open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _⊔_; _≤_; z≤n; s≤s; _≡ᵇ_)
 open import Data.Nat.Properties
-  using (≤-trans; ⊔-lub; ⊔-monoˡ-≤; m≤m⊔n; m≤n⊔m; m≤m+n; n≤1+n)
+  using (≤-trans; ≤-refl; ≤-reflexive; ⊔-lub; ⊔-monoˡ-≤; ⊔-monoʳ-≤; m≤m⊔n; m≤n⊔m; m≤m+n;
+  m≤n+m; n≤1+n; *-identityˡ; *-monoˡ-≤)
 open import Data.Vec using (lookup)
 open import Data.Maybe using (Maybe; nothing; just)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
@@ -58,11 +59,13 @@ open import Verify-Budget-Sufficient.Caps
   using (Caps; frameStep; sizeCount; frameStep-mono-j; fuel-pred)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (FaceOK; faceHere; capsDrainOK; nestValOK?-widen)
-open import Verify-Budget-Sufficient.Nest-Ceiling using (ceilS-sweep-step)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
+open import Verify-Budget-Sufficient.Nest-Ceiling
+  using (ceilS-sweep-step; ceilS-head; ceil-here)
+open import Verify-Budget-Sufficient.Nest-Cap
+  using (nestFac; nestU; nestU-room; 1≤nestFac)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW; innerW; drainW-here; drainW-tail)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthFin; depthDrain; depthInner)
-open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
+open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD; pathΦF-pos)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsΦ?; FrameΦHyp; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; valsSz?; stepFrame-nest-Φ;
   stepFrame-nest-regs; foldPath-nest-regs)
@@ -192,9 +195,17 @@ postulate
   --   THREE the fold of 3 is over that vocabulary and is carried by
   --   the size budget alone -- both rows standing at a potential grant
   --   of ZERO, at a budget that is the value's own size rather than a
-  --   number chosen to clear the fold.  Not covered: a fold already
-  --   nonzero at entry, where the growth would compound rather than
-  --   start at zero.
+  --   number chosen to clear the fold.  AND THE COMPOUNDING REGION IS
+  --   COVERED, on a state reached by RUNNING the first frame and
+  --   handing the second its output: a standing fold and an arriving
+  --   mint combine by MAX in both crossing directions, so nothing here
+  --   stacks.  The OPERATOR is live at a frame in a way it is not at a
+  --   subscribe -- an arrival takes its arm, switch killing and
+  --   exhaust dropping -- and both read the standing fold rather than
+  --   past it; so does a PAIR of arrivals stepped together against the
+  --   single value budget the premise bounds each of them by.  Not
+  --   covered: a nonempty path under the frame, `root` being what
+  --   holds the potential at its floor.
   stepFrame-nest-live-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
@@ -229,11 +240,14 @@ postulate
   -- counterexample unchanged, and the increment this statement has to
   -- cover is the subscribed body's own depth against a residue of zero.
   --
-  -- SO ONLY THE CAP-DERIVED SIDE CAN PAY, and the entry's own park
-  -- receipt is what carries it: the caps ledger comes in at the level,
-  -- and that receipt reads `sizeᵉ` -- one unit per gate layer, where
-  -- the depth reads none.  That is which premise is load-bearing here
-  -- and it is what a discharge spends.  The registry face's drain arm
+  -- SO THE MINT IS PRICED IN THE CAP SIZE AT THE ENTRY'S OWN LEVEL,
+  -- which is the one currency the gate does not truncate: the park
+  -- receipt reads `sizeᵉ` -- one unit per gate layer, where the depth
+  -- reads none -- and the level is where the caps ledger comes in.
+  -- Stating it AT the level rather than at a budget is what leaves
+  -- this a leaf: carrying a level-indexed size across to a
+  -- count-indexed budget is arithmetic, and arithmetic is checked
+  -- above rather than asserted here.  The registry face's drain arm
   -- fell to the same emptiness at the same node and takes the same
   -- bundle, so two faces discharge from ONE producer.
   --
@@ -254,12 +268,32 @@ postulate
   --   installed instead.  Covered: one parked entry, a gated nest, at
   --   depths zero through four, with the incoming live list empty, the
   --   slot telescope scripted and the registry empty so the reaction
-  --   reaches the finish.  Not covered: the switch and exhaust ops,
-  --   whose finish arms drain nothing; and the hypotheses, which carry
-  --   a quantified numeric conjunct and do not compute -- so a row is
+  --   reaches the finish.  Three rungs are tied at the subscribe
+  --   itself, each against a cap size taken at the ladder's own depth,
+  --   so the margin is ZERO and a mint reading one unit past the
+  --   entry's size fails them.  The PATH is covered and measured
+  --   INERT: two frames read what the root reads, since a subscribe
+  --   installs rather than delivers, and a merge outer under the entry
+  --   -- the one frame that would mint on its own account -- never
+  --   fires at a subscribe at all.  The OPERATOR goes the same way and
+  --   is measured so: all three read the entry's own depth at both
+  --   rungs, because what an operator decides is the arm an ARRIVAL
+  --   takes and a subscribe is not one, and the switch arm is tied as
+  --   well.  The LEVEL takes no rows and needs none: it occurs only in
+  --   the premises and in the bound's own cap size, which climbs with
+  --   it, so the ladder already stands at the tightest level there is.
+  --   The REGISTRY is covered from the only side that can move a mint
+  --   -- a share CONNECTING here, a chain already standing being a
+  --   consumer -- and it lands on a DIFFERENT premise than the parked
+  --   queue does: the entry's own closure reading stays flat while the
+  --   mint climbs, so what covers it is the FACE bundle's flat slot
+  --   size, which forces a cap above the mint before this statement is
+  --   applied at all.  Not covered: a DRAIN reached with a chain
+  --   already standing, where the reaction is absorbed before the
+  --   finish is read; and the hypotheses, left standing -- so a row is
   --   evidence about the CONCLUSION, unconditional where green.
-  subscribeInner-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
-    (c : Caps) (sl : Slots Γ) (d W Lv G B U : ℕ) (sf : Gas) (op : AllOp)
+  subscribeInner-live-size : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (sl : Slots Γ) (d W Lv : ℕ) (sf : Gas) (op : AllOp)
     (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
     (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
     ⦃ _ : FaceOK c sl ⦄ →
@@ -273,16 +307,79 @@ postulate
     depthInner sf op allNid κ id now o sched st ≤ pred d →
     pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
     suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
-    (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
-       pathΦF B κ
-         * (nestFac (Caps.cSize (frameStep j c)) W
-              * (G + nestU (Caps.cSize (frameStep j c)) (nestUnit e sl))
-            + pathΦD B κ) ≤ U) →
     foldr (λ l acc → liveNest l ⊔ acc) 0
       (Sched.live (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
         (subscribeInner sf op allNid κ id now o sched st)))))))
       ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-          ⊔ slotsNestSum sl ⊔ U
+          ⊔ slotsNestSum sl ⊔ Caps.cSize (frameStep Lv c)
+
+-- THE LEVEL SITS INSIDE THE BUDGET'S OWN RANGE, and that is the whole
+-- content of this step.  The leaf above prices the mint at the cap
+-- size read at the entry's LEVEL; the budget premise quantifies over a
+-- COUNT -- every level the descent may reach -- so nothing carries one
+-- reading to the other until the level is known to be one of them.
+-- The premise saying so is discharged at the call site out of the
+-- queue's own sweep ceiling, which is a proven receipt rather than a
+-- number the caller happens to offer.
+--
+-- GIVEN IT, THE SIZE IS UNDER THE BUDGET BY WIDENINGS THAT HOLD AT
+-- EVERY ARGUMENT, so nothing here is a fact about this walk.  The
+-- program's unit is positive, so one unit's grant has room for the
+-- size; the grant sits under a sum, the sum under a factor that is at
+-- least one, and the factored quantity under the path factor, which is
+-- at least one for the same reason.  That the chain is generic is the
+-- point: the risk left in this arm is the leaf's reading, and none of
+-- it is in the conversion.
+subscribeInner-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+  (c : Caps) (sl : Slots Γ) (d W Lv G B U : ℕ) (sf : Gas) (op : AllOp)
+  (allNid : NodeId) (κ : Path Γ s t) (id : Id) (now : Tick)
+  (o : Closed Γ s) (sched : Sched Γ) (st : EvalSt e) →
+  ⦃ _ : FaceOK c sl ⦄ →
+  Sched.slots sched ≡ sl →
+  capsOK? (frameStep Lv c) sched st ≡ true →
+  nestValOK? (frameStep Lv c) (obs s) o ≡ true →
+  nestClosOK? (frameStep Lv c) sl o ≡ true →
+  sizeᵉ o ≤ Caps.cSize (frameStep Lv c) →
+  dWᵉ n sl o ≤ Caps.cWid (frameStep Lv c) →
+  innerW sf op allNid κ id now o sched st ≤ W →
+  depthInner sf op allNid κ id now o sched st ≤ pred d →
+  pathSz? (Caps.cSize (frameStep Lv c)) κ ≡ true →
+  suc (pathLen κ) ≤ Caps.cSize (frameStep Lv c) →
+  Lv ≤ sizeCount c d ⊔ Caps.cSize c →
+  (∀ (j : ℕ) → j ≤ sizeCount c d ⊔ Caps.cSize c →
+     pathΦF B κ
+       * (nestFac (Caps.cSize (frameStep j c)) W
+            * (G + nestU (Caps.cSize (frameStep j c)) (nestUnit e sl))
+          + pathΦD B κ) ≤ U) →
+  foldr (λ l acc → liveNest l ⊔ acc) 0
+    (Sched.live (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+      (subscribeInner sf op allNid κ id now o sched st)))))))
+    ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
+        ⊔ slotsNestSum sl ⊔ U
+subscribeInner-nest-live {e = e} c sl d W Lv G B U sf op allNid κ id now o sched st
+  hsl hc hv hcl hsz hw hiw hdi hpk hpl hlv hu =
+  ≤-trans (subscribeInner-live-size c sl d W Lv sf op allNid κ id now o sched st
+             hsl hc hv hcl hsz hw hiw hdi hpk hpl)
+          (⊔-monoʳ-≤ _ size≤U)
+  where
+  S : ℕ
+  S = Caps.cSize (frameStep Lv c)
+
+  u : ℕ
+  u = nestUnit e sl
+
+  scale : ∀ (k x : ℕ) → 1 ≤ k → x ≤ k * x
+  scale k x 1≤k = ≤-trans (≤-reflexive (sym (*-identityˡ x))) (*-monoˡ-≤ x 1≤k)
+
+  size≤U : S ≤ U
+  size≤U =
+    ≤-trans (m≤n+m S u)
+   (≤-trans (nestU-room S u S (s≤s z≤n) ≤-refl)
+   (≤-trans (m≤n+m (nestU S u) G)
+   (≤-trans (scale (nestFac S W) (G + nestU S u) (1≤nestFac S W))
+   (≤-trans (m≤m+n (nestFac S W * (G + nestU S u)) (pathΦD B κ))
+   (≤-trans (scale (pathΦF B κ) _ (pathΦF-pos B κ))
+            (hu Lv hlv))))))
 
 -- WIDENING INTO THE CONCLUSION, which is all four of the arms that do
 -- not mint.  The conclusion joins the incoming fold with two terms a
@@ -375,7 +472,14 @@ mergeAllDrain-nest-live c sl d W Lv G B U sf allNid κ id now lim act (o ∷ q)
                     (proj₁ (proj₂ stepʰ)))
            (≤-trans (drainW-here sf allNid κ id now o q sched st) hw)
            (≤-trans (m≤m⊔n _ _) hd)
-           (pathSz?-⊑ κ stepʰ hpk) (≤-trans hpl (proj₁ stepʰ)) hu
+           (pathSz?-⊑ κ stepʰ hpk) (≤-trans hpl (proj₁ stepʰ))
+           -- the entry's level is inside the budget's range because
+           -- the queue's own sweep ceiling says so: its head is one
+           -- level step, which is where the sweep currency converts
+           (ceil-here c (pred d) d (suc Lv) 0 1
+              (ceilS-head c (pred d) d Lv B̂ (length q) 0 0
+                 (FaceOK.fSize faceHere) z≤n z≤n ceilQ))
+           hu
 
   IH₀ = mergeAllDrain-nest-live c sl d W (Lv + r₀) G B U sf allNid κ id now lim
           (if done then act else suc act) q sched₁ st₁

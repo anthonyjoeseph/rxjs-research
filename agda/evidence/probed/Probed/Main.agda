@@ -52,7 +52,9 @@ open import Probed.PushVals-Caps
          burstsG≡; burstsA≡;
          tieM; tieS; tieX)
 open import Probed.Chain-Step-Live-Deferred
-  using (figures≡; fits; tieFigs≡; tieLive1; tieLive3)
+  using (figures≡; fits; tieFigs≡; tieLive1; tieLive3;
+         twicePacked≡; tieLiveOn3; tieLiveOn1;
+         widePacked≡; tieLiveOuterSwitch; tieLiveOuterPair)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits;
          liveRow; attackRow; twoRow; mapRow)
@@ -102,7 +104,16 @@ open import Probed.Burst-OutW
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
          figures0; figures1; figures2; figures3; figures4;
-         tieLive1; tieLive4)
+         tieLive2; tieLive4;
+         pathFigures1; pathFigures4; outerIdle; tieLivePath;
+         opFigures1; opFigures4; tieLiveSwitch;
+         shareFigures1; shareFigures4; shareSizes; tieLiveShare)
+
+open import Probed.Frame-Drain-Store
+  using (packed≡; gated≡; tieDrain1; tieDrain2; tieDrain3;
+         tieDrainPark; tieDrainGated;
+         regsPacked≡; tieDrainRegs1; tieDrainRegs2; tieDrainRegs3;
+         tieDrainRegsGated)
 
 open import Probed.Fan-Regs-Registry
   using (counts; regsS; marginK; marginK′; regsK; lensK)
@@ -114,3 +125,6 @@ open import Probed.Fold-Width-Reach
 open import Probed.Cross-Count-Fork
   using (separates; arrival₂≡; nodes₂; prem₂; cnstRow₂; ownRow₂;
          arrival₃≡; nodes₃; prem₃; ownRow₃)
+
+open import Probed.Cross-Count-Slot
+  using (counts≡; tieSlot12; tieSlot13)

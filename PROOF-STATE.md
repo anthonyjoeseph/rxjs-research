@@ -215,75 +215,55 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LIVE-LIST MINT AT A DRAINED QUEUE — THE INNER HALF.**
-  `subscribeInner-nest-live` is what one subscribe out of a merge
-  node's parked queue puts on the live list, and the queue it reads is
-  the one the burst face is proven to bound, so its residue is a state
-  quantity and not a width. Read the consuming fit's residue place by
-  place, and either assemble the gated-entry reading over leaves that
-  name what the gate supplies, or record which quantity it cannot.
+- **THE FRAME ARMS' NEST PREMISES, RESTATED AT THE CAP.** The
+  potential is a sum of two halves denominated differently: the walk
+  half multiplies the program's UNIT and is affordable only because the
+  unit sits under the size cap, so no cap-denominated premise can be
+  spent there. The CAP half is where the swap lands, and its
+  coefficient now carries the path factor's own cap, so the room is
+  proven rather than argued. The commit moves `pathNestD`'s bound from
+  `nestUnit` to the instant's `nestCapAt` at every frame arm, and
+  re-fits the arms that spent the unit-side widening.
 
-- **THEN THE OUTER FRAME AROUND IT.** `stepFrame-nest-live-outer` is
-  the same statement in the other position, already restated at its own
-  size budget: depth truncates at the defer this arm mints across and
-  size counts through it, so the entry ceiling was never paying. The
-  restatement names ONE uncovered region — an entry fold already
-  nonzero — and that region is the only thing that could refute it, so
-  it is what gets instantiated rather than the heads that are covered.
+- **THEN THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
+  `stepFrame-sz-inner` is still charged one rung and still FALSE at it.
+  Its program is not in `vals` at all — it is what the `*All` node
+  PARKED — so its count is a function of the entry table and the outer
+  arm's telescope summand transfers nothing to it. The commit states
+  that count and re-runs the constant's refutation against it, which is
+  what says the restatement moved rather than landed.
 
-- **THEN THE DRAIN FRAME'S OWN TWO STORES, WHICH ARE THE LAST PAIR
-  NOTHING HAS INSTANTIATED.** `stepFrame-nest-nodes-inner` and
-  `stepFrame-nest-regs-inner` are the outer pair's mirror in the other
-  frame position, and both carry a `RECOVERY:` pointer to a probe that
-  was deleted with its target — so the harness is recovered rather than
-  rebuilt, which is most of the cost. The regs half's premise is
-  already refuted by an empty burst, so what the pair is worth is the
-  nodes half's reading and a restatement of the regs half from the
-  grant rather than from the walk's values.
+- **THEN THE SIZE FACE'S OTHER REFUTED PAIR, THE STORE HALVES.**
+  `stepFrame-sz-store-inner` and `stepFrame-sz-store-outer` are FALSE
+  for one reason the frame pair above does not carry: a subscription
+  installs the inner PROGRAM's own nodes, and a scan among them stores
+  what that program emitted — `reify` carrying a product value into a
+  term its own size — so the entry table's reading bounds nothing about
+  the residue. They come after the frame pair because a frame charge
+  that reads the arrived program is what a store charge would be stated
+  over, and stating the store half first would price it against a
+  denomination the leg before this one is about to replace.
 
 ### The ledger
 
-- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
-  syntactic unit, read as the registry's own place in the store measure.
-  REFUTED AT A REACHED STATE, not only an arbitrary one, so it is replaced
-  rather than discharged and no mint can be asked for it.
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
-  what one subscribe out of a merge node's parked queue mints on the live list.
-  A gated entry reads zero at every state quantity the consuming fit's residue
-  is built from, so only the cap size pays.
-- **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
-  the outer frame mints. Restated at its OWN size budget: depth truncates at
-  the defer this arm mints across and size counts through it, so the ceiling
-  was never paying. Uncovered: an entry fold already nonzero.
 - **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
   the whole crossing frame's tail, out of the size walk because the ledger
   under it is a product where its charge is a climb. ONE MECHANISM WITH the
   chain door, and what both owe is a recursion rather than a denomination.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×2`: both are FALSE. A crossing arm SUBSCRIBES a
-  program that arrived as a value, and a duplication chain emits exponentially
-  against a constant charge. The size-reading count answering that is itself
-  refuted at the frame ceiling, so both move together.
+  `REFUTED×4, DEAD ROUTE×2, PROBED×2`: the outer arm now charges the arrivals
+  PLUS the telescope behind them, instantiated at the slot shape. The inner arm
+  is still one rung and still FALSE, its program parked in the store.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
   program's own nodes, and a scan among them stores what that program emitted —
   `reify` carrying a product value into a term its own size — so the entry
   table's reading bounds nothing about the residue.
-- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — FALSITY, `RECOVERY`:
-  what the drain frame writes at the nodes map. It takes the term OUT of its
-  parent *All's queue, so the cell it rewrites is the one its ledger's ceiling
-  half is stated over rather than one the walk handed it. Nothing has
-  instantiated it.
-- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, RECOVERY`: what the drain frame registers. The premise alone was
-  refuted by an empty burst: the drain reads the queue, so the walk's values
-  cannot reach it, and the grant is what must pay.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
@@ -300,6 +280,11 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
+- **`fan-regsNest`** (Part7/Depth-Fit) — SHAPE,
+  `REFUTED×2, DEAD ROUTE×2, PROBED`: the registry's own depth against the
+  syntactic unit. The cap-denominated statement is two proven steps, the unit
+  sits under the cap, and the reached counterexample survives every premise —
+  so the conclusion moves and the Φ face's currency with it.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the
@@ -313,6 +298,23 @@ does not fit is a finding about the shared statement, not about the head.
   the queue's own `drainW`, at every level within the descent's count. The
   width is walk-denominated, so it shares the scan arm's dead mechanism and is
   restated with the face rather than alone.
+- **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — DIFFICULTY, `PROBED`: what
+  the outer frame mints, at its OWN size budget. A standing fold and an
+  arriving mint combine by max — both crossing directions, both other ops, a
+  stepped pair. Left: a nonempty path under the frame.
+- **`subscribeInner-live-size`** (Live-Nest-Walk) — DIFFICULTY,
+  `REFUTED, PROBED`: what one subscribe out of a merge node's parked queue
+  mints. Every measure-side axis is read and the cap covers each — depth at
+  margin zero, path, all three ops, a share connecting. Left: a drain arriving
+  with a chain already standing.
+- **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — DIFFICULTY,
+  `PROBED, RECOVERY`: what the drain writes at the nodes map. The pop shrinks,
+  and the park its subscribe makes lands one layer under the term popped — so
+  the entry table covers it with the budget unspent, gate honoured.
+- **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — DIFFICULTY,
+  `REFUTED, PROBED, RECOVERY`: what the drain registers. The premise alone was
+  refuted by an empty burst; the grant pays EXACTLY, the mint being the node's
+  own reading, at margin zero on three rungs.
 - **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — DIFFICULTY, `PROBED`:
   what the outer frame mints at the nodes map. NOT the fresh `*All` cell, which
   the install is proven to price at zero — the write is a full merge PARKING an

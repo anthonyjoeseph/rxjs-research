@@ -1348,6 +1348,36 @@ chainsNest-all D U (c ∷ cs) h =
 -- observable-typed scan accumulator folded back into its own map
 -- function climbs one layer per delivery against a fixed number.
 --
+-- AND THE STATEMENT THAT REPLACES IT IS ALREADY PROVEN, WHICH MAKES
+-- THIS A DENOMINATION RATHER THAN A GAP.  The store measure's own
+-- decomposition puts `regsNestMax` under `storeNestMax`, and the
+-- walk's nest predicate reads that maximum against the instant's
+-- `nestCapAt` -- so the registry's depth under the CAP is two proven
+-- steps and no new mathematics.  What is not available is the
+-- direction this site asks for: the unit sits UNDER the cap, so the
+-- bridge between them runs the wrong way and no arithmetic turns a
+-- cap-side receipt into a unit-side one.
+--
+-- AND NO PREMISE SAVES THE UNIT-SIDE CONCLUSION, which is the move to
+-- rule out before a restatement is spent on it.  The reached
+-- counterexample above satisfies whatever the walk carries, since it
+-- is what a run leaves; threading the nest predicate into this
+-- signature would leave it standing and trade a tracked postulate for
+-- an untracked hypothesis.  The CONCLUSION is what moves, and moving
+-- it is the Φ face's nest currency rather than work owed here: the
+-- potential is a SUM of two halves denominated differently, and the
+-- cap-denominated half is what a cap-denominated premise is spent
+-- against.
+--
+-- DEAD ROUTE: spending the moved conclusion in the potential's WALK
+--   half, which is the half the frame arms visibly charge.  That half
+--   multiplies the syntactic UNIT, and it is affordable only because
+--   the unit sits under the size cap; `nestCapAt` steps by a factor
+--   whose logarithm is already a square of the landing instant's
+--   size, so no widening puts it under the same exponential.  The
+--   CAP half is where the swap lands, and its coefficient carries the
+--   path factor's own cap so that a frame arm can spend it there.
+--
 -- DEAD ROUTE: owing this to whatever MINTS a registration, which is
 --   where the size analogue directly above sends its own obligation.
 --   A mint holds the path it is registering and the program, and the
@@ -1377,20 +1407,29 @@ postulate
     (sl : Slots Γ) (st : EvalSt e) →
     regsNestMax (EvalSt.registry st) ≤ nestUnit e sl
 
--- AND THE FAN-OUT HALF IS NOW A PROVEN FOLD RATHER THAN A FILTER
--- LEMMA, which is the whole of what the store denomination bought.  A
+-- AND THE FAN-OUT HALF IS A PROVEN FOLD RATHER THAN A FILTER LEMMA,
+-- which is the whole of what the store denomination bought.  A
 -- share's admitted selection is under the registry's own place in the
 -- store measure by an induction this tree already had, and the join is
 -- taken apart per chain by the one directly above -- so nothing
 -- between the postulate and the walk's premise is stated over a
--- boolean predicate any more.
+-- boolean predicate.
+--
+-- AND ITS BOUND IS A PARAMETER, WHICH IS WHAT KEEPS IT OUT OF THE
+-- SWAP ABOVE.  Neither step reads the number: the selection is under
+-- the registry's maximum whatever that maximum is, and the join comes
+-- apart against any ceiling.  So this junction is currency-free and
+-- the only thing here denominated in the program's unit is the
+-- statement above's own conclusion -- which is where the swap is owed
+-- and where it stays.  The bound is EXPLICIT because it stands inside
+-- an `all` predicate, where an implicit is a fresh meta per element.
 fan-chain-nestD : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-  (sl : Slots Γ) (i : Fin n) (st : EvalSt e) →
-  regsNestMax (EvalSt.registry st) ≤ nestUnit e sl →
-  all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl)
+  (U : ℕ) (i : Fin n) (st : EvalSt e) →
+  regsNestMax (EvalSt.registry st) ≤ U →
+  all (λ rp → pathNestD (proj₂ rp) ≤ᵇ U)
       (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
-fan-chain-nestD {t = t} {e = e} sl i st h =
-  chainsNest-all 0 (nestUnit e sl) (shareAdmit {t = t} i (EvalSt.registry st))
+fan-chain-nestD {t = t} U i st h =
+  chainsNest-all 0 U (shareAdmit {t = t} i (EvalSt.registry st))
     (≤-trans (shareAdmit-nest i (EvalSt.registry st)) h)
 
 ------------------------------------------------------------------
@@ -1538,20 +1577,20 @@ mutual
       i vals fin ps sched st
 
   walk-share-ΦHyp sl id sf zero nid now Lv i vals fin sched st _ _ _ _ = tt
-  walk-share-ΦHyp sl id sf (suc gas) nid now Lv i vals false sched st
+  walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals false sched st
                   hd hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals false
       (shareAdmit i (EvalSt.registry st)) sched st
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
-          (fan-chain-nestD sl i st (fan-regsNest sl st)) hΦ
-  walk-share-ΦHyp sl id sf (suc gas) nid now Lv i vals true sched st
+          (fan-chain-nestD (nestUnit e sl) i st (fan-regsNest sl st)) hΦ
+  walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
                   hd hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
-          (fan-chain-nestD sl i st (fan-regsNest sl st)) hΦ
+          (fan-chain-nestD (nestUnit e sl) i st (fan-regsNest sl st)) hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
                     _ _ _ _ _ _ = tt
@@ -2032,7 +2071,7 @@ mutual
   walk-frame-LiveHypC {e = e} sl id sf gas nid now Lv k f p vals fin sched st
                       hx hsz hns hw hpz hj =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount f vals) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -2043,6 +2082,7 @@ mutual
     S = Caps.cSize (capsAt e sl id)
     Ch : ℕ
     Ch = chAt e sl id
+    sls = Sched.slots sched
     step = stepFrame sf nid now f p vals fin sched st
     2≤S : 2 ≤ S
     2≤S = 2≤capsAt-size e sl id
@@ -2066,13 +2106,13 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    eqSplit : iterSize S (k + szCount f vals) S
-                ≡ iterSize S (szCount f vals) A
-    eqSplit = iterSize-+ S k (szCount f vals) S
-    hszTail : valsSz? (iterSize S (k + szCount f vals) S) (proj₁ step) ≡ true
+    eqSplit : iterSize S (k + szCount sls f vals) S
+                ≡ iterSize S (szCount sls f vals) A
+    eqSplit = iterSize-+ S k (szCount sls f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount sls f vals) S) (proj₁ step) ≡ true
     hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
                 (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
-    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount f vals) S)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls f vals) S)
                             (proj₂ kv))
                   (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
     hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))
@@ -2081,12 +2121,12 @@ mutual
                 (sym eqSplit)
                 (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
                    hns hsz)
-    cnt≤ : szCount f vals ≤ Ch
-    cnt≤ = szCount≤ch S S 1≤S f vals hx hfz (proj₁ hw)
-    hjTail : k + szCount f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
+    cnt≤ : szCount sls f vals ≤ Ch
+    cnt≤ = szCount≤ch S S 1≤S sls f vals hx hfz (proj₁ hw)
+    hjTail : k + szCount sls f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
     hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
                        (≤-trans (≤-reflexive
-                                  (+-assoc k (szCount f vals) (pathLen p * Ch)))
+                                  (+-assoc k (szCount sls f vals) (pathLen p * Ch)))
                                 (+-monoʳ-≤ k
                                   (+-monoˡ-≤ (pathLen p * Ch) cnt≤))))
                      hj

@@ -48,7 +48,8 @@ open import Rx.Exp
 open import Rx.Prim using (gasPad; g0)
 open import Rx.Evaluator
   using (Sched; EvalSt; subscribeE; sched-init; st-init; root; sched-next; cascadeLatch; chainStep;
-  chainsOf; NodeId; NodeState; mergeAll-st; mergeAllᵒ; stepFrame; thru-outer)
+  chainsOf; NodeId; NodeState; mergeAll-st; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; stepFrame;
+  thru-outer)
 open import Rx.Slots using (Slots)
 open import Rx.Hop-Depth using (hopDᵉ)
 open import Rx.Slot-Hop using (slotHop)
@@ -205,3 +206,117 @@ tieFigs = length (EvalSt.nodes (proj₂ (sub 1)))
 
 tieFigs≡ : tieFigs ≡ (1 , 1 , 0 , 2 , 0 , 1 , 3 , 8 , 16)
 tieFigs≡ = refl
+
+----------------------------------------------------------------------
+-- THE ONE REGION THE ROWS ABOVE LEAVE OPEN: AN ENTRY FOLD ALREADY
+-- NONZERO.  Every row above enters at a fold of ZERO, so what they pin
+-- is the mint and not the way a mint COMBINES with what is already
+-- live.  Both sides of the conclusion carry the entry fold -- the left
+-- through whatever survives the step, the right as a summand of the
+-- join -- so the region is safe only if the two readings combine by
+-- MAX.  A frame that deepened a standing live source, or one whose
+-- mint stacked on the fold rather than joining it, reads one past the
+-- join here and these rows go red.
+--
+-- AND THE STATE IS REACHED BY RUNNING, NOT BUILT.  The first frame is
+-- the one the rows above take, and its OUTPUT schedule and state are
+-- what the second frame is handed, so the entry fold is a fold the
+-- evaluator actually left rather than one written into a record.  The
+-- two depths are crossed in BOTH directions, because a mint that
+-- stacked would be invisible in the direction where the deeper value
+-- arrives second.
+----------------------------------------------------------------------
+
+frameOn : (m : ℕ) → Closed Γ₂ natᵗ → Sched Γ₂ → EvalSt (progL m)
+        → Sched Γ₂ × EvalSt (progL m)
+frameOn m v sc st =
+  let r = stepFrame (gasPad (sucGL m) g0) 1 0 (thru-outer mergeAllᵒ (tieNid m))
+                    root (v ∷ []) false sc st
+  in proj₁ (proj₂ (proj₂ (proj₂ r))) , proj₂ (proj₂ (proj₂ (proj₂ r)))
+
+after₁ : (m : ℕ) → Sched Γ₂ × EvalSt (progL m)
+after₁ m = frameOn m (deferᵉ (deepE m)) (proj₁ (sub m)) (proj₂ (sub m))
+
+-- (the fold entering the second frame , the fold leaving it)
+twice : (m m' : ℕ) → ℕ × ℕ
+twice m m' = liveMax (proj₁ (after₁ m))
+           , liveMax (proj₁ (frameOn m (deferᵉ (deepE m'))
+                              (proj₁ (after₁ m)) (proj₂ (after₁ m))))
+
+-- LOAD-BEARING in both directions: shallow-onto-deep would rise off
+-- the entry fold if the mint stacked, and deep-onto-shallow would rise
+-- past the deeper value's own reading.
+twicePacked : ℕ
+twicePacked = proj₁ (twice 3 1) + 100 * proj₂ (twice 3 1)
+            + 10000 * proj₁ (twice 1 3) + 1000000 * proj₂ (twice 1 3)
+
+-- deep-then-shallow reads 3 -> 3 and shallow-then-deep 1 -> 3: the
+-- second frame's mint JOINS the standing fold rather than adding to
+-- it, and a standing fold is not deepened by a frame that steps past
+-- it.  A stacking mint would read 4 in both directions.
+twicePacked≡ : twicePacked ≡ 3010303
+twicePacked≡ = refl
+
+-- and the statement itself at those two entry states, at the size
+-- budget the ARRIVING value admits and no more -- so the row is asked
+-- to cover the mint out of the second value alone, with the standing
+-- fold carried by the join's own summand and by nothing else
+tieLiveOn3 : Confirms
+  (stepFrame-nest-live-outer (gasPad (sucGL 3) g0) 1 0 mergeAllᵒ (tieNid 3)
+     root (deferᵉ (deepE 1) ∷ []) false (proj₁ (after₁ 3)) (proj₂ (after₁ 3))
+     0 0 (valsV 1))
+tieLiveOn3 = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
+
+tieLiveOn1 : Confirms
+  (stepFrame-nest-live-outer (gasPad (sucGL 1) g0) 1 0 mergeAllᵒ (tieNid 1)
+     root (deferᵉ (deepE 3) ∷ []) false (proj₁ (after₁ 1)) (proj₂ (after₁ 1))
+     0 0 (valsV 3))
+tieLiveOn1 = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- AND THE TWO AXES A FRAME HAS THAT A SUBSCRIBE DOES NOT.  An ARRIVAL
+-- takes the operator's arm -- switch KILLS the standing inner, exhaust
+-- DROPS the arrival while one is active -- so unlike at a subscribe
+-- the operator is LIVE here and a row over it can genuinely fail.  And
+-- a frame steps a LIST: two values in one step mint twice against a
+-- single `V`, which the premise bounds each value by rather than their
+-- sum, so a pair of mints that stacked would read past it.  Both are
+-- taken at the compounded entry state, where a standing fold is there
+-- to be stacked on.
+----------------------------------------------------------------------
+
+opLive : AllOp → (m m' : ℕ) → ℕ
+opLive op m m' = liveMax (proj₁ (proj₂ (proj₂ (proj₂
+  (stepFrame (gasPad (sucGL m) g0) 1 0 (thru-outer op (tieNid m))
+     root (deferᵉ (deepE m') ∷ []) false
+     (proj₁ (after₁ m)) (proj₂ (after₁ m)))))))
+
+pairLive : (m a b : ℕ) → ℕ
+pairLive m a b = liveMax (proj₁ (proj₂ (proj₂ (proj₂
+  (stepFrame (gasPad (sucGL m) g0) 1 0 (thru-outer mergeAllᵒ (tieNid m))
+     root (deferᵉ (deepE a) ∷ deferᵉ (deepE b) ∷ []) false
+     (proj₁ (after₁ m)) (proj₂ (after₁ m)))))))
+
+widePacked : ℕ
+widePacked = opLive switchᵒ 3 1 + 100 * opLive exhaustᵒ 3 1
+           + 10000 * pairLive 1 1 3 + 1000000 * pairLive 1 3 1
+
+-- every one of the four reads 3, which is the STANDING fold and not a
+-- sum with it: switch kills without deepening, exhaust drops the
+-- arrival outright, and a pair of arrivals in one step joins whichever
+-- direction the deeper one comes in.  A stacking mint reads 4 in three
+-- of the four.
+widePacked≡ : widePacked ≡ 3030303
+widePacked≡ = refl
+
+tieLiveOuterSwitch : Confirms
+  (stepFrame-nest-live-outer (gasPad (sucGL 3) g0) 1 0 switchᵒ (tieNid 3)
+     root (deferᵉ (deepE 1) ∷ []) false (proj₁ (after₁ 3)) (proj₂ (after₁ 3))
+     0 0 (valsV 1))
+tieLiveOuterSwitch = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
+
+tieLiveOuterPair : Confirms
+  (stepFrame-nest-live-outer (gasPad (sucGL 1) g0) 1 0 mergeAllᵒ (tieNid 1)
+     root (deferᵉ (deepE 1) ∷ deferᵉ (deepE 3) ∷ []) false
+     (proj₁ (after₁ 1)) (proj₂ (after₁ 1)) 0 0 (valsV 3))
+tieLiveOuterPair = λ _ _ _ → ≤ᵇ⇒≤ _ _ tt
