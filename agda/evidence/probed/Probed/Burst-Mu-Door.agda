@@ -62,14 +62,15 @@ open import Probed.Apparatus using (Confirms)
 
 -- LOAD-BEARING: it is the repair in five numbers.  The nesting is ONE
 -- where the position returning zero reported none, and the block it
--- buys is the whole program's own size -- against a layer count that
--- stands at one however many copies the unfolding plants.
+-- buys is the BIT LENGTH of the whole program's own size -- against a
+-- layer count that stands at one however many copies the unfolding
+-- plants.
 figures : List ℕ
 figures = muDepthᵉ (srcAt 66) ∷ layᵉ (srcAt 66) ∷ sizeᵉ (srcAt 66)
         ∷ muRungsᴺ (muDepthᵉ (srcAt 66)) (sizeᵉ (srcAt 66))
         ∷ slotsSize sl ∷ []
 
-figures≡ : figures ≡ 1 ∷ 1 ∷ 144 ∷ 144 ∷ 1 ∷ []
+figures≡ : figures ≡ 1 ∷ 1 ∷ 144 ∷ 8 ∷ 1 ∷ []
 figures≡ = refl
 
 -- LOAD-BEARING: the fold has something to push and pushing it WRITES.

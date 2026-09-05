@@ -30,7 +30,8 @@
 --
 -- WHAT THEY DO NOT BUY, AND IT IS THE RATE ITSELF.  A row instantiates
 -- one program at one bound, and the question the rate answers is
--- asymptotic: whether `B` rungs pay for one squaring at every `B`.
+-- asymptotic: whether ONE block per level covers what an unfolding
+-- delivers at every bound.
 -- These stand at the sharpest bound the premise admits and clear it,
 -- so what they kill is the claim that the block is UNNECESSARY and
 -- never the claim that it is enough.  The nesting reached is two and
@@ -124,7 +125,7 @@ figures = layᵉ (oAt 4) ∷ muDepthᵉ (oAt 4)
         ∷ descChg (obs (obs natᵗ)) (sizeᵉ (oTwo 2)) (oTwo 2)
         ∷ []
 
-figures≡ : figures ≡ 0 ∷ 1 ∷ 20 ∷ 0 ∷ 2 ∷ 462 ∷ []
+figures≡ : figures ≡ 0 ∷ 1 ∷ 5 ∷ 0 ∷ 2 ∷ 14 ∷ []
 figures≡ = refl
 
 -- LOAD-BEARING: the runs DELIVER, and each delivers ONE value.  An

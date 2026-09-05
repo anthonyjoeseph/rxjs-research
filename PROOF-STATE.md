@@ -215,25 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEDGER THAT MUST BECOME A CLIMB, WHICH IS WHAT THE CHARGE
-  COSTS.** The count now reads the LEVEL the frame stands at as well as
-  the state, since a block is bought at the bound in hand; the walk
-  pays for its frames out of a fixed PRODUCT of a per-frame ceiling,
-  and a charge that grows with the level cannot fit under one. Both
-  halves of that ledger are refuted outright as stated. The commit
-  turns the walk's premise, the dispatch's, and the depth fit's `chAt`
-  apparatus into a climb in the level, so the ceiling a frame is held
-  to is read where the frame is.
-
-- **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
-  THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
-  its ceiling is a fixed product, so what is left is what a frame
-  cannot read off a path: the two crossings' charge, the fan's
-  registry term, and the burst WIDTH. The width is the one to take
-  first — the package proving it is proven already and delivers it at
-  the size cap ONE INSTANT UP, so the whole question is a rung. The
-  commit puts that gap beside the store side's own climb, which
-  crosses the same one.
+- **THE CROSSING ARM'S CEILING, NOW THAT THE CHARGE IS A LOGARITHM.** A
+  block is denominated in the bound's BIT LENGTH, so a frame standing
+  at level `k` is charged `⌈log₂ (iterSize S k S)⌉` where the refuted
+  ledger charged `iterSize S k S` outright — linear in the level
+  against exponential in it. That is why the climb refutation no longer
+  reaches this ledger, and it settles nothing on its own: a walk of `n`
+  frames still pays a SUM that grows with the level against a fixed
+  PRODUCT of a per-frame ceiling. The commit instantiates the crossing
+  arm at the levels the walk actually stands at, and either exhibits
+  the ceiling or refutes the fixed product a second time, at the
+  denomination that replaced the one it killed.
 
 - **THE LEVELS COMPOSING, WHICH IS WHAT NEITHER `μ` ROW REACHES.** Both
   new receipts stand at ONE handed-out nesting, and the block count's
@@ -245,6 +237,16 @@ does not fit is a finding about the shared statement, not about the head.
   it against the count as it stands, which either buys the rate its
   first evidence past one level or refutes it where a single level
   never could.
+
+- **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
+  THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
+  its ceiling is a fixed product, so what is left is what a frame
+  cannot read off a path: the two crossings' charge, the fan's
+  registry term, and the burst WIDTH. The width is the one to take
+  first — the package proving it is proven already and delivers it at
+  the size cap ONE INSTANT UP, so the whole question is a rung. The
+  commit puts that gap beside the store side's own climb, which
+  crosses the same one.
 
 ### The ledger
 
