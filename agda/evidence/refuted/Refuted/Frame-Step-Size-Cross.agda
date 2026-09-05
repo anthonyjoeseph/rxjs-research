@@ -12,12 +12,12 @@
 -- observables and a `from-inner` frame is handed the values one has
 -- delivered; both are priced at ONE rung above the level the arriving
 -- values stand at, whatever the subscription underneath them runs.
--- That is the only arm of the frame size step still charging a
--- constant: `Frame-Step-Size-Level` killed the constant charge for
--- `map-f`, and the repair was to let the count READ the frame -- a
--- map now pays `sizeᵗ fn`, a scan `length vals * suc (sizeᵗ fn)`.  The
--- two crossing frames were never repaired, because their syntax is
--- not what runs: the observable does, and it arrives as a VALUE.
+-- A constant charge had already fallen once at the map arm, in
+-- `Frame-Step-Size-Level`, and the repair there was to let the count
+-- READ the frame -- a map pays `sizeᵗ fn`, a scan
+-- `length vals * suc (sizeᵗ fn)`.  Neither crossing frame could be
+-- repaired that way, because its syntax is not what runs: the
+-- observable does, and it arrives as a VALUE.
 --
 -- WHERE THEY BREAK.  A `thru-outer` step runs its arriving
 -- observable's whole synchronous chain and hands back what it emitted.
@@ -41,10 +41,14 @@
 -- count is what has to move.
 --
 -- WHAT SURVIVES, AND IT IS THE SHAPE OF THE REPAIR.  `iterSize S j B`
--- dominates `2 ^ j * B` (`iterSize-2^`), so a count reading the
--- arriving observables' OWN size buys back the whole blowup at once
--- -- the same move the map arm already made, denominated in the
--- value that runs rather than in the frame that is written.  What
+-- dominates `2 ^ j * B` (`iterSize-2^`), so charging rungs in a
+-- quantity that BOUNDS what runs buys back the whole blowup at once --
+-- the same move the map arm already made, denominated in the value
+-- that runs rather than in the frame that is written.  The two arms
+-- reach that quantity differently, and the second witness is what says
+-- so: the outer arm's program arrives, so its own syntax is readable,
+-- while the inner arm's is parked in the `*All` node and is legible
+-- only through the store bound the premise carries.  What
 -- these rows do NOT touch is the STORE half: the queue this witness
 -- drains is empty afterwards and the chain installs no node, so
 -- `stepFrame-sz-store-inner` and `stepFrame-sz-store-outer` are

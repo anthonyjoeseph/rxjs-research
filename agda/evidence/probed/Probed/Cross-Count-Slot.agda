@@ -2,7 +2,7 @@
 -- THE OUTER CROSSING'S COUNT, INSTANTIATED WHERE READING THE ARRIVAL
 -- ALONE FAILS: an observable that names a shared slot.
 --
--- TARGET: stepFrame-sz-outer @f4940f
+-- TARGET: stepFrame-sz-outer @4184b9
 --
 -- WHY THIS IS THE REGION WORTH BUYING.  A crossing frame subscribes
 -- what arrived, and a variable is the one arrival whose syntax says
@@ -31,9 +31,13 @@
 -- a `scripted` slot, whose contents are data rather than a program to
 -- connect; a telescope of more than one slot, where the summand is a
 -- sum and the stratification is what bounds a slot naming another; the
--- `from-inner` arm, which reaches its program through the store; and
--- both store halves, whose count is the same quantity but whose
--- conclusion is about the node table.
+-- `from-inner` arm, which reaches its program through the store and is
+-- the region `Probed.Cross-Count-Store` reads; and both store halves,
+-- whose count is the same quantity but whose conclusion is about the
+-- node table.  Nor is anything here evidence about the count's store
+-- bound: this arm does not read it, so the figures below stand at
+-- whatever it is handed, and a count ignoring it entirely would pass
+-- every row.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Cross-Count-Slot where
 
@@ -55,8 +59,8 @@ open import Probed.Apparatus using (Confirms)
 -- second is the count as it now stands.
 ----------------------------------------------------------------------
 counts : ℕ
-counts = szCount sl₂ (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
-       + 100 * szCount sl₃ (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
+counts = szCount sl₂ 51 (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
+       + 100 * szCount sl₃ 55 (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
 
 -- LOAD-BEARING: it is what says the count moved along the axis the
 -- emission moves on.  A reading blind to the telescope reports `1` at
