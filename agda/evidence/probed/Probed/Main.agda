@@ -142,6 +142,9 @@ open import Probed.Subscribe-Inner-Doors
   using (mergeDelivered≡; switchAgrees; exhaustAgrees; doorRows≡;
          tieDoorSwitch; tieDoorExhaust)
 
+open import Probed.Subscribe-Mu-Blocks
+  using (figures≡; delivered≡; crossRows≡; deepRows≡; tieMu; tieNest)
+
 open import Probed.Slot-Telescope-Sum
   using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
 

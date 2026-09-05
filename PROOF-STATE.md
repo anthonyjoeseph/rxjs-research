@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE `μ` REGION THE NEW DENOMINATION HAS NEVER BEEN READ AT.** The
-  charge is now a block of rungs per level of `μ` plus the operators,
-  and the rate — one block at the bound reached so far, paying for one
-  squaring — is a DESIGN choice nothing has instantiated. Every row
-  standing over the two descents is at a `μ`-free program, where the
-  block count is nought and the reading is the predecessor's, which
-  those refutations killed and this rate is not. The commit runs the
-  two refuting families at the new
-  charge — the squaring family at four mentions, the duplication chain
-  at the door — which either kills the rate or is the first evidence
-  reaching the region the restatement was for.
+- **THE SAME `μ` REGION AT THE DOOR, WHICH THE VALUE SIDE'S ROWS DO NOT
+  REACH.** The block count is now instantiated where ONE subscription
+  hands its burst back: the layer-only level fails and the charge
+  clears it at four mentions and again one nesting deeper, so the block
+  buys the multiplicity and not the programs being small. What no row
+  touches is the arrival pushed BACK through a crossing door, whose
+  charge is the same denomination read at a burst rather than at a
+  descent — and a door re-enters the arrival, so an unfolding is
+  planted under a frame the value side never stands at. The commit
+  runs the duplication family there.
 
 - **THE LEDGER THAT MUST BECOME A CLIMB, WHICH IS WHAT THE CHARGE
   COSTS.** The count now reads the LEVEL the frame stands at as well as
@@ -254,11 +253,10 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
+- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
   subscription delivers, in its own charge plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice costs nothing; every row stands away from the `μ` the charge was
-  restated for.
+  twice costs nothing; the block is read at two nestings and its rate is open.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   the burst a crossing door pushes back through itself, keyed on the source
   program since an arbitrary burst is unbounded. A duplication chain buys no

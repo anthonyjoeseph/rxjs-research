@@ -1132,6 +1132,20 @@ parkedChgAt-lookup B nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   the deferred subtree the copies sit in, entered at `root` on the
 --   initial table with the crossing bracketed on both sides at the same
 --   rungs.
+-- PROBED: `Probed.Subscribe-Mu-Blocks` at the region every other row
+--   over this statement declined -- the refutation's own family at four
+--   mentions, and the same construction nested twice, whose inner
+--   subtree names both recursive occurrences -- each read at the
+--   smallest bound the premise admits, since a larger one is a weaker
+--   reading.  The layer count is nought at both programs, so the
+--   layer-only level fails where the charge clears it and the figure
+--   moves with the NESTING rather than with the mentions: the block is
+--   what buys the multiplicity, and the crossing the refutation sits on
+--   is closed by the denomination and not by the programs being small.
+--   What the rows do not buy is the RATE, which is asymptotic and which
+--   no instantiation decides; the nesting reached is two and the
+--   mentions four, the telescope is one scripted slot, and nothing is
+--   read past a `root` entry, so no door stands in the way.
 postulate
   subscribeE-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (o : Closed Γ u) (κ : Path Γ u t) (id : Id)
