@@ -123,8 +123,20 @@ open import Probed.Cross-Count-Fork
   using (separates; arrival₂≡; nodes₂; prem₂; cnstRow₂; ownRow₂;
          arrival₃≡; nodes₃; prem₃; ownRow₃)
 
+open import Probed.Cross-Count-Data
+  using (separates; charges₃≡; opsRow₃; opsChain≡; opsRow₂)
+
+open import Probed.Cross-Count-Spine
+  using (separates; arrivalCounts≡; emitCounts≡; layChain≡; layRow₂; layBig≡)
+
+open import Probed.Cross-Count-Burst
+  using (separates; joins≡; valRows≡; storeRow; sinkRows≡)
+
 open import Probed.Cross-Count-Slot
   using (counts≡; tieSlot12; tieSlot13)
 
 open import Probed.Cross-Count-Store
-  using (valRows≡; storeRows≡; tieInner; tieStore)
+  using (charges≡; valRows≡; storeRows≡; tieDrain; tieStore)
+
+open import Probed.Drain-Count-Slot
+  using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)

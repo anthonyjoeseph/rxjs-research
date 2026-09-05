@@ -2046,7 +2046,7 @@ mutual
   walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (f ↠ p) vals fin sched st
                    hsz hns hw hpz hk =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls A f vals) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls nsSt f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -2056,6 +2056,7 @@ mutual
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
     sls = Sched.slots sched
+    nsSt = EvalSt.nodes st
     step = stepFrame sf nid now f p vals fin sched st
     2≤S : 2 ≤ S
     2≤S = 2≤capsAt-size e sl id
@@ -2072,13 +2073,13 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    eqSplit : iterSize S (k + szCount sls A f vals) S
-                ≡ iterSize S (szCount sls A f vals) A
-    eqSplit = iterSize-+ S k (szCount sls A f vals) S
-    hszTail : valsSz? (iterSize S (k + szCount sls A f vals) S) (proj₁ step) ≡ true
+    eqSplit : iterSize S (k + szCount sls nsSt f vals) S
+                ≡ iterSize S (szCount sls nsSt f vals) A
+    eqSplit = iterSize-+ S k (szCount sls nsSt f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount sls nsSt f vals) S) (proj₁ step) ≡ true
     hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
                 (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
-    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls A f vals) S)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls nsSt f vals) S)
                             (proj₂ kv))
                   (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
     hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))
@@ -2237,20 +2238,30 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- kinds that read the program's own syntax; the drain arm charges the
 -- LEVEL ITSELF, flatly and with no value in it, because the parked
 -- program is in the store and the count cannot reach the node table;
--- and the outer arm reads its ARRIVALS, whose only bound is the size
--- premise the walk carries -- which is that same climbing level, so
--- the charge climbs with it even though the clause names no level.
--- The second is the one a reader walks past, and it is the one the
--- ledger refutation is instantiated at.
+-- and the outer arm reads its ARRIVALS, so what bounds its charge is
+-- whatever the size premise bounds about them, and the clause names no
+-- level either way.  The second is the one a reader walks past, and it
+-- is the one the ledger refutation is instantiated at.
 
--- SO THE TWO REPAIRS ARE DIFFERENT AND ONLY ONE IS ARITHMETIC.  The
--- drain wants a reading of what is actually parked, which is a state
--- reading its count is not handed and its sibling arm already takes of
--- the arrivals.  The outer wants the arrivals bounded by the INSTANT's
--- own value cap rather than by the walk's rung ladder -- a fixed
--- number per instant against a quantity that climbs per frame -- and
--- that is a claim about where the size premise is denominated, not
--- about what the clause counts.
+-- SO THE TWO REPAIRS ARE DIFFERENT, AND THE OUTER ONE IS A CURRENCY.
+-- Rungs are bought per operator LAYER, and a frame applies a CLOSED
+-- function, so an arrival's layers grow by the program's own syntax
+-- per frame; what the ladder multiplies besides that is DATA, and data
+-- emits itself, so a reading of an arrival's SIZE prices what a
+-- subscription does not spend and climbs with the level.  A layer
+-- reading is separated from the size one at a reified arrival and
+-- still covers the emission there with no rung bought
+-- (`Probed.Cross-Count-Data`), and it is the only candidate the walk
+-- cannot grow, since a frame's own closed function reifies the arrival
+-- into the term and a count charging that function's syntax inflates
+-- with it (`Probed.Cross-Count-Spine`).  The burst joins by MAX, since
+-- each delivered value comes out of one arrival's run and the shared
+-- sink is read entry by entry (`Probed.Cross-Count-Burst`).  What the
+-- currency does not buy is a ceiling, since a rung admits size
+-- geometrically and layers cost a fixed amount of size apiece.
+-- The drain's repair is unrelated and it is a reading: what is
+-- actually parked, which is a state its count is not handed and its
+-- sibling arm already takes of the arrivals.
 
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
@@ -2268,11 +2279,17 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   WHOLE ledger this premise supplies, at the longest path the size
 --   predicate's own length conjunct admits and with the level in hand
 --   held under the ledger it has been spending.  It is what says which
---   side breaks: TWO rungs of the walk put the level past every
---   allowance the path has, so no reading of this premise fixes a
---   ceiling a crossing frame fits under, and one rung lower the
---   crossing is affordable -- the gap opens with the walk rather than
---   with the program.
+--   side breaks: a single arrival the level admits puts the charge
+--   past every allowance the path has, so no reading of this premise
+--   fixes a ceiling a crossing frame fits under -- and it opens at the
+--   third rung, the second still fitting.
+-- REFUTED: `Refuted.Walk-Ceil-Drain` -- the same ledger against the
+--   DRAIN arm, at a chain parked behind the exiting node deep enough
+--   to overrun it and shallow enough for the walk's own entry store
+--   reading to admit.  The row carries that reading, so what it
+--   exhibits is a table a walk could have reached this frame with --
+--   and it fires at the same rung the outer row does, through the same
+--   channel from the level to a program's layers.
 -- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
 --   a recursion on a depth fuel, the charge at each frame read at the
 --   level that frame stands at, against what `walkFac-ch` affords, and
@@ -2301,7 +2318,7 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   cubic in the cap, while one rung of the caps ladder already
 --   exceeds every polynomial in it.  Recorded at `chain-climb-ch`
 --   from the other end.
--- RECOVERY: git show 216332b:agda/src/Verify-Budget-Sufficient/Regs-Nest-Walk.agda
+-- RECOVERY: git show 157a852:agda/src/Verify-Budget-Sufficient/Regs-Nest-Walk.agda
 --   restores `szCount≤ch` and the `crossFrame?` predicate it excluded
 --   the two crossings by -- a per-frame discharge of the three
 --   program-reading arms against `frameCh`, which is the shelf a

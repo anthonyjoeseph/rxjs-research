@@ -2,7 +2,7 @@
 -- THE OUTER CROSSING'S COUNT, INSTANTIATED WHERE READING THE ARRIVAL
 -- ALONE FAILS: an observable that names a shared slot.
 --
--- TARGET: stepFrame-sz-outer @4184b9
+-- TARGET: stepFrame-sz-outer @cccbd0
 --
 -- WHY THIS IS THE REGION WORTH BUYING.  A crossing frame subscribes
 -- what arrived, and a variable is the one arrival whose syntax says
@@ -19,12 +19,13 @@
 -- rather than a choice of cap.  Both hold.
 --
 -- AND THE FIGURES SAY THE COUNT NOW MOVES WITH THE SLOT, which is the
--- finding and not decoration.  The reading these rows replace is
--- pinned at one across both witnesses -- the arriving syntax is a
--- variable in each -- so a green pair would prove nothing about the
--- repair if the count were still constant along the axis the emission
--- grows on.  It is not: it grows by the definition's own four nodes,
--- and `iterSize` doubles per unit of it.
+-- finding and not decoration.  Every reading taken off the arrival
+-- ALONE is pinned across both witnesses -- the arriving syntax is a
+-- variable in each, which prices at one node and at no layer -- so a
+-- green pair would prove nothing about the repair if the count were
+-- still constant along the axis the emission grows on.  It is not: it
+-- grows by the definition's own four nodes, and `iterSize` doubles per
+-- unit of it.
 --
 -- NOT COVERED: an arrival whose syntax IS what runs -- a chain or a
 -- reified value, which is the region `Probed.Cross-Count-Fork` reads;
@@ -46,7 +47,7 @@ open import Data.Nat using (ℕ; _+_; _*_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
-open import Rx.Evaluator using (root; mergeAllᵒ; thru-outer; sched-init)
+open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer; sched-init)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (szCount; stepFrame-sz-outer)
 open import Refuted.Frame-Step-Size-Slot
@@ -54,18 +55,21 @@ open import Refuted.Frame-Step-Size-Slot
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
--- WHAT THE COUNT READS AT EACH WITNESS.  The first figure of each pair
--- is the arriving syntax the predecessor reading was confined to; the
--- second is the count as it now stands.
+-- WHAT THE COUNT READS AT EACH WITNESS, the second scaled so a change
+-- at either summand moves the total.  The arrival contributes nothing
+-- to either, so what the figures read is the telescope.
 ----------------------------------------------------------------------
 counts : ℕ
-counts = szCount sl₂ 51 (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
-       + 100 * szCount sl₃ 55 (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
+counts = szCount sl₂ (EvalSt.nodes st₂)
+           (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
+       + 100 * szCount sl₃ (EvalSt.nodes st₃)
+           (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
 
 -- LOAD-BEARING: it is what says the count moved along the axis the
--- emission moves on.  A reading blind to the telescope reports `1` at
--- both witnesses, so this row fails for every such reading.
-counts≡ : counts ≡ 5652
+-- emission moves on.  A reading blind to the telescope reports the
+-- same figure at both witnesses, so this row fails for every such
+-- reading.
+counts≡ : counts ≡ 5551
 counts≡ = refl
 
 ----------------------------------------------------------------------

@@ -532,6 +532,24 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             ins_at[bi] = back_up(min(i for i, it in enumerate(p.items)
                                      if it.block == bi))
 
+    # A NAME CLAIMED FROM TWO MODULES MAY NOT BE RE-EXPORTED.  In the real
+    # file two `using` lists asking different modules for the same name is a
+    # scope AMBIGUITY, which Agda reports only where the name is USED -- and a
+    # claim root uses none of them.  `public` turns each into a DEFINITION of
+    # this module, and two definitions of one name is a ClashingDefinition
+    # that fails a file the compiler accepts.  Leaving those opens private
+    # costs nothing: a focus module repeats every original import verbatim, so
+    # it sees the name by the same route the real file does.
+    reimported: set[str] = set()
+    seen_once: set[str] = set()
+    for it in p.items:
+        if it.kind != "pass":
+            continue
+        for nm in using_names(p.lines[it.start : it.end]):
+            if nm in seen_once:
+                reimported.add(nm)
+            seen_once.add(nm)
+
     out: list[str] = []
     emitted: set[int] = set()
     pre_emitted: set[str] = set()   # hoist members already emitted IN PLACE
@@ -588,7 +606,7 @@ def render_ctx(p: Parsed, mod: str, foci: list[str] = [],
             out.append(f"module {mod} where")
             continue
         if it.kind == "pass":
-            out.extend(publicize(p.lines[it.start : it.end]))
+            out.extend(publicize(p.lines[it.start : it.end], reimported))
             continue
         if it.block is not None and it.block in heavy:
             # A KEPT-REAL member stays EXACTLY WHERE IT WAS.  Relocating these
@@ -678,15 +696,36 @@ def render_focus(p: Parsed, mod: str, ctx: str, foci: list[str],
     return "\n".join(HOLES_PRAGMA + out).rstrip() + "\n"
 
 
-def publicize(block: list[str]) -> list[str]:
+def using_names(block: list[str]) -> list[str]:
+    """The names an `open import … using (…)` claims, for the clash check.
+
+    Only `using` is read.  A `renaming` target is exported too, but the
+    caller's question is whether TWO opens claim one name, and this tree's
+    imports are `using`-listed by the gate -- so a miss here can only fail to
+    suppress a `public`, which is the state before this check existed.
+    """
+    if not block or not block[0].startswith(("open import", "import ")):
+        return []
+    text = " ".join(ln.strip() for ln in block)
+    m = re.search(r"\busing\s*\(([^)]*)\)", text)
+    if m is None:
+        return []
+    return [nm.strip() for nm in m.group(1).split(";") if nm.strip()]
+
+
+def publicize(block: list[str], reimported: set[str] = set()) -> list[str]:
     """Make an `open import` re-export, so focus modules see it through the ctx.
 
     `public` goes at the END of the statement, after any using/hiding/renaming,
     so it is appended to the last line of the (possibly multi-line) block.
+    An open claiming a name ANOTHER open also claims is left alone: see the
+    ClashingDefinition note at the call site.
     """
     if not block or not block[0].startswith("open"):
         return block
     if any(re.search(r"\bpublic\b", ln) for ln in block):
+        return block
+    if any(nm in reimported for nm in using_names(block)):
         return block
     out = list(block)
     for k in range(len(out) - 1, -1, -1):

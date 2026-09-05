@@ -185,6 +185,20 @@ the stubs anywhere puts that later signature on the wrong side of the definition
 reads. Keeping each where it already was needs no regex enumerating what a signature
 may mention, which is the only other way to get it right.
 
+## A name claimed from two modules is not re-exported through the context
+
+The context module re-exports the target's `open import`s with `public`, so a focus
+module sees the prelude through it. That turns each imported name into a DEFINITION of
+the context module — and a file whose two `using` lists ask different modules for the
+same name then emits two definitions of it, which is a `ClashingDefinition` on a file
+Agda itself accepts. In the real module that shape is a scope AMBIGUITY, reported only
+where the name is USED, and a claim root uses none of the names it claims; the two
+evidence roots each claim `figures≡` from four probes apiece.
+
+So an open claiming a name another open also claims is emitted WITHOUT `public`. Nothing
+is lost: a focus module repeats every original import verbatim, so it reaches the name by
+the route the real file does, and the suppression is narrowed to the colliding opens.
+
 ## A block member in NO cycle is never stubbed, and that is what blows the budget
 
 The loop's whole trick is that a focused check keeps ONE body real and replaces its

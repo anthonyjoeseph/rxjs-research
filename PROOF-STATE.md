@@ -215,37 +215,36 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO CROSSING ARMS, WHICH CLIMB FOR DIFFERENT REASONS.** The
-  level side is closed: every advance rule between a JOIN and a SUM
-  outruns `walkFac-ch` at the second crossing frame, both endpoints
-  exhibited, and moving the ceiling instead means affording the size
-  ladder iterated at itself — a tower `nestΦAt`'s header rules out. So
-  the charge moves, and `szCount` says where: three arms read the
-  program's own syntax and are level-free, the drain charges the LEVEL
-  flatly, and the outer charges its ARRIVALS, whose only bound is the
-  walk's climbing size premise. The commit takes the outer — the arm
-  `Walk-Ceil-Ledger` is instantiated at — and asks whether the arrivals
-  can be denominated at the instant's own value cap instead.
+- **THE JOIN OVER A QUEUE OF SEVERAL, STILL UNINSTANTIATED.**
+  Every drain row parks exactly one program, so the leaf's MAX is a
+  max over a singleton and its shape is untested. The drain subscribes
+  each entry in turn and every delivered value comes out of one
+  entry's run, which is the argument for a max rather than a sum; the
+  state threaded into a later entry is what could break it. The
+  witness both receipts leave open is one queue MIXING the kinds at
+  three depths — a slot reference, a reference under one operator, a
+  written-out chain — since only a mixed queue asks the max to cover
+  a hidden run and a visible one at once.
 
-- **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
-  cap-side repair at the four sites is now dead in `fan-regsSz`'s
-  header, and the last of them dies on the caps recurrence itself: the
-  stepped cap the registry's receipt names is a blowup of the very
-  depth budget any Φ pricing must fit under, so the potential is a
-  per-instant quantity and the registry is not. The commit states the
-  sink leaf's charge against what the REGISTRY carries — a per-entry
-  reading rather than a cap — and reports whether the walk's own
-  budget can spend it.
+- **THEN WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
+  ARMS ARE NOW WAITING ON.** The drain leaf and the outer arm differ
+  only in WHERE the program sits — parked in a node, or arriving as a
+  value — and now agree in denomination as well. Underneath each is
+  one claim: subscribing a program of bounded size delivers within the
+  rungs its layers and its telescope buy, because reification adds no
+  layer while a substitution multiplies. The commit states that
+  single-subscription claim as the leaf both spend, and reports what
+  the per-entry step of the drain still owes above it.
 
-- **THEN THE STORE ADVANCE AT A CROSSING, WHICH THE CHARGE DOES NOT
-  DECIDE.** A crossing is the only frame that subscribes, so it is what
-  advances the node table inside an instant — which is what makes a
-  flat store field unavailable and what a fan-out entry inherits from
-  the entries before it. That half is independent of the affordability
-  the leg above turns on: it is a claim about WHEN the table moves, not
-  about what the move costs. The commit states the advance at one
-  crossing and reports whether one index serves the frame and the
-  fan-out entry alike.
+- **THEN THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
+  Each crossing arm has two conclusions — what it delivers and what it
+  leaves in the node table — and only three of the four are
+  instantiated. The store half of the outer arm is the blank one, and
+  it is not a repeat of the inner half's: what a subscribed arrival
+  writes into the table is reified by whatever operator it lands
+  under, so the quantity is the run's, not the arrival's. The commit
+  builds the state where that difference shows and reads the repaired
+  denomination against it.
 
 ### The ledger
 
@@ -254,11 +253,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×2, PROBED×4`: both arms now charge rungs in a quantity
-  that bounds what runs — the outer the arrivals plus their telescope, the
-  inner the store bound, its program being parked not passed. Each known
-  refutation re-runs against the reading that replaced it.
+- **`mergeAllDrain-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED×3, TWIN, PROBED×3`: what a run delivers, in layers of what runs plus
+  the telescope behind it — the drain reading its node's queue, the outer arm
+  its arrivals. Both are read where a slot reference hides the run; the join
+  over a queue of several is untested.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the
@@ -278,9 +277,10 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×3, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
+  `REFUTED×4, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
   THE LEVEL SIDE IS CLOSED — ceiling, whole ledger, and every advance rule from
-  a join to a sum — and the ceiling side would need a tower, so the CHARGE moves.
+  a join to a sum — and the ceiling side would need a tower, so the CHARGE
+  moves.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the
