@@ -44,7 +44,7 @@ module Probed.Frame-Drain-Live where
 
 open import Data.Bool using (true; false)
 open import Data.List using (List; []; _∷_; foldr)
-open import Data.Nat using (ℕ; zero; suc; _⊔_)
+open import Data.Nat using (ℕ; zero; suc; _+_; _⊔_)
 open import Data.Maybe using (just; nothing)
 open import Data.Product using (proj₁; proj₂)
 open import Data.Unit using (tt)
@@ -52,12 +52,12 @@ open import Data.Vec using () renaming ([] to []ⱽ; _∷_ to _∷ⱽ_)
 open import Data.Fin using () renaming (zero to fzero)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
-open import Rx.Prim using (g0; gs; hot)
-open import Rx.Exp using (Ctx; Closed; natᵗ; emptyᵉ; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
+open import Rx.Prim using (Gas; g0; gs; hot)
+open import Rx.Exp using (Ctx; Closed; obs; natᵗ; emptyᵉ; mergeAllᵉ; ofᵉ; deferᵉ; strmᵗ)
 open import Rx.Nest-Depth using (nestDᵉ)
 open import Rx.Slots using (Slots; scripted)
-open import Rx.Evaluator using (EvalSt; Sched; from-inner; root; stepFrame; sched-init; st-init; mergeAllᵒ; mergeAll-st;
-  installNode)
+open import Rx.Evaluator using (EvalSt; Sched; Path; _↠_; from-inner; thru-outer; root; stepFrame;
+  subscribeInner; sched-init; st-init; mergeAllᵒ; mergeAll-st; installNode; NodeId; take-f)
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Store using (liveNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; FaceOK; faceOK)
@@ -172,3 +172,79 @@ tieLive4 : Confirms
   (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
      (gs g0) mergeAllᵒ 0 root 0 0 (deep 4) sc₀ (stQ 4) ⦃ faceQ4 ⦄)
 tieLive4 _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+
+----------------------------------------------------------------------
+-- THE TWO AXES THE LADDER LEAVES AT THEIR FLOOR, and both turn out to
+-- be answerable rather than uncovered.
+--
+-- THE LEVEL IS BOUND-SIDE AND MONOTONE, so `Lv = 0` is the TIGHTEST
+-- point rather than the cheapest.  It does not occur under the
+-- subscribe at all: its occurrences are in the premises and in the
+-- bound's own cap size, which climbs with the level by
+-- `frameStep-mono-j`.  A sweep over it could not have failed, so no
+-- row is spent on it.
+--
+-- AND THE PATH IS MEASURED INERT, which is the half no type decides.
+-- `κ` IS measure-side -- it occurs under the subscribe and nowhere in
+-- the bound -- so a row over it genuinely could fail.  It does not: a
+-- two-frame path reads exactly what `root` reads at both rungs,
+-- because a subscribe INSTALLS and does not deliver.  The mint is the
+-- entry's own body, and the frames only record where its later values
+-- will go.
+----------------------------------------------------------------------
+
+gasOf : ℕ → Gas
+gasOf zero    = g0
+gasOf (suc k) = gs (gasOf k)
+
+κT : Path Γ₁ natᵗ natᵗ
+κT = take-f 9 ↠ (take-f 8 ↠ root)
+
+-- the path's own merge outer, installed with room
+outerNid : NodeId
+outerNid = 3
+
+stO : EvalSt e₀
+stO = installNode outerNid
+  (mergeAll-st {Γ = Γ₁} {t = natᵗ} nothing 0 [] false)
+  (st-init e₀)
+
+mintAt : ∀ {u} → ℕ → Path Γ₁ u natᵗ → Closed Γ₁ u → ℕ
+mintAt k κ o = liveMax (proj₁ (proj₂ (proj₂ (proj₂ (proj₂
+  (subscribeInner (gasOf (k + 6)) mergeAllᵒ 0 κ 0 0 o sc₀ stO))))))
+
+-- (root , two frames) at one rung, then at another
+pathFigures : ℕ → List ℕ
+pathFigures k = mintAt k root (deferᵉ (deep k))
+              ∷ mintAt k κT   (deferᵉ (deep k)) ∷ []
+
+-- LOAD-BEARING: the frames are between the subscribed entry and the
+-- root, so a mint that read anything of the path would move the second
+-- number off the first.
+pathFigures1 : pathFigures 1 ≡ 1 ∷ 1 ∷ []
+pathFigures1 = refl
+
+pathFigures4 : pathFigures 4 ≡ 4 ∷ 4 ∷ []
+pathFigures4 = refl
+
+-- AND A PATH FRAME THAT WOULD MINT ON ITS OWN ACCOUNT NEVER FIRES
+-- HERE, which is why the rows above are not merely a statement about
+-- `take-f`.  The entry is a stream of STREAMS and the frame under it
+-- is a merge outer with room, so a DELIVERY through this path would
+-- subscribe the emitted observable and mint its depth.  Subscribing
+-- reads zero at both rungs instead.
+oo : ℕ → Closed Γ₁ (obs natᵗ)
+oo k = ofᵉ (strmᵗ (deferᵉ (deep k)) ∷ [])
+
+κO : Path Γ₁ (obs natᵗ) natᵗ
+κO = thru-outer mergeAllᵒ outerNid ↠ root
+
+outerIdle : mintAt 1 κO (oo 1) ⊔ mintAt 4 κO (oo 4) ≡ 0
+outerIdle = refl
+
+-- and the statement itself at a non-root path, at the rung whose cap
+-- is the ladder's own depth, so the margin here is zero too
+tieLivePath : Confirms
+  (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
+     (gasOf 10) mergeAllᵒ 0 κT 0 0 (deferᵉ (deep 4)) sc₀ stO ⦃ faceQ4 ⦄)
+tieLivePath _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt

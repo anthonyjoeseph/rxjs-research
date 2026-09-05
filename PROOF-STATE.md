@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE DRAINED QUEUE'S MINT, NOW ISOLATED AND STILL UNPRICED.** The
-  budget arithmetic is out of `subscribeInner-nest-live`, which is a
-  real body, and what is left asserted is `subscribeInner-live-size`:
-  what ONE subscribe out of a parked queue mints, against the cap size
-  at the entry's own level. Two rungs tie that at margin zero, so the
-  reading is pinned where the ladder stands and the risk is now whether
-  it survives the shapes the ladder does not reach — a nonempty
-  registry, a level above zero, and a path that is not the root. Widen
-  the harness along those three, since each is a state the statement
-  quantifies over and none of them is reachable by a running family.
+- **THE ONE AXIS LEFT THAT CAN MOVE THE DRAIN'S MINT.** Of the three
+  the ladder left at their floor, the level is bound-side and monotone
+  and the path is measured inert, so `subscribeInner-live-size` is
+  covered everywhere but at a NONEMPTY REGISTRY — where a subscribe
+  can fan into chains that mint on their own account, and where the
+  bound carries no registry term at all. That asymmetry is what the
+  earlier registry-side refutation on this same arm turned on, so the
+  shape is known and the harness is one installed registration away.
+  Build it, and either the row moves off FALSITY or the fan is the
+  counterexample.
 
 - **THEN THE OUTER FRAME AROUND IT.** `stepFrame-nest-live-outer` is
   the same statement in the other position, already restated at its own

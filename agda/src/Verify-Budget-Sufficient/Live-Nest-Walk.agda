@@ -260,11 +260,19 @@ postulate
   --   installed instead.  Covered: one parked entry, a gated nest, at
   --   depths zero through four, with the incoming live list empty, the
   --   slot telescope scripted and the registry empty so the reaction
-  --   reaches the finish.  Two rungs of that ladder are tied at the
-  --   subscribe itself, each against a cap size taken at the ladder's
-  --   own depth, so the margin is ZERO and a mint reading one unit
-  --   past the entry's size fails them.  Not covered: the switch and
-  --   exhaust ops, whose finish arms drain nothing; and the
+  --   reaches the finish.  Three rungs are tied at the subscribe
+  --   itself, each against a cap size taken at the ladder's own depth,
+  --   so the margin is ZERO and a mint reading one unit past the
+  --   entry's size fails them.  The PATH is covered and measured
+  --   INERT: two frames read what the root reads, since a subscribe
+  --   installs rather than delivers, and a merge outer under the entry
+  --   -- the one frame that would mint on its own account -- never
+  --   fires at a subscribe at all.  The LEVEL takes no rows and needs
+  --   none: it occurs only in the premises and in the bound's own cap
+  --   size, which climbs with it, so the ladder already stands at the
+  --   tightest level there is.  Not covered: the switch and exhaust
+  --   ops, whose finish arms drain nothing; a NONEMPTY REGISTRY, which
+  --   is the one axis left that can still move the mint; and the
   --   hypotheses, left standing -- so a row is evidence about the
   --   CONCLUSION, unconditional where green.
   subscribeInner-live-size : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
