@@ -215,28 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE OTHER ARM, TAKEN THE SAME WAY THE OUTER ONE JUST WAS.**
+- **THE OTHER ARM, ONTO THE LEAF THE CROSSING JUST LANDED ON.**
   `stepFrame-sz-store-inner` is still ONE postulate over a whole
-  drain, and the drain has the shape the crossing turned out to have:
-  a close that rewrites only the cell it read, over a fold that
-  subscribes the parked entries in turn through one table. So the same
-  decomposition is available — a wrap lemma that cannot move the
-  reading, and a fold that CARRIES a level rather than climbing one,
-  over a per-entry leaf. What it puts to the test is whether the max
-  the queue's own reading takes survives being stated one entry at a
-  time, which is the thing three entries through one table only
-  measured. The commit writes the body and states the residue.
-
-- **AND THEN THE LEAF ITSELF, DOOR BY DOOR.** `thruConsume-sz-store`
-  is what the outer arm now reduces to entirely, so it carries that
-  whole half's risk in one statement — and unlike the frame it
-  replaced it splits on something small: a merging door ADMITS or
-  PARKS, a switch cancels the inner it holds, an exhaust drops what
-  arrives while busy. Three of the four write nothing the premise does
-  not already bound, and a park only appends one. The commit grinds
-  the arms that install nothing and leaves the subscribing arm stated
-  at full strength, which localises the store risk to the one door
-  that reifies.
+  drain, and the drain now has a leaf waiting for it: its fold
+  subscribes the parked entries in turn through one table, which is
+  the same per-arrival statement the doors reduced to. So the
+  decomposition is a wrap lemma that cannot move the reading, over a
+  fold that CARRIES a level rather than climbing one, over
+  `subscribeInner-sz-store`. What it puts to the test is whether the
+  max the queue's own reading takes survives being stated one entry
+  at a time, which three entries through one table only measured. The
+  commit writes the body and states whatever residue is left.
 
 - **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
   READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
@@ -250,6 +239,18 @@ does not fit is a finding about the shared statement, not about the head.
   one run and either taken alone falls short. The commit scripts that
   arrival and stands the sum beside what it delivers.
 
+- **AND THEN THE LEAF PAST ITS OWN DOOR, WHICH IS ONE STEP OF GAS.**
+  Once both arms are bodies the whole store side rests on
+  `subscribeInner-sz-store`, and that statement is not atomic either:
+  a subscription with no gas writes nothing, and one with gas is the
+  general descent entered at a decorated path. So the same
+  conversion applies once more — a two-clause body over a statement
+  about what the DESCENT installs, which is where the value side
+  already keeps its machinery and where a table's cells are actually
+  written. It is also the first store statement whose subject is not
+  a door, so what it puts to the test is whether the arrival's own
+  layers are the right currency below the operator that admitted it.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -262,10 +263,10 @@ does not fit is a finding about the shared statement, not about the head.
   crossing value halves are bodies over it. A max is refuted at a chain of
   eleven; a slot named twice and a share at two depths cost nothing. A layered
   arrival is unread.
-- **`thruConsume-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: what ONE
-  arriving subscription writes, at a level the arrival's own layers reach. The
-  outer arm's store half is a body over it. Chains do not compound and a park
-  costs rung zero; slots in series are open.
+- **`subscribeInner-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: what ONE
+  arriving subscription writes, at a level the arrival's own layers reach. Every
+  outer store door is now a body over it. Cells written in series do not
+  compound; slots in series are open.
 - **`stepFrame-sz-store-inner`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED, PROBED×4`: the drained queue's denomination at the node table,
   still one postulate over a whole drain. Its max survives three entries

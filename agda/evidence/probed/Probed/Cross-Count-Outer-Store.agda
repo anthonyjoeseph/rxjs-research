@@ -2,7 +2,7 @@
 -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, WHICH IS THE READING NOTHING
 -- HAD EVER STOOD AT.
 --
--- TARGET: thruConsume-sz-store @8ba31b
+-- TARGET: subscribeInner-sz-store @b27028
 --
 -- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The level this leaf is
 -- held to is the arrival's own layers plus the telescope, and every
@@ -18,13 +18,15 @@
 -- reading replaces: a `mergeAll` door with no queue, handed a scan
 -- whose step discards its accumulator and stores the arriving datum
 -- back as a one-shot observable, over a thirteen-rung duplication
--- chain.  The tables are read at the frame, which at ONE arrival and
--- no close is the consumption itself -- the fold has one step and the
--- wrap moves nothing.  They are read at the refuted rung and then at
--- the repaired one, and report `false` then `true` -- so the charge
--- did not merely rename the bound.  The figures beside them say by how
--- much: fourteen layers and a one-slot telescope, against a program
--- of size sixty-three whose stored emission is exponential in it.
+-- chain.  The tables are read at the frame, which at ONE arrival, a
+-- door with room and no close is the subscription itself -- the fold
+-- has one step, the wrap moves nothing, and the bump between them
+-- moves a live count the reading does not price.  They are read at the
+-- refuted rung and then at the repaired one, and report `false` then
+-- `true` -- so the charge did not merely rename the bound.  The
+-- figures beside them say by how much: fourteen layers and a one-slot
+-- telescope, against a program of size sixty-three whose stored
+-- emission is exponential in it.
 --
 -- ALL THREE SINKS ARE RUN at the same arrival, since a merging door
 -- admits everything and is the weakest of the three to stand on
@@ -56,7 +58,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ
   sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; thruConsume-sz-store)
+  using (szCount; subscribeInner-sz-store)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; e₀; st₀; vals₀; post₀)
 open import Probed.Apparatus using (Confirms)
@@ -138,7 +140,7 @@ sinkRows≡ = refl
 -- LOAD-BEARING: it fails for any level the stored emission outruns,
 -- which the constant it replaces is.
 tieOuterStore : Confirms
-  (thruConsume-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+  (subscribeInner-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
      inner (sched-init e₀ sl₁) st₀ 63 63
      (iterSize 63 (layᵉ inner + slotsSize sl₁) 63))
 tieOuterStore = λ _ _ _ _ _ → refl

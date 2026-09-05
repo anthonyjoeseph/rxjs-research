@@ -155,8 +155,7 @@ open import Probed.Slot-Two-Depths
 
 open import Probed.Parked-Queue-Store
   using (parkFigures≡; drainNodes≡; innerRows≡; outerCharge≡; outerRows≡;
-         parkedArrival≡; parkRow≡;
-         tieParkedInner; tieParkedOuterRun; tieParkedOuterPark)
+         tieParkedInner; tieParkedOuterRun)
 
 open import Probed.Partial-Drain-Store
   using (drainFigures≡; partialNodes≡; partialRows≡; groundRow≡;

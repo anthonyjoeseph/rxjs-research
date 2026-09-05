@@ -2,7 +2,7 @@
 -- A TABLE WHOSE CELLS WERE WRITTEN IN SERIES, WHICH IS THE SHAPE THE
 -- SINGLE CLIMB HAS NEVER BEEN ASKED ABOUT.
 --
--- TARGET: thruConsume-sz-store @8ba31b
+-- TARGET: subscribeInner-sz-store @b27028
 --
 -- WHAT EVERY STORE ROW SO FAR DECLINED.  Each witness at either half
 -- subscribes a program that installs ONE node, and the refutation
@@ -18,9 +18,10 @@
 -- whose emission is fed to a SECOND reifying scan -- arriving at a
 -- `thru-outer` frame as one value, so subscribing it writes the whole
 -- chain into one table in one step.  The frame is read rather than the
--- consumption directly, and at ONE arrival with no close the two are
--- the same table: the fold has a single step and the wrap moves
--- nothing.  Against it, a control that is the same reifying scan
+-- subscription directly, and at ONE arrival, a door with room and no
+-- close the two are the same table: the fold has a single step, the
+-- wrap moves nothing, and the bump between them moves a live count the
+-- reading does not price.  Against it, a control that is the same scan
 -- alone, which writes one cell.  Both tables are read at the SAME two
 -- rungs, at the smallest level the statement admits, so what the rows
 -- compare is the number of climbs a table needs and not the size of
@@ -67,7 +68,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; thruConsume-sz-store)
+  using (valsSz?; subscribeInner-sz-store)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -194,7 +195,7 @@ chainPrem≡ = refl
 -- LOAD-BEARING: read at the level the rows are, so a table the chain
 -- outran would fail it exactly as one climb does above.
 tieCellChain : Confirms
-  (thruConsume-sz-store {e = eᶜ} slᶜ (gasPad 64 g0) mergeAllᵒ 0 root 0 0
+  (subscribeInner-sz-store {e = eᶜ} slᶜ (gasPad 64 g0) mergeAllᵒ 0 root 0 0
      topC (sched-init eᶜ slᶜ) stᶜ 2 52
      (iterSize 2 (layᵉ topC + slotsSize slᶜ) 52))
 tieCellChain = λ _ _ _ _ _ → refl
