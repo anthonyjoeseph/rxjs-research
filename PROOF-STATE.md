@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CROSSING ARM, WHERE THE DESCENT RE-ENTERS THE DOOR IT IS
-  ALREADY UNDER.** One rung DOES cover one operator: the store descent
-  is a body now, and six of its ten arms carry the caller's own level
-  through unchanged. The `*All` arm is the one that could not, and its
-  leaf says why — a `thru-outer` frame SUBSCRIBES what it is handed, so
-  the burst re-enters at the ARRIVING VALUE's level and not at the one
-  the outer was subscribed at. The arrival is a runtime value,
-  structurally unrelated to the program, and gas is what the evaluator
-  decrements there. The commit takes that leaf and asks what decreases,
-  since a rung that pays for the mint buys nothing if the arrival's own
-  layers are unbounded by the program's.
+- **WHETHER THE CROSSING REALLY OWES A SECOND BLOCK, WHICH ONE
+  INSTANTIATION DECIDES.** The door's descent is checked now: both
+  premises transport into the source at the caller's own rung, and the
+  burst is all that is left. Its leaf says an arrival's SIZE is bounded
+  one rung block ABOVE the program's, so composing the two readings
+  would cost a block that `suc (layᵉ b)` does not carry — but a rung is
+  `S * suc (2 * s)` and a layer at most doubles, so the bound may
+  already hold that slack. The commit instantiates the leaf at a door
+  over a duplication chain and reads which it is, since a charge
+  restated against a gap that is not there moves every consumer of the
+  descent for nothing.
 
 - **THEN THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
@@ -260,10 +260,10 @@ does not fit is a finding about the shared statement, not about the head.
   subscription delivers, in its own layers plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
   twice and a share at two depths cost nothing. A layered arrival is unread.
-- **`subscribeAll-sz-store`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: what a
-  crossing DOOR writes — its minted cell, then a burst re-entering at the
-  arriving value's level rather than the outer's. All three operators share it
-  and the cell is a parameter, so the re-entry is the whole of what is open.
+- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: the
+  burst a crossing door pushes back through itself, keyed on the source program
+  since an arbitrary burst is unbounded. The descent under it is checked, so the
+  arrival's re-entry is the whole of what is open.
 - **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
   ONE unfolding writes. The size premise does not survive the substitution —
   the proven bound SQUARES it — while the layer reading crosses untouched

@@ -51,7 +51,7 @@ open import Rx.Evaluator
   mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; subscribeE;
   splitBurst; hasRoom;
   thruConsume; thruWrap; switchKill; mergeAllBump; Stream; pushBurst; splitEvents;
-  subscribeAll; subscribeSharedSlot; installNode; memberSource)
+  subscribeSharedSlot; installNode; memberSource)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
@@ -1770,31 +1770,49 @@ postulate
           (proj₂ (proj₂ (subscribeE g (scanᵉ f z b) κ id now sched st))))
       ≡ true
 
-  -- A CROSSING DOOR'S OWN NODE, minted with the operator's initial cell
-  -- and handed the outer's arrivals under a `thru-outer`.  The cell is
-  -- a PARAMETER here rather than read off the door, so the three
-  -- operators share one statement and none of them has a case to offer:
-  -- what each installs must be admitted at the caller's own bound,
-  -- which the last premise asks for and every door answers by `refl`.
+  -- THE BURST A CROSSING DOOR PUSHES BACK THROUGH ITSELF, which is all
+  -- that is left of the door once the subscription underneath it is a
+  -- checked recursion.  The mint, the initial cell and the descent into
+  -- the source belong to the caller now; what stays here is the fold
+  -- that hands the source's own synchronous emission to the frame the
+  -- door has just built above it.
   --
-  -- AND THE BURST IS THE PART THAT IS NOT THE DESCENT'S.  A
-  -- `thru-outer` frame SUBSCRIBES what it is handed, so an emit
-  -- crossing it re-enters at a level the ARRIVING VALUE fixes and not
-  -- at the one the outer was subscribed at.  That is exactly the gap
-  -- the two flat frames do not have, and it is why this door cannot be
-  -- assembled out of the shelf that serves them.
-  subscribeAll-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (g : Gas) (op : AllOp) (ns : NodeState Γ)
+  -- AND IT IS KEYED ON THE SOURCE PROGRAM RATHER THAN ON THE BURST,
+  -- deliberately.  An arbitrary burst at this type is unbounded and a
+  -- statement over one would be false, so what makes the fold
+  -- affordable is that these emits are what subscribing `b` produced --
+  -- which is why the equation naming that subscription is a premise
+  -- rather than a convenience, and why the table the fold enters at is
+  -- the one that subscription left.
+  --
+  -- WHAT IT OWES, AND WHY THE DESCENT CANNOT HAND IT OVER.  A
+  -- `thru-outer` frame SUBSCRIBES what it is handed, so each emit
+  -- re-enters the descent at the ARRIVING VALUE's own charge -- and an
+  -- arrival's SIZE is bounded one rung block ABOVE the program's, since
+  -- a run manufactures payload where it cannot manufacture layers.  So
+  -- the crossing spends a value budget the door was never charged for,
+  -- and composing the two readings costs a second block that
+  -- `suc (layᵉ b)` does not carry.  The gap is arithmetic and not
+  -- structural: the walk this fold enters transports every other
+  -- premise it is handed, and the level side crosses verbatim because
+  -- an arrival's layers ARE bounded by the layers of the program that
+  -- wrote it.
+  pushBurst-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (g : Gas) (op : AllOp) (nid : NodeId)
     (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
-    (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+    (sched : Sched Γ) (st : EvalSt e)
+    (r : Stream Γ (obs u) × Sched Γ × EvalSt e) (S B M : ℕ) → 2 ≤ S →
     Sched.slots sched ≡ sl →
+    r ≡ subscribeE g b (thru-outer op nid ↠ κ) id now sched st →
     iterSize S (suc (layᵉ b) + slotsSize sl) B ≤ M →
-    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    all (λ kv → boundedNode M (proj₂ kv))
+        (EvalSt.nodes (proj₂ (proj₂ r))) ≡ true →
     (sizeᵉ b ≤ᵇ B) ≡ true →
-    boundedNode M ns ≡ true →
     all (λ kv → boundedNode M (proj₂ kv))
         (EvalSt.nodes
-          (proj₂ (proj₂ (subscribeAll g op ns b κ id now sched st))))
+          (proj₂ (proj₂
+            (pushBurst g id now (thru-outer op nid) κ
+              (proj₁ r) (proj₁ (proj₂ r)) (proj₂ (proj₂ r))))))
       ≡ true
 
   -- THE UNFOLDING, WHOSE SIZE PREMISE DOES NOT SURVIVE IT.  A `μ` is
@@ -1836,6 +1854,19 @@ lay-sub : ∀ (S B M j j′ : ℕ) → 2 ≤ S → j ≤ j′ →
   iterSize S j′ B ≤ M → iterSize S j B ≤ M
 lay-sub S B M j j′ 2≤S h le =
   ≤-trans (iterSize-mono-count S B (≤-trans (s≤s z≤n) 2≤S) h) le
+
+-- THE TWO TRANSPORTS AT A DOOR, WHICH IS THE ONE CONSTRUCTOR SHAPE THE
+-- THREE CROSSINGS SHARE.  Each charges one layer and one syntax node
+-- over its source and nothing else, so the door's own arithmetic is
+-- named once here rather than spelled out at three arms that would
+-- then drift apart.
+crossLe : ∀ (S B M L s : ℕ) → 2 ≤ S →
+  iterSize S (suc L + s) B ≤ M → iterSize S (L + s) B ≤ M
+crossLe S B M L s 2≤S le =
+  lay-sub S B M (L + s) (suc L + s) 2≤S (+-monoˡ-≤ s (n≤1+n L)) le
+
+crossSz : ∀ (a B : ℕ) → (suc a ≤ᵇ B) ≡ true → (a ≤ᵇ B) ≡ true
+crossSz a B hb = sz-sub a (suc a) B (n≤1+n a) hb
 
 -- WHAT ONE SUBSCRIPTION WRITES INTO THE TABLE, which is what every
 -- store arm reduces to once its own door and its own gas are taken
@@ -1943,17 +1974,47 @@ subscribeE-sz-store sl g (scanᵉ f z b) κ id now sched st S B M 2≤S slEq le 
   subscribeE-sz-store-scan sl g f z b κ id now sched st S B M 2≤S slEq le hns hb
 subscribeE-sz-store {u = u} sl g (mergeAllᵉ lim b) κ id now sched st S B M
                     2≤S slEq le hns hb =
-  subscribeAll-sz-store sl g mergeAllᵒ (mergeAll-st {t = u} lim 0 [] false)
-    b κ id now sched st S B M 2≤S slEq le hns
-    (sz-sub (sizeᵉ b) (suc (sizeᵉ b)) B (n≤1+n _) hb) refl
+  pushBurst-sz-store-outer sl g mergeAllᵒ nid b κ id now sched₁ st₀ SE
+    S B M 2≤S slEq refl le
+    (subscribeE-sz-store sl g b (thru-outer mergeAllᵒ nid ↠ κ) id now
+      sched₁ st₀ S B M 2≤S slEq (crossLe S B M (layᵉ b) (slotsSize sl) 2≤S le)
+      (setNode-bounded M nid (mergeAll-st {t = u} lim 0 [] false)
+        (EvalSt.nodes st) refl hns)
+      (crossSz (sizeᵉ b) B hb))
+    (crossSz (sizeᵉ b) B hb)
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid (mergeAll-st {t = u} lim 0 [] false) st
+  SE     = subscribeE g b (thru-outer mergeAllᵒ nid ↠ κ) id now sched₁ st₀
 subscribeE-sz-store sl g (switchAllᵉ b) κ id now sched st S B M 2≤S slEq le hns hb =
-  subscribeAll-sz-store sl g switchᵒ (switch-st nothing false)
-    b κ id now sched st S B M 2≤S slEq le hns
-    (sz-sub (sizeᵉ b) (suc (sizeᵉ b)) B (n≤1+n _) hb) refl
+  pushBurst-sz-store-outer sl g switchᵒ nid b κ id now sched₁ st₀ SE
+    S B M 2≤S slEq refl le
+    (subscribeE-sz-store sl g b (thru-outer switchᵒ nid ↠ κ) id now
+      sched₁ st₀ S B M 2≤S slEq (crossLe S B M (layᵉ b) (slotsSize sl) 2≤S le)
+      (setNode-bounded M nid (switch-st nothing false)
+        (EvalSt.nodes st) refl hns)
+      (crossSz (sizeᵉ b) B hb))
+    (crossSz (sizeᵉ b) B hb)
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid (switch-st nothing false) st
+  SE     = subscribeE g b (thru-outer switchᵒ nid ↠ κ) id now sched₁ st₀
 subscribeE-sz-store sl g (exhaustAllᵉ b) κ id now sched st S B M 2≤S slEq le hns hb =
-  subscribeAll-sz-store sl g exhaustᵒ (exhaust-st false false)
-    b κ id now sched st S B M 2≤S slEq le hns
-    (sz-sub (sizeᵉ b) (suc (sizeᵉ b)) B (n≤1+n _) hb) refl
+  pushBurst-sz-store-outer sl g exhaustᵒ nid b κ id now sched₁ st₀ SE
+    S B M 2≤S slEq refl le
+    (subscribeE-sz-store sl g b (thru-outer exhaustᵒ nid ↠ κ) id now
+      sched₁ st₀ S B M 2≤S slEq (crossLe S B M (layᵉ b) (slotsSize sl) 2≤S le)
+      (setNode-bounded M nid (exhaust-st false false)
+        (EvalSt.nodes st) refl hns)
+      (crossSz (sizeᵉ b) B hb))
+    (crossSz (sizeᵉ b) B hb)
+  where
+  nid    = Sched.nextNode sched
+  sched₁ = record sched { nextNode = suc (Sched.nextNode sched) }
+  st₀    = installNode nid (exhaust-st false false) st
+  SE     = subscribeE g b (thru-outer exhaustᵒ nid ↠ κ) id now sched₁ st₀
 subscribeE-sz-store sl g0 (μᵉ body) κ id now sched st S B M 2≤S slEq le hns hb = hns
 subscribeE-sz-store sl (gs fuel) (μᵉ body) κ id now sched st S B M
                     2≤S slEq le hns hb =
