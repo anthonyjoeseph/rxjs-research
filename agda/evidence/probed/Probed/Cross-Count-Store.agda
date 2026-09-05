@@ -2,20 +2,20 @@
 -- THE INNER CROSSING'S TWO HALVES, INSTANTIATED AT THE VERY WITNESSES
 -- THAT KILLED THE CONSTANT THEY REPLACE.
 --
--- TARGET: mergeAllDrain-sz @7c7e56
+-- TARGET: subscribeInner-sz @e1520e
 -- TARGET: stepFrame-sz-store-inner @b7ce7a
 --
 -- WHY THESE POINTS AND NOT OTHERS.  The inner arm subscribes what the
 -- `*All` node has PARKED, so the program it runs is in the node table
 -- and not among the arriving values -- which is why the charge reads
 -- the queue at the frame's own node, and why the whole arm now reduces
--- to what one DRAIN of that queue delivers.  A receipt for that
--- reading is worth having only where the predecessor reading FAILED,
--- since anywhere else a green row is bought by the program being small
--- rather than by the denomination being right.  So both rows are taken
--- at the refutations' own states: the drain door with a twelve-rung
--- duplication chain parked behind it, and the same door with a scan
--- whose accumulator reifies what the drain emits.
+-- to what one SUBSCRIPTION of a parked program delivers.  A receipt
+-- for that reading is worth having only where the predecessor reading
+-- FAILED, since anywhere else a green row is bought by the program
+-- being small rather than by the denomination being right.  So both
+-- rows are taken at the refutations' own states: the drain door with a
+-- twelve-rung duplication chain parked behind it, and the same door
+-- with a scan whose accumulator reifies what the run emits.
 --
 -- WHAT THE PAIRED FIGURES BUY.  Each half reads the same delivered
 -- quantity against two rungs -- the constant one and the parked
@@ -34,12 +34,10 @@
 -- was buying was slack and not denomination.  A rung doubles, so a
 -- program's own layers already dominate what running it can emit.
 --
--- NOT COVERED: a queue holding MORE THAN ONE parked program, where the
--- drain runs several and a MAX join is asked to cover a sequence of
--- runs; a queue whose entries differ in depth, where the join is the
--- claim; a queue parking a SLOT REFERENCE, which is what the summand
--- was added for and which neither row reaches; a chain of installed
--- nodes, since each witness installs one;
+-- NOT COVERED: a parked SLOT REFERENCE, whose layers are zero and
+-- whose whole charge is the summand -- `Probed.Drain-Count-Slot` reads
+-- the value half there, and nothing reads the store half at that
+-- shape; a chain of installed nodes, since each witness installs one;
 -- the outer arm and its store half, whose count reads the arrival and
 -- the slot telescope instead and which `Probed.Cross-Count-Slot`
 -- reads; and the ledger tie, which these rows say nothing about -- a
@@ -52,35 +50,45 @@ module Probed.Cross-Count-Store where
 open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_)
-open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _+_)
-open import Data.Product using (proj₂)
+open import Data.Product using (proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
+open import Rx.Exp using (Val)
 open import Rx.Slots using (slotsSize)
-open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; sched-init; iterSize)
+open import Rx.Layer-Count using (layᵉ)
+open import Rx.Evaluator
+  using (EvalSt; root; mergeAllᵒ; sched-init; iterSize; subscribeInner)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; parkedLayAt; mergeAllDrain-sz; stepFrame-sz-store-inner)
+  using (valsSz?; parkedLayAt; subscribeInner-sz; stepFrame-sz-store-inner)
 open import Refuted.Frame-Step-Size-Cross
   using () renaming (Γ₁ to ΓV; Pow to PowV; chain to chainV;
-                     e₂ to eV; sl₁ to slV; stQ to stV; outQ to outV)
+                     e₂ to eV; sl₁ to slV; stQ to stV)
 open import Refuted.Frame-Step-Size-Cross-Store
   using () renaming (e₀ to eS; sl₁ to slS; stQ to stS; postQ to postS)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
--- THE VALUE HALF.  The drain delivers what a twelve-rung chain emits,
--- read against the rung the constant bought and then against the rung
--- the store bound buys.
+-- THE VALUE HALF.  One subscription delivers what a twelve-rung chain
+-- emits, read against the rung the constant bought and then against
+-- the rung the parked program's own layers buy.
 ----------------------------------------------------------------------
+
+-- WHAT THE ONE SUBSCRIPTION DELIVERS.  The refutation drains a
+-- singleton queue, and a singleton drain delivers exactly what the one
+-- subscription below it delivers, so the row below stands at the very
+-- quantity that killed the constant.
+outV : List (Val ΓV (PowV 12))
+outV = proj₁ (proj₂ (subscribeInner {e = eV} (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+                       (chainV 12) (sched-init eV slV) stV))
 
 -- THE TWO CHARGES, READ OFF THE STATES THE ROWS STAND AT.  They are
 -- the parked programs' layer counts plus a one-slot telescope: a
 -- twelve-rung chain, and a scan over a thirteen-rung one.
 charges : List ℕ
-charges = parkedLayAt 0 (EvalSt.nodes stV) + slotsSize slV
+charges = layᵉ (chainV 12) + slotsSize slV
         ∷ parkedLayAt 0 (EvalSt.nodes stS) + slotsSize slS ∷ []
 
 charges≡ : charges ≡ 13 ∷ 15 ∷ []
@@ -91,7 +99,7 @@ charges≡ = refl
 valRows : List Bool
 valRows = valsSz? {Γ = ΓV} {s = PowV 12} (iterSize 51 1 51) outV
         ∷ valsSz? {Γ = ΓV} {s = PowV 12}
-            (iterSize 51 (parkedLayAt 0 (EvalSt.nodes stV) + slotsSize slV) 51)
+            (iterSize 51 (layᵉ (chainV 12) + slotsSize slV) 51)
             outV
         ∷ []
 
@@ -128,13 +136,14 @@ storeRows≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: it fails for any charge the parked chain's emission
--- outruns, which the constant it replaces did.  The queue, the limit
--- and the active count are the ones the exit hands the drain at this
--- door, so the row stands where the arm actually reaches it.
+-- outruns, which the constant it replaces did.  The schedule and the
+-- state are the ones the exit hands the drain at this door, and the
+-- drain hands straight on, so the row stands where the arm actually
+-- reaches it.
 tieDrain : Confirms
-  (mergeAllDrain-sz {e = eV} (gasPad 8 g0) 0 root 0 0 nothing 0
-     (chainV 12 ∷ []) (sched-init eV slV) stV 51 51)
-tieDrain = λ _ _ _ → refl
+  (subscribeInner-sz {e = eV} (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+     (chainV 12) (sched-init eV slV) stV 51 51)
+tieDrain = λ _ _ → refl
 
 -- LOAD-BEARING: same, through the conclusion about the node table.
 tieStore : Confirms

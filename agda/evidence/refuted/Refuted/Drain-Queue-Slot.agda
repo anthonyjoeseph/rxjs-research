@@ -84,8 +84,11 @@ MergeAllDrainSz = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
 -- refutation's, so the two doors are read against ONE program rather
 -- than against two that merely look alike.
 ----------------------------------------------------------------------
+o₂ : Closed Γ₂ (Pw 12)
+o₂ = input fzero
+
 q₂ : List (Closed Γ₂ (Pw 12))
-q₂ = input fzero ∷ []
+q₂ = o₂ ∷ []
 
 -- THE NODE THE DRAIN RUNS OFF, holding the very queue that is drained
 -- — so the store premise is read at a table the arm actually reaches
@@ -135,8 +138,11 @@ mergeAllDrain-sz-slot-absurd pr =
 -- The definition measures `55` and the emission doubles.  The charge
 -- is `0` here as well, which is the finding.
 ----------------------------------------------------------------------
+o₃ : Closed Γ₃ (Pw 13)
+o₃ = input fzero
+
 q₃ : List (Closed Γ₃ (Pw 13))
-q₃ = input fzero ∷ []
+q₃ = o₃ ∷ []
 
 st₃ : EvalSt e₃
 st₃ = installNode 0 (mergeAll-st {Γ = Γ₃} {t = Pw 13} nothing 1 q₃ true)
