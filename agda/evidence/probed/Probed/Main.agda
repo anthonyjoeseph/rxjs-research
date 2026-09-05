@@ -138,5 +138,8 @@ open import Probed.Cross-Count-Store
 open import Probed.Cross-Count-Outer-Store
   using (figures≡; storeRows≡; sinkRows≡; tieOuterStore)
 
+open import Probed.Slot-Telescope-Sum
+  using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)

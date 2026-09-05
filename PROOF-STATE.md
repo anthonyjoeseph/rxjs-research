@@ -215,19 +215,9 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, WHICH NO ROW HAS
-  CARRIED.** The charge names ONE number for the whole telescope, a sum
-  over every slot in scope, and every row that has ever read it stands
-  at a vocabulary of one — so what is untested is not the summand's
-  reach, which the reference rows buy, but the JOIN: nothing yet says a
-  sum over the slots is the right partner for a max over what runs. The
-  commit scripts a telescope of several definitions, subscribes a
-  program naming a different one at each entry, and reads the charge
-  where a sum and a max come apart.
-
-- **THEN THE LEAF AT THE TWO DOORS THE ARMS NOW ROUTE THROUGH AND NO
-  ROW HAS OPENED.** Both crossing value halves are bodies over one
-  claim about a single subscription, and that claim is stated over an
+- **THE LEAF AT THE TWO DOORS THE ARMS NOW ROUTE THROUGH AND NO ROW
+  HAS OPENED.** Both crossing value halves are bodies over one claim
+  about a single subscription, and that claim is stated over an
   arbitrary operator while every row standing at it subscribes through
   a merge. The other two doors are not variants: a switch CUTS the
   inner it holds before subscribing, so the leaf is read at a schedule
@@ -247,6 +237,17 @@ does not fit is a finding about the shared statement, not about the head.
   reads both store halves against a charge denominated in the
   arrival's layers.
 
+- **THEN THE SLOT NAMED TWICE, WHICH THE TELESCOPE ROWS LEFT OPEN AND
+  WHICH DECIDES WHETHER THE SUM IS SOUND RATHER THAN GENEROUS.** A
+  chained telescope runs each definition once, so its layers add and
+  the sum covers them. A telescope whose upper definitions BOTH name
+  one lower slot runs that slot once only — a share's multicast is the
+  whole point of the binding — but a reading that resolved the
+  reference instead of the binding would charge it twice and a run
+  that re-entered it would emit twice. The commit scripts a diamond,
+  reads what one subscription of the apex delivers, and stands the
+  charge beside it.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -254,10 +255,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×2`: what
+- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×3`: what
   ONE subscription delivers, in the program's own layers plus its telescope.
-  Both crossing value halves are now bodies over it. Read at a hidden run and a
-  written-out one, never at several slots and never past the merge door.
+  Both crossing value halves are now bodies over it. A max over the slots is
+  refuted at a chain of eleven; a slot named twice, and the other two doors,
+  stay unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Both halves now read

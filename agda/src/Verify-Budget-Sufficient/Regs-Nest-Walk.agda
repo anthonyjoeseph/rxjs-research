@@ -998,10 +998,21 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   twelve-rung duplication chain written out, where the layers are the
 --   charge and the telescope is the rounding: `false` against the
 --   constant the crossing used to carry, `true` against thirteen.
---   Neither probe reaches a telescope of SEVERAL slots, a `scripted`
---   slot whose definition a subscription does not run, an operator
---   other than `mergeAllᵒ` at the path's inner end, or a program family
---   whose emission outruns four units of slot syntax per doubling.
+--   Neither probe reaches a `scripted` slot whose definition a
+--   subscription does not run, an operator other than `mergeAllᵒ` at
+--   the path's inner end, or a program family whose emission outruns
+--   four units of slot syntax per doubling.
+--
+-- PROBED: `Probed.Slot-Telescope-Sum` at a telescope of ELEVEN shared
+--   slots, each naming the one below and doubling it, entered at the
+--   top reference so one subscription runs the whole chain.  This is
+--   what decides the JOIN rather than the summand's reach: a max over
+--   the telescope is FALSE here, prices one rung of a chain of ten, and
+--   fails the conclusion at seventeen hundred against a delivered two
+--   thousand, where the stated sum holds.  Not a slot named twice,
+--   where a share's multicast is what stops the layers doubling with
+--   it, and no row can fail on the sum's other side -- it charges slots
+--   the run never names.
 postulate
   subscribeInner-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t) (id : Id)
