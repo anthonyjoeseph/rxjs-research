@@ -215,15 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEDGER THAT MUST BECOME A CLIMB, WHICH IS WHAT THE CHARGE
-  COSTS.** The count now reads the LEVEL the frame stands at as well as
-  the state, since a block is bought at the bound in hand; the walk
-  pays for its frames out of a fixed PRODUCT of a per-frame ceiling,
-  and a charge that grows with the level cannot fit under one. Both
-  halves of that ledger are refuted outright as stated. The commit
-  turns the walk's premise, the dispatch's, and the depth fit's `chAt`
-  apparatus into a climb in the level, so the ceiling a frame is held
-  to is read where the frame is.
+- **THE LEVELS COMPOSING, WHICH IS WHAT NEITHER `μ` ROW REACHES.** Both
+  new receipts stand at ONE handed-out nesting, and the block count's
+  rate — one block per level, bought at the bound reached so far — is
+  what a COMPOSITION tests: a `μ` handed out from inside another `μ`
+  squares a bound that has already been squared, and the second block
+  is bought at the first squaring's own bound rather than at the
+  program's. The commit builds that family at both descents and reads
+  it against the count as it stands, which either buys the rate its
+  first evidence past one level or refutes it where a single level
+  never could.
 
 - **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
@@ -235,16 +236,15 @@ does not fit is a finding about the shared statement, not about the head.
   commit puts that gap beside the store side's own climb, which
   crosses the same one.
 
-- **THE LEVELS COMPOSING, WHICH IS WHAT NEITHER `μ` ROW REACHES.** Both
-  new receipts stand at ONE handed-out nesting, and the block count's
-  rate — one block per level, bought at the bound reached so far — is
-  what a COMPOSITION tests: a `μ` handed out from inside another `μ`
-  squares a bound that has already been squared, and the second block
-  is bought at the first squaring's own bound rather than at the
-  program's. The commit builds that family at both descents and reads
-  it against the count as it stands, which either buys the rate its
-  first evidence past one level or refutes it where a single level
-  never could.
+- **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
+  crossing arm is refuted through the LAYER half of its charge, at a
+  witness that is CONSTRUCTED and admitted by the walk's own premises
+  rather than reached by an evaluator — the one gap between "no ledger
+  pays this arm" and "the arm is unpayable". The commit builds a
+  program whose crossing frame receives a deep arrival by RUNNING, and
+  either reaches that region, which sends the repair to the ceiling, or
+  bounds what a run delivers, which makes the missing fact an invariant
+  on arrivals rather than a ledger.
 
 ### The ledger
 
@@ -287,7 +287,7 @@ does not fit is a finding about the shared statement, not about the head.
   walk's burst package at the instant's OWN size cap. The proven neighbour
   delivers it one rung up, at `nestBurstAt`, and a width bound at the larger
   cap gives none at the smaller — so the residue is a single geometric rung.
-- **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: the two crossing
+- **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: the two crossing
   frames' charge against one frame's ceiling. The telescope half is a program
   constant the burst face already reads against the cap; the LAYER half asks a
   bound on a runtime value, and no premise of the walk carries one.

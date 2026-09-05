@@ -25,7 +25,8 @@ open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
   ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-comm;
-  +-assoc; +-identityʳ; n≤1+n; m≤n+m; <⇒≤)
+  +-assoc; +-identityʳ; n≤1+n; m≤n+m)
+open import Data.Nat.Logarithm using (⌈log₂_⌉)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -61,7 +62,7 @@ open import Verify-Budget-Sufficient.Nest-Walk
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures
   using (thruWrap-vals; takeVals-all; pathLen; boundedNode; setNode-bounded;
-  boundedNode-widen; all-impl; all-++-intro; n<2^n)
+  boundedNode-widen; all-impl; all-++-intro; n≤2^⌈log₂n⌉)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; nest-inflate; dropSource-nest; nestUnit; cutThrough-nest)
 open import Verify-Budget-Sufficient.Caps
@@ -772,10 +773,19 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- substituting the program into itself, so its SYNTAX squares while
 -- the layer count does not move at all -- and a rung is affine in the
 -- bound, so a count of rungs fixed by the layers buys a fixed factor
--- and cannot cover a multiplicity.  What can cover it is rungs bought
--- against the squared bound: `iterSize` taken at `B` rungs already
--- exceeds `2 ^ B * B`, so a block of `B` of them pays for one squaring
--- outright and the μ NESTING decides how many squarings there are.
+-- and cannot cover a multiplicity.  What can cover it is a block of
+-- rungs bought against the squaring, and the μ NESTING decides how
+-- many such blocks there are.
+--
+-- AND THE BLOCK IS DENOMINATED IN THE BOUND'S BIT LENGTH, WHICH IS THE
+-- WHOLE OF WHY IT IS AFFORDABLE.  A rung MULTIPLIES, so the count of
+-- them that reaches a bound is its logarithm: `⌈log₂ B ⌉` of them
+-- already carry `B` past `B * B`.  A block of `B` of them would also
+-- carry it -- that is the reading this count used to take -- but it is
+-- an exponential over-charge, and at a bound the caller supplies as a
+-- level it is exactly the per-frame charge `Refuted.Size-Climb-Afford`
+-- kills.  A logarithmic block is what the squaring costs and nothing
+-- more.
 --
 -- SO THE CHARGE GROWS WITH THE BOUND AND THE STATEMENTS DO NOT.  Each
 -- level of nesting adds a block read at the bound reached so far,
@@ -784,7 +794,7 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- join over.
 muRungsᴺ : ℕ → ℕ → ℕ
 muRungsᴺ zero    B = 0
-muRungsᴺ (suc d) B = B + muRungsᴺ d (B * B)
+muRungsᴺ (suc d) B = ⌈log₂ B ⌉ + muRungsᴺ d (B * B)
 
 -- WHAT A DESCENT IS CHARGED, WHICH IS THE UNFOLDINGS PLUS THE
 -- OPERATORS.  Those are the two things a subscription spends: one rung
@@ -907,7 +917,7 @@ parkedChgAt B nid ((k , s) ∷ r) =
 -- value one frame manufactured, and there the layer count is also
 -- smaller at the duplication chain and agrees exactly at the reified
 -- arrival (`Probed.Cross-Count-Spine`).
---
+
 -- AND THE BURST JOINS BY MAX, WHICH IS A CLAIM ABOUT THE CONCLUSION
 -- AND NOT A CHOICE OF SLACK.  What this count buys is a bound stated
 -- PER DELIVERED VALUE, and every delivered value comes out of ONE
@@ -934,8 +944,9 @@ parkedChgAt B nid ((k , s) ∷ r) =
 -- stands at, so a program carrying no `μ` charges exactly what it
 -- charged before and the two arms keep the shape they already agreed
 -- in.  What it costs is that the count now reads the LEVEL as well as
--- the state, which is the channel the ledger below has to become a
--- climb to pay.
+-- the state -- but only through the level's BIT LENGTH, since that is
+-- what a block is denominated in, so the channel the ledger below has
+-- to pay for is a logarithm of the level and not the level itself.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Cross` and
 --   `Refuted.Frame-Step-Size-Cross-Store` -- one rung, at the
@@ -1958,33 +1969,33 @@ muLay-sub S B M d j j′ s 2≤S h le =
   lay-sub S B M (muRungsᴺ d B + j + s) (muRungsᴺ d B + j′ + s) 2≤S
     (+-monoˡ-≤ s (+-monoʳ-≤ (muRungsᴺ d B) h)) le
 
--- ONE SQUARING, PAID FOR IN RUNGS.  A rung at least doubles, so `B` of
--- them carry a bound past `2 ^ B * B` and therefore past `B * B` -- and
--- that is the whole of why the charge can afford an unfolding while
--- staying a count.
-muStep : ∀ (S B : ℕ) → 1 ≤ S → B * B ≤ iterSize S B B
+-- ONE SQUARING, PAID FOR IN RUNGS.  A rung at least doubles, so
+-- `⌈log₂ B ⌉` of them carry a bound past `2 ^ ⌈log₂ B ⌉ * B` and
+-- therefore past `B * B` -- and that is the whole of why the charge can
+-- afford an unfolding while staying a count logarithmic in the bound.
+muStep : ∀ (S B : ℕ) → 1 ≤ S → B * B ≤ iterSize S ⌈log₂ B ⌉ B
 muStep S B 1≤S =
-  ≤-trans (*-mono-≤ (<⇒≤ (n<2^n B)) ≤-refl) (iterSize-2^ S B B 1≤S)
+  ≤-trans (*-mono-≤ (n≤2^⌈log₂n⌉ B) ≤-refl) (iterSize-2^ S ⌈log₂ B ⌉ B 1≤S)
 
 -- AND ONE UNFOLDING'S CHARGE, WHICH IS THAT SQUARING SPENT.  The
 -- caller's ceiling holds the block for `suc d` levels at bound `B`; the
--- unfolding is descended into at `B * B`, and the leading `B` rungs of
--- that block are exactly what carries the bound there -- so the
--- remaining block, read at the squared bound, is what the recursion
+-- unfolding is descended into at `B * B`, and the leading `⌈log₂ B ⌉`
+-- rungs of that block are exactly what carries the bound there -- so
+-- the remaining block, read at the squared bound, is what the recursion
 -- inherits.
 muUnfold-le : ∀ (S B M d L s : ℕ) → 2 ≤ S →
   iterSize S (muRungsᴺ (suc d) B + L + s) B ≤ M →
   iterSize S (muRungsᴺ d (B * B) + L + s) (B * B) ≤ M
 muUnfold-le S B M d L s 2≤S le =
   ≤-trans (iterSize-mono-s S (muRungsᴺ d (B * B) + L + s) (muStep S B 1≤S))
-    (≤-trans (≤-reflexive (sym (iterSize-+ S B (muRungsᴺ d (B * B) + L + s) B)))
+    (≤-trans (≤-reflexive (sym (iterSize-+ S ⌈log₂ B ⌉ (muRungsᴺ d (B * B) + L + s) B)))
       (≤-trans (≤-reflexive (cong (λ z → iterSize S z B) (sym eq))) le))
   where
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 2≤S
-  eq : muRungsᴺ (suc d) B + L + s ≡ B + (muRungsᴺ d (B * B) + L + s)
-  eq = trans (cong (_+ s) (+-assoc B (muRungsᴺ d (B * B)) L))
-             (+-assoc B (muRungsᴺ d (B * B) + L) s)
+  eq : muRungsᴺ (suc d) B + L + s ≡ ⌈log₂ B ⌉ + (muRungsᴺ d (B * B) + L + s)
+  eq = trans (cong (_+ s) (+-assoc ⌈log₂ B ⌉ (muRungsᴺ d (B * B)) L))
+             (+-assoc ⌈log₂ B ⌉ (muRungsᴺ d (B * B) + L) s)
 
 -- THE TWO TRANSPORTS AT A DOOR, WHICH IS THE ONE CONSTRUCTOR SHAPE THE
 -- THREE CROSSINGS SHARE.  Each charges one layer and one syntax node
@@ -2839,11 +2850,27 @@ szCount≤ch S W 1≤W Bd sl ns (thru-outer _ _)   vals () hf hw
 -- which is why this is a leaf here rather than an arm of the discharge
 -- above it.
 --
+-- AND THE CHARGE HAS TWO CHANNELS, ONLY ONE OF WHICH READS THE
+-- DENOMINATION.  A descent is charged a block of rungs bought against
+-- the `μ` nesting plus one rung per operator, and only the block reads
+-- the bound it is charged at.  An arrival carrying no `μ` is therefore
+-- charged its LAYERS outright -- and a level's worth of syntax holds
+-- half itself in layers, a chain spending two nodes per layer -- so the
+-- per-frame charge stands at the ORDER OF THE LEVEL however the block
+-- is priced.  What that fixes is the shape of any ledger that could
+-- pay this arm: it has to climb with the level, and re-pricing the
+-- block moves nothing.
+--
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the same arm with
 --   the count reading the arrivals' SIZE instead of their layers, at
 --   the level one rung above the cap and the width the consumer
 --   passes.  It is what forced the program denomination this leaf is
 --   stated in, and it does not reach this statement.
+-- REFUTED: `Refuted.Size-Climb-Afford` -- the ledger that CLIMBS,
+--   quantified over every advance rule between a join and a sum, each
+--   frame charged the deepest chain its own level admits.  Two
+--   crossing frames outrun the walk factor's whole polynomial at every
+--   admissible cap, and one does not.
 postulate
   crossCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 2 ≤ S → 1 ≤ W →
     (Bd : ℕ) (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (f : Frame Γ s u)
