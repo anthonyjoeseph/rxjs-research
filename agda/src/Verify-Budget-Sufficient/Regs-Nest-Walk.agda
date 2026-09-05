@@ -18,20 +18,21 @@
 -- thing being proven at every frame kind.
 module Verify-Budget-Sufficient.Regs-Nest-Walk where
 
-open import Data.Bool using (Bool; true; false; if_then_else_)
+open import Data.Bool using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
-  ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤)
+  ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-comm;
+  +-assoc; +-identityʳ)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst; cong)
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; Source; InstEvent; close; exhausted)
@@ -51,7 +52,7 @@ open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
   stepFrame-nodes-inner; capsDrainOK; FaceOK; switchKill-slots;
-  switchKill-nodes)
+  switchKill-nodes; burstsOK; burstsHead)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures
   using (thruWrap-vals; takeVals-all; pathLen; boundedNode; setNode-bounded;
@@ -61,13 +62,13 @@ open import Verify-Budget-Sufficient.Nest-Store
 open import Verify-Budget-Sufficient.Caps
   using (Caps; frameStep; sizeCount; iterSize-infl; iterSize-mono-count)
 open import Verify-Budget-Sufficient.Keeps-Ring
-  using (subscribeE-slots; thruConsume-slots)
+  using (subscribeE-slots; thruConsume-slots; stepFrame-slots)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Caps-Depth using (depthReact)
 open import Verify-Budget-Sufficient.Walk-Factor using (pathΦF; pathΦD)
 open import Verify-Budget-Sufficient.Caps-Face.Part1
-  using (pathSz?; applyFn-iterSize)
+  using (pathSz?; frameSz?; applyFn-iterSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part5 using (scanVals-size)
 open import Verify-Budget-Sufficient.Nest-Subst using (applyFn-nest)
 
@@ -2282,6 +2283,101 @@ stepFrame-sz-store sf id now (thru-outer op nid) path vals fin sched st S B
 frameCh : ℕ → ℕ → ℕ
 frameCh S W = W * suc S
 
+-- WHICH ARMS THE CEILING CANNOT ADMIT ON THEIR SYNTAX ALONE.  Three
+-- frame kinds charge a count read off the PROGRAM -- a function's own
+-- size, once or once per arriving value -- and both quantities this
+-- ceiling is denominated in are program quantities, so those three are
+-- paid outright.  The two crossings charge what they SUBSCRIBE: the
+-- outer the arrivals' layers, the inner the layers parked in a table it
+-- did not build.  Neither is a function of the frame's syntax, and the
+-- frame's own size test is `true` on both, so nothing local ties them.
+crossFrame? : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Bool
+crossFrame? (thru-outer _ _)   = true
+crossFrame? (from-inner _ _ _) = true
+crossFrame? _                  = false
+
+-- THE THREE PROGRAM-READING ARMS AGAINST THE CEILING, and the width
+-- premise is what makes the scan arm fit rather than a bound on its
+-- burst: the count is a width times a successor size and the ceiling is
+-- exactly that product, so the scan arm is an equality and the other two
+-- spend the ceiling's own positivity.
+--
+-- AND THE EXCLUSION IS A REFUTATION'S REPAIR RATHER THAN A WEAKENING:
+-- the crossing arm is machine-false under the reading that made this
+-- uniform, so the conditioned statement replaces a false one instead of
+-- shrinking a true one.
+szCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 1 ≤ W →
+  (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (f : Frame Γ s u)
+  (vals : List (Val Γ s)) →
+  crossFrame? f ≡ false →
+  frameSz? S f ≡ true → length vals ≤ W →
+  szCount sl ns f vals ≤ frameCh S W
+szCount≤ch S W 1≤W sl ns (map-f fn) vals _ hf hw =
+  ≤-trans (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf))
+          (≤-trans (≤-trans (m≤m+n S 1) (≤-reflexive (+-comm S 1))) 1≤ch)
+  where
+  1≤ch : suc S ≤ frameCh S W
+  1≤ch = ≤-trans (≤-reflexive (sym (*-identityˡ (suc S)))) (*-mono-≤ 1≤W ≤-refl)
+szCount≤ch S W 1≤W sl ns (scan-f fn nid) vals _ hf hw =
+  *-mono-≤ hw (s≤s (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf)))
+szCount≤ch S W 1≤W sl ns (take-f nid) vals _ hf hw =
+  ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
+                             (*-mono-≤ 1≤W (s≤s z≤n)))
+szCount≤ch S W 1≤W sl ns (from-inner _ _ _) vals () hf hw
+szCount≤ch S W 1≤W sl ns (thru-outer _ _)   vals () hf hw
+
+-- AND THE TWO CROSSINGS AT THE SAME CEILING, WHICH IS THE ONE PLACE THE
+-- WALK'S LEDGER IS STILL AN ASSERTION.  The telescope half is a program
+-- constant and a standing premise on the burst face already reads it
+-- against the size cap; what is unheld is the LAYER half.  An outer
+-- crossing charges the JOIN of its arrivals' layer counts, so the burst
+-- width does not multiply it and the whole question is one value's
+-- count; an inner one charges the deepest entry parked at its node,
+-- which the frame did not write and the walk's own premises never
+-- mention.
+--
+-- SO WHAT THIS ASKS FOR IS A LAYER BOUND ON A RUNTIME VALUE, and no
+-- hypothesis of the walk carries one: the size receipt the walk climbs
+-- reads syntax rather than layers, and a reified payload contributes
+-- syntax without contributing a layer.  The gap is therefore in the
+-- direction that costs nothing to state and everything to source --
+-- which is why this is a leaf here rather than an arm of the discharge
+-- above it.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the same arm with
+--   the count reading the arrivals' SIZE instead of their layers, at
+--   the level one rung above the cap and the width the consumer
+--   passes.  It is what forced the layer denomination this leaf is
+--   stated in, and it does not reach this statement.
+postulate
+  crossCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 2 ≤ S → 1 ≤ W →
+    (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (f : Frame Γ s u)
+    (vals : List (Val Γ s)) →
+    crossFrame? f ≡ true →
+    slotsSize sl ≤ S → length vals ≤ W →
+    szCount sl ns f vals ≤ frameCh S W
+
+-- ONE FRAME'S CHARGE AGAINST ONE FRAME'S CEILING, uniform in the kind,
+-- which is the shape a walk can spend: the walk reaches its frames
+-- through a path and has no case analysis of its own to offer.  The
+-- split is by the predicate rather than by the constructor, so the two
+-- halves stay separately attackable while the consumer sees one fact.
+szCountFits : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 2 ≤ S → 1 ≤ W →
+  (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (f : Frame Γ s u)
+  (vals : List (Val Γ s)) →
+  frameSz? S f ≡ true → slotsSize sl ≤ S → length vals ≤ W →
+  szCount sl ns f vals ≤ frameCh S W
+szCountFits S W 2≤S 1≤W sl ns (map-f fn) vals hf hsl hw =
+  szCount≤ch S W 1≤W sl ns (map-f fn) vals refl hf hw
+szCountFits S W 2≤S 1≤W sl ns (scan-f fn nid) vals hf hsl hw =
+  szCount≤ch S W 1≤W sl ns (scan-f fn nid) vals refl hf hw
+szCountFits S W 2≤S 1≤W sl ns (take-f nid) vals hf hsl hw =
+  szCount≤ch S W 1≤W sl ns (take-f nid) vals refl hf hw
+szCountFits S W 2≤S 1≤W sl ns (from-inner op allNid inst) vals hf hsl hw =
+  crossCount≤ch S W 2≤S 1≤W sl ns (from-inner op allNid inst) vals refl hsl hw
+szCountFits S W 2≤S 1≤W sl ns (thru-outer op nid) vals hf hsl hw =
+  crossCount≤ch S W 2≤S 1≤W sl ns (thru-outer op nid) vals refl hsl hw
+
 -- WHAT THE SIZE WALK CARRIES THAT NO FRAME CAN RE-ESTABLISH, and the
 -- shape is the one this face already uses for every walk-scoped
 -- hypothesis: a burst WIDTH at each step, because the scan's count
@@ -2382,6 +2478,105 @@ mutual
           (proj₂ (proj₂ (foldPath sf gas id now (toℕ i) p vals
             (if fin then close (toℕ i) exhausted ∷ [] else []) fin sched
             (record st { delivered = rid ∷ EvalSt.delivered st })))))
+
+-- THE SINK'S OWN SHARE OF THE LEDGER, which is the one clause of the
+-- walk that is not a frame and the one term of the budget premise that
+-- is not a path length.  A `share-sink` hands the same values to every
+-- chain the registry admits, so what it owes is per ADMITTED ENTRY at
+-- the state the fold reaches it in -- and the fold's own advance is an
+-- existential the entry's whole run supplies rather than a frame count
+-- the walk can add up.
+--
+-- SO THE TERM IS A REGISTRY WIDTH TIMES A FRAME CEILING, which is the
+-- shape the consumer's budget premise already sets aside and the reason
+-- this is stated over the same ledger as the frame clause rather than
+-- beside it.
+--
+-- DEAD ROUTE: accumulating the fan's advance into the walk's own level
+--   ledger, one ceiling per admitted entry.  An entry's walk reaches a
+--   sink of its own, so the ledger recurs through the dispatch gas and
+--   is exponential in it, while every quantity the consumer can afford
+--   is polynomial in the cap.  It is the same finding the ceiling
+--   parameter of this predicate exists for, arriving at the producer.
+postulate
+  dispatchSzOK-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (S W C k : ℕ) → 2 ≤ S → 1 ≤ W →
+    (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (i : Fin n)
+    (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    slotsSize (Sched.slots sched) ≤ S →
+    burstsOK W sf gas id now (share-sink i) vals fin sched st →
+    k + n * (S * frameCh S W) ≤ C →
+    dispatchSzOK S W C k sf gas id now i vals fin sched st
+
+-- THE WALK'S LEDGER SPENT FRAME BY FRAME, and this is where a budget
+-- premise that is a PRODUCT becomes a ceiling that is a comparison.
+-- The premise sets aside one frame ceiling per frame of the path and a
+-- registry's worth for the sink; each frame then draws one of them and
+-- hands the rest on, so the level the walk has climbed to is under the
+-- ceiling at every step without any frame having to know what the
+-- frames after it will charge.
+--
+-- AND WHAT MAKES THE INDUCTION GO THROUGH IS THAT EVERY PREMISE
+-- TRANSPORTS ALONG THE STEP: the path receipt by its own recursion, the
+-- burst package by its own, the telescope because a frame cannot write
+-- a slot, and the ledger because the frame's draw is exactly the term
+-- the length lost.  Nothing here is re-established at a frame -- which
+-- is what says the ceiling is a fixed product and not a climb.
+walkSzOK-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (S W C k : ℕ) → 2 ≤ S → 1 ≤ W →
+  (sf : Gas) (gas : ℕ) (id : Id) (now : Tick) (p : Path Γ u t)
+  (vals : List (Val Γ u)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+  pathSz? S p ≡ true →
+  slotsSize (Sched.slots sched) ≤ S →
+  burstsOK W sf gas id now p vals fin sched st →
+  k + pathLen p * frameCh S W + n * (S * frameCh S W) ≤ C →
+  walkSzOK S W C k sf gas id now p vals fin sched st
+walkSzOK-go S W C k 2≤S 1≤W sf gas id now root vals fin sched st
+            hp hsl hbo hb = tt
+walkSzOK-go {n = n} S W C k 2≤S 1≤W sf gas id now (share-sink i) vals fin sched st
+            hp hsl hbo hb =
+  dispatchSzOK-go S W C k 2≤S 1≤W sf gas id now i vals fin sched st hsl hbo
+    (≤-trans (≤-reflexive (cong (_+ (n * (S * frameCh S W))) (sym (+-identityʳ k)))) hb)
+walkSzOK-go {n = n} {e = e} S W C k 2≤S 1≤W sf gas id now (f ↠ p) vals fin sched st
+            hp hsl hbo hb =
+  burstsHead W sf gas id now (f ↠ p) vals fin sched st hbo
+  , ≤-trans (+-monoʳ-≤ k szFits) hstep
+  , walkSzOK-go S W C (k + szCount (Sched.slots sched) (EvalSt.nodes st) f vals)
+      2≤S 1≤W sf gas id now p (proj₁ step)
+      (proj₁ (proj₂ (proj₂ step)))
+      (proj₁ (proj₂ (proj₂ (proj₂ step))))
+      (proj₂ (proj₂ (proj₂ (proj₂ step))))
+      hptail
+      (≤-trans (≤-reflexive
+                 (cong slotsSize (stepFrame-slots sf id now f p vals fin sched st)))
+               hsl)
+      (proj₂ (proj₂ hbo))
+      hrec
+  where
+  step = stepFrame sf id now f p vals fin sched st
+  Ch = frameCh S W
+  hpmid : ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) ≡ true
+  hpmid = ∧-trueʳ {a = frameSz? S f} hp
+  hptail : pathSz? S p ≡ true
+  hptail = ∧-trueʳ {a = suc (pathLen p) ≤ᵇ S} hpmid
+  szFits : szCount (Sched.slots sched) (EvalSt.nodes st) f vals ≤ Ch
+  szFits = szCountFits S W 2≤S 1≤W (Sched.slots sched) (EvalSt.nodes st) f vals
+             (∧-trueˡ hp) hsl
+             (burstsHead W sf gas id now (f ↠ p) vals fin sched st hbo)
+  hstep : k + Ch ≤ C
+  hstep = ≤-trans (m≤m+n (k + Ch) (n * (S * Ch)))
+            (≤-trans (+-monoˡ-≤ (n * (S * Ch))
+                       (+-monoʳ-≤ k (m≤m+n Ch (pathLen p * Ch))))
+                     hb)
+  hrec : k + szCount (Sched.slots sched) (EvalSt.nodes st) f vals
+           + pathLen p * Ch + n * (S * Ch) ≤ C
+  hrec = ≤-trans (+-monoˡ-≤ (n * (S * Ch))
+                   (+-monoˡ-≤ (pathLen p * Ch) (+-monoʳ-≤ k szFits)))
+           (≤-trans (≤-reflexive
+                      (cong (_+ (n * (S * Ch)))
+                            (+-assoc k Ch (pathLen p * Ch))))
+                    hb)
 
 -- AND ALONG THE WHOLE PATH, state by state.  The frames' debts cannot
 -- be collected in one bundle up front: each is owed at the state the
