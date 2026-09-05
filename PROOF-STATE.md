@@ -215,28 +215,27 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SQUARING ARRIVAL AT THE VALUE SIDE, WHICH DECIDES HOW WIDE
-  THE REPAIR IS.** The store descent is refuted: an arrival carrying a
-  `μ` unfolds into copies of the whole program, the rung count is
-  blind to the `μ` and to the `defer` its mentions stand under, and one
-  family kills the crossing door's burst, the unfolding leaf and the
-  descent's own conclusion. `subscribeE-sz` is that descent's twin at
-  the very same denomination, reading the values delivered and not the
-  table written. The commit carries the family across — a door with
-  ROOM, so the copies are emitted instead of parked. If it falls too,
-  one restatement serves both halves; if it stands, the squaring
-  reaches only what a subscription writes and the repair is local.
+- **THE LEVEL THAT GROWS WITH THE BOUND, WHICH IS THE ONE RESTATEMENT
+  BOTH HALVES NOW NEED.** The value side fell to the same family as the
+  store side, with no table anywhere in reach, so what is refuted is the
+  DENOMINATION and not either reading of it. A rung is affine in the
+  bound, so a count fixed by the SYNTAX buys a fixed factor and cannot
+  cover a multiplicity. The caps face prices this substitution and is
+  the shape to mirror: it charges an unfold in an EXISTENTIAL number of
+  frame steps, quadratic in the `μ`'s own size. No closed function of
+  the entry program serves instead — an unfold squares the bound the
+  next is charged against. The commit restates both descents at an
+  existential level.
 
-- **THE LEVEL THAT GROWS WITH THE BOUND, WHICH IS THE RESTATEMENT.** A
-  rung is affine in the bound, so a count fixed by the SYNTAX buys a
-  fixed factor and cannot cover a multiplicity. The caps face already
-  prices this exact substitution and is the shape to mirror: it charges
-  an unfold in an EXISTENTIAL number of frame steps, quadratic in the
-  `μ`'s own size. No closed function of the entry program serves
-  instead — an unfold squares the bound the NEXT one is charged
-  against, so nesting outruns any fixed formula. The commit restates
-  the descent at an existential level and reports what the fold under
-  the wrap then owes, each entry now returning a level of its own.
+- **THE JOIN UNDER THE WRAP, WHICH IS WHAT AN EXISTENTIAL LEVEL COSTS.**
+  Every consumer reads the two descents at a level fixed before the
+  fold runs, and a max over the burst is what makes one rung cover one
+  operator. With each entry returning a level of its own the join is
+  over levels rather than under one, and the fold's own charge has to
+  absorb the spread. The commit carries the restated conclusion out
+  through the walk's crossings and the frame step to the depth fit, and
+  reports which consumers take a per-entry level as it stands and which
+  need the spread bounded first.
 
 - **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
@@ -255,11 +254,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×6`: what ONE
+- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
   subscription delivers, in its own layers plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice costs nothing. Its store twin's `μ` arrival is refuted; this side is
-  unread there.
+  twice costs nothing. A `μ` refutes the conclusion itself, with no table in
+  reach.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   the burst a crossing door pushes back through itself, keyed on the source
   program since an arbitrary burst is unbounded. A duplication chain buys no

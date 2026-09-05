@@ -1063,6 +1063,23 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   act on later emits, which is the drain's statement.  Each door is
 --   read at the telescope-free rung and the repaired one, `false` then
 --   `true`, at one arrival shape with zero layers of its own.
+
+-- AND THE CONCLUSION IS FALSE AS STATED, AT THE EDGE ITS STORE SIBLING
+-- FAILS AT, which is what makes the repair one repair rather than the
+-- store side's own.  A `μ` is subscribed by UNFOLDING, and unfolding
+-- plants a copy of the whole program at every mention of the recursive
+-- occurrence; the layer count charges nothing for the `μ` and nothing
+-- under the `defer` those mentions must stand under, so the rung count
+-- is fixed before the multiplicity is chosen -- and a rung is affine in
+-- the bound, so a fixed count buys a fixed factor.  No table is
+-- carrying it here: there is no door, no queue and no cell, only what
+-- one subscription hands back.  So what falls is the DENOMINATION the
+-- two halves share, and the level has to be quantified over the way the
+-- caps face already quantifies the frame steps it prices an unfold in.
+-- REFUTED: `Refuted.Subscribe-Sz-Mu`, at a one-shot source whose single
+--   emission is the deferred subtree the copies sit in -- entered at
+--   `root` on the initial table, with the crossing bracketed on both
+--   sides at the same rungs.
 postulate
   subscribeE-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (o : Closed Γ u) (κ : Path Γ u t) (id : Id)

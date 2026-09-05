@@ -212,6 +212,9 @@ open import Refuted.Burst-Mu-Square
          figures≡; liveness≡; doorRows≡; premDoor; muRows≡; premMu; allRows≡;
          pushBurst-sz-store-outer-absurd; subscribeE-sz-store-μ-absurd;
          subscribeE-sz-store-absurd)
+open import Refuted.Subscribe-Sz-Mu
+  using (SubscribeESz; figures≡; delivered≡; sizes≡; valRows≡;
+         subscribeE-sz-absurd)
 open import Refuted.Frame-Step-Size-Cross-Count
   using (CrossCountCh; figures≡; prem; count≡; cross-count-ch-absurd)
 open import Refuted.Chain-Step-Regs-Cap
