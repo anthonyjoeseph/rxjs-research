@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, AND WHY IT IS A SUM.
 --
--- TARGET: subscribeInner-sz @e1520e
+-- TARGET: subscribeE-sz @c1fd3b
 --
 -- WHAT WAS UNTESTED.  Every reading of this leaf so far stands at a
 -- telescope of ONE, so the summand's shape was never asked a question:
@@ -52,9 +52,10 @@ open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (Slots; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; mergeAll-st;
+  from-inner; _↠_;
   installNode; st-init; sched-init; iterSize; subscribeInner)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz)
+  using (valsSz?; subscribeE-sz)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -169,6 +170,6 @@ telescopeRows≡ = refl
 -- the chained telescope outran would fail it exactly as the max
 -- reading beside it does.
 tieTelescope : Confirms
-  (subscribeInner-sz {e = eᵀ} (gasPad 64 g0) mergeAllᵒ 0 root 0 0 oᵀ
-     (sched-init eᵀ slᵀ) stᵀ 2 1)
+  (subscribeE-sz {e = eᵀ} (gasPad 63 g0) oᵀ (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init eᵀ slᵀ) { nextNode = 1 }) stᵀ 2 1)
 tieTelescope = λ _ _ → refl

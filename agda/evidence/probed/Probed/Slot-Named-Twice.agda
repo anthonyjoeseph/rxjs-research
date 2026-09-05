@@ -2,7 +2,7 @@
 -- THE SLOT NAMED TWICE, WHICH DECIDES WHETHER THE SUMMAND IS SOUND
 -- RATHER THAN MERELY GENEROUS.
 --
--- TARGET: subscribeInner-sz @e1520e
+-- TARGET: subscribeE-sz @c1fd3b
 --
 -- WHAT THE CHAINED TELESCOPE LEFT OPEN.  A chain runs each definition
 -- once and its layers compound in series, which is what the sum buys
@@ -50,9 +50,10 @@ open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (Slots; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; mergeAll-st;
+  from-inner; _↠_;
   installNode; st-init; sched-init; iterSize; subscribeInner)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz)
+  using (valsSz?; subscribeE-sz)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -183,6 +184,6 @@ diamondRows≡ = refl
 -- a re-entered binding outran would fail it exactly as the
 -- telescope-free reading beside it does.
 tieDiamond : Confirms
-  (subscribeInner-sz {e = eᴰ} (gasPad 64 g0) mergeAllᵒ 0 root 0 0 oᴰ
-     (sched-init eᴰ slᴰ) stᴰ 2 1)
+  (subscribeE-sz {e = eᴰ} (gasPad 63 g0) oᴰ (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init eᴰ slᴰ) { nextNode = 1 }) stᴰ 2 1)
 tieDiamond = λ _ _ → refl

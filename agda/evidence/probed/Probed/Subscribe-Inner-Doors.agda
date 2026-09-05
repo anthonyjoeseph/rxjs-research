@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE LEAF AT THE TWO DOORS EVERY OTHER ROW SUBSCRIBED PAST.
 --
--- TARGET: subscribeInner-sz @e1520e
+-- TARGET: subscribeE-sz @c1fd3b
 --
 -- WHY THE DOOR LOOKED LIKE A RISK.  The statement quantifies over an
 -- arbitrary operator and every row standing at it had entered through
@@ -49,10 +49,11 @@ open import Rx.Exp using (Val; obs; input; sizeᵛ)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ;
+  from-inner; _↠_;
   switch-st; exhaust-st; installNode; st-init; sched-init; iterSize;
   subscribeInner)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz)
+  using (valsSz?; subscribeE-sz)
 open import Refuted.Frame-Step-Size-Slot
   using (Pw; Γ₂; sl₂; e₂; st₂)
 open import Probed.Apparatus using (Confirms)
@@ -138,12 +139,12 @@ doorRows≡ = refl
 -- LOAD-BEARING: the operator is the statement's own argument, so this
 -- is the claim at a door and not a claim about one.
 tieDoorSwitch : Confirms
-  (subscribeInner-sz {e = e₂} (gasPad 64 g0) switchᵒ 0 root 0 0 oS
-     (sched-init e₂ sl₂) stSw 51 51)
+  (subscribeE-sz {e = e₂} (gasPad 63 g0) oS (from-inner switchᵒ 0 0 ↠ root) 0 0
+     (record (sched-init e₂ sl₂) { nextNode = 1 }) stSw 51 51)
 tieDoorSwitch = λ _ _ → refl
 
 -- LOAD-BEARING: same, at the door whose rule is to deliver nothing.
 tieDoorExhaust : Confirms
-  (subscribeInner-sz {e = e₂} (gasPad 64 g0) exhaustᵒ 0 root 0 0 oS
-     (sched-init e₂ sl₂) stEx 51 51)
+  (subscribeE-sz {e = e₂} (gasPad 63 g0) oS (from-inner exhaustᵒ 0 0 ↠ root) 0 0
+     (record (sched-init e₂ sl₂) { nextNode = 1 }) stEx 51 51)
 tieDoorExhaust = λ _ _ → refl

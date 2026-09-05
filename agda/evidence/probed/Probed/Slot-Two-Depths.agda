@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE SHARE REACHED AT TWO DEPTHS, WHICH THE DIAMOND DID NOT ASK.
 --
--- TARGET: subscribeInner-sz @e1520e
+-- TARGET: subscribeE-sz @c1fd3b
 --
 -- WHAT THE DIAMOND LEFT OPEN.  An apex naming ONE slot twice reaches
 -- the multicast from a single point of the walk, and the second
@@ -51,9 +51,10 @@ open import Rx.Exp using (Ctx; Ty; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (Slots; shared; slotSize; slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; mergeAll-st;
+  from-inner; _↠_;
   installNode; st-init; sched-init; iterSize; subscribeInner)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz)
+  using (valsSz?; subscribeE-sz)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
@@ -195,6 +196,6 @@ latticeRows≡ = refl
 -- a per-arm resolution outran would fail it exactly as the
 -- telescope-free reading beside it does.
 tieLattice : Confirms
-  (subscribeInner-sz {e = eᶻ} (gasPad 64 g0) mergeAllᵒ 0 root 0 0 oᶻ
-     (sched-init eᶻ slᶻ) stᶻ 2 1)
+  (subscribeE-sz {e = eᶻ} (gasPad 63 g0) oᶻ (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init eᶻ slᶻ) { nextNode = 1 }) stᶻ 2 1)
 tieLattice = λ _ _ → refl

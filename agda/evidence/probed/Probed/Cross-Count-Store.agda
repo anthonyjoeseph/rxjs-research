@@ -2,7 +2,7 @@
 -- WHAT ONE SUBSCRIPTION OF A PARKED PROGRAM DELIVERS, READ AT THE VERY
 -- WITNESS THAT KILLED THE CONSTANT IT REPLACES.
 --
--- TARGET: subscribeInner-sz @e1520e
+-- TARGET: subscribeE-sz @c1fd3b
 --
 -- WHY THIS POINT AND NOT ANOTHER.  The inner arm subscribes what the
 -- `*All` node has PARKED, so the program it runs is in the node table
@@ -52,9 +52,9 @@ open import Rx.Exp using (Val)
 open import Rx.Slots using (slotsSize)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Evaluator
-  using (root; mergeAllᵒ; sched-init; iterSize; subscribeInner)
+  using (root; mergeAllᵒ; from-inner; _↠_; sched-init; iterSize; subscribeInner)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz)
+  using (valsSz?; subscribeE-sz)
 open import Refuted.Frame-Step-Size-Cross
   using () renaming (Γ₁ to ΓV; Pow to PowV; chain to chainV;
                      e₂ to eV; sl₁ to slV; stQ to stV)
@@ -108,6 +108,7 @@ valRows≡ = refl
 -- drain hands straight on, so the row stands where the arm actually
 -- reaches it.
 tieDrain : Confirms
-  (subscribeInner-sz {e = eV} (gasPad 8 g0) mergeAllᵒ 0 root 0 0
-     (chainV 12) (sched-init eV slV) stV 51 51)
+  (subscribeE-sz {e = eV} (gasPad 7 g0) (chainV 12)
+     (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init eV slV) { nextNode = 1 }) stV 51 51)
 tieDrain = λ _ _ → refl
