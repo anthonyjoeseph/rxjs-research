@@ -59,7 +59,8 @@
 -- the three arms that read the program's own syntax -- their counts
 -- are bounded by the cap and a per-frame product pays them at every
 -- rung.  Nor does it reach the `from-inner` arm, which breaks the same
--- ledger a rung earlier and is carried by `Refuted.Walk-Ceil-Drain`.
+-- ledger through what its own node has parked and is carried by
+-- `Refuted.Walk-Ceil-Drain`.
 -- And it says nothing against a ledger that CLIMBS:
 -- what is refuted is a product, and a right-hand side iterating the
 -- way the left-hand side does is a different statement.
@@ -70,6 +71,7 @@ open import Data.Bool using (true)
 open import Data.Empty using (⊥)
 open import Data.Fin using () renaming (zero to fzero)
 open import Data.List using (List; []; _∷_; length)
+open import Data.Product using (_×_)
 open import Data.List.Relation.Unary.Any using (here)
 open import Data.Nat using (ℕ; zero; suc; _≤_; _+_; _*_; s≤s; z≤n)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
@@ -80,7 +82,8 @@ open import Rx.Prim using (hot)
 open import Rx.Exp using (Ctx; Val; Closed; Fn; natᵗ; obs; ofᵉ; mapᵉ;
   nat̂; varᵗ; sizeᵛ)
 open import Rx.Slots using (Slots; scripted; slotsSize)
-open import Rx.Evaluator using (NodeId; AllOp; mergeAllᵒ; thru-outer; iterSize)
+open import Rx.Evaluator using (NodeId; NodeState; AllOp; mergeAllᵒ;
+  thru-outer; iterSize)
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (valsSz?; frameCh; szCount)
@@ -97,12 +100,12 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk
 WalkCeilLedger : Set
 WalkCeilLedger = ∀ {n} {Γ : Ctx n} {u} (S L k : ℕ) → 2 ≤ S → L ≤ S →
   k ≤ L * frameCh S S + n * (S * frameCh S S) →
-  (sl : Slots Γ) (op : AllOp) (nid : NodeId)
-  (vals : List (Val Γ (obs u))) →
+  (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (op : AllOp)
+  (nid : NodeId) (vals : List (Val Γ (obs u))) →
   frameSz? S (thru-outer {Γ = Γ} {u = u} op nid) ≡ true →
   length vals ≤ S →
   valsSz? (iterSize S k S) vals ≡ true →
-  k + szCount sl (iterSize S k S) (thru-outer {Γ = Γ} {u = u} op nid) vals
+  k + szCount sl ns (thru-outer {Γ = Γ} {u = u} op nid) vals
     ≤ L * frameCh S S + n * (S * frameCh S S)
 
 ----------------------------------------------------------------------
@@ -155,7 +158,7 @@ premLvl = refl
 
 -- LOAD-BEARING: and the count genuinely overruns the whole ledger.
 -- Both sides are numerals, so nothing here rests on a normal form.
-count≡ : 3 + szCount sl₁ (iterSize 3 3 3)
+count≡ : 3 + szCount sl₁ []
            (thru-outer {Γ = Γ₁} {u = natᵗ} mergeAllᵒ 0) vals₁ ≡ 73
 count≡ = refl
 
@@ -163,4 +166,4 @@ walk-ceil-ledger-absurd : WalkCeilLedger → ⊥
 walk-ceil-ledger-absurd pr =
   ≤⇒≤ᵇ (pr {Γ = Γ₁} 3 3 3
            (s≤s (s≤s z≤n)) (s≤s (s≤s (s≤s z≤n))) (s≤s (s≤s (s≤s z≤n)))
-           sl₁ mergeAllᵒ 0 vals₁ refl (s≤s z≤n) premLvl)
+           sl₁ [] mergeAllᵒ 0 vals₁ refl (s≤s z≤n) premLvl)

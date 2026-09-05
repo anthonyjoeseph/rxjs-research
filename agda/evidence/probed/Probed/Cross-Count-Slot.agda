@@ -2,7 +2,7 @@
 -- THE OUTER CROSSING'S COUNT, INSTANTIATED WHERE READING THE ARRIVAL
 -- ALONE FAILS: an observable that names a shared slot.
 --
--- TARGET: stepFrame-sz-outer @4184b9
+-- TARGET: stepFrame-sz-outer @cccbd0
 --
 -- WHY THIS IS THE REGION WORTH BUYING.  A crossing frame subscribes
 -- what arrived, and a variable is the one arrival whose syntax says
@@ -47,7 +47,7 @@ open import Data.Nat using (ℕ; _+_; _*_)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
-open import Rx.Evaluator using (root; mergeAllᵒ; thru-outer; sched-init)
+open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer; sched-init)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (szCount; stepFrame-sz-outer)
 open import Refuted.Frame-Step-Size-Slot
@@ -60,8 +60,10 @@ open import Probed.Apparatus using (Confirms)
 -- to either, so what the figures read is the telescope.
 ----------------------------------------------------------------------
 counts : ℕ
-counts = szCount sl₂ 51 (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
-       + 100 * szCount sl₃ 55 (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
+counts = szCount sl₂ (EvalSt.nodes st₂)
+           (thru-outer {Γ = Γ₂} {u = Pw 12} mergeAllᵒ 0) vals₂
+       + 100 * szCount sl₃ (EvalSt.nodes st₃)
+           (thru-outer {Γ = Γ₃} {u = Pw 13} mergeAllᵒ 0) vals₃
 
 -- LOAD-BEARING: it is what says the count moved along the axis the
 -- emission moves on.  A reading blind to the telescope reports the

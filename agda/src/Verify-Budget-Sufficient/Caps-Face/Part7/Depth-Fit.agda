@@ -2046,7 +2046,7 @@ mutual
   walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (f ↠ p) vals fin sched st
                    hsz hns hw hpz hk =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls A f vals) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls nsSt f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -2056,6 +2056,7 @@ mutual
     S : ℕ
     S = Caps.cSize (capsAt e sl id)
     sls = Sched.slots sched
+    nsSt = EvalSt.nodes st
     step = stepFrame sf nid now f p vals fin sched st
     2≤S : 2 ≤ S
     2≤S = 2≤capsAt-size e sl id
@@ -2072,13 +2073,13 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    eqSplit : iterSize S (k + szCount sls A f vals) S
-                ≡ iterSize S (szCount sls A f vals) A
-    eqSplit = iterSize-+ S k (szCount sls A f vals) S
-    hszTail : valsSz? (iterSize S (k + szCount sls A f vals) S) (proj₁ step) ≡ true
+    eqSplit : iterSize S (k + szCount sls nsSt f vals) S
+                ≡ iterSize S (szCount sls nsSt f vals) A
+    eqSplit = iterSize-+ S k (szCount sls nsSt f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount sls nsSt f vals) S) (proj₁ step) ≡ true
     hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
                 (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
-    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls A f vals) S)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls nsSt f vals) S)
                             (proj₂ kv))
                   (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
     hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))
@@ -2283,11 +2284,12 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   fixes a ceiling a crossing frame fits under -- and it opens at the
 --   third rung, the second still fitting.
 -- REFUTED: `Refuted.Walk-Ceil-Drain` -- the same ledger against the
---   DRAIN arm, which is the earlier breach: it fires at the second
---   rung with a single nat arriving, so the row turns on no arrival,
---   no depth and no width.  That is what orders the two repairs --
---   whatever the outer arm comes to read about its arrivals, this
---   premise stays refuted until the drain stops charging the level.
+--   DRAIN arm, at a chain parked behind the exiting node deep enough
+--   to overrun it and shallow enough for the walk's own entry store
+--   reading to admit.  The row carries that reading, so what it
+--   exhibits is a table a walk could have reached this frame with --
+--   and it fires at the same rung the outer row does, through the same
+--   channel from the level to a program's layers.
 -- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
 --   a recursion on a depth fuel, the charge at each frame read at the
 --   level that frame stands at, against what `walkFac-ch` affords, and

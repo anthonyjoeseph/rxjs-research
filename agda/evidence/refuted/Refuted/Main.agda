@@ -215,8 +215,8 @@ open import Refuted.Chain-Step-Regs-Cap
 open import Refuted.Walk-Ceil-Ledger
   using (WalkCeilLedger; figures≡; premLvl; count≡; walk-ceil-ledger-absurd)
 open import Refuted.Walk-Ceil-Drain
-  using (WalkCeilDrain; figures≡; premLvl; count≡; belowFits;
-         walk-ceil-drain-absurd)
+  using (WalkCeilDrain; figures≡; premSt; premLvl; count≡; belowFits;
+         belowAdmits; walk-ceil-drain-absurd)
 open import Refuted.Size-Climb-Afford
   using (szCh; AdvRule; JoinToSum; sum-in-bracket; join-in-bracket; advClimb;
          walkAfford; AdvClimbAfford; 1≤cap; 3≤cap; lvl₁; cap≤lvl₁; lvl₁≤cap;

@@ -60,8 +60,10 @@ open import Probed.Apparatus using (Separates; separates-at)
 
 ----------------------------------------------------------------------
 -- THE TWO JOINS, of one signature so the fork's separation is a value.
--- The second is `src`'s own arm, applied at this file's slots and store
--- bound, so a restatement of the arm moves it.
+-- The second is `src`'s own arm, applied at this file's slots, so a
+-- restatement of the arm moves it.  The node table is the witness's
+-- own: this arm reads no node, since what it prices arrived in its own
+-- list, and handing it the real table is what says so.
 ----------------------------------------------------------------------
 Burst : Set
 Burst = List (Val Γ₁ (obs (Pow 12)))
@@ -70,7 +72,8 @@ sumJ : Burst → ℕ
 sumJ vals = foldr (λ v a → layᵛ (obs (Pow 12)) v + a) 0 vals + slotsSize sl₁
 
 maxJ : Burst → ℕ
-maxJ vals = szCount sl₁ 51 (thru-outer {Γ = Γ₁} {u = Pow 12} mergeAllᵒ 0) vals
+maxJ vals = szCount sl₁ (EvalSt.nodes st₂)
+              (thru-outer {Γ = Γ₁} {u = Pow 12} mergeAllᵒ 0) vals
 
 ----------------------------------------------------------------------
 -- THE BURST.  Three of the arrival the single-value refutation is built

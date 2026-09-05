@@ -215,23 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT THE DRAIN ARM IS DENOMINATED IN, WHICH IS THE EARLIER
-  BREACH.** The arrival side is not what the ledger loses to first: the
-  exit arm charges the LEVEL flatly, since the parked program is in the
-  store and the count is handed no state, and that overruns the whole
-  ledger a rung sooner with one nat arriving. What a `mergeAllᵒ` exit
-  spends is the subscription of what its node has queued. The commit
-  hands the count that state, prices the arm at what is parked, and
-  reports which premises the walk then owes.
-
-- **THEN WHERE AN ARRIVAL'S LAYERS COME FROM, THE OTHER LEVEL
-  CHANNEL.** Currency and join are settled and the outer arm still
-  loses: a rung admits size geometrically and a layer costs fixed size,
-  so the level reaches the charge logarithmically. The arrivals a walk
-  meets are not arbitrary syntax — reification adds no layer — so a
-  delivered observable's layers are bounded by the PROGRAM's. The
-  commit states that as a leaf over the run and reports whether the
-  walk carries what instantiating it needs.
+- **WHERE A DELIVERED OBSERVABLE'S LAYERS COME FROM, WHICH BOTH
+  CROSSING ARMS NOW WAIT ON.** Both arms are denominated in layers and
+  both break at the same rung through one channel: a rung admits size
+  geometrically and a layer costs fixed size, so the level reaches
+  either charge logarithmically. The arrivals a walk meets are not
+  arbitrary syntax — reification adds no layer — so what a run
+  delivers, and what it parks, are bounded in layers by the PROGRAM.
+  The commit states that as a leaf over the run and reports whether
+  the walk carries what instantiating it needs.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
@@ -243,6 +235,15 @@ does not fit is a finding about the shared statement, not about the head.
   reading rather than a cap — and reports whether the walk's own
   budget can spend it.
 
+- **THEN THE JOIN OVER A QUEUE OF SEVERAL, WHICH NOTHING HAS
+  INSTANTIATED.** Every drain row so far parks exactly one program, so
+  the arm's MAX is a max over a singleton and its shape is untested.
+  The drain subscribes each entry in turn and every delivered value
+  comes out of one entry's run, which is the argument for a max rather
+  than a sum — but a queue whose entries differ in depth is where that
+  argument is either bought or refuted. The commit instantiates the
+  arm at such a queue and reports which of the two it is.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -251,10 +252,10 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×2, PROBED×4`: both arms now charge rungs in a quantity
-  that bounds what runs — the outer the arrivals plus their telescope, the
-  inner the store bound, its program being parked not passed. Each known
-  refutation re-runs against the reading that replaced it.
+  `REFUTED×4, DEAD ROUTE×2, PROBED×4`: both arms charge rungs in layers of what
+  runs — the outer the arrivals plus their telescope, the inner the queue at its
+  own node. Both break at the same rung through the level, so one leaf about a
+  delivered observable settles both.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the

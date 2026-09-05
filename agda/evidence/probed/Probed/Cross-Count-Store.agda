@@ -2,50 +2,52 @@
 -- THE INNER CROSSING'S TWO HALVES, INSTANTIATED AT THE VERY WITNESSES
 -- THAT KILLED THE CONSTANT THEY REPLACE.
 --
--- TARGET: stepFrame-sz-inner @6d34df
--- TARGET: stepFrame-sz-store-inner @f82490
+-- TARGET: stepFrame-sz-inner @3f0f90
+-- TARGET: stepFrame-sz-store-inner @7f2f2b
 --
 -- WHY THESE POINTS AND NOT OTHERS.  The inner arm subscribes what the
--- `*All` node has PARKED, so the program it runs is in the store and
--- not among the arguments a count can read -- which is why the charge
--- is denominated in the store bound the premise already carries.  A
--- receipt for that reading is worth having only where the predecessor
--- reading FAILED, since anywhere else a green row is bought by the
--- program being small rather than by the denomination being right.  So
--- both rows are taken at the refutations' own states: the drain door
--- with a twelve-rung duplication chain parked behind it, and the same
--- door with a scan whose accumulator reifies what the drain emits.
+-- `*All` node has PARKED, so the program it runs is in the node table
+-- and not among the arriving values -- which is why the charge reads
+-- the queue at the frame's own node.  A receipt for that reading is
+-- worth having only where the predecessor reading FAILED, since
+-- anywhere else a green row is bought by the program being small
+-- rather than by the denomination being right.  So both rows are taken
+-- at the refutations' own states: the drain door with a twelve-rung
+-- duplication chain parked behind it, and the same door with a scan
+-- whose accumulator reifies what the drain emits.
 --
 -- WHAT THE PAIRED FIGURES BUY.  Each half reads the same delivered
--- quantity against two rungs -- the constant one and the store-
--- denominated one -- and reports `false` then `true`.  That is the
+-- quantity against two rungs -- the constant one and the parked
+-- program's own -- and reports `false` then `true`.  That is the
 -- finding stated as a row rather than as a claim: the quantity did not
 -- move, the charge did, and it moved far enough to clear the very
 -- reading that refuted its predecessor.  A restatement that had merely
 -- renamed the bound would report `false` twice here.
 --
--- AND THE MARGIN IS NOT NARROW, WHICH IS THE POINT OF CHARGING RUNGS
--- RATHER THAN A SUM.  A rung doubles, so charging the bound's own
--- worth of them dominates two to the bound outright -- and two to the
--- bound is what a parked program of that size can emit.  The rows
--- below therefore hold with room that grows in the bound, so nothing
--- here rests on the witnesses' particular numerals.
+-- AND THE CHARGE IS SMALL WHERE THE CAP WAS LARGE, which is what makes
+-- these rows worth re-reading rather than a repeat.  Twelve layers and
+-- fourteen against caps of fifty-one and sixty-three: the charge fell
+-- by a factor and the conclusion still clears, so what the predecessor
+-- was buying was slack and not denomination.  A rung doubles, so a
+-- program's own layers already dominate what running it can emit.
 --
 -- NOT COVERED: a queue holding MORE THAN ONE parked program, where the
--- drain runs several and the arm's single `B` is asked to cover their
--- sum; a chain of installed nodes, since each witness installs one; the
--- outer arm and its store half, whose count reads the arrival and the
--- slot telescope instead and which `Probed.Cross-Count-Slot` reads; and
--- the ledger tie, which these rows say nothing about -- the charge here
--- CLIMBS with the walk's level while a per-frame ceiling is a fixed
--- product, and that gap is what leaves both arms outside any discharge
--- of the walk's ceiling conjunct denominated in `frameCh`.
+-- drain runs several and a MAX join is asked to cover a sequence of
+-- runs; a queue whose entries differ in depth, where the join is the
+-- claim; a chain of installed nodes, since each witness installs one;
+-- the outer arm and its store half, whose count reads the arrival and
+-- the slot telescope instead and which `Probed.Cross-Count-Slot`
+-- reads; and the ledger tie, which these rows say nothing about -- a
+-- parked program is bounded only by the level the store premise
+-- carries, so the charge still reaches the level and a per-frame
+-- ceiling is still a fixed product.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Cross-Count-Store where
 
 open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_)
+open import Data.Nat using (ℕ)
 open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -53,7 +55,7 @@ open import Rx.Prim using (g0; gasPad)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; stepFrame-sz-inner; stepFrame-sz-store-inner)
+  using (valsSz?; parkedLayAt; stepFrame-sz-inner; stepFrame-sz-store-inner)
 open import Refuted.Frame-Step-Size-Cross
   using () renaming (Γ₁ to ΓV; Pow to PowV;
                      e₂ to eV; sl₁ to slV; stQ to stV; outQ to outV)
@@ -67,11 +69,22 @@ open import Probed.Apparatus using (Confirms)
 -- the store bound buys.
 ----------------------------------------------------------------------
 
+-- THE TWO CHARGES, READ OFF THE STATES THE ROWS STAND AT.  They are
+-- the parked programs' layer counts and nothing else: a twelve-rung
+-- chain, and a scan over a thirteen-rung one.
+charges : List ℕ
+charges = parkedLayAt 0 (EvalSt.nodes stV)
+        ∷ parkedLayAt 0 (EvalSt.nodes stS) ∷ []
+
+charges≡ : charges ≡ 12 ∷ 14 ∷ []
+charges≡ = refl
+
 -- LOAD-BEARING: the first entry is the refutation's own row, so a
 -- charge that had not actually grown would repeat it in the second.
 valRows : List Bool
 valRows = valsSz? {Γ = ΓV} {s = PowV 12} (iterSize 51 1 51) outV
-        ∷ valsSz? {Γ = ΓV} {s = PowV 12} (iterSize 51 51 51) outV
+        ∷ valsSz? {Γ = ΓV} {s = PowV 12}
+            (iterSize 51 (parkedLayAt 0 (EvalSt.nodes stV)) 51) outV
         ∷ []
 
 valRows≡ : valRows ≡ false ∷ true ∷ []
@@ -89,7 +102,9 @@ valRows≡ = refl
 storeRows : List Bool
 storeRows = all (λ kv → boundedNode (iterSize 63 1 63) (proj₂ kv))
                 (EvalSt.nodes postS)
-          ∷ all (λ kv → boundedNode (iterSize 63 63 63) (proj₂ kv))
+          ∷ all (λ kv → boundedNode
+                          (iterSize 63 (parkedLayAt 0 (EvalSt.nodes stS)) 63)
+                          (proj₂ kv))
                 (EvalSt.nodes postS)
           ∷ []
 
