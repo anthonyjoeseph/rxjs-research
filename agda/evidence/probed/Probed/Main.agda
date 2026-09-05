@@ -107,3 +107,7 @@ open import Probed.Fan-Regs-Registry
 open import Probed.Fold-Width-Reach
   using (separates; admittedRow≡; census≡; widths≡; width2≡; outruns; agrees;
          entry≡; sizesAgree; driven≡; crossesRun)
+
+open import Probed.Cross-Count-Fork
+  using (separates; arrival₂≡; nodes₂; prem₂; cnstRow₂; ownRow₂;
+         arrival₃≡; nodes₃; prem₃; ownRow₃)

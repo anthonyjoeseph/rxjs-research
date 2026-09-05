@@ -41,6 +41,12 @@ open import Refuted.Chain-Step-Live-Additive
 open import Refuted.Chain-Level-Unbounded
   using (prog; slots; cp; ceil; lvl; arr; pth; widen; fits;
          chain-level-unbounded-absurd)
+open import Refuted.Chain-Climb-Arith
+  using (figures; figures≡; ceil₁; ceil₂; gap₂;
+         chain-climb-arith-absurd; chain-climb-arith-wide-absurd)
+open import Refuted.Frame-Charge-Arith
+  using (figures; figures≡; figuresWide; figuresWide≡;
+         frame-charge-absurd; frame-charge-wide-absurd)
 open import Refuted.Chain-Step-Live-Nest
   using (grown≡3; charge≡1; grown₅≡5; chainStep-nest-live-absurd)
 open import Refuted.Chain-Step-Nodes
@@ -197,6 +203,8 @@ open import Refuted.Frame-Step-Size-Cross-Store
   using (StepFrameSzStoreOuter; StepFrameSzStoreInner; figures≡;
          nodes₀; prem₀; nodesQ; premQ;
          stepFrame-sz-store-outer-absurd; stepFrame-sz-store-inner-absurd)
+open import Refuted.Frame-Step-Size-Cross-Count
+  using (CrossCountCh; figures≡; prem; count≡; cross-count-ch-absurd)
 open import Refuted.Chain-Step-Regs-Cap
   using (ChainStepRegsSz; figures≡; regLens≡; premSz; premPath; premReg;
          row≡false; chain-step-regs-cap-absurd)

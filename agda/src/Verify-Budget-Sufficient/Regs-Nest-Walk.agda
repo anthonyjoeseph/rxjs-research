@@ -22,6 +22,7 @@ open import Data.Bool using (Bool; true; false; if_then_else_)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin using (Fin; toℕ)
 open import Data.List using (List; []; _∷_; _++_; map; length)
+open import Data.Nat.ListAction using (sum)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤; ≤⇒≤ᵇ;
   ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-comm)
@@ -728,16 +729,28 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- KIND.  A `map-f` substitutes into each arriving value independently,
 -- so it pays one rung per node of its own function and the burst does
 -- not enter.  A `scan-f` THREADS, so it pays those rungs ONCE PER
--- arriving value, plus the pairing that precedes each step.  Every
--- other kind computes no value of its own -- a take passes a prefix
--- through, and the two crossing into an inner subscription deliver
--- what they drained -- so one rung covers them.
+-- arriving value, plus the pairing that precedes each step.  A take
+-- computes no value of its own, passing a prefix through, so one rung
+-- covers it.
+--
+-- AND THE TWO CROSSING ARMS ARE WRONG AT ONE RUNG, WHICH IS WHAT THE
+-- CONSTANT HERE IS.  Neither delivers what it drained: each SUBSCRIBES
+-- a program that arrived at runtime, and running that program's own
+-- synchronous chain is a computation whose emission is exponential in
+-- the program's syntax.  What is owed is a reading of what RUNS, and
+-- the two arms differ on whether they can even take one -- an outer
+-- crossing has the program in its own argument list, an inner one
+-- reaches it only through the store.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross` and
+--   `Refuted.Frame-Step-Size-Cross-Store` -- the constant, at the
+--   value and the store halves respectively.
 szCount : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → List (Val Γ s) → ℕ
 szCount (map-f fn)         vals = sizeᵗ fn
 szCount (scan-f fn nid)    vals = length vals * suc (sizeᵗ fn)
 szCount (take-f nid)       vals = 1
 szCount (from-inner _ _ _) vals = 1
-szCount (thru-outer _ _)   vals = 1
+szCount {s = s} (thru-outer _ _) vals = sum (map (sizeᵛ s) vals)
 
 -- WHAT A LOOKUP HANDS BACK when every stored node is bounded.  The
 -- receipt has to be abstracted by the SAME `with` that abstracts the
@@ -815,10 +828,31 @@ postulate
   -- FALSE as they stand: the program that runs arrives as a value, so
   -- the count has to read it and a constant cannot.  They are left
   -- standing only until the count moves, since raising it re-prices
-  -- every level the walk above them spends.
+  -- every level the walk above them spends -- and the re-pricing is
+  -- the expensive half, since the ceiling the count is spent against
+  -- reads the program and the count would read the level.
+  --
+  -- AND THE OUTER ARM'S REPAIR IS DECIDED, WHICH NARROWS WHAT IS LEFT
+  -- TO THE CEILING ALONE.  `Probed.Cross-Count-Fork` separates the
+  -- constant from a count reading the arriving observable's own
+  -- `sizeᵉ`, at the very chain the constant loses on, and the
+  -- second reading holds there -- `iterSize`'s doubling taken at the
+  -- syntax outruns the value's doubling taken at the rung.  It also
+  -- holds at a REIFIED arrival, where the syntax is the value's size
+  -- and the subscription computes nothing, so the reading does not
+  -- overshoot at the shape the constant happens to survive.  What
+  -- that buys is displacement rather than payment: the cost now sits
+  -- entirely at the ceiling, which `frameCh`'s own block prices.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross.stepFrame-sz-inner-absurd`
   --   and `Refuted.Frame-Step-Size-Cross.stepFrame-sz-outer-absurd`.
+  -- DEAD ROUTE: charging the inner arm the size of its own arriving
+  --   values is STRUCTURALLY dead, and not merely too weak.  What the
+  --   inner arm subscribes is what the `*All` node has PARKED, so it
+  --   is in the store and not in `vals` -- the drain runs a program
+  --   this statement's arguments do not mention, and no reading of
+  --   `vals` is a reading of it.  A count for this arm has to be a
+  --   function of the state, which the outer arm's repair is not.
   stepFrame-sz-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
@@ -835,7 +869,7 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
     all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     valsSz? B vals ≡ true →
-    valsSz? (iterSize S 1 B)
+    valsSz? (iterSize S (szCount (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
       (proj₁ (stepFrame sf id now (thru-outer op nid) path vals fin
                 sched st)) ≡ true
 
@@ -942,7 +976,9 @@ postulate
     (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
     all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     valsSz? B vals ≡ true →
-    all (λ kv → boundedNode (iterSize S 1 B) (proj₂ kv))
+    all (λ kv → boundedNode
+                  (iterSize S (szCount (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
+                  (proj₂ kv))
         (EvalSt.nodes
           (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (thru-outer op nid)
                                          path vals fin sched st))))))
@@ -1002,30 +1038,72 @@ stepFrame-sz-store sf id now (thru-outer op nid) path vals fin sched st S B
 -- uniform ceiling is a width times a size -- and the width is exactly
 -- what `burstsOK` carries along a path, frame by frame, in the shape
 -- this walk carries its size receipt.
+--
+-- AND THIS IS WHERE THE CROSSING ARMS' REPAIR HAS TO LAND, RATHER
+-- THAN AT THE FRAME.  Charging a crossing frame the size of what it
+-- subscribes is plausible one line up; it is impossible here.  Both
+-- quantities the ceiling is denominated in read the PROGRAM, the
+-- frame's own size test is `true` on a crossing arm and so ties
+-- nothing, and the arriving observable is a runtime value bounded
+-- only by the LEVEL.  The ceiling is quadratic in the cap while the
+-- level is the caps recurrence, so the gap widens with the cap
+-- instead of closing.  A count that reads what runs therefore forces
+-- the frame ceiling itself to move, and with it the level budget the
+-- consumer concludes at.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the size-reading
+--   count against this ceiling, at the level one rung above the cap
+--   and the width the consumer passes.
+
+-- AND THE DENOMINATION THAT SURVIVES IS ALREADY PROVEN ONE FACE OVER,
+-- which is why the crossing arm is EXCLUDED here rather than charged a
+-- constant.  The burst face charges a subscription its own `sizeᵉ` --
+-- literally `suc (sizeᵉ o)` as the ops count handed to `opIterD` -- and
+-- prices that against the LEVEL rather than the cap:
+-- `opIterD-dominated-at` asks only `m ≤ sizeAt S J` and still lands the
+-- climb inside `lvls S W d J (dCapᶜ S W R d (4 + k) J)`.  A ceiling
+-- `W * (suc S ⊔ sizeAt S J)` pays every arm of `szCount` outright, the
+-- crossing one by the second branch.  What blocks it is not this
+-- ceiling but the LEDGER that spends it: the consumer's budget premise
+-- is LINEAR in the path length, one fixed `Ch` per frame, and a charge
+-- that grows with the level cannot be written as a multiple of any
+-- level-free quantity.  So the arm is excluded until that ledger is a
+-- climb rather than a product.
 frameCh : ℕ → ℕ → ℕ
 frameCh S W = W * suc S
 
+-- WHICH ARM THE CEILING CANNOT ADMIT.  Only the outer crossing charges
+-- a count that reads what RUNS; the other four read the program, and
+-- both quantities this ceiling is denominated in are program
+-- quantities.
+crossFrame? : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → Bool
+crossFrame? (thru-outer _ _) = true
+crossFrame? _                = false
+
+-- AND THE EXCLUSION IS A REFUTATION'S REPAIR RATHER THAN A WEAKENING:
+-- the unconditional statement is machine-false at the crossing arm, so
+-- the conditioned one replaces a false statement instead of shrinking a
+-- true one.
 szCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 1 ≤ W →
   (f : Frame Γ s u) (vals : List (Val Γ s)) →
+  crossFrame? f ≡ false →
   frameSz? S f ≡ true → length vals ≤ W →
   szCount f vals ≤ frameCh S W
-szCount≤ch S W 1≤W (map-f fn) vals hf hw =
+szCount≤ch S W 1≤W (map-f fn) vals _ hf hw =
   ≤-trans (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf))
           (≤-trans (≤-trans (m≤m+n S 1) (≤-reflexive (+-comm S 1))) 1≤ch)
   where
   1≤ch : suc S ≤ frameCh S W
   1≤ch = ≤-trans (≤-reflexive (sym (*-identityˡ (suc S)))) (*-mono-≤ 1≤W ≤-refl)
-szCount≤ch S W 1≤W (scan-f fn nid) vals hf hw =
+szCount≤ch S W 1≤W (scan-f fn nid) vals _ hf hw =
   *-mono-≤ hw (s≤s (≤ᵇ⇒≤ (sizeᵗ fn) S (T-to hf)))
-szCount≤ch S W 1≤W (take-f nid) vals hf hw =
+szCount≤ch S W 1≤W (take-f nid) vals _ hf hw =
   ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
                              (*-mono-≤ 1≤W (s≤s z≤n)))
-szCount≤ch S W 1≤W (from-inner _ _ _) vals hf hw =
+szCount≤ch S W 1≤W (from-inner _ _ _) vals _ hf hw =
   ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
                              (*-mono-≤ 1≤W (s≤s z≤n)))
-szCount≤ch S W 1≤W (thru-outer _ _) vals hf hw =
-  ≤-trans (s≤s z≤n) (≤-trans (≤-reflexive (sym (*-identityˡ 1)))
-                             (*-mono-≤ 1≤W (s≤s z≤n)))
+szCount≤ch S W 1≤W (thru-outer _ _) vals () hf hw
 
 -- WHAT THE SIZE WALK CARRIES THAT NO FRAME CAN RE-ESTABLISH, and the
 -- shape is the one this face already uses for every walk-scoped

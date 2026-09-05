@@ -215,34 +215,30 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **MOVE THE COUNT AT THE CROSSING ARMS — the census is finished and
-  all four are false on ONE quantity.** `szCount` charges a constant
-  where a program that arrived as a VALUE runs; the emission is
-  exponential in that program's syntax and reaches the table only by
-  being stored there, so the same charge repairs both halves. Take the
-  move `map-f` already took: read what runs, here the arriving
-  observables' own `sizeᵉ`. It fits because `iterSize` dominates
-  `2 ^ j`. The leg is the cascade — every level the walk above spends
-  is re-priced by a count that is no longer one.
+- **THE LIVE-LIST MINT AT A DRAINED QUEUE — THE INNER HALF.**
+  `subscribeInner-nest-live` is what one subscribe out of a merge
+  node's parked queue puts on the live list, and the queue it reads is
+  the one the burst face is proven to bound, so its residue is a state
+  quantity and not a width. Read the consuming fit's residue place by
+  place, and either assemble the gated-entry reading over leaves that
+  name what the gate supplies, or record which quantity it cannot.
 
-- **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
-  INSTANTIATION and not a bound.** What the size walk may spend is
-  capped at a cubic in the cap by `walkFac-ch`, proven; what the caps
-  package delivers about a chain's climb is ladder-shaped in every
-  reading the walk supports. Nothing carries the one into the other.
-  Count the frames one chain's subscribe tree installs at concrete
-  programs — and the crossing refutation aims that count, since a
-  frame that subscribes is now known not to be a unit of cost.
+- **THEN THE OUTER FRAME AROUND IT.** `stepFrame-nest-live-outer` is
+  the same statement in the other position, already restated at its own
+  size budget: depth truncates at the defer this arm mints across and
+  size counts through it, so the entry ceiling was never paying. The
+  restatement names ONE uncovered region — an entry fold already
+  nonzero — and that region is the only thing that could refute it, so
+  it is what gets instantiated rather than the heads that are covered.
 
-- **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
-  and `stepFrame-nest-live-outer` are what one subscribe out of a
-  merge's queue, and the outer frame around it, put on the live list.
-  One statement in two positions rather than two: the queue the first
-  reads is the queue the burst face is proven to bound, so each
-  residue is a state quantity and not a width. The first reads zero at
-  every quantity its consumer's residue is built from, so only the cap
-  size pays; the second is restated at its own size budget with an
-  uncovered region named. Taken after the count, which re-prices both.
+- **THE OUTER FRAME'S MINTS AT NODES AND REGS, WHICH NOTHING HAS EVER
+  INSTANTIATED.** `stepFrame-nest-nodes-outer` and
+  `stepFrame-nest-regs-outer` are the tier's two FALSITY rows carrying
+  no evidence at all: the `*All` cell the new subscription hangs from
+  did not exist when the walk started, and the registered frames over
+  the REST of the path are the potential exactly. Both sides compute,
+  so this is the cheapest unmanaged risk in the tier — probe them
+  before anything here is ground.
 
 ### The ledger
 
@@ -264,11 +260,15 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
+- **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
+  the whole crossing frame's tail, out of the size walk because the ledger
+  under it is a product where its charge is a climb. ONE MECHANISM WITH the
+  chain door, and what both owe is a recursion rather than a denomination.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×2`: both are FALSE. A crossing arm SUBSCRIBES a program that arrived
-  as a value, and a duplication chain emits exponentially in its own syntax
-  against a constant charge — which no polynomial tie between cap and level
-  repairs. The count is what moves.
+  `REFUTED×2, DEAD ROUTE×2`: both are FALSE. A crossing arm SUBSCRIBES a
+  program that arrived as a value, and a duplication chain emits exponentially
+  against a constant charge. The size-reading count answering that is itself
+  refuted at the frame ceiling, so both move together.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
   program's own nodes, and a scan among them stores what that program emitted —
@@ -306,10 +306,10 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
-- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: one chain's
-  climb priced per FRAME, and no receipt on the walk funds it — the only
-  reading of an inner subscribe's climb is a LADDER rung, which nothing
-  polynomial in the cap reaches. Nothing has instantiated the climb.
+- **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
+  one chain's climb priced per FRAME. The count half has an answer — the
+  delivery face's sink-aware measure — and it is unaffordable and beside the
+  point: the per-frame rung is already past the charge at ONE frame.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
