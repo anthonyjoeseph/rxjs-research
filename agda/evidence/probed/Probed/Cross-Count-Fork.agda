@@ -15,7 +15,7 @@
 -- of one argument, so the disagreement is a value rather than a
 -- paragraph.
 --
--- FORK: thruConsume-sz-store
+-- FORK: subscribeInner-sz-store
 --
 -- WHY THE ANSWER IS NOT ALREADY KNOWN FROM THE REFUTATION.  A
 -- refutation says the constant is too small; it does not say the size

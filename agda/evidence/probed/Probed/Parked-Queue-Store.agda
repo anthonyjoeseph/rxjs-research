@@ -2,7 +2,7 @@
 -- THE PARKED QUEUE, WHICH NO ROW AT EITHER STORE HALF HAD REACHED.
 --
 -- TARGET: stepFrame-sz-store-inner @b7ce7a
--- TARGET: thruConsume-sz-store @8ba31b
+-- TARGET: subscribeInner-sz-store @b27028
 --
 -- WHAT WAS UNTESTED, AND WHY NO READING OF THE DELIVERED LIST COULD
 -- REACH IT.  A `*All` node holds programs it could not admit, and the
@@ -15,14 +15,13 @@
 -- THE TWO ARMS TREAT IT AS DIFFERENT OBJECTS, which is the finding.
 -- The inner arm RUNS the queue: the drain subscribes every entry in
 -- turn, threading one table through all of them, so the charge reads
--- the queue and joins its entries by max.  A crossing consumption
+-- the queue and joins its entries by max.  A crossing subscription
 -- never looks at it: the level it is held to is the arrival's own
--- layers and the telescope, and the only thing it can do to a queue is
--- APPEND an arrival the premise has already bounded.  So parking costs
--- the ladder nothing at all, which is the one row here read at rung
--- zero -- the very bound the premise carried, with no climb whatever.
--- Those rows are read at the frame, which at ONE arrival and no close
--- is the consumption itself.
+-- layers and the telescope, and a queue standing beside the arrival
+-- moves neither of those, so the entries have to survive a level that
+-- was never bought for them.  That row is read at the frame, which at
+-- ONE arrival, a door with room and no close is the subscription
+-- itself.
 --
 -- WHERE THE MAX COULD HAVE FAILED AND DID NOT.  Three parked entries,
 -- of nought, fourteen and fifteen layers, drained through one door
@@ -35,7 +34,7 @@
 --
 -- WHAT THE ROWS DO NOT BUY.  One queue depth at each arm, and one door
 -- -- a switch holds a node id and an exhaust two bits, so neither has
--- a queue to park in and the shape does not arise there.  Nothing
+-- a queue at all and the shape does not arise there.  Nothing
 -- about a queue whose entries name a SHARED slot each, where one
 -- definition would run once for the several entries reaching it.  And
 -- the entries here are drained to exhaustion, so the queue as ENTERED
@@ -48,7 +47,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Maybe using (nothing; just)
+open import Data.Maybe using (nothing)
 open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
@@ -64,7 +63,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner;
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (parkedLayAt; szCount; stepFrame-sz-store-inner;
-         thruConsume-sz-store)
+         subscribeInner-sz-store)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; e₀; vals₀)
 open import Probed.Apparatus using (Confirms)
@@ -183,39 +182,6 @@ outerRows≡ : outerRows ≡ false ∷ true ∷ []
 outerRows≡ = refl
 
 ----------------------------------------------------------------------
--- THE OUTER ARM, PARKING.  The door is at its limit, so the arrival
--- joins the queue and the step installs nothing at all.
-----------------------------------------------------------------------
-stPark : EvalSt e₀
-stPark = installNode 0 (mergeAll-st {Γ = Γ₁} {t = obs (Pow K)} (just 0) 0
-                         (tiny ∷ []) false)
-           (st-init e₀)
-
-postPark : EvalSt e₀
-postPark = proj₂ (proj₂ (proj₂ (proj₂ (stepFrame {e = e₀} (gasPad 8 g0) 0 0
-             (thru-outer mergeAllᵒ 0) root vals₀ false (sched-init e₀ sl₁) stPark))))
-
--- LOAD-BEARING: it says the arrival really landed in the queue.  A
--- door that had admitted it, or dropped it, would leave the reading at
--- nought.
-parkedArrival≡ : parkedLayAt 0 (EvalSt.nodes stPark)
-               ∷ parkedLayAt 0 (EvalSt.nodes postPark) ∷ []
-               ≡ 0 ∷ 14 ∷ []
-parkedArrival≡ = refl
-
--- LOAD-BEARING, and the tightest row in this file: rung ZERO is the
--- premise's own bound, climbed by nothing.  Parking an arrival the
--- premise bounds leaves a table the premise still bounds, so the
--- ladder pays nothing for a queue that only grows.  It fails the
--- moment a park wraps, copies or re-reifies what it stores.
-parkRow : Bool
-parkRow = all (λ kv → boundedNode (iterSize 65 0 65) (proj₂ kv))
-              (EvalSt.nodes postPark)
-
-parkRow≡ : parkRow ≡ true
-parkRow≡ = refl
-
-----------------------------------------------------------------------
 -- THE TIES.  The types are generated from the statements as they read,
 -- so a restatement changes them rather than leaving the rungs above
 -- copied out beside a claim.  The premises are left as arguments: each
@@ -232,16 +198,7 @@ tieParkedInner = λ _ _ _ → refl
 -- LOAD-BEARING: same, at the reading whose level never counts the
 -- queue it must nonetheless leave bounded.
 tieParkedOuterRun : Confirms
-  (thruConsume-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+  (subscribeInner-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
      inner (sched-init e₀ sl₁) stRun 65 65
      (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
 tieParkedOuterRun = λ _ _ _ _ _ → refl
-
--- LOAD-BEARING: same, at the state where the arrival is parked rather
--- than run, so the conclusion is about a table the consumption only
--- appended to.
-tieParkedOuterPark : Confirms
-  (thruConsume-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
-     inner (sched-init e₀ sl₁) stPark 65 65
-     (iterSize 65 (layᵉ inner + slotsSize sl₁) 65))
-tieParkedOuterPark = λ _ _ _ _ _ → refl

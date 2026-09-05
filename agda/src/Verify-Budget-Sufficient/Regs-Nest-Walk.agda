@@ -45,11 +45,12 @@ open import Rx.Evaluator
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; takeDispatch; takeVals; lookupNode; scanVals; mergeAllᵒ; switchᵒ; exhaustᵒ;
   mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; hasRoom;
-  thruConsume; thruWrap; switchKill)
+  thruConsume; thruWrap; switchKill; mergeAllBump)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
-  stepFrame-nodes-inner; capsDrainOK; FaceOK; switchKill-slots)
+  stepFrame-nodes-inner; capsDrainOK; FaceOK; switchKill-slots;
+  switchKill-nodes)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures
   using (thruWrap-vals; takeVals-all; pathLen; boundedNode; setNode-bounded;
@@ -1576,40 +1577,36 @@ thruWrap-sz-store exhaustᵒ nid true M (vs , bs , sched , st) h
 ... | nothing                    = h
 
 postulate
-  -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, which is the whole of the
-  -- outer arm's store obligation once the fold and the wrap are taken
-  -- off it.  A consumption subscribes the arrival, and the cells the
-  -- subscription installs hold that run's emission -- reified, so
-  -- priced by the arrival's LAYERS -- with the telescope beside them
-  -- for the slots the run connects.  The one door that writes without
-  -- subscribing parks the arrival instead, and a park appends a term
-  -- the value premise already bounds.
+  -- WHAT ONE ARRIVING SUBSCRIPTION WRITES INTO THE TABLE, which is what
+  -- every store arm reduces to once its own door is taken off it.  The
+  -- cells the subscription installs hold that run's emission --
+  -- reified, so priced by the arrival's LAYERS -- with the telescope
+  -- beside them for the slots the run connects.
   --
   -- AND IT IS STATED AT A LEVEL THE ARRIVAL ALREADY REACHES, NOT AS A
   -- CLIMB FROM THE PREMISE'S OWN.  That is what makes it composable
   -- across a burst the count joins by MAX: a statement handing back
   -- one rung per arrival would compound over the fold, and the join
   -- says the arrivals do not compound.  So the level is carried as a
-  -- parameter with the arrival's charge under it, and the fold's job
-  -- is to show the level is never raised rather than to add rungs up.
+  -- parameter with the arrival's charge under it, and every consumer's
+  -- job is to show the level is never raised rather than to add rungs
+  -- up.
   --
   -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
   --   killed the constant, a scan whose step stores the arriving datum
-  --   back as a one-shot observable, run through all three doors.  One
-  --   installed node per witness, so nothing about a parked QUEUE at
-  --   this arm, whose entries are programs the run never delivered.
-  -- PROBED: `Probed.Parked-Queue-Store` at that queue, both ways the
-  --   door can take an arrival.  Admitting one beside a queue of two
-  --   leaves the count where an empty queue leaves it, since the count
-  --   reads the arrival; and PARKING one costs the ladder nothing at
-  --   all -- the row is read at rung ZERO, the premise's own bound
-  --   climbed by nothing, because a park only appends what the premise
-  --   already bounded.  One queue depth and the merging door alone,
-  --   which is the only shape that parks.
+  --   back as a one-shot observable, subscribed at all three doors.
+  --   One installed node per witness, so nothing about a table whose
+  --   entries accumulate across frames.
+  -- PROBED: `Probed.Parked-Queue-Store` at a node that already holds a
+  --   parked queue when the arrival is subscribed: admitting one
+  --   beside a queue of two leaves the reading where an empty queue
+  --   leaves it, since what is read is the arrival's own run.  One
+  --   queue depth and the merging door alone, which is the only shape
+  --   that parks at all.
   -- PROBED: `Probed.Cell-Chain-Store` at a table whose cells were
   --   written in SERIES, which every row above declines: a reifying
   --   scan under a `mergeAll` under a second reifying scan, arriving
-  --   as ONE value, so the consumption writes three cells where the
+  --   as ONE value, so the subscription writes three cells where the
   --   control writes one.  Both tables are read at the same two rungs
   --   and need the same one: a cell holding what the cell below it
   --   emitted is priced by the emission and not by its position, so
@@ -1617,8 +1614,8 @@ postulate
   --   once is not short.  One chain, of one length, with the telescope
   --   a single scripted slot -- so nothing about a chain whose cells
   --   resolve a SLOT, where the summand would do the work.
-  thruConsume-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (sf : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  subscribeInner-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
     (id : Id) (now : Tick) (o : Val Γ (obs u))
     (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
     Sched.slots sched ≡ sl →
@@ -1626,9 +1623,132 @@ postulate
     all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
     (sizeᵛ (obs u) o ≤ᵇ B) ≡ true →
     all (λ kv → boundedNode M (proj₂ kv))
-        (EvalSt.nodes (proj₂ (proj₂ (proj₂
-          (thruConsume sf op nid κ id now o sched st)))))
+        (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+          (subscribeInner sf op allNid κ id now o sched st)))))))
       ≡ true
+
+-- THE MERGE DOOR'S BUMP IS INVISIBLE TO THE READING.  It rewrites the
+-- cell it read and moves only the live count, which is not among what
+-- the reading prices -- so the cell it writes back is bounded by the
+-- very receipt the lookup handed out.
+mergeAllBump-bounded : ∀ {n} {Γ : Ctx n} (M : ℕ) (nid : NodeId) (done : Bool)
+  (ns : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode M (proj₂ kv)) ns ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv)) (mergeAllBump nid done ns) ≡ true
+mergeAllBump-bounded M nid done ns h
+  with lookupNode nid ns | lookupNode-sz M nid ns h
+... | just (mergeAll-st lim act q od) | hb =
+      setNode-bounded M nid
+        (mergeAll-st lim (if done then act else suc act) q od) ns hb h
+... | just (scan-st _)      | _ = h
+... | just (take-st _)      | _ = h
+... | just (switch-st _ _)  | _ = h
+... | just (exhaust-st _ _) | _ = h
+... | nothing               | _ = h
+
+-- ONE ARRIVAL CONSUMED, WHICH IS THE STORE SIDE'S DOOR DISPATCH.  Every
+-- arm either leaves the table alone -- a cell of the wrong kind or the
+-- wrong payload type, a busy exhaust -- or subscribes the arrival
+-- exactly once and rewrites the cell it read, and every one of those
+-- rewrites is invisible to the reading: a merge's bump moves the live
+-- count, a switch stores which inner it now holds, an exhaust its busy
+-- flag, and none of the three is priced.
+--
+-- AND THE ONE DOOR THAT WRITES WITHOUT SUBSCRIBING PARKS THE ARRIVAL,
+-- which costs the level nothing at all: the queue gains a term the
+-- value premise already bounds, and the level stands above that bound
+-- because it stands above `B`.
+--
+-- AND THE SWITCH ARM SUBSCRIBES AT THE STATE ITS CUT RETURNED rather
+-- than at the one it was handed, so both premises are transported
+-- across the cut.  The cut moves no node and leaves the telescope
+-- alone, and that is a fact about the cut rather than an accident of
+-- this caller.
+thruConsume-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (sf : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+  Sched.slots sched ≡ sl →
+  iterSize S (layᵉ o + slotsSize sl) B ≤ M →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  (sizeᵛ (obs u) o ≤ᵇ B) ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂
+        (thruConsume sf op nid κ id now o sched st)))))
+    ≡ true
+
+thruConsume-sz-store {u = u} sl sf mergeAllᵒ nid κ id now o sched st S B M
+                     2≤S slEq le hns ho
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-sz M nid (EvalSt.nodes st) hns
+... | nothing               | _ = hns
+... | just (scan-st _)      | _ = hns
+... | just (take-st _)      | _ = hns
+... | just (switch-st _ _)  | _ = hns
+... | just (exhaust-st _ _) | _ = hns
+... | just (mergeAll-st {w} lim act q od) | hb with w ≟ᵗ u
+...   | no _ = hns
+...   | yes refl with hasRoom lim act
+...     | true =
+  mergeAllBump-bounded M nid
+    (proj₁ (proj₂ (proj₂ (proj₂
+      (subscribeInner sf mergeAllᵒ nid κ id now o sched st)))))
+    (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+      (subscribeInner sf mergeAllᵒ nid κ id now o sched st)))))))
+    (subscribeInner-sz-store sl sf mergeAllᵒ nid κ id now o sched st
+       S B M 2≤S slEq le hns ho)
+...     | false =
+  setNode-bounded M nid (mergeAll-st lim act (q ++ o ∷ []) od)
+    (EvalSt.nodes st)
+    (all-++-intro (λ o′ → sizeᵉ o′ ≤ᵇ M) q (o ∷ []) hb
+      (∧-intro
+        (≤ᵇ-widen (sizeᵉ o)
+          (≤-trans (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S)
+                      (layᵉ o + slotsSize sl) B)
+                   le)
+          ho)
+        refl))
+    hns
+
+thruConsume-sz-store sl sf switchᵒ nid κ id now o sched st S B M
+                     2≤S slEq le hns ho
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = hns
+... | just (scan-st _)           = hns
+... | just (take-st _)           = hns
+... | just (mergeAll-st _ _ _ _) = hns
+... | just (exhaust-st _ _)      = hns
+... | just (switch-st cur od) =
+  setNode-bounded M nid _
+    (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+      (subscribeInner sf switchᵒ nid κ id now o
+         (proj₁ (proj₂ (switchKill cur sched st)))
+         (proj₂ (proj₂ (switchKill cur sched st))))))))))
+    refl
+    (subscribeInner-sz-store sl sf switchᵒ nid κ id now o
+       (proj₁ (proj₂ (switchKill cur sched st)))
+       (proj₂ (proj₂ (switchKill cur sched st))) S B M 2≤S
+       (trans (switchKill-slots cur sched st) slEq) le
+       (subst (λ ns → all (λ kv → boundedNode M (proj₂ kv)) ns ≡ true)
+              (sym (switchKill-nodes cur sched st)) hns)
+       ho)
+
+thruConsume-sz-store sl sf exhaustᵒ nid κ id now o sched st S B M
+                     2≤S slEq le hns ho
+  with lookupNode nid (EvalSt.nodes st)
+... | nothing                    = hns
+... | just (scan-st _)           = hns
+... | just (take-st _)           = hns
+... | just (mergeAll-st _ _ _ _) = hns
+... | just (switch-st _ _)       = hns
+... | just (exhaust-st true od)  = hns
+... | just (exhaust-st false od) =
+  setNode-bounded M nid _
+    (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+      (subscribeInner sf exhaustᵒ nid κ id now o sched st)))))))
+    refl
+    (subscribeInner-sz-store sl sf exhaustᵒ nid κ id now o sched st
+       S B M 2≤S slEq le hns ho)
 
 -- THE FOLD OVER THE BURST, CARRYING A LEVEL RATHER THAN CLIMBING ONE.
 -- Each arrival is consumed at the state its predecessor left, so an
