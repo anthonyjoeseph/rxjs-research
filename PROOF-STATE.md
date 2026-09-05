@@ -215,19 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT THE SHARED CHARGE COSTS THE LEDGER, WHICH IS THE ONLY PLACE
-  EITHER LEAF CAN STILL BE WRONG.** Both leaves now stand at one
-  descent under one charge, and both state that charge as a PREMISE —
-  so no witness can refute it, enlarging it only weakens the statement,
-  and the store leaf records that as a dead route. What the charge is
-  owed at is therefore the CALL SITE: a per-frame ceiling has to supply
-  `iterSize` at the program's layers plus the whole telescope, per
-  frame, and the telescope is a program constant while the layers are
-  not. The commit states that obligation where the walk carries its
-  level, and its product is whether the ceiling is a fixed product or
-  climbs with the walk.
-
-- **AND THEN THE DESCENT'S OWN CLAUSES, WHERE ONE RUNG HAS TO PAY FOR
+- **THE DESCENT'S OWN CLAUSES, WHERE ONE RUNG HAS TO PAY FOR
   ONE OPERATOR.** Both leaves are stated over `subscribeE`, whose cases
   are the program's constructors, and `layᵉ` charges one rung apiece —
   the first statements here attackable STRUCTURALLY rather than through
@@ -237,7 +225,7 @@ does not fit is a finding about the shared statement, not about the head.
   nothing and the one that writes its own cell, leaving the crossings
   postulated, and asks whether one rung covers one operator.
 
-- **AND THEN THE CROSSING ARMS, WHERE THE DESCENT RE-ENTERS THE DOORS
+- **THEN THE CROSSING ARMS, WHERE THE DESCENT RE-ENTERS THE DOORS
   IT IS ALREADY UNDER.** A `*All` constructor is where the two leaves
   stop being about syntax: it mints a node, parks what it cannot admit,
   and hands an arrival back to the very crossing that is a body over
@@ -247,6 +235,16 @@ does not fit is a finding about the shared statement, not about the head.
   commit states the crossing arms at the descent and asks what
   decreases, since a rung that pays for the mint buys nothing if the
   arrival's own layers are unbounded by the program's.
+
+- **AND THEN THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
+  THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
+  its ceiling is a fixed product, so what is left is what a frame
+  cannot read off a path: the two crossings' charge, the fan's
+  registry term, and the burst WIDTH. The width is the one to take
+  first — the package proving it is proven already and delivers it at
+  the size cap ONE INSTANT UP, so the whole question is a rung. The
+  commit puts that gap beside the store side's own climb, which
+  crosses the same one.
 
 ### The ledger
 
@@ -259,11 +257,10 @@ does not fit is a finding about the shared statement, not about the head.
   subscription delivers, in its own layers plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
   twice and a share at two depths cost nothing. A layered arrival is unread.
-- **`subscribeE-sz-store`** (Regs-Nest-Walk) — FALSITY,
-  `DEAD ROUTE, PROBED×4`: what ONE subscription writes, at the same descent and
-  the same charge its value sibling reads, plus a table it did not build. Cells
-  in series do not compound; a parked reference reads the telescope; slots in
-  series are open.
+- **`subscribeE-sz-store`** (Regs-Nest-Walk) — FALSITY, `DEAD ROUTE, PROBED×4`:
+  what ONE subscription writes, at the same descent and the same charge its
+  value sibling reads, plus a table it did not build. Cells in series do not
+  compound; a parked reference reads the telescope; slots in series are open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
@@ -277,11 +274,18 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
-  THE LEVEL SIDE IS CLOSED — ceiling, whole ledger, and every advance rule from
-  a join to a sum — and the ceiling side would need a tower, so the CHARGE
-  moves.
+- **`chain-walk-bursts`** (Part7/Depth-Fit) — FALSITY, `NO EVIDENCE`: the
+  walk's burst package at the instant's OWN size cap. The proven neighbour
+  delivers it one rung up, at `nestBurstAt`, and a width bound at the larger
+  cap gives none at the smaller — so the residue is a single geometric rung.
+- **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: the two crossing
+  frames' charge against one frame's ceiling. The telescope half is a program
+  constant the burst face already reads against the cap; the LAYER half asks a
+  bound on a runtime value, and no premise of the walk carries one.
+- **`dispatchSzOK-go`** (Regs-Nest-Walk) — FALSITY, `DEAD ROUTE`: the sink's
+  share of the ledger, a registry width times a frame ceiling. The fan's own
+  advance is an entry's whole run, so accumulating it into the walk's level is
+  exponential in the dispatch gas and only a ceiling holds it.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the

@@ -33,7 +33,7 @@ open import Rx.Exp       using (obs; Ctx; Closed; Val; Fn; _×ᵗ_; _≟ᵗ_; si
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; valsFit-of-max)
 open import Verify-Budget-Sufficient.Nest-Walk using
-  (nestDᵛˢ; nodeNestAt; capsDrainOK; FaceOK; faceOK;
+  (nestDᵛˢ; nodeNestAt; capsDrainOK; FaceOK; faceOK; burstsOK;
    frameDrainOK; capsWalkOK; dispatchCapsOK; shareCapsOK)
 open import Verify-Budget-Sufficient.Nest-Burst using (drainW)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestU)
@@ -46,7 +46,7 @@ open import Verify-Budget-Sufficient.Walk-Factor using
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
   valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; stepFrame-sz-store; szCount;
-  frameCh; walkSzOK; dispatchSzOK; shareGoSzOK; Φ-to-bound)
+  frameCh; walkSzOK; walkSzOK-go; dispatchSzOK; shareGoSzOK; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; base; walk; ent-step)
@@ -2263,6 +2263,31 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- actually parked, which is a state its count is not handed and its
 -- sibling arm already takes of the arrivals.
 
+-- THE WIDTH THE WALK IS READ AT, WHICH IS THE ONE THING THE CAPS
+-- PACKAGE DOES NOT HAND OVER.  A chain's package says what its frames
+-- may STORE and how far the path may climb; it says nothing about how
+-- many values a frame is handed at once, and the ledger below needs
+-- that at every frame -- once for the walk's own head conjunct and
+-- once to pay a scan's charge, which is a width times a size.
+--
+-- AND THE RUNG IS THE WHOLE GAP.  The proven neighbour delivers this
+-- package at `nestBurstAt`, which is the size cap ONE INSTANT UP, and
+-- a burst bound at a larger width does not give one at a smaller.  So
+-- what is unheld is that a chain's own frames burst within the cap of
+-- the instant they run in, rather than within the cap the instant
+-- after it -- the same rung the store side already climbs, arriving at
+-- the width coordinate.
+postulate
+  chain-walk-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+    (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
+    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+    Sched.slots sched ≡ sl →
+    chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
+      nextId a path sched st →
+    burstsOK (Caps.cSize (capsAt e sl id))
+             (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
+             path (arrVal a ∷ []) (Arrival.isLast a) sched st
+
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
 -- own crossing frame outright and is discharged, so the shape looks
@@ -2318,25 +2343,44 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   cubic in the cap, while one rung of the caps ladder already
 --   exceeds every polynomial in it.  Recorded at `chain-climb-ch`
 --   from the other end.
--- RECOVERY: git show 157a852:agda/src/Verify-Budget-Sufficient/Regs-Nest-Walk.agda
---   restores `szCount≤ch` and the `crossFrame?` predicate it excluded
---   the two crossings by -- a per-frame discharge of the three
---   program-reading arms against `frameCh`, which is the shelf a
---   `pathLen path * chAt` reading of the premise above would spend.
-postulate
-  chain-walk-szOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (sl : Slots Γ) (id : ℕ) (Lc C : ℕ) (a : Arrival Γ) (nextId : Id)
-    (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
-    Sched.slots sched ≡ sl →
-    chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
-      nextId a path sched st →
-    pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    Lc + pathLen path * chAt e sl id
-      + n * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ C →
-    walkSzOK (Caps.cSize (capsAt e sl id))
-             (Caps.cSize (capsAt e sl id)) C Lc
-             (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
-             path (arrVal a ∷ []) (Arrival.isLast a) sched st
+
+-- THE CHAIN'S LEDGER SPENT ALONG ITS OWN PATH, and the body is what
+-- says the premise above it is a FIXED PRODUCT rather than a climb:
+-- one frame ceiling per frame of the path, a registry's worth for the
+-- sink, and no frame re-establishing anything the frame before it
+-- spent.  What the chain contributes is only the two facts the walk
+-- cannot read off a path -- the telescope sits under the cap because
+-- the recurrence's base contains it as a summand, and the bursts sit
+-- under it by the leaf above.
+chain-walk-szOK : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (Lc C : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
+    nextId a path sched st →
+  pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
+  Lc + pathLen path * chAt e sl id
+    + n * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ C →
+  walkSzOK (Caps.cSize (capsAt e sl id))
+           (Caps.cSize (capsAt e sl id)) C Lc
+           (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
+           path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-szOK {n = n} {e = e} sl id Lc C a nextId path sched st
+                heq hcc hp hb =
+  walkSzOK-go S S C Lc (2≤capsAt-size e sl id) 1≤S
+    (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
+    path (arrVal a ∷ []) (Arrival.isLast a) sched st
+    hp hslots
+    (chain-walk-bursts sl id Lc a nextId path sched st heq hcc)
+    hb
+  where
+  S = Caps.cSize (capsAt e sl id)
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)
+  hslots : slotsSize (Sched.slots sched) ≤ S
+  hslots = ≤-trans (≤-reflexive (cong slotsSize heq))
+             (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e))
+                      (capsAt-base-size e sl id))
 
 -- THE LEVEL ONE CHAIN CLIMBS, IN THE WALK'S OWN CURRENCY, and it is
 -- exactly what the cascade's ledger already sets aside per chain: a
