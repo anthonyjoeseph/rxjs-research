@@ -215,15 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING
-  ARMS ARE NOW WAITING ON.** The drain leaf and the outer arm differ
-  only in WHERE the program sits — parked in a node, or arriving as a
-  value — and now agree in denomination as well. Underneath each is
-  one claim: subscribing a program of bounded size delivers within the
-  rungs its layers and its telescope buy, because reification adds no
-  layer while a substitution multiplies. The commit states that
-  single-subscription claim as the leaf both spend, and reports what
-  the per-entry step of the drain still owes above it.
+- **THE OUTER ARM READ THROUGH THE LEAF THE DRAIN NOW SPENDS.** The
+  two crossing arms charge the identical shape — a max over what runs,
+  plus the telescope — and differ only in WHERE the programs sit,
+  parked in a node or arriving as values. The drain is now a real body:
+  an induction over its queue whose every entry bottoms out in one
+  claim about a SINGLE subscription, with the telescope surviving the
+  fold because a subscription hands on the schedule it was handed. The
+  arm reading arrivals is still one postulate over the whole list. The
+  commit writes it as the same fold over the same leaf, and reports
+  what that arm's own finish and limit handling owe that the queue's
+  did not.
 
 - **THEN THE OUTER ARM'S TABLE READING, WHICH NO ROW HAS STOOD AT.**
   Each crossing arm has two conclusions — what it delivers and what it
@@ -235,16 +237,15 @@ does not fit is a finding about the shared statement, not about the head.
   builds the state where that difference shows and reads the repaired
   denomination against it.
 
-- **THEN TWO HIDDEN RUNS IN ONE QUEUE, WHICH ONE SLOT CANNOT STAGE.**
-  The join's remaining risk is the state a later entry inherits, and
-  the queue that shows it needs two entries whose runs are both
-  behind the telescope. One shared slot connects once, so two
-  references to it deliver a single value between them and the second
-  entry runs nothing at all. The commit scripts a telescope of
-  SEVERAL slots, one per entry — which is also the shape the summand
-  has never been read at, being one number standing for several
-  definitions, with nothing yet saying that a max over the entries
-  and a sum over the slots are the right pair of joins.
+- **THEN THE SUMMAND AT A TELESCOPE OF SEVERAL SLOTS, WHICH NO ROW HAS
+  CARRIED.** The charge names ONE number for the whole telescope, a sum
+  over every slot in scope, and every row that has ever read it stands
+  at a vocabulary of one — so what is untested is not the summand's
+  reach, which the reference rows buy, but the JOIN: nothing yet says a
+  sum over the slots is the right partner for a max over what runs. The
+  commit scripts a telescope of several definitions, subscribes a
+  program naming a different one at each entry, and reads the charge
+  where a sum and a max come apart.
 
 ### The ledger
 
@@ -253,11 +254,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`mergeAllDrain-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×3, TWIN, PROBED×4`: what a run delivers, in layers of what runs plus
-  its telescope — the drain reading its node's queue, the outer arm its
-  arrivals. Both read where a slot reference hides the run, the drain's join
-  at a queue of several; two hidden runs are not.
+- **`subscribeInner-sz`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED×3, PROBED×3`: what ONE subscription delivers, in the program's own
+  layers plus its telescope, and the arm reading it over a list of arrivals.
+  The drain is a body over the leaf; the arm is not. Read at a hidden run and
+  a written-out one, never at several slots.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
   table, where a subscribed scan writes what it emitted. Instantiated at the
