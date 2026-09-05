@@ -215,16 +215,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SQUARING ARRIVAL, WHICH IS THE ONE SHAPE LEFT THAT CAN BREAK
-  THE CROSSING.** The door's burst was instantiated at a duplication
-  chain and the fold cost no rung of its own: a rung quadruples where a
-  layer doubles, and the charge outgrew the need at both lengths. So
-  what is left is the shape where a run does not double — an arrival
-  carrying a `μ`, whose unfolding SQUARES a size no layer charge grows
-  with, and squaring outruns a rung. That is the same mechanism the
-  unfolding leaf beside it is a leaf FOR, so one witness aims at both. The commit builds it and reads whether it refutes: a
-  refutation moves the descent's whole denomination, and a receipt
-  closes the last region the crossing has open.
+- **THE SQUARING ARRIVAL AT THE VALUE SIDE, WHICH DECIDES HOW WIDE
+  THE REPAIR IS.** The store descent is refuted: an arrival carrying a
+  `μ` unfolds into copies of the whole program, the rung count is
+  blind to the `μ` and to the `defer` its mentions stand under, and one
+  family kills the crossing door's burst, the unfolding leaf and the
+  descent's own conclusion. `subscribeE-sz` is that descent's twin at
+  the very same denomination, reading the values delivered and not the
+  table written. The commit carries the family across — a door with
+  ROOM, so the copies are emitted instead of parked. If it falls too,
+  one restatement serves both halves; if it stands, the squaring
+  reaches only what a subscription writes and the repair is local.
+
+- **THE LEVEL THAT GROWS WITH THE BOUND, WHICH IS THE RESTATEMENT.** A
+  rung is affine in the bound, so a count fixed by the SYNTAX buys a
+  fixed factor and cannot cover a multiplicity. The caps face already
+  prices this exact substitution and is the shape to mirror: it charges
+  an unfold in an EXISTENTIAL number of frame steps, quadratic in the
+  `μ`'s own size. No closed function of the entry program serves
+  instead — an unfold squares the bound the NEXT one is charged
+  against, so nesting outruns any fixed formula. The commit restates
+  the descent at an existential level and reports what the fold under
+  the wrap then owes, each entry now returning a level of its own.
 
 - **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
@@ -236,18 +248,6 @@ does not fit is a finding about the shared statement, not about the head.
   commit puts that gap beside the store side's own climb, which
   crosses the same one.
 
-- **AND THEN THE VALUE SIDE THROUGH THE DOOR THE STORE SIDE JUST
-  OPENED.** `subscribeE-sz` is the last monolith on this descent and it
-  is the store half's twin: same constructors, same two transports.
-  What the store half established is WHICH arms are leaves and why — a
-  definition behind a reference, a cell in a currency the premise is
-  not stated in, an arrival re-entering at its own level, a
-  substitution that squares the size — and not one of those reasons is
-  about the table. The commit walks the value side over the same
-  clauses and asks which of the four survive the change of reading,
-  since an arm that is a leaf for the store and a body for the value
-  says the two halves are not one descent after all.
-
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -258,15 +258,16 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×6`: what ONE
   subscription delivers, in its own layers plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice and a share at two depths cost nothing. A layered arrival is unread.
-- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `PROBED`: the
-  burst a crossing door pushes back through itself, keyed on the source program
-  since an arbitrary burst is unbounded. The fold costs no rung a duplication
-  chain can buy; a `μ` arrival, which squares rather than doubles, is open.
-- **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`: what
-  ONE unfolding writes. The size premise does not survive the substitution —
-  the proven bound SQUARES it — while the layer reading crosses untouched
-  behind the defer, so the leaf is the size side alone.
+  twice costs nothing. Its store twin's `μ` arrival is refuted; this side is
+  unread there.
+- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+  the burst a crossing door pushes back through itself, keyed on the source
+  program since an arbitrary burst is unbounded. A duplication chain buys no
+  rung; a `μ` arrival refutes it, the copies being a free parameter.
+- **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
+  unfolding writes. Refuted at sixteen mentions and holding at fifteen: the
+  substitution SQUARES the size premise while the level it is held to is the
+  layer count, which the substitution leaves alone.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: the
   reified seed and the cell each arrival rewrites, in a currency the layer
   premise is not stated in. Cells in series do not compound; a parked queue
