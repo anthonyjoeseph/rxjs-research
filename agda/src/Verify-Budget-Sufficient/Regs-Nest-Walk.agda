@@ -779,9 +779,15 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- `mergeAll-st`'s queue is read entry by entry at `sizeᵉ ≤ᵇ B`, so
 -- charging `B` rungs charges at least the size of whatever the drain
 -- runs.  That buys the doubling outright rather than by a polynomial
--- tie, since `iterSize S B B` dominates `2 ^ B * B`.  It is also why
--- the arm leaves the ledger's priceable set below: `B` climbs with the
--- walk's own level while a per-frame charge does not.
+-- tie, since `iterSize S B B` dominates `2 ^ B * B`.
+--
+-- REFUTED: `Refuted.Walk-Ceil-Drain` -- this arm against the whole
+--   ledger a chain door supplies, carrying one nat so that no premise
+--   of the row is vacuous.  It is the EARLIEST crossing that overruns
+--   that ledger, firing one rung before the outer arm's row does and
+--   reading nothing about a value at all -- so no repair to what the
+--   sibling arm reads about its arrivals reaches it, and what this arm
+--   is denominated in has to move instead.
 
 -- AND THE TELESCOPE IS PART OF THE OUTER READING, because arriving
 -- syntax is not what runs whenever it NAMES a slot: a variable prices

@@ -58,9 +58,9 @@
 -- WHAT THIS DOES NOT SHOW.  It does not refute the ceiling SHAPE for
 -- the three arms that read the program's own syntax -- their counts
 -- are bounded by the cap and a per-frame product pays them at every
--- rung.  Nor does it reach the `from-inner` arm, whose charge is the
--- level itself and which therefore breaks the same way without needing
--- a value at all.  And it says nothing against a ledger that CLIMBS:
+-- rung.  Nor does it reach the `from-inner` arm, which breaks the same
+-- ledger a rung earlier and is carried by `Refuted.Walk-Ceil-Drain`.
+-- And it says nothing against a ledger that CLIMBS:
 -- what is refuted is a product, and a right-hand side iterating the
 -- way the left-hand side does is a different statement.
 -- ══════════════════════════════════════════════════════════════════

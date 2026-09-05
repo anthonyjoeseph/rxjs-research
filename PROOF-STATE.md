@@ -215,15 +215,23 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHERE AN ARRIVAL'S LAYERS COME FROM, WHICH IS THE LAST CHANNEL THE
-  LEVEL HAS.** Currency and join are both settled and the ledger still
+- **WHAT THE DRAIN ARM IS DENOMINATED IN, WHICH IS THE EARLIER
+  BREACH.** The arrival side is not what the ledger loses to first: the
+  exit arm charges the LEVEL flatly, since the parked program is in the
+  store and the count is handed no state, and that overruns the whole
+  ledger a rung sooner with one nat arriving. What a `mergeAllᵒ` exit
+  spends is the subscription of what its node has queued. The commit
+  hands the count that state, prices the arm at what is parked, and
+  reports which premises the walk then owes.
+
+- **THEN WHERE AN ARRIVAL'S LAYERS COME FROM, THE OTHER LEVEL
+  CHANNEL.** Currency and join are settled and the outer arm still
   loses: a rung admits size geometrically and a layer costs fixed size,
-  so the level reaches the charge logarithmically, which suffices at
-  the third rung. Every remaining repair is on the other side. The
-  arrivals a walk meets are not arbitrary syntax — reification adds no
-  layer — so a delivered observable's layers should be bounded by the
-  PROGRAM's. The commit states that as a leaf over the run and reports
-  whether the walk carries what instantiating it needs.
+  so the level reaches the charge logarithmically. The arrivals a walk
+  meets are not arbitrary syntax — reification adds no layer — so a
+  delivered observable's layers are bounded by the PROGRAM's. The
+  commit states that as a leaf over the run and reports whether the
+  walk carries what instantiating it needs.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
@@ -234,16 +242,6 @@ does not fit is a finding about the shared statement, not about the head.
   sink leaf's charge against what the REGISTRY carries — a per-entry
   reading rather than a cap — and reports whether the walk's own
   budget can spend it.
-
-- **THEN THE STORE ADVANCE AT A CROSSING, WHICH THE CHARGE DOES NOT
-  DECIDE.** A crossing is the only frame that subscribes, so it is what
-  advances the node table inside an instant — which is what makes a
-  flat store field unavailable and what a fan-out entry inherits from
-  the entries before it. That half is independent of the affordability
-  the leg above turns on: it is a claim about WHEN the table moves, not
-  about what the move costs. The commit states the advance at one
-  crossing and reports whether one index serves the frame and the
-  fan-out entry alike.
 
 ### The ledger
 
@@ -276,9 +274,10 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×3, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
+  `REFUTED×4, DEAD ROUTE×3, RECOVERY`: the whole size walk under ONE ceiling.
   THE LEVEL SIDE IS CLOSED — ceiling, whole ledger, and every advance rule from
-  a join to a sum — and the ceiling side would need a tower, so the CHARGE moves.
+  a join to a sum — and the ceiling side would need a tower, so the CHARGE
+  moves.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the

@@ -2282,6 +2282,12 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   past every allowance the path has, so no reading of this premise
 --   fixes a ceiling a crossing frame fits under -- and it opens at the
 --   third rung, the second still fitting.
+-- REFUTED: `Refuted.Walk-Ceil-Drain` -- the same ledger against the
+--   DRAIN arm, which is the earlier breach: it fires at the second
+--   rung with a single nat arriving, so the row turns on no arrival,
+--   no depth and no width.  That is what orders the two repairs --
+--   whatever the outer arm comes to read about its arrivals, this
+--   premise stays refuted until the drain stops charging the level.
 -- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
 --   a recursion on a depth fuel, the charge at each frame read at the
 --   level that frame stands at, against what `walkFac-ch` affords, and
