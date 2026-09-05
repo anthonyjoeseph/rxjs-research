@@ -214,6 +214,9 @@ open import Refuted.Chain-Step-Regs-Cap
          row≡false; chain-step-regs-cap-absurd)
 open import Refuted.Walk-Ceil-Ledger
   using (WalkCeilLedger; figures≡; premLvl; count≡; walk-ceil-ledger-absurd)
+open import Refuted.Size-Climb-Afford
+  using (szCh; szClimb; walkAfford; SizeClimbAfford; climb-outruns-afford;
+         one-frame-affordable; size-climb-afford-absurd)
 open import Refuted.Cascade-Afford-Wide
   using (CascadeAffordWide; suc≤sizeStep; iterSize-lb; selLen; S≤N; hK;
          cascade-afford-wide-absurd)

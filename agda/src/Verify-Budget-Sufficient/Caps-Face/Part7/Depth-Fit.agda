@@ -2196,8 +2196,24 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- width and the level closes that loop, and a ceiling and a ledger are
 -- both closed forms in exactly those three.  What answers the shape one
 -- stratum up is a recursion on a DEPTH FUEL with every quantity read at
--- the level the walk has CLIMBED to, which is what `dCapᶜ` is; whether
--- the size walk's own factor can afford that shape is the open half.
+-- the level the walk has CLIMBED to, which is what `dCapᶜ` is.
+
+-- AND THE FACTOR DOES NOT AFFORD THAT SHAPE, WHICH SETTLES THE OTHER
+-- SIDE THE SAME WAY.  Written out -- fuel outside, rungs threaded, the
+-- charge at each frame read at the level that frame stands at -- the
+-- climb passes what `walkFac-ch` allows at its SECOND crossing frame,
+-- at every cap this development admits.  The factor's whole ledger
+-- sits below THREE rungs of the size ladder while one crossing frame
+-- climbs a cap's worth of them, and the row is two-sided: one frame is
+-- affordable and two are not.  So the gap is a ladder against a
+-- polynomial, and widening the polynomial buys a rung of the ladder.
+-- What makes the same shape work one face over is therefore not the
+-- shape: the caps ceiling is DEFINED by reading its own climb and is
+-- affordable by construction, while this level must fit under a
+-- nesting budget that is a fixed exponential in a polynomial and reads
+-- nothing.  What is owed here is a ceiling that READS the size walk,
+-- on the pattern `blowH` already sets one stratum up, and the open
+-- question is whether the stratification admits one.
 
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
@@ -2220,6 +2236,11 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   ceiling a crossing frame fits under, and one rung lower the
 --   crossing is affordable -- the gap opens with the walk rather than
 --   with the program.
+-- REFUTED: `Refuted.Size-Climb-Afford` -- the same premise restated as
+--   a recursion on a depth fuel, the charge at each frame read at the
+--   level that frame stands at, against what `walkFac-ch` affords.
+--   Two crossing frames of that climb outrun the factor's whole ledger
+--   at every admissible cap, and one crossing frame does not.
 -- DEAD ROUTE: a fan-out fold that does not advance at all, reading
 --   every admitted entry's node table at the level the fan was
 --   ENTERED at.  Killed at a two-entry fan whose first entry is a
