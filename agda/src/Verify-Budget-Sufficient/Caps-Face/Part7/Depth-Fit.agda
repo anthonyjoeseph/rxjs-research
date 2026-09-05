@@ -2203,20 +2203,27 @@ postulate
 -- climb, `subscribeInner-caps`, reports it at `sLvlD` -- a LADDER
 -- rung, which is an upper bound and so funds nothing.
 --
--- AND NOTHING IN REACH SOURCES THE CONCLUSION, IN TWO SEPARATE WAYS.
--- The climb is the sum of the walk's per-frame witnesses, and the
--- record supplying them bounds each ONLY by a ladder rung: the
--- per-frame charge this ledger counts in is not a conjunct of that Σ
--- at all, so there is nothing to sum.  And the sum would be over the
--- wrong set anyway -- a chain ending in a SHARE SINK adds no frames to
--- `pathLen`, while the walk there runs a delivery per admitted
--- registration, each a fold of its own.  One registry's worth of
--- chains therefore climbs under the single rung this conclusion
--- allows for the chain itself, and the round's ledger counts the
--- lengths of THIS round's chains and never budgeted them.  Both gaps
--- are about what the hypotheses carry, which is why the move owed is
--- a restatement and not a grind.
+-- AND NOTHING IN REACH SOURCES THE CONCLUSION, IN TWO SEPARATE WAYS,
+-- OF WHICH ONLY ONE IS REPAIRABLE.  The climb is the sum of the walk's
+-- per-frame witnesses, and the record supplying them bounds each ONLY
+-- by a REFRESHED ladder rung: the per-frame charge this ledger counts
+-- in is not a conjunct of that Σ at all, so there is nothing to sum --
+-- and one level away from the entry that rung is two orders past what
+-- this ledger hands a whole chain, so a chain of ONE frame is already
+-- over.  The second gap is that the sum is over the wrong set: a chain
+-- ending in a SHARE SINK adds no frames to `pathLen`, while the walk
+-- there runs a delivery per admitted registration, each a fold of its
+-- own.  That one HAS an answer -- the delivery face already proves a
+-- sink-aware measure, a bridge from it to the flat length, and an
+-- aggregate bridge over a round's chains, and a sibling face already
+-- prices a chain list in it -- so it wanted a search and not a
+-- restatement.  The first has none, and it is the binding one: no
+-- count reaches a gap that is already there at one frame.
 --
+-- REFUTED: `Refuted.Frame-Charge-Arith` -- the per-frame conjunct the
+--   walk record carries, held under the per-frame charge this ledger
+--   buys, at two caps and at every depth fuel.  It is what puts the gap
+--   at one frame rather than at the count.
 -- REFUTED: `Refuted.Chain-Climb-Arith` -- the free-number form of this
 --   row, with the state predicate dropped and the path replaced by its
 --   length, at the floor of the cap, the width, the depth fuel and the
@@ -2235,6 +2242,14 @@ postulate
 --   puts a size cap under a single `dLvl`).  So the two ledgers agree
 --   on dimension only in the INCREMENT form, and a ceiling denominated
 --   in the caps ladder cannot be spent by the size walk at all.
+-- DEAD ROUTE: re-denominating the conclusion in the sink-aware count,
+--   which is what the fan-out gap asks for.  Dead twice over.  On
+--   AFFORDABILITY: the arrival ledger bounds a round's sink-aware count
+--   by the real width times the delivery size, whose fan term recurs
+--   through the dispatch gas, while `walkFac-ch` affords a quadratic in
+--   the cap -- so `cascade-afford` breaks where it holds today.  And on
+--   SOURCING: the gap is already at one frame, so a count that is
+--   larger everywhere cannot close it.
 postulate
   chain-climb-ch : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)

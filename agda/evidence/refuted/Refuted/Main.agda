@@ -44,6 +44,9 @@ open import Refuted.Chain-Level-Unbounded
 open import Refuted.Chain-Climb-Arith
   using (figures; figures≡; ceil₁; ceil₂; gap₂;
          chain-climb-arith-absurd; chain-climb-arith-wide-absurd)
+open import Refuted.Frame-Charge-Arith
+  using (figures; figures≡; figuresWide; figuresWide≡;
+         frame-charge-absurd; frame-charge-wide-absurd)
 open import Refuted.Chain-Step-Live-Nest
   using (grown≡3; charge≡1; grown₅≡5; chainStep-nest-live-absurd)
 open import Refuted.Chain-Step-Nodes
