@@ -2203,6 +2203,20 @@ postulate
 -- climb, `subscribeInner-caps`, reports it at `sLvlD` -- a LADDER
 -- rung, which is an upper bound and so funds nothing.
 --
+-- AND NOTHING IN REACH SOURCES THE CONCLUSION, IN TWO SEPARATE WAYS.
+-- The climb is the sum of the walk's per-frame witnesses, and the
+-- record supplying them bounds each ONLY by a ladder rung: the
+-- per-frame charge this ledger counts in is not a conjunct of that Σ
+-- at all, so there is nothing to sum.  And the sum would be over the
+-- wrong set anyway -- a chain ending in a SHARE SINK adds no frames to
+-- `pathLen`, while the walk there runs a delivery per admitted
+-- registration, each a fold of its own.  One registry's worth of
+-- chains therefore climbs under the single rung this conclusion
+-- allows for the chain itself, and the round's ledger counts the
+-- lengths of THIS round's chains and never budgeted them.  Both gaps
+-- are about what the hypotheses carry, which is why the move owed is
+-- a restatement and not a grind.
+--
 -- REFUTED: `Refuted.Chain-Climb-Arith` -- the free-number form of this
 --   row, with the state predicate dropped and the path replaced by its
 --   length, at the floor of the cap, the width, the depth fuel and the

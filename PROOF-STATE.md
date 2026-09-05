@@ -215,14 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE RE-TIED CLIMB — IT IS THE CHEAPEST UNMANAGED RISK
-  ON THIS FACE.** `chain-climb-ch` now bounds the value `chainStep-caps`
-  returns, so both of its sides are functions of a concrete program
-  instead of one side being a free number, and the question is settled
-  by running it rather than by argument. Probe it, and expect either a
-  refutation naming the frame kind that overspends or a coverage
-  boundary saying which hypothesis cannot be discharged at a numeral —
-  both are findings the wall below is currently guessing at.
+- **THE CHAIN DOOR IS DENOMINATED IN THE WRONG COUNT, SO FIX THE COUNT
+  BEFORE ANYTHING ELSE.** `chain-climb-ch` charges a chain
+  `suc (pathLen path)` rungs, and a chain ending in a SHARE SINK runs a
+  delivery per admitted registration under a `pathLen` the sink never
+  raises — one registry's worth of folds under one rung. Decide what
+  the conclusion should count, dispatch included, and restate it there;
+  only then is pushing the per-frame charge into `sf-step`'s Σ worth
+  doing, since that Σ today bounds each frame's witness by a ladder
+  rung and leaves this ledger nothing to sum.
 
 - **THEN THE SIZE FACE'S CROSSING TAIL, IN WHATEVER CURRENCY THAT
   LEAVES.** `walk-cross-LiveHypC` stands at full strength on an
@@ -308,10 +309,10 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
-- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `REFUTED×2, DEAD ROUTE`:
-  one chain's climb priced per FRAME, now stated at the value the step returns
-  rather than at a free number, whose form is refuted arithmetic. What it asks
-  is whether one frame of the walk climbs under the charge; nothing has asked.
+- **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×2, DEAD ROUTE`: one
+  chain's climb priced per FRAME, now stated at the value the step returns
+  rather than at a refuted free number. NOTHING SOURCES IT: the per-frame
+  witness is ladder-bounded only, and a share sink raises no `pathLen`.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
