@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SHARE REACHED AT TWO DEPTHS, WHICH IS WHERE THE SUM
-  COULD STILL BE SHORT.** The diamond just read names one slot twice
-  from ONE apex, and the multicast answers it: the second reference
-  finds the share already fired. Two DIFFERENT slots that both name a
-  third are not that shape — the two paths are subscribed at different
-  points of the same run, so the second reaches the share through its
-  own definition rather than beside the first, and whether the share
-  is connected by then is a fact about the ORDER a telescope is
-  walked. The sum charges it once regardless. The commit scripts that
-  lattice and stands the charge beside what it delivers.
-
-- **AND THEN A PARKED SLOT REFERENCE, WHERE THE INNER CHARGE READS
+- **A PARKED SLOT REFERENCE, WHERE THE INNER CHARGE READS
   ZERO AND THE RUN DELIVERS A TELESCOPE.** The store half's inner
   count is the max of the queue's own LAYERS plus the telescope, and a
   bare reference has zero layers however deep the definition behind it
@@ -247,6 +236,18 @@ does not fit is a finding about the shared statement, not about the head.
   while the charge counts layers once. The commit builds such a chain
   and stands the table's largest cell beside the rung.
 
+- **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, WHICH IS THE
+  READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
+  witness so far enters at a BARE REFERENCE, which carries zero
+  layers, so the whole charge has been the telescope and the `+` has
+  never been read with both sides doing work at once — a sum tested
+  one summand at a time is a sum nothing has told apart from a max
+  over the same two quantities. The entry that tells them apart is an
+  arrival built INLINE over a reference, whose own rungs compound on
+  top of what the named slot delivers, so the two are in series in
+  one run and either taken alone falls short. The commit scripts that
+  arrival and stands the sum beside what it delivers.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -254,11 +255,11 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×5`: what
+- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×6`: what
   ONE subscription delivers, in its own layers plus its telescope. Both
   crossing value halves are bodies over it. A max is refuted at a chain of
-  eleven, and a slot named twice is charged once for free; a share at two
-  depths is unread.
+  eleven; a slot named twice and a share at two depths cost nothing. A
+  layered arrival is unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
   FALSITY, `REFUTED, PROBED×7`: the same two denominations through the node
   table, where a subscribed scan writes its emission. A drained queue never
