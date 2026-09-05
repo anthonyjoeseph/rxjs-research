@@ -231,14 +231,15 @@ does not fit is a finding about the shared statement, not about the head.
   nonzero — and that region is the only thing that could refute it, so
   it is what gets instantiated rather than the heads that are covered.
 
-- **THE OUTER FRAME'S MINTS AT NODES AND REGS, WHICH NOTHING HAS EVER
-  INSTANTIATED.** `stepFrame-nest-nodes-outer` and
-  `stepFrame-nest-regs-outer` are the tier's two FALSITY rows carrying
-  no evidence at all: the `*All` cell the new subscription hangs from
-  did not exist when the walk started, and the registered frames over
-  the REST of the path are the potential exactly. Both sides compute,
-  so this is the cheapest unmanaged risk in the tier — probe them
-  before anything here is ground.
+- **THEN THE DRAIN FRAME'S OWN TWO STORES, WHICH ARE THE LAST PAIR
+  NOTHING HAS INSTANTIATED.** `stepFrame-nest-nodes-inner` and
+  `stepFrame-nest-regs-inner` are the outer pair's mirror in the other
+  frame position, and both carry a `RECOVERY:` pointer to a probe that
+  was deleted with its target — so the harness is recovered rather than
+  rebuilt, which is most of the cost. The regs half's premise is
+  already refuted by an empty burst, so what the pair is worth is the
+  nodes half's reading and a restatement of the regs half from the
+  grant rather than from the walk's values.
 
 ### The ledger
 
@@ -279,17 +280,10 @@ does not fit is a finding about the shared statement, not about the head.
   parent *All's queue, so the cell it rewrites is the one its ledger's ceiling
   half is stated over rather than one the walk handed it. Nothing has
   instantiated it.
-- **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — FALSITY, `NO EVIDENCE`:
-  what the outer frame mints at the nodes map — the *All cell the new
-  subscription hangs from, which did not exist when the walk started, so no
-  reading of the entry table bounds it. Nothing has instantiated it.
 - **`stepFrame-nest-regs-inner`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED, RECOVERY`: what the drain frame registers. The premise alone was
   refuted by an empty burst: the drain reads the queue, so the walk's values
   cannot reach it, and the grant is what must pay.
-- **`stepFrame-nest-regs-outer`** (Regs-Nest-Walk) — FALSITY, `NO EVIDENCE`:
-  what the outer frame registers — the subscribed value's frames over the REST
-  of the path, which is the potential exactly. Nothing has instantiated it.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
@@ -319,6 +313,15 @@ does not fit is a finding about the shared statement, not about the head.
   the queue's own `drainW`, at every level within the descent's count. The
   width is walk-denominated, so it shares the scan arm's dead mechanism and is
   restated with the face rather than alone.
+- **`stepFrame-nest-nodes-outer`** (Nodes-Nest-Walk) — DIFFICULTY, `PROBED`:
+  what the outer frame mints at the nodes map. NOT the fresh `*All` cell, which
+  the install is proven to price at zero — the write is a full merge PARKING an
+  arrival in its queue, so the grant owed is the arriving value itself.
+- **`stepFrame-nest-regs-outer`** (Regs-Nest-Walk) — DIFFICULTY, `PROBED`: what
+  the outer frame registers — the subscribed value's frames over the REST of
+  the path, which is the potential exactly. A ladder where the mint climbs and
+  the entry registry stands still clears the premise's own floor by a constant
+  one.
 - **`burst-out`** (Desc-Ceil) — DIFFICULTY, `PROBED`: one subscribe frame emits
   no more payloads than its term syntactically carries. Seven tight rows tied,
   the scan head and the share chain among them; every region a row could refute

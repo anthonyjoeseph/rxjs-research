@@ -56,6 +56,9 @@ open import Probed.Chain-Step-Live-Deferred
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits;
          liveRow; attackRow; twoRow; mapRow)
+open import Probed.Thru-Outer-Store
+  using (packed≡; cells≡; tieNodes1; tieNodes2; tieNodes3;
+         tieRegs1; tieRegs2; tieRegs3)
 open import Probed.Thru-Step-Indexed
   using (burstLen≡1; figures≡; hypAtZero; valAtOne; marginM≡;
          tightFigures≡; valTight; nestedFigures≡; premN≡; fitN1; fitN2; fitN3;

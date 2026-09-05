@@ -256,6 +256,17 @@ postulate
   -- charge rather than the frame's size: what a `thru-outer` registers
   -- is the subscribed value's frames over the REST of the path, and
   -- that is the potential exactly.
+  --
+  -- PROBED: `Probed.Thru-Outer-Store` -- the same frame and the same
+  --   arrival ladder the nodes face is instantiated at, read on this
+  --   axis: the chain a subscribe appends carries the arrival's own
+  --   flatten layers, so the registry's fold climbs rung by rung while
+  --   the entry registry stands still, and the potential covers it by a
+  --   constant one throughout.  Covered: the merge arm at three rungs,
+  --   at the budget the value premise licenses at burst zero.  Not
+  --   covered: a nonempty path under the frame, since the root is what
+  --   holds that budget at its floor; and the frame grant, which is a Σ
+  --   and does not compute.
   stepFrame-nest-regs-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t)
