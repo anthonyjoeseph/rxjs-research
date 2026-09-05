@@ -15,7 +15,7 @@
 -- of one argument, so the disagreement is a value rather than a
 -- paragraph.
 --
--- FORK: stepFrame-sz-outer
+-- FORK: stepFrame-sz-store-outer
 --
 -- WHY THE ANSWER IS NOT ALREADY KNOWN FROM THE REFUTATION.  A
 -- refutation says the constant is too small; it does not say the size
@@ -36,8 +36,12 @@
 -- covered only chains would be answering half the question.
 --
 -- WHAT THE ROWS DO NOT BUY.  They say nothing about the `from-inner`
--- arm, whose program arrives through the store; nothing about either
--- store half; nothing about the ceiling, which is refuted against
+-- arm, whose program arrives through the store; nothing about the
+-- store conclusion this fork names, which no row here runs -- what
+-- reaches it is the SEPARATION, since the count both conclusions are
+-- denominated in is one object and the arm's value half is now a
+-- theorem read at exactly the winner below; nothing about the
+-- ceiling, which is refuted against
 -- this very count; and nothing about an arrival whose syntax is not
 -- what runs.  Both shapes here are read by running exactly what
 -- arrived, and an `input i` naming a shared slot is neither: it reads

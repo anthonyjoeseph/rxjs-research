@@ -27,7 +27,7 @@
 -- `nestDᵛ` already carries for the depth face, charging a function's
 -- size where that measure charges its nesting.
 
--- FORK: stepFrame-sz-outer
+-- FORK: stepFrame-sz-store-outer
 
 -- WHY THE ANSWER IS NOT KNOWN FROM THE FIRST FORK.  That file's second
 -- shape -- a reified arrival -- is recorded there as degenerate,
@@ -48,7 +48,9 @@
 
 -- WHAT THE ROWS DO NOT BUY.  Nothing about the `from-inner` arm, which
 -- reaches its program through the store and cannot read an operator
--- spine it is not handed; nothing about either store half; nothing
+-- spine it is not handed; nothing about the store conclusion this fork
+-- names, which no row here runs -- what reaches it is the SEPARATION,
+-- the count being one object across both halves of the arm; nothing
 -- about an arrival naming a shared slot, where the telescope summand is
 -- what pays and both candidates here read the slot as one node
 -- (`Refuted.Frame-Step-Size-Slot`); and nothing about a scan inside an

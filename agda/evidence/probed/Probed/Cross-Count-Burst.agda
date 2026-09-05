@@ -12,7 +12,7 @@
 -- `*All` node the burst drains into carries a quantity neither arrival
 -- produced alone.
 
--- FORK: stepFrame-sz-outer
+-- FORK: stepFrame-sz-store-outer
 
 -- THE ROWS.  A `thru-outer` frame is run on a burst of three twelve-rung
 -- duplication chains -- the same arrival the single-value refutation is
@@ -31,9 +31,12 @@
 -- differ across the pair, against the same rung.
 
 -- WHAT THE ROWS DO NOT BUY.  One burst width and one arrival shape, so
--- nothing about a burst whose members differ; and nothing about the
--- SCAN residue, since a threading operator inside an arrival is what
--- the layer count reads at one layer however wide it runs.
+-- nothing about a burst whose members differ; nothing about the SCAN
+-- residue, since a threading operator inside an arrival is what the
+-- layer count reads at one layer however wide it runs; and no row here
+-- discharges the store conclusion this fork names -- the table is read
+-- at the same rung, but what reaches that statement is the SEPARATION,
+-- the join being one choice across both halves of the arm.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Cross-Count-Burst where
 

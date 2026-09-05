@@ -21,7 +21,7 @@
 -- that wrote it.  The rows are taken against that definition rather
 -- than a copy of it, so a restatement of the measure moves them.
 
--- FORK: stepFrame-sz-outer
+-- FORK: stepFrame-sz-store-outer
 
 -- THE ROWS.  A `map-f` frame is run on a data arrival whose two counts
 -- are both nothing, and what it emits reads four thousand and
@@ -41,7 +41,9 @@
 -- of what the repair claims.  Nothing about `μᵉ`, whose unfolding
 -- writes operator layers no static count of the arrival can see;
 -- nothing about a scan's width, which is the residue the neighbouring
--- fork already names; and nothing about either store half.
+-- fork already names; and nothing about the store conclusion this fork
+-- names, which no row here runs -- what reaches it is the SEPARATION,
+-- the count being one object across both halves of the arm.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Cross-Count-Spine where
 

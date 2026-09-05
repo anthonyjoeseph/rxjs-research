@@ -132,9 +132,6 @@ open import Probed.Cross-Count-Spine
 open import Probed.Cross-Count-Burst
   using (separates; joins≡; valRows≡; storeRow; sinkRows≡)
 
-open import Probed.Cross-Count-Slot
-  using (counts≡; tieSlot12; tieSlot13)
-
 open import Probed.Cross-Count-Store
   using (charges≡; valRows≡; storeRows≡; tieDrain; tieStore)
 
