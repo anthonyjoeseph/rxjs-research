@@ -2184,30 +2184,38 @@ postulate
 -- absolute ceiling is not a per-chain increment, which is why this is
 -- stated rather than projected out of the package.
 --
--- AND NO RECEIPT ON THE WALK FUNDS THE POLYNOMIAL, which is what this
--- row carries in place of a route.  The climb is not the outer chain's
--- frames: a `thru-outer` frame SUBSCRIBES an inner per payload, and the
--- only receipt on that subscribe's own climb, `subscribeInner-caps`,
--- reports it at `sLvlD` -- a LADDER rung.  That refutes nothing, since
--- an upper bound is not a lower one, and it funds nothing either: one
--- rung already puts a whole size cap under it (`dLvl-gain-sizeAt`), so
--- weakening through it cannot land inside anything polynomial in the
--- cap.  What the conclusion counts is a storey of the mutually
--- recursive frame/subscribe loop the `fCharge` block of `Rx.Evaluator`
--- measures, for which that block records no closed form -- while
--- charging at the ENTRY cap, which is what `chAt` does, is separately
--- refuted by `Refuted.Caps-Face.caps-frame-boundary-absurd`.
+-- AND THE CLIMB IS DETACHED FROM ITS OWN WITNESS, WHICH IS WHY THE ROW
+-- IS FALSE RATHER THAN MERELY UNFUNDED.  `L′` stands here as a free
+-- number bounded ABOVE by the caps ladder and bounded above again by
+-- the conclusion, and the state predicate beside them does not mention
+-- it at all.  Two upper bounds in the same direction derive nothing
+-- from one another, so the row holds only if the ladder's ceiling is
+-- already under the per-frame product -- and a PROVEN lower bound on
+-- that ceiling puts it past, at the floor of every parameter the
+-- package can pin.  A fold storey squares; the charge is quadratic in
+-- the cap and linear in the path.
 --
--- SO THE DOOR'S LEDGER HAS NO SOURCE, which is the finding rather than
--- this row alone.  What the size walk may SPEND is capped at a cubic in
--- the cap by `walkFac-ch` under `nestΦAt`, and that half is proven;
--- what the caps package DELIVERS about a chain's climb is ladder-shaped
--- in every reading the walk supports.  Nothing carries the one into the
--- other.  So the move owed is not a tighter bound but an
--- instantiation: count the frames one chain's subscribe tree actually
--- installs at a concrete program, and learn which of the two the climb
--- is, before either side is grasped at again.
+-- SO THE RESTATEMENT IS THE WORK, AND BOTH CALLERS ALREADY SHOW ITS
+-- SHAPE: each passes a PROJECTION of the caps package's own Σ, so the
+-- quantity they need bounded is determined exactly where this row
+-- makes it free.  The statement belongs over that Σ rather than over a
+-- number extracted from it, so that whatever else the Σ says about its
+-- witness stays in scope -- the same law a Σ-receipt obeys, arriving
+-- at a component detached from its record.
 --
+-- AND THE RECEIPT THAT READS LIKE A ROUTE IS NOT ONE.  The climb is
+-- not the outer chain's frames: a `thru-outer` frame SUBSCRIBES an
+-- inner per payload, and the only receipt on that subscribe's own
+-- climb, `subscribeInner-caps`, reports it at `sLvlD` -- a LADDER
+-- rung, which is an upper bound and so funds nothing.
+--
+-- REFUTED: `Refuted.Chain-Climb-Arith` -- this row with the state
+--   predicate dropped and the path replaced by its length, at the
+--   floor of the cap, the width, the depth fuel and the delivery
+--   count.  What it leaves open is only whether that predicate forces
+--   a path with more frames than the ceiling has units.
+-- REFUTED: `Refuted.Caps-Face.caps-frame-boundary-absurd` -- charging
+--   the climb at the ENTRY cap, which is what `chAt` reads.
 -- DEAD ROUTE: restating the increment as the ABSOLUTE ceiling the caps
 --   package hands back -- `sizeCount c d ⊔ cSize c`, which is what the
 --   proven chains fold composes across a round.  It is dead on the

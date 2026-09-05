@@ -215,25 +215,23 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE SIZE FACE'S CROSSING FRAME IS A MECHANISM FINDING — REPORTED,
-  AND THE LEG IS THE MEASUREMENT THAT PINS IT.** Four subdivisions of
-  one region came back false, the last on affordability, upstream in
-  already-ground machinery: the walk may spend rungs polynomial in the
-  cap and a crossing frame needs rungs linear in a ladder-shaped size.
-  So stop subdividing and INSTANTIATE — count what one crossing
-  chain's subscribe tree installs at concrete programs, the
-  measurement `chain-climb-ch` has been owed all along, and let it say
-  which of the two the climb really is.
+- **THE CHAIN DOOR'S CLIMB IS REFUTED, AND THE REPAIR IS TO RE-TIE IT
+  TO ITS WITNESS.** `chain-climb-ch` takes the climb as a free number
+  bounded ABOVE by the caps ladder, then bounds it above again — two
+  bounds in one direction — and a proven lower bound on that ladder
+  puts the ceiling past the product at the floor of every parameter.
+  Both callers already pass a PROJECTION of the Σ that determines it.
+  So restate the row over that Σ and repair the two sites: two real
+  bodies are spending a false statement until it lands.
 
-- **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
-  INSTANTIATION and not a bound.** What the size walk may spend is
-  capped at a cubic in the cap by `walkFac-ch`, proven; what the caps
-  package delivers about a chain's climb is ladder-shaped in every
-  reading the walk supports. Nothing carries the one into the other.
-  Count the frames one chain's subscribe tree installs at concrete
-  programs. And the two legs have converged: `chAt` is `frameCh` at the
-  cap in both arguments, so the climb that replaces the walk's product
-  is the same climb this door has to deliver, stated at the other end.
+- **THEN ASK THE SAME QUESTION OF THE SIZE FACE'S CROSSING TAIL.**
+  `walk-cross-LiveHypC` was left at full strength on an affordability
+  wall — the walk may spend rungs polynomial in the cap while a
+  crossing frame needs rungs linear in a ladder-shaped size. `chAt` is
+  `frameCh` at the cap in both arguments, so it is the SAME ledger,
+  and if the door's charge was unaffordable only because it stood
+  detached from its witness then this one may be too. Decide that
+  before re-aiming the wall.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a
@@ -311,10 +309,10 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
-- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: one chain's
-  climb priced per FRAME, and no receipt on the walk funds it — the only
-  reading of an inner subscribe's climb is a LADDER rung, which nothing
-  polynomial in the cap reaches. Nothing has instantiated the climb.
+- **`chain-climb-ch`** (Part7/Depth-Fit) — FALSITY, `REFUTED×2, DEAD ROUTE`:
+  one chain's climb priced per FRAME, REFUTED as arithmetic once its state
+  predicate is dropped. The climb is a free number bounded above twice over,
+  and both callers pass a projection of the Σ that determines it.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
