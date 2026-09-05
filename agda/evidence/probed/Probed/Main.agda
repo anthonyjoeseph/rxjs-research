@@ -135,6 +135,9 @@ open import Probed.Cross-Count-Store
 open import Probed.Cross-Count-Outer-Store
   using (figures≡; storeRows≡; sinkRows≡; tieOuterStore)
 
+open import Probed.Cross-Burst-Slack
+  using (figures≡; liveness≡; climbRows≡; ceilRows≡; sinkRows≡; tieBurstSlack)
+
 open import Probed.Subscribe-Inner-Doors
   using (mergeDelivered≡; switchAgrees; exhaustAgrees; doorRows≡;
          tieDoorSwitch; tieDoorExhaust)

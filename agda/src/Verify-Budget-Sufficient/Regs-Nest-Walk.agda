@@ -1785,18 +1785,34 @@ postulate
   -- rather than a convenience, and why the table the fold enters at is
   -- the one that subscription left.
   --
-  -- WHAT IT OWES, AND WHY THE DESCENT CANNOT HAND IT OVER.  A
+  -- WHAT IT OWES, AND WHERE THE ROUTE AND THE STATEMENT COME APART.  A
   -- `thru-outer` frame SUBSCRIBES what it is handed, so each emit
-  -- re-enters the descent at the ARRIVING VALUE's own charge -- and an
-  -- arrival's SIZE is bounded one rung block ABOVE the program's, since
-  -- a run manufactures payload where it cannot manufacture layers.  So
-  -- the crossing spends a value budget the door was never charged for,
-  -- and composing the two readings costs a second block that
-  -- `suc (layᵉ b)` does not carry.  The gap is arithmetic and not
-  -- structural: the walk this fold enters transports every other
-  -- premise it is handed, and the level side crosses verbatim because
-  -- an arrival's layers ARE bounded by the layers of the program that
-  -- wrote it.
+  -- re-enters the descent at the ARRIVING VALUE's own charge, and the
+  -- obvious route spends the delivered bound on that arrival and then
+  -- climbs again for what re-subscribing it writes -- asking for the
+  -- arrival's layers and the telescope a SECOND time, which
+  -- `suc (layᵉ b)` does not carry and which no caller could supply
+  -- either, since a crossing arm holds exactly the ceiling its parent
+  -- was handed.  The STATEMENT is not short in that way: a rung at
+  -- least quadruples where a layer of payload at most doubles, so the
+  -- door's charge outgrows what the crossing spends, and the level side
+  -- crosses verbatim because an arrival's layers ARE bounded by the
+  -- layers of the program that wrote it.  What that reading does not
+  -- cover is an arrival carrying a `μ`, whose unfolding SQUARES a size
+  -- no layer charge grows with -- squaring outruns a rung, which
+  -- multiplies -- and that is where this statement breaks if it breaks.
+  -- PROBED: `Probed.Cross-Burst-Slack` at a merging door over a
+  --   reifying scan fed a duplication chain, whose emission is
+  --   exponential in the layers the scan is charged for and whose
+  --   re-subscription PARKS that payload in a cell of its own -- so the
+  --   fold writes rather than merely bookkeeping.  Read at the tightest
+  --   `S` the statement admits, at two chain lengths and down all three
+  --   doors: the fold's table clears at exactly the rung the
+  --   subscription's table needs, and four further layers move that
+  --   need by two rungs against a charge that rises by four.  Nothing
+  --   about a `μ` under the door, and nothing about an emission the
+  --   TELESCOPE manufactures, where the layer count is 0 and the rungs
+  --   are bought by `slotsSize` alone.
   pushBurst-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (g : Gas) (op : AllOp) (nid : NodeId)
     (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
