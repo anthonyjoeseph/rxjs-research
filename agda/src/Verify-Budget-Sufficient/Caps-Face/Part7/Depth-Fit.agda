@@ -2231,16 +2231,26 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- iterated at itself, and the nesting budget's header records that no
 -- exponent this instant's fuel affords is a tower.
 
--- AND ONE ARM IS THE WHOLE OF IT, WHICH IS WHAT MAKES THAT ACTIONABLE.
--- The rung count a frame adds is level-free at four of the five frame
--- kinds -- three read the program's own syntax and the crossing reads
--- the arrivals plus the telescope -- and the drain arm charges the
--- LEVEL ITSELF, flatly, with no value in it.  That single clause is
--- what turns the count into a ladder: it is the one place where what a
--- rung costs is what the rungs so far bought.  So the restatement owed
--- is per-arm rather than to the walk, and the shape to state it in is
--- the one the live face's outer arm is PROVEN in, where the conclusion
--- joins a budget passed in and there is no level to index at all.
+-- AND IT IS THE TWO CROSSING ARMS THAT DO IT, IN TWO DIFFERENT WAYS,
+-- which is what makes the restatement per-arm rather than to the walk.
+-- The rung count a frame adds is genuinely level-free at the three
+-- kinds that read the program's own syntax; the drain arm charges the
+-- LEVEL ITSELF, flatly and with no value in it, because the parked
+-- program is in the store and the count cannot reach the node table;
+-- and the outer arm reads its ARRIVALS, whose only bound is the size
+-- premise the walk carries -- which is that same climbing level, so
+-- the charge climbs with it even though the clause names no level.
+-- The second is the one a reader walks past, and it is the one the
+-- ledger refutation is instantiated at.
+
+-- SO THE TWO REPAIRS ARE DIFFERENT AND ONLY ONE IS ARITHMETIC.  The
+-- drain wants a reading of what is actually parked, which is a state
+-- reading its count is not handed and its sibling arm already takes of
+-- the arrivals.  The outer wants the arrivals bounded by the INSTANT's
+-- own value cap rather than by the walk's rung ladder -- a fixed
+-- number per instant against a quantity that climbs per frame -- and
+-- that is a claim about where the size premise is denominated, not
+-- about what the clause counts.
 
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its

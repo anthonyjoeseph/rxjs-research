@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE ONE ARM WHOSE CHARGE IS THE LEVEL.** The level side is now
-  closed: every advance rule between a JOIN and a SUM outruns
-  `walkFac-ch` at the second crossing frame, both endpoints exhibited,
-  and moving the ceiling instead would mean affording the size ladder
-  iterated at itself — a tower `nestΦAt`'s own header rules out. So the
-  charge moves, and `szCount` says which: four arms are level-free and
-  the DRAIN arm charges the level flatly, with no value in it, which is
-  the one place a rung costs what the rungs so far bought. The commit
-  restates that arm against what the drain actually mints per parked
-  entry and reports whether the count is then polynomial.
+- **THE TWO CROSSING ARMS, WHICH CLIMB FOR DIFFERENT REASONS.** The
+  level side is closed: every advance rule between a JOIN and a SUM
+  outruns `walkFac-ch` at the second crossing frame, both endpoints
+  exhibited, and moving the ceiling instead means affording the size
+  ladder iterated at itself — a tower `nestΦAt`'s header rules out. So
+  the charge moves, and `szCount` says where: three arms read the
+  program's own syntax and are level-free, the drain charges the LEVEL
+  flatly, and the outer charges its ARRIVALS, whose only bound is the
+  walk's climbing size premise. The commit takes the outer — the arm
+  `Walk-Ceil-Ledger` is instantiated at — and asks whether the arrivals
+  can be denominated at the instant's own value cap instead.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s
