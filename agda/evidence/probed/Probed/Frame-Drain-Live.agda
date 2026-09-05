@@ -8,7 +8,7 @@
 -- carrying a parked queue is an instance by construction -- which is
 -- the door, and it costs a node install rather than a new program.
 --
--- TARGET: subscribeInner-nest-live @bd7cf0
+-- TARGET: subscribeInner-live-size @2242ea
 
 -- WHAT THE ROWS MEASURE IS THE ASYMMETRY THE ARM TURNS ON.  The gate
 -- truncates: a queue entry `deferᵉ b` reads as nesting ZERO wherever
@@ -24,21 +24,20 @@
 -- tracks the body one for one while all three before-readings stay
 -- flat.
 
--- THE CONSEQUENCE FOR THE FIT, AND IT IS THE FINDING: `U` IS THE ONLY
--- THING THAT CAN PAY HERE, AND IT CANNOT REACH THE DEPTH THROUGH `G`.
--- `InnerΦFit` bounds `U` through a `G` above `nodeNestAt allNid st ⊔
--- nestDᵛˢ vals`, and at this arm both summands are zero -- the queue is
--- gated and the drain carries no incoming values.  The depth therefore
--- has to arrive through the cap-size route, whose base reads a size
--- that sees THROUGH the gate, and not through any nesting reading of
--- the state.  That is a claim about which conjunct is load-bearing at
--- this arm, and it is what a discharge has to spend.
+-- THE CONSEQUENCE, AND IT IS THE FINDING: NOTHING BUILT FROM A
+-- NESTING READING OF THE STATE CAN PAY HERE.  The two state quantities
+-- a grant at this arm is assembled over -- the node's own reading and
+-- the incoming values' -- are BOTH zero here, the first because the
+-- queue is gated and the second because a drain carries no arrivals.
+-- The depth therefore has to arrive by the cap-size route, whose base
+-- reads a size that sees THROUGH the gate.  That is a claim about
+-- which premise is load-bearing at this arm, and it is what a
+-- discharge has to spend.
 
 -- NOT COVERED: the switch and exhaust ops, whose finish arms write a
 -- node and drain nothing; a non-empty registry, which routes the reaction to its absorbing arm
--- before the finish is reached at all; and the hypotheses, which are a
--- Σ carrying a universally quantified numeric conjunct and are not
--- dischargeable by computation -- so a row here is evidence about the
+-- before the finish is reached at all; and the hypotheses, left
+-- standing on every tie -- so a row here is evidence about the
 -- CONCLUSION, unconditionally true where it is green and a lead rather
 -- than a refutation where it is not.
 module Probed.Frame-Drain-Live where
@@ -62,7 +61,7 @@ open import Rx.Evaluator using (EvalSt; Sched; from-inner; root; stepFrame; sche
 open import Verify-Budget-Sufficient.Caps using (Caps; caps)
 open import Verify-Budget-Sufficient.Nest-Store using (liveNest; slotsNestSum)
 open import Verify-Budget-Sufficient.Nest-Walk using (nodeNestAt; FaceOK; faceOK)
-open import Verify-Budget-Sufficient.Live-Nest-Walk using (subscribeInner-nest-live)
+open import Verify-Budget-Sufficient.Live-Nest-Walk using (subscribeInner-live-size)
 open import Probed.Apparatus using (Confirms)
 
 Γ₁ : Ctx 1
@@ -138,31 +137,38 @@ figures4 = refl
 -- so the tie applies it at the same parked body, the same empty live
 -- list and the same scripted telescope.
 --
--- AND `U` IS TAKEN AT THE BODY'S OWN DEPTH, which is what makes the
--- row falsifiable rather than a large number chosen to fit.  The two
--- left summands of the conclusion's join are zero here -- an empty
+-- AND THE CAP IS TAKEN AT THE LADDER'S OWN DEPTH, which is what makes
+-- the row falsifiable rather than a large number chosen to fit.  The
+-- two left summands of the conclusion's join are zero here -- an empty
 -- incoming live list and a telescope summing to zero, both pinned
--- above -- so the row reduces to `after ≤ nestDᵉ o` exactly, and any
--- mint reading one unit more than the body it subscribes fails it.
--- That is the asymmetry this file exists for, stated in the statement.
+-- above -- so the row reduces to `after ≤ k` exactly at a cap of `k`,
+-- and any mint reading one unit more than the body it subscribes fails
+-- it.  That is the asymmetry this file exists for, and stating the
+-- bound in the cap rather than in a budget is what the statement now
+-- says: it is the size side that has to reach through the gate.
 --
--- NOT COVERED: the eleven premises, left standing and unread, and the
--- cap, which enters only through them -- so the row is evidence about
--- the CONCLUSION, unconditionally true where it is green.
+-- NOT COVERED: the ten premises, left standing and unread -- so the
+-- row is evidence about the CONCLUSION, unconditionally true where it
+-- is green.  The rungs are two rather than five because the face
+-- bundle needs a cap of at least two and the ladder's own depth is the
+-- cap, so depths zero and one have no legal instance here.
 ----------------------------------------------------------------------
 
-cQ : Caps
-cQ = caps 8 4 1
+cQ : ℕ → Caps
+cQ k = caps k 4 1
 
-faceQ : FaceOK cQ sl₁
-faceQ = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+faceQ2 : FaceOK (cQ 2) sl₁
+faceQ2 = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
 
-tieLive1 : Confirms
-  (subscribeInner-nest-live cQ sl₁ 1 1 0 0 0 (nestDᵉ (deep 1))
-     (gs g0) mergeAllᵒ 0 root 0 0 (deep 1) sc₀ (stQ 1) ⦃ faceQ ⦄)
-tieLive1 _ _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+faceQ4 : FaceOK (cQ 4) sl₁
+faceQ4 = faceOK (≤ᵇ⇒≤ _ _ tt) (≤ᵇ⇒≤ _ _ tt) refl (≤ᵇ⇒≤ _ _ tt)
+
+tieLive2 : Confirms
+  (subscribeInner-live-size (cQ 2) sl₁ 2 2 0
+     (gs g0) mergeAllᵒ 0 root 0 0 (deep 2) sc₀ (stQ 2) ⦃ faceQ2 ⦄)
+tieLive2 _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
 
 tieLive4 : Confirms
-  (subscribeInner-nest-live cQ sl₁ 4 4 0 0 0 (nestDᵉ (deep 4))
-     (gs g0) mergeAllᵒ 0 root 0 0 (deep 4) sc₀ (stQ 4) ⦃ faceQ ⦄)
-tieLive4 _ _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt
+  (subscribeInner-live-size (cQ 4) sl₁ 4 4 0
+     (gs g0) mergeAllᵒ 0 root 0 0 (deep 4) sc₀ (stQ 4) ⦃ faceQ4 ⦄)
+tieLive4 _ _ _ _ _ _ _ _ _ _ = ≤ᵇ⇒≤ _ _ tt

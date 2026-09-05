@@ -102,7 +102,7 @@ open import Probed.Burst-OutW
 open import Probed.Frame-Drain-Live
   using (beforeLive; beforeSlots;
          figures0; figures1; figures2; figures3; figures4;
-         tieLive1; tieLive4)
+         tieLive2; tieLive4)
 
 open import Probed.Fan-Regs-Registry
   using (counts; regsS; marginK; marginK′; regsK; lensK)

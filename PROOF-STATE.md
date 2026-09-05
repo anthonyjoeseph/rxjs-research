@@ -215,13 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LIVE-LIST MINT AT A DRAINED QUEUE — THE INNER HALF.**
-  `subscribeInner-nest-live` is what one subscribe out of a merge
-  node's parked queue puts on the live list, and the queue it reads is
-  the one the burst face is proven to bound, so its residue is a state
-  quantity and not a width. Read the consuming fit's residue place by
-  place, and either assemble the gated-entry reading over leaves that
-  name what the gate supplies, or record which quantity it cannot.
+- **THE DRAINED QUEUE'S MINT, NOW ISOLATED AND STILL UNPRICED.** The
+  budget arithmetic is out of `subscribeInner-nest-live`, which is a
+  real body, and what is left asserted is `subscribeInner-live-size`:
+  what ONE subscribe out of a parked queue mints, against the cap size
+  at the entry's own level. Two rungs tie that at margin zero, so the
+  reading is pinned where the ladder stands and the risk is now whether
+  it survives the shapes the ladder does not reach — a nonempty
+  registry, a level above zero, and a path that is not the root. Widen
+  the harness along those three, since each is a state the statement
+  quantifies over and none of them is reachable by a running family.
 
 - **THEN THE OUTER FRAME AROUND IT.** `stepFrame-nest-live-outer` is
   the same statement in the other position, already restated at its own
@@ -253,10 +256,10 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-nest-live`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
+- **`subscribeInner-live-size`** (Live-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
   what one subscribe out of a merge node's parked queue mints on the live list.
   A gated entry reads zero at every state quantity the consuming fit's residue
-  is built from, so only the cap size pays.
+  is built from, so the bound is the cap size at the entry's own level.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — FALSITY, `PROBED`: what
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
