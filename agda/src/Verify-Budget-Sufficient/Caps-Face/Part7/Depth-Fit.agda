@@ -5,8 +5,8 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
-  m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; *-distribˡ-+; *-distribʳ-+; +-suc; +-assoc; +-identityʳ)
+  m≤n+m; n≤1+n; *-identityʳ; *-identityˡ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub;
+  m≤m⊔n; m≤n⊔m; +-mono-≤; *-distribʳ-+; +-suc; +-assoc; +-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -91,7 +91,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part3 using
 open import Decide using (T-to; T⇒≡true; ∧-intro; ∧-trueˡ; ∧-trueʳ)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using
   (nestWalkAt-def; nestΦAt; nestΦ-sight≤capsH; nestCapAt≤nestΦAt; nestWalkAt≤nestΦAt;
-  nestUnit≤size; iterSize≤2^; walkExp-widen)
+  iterSize≤2^; walkExp-widen; nestΦ-frame-charge)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeFinish-caps; cascadeGo-caps; cascadeLatch-caps; chainStep-slots; chainsOf-caps; chainsOf-length)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
@@ -159,13 +159,13 @@ nestD≤pathΦD B (thru-outer _ _ ↠ p)   = s≤s (nestD≤pathΦD B p)
 -- can charge.  The first two come off the premises directly and the
 -- input guard is free once the context is read whole, so the only
 -- content is that the charge affords it -- and it does, in three
--- pieces that each land on one summand.  The maximum in flight is
--- paid by the outer frame's OWN factor, which is two to the cap and
--- so at least two; the path's depth is under the unit twice over,
--- since the unit is under the cap; and the wrap is charged at the cap
--- while the grant spends it at the context's width, which is smaller.
--- The doubling in the charge is what lets the first piece sit beside
--- the other two rather than competing with them.
+-- pieces that land on the potential's two halves.  The maximum in
+-- flight is paid by the outer frame's OWN factor, which is two to the
+-- cap and so at least two; the path's depth splits at the premise's
+-- own denomination, the cap piece landing on the cap's charge and the
+-- leaf's square beside the wrap on the walk's.  The doubling in the
+-- charge is what lets the first piece sit beside the other two rather
+-- than competing with them.
 walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (id : ℕ) (sf : Gas) (eid : Id) (now : Tick)
   (op : AllOp) (nid : NodeId)
@@ -173,7 +173,7 @@ walk-thru-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op nid ↠ p) ≡ true →
-  pathNestD (thru-outer op nid ↠ p) ≤ nestUnit e sl →
+  pathNestD (thru-outer op nid ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (thru-outer op nid ↠ p) vals ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -198,8 +198,6 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   D    = pathΦD S p
   M    = nestDᵛˢ vals
   W    = slotWrapSum sl
-  Y    = nestUnit e sl + (S * S + S * S) + S
-  X    = Y + S * W
   G    = Dn + M + n * W
   hpp  : pathSz? S p ≡ true
   hpp  = ∧-trueʳ hpz
@@ -209,7 +207,7 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
   EXP  = (S + S) * (suc S * S)
   Q≤   : Q ≤ 2 ^ EXP
   Q≤   = pathΦF-cap S p hpp
-  D≤   : D ≤ nestUnit e sl + S * S
+  D≤   : D ≤ nestCapAt e sl id + S * S
   D≤   = ≤-trans (pathΦD≤nestD S p)
                  (+-monoˡ-≤ (S * S) (≤-trans (n≤1+n (pathNestD p)) hnd))
   n≤S  : n ≤ S
@@ -223,36 +221,21 @@ walk-thru-fit {n = n} {e = e} sl id sf eid now op nid p vals fin sched st
                              vals hΦ)
   hA2  : 2 * (Q * M) ≤ nestΦAt e sl id
   hA2  = ≤-trans (*-monoˡ-≤ (Q * M) 2≤2^S) hA
-  halfShape : ∀ q d → 2 * (q * d) ≡ q * (2 * d)
-  halfShape q d = solve 2 (λ q′ d′ → con 2 :* (q′ :* d′) := q′ :* (con 2 :* d′))
-                        refl q d
-  -- the path's own depth, and the wrap, against the charge's own half
-  yShape : (S + S * S) + (nestUnit e sl + S * S) ≡ Y
-  yShape = solve 2 (λ a u → (a :+ a :* a) :+ (u :+ a :* a)
-                              := u :+ (a :* a :+ a :* a) :+ a)
-                 refl S (nestUnit e sl)
-  2D≤Y : 2 * D ≤ Y
-  2D≤Y =
-    ≤-trans (*-monoʳ-≤ 2 D≤)
-    (≤-trans (≤-reflexive (2X≡X+X (nestUnit e sl + S * S)))
-    (≤-trans (+-monoˡ-≤ (nestUnit e sl + S * S)
-               (+-monoˡ-≤ (S * S) (nestUnit≤size e sl id)))
-             (≤-reflexive yShape)))
-  hBC  : 2 * (Q * D) + Q * (n * W) ≤ 2 ^ EXP * X
-  hBC  =
-    ≤-trans (+-mono-≤
-              (≤-trans (≤-reflexive (halfShape Q D)) (*-mono-≤ Q≤ 2D≤Y))
-              (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S)))
-            (≤-reflexive (sym (*-distribˡ-+ (2 ^ EXP) Y (S * W))))
+  -- the path's own depth, and the wrap, against the charge a frame arm
+  -- is granted: the depth's cap piece against the cap's half and its
+  -- leaf square beside the wrap against the walk's
+  reshape : ∀ q d w → 2 * (2 * (q * d) + q * w)
+                        ≡ 4 * (q * d) + 2 * (q * w)
+  reshape q d w = solve 3 (λ q′ d′ w′ →
+                    con 2 :* (con 2 :* (q′ :* d′) :+ q′ :* w′)
+                      := con 4 :* (q′ :* d′) :+ con 2 :* (q′ :* w′))
+                  refl q d w
   hBC2 : 2 * (2 * (Q * D) + Q * (n * W)) ≤ nestΦAt e sl id
-  hBC2 = ≤-trans
-           (subst (2 * (2 * (Q * D) + Q * (n * W)) ≤_)
-                  (sym (nestWalkAt-def e sl id))
-                  (≤-trans (*-monoʳ-≤ 2 hBC)
-                  (≤-trans (≤-reflexive (sym (*-assoc 2 (2 ^ EXP) X)))
-                           (*-monoˡ-≤ X (^-monoʳ-≤ 2
-                             (s≤s (walkExp-widen S 1≤S)))))))
-           (nestWalkAt≤nestΦAt e sl id)
+  hBC2 =
+    ≤-trans (≤-reflexive (reshape Q D (n * W)))
+    (≤-trans (+-mono-≤ (*-monoʳ-≤ 4 (*-mono-≤ Q≤ D≤))
+                       (*-monoʳ-≤ 2 (*-mono-≤ Q≤ (*-monoˡ-≤ W n≤S))))
+             (nestΦ-frame-charge e sl id))
   spread : 2 * (Q * (D + M + n * W + D))
              ≡ 2 * (Q * M) + 2 * (2 * (Q * D) + Q * (n * W))
   spread =
@@ -671,7 +654,7 @@ postulate
     (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     pathSz? (Caps.cSize (capsAt e sl id)) (scan-f fn nid ↠ p) ≡ true →
-    pathNestD (scan-f fn nid ↠ p) ≤ nestUnit e sl →
+    pathNestD (scan-f fn nid ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (scan-f fn nid ↠ p) vals ≡ true →
     FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -791,7 +774,7 @@ postulate
     (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-    pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+    pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (from-inner op allNid inst ↠ p) vals ≡ true →
     ∀ (j : ℕ) →
@@ -845,7 +828,7 @@ postulate
     lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
     Sched.slots sched ≡ sl →
     pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-    pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+    pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
            (from-inner op allNid inst ↠ p) vals ≡ true →
     ∀ (j : ℕ) →
@@ -870,7 +853,7 @@ innerΦ-fit-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
   Σ Caps λ c → Σ ℕ λ d → Σ ℕ λ Lv → Σ ℕ λ G →
@@ -909,7 +892,7 @@ innerΦ-fit-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
   capsDrainOK (capsAt e sl id) sl (capsH e sl id) Lv
@@ -952,7 +935,7 @@ innerΦ-quiet : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   NotMergeAt {s = s} (lookupNode allNid (EvalSt.nodes st)) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
   FrameΦHyp sf eid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -977,7 +960,7 @@ innerΦ-drain : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   lookupNode allNid (EvalSt.nodes st) ≡ just (mergeAll-st lim act q od) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now
@@ -1020,7 +1003,7 @@ innerΦ-fit-go : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   lookupNode allNid (EvalSt.nodes st) ≡ ns →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now
@@ -1065,7 +1048,7 @@ innerΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (from-inner op allNid inst ↠ p) ≡ true →
-  pathNestD (from-inner op allNid inst ↠ p) ≤ nestUnit e sl →
+  pathNestD (from-inner op allNid inst ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
          (from-inner op allNid inst ↠ p) vals ≡ true →
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now
@@ -1093,7 +1076,7 @@ frameΦ-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
   (vals : List (Val Γ s)) (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
   Sched.slots sched ≡ sl →
   pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
-  pathNestD (f ↠ p) ≤ nestUnit e sl →
+  pathNestD (f ↠ p) ≤ nestCapAt e sl id →
   valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) (f ↠ p) vals ≡ true →
   frameDrainOK (capsAt e sl id) sl (capsH e sl id) Lv sf eid now f p vals sched st →
   depthFrame sf eid now f p vals fin sched st ≤ capsH e sl id →
@@ -1432,6 +1415,18 @@ fan-chain-nestD {t = t} U i st h =
   chainsNest-all 0 U (shareAdmit {t = t} i (EvalSt.registry st))
     (≤-trans (shareAdmit-nest i (EvalSt.registry st)) h)
 
+-- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
+-- the recurrence nondecreasing after it.  It stands here because it is
+-- the bridge the whole walk crosses on: every producer downstream
+-- holds a unit-side receipt and every consumer now asks for a cap-side
+-- one, and this is the only step between them -- which is also why it
+-- runs one way only, and why the statement above cannot be repaired by
+-- reading it back.
+unit≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  nestUnit e sl ≤ nestCapAt e sl id
+unit≤cap e sl id =
+  ≤-trans (≤-reflexive (sym (nestCapAt-0 e sl))) (nestCap-mono₀ e sl id)
+
 ------------------------------------------------------------------
 -- THE CONS CLAUSE'S THREE SUMMANDS, NAMED ONCE RATHER THAN AT EVERY
 -- CALL.  `lub3-*` must be handed its bounds explicitly -- that is
@@ -1530,7 +1525,7 @@ mutual
     depthFold sf gas nid now envSrc path vals evs fin sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
     pathSz? (Caps.cSize (capsAt e sl id)) path ≡ true →
-    pathNestD path ≤ nestUnit e sl →
+    pathNestD path ≤ nestCapAt e sl id →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id) path vals ≡ true →
     PathΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       path vals fin sched st
@@ -1570,7 +1565,7 @@ mutual
     depthShareGo sf gas nid now i vals fin ps sched st ≤ capsH e sl id →
     Sched.slots sched ≡ sl →
     all (λ rp → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rp)) ps ≡ true →
-    all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestUnit e sl) ps ≡ true →
+    all (λ rp → pathNestD (proj₂ rp) ≤ᵇ nestCapAt e sl id) ps ≡ true →
     valsΦ? (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
       (share-sink {t = t} i) vals ≡ true →
     ShareGoΦHyp sf gas nid now (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
@@ -1583,14 +1578,16 @@ mutual
       (shareAdmit i (EvalSt.registry st)) sched st
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
-          (fan-chain-nestD (nestUnit e sl) i st (fan-regsNest sl st)) hΦ
+          (fan-chain-nestD (nestCapAt e sl id) i st
+             (≤-trans (fan-regsNest sl st) (unit≤cap e sl id))) hΦ
   walk-share-ΦHyp {e = e} sl id sf (suc gas) nid now Lv i vals true sched st
                   hd hdd hsl hΦ =
     walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals true
       (shareAdmit i (EvalSt.registry st)) sched (shareLatch i true st)
       (proj₂ (proj₂ hd)) hdd
       hsl (fan-chain-sz sl id i st (fan-regsSz sl id st))
-          (fan-chain-nestD (nestUnit e sl) i st (fan-regsNest sl st)) hΦ
+          (fan-chain-nestD (nestCapAt e sl id) i st
+             (≤-trans (fan-regsNest sl st) (unit≤cap e sl id))) hΦ
 
   walk-shareGo-ΦHyp sl id sf gas nid now Lv i vals fin [] sched st
                     _ _ _ _ _ _ = tt
@@ -1619,8 +1616,8 @@ mutual
     B = Caps.cSize (capsAt e sl id)
     hp₀ : pathSz? B p ≡ true
     hp₀ = ∧-trueˡ hpz
-    hndp : pathNestD p ≤ nestUnit e sl
-    hndp = ≤ᵇ⇒≤ (pathNestD p) (nestUnit e sl) (T-to (∧-trueˡ hnd))
+    hndp : pathNestD p ≤ nestCapAt e sl id
+    hndp = ≤ᵇ⇒≤ (pathNestD p) (nestCapAt e sl id) (T-to (∧-trueˡ hnd))
     st₀ : EvalSt e
     st₀ = record st { delivered = rid ∷ EvalSt.delivered st }
     evs = if fin then close (toℕ i) exhausted ∷ [] else []
@@ -1722,12 +1719,13 @@ chain-walk-ΦHyp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   PathΦHyp (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
     (Caps.cSize (capsAt e sl id)) (nestΦAt e sl id)
     path (arrVal a ∷ []) (Arrival.isLast a) sched st
-chain-walk-ΦHyp {n = n} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ =
+chain-walk-ΦHyp {n = n} {e = e} sl id Lc a nextId path sched st hcc hdc hsl hp hΦ =
   walk-ΦHyp-go sl id _ n nextId (arrTick a) Lc (arrSource a)
     (if Arrival.isLast a then close (arrSource a) exhausted ∷ [] else [])
     path (arrVal a ∷ [])
     (Arrival.isLast a) sched st hcc hdc hsl hp
-    (≤-trans (m≤n+m (pathNestD path) (nestDᵛ (arrTy a) (arrVal a))) hΦ)
+    (≤-trans (≤-trans (m≤n+m (pathNestD path) (nestDᵛ (arrTy a) (arrVal a))) hΦ)
+             (unit≤cap e sl id))
     (entryΦ sl id a path hp hΦ)
 
 chainStep-nest-regsC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
@@ -2380,13 +2378,6 @@ chainStep-nest-liveC {e = e} sl id Lc a nextId Lv j path sched st
       (chain-walk-LiveHyp sl id Lc a nextId Lv j path sched st
          hcc hsl hsz hp hj hLc))
     (⊔-lub ≤-refl (≤-trans afford (m≤n⊔m _ (nestΦAt e sl id))))
-
--- AND THE UNIT IS UNDER EVERY CAP, being the cap at instant zero and
--- the recurrence nondecreasing after it.
-unit≤cap : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
-  nestUnit e sl ≤ nestCapAt e sl id
-unit≤cap e sl id =
-  ≤-trans (≤-reflexive (sym (nestCapAt-0 e sl))) (nestCap-mono₀ e sl id)
 
 -- AND THAT IS WHAT A WALK CAN CARRY.  A bound the chains preserve has
 -- to be one the growth cannot climb past however many chains run, and
