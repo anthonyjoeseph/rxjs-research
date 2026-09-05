@@ -215,23 +215,25 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO SIZE-WALK ROWS NOTHING HAS EVER REACHED.**
-  `innerΦ-quiet-fit` and `chain-walk-szOK` are FALSITY by ABSENCE: each
-  says its own header carries no instantiation, and one of them is a
-  charge at WIDTH ZERO, which is precisely where a bound routinely goes
-  false because the transformer is the identity there. Both sides
-  compute, so the cheapest unmanaged risk in this tier is a probe rather
-  than a grind. The commit instantiates them and takes whichever
-  outcome falls out — a refutation restates, a receipt re-ranks.
+- **THE SIZE WALK NOTHING HAS EVER REACHED.** `chain-walk-szOK` is
+  FALSITY by ABSENCE: its header carries no instantiation of any kind.
+  Its conclusion is a `Set` assembled from `≤` and `≡ true` over the
+  evaluator and is NOT sealed, so it is reachable by INHABITATION rather
+  than by `refl` — which is what the sibling row beside it turned out not
+  to be, its potential being sealed on both sides and needing a
+  parametric refutation instead. The commit instantiates it along one
+  admitted chain and takes whichever outcome falls out — a refutation
+  restates, a receipt re-ranks.
 
-- **THEN THE FAN'S THREE MISSING CONJUNCTS, AS ONE FIELD OR THREE.**
-  `walk-share-nestOK`, `fan-regsSz` and `sink-fan-sink` are the same
-  shape in three currencies: the walk reads the registry at a state it
-  has stepped to, and its carried bundle says nothing about the
-  registry's depth, its size, or the stratification a re-entered chain
-  wants. Each is owed as a carried conjunct rather than a hypothesis.
-  The commit decides whether one field answers all three, and pays the
-  producer cascade for whichever it adds.
+- **THEN THE STORE PREDICATE THE WALK DOES NOT CARRY, WHICH IS NOW FOUR
+  SITES AND NOT THREE.** `walk-share-nestOK`, `fan-regsSz`,
+  `sink-fan-sink` and BOTH inner Φ arms are one shape in several
+  currencies: the walk reads the registry and the node table at a state
+  it has stepped to, and its carried bundle says nothing about depth,
+  size, or the stratification a re-entered chain wants. The inner arms
+  joined them by machine — each charges a table its premises never
+  mention. The commit decides whether one carried field answers all of
+  them, and pays the producer cascade for whichever it adds.
 
 - **THEN THE PRODUCERS THAT CASCADE ANSWERS.** A field on the walk's
   bundle obliges every producer to re-establish it, and the frame arms
@@ -271,9 +273,6 @@ does not fit is a finding about the shared statement, not about the head.
   PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
   walk's, and taking the walk up to one moves the leaf's exponent and its
   budget.
-- **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the same
-  charge at width zero, where the lookup finds no merge at this type. Nothing
-  has instantiated it.
 - **`chain-walk-szOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE`: the size
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
@@ -291,10 +290,14 @@ does not fit is a finding about the shared statement, not about the head.
   per-instant potential cannot dominate a count exponential in itself; the one
   affording ceiling is the store's exit-index factor, priced in a refuted
   width.
-- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the charge at
-  the queue's own `drainW`, at every level within the descent's count. The
-  width is walk-denominated, so it shares the scan arm's dead mechanism and is
-  restated with the face rather than alone.
+- **`innerΦ-quiet-fit`** (Part7/Depth-Fit) — SHAPE, `REFUTED×2`: the charge at
+  width zero, refuted at one installed cell — it reads the node table and no
+  premise of it bounds the table. Owed as a carried store predicate, with the
+  drain arm.
+- **`innerΦ-drain-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the same
+  charge at the queue's own `drainW`. Its extra premise pins the cell's
+  CONSTRUCTOR, not its depth, so a parked program runs the store term away here
+  too; the width is walk-denominated besides.
 - **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — DIFFICULTY, `PROBED`: what
   the outer frame mints, at its OWN size budget. A standing fold and an
   arriving mint combine by max — both crossing directions, both other ops, a

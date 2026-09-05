@@ -764,6 +764,23 @@ postulate
   -- the whole of the quiet arm once the reported quantities are taken
   -- out of it: one inequality, at every level within the descent's own
   -- count.
+  --
+  -- AND IT CHARGES THE NODE TABLE WHILE NO PREMISE OF IT BOUNDS THE
+  -- TABLE, which is the first of the two shapes that are almost always
+  -- wrong: `nodeNestAt` reads one accumulator out of a state this
+  -- quantifies over, and the four premises speak about the schedule,
+  -- the path and the values in flight.  At an empty burst the potential
+  -- premise is an `all` over nothing, the depth premise is met because a
+  -- `from-inner` is charged no depth, and the level is met at zero -- so
+  -- a fixed number is asked to dominate the depth of whatever cell the
+  -- frame happens to name.  The gap is a MISSING INVARIANT and not a
+  -- missing lemma: what is owed is the ambient store predicate every
+  -- cascade door already takes, carried down the walk, which is
+  -- `walk-share-nestOK`'s gap read at this arm.  Whether the grant is
+  -- AFFORDABLE once it has that is a separate question, and the factor
+  -- being read at the walk's level is why it stays open.
+  -- REFUTED: `Refuted.Inner-Phi-Store`, at one installed scan cell whose
+  --   accumulator is deeper than the instant's potential.
   -- REFUTED: `Refuted.Cap-Walk-Cross`, which settles the ordering the
   --   charge is read under -- the store ceiling sits under the budget,
   --   so the fold arm's settlement binds this one too.
@@ -803,6 +820,18 @@ postulate
   -- statement is strictly stronger for it, and it is the honest one:
   -- the levels a drain can reach are the levels the ROUND affords, not
   -- the ones this one reaction descends through.
+  --
+  -- AND ITS ONE EXTRA PREMISE PINS THE CELL'S CONSTRUCTOR AND NOT ITS
+  -- DEPTH, so the store term runs away here exactly as it does in the
+  -- quiet arm beside it.  The lookup says the cell IS a merge at this
+  -- frame's type; what that cell has PARKED is then read by the same
+  -- `nodeNestAt`, and a queue holding one deep program sends its depth
+  -- through a conclusion whose right side is fixed by the program, the
+  -- slots and the instant.  So the arm owes the ambient store predicate
+  -- carried down the walk before the width question is even reached,
+  -- and the two inner arms owe it as one thing.
+  -- REFUTED: `Refuted.Inner-Phi-Store`, at one parked program deeper
+  --   than the instant's potential.
   -- REFUTED: `Refuted.Cap-Walk-Cross`.
 
   -- AND ITS OBSTACLE IS THE SCAN ARM'S, ONE ARM OVER.  The charge here

@@ -266,3 +266,7 @@ open import Refuted.Chains-Burst-Flat
 open import Refuted.Drain-Root-Ceil
   using (InnerUnderRootCeil; emitted₂; emitted₃; ceil₂≡2; ceil₃≡3;
          mapBurst₂≡4; mapBurst₃≡6; drain-root-ceil-absurd)
+open import Refuted.Inner-Phi-Store
+  using (InnerΦQuiet; deepNest; nodeNest≡; legal; premΦ;
+         inner-phi-store-absurd;
+         InnerΦDrain; parked; nodeNestQ≡; inner-phi-drain-store-absurd)
