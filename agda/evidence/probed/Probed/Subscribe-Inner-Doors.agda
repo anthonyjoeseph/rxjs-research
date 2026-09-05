@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE LEAF AT THE TWO DOORS EVERY OTHER ROW SUBSCRIBED PAST.
 --
--- TARGET: subscribeE-sz @c1fd3b
+-- TARGET: subscribeE-sz @8d93e9
 --
 -- WHY THE DOOR LOOKED LIKE A RISK.  The statement quantifies over an
 -- arbitrary operator and every row standing at it had entered through

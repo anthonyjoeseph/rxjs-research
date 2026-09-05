@@ -100,12 +100,12 @@ open import Verify-Budget-Sufficient.Regs-Nest-Walk
 WalkCeilLedger : Set
 WalkCeilLedger = ∀ {n} {Γ : Ctx n} {u} (S L k : ℕ) → 2 ≤ S → L ≤ S →
   k ≤ L * frameCh S S + n * (S * frameCh S S) →
-  (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (op : AllOp)
+  (Bd : ℕ) (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (op : AllOp)
   (nid : NodeId) (vals : List (Val Γ (obs u))) →
   frameSz? S (thru-outer {Γ = Γ} {u = u} op nid) ≡ true →
   length vals ≤ S →
   valsSz? (iterSize S k S) vals ≡ true →
-  k + szCount sl ns (thru-outer {Γ = Γ} {u = u} op nid) vals
+  k + szCount Bd sl ns (thru-outer {Γ = Γ} {u = u} op nid) vals
     ≤ L * frameCh S S + n * (S * frameCh S S)
 
 ----------------------------------------------------------------------
@@ -158,7 +158,7 @@ premLvl = refl
 
 -- LOAD-BEARING: and the count genuinely overruns the whole ledger.
 -- Both sides are numerals, so nothing here rests on a normal form.
-count≡ : 3 + szCount sl₁ []
+count≡ : 3 + szCount (iterSize 3 3 3) sl₁ []
            (thru-outer {Γ = Γ₁} {u = natᵗ} mergeAllᵒ 0) vals₁ ≡ 73
 count≡ = refl
 
@@ -166,4 +166,4 @@ walk-ceil-ledger-absurd : WalkCeilLedger → ⊥
 walk-ceil-ledger-absurd pr =
   ≤⇒≤ᵇ (pr {Γ = Γ₁} 3 3 3
            (s≤s (s≤s z≤n)) (s≤s (s≤s (s≤s z≤n))) (s≤s (s≤s (s≤s z≤n)))
-           sl₁ [] mergeAllᵒ 0 vals₁ refl (s≤s z≤n) premLvl)
+           (iterSize 3 3 3) sl₁ [] mergeAllᵒ 0 vals₁ refl (s≤s z≤n) premLvl)

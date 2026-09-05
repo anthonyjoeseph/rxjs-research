@@ -2,7 +2,7 @@
 -- THE SLOT NAMED TWICE, WHICH DECIDES WHETHER THE SUMMAND IS SOUND
 -- RATHER THAN MERELY GENEROUS.
 --
--- TARGET: subscribeE-sz @c1fd3b
+-- TARGET: subscribeE-sz @8d93e9
 --
 -- WHAT THE CHAINED TELESCOPE LEFT OPEN.  A chain runs each definition
 -- once and its layers compound in series, which is what the sum buys

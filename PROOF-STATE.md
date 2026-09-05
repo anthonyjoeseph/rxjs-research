@@ -215,27 +215,15 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEVEL THAT GROWS WITH THE BOUND, WHICH IS THE ONE RESTATEMENT
-  BOTH HALVES NOW NEED.** The value side fell to the same family as the
-  store side, with no table anywhere in reach, so what is refuted is the
-  DENOMINATION and not either reading of it. A rung is affine in the
-  bound, so a count fixed by the SYNTAX buys a fixed factor and cannot
-  cover a multiplicity. The caps face prices this substitution and is
-  the shape to mirror: it charges an unfold in an EXISTENTIAL number of
-  frame steps, quadratic in the `μ`'s own size. No closed function of
-  the entry program serves instead — an unfold squares the bound the
-  next is charged against. The commit restates both descents at an
-  existential level.
-
-- **THE JOIN UNDER THE WRAP, WHICH IS WHAT AN EXISTENTIAL LEVEL COSTS.**
-  Every consumer reads the two descents at a level fixed before the
-  fold runs, and a max over the burst is what makes one rung cover one
-  operator. With each entry returning a level of its own the join is
-  over levels rather than under one, and the fold's own charge has to
-  absorb the spread. The commit carries the restated conclusion out
-  through the walk's crossings and the frame step to the depth fit, and
-  reports which consumers take a per-entry level as it stands and which
-  need the spread bounded first.
+- **THE LEDGER THAT MUST BECOME A CLIMB, WHICH IS WHAT THE CHARGE
+  COSTS.** The count now reads the LEVEL the frame stands at as well as
+  the state, since a block is bought at the bound in hand; the walk
+  pays for its frames out of a fixed PRODUCT of a per-frame ceiling,
+  and a charge that grows with the level cannot fit under one. Both
+  halves of that ledger are refuted outright as stated. The commit
+  turns the walk's premise, the dispatch's, and the depth fit's `chAt`
+  apparatus into a climb in the level, so the ceiling a frame is held
+  to is read where the frame is.
 
 - **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
@@ -247,6 +235,17 @@ does not fit is a finding about the shared statement, not about the head.
   commit puts that gap beside the store side's own climb, which
   crosses the same one.
 
+- **THE LEVELS COMPOSING, WHICH IS WHAT NEITHER `μ` ROW REACHES.** Both
+  new receipts stand at ONE handed-out nesting, and the block count's
+  rate — one block per level, bought at the bound reached so far — is
+  what a COMPOSITION tests: a `μ` handed out from inside another `μ`
+  squares a bound that has already been squared, and the second block
+  is bought at the first squaring's own bound rather than at the
+  program's. The commit builds that family at both descents and reads
+  it against the count as it stands, which either buys the rate its
+  first evidence past one level or refutes it where a single level
+  never could.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -254,19 +253,15 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
-  subscription delivers, in its own layers plus its telescope. The WHOLE value
+- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
+  subscription delivers, in its own charge plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice costs nothing. A `μ` refutes the conclusion itself, with no table in
-  reach.
-- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`:
-  the burst a crossing door pushes back through itself, keyed on the source
-  program since an arbitrary burst is unbounded. A duplication chain buys no
-  rung; a `μ` arrival refutes it, the copies being a free parameter.
-- **`subscribeE-sz-store-μ`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: what ONE
-  unfolding writes. Refuted at sixteen mentions and holding at fifteen: the
-  substitution SQUARES the size premise while the level it is held to is the
-  layer count, which the substitution leaves alone.
+  twice costs nothing; the block is read at two nestings and its rate is open.
+- **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
+  `REFUTED, PROBED×2`: the burst a crossing door pushes back through itself,
+  keyed on the source program since an arbitrary burst is unbounded. A
+  duplication chain buys no rung; a handed-out `μ` is charged at one nesting,
+  and composed nestings are open.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: the
   reified seed and the cell each arrival rewrites, in a currency the layer
   premise is not stated in. Cells in series do not compound; a parked queue

@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE SHARE REACHED AT TWO DEPTHS, WHICH THE DIAMOND DID NOT ASK.
 --
--- TARGET: subscribeE-sz @c1fd3b
+-- TARGET: subscribeE-sz @8d93e9
 --
 -- WHAT THE DIAMOND LEFT OPEN.  An apex naming ONE slot twice reaches
 -- the multicast from a single point of the walk, and the second

@@ -2,7 +2,7 @@
 -- WHAT ONE SUBSCRIPTION OF A PARKED PROGRAM DELIVERS, READ AT THE VERY
 -- WITNESS THAT KILLED THE CONSTANT IT REPLACES.
 --
--- TARGET: subscribeE-sz @c1fd3b
+-- TARGET: subscribeE-sz @8d93e9
 --
 -- WHY THIS POINT AND NOT ANOTHER.  The inner arm subscribes what the
 -- `*All` node has PARKED, so the program it runs is in the node table

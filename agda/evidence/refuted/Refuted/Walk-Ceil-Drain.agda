@@ -79,14 +79,14 @@ WalkCeilDrain : Set
 WalkCeilDrain = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (S L k : ℕ) →
   2 ≤ S → L ≤ S →
   k ≤ L * frameCh S S + n * (S * frameCh S S) →
-  (sl : Slots Γ) (op : AllOp) (allNid inst : NodeId) (st : EvalSt e)
+  (Bd : ℕ) (sl : Slots Γ) (op : AllOp) (allNid inst : NodeId) (st : EvalSt e)
   (vals : List (Val Γ natᵗ)) →
   frameSz? S (from-inner {Γ = Γ} {s = natᵗ} op allNid inst) ≡ true →
   length vals ≤ S →
   valsSz? {Γ = Γ} {s = natᵗ} (iterSize S k S) vals ≡ true →
   all (λ kv → boundedNode (iterSize S k S) (proj₂ kv))
       (EvalSt.nodes st) ≡ true →
-  k + szCount sl (EvalSt.nodes st)
+  k + szCount Bd sl (EvalSt.nodes st)
         (from-inner {Γ = Γ} {s = natᵗ} op allNid inst) vals
     ≤ L * frameCh S S + n * (S * frameCh S S)
 
@@ -146,7 +146,7 @@ premLvl = refl
 
 -- LOAD-BEARING: and the count genuinely overruns the whole ledger.
 -- Both sides are numerals, so nothing here rests on a normal form.
-count≡ : 3 + szCount sl₁ (EvalSt.nodes (parked 70))
+count≡ : 3 + szCount (iterSize 3 3 3) sl₁ (EvalSt.nodes (parked 70))
            (from-inner {Γ = Γ₁} {s = natᵗ} mergeAllᵒ 0 1) vals₁ ≡ 74
 count≡ = refl
 
@@ -155,7 +155,7 @@ count≡ = refl
 -- fits under the ledger, and one layer deeper is a chain that reading
 -- rejects.  So the earlier breach the store-bound denomination bought
 -- is gone rather than merely moved.
-belowFits : ((2 + szCount sl₁ (EvalSt.nodes (parked 63))
+belowFits : ((2 + szCount (iterSize 3 2 3) sl₁ (EvalSt.nodes (parked 63))
                (from-inner {Γ = Γ₁} {s = natᵗ} mergeAllᵒ 0 1) vals₁)
              ≤ᵇ (3 * frameCh 3 3 + 1 * (3 * frameCh 3 3))) ≡ true
 belowFits = refl
@@ -168,4 +168,5 @@ walk-ceil-drain-absurd : WalkCeilDrain → ⊥
 walk-ceil-drain-absurd pr =
   ≤⇒≤ᵇ (pr {Γ = Γ₁} 3 3 3
            (s≤s (s≤s z≤n)) (s≤s (s≤s (s≤s z≤n))) (s≤s (s≤s (s≤s z≤n)))
-           sl₁ mergeAllᵒ 0 1 (parked 70) vals₁ refl (s≤s z≤n) premLvl premSt)
+           (iterSize 3 3 3) sl₁ mergeAllᵒ 0 1 (parked 70) vals₁ refl
+           (s≤s z≤n) premLvl premSt)

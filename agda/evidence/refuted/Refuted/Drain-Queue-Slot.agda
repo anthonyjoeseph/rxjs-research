@@ -53,11 +53,10 @@ open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans
 
 open import Rx.Prim using (Gas; g0; gasPad; Tick; Id)
 open import Rx.Exp using (Ctx; Closed; Val; obs; input; sizeᵉ)
-open import Rx.Layer-Count using (layᵛˢ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; NodeId;
   mergeAll-st; installNode; mergeAllDrain; sched-init; st-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?; descChgˢ)
 open import Refuted.Frame-Step-Size-Slot
   using (Pw; chnG; f≡t; Γ₂; sl₂; e₂; Γ₃; sl₃; e₃)
 
@@ -73,7 +72,7 @@ MergeAllDrainSz = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true →
-  valsSz? (iterSize S (layᵛˢ (obs s) q) B)
+  valsSz? (iterSize S (descChgˢ (obs s) B q) B)
     (proj₁ (mergeAllDrain sf allNid κ id now lim act q sched st)) ≡ true
 
 ----------------------------------------------------------------------
@@ -105,7 +104,7 @@ out₂ = proj₁ (mergeAllDrain {e = e₂} (gasPad 64 g0) 0 root 0 0
 -- layers the charge is allowed to see.
 figures₂ : List ℕ
 figures₂ = sizeᵉ (chnG {Γ = Γ₂} 12)
-         ∷ layᵛˢ {Γ = Γ₂} (obs (Pw 12)) q₂
+         ∷ descChgˢ {Γ = Γ₂} (obs (Pw 12)) 51 q₂
          ∷ iterSize 51 0 51 ∷ []
 
 figures₂≡ : figures₂ ≡ 51 ∷ 0 ∷ 51 ∷ []
@@ -121,7 +120,7 @@ prem₂ = refl
 
 row₂ : Bool
 row₂ = valsSz? {Γ = Γ₂} {s = Pw 12}
-         (iterSize 51 (layᵛˢ {Γ = Γ₂} (obs (Pw 12)) q₂) 51)
+         (iterSize 51 (descChgˢ {Γ = Γ₂} (obs (Pw 12)) 51 q₂) 51)
          out₂
 
 row₂≡false : row₂ ≡ false
@@ -154,7 +153,7 @@ out₃ = proj₁ (mergeAllDrain {e = e₃} (gasPad 64 g0) 0 root 0 0
 
 figures₃ : List ℕ
 figures₃ = sizeᵉ (chnG {Γ = Γ₃} 13)
-         ∷ layᵛˢ {Γ = Γ₃} (obs (Pw 13)) q₃
+         ∷ descChgˢ {Γ = Γ₃} (obs (Pw 13)) 55 q₃
          ∷ iterSize 55 0 55 ∷ []
 
 figures₃≡ : figures₃ ≡ 55 ∷ 0 ∷ 55 ∷ []
@@ -168,7 +167,7 @@ prem₃ = refl
 
 row₃ : Bool
 row₃ = valsSz? {Γ = Γ₃} {s = Pw 13}
-         (iterSize 55 (layᵛˢ {Γ = Γ₃} (obs (Pw 13)) q₃) 55)
+         (iterSize 55 (descChgˢ {Γ = Γ₃} (obs (Pw 13)) 55 q₃) 55)
          out₃
 
 row₃≡false : row₃ ≡ false
