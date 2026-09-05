@@ -1320,6 +1320,20 @@ postulate
 --   whether the Φ pricing affords a leaf exponent read at a stepped
 --   cap, which the route directly above prices at a FLAT raise and
 --   therefore does not answer for an indexed one.
+-- DEAD ROUTE: that INDEXED form itself, and it dies on the same
+--   arithmetic as the flat raise -- by ONE step of the recurrence
+--   rather than at some threshold, so no ceiling is small enough.
+--   What a size receipt actually buys the Φ pricing is a LENGTH, via
+--   `pathSz?-len`, and the length lands in an EXPONENT: a sink's own
+--   factor is two to the cap times a square of it, and a fanned chain
+--   is affordable exactly while its length is under the cap the
+--   CONCLUSION is stated at.  A receipt at any larger cap bounds the
+--   length by that cap instead and multiplies the exponent by the
+--   ratio, which one step already makes a square.  Nor does weakening
+--   only the PREMISE escape it, which is how the caps face repaired
+--   its own version: there the conclusions already named the larger
+--   cap, and here they cannot, so the premise's cap reaches the
+--   conclusion through the factor lemmas either way.
 postulate
   fan-regsSz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (st : EvalSt e) →

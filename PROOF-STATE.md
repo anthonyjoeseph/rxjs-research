@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE Φ FOLD TAKES A PER-ENTRY CAP, OR THE FOUR SITES HAVE NO
-  REPAIR.** A FLAT field is dead at all four — `fan-regsSz` now
-  carries the elimination: the descent reads a state the instant has
-  stepped, every receipt in hand sits at or above the cap it stepped
-  to, and all four predicates weaken UPWARD, so one cap for the fold
-  is unavailable at the read or useless at the consumer. What that
-  leaves is the INDEXED form, and it is the shape both neighbouring
-  faces already run — the size walk's fold under a ceiling, and a
-  per-frame advance proven under exactly such a ceiling. The commit
-  gives the Φ fan-out fold that index and reports what the leaf
-  exponent costs when it is read at a stepped cap.
+- **IS AN ADMITTED CHAIN SHORTER THAN THE INSTANT'S ENTRY CAP?** That
+  one number is what the four sites reduce to. No cap-side repair
+  survives — flat field, indexed field and premise-only weakening are
+  all dead in `fan-regsSz`'s header, and by ONE step of the recurrence
+  rather than at a threshold, because what a size receipt buys the Φ
+  pricing is a LENGTH and the length sits in an EXPONENT. So the
+  question stops being which denomination and becomes whether the
+  registry can hold a chain longer than the cap the conclusion names.
+  Lengths COMPUTE where caps do not, so the commit instantiates it at
+  a run that subscribes reified syntax mid-instant.
 
 - **THEN THE ONE NUMBER THE SIZE WALK NOW HANGS ON.** Collapsing that
   face's ledger into a ceiling put the crossing frame's climb and the
@@ -267,11 +266,11 @@ does not fit is a finding about the shared statement, not about the head.
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
   — so the residue is the arbitrary chain, owed as a carried invariant.
-- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×2`: the
-  registry's own size receipt at the PROGRAM's cap. THE ENTRY CAP IS THE Φ
-  PRICING'S AND NOTHING ELSE'S: three carried receipts sit above the fanned
-  walk's, and taking the walk up to one moves the leaf's exponent and its
-  budget.
+- **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×3`: the
+  registry's own size receipt at the PROGRAM's cap. WHAT IT BUYS IS A LENGTH
+  AND THE LENGTH SITS IN AN EXPONENT, so every raise dies by one step of the
+  recurrence and the residue is whether an admitted chain is shorter than the
+  entry cap at all.
 - **`walk-share-nestOK`** (Part7/Depth-Fit) — FALSITY, `DEAD ROUTE×4`: the
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
