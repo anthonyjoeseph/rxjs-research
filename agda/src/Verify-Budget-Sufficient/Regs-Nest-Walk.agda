@@ -763,7 +763,7 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- arriving value, plus the pairing that precedes each step.  A take
 -- computes no value of its own, passing a prefix through, so one rung
 -- covers it.
---
+
 -- THE TWO CROSSING ARMS DELIVER NOTHING THEY DRAINED: each SUBSCRIBES
 -- a program that arrived at runtime, and running that program's own
 -- synchronous chain is a computation whose emission is exponential in
@@ -771,7 +771,7 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- RUNS, and the arms differ only in WHERE that program is -- an outer
 -- crossing has it in its own argument list, an inner one reaches it
 -- through the store.
---
+
 -- AND THE INNER ARM IS THEREFORE DENOMINATED IN THE STORE BOUND, which
 -- is what the extra argument is for.  The parked program is not in
 -- `vals` and this count cannot reach the node table, so the largest
@@ -782,7 +782,7 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- tie, since `iterSize S B B` dominates `2 ^ B * B`.  It is also why
 -- the arm leaves the ledger's priceable set below: `B` climbs with the
 -- walk's own level while a per-frame charge does not.
---
+
 -- AND THE TELESCOPE IS PART OF THE OUTER READING, because arriving
 -- syntax is not what runs whenever it NAMES a slot: a variable prices
 -- at one node and connecting it runs the whole of that slot's shared
@@ -793,6 +793,30 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- A resolving count would chase slot references transitively, and what
 -- terminates that chase is the telescope's stratification, a property
 -- of the telescope and not of this frame.
+
+-- AND THE OUTER ARM READS THE ONE PART OF AN ARRIVAL THE WALK
+-- INFLATES, which is why its charge climbs and the three syntactic
+-- arms' do not.  What a subscription spends is per OPERATOR LAYER --
+-- each substitution multiplies, so a k-layer chain emits at two to the
+-- k and k rungs pay for it -- and a frame applies a CLOSED function, so
+-- a crossing arrival's layers grow by the program's own syntax per
+-- frame and no faster.  What the ladder multiplies is the arrival's
+-- DATA, and data emits itself.  So `sizeᵛ` is a reading of the run only
+-- where the arrival's syntax IS the run, and the walk manufactures the
+-- other shape.
+--
+-- AND THE SPLIT IS MACHINE-SEPARATED RATHER THAN ARGUED.  A count
+-- charging the operator spine, joining by MAX wherever a payload
+-- branches -- the clause shape `nestDᵛ` already carries, charging a
+-- function's size where that measure charges its nesting -- reads a
+-- reified arrival at NOTHING where this one reads four thousand, and
+-- the emission still fits with no rung bought, at a margin of two
+-- nodes.  At the duplication chain it stays above one rung and below
+-- this count.  So the arm's repair is a currency and not an
+-- arithmetic, and what it then owes is that the walk cannot inflate the
+-- spine -- which no row instantiates and which the scan clause, growing
+-- per ELEMENT, is where it would be bought or lost
+-- (`Probed.Cross-Count-Data`).
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Cross` and
 --   `Refuted.Frame-Step-Size-Cross-Store` -- one rung, at the

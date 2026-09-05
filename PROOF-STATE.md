@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE TWO CROSSING ARMS, WHICH CLIMB FOR DIFFERENT REASONS.** The
-  level side is closed: every advance rule between a JOIN and a SUM
-  outruns `walkFac-ch` at the second crossing frame, both endpoints
-  exhibited, and moving the ceiling instead means affording the size
-  ladder iterated at itself — a tower `nestΦAt`'s header rules out. So
-  the charge moves, and `szCount` says where: three arms read the
-  program's own syntax and are level-free, the drain charges the LEVEL
-  flatly, and the outer charges its ARRIVALS, whose only bound is the
-  walk's climbing size premise. The commit takes the outer — the arm
-  `Walk-Ceil-Ledger` is instantiated at — and asks whether the arrivals
-  can be denominated at the instant's own value cap instead.
+- **THE OPERATOR SPINE, WHICH IS WHERE THE OUTER ARM'S CHARGE SHOULD
+  HAVE BEEN.** The outer count is forked: a reading of the arrival's
+  operator layers, joining by MAX where a payload branches, sits at
+  NOTHING where the size reading sits at four thousand, and still
+  covers the emission with no rung bought. So the arm's climb is a
+  currency error — the walk inflates an arrival's DATA while a
+  subscription spends per LAYER — and the repair is level-free. What it
+  owes is that the walk cannot inflate the spine,
+  and the scan clause is where that is bought or lost, since a scan
+  grows per ELEMENT and the count would then carry a width. The commit
+  states that measure and its per-frame bound in `src`.
 
 - **THEN WHAT PRICES A FANNED CHAIN, GIVEN THAT NO CAP DOES.** Every
   cap-side repair at the four sites is now dead in `fan-regsSz`'s

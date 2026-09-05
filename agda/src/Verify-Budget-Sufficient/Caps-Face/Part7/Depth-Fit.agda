@@ -2243,14 +2243,18 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- The second is the one a reader walks past, and it is the one the
 -- ledger refutation is instantiated at.
 
--- SO THE TWO REPAIRS ARE DIFFERENT AND ONLY ONE IS ARITHMETIC.  The
--- drain wants a reading of what is actually parked, which is a state
--- reading its count is not handed and its sibling arm already takes of
--- the arrivals.  The outer wants the arrivals bounded by the INSTANT's
--- own value cap rather than by the walk's rung ladder -- a fixed
--- number per instant against a quantity that climbs per frame -- and
--- that is a claim about where the size premise is denominated, not
--- about what the clause counts.
+-- SO THE TWO REPAIRS ARE DIFFERENT, AND THE OUTER ONE IS A CURRENCY.
+-- Its charge climbs because it reads the arrival's SIZE, and the walk
+-- inflates exactly the part of an arrival a subscription does not
+-- spend: rungs are bought per operator layer, a frame applies a closed
+-- function, so layers grow by the program's own syntax per frame while
+-- the data the ladder multiplies emits itself.  A count of the
+-- operator spine is therefore level-free by construction, and it is
+-- separated from the size one at a reified arrival and still covers
+-- the emission there with no rung bought (`Probed.Cross-Count-Data`).
+-- The drain's repair is unrelated and it is a reading: what is
+-- actually parked, which is a state its count is not handed and its
+-- sibling arm already takes of the arrivals.
 
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
