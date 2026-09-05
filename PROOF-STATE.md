@@ -215,24 +215,12 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE VALUE LEAF THROUGH THE SAME DOOR, WHICH IS WHERE THE TWO
-  HALVES WOULD FINALLY SHARE A STATEMENT.** `subscribeInner-sz` carries
-  the delivered half of exactly the reading its store sibling carries,
-  at the same arrival and the same gas step, and the two have been
-  ground apart the whole way down. The store side is now a body over the
-  DESCENT, so the value leaf's own descent is the same subject read at
-  the other projection: the commit writes that body and puts the two
-  side by side. What it puts to the test is whether one descent
-  statement can carry both — a residue that will not join is the
-  finding, since two currencies at one call are what a per-frame ceiling
-  has to multiply.
-
-- **AND THEN WHAT THE CROSSING CHARGE COSTS THE LEDGER, WHICH IS THE
-  ONLY PLACE EITHER LEAF CAN STILL BE WRONG.** Both leaves state their
-  reading as a PREMISE, so no witness can refute the charge — enlarging
-  it strengthens the premise and weakens the statement, and the store
-  leaf's header now records that as a dead route. What the charge is
-  therefore owed at is the CALL SITE: a per-frame ceiling has to supply
+- **WHAT THE SHARED CHARGE COSTS THE LEDGER, WHICH IS THE ONLY PLACE
+  EITHER LEAF CAN STILL BE WRONG.** Both leaves now stand at one
+  descent under one charge, and both state that charge as a PREMISE —
+  so no witness can refute it, enlarging it only weakens the statement,
+  and the store leaf records that as a dead route. What the charge is
+  owed at is therefore the CALL SITE: a per-frame ceiling has to supply
   `iterSize` at the program's layers plus the whole telescope, per
   frame, and the telescope is a program constant while the layers are
   not. The commit states that obligation where the walk carries its
@@ -240,15 +228,25 @@ does not fit is a finding about the shared statement, not about the head.
   climbs with the walk.
 
 - **AND THEN THE DESCENT'S OWN CLAUSES, WHERE ONE RUNG HAS TO PAY FOR
-  ONE OPERATOR.** The store leaf is now stated over `subscribeE`, whose
-  cases are the program's constructors, and `layᵉ` charges one rung
-  apiece. So it is the first statement here that can be attacked
-  STRUCTURALLY rather than through another door: a map or a take writes
-  nothing, a scan writes the cell its own emission fills, a `*All` mints
-  a node and hands its arrivals to a crossing already bodied. The commit
-  takes the arms that write nothing and the one that writes its own
-  cell, leaving the crossings postulated, and asks whether one
-  `iterSize` rung covers one operator's write.
+  ONE OPERATOR.** Both leaves are stated over `subscribeE`, whose cases
+  are the program's constructors, and `layᵉ` charges one rung apiece —
+  the first statements here attackable STRUCTURALLY rather than through
+  another door. A map or a take writes nothing, a scan writes the cell
+  its own emission fills, a `*All` mints a node and hands its arrivals
+  to a crossing already bodied. The commit takes the arms that write
+  nothing and the one that writes its own cell, leaving the crossings
+  postulated, and asks whether one rung covers one operator.
+
+- **AND THEN THE CROSSING ARMS, WHERE THE DESCENT RE-ENTERS THE DOORS
+  IT IS ALREADY UNDER.** A `*All` constructor is where the two leaves
+  stop being about syntax: it mints a node, parks what it cannot admit,
+  and hands an arrival back to the very crossing that is a body over
+  these leaves. So the recursion closes on itself and the measure is
+  the question — the arrival is a runtime VALUE, structurally unrelated
+  to the program, and gas is what the evaluator decrements there. The
+  commit states the crossing arms at the descent and asks what
+  decreases, since a rung that pays for the mint buys nothing if the
+  arrival's own layers are unbounded by the program's.
 
 ### The ledger
 
@@ -257,16 +255,15 @@ does not fit is a finding about the shared statement, not about the head.
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
-- **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×6`: what
-  ONE subscription delivers, in its own layers plus its telescope. Both
-  crossing value halves are bodies over it. A max is refuted at a chain of
-  eleven; a slot named twice and a share at two depths cost nothing. A layered
-  arrival is unread.
+- **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×6`: what ONE
+  subscription delivers, in its own layers plus its telescope. The WHOLE value
+  side is a body over it. A max is refuted at a chain of eleven; a slot named
+  twice and a share at two depths cost nothing. A layered arrival is unread.
 - **`subscribeE-sz-store`** (Regs-Nest-Walk) — FALSITY,
-  `DEAD ROUTE, PROBED×4`: what ONE subscription writes, at a level the
-  program's own layers reach. The WHOLE store side is a body over it, doors and
-  gas step included. Cells in series do not compound; a parked reference reads
-  the telescope; slots in series are open.
+  `DEAD ROUTE, PROBED×4`: what ONE subscription writes, at the same descent and
+  the same charge its value sibling reads, plus a table it did not build. Cells
+  in series do not compound; a parked reference reads the telescope; slots in
+  series are open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

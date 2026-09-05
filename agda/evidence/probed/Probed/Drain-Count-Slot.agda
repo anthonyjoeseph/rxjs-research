@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════
 -- THE TELESCOPE SUMMAND, READ AT THE ONE SHAPE THAT FORCED IT.
 --
--- TARGET: subscribeInner-sz @e1520e
+-- TARGET: subscribeE-sz @c1fd3b
 --
 -- WHY THIS POINT AND NOT ANOTHER.  Every other reading of this leaf is
 -- taken at a program written out, where the summand is a rounding and
@@ -61,9 +61,9 @@ open import Rx.Exp using (Val)
 open import Rx.Slots using (slotsSize)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Evaluator
-  using (root; mergeAllᵒ; sched-init; iterSize; subscribeInner)
+  using (root; mergeAllᵒ; from-inner; _↠_; sched-init; iterSize; subscribeInner)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz)
+  using (valsSz?; subscribeE-sz)
 open import Refuted.Frame-Step-Size-Slot
   using (Pw; Γ₂; sl₂; e₂; Γ₃; sl₃; e₃)
 open import Refuted.Drain-Queue-Slot
@@ -130,13 +130,13 @@ slotRows≡ = refl
 -- inner hands the drain at this door, and the drain hands straight on,
 -- so the row stands where the arm actually reaches it.
 tieDrainSlot12 : Confirms
-  (subscribeInner-sz {e = e₂} (gasPad 64 g0) mergeAllᵒ 0 root 0 0 o₂
-     (sched-init e₂ sl₂) st₂ 51 51)
+  (subscribeE-sz {e = e₂} (gasPad 63 g0) o₂ (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init e₂ sl₂) { nextNode = 1 }) st₂ 51 51)
 tieDrainSlot12 = λ _ _ → refl
 
 -- LOAD-BEARING: same statement one rung deeper behind the reference,
 -- which is the sweep's measure-side axis.
 tieDrainSlot13 : Confirms
-  (subscribeInner-sz {e = e₃} (gasPad 64 g0) mergeAllᵒ 0 root 0 0 o₃
-     (sched-init e₃ sl₃) st₃ 55 55)
+  (subscribeE-sz {e = e₃} (gasPad 63 g0) o₃ (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init e₃ sl₃) { nextNode = 1 }) st₃ 55 55)
 tieDrainSlot13 = λ _ _ → refl

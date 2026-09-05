@@ -44,7 +44,8 @@ open import Rx.Evaluator
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; takeDispatch; takeVals; lookupNode; scanVals; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; subscribeE; hasRoom;
+  mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; subscribeE;
+  splitBurst; hasRoom;
   thruConsume; thruWrap; switchKill; mergeAllBump)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
@@ -963,9 +964,9 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 -- WHAT ONE SUBSCRIPTION DELIVERS, WHICH IS WHAT BOTH CROSSING ARMS
 -- BOTTOM OUT IN.  A frame that runs an observable -- the drain
 -- entering its node's queue, the outer arm entering an arrival --
--- reaches `subscribeInner` and nothing else, so this is the single
--- claim underneath both: running a program of size at most `B`
--- delivers within the rungs its own LAYERS and the telescope buy.
+-- reaches a descent and nothing else, so this is the single claim
+-- underneath both: running a program of size at most `B` delivers
+-- within the rungs its own LAYERS and the telescope buy.
 --
 -- AND IT READS NO TABLE, WHICH IS THE PART THAT IS LOAD-BEARING RATHER
 -- THAN TIDY.  What a subscription emits is a function of the program's
@@ -976,6 +977,18 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 -- instead would have to be re-established after every entry of a fold,
 -- and a fold's rungs then COMPOSE BY ADDITION -- which is exactly the
 -- max the drain above needs and cannot then have.
+--
+-- AND THE TWO HALVES SHARE A SUBJECT AND A CHARGE, NOT A STATEMENT.
+-- With both doors bodied, this and its store sibling stand at the SAME
+-- descent, at the same arguments, under the same
+-- `iterSize S (layᵉ o + slotsSize sl) B` -- so the currency a per-frame
+-- ceiling has to supply is asked for once rather than twice.  What does
+-- not join is the shape: the store half reads a TABLE it did not build,
+-- so it carries a level the premise already reaches and a boundedness
+-- hypothesis on the entering nodes, while what a run DELIVERS is a
+-- function of the program alone and needs neither.  One ceiling
+-- therefore serves both, and the table premise stays the store side's
+-- own to re-establish.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Slot.stepFrame-sz-outer-own-absurd`
 --   -- the telescope-free reading of what a run delivers, at the sister
@@ -1046,13 +1059,39 @@ parkedLayAt-lookup nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   read at the telescope-free rung and the repaired one, `false` then
 --   `true`, at one arrival shape with zero layers of its own.
 postulate
-  subscribeInner-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t) (id : Id)
-    (now : Tick) (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e)
+  subscribeE-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (g : Gas) (o : Closed Γ u) (κ : Path Γ u t) (id : Id)
+    (now : Tick) (sched : Sched Γ) (st : EvalSt e)
     (S B : ℕ) → 2 ≤ S → (sizeᵉ o ≤ᵇ B) ≡ true →
     valsSz? (iterSize S (layᵉ o + slotsSize (Sched.slots sched)) B)
-      (proj₁ (proj₂ (subscribeInner sf op allNid κ id now o sched st)))
+      (proj₁ (splitBurst {A = Val Γ t}
+        (proj₁ (subscribeE g o κ id now sched st))))
       ≡ true
+
+-- ONE ARRIVAL SUBSCRIBED, READ AT WHAT IT HANDS BACK.  The door mints
+-- the inner's exit-frame instance and then does exactly one thing with
+-- it, and gas alone decides which: with none the arrival is answered
+-- by a dry close, which carries no value at all, so the delivered list
+-- is EMPTY and the bound holds on nothing; with some it is the general
+-- descent entered at the caller's path under a `from-inner`
+-- decoration, and what this splits is the very burst that returns.
+--
+-- SO NEITHER SIDE MOVES AT THE DOOR.  `layᵉ` reads the program and not
+-- the path it is subscribed at, the record update touches no slot, and
+-- the split is a projection rather than a step -- which is what lets
+-- the charge cross verbatim rather than climbing a rung here.
+subscribeInner-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t) (id : Id)
+  (now : Tick) (o : Val Γ (obs u)) (sched : Sched Γ) (st : EvalSt e)
+  (S B : ℕ) → 2 ≤ S → (sizeᵉ o ≤ᵇ B) ≡ true →
+  valsSz? (iterSize S (layᵉ o + slotsSize (Sched.slots sched)) B)
+    (proj₁ (proj₂ (subscribeInner sf op allNid κ id now o sched st)))
+    ≡ true
+subscribeInner-sz g0 op allNid κ id now o sched st S B 2≤S hb = refl
+subscribeInner-sz (gs fuel) op allNid κ id now o sched st S B 2≤S hb =
+  subscribeE-sz fuel o (from-inner op allNid (Sched.nextNode sched) ↠ κ)
+    id now (record sched { nextNode = suc (Sched.nextNode sched) }) st
+    S B 2≤S hb
 
 -- THE TELESCOPE A SUBSCRIPTION HANDS ON IS THE ONE IT WAS HANDED,
 -- which is what lets a charge keyed on the slots survive a fold: the
