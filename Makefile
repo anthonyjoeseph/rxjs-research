@@ -783,6 +783,23 @@ roadmap-selftest:
 	  fi; \
 	  echo "$$nof" | grep -q "b-shape" \
 	    && { echo "SELFTEST FAIL: the no-floor check fired on a SHAPE row — the blank is legal on the classes that claim nothing"; fail=1; }; \
+	  cap=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-overcap.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/evid-overcap.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census-overcap.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a row carrying EIGHT receipts PASSED — the cap binds only per postulate again, which a row naming two arms of one statement walks straight past"; fail=1; \
+	  else \
+	    echo "$$cap" | grep -q "OVER THE RECEIPT CAP" \
+	      || { echo "SELFTEST FAIL: an over-capped row was rejected for the wrong reason"; fail=1; }; \
+	  fi; \
+	  echo "$$cap" | grep -q "fam-{alpha,beta}" \
+	    || { echo "SELFTEST FAIL: the over-capped row was not NAMED"; fail=1; }; \
+	  echo "$$cap" | grep -q "a-falsity" \
+	    && { echo "SELFTEST FAIL: a row at the cap EXACTLY was reported — a coverage lattice is legitimate up to the cap"; fail=1; }; \
+	  echo "$$cln" | grep -q "OVER THE RECEIPT CAP" \
+	    && { echo "SELFTEST FAIL: the cap fired on a clean roadmap — a row with TWIN×9 is being charged, and only PROBED is capped"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and

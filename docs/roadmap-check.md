@@ -5,7 +5,7 @@ FIRST, so a stale row misdirects the next session's whole leg. One already did, 
 two postulates that had become real definitions. This target makes the parts a machine
 can see into build failures.
 
-## Eleven checks
+## Twelve checks
 
 1. **Sort** — each tier is ordered riskiest-class-first (FALSITY, SHAPE, VACUITY,
    DIFFICULTY, GRINDABLE). Priority that lives only in prose gets spent on whatever is
@@ -39,6 +39,9 @@ can see into build failures.
     postulates than that to plan over.
 11. **The leg budget** — each leg's prose is within `LEG_BUDGET`, which is several times
     `ROW_BUDGET`.
+12. **The row's receipt cap** — no row carries more `PROBED` receipts than
+    `make evidence-check` allows one postulate. The number is imported from that
+    checker, so the two cannot drift apart.
 
 ## The roadmap is the schedule; the rows are the ledger
 
@@ -213,6 +216,31 @@ several postulates merges their markers, so one marked sibling covers a family �
 is correct where the row really is one statement and wrong where it is a bag. When the
 census answers a family row with a single marker, the question to ask is whether the row
 should be SPLIT, and the answer is usually yes.
+
+## The receipt cap has two units, and the row is the one that was missing
+
+`make evidence-check` caps receipts at seven per POSTULATE. Check 12 caps the same
+number per ROW, and the second unit is not a stricter version of the first — it is the
+one that matches what the cap is FOR. A probe aims a grind or refutes a statement; past
+the cap the receipts have stopped deciding anything while the item stays open, so what
+more evidence buys is more evidence to delete on discharge. The item that stays open is
+a roadmap row.
+
+A row naming both arms of one statement walks straight past the per-name cap: five
+receipts on one arm and four on the other is nine on one open item, and neither name is
+over. That is the shape it was measured on, and it is the common shape — a statement
+with an inner and an outer face shares a row precisely because a restatement of either
+moves the other.
+
+The repair is to DEFINE something, or to delete the receipts that no longer earn their
+place. Splitting the row satisfies the count and changes nothing — the same laundering
+as merging probe files under the per-name cap, which E8 already names. Note this is the
+opposite direction from the split the section above recommends: split a row when its
+markers are evidence about DIFFERENT statements, never when its markers are too many.
+
+Only `PROBED` is counted. A refutation KILLS a statement rather than accumulating
+against a live one, and `TWIN`, `DEAD ROUTE` and `RECOVERY` name a route rather than buy
+coverage.
 
 ## `make roadmap-moved` — the roadmap cannot stay the same across commits
 

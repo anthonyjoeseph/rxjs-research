@@ -1,0 +1,25 @@
+# fixture: a row that gathers receipts past the cap without any ONE of its
+# names doing so.  `fam-alpha` carries five and `fam-beta` three, so the
+# per-postulate cap `make evidence-check` enforces is quiet at both while the
+# row they share carries eight -- which is the reading nothing was holding.
+# `a-falsity` sits at the cap EXACTLY, and must stay quiet.
+a-falsity: PROBED×7
+d-grindable: TWIN
+fam-alpha: PROBED×5
+fam-beta: PROBED×3
+e-difficulty: REFUTED×2
+c-difficulty: PROBED
+suf-nodry-loop: PROBED
+f-grindable: TWIN
+glob-one: TWIN
+glob-two: TWIN
+nonpostulate-parent: TWIN
+names-are-free-one: TWIN
+names-are-free-two: TWIN
+names-are-free-three: TWIN
+names-are-free-four: TWIN
+names-are-free-five: TWIN
+names-are-free-six: TWIN
+names-are-free-seven: TWIN
+names-are-free-eight: TWIN
+names-are-free-nine: TWIN

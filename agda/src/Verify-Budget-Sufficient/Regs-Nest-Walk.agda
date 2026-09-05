@@ -1581,15 +1581,6 @@ postulate
   --   across, which at an empty arrival list is the telescope alone.
   --   One queue depth and one door; an entry naming a shared slot is
   --   `Probed.Parked-Slot-Store`.
-  -- PROBED: `Probed.Biting-Door-Store` at the two doors that are not
-  --   the drain, each reached where its rule BITES -- a switch whose
-  --   held inner is the one finishing, an exhaust busy with it -- and
-  --   the outgoing inner's own cell standing in the table beside the
-  --   door.  A finishing inner rewrites only that door's own bit, a
-  --   node id and two flags, which this predicate does not read, so
-  --   the row is taken at rung ZERO: the premise's own bound climbed
-  --   by nothing, which is the tightest reading the conclusion admits.
-  --   One outgoing cell, and no door biting under a limit.
   -- PROBED: `Probed.Partial-Drain-Store` at the drain a LIMIT stops
   --   mid-queue, which is what separates the queue as ENTERED from the
   --   queue as LEFT: one table then carries the cell an admitted entry
@@ -1655,15 +1646,18 @@ postulate
   --   climbed by nothing, because a park only appends what the premise
   --   already bounded.  One queue depth and the merging door alone,
   --   which is the only shape that parks.
-  -- PROBED: `Probed.Biting-Door-Store` at the other two doors taking
-  --   an ARRIVAL where their rules bite.  A CUT reaches the registry
-  --   and the schedule's live set and no table at all, so the outgoing
-  --   inner's cell is left standing and what the frame leaves is the
-  --   idle reading beside a cell the premise already bounds: the
-  --   refuted constant still fails there and the stated count holds.
-  --   A busy exhaust writes nothing whatever, and is read at rung
-  --   ZERO.  The cut is taken at an EMPTY registry, so nothing about
-  --   the severing itself, which reaches no table either way.
+  -- PROBED: `Probed.Cell-Chain-Store` at a table whose cells were
+  --   written in SERIES, which every row above declines: a reifying
+  --   scan under a `mergeAll` under a second reifying scan, arriving
+  --   as ONE value, so the frame writes three cells where the control
+  --   writes one.  Both tables are read at the same two rungs and
+  --   need the same one: a cell holding what the cell below it
+  --   emitted is priced by the emission and not by its position, so
+  --   the series does not compound and counting the arrival's layers
+  --   once is not short.  One chain, of one length, with the
+  --   telescope a single scripted slot -- so nothing about a chain
+  --   whose cells resolve a SLOT, where the summand would do the
+  --   work.
   stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
