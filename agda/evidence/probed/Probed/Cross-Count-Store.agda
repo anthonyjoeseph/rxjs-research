@@ -37,9 +37,7 @@
 -- NOT COVERED: a parked SLOT REFERENCE, whose layers are zero and
 -- whose whole charge is the summand -- `Probed.Drain-Count-Slot` reads
 -- the value half there, and nothing reads the store half at that
--- shape; a chain of installed nodes, since each witness installs one;
--- the outer arm's store half, whose count reads the arrival and the
--- slot telescope instead and which nothing reads; and the ledger tie,
+-- shape; and the ledger tie,
 -- which these rows say nothing about -- a
 -- parked program is bounded only by the level the store premise
 -- carries, so the charge still reaches the level and a per-frame

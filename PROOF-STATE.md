@@ -215,18 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE PARKED QUEUE, WHICH EVERY TABLE ROW SO FAR HAS AVOIDED.**
-  A crossing's table reading is a max over entries, and every witness
-  taken at it installs exactly ONE — a scan, read through the
-  accumulator's `sizeᵛ`. A `*All` node under its limit parks what it
-  cannot admit, and those entries are read by `sizeᵉ` over programs
-  the run produced and never delivered, so they are the one part of
-  the table no reading of the delivered list can reach even in
-  principle. The commit builds an arrival that parks several, and
-  reads both store halves against a charge denominated in the
-  arrival's layers.
-
-- **THEN THE SLOT NAMED TWICE, WHICH THE TELESCOPE ROWS LEFT OPEN AND
+- **THE SLOT NAMED TWICE, WHICH THE TELESCOPE ROWS LEFT OPEN AND
   WHICH DECIDES WHETHER THE SUM IS SOUND RATHER THAN GENEROUS.** A
   chained telescope runs each definition once, so its layers add and
   the sum covers them. A telescope whose upper definitions BOTH name
@@ -248,6 +237,17 @@ does not fit is a finding about the shared statement, not about the head.
   busy, which is where a written cell can carry what the arrival's own
   layers never bought.
 
+- **THEN THE PARTIAL DRAIN, WHERE BOTH KINDS OF TABLE ENTRY STAND AT
+  ONE RUNG.** The queue rows just taken split the two cleanly: a drain
+  to exhaustion leaves installed cells and no queue, and a park leaves
+  a queue and no cell, priced at rung zero. Under a LIMIT the drain
+  stops mid-queue, so one table carries the cells the admitted entries
+  wrote and the entries that never ran — and the charge that must
+  cover both is read off the queue as the frame ENTERED it, which the
+  survivors are a suffix of and the cells a run of the prefix. The
+  commit drains a queue under a limit that bites partway and reads the
+  inner half at the one rung.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -261,10 +261,10 @@ does not fit is a finding about the shared statement, not about the head.
   a chain of eleven, and the door is invisible to the burst; a slot named twice
   stays unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED×2`: the same two denominations through the node
-  table, where a subscribed scan writes what it emitted. Both halves now read
-  at the state that killed the constant, the outer at all three doors; each
-  witness installs ONE node, so a parked queue is blank.
+  FALSITY, `REFUTED, PROBED×4`: the same two denominations through the node
+  table, where a subscribed scan writes what it emitted. A drained queue of
+  three does not compound past its max, and parking costs rung zero; a
+  partial drain, holding both at once, stays unread.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope
