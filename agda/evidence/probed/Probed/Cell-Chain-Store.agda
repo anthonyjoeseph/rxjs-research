@@ -2,7 +2,7 @@
 -- A TABLE WHOSE CELLS WERE WRITTEN IN SERIES, WHICH IS THE SHAPE THE
 -- SINGLE CLIMB HAS NEVER BEEN ASKED ABOUT.
 --
--- TARGET: subscribeInner-sz-store @b27028
+-- TARGET: subscribeE-sz-store @f8b804
 --
 -- WHAT EVERY STORE ROW SO FAR DECLINED.  Each witness at either half
 -- subscribes a program that installs ONE node, and the refutation
@@ -65,10 +65,11 @@ open import Rx.Exp using (Ctx; Closed; Val; Fn; natᵗ; obs; _×ᵗ_;
 open import Rx.Slots using (Slots; scripted; slotsSize)
 open import Rx.Layer-Count using (layᵛˢ; layᵉ)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; thru-outer;
+  from-inner; _↠_;
   mergeAll-st; installNode; st-init; sched-init; iterSize; stepFrame)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (valsSz?; subscribeInner-sz-store)
+  using (valsSz?; subscribeE-sz-store)
 open import Refuted.Frame-Step-Size-Slot using (Pw; chnG)
 open import Probed.Apparatus using (Confirms)
 
@@ -193,9 +194,14 @@ chainPrem≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: read at the level the rows are, so a table the chain
--- outran would fail it exactly as one climb does above.
+-- outran would fail it exactly as one climb does above.  The point is
+-- the one the merging door hands the descent -- the caller's path under
+-- a `from-inner` decoration, one gas spent, the minted instance
+-- counted -- so the row computes what a crossing at this state
+-- computes.
 tieCellChain : Confirms
-  (subscribeInner-sz-store {e = eᶜ} slᶜ (gasPad 64 g0) mergeAllᵒ 0 root 0 0
-     topC (sched-init eᶜ slᶜ) stᶜ 2 52
+  (subscribeE-sz-store {e = eᶜ} slᶜ (gasPad 63 g0) topC
+     (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init eᶜ slᶜ) { nextNode = 1 }) stᶜ 2 52
      (iterSize 2 (layᵉ topC + slotsSize slᶜ) 52))
 tieCellChain = λ _ _ _ _ _ → refl

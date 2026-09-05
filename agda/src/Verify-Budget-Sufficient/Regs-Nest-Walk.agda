@@ -44,7 +44,7 @@ open import Rx.Evaluator
   take-f; from-inner; thru-outer; foldPath; stepFrame; dispatchShare; thruWalk; shareGo;
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; takeDispatch; takeVals; lookupNode; scanVals; mergeAllᵒ; switchᵒ; exhaustᵒ;
-  mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; hasRoom;
+  mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; subscribeE; hasRoom;
   thruConsume; thruWrap; switchKill; mergeAllBump)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
@@ -1577,30 +1577,51 @@ thruWrap-sz-store exhaustᵒ nid true M (vs , bs , sched , st) h
 ... | nothing                    = h
 
 postulate
-  -- WHAT ONE ARRIVING SUBSCRIPTION WRITES INTO THE TABLE, which is what
-  -- every store arm reduces to once its own door is taken off it.  The
-  -- cells the subscription installs hold that run's emission --
-  -- reified, so priced by the arrival's LAYERS -- with the telescope
-  -- beside them for the slots the run connects.
+  -- WHAT ONE SUBSCRIPTION WRITES INTO THE TABLE, which is what every
+  -- store arm reduces to once its own door and its own gas are taken
+  -- off it.  The cells the subscription installs hold that run's
+  -- emission -- reified, so priced by the program's LAYERS -- with the
+  -- telescope beside them for the slots the run connects.
   --
-  -- AND IT IS STATED AT A LEVEL THE ARRIVAL ALREADY REACHES, NOT AS A
+  -- AND IT IS STATED AT A LEVEL THE PROGRAM ALREADY REACHES, NOT AS A
   -- CLIMB FROM THE PREMISE'S OWN.  That is what makes it composable
   -- across a burst the count joins by MAX: a statement handing back
-  -- one rung per arrival would compound over the fold, and the join
-  -- says the arrivals do not compound.  So the level is carried as a
-  -- parameter with the arrival's charge under it, and every consumer's
-  -- job is to show the level is never raised rather than to add rungs
-  -- up.
+  -- one rung per subscription would compound over the fold, and the
+  -- join says the subscriptions do not compound.  So the level is
+  -- carried as a parameter with the program's charge under it, and
+  -- every consumer's job is to show the level is never raised rather
+  -- than to add rungs up.
   --
+  -- AND NOTHING IS CHARGED FOR THE PATH, which is sound rather than an
+  -- omission: `κ` is a CONTINUATION and not something this call walks.
+  -- What the subscription emits is handed back UP to whoever asked for
+  -- it, and the path is spent only as the decoration a later crossing
+  -- subscribes its own arrival under -- where that arrival's layers
+  -- pay for what it writes.  No node state holds a path either, so
+  -- nothing the reading prices can grow with one.  What it does cost is
+  -- that a `κ` no ancestor ever built is admitted at the same level,
+  -- since the charge is bought by the subscribed program alone.
+  --
+  -- DEAD ROUTE: telling the `+` apart from a `⊔` by INSTANTIATION.
+  --   Both summands sit inside a PREMISE, so enlarging the charge
+  --   strengthens that premise and WEAKENS the statement -- no witness
+  --   can refute the sum on either axis, however much it delivers, and
+  --   a row at the joined reading that comes out true says the sum
+  --   bought slack rather than that it was wrong.  The gap is
+  --   unreachable besides: a rung multiplies, so the two readings are a
+  --   geometric factor apart and every emission a slot telescope can
+  --   produce sits far below both.  What the sum COSTS is paid by the
+  --   consumers that must supply the premise, so it is decided at the
+  --   call sites and not by any state this statement can be entered at.
   -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
   --   killed the constant, a scan whose step stores the arriving datum
   --   back as a one-shot observable, subscribed at all three doors.
   --   One installed node per witness, so nothing about a table whose
   --   entries accumulate across frames.
   -- PROBED: `Probed.Parked-Queue-Store` at a node that already holds a
-  --   parked queue when the arrival is subscribed: admitting one
+  --   parked queue when the program is subscribed: admitting one
   --   beside a queue of two leaves the reading where an empty queue
-  --   leaves it, since what is read is the arrival's own run.  One
+  --   leaves it, since what is read is the program's own run.  One
   --   queue depth and the merging door alone, which is the only shape
   --   that parks at all.
   -- PROBED: `Probed.Cell-Chain-Store` at a table whose cells were
@@ -1610,11 +1631,11 @@ postulate
   --   control writes one.  Both tables are read at the same two rungs
   --   and need the same one: a cell holding what the cell below it
   --   emitted is priced by the emission and not by its position, so
-  --   the series does not compound and counting the arrival's layers
-  --   once is not short.  One chain, of one length, with the telescope
-  --   a single scripted slot -- so nothing about a chain whose cells
-  --   resolve a SLOT, where the summand would do the work.
-  -- PROBED: `Probed.Parked-Slot-Store` at the arrival whose OWN layers
+  --   the series does not compound and counting the layers once is not
+  --   short.  One chain, of one length, with the telescope a single
+  --   scripted slot -- so nothing about a chain whose cells resolve a
+  --   SLOT, where the summand would do the work.
+  -- PROBED: `Probed.Parked-Slot-Store` at the program whose OWN layers
   --   are nought -- a bare reference to a shared slot -- so the first
   --   summand contributes nothing and the telescope carries the whole
   --   climb.  Read at two depths behind the same reference, since one
@@ -1622,18 +1643,51 @@ postulate
   --   units of slot syntax; the telescope-free reading fails at both.
   --   So the summand REACHES the written table, never that its size is
   --   right: one slot, one queue entry, and the merging door alone.
-  subscribeInner-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sl : Slots Γ) (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
-    (id : Id) (now : Tick) (o : Val Γ (obs u))
+  subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
+    (id : Id) (now : Tick)
     (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
     Sched.slots sched ≡ sl →
     iterSize S (layᵉ o + slotsSize sl) B ≤ M →
     all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
-    (sizeᵛ (obs u) o ≤ᵇ B) ≡ true →
+    (sizeᵉ o ≤ᵇ B) ≡ true →
     all (λ kv → boundedNode M (proj₂ kv))
-        (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
-          (subscribeInner sf op allNid κ id now o sched st)))))))
+        (EvalSt.nodes (proj₂ (proj₂ (subscribeE g o κ id now sched st))))
       ≡ true
+
+-- ONE ARRIVAL SUBSCRIBED, WHICH IS THE STORE SIDE'S LAST DOOR.  A
+-- crossing frame mints the inner's exit-frame instance and then does
+-- exactly one thing with it, and which of the two is decided by gas
+-- alone: with none, the arrival is answered by a dry close and the
+-- table is handed back untouched, so the premise IS the conclusion;
+-- with some, it is the general descent entered at the caller's path
+-- under a `from-inner` decoration, and the minted instance moves only
+-- the scheduler's node counter, which the reading does not price.
+--
+-- SO THE DECORATION IS FREE AND THE ARRIVAL'S CHARGE IS UNCHANGED:
+-- `layᵉ` reads the program, not the path it is subscribed at, and the
+-- record update touches no slot -- which is what lets the level cross
+-- this door verbatim rather than climbing a rung at it.
+subscribeInner-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (sf : Gas) (op : AllOp) (allNid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (o : Val Γ (obs u))
+  (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+  Sched.slots sched ≡ sl →
+  iterSize S (layᵉ o + slotsSize sl) B ≤ M →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  (sizeᵛ (obs u) o ≤ᵇ B) ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (proj₂
+        (subscribeInner sf op allNid κ id now o sched st)))))))
+    ≡ true
+subscribeInner-sz-store sl g0 op allNid κ id now o sched st S B M
+                        2≤S slEq le hns hb = hns
+subscribeInner-sz-store sl (gs fuel) op allNid κ id now o sched st S B M
+                        2≤S slEq le hns hb =
+  subscribeE-sz-store sl fuel o
+    (from-inner op allNid (Sched.nextNode sched) ↠ κ) id now
+    (record sched { nextNode = suc (Sched.nextNode sched) }) st S B M
+    2≤S slEq le hns hb
 
 -- THE MERGE DOOR'S BUMP IS INVISIBLE TO THE READING.  It rewrites the
 -- cell it read and moves only the live count, which is not among what

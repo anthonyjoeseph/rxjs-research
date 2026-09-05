@@ -215,41 +215,40 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
-  READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
-  witness so far enters at a BARE REFERENCE, which carries zero
-  layers, so the whole charge has been the telescope and the `+` has
-  never been read with both sides doing work at once — a sum tested
-  one summand at a time is a sum nothing has told apart from a max
-  over the same two quantities. The entry that tells them apart is an
-  arrival built INLINE over a reference, whose own rungs compound on
-  top of what the named slot delivers, so the two are in series in
-  one run and either taken alone falls short. The commit scripts that
-  arrival and stands the sum beside what it delivers.
+- **THE VALUE LEAF THROUGH THE SAME DOOR, WHICH IS WHERE THE TWO
+  HALVES WOULD FINALLY SHARE A STATEMENT.** `subscribeInner-sz` carries
+  the delivered half of exactly the reading its store sibling carries,
+  at the same arrival and the same gas step, and the two have been
+  ground apart the whole way down. The store side is now a body over the
+  DESCENT, so the value leaf's own descent is the same subject read at
+  the other projection: the commit writes that body and puts the two
+  side by side. What it puts to the test is whether one descent
+  statement can carry both — a residue that will not join is the
+  finding, since two currencies at one call are what a per-frame ceiling
+  has to multiply.
 
-- **AND THEN THE LEAF PAST ITS OWN DOOR, WHICH IS ONE STEP OF GAS.**
-  The whole store side now rests on `subscribeInner-sz-store`, and
-  that statement is not atomic either: a subscription with no gas
-  writes nothing, and one with gas is the general descent entered at
-  a decorated path. So the same conversion applies once more — a
-  two-clause body over a statement about what the DESCENT installs,
-  which is where the value side already keeps its machinery and where
-  a table's cells are actually written. It is also the first store
-  statement whose subject is not a door, so what it puts to the test
-  is whether the arrival's own layers are the right currency below
-  the operator that admitted it.
+- **AND THEN WHAT THE CROSSING CHARGE COSTS THE LEDGER, WHICH IS THE
+  ONLY PLACE EITHER LEAF CAN STILL BE WRONG.** Both leaves state their
+  reading as a PREMISE, so no witness can refute the charge — enlarging
+  it strengthens the premise and weakens the statement, and the store
+  leaf's header now records that as a dead route. What the charge is
+  therefore owed at is the CALL SITE: a per-frame ceiling has to supply
+  `iterSize` at the program's layers plus the whole telescope, per
+  frame, and the telescope is a program constant while the layers are
+  not. The commit states that obligation where the walk carries its
+  level, and its product is whether the ceiling is a fixed product or
+  climbs with the walk.
 
-- **AND THEN THE VALUE LEAF THROUGH THE SAME DOOR, WHICH IS WHERE THE
-  TWO HALVES WOULD FINALLY SHARE A STATEMENT.** `subscribeInner-sz`
-  carries the delivered half of exactly the reading its store sibling
-  carries, at the same arrival, the same telescope and the same gas
-  step, and the two have been ground apart the whole way down. Once
-  the store leaf is a body over the descent, the value leaf's own
-  descent is the same subject read at the other projection, so the
-  commit writes that body and puts the two side by side. What it puts
-  to the test is whether one descent statement can carry both — and a
-  residue that will not join is the finding, since two currencies at
-  one call are what a per-frame ceiling has to multiply.
+- **AND THEN THE DESCENT'S OWN CLAUSES, WHERE ONE RUNG HAS TO PAY FOR
+  ONE OPERATOR.** The store leaf is now stated over `subscribeE`, whose
+  cases are the program's constructors, and `layᵉ` charges one rung
+  apiece. So it is the first statement here that can be attacked
+  STRUCTURALLY rather than through another door: a map or a take writes
+  nothing, a scan writes the cell its own emission fills, a `*All` mints
+  a node and hands its arrivals to a crossing already bodied. The commit
+  takes the arms that write nothing and the one that writes its own
+  cell, leaving the crossings postulated, and asks whether one
+  `iterSize` rung covers one operator's write.
 
 ### The ledger
 
@@ -263,10 +262,11 @@ does not fit is a finding about the shared statement, not about the head.
   crossing value halves are bodies over it. A max is refuted at a chain of
   eleven; a slot named twice and a share at two depths cost nothing. A layered
   arrival is unread.
-- **`subscribeInner-sz-store`** (Regs-Nest-Walk) — FALSITY, `PROBED×4`: what ONE
-  arriving subscription writes, at a level the arrival's own layers reach. The
-  WHOLE store side is now a body over it, both arms. Cells written in series do
-  not compound; a parked reference reads the telescope; slots in series are open.
+- **`subscribeE-sz-store`** (Regs-Nest-Walk) — FALSITY,
+  `DEAD ROUTE, PROBED×4`: what ONE subscription writes, at a level the
+  program's own layers reach. The WHOLE store side is a body over it, doors and
+  gas step included. Cells in series do not compound; a parked reference reads
+  the telescope; slots in series are open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

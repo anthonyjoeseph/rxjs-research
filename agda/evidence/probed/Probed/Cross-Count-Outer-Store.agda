@@ -2,7 +2,7 @@
 -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, WHICH IS THE READING NOTHING
 -- HAD EVER STOOD AT.
 --
--- TARGET: subscribeInner-sz-store @b27028
+-- TARGET: subscribeE-sz-store @f8b804
 --
 -- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The level this leaf is
 -- held to is the arrival's own layers plus the telescope, and every
@@ -54,11 +54,12 @@ open import Rx.Exp using (obs)
 open import Rx.Layer-Count using (layᵉ)
 open import Rx.Slots using (slotsSize)
 open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ;
+  from-inner; _↠_;
   thru-outer; switch-st; exhaust-st; installNode; st-init; stepFrame;
   sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; subscribeInner-sz-store)
+  using (szCount; subscribeE-sz-store)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; e₀; st₀; vals₀; post₀)
 open import Probed.Apparatus using (Confirms)
@@ -138,9 +139,13 @@ sinkRows≡ = refl
 ----------------------------------------------------------------------
 
 -- LOAD-BEARING: it fails for any level the stored emission outruns,
--- which the constant it replaces is.
+-- which the constant it replaces is.  The point is the one the merging
+-- door hands the descent -- the caller's path under a `from-inner`
+-- decoration, one gas spent, the minted instance counted -- so the row
+-- computes what a crossing at this state computes.
 tieOuterStore : Confirms
-  (subscribeInner-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
-     inner (sched-init e₀ sl₁) st₀ 63 63
+  (subscribeE-sz-store {e = e₀} sl₁ (gasPad 7 g0) inner
+     (from-inner mergeAllᵒ 0 0 ↠ root) 0 0
+     (record (sched-init e₀ sl₁) { nextNode = 1 }) st₀ 63 63
      (iterSize 63 (layᵉ inner + slotsSize sl₁) 63))
 tieOuterStore = λ _ _ _ _ _ → refl
