@@ -28,11 +28,12 @@
 --
 -- SO THE COUNT IS ONE DECISION.  All four arms fail on the same
 -- quantity -- the size of what the subscribed program emits -- and it
--- reaches the store only by being written there, so a count reading
--- the arriving observables' own `sizeᵉ` covers the table exactly as it
--- covers the emission.  What these rows do NOT show is that the store
--- needs no charge of its own beyond that: the witness installs one
--- node and a chain of them is not built here.
+-- reaches the store only by being written there, so whatever reading
+-- covers the emission covers the table by the same argument, and the
+-- two halves of an arm cannot be denominated apart.  What these rows
+-- do NOT show is that the store needs no charge of its own beyond
+-- that: the witness installs one node and a chain of them is not
+-- built here.
 -- ══════════════════════════════════════════════════════════════════
 module Refuted.Frame-Step-Size-Cross-Store where
 

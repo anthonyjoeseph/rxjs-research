@@ -1829,12 +1829,14 @@ chAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
 chAt e sl id =
   frameCh (Caps.cSize (capsAt e sl id)) (Caps.cSize (capsAt e sl id))
 
--- THE ONE FRAME KIND THIS LEDGER CANNOT PRICE, TAKEN WHOLE.  Four of
--- the five frame kinds charge the ladder a count the ceiling above
--- dominates, and the fifth charges what its arriving observables would
--- cost to RUN.  That count is bounded -- by the burst width times the
--- level's own size reading, which is the denomination the subscription
--- door already prices its climbs in -- but it is not bounded by any
+-- THE FRAME KINDS THIS LEDGER CANNOT PRICE, TAKEN WHOLE.  Three of
+-- the five charge the ladder a count the ceiling above dominates, and
+-- the two crossings charge what the program they subscribe would cost
+-- to RUN -- the outer reading its arriving observables, the inner the
+-- store bound that is the only reading of a parked one available where
+-- the count is taken.  That count is bounded -- by the burst width
+-- times the level's own size reading, which is the denomination the
+-- subscription door already prices its climbs in -- but not by any
 -- multiple of a level-free quantity, and the premise below spends
 -- exactly such a multiple, one `chAt` per frame of the path.  So the
 -- gap is not the frame's charge and not the ceiling: it is that this
@@ -1874,8 +1876,8 @@ chAt e sl id =
 -- portable.  It is not: that face is denominated in DEPTH, and depth
 -- TRUNCATES at the defer a crossing mints across while size counts
 -- straight through it.  The two faces agree at every other frame kind
--- and part company exactly here, which is why the crossing arm is the
--- one this face cannot borrow.
+-- and part company exactly here, which is why the crossing arms are
+-- the ones this face cannot borrow.
 --
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
 --   count against the cap-side ceiling, which is the assembly this
@@ -1888,11 +1890,12 @@ chAt e sl id =
 --   consumer's affordability side cannot pay it at any cap.  This is
 --   the same wall `chain-climb-ch` records from the other end.
 postulate
-  walk-cross-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  walk-cross-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
-    (Lv k : ℕ) (op : AllOp) (fid : NodeId) (p : Path Γ u t)
-    (vals : List (Val Γ (obs u))) (fin : Bool)
+    (Lv k : ℕ) (f : Frame Γ s u) (p : Path Γ u t)
+    (vals : List (Val Γ s)) (fin : Bool)
     (sched : Sched Γ) (st : EvalSt e) →
+    crossFrame? f ≡ true →
     valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
               (Caps.cSize (capsAt e sl id))) vals ≡ true →
     all (λ kv → boundedNode (iterSize (Caps.cSize (capsAt e sl id)) k
@@ -1900,13 +1903,13 @@ postulate
         (EvalSt.nodes st) ≡ true →
     walkSzOK (Caps.cSize (capsAt e sl id))
              (Caps.cSize (capsAt e sl id)) k sf gas nid now
-             (thru-outer op fid ↠ p) vals fin sched st →
-    pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op fid ↠ p) ≡ true →
-    k + pathLen (thru-outer {Γ = Γ} {u = u} op fid ↠ p) * chAt e sl id
+             (f ↠ p) vals fin sched st →
+    pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
+    k + pathLen (f ↠ p) * chAt e sl id
       + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
     PathLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
-      (thru-outer op fid ↠ p) vals fin sched st
+      (f ↠ p) vals fin sched st
 
 mutual
   walk-LiveHyp-goC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
@@ -1928,7 +1931,7 @@ mutual
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       path vals fin sched st
 
-  -- THE FRAME STEP, SHARED BY THE FOUR KINDS THE LEDGER CAN PRICE.  The
+  -- THE FRAME STEP, SHARED BY THE THREE KINDS THE LEDGER CAN PRICE.  The
   -- head reading and the tail recursion are one body for all of them;
   -- what differs is only the count each charges, and the ceiling
   -- dominates every one of those uniformly, so the frame kind enters
@@ -2059,17 +2062,17 @@ mutual
       refl hsz hns hw hpz hj
   walk-LiveHyp-goC sl id sf gas nid now Lv k (from-inner op an ii ↠ p) vals fin
                    sched st hsz hns hw hpz hj =
-    walk-frame-LiveHypC sl id sf gas nid now Lv k (from-inner op an ii) p vals fin
+    walk-cross-LiveHypC sl id sf gas nid now Lv k (from-inner op an ii) p vals fin
       sched st refl hsz hns hw hpz hj
   walk-LiveHyp-goC sl id sf gas nid now Lv k (thru-outer op fid ↠ p) vals fin
                    sched st hsz hns hw hpz hj =
-    walk-cross-LiveHypC sl id sf gas nid now Lv k op fid p vals fin sched st
-      hsz hns hw hpz hj
+    walk-cross-LiveHypC sl id sf gas nid now Lv k (thru-outer op fid) p vals fin
+      sched st refl hsz hns hw hpz hj
 
   walk-frame-LiveHypC {e = e} sl id sf gas nid now Lv k f p vals fin sched st
                       hx hsz hns hw hpz hj =
       hHead
-    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls f vals) p
+    , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount sls A f vals) p
         (proj₁ step)
         (proj₁ (proj₂ (proj₂ step)))
         (proj₁ (proj₂ (proj₂ (proj₂ step))))
@@ -2104,13 +2107,13 @@ mutual
     hpTail = proj₂ (∧-true (suc (pathLen p) ≤ᵇ S) (pathSz? S p)
                       (proj₂ (∧-true (frameSz? S f)
                                ((suc (pathLen p) ≤ᵇ S) ∧ pathSz? S p) hpz)))
-    eqSplit : iterSize S (k + szCount sls f vals) S
-                ≡ iterSize S (szCount sls f vals) A
-    eqSplit = iterSize-+ S k (szCount sls f vals) S
-    hszTail : valsSz? (iterSize S (k + szCount sls f vals) S) (proj₁ step) ≡ true
+    eqSplit : iterSize S (k + szCount sls A f vals) S
+                ≡ iterSize S (szCount sls A f vals) A
+    eqSplit = iterSize-+ S k (szCount sls A f vals) S
+    hszTail : valsSz? (iterSize S (k + szCount sls A f vals) S) (proj₁ step) ≡ true
     hszTail = subst (λ z → valsSz? z (proj₁ step) ≡ true) (sym eqSplit)
                 (stepFrame-sz sf nid now f p vals fin sched st S A 2≤S hns hsz)
-    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls f vals) S)
+    hnsTail : all (λ kv → boundedNode (iterSize S (k + szCount sls A f vals) S)
                             (proj₂ kv))
                   (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ step))))) ≡ true
     hnsTail = subst (λ z → all (λ kv → boundedNode z (proj₂ kv))
@@ -2119,12 +2122,12 @@ mutual
                 (sym eqSplit)
                 (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
                    hns hsz)
-    cnt≤ : szCount sls f vals ≤ Ch
-    cnt≤ = szCount≤ch S S 1≤S sls f vals hx hfz (proj₁ hw)
-    hjTail : k + szCount sls f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
+    cnt≤ : szCount sls A f vals ≤ Ch
+    cnt≤ = szCount≤ch S S A 1≤S sls f vals hx hfz (proj₁ hw)
+    hjTail : k + szCount sls A f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
     hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
                        (≤-trans (≤-reflexive
-                                  (+-assoc k (szCount sls f vals) (pathLen p * Ch)))
+                                  (+-assoc k (szCount sls A f vals) (pathLen p * Ch)))
                                 (+-monoʳ-≤ k
                                   (+-monoˡ-≤ (pathLen p * Ch) cnt≤))))
                      hj

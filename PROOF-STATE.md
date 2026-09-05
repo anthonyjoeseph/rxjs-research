@@ -215,26 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
-  `stepFrame-sz-inner` is still charged one rung and still FALSE at it.
-  Its program is not in `vals` at all — it is what the `*All` node
-  PARKED — so its count is a function of the entry table and the outer
-  arm's telescope summand transfers nothing to it. The commit states
-  that count and re-runs the constant's refutation against it, which is
-  what says the restatement moved rather than landed.
-
-- **THEN THE SIZE FACE'S OTHER REFUTED PAIR, THE STORE HALVES.**
-  `stepFrame-sz-store-inner` and `stepFrame-sz-store-outer` are FALSE
-  for one reason the frame pair above does not carry: a subscription
-  installs the inner PROGRAM's own nodes, and a scan among them stores
-  what that program emitted — `reify` carrying a product value into a
-  term its own size — so the entry table's reading bounds nothing about
-  the residue. They come after the frame pair because a frame charge
-  that reads the arrived program is what a store charge would be stated
-  over, and stating the store half first would price it against a
-  denomination the leg before this one has only just replaced.
-
-- **THEN THE REGISTRY'S DEPTH, HONESTLY CAP-SIDE.** Every frame arm now
+- **THE REGISTRY'S DEPTH, HONESTLY CAP-SIDE.** Every frame arm now
   ACCEPTS a cap-denominated depth receipt; `fan-regsNest` is the one
   producer still minting a unit-side one, and its consumers reach it
   through a composition that throws the extra room away. A BARE cap-side
@@ -244,6 +225,24 @@ does not fit is a finding about the shared statement, not about the head.
   the commit is what says whether that hypothesis is available where the
   fan reads the registry.
 
+- **THEN THE TWO SIZE-WALK ROWS NOTHING HAS EVER REACHED.**
+  `innerΦ-quiet-fit` and `chain-walk-szOK` are FALSITY by ABSENCE: each
+  says its own header carries no instantiation, and one of them is a
+  charge at WIDTH ZERO, which is precisely where a bound routinely goes
+  false because the transformer is the identity there. Both sides
+  compute, so the cheapest unmanaged risk in this tier is a probe rather
+  than a grind. The commit instantiates them and takes whichever
+  outcome falls out — a refutation restates, a receipt re-ranks.
+
+- **THEN THE FAN'S SIZE RECEIPT, AT WHOSE CAP.** `fan-regsSz` and
+  `sink-fan-sink` are the fanned walk's two remaining FALSITY rows, and
+  they share the producer question the leg above answers one
+  denomination over: the entry cap is the Φ pricing's, three carried
+  receipts sit above the fanned walk's own, and taking the walk up to
+  one moves the leaf's exponent and its budget. What the commit decides
+  is whether the admissibility the depth producer carries is the same
+  hypothesis the size producer needs, or a second one.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -252,18 +251,19 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
-  the whole crossing frame's tail, out of the size walk because the ledger
-  under it is a product where its charge is a climb. ONE MECHANISM WITH the
-  chain door, and what both owe is a recursion rather than a denomination.
+  BOTH crossing frames' tails, out of the walk: the ledger is a per-frame
+  product where the inner charge CLIMBS with the level. ONE MECHANISM WITH the
+  chain door; both owe a recursion, not a denomination.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED×4, DEAD ROUTE×2, PROBED×2`: the outer arm now charges the arrivals
-  PLUS the telescope behind them, instantiated at the slot shape. The inner arm
-  is still one rung and still FALSE, its program parked in the store.
+  `REFUTED×4, DEAD ROUTE×2, PROBED×4`: both arms now charge rungs in a quantity
+  that bounds what runs — the outer the arrivals plus their telescope, the
+  inner the store bound, its program being parked not passed. Each known
+  refutation re-runs against the reading that replaced it.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED×2`: both are FALSE. The subscription installs the inner
-  program's own nodes, and a scan among them stores what that program emitted —
-  `reify` carrying a product value into a term its own size — so the entry
-  table's reading bounds nothing about the residue.
+  FALSITY, `REFUTED×2, PROBED×2`: the same two denominations through the node
+  table, where a subscribed scan writes what it emitted. Instantiated at the
+  inner half only; the outer half's table reading is not, and neither covers a
+  queue holding more than one parked program.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

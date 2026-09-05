@@ -128,3 +128,6 @@ open import Probed.Cross-Count-Fork
 
 open import Probed.Cross-Count-Slot
   using (counts≡; tieSlot12; tieSlot13)
+
+open import Probed.Cross-Count-Store
+  using (valRows≡; storeRows≡; tieInner; tieStore)
