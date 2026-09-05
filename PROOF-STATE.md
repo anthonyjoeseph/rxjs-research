@@ -215,17 +215,7 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A PARKED SLOT REFERENCE, WHERE THE INNER CHARGE READS
-  ZERO AND THE RUN DELIVERS A TELESCOPE.** The store half's inner
-  count is the max of the queue's own LAYERS plus the telescope, and a
-  bare reference has zero layers however deep the definition behind it
-  goes — so an entry of that shape contributes nothing to the max and
-  everything to what running it writes. The value half is read there
-  already; the store half has never been, and it is the one entry
-  shape where the two summands are not both doing work. The commit
-  parks a reference to a deep slot, drains it, and reads the table.
-
-- **AND THEN A CHAIN OF INSTALLED CELLS, WHICH EVERY STORE ROW HAS SO
+- **A CHAIN OF INSTALLED CELLS, WHICH EVERY STORE ROW HAS SO
   FAR DECLINED.** Each witness at either half subscribes a program
   installing ONE node, and the refutation that set the denomination
   says so in as many words — so the shape the conclusion is weakest at
@@ -236,7 +226,7 @@ does not fit is a finding about the shared statement, not about the head.
   while the charge counts layers once. The commit builds such a chain
   and stands the table's largest cell beside the rung.
 
-- **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, WHICH IS THE
+- **AND THEN AN ARRIVAL WHOSE OWN LAYERS ARE NOT ZERO, THE
   READING THAT WOULD SEPARATE THE SUM FROM A MAX.** Every slot
   witness so far enters at a BARE REFERENCE, which carries zero
   layers, so the whole charge has been the telescope and the `+` has
@@ -248,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   one run and either taken alone falls short. The commit scripts that
   arrival and stands the sum beside what it delivers.
 
+- **AND THEN A QUEUE JOINING A REFERENCE AGAINST A WRITTEN-OUT
+  PROGRAM, WHERE THE MAX AND THE SUMMAND MEET.** The two entry shapes
+  are read APART: a written-out program carries the layers and
+  the telescope is a rounding; a bare reference carries none
+  and the telescope is the whole climb. The charge joins the queue's
+  layers by MAX and adds the telescope ONCE, so a queue holding both
+  is priced by whichever entry has the layers, plus a summand the
+  OTHER entry spends by itself — and nothing yet says those two costs
+  join rather than add, since the entries drain through one table in
+  series, a later subscription reading what an earlier one wrote. The
+  commit parks both behind one door and reads the table.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -258,13 +260,14 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeInner-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED×6`: what
   ONE subscription delivers, in its own layers plus its telescope. Both
   crossing value halves are bodies over it. A max is refuted at a chain of
-  eleven; a slot named twice and a share at two depths cost nothing. A
-  layered arrival is unread.
+  eleven; a slot named twice and a share at two depths cost nothing. A layered
+  arrival is unread.
 - **`stepFrame-sz-store-inner`, `stepFrame-sz-store-outer`** (Regs-Nest-Walk) —
-  FALSITY, `REFUTED, PROBED×7`: the same two denominations through the node
-  table, where a subscribed scan writes its emission. A drained queue never
+  FALSITY, `REFUTED, PROBED×8`: the same two denominations through the node
+  table. A drained queue never
   compounds past its max; parking and a bite cost rung zero; a stopped drain
-  reads the queue as entered. A cell chain is open.
+  reads the queue as entered, and a parked reference the telescope. A cell
+  chain is open.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
   escalation is PROGRAM-bounded after all — hops climb the stratified telescope

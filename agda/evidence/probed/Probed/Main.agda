@@ -168,5 +168,9 @@ open import Probed.Partial-Drain-Store
   using (drainFigures≡; partialNodes≡; partialRows≡; groundRow≡;
          zeroLaneRow≡; zeroLaneHolds≡; tiePartial)
 
+open import Probed.Parked-Slot-Store
+  using (slotStoreFigures≡; slotStoreNodes≡; slotStoreRows≡;
+         tieParkedSlot12; tieParkedSlot13)
+
 open import Probed.Drain-Count-Slot
   using (slotCharges≡; slotRows≡; tieDrainSlot12; tieDrainSlot13)

@@ -1579,7 +1579,8 @@ postulate
   --   two rival readings fail -- the queue as the step LEAVES it,
   --   which a full drain empties, and the outer arm's count carried
   --   across, which at an empty arrival list is the telescope alone.
-  --   One queue depth, one door, and no entry naming a shared slot.
+  --   One queue depth and one door; an entry naming a shared slot is
+  --   `Probed.Parked-Slot-Store`.
   -- PROBED: `Probed.Biting-Door-Store` at the two doors that are not
   --   the drain, each reached where its rule BITES -- a switch whose
   --   held inner is the one finishing, an exhaust busy with it -- and
@@ -1599,6 +1600,19 @@ postulate
   --   admitted NOWHERE, so the climb is bought by the entry that ran
   --   and a parked entry is priced by syntax the premise already
   --   bounds.  One lane, and no survivor out-layering the admitted.
+  -- PROBED: `Probed.Parked-Slot-Store` at the one entry shape where
+  --   the first summand reads NOTHING: a bare slot reference, whose
+  --   layer count is nought however deep the definition behind it
+  --   goes, so the whole climb is the telescope.  Drained, the run
+  --   resolves the reference and the table it leaves carries a scan's
+  --   accumulator holding the emission reified -- which fails the
+  --   charge with the summand dropped, at both of two depths, and
+  --   holds with it.  So the telescope is legible from the schedule
+  --   for what the frame WRITES and not only for what it delivers.
+  --   The clearance is not tight and cannot be: slot syntax grows
+  --   linearly against a rung admitting size geometrically, so the
+  --   rows buy REACH and never size.  One slot, one entry, and no max
+  --   joining a reference against a written-out program.
   stepFrame-sz-store-inner : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (allNid inst : NodeId)
     (path : Path Γ s t) (vals : List (Val Γ s)) (fin : Bool)
