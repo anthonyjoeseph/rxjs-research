@@ -2850,11 +2850,27 @@ szCount≤ch S W 1≤W Bd sl ns (thru-outer _ _)   vals () hf hw
 -- which is why this is a leaf here rather than an arm of the discharge
 -- above it.
 --
+-- AND THE CHARGE HAS TWO CHANNELS, ONLY ONE OF WHICH READS THE
+-- DENOMINATION.  A descent is charged a block of rungs bought against
+-- the `μ` nesting plus one rung per operator, and only the block reads
+-- the bound it is charged at.  An arrival carrying no `μ` is therefore
+-- charged its LAYERS outright -- and a level's worth of syntax holds
+-- half itself in layers, a chain spending two nodes per layer -- so the
+-- per-frame charge stands at the ORDER OF THE LEVEL however the block
+-- is priced.  What that fixes is the shape of any ledger that could
+-- pay this arm: it has to climb with the level, and re-pricing the
+-- block moves nothing.
+--
 -- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the same arm with
 --   the count reading the arrivals' SIZE instead of their layers, at
 --   the level one rung above the cap and the width the consumer
 --   passes.  It is what forced the program denomination this leaf is
 --   stated in, and it does not reach this statement.
+-- REFUTED: `Refuted.Size-Climb-Afford` -- the ledger that CLIMBS,
+--   quantified over every advance rule between a join and a sum, each
+--   frame charged the deepest chain its own level admits.  Two
+--   crossing frames outrun the walk factor's whole polynomial at every
+--   admissible cap, and one does not.
 postulate
   crossCount≤ch : ∀ {n} {Γ : Ctx n} {s u} (S W : ℕ) → 2 ≤ S → 1 ≤ W →
     (Bd : ℕ) (sl : Slots Γ) (ns : List (NodeId × NodeState Γ)) (f : Frame Γ s u)

@@ -227,8 +227,9 @@ open import Refuted.Walk-Ceil-Drain
          belowAdmits; walk-ceil-drain-absurd)
 open import Refuted.Size-Climb-Afford
   using (szCh; AdvRule; JoinToSum; sum-in-bracket; join-in-bracket; advClimb;
-         walkAfford; AdvClimbAfford; 1≤cap; 3≤cap; lvl₁; cap≤lvl₁; lvl₁≤cap;
-         climb-outruns-afford; one-frame-affordable; adv-climb-afford-absurd)
+         walkAfford; AdvClimbAfford; 1≤cap; 4≤cap; lvl₁; chg₀≤lvl₁; lvl₁≤chg₀;
+         3≤lvl₁; climb-outruns-afford; one-frame-affordable;
+         adv-climb-afford-absurd)
 open import Refuted.Cascade-Afford-Wide
   using (CascadeAffordWide; suc≤sizeStep; iterSize-lb; selLen; S≤N; hK;
          cascade-afford-wide-absurd)

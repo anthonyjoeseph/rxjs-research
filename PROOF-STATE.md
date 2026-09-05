@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CROSSING ARM'S CEILING, NOW THAT THE CHARGE IS A LOGARITHM.** A
-  block is denominated in the bound's BIT LENGTH, so a frame standing
-  at level `k` is charged `⌈log₂ (iterSize S k S)⌉` where the refuted
-  ledger charged `iterSize S k S` outright — linear in the level
-  against exponential in it. That is why the climb refutation no longer
-  reaches this ledger, and it settles nothing on its own: a walk of `n`
-  frames still pays a SUM that grows with the level against a fixed
-  PRODUCT of a per-frame ceiling. The commit instantiates the crossing
-  arm at the levels the walk actually stands at, and either exhibits
-  the ceiling or refutes the fixed product a second time, at the
-  denomination that replaced the one it killed.
-
 - **THE LEVELS COMPOSING, WHICH IS WHAT NEITHER `μ` ROW REACHES.** Both
   new receipts stand at ONE handed-out nesting, and the block count's
   rate — one block per level, bought at the bound reached so far — is
@@ -247,6 +235,16 @@ does not fit is a finding about the shared statement, not about the head.
   the size cap ONE INSTANT UP, so the whole question is a rung. The
   commit puts that gap beside the store side's own climb, which
   crosses the same one.
+
+- **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
+  crossing arm is refuted through the LAYER half of its charge, at a
+  witness that is CONSTRUCTED and admitted by the walk's own premises
+  rather than reached by an evaluator — the one gap between "no ledger
+  pays this arm" and "the arm is unpayable". The commit builds a
+  program whose crossing frame receives a deep arrival by RUNNING, and
+  either reaches that region, which sends the repair to the ceiling, or
+  bounds what a run delivers, which makes the missing fact an invariant
+  on arrivals rather than a ledger.
 
 ### The ledger
 
@@ -289,7 +287,7 @@ does not fit is a finding about the shared statement, not about the head.
   walk's burst package at the instant's OWN size cap. The proven neighbour
   delivers it one rung up, at `nestBurstAt`, and a width bound at the larger
   cap gives none at the smaller — so the residue is a single geometric rung.
-- **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED`: the two crossing
+- **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: the two crossing
   frames' charge against one frame's ceiling. The telescope half is a program
   constant the burst face already reads against the cap; the LAYER half asks a
   bound on a runtime value, and no premise of the walk carries one.
