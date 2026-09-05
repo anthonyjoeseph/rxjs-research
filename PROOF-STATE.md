@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CEILING THE NEW OUTER COUNT IS SPENT AGAINST.** `szCount≤ch`
-  admits the crossing arm only by absurd pattern, and the count it would
-  now have to dominate carries `slotsSize` — a telescope quantity
-  `frameCh` is not denominated in, being a product of a width and a
-  program size. The burst walk beside it already maintains
-  `slotsSize sl ≤ cSize c` as an invariant, so the material exists and
-  what has to be decided is whether the telescope enters the ceiling or
-  the size walk's own premise. Until one of them carries it,
-  `walk-cross-LiveHypC` has no ledger and the crossing frame stays
-  outside the walk entirely.
+- **THE Φ FACE'S NEST PREMISES, OFF THE PROGRAM'S UNIT.** Every frame
+  arm of the walk takes its nest premise as `pathNestD` under
+  `nestUnit`, and the registry receipt that supplies the share fan-out's
+  copy cannot be had at that bound: what the store maintains is
+  `storeNestMax` under the instant's `nestCapAt`, and the unit sits
+  UNDER the cap, so the bridge runs the wrong way. The junction between
+  the two is already off the unit — its bound is a parameter — so the
+  swap is the walk's own premises and the sight ceiling, which is a
+  function OF the unit. The commit takes the frame arms to the cap and
+  finds out whether the ceiling follows or is where the swap stops.
 
 - **THEN THE INNER CROSSING ARM, DENOMINATED IN THE STORE.**
   `stepFrame-sz-inner` is still charged one rung and still FALSE at it.
@@ -247,11 +247,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### The ledger
 
-- **`fan-regsNest`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
-  syntactic unit, read as the registry's own place in the store measure.
-  REFUTED AT A REACHED STATE, not only an arbitrary one, so it is replaced
-  rather than discharged and no mint can be asked for it.
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
@@ -286,6 +281,11 @@ does not fit is a finding about the shared statement, not about the head.
   walk holding along one chain's path, now asked at the level the caps walk has
   itself reached rather than flat. The index no longer misses; what is left is
   the fan-out's own reading, which nothing has instantiated.
+- **`fan-regsNest`** (Part7/Depth-Fit) — SHAPE,
+  `REFUTED×2, DEAD ROUTE, PROBED`: the registry's own depth against the
+  syntactic unit. The cap-denominated statement is two proven steps, the unit
+  sits under the cap, and the reached counterexample survives every premise —
+  so the conclusion moves and the Φ face's currency with it.
 - **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
   one chain's climb priced per FRAME. The count half has an answer — the
   delivery face's sink-aware measure — and it is unaffordable and beside the
