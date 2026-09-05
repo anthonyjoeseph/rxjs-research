@@ -46,7 +46,7 @@ open import Verify-Budget-Sufficient.Walk-Factor using
 open import Verify-Budget-Sufficient.Regs-Nest-Walk using
   (foldPath-nest-regs; PathΦHyp; DispatchΦHyp; ShareGoΦHyp; FrameΦHyp; valsΦ?; valsSz?;
   valsΦ?-mono; valsSz?-mono; stepFrame-nest-Φ; stepFrame-sz; stepFrame-sz-store;
-  szCount; szCount≤ch; frameCh; walkSzOK; dispatchSzOK; shareGoSzOK; Φ-to-bound)
+  szCount; szCount≤ch; crossFrame?; frameCh; walkSzOK; dispatchSzOK; shareGoSzOK; Φ-to-bound)
 open import Verify-Budget-Sufficient.Nodes-Nest-Walk using (foldPath-nest-nodes)
 open import Verify-Budget-Sufficient.Nest-Ceiling using
   (Reached; Ent; Pos; base; walk; ent-step)
@@ -1792,6 +1792,53 @@ chAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
 chAt e sl id =
   frameCh (Caps.cSize (capsAt e sl id)) (Caps.cSize (capsAt e sl id))
 
+-- THE ONE FRAME KIND THIS LEDGER CANNOT PRICE, TAKEN WHOLE.  Four of
+-- the five frame kinds charge the ladder a count the ceiling above
+-- dominates, and the fifth charges what its arriving observables would
+-- cost to RUN.  That count is bounded -- by the burst width times the
+-- level's own size reading, which is the denomination the subscription
+-- door already prices its climbs in -- but it is not bounded by any
+-- multiple of a level-free quantity, and the premise below spends
+-- exactly such a multiple, one `chAt` per frame of the path.  So the
+-- gap is not the frame's charge and not the ceiling: it is that this
+-- ledger is a PRODUCT where the charge is a CLIMB, and no
+-- reparameterisation of `chAt` repairs that.  Reading `chAt` at the
+-- concluding level makes the premise unsatisfiable outright, since the
+-- ceiling would then dominate `iterSize S Lv S` while the premise asks
+-- it to fit under `Lv`.
+--
+-- WHAT WOULD DISCHARGE IT is the subscription door's own arithmetic:
+-- a nested climb in place of the product, `opIterD`-shaped, whose
+-- dominance lemma asks of an ops count only that it sit under the
+-- level's size reading -- which is precisely the premise this walk
+-- already carries at every frame.  That is a restatement of the ledger
+-- and of every consumer that spends it, not a proof, which is why the
+-- residue stands here at full strength rather than being ground.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Count` -- the crossing
+--   count against the cap-side ceiling, which is the assembly this
+--   postulate replaces.
+postulate
+  walk-cross-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv k : ℕ) (op : AllOp) (fid : NodeId) (p : Path Γ u t)
+    (vals : List (Val Γ (obs u))) (fin : Bool)
+    (sched : Sched Γ) (st : EvalSt e) →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    all (λ kv → boundedNode (iterSize (Caps.cSize (capsAt e sl id)) k
+                              (Caps.cSize (capsAt e sl id))) (proj₂ kv))
+        (EvalSt.nodes st) ≡ true →
+    walkSzOK (Caps.cSize (capsAt e sl id))
+             (Caps.cSize (capsAt e sl id)) k sf gas nid now
+             (thru-outer op fid ↠ p) vals fin sched st →
+    pathSz? (Caps.cSize (capsAt e sl id)) (thru-outer op fid ↠ p) ≡ true →
+    k + pathLen (thru-outer {Γ = Γ} {u = u} op fid ↠ p) * chAt e sl id
+      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
+    PathLiveHyp sf gas nid now
+      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      (thru-outer op fid ↠ p) vals fin sched st
+
 mutual
   walk-LiveHyp-goC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
@@ -1811,6 +1858,32 @@ mutual
     PathLiveHyp sf gas nid now
       (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
       path vals fin sched st
+
+  -- THE FRAME STEP, SHARED BY THE FOUR KINDS THE LEDGER CAN PRICE.  The
+  -- head reading and the tail recursion are one body for all of them;
+  -- what differs is only the count each charges, and the ceiling
+  -- dominates every one of those uniformly, so the frame kind enters
+  -- here exactly once -- as the premise saying it is not the crossing
+  -- one.
+  walk-frame-LiveHypC : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
+    (sl : Slots Γ) (id : ℕ) (sf : Gas) (gas : ℕ) (nid : Id) (now : Tick)
+    (Lv k : ℕ) (f : Frame Γ s u) (p : Path Γ u t) (vals : List (Val Γ s))
+    (fin : Bool) (sched : Sched Γ) (st : EvalSt e) →
+    crossFrame? f ≡ false →
+    valsSz? (iterSize (Caps.cSize (capsAt e sl id)) k
+              (Caps.cSize (capsAt e sl id))) vals ≡ true →
+    all (λ kv → boundedNode (iterSize (Caps.cSize (capsAt e sl id)) k
+                              (Caps.cSize (capsAt e sl id))) (proj₂ kv))
+        (EvalSt.nodes st) ≡ true →
+    walkSzOK (Caps.cSize (capsAt e sl id))
+             (Caps.cSize (capsAt e sl id)) k sf gas nid now
+             (f ↠ p) vals fin sched st →
+    pathSz? (Caps.cSize (capsAt e sl id)) (f ↠ p) ≡ true →
+    k + pathLen (f ↠ p) * chAt e sl id
+      + gas * (Caps.cSize (capsAt e sl id) * chAt e sl id) ≤ Lv →
+    PathLiveHyp sf gas nid now
+      (iterSize (Caps.cSize (capsAt e sl id)) Lv (Caps.cSize (capsAt e sl id)))
+      (f ↠ p) vals fin sched st
 
   -- ONE LEVEL OF THE DISPATCH TELESCOPE.  The spent arm owes nothing;
   -- the latched one is the fan-out fold over the admitted snapshot,
@@ -1903,8 +1976,29 @@ mutual
     hj′ : k + gas * (S * Ch) ≤ Lv
     hj′ = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
                     (≤-reflexive (sym (+-identityʳ k)))) hj
-  walk-LiveHyp-goC {e = e} sl id sf gas nid now Lv k (f ↠ p) vals fin sched st
+  walk-LiveHyp-goC sl id sf gas nid now Lv k (map-f fn ↠ p) vals fin sched st
                    hsz hns hw hpz hj =
+    walk-frame-LiveHypC sl id sf gas nid now Lv k (map-f fn) p vals fin sched st
+      refl hsz hns hw hpz hj
+  walk-LiveHyp-goC sl id sf gas nid now Lv k (scan-f fn fid ↠ p) vals fin sched st
+                   hsz hns hw hpz hj =
+    walk-frame-LiveHypC sl id sf gas nid now Lv k (scan-f fn fid) p vals fin sched st
+      refl hsz hns hw hpz hj
+  walk-LiveHyp-goC sl id sf gas nid now Lv k (take-f fid ↠ p) vals fin sched st
+                   hsz hns hw hpz hj =
+    walk-frame-LiveHypC sl id sf gas nid now Lv k (take-f fid) p vals fin sched st
+      refl hsz hns hw hpz hj
+  walk-LiveHyp-goC sl id sf gas nid now Lv k (from-inner op an ii ↠ p) vals fin
+                   sched st hsz hns hw hpz hj =
+    walk-frame-LiveHypC sl id sf gas nid now Lv k (from-inner op an ii) p vals fin
+      sched st refl hsz hns hw hpz hj
+  walk-LiveHyp-goC sl id sf gas nid now Lv k (thru-outer op fid ↠ p) vals fin
+                   sched st hsz hns hw hpz hj =
+    walk-cross-LiveHypC sl id sf gas nid now Lv k op fid p vals fin sched st
+      hsz hns hw hpz hj
+
+  walk-frame-LiveHypC {e = e} sl id sf gas nid now Lv k f p vals fin sched st
+                      hx hsz hns hw hpz hj =
       hHead
     , walk-LiveHyp-goC sl id sf gas nid now Lv (k + szCount f vals) p
         (proj₁ step)
@@ -1956,7 +2050,7 @@ mutual
                 (stepFrame-sz-store sf nid now f p vals fin sched st S A 2≤S
                    hns hsz)
     cnt≤ : szCount f vals ≤ Ch
-    cnt≤ = szCount≤ch S S 1≤S f vals hfz (proj₁ hw)
+    cnt≤ = szCount≤ch S S 1≤S f vals hx hfz (proj₁ hw)
     hjTail : k + szCount f vals + pathLen p * Ch + gas * (S * Ch) ≤ Lv
     hjTail = ≤-trans (+-monoˡ-≤ (gas * (S * Ch))
                        (≤-trans (≤-reflexive

@@ -215,15 +215,14 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-DENOMINATE THE FRAME CEILING — the whole crossing cost is now
-  known to sit there and nowhere else.** The fork settled the frame
-  half: the size-reading count holds at the chain that refutes the
-  constant AND at a reified arrival, so `stepFrame-sz`'s outer arm is
-  repairable. `frameCh`'s two quantities both read the program, so it
-  is not. The burst face already prices exactly this charge against
-  the LEVEL — `opIterD-dominated-at` asks only `m ≤ sizeAt S J` and
-  still lands the climb — so give `frameCh` the level index it lacks
-  and port that arithmetic, rather than inventing a per-kind ceiling.
+- **THE LEDGER IS A PRODUCT WHERE THE CHARGE IS A CLIMB.** Giving
+  `frameCh` the level index pays every arm of the count outright, so
+  the ceiling was never the blocker; what cannot hold it is the budget
+  premise spending it, one level-free `chAt` per frame against a charge
+  that grows with the level. Restate that budget as an `opIterD`-shaped
+  climb — the subscription door's own arithmetic, whose dominance lemma
+  asks of an ops count exactly the size premise this walk carries — and
+  re-price its consumers. `walk-cross-LiveHypC` stands in meanwhile.
 
 - **THE CHAIN DOOR'S LEDGER HAS NO SOURCE, so its product is an
   INSTANTIATION and not a bound.** What the size walk may spend is
@@ -232,8 +231,8 @@ does not fit is a finding about the shared statement, not about the head.
   reading the walk supports. Nothing carries the one into the other.
   Count the frames one chain's subscribe tree installs at concrete
   programs. And the two legs have converged: `chAt` is `frameCh` at the
-  cap in both arguments, which is the very ceiling the crossing count
-  is now refuted against, so whatever re-denominates one re-prices both.
+  cap in both arguments, so the climb that replaces the walk's product
+  is the same climb this door has to deliver, stated at the other end.
 
 - **THE LIVE-LIST MINT AT A DRAINED QUEUE.** `subscribeInner-nest-live`
   and `stepFrame-nest-live-outer` are what one subscribe out of a
@@ -265,6 +264,9 @@ does not fit is a finding about the shared statement, not about the head.
   the outer frame mints. Restated at its OWN size budget: depth truncates at
   the defer this arm mints across and size counts through it, so the ceiling
   was never paying. Uncovered: an entry fold already nonzero.
+- **`walk-cross-LiveHypC`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the whole
+  crossing frame's tail, out of the size walk because the ledger under it is a
+  product where its charge is a climb. Nothing has instantiated it.
 - **`stepFrame-sz-inner`, `stepFrame-sz-outer`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED×2, DEAD ROUTE×2`: both are FALSE. A crossing arm SUBSCRIBES a
   program that arrived as a value, and a duplication chain emits exponentially
