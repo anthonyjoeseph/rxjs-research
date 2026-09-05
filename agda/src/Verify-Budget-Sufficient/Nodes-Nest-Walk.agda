@@ -80,6 +80,31 @@ postulate
   -- walk started, and therefore one no reading of the entry table
   -- bounds.  Its grant is a value fit rather than a ceiling, because
   -- what the mint's depth is a function of is the subscribed value.
+  --
+  -- BUT THE FRESH CELL IS NOT WHAT THE READING SEES, and the arm the
+  -- proof has to pay for is the OTHER one.  A head's install carries no
+  -- payload and the measure prices it at zero -- which is proven beside
+  -- the install and not merely observed -- so an arrival that
+  -- SUBSCRIBES moves this fold not at all.  The write that does move it
+  -- is the arrival that does not subscribe: a full *All PARKS its
+  -- observable in the node's queue, and the queue is the one cell the
+  -- measure reads through.  So the value fit is the right grant for a
+  -- reason one word off the one above: what the frame stores is the
+  -- arriving value itself, not a cell shaped by it.
+  --
+  -- PROBED: `Probed.Thru-Outer-Store` -- the merge arm at capacity ONE
+  --   handed two arrivals, so the first subscribes and stays active and
+  --   the second has nowhere to go but the queue, at three rungs of a
+  --   flatten ladder and at the budget the value premise itself
+  --   licenses at burst zero.  Covered: the fold climbing with the
+  --   arrivals' depth against an entry table of zero, pinned at the
+  --   parked cell as well as at the fold so the reading is attributed
+  --   rather than assumed, and clearing the budget by a CONSTANT one at
+  --   every rung.  Not covered: the switch and exhaust arms, which kill
+  --   or drop rather than queue; an entry queue already nonempty, where
+  --   the park compounds instead of starting from zero; and the frame
+  --   grant, which is a Σ and does not compute -- so a row is evidence
+  --   about the CONCLUSION, unconditional where green.
   stepFrame-nest-nodes-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
     (path : Path Γ u t)
