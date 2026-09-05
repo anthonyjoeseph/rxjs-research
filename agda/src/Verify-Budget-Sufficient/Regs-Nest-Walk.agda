@@ -31,7 +31,7 @@ open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.Product using (Σ; _×_; _,_; proj₁; proj₂)
 open import Data.Vec using (lookup)
 open import Data.Unit using (⊤; tt)
-open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; subst)
+open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; subst)
 
 open import Decide using (∧-intro; ∧-trueˡ; ∧-trueʳ; T-to; T⇒≡true; ≤ᵇ-widen)
 open import Rx.Prim using (Gas; g0; gs; Id; Tick; Source; InstEvent; close; exhausted)
@@ -45,7 +45,7 @@ open import Rx.Evaluator
   shareAdmit; shareLatch; iterSize; NodeState; scan-st; take-st; mergeAll-st; switch-st;
   exhaust-st; takeDispatch; takeVals; lookupNode; scanVals; mergeAllᵒ; switchᵒ; exhaustᵒ;
   mergeAllDrain; innerFinish; aliveThroughᶠ; subscribeInner; hasRoom;
-  thruConsume; switchKill)
+  thruConsume; thruWrap; switchKill)
 open import Rx.Nest-Depth using (nestDᵛ; nestDᵗ)
 open import Verify-Budget-Sufficient.Nest-Walk
   using (nestDᵛˢ; thruWalk-nest; nodeNestAt; stepFrame-emit-scan;
@@ -1531,6 +1531,191 @@ stepWiden : ∀ {n} {Γ : Ctx n} (S B k : ℕ) → 2 ≤ S →
 stepWiden S B k 2≤S ns h =
   nodesSz-widen (iterSize-infl S (≤-trans (s≤s z≤n) 2≤S) k B) ns h
 
+-- THE WRAP THAT CLOSES A `thru-outer` FRAME CANNOT MOVE THE STORE
+-- READING.  Whichever door it is, it rewrites exactly the cell it just
+-- read and changes only that cell's own-done flag -- and no flag is
+-- among what the reading prices, which is a scan's accumulator and a
+-- merge queue's entries.  So the level the fold below arrives at is
+-- the level the frame leaves, and the arm's whole content is the fold.
+thruWrap-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (op : AllOp) (nid : NodeId) (fin : Bool) (M : ℕ)
+  (r : List (Val Γ u) × List (InstEvent (Val Γ t)) × Sched Γ × EvalSt e) →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂ r)))) ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂ (proj₂ (thruWrap op nid fin r))))))
+    ≡ true
+thruWrap-sz-store op nid false M (vs , bs , sched , st) h = h
+thruWrap-sz-store mergeAllᵒ nid true M (vs , bs , sched , st) h
+  with lookupNode nid (EvalSt.nodes st)
+     | lookupNode-sz M nid (EvalSt.nodes st) h
+... | just (mergeAll-st lim act q od) | hb =
+      setNode-bounded M nid (mergeAll-st lim act q true) (EvalSt.nodes st) hb h
+... | just (scan-st _)      | _ = h
+... | just (take-st _)      | _ = h
+... | just (switch-st _ _)  | _ = h
+... | just (exhaust-st _ _) | _ = h
+... | nothing               | _ = h
+thruWrap-sz-store switchᵒ nid true M (vs , bs , sched , st) h
+  with lookupNode nid (EvalSt.nodes st)
+... | just (switch-st cur od)    =
+      setNode-bounded M nid (switch-st cur true) (EvalSt.nodes st) refl h
+... | just (scan-st _)           = h
+... | just (take-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (exhaust-st _ _)      = h
+... | nothing                    = h
+thruWrap-sz-store exhaustᵒ nid true M (vs , bs , sched , st) h
+  with lookupNode nid (EvalSt.nodes st)
+... | just (exhaust-st act od)   =
+      setNode-bounded M nid (exhaust-st act true) (EvalSt.nodes st) refl h
+... | just (scan-st _)           = h
+... | just (take-st _)           = h
+... | just (mergeAll-st _ _ _ _) = h
+... | just (switch-st _ _)       = h
+... | nothing                    = h
+
+postulate
+  -- WHAT ONE ARRIVING SUBSCRIPTION WRITES, which is the whole of the
+  -- outer arm's store obligation once the fold and the wrap are taken
+  -- off it.  A consumption subscribes the arrival, and the cells the
+  -- subscription installs hold that run's emission -- reified, so
+  -- priced by the arrival's LAYERS -- with the telescope beside them
+  -- for the slots the run connects.  The one door that writes without
+  -- subscribing parks the arrival instead, and a park appends a term
+  -- the value premise already bounds.
+  --
+  -- AND IT IS STATED AT A LEVEL THE ARRIVAL ALREADY REACHES, NOT AS A
+  -- CLIMB FROM THE PREMISE'S OWN.  That is what makes it composable
+  -- across a burst the count joins by MAX: a statement handing back
+  -- one rung per arrival would compound over the fold, and the join
+  -- says the arrivals do not compound.  So the level is carried as a
+  -- parameter with the arrival's charge under it, and the fold's job
+  -- is to show the level is never raised rather than to add rungs up.
+  --
+  -- PROBED: `Probed.Cross-Count-Outer-Store` at the very state that
+  --   killed the constant, a scan whose step stores the arriving datum
+  --   back as a one-shot observable, run through all three doors.  One
+  --   installed node per witness, so nothing about a parked QUEUE at
+  --   this arm, whose entries are programs the run never delivered.
+  -- PROBED: `Probed.Parked-Queue-Store` at that queue, both ways the
+  --   door can take an arrival.  Admitting one beside a queue of two
+  --   leaves the count where an empty queue leaves it, since the count
+  --   reads the arrival; and PARKING one costs the ladder nothing at
+  --   all -- the row is read at rung ZERO, the premise's own bound
+  --   climbed by nothing, because a park only appends what the premise
+  --   already bounded.  One queue depth and the merging door alone,
+  --   which is the only shape that parks.
+  -- PROBED: `Probed.Cell-Chain-Store` at a table whose cells were
+  --   written in SERIES, which every row above declines: a reifying
+  --   scan under a `mergeAll` under a second reifying scan, arriving
+  --   as ONE value, so the consumption writes three cells where the
+  --   control writes one.  Both tables are read at the same two rungs
+  --   and need the same one: a cell holding what the cell below it
+  --   emitted is priced by the emission and not by its position, so
+  --   the series does not compound and counting the arrival's layers
+  --   once is not short.  One chain, of one length, with the telescope
+  --   a single scripted slot -- so nothing about a chain whose cells
+  --   resolve a SLOT, where the summand would do the work.
+  thruConsume-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+    (sl : Slots Γ) (sf : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+    (id : Id) (now : Tick) (o : Val Γ (obs u))
+    (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+    Sched.slots sched ≡ sl →
+    iterSize S (layᵉ o + slotsSize sl) B ≤ M →
+    all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+    (sizeᵛ (obs u) o ≤ᵇ B) ≡ true →
+    all (λ kv → boundedNode M (proj₂ kv))
+        (EvalSt.nodes (proj₂ (proj₂ (proj₂
+          (thruConsume sf op nid κ id now o sched st)))))
+      ≡ true
+
+-- THE FOLD OVER THE BURST, CARRYING A LEVEL RATHER THAN CLIMBING ONE.
+-- Each arrival is consumed at the state its predecessor left, so an
+-- induction that gave the table a rung per entry would end at the
+-- arrivals' SUM -- and the count joins them by max.  What is carried
+-- instead is one level high enough for the whole burst: the head's own
+-- charge sits under the join, so the leaf above leaves the level where
+-- it found it, and the tail inherits the same level unchanged.
+--
+-- AND THE TELESCOPE SURVIVES THE FOLD, which is what lets the level be
+-- named once at the head schedule: a consumption hands on the slots it
+-- was handed, whichever door it took.
+thruWalk-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sl : Slots Γ) (sf : Gas) (op : AllOp) (nid : NodeId) (κ : Path Γ u t)
+  (id : Id) (now : Tick) (vals : List (Val Γ (obs u)))
+  (sched : Sched Γ) (st : EvalSt e) (S B M : ℕ) → 2 ≤ S →
+  Sched.slots sched ≡ sl →
+  iterSize S (layᵛˢ (obs u) vals + slotsSize sl) B ≤ M →
+  all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  all (λ kv → boundedNode M (proj₂ kv))
+      (EvalSt.nodes (proj₂ (proj₂ (proj₂
+        (thruWalk sf op nid κ id now vals sched st)))))
+    ≡ true
+thruWalk-sz-store sl sf op nid κ id now [] sched st S B M 2≤S slEq le hns hv = hns
+thruWalk-sz-store {u = u} sl sf op nid κ id now (o ∷ os) sched st S B M
+                  2≤S slEq le hns hv =
+  thruWalk-sz-store sl sf op nid κ id now os sched₁ st₁ S B M 2≤S
+    (trans (thruConsume-slots sf op nid κ id now o sched st) slEq)
+    tailLe headBound (∧-trueʳ hv)
+  where
+  1≤S : 1 ≤ S
+  1≤S = ≤-trans (s≤s z≤n) 2≤S
+
+  r₁ = thruConsume sf op nid κ id now o sched st
+  sched₁ = proj₁ (proj₂ (proj₂ r₁))
+  st₁ = proj₂ (proj₂ (proj₂ r₁))
+
+  headBound : all (λ kv → boundedNode M (proj₂ kv)) (EvalSt.nodes st₁) ≡ true
+  headBound =
+    thruConsume-sz-store sl sf op nid κ id now o sched st S B M 2≤S slEq
+      (≤-trans (iterSize-mono-count S B 1≤S
+                 (+-monoˡ-≤ (slotsSize sl)
+                   (m≤m⊔n (layᵉ o) (layᵛˢ (obs u) os))))
+               le)
+      hns (∧-trueˡ hv)
+
+  tailLe : iterSize S (layᵛˢ (obs u) os + slotsSize sl) B ≤ M
+  tailLe =
+    ≤-trans (iterSize-mono-count S B 1≤S
+              (+-monoˡ-≤ (slotsSize sl)
+                (m≤n⊔m (layᵉ o) (layᵛˢ (obs u) os))))
+            le
+
+-- THE OUTER ARM'S STORE HALF, ASSEMBLED.  Its count is the object the
+-- value half spends -- the arrivals' layers joined by max, plus the
+-- telescope -- and the arm is the fold under the wrap, so the level the
+-- conclusion names is exactly the level the fold is asked to hold.
+--
+-- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-outer-absurd`
+--   -- one rung, which is the charge this reading replaces.
+stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
+  (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
+  (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
+  (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
+  all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
+  valsSz? B vals ≡ true →
+  all (λ kv → boundedNode
+                (iterSize S (szCount (Sched.slots sched) (EvalSt.nodes st)
+                              (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
+                (proj₂ kv))
+      (EvalSt.nodes
+        (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (thru-outer op nid)
+                                       path vals fin sched st))))))
+    ≡ true
+stepFrame-sz-store-outer {u = u} sf id now op nid path vals fin sched st S B
+                         2≤S hns hv =
+  thruWrap-sz-store op nid fin
+    (iterSize S (layᵛˢ (obs u) vals + slotsSize (Sched.slots sched)) B)
+    (thruWalk sf op nid path id now vals sched st)
+    (thruWalk-sz-store (Sched.slots sched) sf op nid path id now vals sched st
+      S B (iterSize S (layᵛˢ (obs u) vals + slotsSize (Sched.slots sched)) B)
+      2≤S refl ≤-refl
+      (stepWiden S B (layᵛˢ (obs u) vals + slotsSize (Sched.slots sched))
+        2≤S (EvalSt.nodes st) hns)
+      hv)
+
 -- THE STORE SIDE OF THE SAME STEP, and the reason the walk can carry
 -- its own store premise rather than importing one: at the three arms
 -- that compute, a frame writes at most the entry it read, and the only
@@ -1553,19 +1738,16 @@ stepFrame-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     ≡ true
 
 postulate
-  -- THE STORE HALVES OF THE SAME TWO FRAMES.  What a crossing writes
-  -- into the table is what its subscription emitted -- a scan the
-  -- subscription installs holds the emission REIFIED, and `reify` at a
-  -- product mirrors the value it came from -- so the quantity owed
-  -- here is the same one the value halves owe, reaching the table only
-  -- by being written there.  The inner half therefore follows the
-  -- inner value half onto the parked queue AND the telescope beside
-  -- it; the outer half reads the arrivals and the telescope, as its
-  -- own value half does.
+  -- THE STORE HALF OF THE CROSSING THAT DRAINS.  What a crossing
+  -- writes into the table is what its subscription emitted -- a scan
+  -- the subscription installs holds the emission REIFIED, and `reify`
+  -- at a product mirrors the value it came from -- so the quantity
+  -- owed here is the same one the inner value half owes, reaching the
+  -- table only by being written there: the parked queue's layers AND
+  -- the telescope beside them.
   --
   -- REFUTED: `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-inner-absurd`
-  --   and `Refuted.Frame-Step-Size-Cross-Store.stepFrame-sz-store-outer-absurd`
-  --   -- one rung at each, which is the charge both readings replace.
+  --   -- one rung, which is the charge this reading replaces.
   -- PROBED: `Probed.Cross-Count-Store` -- the inner half at the very
   --   witness that kills the constant: a scan whose accumulator is the
   --   drained program's emission reified, charged at the layers the
@@ -1616,60 +1798,6 @@ postulate
                   (proj₂ kv))
         (EvalSt.nodes
           (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (from-inner op allNid inst)
-                                         path vals fin sched st))))))
-      ≡ true
-
-  -- THE OUTER STORE HALF, WHICH IS THE ONE CONCLUSION OF THIS ARM NO
-  -- ROW HAS EVER STOOD AT.  Its count is the same object the value
-  -- half spends -- the arrivals' layers joined by max, plus the
-  -- telescope -- and every separation that count rests on was taken at
-  -- the value half: against a constant and against the arrivals' size
-  -- (`Probed.Cross-Count-Fork`), against an operator spine
-  -- (`Probed.Cross-Count-Data`, `Probed.Cross-Count-Spine`), and the
-  -- max against the sum (`Probed.Cross-Count-Burst`) -- every one of
-  -- them reading what the frame DELIVERED.  So what is open here is not
-  -- the count's shape but whether a quantity settled against the
-  -- delivered list also covers what the subscription WRITES, which is a
-  -- different reading of the same run: a scan the subscription installs
-  -- holds the emission reified.
-
-  -- PROBED: `Probed.Cross-Count-Outer-Store` -- at the very state that
-  --   killed the constant, a scan whose step stores the arriving datum
-  --   back as a one-shot observable, run through all three sinks.  One
-  --   installed node per witness, so nothing about a parked QUEUE at
-  --   this arm, whose entries are programs the run never delivered.
-  -- PROBED: `Probed.Parked-Queue-Store` at that queue, both ways the
-  --   door can take an arrival.  Admitting one beside a queue of two
-  --   leaves the count where an empty queue leaves it, since the count
-  --   reads the arrival; and PARKING one costs the ladder nothing at
-  --   all -- the row is read at rung ZERO, the premise's own bound
-  --   climbed by nothing, because a park only appends what the premise
-  --   already bounded.  One queue depth and the merging door alone,
-  --   which is the only shape that parks.
-  -- PROBED: `Probed.Cell-Chain-Store` at a table whose cells were
-  --   written in SERIES, which every row above declines: a reifying
-  --   scan under a `mergeAll` under a second reifying scan, arriving
-  --   as ONE value, so the frame writes three cells where the control
-  --   writes one.  Both tables are read at the same two rungs and
-  --   need the same one: a cell holding what the cell below it
-  --   emitted is priced by the emission and not by its position, so
-  --   the series does not compound and counting the arrival's layers
-  --   once is not short.  One chain, of one length, with the
-  --   telescope a single scripted slot -- so nothing about a chain
-  --   whose cells resolve a SLOT, where the summand would do the
-  --   work.
-  stepFrame-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
-    (sf : Gas) (id : Id) (now : Tick) (op : AllOp) (nid : NodeId)
-    (path : Path Γ u t) (vals : List (Val Γ (obs u))) (fin : Bool)
-    (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
-    all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
-    valsSz? B vals ≡ true →
-    all (λ kv → boundedNode
-                  (iterSize S (szCount (Sched.slots sched) (EvalSt.nodes st)
-                                (thru-outer {Γ = Γ} {u = u} op nid) vals) B)
-                  (proj₂ kv))
-        (EvalSt.nodes
-          (proj₂ (proj₂ (proj₂ (proj₂ (stepFrame sf id now (thru-outer op nid)
                                          path vals fin sched st))))))
       ≡ true
 

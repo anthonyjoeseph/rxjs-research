@@ -1,26 +1,28 @@
 -- ══════════════════════════════════════════════════════════════════
--- THE OUTER CROSSING'S TABLE, WHICH IS THE ONE CONCLUSION OF THIS ARM
--- NOTHING HAD EVER STOOD AT.
+-- WHAT ONE ARRIVING SUBSCRIPTION WRITES, WHICH IS THE READING NOTHING
+-- HAD EVER STOOD AT.
 --
--- TARGET: stepFrame-sz-store-outer @62e3c5
+-- TARGET: thruConsume-sz-store @8ba31b
 --
--- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The count is one
--- object across both halves of the arm -- the arrivals' layers joined
--- by max, plus the telescope -- and every separation it rests on was
--- taken at the DELIVERED list.  What a subscription WRITES is a
--- different reading of the same run: the arrival is reified by
--- whatever operator it lands under, so a scan the subscription
--- installs holds an emission rather than an arrival, and `sizeᵛ` at an
--- `obs` reads the expression that emission became.  A quantity settled
--- against what came out says nothing about that until it is run.
+-- WHY THE OTHER HALF'S ROWS DO NOT REACH HERE.  The level this leaf is
+-- held to is the arrival's own layers plus the telescope, and every
+-- separation that quantity rests on was taken at the DELIVERED list.
+-- What a subscription WRITES is a different reading of the same run:
+-- the arrival is reified by whatever operator it lands under, so a
+-- scan the subscription installs holds an emission rather than an
+-- arrival, and `sizeᵛ` at an `obs` reads the expression that emission
+-- became.  A quantity settled against what came out says nothing about
+-- that until it is run.
 --
 -- THE ROWS.  The state is the one that killed the constant this
 -- reading replaces: a `mergeAll` door with no queue, handed a scan
 -- whose step discards its accumulator and stores the arriving datum
 -- back as a one-shot observable, over a thirteen-rung duplication
--- chain.  The table is read at the refuted rung and then at the
--- repaired one, and reports `false` then `true` -- so the charge did
--- not merely rename the bound.  The figures beside them say by how
+-- chain.  The tables are read at the frame, which at ONE arrival and
+-- no close is the consumption itself -- the fold has one step and the
+-- wrap moves nothing.  They are read at the refuted rung and then at
+-- the repaired one, and report `false` then `true` -- so the charge
+-- did not merely rename the bound.  The figures beside them say by how
 -- much: fourteen layers and a one-slot telescope, against a program
 -- of size sixty-three whose stored emission is exponential in it.
 --
@@ -41,7 +43,7 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_)
 open import Data.Maybe using (nothing)
-open import Data.Nat using (ℕ)
+open import Data.Nat using (ℕ; _+_)
 open import Data.Product using (proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
@@ -54,7 +56,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ
   sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; stepFrame-sz-store-outer)
+  using (szCount; thruConsume-sz-store)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; e₀; st₀; vals₀; post₀)
 open import Probed.Apparatus using (Confirms)
@@ -133,9 +135,10 @@ sinkRows≡ = refl
 -- the conclusion with them unasked.
 ----------------------------------------------------------------------
 
--- LOAD-BEARING: it fails for any charge the stored emission outruns,
--- which the constant it replaces does.
+-- LOAD-BEARING: it fails for any level the stored emission outruns,
+-- which the constant it replaces is.
 tieOuterStore : Confirms
-  (stepFrame-sz-store-outer {e = e₀} (gasPad 8 g0) 0 0 mergeAllᵒ 0 root
-     vals₀ false (sched-init e₀ sl₁) st₀ 63 63)
-tieOuterStore = λ _ _ _ → refl
+  (thruConsume-sz-store {e = e₀} sl₁ (gasPad 8 g0) mergeAllᵒ 0 root 0 0
+     inner (sched-init e₀ sl₁) st₀ 63 63
+     (iterSize 63 (layᵉ inner + slotsSize sl₁) 63))
+tieOuterStore = λ _ _ _ _ _ → refl
