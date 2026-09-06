@@ -3,11 +3,11 @@
 module Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps where
 
 open import Data.Bool    using (true; false; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _+_; _*_; _⊔_; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; suc; _+_; _≤_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ≤-reflexive; n≤1+n; *-identityʳ)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
-open import Data.List    using (List; []; _∷_; length; foldr)
+open import Data.List    using (List; []; _∷_; length)
 open import Data.Bool.ListAction using (all; any)
 open import Data.Fin     using (Fin)
 import Data.Fin as Fin
@@ -24,11 +24,9 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; refl; sym; trans; subst)
 
 open import Rx.Prim      using (Tick; Id; Source; _at_from_as_; Gas; after_,_; close; exhausted)
-open import Rx.Exp       using (obs; _≟ᵗ_; Ctx; Closed; Val; sizeᵛ)
+open import Rx.Exp       using (obs; _≟ᵗ_; Ctx; Closed; Val)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
-open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestF; slotsNestSum; liveNest)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; Chain; lookupNode; NodeId; AllOp; cascadeLatch;
   cascadeFinish; arrSource; chainsOf; chainsGo; cascadeGo; Path; arrTy; stepFrame;
   subscribeInner; innerFinish; sameSource; regAt; fLvlD; lvls; sLvlD; chainStep; budgetAt;
@@ -556,147 +554,3 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
             chainStep id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ })
       in trans (cascadeGo-slots a id chains sched₁ st₁)
                (chainStep-slots id a c sched₀ (record st₀ { delivered = rid ∷ EvalSt.delivered st₀ }))
-
-
--- AND NO CONSTANT MULTIPLE OF THE SYNTACTIC CEILING CAN WORK, BECAUSE
--- THE DESCENT IS A PRODUCT AND EVERY NARROW TERM IS A SUM.  That is
--- the difference between a width factor that is merely safe and one
--- that is structural.  The two refutations below kill one narrow
--- reading each, and either could be read as an off-by-a-constant that
--- a larger constant would fix.  It is not one.  `Harness.Main`'s
--- SERIES X decomposes the crossing instant and drives its two axes
--- INDEPENDENTLY (measured-not-rechecked, so it discharges nothing):
--- over a grid of fold depth `w` against source length `k` the descent
--- is `w * (k + 4) + 1` throughout, so the slope down the source axis
--- IS the fold depth.  `nestSyn`, `chainsNestD` and `storeNestMax` each
--- move with `w` alone and with `k` not at all, so no multiple of them
--- tracks a term in `w * k` however large it is taken.  `realWidAt` is
--- the one term in this vocabulary that moves with BOTH axes, which is
--- what makes `realWidAt * nestSyn` a product rather than a generous
--- constant, and why the width form clears every row the narrow ones
--- cross on.
-
--- AND THE CHAIN COUNT AND THE REGISTRY ARE FLAT ACROSS THAT WHOLE
--- GRID, both reading ONE at every cell, which is what says where the
--- growth is NOT.  It is not a longer selection for the cascade to fold
--- over, and it is not registrations accumulating as the fold threads
--- its state -- the two readings the shape of the recursion invites,
--- since both folds in this family carry their tail at the state the
--- head left.  What is left is the bounded limit's drain, which is
--- where all three refutations in this face already pointed.  The
--- positive mechanism is not read off this grid and is not claimed
--- here.
-
--- THE PENDING-SOURCE COMPONENT, which is where this statement is
--- FALSE.  A live source carries the values an emit has queued but not
--- yet dispatched, so a walk can leave one holding a value nested deeper
--- than anything the store held before.  It does, and the constructor
--- that does it is `deferᵉ`: its subscribe clause mints a live source of
--- its own with `elemTy = obs u` and the deferred BODY as the pending
--- payload, so `liveNest` reads the body's full depth.
---
--- AND THE ARGUMENT THAT SAID OTHERWISE WAS STRUCTURAL, WHICH IS WHY IT
--- HELD FOR SO LONG.  A live minted at a SCRIPTED slot takes its element
--- type from that slot, and `Slot`'s scripted constructor carries an
--- `isData` side condition that is false at every observable type -- so
--- no slot-minted live can carry an observable, and every family the
--- harness drives reads this component as zero.  All of that is true.
--- It is not exhaustive: the slot is one of TWO mint sites, and the
--- other one never meets `isData`.
-
--- THE OBVIOUS REPAIR IS ALSO DEAD, and it is dead for a reason worth
--- carrying rather than rediscovering.  Charging the ARRIVAL's payload
--- cannot cover the new live, because the payload IS the `deferᵉ` term
--- and `nestDᵉ` is zero there by design -- a deferred body is not
--- entered synchronously, so the synchronous measure declines to look
--- inside it.  The measure's zero and the store's content therefore
--- disagree at exactly one constructor, and every quantity built over
--- `nestDᵉ` -- the unit, the syntactic ceiling -- inherits the blindness.
--- What a repair must find is a term that sees a deferred body, and
--- `sizeᵛ` is one: the sighted measure descends where the synchronous
--- one stops, so the charge is the arrival's SIZE rather than its
--- depth, taken once per chain the selection carries.  That currency
--- costs nothing above, because the caps already bound an arrival's
--- size -- it is `valCaps?`'s first conjunct, which the tick holds
--- already -- so the premise the restatement needs is discharged where
--- the cascade is entered and never reaches a caller.
---
--- AND THE FOLD ABOVE IT IS THREADED IN THE LIVE COMPONENT'S OWN
--- CURRENCY, not in the store's, because the store is the one thing the
--- induction cannot carry: a walk GROWS the node table, so an inductive
--- step landing at `storeNestMax` of the state it produced could never
--- be brought back to the state it started from.  What does thread is
--- the pair the live component can actually reach -- the lives already
--- there, and the slots, which `cascadeGo-slots` proves the fold leaves
--- untouched.  The statement the caller wants follows because both are
--- summands of the same `⊔`.
---
--- THE SHAPE THAT COULD WORK IS THE μ STEP'S, NOT THE FRAME'S.  A μ
--- already jumps the level by a quadratic without paying an operator per
--- level, because its measure is RE-MINTED at the stepped level's size
--- cap rather than decremented.  A frame's sibling of that step is what
--- this leaf is waiting on, and it leaves the drain's conjunct
--- arithmetic — which is what kept the ceiling out of the types.
-
--- AND THE ARRIVAL'S SIZE IS NOT ENOUGH EITHER, BECAUSE THE MINTED BODY
--- NEED NOT ARRIVE.  A scan hands its parked seed through unchanged, so
--- a step can mint a live out of a value the arrival never carried and
--- the store's depth measure reads as zero.  The charge that survives
--- is the level's own size cap, one level up -- every parked value and
--- every arrival is size-capped there, and a deferred body is seen by
--- SIZE where no depth measure looks -- so the statement as it reads
--- here does not survive that mint, and the restatement at that cap is
--- what is owed.  The live fold is a NEXT-instant quantity: nothing in this
--- instant's descent reads it, so the fold's ceiling is spent at the
--- instant boundary alone and never inside a cascade.
---
--- REFUTED: `Refuted.Chain-Step-Live-Nest`, three against one at a body
---   three layers deep and five against one at five, so the gap is
---   unbounded in the body's depth and no constant repairs it.
--- REFUTED: `Refuted.Chain-Step-Live-Seed` -- this statement, at a deep
---   deferred constant parked as a scan's SEED and handed through to a
---   merging outer: the arrival is one unit wide, the path factor a
---   small constant, the minted live the seed's full depth, and the
---   node fold reads the seed as zero -- so the gap is unbounded in the
---   seed and no store term in the depth currency closes it.
--- REFUTED: `Refuted.Chain-Step-Live-Additive` -- the depth-additive
---   charge, the path's depth plus the arrival's size, at a `map-f`
---   whose function is a deferred constant: both depth measures read
---   zero into the body while the grown fold tracks its depth.
--- PROBED: `Probed.Chain-Step-Live-Nest` re-runs that same adversarial
---   family against THIS conclusion rather than a numeral standing in
---   for it.  Covered: the deferred-body rows the old form died on --
---   grown 3 against a charge of 16, grown 5 against 24 -- so the two
---   sides now move together where they used to diverge, and each is
---   pinned separately so a repair moving either fails naming a number.
---   Also covered, and it is the reason the file is not two rows: the
---   right side carries NO store term, so a step minting a live out of
---   a PARKED value would exceed it with the arrival left shallow.  The
---   attack is armed -- a limited merge whose first inner is a `deferᵉ`
---   leaves the second genuinely pending, and the node reads depth 2
---   and 4 -- and the grown fold stays at zero, so the drain does not
---   run inside a step and the missing store term is not owed here.
---   And the tight direction on the path: `frameNestF` is one at every
---   frame but `map-f`/`scan-f`, so two merge frames give the step a
---   second mint site while leaving the charge exactly where the
---   one-frame rows left it -- grown 3 against 19, grown 5 against 27.
---   And a `map-f`, the only frame that both exceeds a factor of one
---   and hands the step a value the ARRIVAL never carried: a constant
---   deferred body two and four deep, against a shallow arrival, mints
---   at the body's depth and the factor pays for it.  The constant must
---   be DEFERRED or the row cannot fail -- a plain deep observable
---   finishes inside the step and the grown fold stays at zero.
---   NOT covered: a share sink, whose mint site no row here reaches.
--- RECOVERY: git show df46945:agda/src/Verify-Budget-Sufficient/Live-Nest-Walk.agda
---   restores the frame-by-frame live walk that priced the live fold
---   under the instant's ceiling, and the size walk beside it in
---   `Regs-Nest-Walk` at the same sha.
-postulate
-  chainStep-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
-    (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)
-    (sched : Sched Γ) (st : EvalSt e) →
-    let r = chainStep id a path sched st
-    in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
-         ≤ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
-           ⊔ slotsNestSum (Sched.slots sched)
-           ⊔ pathNestF path * sizeᵛ (arrTy a) (arrVal a)

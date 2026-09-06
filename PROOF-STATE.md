@@ -215,29 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **ONE DELIVERY'S PENDING SOURCES ARE CHARGED WHERE NO DEPTH MEASURE
-  LOOKS.** The live a step mints need not be carried by the arrival: a
-  scan hands a parked deferred seed through unchanged, and that seed
-  is a live of any depth at arrival width one and node fold zero, so
-  the per-chain charge at the arrival's size is refuted outright. What
-  survives is the level's own SIZE cap one level up, where every parked
-  value and every arrival is already priced. The commit restates
-  `chainStep-nest-live` at `nestCapAt e sl (suc id)`, carries the
-  restatement through `cascadeGo-live-nest` to `cascadeGo-nest-live`,
-  and retargets or deletes `Probed.Chain-Step-Live-Nest`, whose rows are
-  evidence about the form that died.
-
-- **THE LIVE FOLD IS SPENT AT THE INSTANT BOUNDARY, THE ONE PLACE ITS
-  CEILING IS OWED.** Nothing in an instant's descent reads the fold —
-  the store ceiling every chain descends under is stated over the
-  synchronous store alone — so the fold's bound has one consumer: the
-  subscribe frame's `burst-nest-live` receipt, against the unit plus
-  `capsAt`'s size. The commit instantiates the restated live charge at
-  the seed program of the refutation, at the boundary, and either fits
-  it under that receipt's bound, which closes the tie, or finds a parked
-  seed's size outrunning the unit, which is a finding for the receipt's
-  own header and not for any ledger.
-
 - **THE THIRD LEVEL, WHERE THE RATE FIRST PAYS FOR A SQUARING OF A
   SQUARING.** Composition is instantiated at both descents now and the
   rate is not — a property of the leaf, not of the programs: the door's
@@ -249,6 +226,29 @@ does not fit is a finding about the shared statement, not about the head.
   needs the second group — so the commit takes that family to three,
   where the third group is bought at a bound already squared twice and
   a merely generous rate stops reading the same as a right one.
+
+- **THE LIVE FOLD IS NOT CARRIED — IT IS READ OFF THE PREDICATE AT THE
+  PLACE IT IS OWED.** The cascade's fold now comes from the exit cap's
+  own store conjunct, depth being pointwise under size, and no
+  walk-denominated charge survives that reading. The same reading is
+  owed one frame up: `burst-nest-live` charges the subscribe frame's
+  live place against the unit plus `capsAt`'s size, and its site
+  carries a caps predicate of the same shape. The commit takes the
+  pointwise route there and either retires the row or finds the
+  frame's post-state carrying no size cap at all — which is a finding
+  for that row's header, and the point at which the two places stop
+  mirroring each other.
+
+- **THE SYNCHRONOUS MAXIMUM IS A PREMISE NO PRODUCER ESTABLISHES.**
+  `chain-depth-sighted` prices one chain's descent under the round's
+  ceiling off the store's synchronous maximum — slots, nodes and
+  registry, the live fold deliberately absent, which the reading above
+  vindicates rather than merely permits. Its rows tie that premise to
+  the ENTRY store's own maximum and a store filled past it is
+  uncovered, so what the row rests on is an invariant nothing supplies.
+  The commit instantiates the premise at a program whose walk writes
+  the store before the chain is taken; the answer decides between a
+  carried record field and a restatement at the exit cap.
 
 ### The ledger
 
@@ -287,11 +287,6 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`chainStep-nest-live`** (Part7/Cascade-Caps) — SHAPE,
-  `REFUTED×3, PROBED, RECOVERY`: one delivery's pending sources, charged per
-  chain at the arrival's `sizeᵛ`. A parked deferred seed handed through a scan
-  mints a live of any depth at width one, so the charge owed is the level's
-  size cap one level up; restate there before grinding.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one

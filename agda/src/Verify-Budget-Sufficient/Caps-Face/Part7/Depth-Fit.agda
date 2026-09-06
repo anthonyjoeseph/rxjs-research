@@ -2265,6 +2265,106 @@ cascade-depth-capsH {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz val
   where
   B = nestΦAt e sl id
 
+-- THE WALK'S POST-STATE FITS THE INSTANT'S EXIT CAP, which is the caps
+-- face's own product read one clause before the instant ends.  The
+-- store face needs it at exactly this point: its measure is taken over
+-- the walk's post-state, before the finish shortens any list, so a fit
+-- stated after the finish is not one it can spend.
+caps-go :
+  (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
+    (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
+    (κ′ : Path Γ′ u′ t′) (id′ : Id) (now′ : Tick) (o′ : Val Γ′ (obs u′))
+    (sl′ : Slots Γ′) (sched′ : Sched Γ′) (st′ : EvalSt e′) →
+    2 ≤ Caps.cSize c′ →
+    1 ≤ Caps.cReg c′ →
+    Sched.slots sched′ ≡ sl′ →
+    slotsCaps? (Caps.cSize c′) (Caps.cWid c′) sl′ ≡ true →
+    slotsSize sl′ ≤ Caps.cSize c′ →
+    capsOK? (frameStep j′ c′) sched′ st′ ≡ true →
+    valCaps? (frameStep j′ c′) sl′ (obs u′) o′ ≡ true →
+    pathSz? (Caps.cSize (frameStep j′ c′)) κ′ ≡ true →
+    suc (pathLen κ′) ≤ Caps.cSize (frameStep j′ c′) →
+    nest o′ sl′ (EvalSt.connectedShares st′) ≤ bud →
+    depthInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′ ≤ dep →
+    let r′ = subscribeInner g′ op′ allNid′ κ′ id′ now′ o′ sched′ st′
+    in Σ ℕ λ j₂ →
+       (capsOK? (frameStep (j′ + j₂) c′)
+                (proj₁ (proj₂ (proj₂ (proj₂ (proj₂ r′)))))
+                (proj₂ (proj₂ (proj₂ (proj₂ (proj₂ r′))))) ≡ true)
+       × (valsCaps? (frameStep (j′ + j₂) c′) sl′ (proj₁ (proj₂ r′)) ≡ true)
+       × (all (eventCaps? (frameStep (j′ + j₂) c′) sl′)
+              (proj₁ (proj₂ (proj₂ r′))) ≡ true)
+       × (suc (j′ + j₂) ≤ sLvlD (Caps.cSize c′) (Caps.cWid c′) dep (suc bud) (suc j′))
+   ) →
+  -- ifc  (innerFinish-caps, .Subscribe-Face)
+  (∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
+    (c : Caps) (dep bud j : ℕ) (g : Gas) (op : AllOp) (allNid inst : NodeId)
+    (κ : Path Γ s t) (id : Id) (now : Tick) (vals : List (Val Γ s))
+    (sl : Slots Γ) (sched : Sched Γ) (st : EvalSt e) →
+    2 ≤ Caps.cSize c →
+    1 ≤ Caps.cReg c →
+    Sched.slots sched ≡ sl →
+    slotsCaps? (Caps.cSize c) (Caps.cWid c) sl ≡ true →
+    slotsSize sl ≤ Caps.cSize c →
+    capsOK? (frameStep j c) sched st ≡ true →
+    pathSz? (Caps.cSize (frameStep j c)) κ ≡ true →
+    suc (pathLen κ) ≤ Caps.cSize (frameStep j c) →
+    valsCaps? (frameStep j c) sl vals ≡ true →
+    frameBud c j ≤ bud →
+    depthFin g op allNid inst κ id now vals sched st
+      (lookupNode allNid (EvalSt.nodes st)) ≤ dep →
+    let r = innerFinish g op allNid inst κ id now vals sched st
+              (lookupNode allNid (EvalSt.nodes st))
+    in Σ ℕ λ j′ →
+       (capsOK? (frameStep (j + j′) c)
+                (proj₁ (proj₂ (proj₂ (proj₂ r)))) (proj₂ (proj₂ (proj₂ (proj₂ r))))
+                  ≡ true)
+       × (valsCaps? (frameStep (j + j′) c) sl (proj₁ r) ≡ true)
+       × (all (eventCaps? (frameStep (j + j′) c) sl)
+              (proj₁ (proj₂ r)) ≡ true)
+       × (suc (j + j′) ≤ fLvlD (Caps.cSize c) (Caps.cWid c) dep j)) →
+  ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
+  (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  capsOK? (capsAt e sl id) sched st ≡ true →
+  nestOK? e sl id sched st ≡ true →
+  nestDᵛ (arrTy a) (arrVal a) ≤ nestCapAt e sl id →
+  valCaps? (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  nestClosOK?ᵛ (capsAt e sl id) sl (arrTy a) (arrVal a) ≡ true →
+  let r = cascadeGo a nextId (chainsOf a st) sched (cascadeLatch a st)
+  in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
+caps-go siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV =
+  capsOK?-mono (frameStep j c) (capsAt e sl (suc id))
+               (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
+               (frameStep-mono-j c (2≤capsAt-size e sl id) jFits)
+               (proj₂ (proj₂ GO))
+  where
+  c    = capsAt e sl id
+  st₀  = cascadeLatch a st
+  GO   = cascadeGo-caps siC ifc c (capsH e sl id) a nextId (chainsOf a st) sl sched st₀
+           (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
+           (slotsCaps?-capsAt e sl id) slEq
+           (cascadeLatch-caps c a sched st pre) val
+           (chainsOf-caps (Caps.cSize c) a st (capsOK?-regs c sched st pre))
+           (n≤capsAt-size e sl id)
+           (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
+           -- H1 is FREE here: capsAt's base formula already contains the
+           -- slot store as a summand
+           (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e))
+                    (capsAt-base-size e sl id))
+           (cascade-depth-capsH sl id a nextId sched st slEq pre nok bnd
+             (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize c)
+                   (T-to (valCaps?-size c sl (arrTy a) (arrVal a) val)))
+             val closV)
+  GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
+  j     = proj₁ GO
+  jFits = proj₁ (proj₂ GO)
+
+-- AND THE WHOLE INSTANT IS THE SAME ROUND ONE STEP ON.  `cascade` is a
+-- latch, a walk and a finish; the walk's post-state is already at the
+-- exit cap above, and the finish only shortens lists, so the instant's
+-- fit is the walk's fit widened by the one clause between them.
 caps-tick :
   (∀ {n′} {Γ′ : Ctx n′} {t′} {e′ : Closed Γ′ t′} {u′}
     (c′ : Caps) (dep bud j′ : ℕ) (g′ : Gas) (op′ : AllOp) (allNid′ : NodeId)
@@ -2331,31 +2431,9 @@ caps-tick :
   in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true
 caps-tick siC ifc {e = e} sl id a nextId sched st slEq pre nok bnd val closV =
   cascadeFinish-caps (capsAt e sl (suc id)) a (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
-    (capsOK?-mono (frameStep j c) (capsAt e sl (suc id))
-                  (proj₁ (proj₂ GOr)) (proj₂ (proj₂ GOr))
-                  (frameStep-mono-j c (2≤capsAt-size e sl id) jFits)
-                  (proj₂ (proj₂ GO)))
+    (caps-go siC ifc sl id a nextId sched st slEq pre nok bnd val closV)
   where
-  c    = capsAt e sl id
-  st₀  = cascadeLatch a st
-  GO   = cascadeGo-caps siC ifc c (capsH e sl id) a nextId (chainsOf a st) sl sched st₀
-           (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
-           (slotsCaps?-capsAt e sl id) slEq
-           (cascadeLatch-caps c a sched st pre) val
-           (chainsOf-caps (Caps.cSize c) a st (capsOK?-regs c sched st pre))
-           (n≤capsAt-size e sl id)
-           (≤-trans (chainsOf-length a st) (capsOK?-count c sched st pre))
-           -- H1 is FREE here: capsAt's base formula already contains the
-           -- slot store as a summand
-           (≤-trans (m≤n+m (slotsSize sl) (2 + sizeᵉ e))
-                    (capsAt-base-size e sl id))
-           (cascade-depth-capsH sl id a nextId sched st slEq pre nok bnd
-             (≤ᵇ⇒≤ (sizeᵛ (arrTy a) (arrVal a)) (Caps.cSize c)
-                   (T-to (valCaps?-size c sl (arrTy a) (arrVal a) val)))
-             val closV)
-  GOr   = cascadeGo a nextId (chainsOf a st) sched st₀
-  j     = proj₁ GO
-  jFits = proj₁ (proj₂ GO)
+  GOr = cascadeGo a nextId (chainsOf a st) sched (cascadeLatch a st)
 
 -- REFUTED: `caps-frame-boundary-absurd`
 --   (sizeStep C C ≤ C is impossible for 1 ≤ C) and `reach-via-size-absurd`

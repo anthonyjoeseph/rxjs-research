@@ -21,8 +21,8 @@ open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_; length; foldr)
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s; _≤ᵇ_)
 open import Data.Nat.Properties using
-  (≤-refl; ≤-trans; n≤1+n; ≤-reflexive; ≤ᵇ⇒≤; m≤n+m; +-assoc; +-comm; +-mono-≤; +-monoʳ-≤;
-  +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; *-mono-≤; m^n>0; ⊔-lub; m≤m⊔n; m≤n⊔m; ^-distribˡ-+-*)
+  (≤-trans; n≤1+n; ≤-reflexive; ≤ᵇ⇒≤; m≤n+m; +-assoc; +-comm; +-mono-≤; +-monoʳ-≤; +-monoˡ-≤;
+  *-monoˡ-≤; *-mono-≤; m^n>0; ⊔-lub; m≤m⊔n; m≤n⊔m; ^-distribˡ-+-*)
 open import Data.Product using (_×_; _,_; proj₂)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
@@ -42,8 +42,8 @@ open import Verify-Budget-Sufficient.Caps-Face.Part1 using (frameSz?; pathSz?; r
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using (pathSz?-len)
 open import Verify-Budget-Sufficient.Measures using (pathLen; ∧-true)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (pathNestD; frameSzD; pathSzSum; pathNestF; frameNestF; 1≤frameNestF; frameNestF≡;
-   chainsNestD; chainsNestF; chainsSzSum)
+  (pathNestD; frameSzD; pathSzSum; frameNestF; 1≤frameNestF; frameNestF≡;
+   chainsNestD; chainsSzSum)
 open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵗ≤sizeᵗ)
 open import Decide using (T-to; ∧-intro)
 
@@ -222,18 +222,12 @@ chainsDelNestD g c = foldr (λ rc acc → deliverNestD g c (proj₂ rc) ⊔ acc)
 chainsDelNestF : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Caps → List (RegId × Path Γ s t) → ℕ
 chainsDelNestF g c = foldr (λ rc acc → deliverNestF g c (proj₂ rc) * acc) 1
 
-1≤chainsDelNestF : ∀ {n} {Γ : Ctx n} {s t} (g : ℕ) (c : Caps)
-  (cs : List (RegId × Path Γ s t)) → 1 ≤ chainsDelNestF g c cs
-1≤chainsDelNestF g c []             = s≤s z≤n
-1≤chainsDelNestF g c ((_ , p) ∷ cs) =
-  *-mono-≤ (1≤deliverNestF g c p) (1≤chainsDelNestF g c cs)
-
 -- THE EXPONENT THE CAPS RIDER TELESCOPES TO OVER A CHAIN LIST.  One
 -- factor is spent per FRAME, so the fold's exponent is the total frame
--- count and not the chain count -- the same reason `chainsNestF` is a
--- product where `chainsNestD` is a max.  The path form sits beside the
--- deliver form because the bridges directly below relate the two, and
--- a fact relating two aggregates belongs with both of them.
+-- count and not the chain count -- which is why `chainsDelNestF` is a
+-- product where `chainsDelNestD` is a max.  The length aggregates sit
+-- beside the deliver forms because the bridges directly below relate
+-- the two, and a fact relating two aggregates belongs with both.
 chainsLenSum : ∀ {n} {Γ : Ctx n} {s t} →
   List (RegId × Path Γ s t) → ℕ
 chainsLenSum = foldr (λ rc acc → pathLen (proj₂ rc) + acc) 0
@@ -298,19 +292,3 @@ chainsDelNestD-chains g c ((_ , p) ∷ cs) =
         (≤-trans (chainsDelNestD-chains g c cs)
                  (+-monoˡ-≤ (fanSq g c) (m≤n⊔m (pathNestD p) (chainsNestD cs))))
 
--- AND THE PATH FACTOR SITS UNDER THE DELIVERY FACTOR, frame for frame,
--- the two differing only at the sink -- where one charges nothing and
--- the other charges the fan.  A consumer holding a delivery bound and
--- owing a path one spends this rather than re-deriving the product.
-pathNestF≤deliver : ∀ {n} {Γ : Ctx n} {s t} (g : ℕ) (c : Caps) (p : Path Γ s t) →
-  pathNestF p ≤ deliverNestF g c p
-pathNestF≤deliver g c root           = ≤-refl
-pathNestF≤deliver g c (share-sink _) = m^n>0 2 (fanSq g c)
-pathNestF≤deliver g c (f ↠ p)        =
-  *-monoʳ-≤ (frameNestF f) (pathNestF≤deliver g c p)
-
-chainsNestF≤ : ∀ {n} {Γ : Ctx n} {s t} (g : ℕ) (c : Caps)
-  (cs : List (RegId × Path Γ s t)) → chainsNestF cs ≤ chainsDelNestF g c cs
-chainsNestF≤ g c []             = ≤-refl
-chainsNestF≤ g c ((_ , p) ∷ cs) =
-  *-mono-≤ (pathNestF≤deliver g c p) (chainsNestF≤ g c cs)
