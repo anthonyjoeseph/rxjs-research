@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE WIDTH THE LEDGER IS READ AT, NOW THAT IT CANNOT BE THE
-  INSTANT'S OWN CAP.** The descent from the width the cascade hands
-  over to the cap the walk is otherwise read at is refuted at every
-  program and every instant — one instant of the caps climb is a power
-  of the one below — so the width coordinate is closed and the ceiling
-  is the only thing left to move. The commit reads the walk's burst
-  package at the wider width and puts its frame charge against what
-  the chain's ledger affords: either the charge fits, which retires
-  the residue outright, or the gap is a second ceiling question and
-  names its own currency.
+- **THE ENTRY CAP'S SIZE, FROM BELOW AND IN THE PROGRAM'S OWN
+  DIMENSION.** Reading the walk's ledger at the width the cascade hands
+  over is dead on affordability — the per-frame charge is linear in the
+  width, the ceiling admits a level count only quadratic in the cap — so
+  the burst number stays the instant's own size, and nothing says that
+  size is large enough. A chain's burst DOUBLES at each crossing frame,
+  while every proven lower bound on the entry cap is a numeral or the
+  program's own size: the wrong dimension by an exponential. The commit
+  takes it out of the blowup's count, which runs a registry width per
+  delivery and so carries the program as a factor rather than a summand.
 
 - **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
   crossing arm is refuted through the LAYER half of its charge, at a
@@ -285,10 +285,11 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`chain-walk-bursts`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: the walk's
-  burst package at the instant's OWN size cap. The proven neighbour delivers it
-  one rung up, at `nestBurstAt`, and the descent to the smaller cap is refuted
-  by the ladder's own climb — so the residue is the consumer's ceiling.
+- **`chain-walk-bursts`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
+  the walk's burst package at the instant's OWN size cap. The descent from the
+  neighbour's rung is refuted and the wider read is dead on affordability, so
+  what is owed is a lower bound on the entry size in the program's own
+  dimension.
 - **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: the two crossing
   frames' charge against one frame's ceiling. The telescope half is a program
   constant the burst face already reads against the cap; the LAYER half asks a
