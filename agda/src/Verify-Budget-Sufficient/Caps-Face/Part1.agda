@@ -314,7 +314,7 @@ frameSz? B (thru-outer _ _)   = true
 -- therefore bounded by the size level and by nothing smaller, so a
 -- second number tracks the first instead of escaping it.
 --
--- SO NEITHER OF THE TWO REPAIRS `Refuted.Sink-Level-Range` NAMED IS
+-- SO NEITHER OF THE TWO REPAIRS THE SINK HOP'S ARITHMETIC INVITED IS
 -- OPEN, and what is owed is a mechanism rather than a ledger: the walk
 -- carries a receipt about the path it is on, a sink spends it on paths
 -- it is not on, and every bridge tried so far has been a cap big

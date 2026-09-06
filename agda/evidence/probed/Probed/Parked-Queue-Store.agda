@@ -45,7 +45,7 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; from-inner; _↠_;
   iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; subscribeE-sz-store-scan)
+  using (descChgˢ; subscribeE-sz-store-scan)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; keep; chain; e₀; vals₀)
 open import Probed.Apparatus using (Confirms)
@@ -84,8 +84,7 @@ postRun = proj₂ (proj₂ (proj₂ (proj₂ (stepFrame {e = e₀} (gasPad 8 g0)
             (thru-outer mergeAllᵒ 0) root vals₀ false (sched-init e₀ sl₁) stRun))))
 
 outerCharge : ℕ
-outerCharge = szCount 63 sl₁ (EvalSt.nodes stRun)
-                (thru-outer {Γ = Γ₁} {u = obs (Pow K)} mergeAllᵒ 0) vals₀
+outerCharge = descChgˢ {Γ = Γ₁} (obs (obs (Pow K))) 63 vals₀ + slotsSize sl₁
 
 -- LOAD-BEARING: the charge is the ARRIVAL's, so it does not move when
 -- the queue beside it does -- fifteen here and fifteen at an empty

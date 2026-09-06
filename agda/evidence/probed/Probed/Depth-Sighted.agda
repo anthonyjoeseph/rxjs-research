@@ -43,7 +43,7 @@
 -- ceiling admits and so the strongest reading: the grant is monotone
 -- in it, so a row holding here holds at every legal `descW` bound.
 -- TARGET: sight-all-walk @b9a208
--- TARGET: chain-depth-sighted @36ffe2
+-- TARGET: chain-depth-sighted @a192df
 module Probed.Depth-Sighted where
 
 open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤ᵇ_; _≤_)
@@ -78,7 +78,8 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
   using (chain-depth-sighted)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (storeNestMax; nestUnit; sightCeil; pathNestD; sightCeil-mono; fitB)
+  using (storeNestMax; storeSyncMax; nestUnit; sightCeil; pathNestD; sightCeil-mono;
+         fitB)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestB-base)
 open import Verify-Budget-Sufficient.Depth-Sighted using (sight-all-walk)
 
@@ -388,9 +389,11 @@ sizeFigs≡ : sizeFigs ≡ 30100052028
 -- BOTH PREMISES ARE DISCHARGED, AT THE TIGHTEST VALUE EACH ADMITS.
 -- The slots equation is reflexivity by taking `sl` to be the schedule's
 -- own; the store bound is reflexivity by taking `S` to be the store's
--- own maximum.  Nothing is weakened by either -- the ceiling is
--- monotone in `S`, so the least admissible `S` is the strongest
--- reading, and a row here holds at every larger one a caller supplies.
+-- own SYNCHRONOUS maximum -- slots, nodes and registry, the live fold
+-- left out, which is the reading the statement takes.  Nothing is
+-- weakened by either -- the ceiling is monotone in `S`, so the least
+-- admissible `S` is the strongest reading, and a row here holds at
+-- every larger one a caller supplies, the full store maximum included.
 --
 -- NON-VACUITY IS PINNED AND NOT ASSERTED.  A point taken from an
 -- exhausted schedule or an empty chain list falls to the default below,
@@ -439,7 +442,7 @@ chainDesc = depthChain 2 uArr uPth uSc uSt
 chainDesc≡ : chainDesc ≡ 17
 
 chainRow : Confirms
-  (chain-depth-sighted (Sched.slots uSc) uArr 2 (storeNestMax uSc uSt)
+  (chain-depth-sighted (Sched.slots uSc) uArr 2 (storeSyncMax uSc uSt)
      uPth uSc uSt refl ≤-refl)
 chainRow = ≤ᵇ⇒≤ _ _ tt
 
@@ -477,7 +480,7 @@ farDesc = depthChain 2 fArr fPth fSc fSt
 farDesc≡ : farDesc ≡ 17
 
 farChainRow : Confirms
-  (chain-depth-sighted (Sched.slots fSc) fArr 2 (storeNestMax fSc fSt)
+  (chain-depth-sighted (Sched.slots fSc) fArr 2 (storeSyncMax fSc fSt)
      fPth fSc fSt refl ≤-refl)
 farChainRow = ≤ᵇ⇒≤ _ _ tt
 

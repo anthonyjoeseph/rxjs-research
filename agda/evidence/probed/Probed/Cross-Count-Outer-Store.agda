@@ -59,19 +59,19 @@ open import Rx.Evaluator using (EvalSt; root; mergeAllᵒ; switchᵒ; exhaustᵒ
   sched-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
-  using (szCount; subscribeE-sz-store-scan)
+  using (descChgˢ; subscribeE-sz-store-scan)
 open import Refuted.Frame-Step-Size-Cross-Store
   using (Γ₁; sl₁; Pow; K; inner; keep; chain; e₀; st₀; vals₀; post₀)
 open import Probed.Apparatus using (Confirms)
 
 ----------------------------------------------------------------------
--- THE CHARGE, READ OFF THE STATE THE ROWS STAND AT.  It is `src`'s own
--- count applied at this file's frame, so a restatement of the count
--- moves the rows rather than leaving a copy of it here.
+-- THE CHARGE, READ OFF THE STATE THE ROWS STAND AT.  It is what an
+-- outer crossing spends -- the arriving programs' descent charge plus
+-- the telescope -- built from `src`'s own charge, so a restatement of
+-- the charge moves the rows rather than leaving a copy of it here.
 ----------------------------------------------------------------------
 charge : ℕ
-charge = szCount 63 sl₁ (EvalSt.nodes st₀)
-           (thru-outer {Γ = Γ₁} {u = obs (Pow K)} mergeAllᵒ 0) vals₀
+charge = descChgˢ {Γ = Γ₁} (obs (obs (Pow K))) 63 vals₀ + slotsSize sl₁
 
 -- LOAD-BEARING: it is what says the charge is the PROGRAM's and not
 -- the run's.  The arrival's layers and the one scripted slot against

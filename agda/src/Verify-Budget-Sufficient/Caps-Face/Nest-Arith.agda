@@ -29,7 +29,7 @@ open import Relation.Binary.PropositionalEquality
 
 open import Rx.Prim      using (_at_from_as_)
 open import Rx.Exp       using (Ctx; Closed; sizeᵉ; syncSizeᵉ)
-open import Rx.Evaluator using (iterSize; root)
+open import Rx.Evaluator using (root)
 open import Rx.Frame-Width using (entryCeil)
 open import Rx.Slot-Clos using (slotsClos)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-def; nestB; nestB≤pow)
@@ -493,41 +493,6 @@ nestΦ-frame-charge e sl id =
     ≤-trans (≤-reflexive (sym (*-assoc 2 Z (Sq + Sq + S * W))))
     (≤-trans (*-mono-≤ (^-monoʳ-≤ 2 (s≤s (walkExp-widen S 1≤S))) xwFit)
              (≤-reflexive (sym (nestWalkAt-def e sl id))))
-
--- THE INSTANT'S SIZE GROWTH, OVER A BARE COUNT.  A frame multiplies
--- the size by a fixed step, so `j` of them is a power whose base is a
--- small multiple of the cap and whose exponent is the count itself;
--- and the cap's own square sits under an exponential once the cap is
--- past fourteen, so the whole power reduces to base two at an exponent
--- LINEAR in the count.  That linearity is the content: the statement
--- says nothing about which counts are reachable, which is what makes
--- it reusable at a charge the caller chooses.
---
--- AND THE COUNT BOUND IS THE CALLER'S, DELIBERATELY.  This used to
--- carry a `j ≤ S * S + S + S * S` premise and conclude at the walk
--- factor directly, which pinned the arithmetic to one reading of what
--- a cascade's levels run to -- so the statement had to be restated
--- every time the charge did, and it was.  The count now rides in the
--- exponent, the affordability is the consumer's leaf, and a
--- re-denomination of the charge moves neither.
-iterSize≤2^ : ∀ (S j s : ℕ) → 8 ≤ S → s ≤ S →
-  iterSize S j s ≤ 2 ^ (S * j) * S
-iterSize≤2^ S j s h8 hs =
-  ≤-trans (iterSize-pow S S j s 1≤S ≤-refl hs) (*-monoˡ-≤ S powFit)
-  where
-  1≤S : 1 ≤ S
-  1≤S = ≤-trans (≤ᵇ⇒≤ 1 8 tt) h8
-  3≤4S : 3 ≤ 4 * S
-  3≤4S = ≤-trans (≤ᵇ⇒≤ 3 4 tt)
-                 (≤-trans (≤-reflexive (sym (*-identityʳ 4)))
-                          (*-monoʳ-≤ 4 1≤S))
-  3S≤2^S : 3 * S ≤ 2 ^ S
-  3S≤2^S =
-    ≤-trans (*-monoˡ-≤ S 3≤4S)
-            (≤-trans (≤-reflexive (*-assoc 4 S S)) (sq4≤2^ S h8))
-  powFit : (3 * S) ^ j ≤ 2 ^ (S * j)
-  powFit =
-    ≤-trans (^-monoˡ-≤ j 3S≤2^S) (≤-reflexive (^-*-assoc 2 S j))
 
 -- THE STEP'S ARITHMETIC, OVER BARE NUMBERS, and it is a body rather
 -- than a leaf.  Nothing about caps survives here: a cap that steps by
