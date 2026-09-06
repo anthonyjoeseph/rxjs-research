@@ -292,3 +292,6 @@ open import Refuted.Drain-Queue-Slot
   using (MergeAllDrainSz; figures₂≡; nodes₂; prem₂; row₂≡false;
          figures₃≡; nodes₃; prem₃; row₃≡false;
          mergeAllDrain-sz-slot-absurd; mergeAllDrain-sz-slot-absurd′)
+open import Refuted.Walk-Burst-Rung
+  using (WidthAtOwnInstant; Γ₀; sl₀; e₀; S; K; 2≤S; 2≤K; 1<sucK;
+         S<climb; climb≤burst; walk-burst-rung-absurd)
