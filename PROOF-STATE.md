@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **INSTANTIATE THE CHAIN'S BURST LEDGER, NOW THAT ITS WIDTH IS A
-  NUMBER A MACHINE EVALUATES.** The ledger was read at the entry cap, a
-  tower nothing computes, so no reading of it could be probed at all.
-  It is stated at two to the term's own size now, and the widening to
-  the cap is proven — so the leaf is instantiable for the first time,
-  and it stands on nothing: a burst doubles at each crossing frame, and
-  whether a path's crossings are bounded by the term is exactly what
-  the exponent assumes. The commit runs a chain whose path crosses more
-  doors than the term's size admits, and either refutes the leaf, which
-  sends the exponent back to the ladder, or covers the shapes a
-  refutation would live in.
+- **PRICE THE BURST LEDGER ON THE AXIS THAT ADMITS THE ARRIVAL.** A
+  crossing frame delivers the arriving payload's whole script, so the
+  burst the walk then sees is that payload's emission WIDTH — and the
+  caps package prices a payload on two axes, a size and a width, while
+  the ledger is read against the size one alone. That is a currency
+  mismatch rather than a gap: the width axis is the only premise of a
+  chain saying how many values a frame gets, and holding it under the
+  size axis is refuted for an arbitrary cap. The commit states the
+  ledger at the width its premise admits and either carries that to
+  the consumer, which reads both axes off one number, or exhibits the
+  instant where the two part.
 
 - **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
   crossing arm is refuted through the LAYER half of its charge, at a
@@ -286,10 +286,11 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`chain-walk-bursts-exp`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`:
-  the walk's burst package at two to the TERM's own size. The descent from the
-  neighbour's rung is refuted and the wider read is dead on affordability, so the
-  ledger is stated here and widened to the cap, proven above it at every instant.
+- **`chain-walk-bursts`** (Part7/Depth-Fit) — FALSITY,
+  `REFUTED, DEAD ROUTE×2, RECOVERY`: the walk's burst package at the instant's
+  own SIZE cap. The descent from the neighbour's rung is refuted, the wider
+  read is dead on affordability, and the term's exponential is dead on the
+  arrival being no part of the term.
 - **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: the two crossing
   frames' charge against one frame's ceiling. The telescope half is a program
   constant the burst face already reads against the cap; the LAYER half asks a
