@@ -35,15 +35,13 @@
 module Verify-Budget-Sufficient.Measures where
 
 open import Data.Bool    using (Bool; true; false; T; _∧_; _∨_; if_then_else_)
-open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _∸_; ⌈_/2⌉; _≤_; _<_; _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; ⌈_/2⌉; _≤_; _<_; _⊔_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; ≤-pred; +-suc; +-identityʳ; +-comm; +-assoc;
   +-monoˡ-≤; *-monoˡ-≤; *-monoʳ-≤; m⊔n≤o⇒m≤o; m⊔n≤o⇒n≤o; ⊔-mono-≤; *-suc; m≤m+n; m≤n+m; n≤1+n;
   +-mono-≤; m≤m*n; ^-monoʳ-≤; *-assoc; +-mono-<-≤; +-mono-≤-<; ≡⇒≡ᵇ; *-distribʳ-+;
   *-distribˡ-+; *-identityʳ; ^-monoˡ-≤; ^-*-assoc; ^-distribˡ-+-*; *-mono-≤; +-monoʳ-≤; *-comm;
   m≤m⊔n; m≤n⊔m; ⊔-lub; *-zeroʳ; *-identityˡ; suc-injective; <-irrefl; ≤-antisym; m^n≢0; m^n>0;
   ⌊n/2⌋+⌈n/2⌉≡n; ⌊n/2⌋≤⌈n/2⌉; ⌈n/2⌉<n)
-open import Data.Nat.Logarithm using (⌈log₂_⌉; ⌈log₂⌉-mono-≤;
-  ⌈log₂⌈n/2⌉⌉≡⌈log₂n⌉∸1; ⌈log₂2^n⌉≡n)
 open import Data.Empty   using (⊥; ⊥-elim)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -138,40 +136,48 @@ n<2^n (suc n) = ≤-trans step (≤-reflexive shape)
 -- over-charge, because a doubling MULTIPLIES.  What a charge counting
 -- doublings has to be denominated in is therefore the logarithm, and
 -- this is the side of it a charge spends: reaching `n` is affordable in
--- `⌈log₂ n ⌉` of them.  The recursion halves and the induction is
--- fuelled by the argument itself, since the stdlib's `⌈log₂_⌉` is
--- well-founded rather than structural.
-n≤2^⌈log₂n⌉ : ∀ n → n ≤ 2 ^ ⌈log₂ n ⌉
-n≤2^⌈log₂n⌉ n = go n n ≤-refl
-  where
-  climb : ∀ L → 1 ≤ L → suc (L ∸ 1) ≤ L
-  climb zero    ()
-  climb (suc L) _  = ≤-refl
+-- a count of doublings equal to the bit length.
+--
+-- AND IT IS SPELLED STRUCTURALLY RATHER THAN TAKEN FROM THE STDLIB,
+-- WHICH IS A COMPUTABILITY REQUIREMENT AND NOT A PREFERENCE.  This
+-- count sits inside a TYPE -- a charge a descent is stated at -- so
+-- anything instantiating that statement has to NORMALISE it.  The
+-- stdlib's `⌈log₂_⌉` recurses on an accessibility proof it destructs,
+-- so evaluating it forces a well-foundedness spine whose cost grows
+-- with the ARGUMENT rather than with its logarithm; the charge reads
+-- each successive block at a bound already squared, so the argument is
+-- the bound raised to a power of two and the spine is unaffordable
+-- from the second squaring on.  The fuel here is the argument itself
+-- and every step halves, so the same value costs a logarithmic number
+-- of reductions and a statement carrying this charge stays open to
+-- instantiation.
+bitsGo : ℕ → ℕ → ℕ
+bitsGo _       zero          = 0
+bitsGo _       (suc zero)    = 0
+bitsGo zero    (suc (suc _)) = 0
+bitsGo (suc f) (suc (suc k)) = suc (bitsGo f ⌈ suc (suc k) /2⌉)
 
-  go : ∀ f m → m ≤ f → m ≤ 2 ^ ⌈log₂ m ⌉
+bitsᴺ : ℕ → ℕ
+bitsᴺ n = bitsGo n n
+
+n≤2^bitsᴺ : ∀ n → n ≤ 2 ^ bitsᴺ n
+n≤2^bitsᴺ n = go n n ≤-refl
+  where
+  go : ∀ f m → m ≤ f → m ≤ 2 ^ bitsGo f m
   go f       zero          _        = z≤n
-  go f       (suc zero)    _        =
-    ≤-reflexive (sym (cong (2 ^_) (⌈log₂2^n⌉≡n 0)))
+  go f       (suc zero)    _        = ≤-refl
   go zero    (suc (suc k)) ()
   go (suc f) (suc (suc k)) (s≤s le) =
     ≤-trans (≤-reflexive (sym (⌊n/2⌋+⌈n/2⌉≡n (suc (suc k)))))
       (≤-trans (+-monoˡ-≤ ⌈ suc (suc k) /2⌉ (⌊n/2⌋≤⌈n/2⌉ (suc (suc k))))
         (≤-trans (+-mono-≤ ih ih)
-          (≤-trans (≤-reflexive
-                     (cong (2 ^ (L ∸ 1) +_) (sym (+-identityʳ (2 ^ (L ∸ 1))))))
-                   (^-monoʳ-≤ 2 (climb L 1≤L)))))
+                 (≤-reflexive (cong (2 ^ L +_) (sym (+-identityʳ (2 ^ L)))))))
     where
     L : ℕ
-    L = ⌈log₂ (suc (suc k)) ⌉
+    L = bitsGo f ⌈ suc (suc k) /2⌉
 
-    ih : ⌈ suc (suc k) /2⌉ ≤ 2 ^ (L ∸ 1)
-    ih = subst (λ z → ⌈ suc (suc k) /2⌉ ≤ 2 ^ z)
-               (⌈log₂⌈n/2⌉⌉≡⌈log₂n⌉∸1 (suc (suc k)))
-               (go f ⌈ suc (suc k) /2⌉ (≤-trans (≤-pred (⌈n/2⌉<n k)) le))
-
-    1≤L : 1 ≤ L
-    1≤L = ≤-trans (≤-reflexive (sym (⌈log₂2^n⌉≡n 1)))
-                  (⌈log₂⌉-mono-≤ {2 ^ 1} {suc (suc k)} (s≤s (s≤s z≤n)))
+    ih : ⌈ suc (suc k) /2⌉ ≤ 2 ^ L
+    ih = go f ⌈ suc (suc k) /2⌉ (≤-trans (≤-pred (⌈n/2⌉<n k)) le)
 
 -- height (4+sz)·(1+id): the per-instant story gain (4+sz) ≥ 5 covers
 -- the walk ledger's worst-case ~4-story spend against the ENTRY cap
