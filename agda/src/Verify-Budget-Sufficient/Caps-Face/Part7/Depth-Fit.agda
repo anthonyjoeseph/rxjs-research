@@ -2292,6 +2292,22 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- package is spent entirely inside the lemma that BUILDS the
 -- predicate, to hold one frame's draw under a width times the cap.
 
+-- AND THE PACKAGE PRICES A VALUE, NEVER A LIST, WHICH IS WHERE THE
+-- RESIDUE ACTUALLY IS.  Every conjunct a chain carries about the
+-- values a frame is handed reads them ONE AT A TIME -- a size and a
+-- width per payload -- so no premise here says how MANY a frame gets,
+-- while the head conjunct of this ledger says exactly that at every
+-- clause.  The count is the evaluator's own: a crossing door emits
+-- each arriving script whole, so one frame's output is the sum of its
+-- inputs' emissions and the count MULTIPLIES across a crossing.  And
+-- the cap those values are admitted at CLIMBS with the walk's own
+-- level while this width stays the entry's, so the two ends of the
+-- path are not even read against the same number.  Both readings of
+-- the width coordinate are shut -- wider is unaffordable at a rung,
+-- the term's own exponential does not move with the instant -- which
+-- leaves a law about what a STEP outputs, stated where the step is.
+-- That law computes, and nothing else in this region does.
+
 -- AND THE WIDTH IS THE ARRIVAL'S OWN, WHICH IS WHY IT IS READ AT THE
 -- INSTANT'S CAP AND NOT OFF THE TERM.  A frame crossing into a merge
 -- delivers the arriving observable's whole script, so the burst the

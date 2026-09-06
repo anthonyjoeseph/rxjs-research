@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PRICE THE BURST LEDGER ON THE AXIS THAT ADMITS THE ARRIVAL.** A
-  crossing frame delivers the arriving payload's whole script, so the
-  burst the walk then sees is that payload's emission WIDTH — and the
-  caps package prices a payload on two axes, a size and a width, while
-  the ledger is read against the size one alone. That is a currency
-  mismatch rather than a gap: the width axis is the only premise of a
-  chain saying how many values a frame gets, and holding it under the
-  size axis is refuted for an arbitrary cap. The commit states the
-  ledger at the width its premise admits and either carries that to
-  the consumer, which reads both axes off one number, or exhibits the
-  instant where the two part.
+- **THE COUNT IS THE EVALUATOR'S, SO THE LAW BELONGS AT THE STEP.**
+  Every conjunct a chain carries about the values a frame is handed
+  prices them ONE AT A TIME — a size and a width per payload — so no
+  premise in the package says how MANY a frame gets, which is exactly
+  what this ledger's head conjunct asks at every clause. Both readings
+  of the width coordinate are shut: a wider one is unaffordable at a
+  rung, and the term's own exponential does not move with the instant.
+  What is left is a law about what a STEP outputs, stated where the
+  step is — and that one COMPUTES, so the commit instantiates it before
+  stating it. Nothing else in this region can be instantiated at all.
 
 - **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
   crossing arm is refuted through the LAYER half of its charge, at a
