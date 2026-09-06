@@ -73,8 +73,9 @@ open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
 open import Decide using (≤ᵇ-true; T-to)
 open import Verify-Budget-Sufficient.Measures using
-  (fᵢ≤sum-tab; sum-tab-mono; sizeᵉ-pos; boundedLive; stBounded?; stB-live; ∧-true)
-open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵛ≤sizeᵛ)
+  (fᵢ≤sum-tab; sum-tab-mono; sizeᵉ-pos; boundedLive; boundedNode; stBounded?; stB-live;
+  stB-nodes; ∧-true)
+open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵛ≤sizeᵛ; nestDᵉ≤sizeᵉ)
 open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; 21≤capsAt-size)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base; nestB; nestB-mono; nestB-monoB; nestB-monoW; nestB-add)
 open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap)
@@ -383,6 +384,48 @@ stBounded?-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
   foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ≤ B
 stBounded?-live B sched st h =
   liveFold≤ B (Sched.live sched) (stB-live B sched st h)
+
+-- AND THE NODE TABLE READS THE SAME WAY, which is what a frame's own
+-- nesting receipt needs at its second place.  A node's nesting is a
+-- `⊔` over payloads the size half of the same predicate already bounds
+-- one at a time, and the depth-under-size lemmas turn each of those
+-- into the bound beside it; the three payload-free heads carry no
+-- syntax at all, so their arms close on `z≤n` and read nothing out of
+-- the hypothesis.  The registry is the place this does NOT reach: its
+-- entries are PATHS, whose nesting sums a frame's function depth once
+-- per frame while the size predicate bounds each function separately,
+-- so the same reading buys a length-scaled bound there and not this
+-- one.
+queuedNest≤ : ∀ {n} {Γ : Ctx n} {u} (B : ℕ) (q : List (Closed Γ u)) →
+  all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true →
+  foldr (λ o acc → nestDᵉ o ⊔ acc) 0 q ≤ B
+queuedNest≤ B []      h = z≤n
+queuedNest≤ B (o ∷ q) h with ∧-true (sizeᵉ o ≤ᵇ B) _ h
+... | h₁ , h₂ =
+  ⊔-lub (≤-trans (nestDᵉ≤sizeᵉ o) (≤ᵇ⇒≤ (sizeᵉ o) B (T-to h₁)))
+        (queuedNest≤ B q h₂)
+
+nodeNest≤ : ∀ {n} {Γ : Ctx n} (B : ℕ) (nd : NodeState Γ) →
+  boundedNode B nd ≡ true → nodeNest nd ≤ B
+nodeNest≤ B (scan-st {t} v)       h =
+  ≤-trans (nestDᵛ≤sizeᵛ t v) (≤ᵇ⇒≤ (sizeᵛ t v) B (T-to h))
+nodeNest≤ B (mergeAll-st _ _ q _) h = queuedNest≤ B q h
+nodeNest≤ B (take-st _)           h = z≤n
+nodeNest≤ B (switch-st _ _)       h = z≤n
+nodeNest≤ B (exhaust-st _ _)      h = z≤n
+
+nodesFold≤ : ∀ {n} {Γ : Ctx n} (B : ℕ) (kvs : List (NodeId × NodeState Γ)) →
+  all (λ kv → boundedNode B (proj₂ kv)) kvs ≡ true →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 kvs ≤ B
+nodesFold≤ B []         h = z≤n
+nodesFold≤ B (kv ∷ kvs) h with ∧-true (boundedNode B (proj₂ kv)) _ h
+... | h₁ , h₂ = ⊔-lub (nodeNest≤ B (proj₂ kv) h₁) (nodesFold≤ B kvs h₂)
+
+stBounded?-nodes : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → stBounded? B sched st ≡ true →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ B
+stBounded?-nodes B sched st h =
+  nodesFold≤ B (EvalSt.nodes st) (stB-nodes B sched st h)
 
 storeNest-nodes≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
