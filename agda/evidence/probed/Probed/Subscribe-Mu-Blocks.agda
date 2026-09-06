@@ -15,27 +15,35 @@
 -- THE ROWS.  The refutation's own family, unchanged: a `μ` whose body
 -- emits ONE value, that value being a deferred subtree mentioning the
 -- recursive occurrence `k` times, entered at `root` on the initial
--- table.  Beside it the same construction nested twice, whose second
--- level is what makes the block count move at all.  Each is read at
--- the SMALLEST bound the statement admits -- the program's own size --
--- since the charge grows with the bound and a larger one would be a
--- weaker reading.
+-- table.  Beside it the same construction nested twice and then three
+-- deep, each level's body naming every occurrence above it.  Each is
+-- read at the SMALLEST bound the statement admits -- the program's own
+-- size -- since the charge grows with the bound and a larger one would
+-- be a weaker reading.
 --
 -- WHAT THEY FIND.  The block is what buys the multiplicity: at the
 -- very mention count that refuted the predecessor, the layer-only
--- level still fails and the charge clears it, and one level deeper
--- the layer count does not move while the block count does.  So the
--- crossing the refutation sits on is closed by the denomination and
--- not by the programs being small.
+-- level still fails and the charge clears it, and at each further
+-- level the layer count does not move while the block count does.  So
+-- the crossing the refutation sits on is closed by the denomination
+-- and not by the programs being small.
 --
--- WHAT THEY DO NOT BUY, AND IT IS THE RATE ITSELF.  A row instantiates
--- one program at one bound, and the question the rate answers is
--- asymptotic: whether ONE block per level covers what an unfolding
--- delivers at every bound.
--- These stand at the sharpest bound the premise admits and clear it,
--- so what they kill is the claim that the block is UNNECESSARY and
--- never the claim that it is enough.  The nesting reached is two and
--- the mentions four; nothing here is read past a `root` entry, so the
+-- AND THE THIRD LEVEL IS WHERE A RATE STOPS READING LIKE A CONSTANT.
+-- One block per level is bought at the bound reached so far, and the
+-- bound SQUARES per level, so the first two levels are consistent with
+-- a charge that is merely generous: their blocks are read at the size
+-- and at its square, both small enough that a wrong rate would still
+-- clear.  The third is read at the square of a square, where a block
+-- that did not grow with the bound would be outrun -- and it clears at
+-- the same sharpest bound, with the layer-only side still failing.
+--
+-- WHAT THEY DO NOT BUY.  A row instantiates one program at one bound,
+-- and the question the rate answers is asymptotic: whether ONE block
+-- per level covers what an unfolding delivers at EVERY bound.  These
+-- stand at the sharpest bound the premise admits and clear it, so what
+-- they kill is the claim that the block is UNNECESSARY and never the
+-- claim that it is enough.  The nesting reached is three and the
+-- mentions four; nothing here is read past a `root` entry, so the
 -- telescope is one scripted slot and no door stands in the way.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Subscribe-Mu-Blocks where
@@ -100,6 +108,25 @@ bigTwo k = mergeAllᵉ nothing (ofᵉ (musT k))
 oTwo : (k : ℕ) → Closed Γ (obs natᵗ)
 oTwo k = μᵉ (μᵉ (ofᵉ (strmᵗ (deferᵉ (bigTwo k)) ∷ [])))
 
+----------------------------------------------------------------------
+-- AND THE SAME NESTED THREE DEEP, which is where the rate is bought
+-- at a bound already squared twice.  The innermost subtree mentions
+-- all THREE occurrences, so an unfolding at any level plants a copy
+-- the other two still name.
+----------------------------------------------------------------------
+musR : (j : ℕ) → List (Tm Γ [] (obs natᵗ ∷ obs natᵗ ∷ obs natᵗ ∷ []) [] (obs natᵗ))
+musR zero    = []
+musR (suc j) = strmᵗ (mergeAllᵉ nothing (varᵉ (here refl)))
+             ∷ strmᵗ (mergeAllᵉ nothing (varᵉ (there (here refl))))
+             ∷ strmᵗ (mergeAllᵉ nothing (varᵉ (there (there (here refl)))))
+             ∷ musR j
+
+bigThree : (k : ℕ) → Exp Γ [] (obs natᵗ ∷ obs natᵗ ∷ obs natᵗ ∷ []) [] natᵗ
+bigThree k = mergeAllᵉ nothing (ofᵉ (musR k))
+
+oThree : (k : ℕ) → Closed Γ (obs natᵗ)
+oThree k = μᵉ (μᵉ (μᵉ (ofᵉ (strmᵗ (deferᵉ (bigThree k)) ∷ []))))
+
 e₀ : Closed Γ (obs natᵗ)
 e₀ = emptyᵉ
 
@@ -136,6 +163,19 @@ delivered = length (outOf (oAt 4)) ∷ length (outOf (oTwo 2)) ∷ []
 
 delivered≡ : delivered ≡ 1 ∷ 1 ∷ []
 delivered≡ = refl
+
+-- LOAD-BEARING: the third level's own three numbers, read the same
+-- way.  The layer count is nought here too, so a charge that read
+-- only the layers would report the same figure it reports two levels
+-- up, and the block count is the whole of what separates them.
+thirdFigures : List ℕ
+thirdFigures = layᵉ (oThree 1) ∷ muDepthᵉ (oThree 1)
+             ∷ descChg (obs (obs natᵗ)) (sizeᵉ (oThree 1)) (oThree 1)
+             ∷ length (outOf (oThree 1))
+             ∷ []
+
+thirdFigures≡ : thirdFigures ≡ 0 ∷ 3 ∷ 31 ∷ 1 ∷ []
+thirdFigures≡ = refl
 
 ----------------------------------------------------------------------
 -- THE CROSSING, read at both denominations over one program.
@@ -174,6 +214,25 @@ deepRows = valsSz? {Γ = Γ} {s = obs natᵗ}
 deepRows≡ : deepRows ≡ false ∷ true ∷ []
 deepRows≡ = refl
 
+-- LOAD-BEARING at the level the rate is actually a rate: three blocks
+-- are read at bounds squared twice over, and the layer-only side still
+-- fails while the charged side clears.  A rate that covered the first
+-- squaring by luck rather than by accounting would run out here, since
+-- the third block is bought against a bound the first two already
+-- squared and nothing else between the two readings has moved.
+thirdRows : List Bool
+thirdRows = valsSz? {Γ = Γ} {s = obs natᵗ}
+              (iterSize 2 (layᵉ (oThree 1) + slotsSize sl) (sizeᵉ (oThree 1)))
+              (outOf (oThree 1))
+          ∷ valsSz? {Γ = Γ} {s = obs natᵗ}
+              (iterSize 2 (descChg (obs (obs natᵗ)) (sizeᵉ (oThree 1)) (oThree 1)
+                             + slotsSize sl) (sizeᵉ (oThree 1)))
+              (outOf (oThree 1))
+          ∷ []
+
+thirdRows≡ : thirdRows ≡ false ∷ true ∷ []
+thirdRows≡ = refl
+
 ----------------------------------------------------------------------
 -- THE TIE.  The type is generated from the statement as it reads, so
 -- a restatement moves the row rather than leaving the rungs above
@@ -193,3 +252,8 @@ tieNest : Confirms
   (subscribeE-sz {e = e₀} (gasPad 64 g0) (oTwo 2) root 0 0
      (sched-init e₀ sl) (st-init e₀) 2 (sizeᵉ (oTwo 2)))
 tieNest = λ _ _ → refl
+
+tieThird : Confirms
+  (subscribeE-sz {e = e₀} (gasPad 64 g0) (oThree 1) root 0 0
+     (sched-init e₀ sl) (st-init e₀) 2 (sizeᵉ (oThree 1)))
+tieThird = λ _ _ → refl

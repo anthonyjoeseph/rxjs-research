@@ -128,7 +128,8 @@ open import Probed.Subscribe-Inner-Doors
          tieDoorSwitch; tieDoorExhaust)
 
 open import Probed.Subscribe-Mu-Blocks
-  using (figures≡; delivered≡; crossRows≡; deepRows≡; tieMu; tieNest)
+  using (figures≡; delivered≡; crossRows≡; deepRows≡; thirdFigures≡;
+         thirdRows≡; tieMu; tieNest; tieThird)
 
 open import Probed.Burst-Mu-Door
   using (figures≡; liveness≡; blindRows≡; nowRows≡; premNow; tieDoorMu)

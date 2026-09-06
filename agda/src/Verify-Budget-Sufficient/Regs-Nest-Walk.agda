@@ -25,7 +25,6 @@ open import Data.List using (List; []; _∷_; _++_; map; length)
 open import Data.Nat using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤-trans; ≤-refl; ⊔-lub; m≤m⊔n; m≤n⊔m; m≤m+n; ≤-reflexive; *-monoʳ-≤; +-monoˡ-≤; +-monoʳ-≤;
   ≤⇒≤ᵇ; ≤ᵇ⇒≤; m^n>0; *-zeroʳ; *-distribˡ-⊔; *-identityˡ; *-mono-≤; +-assoc; n≤1+n; m≤n+m)
-open import Data.Nat.Logarithm using (⌈log₂_⌉)
 open import Data.Maybe using (Maybe; just; nothing)
 open import Data.Nat.Solver using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
@@ -58,7 +57,7 @@ open import Verify-Budget-Sufficient.Nest-Walk
 open import Verify-Budget-Sufficient.Depth-Sighted using (ValsFit; thruFit-vals)
 open import Verify-Budget-Sufficient.Measures
   using (thruWrap-vals; takeVals-all; pathLen; boundedNode; setNode-bounded; all-++-intro;
-  n≤2^⌈log₂n⌉)
+  n≤2^bitsᴺ; bitsᴺ)
 open import Verify-Budget-Sufficient.Nest-Store
   using (regsNestMax; nest-inflate; dropSource-nest; nestUnit; cutThrough-nest)
 open import Verify-Budget-Sufficient.Caps
@@ -774,7 +773,7 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 --
 -- AND THE BLOCK IS DENOMINATED IN THE BOUND'S BIT LENGTH, WHICH IS THE
 -- WHOLE OF WHY IT IS AFFORDABLE.  A rung MULTIPLIES, so the count of
--- them that reaches a bound is its logarithm: `⌈log₂ B ⌉` of them
+-- them that reaches a bound is its logarithm: `bitsᴺ B` of them
 -- already carry `B` past `B * B`.  A block of `B` of them would also
 -- carry it -- that is the reading this count used to take -- but it is
 -- an exponential over-charge, and at a bound the caller supplies as a
@@ -788,7 +787,7 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- join over.
 muRungsᴺ : ℕ → ℕ → ℕ
 muRungsᴺ zero    B = 0
-muRungsᴺ (suc d) B = ⌈log₂ B ⌉ + muRungsᴺ d (B * B)
+muRungsᴺ (suc d) B = bitsᴺ B + muRungsᴺ d (B * B)
 
 -- WHAT A DESCENT IS CHARGED, WHICH IS THE UNFOLDINGS PLUS THE
 -- OPERATORS.  Those are the two things a subscription spends: one rung
@@ -987,18 +986,22 @@ parkedChgAt-lookup B nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   rungs.
 -- PROBED: `Probed.Subscribe-Mu-Blocks` at the region every other row
 --   over this statement declined -- the refutation's own family at four
---   mentions, and the same construction nested twice, whose inner
---   subtree names both recursive occurrences -- each read at the
+--   mentions, and the same construction nested twice and three deep,
+--   each level's body naming every occurrence above it -- read at the
 --   smallest bound the premise admits, since a larger one is a weaker
---   reading.  The layer count is nought at both programs, so the
+--   reading.  The layer count is nought at all three programs, so the
 --   layer-only level fails where the charge clears it and the figure
 --   moves with the NESTING rather than with the mentions: the block is
 --   what buys the multiplicity, and the crossing the refutation sits on
 --   is closed by the denomination and not by the programs being small.
---   What the rows do not buy is the RATE, which is asymptotic and which
---   no instantiation decides; the nesting reached is two and the
---   mentions four, the telescope is one scripted slot, and nothing is
---   read past a `root` entry, so no door stands in the way.
+--   The third level is what separates a RATE from a generosity: its
+--   block is bought at the square of a square, where a count that did
+--   not grow with the bound would be outrun, and it clears there too.
+--   What the rows still do not buy is the rate at EVERY bound, which is
+--   asymptotic and which no instantiation decides; the nesting reached
+--   is three and the mentions four, the telescope is one scripted slot,
+--   and nothing is read past a `root` entry, so no door stands in the
+--   way.
 postulate
   subscribeE-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (o : Closed Γ u) (κ : Path Γ u t) (id : Id)
@@ -1412,16 +1415,16 @@ muLay-sub S B M d j j′ s 2≤S h le =
     (+-monoˡ-≤ s (+-monoʳ-≤ (muRungsᴺ d B) h)) le
 
 -- ONE SQUARING, PAID FOR IN RUNGS.  A rung at least doubles, so
--- `⌈log₂ B ⌉` of them carry a bound past `2 ^ ⌈log₂ B ⌉ * B` and
+-- `bitsᴺ B` of them carry a bound past `2 ^ bitsᴺ B * B` and
 -- therefore past `B * B` -- and that is the whole of why the charge can
 -- afford an unfolding while staying a count logarithmic in the bound.
-muStep : ∀ (S B : ℕ) → 1 ≤ S → B * B ≤ iterSize S ⌈log₂ B ⌉ B
+muStep : ∀ (S B : ℕ) → 1 ≤ S → B * B ≤ iterSize S (bitsᴺ B) B
 muStep S B 1≤S =
-  ≤-trans (*-mono-≤ (n≤2^⌈log₂n⌉ B) ≤-refl) (iterSize-2^ S ⌈log₂ B ⌉ B 1≤S)
+  ≤-trans (*-mono-≤ (n≤2^bitsᴺ B) ≤-refl) (iterSize-2^ S (bitsᴺ B) B 1≤S)
 
 -- AND ONE UNFOLDING'S CHARGE, WHICH IS THAT SQUARING SPENT.  The
 -- caller's ceiling holds the block for `suc d` levels at bound `B`; the
--- unfolding is descended into at `B * B`, and the leading `⌈log₂ B ⌉`
+-- unfolding is descended into at `B * B`, and the leading `bitsᴺ B`
 -- rungs of that block are exactly what carries the bound there -- so
 -- the remaining block, read at the squared bound, is what the recursion
 -- inherits.
@@ -1430,14 +1433,14 @@ muUnfold-le : ∀ (S B M d L s : ℕ) → 2 ≤ S →
   iterSize S (muRungsᴺ d (B * B) + L + s) (B * B) ≤ M
 muUnfold-le S B M d L s 2≤S le =
   ≤-trans (iterSize-mono-s S (muRungsᴺ d (B * B) + L + s) (muStep S B 1≤S))
-    (≤-trans (≤-reflexive (sym (iterSize-+ S ⌈log₂ B ⌉ (muRungsᴺ d (B * B) + L + s) B)))
+    (≤-trans (≤-reflexive (sym (iterSize-+ S (bitsᴺ B) (muRungsᴺ d (B * B) + L + s) B)))
       (≤-trans (≤-reflexive (cong (λ z → iterSize S z B) (sym eq))) le))
   where
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 2≤S
-  eq : muRungsᴺ (suc d) B + L + s ≡ ⌈log₂ B ⌉ + (muRungsᴺ d (B * B) + L + s)
-  eq = trans (cong (_+ s) (+-assoc ⌈log₂ B ⌉ (muRungsᴺ d (B * B)) L))
-             (+-assoc ⌈log₂ B ⌉ (muRungsᴺ d (B * B) + L) s)
+  eq : muRungsᴺ (suc d) B + L + s ≡ bitsᴺ B + (muRungsᴺ d (B * B) + L + s)
+  eq = trans (cong (_+ s) (+-assoc (bitsᴺ B) (muRungsᴺ d (B * B)) L))
+             (+-assoc (bitsᴺ B) (muRungsᴺ d (B * B) + L) s)
 
 -- THE TWO TRANSPORTS AT A DOOR, WHICH IS THE ONE CONSTRUCTOR SHAPE THE
 -- THREE CROSSINGS SHARE.  Each charges one layer and one syntax node

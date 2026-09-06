@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE THIRD LEVEL, WHERE THE RATE FIRST PAYS FOR A SQUARING OF A
-  SQUARING.** Composition is instantiated at both descents now and the
-  rate is not — a property of the leaf, not of the programs: the door's
-  fold PARKS the inner nesting instead of entering it, so one
-  rung-group already affords MORE than the cube of the bound where a
-  second unfolding multiplies the stored syntax only by the mention
-  count. The subscription descent is the
-  one whose crossing ENTERS the nesting, and its own two-level bracket
-  needs the second group — so the commit takes that family to three,
-  where the third group is bought at a bound already squared twice and
-  a merely generous rate stops reading the same as a right one.
-
 - **THE LIVE FOLD IS NOT CARRIED — IT IS READ OFF THE PREDICATE AT THE
   PLACE IT IS OWED.** The cascade's fold now comes from the exit cap's
   own store conjunct, depth being pointwise under size, and no
@@ -250,6 +238,19 @@ does not fit is a finding about the shared statement, not about the head.
   the store before the chain is taken; the answer decides between a
   carried record field and a restatement at the exit cap.
 
+- **THE TELESCOPE PAST ONE SLOT, WHERE TWO ROWS ARE UNCOVERED IN THE
+  SAME PLACE.** `subscribeSharedSlot-sz-store`'s entire climb IS the
+  telescope summand — an `input` charges nought, so no reading of the
+  program term reaches it — and it is instantiated only behind ONE
+  reference; `subscribeE-sz-store-scan` says the same of slots in
+  series. That is one region carrying two statements: the region
+  where a summand really a MAXIMUM reads identically to one really a
+  SUM, since one slot makes the two agree.
+  The commit builds a telescope of several DISTINCT slots behind
+  distinct references and reads both charges at it; whichever way the
+  figures fall one of the two denominations is refuted, which is why
+  this is worth more than either row's remaining grind.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -258,9 +259,9 @@ does not fit is a finding about the shared statement, not about the head.
   denominations stay closed to instantiation — the cap does not return, the
   climb bound is sealed — so evidence can raise this class, never lower it.
 - **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
-  subscription delivers, in its own charge plus its telescope. The WHOLE value
+  subscription delivers, in its charge plus its telescope. The WHOLE value
   side is a body over it. A max is refuted at a chain of eleven; a slot named
-  twice costs nothing; the block is read at two nestings and its rate is open.
+  twice is free; the block reaches three nestings, the last twice-squared.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED, PROBED×3`: the burst a crossing door pushes back through itself,
   keyed on the source program since an arbitrary burst is unbounded. A
