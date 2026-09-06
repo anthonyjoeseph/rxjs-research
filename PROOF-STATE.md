@@ -239,8 +239,9 @@ does not fit is a finding about the shared statement, not about the head.
   SQUARING.** Composition is instantiated at both descents now and the
   rate is not — a property of the leaf, not of the programs: the door's
   fold PARKS the inner nesting instead of entering it, so one
-  rung-group already affords the cube of the bound where a second
-  unfolding delivers a sixteenth of it. The subscription descent is the
+  rung-group already affords MORE than the cube of the bound where a
+  second unfolding multiplies the stored syntax only by the mention
+  count. The subscription descent is the
   one whose crossing ENTERS the nesting, and its own two-level bracket
   needs the second group — so the commit takes that family to three,
   where the third group is bought at a bound already squared twice and

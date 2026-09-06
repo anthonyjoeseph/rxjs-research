@@ -25,18 +25,19 @@
 -- to nought the conclusion fails at a mention count where it holds one
 -- mention below, so the bracket is the multiplicity and not the second
 -- door the composition adds.  But the count stopped at ONE level
--- CLEARS the same row -- one group already affords the cube of the
--- bound, where a second unfolding delivers a sixteenth of it -- so
--- what the second group buys is not what closes this crossing, and no
--- mention count reaches a reading where it is.
+-- CLEARS the same row -- one group already affords more than the CUBE
+-- of the program's own bound, where a second unfolding multiplies the
+-- stored syntax only by the mention count -- so what the second group
+-- buys is not what closes this crossing, and no mention count reaches
+-- a reading where it is.
 --
 -- WHAT THEY DO NOT BUY, AND IT IS STILL THE RATE.  Two nesting levels,
--- one door, one telescope of a single scripted slot -- so nothing
--- about three, where the third group is bought at a bound already
--- squared twice, and nothing about a nesting reached through the
--- TELESCOPE rather than through the program term.  The rate stays
--- asymptotic: these clear at the smallest bound the premise admits and
--- say nothing about every bound.
+-- one door, and NO telescope at all -- so nothing about three, where
+-- the third group is bought at a bound already squared twice, and
+-- nothing about a nesting reached through a TELESCOPE rather than
+-- through the program term.  The rate stays asymptotic: these clear at
+-- the smallest bound the premise admits and say nothing about every
+-- bound.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Mu-Compose where
 
@@ -46,21 +47,47 @@ open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here; there)
 open import Data.Maybe using (nothing; just)
 open import Data.Nat using (ℕ; suc; _+_)
+open import Data.Vec using () renaming ([] to []ⱽ)
 open import Data.Product using (_×_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Prim using (g0; gasPad)
-open import Rx.Exp using (Exp; Tm; Closed; natᵗ; obs;
-  ofᵉ; mergeAllᵉ; μᵉ; varᵉ; deferᵉ; strmᵗ; sizeᵉ; unfoldμ)
-open import Rx.Slots using (slotsSize)
+open import Rx.Exp using (Ctx; Exp; Tm; Closed; natᵗ; obs;
+  emptyᵉ; ofᵉ; mergeAllᵉ; μᵉ; varᵉ; deferᵉ; strmᵗ; sizeᵉ; unfoldμ)
+open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Layer-Count using (layᵉ; muDepthᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Stream; root; _↠_;
-  mergeAllᵒ; thru-outer; subscribeE; pushBurst; iterSize)
+  mergeAllᵒ; thru-outer; mergeAll-st; installNode; st-init; sched-init;
+  subscribeE; pushBurst; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
 open import Verify-Budget-Sufficient.Regs-Nest-Walk
   using (muRungsᴺ; pushBurst-sz-store-outer)
-open import Refuted.Burst-Mu-Square using (Γ; sl; e₀; st₀; sched₀)
 open import Probed.Apparatus using (Confirms)
+
+----------------------------------------------------------------------
+-- THE APPARATUS, AT A CONTEXT WITH NO TELESCOPE AT ALL.  Every slot
+-- shape costs at least one, so a slot-free context is the only reading
+-- where the count buys no rung for the telescope -- and that is the
+-- STRONGER row rather than the cheaper one, since the telescope enters
+-- only the bound.  A rung fewer is a bound four times smaller, which
+-- is what brings the crossing within reach of a machine at all.
+----------------------------------------------------------------------
+
+Γ : Ctx 0
+Γ = []ⱽ
+
+sl : Slots Γ
+sl ()
+
+e₀ : Closed Γ natᵗ
+e₀ = emptyᵉ
+
+st₀ : EvalSt e₀
+st₀ = installNode 0 (mergeAll-st {Γ = Γ} {t = natᵗ} nothing 0 [] false)
+        (st-init e₀)
+
+sched₀ : Sched Γ
+sched₀ = record (sched-init e₀ sl) { nextNode = 1 }
 
 ----------------------------------------------------------------------
 -- THE FAMILY.  The inner body mentions BOTH occurrences, so unfolding
@@ -74,8 +101,7 @@ mus² (suc j) = strmᵗ (varᵉ (here refl))
              ∷ mus² j
 
 innerAt : (k : ℕ) → Exp Γ (natᵗ ∷ natᵗ ∷ []) [] [] natᵗ
-innerAt k = mergeAllᵉ (just 0)
-              (ofᵉ (strmᵗ (deferᵉ (mergeAllᵉ nothing (ofᵉ (mus² k)))) ∷ []))
+innerAt k = deferᵉ (mergeAllᵉ nothing (ofᵉ (mus² k)))
 
 bodyAt² : (k : ℕ) → Exp Γ (natᵗ ∷ []) [] [] natᵗ
 bodyAt² k = mergeAllᵉ (just 0) (ofᵉ (strmᵗ (μᵉ (innerAt k)) ∷ []))
@@ -90,15 +116,15 @@ srcAt² k = ofᵉ (strmᵗ (μᵉ (bodyAt² k)) ∷ [])
 -- LOAD-BEARING: it is the composition in six numbers.  The nesting is
 -- TWO, and the block it buys is one logarithm of the program plus one
 -- of the program SQUARED -- against a layer count that stands at the
--- two operators outside the defer, however many copies either
--- unfolding plants.
+-- one door outside the defer, however many copies either unfolding
+-- plants.
 figures : List ℕ
 figures = muDepthᵉ (srcAt² 8) ∷ layᵉ (srcAt² 8) ∷ sizeᵉ (srcAt² 8)
         ∷ sizeᵉ (unfoldμ (bodyAt² 8))
         ∷ muRungsᴺ (muDepthᵉ (srcAt² 8)) (sizeᵉ (srcAt² 8))
         ∷ slotsSize sl ∷ []
 
-figures≡ : figures ≡ 2 ∷ 2 ∷ 49 ∷ 405 ∷ 18 ∷ 1 ∷ []
+figures≡ : figures ≡ 2 ∷ 1 ∷ 45 ∷ 369 ∷ 17 ∷ 0 ∷ []
 figures≡ = refl
 
 ----------------------------------------------------------------------
@@ -140,7 +166,7 @@ blindRow k = all (λ kv → boundedNode (Mblind k) (proj₂ kv))
 -- fails is the multiplicity alone and not the second door the
 -- composition adds.
 blindRows : List Bool
-blindRows = blindRow 256 ∷ blindRow 257 ∷ []
+blindRows = blindRow 16 ∷ blindRow 17 ∷ []
 
 blindRows≡ : blindRows ≡ true ∷ false ∷ []
 blindRows≡ = refl
@@ -169,7 +195,7 @@ nowRow k = all (λ kv → boundedNode (Mnow k) (proj₂ kv))
 -- the very mention count the block-blinded reading fails at.  A block
 -- the second level had been needed for would fail here.
 rateRows : List Bool
-rateRows = oneRow 257 ∷ nowRow 257 ∷ []
+rateRows = oneRow 17 ∷ nowRow 17 ∷ []
 
 rateRows≡ : rateRows ≡ true ∷ true ∷ []
 rateRows≡ = refl
@@ -177,8 +203,8 @@ rateRows≡ = refl
 -- LOAD-BEARING: the table premise at the level the rows are read at,
 -- spelled out so the witness cannot be read as one that merely fails
 -- to satisfy it.
-premNow : all (λ kv → boundedNode (Mnow 257) (proj₂ kv))
-              (EvalSt.nodes (proj₂ (proj₂ (subAt² 257)))) ≡ true
+premNow : all (λ kv → boundedNode (Mnow 17) (proj₂ kv))
+              (EvalSt.nodes (proj₂ (proj₂ (subAt² 17)))) ≡ true
 premNow = refl
 
 ----------------------------------------------------------------------
@@ -193,6 +219,6 @@ premNow = refl
 -- fail it exactly as the blinded reading beside it does.
 tieCompose : Confirms
   (pushBurst-sz-store-outer {e = e₀} sl (gasPad 64 g0) mergeAllᵒ 0
-     (srcAt² 257) root 0 0 sched₀ st₀ (subAt² 257) 2
-     (sizeᵉ (srcAt² 257)) (Mnow 257))
+     (srcAt² 17) root 0 0 sched₀ st₀ (subAt² 17) 2
+     (sizeᵉ (srcAt² 17)) (Mnow 17))
 tieCompose = λ _ _ _ _ _ _ → refl

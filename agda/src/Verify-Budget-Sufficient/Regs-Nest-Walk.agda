@@ -1931,14 +1931,15 @@ postulate
   --   mention count where it holds one mention below, so the bracket is
   --   the multiplicity and not the second door the composition adds.
   --   But the count stopped at ONE level CLEARS that same row -- one
-  --   group already affords the cube of the bound where a second
-  --   unfolding delivers a sixteenth of it -- so what a second group
-  --   buys is not what closes this crossing, and no mention count
-  --   reaches a reading where it is.  The rate is therefore beyond
+  --   group already affords more than the CUBE of the program's own
+  --   bound, where a second unfolding multiplies the stored syntax
+  --   only by the mention count -- so what a second group buys is not
+  --   what closes this crossing, and no mention count reaches a
+  --   reading where it is.  The rate is therefore beyond
   --   instantiation HERE rather than merely unreached: this fold PARKS
   --   the inner nesting in a cell instead of entering it, so the
   --   squaring the second group is bought against never happens under
-  --   this leaf.  Two levels, one door, one scripted slot.
+  --   this leaf.  Two levels, one door, no telescope at all.
   pushBurst-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (g : Gas) (op : AllOp) (nid : NodeId)
     (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
