@@ -2306,9 +2306,11 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- level while this width stays the entry's, so the two ends of the
 -- path are not even read against the same number.  Both readings of
 -- the width coordinate are shut -- wider is unaffordable at a rung,
--- the term's own exponential does not move with the instant -- which
--- leaves a law about what a STEP outputs, stated where the step is.
--- That law computes, and nothing else in this region does.
+-- the term's own exponential does not move with the instant -- and so
+-- is a law about what a STEP outputs stated at a FIXED bound, since
+-- the count climbs exactly where the cap the values are admitted at
+-- climbs.  What is left is a ledger whose own bound is INDEXED by the
+-- level the caps side is already spending.
 
 -- AND THE WIDTH IS THE ARRIVAL'S OWN, WHICH IS WHY IT IS READ AT THE
 -- INSTANT'S CAP AND NOT OFF THE TERM.  A frame crossing into a merge
@@ -2325,6 +2327,11 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   frame outputs, at two crossing frames over one scripted slot: six
 --   values handed in, thirty-six out, against an allowance of
 --   thirty-one, with the reading still holding one arrival shorter.
+-- REFUTED: `Refuted.Walk-Burst-Entry-Size` -- the caps-GENERIC form of
+--   this statement, which is the strongest reading a route may use
+--   since the entry cap's own fields are iterates the tower seals: the
+--   walk's caps package held at level zero across two crossing frames,
+--   thirty-six values delivered against an entry size of thirty-five.
 -- DEAD ROUTE: reading the ledger at the number the cascade hands over,
 --   so the proven neighbour can be spent unchanged.  Dead on
 --   AFFORDABILITY rather than on transport: the per-frame charge is
@@ -2350,6 +2357,16 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   a frame's output count is MULTIPLIED and not incremented, while
 --   the entry recurrence's base moves only linearly in the script the
 --   multiplication is taken over.
+-- DEAD ROUTE: proving this through a lemma generic in the caps triple,
+--   which is what any route must do, since no step of a proof can read
+--   the sealed iterates the entry cap's fields are.  Dead because the
+--   two sides are denominated at different points of the walk: the
+--   caps package re-reads its cap at each frame's own LEVEL and climbs
+--   with the descent, while the burst package charges every clause
+--   against ONE number -- and the count climbs with the level, which
+--   is what the caps side spends the level ON.  A ledger that survives
+--   is one whose bound climbs with the walk's level, or one stated at
+--   the cap that level reaches.
 -- RECOVERY: git show 0e888f3 restores the term-side floor on the cap
 --   and the ledger's upward closure in its width, which are what a
 --   transport from a smaller width would spend.

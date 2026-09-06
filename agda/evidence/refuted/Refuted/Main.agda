@@ -77,6 +77,10 @@ open import Refuted.Walk-Burst-Additive
   using (handed≡6; delivered≡36; allowed≡31; delivered₅≡25; allowed₅≡28;
          frame-out-additive-absurd)
   renaming (premises to additivePremises)
+open import Refuted.Walk-Burst-Entry-Size
+  using (size≡35; walk-burst-entry-size-absurd)
+  renaming (handed≡6 to entryHanded≡6; delivered≡36 to entryDelivered≡36;
+            walkOK to entryWalkOK)
 open import Refuted.Thru-Scan-Burst-Nest
   using (charged≡8192; charged₁₃≡8192; stepFrame-nodes-thru-burst-absurd)
   renaming (premises to thruBurstPremises;

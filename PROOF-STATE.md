@@ -215,16 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE STEP LAW IS A PRODUCT, SO WHAT AFFORDS IT IS A RUNG.** The
-  step's own count is instantiated now, and the additive reading of it
-  is dead — the reading every other ledger here charges by. A crossing
-  frame emits each arrival's whole burst, so two crossings over one
-  scripted slot square that slot's length while
-  the entry recurrence's base moves only linearly in it. What is owed
-  at the step is therefore a PRODUCT along the path, with the crossing
-  count as its exponent, and the only number in reach that admits a
-  tower is the ladder the cap itself climbs. The commit states that law
-  where the step is and instantiates it before the ledger spends it.
+- **THE BURST LEDGER IS DENOMINATED AT THE WRONG POINT OF THE WALK.**
+  Its caps-generic form is refuted now, at level zero over two
+  crossings, and that form is the strongest one a route may use, since
+  the entry cap's fields are iterates the tower seals. The two sides
+  part on WHERE they charge: the caps package re-reads its cap at each
+  frame's own level and climbs with the descent, the burst package
+  charges every clause against one fixed number, and the count climbs
+  with the level. So the residue is a restatement, not a grind. The
+  commit restates the walk's burst predicate at a bound indexed by that
+  same level, and carries the restatement to the one site that spends
+  it.
 
 - **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
   crossing arm is refuted through the LAYER half of its charge, at a
@@ -286,10 +287,10 @@ does not fit is a finding about the shared statement, not about the head.
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
 - **`chain-walk-bursts`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×2, DEAD ROUTE×3, RECOVERY`: the walk's burst package at the
-  instant's own SIZE cap. Both readings of the width are shut, and the additive
-  law for what a step outputs is refuted at two crossings — so what is owed is a
-  product along the path.
+  `REFUTED×3, DEAD ROUTE×4, RECOVERY`: the walk's burst package at the
+  instant's own SIZE cap. Refuted in the caps-generic form any route must use —
+  the caps side climbs level by level and this bound does not — so what is owed
+  is a restatement, not a proof.
 - **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: the two crossing
   frames' charge against one frame's ceiling. The telescope half is a program
   constant the burst face already reads against the cap; the LAYER half asks a
