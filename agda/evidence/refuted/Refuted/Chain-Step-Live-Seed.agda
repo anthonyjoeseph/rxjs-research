@@ -2,7 +2,7 @@
 -- THE LIVE FOLD'S ARRIVAL-SIZE CHARGE, AGAINST A DEFERRED BODY THE
 -- ARRIVAL NEVER CARRIED AND THE STORE'S DEPTH MEASURE CANNOT SEE.
 --
--- `chainStep-nest-live` charges a step `pathNestF path * sizeᵛ` of the
+-- `chainStep-nest-live` charges a step `pathNestFᴿ path * sizeᵛ` of the
 -- ARRIVAL, on top of the incoming live fold and the slots.  The
 -- witness parks a deep deferred constant as a scan's SEED, delivers a
 -- unit-sized arrival, and lets the scan hand the seed through unchanged
@@ -27,21 +27,22 @@ open import Data.Bool using (false)
 open import Data.Fin using () renaming (zero to fzero; suc to fsuc)
 open import Data.List using ([]; _∷_; foldr; length)
 open import Data.List.Relation.Unary.Any using (here)
-open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; _*_; _+_)
+open import Data.Nat using (ℕ; zero; suc; _≤_; _⊔_; _*_; _+_; _^_)
 open import Data.Nat.Properties using (≤⇒≤ᵇ)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl)
 
 open import Rx.Exp
-  using (Closed; Exp; natᵗ; nat̂; ofᵉ; strmᵗ; deferᵉ; switchAllᵉ;
+  using (Ctx; Closed; Exp; natᵗ; nat̂; ofᵉ; strmᵗ; deferᵉ; switchAllᵉ; sizeᵗ;
          mergeAllᵉ; scanᵉ; fstᵗ; varᵗ; input; sizeᵛ)
 open import Rx.Prim using (Gas; g0; gs; Source)
 open import Rx.Evaluator
-  using (Sched; EvalSt; subscribeE; sched-init; st-init; root;
-         chainStep; chainsOf; Arrival; Path)
+  using (Sched; EvalSt; subscribeE; sched-init; st-init; root; share-sink;
+         chainStep; chainsOf; Arrival; Path; Frame; _↠_;
+         map-f; scan-f; take-f; from-inner; thru-outer)
 open import Rx.Slots using (Slots)
 open import Verify-Budget-Sufficient.Nest-Store
-  using (liveNest; slotsNestSum; pathNestF; nodeNest)
+  using (liveNest; slotsNestSum; nodeNest)
 open import Refuted.Demand-Programs using (Γ₂; insT)
 
 -- the seed: a body k `switchAllᵉ` layers deep, under one gate
@@ -88,6 +89,25 @@ pathOf k with chainsOf (shallow k) (proj₂ (sub k))
 oneChain : length (chainsOf (shallow 9) (proj₂ (sub 9))) ≡ 1
 oneChain = refl
 
+-- THE WALK'S MULTIPLICATIVE PATH FACTOR, STATED HERE RATHER THAN
+-- IMPORTED.  `src` carries no such measure any more: the per-step
+-- charge this file refutes was retired along with the currency that
+-- priced it, and a refutation that imported the survivor would be
+-- refuting whatever that survivor means today.  The clauses are the
+-- ones the charge was written over -- a power of two in the step
+-- function's size at the two frames that substitute, one elsewhere.
+frameNestFᴿ : ∀ {n} {Γ : Ctx n} {s u} → Frame Γ s u → ℕ
+frameNestFᴿ (map-f f)          = 2 ^ sizeᵗ f
+frameNestFᴿ (scan-f f _)       = 2 ^ sizeᵗ f
+frameNestFᴿ (take-f _)         = 1
+frameNestFᴿ (from-inner _ _ _) = 1
+frameNestFᴿ (thru-outer _ _)   = 1
+
+pathNestFᴿ : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
+pathNestFᴿ root           = 1
+pathNestFᴿ (share-sink _)  = 1
+pathNestFᴿ (f ↠ p)        = frameNestFᴿ f * pathNestFᴿ p
+
 liveMax : Sched Γ₂ → ℕ
 liveMax sched = foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
 
@@ -96,7 +116,7 @@ grown k = liveMax (proj₁ (proj₂ (chainStep {e = prog k} 1 (shallow k) (pathO
 
 charge : ℕ → ℕ
 charge k = liveMax (proj₁ (sub k)) ⊔ slotsNestSum (Sched.slots (proj₁ (sub k)))
-             ⊔ pathNestF (pathOf k) * sizeᵛ {Γ = Γ₂} natᵗ 0
+             ⊔ pathNestFᴿ (pathOf k) * sizeᵛ {Γ = Γ₂} natᵗ 0
 
 -- the store's own depth reading of the parked seed: blind
 armed : ℕ → ℕ

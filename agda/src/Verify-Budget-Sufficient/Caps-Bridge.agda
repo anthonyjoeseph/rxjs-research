@@ -99,7 +99,7 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Ledger using
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps using
   (arr-chains-bursts; arr-chains-caps)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using
-  (caps-tick; cascade-depth-capsH)
+  (caps-tick; caps-go; cascade-depth-capsH)
 open import Verify-Budget-Sufficient.Caps-Nest using
   (nest; nest≤)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
@@ -835,11 +835,15 @@ store-growth {e = e} sl id a nextId sched st hsl hcaps hnest hval hsz valC closC
       (arr-chains-nest-syn sl id a sched st hsl hcaps hnest)
       (arr-chains-len-sum sl id a sched st hsl hcaps)
       (arr-chains-nest-fac sl id a sched st hsl hcaps hnest)
-      hsz
       (cascade-depth-capsH sl id a nextId sched st hsl hcaps hnest hval hsz valC closC)
       (arr-chains-bursts sl id a nextId sched st hsl hcaps hch valC closC hdep)
       (arr-chains-caps sl id a nextId sched st hsl hcaps hch valC closC hdep)
       hch
+      (caps-go (λ {n′} {Γ′} {t′} {e′} {u′} →
+                  subscribeInner-caps {n′} {Γ′} {t′} {e′} {u′})
+               (λ {n′} {Γ′} {t′} {e′} {s′} →
+                  innerFinish-caps {n′} {Γ′} {t′} {e′} {s′})
+               sl id a nextId sched st hsl hcaps hnest hval valC closC)
     where
     hch  = chainsOf-caps (Caps.cSize (capsAt e sl id)) a st
              (capsOK?-regs (capsAt e sl id) sched st hcaps)
@@ -2101,7 +2105,7 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 --   summand exists for and it is load-bearing rather than slack.
 --   The conclusion itself does not reduce -- the increment is built
 --   over `capsAt`'s size, which is sealed through `capsBase` -- but
---   `capsAt-base-size⁺` and `size≤nestIncAt` are PROVEN and compose
+--   `capsAt-base-size⁺` and `sizeSuc≤nestIncAt` are PROVEN and compose
 --   into a lower bound on it built from `sizeᵉ`, and putting that bound
 --   in the increment's place gives a STRICTLY STRONGER claim that
 --   computes.  Green there is green here.  It is taken at the same defer-headed family that

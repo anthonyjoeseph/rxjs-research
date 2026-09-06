@@ -49,16 +49,16 @@ module Verify-Budget-Sufficient.Nest-Store where
 open import Data.Bool using (Bool; true; false; T; _∨_)
 open import Data.Unit using (tt)
 open import Data.List using (List; foldr; tabulate; []; _∷_; _++_)
-open import Data.Bool.ListAction using (any)
-open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s; >-nonZero)
-open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; *-mono-≤; ≤-refl; ⊔-mono-≤;
-  m≤n⊔m; m≤m⊔n; m≤m+n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
-  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤; +-comm; ^-identityʳ; ^-monoʳ-≤)
+open import Data.Bool.ListAction using (any; all)
+open import Data.Nat  using (ℕ; zero; suc; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _<ᵇ_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤-trans; ≤-reflexive; ⊔-lub; +-assoc; +-monoʳ-≤; +-monoˡ-≤; ≤-refl; ⊔-mono-≤; m≤n⊔m;
+  m≤m⊔n; m≤m+n; ⊔-monoʳ-≤; n≤1+n; *-monoˡ-≤; *-monoʳ-≤; *-assoc; *-comm; *-identityˡ;
+  *-identityʳ; *-distribˡ-+; m^n>0; +-mono-≤; +-comm)
 open import Data.Nat.ListAction using (sum)
 open import Data.Product using (_×_; _,_; proj₁; proj₂)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans; cong; subst)
 
-open import Rx.Exp using (Ctx; Closed; Ty; sizeᵗ; sizeᵉ; syncSizeᵉ; _≟ᵗ_)
+open import Rx.Exp using (Ctx; Closed; Ty; Val; sizeᵗ; sizeᵉ; sizeᵛ; syncSizeᵉ; _≟ᵗ_)
 open import Rx.Slots using (Slot; Slots; scripted; shared)
 open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; Frame; Path; root; share-sink; _↠_; RegId;
   NodeId; setNode; installNode;
@@ -66,16 +66,18 @@ open import Rx.Evaluator using (map-f; scan-f; take-f; from-inner; thru-outer; F
   Arrival; cascadeLatch; Chain; cascadeFinish; shareAdmit; sameSource; dropSource; sweepLive; register;
   arrSource; AllOp; mergeAllᵒ; switchᵒ; exhaustᵒ; cutThrough; pathHasNode)
 open import Data.Maybe using (Maybe; nothing)
-open import Rx.Prim using (Source)
+open import Rx.Prim using (Source; Tick)
 open import Data.Fin using (Fin; toℕ)
 open import Data.Vec using (lookup)
 open import Relation.Nullary using (yes; no)
 open import Rx.Nest-Depth using (nestDᵉ; nestDᵗ; nestDᵛ)
-open import Decide using (≤ᵇ-true)
-open import Verify-Budget-Sufficient.Measures using (fᵢ≤sum-tab; sum-tab-mono; sizeᵉ-pos)
-open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; capsAt-⊑-suc; 21≤capsAt-size)
+open import Decide using (≤ᵇ-true; T-to)
+open import Verify-Budget-Sufficient.Measures using
+  (fᵢ≤sum-tab; sum-tab-mono; sizeᵉ-pos; boundedLive; stBounded?; stB-live; ∧-true)
+open import Verify-Budget-Sufficient.Nest-Depth-Size using (nestDᵛ≤sizeᵛ)
+open import Verify-Budget-Sufficient.Caps using (capsAt; Caps; 1≤pow≤; 1≤capsAt-reg; 21≤capsAt-size)
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-base; nestB; nestB-mono; nestB-monoB; nestB-monoW; nestB-add)
-open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap; delSize-monoᶜ)
+open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; delSize-cap)
 
 pathNestD : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
 pathNestD root                    = 0
@@ -135,17 +137,6 @@ frameNestF (thru-outer _ _)   = 1
 1≤frameNestF (take-f _)         = s≤s z≤n
 1≤frameNestF (from-inner _ _ _) = s≤s z≤n
 1≤frameNestF (thru-outer _ _)   = s≤s z≤n
-
--- the walk telescopes by MULTIPLYING these, one per frame
-pathNestF : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → ℕ
-pathNestF root           = 1
-pathNestF (share-sink _) = 1
-pathNestF (f ↠ p)        = frameNestF f * pathNestF p
-
-1≤pathNestF : ∀ {n} {Γ : Ctx n} {s t} (p : Path Γ s t) → 1 ≤ pathNestF p
-1≤pathNestF root           = s≤s z≤n
-1≤pathNestF (share-sink _) = s≤s z≤n
-1≤pathNestF (f ↠ p)        = *-mono-≤ (1≤frameNestF f) (1≤pathNestF p)
 
 -- THE ARITHMETIC BOTH TELESCOPES RUN ON, and the only place a factor
 -- and a summand meet: one step's factor multiplies everything the rest
@@ -214,24 +205,9 @@ chainsNestD : ∀ {n} {Γ : Ctx n} {s t} →
   List (RegId × Path Γ s t) → ℕ
 chainsNestD = foldr (λ rc acc → pathNestD (proj₂ rc) ⊔ acc) 0
 
--- THE FACTORS ARE A PRODUCT, not a max, because the fold runs the
--- chains in sequence and each one's factor multiplies whatever the ones
--- after it will charge.
-chainsNestF : ∀ {n} {Γ : Ctx n} {s t} →
-  List (RegId × Path Γ s t) → ℕ
-chainsNestF = foldr (λ rc acc → pathNestF (proj₂ rc) * acc) 1
-
 chainsSzSum : ∀ {n} {Γ : Ctx n} {s t} →
   List (RegId × Path Γ s t) → ℕ
 chainsSzSum = foldr (λ rc acc → pathSzSum (proj₂ rc) + acc) 0
-
--- the selection's factor is a product of the paths' own, so it is at
--- least one for the same reason each of them is -- and the walk needs
--- exactly this to read one chain's charge against the whole list's
-1≤chainsNestF : ∀ {n} {Γ : Ctx n} {s t} (cs : List (RegId × Path Γ s t)) →
-  1 ≤ chainsNestF cs
-1≤chainsNestF []             = s≤s z≤n
-1≤chainsNestF ((_ , p) ∷ cs) = *-mono-≤ (1≤pathNestF p) (1≤chainsNestF cs)
 
 -- A SCRIPTED SLOT IS OBS-FREE BY CONSTRUCTION (`isData`), so no
 -- observable enters a run from outside the program and the clause is 0
@@ -374,6 +350,39 @@ storeNest-live≤ sched st =
   ≤-trans (≤-trans (m≤n⊔m (slotsNestSum (Sched.slots sched)) _)
                    (m≤m⊔n _ (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st))))
           (m≤m⊔n _ (regsNestMax (EvalSt.registry st)))
+
+-- THE LIVE PLACE IS ALREADY BOUNDED BY THE SIZE CAP, so the depth
+-- currency buys nothing there.  A live source's depth reading is a ⊔
+-- over its pendings' `nestDᵛ`, its size reading is an `all` over the
+-- same pendings' `sizeᵛ`, and `nestDᵛ≤sizeᵛ` puts the first pointwise
+-- under the second -- so a hypothesis that every pending fits a size
+-- budget bounds the whole ⊔-fold by that budget, with no induction
+-- over the machine and no arrival-shaped charge.  That is what a
+-- delivery face needs at its live place: the caps predicate it
+-- already carries answers the question the depth face was asking.
+pendNest≤ : ∀ {n} {Γ : Ctx n} (B : ℕ) (u : Ty) (ps : List (Tick × Val Γ u)) →
+  all (λ tv → sizeᵛ u (proj₂ tv) ≤ᵇ B) ps ≡ true →
+  foldr (λ tv acc → nestDᵛ u (proj₂ tv) ⊔ acc) 0 ps ≤ B
+pendNest≤ B u []             h = z≤n
+pendNest≤ B u ((tk , v) ∷ ps) h with ∧-true (sizeᵛ u v ≤ᵇ B) _ h
+... | h₁ , h₂ =
+  ⊔-lub (≤-trans (nestDᵛ≤sizeᵛ u v) (≤ᵇ⇒≤ (sizeᵛ u v) B (T-to h₁)))
+        (pendNest≤ B u ps h₂)
+
+liveFold≤ : ∀ {n} {Γ : Ctx n} (B : ℕ) (ls : List (LiveSource Γ)) →
+  all (boundedLive B) ls ≡ true →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 ls ≤ B
+liveFold≤ B []       h = z≤n
+liveFold≤ B (l ∷ ls) h with ∧-true (boundedLive B l) _ h
+... | h₁ , h₂ =
+  ⊔-lub (pendNest≤ B (LiveSource.elemTy l) (LiveSource.pending l) h₁)
+        (liveFold≤ B ls h₂)
+
+stBounded?-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} (B : ℕ)
+  (sched : Sched Γ) (st : EvalSt e) → stBounded? B sched st ≡ true →
+  foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched) ≤ B
+stBounded?-live B sched st h =
+  liveFold≤ B (Sched.live sched) (stB-live B sched st h)
 
 storeNest-nodes≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sched : Sched Γ) (st : EvalSt e) →
@@ -937,20 +946,17 @@ abstract
          * (suc (suc (realWidAt e sl id * delSize n (capsAt e sl (suc id))))
             * nestU (delSq n (capsAt e sl (suc id))) (nestUnit e sl)))
 
-  -- THE SIZE CAP SITS UNDER ONE INSTANT'S GROWTH, which is what lets a
-  -- walk charge an arrival's own size to the increment rather than to
-  -- the store it arrived at.  Proven in here because every factor it
-  -- reads is sealed: the width is at least one, so the doubled term
-  -- already exceeds the size, and the remaining factors are each at
-  -- least one.
-  size≤nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) → Caps.cSize (capsAt e sl id) ≤ nestIncAt e sl id
-  size≤nestIncAt {n = n} e sl id =
+  -- AND SO DOES THE EXIT CAP'S SIZE, which is the reading a delivery
+  -- face actually holds: its store predicate is stated at the cap the
+  -- instant CLOSES at, not the one it opened at.  The chain is the
+  -- entry cap's with its one monotonicity step dropped -- the
+  -- increment's own `delSize` is already taken at `suc id`, so there
+  -- is nothing to widen across.
+  sizeSuc≤nestIncAt : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
+    (id : ℕ) → Caps.cSize (capsAt e sl (suc id)) ≤ nestIncAt e sl id
+  sizeSuc≤nestIncAt {n = n} e sl id =
     ≤-trans S≤mid (≤-trans (≤-trans mid≤u u≤b) b≤r)
     where
-    S : ℕ
-    S = Caps.cSize (capsAt e sl id)
-
     D : ℕ
     D = delSize n (capsAt e sl (suc id))
 
@@ -963,12 +969,9 @@ abstract
     1≤U : 1 ≤ U
     1≤U = ≤-trans (s≤s z≤n) (nestU-base (delSq n (capsAt e sl (suc id))) (nestUnit e sl))
 
-    S≤mid : S ≤ suc (suc (R * D))
+    S≤mid : Caps.cSize (capsAt e sl (suc id)) ≤ suc (suc (R * D))
     S≤mid =
-      ≤-trans (≤-trans (delSize-cap n (capsAt e sl id))
-                       (delSize-monoᶜ n (capsAt e sl id) (capsAt e sl (suc id))
-                         (proj₁ (capsAt-⊑-suc e sl id))
-                         (proj₂ (proj₂ (capsAt-⊑-suc e sl id)))))
+      ≤-trans (delSize-cap n (capsAt e sl (suc id)))
         (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ D)))
                           (*-monoˡ-≤ D (1≤capsAt-reg e sl id)))
                  (≤-trans (n≤1+n (R * D)) (n≤1+n (suc (R * D)))))
@@ -985,16 +988,6 @@ abstract
             ≤ R * (nestBurstAt e sl id * (suc (suc (R * D)) * U))
     b≤r = ≤-trans (≤-reflexive (sym (*-identityˡ _)))
                   (*-monoˡ-≤ _ (1≤capsAt-reg e sl id))
-
-  -- AND A BASE SITS UNDER ITS OWN BURST POWER, the burst being
-  -- positive by construction.  A consumer holding a bound on the
-  -- POWER needs this to spend it on the base, and cannot see that the
-  -- exponent is nonzero from outside.
-  m≤m^burst : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ)
-    (id : ℕ) (x : ℕ) → 1 ≤ x → x ≤ x ^ nestBurstAt e sl id
-  m≤m^burst e sl id x hx =
-    ≤-trans (≤-reflexive (sym (^-identityʳ x)))
-            (^-monoʳ-≤ x ⦃ >-nonZero hx ⦄ (1≤nestBurstAt e sl id))
 
   -- READ BACK OUT OF THE SEAL for the same reason the width is: a
   -- consumer proving the fanout bound has to say what it proved.
@@ -1129,8 +1122,8 @@ nestCap-mono₀ e sl (suc id) =
 -- measures: a defer-headed program at a body four deep leaves a store
 -- of 4 against a unit of 2, so the unit alone does not carry it.
 -- THE SUMMAND IS THE INCREMENT ITSELF, not the size it dominates.
--- Charging the size is available -- `size≤nestIncAt` gives it -- and
--- it is the wrong choice, because the summand here is an obligation
+-- Charging the size is available -- `sizeSuc≤nestIncAt` gives it --
+-- and it is the wrong choice: the summand here is an obligation
 -- placed on whoever supplies the store bound: a SMALLER summand is a
 -- HARDER leaf, and the increment is what the cap actually offers at
 -- this step.  Nothing downstream wants the tighter one, and the size

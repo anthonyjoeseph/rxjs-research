@@ -4,8 +4,8 @@ module Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Nest where
 
 open import Data.Bool    using (true)
 open import Data.Nat     using (ℕ; suc; _+_; _*_; _^_; _⊔_; _≤_; z≤n; s≤s)
-open import Data.Nat.Properties using (*-assoc; *-identityˡ; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m;
-  *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
+open import Data.Nat.Properties using (*-assoc; ^-monoˡ-≤; *-monoˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; *-mono-≤;
+  *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; +-assoc; ⊔-lub; m≤m⊔n; m≤n⊔m; +-mono-≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; length; foldr)
@@ -23,28 +23,27 @@ open import Relation.Binary.PropositionalEquality
   using (_≡_; sym; subst; cong)
 
 open import Rx.Prim      using (Id; _at_from_as_)
-open import Rx.Exp       using (Ctx; Closed; sizeᵛ)
+open import Rx.Exp       using (Ctx; Closed)
 open import Rx.Nest-Depth using (nestDᵛ)
-open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-monoS; 1≤nestFac; nestU; nestU-mono; nestU-room)
+open import Verify-Budget-Sufficient.Nest-Cap using (nestFac; nestFac-monoS; nestU; nestU-mono; nestU-room)
 open import Verify-Budget-Sufficient.Nest-Walk using
   (faceAt)
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade)
 open import Verify-Budget-Sufficient.Deliver-Measure using
-  (chainsDelLen; chainsDelNestD; chainsDelNestF; 1≤chainsDelNestF; chainsDelNestD-chains;
-  chainsNestF≤)
+  (chainsDelLen; chainsDelNestD; chainsDelNestF; chainsDelNestD-chains)
 open import Verify-Budget-Sufficient.Fan-Caps using
   (fanSq; delSize; delSq; delSq-monoᶜ; delSq-cap)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (chainsNestD; chainsNestF; storeNestMax; nestCapAt; nestOK?; nestFacAt; 1≤nestFacAt;
-  nest-inflate; realWidAt; nestIncAt; nestIncAt-def; m≤m^burst; nestBurstAt; 1≤nestBurstAt;
-  nestUnit; slotsNestSum; liveNest; nodeNest; regsNestMax)
+  (chainsNestD; storeNestMax; nestCapAt; nestOK?; nestFacAt; 1≤nestFacAt; nest-inflate;
+  realWidAt; nestIncAt; nestIncAt-def; nestBurstAt; 1≤nestBurstAt; nestUnit; slotsNestSum;
+  liveNest; nodeNest; regsNestMax)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; chainsOf; cascadeGo; Path; arrTy)
 open import Rx.Slots using (Slots)
 
 open import Verify-Budget-Sufficient.Caps using
-  (1≤capsAt-reg; 1≤pow≤; 2≤capsAt-size; Caps; capsAt; capsAt-suc-full; capsAt-⊑-suc; capsH;
-  _⊑ᶜ_; frameStep; frameStep-mono-j; size≤sizeCount)
+  (1≤capsAt-reg; 2≤capsAt-size; Caps; capsAt; capsAt-suc-full; capsAt-⊑-suc; capsH; _⊑ᶜ_;
+  frameStep; frameStep-mono-j; size≤sizeCount)
 open import Verify-Budget-Sufficient.Measures using
   (all-impl)
 open import Verify-Budget-Sufficient.Caps-Depth
@@ -244,6 +243,15 @@ postulate
 -- slot arm needs no charge at all, the fold threading that store
 -- untouched, and the split is worth taking because the three arms
 -- that survive it are nowhere near equally hard.
+--
+-- DEAD ROUTE: any CONSTANT multiple of the syntactic ceiling.  Driving
+--   the crossing instant's two axes independently -- fold depth against
+--   source length -- puts the descent in their PRODUCT, while every term
+--   in the narrow vocabulary moves with the first axis alone, so no
+--   multiple of one tracks the other however large it is taken.  The
+--   chain count and the registry read flat across that whole grid, which
+--   also says the growth is neither a longer selection nor accumulating
+--   registrations.
 cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (sl : Slots Γ) (id : ℕ) (a : Arrival Γ) (nextId : Id)
   (chains : List (RegId × Path Γ (arrTy a) t))
@@ -260,16 +268,16 @@ cascadeGo-nest : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
       ^ chainsDelLen n (capsAt e sl (suc id)) chains
     * chainsDelNestF n (capsAt e sl (suc id)) chains ^ nestBurstAt e sl id
       ≤ nestFacAt e sl id →
-  sizeᵛ (arrTy a) (arrVal a) ≤ Caps.cSize (capsAt e sl id) →
   depthCascade a nextId chains sched st ≤ capsH e sl id →
   chainsBurstOK (nestBurstAt e sl id) a nextId chains sched st →
   chainsCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) 0 a nextId chains sched st →
   all (λ rc → pathSz? (Caps.cSize (capsAt e sl id)) (proj₂ rc)) chains ≡ true →
   let r = cascadeGo a nextId chains sched st
-  in storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
+  in capsOK? (capsAt e sl (suc id)) (proj₁ (proj₂ r)) (proj₂ (proj₂ r)) ≡ true →
+     storeNestMax (proj₁ (proj₂ r)) (proj₂ (proj₂ r))
        ≤ nestFacAt e sl id
          * (storeNestMax sched st + nestIncAt e sl id)
-cascadeGo-nest {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hls hfac hsz hdep hburst hcw hpz =
+cascadeGo-nest {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hnest hval hcnt hchg hls hfac hdep hburst hcw hpz hgo =
   ⊔-lub (⊔-lub (⊔-lub SL LV) ND) RG
   where
   r   = cascadeGo a nextId chains sched st
@@ -289,24 +297,8 @@ cascadeGo-nest {n = n} {e = e} sl id a nextId chains sched st hsl hcaps hnest hv
   SL = ≤-trans (≤-reflexive (cong slotsNestSum (cascadeGo-slots a nextId chains sched st)))
                (≤-trans (≤-trans (≤-trans (m≤m⊔n _ _) (≤-trans (m≤m⊔n _ _) (m≤m⊔n _ _))) base≤) up)
 
-  -- ONE CHAIN'S FACTOR OUT OF THE SELECTION'S POWER.  The fanout
-  -- premise bounds the whole product raised to the burst; the burst is
-  -- a successor and every factor is at least one, so the bare product
-  -- comes out of it.
-  chF≤fac : chainsNestF chains ≤ nestFacAt e sl id
-  chF≤fac =
-    ≤-trans (chainsNestF≤ n (capsAt e sl (suc id)) chains)
-      (≤-trans (m≤m^burst e sl id (chainsDelNestF n (capsAt e sl (suc id)) chains)
-                          (1≤chainsDelNestF n (capsAt e sl (suc id)) chains))
-               (≤-trans (≤-trans (≤-reflexive (sym (*-identityˡ _)))
-                                 (*-monoˡ-≤ _ (1≤pow≤ (nestFac (Caps.cSize (capsAt e sl (suc id)))
-                                                               (nestBurstAt e sl id))
-                                                      (chainsDelLen n (capsAt e sl (suc id)) chains)
-                                                      (1≤nestFac _ _))))
-                        hfac))
-
   LV : foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sd′) ≤ nestFacAt e sl id * RHS
-  LV = cascadeGo-nest-live sl id a nextId chains sched st hsl hcaps hnest hval hsz chF≤fac
+  LV = cascadeGo-nest-live sl id a nextId chains sched st hgo
 
   ND : foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st′)
          ≤ nestFacAt e sl id * RHS
@@ -431,6 +423,6 @@ postulate
 --
 -- IT IS STATED IN THE SIZE CURRENCY AND NOT THE FANOUT ONE, which is
 -- what keeps it provable: the exponential is peeled off by
--- `chainsNestF≡` above the leaf, so nothing under here ever multiplies.
+-- `chainsDelNestF≡` above the leaf, so nothing under here multiplies.
 -- the selection inherits the registry's own size predicate, filter and
 -- retag alike

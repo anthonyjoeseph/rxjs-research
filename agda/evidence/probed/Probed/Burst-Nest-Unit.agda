@@ -197,7 +197,7 @@ deferFigs≡ = refl
 -- The conclusion itself cannot be instantiated: the increment is
 -- built over `Caps.cSize (capsAt …)`, sealed through `capsBase`, and
 -- that is a boundary rather than a gap.  But `capsAt-base-size⁺` and
--- `size≤nestIncAt` are PROVEN and compose into a lower bound on the
+-- `sizeSuc≤nestIncAt` are PROVEN and compose into a lower bound on the
 -- increment built from `sizeᵉ`, which is sighted exactly where
 -- `nestUnit` is blind -- so putting that bound in the increment's
 -- place gives a STRICTLY STRONGER claim that does compute.  A green row here is evidence for

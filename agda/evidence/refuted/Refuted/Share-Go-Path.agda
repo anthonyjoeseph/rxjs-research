@@ -28,8 +28,8 @@
 -- built by a run holds only paths the program subscribed.  The repair
 -- is therefore one of two restatements, and both are known shapes
 -- here: denominate the charge in the registrations' own measure, the
--- way the chain-step face already charges `pathNestF` after its own
--- refutation of a program-denominated bound; or keep the unit and add
+-- way the cascade face reads its live fold off the caps predicate the
+-- instant closes at rather than off the walk; or keep the unit and add
 -- the premise that every registered path's frames are the program's,
 -- which is a registry invariant no hypothesis currently carries.
 -- ══════════════════════════════════════════════════════════════════

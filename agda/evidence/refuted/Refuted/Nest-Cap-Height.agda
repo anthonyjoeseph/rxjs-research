@@ -74,7 +74,7 @@ open import Verify-Budget-Sufficient.Fan-Caps using (delSize; delSq; cSize≤del
 open import Verify-Budget-Sufficient.Nest-Cap using (nestU; nestU-room)
 open import Verify-Budget-Sufficient.Nest-Store using
   (nestCapAt; nestCapAt-suc; nestFacAt; nestFacAt-def; 1≤nestFacAt; nestIncAt;
-   nestIncAt-def; nestUnit; size≤nestIncAt; realWidAt; realWidAt-def;
+   nestIncAt-def; nestUnit; sizeSuc≤nestIncAt; realWidAt; realWidAt-def;
    nestBurstAt; 1≤nestBurstAt)
 open import Refuted.Demand-Programs using (Γ₀; ins₀; progD)
 
@@ -250,8 +250,8 @@ fac≤cap e sl id =
   where
   1≤rest : 1 ≤ nestCapAt e sl id + nestIncAt e sl id
   1≤rest = ≤-trans (≤-trans (s≤s z≤n)
-                            (≤-trans (2≤capsAt-size e sl id)
-                                     (size≤nestIncAt e sl id)))
+                            (≤-trans (2≤capsAt-size e sl (suc id))
+                                     (sizeSuc≤nestIncAt e sl id)))
                    (m≤n+m (nestIncAt e sl id) (nestCapAt e sl id))
 
 ----------------------------------------------------------------------

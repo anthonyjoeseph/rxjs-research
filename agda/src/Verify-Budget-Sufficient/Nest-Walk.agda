@@ -4288,7 +4288,7 @@ pushFit-ems {Γ = Γ} {u = u} c L sl B W m m′ fuel op nid κ id now (em ∷ em
 --
 -- AND THE GRANT NAMES `κ` NOWHERE, WHICH IS ONLY SOUND BECAUSE A PATH
 -- FRAME MINTS AT DELIVERY RATHER THAN AT SUBSCRIBE.  The reading that
--- would break it is a `map-f`, whose `pathNestF` factor is `2 ^ sizeᵗ`
+-- would break it is a `map-f`, whose `frameNestF` factor is `2 ^ sizeᵗ`
 -- of the function while every other frame's is one, and whose body is
 -- an observable that gets SUBSCRIBED when a value passes it: if that
 -- happened inside the frame, an arbitrarily deep body would install
