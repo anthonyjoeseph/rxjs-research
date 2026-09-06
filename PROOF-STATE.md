@@ -215,27 +215,28 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE BURST LEDGER IS DENOMINATED AT THE WRONG POINT OF THE WALK.**
-  Its caps-generic form is refuted now, at level zero over two
-  crossings, and that form is the strongest one a route may use, since
-  the entry cap's fields are iterates the tower seals. The two sides
-  part on WHERE they charge: the caps package re-reads its cap at each
-  frame's own level and climbs with the descent, the burst package
-  charges every clause against one fixed number, and the count climbs
-  with the level. So the residue is a restatement, not a grind. The
-  commit restates the walk's burst predicate at a bound indexed by that
-  same level, and carries the restatement to the one site that spends
-  it.
+- **ONE DELIVERY'S PENDING SOURCES ARE CHARGED WHERE NO DEPTH MEASURE
+  LOOKS.** The live a step mints need not be carried by the arrival: a
+  scan hands a parked deferred seed through unchanged, and that seed
+  is a live of any depth at arrival width one and node fold zero, so
+  the per-chain charge at the arrival's size is refuted outright. What
+  survives is the level's own SIZE cap one level up, where every parked
+  value and every arrival is already priced. The commit restates
+  `chainStep-nest-live` at `nestCapAt e sl (suc id)`, carries the
+  restatement through `cascadeGo-live-nest` to `cascadeGo-nest-live`,
+  and retargets or deletes `Probed.Chain-Step-Live-Nest`, whose rows are
+  evidence about the form that died.
 
-- **WHETHER A RUN CAN DELIVER THE ARRIVAL NO LEDGER PAYS FOR.** The
-  crossing arm is refuted through the LAYER half of its charge, at a
-  witness that is CONSTRUCTED and admitted by the walk's own premises
-  rather than reached by an evaluator — the one gap between "no ledger
-  pays this arm" and "the arm is unpayable". The commit builds a
-  program whose crossing frame receives a deep arrival by RUNNING, and
-  either reaches that region, which sends the repair to the ceiling, or
-  bounds what a run delivers, which makes the missing fact an invariant
-  on arrivals rather than a ledger.
+- **THE LIVE FOLD IS SPENT AT THE INSTANT BOUNDARY, THE ONE PLACE ITS
+  CEILING IS OWED.** Nothing in an instant's descent reads the fold —
+  the store ceiling every chain descends under is stated over the
+  synchronous store alone — so the fold's bound has one consumer: the
+  subscribe frame's `burst-nest-live` receipt, against the unit plus
+  `capsAt`'s size. The commit instantiates the restated live charge at
+  the seed program of the refutation, at the boundary, and either fits
+  it under that receipt's bound, which closes the tie, or finds a parked
+  seed's size outrunning the unit, which is a finding for the receipt's
+  own header and not for any ledger.
 
 - **THE THIRD LEVEL, WHERE THE RATE FIRST PAYS FOR A SQUARING OF A
   SQUARING.** Composition is instantiated at both descents now and the
@@ -286,23 +287,11 @@ does not fit is a finding about the shared statement, not about the head.
   instant's nest predicate at the state the fan reads the registry. The door
   has it and the walk carries no nest conjunct at all; threading it down is
   refused by the store's own growth toward the NEXT cap.
-- **`chain-walk-bursts`** (Part7/Depth-Fit) — FALSITY,
-  `REFUTED×3, DEAD ROUTE×4, RECOVERY`: the walk's burst package at the
-  instant's own SIZE cap. Refuted in the caps-generic form any route must use —
-  the caps side climbs level by level and this bound does not — so what is owed
-  is a restatement, not a proof.
-- **`crossCount≤ch`** (Regs-Nest-Walk) — FALSITY, `REFUTED×2`: the two crossing
-  frames' charge against one frame's ceiling. The telescope half is a program
-  constant the burst face already reads against the cap; the LAYER half asks a
-  bound on a runtime value, and no premise of the walk carries one.
-- **`dispatchSzOK-go`** (Regs-Nest-Walk) — FALSITY, `DEAD ROUTE`: the sink's
-  share of the ledger, a registry width times a frame ceiling. The fan's own
-  advance is an entry's whole run, so accumulating it into the walk's level is
-  exponential in the dispatch gas and only a ceiling holds it.
-- **`chain-climb-ch`** (Part7/Depth-Fit) — SHAPE, `REFUTED×3, DEAD ROUTE×2`:
-  one chain's climb priced per FRAME. The count half has an answer — the
-  delivery face's sink-aware measure — and it is unaffordable and beside the
-  point: the per-frame rung is already past the charge at ONE frame.
+- **`chainStep-nest-live`** (Part7/Cascade-Caps) — SHAPE,
+  `REFUTED×3, PROBED, RECOVERY`: one delivery's pending sources, charged per
+  chain at the arrival's `sizeᵛ`. A parked deferred seed handed through a scan
+  mints a live of any depth at width one, so the charge owed is the level's
+  size cap one level up; restate there before grinding.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
@@ -316,15 +305,6 @@ does not fit is a finding about the shared statement, not about the head.
   charge at the queue's own `drainW`. Its extra premise pins the cell's
   CONSTRUCTOR, not its depth, so a parked program runs the store term away here
   too; the width is walk-denominated besides.
-- **`stepFrame-nest-live-outer`** (Live-Nest-Walk) — DIFFICULTY, `PROBED`: what
-  the outer frame mints, at its OWN size budget. A standing fold and an
-  arriving mint combine by max — both crossing directions, both other ops, a
-  stepped pair. Left: a nonempty path under the frame.
-- **`subscribeInner-live-size`** (Live-Nest-Walk) — DIFFICULTY,
-  `REFUTED, PROBED`: what one subscribe out of a merge node's parked queue
-  mints. Every measure-side axis is read and the cap covers each — depth at
-  margin zero, path, all three ops, a share connecting. Left: a drain arriving
-  with a chain already standing.
 - **`stepFrame-nest-nodes-inner`** (Nodes-Nest-Walk) — DIFFICULTY,
   `PROBED, RECOVERY`: what the drain writes at the nodes map. The pop shrinks,
   and the park its subscribe makes lands one layer under the term popped — so
@@ -353,8 +333,9 @@ does not fit is a finding about the shared statement, not about the head.
 
 - **`chain-depth-sighted`** (Part7/Arrival-Caps) — DIFFICULTY,
   `REFUTED×2, DEAD ROUTE, PROBED`: ONE chain's descent under the round's
-  ceiling, whose store slot is the CAP. The rows read the round at the entry
-  store, which is below that cap, so they say nothing about the room it adds.
+  ceiling, premised on the store's SYNCHRONOUS maximum — slots, nodes and
+  registry, the live fold left out. The rows tie the premise to the entry
+  store's own maximum; a store filled past it is open.
 - **`subscribeE-fit`** (Sighted-Fit) — DIFFICULTY, `REFUTED×3, PROBED×2`: what
   ANY subscription's emitted VALUES cost, in the `nestB` currency against a
   `descW` bound. The family that kills the width-free form holds here at and
@@ -390,11 +371,6 @@ does not fit is a finding about the shared statement, not about the head.
   frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
   the floor assembles all four. The unit alone is refuted by a defer-headed
   program; a size bound makes it compute.
-- **`chainStep-nest-live`** (Part7/Cascade-Caps) — DIFFICULTY,
-  `REFUTED, PROBED`: one delivery's pending sources. The charge is the
-  arrival's `sizeᵛ` per chain, sighted where `nestDᵉ` is blind and bounded by
-  `valCaps?` at the cascade door — now instantiated at the family that killed
-  the depth form, and at the frames that mint past the arrival.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what

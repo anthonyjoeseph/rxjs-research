@@ -51,10 +51,6 @@ open import Probed.PushVals-Caps
          burstsM≡; burstsS≡; burstsX≡; burstsSh≡; burstsShS≡; burstsShX≡;
          burstsG≡; burstsA≡;
          tieM; tieS; tieX)
-open import Probed.Chain-Step-Live-Deferred
-  using (figures≡; fits; tieFigs≡; tieLive1; tieLive3;
-         twicePacked≡; tieLiveOn3; tieLiveOn1;
-         widePacked≡; tieLiveOuterSwitch; tieLiveOuterPair)
 open import Probed.Chain-Step-Live-Nest
   using (sides≡; fits; attack≡; aFits; two≡; twoFits; mapped≡; mapFits;
          liveRow; attackRow; twoRow; mapRow)
@@ -100,14 +96,6 @@ open import Probed.Sight-Fit-Width
 open import Probed.Burst-OutW
   using (readout≡; tieOf; tieMerge; tieSwitch; deeper≡; tieScan; tieScanκ;
   chained≡; tieChain; tieTwice)
-
-open import Probed.Frame-Drain-Live
-  using (beforeLive; beforeSlots;
-         figures0; figures1; figures2; figures3; figures4;
-         tieLive2; tieLive4;
-         pathFigures1; pathFigures4; outerIdle; tieLivePath;
-         opFigures1; opFigures4; tieLiveSwitch;
-         shareFigures1; shareFigures4; shareSizes; tieLiveShare)
 
 open import Probed.Frame-Drain-Store
   using (packed≡; gated≡; tieDrain1; tieDrain2; tieDrain3;

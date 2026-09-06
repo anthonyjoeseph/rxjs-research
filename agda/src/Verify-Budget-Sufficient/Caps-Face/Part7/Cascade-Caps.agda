@@ -603,7 +603,7 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- harness drives reads this component as zero.  All of that is true.
 -- It is not exhaustive: the slot is one of TWO mint sites, and the
 -- other one never meets `isData`.
---
+
 -- THE OBVIOUS REPAIR IS ALSO DEAD, and it is dead for a reason worth
 -- carrying rather than rediscovering.  Charging the ARRIVAL's payload
 -- cannot cover the new live, because the payload IS the `deferᵉ` term
@@ -637,10 +637,32 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 -- cap rather than decremented.  A frame's sibling of that step is what
 -- this leaf is waiting on, and it leaves the drain's conjunct
 -- arithmetic — which is what kept the ceiling out of the types.
+
+-- AND THE ARRIVAL'S SIZE IS NOT ENOUGH EITHER, BECAUSE THE MINTED BODY
+-- NEED NOT ARRIVE.  A scan hands its parked seed through unchanged, so
+-- a step can mint a live out of a value the arrival never carried and
+-- the store's depth measure reads as zero.  The charge that survives
+-- is the level's own size cap, one level up -- every parked value and
+-- every arrival is size-capped there, and a deferred body is seen by
+-- SIZE where no depth measure looks -- so the statement as it reads
+-- here does not survive that mint, and the restatement at that cap is
+-- what is owed.  The live fold is a NEXT-instant quantity: nothing in this
+-- instant's descent reads it, so the fold's ceiling is spent at the
+-- instant boundary alone and never inside a cascade.
 --
 -- REFUTED: `Refuted.Chain-Step-Live-Nest`, three against one at a body
 --   three layers deep and five against one at five, so the gap is
 --   unbounded in the body's depth and no constant repairs it.
+-- REFUTED: `Refuted.Chain-Step-Live-Seed` -- this statement, at a deep
+--   deferred constant parked as a scan's SEED and handed through to a
+--   merging outer: the arrival is one unit wide, the path factor a
+--   small constant, the minted live the seed's full depth, and the
+--   node fold reads the seed as zero -- so the gap is unbounded in the
+--   seed and no store term in the depth currency closes it.
+-- REFUTED: `Refuted.Chain-Step-Live-Additive` -- the depth-additive
+--   charge, the path's depth plus the arrival's size, at a `map-f`
+--   whose function is a deferred constant: both depth measures read
+--   zero into the body while the grown fold tracks its depth.
 -- PROBED: `Probed.Chain-Step-Live-Nest` re-runs that same adversarial
 --   family against THIS conclusion rather than a numeral standing in
 --   for it.  Covered: the deferred-body rows the old form died on --
@@ -665,6 +687,10 @@ cascadeGo-slots a id ((rid , c) ∷ chains) sched₀ st₀
 --   be DEFERRED or the row cannot fail -- a plain deep observable
 --   finishes inside the step and the grown fold stays at zero.
 --   NOT covered: a share sink, whose mint site no row here reaches.
+-- RECOVERY: git show df46945:agda/src/Verify-Budget-Sufficient/Live-Nest-Walk.agda
+--   restores the frame-by-frame live walk that priced the live fold
+--   under the instant's ceiling, and the size walk beside it in
+--   `Regs-Nest-Walk` at the same sha.
 postulate
   chainStep-nest-live : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (id : Id) (a : Arrival Γ) (path : Path Γ (arrTy a) t)

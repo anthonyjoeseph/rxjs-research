@@ -391,6 +391,63 @@ storeNest-regs≤ sched st =
          ⊔ foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live sched)
          ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)) _
 
+-- THE THREE PLACES A DESCENT CAN SEE, which is the store with the live
+-- fold left out -- on purpose, and not as a convenience.  A live's
+-- pending payload is read by nobody until the schedule advances: the
+-- evaluator pushes a live at its mint and filters the list at every
+-- finish, and the one reader of a payload is the instant boundary.
+-- The descent measure reads slots, nodes and registry and never a
+-- live, so a ceiling on a descent stated over the four-place store is
+-- stated over a summand that cannot move it -- and holding THAT summand
+-- under this instant's ceiling is a statement about the NEXT instant's
+-- entry, which the tick already prices at the successor cap.  A chain
+-- charged only against what it can see preserves a ceiling on what it
+-- can see, and that is a fold over three arms with no leaf in it.
+storeSyncMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} →
+  Sched Γ → EvalSt e → ℕ
+storeSyncMax sched st =
+  slotsNestSum (Sched.slots sched)
+  ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)
+  ⊔ regsNestMax (EvalSt.registry st)
+
+-- and it is under the four-place store, which is how the nesting
+-- invariant -- stated over all four places -- hands a ceiling to it
+storeSyncMax≤storeNestMax : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  storeSyncMax sched st ≤ storeNestMax sched st
+storeSyncMax≤storeNestMax sched st =
+  ⊔-lub (⊔-lub (storeNest-slots≤ sched st) (storeNest-nodes≤ sched st))
+        (storeNest-regs≤ sched st)
+
+storeSyncMax-lub : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) (F : ℕ) →
+  slotsNestSum (Sched.slots sched) ≤ F →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ F →
+  regsNestMax (EvalSt.registry st) ≤ F →
+  storeSyncMax sched st ≤ F
+storeSyncMax-lub sched st F hs hn hr = ⊔-lub (⊔-lub hs hn) hr
+
+storeSync-slots≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  slotsNestSum (Sched.slots sched) ≤ storeSyncMax sched st
+storeSync-slots≤ sched st =
+  ≤-trans (m≤m⊔n _ (foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)))
+          (m≤m⊔n _ (regsNestMax (EvalSt.registry st)))
+
+storeSync-nodes≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st) ≤ storeSyncMax sched st
+storeSync-nodes≤ sched st =
+  ≤-trans (m≤n⊔m (slotsNestSum (Sched.slots sched)) _)
+          (m≤m⊔n _ (regsNestMax (EvalSt.registry st)))
+
+storeSync-regs≤ : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sched : Sched Γ) (st : EvalSt e) →
+  regsNestMax (EvalSt.registry st) ≤ storeSyncMax sched st
+storeSync-regs≤ sched st =
+  m≤n⊔m (slotsNestSum (Sched.slots sched)
+         ⊔ foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0 (EvalSt.nodes st)) _
+
 -- A REGISTRATION IS APPENDED, so the registry's ⊔-fold rises by at
 -- most the chain being registered — the one place the sighted walk's
 -- share descent moves the store, and it moves it by exactly the path

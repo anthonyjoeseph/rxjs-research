@@ -32,7 +32,7 @@ open import Verify-Budget-Sufficient.Subscribe-Face using (subscribeInner-caps; 
 open import Verify-Budget-Sufficient.Caps-Depth using
   (depthCascade; depthChain; lub3-l; lub3-m; lub3-r)
 open import Verify-Budget-Sufficient.Nest-Store using
-  (storeNestMax; realWidAt-def; nestUnit; sightCeil; nestBurstAt)
+  (storeSyncMax; realWidAt-def; nestUnit; sightCeil; nestBurstAt)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; arrVal; RegId; cascadeLatch; arrSource; chainsOf; cascadeGo; Path;
   arrTy; regAt; dCapᶜ; lvls; iterL; chainStep; budgetAt; arrTick)
 open import Rx.Slots using (Slots; slotsSize)
@@ -547,6 +547,18 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 -- consumer nothing, because the arithmetic below already collapses all
 -- three of the ceiling's summands to that same cap.
 --
+-- AND THE STORE IT READS IS THE SYNCHRONOUS ONE -- slots, nodes and
+-- registry, with the live fold left out -- because the descent never
+-- reads a live.  A live's pending payload is a next-instant quantity:
+-- nothing within an instant consumes it, and the measure this bounds
+-- reads a deferred body as zero at the node and never at the live at
+-- all.  Charging the leaf against the four-place store would make the
+-- round hold the live fold under THIS instant's ceiling, which is the
+-- next instant's entry bound and is not preservable by any charge
+-- this instant's fuel affords.  The three-place store is what a chain
+-- can be held to, and it is the weaker premise, so this is the
+-- stronger statement.
+--
 -- REFUTED: `Refuted.Chain-Step-Store` is why the reading could not be
 --   carried -- nine before one chain and sixteen after, at the instant
 --   the round's own rows are read at, with two further families in the
@@ -589,8 +601,8 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   rows instantiate this statement at the chain itself, both premises
 --   discharged at the tightest value each admits: the slots equation
 --   at the schedule's own slots, the store bound at the store's own
---   maximum, which is the strongest reading since the ceiling is
---   monotone in it.  What those two report is that the chain leaf does
+--   synchronous maximum, which is the strongest reading since the
+--   ceiling is monotone in it.  What those two report is that the chain leaf does
 --   not see the delivered COUNT.  The round's descent moves forty-nine
 --   to one hundred and ninety-three across that axis while the first
 --   chain's stays at seventeen either side, so the growth lives wholly
@@ -604,7 +616,7 @@ postulate
     (sl : Slots Γ) (a : Arrival Γ) (nextId : Id) (S : ℕ)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
-    storeNestMax sched st ≤ S →
+    storeSyncMax sched st ≤ S →
     depthChain nextId a path sched st
       ≤ sightCeil (sizeᵉ e) (nestDᵛ (arrTy a) (arrVal a)) S (nestUnit e sl)
 

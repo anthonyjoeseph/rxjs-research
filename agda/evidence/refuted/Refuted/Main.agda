@@ -41,14 +41,10 @@ open import Refuted.Chain-Step-Live-Additive
 open import Refuted.Chain-Level-Unbounded
   using (prog; slots; cp; ceil; lvl; arr; pth; widen; fits;
          chain-level-unbounded-absurd)
-open import Refuted.Chain-Climb-Arith
-  using (figures; figures≡; ceil₁; ceil₂; gap₂;
-         chain-climb-arith-absurd; chain-climb-arith-wide-absurd)
-open import Refuted.Frame-Charge-Arith
-  using (figures; figures≡; figuresWide; figuresWide≡;
-         frame-charge-absurd; frame-charge-wide-absurd)
 open import Refuted.Chain-Step-Live-Nest
   using (grown≡3; charge≡1; grown₅≡5; chainStep-nest-live-absurd)
+open import Refuted.Chain-Step-Live-Seed
+  using (oneChain; figures≡; chainStep-nest-live-seed-absurd)
 open import Refuted.Chain-Step-Nodes
   using (grown≡22; charge≡15; chainStep-nodes-absurd)
 open import Refuted.Share-Sink-Nodes
@@ -146,13 +142,6 @@ open import Refuted.Share-Go-Registry
   using (priced; slots-fixed; grown≡; charge≡; share-go-registry-absurd)
 open import Refuted.Share-Go-Stack
   using (priced; reg-priced; slots-fixed; grown≡; charge≡; share-go-stack-absurd)
-open import Refuted.Share-Live-Afford
-  using (entering≡; produced≡; hU; hR; share-live-afford-absurd)
-open import Refuted.Share-Live-Level
-  using (frame₁≡; frame₂≡; after₁≡; after₂≡; afford; 1≤S; hV; hR; j≤Lv;
-  share-live-level-absurd)
-open import Refuted.Sink-Level-Range
-  using (reading≡; range≡; len≡; 8≤S; j≤range; legal; sink-level-range-absurd)
 open import Refuted.Sink-Phi-Leaf
   using (escalates; deepens; leafFac≡; leafDep≡; legal; handed; 8≤B;
   sink-phi-leaf-absurd)
@@ -223,24 +212,9 @@ open import Refuted.Burst-Mu-Square
 open import Refuted.Subscribe-Sz-Mu
   using (SubscribeESz; figures≡; delivered≡; sizes≡; valRows≡;
          subscribeE-sz-absurd)
-open import Refuted.Frame-Step-Size-Cross-Count
-  using (CrossCountCh; figures≡; prem; count≡; cross-count-ch-absurd)
 open import Refuted.Chain-Step-Regs-Cap
   using (ChainStepRegsSz; figures≡; regLens≡; premSz; premPath; premReg;
          row≡false; chain-step-regs-cap-absurd)
-open import Refuted.Walk-Ceil-Ledger
-  using (WalkCeilLedger; figures≡; premLvl; count≡; walk-ceil-ledger-absurd)
-open import Refuted.Walk-Ceil-Drain
-  using (WalkCeilDrain; figures≡; premSt; premLvl; count≡; belowFits;
-         belowAdmits; walk-ceil-drain-absurd)
-open import Refuted.Size-Climb-Afford
-  using (szCh; AdvRule; JoinToSum; sum-in-bracket; join-in-bracket; advClimb;
-         walkAfford; AdvClimbAfford; 1≤cap; 4≤cap; lvl₁; chg₀≤lvl₁; lvl₁≤chg₀;
-         3≤lvl₁; climb-outruns-afford; one-frame-affordable;
-         adv-climb-afford-absurd)
-open import Refuted.Cascade-Afford-Wide
-  using (CascadeAffordWide; suc≤sizeStep; iterSize-lb; selLen; S≤N; hK;
-         cascade-afford-wide-absurd)
 open import Refuted.Arr-Cap-Step
   using (cA; ArrCapStep; arr-cap-step-absurd; arr-cap-step-wide-absurd)
 open import Refuted.Nest-Clos-Flat
