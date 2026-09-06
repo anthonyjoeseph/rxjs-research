@@ -2297,10 +2297,12 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- values a frame is handed reads them ONE AT A TIME -- a size and a
 -- width per payload -- so no premise here says how MANY a frame gets,
 -- while the head conjunct of this ledger says exactly that at every
--- clause.  The count is the evaluator's own: a crossing door emits
--- each arriving script whole, so one frame's output is the sum of its
--- inputs' emissions and the count MULTIPLIES across a crossing.  And
--- the cap those values are admitted at CLIMBS with the walk's own
+-- clause.  The count is the evaluator's own, and it COMPOUNDS: a
+-- crossing door emits each arriving script whole, so one frame's
+-- output is the sum of its inputs' emission widths, and two crossings
+-- over one scripted slot square that slot's length.  So what is
+-- missing is a PRODUCT along the path, never a sum over its frames.
+-- And the cap those values are admitted at CLIMBS with the walk's own
 -- level while this width stays the entry's, so the two ends of the
 -- path are not even read against the same number.  Both readings of
 -- the width coordinate are shut -- wider is unaffordable at a rung,
@@ -2319,6 +2321,10 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --
 -- REFUTED: `Refuted.Walk-Burst-Rung` -- the width descent, at every
 --   program and every instant.
+-- REFUTED: `Refuted.Walk-Burst-Additive` -- an additive law for what a
+--   frame outputs, at two crossing frames over one scripted slot: six
+--   values handed in, thirty-six out, against an allowance of
+--   thirty-one, with the reading still holding one arrival shorter.
 -- DEAD ROUTE: reading the ledger at the number the cascade hands over,
 --   so the proven neighbour can be spent unchanged.  Dead on
 --   AFFORDABILITY rather than on transport: the per-frame charge is
@@ -2335,6 +2341,15 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   the first crossing frame.  The direction is wrong as well as the
 --   number, since the cap is where the burst already lives, so a
 --   widening TO it arrives from under the region in question.
+-- DEAD ROUTE: discharging the ledger from an ADDITIVE law about what a
+--   step outputs -- what a frame hands on is what it was handed plus
+--   one cap's worth -- which is how every other ledger in this region
+--   charges a frame, and which would carry the fixed width down the
+--   path unchanged.  Dead on the evaluator rather than on the
+--   arithmetic: a crossing frame emits each arrival's whole burst, so
+--   a frame's output count is MULTIPLIED and not incremented, while
+--   the entry recurrence's base moves only linearly in the script the
+--   multiplication is taken over.
 -- RECOVERY: git show 0e888f3 restores the term-side floor on the cap
 --   and the ledger's upward closure in its width, which are what a
 --   transport from a smaller width would spend.

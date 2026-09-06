@@ -73,6 +73,10 @@ open import Refuted.Scan-Burst-Nest
 open import Refuted.Scan-Arr-Nest
   using (premises; burst≡14; delivered≡; charged≡;
          delivered₁₃≡; charged₁₃≡; closKeys≡; subscribeE-nest-arr-scan-absurd)
+open import Refuted.Walk-Burst-Additive
+  using (handed≡6; delivered≡36; allowed≡31; delivered₅≡25; allowed₅≡28;
+         frame-out-additive-absurd)
+  renaming (premises to additivePremises)
 open import Refuted.Thru-Scan-Burst-Nest
   using (charged≡8192; charged₁₃≡8192; stepFrame-nodes-thru-burst-absurd)
   renaming (premises to thruBurstPremises;
