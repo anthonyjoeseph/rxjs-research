@@ -29,7 +29,7 @@ open import Probed.Scan-Burst-Nest
   using (premises; scanBursts≡; scanEmits≡; fits₁₃; fits₁₄; flat≡; flat-fails;
          tie₁₃; tie₁₄)
 open import Probed.Burst-Nest-Unit
-  using (figures≡; okM; okS; okX; liveM; nodesM; regsM; deferFigs≡; strongFigs≡; strongFits;
+  using (figures≡; okM; okS; okX; regsM; deferFigs≡; strongFigs≡; strongFits;
          strongHeads; richFigs≡; richFits)
 open import Probed.Cascade-Store-Components
   using (U-parts; C-parts; F-parts; tieRegs)

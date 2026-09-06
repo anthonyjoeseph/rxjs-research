@@ -114,7 +114,8 @@ open import Verify-Budget-Sufficient.Nest-Store using
   (slotsNestSum; fitG; storeNestMax; nestCapAt; nestCapAt-0; nestOK?; nestOK?-store; nestOK?-intro;
   nestCapAt-suc; nestFacAt; nestIncAt; storeNest-latch; storeNest-finish; nestOK?-latch;
   nestUnit; nestOK?-from-floor; storeNestMax-lub; liveNest; nodeNest; regsNestMax;
-  storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil)
+  storeNest-slots≤; storeNest-live≤; storeNest-nodes≤; storeNest-regs≤; sightCeil;
+  stBounded?-live; stBounded?-nodes; sizeSuc≤nestIncAt)
 
 open import Verify-Budget-Sufficient.Op-Budget using (opIterD-dominated)
 open import Verify-Budget-Sufficient.Init-Caps using (baseCaps; init-capsOK?-base)
@@ -2074,14 +2075,14 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 -- the cascade ones.
 -- AND THE `deferᵉ` BLINDNESS DOES NOT REACH THIS ROW, which is worth
 -- saying because the argument that it does is short and wrong.  A
--- subscribe of `deferᵉ D` mints a live source carrying `D` itself, so
--- the live fold grows by `nestDᵉ D` while `nestDᵉ (deferᵉ D)` is zero --
+-- subscribe of `deferᵉ D` puts `D` itself into the store, so the store
+-- grows by `nestDᵉ D` while `nestDᵉ (deferᵉ D)` is zero --
 -- that is what refuted `chainStep-nest-live`.  Read at instant ZERO the
 -- cap is `suc (nestDᵉ e + slotsNestSum)` and the deficit is real.  This
 -- row is at instant ONE, where the cap is `nestFacAt` times the rest,
 -- `nestFacAt` is a power of two in the caps' own size, and `capsAt`
 -- reads `sizeᵉ` -- which DOES descend into a deferred body.  So the cap
--- grows exponentially in `D` where the live fold grows linearly, and
+-- grows exponentially in `D` where the store grows linearly, and
 -- the corner the refutation exploits is paid for here by the caps half
 -- rather than the depth half.
 -- AND THE SECOND SUMMAND IS WHY THIS LEAF IS NOT THE UNIT ALONE.  The
@@ -2095,6 +2096,25 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 -- smaller of the two would be the harder leaf for no consumer's sake.
 -- `nestCapAt-1-floor` carries the pair under the instant-one cap
 -- without the factor ever being read.
+-- AND THE REGISTRY IS THE ONE PLACE THIS FRAME'S OWN CAPS PREDICATE
+-- CANNOT REACH, which is why the store's other two moving places are
+-- bodies here and this one stays a leaf.  `cascadeGo-nest-regs` is the
+-- same component one face over and in the same currency -- the registry
+-- against the store the step began at plus one increment -- so the two
+-- are worth reading together, though it is a leaf there as well.
+-- DEAD ROUTE: reading this component out of `burst-caps`, the way the
+--   live place and the node table are read, is STRUCTURALLY DEAD rather
+--   than merely unfinished.  The only registry conjunct
+--   `capsOK?-parts` exposes is `regsSz?`, a SIZE predicate over paths,
+--   and `pathNestD-len` is already the sharp conversion out of it: a
+--   path passes `pathSz? B` while carrying up to `pathLen` frames of
+--   function depth `B` apiece, because the predicate charges each
+--   frame's function separately while `pathNestD` SUMS them, so the
+--   fold is under `pathLen p * B` and under nothing smaller.  The
+--   predicate's own length conjunct then closes it at `B * B`, which
+--   sits above this row's right-hand side and not under it.  A bound in
+--   this currency has to be read off the SYNTAX the frame registers
+--   from, not off the size predicate the frame leaves behind.
 -- PROBED: `Probed.Burst-Nest-Unit` instantiates the left half against
 --   the unit at the three `*All` heads over a two-layer wrap, where
 --   the store reads 1 against a unit of 5 -- neither vacuous nor
@@ -2118,34 +2138,61 @@ pop-head-nest {e = e} id sched st eq h with schedGo (Sched.live sched) in eqL | 
 --   Every row reads the store's MAXIMUM, so what it says about a
 --   component is said about all four at once.
 postulate
-  burst-nest-live : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    let r = subscribeE (budgetAt e ins 0) e root 0 0
-                       (sched-init e ins) (st-init e)
-    in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
-         ≤ nestUnit e ins + nestIncAt e ins 0
-
-  -- The node table, which is the place the wraps this frame installs
-  -- land.  It is the component the walk face's own grant speaks about,
-  -- and it is stated here at the FLOOR currency rather than that grant:
-  -- what a caller of this row needs is the store under one instant's
-  -- growth, and the walk's bound is keyed on a width this call site
-  -- never reads.
-  burst-nest-nodes : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
-    let r = subscribeE (budgetAt e ins 0) e root 0 0
-                       (sched-init e ins) (st-init e)
-    in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
-             (EvalSt.nodes (proj₂ (proj₂ r)))
-         ≤ nestUnit e ins + nestIncAt e ins 0
-
-  -- The registry's own paths.  `cascadeGo-nest-regs` is this component
-  -- one face over and in the same currency -- the registry against the
-  -- store the step began at plus one increment -- so the two are worth
-  -- reading together, though it is a leaf there as well.
   burst-nest-regs : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
                        (sched-init e ins) (st-init e)
     in regsNestMax (EvalSt.registry (proj₂ (proj₂ r)))
          ≤ nestUnit e ins + nestIncAt e ins 0
+
+-- THE LIVE PLACE IS NOT CARRIED — IT IS READ OFF THE PREDICATE THE
+-- FRAME ALREADY LEAVES BEHIND.  `burst-caps` certifies the
+-- post-subscribe state at instant one's caps, and that predicate's
+-- store half bounds every pending payload by the cap's SIZE; a depth is
+-- under a size termwise, so the ⊔-fold over the live list is under the
+-- size as well.  `sizeSuc≤nestIncAt` closes it: instant one's size is
+-- under the increment this row is stated against, and the unit is added
+-- on the left.  Nothing in the chain reads the nesting cap, which is
+-- what makes the reading available a whole instant before the nesting
+-- invariant is established.
+burst-nest-live : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in foldr (λ l acc → liveNest l ⊔ acc) 0 (Sched.live (proj₁ (proj₂ r)))
+       ≤ nestUnit e ins + nestIncAt e ins 0
+burst-nest-live e ins =
+  ≤-trans (stBounded?-live (Caps.cSize (capsAt e ins 1)) sched₁ st₁
+             (proj₁ (capsOK?-parts (capsAt e ins 1) sched₁ st₁ (burst-caps e ins))))
+          (≤-trans (sizeSuc≤nestIncAt e ins 0)
+                   (m≤n+m (nestIncAt e ins 0) (nestUnit e ins)))
+  where
+  r      = subscribeE (budgetAt e ins 0) e root 0 0
+                      (sched-init e ins) (st-init e)
+  sched₁ = proj₁ (proj₂ r)
+  st₁    = proj₂ (proj₂ r)
+
+-- THE NODE TABLE, which is where the wraps this frame installs land,
+-- and it is the same reading one place over.  The walk face's own grant
+-- speaks about this component too, but it is keyed on a width this call
+-- site never reads; the caps predicate is keyed on nothing but the
+-- size, so it answers at the currency the caller actually wants.  Three
+-- of the five node heads carry no syntax at all, so their arms close on
+-- nothing the predicate had to supply.
+burst-nest-nodes : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
+  let r = subscribeE (budgetAt e ins 0) e root 0 0
+                     (sched-init e ins) (st-init e)
+  in foldr (λ kv acc → nodeNest (proj₂ kv) ⊔ acc) 0
+           (EvalSt.nodes (proj₂ (proj₂ r)))
+       ≤ nestUnit e ins + nestIncAt e ins 0
+burst-nest-nodes e ins =
+  ≤-trans (stBounded?-nodes (Caps.cSize (capsAt e ins 1)) sched₁ st₁
+             (proj₁ (capsOK?-parts (capsAt e ins 1) sched₁ st₁ (burst-caps e ins))))
+          (≤-trans (sizeSuc≤nestIncAt e ins 0)
+                   (m≤n+m (nestIncAt e ins 0) (nestUnit e ins)))
+  where
+  r      = subscribeE (budgetAt e ins 0) e root 0 0
+                      (sched-init e ins) (st-init e)
+  sched₁ = proj₁ (proj₂ r)
+  st₁    = proj₂ (proj₂ r)
 
 -- THE BURST'S OWN NESTING RECEIPT, the mirror of `burst-caps`.  The
 -- subscribe frame is the one place a run's nesting can jump without an

@@ -215,18 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LIVE FOLD IS NOT CARRIED — IT IS READ OFF THE PREDICATE AT THE
-  PLACE IT IS OWED.** The cascade's fold now comes from the exit cap's
-  own store conjunct, depth being pointwise under size, and no
-  walk-denominated charge survives that reading. The same reading is
-  owed one frame up: `burst-nest-live` charges the subscribe frame's
-  live place against the unit plus `capsAt`'s size, and its site
-  carries a caps predicate of the same shape. The commit takes the
-  pointwise route there and either retires the row or finds the
-  frame's post-state carrying no size cap at all — which is a finding
-  for that row's header, and the point at which the two places stop
-  mirroring each other.
-
 - **THE SYNCHRONOUS MAXIMUM IS A PREMISE NO PRODUCER ESTABLISHES.**
   `chain-depth-sighted` prices one chain's descent under the round's
   ceiling off the store's synchronous maximum — slots, nodes and
@@ -250,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   distinct references and reads both charges at it; whichever way the
   figures fall one of the two denominations is refuted, which is why
   this is worth more than either row's remaining grind.
+
+- **THE REGISTRY IS THE ONE STORE PLACE THE FRAME'S OWN PREDICATE
+  CANNOT ANSWER, so its bound has to be read off the syntax instead.**
+  `burst-nest-regs` is what is left of the subscribe frame's nesting
+  receipt once its two sibling places are bodies. A registration's path
+  measure SUMS each frame's function depth, while the size predicate
+  the frame leaves behind bounds each of them separately, so the
+  pointwise reading delivers the square of the size. Every path in this
+  registry was built by the frame out of the program's own term, so the
+  commit states the syntax-side bound instead: a registered path's
+  depth under the program's own `nestDᵉ`, the currency the unit is
+  already written in.
 
 ### The ledger
 
@@ -362,11 +362,10 @@ does not fit is a finding about the shared statement, not about the head.
   stream leaf — the walk over it is a proven body, so what remains per instant
   is the frame widths, which are sealed and taken as a quantified premise
   wherever a row reads them.
-- **`burst-nest-live`, `burst-nest-nodes`, `burst-nest-regs`** (Caps-Bridge) —
-  DIFFICULTY, `PROBED`: three of the store's four places after the subscribe
-  frame, against the unit PLUS `capsAt`'s size; the slot place is proven and
-  the floor assembles all four. The unit alone is refuted by a defer-headed
-  program; a size bound makes it compute.
+- **`burst-nest-regs`** (Caps-Bridge) — DIFFICULTY, `DEAD ROUTE, PROBED`: the
+  registry's paths after the subscribe frame, under the unit plus one increment.
+  Its siblings read off the frame's caps predicate; a path's depth SUMS what
+  that predicate bounds frame by frame, so this one cannot.
 - **`subscribeE-nest-scan`** (Nest-Walk) — DIFFICULTY,
   `REFUTED, DEAD ROUTE, PROBED`: `NestAt` now carries the pointwise store
   conjunct this head's accumulator read demanded, so the shape is settled; what
