@@ -1942,6 +1942,43 @@ capsAt-exp-gain e sl id =
   exp-size-gain (capsAt e sl id) (capsH e sl id)
     (2≤capsAt-size e sl id) (1≤capsAt-reg e sl id)
 
+-- AND THE ENTRY CAP IS ALREADY PAST TWO TO THE PROGRAM, which is the
+-- one floor on this face denominated in the PROGRAM rather than in a
+-- numeral.  Every other lower bound here is a constant or the term's
+-- own size, and both are a whole exponential short of what a chain's
+-- burst reaches: a burst doubles at each crossing frame, so a ledger
+-- read against the cap needs the cap to be exponential in the term
+-- before any of it is affordable.  The floor comes out of the
+-- BLOWUP'S OWN COUNT and not out of the recurrence's depth -- the
+-- count runs a registry width per delivery and the base cap carries
+-- the term as a summand, so the count carries it as a FACTOR, and one
+-- level of the ladder already doubles once per unit of it.  Stated at
+-- every instant because the base's own blowup buys it outright: the
+-- recurrence never descends, so no instant is a weaker reading.
+capsAt-size-exp : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (sl : Slots Γ) (id : ℕ) →
+  2 ^ (2 + sizeᵉ e + slotsSize sl) ≤ Caps.cSize (capsAt e sl id)
+capsAt-size-exp {n = n} e sl zero =
+  ≤-trans (≤-trans (^-monoʳ-≤ 2 (m≤m+n (2 + sizeᵉ e + slotsSize sl) (slotsClos sl)))
+                   (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S₀))))
+                            (*-monoʳ-≤ (2 ^ S₀) (s≤s z≤n))))
+          (exp-size-gain c₀ (capsBase e sl) (s≤s (s≤s z≤n)) (s≤s z≤n))
+  where
+  c₀ : Caps
+  c₀ = caps (2 + sizeᵉ e + slotsSize sl + slotsClos sl)
+            (suc (entryCeil n sl e))
+            (suc (sizeᵉ e + slotsSize sl))
+  S₀ : ℕ
+  S₀ = Caps.cSize c₀
+capsAt-size-exp e sl (suc id) =
+  ≤-trans (≤-trans (^-monoʳ-≤ 2 (capsAt-base-size e sl id))
+                   (≤-trans (≤-reflexive (sym (*-identityʳ (2 ^ S))))
+                            (*-monoʳ-≤ (2 ^ S)
+                               (≤-trans (s≤s z≤n) (2≤capsAt-size e sl id)))))
+          (capsAt-exp-gain e sl id)
+  where
+  S : ℕ
+  S = Caps.cSize (capsAt e sl id)
+
 -- AND THE OTHER SIDE OF THE SAME STEP: every size step at least
 -- MULTIPLIES BY THE SIZE, so the count-many steps put a whole power of
 -- the size under the next one.  That floor is far above the doubling

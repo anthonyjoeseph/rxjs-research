@@ -67,8 +67,9 @@ open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Caps using
   (1≤capsAt-reg; 2≤capsAt-size; 8≤capsAt-size; B2-cReg≤cSize; Caps; capsAt; capsAt-base-size;
-  capsH; frameStep; frameStep-0; sizeCount; iterSize-infl; iterSize-mono-count;
-  frameStep-mono-j; _⊑ᶜ_; lvls-mono)
+  capsAt-size-exp; capsH; frameStep; frameStep-0; sizeCount; iterSize-infl;
+  iterSize-mono-count; frameStep-mono-j; _⊑ᶜ_; lvls-mono)
+open import Verify-Budget-Sufficient.Nest-Walk.Bursts-Mono using (burstsOK-mono-W)
 open import Verify-Budget-Sufficient.Measures using
   (pathLen; ∧-true; 2X≡X+X; all-impl; boundedNode)
 open import Verify-Budget-Sufficient.Keeps-Ring using
@@ -2292,16 +2293,16 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- package is spent entirely inside the lemma that BUILDS the
 -- predicate, to hold one frame's draw under a width times the cap.
 
--- SO WHAT IS OWED IS A LOWER BOUND ON THE ENTRY SIZE, AND IT IS A
--- SHAPE THIS TOWER HAS NEVER STATED.  A chain's burst DOUBLES at each
--- crossing frame, so the number this row needs is exponential in the
--- program; every proven lower bound on the entry cap is a numeral or
--- the program's own size, which is the wrong dimension by an
--- exponential.  The blowup's own count is where such a bound comes
--- from -- it runs a registry width per delivery, so it carries the
--- program as a FACTOR rather than as a summand -- and until it is
--- stated, no reading of this statement is instantiable either, since
--- the entry cap is a tower no machine evaluates.
+-- SO THE LEDGER IS STATED AT TWO TO THE PROGRAM, AND THE CAP IS
+-- REACHED BY WIDENING.  A chain's burst doubles at each crossing frame
+-- and a path's frames come out of the term, so the term's own
+-- exponential is the number the walk actually needs; the entry cap is
+-- above that number at every instant (`capsAt-size-exp`), and the
+-- ledger is upward-closed in its width at every clause
+-- (`burstsOK-mono-W`), so what closes the gap is arithmetic rather
+-- than a second reading of the width coordinate.  What this leaf keeps
+-- is the whole of the evaluator's side, and it keeps it at a number a
+-- machine EVALUATES -- which the cap, a tower, is not.
 --
 -- REFUTED: `Refuted.Walk-Burst-Rung` -- the width descent, at every
 --   program and every instant.
@@ -2313,15 +2314,34 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 --   caps ladder, which is past every polynomial in it, costs more at
 --   ONE frame than the whole cascade is allowed.
 postulate
-  chain-walk-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  chain-walk-bursts-exp : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
     (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
     Sched.slots sched ≡ sl →
     chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
       nextId a path sched st →
-    burstsOK (Caps.cSize (capsAt e sl id))
+    burstsOK (2 ^ (2 + sizeᵉ e + slotsSize sl))
              (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
              path (arrVal a ∷ []) (Arrival.isLast a) sched st
+
+-- AND THE WIDENING ITSELF, which is the whole of what the cap
+-- contributes: the chain's ledger at the instant's own size cap, off
+-- the leaf above and the floor under that cap.
+chain-walk-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
+  (path : Path Γ (arrTy a) t) (sched : Sched Γ) (st : EvalSt e) →
+  Sched.slots sched ≡ sl →
+  chainCapsOK (capsAt e sl id) (capsAt e sl (suc id)) sl (capsH e sl id) Lc
+    nextId a path sched st →
+  burstsOK (Caps.cSize (capsAt e sl id))
+           (budgetAt e (Sched.slots sched) nextId) n nextId (arrTick a)
+           path (arrVal a ∷ []) (Arrival.isLast a) sched st
+chain-walk-bursts {e = e} sl id Lc a nextId path sched st heq hcc =
+  burstsOK-mono-W (2 ^ (2 + sizeᵉ e + slotsSize sl))
+    (Caps.cSize (capsAt e sl id)) (capsAt-size-exp e sl id)
+    (budgetAt e (Sched.slots sched) nextId) _ nextId (arrTick a)
+    path (arrVal a ∷ []) (Arrival.isLast a) sched st
+    (chain-walk-bursts-exp sl id Lc a nextId path sched st heq hcc)
 
 -- AND THE PROVEN MIRROR DOES NOT TRANSFER, which is the natural next
 -- move and the reason to say so here.  The potential face prices its
