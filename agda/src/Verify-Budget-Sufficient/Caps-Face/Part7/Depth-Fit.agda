@@ -2270,13 +2270,48 @@ chain-entry-nodesSz {e = e} sl id Lc a nextId path sched st hcc =
 -- that at every frame -- once for the walk's own head conjunct and
 -- once to pay a scan's charge, which is a width times a size.
 --
--- AND THE RUNG IS THE WHOLE GAP.  The proven neighbour delivers this
--- package at `nestBurstAt`, which is the size cap ONE INSTANT UP, and
--- a burst bound at a larger width does not give one at a smaller.  So
--- what is unheld is that a chain's own frames burst within the cap of
--- the instant they run in, rather than within the cap the instant
--- after it -- the same rung the store side already climbs, arriving at
--- the width coordinate.
+-- AND THE RUNG DOES NOT EXIST, WHICH SENDS THE REPAIR TO THE
+-- CONSUMER.  The proven neighbour delivers this package at
+-- `nestBurstAt`, which IS the size cap one instant up rather than a
+-- bound by it, so the transport the ledger wants is a width DESCENT.
+-- The caps ladder refuses it outright: one instant of the climb is a
+-- POWER of the instant below, at an exponent the same ladder proves
+-- is at least two, so the descent asks a cap to be no larger than its
+-- own cube.  No program enters that arithmetic, so no reading of the
+-- width coordinate survives -- not a tighter report, since the report
+-- is an equality; not a wider reading, since that is the instant's
+-- own cap; not a bound interposed between them, since a power admits
+-- nothing underneath.  What is left is to read the ledger AT the
+-- wider width and afford a frame charge stated in it.
+
+-- AND THE WIDTH IS INERT IN THE CONSUMER, WHICH IS WHY WHAT IS LEFT IS
+-- NOT A TRANSPORT QUESTION.  The walk's size predicate carries the
+-- width in one conjunct per frame, and the only reader of that
+-- predicate projects PAST that conjunct at every clause -- so a wider
+-- number would need nothing downstream generalised at all.  The
+-- package is spent entirely inside the lemma that BUILDS the
+-- predicate, to hold one frame's draw under a width times the cap.
+
+-- SO WHAT IS OWED IS A LOWER BOUND ON THE ENTRY SIZE, AND IT IS A
+-- SHAPE THIS TOWER HAS NEVER STATED.  A chain's burst DOUBLES at each
+-- crossing frame, so the number this row needs is exponential in the
+-- program; every proven lower bound on the entry cap is a numeral or
+-- the program's own size, which is the wrong dimension by an
+-- exponential.  The blowup's own count is where such a bound comes
+-- from -- it runs a registry width per delivery, so it carries the
+-- program as a FACTOR rather than as a summand -- and until it is
+-- stated, no reading of this statement is instantiable either, since
+-- the entry cap is a tower no machine evaluates.
+--
+-- REFUTED: `Refuted.Walk-Burst-Rung` -- the width descent, at every
+--   program and every instant.
+-- DEAD ROUTE: reading the ledger at the number the cascade hands over,
+--   so the proven neighbour can be spent unchanged.  Dead on
+--   AFFORDABILITY rather than on transport: the per-frame charge is
+--   LINEAR in the width, and the ceiling this ledger is met against
+--   admits a level count only quadratic in the cap -- so a rung of the
+--   caps ladder, which is past every polynomial in it, costs more at
+--   ONE frame than the whole cascade is allowed.
 postulate
   chain-walk-bursts : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (id : ℕ) (Lc : ℕ) (a : Arrival Γ) (nextId : Id)
