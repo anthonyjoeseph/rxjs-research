@@ -148,6 +148,9 @@ open import Probed.Subscribe-Mu-Blocks
 open import Probed.Burst-Mu-Door
   using (figures≡; liveness≡; blindRows≡; nowRows≡; premNow; tieDoorMu)
 
+open import Probed.Mu-Compose
+  using (figures≡; liveness≡; blindRows≡; rateRows≡; premNow; tieCompose)
+
 open import Probed.Slot-Telescope-Sum
   using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
 

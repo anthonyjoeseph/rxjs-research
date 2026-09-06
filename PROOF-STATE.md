@@ -215,17 +215,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE LEVELS COMPOSING, WHICH IS WHAT NEITHER `μ` ROW REACHES.** Both
-  new receipts stand at ONE handed-out nesting, and the block count's
-  rate — one block per level, bought at the bound reached so far — is
-  what a COMPOSITION tests: a `μ` handed out from inside another `μ`
-  squares a bound that has already been squared, and the second block
-  is bought at the first squaring's own bound rather than at the
-  program's. The commit builds that family at both descents and reads
-  it against the count as it stands, which either buys the rate its
-  first evidence past one level or refutes it where a single level
-  never could.
-
 - **THE THREE RESIDUES THE WALK'S LEDGER LEFT BEHIND, WHERE
   THE SHARPEST ONE IS A SINGLE RUNG.** The size walk is a body now and
   its ceiling is a fixed product, so what is left is what a frame
@@ -246,6 +235,18 @@ does not fit is a finding about the shared statement, not about the head.
   bounds what a run delivers, which makes the missing fact an invariant
   on arrivals rather than a ledger.
 
+- **THE THIRD LEVEL, WHERE THE RATE FIRST PAYS FOR A SQUARING OF A
+  SQUARING.** Composition is instantiated at both descents now and the
+  rate is not — a property of the leaf, not of the programs: the door's
+  fold PARKS the inner nesting instead of entering it, so one
+  rung-group already affords MORE than the cube of the bound where a
+  second unfolding multiplies the stored syntax only by the mention
+  count. The subscription descent is the
+  one whose crossing ENTERS the nesting, and its own two-level bracket
+  needs the second group — so the commit takes that family to three,
+  where the third group is bought at a bound already squared twice and
+  a merely generous rate stops reading the same as a right one.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -258,10 +259,10 @@ does not fit is a finding about the shared statement, not about the head.
   side is a body over it. A max is refuted at a chain of eleven; a slot named
   twice costs nothing; the block is read at two nestings and its rate is open.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED×2`: the burst a crossing door pushes back through itself,
+  `REFUTED, PROBED×3`: the burst a crossing door pushes back through itself,
   keyed on the source program since an arbitrary burst is unbounded. A
-  duplication chain buys no rung; a handed-out `μ` is charged at one nesting,
-  and composed nestings are open.
+  duplication chain buys no rung; a handed-out `μ` is charged at one nesting
+  and at two; the rate is beyond a fold that parks them.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY, `PROBED×3`: the
   reified seed and the cell each arrival rewrites, in a currency the layer
   premise is not stated in. Cells in series do not compound; a parked queue
