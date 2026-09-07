@@ -619,6 +619,17 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   clause responsible.  Speed is a constant against that, so the
 --   conclusion side is closed to instantiation permanently and this row
 --   moves only by proof.
+
+-- ONE FRAME'S OWN SPEND.  `depthFrame` is flatly nought at map, scan
+-- and take, so the whole claim is the two arms that charge: the
+-- `from-inner` react, and the `thru-outer` walk that sits a successor
+-- above it.
+-- PROBED: `Probed.Depth-Join` instantiates this at the first chain a
+--   round admits, whose path is headed by `from-inner` over three
+--   frames -- one of the two arms that can fail, read against the
+--   ceiling at the state the cascade hands the chain.  The `thru-outer`
+--   arm is NOT covered, and it is the larger of the two, so this does
+--   not reach the region the class is held for.
 postulate
   frame-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)
@@ -628,6 +639,12 @@ postulate
     depthFrame sf bid now f p vals fin sched st
       ≤ sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
 
+-- THE TWO OBLIGATIONS THE SHARE SINK OWES, which are the same pair one
+-- level down: the registrations a share admits rather than the frames a
+-- path crosses.  Neither is covered -- the first is `depthFold` again
+-- and inherits the barrier, and no row reaches a registration point at
+-- all -- so the absence is of a POINT rather than of a sweep.
+postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
     (vals : List (Val Γ (lookup Γ i))) (fin : Bool)
@@ -693,6 +710,15 @@ disp-depth-fit {e = e} sl sf gas bid now i vals fin sched st hsl hsf =
   D : ℕ
   D = sightCeil (sizeᵉ e) (nestDᵛˢ vals) (storeSyncMax sched st) (nestUnit e sl)
 
+-- AND THE CEILING SURVIVES THE STEP THAT FRAME MAKES, which is the
+-- obligation the fold cannot discharge for itself and the reason the
+-- invariant is a ceiling rather than a store bound: the values and the
+-- store are free to trade, and only their combination is held.
+-- PROBED: `Probed.Depth-Join` reads both conjuncts at the same chain
+--   edge the frame row stands at -- slots by reflexivity, the ceiling
+--   as two numerals at states one `stepFrame` apart.  ONE step at ONE
+--   head; nothing here sweeps the frame arms or the states a walk
+--   reaches later.
 postulate
   chain-fit-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)
