@@ -2182,6 +2182,15 @@ burst-nodes≤inc e ins =
 --   this family keeps every registration it makes; a registration
 --   minted anywhere but a delivery or the walk's own descent; and the
 --   margin at this row's own budget rather than at padded gas.
+-- PROBED: `Probed.Burst-Nest-Unit` reaches that budget, which the
+--   currency rows could not.  Covered: a wrap corpus at
+--   `budgetAt e ins 0` over the three `*All` heads, where the store's
+--   maximum sits under the program's unit with room, and this
+--   statement's own conclusion follows at one of them through a proven
+--   converse from the store to the registry.  NOT covered: the RIGHT
+--   summand, which those rows spend NOWHERE -- the unit alone pays on
+--   that corpus, so they reach the budget and still cannot decide the
+--   split or report a margin against the sum.
 postulate
   burst-regs-split : ∀ {n} {Γ : Ctx n} {t} (e : Closed Γ t) (ins : Slots Γ) →
     let r = subscribeE (budgetAt e ins 0) e root 0 0
