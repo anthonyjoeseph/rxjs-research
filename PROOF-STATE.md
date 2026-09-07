@@ -238,29 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **RE-MEASURING EVERY MODULE THIS TIER RECORDS AS OVER BUDGET, because
-  three of them just turned out not to be.** The numbers file marks a
-  budget-killed run as a FLOOR, and a floor taken against an unbuilt
-  cone is a reading about the container, not the module — the whole of
-  a face charged with cost that a control truncated to its imports
-  prices almost entirely. Three rows fell that way in one sitting, one
-  by a factor of twenty-five, and each had a shape reading standing
-  ready to explain it. The commit re-runs the remaining floors
-  bottom-up on a coherent cache and deletes the findings resting on the
-  ones that fall — the expensive half, since a diagnosis outlives the
-  number it came from.
-
-- **INSTANTIATING THE THREE ENTRY READINGS, WHICH ARE NOW THE CHEAPEST
-  UNMANAGED RISK ON THE TIER.** Each is a reading over a list the state
-  hands out — a share's admitted continuations, a cascade's filter of
-  the registry, a drain's chains against the arrival it pops — and each
-  is FALSITY on the honest ground that NOTHING HAS INSTANTIATED IT, not
-  on a doubt anyone has written down. All three sides compute: the lists
-  come out of the evaluator by running, and the predicates are `Bool`.
-  So the leg reaches them at programs where a sink's floor is genuinely
-  below a minted source's, which is the region that killed the free
-  forms, and every row ends at a receipt or a refutation rather than
-  where it started.
+- **CARRYING THE TELESCOPE TO THE REGISTER, which takes the two frame
+  readings off the state at four of their five sites.** A sink-floored
+  chain is registered by the CONNECT, so a frame the descent pushes is
+  a subterm of the slot's def, and `Rx.Slots.shared` constrains that
+  def to exactly what the frame predicate asks at such a chain's floor.
+  The home is already built: `regP?` carries a path predicate over
+  every registry entry, `shareAdmit-chP` moves one onto the admitted
+  chains, and the walk preserves one. So the commit instantiates it at
+  the frame predicate and writes `chainsOf`'s missing twin of that
+  transport. The fifth site is excluded rather than proven, and it is
+  `walk-share-strat`'s own: a delivered observable carries syntax the
+  telescope never checked.
 
 - **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
   is the one door the pricing leaves open.** Both ends are closed by
@@ -272,6 +261,18 @@ does not fit is a finding about the shared statement, not about the head.
   asks what the walk must carry for that to be stateable, and whether
   the depth measure still decreases when a chain is entered below the
   top — the mechanism question the currency search stood in for.
+
+- **RE-MEASURING WHAT IS LEFT OF THE OVER-BUDGET LIST, now that the
+  cause of one reading is known and it was not the module.** A dev
+  check charges a consumer for its imports' CONTENTS, so a new
+  module-graph edge into a widely imported module raises the cost of
+  everything downstream: measured at sixty-three seconds against over
+  eight minutes for one edge into the module defining the path
+  predicates, with the bodies unchanged. That is a third cause
+  beside the cold cone and the genuine SCC, and it is the one a shape
+  reading cannot see. The commit re-runs the remaining floors
+  bottom-up on a coherent cache, attributes each to cone, edge or
+  block, and deletes the findings resting on the ones that fall.
 
 ### Open questions
 
@@ -315,18 +316,17 @@ does not fit is a finding about the shared statement, not about the head.
   does to the chain's stratification reading, the one reading a walk cannot
   transport. A `scan-f` folds against a value in the STORE, which no path
   predicate reaches and the premised state receipt does not yet read.
-- **`sink-admit-entry`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: what a
-  share hands each chain it admitted — a stratified continuation whose floor is
-  at or above the slot the values leave. Its subject is read off the registry
-  the receipt names, so no refuted quantifier survives in it; nothing has
-  instantiated it.
-- **`cascade-admit-entry`** (Part7/Arrival-Caps) — FALSITY, `REFUTED`: the same
-  reading for a cascade's chains, over `chainsOf` — a filter of the registry, so
-  the subject is the state's and not a free path's. Nothing has instantiated it.
-- **`pop-head-strat`** (Caps-Bridge) — FALSITY, `REFUTED`: where the arrival's own
-  value sits against every chain that will receive it, read at the drain so both
-  subjects are the receipt's arguments rather than free. It wants a fact relating
-  a source's pending values to the floors registered against it.
+- **`sink-admit-sink`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: what a share
+  hands each chain it admitted, asked ONLY where the chain ends at a sink. Both
+  conjuncts are free at the root's floor, so the risky region is a share's own
+  registrations rather than the registry.
+- **`cascade-admit-sink`** (Part7/Arrival-Caps) — FALSITY, `REFUTED`: the same
+  reading for a cascade's chains, over `chainsOf`, and the same disjunct. The
+  refutation is what forbids trading the disjunct for a free path plus a floor.
+- **`pop-head-strat-sink`** (Caps-Bridge) — FALSITY, `REFUTED`: where the
+  arrival's own value sits against every chain that will receive it, asked only
+  below the root. It wants a fact relating a source's pending values to the
+  floors registered against it, and only where a floor drops.
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both

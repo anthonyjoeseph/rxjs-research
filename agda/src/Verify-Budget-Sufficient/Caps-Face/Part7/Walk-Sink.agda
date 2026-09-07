@@ -2,15 +2,16 @@
 -- the chain/sink walk SCC
 module Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink where
 
-open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _∸_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; s≤s; z≤n)
-open import Data.Nat.Properties using (m+[n∸m]≡n; ≤ᵇ⇒≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; +-monoʳ-≤; ⊔-lub; m≤m⊔n;
+open import Data.Nat.Properties using (m+[n∸m]≡n; ≤ᵇ⇒≤; ≤⇒≤ᵇ; <⇒≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; +-monoʳ-≤; ⊔-lub; m≤m⊔n;
   m≤n⊔m; +-suc; ≤-pred)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length)
 open import Data.Bool.ListAction using (any; all)
 open import Data.Fin     using (Fin)
+open import Data.Fin.Properties using (toℕ<n)
 import Data.Fin as Fin
 open import Data.List.Relation.Unary.All using (All)
   renaming ([] to []ᵃ; _∷_ to _∷ᵃ_; map to mapᴬ)
@@ -72,7 +73,9 @@ open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   shareLatch-caps; slotsCaps?-capsAt; valsCaps?-lvl)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (frameStep-⊑-+; valCaps?-size)
-open import Decide using (T-to)
+open import Decide using (T-to; T⇒≡true; ∧-intro)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
+  (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
   (RingState; WalkHyps; ent-infl; floor-parts; frameStep-regAt; regs-exit; ring-room; ringFold; sink-deliv-cap; sink-entry-ladder; sink-step-caps; walk-frame-clos)
 
@@ -108,11 +111,46 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 -- ring and the burst ring -- so a premise added to that tuple is a
 -- premise both rings must carry to their own dispatch.  The two are
 -- structurally identical and neither derives the other.
+
+-- AND ONLY THE SINK-FLOORED ENTRIES ARE ASKED FOR, which is the same
+-- split `cascade-admit-sink` makes over the cascade's chains and the
+-- same reason: a chain ending at `root` is charged at `n`, every
+-- closure a frame names is below `n`, and `toℕ i` is below `n` because
+-- `i` indexes `Γ` -- so BOTH conjuncts fall out of the floor alone and
+-- the receipt is not spent.  The disjunct below is therefore the whole
+-- risky region: what a share registered, not what the registry holds.
+-- The coverage boundary on that region, and the telescope route
+-- through it, are recorded once at `cascade-admit-sink`; the second
+-- conjunct here needs neither, since `toℕ i ≤ pathFloor` holds at a
+-- chain the share itself registered by definition of the floor.
 postulate
-  sink-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  sink-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
     capsOK? c sched st ≡ true →
-    admEntry? {t = t} (Fin.toℕ i) (shareAdmit i (EvalSt.registry st)) ≡ true
+    all (λ en → (n ≤ᵇ pathFloor (proj₂ en)) ∨
+                (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en))))
+        (shareAdmit {t = t} i (EvalSt.registry st)) ≡ true
+
+sink-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (i : Fin n) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  admEntry? {t = t} (Fin.toℕ i) (shareAdmit i (EvalSt.registry st)) ≡ true
+sink-admit-entry {n = n} {Γ = Γ} {t = t} c i sched st cok =
+  all-impl _ _ free (shareAdmit {t = t} i (EvalSt.registry st))
+    (sink-admit-sink c i sched st cok)
+  where
+  atRoot : (p : Path Γ (lookup Γ i) t) → n ≤ pathFloor p →
+           (pathStrat? p ∧ (Fin.toℕ i ≤ᵇ pathFloor p)) ≡ true
+  atRoot p le = ∧-intro (pathStrat-top p le)
+                        (T⇒≡true _ (≤⇒≤ᵇ (≤-trans (<⇒≤ (toℕ<n i)) le)))
+
+  free : ∀ (en : RegId × Path Γ (lookup Γ i) t) →
+         ((n ≤ᵇ pathFloor (proj₂ en)) ∨
+          (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en)))) ≡ true →
+         (pathStrat? (proj₂ en) ∧ (Fin.toℕ i ≤ᵇ pathFloor (proj₂ en))) ≡ true
+  free en h with n ≤ᵇ pathFloor (proj₂ en) in eq
+  ... | true  = atRoot (proj₂ en) (≤ᵇ⇒≤ n _ (T-to eq))
+  ... | false = h
 
 -- WHAT AN ADMITTED REGISTRATION HANDS ITS OWN WALK, AS A TUPLE AND NOT
 -- AS A STEP.  The entry's path lives in the REGISTRY rather than in the

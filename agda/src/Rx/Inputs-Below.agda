@@ -476,3 +476,23 @@ ib-monoᵛ k k′ le (s +ᵗ t) (inj₁ a) h = ib-monoᵛ k k′ le s a h
 ib-monoᵛ k k′ le (s +ᵗ t) (inj₂ b) h = ib-monoᵛ k k′ le t b h
 ib-monoᵛ k k′ le (obs t)  e        h =
   T⇒≡true (inputsBelowᵉ k′ e) (ib-monoᵉ k k′ le e (T-to h))
+
+-- AND THE TOP STRATUM ON A RUNTIME VALUE, which is the value-side twin
+-- of the expression walk directly above and recurses on the TYPE for
+-- the same reason `ib-monoᵛ` does: the data arms carry no syntax, so
+-- only `obs` has anything to prove and it hands straight over.  What
+-- this buys a consumer is a reading charged at `n` for free -- a chain
+-- that terminates at the root asks for exactly that, so no fact about
+-- the state is spent establishing it.
+ib-topᵛ : ∀ {n} {Γ : Ctx n} (t : Ty) (v : Val Γ t) →
+  inputsBelowᵛ n t v ≡ true
+ib-topᵛ unitᵗ    v        = refl
+ib-topᵛ boolᵗ    v        = refl
+ib-topᵛ natᵗ     v        = refl
+ib-topᵛ (s ×ᵗ t) (a , b)  =
+  T⇒≡true (inputsBelowᵛ _ s a ∧ inputsBelowᵛ _ t b)
+    (∧⁺ (inputsBelowᵛ _ s a) (inputsBelowᵛ _ t b)
+        (T-to (ib-topᵛ s a)) (T-to (ib-topᵛ t b)))
+ib-topᵛ (s +ᵗ t) (inj₁ a) = ib-topᵛ s a
+ib-topᵛ (s +ᵗ t) (inj₂ b) = ib-topᵛ t b
+ib-topᵛ (obs t)  e        = T⇒≡true (inputsBelowᵉ _ e) (ib-topᵉ e)

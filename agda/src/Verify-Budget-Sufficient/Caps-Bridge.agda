@@ -29,7 +29,7 @@
 -- remaining postulate on this side is `sizeCount-mono-d` (§ D).
 module Verify-Budget-Sufficient.Caps-Bridge where
 
-open import Data.Bool    using (Bool; true; false; _∧_)
+open import Data.Bool    using (Bool; true; false; _∧_; _∨_)
 open import Data.Maybe   using (nothing)
 open import Data.Nat     using (ℕ; zero; suc; _+_; _*_; _^_; _≤_; _≤ᵇ_; _⊔_; z≤n; s≤s)
 open import Data.Nat.Properties using (≤ᵇ⇒≤; ≤⇒≤ᵇ; ≤-trans; ≤-refl; ≤-reflexive; m≤n+m; m≤m+n; n≤1+n; m≤m⊔n; m≤n⊔m; m≤m*n;
@@ -52,7 +52,7 @@ open import Rx.Slot-Hop using (slotHop)
 open import Rx.Evaluator using (Sched; EvalSt; Arrival; LiveSource; mergeAll-st; Path; root; arrTy; arrVal; cascade;
   cascadeGo; cascadeLatch; cascadeFinish; chainsOf; hasDry; subscribeE; budgetAt; opIterD;
   sizeStep; capsBase; sched-next; schedGo; schedHeadOf; schedEarlier; drain; evaluate;
-  sched-init; st-init)
+  sched-init; st-init; RegId)
 open import Rx.Slots using (Slots; slotsSize)
 open import Rx.Slot-Clos using (slotsClos)
 open import Verify-Budget-Sufficient.Desc-Ceil using (descW-ceil)
@@ -141,7 +141,7 @@ open import Verify-Budget-Sufficient.Depth-Sighted using (depthE-sighted)
 open import Verify-Budget-Sufficient.Nest-Burst using (descW)
 open import Rx.Frame-Width using (entryCeil)
 open import Rx.Burst-Ceil using (bCeil≤ceil; slotsB≤slotsCeil)
-open import Rx.Inputs-Below using (ib-topᵉ)
+open import Rx.Inputs-Below using (ib-topᵉ; ib-topᵛ; ib-monoᵛ)
 open import Rx.Exp using (sizeᵛ; Closed; Ctx; sizeᵉ; syncSizeᵉ)
 open import Decide using (T-to; T⇒≡true; f≡t-absurd; ∧-intro; ≤ᵇ-widen)
 
@@ -1133,18 +1133,63 @@ pop-head-clos c sched st eq cOK
 -- the chains registered against it -- and the register is where it is
 -- owed, which is exactly the obligation `sink-fan-sink`'s dead route
 -- enumerates last.
+
+-- AND ONLY THE SINK-FLOORED CHAINS ARE ASKED FOR, the same split the
+-- two admitted-entry readings make and for the same reason: a chain
+-- terminating at `root` charges the payload at `n`, and `ib-topᵛ` puts
+-- every value of every program below `n` with nothing supplied.  So
+-- the two lists this fact was said to relate -- a source's pending
+-- values and the floors registered against it -- only have to be
+-- related where a floor DROPS, which is a share's own registrations.
+-- The coverage boundary on that region is recorded once, at
+-- `cascade-admit-sink`, and so is the telescope route through it --
+-- which does NOT carry here.  That route is about a chain's FRAMES,
+-- all of them subterms of the slot's def; this reading is about the
+-- ARRIVAL's value, which the schedule supplies and no slot constrains.
+-- `Arrival` and `LiveSource` both carry a free element type with no
+-- data witness, so the fact that would close it is that every source
+-- the evaluator installs is data-typed -- true of a `scripted` slot by
+-- its own constructor, and open at the sources a cold or a `deferᵉ`
+-- body mints.
+--
+-- AND THIS ROW HAS A SECOND ONE, NARROWER THAN THAT: `inputsBelowᵛ` is
+-- constantly `true` on every data arm, so a row is load-bearing only
+-- at an arrival whose type is `obs`.  Every arrival `Demand-Programs`
+-- produces is `natᵗ`, so the predicate there is true before the
+-- floor is even read -- the conclusion admits no instantiation at all
+-- on that corpus, independently of what the registry holds.
 --
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-vals-strat-absurd` kills the
 --   free form this replaces, where the values were quantified after the
 --   receipt.
 postulate
-  pop-head-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  pop-head-strat-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (sched : Sched Γ) (st : EvalSt e)
     {a : Arrival Γ} {sched′ : Sched Γ} →
     sched-next sched ≡ inj₂ (a , sched′) →
     capsOK? c sched st ≡ true →
-    all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+    all (λ rc → (n ≤ᵇ pathFloor (proj₂ rc)) ∨
+                inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
         (chainsOf a st) ≡ true
+
+pop-head-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (sched : Sched Γ) (st : EvalSt e)
+  {a : Arrival Γ} {sched′ : Sched Γ} →
+  sched-next sched ≡ inj₂ (a , sched′) →
+  capsOK? c sched st ≡ true →
+  all (λ rc → inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a))
+      (chainsOf a st) ≡ true
+pop-head-strat {n = n} {Γ = Γ} {t = t} c sched st {a = a} nx cok =
+  all-impl _ _ free (chainsOf a st) (pop-head-strat-sink c sched st nx cok)
+  where
+  free : ∀ (rc : RegId × Path Γ (arrTy a) t) →
+         ((n ≤ᵇ pathFloor (proj₂ rc)) ∨
+          inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a)) ≡ true →
+         inputsBelowᵛ (pathFloor (proj₂ rc)) (arrTy a) (arrVal a) ≡ true
+  free rc h with n ≤ᵇ pathFloor (proj₂ rc) in eqb
+  ... | true  = ib-monoᵛ n _ (≤ᵇ⇒≤ n _ (T-to eqb)) (arrTy a) (arrVal a)
+                  (ib-topᵛ (arrTy a) (arrVal a))
+  ... | false = h
 
 pop-head-widCaps : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
   (c : Caps) (sched : Sched Γ) (st : EvalSt e)

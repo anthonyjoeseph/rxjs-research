@@ -2,10 +2,10 @@
 -- arr-chain-caps … arr-chains-caps-all
 module Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps where
 
-open import Data.Bool    using (Bool; true; false; if_then_else_)
-open import Data.Nat     using (ℕ; suc; _+_; _∸_; _⊔_; _≤_; _≡ᵇ_; z≤n; s≤s)
+open import Data.Bool    using (Bool; true; false; if_then_else_; _∨_)
+open import Data.Nat     using (ℕ; suc; _+_; _∸_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (m+[n∸m]≡n; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n; m≤n+m; n≤1+n; *-identityʳ; +-monoʳ-≤; m≤m⊔n;
-  +-suc; ⊔-lub)
+  +-suc; ⊔-lub; ≤ᵇ⇒≤)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; length)
@@ -57,12 +57,14 @@ open import Verify-Budget-Sufficient.Caps-Depth
 open import Verify-Budget-Sufficient.Caps-Face.Part1 using
   (capsAt-round-size; capsOK?; n≤capsAt-size; pathFloor; pathStrat?; pathSz?; pathSz?-widen;
   valCaps?; nestClosOK?ᵛ; nestClosOK?ᵛ-widen)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Root-Strat using
+  (pathStrat-top)
 open import Verify-Budget-Sufficient.Caps-Face.Part4 using
   (capsOK?-count; capsOK?-regs; pathSz?-len; slotsCaps?-capsAt; valsCaps?; valsCaps?-lvl;
   foldPath-slots)
 open import Verify-Budget-Sufficient.Caps-Face.Part3 using
   (valCaps?-widen)
-open import Decide using (∧-intro)
+open import Decide using (∧-intro; T-to)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Cascade-Caps using
   (cascadeGo-deliveries; cascadeLatch-caps; chainStep-slots; chainsOf-length; walkH)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Chain-Caps-OK using
@@ -109,19 +111,70 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Walk-Sink using
 -- one is minted.  The claim is therefore stated AT each entry's own
 -- floor, which is also why it cannot be a per-arrival premise.
 --
+
+-- AND ONLY THE SINK-FLOORED CHAINS ARE ASKED FOR, because the others
+-- are free and `pathStrat-top` says so without spending the receipt.
+-- A frame names inputs of `Γ`, so every closure is below `n`; a chain
+-- ending at `root` is charged at exactly `n`, and one ending at a
+-- `share-sink` at the slot's index.  So the disjunct below is the
+-- whole risky region, and it is strictly smaller than the chain set:
+-- what a share registered, rather than what the registry holds.
+--
+-- AND THE REGION ADMITS NO INSTANTIATION ON THE DEMAND CORPUS, which
+-- is a coverage boundary rather than an unprobed row.  Running every
+-- family of `Demand-Programs` -- fan, unsubscribe, window, chain --
+-- across the instants the schedule reaches, and
+-- counting registry entries whose chain floors below `n`, gives ZERO
+-- at every one of thirteen configurations: the corpus registers
+-- root-terminated chains only, so a row taken on it would land in the
+-- disjunct's free half and could not have failed.
+--
+-- AND THE TELESCOPE CLOSES MOST OF THAT REGION, BUT NOT ALL OF IT,
+-- WHICH IS WHERE THIS MEETS `walk-share-strat`.  A sink-terminated
+-- chain is registered by the CONNECT, which subscribes the slot's def
+-- under `share-sink i`, so a frame the DESCENT pushes is a subterm of
+-- that def -- and `Rx.Slots.shared` admits a def only with its inputs
+-- below the slot's own index, which is definitionally what
+-- `frameStrat?` asks at the floor such a chain reports.  That is four
+-- of the five registration sites the reading is owed at, and the
+-- series in `Harness.Main` targeting `walk-share-strat` enumerates
+-- them.  The fifth is NOT telescope induction and the tempting
+-- argument that it is, is false: a flatten frame inside the def can
+-- subscribe an observable that arrived as a VALUE, and `Val Γ (obs t)`
+-- is an arbitrary closed expression, so the syntax the telescope
+-- checked never contained the inputs then being registered.  Read off
+-- the constructors, not instantiated, so nothing here lowers a class.
+--
 -- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
---   form this replaces, where the path was quantified after the
+--   free form this replaces, where the path was quantified after the
 --   receipt: one frame over a sink -- a `map` whose template names
 --   input one, ending at slot nought, whose floor is nought -- against
 --   the receipt taken at the INITIAL state of a two-slot program,
 --   where it computes. The telescope's own stratification does not
 --   reach it, `shared` constraining a slot's DEF while a path's frames
---   are not any slot's def.
+--   are not any slot's def.  It is also why the disjunct above may not
+--   be traded for a premise on a free path: that is the refuted form
+--   with a floor hypothesis, and the counterexample's floor is nought.
 postulate
-  cascade-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  cascade-admit-sink : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
     capsOK? c sched st ≡ true →
-    all (λ rc → pathStrat? (proj₂ rc)) (chainsOf a st) ≡ true
+    all (λ rc → (n ≤ᵇ pathFloor (proj₂ rc)) ∨ pathStrat? (proj₂ rc))
+        (chainsOf a st) ≡ true
+
+cascade-admit-entry : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
+  (c : Caps) (a : Arrival Γ) (sched : Sched Γ) (st : EvalSt e) →
+  capsOK? c sched st ≡ true →
+  all (λ rc → pathStrat? (proj₂ rc)) (chainsOf a st) ≡ true
+cascade-admit-entry {n = n} {Γ = Γ} {t = t} c a sched st cok =
+  all-impl _ _ free (chainsOf a st) (cascade-admit-sink c a sched st cok)
+  where
+  free : ∀ (rc : RegId × Path Γ (arrTy a) t) →
+         ((n ≤ᵇ pathFloor (proj₂ rc)) ∨ pathStrat? (proj₂ rc)) ≡ true →
+         pathStrat? (proj₂ rc) ≡ true
+  free rc h with n ≤ᵇ pathFloor (proj₂ rc) in eq
+  ... | true  = pathStrat-top (proj₂ rc) (≤ᵇ⇒≤ n _ (T-to eq))
+  ... | false = h
 
 -- THE TUPLE ONE CHAIN'S WALK IS ENTERED WITH, met once and spent by
 -- both ledgers below.  The cascade's round package carries every
