@@ -88,7 +88,7 @@ open import Probed.Depth-Sighted
          walkFigs≡; walkRow≡; tieWalk1; tieWalk4;
          stepStore≡)
 open import Probed.Depth-Join
-  using (shapeFigs≡; frameRow; stepRow)
+  using (shapeFigs≡; frameRow; stepRow; thruRow1; thruRow4; thruStep4; admitFig≡)
 open import Probed.Sight-Fit-Width
   using (figures≡; oldRow≡; newRow≡; tie12; tie13; tie16)
 

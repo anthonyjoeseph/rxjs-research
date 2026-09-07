@@ -624,12 +624,14 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 -- and take, so the whole claim is the two arms that charge: the
 -- `from-inner` react, and the `thru-outer` walk that sits a successor
 -- above it.
--- PROBED: `Probed.Depth-Join` instantiates this at the first chain a
---   round admits, whose path is headed by `from-inner` over three
---   frames -- one of the two arms that can fail, read against the
---   ceiling at the state the cascade hands the chain.  The `thru-outer`
---   arm is NOT covered, and it is the larger of the two, so this does
---   not reach the region the class is held for.
+-- PROBED: `Probed.Depth-Join` covers BOTH arms that charge.  The
+--   `from-inner` one is read at the first chain a round admits, whose
+--   path is headed by it over three frames, against the ceiling at the
+--   state the cascade hands the chain.  The `thru-outer` one -- the
+--   larger, a successor above the react -- is read at an ASSEMBLED
+--   frame and state rather than a walked one, at two inner nestings so
+--   a pass surviving only a flat arrival is not one.  The residue is
+--   therefore the state axis at that arm, not the arm.
 postulate
   frame-depth-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)
@@ -641,9 +643,20 @@ postulate
 
 -- THE TWO OBLIGATIONS THE SHARE SINK OWES, which are the same pair one
 -- level down: the registrations a share admits rather than the frames a
--- path crosses.  Neither is covered -- the first is `depthFold` again
--- and inherits the barrier, and no row reaches a registration point at
--- all -- so the absence is of a POINT rather than of a sweep.
+-- path crosses.  Neither is covered, and for two different reasons.
+-- `share-fold-fit` is `depthFold` again, so it inherits the parent's
+-- own barrier and no instrument reaches it.
+--
+-- AND `share-step-fit` IS BLOCKED BY THE CORPUS RATHER THAN BY THE
+-- MEASURE, which is the weaker obstruction and the one worth writing
+-- down.  Its `rid` and `p` are exactly a `shareAdmit` entry, so a point
+-- is whatever the shared slot has registered where the row would
+-- stand -- and `Probed.Depth-Join` reads that list off the registry at
+-- the round these leaves are otherwise instantiated at and finds it
+-- EMPTY.  So the absence is of a POINT and the point is a program
+-- away: a family whose shared slot is connected and delivering by the
+-- instant the descent is priced at would supply one, where every
+-- family here connects inside the root subscribe or not at all.
 postulate
   share-fold-fit : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t}
     (sl : Slots Γ) (sf : Gas) (gas : ℕ) (bid : Id) (now : Tick) (i : Fin n)
@@ -714,11 +727,13 @@ disp-depth-fit {e = e} sl sf gas bid now i vals fin sched st hsl hsf =
 -- obligation the fold cannot discharge for itself and the reason the
 -- invariant is a ceiling rather than a store bound: the values and the
 -- store are free to trade, and only their combination is held.
--- PROBED: `Probed.Depth-Join` reads both conjuncts at the same chain
---   edge the frame row stands at -- slots by reflexivity, the ceiling
---   as two numerals at states one `stepFrame` apart.  ONE step at ONE
---   head; nothing here sweeps the frame arms or the states a walk
---   reaches later.
+-- PROBED: `Probed.Depth-Join` reads both conjuncts at the chain edge
+--   the frame row stands at -- slots by reflexivity, the ceiling as two
+--   numerals at states one `stepFrame` apart -- and again at the
+--   `thru-outer` frame, so the step is taken at each arm that charges
+--   rather than at the one the corpus happens to head a chain with.
+--   The second point's state is assembled rather than walked, which is
+--   what the coverage still wants.
 postulate
   chain-fit-step : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s u}
     (sl : Slots Γ) (sf : Gas) (bid : Id) (now : Tick)

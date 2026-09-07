@@ -5,7 +5,8 @@
 -- survives the step that frame makes.  Both are stated at a single
 -- `Frame` and a single `Path`, which is the smallest unit this measure
 -- has, and both sides of each reduce -- so the rows below read them at
--- a state the evaluator reaches rather than at one written down.
+-- states rather than symbolically, and at each arm of `depthFrame`
+-- that charges rather than at whichever one a program hands over.
 --
 -- THIS IS WHAT THE DECOMPOSITION WAS FOR, and it is the whole reading:
 -- the parent's own conclusion is CLOSED to instantiation -- the descent
@@ -30,17 +31,18 @@
 -- taken: five is the `from-inner` head, and it is read in the same
 -- build as the rows.
 --
--- WHAT IS NOT COVERED, and it is one of the four leaves rather than a
--- shape within these two.  `share-fold-fit` is `depthFold` again, so it
--- inherits the parent's own barrier and no row here or anywhere reaches
--- it; `share-step-fit` wants a registration read off the registry, and
--- these rows stand at a `from-inner` edge, which admits none.  Both are
--- absences of a POINT rather than of a sweep.
+-- WHAT IS NOT COVERED IS THE OTHER TWO LEAVES, and their obstructions
+-- are not the same one.  `share-fold-fit` is `depthFold` again, so it
+-- inherits the parent's own barrier and no instrument reaches it.
+-- `share-step-fit` is merely unpointed: its `rid` and `p` are a
+-- `shareAdmit` entry, and `admitFig` reads that list off the registry
+-- here and finds it empty, so what it wants is a program rather than
+-- an instrument.
 -- TARGET: frame-depth-fit @9d21e7
 -- TARGET: chain-fit-step @266bd8
 module Probed.Depth-Join where
 
-open import Data.Bool using (Bool)
+open import Data.Bool using (Bool; false)
 open import Data.List using (List; _∷_; [])
 open import Data.Nat using (ℕ; suc; _+_; _*_)
 open import Data.Nat.Properties using (≤ᵇ⇒≤)
@@ -54,8 +56,13 @@ open import Rx.Evaluator
   using (Sched; Arrival; Path; Frame; root; share-sink; _↠_; map-f; scan-f; take-f; from-inner;
   thru-outer; arrTy; arrVal; budgetAt)
 
+open import Data.List renaming (length to lengthL) using ()
+open import Data.Fin using (zero)
+open import Rx.Evaluator using (shareAdmit; EvalSt; mergeAllᵒ)
+
 open import Refuted.Demand-Programs using (Γ₂; progU)
-open import Probed.Depth-Sighted using (uArr; uPth; uSc; uSt)
+open import Probed.Depth-Sighted
+  using (uArr; uPth; uSc; uSt; slotsT; deep; wSched; wSt)
 open import Probed.Apparatus using (Confirms)
 open import Verify-Budget-Sufficient.Caps-Face.Part7.Arrival-Caps
   using (frame-depth-fit; chain-fit-step)
@@ -134,3 +141,56 @@ stepRow : Confirms
   (chain-fit-step (Sched.slots uSc) uSf 2 (Arrival.tick uArr)
      (Split.hd uSpl) (Split.tl uSpl) uVals uFin uSc uSt refl refl)
 stepRow = refl , ≤ᵇ⇒≤ _ _ tt
+
+-- THE OTHER ARM THAT CHARGES, at a frame this tree already builds.
+-- `from-inner` above is one of `depthFrame`'s two live arms and
+-- `thru-outer` is the other -- a successor above the react, so the
+-- larger of the two -- and the reason no row above reaches it is that
+-- the corpus does not head a chain with one.  `Probed.Depth-Sighted`
+-- assembles exactly that frame for its own walk rows, so the arm is
+-- reachable here by spending its state rather than by finding a
+-- program, and the row below is the leaf read at it.
+--
+-- WHAT THIS ROW IS AND IS NOT.  The frame and its state are ASSEMBLED
+-- -- a `mergeAll` node installed over the initial state -- not walked
+-- to by a run, so this is evidence about the ARM and not about a
+-- position a cascade hands out.  That is the weaker half of what the
+-- class wants and the half nothing else supplies: the two rows above
+-- stand at a reached edge whose arm cannot fail the way this one can.
+-- The nesting is read at two depths so a pass that only survives a
+-- flat inner is not one, and the gas is the budget the statement
+-- names rather than the pad the walk rows use.
+tSf : Gas
+tSf = budgetAt (progU 8 2) slotsT 0
+
+thruRow1 : Confirms
+  (frame-depth-fit {e = progU 8 2} slotsT tSf 0 0
+     (thru-outer mergeAllᵒ 7) (root {Γ = Γ₂} {t = natᵗ})
+     (deep 1 ∷ []) false wSched wSt refl refl)
+thruRow1 = ≤ᵇ⇒≤ _ _ tt
+
+thruRow4 : Confirms
+  (frame-depth-fit {e = progU 8 2} slotsT tSf 0 0
+     (thru-outer mergeAllᵒ 7) (root {Γ = Γ₂} {t = natᵗ})
+     (deep 4 ∷ []) false wSched wSt refl refl)
+thruRow4 = ≤ᵇ⇒≤ _ _ tt
+
+-- AND THE CEILING SURVIVES THAT FRAME'S STEP TOO, which is the second
+-- leaf read at the arm the first pair could not reach.
+thruStep4 : Confirms
+  (chain-fit-step {e = progU 8 2} slotsT tSf 0 0
+     (thru-outer mergeAllᵒ 7) (root {Γ = Γ₂} {t = natᵗ})
+     (deep 4 ∷ []) false wSched wSt refl refl)
+thruStep4 = refl , ≤ᵇ⇒≤ _ _ tt
+
+-- WHETHER THE ROUND OFFERS A REGISTRATION AT ALL, which is what
+-- `share-step-fit` wants and what nothing here has been able to
+-- supply.  Its `rid` and `p` are exactly a `shareAdmit` entry, so the
+-- question is whether the shared slot has any at the point these rows
+-- stand at -- a corpus fact, read off the registry rather than
+-- guessed, and a nought is a boundary rather than a failure.
+admitFig : ℕ
+admitFig = lengthL (shareAdmit zero (EvalSt.registry uSt))
+
+admitFig≡ : admitFig ≡ 0
+admitFig≡ = refl
