@@ -771,32 +771,75 @@ valsSz?-mono {s = s} V V′ (v ∷ vs) h hv =
 -- rungs bought against the squaring, and the μ NESTING decides how
 -- many such blocks there are.
 --
--- AND THE BLOCK IS DENOMINATED IN THE BOUND'S BIT LENGTH, WHICH IS THE
--- WHOLE OF WHY IT IS AFFORDABLE.  A rung MULTIPLIES, so the count of
--- them that reaches a bound is its logarithm: `bitsᴺ B` of them
--- already carry `B` past `B * B`.  A block of `B` of them would also
--- carry it -- that is the reading this count used to take -- but it is
--- an exponential over-charge, and at a bound the caller supplies as a
--- level it is a per-frame charge no linear ledger survives.  A
--- logarithmic block is what the squaring costs and nothing more.
+-- AND THAT BLOCK IS DENOMINATED IN THE BOUND'S BIT LENGTH, WHICH IS
+-- THE WHOLE OF WHY IT IS AFFORDABLE.  A rung MULTIPLIES, so the count
+-- of them that reaches a bound is its logarithm: `bitsᴺ B` of them
+-- already carry `B` past `B * B`.  Each level of nesting adds one such
+-- block read at the bound reached so far, which is what lets every
+-- statement below stay at the caller's own `B` rather than quantify a
+-- bound its consumers would then have to join over.
 --
--- SO THE CHARGE GROWS WITH THE BOUND AND THE STATEMENTS DO NOT.  Each
--- level of nesting adds a block read at the bound reached so far,
--- which is what lets every statement below stay at the caller's own
--- `B` rather than quantify a bound its consumers would then have to
--- join over.
-muRungsᴺ : ℕ → ℕ → ℕ
-muRungsᴺ zero    B = 0
-muRungsᴺ (suc d) B = bitsᴺ B + muRungsᴺ d (B * B)
+-- WHAT A SQUARING BLOCK DOES NOT BUY IS THE DELIVERIES, AND THAT IS
+-- THE SECOND BLOCK.  A subscription runs its synchronous sources
+-- inside its own frame, and a scanning step may plant its accumulator
+-- at as many occurrences as the step spells -- so the cell multiplies
+-- once per value delivered, by a factor the SYNTAX buys and no depth
+-- reading sees.  A program of size `B` spends it on a fan of `m` and a
+-- burst of `a` with `m + a ≤ B`, reaching `m ^ a`; a rung multiplies
+-- by at least four, so `bitsᴺ B` rungs cover one such factor and
+-- `B * bitsᴺ B` of them cover every delivery the syntax can pay for.
+--
+-- AND IT IS CHARGED AT EVERY LEVEL RATHER THAN ONCE AT THE TOP,
+-- because an unfolding is descended into at the SQUARED bound and
+-- writes its own sources there.  Charging inside the recursion is also
+-- what keeps the `μ` arm a transport: the leading rungs pay the
+-- squaring, this level's delivery block is slack the arm drops, and
+-- what remains is the same charge read at `B * B`.
+-- DEAD ROUTE: paying the deliveries as a FLAT summand beside the
+--   telescope -- `+ B`, or any `f B` however large.  The `μ` arm hands
+--   the recursion `B * B`, so the premise it must supply names
+--   `f (B * B)` while the one it holds names `f B`, and those run the
+--   wrong way for every non-constant `f`.  The same arm kills a
+--   premise relating the two parameters, `B ≤ S`, since `S` is passed
+--   through the unfolding unchanged while `B` squares.
+-- DEAD ROUTE: sizing the block at `B` rather than at `B * bitsᴺ B`,
+--   on arithmetic rather than on shape.  One iteration multiplies by
+--   `2 * S`, which the premises floor at four, so `B` of them buy
+--   `4 ^ B` against a cell the syntax drives to `m ^ a` at
+--   `m + a ≤ B` -- which maximises near `(B / 2) ^ (B / 2)` and
+--   overtakes `4 ^ B` once `B` passes thirty-odd.  Not refutable by
+--   instantiation: the crossing first needs a stored value of some
+--   `10 ^ 26` nodes, so the block is sized by this arithmetic and
+--   never by a row.
+-- DEAD ROUTE: instantiating anything that reads this count at a
+--   NESTING of two or more, which is the price the second block
+--   charges and it is paid in coverage.  The count itself computes in
+--   seconds at any nesting -- some three and a half million rungs at
+--   two levels of a twenty-node program -- but a row must compare
+--   against the `iterSize` tower that many rungs index, and a rung
+--   MULTIPLIES, so the tower is millions of digits reached one
+--   multiplication at a time.  Measured as not finishing in five
+--   hundred seconds at ONE level of a program of a hundred and forty.
+--   Nor does a smaller program recover it, since separating this
+--   count from a blinded one needs a multiplicity large enough to
+--   outrun the blinded reading, and every reading of this shape now
+--   carries a delivery group that clears what a small program builds.
+--   One level at a twenty-node program is what remains reachable, and
+--   it is where the crossing against the layer-only denomination
+--   lives.
+descRungsᴺ : ℕ → ℕ → ℕ
+descRungsᴺ zero    B = B * bitsᴺ B
+descRungsᴺ (suc d) B = bitsᴺ B + B * bitsᴺ B + descRungsᴺ d (B * B)
 
--- WHAT A DESCENT IS CHARGED, WHICH IS THE UNFOLDINGS PLUS THE
--- OPERATORS.  Those are the two things a subscription spends: one rung
--- per operator it runs, and one block per level of `μ` it has to
--- unfold on the way.  A program carrying no `μ` charges the layer
--- count and nothing beside it, which is what leaves every reading
--- taken away from the `μ` edge exactly where it was.
+-- WHAT A DESCENT IS CHARGED, WHICH IS THE RUNGS PLUS THE OPERATORS.
+-- Those are the two things a subscription spends: one rung per
+-- operator it runs, and one rung block per level of `μ` it has to
+-- unfold on the way -- carrying, at every level including the
+-- outermost, what that level's own deliveries cost.  So a program
+-- carrying no `μ` still charges a block, and only the OPERATOR half is
+-- read off the layers.
 descChg : ∀ {n} {Γ : Ctx n} (t : Ty) → ℕ → Val Γ t → ℕ
-descChg t B v = muRungsᴺ (muDepthᵛ t v) B + layᵛ t v
+descChg t B v = descRungsᴺ (muDepthᵛ t v) B + layᵛ t v
 
 -- AND A BURST JOINS BY MAX FOR THE REASON A PAIR DOES.  A frame handed
 -- several observables subscribes each of them, and what each one emits
@@ -977,7 +1020,7 @@ parkedChgAt-lookup B nid ((k , s) ∷ r) with k ≡ᵇ nid
 -- fixed before the multiplicity is chosen -- and a rung is affine in
 -- the bound, so a fixed count buys a fixed factor.  No table is
 -- carrying that here: there is no door, no queue and no cell, only what
--- one subscription hands back, which is why the block `muRungsᴺ` adds
+-- one subscription hands back, which is why the block `descRungsᴺ` adds
 -- per level of nesting is the whole of the difference.
 -- REFUTED: `Refuted.Subscribe-Sz-Mu` -- the layer-only denomination
 --   this charge replaces, at a one-shot source whose single emission is
@@ -986,22 +1029,17 @@ parkedChgAt-lookup B nid ((k , s) ∷ r) with k ≡ᵇ nid
 --   rungs.
 -- PROBED: `Probed.Subscribe-Mu-Blocks` at the region every other row
 --   over this statement declined -- the refutation's own family at four
---   mentions, and the same construction nested twice and three deep,
---   each level's body naming every occurrence above it -- read at the
---   smallest bound the premise admits, since a larger one is a weaker
---   reading.  The layer count is nought at all three programs, so the
---   layer-only level fails where the charge clears it and the figure
---   moves with the NESTING rather than with the mentions: the block is
---   what buys the multiplicity, and the crossing the refutation sits on
---   is closed by the denomination and not by the programs being small.
---   The third level is what separates a RATE from a generosity: its
---   block is bought at the square of a square, where a count that did
---   not grow with the bound would be outrun, and it clears there too.
---   What the rows still do not buy is the rate at EVERY bound, which is
---   asymptotic and which no instantiation decides; the nesting reached
---   is three and the mentions four, the telescope is one scripted slot,
+--   mentions, ONE level of nesting, read at the smallest bound the
+--   premise admits, since a larger one is a weaker reading.  The layer
+--   count is nought there, so the layer-only level fails where the
+--   charge clears it: the block is what buys the multiplicity, and the
+--   crossing the refutation sits on is closed by the denomination and
+--   not by the program being small.  What the row does not buy is the
+--   rate at EVERY bound, which is asymptotic and which no instantiation
+--   decides; the mentions are four, the telescope is one scripted slot,
 --   and nothing is read past a `root` entry, so no door stands in the
---   way.
+--   way.  Nesting past one level is not merely unreached but
+--   unreachable, for the reason `descRungsᴺ`'s own header records.
 postulate
   subscribeE-sz : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (g : Gas) (o : Closed Γ u) (κ : Path Γ u t) (id : Id)
@@ -1285,25 +1323,25 @@ postulate
   -- SO THE ARM IS A LEAF FOR AN ARITHMETIC REASON AND NOT A STRUCTURAL
   -- ONE.  The recursion into the source is available and every one of
   -- its premises transports; what does not transport is the cell.
-  -- AND IT IS FALSE AS STATED, ON THE ONE AXIS THE CHARGE DOES NOT
-  -- READ.  `descChg` is two DEPTH counts and carries no size, so a
-  -- synchronous source buys arrivals without buying a single
-  -- iteration: the exponent is FIXED across the crossing and the bound
-  -- moves only through the seed, which is the program's own syntax and
-  -- grows by one per arrival.  What spends them is a step that WRAPS
-  -- its accumulator rather than replacing it, doubling the stored cell
-  -- per arrival from fixed text.  Affine against geometric, so the
-  -- repair is a charge that counts what a subscription DELIVERS, and
-  -- no hypothesis available here is a substitute for it.
-  -- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- a scan whose
-  --   step rebuilds its accumulator at two occurrences, over a
-  --   synchronous run, entered at `root` on the initial table with the
-  --   least `M` the premise admits.  The crossing is bracketed: three
-  --   arrivals fewer and the claim HOLDS at the very same program
-  --   shape, so what fails is the arrival count and not the gas, the
-  --   telescope, or the arithmetic of `iterSize`.  The same witness
-  --   carries up to `subscribeE-sz-store`, whose bound is spelled in
-  --   this currency -- so the defect is the charge and not this arm.
+  -- AND THE ARRIVALS ARE WHY THE CHARGE CARRIES A DELIVERY BLOCK AND
+  -- NOT TWO DEPTH COUNTS.  A synchronous source buys arrivals without
+  -- buying depth, so a reading denominated in unfoldings and layers
+  -- holds its exponent FIXED across a crossing whose stored cell a
+  -- wrapping step doubles per arrival -- affine against geometric.
+  -- What answers it is a count that grows with the SIZE bound, which
+  -- is what a delivery block is; no hypothesis available here is a
+  -- substitute, since the arrivals are the source's own text.
+  -- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- the DEPTH-ONLY
+  --   denomination this premise replaces, spelled out locally there so
+  --   the witness survives the live charge moving.  A scan whose step
+  --   rebuilds its accumulator at two occurrences, over a synchronous
+  --   run, entered at `root` on the initial table with the least `M`
+  --   that reading admits.  The crossing is bracketed: three arrivals
+  --   fewer and the claim HOLDS at the very same program shape, so what
+  --   failed was the arrival count and not the gas, the telescope, or
+  --   the arithmetic of `iterSize`.  The same witness carries up to
+  --   `subscribeE-sz-store`, whose bound was spelled in that same
+  --   currency -- so what it killed was the charge and not this arm.
   -- DEAD ROUTE: the SUBSTITUTING telescope is bound-side HERE TOO, and
   --   for the same arithmetic the sibling slot statement records: this
   --   premise iterates `sizeStep S` once per unit of `descChg` plus the
@@ -1386,6 +1424,21 @@ postulate
   --   this premise replaces, where the copies an unfolding plants are a
   --   free parameter of the program and no count of rungs fixed by the
   --   layers moves with them.
+  -- DEAD ROUTE: reading this leaf's block by INSTANTIATION at all, at
+  --   the `μ` a source hands OUT rather than runs and at one handed out
+  --   from INSIDE another.  Both families were built and both are now
+  --   beyond reach, for two reasons that close from opposite sides.  A
+  --   block is geometric in the bound, so at a program of some hundred
+  --   and fifty nodes it names hundreds of thousands of rungs, and the
+  --   `iterSize` tower a row compares against is reached one
+  --   multiplication at a time -- measured as not finishing in five
+  --   hundred seconds at one nesting level.  Shrinking the program does
+  --   not recover it: separating a block from no block needs a
+  --   multiplicity large enough to outrun the blinded reading, and that
+  --   reading now carries a delivery group of its own which clears
+  --   every table a small program can build.  So the block's RATE is
+  --   settled by the arithmetic written into `descRungsᴺ`'s header and
+  --   never by a row at this leaf.
   -- PROBED: `Probed.Cross-Burst-Slack` at a merging door over a
   --   reifying scan fed a duplication chain, whose emission is
   --   exponential in the layers the scan is charged for and whose
@@ -1394,38 +1447,17 @@ postulate
   --   `S` the statement admits, at two chain lengths and down all three
   --   doors: the fold's table clears at exactly the rung the
   --   subscription's table needs, and four further layers move that
-  --   need by two rungs against a charge that rises by four.  Nothing
-  --   about a `μ` under the door, and nothing about an emission the
-  --   TELESCOPE manufactures, where the layer count is 0 and the rungs
-  --   are bought by `slotsSize` alone.
-  -- PROBED: `Probed.Burst-Mu-Door` at the `μ` a source hands OUT rather
-  --   than runs, which is where this leaf is charged or nowhere -- the
-  --   refutation's own family, folded back through a merging door with
-  --   no room at the table that subscription left.  Against it the same
-  --   reading with the block count forced to nought: that fails at the
-  --   refutation's mention count and holds one mention below it, so the
-  --   bracket is the multiplicity, while the count as it stands clears
-  --   the same table and clears again at three times the mentions.  One
-  --   nesting level, one door, one scripted slot -- so nothing about a
-  --   `μ` handed out from inside another, where the levels compose, and
-  --   nothing about the rate, which is asymptotic.
-  -- PROBED: `Probed.Mu-Compose` at a `μ` handed out from INSIDE another
-  --   one -- the same family with a second nesting threaded through the
-  --   EMISSION position, which is the only shape at this leaf where a
-  --   second rung-group is bought at all.  The block still closes the
-  --   crossing there: blinded to nought the conclusion fails at a
-  --   mention count where it holds one mention below, so the bracket is
-  --   the multiplicity and not the second door the composition adds.
-  --   But the count stopped at ONE level CLEARS that same row -- one
-  --   group already affords more than the CUBE of the program's own
-  --   bound, where a second unfolding multiplies the stored syntax
-  --   only by the mention count -- so what a second group buys is not
-  --   what closes this crossing, and no mention count reaches a
-  --   reading where it is.  The rate is therefore beyond
-  --   instantiation HERE rather than merely unreached: this fold PARKS
-  --   the inner nesting in a cell instead of entering it, so the
-  --   squaring the second group is bought against never happens under
-  --   this leaf.  Two levels, one door, no telescope at all.
+  --   need by two rungs -- read as a CLIMB in rungs from the program's
+  --   own size, so what the rows settle is that no second block is
+  --   owed, whatever the charge that buys the first is spelled as.
+  --   Nothing about a `μ` under the door, and nothing about an emission
+  --   the TELESCOPE manufactures, where the layer count is 0 and the
+  --   rungs are bought by `slotsSize` alone.
+  -- RECOVERY: `git show 248bbf8` restores the two harnesses, in
+  --   `Probed/Burst-Mu-Door.agda` and `Probed/Mu-Compose.agda` -- the
+  --   μ-under-a-door family, the composed nesting threaded through the
+  --   EMISSION position, and the liveness rows that say the fold writes
+  --   rather than merely bookkeeping.
   pushBurst-sz-store-outer : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (sl : Slots Γ) (g : Gas) (op : AllOp) (nid : NodeId)
     (b : Closed Γ (obs u)) (κ : Path Γ u t) (id : Id) (now : Tick)
@@ -1433,7 +1465,7 @@ postulate
     (r : Stream Γ (obs u) × Sched Γ × EvalSt e) (S B M : ℕ) → 2 ≤ S →
     Sched.slots sched ≡ sl →
     r ≡ subscribeE g b (thru-outer op nid ↠ κ) id now sched st →
-    iterSize S (muRungsᴺ (muDepthᵉ b) B + suc (layᵉ b) + slotsSize sl) B ≤ M →
+    iterSize S (descRungsᴺ (muDepthᵉ b) B + suc (layᵉ b) + slotsSize sl) B ≤ M →
     all (λ kv → boundedNode M (proj₂ kv))
         (EvalSt.nodes (proj₂ (proj₂ r))) ≡ true →
     (sizeᵉ b ≤ᵇ B) ≡ true →
@@ -1466,11 +1498,11 @@ lay-sub S B M j j′ 2≤S h le =
 -- so the block of rungs the unfoldings bought is common to both sides
 -- and only the layer summand has to shrink.
 muLay-sub : ∀ (S B M d j j′ s : ℕ) → 2 ≤ S → j ≤ j′ →
-  iterSize S (muRungsᴺ d B + j′ + s) B ≤ M →
-  iterSize S (muRungsᴺ d B + j + s) B ≤ M
+  iterSize S (descRungsᴺ d B + j′ + s) B ≤ M →
+  iterSize S (descRungsᴺ d B + j + s) B ≤ M
 muLay-sub S B M d j j′ s 2≤S h le =
-  lay-sub S B M (muRungsᴺ d B + j + s) (muRungsᴺ d B + j′ + s) 2≤S
-    (+-monoˡ-≤ s (+-monoʳ-≤ (muRungsᴺ d B) h)) le
+  lay-sub S B M (descRungsᴺ d B + j + s) (descRungsᴺ d B + j′ + s) 2≤S
+    (+-monoˡ-≤ s (+-monoʳ-≤ (descRungsᴺ d B) h)) le
 
 -- ONE SQUARING, PAID FOR IN RUNGS.  A rung at least doubles, so
 -- `bitsᴺ B` of them carry a bound past `2 ^ bitsᴺ B * B` and
@@ -1485,20 +1517,29 @@ muStep S B 1≤S =
 -- unfolding is descended into at `B * B`, and the leading `bitsᴺ B`
 -- rungs of that block are exactly what carries the bound there -- so
 -- the remaining block, read at the squared bound, is what the recursion
--- inherits.
+-- inherits.  The level's own delivery rungs are left over, and the
+-- descent simply does not spend them: an unfolding delivers nothing by
+-- itself, so dropping them is slack rather than a gap.
 muUnfold-le : ∀ (S B M d L s : ℕ) → 2 ≤ S →
-  iterSize S (muRungsᴺ (suc d) B + L + s) B ≤ M →
-  iterSize S (muRungsᴺ d (B * B) + L + s) (B * B) ≤ M
+  iterSize S (descRungsᴺ (suc d) B + L + s) B ≤ M →
+  iterSize S (descRungsᴺ d (B * B) + L + s) (B * B) ≤ M
 muUnfold-le S B M d L s 2≤S le =
-  ≤-trans (iterSize-mono-s S (muRungsᴺ d (B * B) + L + s) (muStep S B 1≤S))
-    (≤-trans (≤-reflexive (sym (iterSize-+ S (bitsᴺ B) (muRungsᴺ d (B * B) + L + s) B)))
-      (≤-trans (≤-reflexive (cong (λ z → iterSize S z B) (sym eq))) le))
+  ≤-trans (iterSize-mono-s S (descRungsᴺ d (B * B) + L + s) (muStep S B 1≤S))
+    (≤-trans (≤-reflexive (sym (iterSize-+ S (bitsᴺ B) (descRungsᴺ d (B * B) + L + s) B)))
+      (lay-sub S B M (bitsᴺ B + (descRungsᴺ d (B * B) + L + s))
+        (descRungsᴺ (suc d) B + L + s) 2≤S ineq le))
   where
   1≤S : 1 ≤ S
   1≤S = ≤-trans (s≤s z≤n) 2≤S
-  eq : muRungsᴺ (suc d) B + L + s ≡ bitsᴺ B + (muRungsᴺ d (B * B) + L + s)
-  eq = trans (cong (_+ s) (+-assoc (bitsᴺ B) (muRungsᴺ d (B * B)) L))
-             (+-assoc (bitsᴺ B) (muRungsᴺ d (B * B) + L) s)
+  R : ℕ
+  R = descRungsᴺ d (B * B)
+  eq : bitsᴺ B + (R + L + s) ≡ bitsᴺ B + R + L + s
+  eq = sym (trans (cong (_+ s) (+-assoc (bitsᴺ B) R L))
+                  (+-assoc (bitsᴺ B) (R + L) s))
+  ineq : bitsᴺ B + (R + L + s) ≤ descRungsᴺ (suc d) B + L + s
+  ineq = ≤-trans (≤-reflexive eq)
+           (+-monoˡ-≤ s (+-monoˡ-≤ L
+             (+-monoˡ-≤ R (m≤m+n (bitsᴺ B) (B * bitsᴺ B)))))
 
 -- THE TWO TRANSPORTS AT A DOOR, WHICH IS THE ONE CONSTRUCTOR SHAPE THE
 -- THREE CROSSINGS SHARE.  Each charges one layer and one syntax node
@@ -1506,8 +1547,8 @@ muUnfold-le S B M d L s 2≤S le =
 -- named once here rather than spelled out at three arms that would
 -- then drift apart.
 crossLe : ∀ (S B M d L s : ℕ) → 2 ≤ S →
-  iterSize S (muRungsᴺ d B + suc L + s) B ≤ M →
-  iterSize S (muRungsᴺ d B + L + s) B ≤ M
+  iterSize S (descRungsᴺ d B + suc L + s) B ≤ M →
+  iterSize S (descRungsᴺ d B + L + s) B ≤ M
 crossLe S B M d L s 2≤S le =
   muLay-sub S B M d L (suc L) s 2≤S (n≤1+n L) le
 
@@ -1576,20 +1617,20 @@ crossSz a B hb = sz-sub a (suc a) B (n≤1+n a) hb
 --   with the crossing bracketed on both sides so what fails is the
 --   multiplicity and not the door or the arithmetic.
 
--- AND ITS OWN CONCLUSION IS FALSE TODAY, WHICH IS A FACT ABOUT THE
--- CHARGE RATHER THAN ABOUT ANY ARM.  The body reduces to leaves and
--- one of them is false, so this statement inherits that without a
--- clause of it being individually wrong -- the retroactive shape, and
--- the reason the assembly is worth instantiating at all.
--- The axis is the ARRIVAL count: `descChg` sums an unfolding depth and
--- a layer depth, neither of which a synchronous run moves, so the
--- exponent is fixed while a step that wraps its accumulator doubles
--- the cell per value delivered.  Nothing here can be repaired by
--- moving the recursion; the charge has to learn to count deliveries.
--- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- the same witness
---   that kills the `scanᵉ` leaf, entered against this statement
---   directly, since the two bounds are spelled identically and this
---   program is an ordinary closed term.
+-- AND THIS IS THE ASSEMBLY WHOSE OWN CONCLUSION WAS INSTANTIATED, not
+-- merely its leaves -- which is why the charge under it counts
+-- deliveries at all.  A real body over postulated leaves computes
+-- exactly as a postulate does, so a witness could be entered against
+-- it directly, and one was: the defect was the CURRENCY the body and
+-- its leaves share rather than any clause of either, so no arm of the
+-- recursion could have been moved to repair it.  That is the
+-- retroactive shape, and the reason an assembly is worth instantiating
+-- even while it typechecks.
+-- REFUTED: `Refuted.Subscribe-Store-Scan-Arrivals` -- the DEPTH-ONLY
+--   denomination this bound replaces, by the same witness that kills
+--   the `scanᵉ` leaf, entered against this statement directly since the
+--   two bounds were spelled identically and this program is an
+--   ordinary closed term.
 subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   (sl : Slots Γ) (g : Gas) (o : Closed Γ u) (κ : Path Γ u t)
   (id : Id) (now : Tick)
@@ -1601,11 +1642,16 @@ subscribeE-sz-store : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
   all (λ kv → boundedNode M (proj₂ kv))
       (EvalSt.nodes (proj₂ (proj₂ (subscribeE g o κ id now sched st))))
     ≡ true
-subscribeE-sz-store sl g (input i) κ id now sched st S B M 2≤S slEq le hns hb
+subscribeE-sz-store {Γ = Γ} {u = u} sl g (input i) κ id now sched st S B M
+                    2≤S slEq le hns hb
   with Sched.slots sched i
 ... | shared d =
       subscribeSharedSlot-sz-store sl g i d κ id now sched st S B M
-        2≤S slEq le hns hb
+        2≤S slEq
+        (lay-sub S B M (slotsSize sl)
+          (descChg {Γ = Γ} (obs u) B (input i) + slotsSize sl) 2≤S
+          (m≤n+m (slotsSize sl) (descChg {Γ = Γ} (obs u) B (input i))) le)
+        hns hb
 ... | scripted (hot _) with memberSource (toℕ i) (EvalSt.completedSources st)
 ...   | true  = hns
 ...   | false = hns
@@ -1703,7 +1749,7 @@ subscribeE-sz-store sl (gs fuel) (μᵉ body) κ id now sched st S B M
           (B * B) ≤ M
   le′ = subst (λ z → iterSize S (z + slotsSize sl) (B * B) ≤ M)
           (sym (cong₂ _+_
-                 (cong (λ d → muRungsᴺ d (B * B)) (muDepth-unfoldμ body))
+                 (cong (λ d → descRungsᴺ d (B * B)) (muDepth-unfoldμ body))
                  (lay-unfoldμ body)))
           (muUnfold-le S B M (muDepthᵉ body) (layᵉ body) (slotsSize sl) 2≤S le)
 

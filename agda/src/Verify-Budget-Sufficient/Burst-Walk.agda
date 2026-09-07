@@ -107,11 +107,11 @@ open import Rx.Evaluator
   switchᵒ; exhaustᵒ; NodeId; NodeState; takeDispatch; takeVals; cutThrough; lookupNode;
   pathHasNode; memberSource; scanVals; innerFinish; mergeAllDrain; aliveThroughᶠ; mergeAllBump;
   switchKill; thruConsume; thruWalk; thruWrap; scan-st; take-st; hasRoom; mergeAll-st;
-  switch-st; exhaust-st)
+  switch-st; exhaust-st; shareAdmit)
 open import Rx.Slots using (Slots; slotsSize)
 
 open import Verify-Budget-Sufficient.Delivery-Walk
-  using (Walk-Hyps; module Walk; regP?)
+  using (Walk-Hyps; module Walk; regP?; chP?-const)
 open import Verify-Budget-Sufficient.Deliveries using
   (delivN)
 open import Verify-Budget-Sufficient.Measures using
@@ -3384,7 +3384,9 @@ module BurstWalk
   burstH = record
     { OK        = OKB {e = e} c sl Ψ
     ; Pb        = PbB c Ψ
-    ; Vb        = VbB c sl Ψ
+    -- PATH-BLIND: `VbB` bounds a payload's size and function caps, neither
+    -- of which depends on the chain the payload is travelling
+    ; Vb        = λ _ → VbB c sl Ψ
     ; Eb        = EbB c sl Ψ
     ; Bb        = BbB c sl Ψ
     -- THE GAS HOOK, SPENT (the anchor ruling, `cascadeGo-nodry`'s header): the
@@ -3462,10 +3464,13 @@ module BurstWalk
                     ∧-intro (pathSz?-widen p (proj₁ (frameStep-mono-j c 2≤S le))
                               (pbC J p h))
                             (pbΨ J p h)
-    ; v-widen   = λ {J} {J′} le vs h →
+    ; v-widen   = λ {J} {J′} le _ vs h →
                     ∧-intro (valsCaps?-lvl _ _ sl vs (frameStep-mono-j c 2≤S le)
                               (vbC J vs h))
                             (vbΨ J vs h)
+    ; v-fan     = λ J i vs _ st _ h →
+                    chP?-const (VbB c sl Ψ J vs)
+                      (shareAdmit i (EvalSt.registry st)) h
     ; ok-reg    = λ J sched st ok →
                     capsOK?-count (frameStep J c) sched st (proj₂ (proj₁ ok))
     ; ok-cons   = λ J rid sched st ok →
@@ -3577,7 +3582,8 @@ cascadeGo-burst-nodry siC ifc {n = n} {e = e} id a chains sched st
          , regP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ)
              (EvalSt.registry st) (capsOK?-regs c sched st inv) rΨ )
          (chP?-∧ (pathSz? (Caps.cSize (frameStep 0 c))) (pathBΨ? Ψ) chains pS pΨ)
-         (∧-intro (∧-intro (∧-intro vC refl) refl) (∧-intro vΨ refl))
+         (chP?-const (VbB c sl Ψ 0 (arrVal a ∷ [])) chains
+            (∧-intro (∧-intro (∧-intro vC refl) refl) (∧-intro vΨ refl)))
          hC hD
 
   D = delivN st (proj₂ (proj₂ cg))

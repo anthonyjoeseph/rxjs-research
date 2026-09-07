@@ -8,7 +8,8 @@
 module Verify-Budget-Sufficient.Walk-Factor where
 
 open import Data.Bool using (Bool; true; false; _∧_)
-open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_)
+open import Data.Nat using (ℕ; suc; _+_; _*_; _^_; _≤_; z≤n; s≤s; _≤ᵇ_; _<ᵇ_)
+open import Data.Fin using (toℕ)
 open import Data.Nat.Properties using
   (≤-refl; ≤-trans; ≤-reflexive; ≤ᵇ⇒≤; +-mono-≤; +-monoˡ-≤; +-assoc; *-monoˡ-≤;
    *-identityˡ; *-distribʳ-+; m≤m+n; m≤n+m; m^n>0; ^-distribˡ-+-*; ^-monoʳ-≤;
@@ -253,6 +254,29 @@ pathRoots : ∀ {n} {Γ : Ctx n} {s t} → Path Γ s t → Bool
 pathRoots root           = true
 pathRoots (share-sink _) = false
 pathRoots (_ ↠ p)        = pathRoots p
+
+-- AND WHERE IT ANSWERS SINK, THE PRICE IS THE TELESCOPE'S OWN INDEX
+-- AND NOT A CAP.  A shared slot's definition may name only inputs
+-- BELOW its own index, so a registration whose continuation ends at
+-- some slot's sink was minted subscribing an input that slot's
+-- definition contains, and its source is strictly under that slot.
+-- Reading that off one entry is what this decides, and the reading is
+-- the whole reason the fan's escalation is bounded by the program: a
+-- sink hop strictly climbs, so no chain is re-entered through its own
+-- sink and the hop count cannot exceed the slot count.
+--
+-- AND IT MENTIONS NO CAP, WHICH IS WHAT LETS IT BE CARRIED WHERE THE
+-- CAP-DENOMINATED PREDICATES CANNOT.  The elimination that closed the
+-- flat carried field, and the indexed shape under it, turns on those
+-- predicates WEAKENING as their cap grows -- so a receipt taken at an
+-- entry cap is useless at a descent that has stepped.  Nothing here
+-- moves with a cap at all: source and sink are both fixed when the
+-- entry is minted, so a receipt survives every step the instant takes
+-- and the direction the elimination turns on does not exist.
+sinkAbove? : ∀ {n} {Γ : Ctx n} {s t} → ℕ → Path Γ s t → Bool
+sinkAbove? src root           = true
+sinkAbove? src (share-sink j) = src <ᵇ toℕ j
+sinkAbove? src (_ ↠ p)        = sinkAbove? src p
 
 pathΦSz-root : ∀ {n} {Γ : Ctx n} {s t} (B : ℕ) (p : Path Γ s t) →
   pathRoots p ≡ true → pathSz? B p ≡ true →

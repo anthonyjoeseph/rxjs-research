@@ -45,20 +45,32 @@ open import Data.Bool using (Bool; true; false)
 open import Data.Bool.ListAction using (all)
 open import Data.Empty using (⊥)
 open import Data.List using (List; []; _∷_)
-open import Data.Nat using (ℕ; _≤_; _≤ᵇ_; s≤s; z≤n)
+open import Data.Nat using (ℕ; _≤_; _≤ᵇ_; _⊔_; s≤s; z≤n)
 open import Data.Maybe using (Maybe; nothing)
 open import Data.Product using (proj₁; proj₂)
 open import Data.Fin using () renaming (zero to fzero)
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
 
 open import Rx.Prim using (Gas; g0; gasPad; Tick; Id)
-open import Rx.Exp using (Ctx; Closed; Val; obs; input; sizeᵉ)
+open import Rx.Exp using (Ctx; Closed; Val; input; sizeᵉ)
 open import Rx.Evaluator using (Sched; EvalSt; Path; root; NodeId;
   mergeAll-st; installNode; mergeAllDrain; sched-init; st-init; iterSize)
 open import Verify-Budget-Sufficient.Measures using (boundedNode)
-open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?; descChgˢ)
+open import Rx.Layer-Count using (layᵉ)
+open import Verify-Budget-Sufficient.Regs-Nest-Walk using (valsSz?)
 open import Refuted.Frame-Step-Size-Slot
   using (Pw; chnG; f≡t; Γ₂; sl₂; e₂; Γ₃; sl₃; e₃)
+
+----------------------------------------------------------------------
+-- THE READING UNDER TEST, WRITTEN OUT.  One rung per layer of the
+-- deepest parked program, which is the charge the statement below
+-- spends.  Spelling it here rather than importing whichever function
+-- the tower carries today is what lets these rows go on refuting the
+-- READING after that function moves.
+----------------------------------------------------------------------
+layMaxˢ : ∀ {n} {Γ : Ctx n} {s} → List (Closed Γ s) → ℕ
+layMaxˢ []      = 0
+layMaxˢ (o ∷ q) = layᵉ o ⊔ layMaxˢ q
 
 ----------------------------------------------------------------------
 -- THE STATEMENT, WRITTEN OUT RATHER THAN IMPORTED.  Importing the
@@ -72,7 +84,7 @@ MergeAllDrainSz = ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {s}
   (sched : Sched Γ) (st : EvalSt e) (S B : ℕ) → 2 ≤ S →
   all (λ kv → boundedNode B (proj₂ kv)) (EvalSt.nodes st) ≡ true →
   all (λ o → sizeᵉ o ≤ᵇ B) q ≡ true →
-  valsSz? (iterSize S (descChgˢ (obs s) B q) B)
+  valsSz? (iterSize S (layMaxˢ q) B)
     (proj₁ (mergeAllDrain sf allNid κ id now lim act q sched st)) ≡ true
 
 ----------------------------------------------------------------------
@@ -104,7 +116,7 @@ out₂ = proj₁ (mergeAllDrain {e = e₂} (gasPad 64 g0) 0 root 0 0
 -- layers the charge is allowed to see.
 figures₂ : List ℕ
 figures₂ = sizeᵉ (chnG {Γ = Γ₂} 12)
-         ∷ descChgˢ {Γ = Γ₂} (obs (Pw 12)) 51 q₂
+         ∷ layMaxˢ q₂
          ∷ iterSize 51 0 51 ∷ []
 
 figures₂≡ : figures₂ ≡ 51 ∷ 0 ∷ 51 ∷ []
@@ -120,7 +132,7 @@ prem₂ = refl
 
 row₂ : Bool
 row₂ = valsSz? {Γ = Γ₂} {s = Pw 12}
-         (iterSize 51 (descChgˢ {Γ = Γ₂} (obs (Pw 12)) 51 q₂) 51)
+         (iterSize 51 (layMaxˢ q₂) 51)
          out₂
 
 row₂≡false : row₂ ≡ false
@@ -153,7 +165,7 @@ out₃ = proj₁ (mergeAllDrain {e = e₃} (gasPad 64 g0) 0 root 0 0
 
 figures₃ : List ℕ
 figures₃ = sizeᵉ (chnG {Γ = Γ₃} 13)
-         ∷ descChgˢ {Γ = Γ₃} (obs (Pw 13)) 55 q₃
+         ∷ layMaxˢ q₃
          ∷ iterSize 55 0 55 ∷ []
 
 figures₃≡ : figures₃ ≡ 55 ∷ 0 ∷ 55 ∷ []
@@ -167,7 +179,7 @@ prem₃ = refl
 
 row₃ : Bool
 row₃ = valsSz? {Γ = Γ₃} {s = Pw 13}
-         (iterSize 55 (descChgˢ {Γ = Γ₃} (obs (Pw 13)) 55 q₃) 55)
+         (iterSize 55 (layMaxˢ q₃) 55)
          out₃
 
 row₃≡false : row₃ ≡ false

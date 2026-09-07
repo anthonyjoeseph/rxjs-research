@@ -4,16 +4,16 @@
 --
 -- TARGET: subscribeSharedSlot-sz-store @048f7d
 --
--- WHAT EVERY STORE ROW SO FAR LEFT OPEN.  This charge is the deepest
--- parked program's LAYERS joined over the queue, plus the telescope.
+-- WHAT EVERY STORE ROW SO FAR LEFT OPEN.  This charge reads the
+-- deepest parked program joined over the queue, plus the telescope.
 -- Every witness at this half has parked a program written out, where
--- the layers are the charge and the summand is a rounding.  A bare
+-- that program's own layers are what the first summand reads.  A bare
 -- reference is the other shape: its layer count is nought however
--- deep the definition behind it goes, so the first summand
--- contributes nothing at all and the second carries the whole climb.
--- The value half is read at that shape already; the table has never
--- been, and a summand that reached the delivered list without
--- reaching what the run WRITES would show nowhere else.
+-- deep the definition behind it goes, so the first summand sees
+-- nothing of the run and the telescope is what has to reach it.  The
+-- value half is read at that shape already; the table has never been,
+-- and a summand that reached the delivered list without reaching what
+-- the run WRITES would show nowhere else.
 --
 -- THE ROWS.  A single shared slot holding a duplication chain under a
 -- scan that reifies what it sees, and a door whose parked queue is
@@ -24,29 +24,26 @@
 -- depths, because one more rung behind the reference doubles the
 -- emission while moving the charge by four units of slot syntax.
 --
--- WHAT THEY FIND.  The parked layer count is nought at both depths
--- and the charge moves with the slot alone.  The table the frame
--- leaves carries the scan's accumulator, which is the emission
--- reified, so it fails the telescope-free reading -- the premise's own
--- bound climbed by nothing, which is what the charge collapses to
--- when the summand is dropped -- and holds at the stated one.  The
--- reference is legible from the schedule the frame is handed, and it
--- is legible there for the WRITTEN table and not merely for the
+-- WHAT THEY FIND.  The parked layer count is nought at both depths,
+-- so nothing the first summand reads moves with the run.  The table
+-- the frame leaves carries the scan's accumulator, which is the
+-- emission reified, and it fits the stated sum at both depths -- so
+-- the reference is legible from the schedule the frame is handed, and
+-- it is legible there for the WRITTEN table and not merely for the
 -- delivered list.
 --
 -- WHAT THE ROWS DO NOT BUY, and the first half is this file's honest
 -- residue.  The clearance is not tight and cannot be: four units of
 -- slot syntax per doubling of emission against a rung that admits
--- size geometrically means the summand dominates by construction once
--- it is in the charge at all, so these rows say the telescope REACHES
--- the table, never that its size is right.  And beyond that: one slot
--- in the telescope, one entry in the queue, so nothing about a max
--- joining a reference against a written-out program; and no arm other
--- than the drain.
+-- size geometrically means the charge dominates by construction, so
+-- these rows say the telescope REACHES the table, never that its size
+-- is right.  And beyond that: one slot in the telescope, one entry in
+-- the queue, so nothing about a max joining a reference against a
+-- written-out program; and no arm other than the drain.
 -- ══════════════════════════════════════════════════════════════════
 module Probed.Parked-Slot-Store where
 
-open import Data.Bool using (Bool; true; false)
+open import Data.Bool using (Bool; true)
 open import Data.Bool.ListAction using (all)
 open import Data.List using (List; []; _∷_; length)
 open import Data.List.Relation.Unary.Any using (here)
@@ -141,9 +138,11 @@ postᴿ = proj₂ (proj₂ (proj₂ (proj₂
 -- THE CHARGES, READ OFF THE STATES THE ROWS STAND AT.
 ----------------------------------------------------------------------
 
--- LOAD-BEARING: the first and fourth entries say the queue's own
--- layers contribute NOTHING at either depth, so the charge between the
--- two rows moves with the slot alone -- which is what makes the sweep
+-- LOAD-BEARING: the queue's own LAYERS contribute nothing at either
+-- depth -- a parked reference has none -- so the first and fourth
+-- entries are the delivery block alone, read at each row's own bound.
+-- What separates the two rows is therefore the slot behind the
+-- reference and the bound it forces, which is what makes the sweep
 -- measure-side rather than an axis that cannot fail.
 slotStoreFigures : List ℕ
 slotStoreFigures = parkedChgAt 59 0 (EvalSt.nodes stᴾ)
@@ -153,7 +152,7 @@ slotStoreFigures = parkedChgAt 59 0 (EvalSt.nodes stᴾ)
                  ∷ slotSize (slᴿ fz)
                  ∷ []
 
-slotStoreFigures≡ : slotStoreFigures ≡ 0 ∷ 59 ∷ 1 ∷ 0 ∷ 63 ∷ []
+slotStoreFigures≡ : slotStoreFigures ≡ 354 ∷ 59 ∷ 1 ∷ 378 ∷ 63 ∷ []
 slotStoreFigures≡ = refl
 
 -- LOAD-BEARING: it is what says the run reached the slot's definition
@@ -170,23 +169,27 @@ slotStoreNodes≡ = refl
 -- and the store premise reads a queue holding it.
 ----------------------------------------------------------------------
 
--- LOAD-BEARING: entries one and three are the charge with the summand
--- DROPPED, which at a parked reference is the premise's own bound
--- climbed by nothing; a table the telescope failed to reach would
--- report `false` four times.
+-- LOAD-BEARING: each fails for any level the resolved slot's stored
+-- emission outruns, and the two stand one rung apart behind the
+-- reference -- so a run that declined to resolve it would leave the
+-- door's own cell and both rows would hold for a reason the telescope
+-- had nothing to do with.
+-- DEAD ROUTE: separating the TELESCOPE summand here, by reading the
+--   same tables at the charge with the summand dropped.  At a parked
+--   reference the layers are nought, so that reading used to be the
+--   premise's bound climbed by nothing and it failed; the charge now
+--   carries a delivery block geometric in the bound, which clears
+--   these tables on its own, and both rows hold either way.  What
+--   separates the summand is instead the reach witnesses of the
+--   cascade file, which are taken in slot SIZES and never through the
+--   charge.
 slotStoreRows : List Bool
 slotStoreRows =
-    all (λ kv → boundedNode (iterSize 59 (parkedChgAt 59 0 (EvalSt.nodes stᴾ)) 59)
-                  (proj₂ kv))
-        (EvalSt.nodes postᴾ)
-  ∷ all (λ kv → boundedNode
+    all (λ kv → boundedNode
                   (iterSize 59 (parkedChgAt 59 0 (EvalSt.nodes stᴾ)
                                  + slotsSize slᴾ) 59)
                   (proj₂ kv))
         (EvalSt.nodes postᴾ)
-  ∷ all (λ kv → boundedNode (iterSize 63 (parkedChgAt 63 0 (EvalSt.nodes stᴿ)) 63)
-                  (proj₂ kv))
-        (EvalSt.nodes postᴿ)
   ∷ all (λ kv → boundedNode
                   (iterSize 63 (parkedChgAt 63 0 (EvalSt.nodes stᴿ)
                                  + slotsSize slᴿ) 63)
@@ -194,7 +197,7 @@ slotStoreRows =
         (EvalSt.nodes postᴿ)
   ∷ []
 
-slotStoreRows≡ : slotStoreRows ≡ false ∷ true ∷ false ∷ true ∷ []
+slotStoreRows≡ : slotStoreRows ≡ true ∷ true ∷ []
 slotStoreRows≡ = refl
 
 ----------------------------------------------------------------------

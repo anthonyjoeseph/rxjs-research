@@ -215,29 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **A CHARGE THAT COUNTS DELIVERIES, which is what the refuted arrival
-  axis leaves owed.** `descChg` sums an unfolding depth and a layer
-  depth, so nothing in it moves when a synchronous source fires many
-  values, while a step wrapping its accumulator doubles the cell per
-  arrival. The witness carries up from the `scanᵉ` leaf to
-  `subscribeE-sz-store` itself, so a body the tower builds on concludes
-  something false — why the currency and not the arm is what moves. No
-  delivery measure exists to reach for, and the commit decides between
-  minting one and spending the seed: a synchronous run delivers no more
-  than its source spells, so `B` may already bound it, at a tower's cost
-  the consumers must afford. Then both bounds are restated over it.
-
-- **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
-  rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
-  `sink-fan-sink` and both `innerΦ-*-fit` arms end at the same residue
-  written four ways: the walk reads the node table and the registry and
-  carries no conjunct about either, so every route threading one down is
-  refused by the store's own growth toward the NEXT cap. The commit puts
-  the missing conjunct on the walk's invariant record, which obliges
-  every producer where a hypothesis obliges only today's caller, and
-  reads it at the fan's reach. Whether ONE field serves all four is what
-  decides if this is one statement or four; a crossing there is a
-  finding about the walk rather than about a row.
+- **GETTING THE BURST FACE BACK INTO THE DEV LOOP.** The chain index is
+  in and its SHAPE risk is discharged, `chP?-const` carrying every face
+  with nothing to say about the chain. What is left is a tooling loss,
+  not an attribution: the measurement that was to separate the two cost
+  candidates KILLED BOTH, and is recorded dead in the field's own
+  header. So the face's only surviving loop is the gate, and the commit
+  SPLITS it at its non-cycle boundaries — safe by the loop's own
+  criterion, since it holds no mutual cycle — because nothing else on
+  this face, the next measurement and the mint's fifth site included, is
+  payable until it measures in seconds again.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
@@ -251,6 +238,18 @@ does not fit is a finding about the shared statement, not about the head.
   right summand, not the sum; none promotes the row off a coverage gap
   that currently reads as safe.
 
+- **WHETHER `fan-regsSz` IS STILL THE FAN'S SUPPLIER AT ALL.** It is
+  the last cap-denominated receipt the sink arm consumes, and the four
+  dead routes under it close every re-denomination of the cap it names.
+  What none of them asked is whether the arm needs it: the size
+  receipt buys a LENGTH through `pathSz?-len`, the length lands in the
+  Φ leaf's exponent, and the stratification receipt now bounds the same
+  climb by the slot count without naming a cap. The commit puts the two
+  side by side at the leaf and either drops the size premise from
+  `sink-fan-sink` — retiring the row's only consumer, which is what the
+  four dead routes leave as the escape — or records why the exponent
+  still wants a length the telescope cannot give.
+
 ### The ledger
 
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
@@ -261,17 +260,17 @@ does not fit is a finding about the shared statement, not about the head.
 - **`subscribeE-sz`** (Regs-Nest-Walk) — FALSITY, `REFUTED, PROBED`: what ONE
   subscription delivers, in its charge plus its telescope. The WHOLE value side
   is a body over it. A max is refuted at a chain of eleven; a slot named twice
-  is free; the block reaches three nestings, the last twice-squared.
+  is free; the delivery block clears ONE nesting and no deeper level computes.
 - **`pushBurst-sz-store-outer`** (Regs-Nest-Walk) — FALSITY,
-  `REFUTED, PROBED×3`: the burst a crossing door pushes back through itself,
-  keyed on the source program since an arbitrary burst is unbounded. A
-  duplication chain buys no rung; a handed-out `μ` is charged at one nesting
-  and at two; the rate is beyond a fold that parks them.
+  `REFUTED, DEAD ROUTE, PROBED, RECOVERY`: the burst a crossing door pushes
+  back through itself, keyed on the source program since an arbitrary burst is
+  unbounded. A duplication chain buys no rung; the climb rows say no second
+  block is owed, read in rungs rather than through the charge.
 - **`subscribeE-sz-store-scan`** (Regs-Nest-Walk) — FALSITY,
   `REFUTED, DEAD ROUTE, PROBED×4`: the reified seed and the cell each arrival
-  rewrites. REFUTED on the arrival count — a wrapping step doubles the cell
-  where a depth-only charge stays fixed — and the same witness carries up to
-  the assembly consuming it, so the currency is what moves.
+  rewrites. The arrival count REFUTED the depth-only denomination — a wrapping
+  step doubles the cell where unfoldings and layers hold fixed — and the charge
+  now buys a delivery block at the SIZE bound.
 - **`subscribeSharedSlot-sz-store`** (Regs-Nest-Walk) — FALSITY,
   `DEAD ROUTE, PROBED×2`: the definition behind a reference, whose entire climb
   is the telescope summand — `input` charges nought, so no program reading
@@ -279,8 +278,12 @@ does not fit is a finding about the shared statement, not about the head.
   maximum is closed to instantiation.
 - **`sink-fan-sink`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE`: the
   potential at an admitted chain that ends at a SECOND hand-over. Its
-  escalation is PROGRAM-bounded after all — hops climb the stratified telescope
-  — so the residue is the arbitrary chain, owed as a carried invariant.
+  escalation is PROGRAM-bounded: hops climb the stratified telescope. The chain
+  now arrives carrying its `sinkAbove?` reading, so what is open is the MINT.
+- **`walk-share-strat`** (Part7/Depth-Fit) — FALSITY, `REFUTED`: every
+  registered chain ends strictly ABOVE the input it was minted subscribing.
+  The only receipt here naming no cap, which is what makes it carryable; the
+  free form dies at one `register`, so it is owed at the mint.
 - **`fan-regsSz`** (Part7/Depth-Fit) — FALSITY, `REFUTED, DEAD ROUTE×4`: the
   registry's own size receipt at the PROGRAM's cap. NO CAP PRICES A REGISTERED
   CHAIN: the stepped cap the receipt names is a blowup of the depth budget any

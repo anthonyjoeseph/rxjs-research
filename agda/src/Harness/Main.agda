@@ -361,18 +361,18 @@ smallRow k = "small layer " ++ show k
 ------------------------------------------------------------------
 -- SERIES — WHERE A SINK HANDS ON TO, AND HOW FAR THAT CAN GO.
 --
--- TARGET: sink-fan-sink @d156ce
+-- TARGET: sink-fan-sink @3b3b85
 --
--- WHAT IS OWED.  The arm's refutation and its header rest on one claim
--- about the MACHINE rather than about the arithmetic: that the hop
--- count is bounded by nothing but the dispatch gas, since `shareAdmit`
--- filters on the source and the element type and never on whether a
--- chain has already been delivered to.  If that is right, the leaf's
--- price has to dominate itself times a frame product an unbounded
--- number of times and no denomination survives.  What no row anywhere
--- reaches is whether a RUN can put a second hand-over under a sink at
--- all, and how deep hand-overs can nest, so the rows here read the
--- registry a real subscribe leaves and walk it.
+-- WHAT IS OWED.  The arm now takes its stratification reading as a
+-- PREMISE -- every registered chain ends strictly above the input it
+-- was minted subscribing -- and a premise nothing instantiates is
+-- worth no more than the unconditional statement it replaced.  So what
+-- these rows are evidence for is that a REAL run satisfies it: that a
+-- subscribe leaves a registry with hand-overs in it at all, that every
+-- one of them is stratified, and that the hop count they generate is
+-- bounded by the program rather than by whatever fuel a walk is
+-- handed.  The rows read the registry a real subscribe leaves and walk
+-- it; they say nothing about the arithmetic the arm then spends.
 --
 -- AND THE DECIDING COMPARISON IS ACROSS THE FUEL, NOT INSIDE ONE RUN.
 -- A hop walk needs a fuel to be total, so any single depth is
@@ -382,14 +382,22 @@ smallRow k = "small layer " ++ show k
 -- last of them four times the slot count.
 --
 -- WHAT WOULD MAKE THEM FAIL.  A registry entry whose source is not
--- strictly below the slot its chain ends at -- the self-re-entry the
--- refutation's own witness uses, a chain from source zero terminating
--- at `share-sink` zero -- or a hop depth that grows when only the fuel
+-- strictly below the slot its chain ends at -- which is exactly a
+-- `sinkAbove?` of false, the self-re-entry `Refuted.Fan-Chain-Registry`
+-- builds by hand -- or a hop depth that grows when only the fuel
 -- does.  Both are read off a run rather than constructed, and the
 -- program is built to PRODUCE hand-overs: two shared slots, each
 -- defined over the one below it, and a root that subscribes all three,
 -- so a registry with no sink terminal at all would be the degenerate
 -- reading and is visible in the census row.
+--
+-- WHAT THEY DO NOT REACH, and it is the half the reading guards
+-- rather than asserts: a MINTED source.  Every slot here is hot or
+-- shared, so every entry the census prints is slot-sourced, and the
+-- arm where a cold subscribe registers a fresh source under an
+-- enclosing share's sink appears in no row.  That arm is carried by
+-- `srcFloor?` and not by anything measurable here, so the gap is a
+-- statement of where these rows stop and not a hole in the reading.
 --
 -- ⚠ measured-not-rechecked, like every row in this module.
 ------------------------------------------------------------------

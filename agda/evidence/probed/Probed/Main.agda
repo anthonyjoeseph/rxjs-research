@@ -130,14 +130,7 @@ open import Probed.Subscribe-Inner-Doors
          tieDoorSwitch; tieDoorExhaust)
 
 open import Probed.Subscribe-Mu-Blocks
-  using (figures≡; delivered≡; crossRows≡; deepRows≡; thirdFigures≡;
-         thirdRows≡; tieMu; tieNest; tieThird)
-
-open import Probed.Burst-Mu-Door
-  using (figures≡; liveness≡; blindRows≡; nowRows≡; premNow; tieDoorMu)
-
-open import Probed.Mu-Compose
-  using (figures≡; liveness≡; blindRows≡; rateRows≡; premNow; tieCompose)
+  using (figures≡; delivered≡; crossRows≡; tieMu)
 
 open import Probed.Slot-Telescope-Sum
   using (figures≡; delivered≡; telescopeRows≡; tieTelescope)
