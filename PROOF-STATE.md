@@ -215,17 +215,29 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **THE CARRIED STORE PREDICATE FOUR ROWS ARE ALL OWED, and a field
-  rather than a hypothesis is what it has to be.** `walk-share-nestOK`,
-  `sink-fan-sink` and both `innerΦ-*-fit` arms end at the same residue
-  written four ways: the walk reads the node table and the registry and
-  carries no conjunct about either, so every route threading one down is
-  refused by the store's own growth toward the NEXT cap. The commit puts
-  the missing conjunct on the walk's invariant record, which obliges
-  every producer where a hypothesis obliges only today's caller, and
-  reads it at the fan's reach. Whether ONE field serves all four is what
-  decides if this is one statement or four; a crossing there is a
-  finding about the walk rather than about a row.
+- **STRATIFICATION AT THE MINT, WHERE THE FOUR-ROW OBSTACLE LEAVES
+  IT.** `sink-fan-sink`'s escalation is program-bounded: sink hops
+  climb the slot telescope, so no chain re-enters its own sink and the
+  count is capped by the slot count — a price that is NOT a cap, which
+  is what this neighbourhood is short of. Asserting it at the READ is
+  dead, one `register` killing that and `fan-regsSz` alike, so it is
+  owed at the mint — and the mint is FOUR obligations. A slot-sourced
+  registration wants the telescope carried down the subscribe descent;
+  a minted-sourced one wants a floor on the sched's next source that
+  nothing carries; a delivered inner reaches the input arm under
+  syntax the telescope never saw. The commit states four, wires one.
+
+- **WHAT PRICES A REGISTERED CHAIN, since no cap does and the flat
+  potential is dead.** `fan-regsSz` and `scanΦ-fit` are one question
+  written twice: the stepped cap the receipt names is a blowup of the
+  depth budget any Φ pricing must fit under, and a flat per-instant
+  potential cannot dominate a count exponential in itself. So the
+  residue is a MECHANISM and not a denomination, so grinding either
+  row spends effort on a refuted shape. The leg above supplies the one
+  candidate price that is not a cap — the slot count, read out of the
+  registry where the wall stands — so this commit spends it, and both
+  rows are restated over it together, a pricing serving one and not
+  the other not being it.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
@@ -238,18 +250,6 @@ does not fit is a finding about the shared statement, not about the head.
   in rather than the table's maximum. A crossing there restates the
   right summand, not the sum; none promotes the row off a coverage gap
   that currently reads as safe.
-
-- **WHAT PRICES A REGISTERED CHAIN, since no cap does and the flat
-  potential is dead.** `fan-regsSz` and `scanΦ-fit` are one question
-  written twice: the stepped cap the receipt names is a blowup of the
-  depth budget any Φ pricing must fit under, and a flat per-instant
-  potential cannot dominate a count exponential in itself. So the
-  residue is a MECHANISM and not a denomination, so grinding either
-  row spends effort on a refuted shape. The commit picks the pricing:
-  the store's exit-index factor is the one affording ceiling on offer
-  and it was priced in a refuted width, so the choice is re-pricing it
-  or finding a second. Both rows are then restated over whichever
-  lands, since a pricing serving one and not the other is not it.
 
 ### The ledger
 
