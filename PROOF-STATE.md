@@ -215,17 +215,17 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **WHAT PRICES A REGISTERED CHAIN, since no cap does and the flat
-  potential is dead.** `fan-regsSz` and `scanΦ-fit` are one question
-  written twice: the stepped cap the receipt names is a blowup of the
-  depth budget any Φ pricing must fit under, and a flat per-instant
-  potential cannot dominate a count exponential in itself. So the
-  residue is a MECHANISM and not a denomination, so grinding either
-  row spends effort on a refuted shape. The leg above supplies the one
-  candidate price that is not a cap — the slot count, read out of the
-  registry where the wall stands — so this commit spends it, and both
-  rows are restated over it together, a pricing serving one and not
-  the other not being it.
+- **THE SLOT-SOURCED MINT, WHICH IS THE ONE OBLIGATION LEFT ON
+  `walk-share-strat`.** Two of the three the sink leaf enumerates are
+  now spent: the minted-source arm is the reading's own guard, carried
+  by `srcFloor?`, and the delivered inner is a different invariant.
+  What is left is the descent: a share's def may name only inputs below
+  its index, `inputsBelowᵉ` is the field that says so, and the
+  subscribe descent does not carry it to the arm that registers. The
+  commit threads it. The risk is SHAPE — the field may not reach that
+  arm at all, a `deferᵉ` body being subscribed under syntax the
+  enclosing def never named — and `Rx.Slot-Hop` is the precedent, its
+  recursion on the slot index resting on the same fact.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
@@ -239,17 +239,17 @@ does not fit is a finding about the shared statement, not about the head.
   right summand, not the sum; none promotes the row off a coverage gap
   that currently reads as safe.
 
-- **THE FIRST MINT OBLIGATION: CARRYING THE TELESCOPE DOWN THE
-  SUBSCRIBE DESCENT.** `walk-share-strat` is now the read-side receipt
-  and the mint side is where it is paid. Three of the four obligations
-  are open; the slot-sourced one is the one a descent can carry,
-  because the continuation's terminal and the expression's inputs meet
-  at the enclosing share's own `inputsBelowᵉ` field and nothing else
-  has to be invented. The commit threads that field through the
-  subscribe descent and discharges the slot-sourced arm, leaving the
-  minted-source floor and the delivered inner stated where they are.
-  Its risk is that the field turns out not to reach the arm that
-  registers, which is a SHAPE finding and not a grind.
+- **WHETHER `fan-regsSz` IS STILL THE FAN'S SUPPLIER AT ALL.** It is
+  the last cap-denominated receipt the sink arm consumes, and the four
+  dead routes under it close every re-denomination of the cap it names.
+  What none of them asked is whether the arm needs it: the size
+  receipt buys a LENGTH through `pathSz?-len`, the length lands in the
+  Φ leaf's exponent, and the stratification receipt now bounds the same
+  climb by the slot count without naming a cap. The commit puts the two
+  side by side at the leaf and either drops the size premise from
+  `sink-fan-sink` — retiring the row's only consumer, which is what the
+  four dead routes leave as the escape — or records why the exponent
+  still wants a length the telescope cannot give.
 
 ### The ledger
 

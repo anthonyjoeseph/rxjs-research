@@ -391,6 +391,14 @@ smallRow k = "small layer " ++ show k
 -- so a registry with no sink terminal at all would be the degenerate
 -- reading and is visible in the census row.
 --
+-- WHAT THEY DO NOT REACH, and it is the half the reading guards
+-- rather than asserts: a MINTED source.  Every slot here is hot or
+-- shared, so every entry the census prints is slot-sourced, and the
+-- arm where a cold subscribe registers a fresh source under an
+-- enclosing share's sink appears in no row.  That arm is carried by
+-- `srcFloor?` and not by anything measurable here, so the gap is a
+-- statement of where these rows stop and not a hole in the reading.
+--
 -- ⚠ measured-not-rechecked, like every row in this module.
 ------------------------------------------------------------------
 

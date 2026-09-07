@@ -2,11 +2,12 @@
 -- pathNestD-step … caps-tick
 module Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit where
 
-open import Data.Bool    using (Bool; true; false; _∧_; if_then_else_)
+open import Data.Bool    using (Bool; true; false; _∧_; _∨_; if_then_else_)
 open import Data.Nat     using (ℕ; zero; suc; pred; _+_; _*_; _^_; _⊔_; _≤_; _≤ᵇ_; _≡ᵇ_; z≤n; s≤s)
 open import Data.Nat.Properties using (*-assoc; ≤ᵇ⇒≤; ≤⇒≤ᵇ; ^-monoʳ-≤; *-monoˡ-≤; *-cancelˡ-≤; ≤-trans; ≤-refl; ≤-reflexive; m≤m+n;
   m≤n+m; n≤1+n; *-identityʳ; *-mono-≤; *-monoʳ-≤; +-monoʳ-≤; +-monoˡ-≤; ⊔-lub; m≤m⊔n; m≤n⊔m;
-  +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡)
+  +-mono-≤; +-suc; +-assoc; ≡ᵇ⇒≡; 1+n≰n)
+open import Data.Fin.Properties using (toℕ<n)
 open import Data.Nat.Solver     using (module +-*-Solver)
 open +-*-Solver using (solve; _:=_; _:+_; _:*_; con)
 open import Data.List    using (List; []; _∷_; _++_; length; foldr)
@@ -1212,10 +1213,9 @@ sink-fan-root {e = e} sl id i p vals hr hz hΦ =
 --   slot-sourced registration wants the telescope carried down the
 --   subscribe descent, since the continuation's terminal and the
 --   expression's inputs meet only at the enclosing share's own
---   `inputsBelowᵉ` field; a minted-sourced one wants a FLOOR on the
---   sched's next source, which starts at the slot count and only
---   climbs and which nothing carries today, and gets the receipt for
---   free once it has one; and an inner subscribe of a DELIVERED
+--   `inputsBelowᵉ` field; a minted-sourced one is FREE, `srcFloor?`
+--   carrying the floor the reading's own guard is stated as, so that
+--   arm is spent rather than owed; and an inner subscribe of a DELIVERED
 --   observable reaches the input arm under syntax the telescope never
 --   saw, so it registers a slot source against a continuation nothing
 --   local relates it to -- a conjunct on the values in flight, which
@@ -1355,14 +1355,35 @@ fan-chain-sz {e = e} sl id i st h =
   shareAdmit-caps (Caps.cSize (capsAt e sl id)) i (EvalSt.registry st) h
 
 -- WHAT THE REGISTRY HOLDS WHEN IT IS READ, IN THE ONE CURRENCY THAT IS
--- NOT A CAP.  Every entry's continuation ends STRICTLY ABOVE the input
--- it was minted subscribing: a shared slot's definition may name only
--- inputs below its own index, so a registration whose path terminates
--- at slot `j`'s sink was minted subscribing something that definition
--- contains, and its source is under `j`.  Read entry by entry off the
--- registry, which is what the fan-out's selection is filtered from.
+-- NOT A CAP.  A SLOT-SOURCED entry's continuation ends STRICTLY ABOVE
+-- the input it was minted subscribing: a shared slot's definition may
+-- name only inputs below its own index, so a registration whose path
+-- terminates at slot `j`'s sink was minted subscribing something that
+-- definition contains, and its source is under `j`.  Read entry by
+-- entry off the registry, which is what the selection is filtered from.
+--
+-- AND THE FLOOR IS A GUARD AND NOT A CONJUNCT, WHICH IS WHAT KEEPS THE
+-- READING TRUE.  The unguarded form -- the climb demanded of EVERY
+-- entry -- is false at a cold slot subscribed from inside a share's
+-- definition: that arm mints a fresh source, `srcFloor?` puts every
+-- minted source at or above the slot count, and the continuation it
+-- registers ends at the enclosing share's sink, which is below it.  So
+-- the climb is asked only of sources the telescope reaches, and a
+-- minted one discharges the disjunct instead of the ordering.  That is
+-- also why the minted arm costs nothing at the mint: `srcFloor?` is
+-- already a carried conjunct of the caps bundle and is exactly this
+-- disjunct, so the obligation is spent where it is established.
 regStrat? : ∀ {n} {Γ : Ctx n} {t} → List (RegId × Source × Chain Γ t) → Bool
-regStrat? = all (λ en → sinkAbove? (proj₁ (proj₂ en)) (proj₂ (proj₂ (proj₂ en))))
+regStrat? {n = n} =
+  all (λ en → (n ≤ᵇ proj₁ (proj₂ en))
+            ∨ sinkAbove? (proj₁ (proj₂ en)) (proj₂ (proj₂ (proj₂ en))))
+
+-- A SLOT INDEX IS UNDER THE FLOOR, which is what makes the guard
+-- vanish on everything admission keeps.
+floorFalse : ∀ {n} (i : Fin n) → (n ≤ᵇ toℕ i) ≡ false
+floorFalse {n} i with n ≤ᵇ toℕ i in eq
+... | false = refl
+... | true  = ⊥-elim (1+n≰n (≤-trans (toℕ<n i) (≤ᵇ⇒≤ n (toℕ i) (T-to eq))))
 
 -- AND THE SELECTION INHERITS IT WITH THE SOURCE PINNED, WHICH COSTS NO
 -- ARGUMENT.  `shareAdmit` keeps an entry only where `sameSource` holds
@@ -1374,14 +1395,15 @@ fan-chain-strat : ∀ {n} {Γ : Ctx n} {t} (i : Fin n)
   regStrat? rs ≡ true →
   all (λ rp → sinkAbove? (toℕ i) (proj₂ rp)) (shareAdmit {t = t} i rs) ≡ true
 fan-chain-strat i [] h = refl
-fan-chain-strat {Γ = Γ} i ((rid , s , (u , p)) ∷ r) h
+fan-chain-strat {n = n} {Γ = Γ} i ((rid , s , (u , p)) ∷ r) h
   with sameSource (toℕ i) s in eqs | u ≟ᵗ lookup Γ i
-     | ∧-true (sinkAbove? s p) (regStrat? r) h
+     | ∧-true ((n ≤ᵇ s) ∨ sinkAbove? s p) (regStrat? r) h
 ... | false | _        | _  , hr = fan-chain-strat i r hr
 ... | true  | no _     | _  , hr = fan-chain-strat i r hr
 ... | true  | yes refl | hp , hr =
-      ∧-intro (subst (λ z → sinkAbove? z p ≡ true)
-                     (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs))) hp)
+      ∧-intro (subst (λ b → b ∨ sinkAbove? (toℕ i) p ≡ true) (floorFalse i)
+                     (subst (λ z → (n ≤ᵇ z) ∨ sinkAbove? z p ≡ true)
+                            (sym (≡ᵇ⇒≡ (toℕ i) s (T-to eqs))) hp))
               (fan-chain-strat i r hr)
 
 -- ONE CHAIN'S DEPTH OUT OF THE SELECTION'S JOIN.  The cascade-level
@@ -1512,11 +1534,11 @@ postulate
     nestOK? e sl id sched st ≡ true
 
 -- THE STRATIFICATION RECEIPT, TAKEN AT THE STATE THE WALK IS STANDING
--- ON.  It says the registry holds no entry whose continuation ends at
--- or below the input it was minted subscribing, which is what bounds
--- the fan-out's escalation by the PROGRAM: a sink hop strictly climbs
--- the slot telescope, so no chain is re-entered through its own sink
--- and the hop count cannot exceed the slot count.
+-- ON.  It says the registry holds no slot-sourced entry whose
+-- continuation ends at or below the input it was minted subscribing,
+-- which is what bounds the fan-out's escalation by the PROGRAM: a sink
+-- hop strictly climbs the slot telescope, so no chain is re-entered
+-- through its own sink and the hop count cannot exceed the slot count.
 --
 -- AND ITS CONCLUSION NAMES NO CAP, WHICH IS THE WHOLE REASON IT IS
 -- AVAILABLE WHERE THE FOUR CARRIED PREDICATES ARE NOT.  The
