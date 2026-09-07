@@ -16,6 +16,9 @@ open import Refuted.Anchor
          round3-anchor-indexed-absurd)
 open import Refuted.Wet
   using (wet-ceiling-absurd; wet-ell-absurd)
+open import Refuted.Walk-Entry-Strat
+  using (okₛ; badPath-unstratified; goodPath-stratified; badVal-unstratified;
+         walk-path-strat-absurd; walk-vals-strat-absurd)
 open import Refuted.Hop-Drag
   using (hop-drag-absurd)
 open import Refuted.Cut-Through

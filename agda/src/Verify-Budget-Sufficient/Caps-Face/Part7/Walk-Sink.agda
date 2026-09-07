@@ -84,15 +84,40 @@ open import Verify-Budget-Sufficient.Caps-Face.Part7.Ring-Vocabulary using
 -- seven other hypotheses are rearrangements of the round package;
 -- these two are not.
 --
--- SO ONE PAIR OF LEAVES SERVES BOTH, and that is the finding rather
--- than a convenience.  Both are stated against the STATE receipt, for
--- the same reason the frame's hop is -- a registration's path is
--- built from the observable that was subscribed and an arrival's
--- value is held by a live source, so both live in the store, and
--- `capsOK?` is the store's receipt.  One stratification conjunct on
--- the invariant record turns all three of this module's leaves into
--- projections, which is why they are stated at one premise: they are
--- discharged together or not at all.
+-- AND A CONJUNCT ON THE RECEIPT CANNOT REACH EITHER OF THEM, which is
+-- what separates this pair from the frame's hop rather than joining
+-- them to it.  The receipt names the caps, the schedule and the state;
+-- the path and the values are quantified AFTER it and appear in no
+-- hypothesis.  So each statement says "if `capsOK?` is satisfiable at
+-- all, every path (every value) is stratified", and no strengthening
+-- of a predicate over the store changes a word of that -- the
+-- quantifier, not the receipt's contents, is what is wrong.
+--
+-- WHAT THE RESTATEMENT OWES IS A MEMBERSHIP PREMISE, not a stronger
+-- receipt: the path and the values have to be tied to the store the
+-- receipt is about, and both entries can supply the tie -- the ring
+-- from its admitted registration, the cascade from its live source.
+-- A store conjunct is then what the membership is spent AGAINST, so it
+-- is still owed; it is just not sufficient on its own.  The frame's
+-- hop is the contrasting case and is repairable by a conjunct alone,
+-- because the value it is missing is a store node its hypotheses
+-- already reach.
+--
+-- REFUTED: `Refuted.Walk-Entry-Strat.walk-path-strat-absurd` kills the
+--   free path form at one frame over a sink -- a `map` whose template
+--   names input one, ending at slot nought, whose floor is nought --
+--   against the receipt taken at the INITIAL state of a two-slot
+--   program, where `okₛ` computes it. The telescope's own
+--   stratification does not reach it: `shared` constrains a slot's
+--   DEF, and a path's frames are not any slot's def.
+-- REFUTED: `Refuted.Walk-Entry-Strat.walk-vals-strat-absurd` kills the
+--   free value form INDEPENDENTLY, at a path that is itself
+--   stratified -- a bare sink, pinned -- so it is a second defect and
+--   not a corollary. `Val Γ (obs t)` is an arbitrary closed
+--   expression, so nothing about the telescope constrains what an
+--   entered value may name.
+--   Not covered: whether any membership premise the two entries can
+--   actually supply is enough, which is the restatement's own question.
 postulate
   walk-path-strat : ∀ {n} {Γ : Ctx n} {t} {e : Closed Γ t} {u}
     (c : Caps) (p : Path Γ u t) (sched : Sched Γ) (st : EvalSt e) →

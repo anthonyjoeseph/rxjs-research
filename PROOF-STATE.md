@@ -215,17 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **SEALING THE STRATIFICATION READING, WHICH ITS COST SAYS IS OWED
-  BEFORE THE RECORD CONJUNCT.** The reading landed and the walk's
-  bundle carries it, but the predicates behind it are TRANSPARENT and
-  sit inside a recursive premise, so they normalise at every
-  application of every statement carrying one — a measure landing in
-  types. The leg is `abstract` over them plus the one equation the hop
-  step spends, proven inside the block, and a measurement attributing
-  the cost to a face rather than to a cone. Then the conjunct the
-  three leaves converge on: a `scan-f` folds against a value in the
-  STORE that no path predicate reaches, so it is owed on the state
-  receipt where every producer pays it.
+- **TYING THE WALK'S ENTRY TO THE STORE, NOW THAT A CONJUNCT ALONE IS
+  KNOWN NOT TO.** Two of the three stratification leaves are refuted:
+  each quantifies its subject AFTER a receipt naming only the store, so
+  no strengthening of that receipt reaches it. The leg restates both
+  against a MEMBERSHIP premise the two entries can actually supply, the
+  ring from its admitted registration and the cascade from its live
+  source, and carries the restatement through the entry tuple that
+  spends them. The store conjunct is still owed — it is what the
+  membership is spent against, and what the hop leaf, which no
+  refutation touches, needs on its own.
 
 - **PRICING A FANNED CHAIN IN SOMETHING THAT IS NOT A CAP, where every
   route under `fan-regsSz` now converges.** Five closed routes leave
@@ -256,16 +255,6 @@ does not fit is a finding about the shared statement, not about the head.
   does to the chain's stratification reading, the one reading a walk cannot
   transport. A `scan-f` folds against a value in the STORE, which no path
   predicate reaches and the premised state receipt does not yet read.
-- **`walk-vals-strat`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the values
-  a walk is entered with, read at the chain's own floor. Six of the bundle's
-  hypotheses rearrange the round package and this does not: the ring enters at
-  a registration and the cascade at an arrival, and both values are the
-  store's.
-- **`walk-path-strat`** (Part7/Walk-Sink) — FALSITY, `NO EVIDENCE`: the same
-  premise for the path, whose frames carry the syntax of whatever pushed them.
-  Registered or arriving, a chain's path is built from an observable the store
-  holds, so one record conjunct settles this, its value twin and the hop
-  together.
 - **`walk-frame-drain-entries`** (Part7/Walk-Sink) — FALSITY,
   `REFUTED×2, DEAD ROUTE, TWIN, PROBED×2`: the per-entry tuple the `from-inner`
   drain owes, the wrapper's ceiling now minted from the frame's own room. Both
@@ -325,6 +314,14 @@ does not fit is a finding about the shared statement, not about the head.
   store half of that step, carried APART from the values half so that no
   ceiling has to cross a step at all; the position's ceiling is rebuilt from
   the two ingredients where it is spent.
+- **`walk-path-strat`** (Part7/Walk-Sink) — SHAPE, `REFUTED×2`: the path a walk
+  is entered with, read at its own floor. The free form is dead: the path is
+  quantified after a receipt naming only the store, so no conjunct reaches it.
+  A membership premise is what is owed, and both entries can supply one.
+- **`walk-vals-strat`** (Part7/Walk-Sink) — SHAPE, `REFUTED×2`: its value twin,
+  refuted INDEPENDENTLY at a path that is itself stratified — an entered value
+  is an arbitrary closed expression, so the telescope constrains nothing. The
+  same membership premise settles both, and the hop still wants the conjunct.
 - **`scanΦ-fit`** (Part7/Depth-Fit) — SHAPE, `DEAD ROUTE`: the producing side
   of the fold's grant. THE MECHANISM IS DEAD, NOT A DENOMINATION: a flat
   per-instant potential cannot dominate a count exponential in itself; the one
