@@ -248,9 +248,20 @@ record Walk-Hyps {n} {Γ : Ctx n} {t} (e : Closed Γ t) (S W R d : ℕ) : Set₁
     -- the chain list — so at a face whose own reading is a fold over the
     -- payload, every recursive site now nests a fold in a fold.  That is
     -- read off the statements rather than measured, and the standing
-    -- alternative is the record projection; separating the two is what
-    -- the next measurement is for, and the figures live in
+    -- alternative is the record projection.  The figures live in
     -- `typecheck-performance-numbers.md`.
+    --
+    -- DEAD ROUTE: SEALING THE FIELD AT THE FACE DOES NOT RECOVER IT, so
+    --   neither candidate survives as a sufficient one.  An `abstract`
+    --   wrapper over the burst ledger — the field bound to an opaque
+    --   head, with the two projections, the widening and the fan's
+    --   distribution proven inside the block, since a sealed head is no
+    --   longer syntactically constant in the chain and the free
+    --   distribution stops matching — still ran past the dev budget on a
+    --   warm cache, against a pre-index baseline that completed well
+    --   inside it.  An opaque head is exactly what keeps a body out of
+    --   the generated types, so whatever is being paid for is not the
+    --   ledger's body reaching them.
     Vb : ∀ {u} → Path Γ u t → ℕ → ∀ {s} → List (Val Γ s) → Bool
 
     -- BURST LEDGERS: an abstract Bool over the accumulated protocol events

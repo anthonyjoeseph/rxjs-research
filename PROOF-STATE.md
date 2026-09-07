@@ -215,16 +215,16 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **PAYING FOR THE CHAIN INDEX ON THE FACE THAT IGNORES IT.** The index
-  is in, and the SHAPE risk is discharged: the generic and the caps face
-  are green, `chP?-const` carrying every face with nothing to say about
-  the chain. The burst face's check went up by a multiple, and the
-  attribution is now a candidate rather than a claim: the index turned
-  three loop premises from one Bool into an `all` over the chain list, so
-  a face whose own reading is a fold nests one. Next is the measurement
-  separating that from the record projection, then the repair it names —
-  most likely splitting the ledger so only the small per-chain half sits
-  inside the fold. The mint's fifth site waits on it.
+- **GETTING THE BURST FACE BACK INTO THE DEV LOOP.** The chain index is
+  in and its SHAPE risk is discharged, `chP?-const` carrying every face
+  with nothing to say about the chain. What is left is a tooling loss,
+  not an attribution: the measurement that was to separate the two cost
+  candidates KILLED BOTH, and is recorded dead in the field's own
+  header. So the face's only surviving loop is the gate, and the commit
+  SPLITS it at its non-cycle boundaries — safe by the loop's own
+  criterion, since it holds no mutual cycle — because nothing else on
+  this face, the next measurement and the mint's fifth site included, is
+  payable until it measures in seconds again.
 
 - **THE DELIVERED SUMMAND AT THE ROW'S OWN BUDGET, which is the one
   region the split's evidence declines to reach.** `burst-regs-split`
