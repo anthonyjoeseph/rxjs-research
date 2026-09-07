@@ -82,6 +82,29 @@ LEDGER of one-line hooks; everything else lives in the code.
   backlog. The budget is several times a row's, because a leg carries its own
   reasoning and a group has no header to send research to; past it, the leg has
   stopped saying why this group is next and started proving it.
+- **A TIER MAY OPEN AN `### Open questions` SECTION, AND IT IS NOT A SECOND
+  ROADMAP (Anthony).** A question is what the tier does not yet KNOW that
+  several of its FALSITY rows are all waiting on — the thing a row cannot
+  say, because a row is about one statement and the uncertainty is shared.
+  So it names at least two, and answering one moves all of them at once.
+  It is capped at three for the roadmap's reason: past that the entries are
+  rows wearing headings, or two phrasings of one question.
+  **BUT IT IS NOT REQUIRED TO MOVE, AND NOT REQUIRED AT ALL.** A leg is a
+  commit, so it moves with every commit; a question outlives many, and
+  forcing one to change per commit would produce a rewritten question rather
+  than an answered one. Nor is the section mandatory per tier — a required
+  question is a filler question, exactly as a required `TWIN:` is filler,
+  and filler here is worse than blank because it reads as research.
+  **WHAT IS HELD INSTEAD IS THE `relevant:` LINE, and `make roadmap-check`
+  enforces it.** Every name on it must still be a LIVE postulate, must be a
+  row of that same tier, and must still be FALSITY. Nothing else would
+  notice this section aging, so that list is the one thing kept current: a
+  name off the ledger means the question is answered or its row was
+  restated, and a row that has come down out of FALSITY means the
+  uncertainty is settled there. When nothing risky is left under a question,
+  the question goes. The list is FREE of the prose budget, so a question is
+  never shortened by dropping a postulate from it — the same asymmetry the
+  rows carry, for the same reason.
 - **EVERY TIER IS SORTED RISKIEST-FIRST, AND THE SORT IS AN INVARIANT —
   NOT A ONE-TIME TIDY.** Within a tier, rows appear
   in risk-class order: FALSITY, then SHAPE, then VACUITY, then DIFFICULTY,
@@ -248,6 +271,42 @@ does not fit is a finding about the shared statement, not about the head.
   bottom-up on a coherent cache and deletes the findings resting on the
   ones that fall — the expensive half, since a diagnosis outlives the
   number it came from.
+
+### Open questions
+
+- **CAN A PREDICATE OVER THE PATH SEE WHAT LIVES IN THE STORE?** Six rows
+  fail in one place: the statement reads a PATH or a chain, and the quantity
+  it must bound is a cell in the STORE. A `scan-f` carries a `NodeId`, so
+  the value it folds against is not in the syntax at all and no reading of
+  the term reaches it. The standing ruling says a missing invariant goes in
+  the RECORD and never in a signature — but a conjunct there must survive
+  `stepFrame`, and that is exactly where two of these are refuted. So the
+  question is not whether to add it; it is whether ANY store conjunct is
+  preserved by the step, or whether the step is where the reading has to be
+  re-established rather than transported.
+  relevant: `walk-strat-step`, `step-frame-store≤`, `share-fold-store≤`, `subscribeE-sz-store-scan`, `pushBurst-sz-store-outer`, `subscribeSharedSlot-sz-store`
+
+- **IS THERE A COMPUTABLE SHADOW OF THE SEALED FACES?** Three rows say in
+  their own headers that they cannot be instantiated — the cap does not
+  return, the climb bound is sealed, the fold's doubling closes the
+  conclusion. That sealing is what makes the tower checkable, so it is not
+  removable per row. It leaves a block of this tier whose class evidence can
+  only RAISE and never lower: a refutation still lands, a probe cannot be
+  written. The question is whether a weaker family exists that REDUCES and
+  whose truth would imply these, because absent one they reach a proof only
+  by being proven, and nothing de-risks them first.
+  relevant: `walk-frame-drain-entries`, `subscribeE-sz`, `share-fold-fit`
+
+- **WHAT PRICES A REGISTERED CHAIN, AND WHERE IS THE RECEIPT OWED?** Five
+  closed routes under `fan-regsSz` name one residue: no cap prices a
+  registered chain, and the stratified climb counts hops where the receipt
+  counts frames. Two siblings reach the same place from the other side —
+  each dies in its free form at one `register`, so each is owed AT THE MINT
+  rather than along the walk. The question is what the factor can be
+  denominated in when neither a cap nor the telescope will pay it, and
+  whether the answer is a denomination at all or a mechanism that
+  establishes the receipt where the chain is created.
+  relevant: `fan-regsSz`, `sink-fan-sink`, `walk-share-strat`
 
 ### The ledger
 

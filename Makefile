@@ -842,6 +842,53 @@ roadmap-selftest:
 	    && { echo "SELFTEST FAIL: a row at the cap EXACTLY was reported — a coverage lattice is legitimate up to the cap"; fail=1; }; \
 	  echo "$$cln" | grep -q "OVER THE RECEIPT CAP" \
 	    && { echo "SELFTEST FAIL: the cap fired on a clean roadmap — a row with TWIN×9 is being charged, and only PROBED is capped"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-good.md > /dev/null 2>&1 \
+	    || { echo "SELFTEST FAIL: a well-formed OPEN QUESTIONS section was rejected, or a tier carrying none at all was — the section is optional when absent and the cap is not a quota"; fail=1; }; \
+	  scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-good.md 2>&1 \
+	    | grep -q "OPEN QUESTIONS" \
+	    && { echo "SELFTEST FAIL: a question whose relevant list WRAPPED was reported — a wrapped ledger line is being charged as prose and its names never checked"; fail=1; }; \
+	  qmy=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-many.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-many.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a tier naming FOUR open questions PASSED — the cap is dead"; fail=1; \
+	  fi; \
+	  echo "$$qmy" | grep -q "^  Tier 0  4 question(s), wanted at most 3" \
+	    || { echo "SELFTEST FAIL: the over-capped tier was not NAMED with its found and wanted counts"; fail=1; }; \
+	  echo "$$qmy" | grep -q "OVER BUDGET" \
+	    && { echo "SELFTEST FAIL: a budget check fired on questions-many.md, so it does not isolate the COUNT"; fail=1; }; \
+	  qth=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-thin.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-thin.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a question over ONE postulate PASSED — a row wearing a heading is a question again"; fail=1; \
+	  fi; \
+	  echo "$$qth" | grep -q "THE-SINGLETON-question" \
+	    || { echo "SELFTEST FAIL: the singleton question was not NAMED"; fail=1; }; \
+	  echo "$$qth" | grep -q "WELL-FORMED-QUESTION" \
+	    && { echo "SELFTEST FAIL: a question naming two postulates was reported thin"; fail=1; }; \
+	  qft=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-fat.md 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-fat.md > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a question carrying its own answer PASSED — the question budget is dead"; fail=1; \
+	  fi; \
+	  echo "$$qft" | grep -q "OPEN QUESTIONS OVER BUDGET" \
+	    || { echo "SELFTEST FAIL: the over-budget question was not reported"; fail=1; }; \
+	  echo "$$qft" | grep -q "THE-within-budget-question" \
+	    && { echo "SELFTEST FAIL: a question was charged for its relevant list — the ledger line is FREE, so shortening would mean dropping a postulate"; fail=1; }; \
+	  echo "$$qft" | grep -q "TOO FEW POSTULATES" \
+	    && { echo "SELFTEST FAIL: the name-count check fired on questions-fat.md, so it does not isolate the budget"; fail=1; }; \
+	  qst=$$(scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-stale.md \
+	           --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	           --src-names scripts/roadmap-selftest/src-names.txt 2>&1); \
+	  if scripts/check-roadmap.py --file scripts/roadmap-selftest/questions-stale.md \
+	       --ledger scripts/roadmap-selftest/ledger.txt --census scripts/roadmap-selftest/census.txt \
+	       --src-names scripts/roadmap-selftest/src-names.txt > /dev/null 2>&1; then \
+	    echo "SELFTEST FAIL: a question naming a discharged row and a no-longer-FALSITY row PASSED — the one thing this section is held to is dead, and nothing else would notice it aging"; fail=1; \
+	  fi; \
+	  echo "$$qst" | grep -q "zz-off-the-ledger. — not a live postulate" \
+	    || { echo "SELFTEST FAIL: a relevant name that left the ledger was not reported"; fail=1; }; \
+	  echo "$$qst" | grep -q "b-shape. — its row is SHAPE, not FALSITY" \
+	    || { echo "SELFTEST FAIL: a relevant name whose row is no longer FALSITY was not reported"; fail=1; }; \
+	  echo "$$qst" | grep -q "a-falsity. —" \
+	    && { echo "SELFTEST FAIL: a live FALSITY row of the tier was reported stale"; fail=1; }; \
+	  echo "$$cln" | grep -q "OPEN QUESTIONS" \
+	    && { echo "SELFTEST FAIL: a questions check fired on a roadmap carrying NO questions section — the section is mandatory again, and a required question is a filler question"; fail=1; }; \
 	  if [ $$fail -eq 0 ]; then echo "roadmap-selftest: OK"; else exit 1; fi
 
 # `imports-check` JOINS THIS LIST IN THE COMMIT THAT MAKES THE TREE PASS IT, and

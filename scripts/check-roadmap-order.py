@@ -89,7 +89,7 @@ def claimed_names(tiers, classes):
     """
     rm = _CR
     out = {}
-    for tier, rows, _pre, _legs in tiers:
+    for tier, rows, _pre, _legs, _qs in tiers:
         for label, cls, _lineno, _cost in rows:
             if cls not in classes or not rm.is_claim_head(label):
                 continue
