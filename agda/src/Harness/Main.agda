@@ -82,6 +82,7 @@ open import Verify-Budget-Sufficient.Nest-Store using (nestUnit; slotWrapSum;
 open import Verify-Budget-Sufficient.Nest-Walk using (nodesMax)
 open import Verify-Budget-Sufficient.Caps-Face.Nest-Arith using (nestWalkAt;
   capΦAt; nestΦAt)
+open import Verify-Budget-Sufficient.Caps-Face.Part7.Depth-Fit using (regStrat?)
 
 ------------------------------------------------------------------
 -- THE CALIBRATION PIN.  `towerℕ` is the one member of this
@@ -470,6 +471,138 @@ fuelAtˢ 2 = 3
 fuelAtˢ 3 = 6
 fuelAtˢ _ = 12
 
+------------------------------------------------------------------
+-- SERIES — THE ARM THE SINK CENSUS ABOVE DECLARED UNREACHED: a
+-- registration minted out of a DELIVERED observable.
+--
+-- TARGET: walk-share-strat @cddd82
+--
+-- WHY THIS ARM AND NOT ANOTHER.  The stratification reading is owed at
+-- five registration sites and the subscribe descent reaches four of
+-- them, where the guard the reading wants falls out of the def's own
+-- `inputsBelowᵉ` field.  The fifth is this one: a flatten frame inside
+-- a share's def subscribes an observable that arrived as a VALUE, and
+-- `Val Γ (obs t)` is an arbitrary closed expression, so the syntax the
+-- telescope checked never contained the inputs now being registered.
+-- Nothing has ever instantiated it -- the census above says in writing
+-- that every entry it prints is slot-sourced through the descent.
+--
+-- WHAT THE ROWS ARE FOR.  Not the arithmetic: the question is whether
+-- a REAL run reaches this site at all, and what the registry holds
+-- when it does.  The program is built to force it -- slot one is
+-- `obs`-typed and emits the observable `input 0`, slot two flattens
+-- slot one -- so the source-zero entry the census prints can only have
+-- been minted from the delivered value, slot two's own def naming no
+-- input but slot one.
+--
+-- LOAD-BEARING, AND THE SEPARATION IS AT INSTANT ONE.  The two
+-- telescopes differ in ONE place -- what slot one's map returns -- so
+-- the delivery is the only axis between the runs.  At the SUBSCRIBE
+-- frame they agree, three entries each, because a hot's emissions are
+-- scheduled and nothing has been delivered yet; the arm is reached one
+-- instant later, where the delivered run gains exactly one entry and
+-- the control gains none.  Two failure modes the rows would have shown:
+-- the same census at both instants would mean the entries are the
+-- descent's own registrations and not this arm's, and both runs losing
+-- their entries would mean the axis is the share COMPLETING rather than
+-- the delivery -- which is what a one-shot delivering def did before
+-- the map replaced it.
+--
+-- WHAT THEY DO NOT REACH.  One layer of flattening, so nothing about
+-- an observable delivered THROUGH a delivered observable; one shape of
+-- delivering def, a map off a hot, so nothing about an observable
+-- built by a fixpoint or held across a defer; and one arrival, the
+-- hot's first scheduled emission, so a registration minted later than
+-- its script is uncovered.  The third instant of each sweep is
+-- DEGENERATE and printed only to show where the run ends: the hot is
+-- exhausted, its entries are dropped, and the reading is `all` over an
+-- empty registry, so it holds whatever the arm does.
+--
+-- ⚠ measured-not-rechecked, like every row in this module.
+------------------------------------------------------------------
+
+Γᵈ : Ctx 3
+Γᵈ = natᵗ ∷ⱽ obs natᵗ ∷ⱽ natᵗ ∷ⱽ []ⱽ
+
+-- what slot one delivers, and it is the ONLY axis between the two
+-- telescopes below: an observable naming a live input, against one
+-- naming nothing.
+liveᵈ : Fn Γᵈ [] [] [] natᵗ (obs natᵗ)
+liveᵈ = strmᵗ (input fzero)
+
+deadᵈ : Fn Γᵈ [] [] [] natᵗ (obs natᵗ)
+deadᵈ = strmᵗ emptyᵉ
+
+-- slot one is the one that matters: `obs`-typed, so what it delivers is
+-- an EXPRESSION, and the `ok` field only ever saw the expression's own
+-- syntax.  Slot two names slot one and nothing else, which is what
+-- makes a source-zero registration attributable to the delivery.  Both
+-- slots emit through a MAP off the hot rather than through a one-shot,
+-- which is what keeps the share alive across the axis: a def that
+-- completes inside its own connect registers nothing at all, and a
+-- control degenerate that way would separate on completion rather than
+-- on the delivery.
+slᵈ : Slots Γᵈ
+slᵈ fzero               = scripted (hot ((after 0 , 1) ∷ (after 2 , 2) ∷ []))
+slᵈ (fsuc fzero)        = shared (mapᵉ liveᵈ (input fzero))
+slᵈ (fsuc (fsuc fzero)) = shared (mergeAllᵉ nothing (input (fsuc fzero)))
+
+slᶜ : Slots Γᵈ
+slᶜ fzero               = scripted (hot ((after 0 , 1) ∷ (after 2 , 2) ∷ []))
+slᶜ (fsuc fzero)        = shared (mapᵉ deadᵈ (input fzero))
+slᶜ (fsuc (fsuc fzero)) = shared (mergeAllᵉ nothing (input (fsuc fzero)))
+
+eᵈ : Closed Γᵈ natᵗ
+eᵈ = input (fsuc (fsuc fzero))
+
+-- the run has to be DRIVEN, and that is forced rather than chosen: a
+-- hot's emissions are scheduled, so at the subscribe frame slot one has
+-- delivered nothing and the flatten has had nothing to subscribe.  The
+-- arm is a later-instant arrival by construction, which is also why the
+-- census above could not have reached it.
+stepᵈ : Sched Γᵈ × EvalSt eᵈ → Sched Γᵈ × EvalSt eᵈ
+stepᵈ (sd , st) with sched-next sd
+... | inj₁ _       = sd , st
+... | inj₂ (a , s) = let r = cascade a 1 s st in proj₁ (proj₂ r) , proj₂ (proj₂ r)
+
+driveᵈ : ℕ → Slots Γᵈ → Sched Γᵈ × EvalSt eᵈ
+driveᵈ n sl = go n (let r = subscribeE gasᴴ eᵈ root 0 0
+                              (sched-init eᵈ sl) (st-init eᵈ)
+                    in proj₁ (proj₂ r) , proj₂ (proj₂ r))
+  where
+  go : ℕ → Sched Γᵈ × EvalSt eᵈ → Sched Γᵈ × EvalSt eᵈ
+  go 0       x = x
+  go (suc k) x = go k (stepᵈ x)
+
+regsᵈ : ℕ → Slots Γᵈ → List (RegId × Source × Chain Γᵈ natᵗ)
+regsᵈ k sl = EvalSt.registry (proj₂ (driveᵈ k sl))
+
+pathSinkᵈ : ∀ {s} → Path Γᵈ s natᵗ → Maybe (Fin 3)
+pathSinkᵈ root           = nothing
+pathSinkᵈ (share-sink i) = just i
+pathSinkᵈ (f ↠ p)        = pathSinkᵈ p
+
+regRowᵈ : RegId × Source × Chain Γᵈ natᵗ → String
+regRowᵈ (_ , src , (_ , p)) =
+  "  [src " ++ show src ++ " → " ++ termˢ (pathSinkᵈ p) ++ "]"
+
+-- the verdict is the REAL predicate rather than a reading of it
+-- restated here, so a statement that moves takes this row with it
+stratᵈ : ℕ → Slots Γᵈ → String
+stratᵈ k sl = if regStrat? (regsᵈ k sl) then "true" else "false"
+
+censusᵈ : String → Slots Γᵈ → ℕ → String
+censusᵈ tag sl k = tag ++ "@" ++ show k ++ ": "
+                 ++ show (length (regsᵈ k sl)) ++ " entries"
+                 ++ foldr _++_ "" (map regRowᵈ (regsᵈ k sl))
+                 ++ "  regStrat? = " ++ stratᵈ k sl
+
+deliveredRow : ℕ → String
+deliveredRow = censusᵈ "delivered" slᵈ
+
+controlRow : ℕ → String
+controlRow = censusᵈ "control" slᶜ
+
 rowAt : ℕ → String
 rowAt 0 = "CALIBRATION towerℕ 4 (refl-pinned 65536 in this module) = "
             ++ show calibration
@@ -543,13 +676,16 @@ rowAt 18 = "nodesMax@0..4 = " ++ show (nodesMax (proj₂ (driveH 0)))
 -- one to seven, 30 to 33 as the small-dial layers zero to three, 34 as
 -- the sink census and 35 to 38 as the hop walk's four fuels --
 -- dispatched by arithmetic because a numeric literal PATTERN at 20
--- expands to twenty constructors
+-- expands to twenty constructors; 39 to 41 are the delivered-observable
+-- census at instants zero to two and 42 to 44 its control
 rowAt 19 = wideRow 0
 rowAt n = if n ≤ᵇ 22 then wideRow (n ∸ 19)
           else if n ≤ᵇ 29 then burstRow (n ∸ 22)
           else if n ≤ᵇ 33 then smallRow (n ∸ 30)
           else if n ≤ᵇ 34 then regsRow
-          else if n ≤ᵇ 38 then hopRow (fuelAtˢ (n ∸ 34)) else "(no such row)"
+          else if n ≤ᵇ 38 then hopRow (fuelAtˢ (n ∸ 34))
+          else if n ≤ᵇ 41 then deliveredRow (n ∸ 39)
+          else if n ≤ᵇ 44 then controlRow (n ∸ 42) else "(no such row)"
 
 main : IO Unit
 main = getContents >>= λ s →
