@@ -575,6 +575,20 @@ arr-chains-bursts sl id a nextId sched st sleq cok hpz hvc hcl hdp =
 --   the ceiling is calibrated against -- a limit-one mergeAll over
 --   three inners, read at the second cascade, whose descent climbs six
 --   per fold layer against the bare sum's four.
+-- DEAD ROUTE: re-threading a slacker `S` so that a proven monotonicity
+--   carries an entry row forward cannot close the coverage gap above,
+--   and the reason is that the gap is on the wrong side of the
+--   statement.  The round already threads a cap-denominated `S`
+--   unchanged across its chains and already re-establishes the store
+--   premise at each stepped state, by `chainStep-store≤`, which is
+--   proven.  So the premise was never what the rows could not reach.
+--   What they cannot reach is the CONCLUSION, whose subject is the
+--   state itself: nothing transports `depthChain` from a state to one
+--   a chain has stepped, and every consumer in this family takes the
+--   descent bound as a HYPOTHESIS rather than establishing it, so
+--   there is no monotonicity to borrow.  Slackening `S` only weakens a
+--   premise that is already discharged, and moves no risk off this
+--   leaf onto the round.
 -- PROBED: `Probed.Depth-Sighted` reads this side at the second cascade
 --   along both axes -- fold depths two and eight, delivered counts two,
 --   six and twenty -- and at the width family that drains nothing.
