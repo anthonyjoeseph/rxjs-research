@@ -238,18 +238,6 @@ does not fit is a finding about the shared statement, not about the head.
 
 ### Big picture tier roadmap
 
-- **AFFORDING ONE FRAME STEP IN THE Φ PRICING, which is what the
-  registry question turned out to be.** The currency search is over:
-  `register-caps` prices a mint at exactly one step, `capsOK?-regs`
-  already delivers the conclusion at whatever level the reading is
-  held, and the connect path puts a mint inside the ordinary fan — so
-  nothing about registries is unproven and the entry-cap reading is
-  unavailable rather than merely unwritten. That leaves one number.
-  The commit takes `pathΦF`'s sink clause at a single step and either
-  finds the exponent affordable there — the whole row falls out of
-  proven parts if it is — or pins WHICH factor overruns, so the
-  refutation can be written against a quantity instead of a route.
-
 - **RE-MEASURING EVERY MODULE THIS TIER RECORDS AS OVER BUDGET, because
   three of them just turned out not to be.** The numbers file marks a
   budget-killed run as a FLOOR, and a floor taken against an unbuilt
@@ -273,6 +261,17 @@ does not fit is a finding about the shared statement, not about the head.
   below a minted source's, which is the region that killed the free
   forms, and every row ends at a receipt or a refutation rather than
   where it started.
+
+- **WALKING AN ADMITTED CHAIN AT THE LEVEL IT WAS REGISTERED AT, which
+  is the one door the pricing leaves open.** Both ends are closed by
+  arithmetic now, and `fan-regsSz`'s header carries which: the fan can
+  reach neither the entry-cap receipt nor the stepped one. What
+  neither end touches is the fan's own choice to re-enter a chain from
+  the instant's TOP. A chain re-entered at the level it was registered
+  at needs exactly the receipt `register-caps` left behind. The commit
+  asks what the walk must carry for that to be stateable, and whether
+  the depth measure still decreases when a chain is entered below the
+  top — the mechanism question the currency search stood in for.
 
 ### Open questions
 

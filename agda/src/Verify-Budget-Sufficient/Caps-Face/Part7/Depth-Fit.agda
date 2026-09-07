@@ -1345,6 +1345,14 @@ postulate
 -- DEAD ROUTE: that INDEXED form itself, and it dies on the same
 --   arithmetic as the flat raise -- by ONE step of the recurrence
 --   rather than at some threshold, so no ceiling is small enough.
+--   The quantity, since "one step" is the whole claim: `sizeStep`
+--   sends a size to itself times one more than twice itself, so a
+--   single step carries the cap to roughly twice its square, and
+--   `pathΦF`'s sink clause raises two to the cap times a successor of
+--   it times itself.  The exponent is therefore CUBIC in the cap
+--   before the step and SIXTH-POWER after it -- a ratio that is
+--   itself exponential, not a constant or a polynomial factor, which
+--   is why no ceiling and no per-entry indexing closes it.
 --   What a size receipt actually buys the Φ pricing is a LENGTH, via
 --   `pathSz?-len`, and the length lands in an EXPONENT: a sink's own
 --   factor is two to the cap times a square of it, and a fanned chain
