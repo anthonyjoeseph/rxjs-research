@@ -94,15 +94,27 @@ entStrat? {n = n} s p = ((n ≤ᵇ s) ∨ (s ≤ᵇ pathFloor p)) ∧ pathStrat?
 -- observable that arrived as a VALUE, and `Val Γ (obs t)` is arbitrary
 -- closed syntax the telescope never checked.
 --
--- AND THE RECEIPT IS WHAT IS SUSPECT NOW THAT THE GUARD IS PINNED.
--- `capsOK?` carries a length ledger over the registry and nothing
--- about stratification, so what is being asserted is that a state
--- satisfying the cap reading is one the evaluator could have BUILT --
--- which no conjunct of that reading says.  If it turns out false, the
--- repair is a conjunct on the state predicate rather than a weaker
--- statement here: a producer obligation, cascading through every site
--- that builds a state, is the cost of the fact being true.
+-- AND THE RECEIPT IS NOT ONE, WHICH IS A FACT RATHER THAN A DOUBT.
+-- `capsOK?` prices the registry by LENGTH and by per-chain SIZE, and
+-- reads no frame and no source, so it cannot separate a state the
+-- evaluator built from one holding a chain that reads the very slot
+-- its own sink sits at.  The caps are universally quantified, so a
+-- counterexample picks them generous and both registry conjuncts fall
+-- out at a one-entry registry.  What the statement below asserts is
+-- therefore that a caps-legal state is a BUILT one, which no conjunct
+-- of that reading says.
 --
+-- SO THE FACT IS OWED AT THE MINT, which is where the two siblings
+-- this reading was to be handed to are already owed theirs.  The
+-- repair is neither a weaker statement here nor a bigger cap: it is a
+-- conjunct on the state predicate, obliging every producer, and
+-- cascading it through the faces that re-establish that predicate is
+-- the cost of the fact being true rather than a reason to avoid it.
+--
+-- REFUTED: `Refuted.Fan-Chain-Registry`, at a one-slot program whose
+--   registration reads its own sink's slot.  The FRAME half is what
+--   fails there, so the row stands wherever the guard sits and did
+--   not die with the repair that moved it.
 -- DEAD ROUTE: a free path quantified after the receipt cannot be
 --   asked for at all, and the refutation of that form is recorded at
 --   `cascade-admit-sink`'s own site -- which is why the subject here
